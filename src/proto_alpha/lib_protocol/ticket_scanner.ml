@@ -124,9 +124,9 @@ module Ticket_inspection = struct
     | Chain_id_key -> (k [@ocaml.tailcall]) False_ht
     | Address_key -> (k [@ocaml.tailcall]) False_ht
     | Tx_rollup_l2_address_key -> (k [@ocaml.tailcall]) False_ht
-    | Pair_key (_, _, _) -> (k [@ocaml.tailcall]) False_ht
-    | Union_key (_, _, _) -> (k [@ocaml.tailcall]) False_ht
-    | Option_key (_, _) -> (k [@ocaml.tailcall]) False_ht
+    | Pair_key (_, _, _, YesYes) -> (k [@ocaml.tailcall]) False_ht
+    | Union_key (_, _, _, YesYes) -> (k [@ocaml.tailcall]) False_ht
+    | Option_key (_, _, Yes) -> (k [@ocaml.tailcall]) False_ht
 
   (* Short circuit pairing of two [has_tickets] values.
      If neither left nor right branch contains a ticket, [False_ht] is
@@ -289,9 +289,9 @@ module Ticket_collection = struct
     | Chain_id_key -> (k [@ocaml.tailcall]) ctxt acc
     | Address_key -> (k [@ocaml.tailcall]) ctxt acc
     | Tx_rollup_l2_address_key -> (k [@ocaml.tailcall]) ctxt acc
-    | Pair_key (_, _, _) -> (k [@ocaml.tailcall]) ctxt acc
-    | Union_key (_, _, _) -> (k [@ocaml.tailcall]) ctxt acc
-    | Option_key (_, _) -> (k [@ocaml.tailcall]) ctxt acc
+    | Pair_key (_, _, _, YesYes) -> (k [@ocaml.tailcall]) ctxt acc
+    | Union_key (_, _, _, YesYes) -> (k [@ocaml.tailcall]) ctxt acc
+    | Option_key (_, _, Yes) -> (k [@ocaml.tailcall]) ctxt acc
 
   let tickets_of_set :
       type a ret.

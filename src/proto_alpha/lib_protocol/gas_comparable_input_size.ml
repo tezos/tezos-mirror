@@ -122,20 +122,20 @@ let rec size_of_comparable_value :
    | Timestamp_key -> timestamp v
    | Address_key -> address v
    | Tx_rollup_l2_address_key -> tx_rollup_l2_address v
-   | Pair_key (leaf, node, _) ->
+   | Pair_key (leaf, node, _, YesYes) ->
        let (lv, rv) = v in
        let size =
          size_of_comparable_value leaf lv + size_of_comparable_value node rv
        in
        size + 1
-   | Union_key (left, right, _) ->
+   | Union_key (left, right, _, YesYes) ->
        let size =
          match v with
          | L v -> size_of_comparable_value left v
          | R v -> size_of_comparable_value right v
        in
        size + 1
-   | Option_key (ty, _) -> (
+   | Option_key (ty, _, Yes) -> (
        match v with None -> 1 | Some x -> size_of_comparable_value ty x + 1)
    | Signature_key -> signature v
    | Key_key -> public_key v

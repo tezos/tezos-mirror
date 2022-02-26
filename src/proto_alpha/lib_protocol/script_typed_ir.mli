@@ -204,13 +204,19 @@ type _ comparable_ty =
   | Address_key : address comparable_ty
   | Tx_rollup_l2_address_key : tx_rollup_l2_address comparable_ty
   | Pair_key :
-      'a comparable_ty * 'b comparable_ty * ('a, 'b) pair ty_metadata
+      'a comparable_ty
+      * 'b comparable_ty
+      * ('a, 'b) pair ty_metadata
+      * (yes, yes, yes) dand
       -> ('a, 'b) pair comparable_ty
   | Union_key :
-      'a comparable_ty * 'b comparable_ty * ('a, 'b) union ty_metadata
+      'a comparable_ty
+      * 'b comparable_ty
+      * ('a, 'b) union ty_metadata
+      * (yes, yes, yes) dand
       -> ('a, 'b) union comparable_ty
   | Option_key :
-      'v comparable_ty * 'v option ty_metadata
+      'v comparable_ty * 'v option ty_metadata * yes dbool
       -> 'v option comparable_ty
 
 module type Boxed_set_OPS = sig

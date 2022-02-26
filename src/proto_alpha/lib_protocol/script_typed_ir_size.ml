@@ -60,12 +60,12 @@ let ty_traverse_f =
     | Bool_key -> ret_succ_adding accu base_basic
     | Chain_id_key -> ret_succ_adding accu base_basic
     | Never_key -> ret_succ_adding accu base_basic
-    | Pair_key (_ty1, _ty2, a) ->
+    | Pair_key (_ty1, _ty2, a, YesYes) ->
+        ret_succ_adding accu @@ (base_compound a +! (word_size *? 3))
+    | Union_key (_ty1, _ty2, a, YesYes) ->
+        ret_succ_adding accu @@ (base_compound a +! (word_size *? 3))
+    | Option_key (_ty, a, Yes) ->
         ret_succ_adding accu @@ (base_compound a +! (word_size *? 2))
-    | Union_key (_ty1, _ty2, a) ->
-        ret_succ_adding accu @@ (base_compound a +! (word_size *? 2))
-    | Option_key (_ty, a) ->
-        ret_succ_adding accu @@ (base_compound a +! word_size)
   and apply : type a ac. nodes_and_size -> (a, ac) ty -> nodes_and_size =
    fun accu ty ->
     match ty with
@@ -344,9 +344,10 @@ let rec value_size :
     | Tx_rollup_l2_address_key ->
         ret_succ_adding accu (tx_rollup_l2_address_size x)
     | Bool_key -> ret_succ accu
-    | Pair_key (_, _, _) -> ret_succ_adding accu h2w
-    | Union_key (_, _, _) -> ret_succ_adding accu h1w
-    | Option_key (_, _) -> ret_succ_adding accu (option_size (fun _ -> !!0) x)
+    | Pair_key (_, _, _, YesYes) -> ret_succ_adding accu h2w
+    | Union_key (_, _, _, YesYes) -> ret_succ_adding accu h1w
+    | Option_key (_, _, Yes) ->
+        ret_succ_adding accu (option_size (fun _ -> !!0) x)
     | Chain_id_key -> ret_succ_adding accu chain_id_size
     | Never_key -> ( match x with _ -> .)
   in

@@ -178,11 +178,11 @@ let rec ty_of_comparable_ty :
   | Address_key -> Address_t
   | Tx_rollup_l2_address_key -> Tx_rollup_l2_address_t
   | Chain_id_key -> Chain_id_t
-  | Pair_key (l, r, meta) ->
+  | Pair_key (l, r, meta, YesYes) ->
       Pair_t (ty_of_comparable_ty l, ty_of_comparable_ty r, meta, YesYes)
-  | Union_key (l, r, meta) ->
+  | Union_key (l, r, meta, YesYes) ->
       Union_t (ty_of_comparable_ty l, ty_of_comparable_ty r, meta, YesYes)
-  | Option_key (t, meta) -> Option_t (ty_of_comparable_ty t, meta, Yes)
+  | Option_key (t, meta, Yes) -> Option_t (ty_of_comparable_ty t, meta, Yes)
 
 let rec unparse_comparable_ty_uncarbonated :
     type a loc. loc:loc -> a comparable_ty -> loc Script.michelson_node =
@@ -202,7 +202,7 @@ let rec unparse_comparable_ty_uncarbonated :
   | Address_key -> Prim (loc, T_address, [], [])
   | Tx_rollup_l2_address_key -> Prim (loc, T_tx_rollup_l2_address, [], [])
   | Chain_id_key -> Prim (loc, T_chain_id, [], [])
-  | Pair_key (l, r, _meta) -> (
+  | Pair_key (l, r, _meta, YesYes) -> (
       let tl = unparse_comparable_ty_uncarbonated ~loc l in
       let tr = unparse_comparable_ty_uncarbonated ~loc r in
       (* Fold [pair a1 (pair ... (pair an-1 an))] into [pair a1 ... an] *)
@@ -211,11 +211,11 @@ let rec unparse_comparable_ty_uncarbonated :
       match tr with
       | Prim (_, T_pair, ts, []) -> Prim (loc, T_pair, tl :: ts, [])
       | _ -> Prim (loc, T_pair, [tl; tr], []))
-  | Union_key (l, r, _meta) ->
+  | Union_key (l, r, _meta, YesYes) ->
       let tl = unparse_comparable_ty_uncarbonated ~loc l in
       let tr = unparse_comparable_ty_uncarbonated ~loc r in
       Prim (loc, T_or, [tl; tr], [])
-  | Option_key (t, _meta) ->
+  | Option_key (t, _meta, Yes) ->
       Prim (loc, T_option, [unparse_comparable_ty_uncarbonated ~loc t], [])
 
 let unparse_memo_size ~loc memo_size =
@@ -360,14 +360,14 @@ let[@coq_axiom_with_reason "gadt"] rec comparable_ty_of_ty :
   | Pair_t (l, r, pname, _) ->
       comparable_ty_of_ty ctxt loc l >>? fun (lty, ctxt) ->
       comparable_ty_of_ty ctxt loc r >|? fun (rty, ctxt) ->
-      (Pair_key (lty, rty, pname), ctxt)
+      (Pair_key (lty, rty, pname, YesYes), ctxt)
   | Union_t (l, r, meta, _) ->
       comparable_ty_of_ty ctxt loc l >>? fun (lty, ctxt) ->
       comparable_ty_of_ty ctxt loc r >|? fun (rty, ctxt) ->
-      (Union_key (lty, rty, meta), ctxt)
+      (Union_key (lty, rty, meta, YesYes), ctxt)
   | Option_t (tt, meta, _) ->
       comparable_ty_of_ty ctxt loc tt >|? fun (ty, ctxt) ->
-      (Option_key (ty, meta), ctxt)
+      (Option_key (ty, meta, Yes), ctxt)
   | Lambda_t _ | List_t _ | Ticket_t _ | Set_t _ | Map_t _ | Big_map_t _
   | Contract_t _ | Operation_t | Bls12_381_fr_t | Bls12_381_g1_t
   | Bls12_381_g2_t | Sapling_state_t _ | Sapling_transaction_t _
@@ -589,7 +589,7 @@ let unparse_option ~loc unparse_v ctxt = function
 
 let comparable_comb_witness2 :
     type t. t comparable_ty -> (t, unit -> unit -> unit) comb_witness = function
-  | Pair_key (_, Pair_key _, _) -> Comb_Pair (Comb_Pair Comb_Any)
+  | Pair_key (_, Pair_key _, _, YesYes) -> Comb_Pair (Comb_Pair Comb_Any)
   | Pair_key _ -> Comb_Pair Comb_Any
   | _ -> Comb_Any
 
@@ -629,16 +629,16 @@ let[@coq_axiom_with_reason "gadt"] rec unparse_comparable_data :
   | (Key_hash_key, k) -> Lwt.return @@ unparse_key_hash ~loc ctxt mode k
   | (Chain_id_key, chain_id) ->
       Lwt.return @@ unparse_chain_id ~loc ctxt mode chain_id
-  | (Pair_key (tl, tr, _), pair) ->
+  | (Pair_key (tl, tr, _, YesYes), pair) ->
       let r_witness = comparable_comb_witness2 tr in
       let unparse_l ctxt v = unparse_comparable_data ~loc ctxt mode tl v in
       let unparse_r ctxt v = unparse_comparable_data ~loc ctxt mode tr v in
       unparse_pair ~loc unparse_l unparse_r ctxt mode r_witness pair
-  | (Union_key (tl, tr, _), v) ->
+  | (Union_key (tl, tr, _, YesYes), v) ->
       let unparse_l ctxt v = unparse_comparable_data ~loc ctxt mode tl v in
       let unparse_r ctxt v = unparse_comparable_data ~loc ctxt mode tr v in
       unparse_union ~loc unparse_l unparse_r ctxt v
-  | (Option_key (t, _), v) ->
+  | (Option_key (t, _, Yes), v) ->
       let unparse_v ctxt v = unparse_comparable_data ~loc ctxt mode t v in
       unparse_option ~loc unparse_v ctxt v
   | (Never_key, _) -> .
@@ -822,21 +822,21 @@ let rec comparable_ty_eq :
     | (Address_key, _) -> not_equal ()
     | (Tx_rollup_l2_address_key, Tx_rollup_l2_address_key) -> return Eq
     | (Tx_rollup_l2_address_key, _) -> not_equal ()
-    | (Pair_key (left_a, right_a, meta_a), Pair_key (left_b, right_b, meta_b))
-      ->
+    | ( Pair_key (left_a, right_a, meta_a, YesYes),
+        Pair_key (left_b, right_b, meta_b, YesYes) ) ->
         let* () = type_metadata_eq meta_a meta_b in
         let* Eq = comparable_ty_eq ~error_details left_a left_b in
         let+ Eq = comparable_ty_eq ~error_details right_a right_b in
         (Eq : (ta comparable_ty, tb comparable_ty) eq)
     | (Pair_key _, _) -> not_equal ()
-    | (Union_key (left_a, right_a, meta_a), Union_key (left_b, right_b, meta_b))
-      ->
+    | ( Union_key (left_a, right_a, meta_a, YesYes),
+        Union_key (left_b, right_b, meta_b, YesYes) ) ->
         let* () = type_metadata_eq meta_a meta_b in
         let* Eq = comparable_ty_eq ~error_details left_a left_b in
         let+ Eq = comparable_ty_eq ~error_details right_a right_b in
         (Eq : (ta comparable_ty, tb comparable_ty) eq)
     | (Union_key _, _) -> not_equal ()
-    | (Option_key (ta, meta_a), Option_key (tb, meta_b)) ->
+    | (Option_key (ta, meta_a, Yes), Option_key (tb, meta_b, Yes)) ->
         let* () = type_metadata_eq meta_a meta_b in
         let+ Eq = comparable_ty_eq ~error_details ta tb in
         (Eq : (ta comparable_ty, tb comparable_ty) eq)
@@ -2490,16 +2490,16 @@ let[@coq_axiom_with_reason "gadt"] rec parse_comparable_data :
       Lwt.return @@ traced_no_lwt @@ parse_address ctxt expr
   | (Tx_rollup_l2_address_key, expr) ->
       Lwt.return @@ traced_no_lwt @@ parse_tx_rollup_l2_address ctxt expr
-  | (Pair_key (tl, tr, _), expr) ->
+  | (Pair_key (tl, tr, _, YesYes), expr) ->
       let r_witness = comparable_comb_witness1 tr in
       let parse_l ctxt v = parse_comparable_data ?type_logger ctxt tl v in
       let parse_r ctxt v = parse_comparable_data ?type_logger ctxt tr v in
       traced @@ parse_pair parse_l parse_r ctxt ~legacy r_witness expr
-  | (Union_key (tl, tr, _), expr) ->
+  | (Union_key (tl, tr, _, YesYes), expr) ->
       let parse_l ctxt v = parse_comparable_data ?type_logger ctxt tl v in
       let parse_r ctxt v = parse_comparable_data ?type_logger ctxt tr v in
       traced @@ parse_union parse_l parse_r ctxt ~legacy expr
-  | (Option_key (t, _), expr) ->
+  | (Option_key (t, _, Yes), expr) ->
       let parse_v ctxt v = parse_comparable_data ?type_logger ctxt t v in
       traced @@ parse_option parse_v ctxt ~legacy expr
   | (Never_key, expr) -> Lwt.return @@ traced_no_lwt @@ parse_never expr

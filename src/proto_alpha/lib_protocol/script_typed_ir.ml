@@ -329,13 +329,19 @@ type _ comparable_ty =
   | Address_key : address comparable_ty
   | Tx_rollup_l2_address_key : tx_rollup_l2_address comparable_ty
   | Pair_key :
-      'a comparable_ty * 'b comparable_ty * ('a, 'b) pair ty_metadata
+      'a comparable_ty
+      * 'b comparable_ty
+      * ('a, 'b) pair ty_metadata
+      * (yes, yes, yes) dand
       -> ('a, 'b) pair comparable_ty
   | Union_key :
-      'a comparable_ty * 'b comparable_ty * ('a, 'b) union ty_metadata
+      'a comparable_ty
+      * 'b comparable_ty
+      * ('a, 'b) union ty_metadata
+      * (yes, yes, yes) dand
       -> ('a, 'b) union comparable_ty
   | Option_key :
-      'v comparable_ty * 'v option ty_metadata
+      'v comparable_ty * 'v option ty_metadata * yes dbool
       -> 'v option comparable_ty
 
 (*
@@ -1800,9 +1806,9 @@ let comparable_ty_metadata : type a. a comparable_ty -> a ty_metadata = function
   | Bytes_key | Mutez_key | Bool_key | Key_hash_key | Key_key | Timestamp_key
   | Chain_id_key | Address_key | Tx_rollup_l2_address_key ->
       meta_basic
-  | Pair_key (_, _, meta) -> meta
-  | Union_key (_, _, meta) -> meta
-  | Option_key (_, meta) -> meta
+  | Pair_key (_, _, meta, YesYes) -> meta
+  | Union_key (_, _, meta, YesYes) -> meta
+  | Option_key (_, meta, Yes) -> meta
 
 let ty_size : type v vc. (v, vc) ty -> v Type_size.t =
  fun t -> (ty_metadata t).size
@@ -1914,7 +1920,7 @@ let comparable_pair_t loc l r =
 
 let pair_key loc l r =
   Type_size.compound2 loc (comparable_ty_size l) (comparable_ty_size r)
-  >|? fun size -> Pair_key (l, r, {size})
+  >|? fun size -> Pair_key (l, r, {size}, YesYes)
 
 let pair_3_key loc l m r = pair_key loc m r >>? fun r -> pair_key loc l r
 
@@ -1936,7 +1942,7 @@ let union_bytes_bool_t =
 
 let union_key loc l r =
   Type_size.compound2 loc (comparable_ty_size l) (comparable_ty_size r)
-  >|? fun size -> Union_key (l, r, {size})
+  >|? fun size -> Union_key (l, r, {size}, YesYes)
 
 let lambda_t loc l r =
   Type_size.compound2 loc (ty_size l) (ty_size r) >|? fun size ->
@@ -1981,7 +1987,7 @@ let option_pair_int_nat_t =
 
 let option_key loc t =
   Type_size.compound1 loc (comparable_ty_size t) >|? fun size ->
-  Option_key (t, {size})
+  Option_key (t, {size}, Yes)
 
 let list_t loc t =
   Type_size.compound1 loc (ty_size t) >|? fun size -> List_t (t, {size})
@@ -2251,9 +2257,9 @@ let (ty_traverse, comparable_ty_traverse) =
     | Mutez_key | Key_hash_key | Key_key | Timestamp_key | Address_key
     | Tx_rollup_l2_address_key | Bool_key | Chain_id_key | Never_key ->
         (return [@ocaml.tailcall]) ()
-    | Pair_key (ty1, ty2, _) -> (next2 [@ocaml.tailcall]) ty1 ty2
-    | Union_key (ty1, ty2, _) -> (next2 [@ocaml.tailcall]) ty1 ty2
-    | Option_key (ty, _) -> (next [@ocaml.tailcall]) ty
+    | Pair_key (ty1, ty2, _, YesYes) -> (next2 [@ocaml.tailcall]) ty1 ty2
+    | Union_key (ty1, ty2, _, YesYes) -> (next2 [@ocaml.tailcall]) ty1 ty2
+    | Option_key (ty, _, Yes) -> (next [@ocaml.tailcall]) ty
   and aux' :
       type ret t tc accu.
       accu ty_traverse -> accu -> (t, tc) ty -> (accu -> ret) -> ret =
@@ -2421,13 +2427,13 @@ let value_traverse (type t tc) (ty : ((t, tc) ty, t comparable_ty) union)
     | Mutez_key | Key_hash_key | Key_key | Timestamp_key | Address_key
     | Tx_rollup_l2_address_key | Bool_key | Chain_id_key | Never_key ->
         (return [@ocaml.tailcall]) ()
-    | Pair_key (ty1, ty2, _) ->
+    | Pair_key (ty1, ty2, _, YesYes) ->
         (next2 [@ocaml.tailcall]) ty1 ty2 (fst x) (snd x)
-    | Union_key (ty1, ty2, _) -> (
+    | Union_key (ty1, ty2, _, YesYes) -> (
         match x with
         | L l -> (next [@ocaml.tailcall]) ty1 l
         | R r -> (next [@ocaml.tailcall]) ty2 r)
-    | Option_key (ty, _) -> (
+    | Option_key (ty, _, Yes) -> (
         match x with
         | None -> (return [@ocaml.tailcall]) ()
         | Some v -> (next [@ocaml.tailcall]) ty v)
