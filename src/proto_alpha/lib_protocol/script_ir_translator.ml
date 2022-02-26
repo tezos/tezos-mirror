@@ -526,9 +526,9 @@ let unparse_option ~loc unparse_v ctxt = function
 
 (* -- Unparsing data of comparable types -- *)
 
-let comparable_comb_witness2 :
-    type t. t comparable_ty -> (t, unit -> unit -> unit) comb_witness = function
-  | Pair_t (_, Pair_t _, _, YesYes) -> Comb_Pair (Comb_Pair Comb_Any)
+let comb_witness2 :
+    type t tc. (t, tc) ty -> (t, unit -> unit -> unit) comb_witness = function
+  | Pair_t (_, Pair_t _, _, _) -> Comb_Pair (Comb_Pair Comb_Any)
   | Pair_t _ -> Comb_Pair Comb_Any
   | _ -> Comb_Any
 
@@ -568,7 +568,7 @@ let[@coq_axiom_with_reason "gadt"] rec unparse_comparable_data :
   | (Chain_id_t, chain_id) ->
       Lwt.return @@ unparse_chain_id ~loc ctxt mode chain_id
   | (Pair_t (tl, tr, _, YesYes), pair) ->
-      let r_witness = comparable_comb_witness2 tr in
+      let r_witness = comb_witness2 tr in
       let unparse_l ctxt v = unparse_comparable_data ~loc ctxt mode tl v in
       let unparse_r ctxt v = unparse_comparable_data ~loc ctxt mode tr v in
       unparse_pair ~loc unparse_l unparse_r ctxt mode r_witness pair
@@ -5483,12 +5483,6 @@ let list_entrypoints_uncarbonated (type full fullc) (full : (full, fullc) ty)
 (* ---- Unparsing (Typed IR -> Untyped expressions) --------------------------*)
 
 (* -- Unparsing data of any type -- *)
-
-let comb_witness2 :
-    type t tc. (t, tc) ty -> (t, unit -> unit -> unit) comb_witness = function
-  | Pair_t (_, Pair_t _, _, _) -> Comb_Pair (Comb_Pair Comb_Any)
-  | Pair_t _ -> Comb_Pair Comb_Any
-  | _ -> Comb_Any
 
 let[@coq_axiom_with_reason "gadt"] rec unparse_data :
     type a ac.
