@@ -326,7 +326,7 @@ end)
       | `TTx_rollup_l2_address -> Ex_comparable_ty tx_rollup_l2_address_key
       | `TTimestamp -> Ex_comparable_ty timestamp_key
       | `TKey_hash -> Ex_comparable_ty key_hash_key
-      | `TMutez -> Ex_comparable_ty mutez_key
+      | `TMutez -> Ex_comparable_ty mutez_t
       | `TInt -> Ex_comparable_ty int_t
       | `TUnit -> Ex_comparable_ty unit_t
       | `TSignature -> Ex_comparable_ty signature_t

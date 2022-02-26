@@ -1854,8 +1854,6 @@ let bytes_t = Bytes_t
 
 let mutez_t = Mutez_t
 
-let mutez_key = mutez_t
-
 let key_hash_t = Key_hash_t
 
 let key_hash_key = key_hash_t
