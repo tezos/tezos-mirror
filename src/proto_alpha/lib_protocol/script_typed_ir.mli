@@ -1603,31 +1603,31 @@ val union_key :
 val option_key :
   Script.location -> 'v comparable_ty -> 'v option comparable_ty tzresult
 
-val unit_t : (unit, yes) ty
+val unit_t : unit comparable_ty
 
-val int_t : (z num, yes) ty
+val int_t : z num comparable_ty
 
-val nat_t : (n num, yes) ty
+val nat_t : n num comparable_ty
 
-val signature_t : (signature, yes) ty
+val signature_t : signature comparable_ty
 
-val string_t : (Script_string.t, yes) ty
+val string_t : Script_string.t comparable_ty
 
-val bytes_t : (Bytes.t, yes) ty
+val bytes_t : Bytes.t comparable_ty
 
-val mutez_t : (Tez.t, yes) ty
+val mutez_t : Tez.t comparable_ty
 
-val key_hash_t : (public_key_hash, yes) ty
+val key_hash_t : public_key_hash comparable_ty
 
-val key_t : (public_key, yes) ty
+val key_t : public_key comparable_ty
 
-val timestamp_t : (Script_timestamp.t, yes) ty
+val timestamp_t : Script_timestamp.t comparable_ty
 
-val address_t : (address, yes) ty
+val address_t : address comparable_ty
 
-val tx_rollup_l2_address_t : (tx_rollup_l2_address, yes) ty
+val tx_rollup_l2_address_t : tx_rollup_l2_address comparable_ty
 
-val bool_t : (bool, yes) ty
+val bool_t : bool comparable_ty
 
 val pair_t :
   Script.location -> ('a, _) ty -> ('b, _) ty -> ('a, 'b) pair ty_ex_c tzresult
@@ -1645,9 +1645,9 @@ val comparable_union_t :
   Script.location ->
   ('a, yes) ty ->
   ('b, yes) ty ->
-  (('a, 'b) union, yes) ty tzresult
+  ('a, 'b) union comparable_ty tzresult
 
-val union_bytes_bool_t : ((Bytes.t, bool) union, yes) ty
+val union_bytes_bool_t : (Bytes.t, bool) union comparable_ty
 
 val lambda_t :
   Script.location ->
@@ -1657,21 +1657,21 @@ val lambda_t :
 
 val option_t : Script.location -> ('v, 'c) ty -> ('v option, 'c) ty tzresult
 
-val option_mutez_t : (Tez.t option, yes) ty
+val option_mutez_t : Tez.t option comparable_ty
 
-val option_string_t : (Script_string.t option, yes) ty
+val option_string_t : Script_string.t option comparable_ty
 
-val option_bytes_t : (Bytes.t option, yes) ty
+val option_bytes_t : Bytes.t option comparable_ty
 
-val option_nat_t : (n num option, yes) ty
+val option_nat_t : n num option comparable_ty
 
-val option_pair_nat_nat_t : ((n num, n num) pair option, yes) ty
+val option_pair_nat_nat_t : (n num, n num) pair option comparable_ty
 
-val option_pair_nat_mutez_t : ((n num, Tez.t) pair option, yes) ty
+val option_pair_nat_mutez_t : (n num, Tez.t) pair option comparable_ty
 
-val option_pair_mutez_mutez_t : ((Tez.t, Tez.t) pair option, yes) ty
+val option_pair_mutez_mutez_t : (Tez.t, Tez.t) pair option comparable_ty
 
-val option_pair_int_nat_t : ((z num, n num) pair option, yes) ty
+val option_pair_int_nat_t : (z num, n num) pair option comparable_ty
 
 val list_t : Script.location -> ('v, _) ty -> ('v boxed_list, no) ty tzresult
 
@@ -1706,9 +1706,9 @@ val sapling_state_t : memo_size:Sapling.Memo_size.t -> (Sapling.state, no) ty
 
 val operation_t : (operation, no) ty
 
-val chain_id_t : (Script_chain_id.t, yes) ty
+val chain_id_t : Script_chain_id.t comparable_ty
 
-val never_t : (never, yes) ty
+val never_t : never comparable_ty
 
 val bls12_381_g1_t : (Script_bls.G1.t, no) ty
 
