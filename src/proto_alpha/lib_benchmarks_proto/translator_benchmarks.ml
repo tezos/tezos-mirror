@@ -814,7 +814,7 @@ module Unparse_comparable_type_benchmark : Benchmark.S = struct
       let ty = dummy_comparable_type_generator size in
       let nodes =
         let (Script_ir_translator.Ex_comparable_ty ty) = ty in
-        let x = Script_typed_ir.comparable_ty_size ty in
+        let x = Script_typed_ir.ty_size ty in
         Saturation_repr.to_int @@ Script_typed_ir.Type_size.to_int x
       in
       match ty with

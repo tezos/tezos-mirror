@@ -1798,7 +1798,7 @@ module Cost_of = struct
     let unparse_comparable_type comp_ty =
       atomic_step_cost
       @@ cost_UNPARSE_COMPARABLE_TYPE
-           Script_typed_ir.(comparable_ty_size comp_ty |> Type_size.to_int)
+           Script_typed_ir.(ty_size comp_ty |> Type_size.to_int)
 
     let unparse_instr_cycle = atomic_step_cost cost_UNPARSING_CODE
 

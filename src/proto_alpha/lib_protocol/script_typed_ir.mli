@@ -1550,8 +1550,6 @@ val kinstr_rewritek :
 
 val ty_size : ('a, _) ty -> 'a Type_size.t
 
-val comparable_ty_size : 'a comparable_ty -> 'a Type_size.t
-
 val is_comparable : ('v, 'c) ty -> 'c dbool
 
 type 'v ty_ex_c = Ty_ex_c : ('v, _) ty -> 'v ty_ex_c [@@ocaml.unboxed]

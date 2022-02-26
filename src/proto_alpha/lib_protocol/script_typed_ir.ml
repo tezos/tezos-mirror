@@ -1800,18 +1800,7 @@ let ty_metadata : type a ac. (a, ac) ty -> a ty_metadata = function
   | Bls12_381_fr_t | Chest_t | Chest_key_t ->
       meta_basic
 
-let comparable_ty_metadata : type a. a comparable_ty -> a ty_metadata = function
-  | Unit_t | Never_t | Int_t | Nat_t | Signature_t | String_t | Bytes_t
-  | Mutez_t | Bool_t | Key_hash_t | Key_t | Timestamp_t | Chain_id_t | Address_t
-  | Tx_rollup_l2_address_t ->
-      meta_basic
-  | Pair_t (_, _, meta, YesYes) -> meta
-  | Union_t (_, _, meta, YesYes) -> meta
-  | Option_t (_, meta, Yes) -> meta
-
 let ty_size t = (ty_metadata t).size
-
-let comparable_ty_size t = (comparable_ty_metadata t).size
 
 let is_comparable : type v c. (v, c) ty -> c dbool = function
   | Never_t -> Yes
@@ -1994,15 +1983,14 @@ let operation_t = Operation_t
 let list_operation_t = List_t (operation_t, {size = Type_size.two})
 
 let set_t loc t =
-  Type_size.compound1 loc (comparable_ty_size t) >|? fun size ->
-  Set_t (t, {size})
+  Type_size.compound1 loc (ty_size t) >|? fun size -> Set_t (t, {size})
 
 let map_t loc l r =
-  Type_size.compound2 loc (comparable_ty_size l) (ty_size r) >|? fun size ->
+  Type_size.compound2 loc (ty_size l) (ty_size r) >|? fun size ->
   Map_t (l, r, {size})
 
 let big_map_t loc l r =
-  Type_size.compound2 loc (comparable_ty_size l) (ty_size r) >|? fun size ->
+  Type_size.compound2 loc (ty_size l) (ty_size r) >|? fun size ->
   Big_map_t (l, r, {size})
 
 let contract_t loc t =
@@ -2032,8 +2020,7 @@ let bls12_381_g2_t = Bls12_381_g2_t
 let bls12_381_fr_t = Bls12_381_fr_t
 
 let ticket_t loc t =
-  Type_size.compound1 loc (comparable_ty_size t) >|? fun size ->
-  Ticket_t (t, {size})
+  Type_size.compound1 loc (ty_size t) >|? fun size -> Ticket_t (t, {size})
 
 let chest_key_t = Chest_key_t
 
