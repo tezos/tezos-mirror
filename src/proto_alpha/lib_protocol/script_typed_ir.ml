@@ -2001,8 +2001,6 @@ let chain_id_key = chain_id_t
 
 let never_t = Never_t
 
-let never_key = never_t
-
 let bls12_381_g1_t = Bls12_381_g1_t
 
 let bls12_381_g2_t = Bls12_381_g2_t
