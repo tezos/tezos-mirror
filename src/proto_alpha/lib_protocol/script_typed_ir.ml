@@ -1844,8 +1844,6 @@ let unit_t = Unit_t
 
 let int_t = Int_t
 
-let int_key = int_t
-
 let nat_t = Nat_t
 
 let nat_key = nat_t

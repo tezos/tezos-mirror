@@ -59,7 +59,7 @@ let big_map_updates_of_key_values ctxt key_values =
         wrap
           (Script_ir_translator.hash_comparable_data
              ctxt
-             Script_typed_ir.int_key
+             Script_typed_ir.int_t
              (Script_int.of_int key))
       in
       return
@@ -1099,14 +1099,14 @@ let test_transfer_big_map_with_tickets () =
   in
   let*? parameters_ty =
     Environment.wrap_tzresult
-    @@ big_map_t Micheline.dummy_location int_key value_type
+    @@ big_map_t Micheline.dummy_location int_t value_type
   in
   let parameters =
     Big_map
       {
         id = Some big_map_id;
         diff = {map = Big_map_overlay.empty; size = 0};
-        key_type = int_key;
+        key_type = int_t;
         value_type;
       }
   in

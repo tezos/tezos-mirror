@@ -327,7 +327,7 @@ end)
       | `TTimestamp -> Ex_comparable_ty timestamp_key
       | `TKey_hash -> Ex_comparable_ty key_hash_key
       | `TMutez -> Ex_comparable_ty mutez_key
-      | `TInt -> Ex_comparable_ty int_key
+      | `TInt -> Ex_comparable_ty int_t
       | `TUnit -> Ex_comparable_ty unit_t
       | `TSignature -> Ex_comparable_ty signature_key
       | `TKey -> Ex_comparable_ty key_key

@@ -1123,7 +1123,7 @@ module Registration_section = struct
 
     let set_iter_code =
       ISet_iter
-        ( kinfo (set int_cmp @$ unit @$ bot),
+        ( kinfo (set int @$ unit @$ bot),
           IDrop (kinfo (int @$ unit @$ bot), halt_unit),
           halt_unit )
 
@@ -1140,7 +1140,7 @@ module Registration_section = struct
        *)
       simple_benchmark
         ~name:Interpreter_workload.N_ISet_iter
-        ~intercept_stack:(Script_set.empty int_cmp, ((), eos))
+        ~intercept_stack:(Script_set.empty int, ((), eos))
         ~kinstr:set_iter_code
         ()
 
@@ -1149,9 +1149,8 @@ module Registration_section = struct
         ~name:Interpreter_workload.N_ISet_mem
         ~kinstr:
           (ISet_mem
-             ( kinfo (int @$ set int_cmp @$ unit @$ bot),
-               halt (bool @$ unit @$ bot) ))
-        ~intercept_stack:(Script_int.zero, (Script_set.empty int_cmp, ((), eos)))
+             (kinfo (int @$ set int @$ unit @$ bot), halt (bool @$ unit @$ bot)))
+        ~intercept_stack:(Script_int.zero, (Script_set.empty int, ((), eos)))
         ~stack_sampler:(fun cfg rng_state () ->
           assert (cfg.sampler.set_size.min >= 1) ;
           let n =
@@ -1163,7 +1162,7 @@ module Registration_section = struct
           let set =
             List.fold_left
               (fun set elt -> Script_set.update elt true set)
-              (Script_set.empty int_cmp)
+              (Script_set.empty int)
               elts
           in
           let elt =
@@ -1178,10 +1177,8 @@ module Registration_section = struct
         ~name:Interpreter_workload.N_ISet_update
         ~kinstr:
           (ISet_update
-             ( kinfo (int @$ bool @$ set int_cmp @$ bot),
-               halt (set int_cmp @$ bot) ))
-        ~intercept_stack:
-          (Script_int.zero, (false, (Script_set.empty int_cmp, eos)))
+             (kinfo (int @$ bool @$ set int @$ bot), halt (set int @$ bot)))
+        ~intercept_stack:(Script_int.zero, (false, (Script_set.empty int, eos)))
         ~stack_sampler:(fun cfg rng_state () ->
           assert (cfg.sampler.set_size.min >= 2) ;
           let n =
@@ -1196,7 +1193,7 @@ module Registration_section = struct
           let set =
             List.fold_left
               (fun set elt -> Script_set.update elt true set)
-              (Script_set.empty int_cmp)
+              (Script_set.empty int)
               in_set
           in
           let stack =
@@ -1229,7 +1226,7 @@ module Registration_section = struct
       let map =
         List.fold_left
           (fun map i -> Script_map.update i (Some ()) map)
-          (Script_map.empty int_cmp)
+          (Script_map.empty int)
           keys
       in
       let (module M) = Script_map.get_module map in
@@ -1249,16 +1246,16 @@ module Registration_section = struct
     (*
     let map_map_code =
       IMap_map
-        ( kinfo (map int_cmp unit @$ unit @$ bot),
+        ( kinfo (map int unit @$ unit @$ bot),
           ICdr (kinfo (cpair int unit @$ unit @$ bot), halt_unitunit),
-          halt (map int_cmp unit @$ unit @$ bot) )
+          halt (map int unit @$ unit @$ bot) )
      *)
 
     let map_map_code =
       IMap_map
-        ( kinfo (map int_cmp unit @$ unit @$ bot),
+        ( kinfo (map int unit @$ unit @$ bot),
           IFailwith (kinfo (cpair int unit @$ unit @$ bot), 0, cpair int unit),
-          halt (map int_cmp unit @$ unit @$ bot) )
+          halt (map int unit @$ unit @$ bot) )
 
     let () =
       (*
@@ -1270,14 +1267,14 @@ module Registration_section = struct
       simple_benchmark
         ~name:Interpreter_workload.N_IMap_map
         ~intercept_stack:
-          (let map = Script_map.empty int_cmp in
+          (let map = Script_map.empty int in
            (map, ((), eos)))
         ~kinstr:map_map_code
         ()
 
     let kmap_iter_code =
       IMap_iter
-        ( kinfo (map int_cmp unit @$ unit @$ bot),
+        ( kinfo (map int unit @$ unit @$ bot),
           IDrop (kinfo (cpair int unit @$ unit @$ bot), halt_unit),
           halt_unit )
 
@@ -1291,7 +1288,7 @@ module Registration_section = struct
       simple_benchmark
         ~name:Interpreter_workload.N_IMap_iter
         ~intercept_stack:
-          (let map = Script_map.empty int_cmp in
+          (let map = Script_map.empty int in
            (map, ((), eos)))
         ~kinstr:kmap_iter_code
         ()
@@ -1306,10 +1303,10 @@ module Registration_section = struct
         ~name:Interpreter_workload.N_IMap_mem
         ~kinstr:
           (IMap_mem
-             ( kinfo (int @$ map int_cmp unit @$ unit @$ bot),
+             ( kinfo (int @$ map int unit @$ unit @$ bot),
                halt (bool @$ unit @$ bot) ))
         ~intercept_stack:
-          (let map = Script_map.empty int_cmp in
+          (let map = Script_map.empty int in
            (Script_int.zero, (map, ((), eos))))
         ~stack_sampler:(fun cfg rng_state () ->
           let (key, map) = generate_map_and_key_in_map cfg rng_state in
@@ -1326,10 +1323,10 @@ module Registration_section = struct
         ~name:Interpreter_workload.N_IMap_get
         ~kinstr:
           (IMap_get
-             ( kinfo (int @$ map int_cmp unit @$ unit @$ bot),
+             ( kinfo (int @$ map int unit @$ unit @$ bot),
                halt (option unit @$ unit @$ bot) ))
         ~intercept_stack:
-          (let map = Script_map.empty int_cmp in
+          (let map = Script_map.empty int in
            (Script_int.zero, (map, ((), eos))))
         ~stack_sampler:(fun cfg rng_state () ->
           let (key, map) = generate_map_and_key_in_map cfg rng_state in
@@ -1346,10 +1343,10 @@ module Registration_section = struct
         ~name:Interpreter_workload.N_IMap_update
         ~kinstr:
           (IMap_update
-             ( kinfo (int @$ option unit @$ map int_cmp unit @$ bot),
-               halt (map int_cmp unit @$ bot) ))
+             ( kinfo (int @$ option unit @$ map int unit @$ bot),
+               halt (map int unit @$ bot) ))
         ~intercept_stack:
-          (let map = Script_map.empty int_cmp in
+          (let map = Script_map.empty int in
            (Script_int.zero, (None, (map, eos))))
         ~stack_sampler:(fun cfg rng_state () ->
           let (key, map) = generate_map_and_key_in_map cfg rng_state in
@@ -1367,10 +1364,10 @@ module Registration_section = struct
         ~name:Interpreter_workload.N_IMap_get_and_update
         ~kinstr:
           (IMap_get_and_update
-             ( kinfo (int @$ option unit @$ map int_cmp unit @$ bot),
-               halt (option unit @$ map int_cmp unit @$ bot) ))
+             ( kinfo (int @$ option unit @$ map int unit @$ bot),
+               halt (option unit @$ map int unit @$ bot) ))
         ~intercept_stack:
-          (let map = Script_map.empty int_cmp in
+          (let map = Script_map.empty int in
            (Script_int.zero, (None, (map, eos))))
         ~stack_sampler:(fun cfg rng_state () ->
           let (key, map) = generate_map_and_key_in_map cfg rng_state in
@@ -1386,9 +1383,9 @@ module Registration_section = struct
        *)
       simple_benchmark_with_stack_sampler
         ~name:Interpreter_workload.N_IMap_size
-        ~kinstr:(IMap_size (kinfo (map int_cmp unit @$ bot), halt (nat @$ bot)))
+        ~kinstr:(IMap_size (kinfo (map int unit @$ bot), halt (nat @$ bot)))
         ~stack_sampler:(fun _cfg _rng_state ->
-          let map = Script_map.empty int_cmp in
+          let map = Script_map.empty int in
           fun () -> (map, eos))
         ()
   end
@@ -1403,7 +1400,7 @@ module Registration_section = struct
       let map =
         List.fold_left
           (fun map i -> Script_map.update i (Some (Some ())) map)
-          (Script_map.empty int_cmp)
+          (Script_map.empty int)
           keys
       in
       let (module M) = Script_map.get_module map in
@@ -1415,9 +1412,7 @@ module Registration_section = struct
         raise_if_error
           (Lwt_main.run
              ( Execution_context.make ~rng_state >>=? fun (ctxt, _) ->
-               let big_map =
-                 Script_ir_translator.empty_big_map int_cmp unit_t
-               in
+               let big_map = Script_ir_translator.empty_big_map int unit_t in
                Script_map.fold
                  (fun k v acc ->
                    acc >>=? fun (bm, ctxt_acc) ->
@@ -1448,7 +1443,7 @@ module Registration_section = struct
         ~name:Interpreter_workload.N_IBig_map_mem
         ~kinstr:
           (IBig_map_mem
-             ( kinfo (int @$ big_map int_cmp unit @$ unit @$ bot),
+             ( kinfo (int @$ big_map int unit @$ unit @$ bot),
                halt (bool @$ unit @$ bot) ))
         ~stack_sampler:(fun cfg rng_state () ->
           let (key, map) = generate_big_map_and_key_in_map cfg rng_state in
@@ -1465,10 +1460,10 @@ module Registration_section = struct
         ~name:Interpreter_workload.N_IBig_map_get
         ~kinstr:
           (IBig_map_get
-             ( kinfo (int @$ big_map int_cmp unit @$ unit @$ bot),
+             ( kinfo (int @$ big_map int unit @$ unit @$ bot),
                halt (option unit @$ unit @$ bot) ))
         ~intercept_stack:
-          (let map = Script_ir_translator.empty_big_map int_cmp unit in
+          (let map = Script_ir_translator.empty_big_map int unit in
            (Script_int.zero, (map, ((), eos))))
         ~stack_sampler:(fun cfg rng_state () ->
           let (key, map) = generate_big_map_and_key_in_map cfg rng_state in
@@ -1485,10 +1480,10 @@ module Registration_section = struct
         ~name:Interpreter_workload.N_IBig_map_update
         ~kinstr:
           (IBig_map_update
-             ( kinfo (int @$ option unit @$ big_map int_cmp unit @$ bot),
-               halt (big_map int_cmp unit @$ bot) ))
+             ( kinfo (int @$ option unit @$ big_map int unit @$ bot),
+               halt (big_map int unit @$ bot) ))
         ~intercept_stack:
-          (let map = Script_ir_translator.empty_big_map int_cmp unit in
+          (let map = Script_ir_translator.empty_big_map int unit in
            (Script_int.zero, (None, (map, eos))))
         ~stack_sampler:(fun cfg rng_state () ->
           let (key, map) = generate_big_map_and_key_in_map cfg rng_state in
@@ -1506,10 +1501,10 @@ module Registration_section = struct
         ~name:Interpreter_workload.N_IBig_map_get_and_update
         ~kinstr:
           (IBig_map_get_and_update
-             ( kinfo (int @$ option unit @$ big_map int_cmp unit @$ bot),
-               halt (option unit @$ big_map int_cmp unit @$ bot) ))
+             ( kinfo (int @$ option unit @$ big_map int unit @$ bot),
+               halt (option unit @$ big_map int unit @$ bot) ))
         ~intercept_stack:
-          (let map = Script_ir_translator.empty_big_map int_cmp unit in
+          (let map = Script_ir_translator.empty_big_map int unit in
            (Script_int.zero, (None, (map, eos))))
         ~stack_sampler:(fun cfg rng_state () ->
           let (key, map) = generate_big_map_and_key_in_map cfg rng_state in
@@ -3047,7 +3042,7 @@ module Registration_section = struct
 
     let map_enter_body_code =
       let kbody = ICdr (kinfo (cpair int unit @$ unit @$ bot), halt_unitunit) in
-      fun accu -> KMap_enter_body (kbody, accu, Script_map.empty int_cmp, KNil)
+      fun accu -> KMap_enter_body (kbody, accu, Script_map.empty int, KNil)
 
     let () =
       (*

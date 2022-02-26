@@ -45,11 +45,11 @@ let forty_two_n = Script_int.abs forty_two
 
 let dummy_set =
   let open Script_set in
-  update forty_two true (empty Script_typed_ir.int_key)
+  update forty_two true (empty Script_typed_ir.int_t)
 
 let dummy_map =
   let open Script_map in
-  update forty_two (Some forty_two) (empty Script_typed_ir.int_key)
+  update forty_two (Some forty_two) (empty Script_typed_ir.int_t)
 
 let dummy_timestamp = Script_timestamp.of_zint (Z.of_int 42)
 
@@ -148,7 +148,7 @@ let all_interpreter_costs =
     ("dipn", dipn 42);
     ("dropn", dropn 42);
     ("neq", neq);
-    ("compare", compare Script_typed_ir.int_key forty_two forty_two);
+    ("compare", compare Script_typed_ir.int_t forty_two forty_two);
     ( "concat_string_precheck",
       concat_string_precheck Script_list.(cons "42" empty) );
     ("concat_string", concat_string (S.safe_int 42));
