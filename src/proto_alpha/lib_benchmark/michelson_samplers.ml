@@ -443,7 +443,7 @@ end)
       let option_case size =
         let size = size - 1 in
         let* (Ex_comparable_ty t) = m_comparable_type ~size in
-        match option_key (-1) t with
+        match comparable_option_t (-1) t with
         | Error _ -> (* what should be done here? *) assert false
         | Ok res_ty -> return @@ Ex_comparable_ty res_ty
       in

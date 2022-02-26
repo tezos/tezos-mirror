@@ -1116,7 +1116,7 @@ let[@coq_struct "ty"] rec parse_comparable_ty :
         check_type_annot loc annot >>? fun () ->
         parse_comparable_ty ~stack_depth:(stack_depth + 1) ctxt t
         >>? fun (Ex_comparable_ty t, ctxt) ->
-        option_key loc t >|? fun ty -> (Ex_comparable_ty ty, ctxt)
+        comparable_option_t loc t >|? fun ty -> (Ex_comparable_ty ty, ctxt)
     | Prim (loc, T_option, l, _) ->
         error (Invalid_arity (loc, T_option, 1, List.length l))
     | Prim

@@ -1554,9 +1554,6 @@ val is_comparable : ('v, 'c) ty -> 'c dbool
 
 type 'v ty_ex_c = Ty_ex_c : ('v, _) ty -> 'v ty_ex_c [@@ocaml.unboxed]
 
-val option_key :
-  Script.location -> 'v comparable_ty -> 'v option comparable_ty tzresult
-
 val unit_t : unit comparable_ty
 
 val int_t : z num comparable_ty
@@ -1617,6 +1614,9 @@ val lambda_t :
   (('arg, 'ret) lambda, no) ty tzresult
 
 val option_t : Script.location -> ('v, 'c) ty -> ('v option, 'c) ty tzresult
+
+val comparable_option_t :
+  Script.location -> 'v comparable_ty -> 'v option comparable_ty tzresult
 
 val option_mutez_t : Tez.t option comparable_ty
 
