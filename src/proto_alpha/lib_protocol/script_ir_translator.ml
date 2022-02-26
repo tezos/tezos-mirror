@@ -299,7 +299,7 @@ let serialize_ty_for_error ty =
   *)
   unparse_ty_uncarbonated ~loc:() ty |> Micheline.strip_locations
 
-let[@coq_axiom_with_reason "gadt"] rec comparable_ty_of_ty :
+let[@coq_axiom_with_reason "gadt"] comparable_ty_of_ty :
     type a ac.
     context ->
     Script.location ->
@@ -307,37 +307,9 @@ let[@coq_axiom_with_reason "gadt"] rec comparable_ty_of_ty :
     (a comparable_ty * context) tzresult =
  fun ctxt loc ty ->
   Gas.consume ctxt Typecheck_costs.comparable_ty_of_ty_cycle >>? fun ctxt ->
-  match ty with
-  | Unit_t -> ok ((Unit_t : a comparable_ty), ctxt)
-  | Never_t -> ok (Never_t, ctxt)
-  | Int_t -> ok (Int_t, ctxt)
-  | Nat_t -> ok (Nat_t, ctxt)
-  | Signature_t -> ok (Signature_t, ctxt)
-  | String_t -> ok (String_t, ctxt)
-  | Bytes_t -> ok (Bytes_t, ctxt)
-  | Mutez_t -> ok (Mutez_t, ctxt)
-  | Bool_t -> ok (Bool_t, ctxt)
-  | Key_hash_t -> ok (Key_hash_t, ctxt)
-  | Key_t -> ok (Key_t, ctxt)
-  | Timestamp_t -> ok (Timestamp_t, ctxt)
-  | Address_t -> ok (Address_t, ctxt)
-  | Tx_rollup_l2_address_t -> ok (Tx_rollup_l2_address_t, ctxt)
-  | Chain_id_t -> ok (Chain_id_t, ctxt)
-  | Pair_t (l, r, pname, _) ->
-      comparable_ty_of_ty ctxt loc l >>? fun (lty, ctxt) ->
-      comparable_ty_of_ty ctxt loc r >|? fun (rty, ctxt) ->
-      (Pair_t (lty, rty, pname, YesYes), ctxt)
-  | Union_t (l, r, meta, _) ->
-      comparable_ty_of_ty ctxt loc l >>? fun (lty, ctxt) ->
-      comparable_ty_of_ty ctxt loc r >|? fun (rty, ctxt) ->
-      (Union_t (lty, rty, meta, YesYes), ctxt)
-  | Option_t (tt, meta, _) ->
-      comparable_ty_of_ty ctxt loc tt >|? fun (ty, ctxt) ->
-      (Option_t (ty, meta, Yes), ctxt)
-  | Lambda_t _ | List_t _ | Ticket_t _ | Set_t _ | Map_t _ | Big_map_t _
-  | Contract_t _ | Operation_t | Bls12_381_fr_t | Bls12_381_g1_t
-  | Bls12_381_g2_t | Sapling_state_t _ | Sapling_transaction_t _
-  | Sapling_transaction_deprecated_t _ | Chest_key_t | Chest_t ->
+  match is_comparable ty with
+  | Yes -> ok ((ty : a comparable_ty), ctxt)
+  | No ->
       let t = serialize_ty_for_error ty in
       error (Comparable_type_expected (loc, t))
 

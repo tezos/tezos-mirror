@@ -587,12 +587,7 @@ let rec kinstr_extra_size : type a s r f. (a, s, r, f) kinstr -> nodes_and_size
       | IComb_get (_, n, _, _) -> comb (n / 2)
       | IComb_set (_, n, _, _) -> comb (n / 2)
       | IDup_n (_, n, _, _) -> dup_n_gadt_witness_size n
-      (* Every instruction whose elaboration uses [comparable_of_ty] or
-         [ty_of_comparable_ty] to create a type that is embedded in the IR. *)
-      | ITicket (_, k) -> (
-          let kinfo = Script_typed_ir.kinfo_of_kinstr k in
-          match kinfo.kstack_ty with Item_t (ty, _) -> ty_size ty)
-      | ICompare (_, ty, _) -> ty_size ty
+      (* Other extra *)
       | ILambda (_, lambda, _) -> lambda_extra_size lambda
       | _ -> zero
     in
