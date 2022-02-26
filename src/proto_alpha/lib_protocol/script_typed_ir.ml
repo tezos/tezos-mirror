@@ -2261,8 +2261,6 @@ let ty_traverse =
   in
   fun ty init f -> aux f init ty (fun accu -> accu)
 
-let comparable_ty_traverse = ty_traverse
-
 type 'accu stack_ty_traverse = {
   apply : 'ty 's. 'accu -> ('ty, 's) stack_ty -> 'accu;
 }

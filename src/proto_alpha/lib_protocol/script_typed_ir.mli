@@ -1742,8 +1742,6 @@ val kinstr_traverse :
 
 type 'a ty_traverse = {apply : 't 'tc. 'a -> ('t, 'tc) ty -> 'a}
 
-val comparable_ty_traverse : 'a comparable_ty -> 'r -> 'r ty_traverse -> 'r
-
 val ty_traverse : ('a, _) ty -> 'r -> 'r ty_traverse -> 'r
 
 type 'accu stack_ty_traverse = {

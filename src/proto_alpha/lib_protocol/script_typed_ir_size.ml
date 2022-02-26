@@ -96,7 +96,7 @@ let ty_traverse_f =
   ({apply} : nodes_and_size ty_traverse)
 
 let comparable_ty_size : type a. a comparable_ty -> nodes_and_size =
- fun cty -> comparable_ty_traverse cty zero ty_traverse_f
+ fun cty -> ty_traverse cty zero ty_traverse_f
 
 let ty_size : type a ac. (a, ac) ty -> nodes_and_size =
  fun ty -> ty_traverse ty zero ty_traverse_f
