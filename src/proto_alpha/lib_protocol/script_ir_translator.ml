@@ -2282,8 +2282,8 @@ let parse_option parse_v ctxt ~legacy = function
 
 (* -- parse data of comparable types -- *)
 
-let comparable_comb_witness1 :
-    type t. t comparable_ty -> (t, unit -> unit) comb_witness = function
+let comb_witness1 : type t tc. (t, tc) ty -> (t, unit -> unit) comb_witness =
+  function
   | Pair_t _ -> Comb_Pair Comb_Any
   | _ -> Comb_Any
 
@@ -2334,7 +2334,7 @@ let[@coq_axiom_with_reason "gadt"] rec parse_comparable_data :
   | (Tx_rollup_l2_address_t, expr) ->
       Lwt.return @@ traced_no_lwt @@ parse_tx_rollup_l2_address ctxt expr
   | (Pair_t (tl, tr, _, YesYes), expr) ->
-      let r_witness = comparable_comb_witness1 tr in
+      let r_witness = comb_witness1 tr in
       let parse_l ctxt v = parse_comparable_data ?type_logger ctxt tl v in
       let parse_r ctxt v = parse_comparable_data ?type_logger ctxt tr v in
       traced @@ parse_pair parse_l parse_r ctxt ~legacy r_witness expr
@@ -2348,11 +2348,6 @@ let[@coq_axiom_with_reason "gadt"] rec parse_comparable_data :
   | (Never_t, expr) -> Lwt.return @@ traced_no_lwt @@ parse_never expr
 
 (* -- parse data of any type -- *)
-
-let comb_witness1 : type t tc. (t, tc) ty -> (t, unit -> unit) comb_witness =
-  function
-  | Pair_t _ -> Comb_Pair Comb_Any
-  | _ -> Comb_Any
 
 (*
   Some values, such as operations, tickets, or big map ids, are used only
