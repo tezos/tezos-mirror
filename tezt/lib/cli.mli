@@ -96,6 +96,8 @@ type options = {
   mutable job_count : int;
   mutable suggest_jobs : bool;
   mutable junit : string option;
+  mutable skip : int;
+  mutable only : int option;
 }
 
 (** Values for command-line options. *)
