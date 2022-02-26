@@ -269,32 +269,7 @@ let rec value_size :
     | Chest_key_t -> ret_succ_adding accu (chest_key_size x)
     | Chest_t -> ret_succ_adding accu (chest_size x)
   in
-  let apply_comparable :
-      type a. nodes_and_size -> a comparable_ty -> a -> nodes_and_size =
-   fun accu ty x ->
-    match ty with
-    | Unit_t -> ret_succ accu
-    | Int_t -> ret_succ_adding accu (script_int_size x)
-    | Nat_t -> ret_succ_adding accu (script_nat_size x)
-    | Signature_t -> ret_succ_adding accu signature_size
-    | String_t -> ret_succ_adding accu (script_string_size x)
-    | Bytes_t -> ret_succ_adding accu (bytes_size x)
-    | Mutez_t -> ret_succ_adding accu mutez_size
-    | Key_hash_t -> ret_succ_adding accu (key_hash_size x)
-    | Key_t -> ret_succ_adding accu (public_key_size x)
-    | Timestamp_t -> ret_succ_adding accu (timestamp_size x)
-    | Address_t -> ret_succ_adding accu (address_size x)
-    | Tx_rollup_l2_address_t ->
-        ret_succ_adding accu (tx_rollup_l2_address_size x)
-    | Bool_t -> ret_succ accu
-    | Pair_t (_, _, _, YesYes) -> ret_succ_adding accu h2w
-    | Union_t (_, _, _, YesYes) -> ret_succ_adding accu h1w
-    | Option_t (_, _, Yes) ->
-        ret_succ_adding accu (option_size (fun _ -> !!0) x)
-    | Chain_id_t -> ret_succ_adding accu chain_id_size
-    | Never_t -> ( match x with _ -> .)
-  in
-  value_traverse ty x accu {apply; apply_comparable}
+  value_traverse ty x accu {apply}
  [@@coq_axiom_with_reason "unreachable expressions '.' not handled for now"]
 
 and big_map_size :

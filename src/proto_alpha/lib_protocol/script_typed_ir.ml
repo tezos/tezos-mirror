@@ -2274,10 +2274,7 @@ let stack_ty_traverse (type a t) (sty : (a, t) stack_ty) init f =
   in
   aux init sty
 
-type 'a value_traverse = {
-  apply : 't 'tc. 'a -> ('t, 'tc) ty -> 't -> 'a;
-  apply_comparable : 't. 'a -> 't comparable_ty -> 't -> 'a;
-}
+type 'a value_traverse = {apply : 't 'tc. 'a -> ('t, 'tc) ty -> 't -> 'a}
 
 let value_traverse (type t tc) (ty : (t, tc) ty) (x : t) init f =
   let rec aux : type ret t tc. 'accu -> (t, tc) ty -> t -> ('accu -> ret) -> ret

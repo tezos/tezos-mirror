@@ -1750,10 +1750,7 @@ type 'accu stack_ty_traverse = {
 
 val stack_ty_traverse : ('a, 's) stack_ty -> 'r -> 'r stack_ty_traverse -> 'r
 
-type 'a value_traverse = {
-  apply : 't 'tc. 'a -> ('t, 'tc) ty -> 't -> 'a;
-  apply_comparable : 't. 'a -> 't comparable_ty -> 't -> 'a;
-}
+type 'a value_traverse = {apply : 't 'tc. 'a -> ('t, 'tc) ty -> 't -> 'a}
 
 val value_traverse : ('t, _) ty -> 't -> 'r -> 'r value_traverse -> 'r
 
