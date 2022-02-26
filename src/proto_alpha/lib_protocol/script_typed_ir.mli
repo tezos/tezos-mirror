@@ -1740,10 +1740,7 @@ type 'a kinstr_traverse = {
 val kinstr_traverse :
   ('a, 'b, 'c, 'd) kinstr -> 'ret -> 'ret kinstr_traverse -> 'ret
 
-type 'a ty_traverse = {
-  apply : 't 'tc. 'a -> ('t, 'tc) ty -> 'a;
-  apply_comparable : 't. 'a -> 't comparable_ty -> 'a;
-}
+type 'a ty_traverse = {apply : 't 'tc. 'a -> ('t, 'tc) ty -> 'a}
 
 val comparable_ty_traverse : 'a comparable_ty -> 'r -> 'r ty_traverse -> 'r
 

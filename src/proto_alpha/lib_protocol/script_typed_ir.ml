@@ -2207,41 +2207,15 @@ let kinstr_traverse i init f =
   in
   aux init i (fun accu -> accu)
 
-type 'a ty_traverse = {
-  apply : 't 'tc. 'a -> ('t, 'tc) ty -> 'a;
-  apply_comparable : 't. 'a -> 't comparable_ty -> 'a;
-}
+type 'a ty_traverse = {apply : 't 'tc. 'a -> ('t, 'tc) ty -> 'a}
 
-let (ty_traverse, comparable_ty_traverse) =
+let ty_traverse =
   let rec aux :
-      type t ret accu.
-      accu ty_traverse -> accu -> t comparable_ty -> (accu -> ret) -> ret =
-   fun f accu ty continue ->
-    let accu = f.apply_comparable accu ty in
-    let next2 ty1 ty2 =
-      (aux [@ocaml.tailcall]) f accu ty1 @@ fun accu ->
-      (aux [@ocaml.tailcall]) f accu ty2 @@ fun accu ->
-      (continue [@ocaml.tailcall]) accu
-    in
-    let next ty1 =
-      (aux [@ocaml.tailcall]) f accu ty1 @@ fun accu ->
-      (continue [@ocaml.tailcall]) accu
-    in
-    let return () = (continue [@ocaml.tailcall]) accu in
-    match ty with
-    | Unit_t | Int_t | Nat_t | Signature_t | String_t | Bytes_t | Mutez_t
-    | Key_hash_t | Key_t | Timestamp_t | Address_t | Tx_rollup_l2_address_t
-    | Bool_t | Chain_id_t | Never_t ->
-        (return [@ocaml.tailcall]) ()
-    | Pair_t (ty1, ty2, _, YesYes) -> (next2 [@ocaml.tailcall]) ty1 ty2
-    | Union_t (ty1, ty2, _, YesYes) -> (next2 [@ocaml.tailcall]) ty1 ty2
-    | Option_t (ty, _, Yes) -> (next [@ocaml.tailcall]) ty
-  and aux' :
       type ret t tc accu.
       accu ty_traverse -> accu -> (t, tc) ty -> (accu -> ret) -> ret =
    fun f accu ty continue ->
     let accu = f.apply accu ty in
-    match (ty : (t, tc) ty) with
+    match ty with
     | Unit_t | Int_t | Nat_t | Signature_t | String_t | Bytes_t | Mutez_t
     | Key_hash_t | Key_t | Timestamp_t | Address_t | Tx_rollup_l2_address_t
     | Bool_t | Sapling_transaction_t _ | Sapling_transaction_deprecated_t _
@@ -2251,22 +2225,22 @@ let (ty_traverse, comparable_ty_traverse) =
     | Ticket_t (cty, _) -> aux f accu cty continue
     | Chest_key_t | Chest_t -> (continue [@ocaml.tailcall]) accu
     | Pair_t (ty1, ty2, _, _) ->
-        (next2' [@ocaml.tailcall]) f accu ty1 ty2 continue
+        (next2 [@ocaml.tailcall]) f accu ty1 ty2 continue
     | Union_t (ty1, ty2, _, _) ->
-        (next2' [@ocaml.tailcall]) f accu ty1 ty2 continue
+        (next2 [@ocaml.tailcall]) f accu ty1 ty2 continue
     | Lambda_t (ty1, ty2, _) ->
-        (next2' [@ocaml.tailcall]) f accu ty1 ty2 continue
-    | Option_t (ty1, _, _) -> (next' [@ocaml.tailcall]) f accu ty1 continue
-    | List_t (ty1, _) -> (next' [@ocaml.tailcall]) f accu ty1 continue
+        (next2 [@ocaml.tailcall]) f accu ty1 ty2 continue
+    | Option_t (ty1, _, _) -> (next [@ocaml.tailcall]) f accu ty1 continue
+    | List_t (ty1, _) -> (next [@ocaml.tailcall]) f accu ty1 continue
     | Set_t (cty, _) -> (aux [@ocaml.tailcall]) f accu cty @@ continue
     | Map_t (cty, ty1, _) ->
         (aux [@ocaml.tailcall]) f accu cty @@ fun accu ->
-        (next' [@ocaml.tailcall]) f accu ty1 continue
+        (next [@ocaml.tailcall]) f accu ty1 continue
     | Big_map_t (cty, ty1, _) ->
         (aux [@ocaml.tailcall]) f accu cty @@ fun accu ->
-        (next' [@ocaml.tailcall]) f accu ty1 continue
-    | Contract_t (ty1, _) -> (next' [@ocaml.tailcall]) f accu ty1 continue
-  and next2' :
+        (next [@ocaml.tailcall]) f accu ty1 continue
+    | Contract_t (ty1, _) -> (next [@ocaml.tailcall]) f accu ty1 continue
+  and next2 :
       type a ac b bc ret accu.
       accu ty_traverse ->
       accu ->
@@ -2275,18 +2249,19 @@ let (ty_traverse, comparable_ty_traverse) =
       (accu -> ret) ->
       ret =
    fun f accu ty1 ty2 continue ->
-    (aux' [@ocaml.tailcall]) f accu ty1 @@ fun accu ->
-    (aux' [@ocaml.tailcall]) f accu ty2 @@ fun accu ->
+    (aux [@ocaml.tailcall]) f accu ty1 @@ fun accu ->
+    (aux [@ocaml.tailcall]) f accu ty2 @@ fun accu ->
     (continue [@ocaml.tailcall]) accu
-  and next' :
+  and next :
       type a ac ret accu.
       accu ty_traverse -> accu -> (a, ac) ty -> (accu -> ret) -> ret =
    fun f accu ty1 continue ->
-    (aux' [@ocaml.tailcall]) f accu ty1 @@ fun accu ->
+    (aux [@ocaml.tailcall]) f accu ty1 @@ fun accu ->
     (continue [@ocaml.tailcall]) accu
   in
-  ( (fun ty init f -> aux' f init ty (fun accu -> accu)),
-    fun cty init f -> aux f init cty (fun accu -> accu) )
+  fun ty init f -> aux f init ty (fun accu -> accu)
+
+let comparable_ty_traverse = ty_traverse
 
 type 'accu stack_ty_traverse = {
   apply : 'ty 's. 'accu -> ('ty, 's) stack_ty -> 'accu;

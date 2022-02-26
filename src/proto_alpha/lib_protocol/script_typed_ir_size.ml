@@ -41,32 +41,7 @@ let ty_traverse_f =
   in
   let base_compound_no_meta = header_size in
   let base_compound _meta = h1w in
-  let apply_comparable :
-      type a. nodes_and_size -> a comparable_ty -> nodes_and_size =
-   fun accu cty ->
-    match cty with
-    | Unit_t -> ret_succ_adding accu base_basic
-    | Int_t -> ret_succ_adding accu base_basic
-    | Nat_t -> ret_succ_adding accu base_basic
-    | Signature_t -> ret_succ_adding accu base_basic
-    | String_t -> ret_succ_adding accu base_basic
-    | Bytes_t -> ret_succ_adding accu base_basic
-    | Mutez_t -> ret_succ_adding accu base_basic
-    | Key_hash_t -> ret_succ_adding accu base_basic
-    | Key_t -> ret_succ_adding accu base_basic
-    | Timestamp_t -> ret_succ_adding accu base_basic
-    | Address_t -> ret_succ_adding accu base_basic
-    | Tx_rollup_l2_address_t -> ret_succ_adding accu base_basic
-    | Bool_t -> ret_succ_adding accu base_basic
-    | Chain_id_t -> ret_succ_adding accu base_basic
-    | Never_t -> ret_succ_adding accu base_basic
-    | Pair_t (_ty1, _ty2, a, YesYes) ->
-        ret_succ_adding accu @@ (base_compound a +! (word_size *? 3))
-    | Union_t (_ty1, _ty2, a, YesYes) ->
-        ret_succ_adding accu @@ (base_compound a +! (word_size *? 3))
-    | Option_t (_ty, a, Yes) ->
-        ret_succ_adding accu @@ (base_compound a +! (word_size *? 2))
-  and apply : type a ac. nodes_and_size -> (a, ac) ty -> nodes_and_size =
+  let apply : type a ac. nodes_and_size -> (a, ac) ty -> nodes_and_size =
    fun accu ty ->
     match ty with
     | Unit_t -> ret_succ_adding accu base_basic
@@ -118,7 +93,7 @@ let ty_traverse_f =
     | Ticket_t (_cty, a) ->
         ret_succ_adding accu @@ (base_compound a +! word_size)
   in
-  ({apply; apply_comparable} : nodes_and_size ty_traverse)
+  ({apply} : nodes_and_size ty_traverse)
 
 let comparable_ty_size : type a. a comparable_ty -> nodes_and_size =
  fun cty -> comparable_ty_traverse cty zero ty_traverse_f
