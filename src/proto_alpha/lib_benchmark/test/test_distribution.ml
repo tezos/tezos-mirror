@@ -77,7 +77,7 @@ let rec tnames_of_type :
       tnames_of_type lty (tnames_of_type rty (`TUnion :: acc))
   | Script_typed_ir.Lambda_t (dom, range, _) ->
       tnames_of_type dom (tnames_of_type range (`TLambda :: acc))
-  | Script_typed_ir.Option_t (ty, _) -> tnames_of_type ty (`TOption :: acc)
+  | Script_typed_ir.Option_t (ty, _, _) -> tnames_of_type ty (`TOption :: acc)
   | Script_typed_ir.List_t (ty, _) -> tnames_of_type ty (`TList :: acc)
   | Script_typed_ir.Set_t (ty, _) -> tnames_of_comparable_type ty (`TSet :: acc)
   | Script_typed_ir.Map_t (kty, vty, _) ->

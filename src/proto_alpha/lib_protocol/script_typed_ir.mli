@@ -1353,7 +1353,7 @@ and 'ty ty =
   | Lambda_t :
       'arg ty * 'ret ty * ('arg, 'ret) lambda ty_metadata
       -> ('arg, 'ret) lambda ty
-  | Option_t : 'v ty * 'v option ty_metadata -> 'v option ty
+  | Option_t : 'v ty * 'v option ty_metadata * to_be_replaced -> 'v option ty
   | List_t : 'v ty * 'v boxed_list ty_metadata -> 'v boxed_list ty
   | Set_t : 'v comparable_ty * 'v set ty_metadata -> 'v set ty
   | Map_t :

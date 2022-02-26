@@ -1249,7 +1249,7 @@ and 'ty ty =
   | Lambda_t :
       'arg ty * 'ret ty * ('arg, 'ret) lambda ty_metadata
       -> ('arg, 'ret) lambda ty
-  | Option_t : 'v ty * 'v option ty_metadata -> 'v option ty
+  | Option_t : 'v ty * 'v option ty_metadata * to_be_replaced -> 'v option ty
   | List_t : 'v ty * 'v boxed_list ty_metadata -> 'v boxed_list ty
   | Set_t : 'v comparable_ty * 'v set ty_metadata -> 'v set ty
   | Map_t :
@@ -1773,7 +1773,7 @@ let ty_metadata : type a. a ty -> a ty_metadata = function
       meta_basic
   | Pair_t (_, _, meta, _) -> meta
   | Union_t (_, _, meta, _) -> meta
-  | Option_t (_, meta) -> meta
+  | Option_t (_, meta, _) -> meta
   | Lambda_t (_, _, meta) -> meta
   | List_t (_, meta) -> meta
   | Set_t (_, meta) -> meta
@@ -1878,35 +1878,39 @@ let lambda_t loc l r =
   Lambda_t (l, r, {size})
 
 let option_t loc t =
-  Type_size.compound1 loc (ty_size t) >|? fun size -> Option_t (t, {size})
+  Type_size.compound1 loc (ty_size t) >|? fun size -> Option_t (t, {size}, ())
 
-let option_mutez_t = Option_t (mutez_t, {size = Type_size.two})
+let option_mutez_t = Option_t (mutez_t, {size = Type_size.two}, ())
 
-let option_string_t = Option_t (string_t, {size = Type_size.two})
+let option_string_t = Option_t (string_t, {size = Type_size.two}, ())
 
-let option_bytes_t = Option_t (bytes_t, {size = Type_size.two})
+let option_bytes_t = Option_t (bytes_t, {size = Type_size.two}, ())
 
-let option_nat_t = Option_t (nat_t, {size = Type_size.two})
+let option_nat_t = Option_t (nat_t, {size = Type_size.two}, ())
 
 let option_pair_nat_nat_t =
   Option_t
     ( Pair_t (nat_t, nat_t, {size = Type_size.three}, ()),
-      {size = Type_size.four} )
+      {size = Type_size.four},
+      () )
 
 let option_pair_nat_mutez_t =
   Option_t
     ( Pair_t (nat_t, mutez_t, {size = Type_size.three}, ()),
-      {size = Type_size.four} )
+      {size = Type_size.four},
+      () )
 
 let option_pair_mutez_mutez_t =
   Option_t
     ( Pair_t (mutez_t, mutez_t, {size = Type_size.three}, ()),
-      {size = Type_size.four} )
+      {size = Type_size.four},
+      () )
 
 let option_pair_int_nat_t =
   Option_t
     ( Pair_t (int_t, nat_t, {size = Type_size.three}, ()),
-      {size = Type_size.four} )
+      {size = Type_size.four},
+      () )
 
 let option_key loc t =
   Type_size.compound1 loc (comparable_ty_size t) >|? fun size ->
@@ -2203,7 +2207,7 @@ let (ty_traverse, comparable_ty_traverse) =
         (next2' [@ocaml.tailcall]) f accu ty1 ty2 continue
     | Lambda_t (ty1, ty2, _) ->
         (next2' [@ocaml.tailcall]) f accu ty1 ty2 continue
-    | Option_t (ty1, _) -> (next' [@ocaml.tailcall]) f accu ty1 continue
+    | Option_t (ty1, _, _) -> (next' [@ocaml.tailcall]) f accu ty1 continue
     | List_t (ty1, _) -> (next' [@ocaml.tailcall]) f accu ty1 continue
     | Set_t (cty, _) -> (aux [@ocaml.tailcall]) f accu cty @@ continue
     | Map_t (cty, ty1, _) ->
@@ -2283,7 +2287,7 @@ let value_traverse (type t) (ty : (t ty, t comparable_ty) union) (x : t) init f
         match x with
         | L l -> (next [@ocaml.tailcall]) ty1 l
         | R r -> (next [@ocaml.tailcall]) ty2 r)
-    | Option_t (ty, _) -> (
+    | Option_t (ty, _, _) -> (
         match x with
         | None -> return ()
         | Some v -> (next [@ocaml.tailcall]) ty v)

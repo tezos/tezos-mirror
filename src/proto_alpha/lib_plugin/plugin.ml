@@ -2057,7 +2057,7 @@ module RPC = struct
             let ta = unparse_ty ~loc uta in
             let tr = unparse_ty ~loc utr in
             return (T_lambda, [ta; tr], [])
-        | Option_t (ut, _meta) ->
+        | Option_t (ut, _meta, _) ->
             let annot = [] in
             let ut = unparse_ty ~loc ut in
             return (T_option, [ut], annot)

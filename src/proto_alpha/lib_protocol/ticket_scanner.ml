@@ -179,7 +179,7 @@ module Ticket_inspection = struct
         (* As of H, closures cannot contain tickets because APPLY requires
            a packable type and tickets are not packable. *)
         (k [@ocaml.tailcall]) False_ht
-    | Option_t (ty, _) ->
+    | Option_t (ty, _, _) ->
         (has_tickets_of_ty [@ocaml.tailcall]) ty (fun ht ->
             let opt_hty = map_has_tickets (fun ht -> Option_ht ht) ht in
             (k [@ocaml.tailcall]) opt_hty)
@@ -360,7 +360,7 @@ module Ticket_collection = struct
               v
               acc
               k)
-    | (Option_ht el_hty, Option_t (el_ty, _)) -> (
+    | (Option_ht el_hty, Option_t (el_ty, _, _)) -> (
         match x with
         | Some x ->
             (tickets_of_value [@ocaml.tailcall])

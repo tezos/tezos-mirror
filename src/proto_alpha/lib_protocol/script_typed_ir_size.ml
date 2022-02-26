@@ -96,7 +96,8 @@ let ty_traverse_f =
         ret_succ_adding accu @@ (base_compound a +! (word_size *? 3))
     | Lambda_t (_ty1, _ty2, a) ->
         ret_succ_adding accu @@ (base_compound a +! (word_size *? 2))
-    | Option_t (_ty, a) -> ret_succ_adding accu @@ (base_compound a +! word_size)
+    | Option_t (_ty, a, _) ->
+        ret_succ_adding accu @@ (base_compound a +! (word_size *? 2))
     | List_t (_ty, a) -> ret_succ_adding accu @@ (base_compound a +! word_size)
     | Set_t (_cty, a) -> ret_succ_adding accu @@ (base_compound a +! word_size)
     | Map_t (_cty, _ty, a) ->
@@ -289,7 +290,7 @@ let rec value_size :
     | Union_t (_, _, _, _) -> ret_succ_adding accu h1w
     | Lambda_t (_, _, _) ->
         (lambda_size [@ocaml.tailcall]) ~count_lambda_nodes (ret_succ accu) x
-    | Option_t (_, _) -> ret_succ_adding accu (option_size (fun _ -> !!0) x)
+    | Option_t (_, _, _) -> ret_succ_adding accu (option_size (fun _ -> !!0) x)
     | List_t (_, _) -> ret_succ_adding accu (h2w +! (h2w *? x.length))
     | Set_t (_, _) ->
         let module M = (val Script_set.get x) in

@@ -567,7 +567,7 @@ end)
                 L (value left_t rng_state)
               else R (value right_t rng_state)
         | Lambda_t (arg_ty, ret_ty, _) -> generate_lambda arg_ty ret_ty
-        | Option_t (ty, _) ->
+        | Option_t (ty, _, _) ->
             fun rng_state ->
               if Base_samplers.uniform_bool rng_state then None
               else Some (value ty rng_state)
