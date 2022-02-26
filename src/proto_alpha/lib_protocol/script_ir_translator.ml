@@ -692,7 +692,7 @@ let type_metadata_eq :
 let default_ty_eq_error loc ty1 ty2 =
   let ty1 = serialize_ty_for_error ty1 in
   let ty2 = serialize_ty_for_error ty2 in
-  Inconsistent_types (Some loc, ty1, ty2)
+  Inconsistent_types (loc, ty1, ty2)
 
 (* Check that two comparable types are equal.
 
@@ -799,7 +799,7 @@ let ty_eq :
     |> Gas_monad.record_trace_eval ~error_details (fun () ->
            let ty1 = serialize_ty_for_error ty1 in
            let ty2 = serialize_ty_for_error ty2 in
-           Inconsistent_types (Some loc, ty1, ty2))
+           Inconsistent_types (loc, ty1, ty2))
   in
   let memo_size_eq ms1 ms2 =
     Gas_monad.of_result (memo_size_eq ~error_details ms1 ms2)

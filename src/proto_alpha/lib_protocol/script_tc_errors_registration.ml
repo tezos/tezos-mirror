@@ -573,7 +573,7 @@ let () =
        where the equality of two types have to be proven, it is always \
        accompanied with another error that provides more context."
     (obj3
-       (opt "loc" Script.location_encoding)
+       (req "loc" Script.location_encoding)
        (req "first_type" Script.expr_encoding)
        (req "other_type" Script.expr_encoding))
     (function
