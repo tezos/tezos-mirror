@@ -1108,7 +1108,8 @@ let[@coq_struct "ty"] rec parse_comparable_ty :
         >>? fun (Ex_comparable_ty right, ctxt) ->
         parse_comparable_ty ~stack_depth:(stack_depth + 1) ctxt left
         >>? fun (Ex_comparable_ty left, ctxt) ->
-        union_key loc left right >|? fun ty -> (Ex_comparable_ty ty, ctxt)
+        comparable_union_t loc left right >|? fun ty ->
+        (Ex_comparable_ty ty, ctxt)
     | Prim (loc, ((T_pair | T_or) as prim), l, _) ->
         error (Invalid_arity (loc, prim, 2, List.length l))
     | Prim (loc, T_option, [t], annot) ->

@@ -1894,7 +1894,7 @@ let union_t :
 let union_bytes_bool_t =
   Union_t (bytes_t, bool_t, {size = Type_size.three}, YesYes)
 
-let union_key loc l r =
+let comparable_union_t loc l r =
   Type_size.compound2 loc (ty_size l) (ty_size r) >|? fun size ->
   Union_t (l, r, {size}, YesYes)
 

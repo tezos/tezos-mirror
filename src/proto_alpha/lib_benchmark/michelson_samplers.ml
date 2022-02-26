@@ -467,7 +467,7 @@ end)
         let size_right = size - size_left in
         let* (Ex_comparable_ty l) = m_comparable_type ~size:size_left in
         let* (Ex_comparable_ty r) = m_comparable_type ~size:size_right in
-        match union_key (-1) l r with
+        match comparable_union_t (-1) l r with
         | Error _ -> assert false
         | Ok res_ty -> return @@ Ex_comparable_ty res_ty
       in
