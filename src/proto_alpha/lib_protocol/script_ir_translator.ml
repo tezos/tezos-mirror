@@ -161,29 +161,6 @@ let check_kind kinds expr =
    (everything that cannot contain a lambda). The rest is located at
    the end of the file. *)
 
-let rec ty_of_comparable_ty :
-    type a. a comparable_ty -> (a, Dependent_bool.yes) ty = function
-  | Unit_t -> Unit_t
-  | Never_t -> Never_t
-  | Int_t -> Int_t
-  | Nat_t -> Nat_t
-  | Signature_t -> Signature_t
-  | String_t -> String_t
-  | Bytes_t -> Bytes_t
-  | Mutez_t -> Mutez_t
-  | Bool_t -> Bool_t
-  | Key_hash_t -> Key_hash_t
-  | Key_t -> Key_t
-  | Timestamp_t -> Timestamp_t
-  | Address_t -> Address_t
-  | Tx_rollup_l2_address_t -> Tx_rollup_l2_address_t
-  | Chain_id_t -> Chain_id_t
-  | Pair_t (l, r, meta, YesYes) ->
-      Pair_t (ty_of_comparable_ty l, ty_of_comparable_ty r, meta, YesYes)
-  | Union_t (l, r, meta, YesYes) ->
-      Union_t (ty_of_comparable_ty l, ty_of_comparable_ty r, meta, YesYes)
-  | Option_t (t, meta, Yes) -> Option_t (ty_of_comparable_ty t, meta, Yes)
-
 let rec unparse_comparable_ty_uncarbonated :
     type a loc. loc:loc -> a comparable_ty -> loc Script.michelson_node =
  fun ~loc -> function
@@ -807,11 +784,7 @@ let rec comparable_ty_eq :
       @@ Error
            (match error_details with
            | Fast -> (Inconsistent_types_fast : error_trace)
-           | Informative ->
-               trace_of_error
-               @@ default_ty_eq_error
-                    (ty_of_comparable_ty ta)
-                    (ty_of_comparable_ty tb))
+           | Informative -> trace_of_error @@ default_ty_eq_error ta tb)
     in
     match (ta, tb) with
     | (Unit_t, Unit_t) -> return (Eq : (ta comparable_ty, tb comparable_ty) eq)
@@ -2468,7 +2441,7 @@ let[@coq_axiom_with_reason "gadt"] rec parse_comparable_data :
      [parse_comparable_data] doesn't call [parse_returning].
      The stack depth is bounded by the type depth, bounded by 1024. *)
   let parse_data_error () =
-    let ty = serialize_ty_for_error (ty_of_comparable_ty ty) in
+    let ty = serialize_ty_for_error ty in
     Invalid_constant (location script_data, strip_locations script_data, ty)
   in
   let traced_no_lwt body = record_trace_eval parse_data_error body in
@@ -3648,10 +3621,9 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       check_var_type_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IEmpty_set (kinfo, t, k))} in
       set_t loc t >>?= fun ty -> typed ctxt loc instr (Item_t (ty, rest))
-  | (Prim (loc, I_ITER, [body], annot), Item_t (Set_t (comp_elt, _), rest)) -> (
+  | (Prim (loc, I_ITER, [body], annot), Item_t (Set_t (elt, _), rest)) -> (
       check_kind [Seq_kind] body >>?= fun () ->
       error_unexpected_annot loc annot >>?= fun () ->
-      let elt = ty_of_comparable_ty comp_elt in
       non_terminal_recursion
         ?type_logger
         tc_context
@@ -3687,7 +3659,6 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       | Failed {descr} -> typed_no_lwt ctxt loc (mk_iset_iter (descr rest)) rest
       )
   | (Prim (loc, I_MEM, [], annot), Item_t (v, Item_t (Set_t (elt, _), rest))) ->
-      let elt = ty_of_comparable_ty elt in
       check_var_type_annot loc annot >>?= fun () ->
       check_item_ty ctxt elt v loc I_MEM 1 2 >>?= fun (Eq, ctxt) ->
       let instr = {apply = (fun kinfo k -> ISet_mem (kinfo, k))} in
@@ -3695,8 +3666,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
         : ((a, s) judgement * context) tzresult Lwt.t)
   | ( Prim (loc, I_UPDATE, [], annot),
       Item_t (v, Item_t (Bool_t, (Item_t (Set_t (elt, _), _) as stack))) ) ->
-      check_item_ty ctxt (ty_of_comparable_ty elt) v loc I_UPDATE 1 3
-      >>?= fun (Eq, ctxt) ->
+      check_item_ty ctxt elt v loc I_UPDATE 1 3 >>?= fun (Eq, ctxt) ->
       check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> ISet_update (kinfo, k))} in
       (typed ctxt loc instr stack : ((a, s) judgement * context) tzresult Lwt.t)
@@ -3713,9 +3683,8 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       check_var_type_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IEmpty_map (kinfo, tk, k))} in
       map_t loc tk tv >>?= fun ty -> typed ctxt loc instr (Item_t (ty, stack))
-  | ( Prim (loc, I_MAP, [body], annot),
-      Item_t (Map_t (ck, elt, _), starting_rest) ) -> (
-      let k = ty_of_comparable_ty ck in
+  | (Prim (loc, I_MAP, [body], annot), Item_t (Map_t (k, elt, _), starting_rest))
+    -> (
       check_kind [Seq_kind] body >>?= fun () ->
       check_var_type_annot loc annot >>?= fun () ->
       pair_t loc k elt >>?= fun (Ty_ex_c ty) ->
@@ -3748,7 +3717,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
                       IMap_map (kinfo, ibody, k));
                 }
               in
-              map_t loc ck ret >>? fun ty ->
+              map_t loc k ret >>? fun ty ->
               let stack = Item_t (ty, rest) in
               typed_no_lwt ctxt loc instr stack )
       | Typed {aft; _} ->
@@ -3756,10 +3725,9 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
           error (Invalid_map_body (loc, aft))
       | Failed _ -> error (Invalid_map_block_fail loc))
   | ( Prim (loc, I_ITER, [body], annot),
-      Item_t (Map_t (comp_elt, element_ty, _), rest) ) -> (
+      Item_t (Map_t (key, element_ty, _), rest) ) -> (
       check_kind [Seq_kind] body >>?= fun () ->
       error_unexpected_annot loc annot >>?= fun () ->
-      let key = ty_of_comparable_ty comp_elt in
       pair_t loc key element_ty >>?= fun (Ty_ex_c ty) ->
       non_terminal_recursion
         ?type_logger
@@ -3794,17 +3762,15 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
             >>? fun (Eq, ctxt) : ((a, s) judgement * context) tzresult ->
               typed_no_lwt ctxt loc (make_instr ibody) rest )
       | Failed {descr} -> typed_no_lwt ctxt loc (make_instr (descr rest)) rest)
-  | (Prim (loc, I_MEM, [], annot), Item_t (vk, Item_t (Map_t (ck, _, _), rest)))
+  | (Prim (loc, I_MEM, [], annot), Item_t (vk, Item_t (Map_t (k, _, _), rest)))
     ->
-      let k = ty_of_comparable_ty ck in
       check_item_ty ctxt vk k loc I_MEM 1 2 >>?= fun (Eq, ctxt) ->
       check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IMap_mem (kinfo, k))} in
       (typed ctxt loc instr (Item_t (bool_t, rest))
         : ((a, s) judgement * context) tzresult Lwt.t)
-  | ( Prim (loc, I_GET, [], annot),
-      Item_t (vk, Item_t (Map_t (ck, elt, _), rest)) ) ->
-      let k = ty_of_comparable_ty ck in
+  | (Prim (loc, I_GET, [], annot), Item_t (vk, Item_t (Map_t (k, elt, _), rest)))
+    ->
       check_item_ty ctxt vk k loc I_GET 1 2 >>?= fun (Eq, ctxt) ->
       check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IMap_get (kinfo, k))} in
@@ -3814,9 +3780,8 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
   | ( Prim (loc, I_UPDATE, [], annot),
       Item_t
         ( vk,
-          Item_t (Option_t (vv, _, _), (Item_t (Map_t (ck, v, _), _) as stack))
+          Item_t (Option_t (vv, _, _), (Item_t (Map_t (k, v, _), _) as stack))
         ) ) ->
-      let k = ty_of_comparable_ty ck in
       check_item_ty ctxt vk k loc I_UPDATE 1 3 >>?= fun (Eq, ctxt) ->
       check_item_ty ctxt vv v loc I_UPDATE 2 3 >>?= fun (Eq, ctxt) ->
       check_var_annot loc annot >>?= fun () ->
@@ -3825,9 +3790,8 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
   | ( Prim (loc, I_GET_AND_UPDATE, [], annot),
       Item_t
         ( vk,
-          (Item_t (Option_t (vv, _, _), Item_t (Map_t (ck, v, _), _)) as stack)
+          (Item_t (Option_t (vv, _, _), Item_t (Map_t (k, v, _), _)) as stack)
         ) ) ->
-      let k = ty_of_comparable_ty ck in
       check_item_ty ctxt vk k loc I_GET_AND_UPDATE 1 3 >>?= fun (Eq, ctxt) ->
       check_item_ty ctxt vv v loc I_GET_AND_UPDATE 2 3 >>?= fun (Eq, ctxt) ->
       check_var_annot loc annot >>?= fun () ->
@@ -3851,16 +3815,14 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       let stack = Item_t (ty, stack) in
       typed ctxt loc instr stack
   | ( Prim (loc, I_MEM, [], annot),
-      Item_t (set_key, Item_t (Big_map_t (map_key, _, _), rest)) ) ->
-      let k = ty_of_comparable_ty map_key in
+      Item_t (set_key, Item_t (Big_map_t (k, _, _), rest)) ) ->
       check_item_ty ctxt set_key k loc I_MEM 1 2 >>?= fun (Eq, ctxt) ->
       check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IBig_map_mem (kinfo, k))} in
       let stack = Item_t (bool_t, rest) in
       (typed ctxt loc instr stack : ((a, s) judgement * context) tzresult Lwt.t)
   | ( Prim (loc, I_GET, [], annot),
-      Item_t (vk, Item_t (Big_map_t (ck, elt, _), rest)) ) ->
-      let k = ty_of_comparable_ty ck in
+      Item_t (vk, Item_t (Big_map_t (k, elt, _), rest)) ) ->
       check_item_ty ctxt vk k loc I_GET 1 2 >>?= fun (Eq, ctxt) ->
       check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IBig_map_get (kinfo, k))} in
@@ -3873,8 +3835,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
           Item_t
             ( Option_t (set_value, _, _),
               (Item_t (Big_map_t (map_key, map_value, _), _) as stack) ) ) ) ->
-      let k = ty_of_comparable_ty map_key in
-      check_item_ty ctxt set_key k loc I_UPDATE 1 3 >>?= fun (Eq, ctxt) ->
+      check_item_ty ctxt set_key map_key loc I_UPDATE 1 3 >>?= fun (Eq, ctxt) ->
       check_item_ty ctxt set_value map_value loc I_UPDATE 2 3
       >>?= fun (Eq, ctxt) ->
       check_var_annot loc annot >>?= fun () ->
@@ -3883,9 +3844,8 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
   | ( Prim (loc, I_GET_AND_UPDATE, [], annot),
       Item_t
         ( vk,
-          (Item_t (Option_t (vv, _, _), Item_t (Big_map_t (ck, v, _), _)) as
+          (Item_t (Option_t (vv, _, _), Item_t (Big_map_t (k, v, _), _)) as
           stack) ) ) ->
-      let k = ty_of_comparable_ty ck in
       check_item_ty ctxt vk k loc I_GET_AND_UPDATE 1 3 >>?= fun (Eq, ctxt) ->
       check_item_ty ctxt vv v loc I_GET_AND_UPDATE 2 3 >>?= fun (Eq, ctxt) ->
       check_var_annot loc annot >>?= fun () ->
@@ -4903,8 +4863,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       (Item_t (Ticket_t (t, _), _) as full_stack) ) ->
       check_var_annot loc annot >>?= fun () ->
       let () = check_dupable_comparable_ty t in
-      opened_ticket_type loc t >>?= fun opened_ticket_ty ->
-      let result = ty_of_comparable_ty opened_ticket_ty in
+      opened_ticket_type loc t >>?= fun result ->
       let instr = {apply = (fun kinfo k -> IRead_ticket (kinfo, k))} in
       let stack = Item_t (result, full_stack) in
       typed ctxt loc instr stack
@@ -5742,8 +5701,7 @@ let[@coq_axiom_with_reason "gadt"] rec unparse_data :
       >|=? fun (items, ctxt) -> (Micheline.Seq (loc, List.rev items), ctxt)
   | (Ticket_t (t, _), {ticketer; contents; amount}) ->
       (* ideally we would like to allow a little overhead here because it is only used for unparsing *)
-      opened_ticket_type loc t >>?= fun opened_ticket_ty ->
-      let t = ty_of_comparable_ty opened_ticket_ty in
+      opened_ticket_type loc t >>?= fun t ->
       let destination : Destination.t = Contract ticketer in
       let addr = {destination; entrypoint = Entrypoint.default} in
       (unparse_data [@tailcall])

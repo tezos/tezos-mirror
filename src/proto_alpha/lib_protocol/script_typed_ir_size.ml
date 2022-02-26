@@ -592,19 +592,7 @@ let rec kinstr_extra_size : type a s r f. (a, s, r, f) kinstr -> nodes_and_size
       | ITicket (_, k) -> (
           let kinfo = Script_typed_ir.kinfo_of_kinstr k in
           match kinfo.kstack_ty with Item_t (ty, _) -> ty_size ty)
-      | IRead_ticket (_, k) -> (
-          let kinfo = Script_typed_ir.kinfo_of_kinstr k in
-          match kinfo.kstack_ty with Item_t (ty, _) -> ty_size ty)
       | ICompare (_, ty, _) -> ty_size ty
-      | ISet_iter (_, body, _) -> (
-          let kinfo = Script_typed_ir.kinfo_of_kinstr body in
-          match kinfo.kstack_ty with Item_t (ty, _) -> ty_size ty)
-      | IMap_map (_, body, _) -> (
-          let kinfo = Script_typed_ir.kinfo_of_kinstr body in
-          match kinfo.kstack_ty with Item_t (ty, _) -> ty_size ty)
-      | IMap_iter (_, body, _) -> (
-          let kinfo = Script_typed_ir.kinfo_of_kinstr body in
-          match kinfo.kstack_ty with Item_t (ty, _) -> ty_size ty)
       | ILambda (_, lambda, _) -> lambda_extra_size lambda
       | _ -> zero
     in

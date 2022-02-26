@@ -208,25 +208,16 @@ let ctxt =
 
 let unparse_comparable_ty ty =
   Micheline.strip_locations
-    (fst
-       (assert_ok
-          Script_ir_translator.(
-            unparse_ty ~loc:() ctxt (ty_of_comparable_ty ty))))
+    (fst (assert_ok Script_ir_translator.(unparse_ty ~loc:() ctxt ty)))
 
 let unparse_comparable_data ty x =
   Micheline.strip_locations
-    (fst
-       (assert_return
-          Script_ir_translator.(
-            unparse_data ctxt Readable (ty_of_comparable_ty ty) x)))
+    (fst (assert_return Script_ir_translator.(unparse_data ctxt Readable ty x)))
 
 let pack_comparable_data ty x =
-  fst
-    (assert_return
-       Script_ir_translator.(pack_data ctxt (ty_of_comparable_ty ty) x))
+  fst (assert_return Script_ir_translator.(pack_data ctxt ty x))
 
 let unpack_comparable_data ty bytes =
-  let ty = Script_ir_translator.ty_of_comparable_ty ty in
   fst (assert_return (Script_interpreter_defs.unpack ctxt ~ty ~bytes))
 
 let pp_comparable_ty fmt ty =

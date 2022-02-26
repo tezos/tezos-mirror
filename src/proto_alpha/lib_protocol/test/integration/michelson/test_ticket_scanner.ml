@@ -57,7 +57,7 @@ let string_list_of_ex_tickets ctxt tickets =
       @@ Script_ir_translator.unparse_data
            ctxt
            Script_ir_translator.Readable
-           (Script_ir_translator.ty_of_comparable_ty cty)
+           cty
            contents
     in
     let content =
