@@ -24,6 +24,7 @@
 (*****************************************************************************)
 
 open Tezos_sapling.Core.Client
+module UTXO = Tezos_sapling.Core.Validator_legacy.UTXO
 
 let _ = Random.self_init ()
 
@@ -505,7 +506,7 @@ let unshield ~src ~dst ~backdst amount (state : Contract_state.t) anti_replay =
   let memo_size = Storage.get_memo_size state.storage in
   let payback = create_payback ~memo_size backdst change in
   let sapling_transaction =
-    F.forge_transaction
+    F.forge_transaction_legacy
       (Shuffle.list inputs)
       [payback]
       src
@@ -521,7 +522,7 @@ let shield cctxt ~dst ?message amount (state : Contract_state.t) anti_replay =
   let payment = create_payment ~message dst shielded_amount in
   let negative_amount = Int64.neg (Tez.to_mutez amount) in
   let sapling_transaction =
-    F.forge_shield_transaction
+    F.forge_shield_transaction_legacy
       [payment]
       negative_amount
       anti_replay
@@ -543,7 +544,7 @@ let transfer cctxt ~src ~dst ~backdst ?message amount (state : Contract_state.t)
   let payment = create_payment ~message dst amount in
   let payback = create_payback ~memo_size backdst change in
   let sapling_transaction =
-    F.forge_transaction
+    F.forge_transaction_legacy
       (Shuffle.list inputs)
       (Shuffle.pair payback payment)
       src
