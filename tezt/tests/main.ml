@@ -111,6 +111,10 @@ let () =
     ~from_protocol:Alpha
     ~to_protocol:Injected_test
     ~loser_protocols:[Jakarta] ;
+  Voting.register
+    ~from_protocol:Alpha
+    ~to_protocol:Demo
+    ~loser_protocols:[Jakarta] ;
   (* This file tests an RPC added in protocol G *)
   Big_map_all.register () ;
   Reject_malformed_micheline.register ~protocols:[Alpha] ;

@@ -226,11 +226,12 @@ let check_listings_not_empty client =
       Test.fail "Expected GET .../votes/listing RPC to return a non-empty list"
   | _ :: _ -> unit
 
-type target_protocol = Known of Protocol.t | Injected_test
+type target_protocol = Known of Protocol.t | Injected_test | Demo
 
 let target_protocol_tag = function
   | Known protocol -> Protocol.tag protocol
   | Injected_test -> "injected_test"
+  | Demo -> "demo_counter"
 
 let inject_test_protocol client =
   let protocol_path = Temp.dir "test_proto" in
@@ -278,7 +279,7 @@ let test_voting ~from_protocol ~(to_protocol : target_protocol) ~loser_protocols
        :: List.map (fun p -> "loser_" ^ Protocol.tag p) loser_protocols
       @ [
           (match to_protocol with
-          | Known _ -> "known"
+          | Known _ | Demo -> "known"
           | Injected_test -> "injected");
         ])
   @@ fun () ->
@@ -402,6 +403,7 @@ let test_voting ~from_protocol ~(to_protocol : target_protocol) ~loser_protocols
     match to_protocol with
     | Known protocol -> return (Protocol.hash protocol)
     | Injected_test -> inject_test_protocol client
+    | Demo -> return Protocol.demo_counter_hash
   in
   (* Submit proposals: [to_protocol] and [loser_protocols]. *)
   let* () =
@@ -853,6 +855,16 @@ let test_voting ~from_protocol ~(to_protocol : target_protocol) ~loser_protocols
             remaining = 2;
           }
       in
+      check_protocols client (to_protocol_hash, to_protocol_hash)
+  | Demo ->
+      let* () =
+        check_protocols client (Protocol.hash from_protocol, to_protocol_hash)
+      in
+      Log.info
+        "Current period: adoption, with next protocol: %s."
+        (target_protocol_tag to_protocol) ;
+      Log.info "Baking transition block..." ;
+      let* () = Demo_client.bake client in
       check_protocols client (to_protocol_hash, to_protocol_hash)
 
 let test_user_activated_protocol_override_baker_vote ~from_protocol ~to_protocol
@@ -1350,4 +1362,4 @@ let register ~from_protocol ~(to_protocol : target_protocol) ~loser_protocols =
       test_user_activated_protocol_override_baker_vote
         ~from_protocol
         ~to_protocol
-  | Injected_test -> ()
+  | Demo | Injected_test -> ()
