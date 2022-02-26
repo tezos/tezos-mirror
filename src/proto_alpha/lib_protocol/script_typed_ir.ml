@@ -1842,8 +1842,6 @@ type 'v ty_ex_c = Ty_ex_c : ('v, _) ty -> 'v ty_ex_c [@@ocaml.unboxed]
 
 let unit_t = Unit_t
 
-let unit_key = unit_t
-
 let int_t = Int_t
 
 let int_key = int_t

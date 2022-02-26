@@ -161,7 +161,7 @@ let string_token ~ticketer content =
 
 let unit_ticket ~ticketer =
   Ticket_token.Ex_token
-    {ticketer; contents_type = Script_typed_ir.unit_key; contents = ()}
+    {ticketer; contents_type = Script_typed_ir.unit_t; contents = ()}
 
 let new_contracts ~before ~after =
   let all_contracts current_block =

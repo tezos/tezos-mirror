@@ -328,7 +328,7 @@ end)
       | `TKey_hash -> Ex_comparable_ty key_hash_key
       | `TMutez -> Ex_comparable_ty mutez_key
       | `TInt -> Ex_comparable_ty int_key
-      | `TUnit -> Ex_comparable_ty unit_key
+      | `TUnit -> Ex_comparable_ty unit_t
       | `TSignature -> Ex_comparable_ty signature_key
       | `TKey -> Ex_comparable_ty key_key
       | `TChain_id -> Ex_comparable_ty chain_id_key

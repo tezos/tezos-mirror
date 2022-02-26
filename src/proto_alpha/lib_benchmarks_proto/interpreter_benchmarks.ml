@@ -1118,8 +1118,7 @@ module Registration_section = struct
     let () =
       simple_benchmark
         ~name:Interpreter_workload.N_IEmpty_set
-        ~kinstr:
-          (IEmpty_set (kinfo_unit, unit_cmp, halt (set unit_cmp @$ unit @$ bot)))
+        ~kinstr:(IEmpty_set (kinfo_unit, unit, halt (set unit @$ unit @$ bot)))
         ()
 
     let set_iter_code =
@@ -1217,7 +1216,7 @@ module Registration_section = struct
     let () =
       simple_benchmark
         ~name:Interpreter_workload.N_ISet_size
-        ~kinstr:(ISet_size (kinfo (set unit_cmp @$ bot), halt (nat @$ bot)))
+        ~kinstr:(ISet_size (kinfo (set unit @$ bot), halt (nat @$ bot)))
         ()
   end
 
@@ -1244,8 +1243,7 @@ module Registration_section = struct
       simple_benchmark
         ~name:Interpreter_workload.N_IEmpty_map
         ~kinstr:
-          (IEmpty_map
-             (kinfo_unit, unit_cmp, halt (map unit_cmp unit @$ unit @$ bot)))
+          (IEmpty_map (kinfo_unit, unit, halt (map unit unit @$ unit @$ bot)))
         ()
 
     (*
@@ -1436,10 +1434,7 @@ module Registration_section = struct
         ~name:Interpreter_workload.N_IEmpty_big_map
         ~kinstr:
           (IEmpty_big_map
-             ( kinfo_unit,
-               unit_cmp,
-               unit,
-               halt (big_map unit_cmp unit @$ unit @$ bot) ))
+             (kinfo_unit, unit, unit, halt (big_map unit unit @$ unit @$ bot)))
         ()
 
     let () =
@@ -2657,7 +2652,7 @@ module Registration_section = struct
       simple_benchmark
         ~name:Interpreter_workload.N_ITicket
         ~kinstr:
-          (ITicket (kinfo (unit @$ nat @$ bot), halt (ticket unit_cmp @$ bot)))
+          (ITicket (kinfo (unit @$ nat @$ bot), halt (ticket unit @$ bot)))
         ()
 
     let () =
@@ -2665,13 +2660,12 @@ module Registration_section = struct
         ~name:Interpreter_workload.N_IRead_ticket
         ~kinstr:
           (IRead_ticket
-             ( kinfo (ticket unit_cmp @$ bot),
-               halt (cpair address (cpair unit nat) @$ ticket unit_cmp @$ bot)
-             ))
+             ( kinfo (ticket unit @$ bot),
+               halt (cpair address (cpair unit nat) @$ ticket unit @$ bot) ))
         ()
 
     let split_ticket_instr =
-      let ticket_unit = ticket unit_cmp in
+      let ticket_unit = ticket unit in
       let (Ty_ex_c pair_ticket_unit_ticket_unit) =
         pair ticket_unit ticket_unit
       in
@@ -2707,9 +2701,7 @@ module Registration_section = struct
           fun () ->
             let half_amount = Samplers.Random_value.value nat rng_state in
             let amount = Script_int.add_n half_amount half_amount in
-            let ticket =
-              Samplers.Random_value.value (ticket unit_cmp) rng_state
-            in
+            let ticket = Samplers.Random_value.value (ticket unit) rng_state in
             let ticket = {ticket with amount} in
             Ex_stack_and_kinstr
               {

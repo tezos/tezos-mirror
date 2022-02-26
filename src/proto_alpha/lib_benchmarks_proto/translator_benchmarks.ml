@@ -646,11 +646,11 @@ let rec dummy_type_generator size =
 let rec dummy_comparable_type_generator size =
   let open Script_ir_translator in
   let open Script_typed_ir in
-  if size <= 0 then Ex_comparable_ty unit_key
+  if size <= 0 then Ex_comparable_ty unit_t
   else
     match dummy_comparable_type_generator (size - 2) with
     | Ex_comparable_ty r ->
-        let l = unit_key in
+        let l = unit_t in
         Ex_comparable_ty
           (match pair_key (-1) l r with Error _ -> assert false | Ok t -> t)
 

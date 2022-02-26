@@ -34,8 +34,6 @@ let bot = Bot_t
 
 let unit = unit_t
 
-let unit_cmp = unit_key
-
 let int_cmp = int_key
 
 let string_cmp = string_key

@@ -160,17 +160,15 @@ let test_stack_overflow_in_lwt () =
   in
   let stack = Bot_t in
   let item ty s = Item_t (ty, s) in
-  let unit_t = unit_t in
-  let unit_k = unit_key in
   let bool_t = bool_t in
-  big_map_t (-1) unit_k unit_t >>??= fun big_map_t ->
+  big_map_t (-1) unit_t unit_t >>??= fun big_map_t ->
   let descr kinstr = {kloc = 0; kbef = stack; kaft = stack; kinstr} in
   let kinfo s = {iloc = -1; kstack_ty = s} in
   let stack1 = item big_map_t Bot_t in
   let stack2 = item big_map_t (item big_map_t Bot_t) in
   let stack3 = item unit_t stack2 in
   let stack4 = item bool_t stack1 in
-  let push_empty_big_map k = IEmpty_big_map (kinfo stack, unit_k, unit_t, k) in
+  let push_empty_big_map k = IEmpty_big_map (kinfo stack, unit_t, unit_t, k) in
   let large_mem_seq n =
     let rec aux n acc =
       if n = 0 then acc
