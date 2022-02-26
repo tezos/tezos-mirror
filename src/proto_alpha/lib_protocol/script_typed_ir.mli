@@ -1554,8 +1554,6 @@ val is_comparable : ('v, 'c) ty -> 'c dbool
 
 type 'v ty_ex_c = Ty_ex_c : ('v, _) ty -> 'v ty_ex_c [@@ocaml.unboxed]
 
-val nat_key : n num comparable_ty
-
 val signature_key : signature comparable_ty
 
 val string_key : Script_string.t comparable_ty

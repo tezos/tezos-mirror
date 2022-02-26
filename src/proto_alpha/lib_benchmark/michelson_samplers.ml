@@ -319,7 +319,7 @@ end)
         Script_ir_translator.ex_comparable_ty =
       match cmp_tn with
       | `TString -> Ex_comparable_ty string_key
-      | `TNat -> Ex_comparable_ty nat_key
+      | `TNat -> Ex_comparable_ty nat_t
       | `TBytes -> Ex_comparable_ty bytes_key
       | `TBool -> Ex_comparable_ty bool_key
       | `TAddress -> Ex_comparable_ty address_key
