@@ -92,7 +92,7 @@ let pair k1 k2 =
 
 (* comparable pair type constructor *)
 let cpair k1 k2 =
-  match pair_key (-1) k1 k2 with Error _ -> assert false | Ok t -> t
+  match comparable_pair_t (-1) k1 k2 with Error _ -> assert false | Ok t -> t
 
 (* union type constructor*)
 let union k1 k2 =

@@ -652,7 +652,9 @@ let rec dummy_comparable_type_generator size =
     | Ex_comparable_ty r ->
         let l = unit_t in
         Ex_comparable_ty
-          (match pair_key (-1) l r with Error _ -> assert false | Ok t -> t)
+          (match comparable_pair_t (-1) l r with
+          | Error _ -> assert false
+          | Ok t -> t)
 
 module Parse_type_shared = struct
   type config = {max_size : int}

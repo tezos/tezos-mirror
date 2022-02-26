@@ -1875,11 +1875,12 @@ let pair_t :
   let (Ex_dand cmp) = dand (is_comparable l) (is_comparable r) in
   Ty_ex_c (Pair_t (l, r, {size}, cmp))
 
-let pair_key loc l r =
+let comparable_pair_t loc l r =
   Type_size.compound2 loc (ty_size l) (ty_size r) >|? fun size ->
   Pair_t (l, r, {size}, YesYes)
 
-let pair_3_key loc l m r = pair_key loc m r >>? fun r -> pair_key loc l r
+let comparable_pair_3_t loc l m r =
+  comparable_pair_t loc m r >>? fun r -> comparable_pair_t loc l r
 
 let union_t :
     type a ac b bc.
