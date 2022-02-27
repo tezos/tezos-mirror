@@ -55,3 +55,7 @@ val sign_bytes :
   signer:key ->
   bytes ->
   Tezos_crypto.Signature.t
+
+(** Standard name for a bootstrap accounts parameterised by an
+    integer. *)
+val bootstrap : int -> string

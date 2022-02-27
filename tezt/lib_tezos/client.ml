@@ -1426,7 +1426,7 @@ let get_parameter_file ?additional_bootstrap_account_count
       let* additional_bootstrap_accounts =
         Lwt_list.map_s
           (fun i ->
-            let alias = sf "bootstrap%d" i in
+            let alias = Account.bootstrap i in
             let* key = gen_and_show_keys ~alias client in
             return (key, default_accounts_balance))
           (range 6 (5 + n))

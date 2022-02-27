@@ -43,16 +43,25 @@ let parameter_file protocol =
     ~base:(Either.right (protocol, None))
     [(["tx_rollup_enable"], Some "true")]
 
+let submit_batch ?(src = Constant.bootstrap1.public_key_hash) ~batch ~rollup
+    client =
+  Client.Tx_rollup.submit_batch ~hooks ~content:batch ~rollup ~src client
+
 (* This module only registers regressions tests. Those regressions
    tests should be used to ensure there is no regressions with the
    various RPCs exported by the tx_rollups. *)
 module Regressions = struct
   type t = {node : Node.t; client : Client.t; rollup : string}
 
-  let init_with_tx_rollup ~protocol =
+  let init_with_tx_rollup ?additional_bootstrap_account_count ~protocol () =
     let* parameter_file = parameter_file protocol in
     let* (node, client) =
-      Client.init_with_protocol ~parameter_file `Client ~protocol ()
+      Client.init_with_protocol
+        ?additional_bootstrap_account_count
+        ~parameter_file
+        `Client
+        ~protocol
+        ()
     in
     (* We originate a dumb rollup to be able to generate a paths for
        tx_rollups related RPCs. *)
@@ -63,48 +72,12 @@ module Regressions = struct
     let* _ = Node.wait_for_level node 2 in
     return {node; client; rollup}
 
-  let rpc_state ~protocols =
-    Protocol.register_regression_test
-      ~__FILE__
-      ~output_file:"tx_rollup_rpc_state"
-      ~title:"RPC (tx_rollups, regression) - state"
-      ~tags:["tx_rollup"; "rpc"]
-      ~protocols
-    @@ fun protocol ->
-    let* {node = _; client; rollup} = init_with_tx_rollup ~protocol in
-    let*! _state = Rollup.get_state ~hooks ~rollup client in
-    return ()
-
-  let submit_batch ~batch {rollup; client; node} =
-    let*! () =
-      Client.Tx_rollup.submit_batch
-        ~hooks
-        ~content:batch
-        ~rollup
-        ~src:Constant.bootstrap1.public_key_hash
-        client
-    in
+  let submit_batch_and_bake ~batch {rollup; client; node} =
+    let*! () = submit_batch ~batch ~rollup client in
     let current_level = Node.get_level node in
     let* () = Client.bake_for client in
     let* _ = Node.wait_for_level node (current_level + 1) in
     return ()
-
-  let rpc_inbox ~protocols =
-    Protocol.register_regression_test
-      ~__FILE__
-      ~output_file:"tx_rollup_rpc_inbox"
-      ~title:"RPC (tx_rollups, regression) - inbox"
-      ~tags:["tx_rollup"; "rpc"; "inbox"]
-      ~protocols
-    @@ fun protocol ->
-    let* ({rollup; client; node = _} as state) =
-      init_with_tx_rollup ~protocol
-    in
-    (* The content of the batch does not matter for the regression test. *)
-    let batch = "blob" in
-    let* () = submit_batch ~batch state in
-    let*! _inbox = Rollup.get_inbox ~hooks ~rollup client in
-    unit
 
   let submit_commitment ~level ~roots ~inbox_hash ~predecessor
       {rollup; client; node} =
@@ -124,43 +97,149 @@ module Regressions = struct
     let* _ = Node.wait_for_level node (current_level + 1) in
     return ()
 
-  let rpc_commitment ~protocols =
-    Protocol.register_regression_test
-      ~__FILE__
-      ~output_file:"tx_rollup_rpc_commitment"
-      ~title:"RPC (tx_rollups, regression) - commitment"
-      ~tags:["tx_rollup"; "rpc"; "commitment"]
-      ~protocols
-    @@ fun protocol ->
-    let* ({rollup; client; node} as state) = init_with_tx_rollup ~protocol in
-    (* The content of the batch does not matter for the regression test. *)
-    let batch = "blob" in
-    let* () = submit_batch ~batch state in
-    let batch_level = Node.get_level node in
+  module RPC = struct
+    let rpc_state ~protocols =
+      Protocol.register_regression_test
+        ~__FILE__
+        ~output_file:"tx_rollup_rpc_state"
+        ~title:"RPC (tx_rollup, regression) - state"
+        ~tags:["tx_rollup"; "rpc"; "state"]
+        ~protocols
+      @@ fun protocol ->
+      let* {node = _; client; rollup} = init_with_tx_rollup ~protocol () in
+      let*! _state = Rollup.get_state ~hooks ~rollup client in
+      return ()
 
-    let*! inbox = Rollup.get_inbox ~hooks ~rollup client in
+    let rpc_inbox ~protocols =
+      Protocol.register_regression_test
+        ~__FILE__
+        ~output_file:"tx_rollup_rpc_inbox"
+        ~title:"RPC (tx_rollup, regression) - inbox"
+        ~tags:["tx_rollup"; "rpc"; "inbox"]
+        ~protocols
+      @@ fun protocol ->
+      let* ({rollup; client; node = _} as state) =
+        init_with_tx_rollup ~protocol ()
+      in
+      (* The content of the batch does not matter for the regression test. *)
+      let batch = "blob" in
+      let* () = submit_batch_and_bake ~batch state in
+      let*! _inbox = Rollup.get_inbox ~hooks ~rollup client in
+      unit
 
-    let* () = Client.bake_for client in
+    let rpc_commitment ~protocols =
+      Protocol.register_regression_test
+        ~__FILE__
+        ~output_file:"tx_rollup_rpc_commitment"
+        ~title:"RPC (tx_rollup, regression) - commitment"
+        ~tags:["tx_rollup"; "rpc"; "commitment"]
+        ~protocols
+      @@ fun protocol ->
+      let* ({rollup; client; node} as state) =
+        init_with_tx_rollup ~protocol ()
+      in
+      (* The content of the batch does not matter for the regression test. *)
+      let batch = "blob" in
+      let* () = submit_batch_and_bake ~batch state in
+      let batch_level = Node.get_level node in
+      let*! inbox = Rollup.get_inbox ~rollup client in
+      (* FIXME https://gitlab.com/tezos/tezos/-/issues/2503
 
-    (* FIXME https://gitlab.com/tezos/tezos/-/issues/2503
+         we introduce two bakes to ensure the block is finalised. This
+         should be removed once we do not rely on Tenderbake anymore. *)
+      let* () = Client.bake_for client in
+      let* () = Client.bake_for client in
+      (* FIXME https://gitlab.com/tezos/tezos/-/issues/2503
 
-       At the same time we add actual Irmin Merkle roots for
-       commitments, we will ensure the root is indeed the root of the
-       previous inbox. I don't know yet how we will be able to do that
-       yes, something is missing. *)
-    let* () =
-      submit_commitment
-        ~level:batch_level
-        ~roots:["root"]
-        ~inbox_hash:inbox.hash
-        ~predecessor:None
-        state
-    in
-    let offset = Node.get_level node - batch_level in
-    let*! _commitment =
-      Rollup.get_commitment ~hooks ~block:"head" ~offset ~rollup client
-    in
-    unit
+         At the same time we remove the dependency to Tenderbake for
+         commitment, we will ensure the root is indeed the root of the
+         previous inbox. I don't know yet how we will be able to do that
+         yes, something is missing. *)
+      let* () =
+        submit_commitment
+          ~level:batch_level
+          ~roots:["root"]
+          ~inbox_hash:inbox.hash
+          ~predecessor:None
+          state
+      in
+      let offset = Node.get_level node - batch_level in
+      let*! _commitment =
+        Rollup.get_commitment ~hooks ~block:"head" ~offset ~rollup client
+      in
+      unit
+  end
+
+  module Limits = struct
+    (* The constant comes from the default parameters of the protocol. *)
+    let batch_limit = 5_000
+
+    let inbox_limit = 100_000
+
+    let submit_empty_batch ~protocols =
+      Protocol.register_regression_test
+        ~__FILE__
+        ~output_file:"tx_rollup_limit_empty_batch"
+        ~title:"Submit empty batch"
+        ~tags:["tx_rollup"; "batch"; "client"]
+        ~protocols
+      @@ fun protocol ->
+      let* state = init_with_tx_rollup ~protocol () in
+      let batch = "" in
+      let* () = submit_batch_and_bake ~batch state in
+      unit
+
+    let submit_maximum_size_batch ~protocols =
+      Protocol.register_regression_test
+        ~__FILE__
+        ~output_file:"tx_rollup_limit_maximum_size_batch"
+        ~title:"Submit maximum size batch"
+        ~tags:["tx_rollup"; "batch"; "client"]
+        ~protocols
+      @@ fun protocol ->
+      let* state = init_with_tx_rollup ~protocol () in
+      let batch = String.make batch_limit 'b' in
+      let* () = submit_batch_and_bake ~batch state in
+      let batch = String.make (batch_limit + 1) 'c' in
+      let*? process = submit_batch ~batch ~rollup:state.rollup state.client in
+      Process.check_error
+        ~msg:
+          (rex
+             "A message submtitted to a transaction rollup inbox exceeds limit")
+        process
+
+    let inbox_maximum_size ~protocols =
+      Protocol.register_regression_test
+        ~__FILE__
+        ~output_file:"tx_rollup_limit_maximum_size_inbox"
+        ~title:"Submit maximum size inbox"
+        ~tags:["tx_rollup"; "inbox"; "client"]
+        ~protocols
+      @@ fun protocol ->
+      (* The test assumes inbox_limit % batch_limit = 0 *)
+      let max_batch_number_per_inbox = inbox_limit / batch_limit in
+      let additional_bootstrap_account_count = max_batch_number_per_inbox - 5 in
+      let* {client; rollup; node} =
+        init_with_tx_rollup ~additional_bootstrap_account_count ~protocol ()
+      in
+      let batch = String.make batch_limit 'a' in
+      let* () =
+        fold max_batch_number_per_inbox () (fun i () ->
+            let src = Account.bootstrap (i + 1) in
+            let*! () = submit_batch ~src ~batch ~rollup client in
+            unit)
+      in
+      let current_level = Node.get_level node in
+      let* () = Client.bake_for client in
+      let* _ = Node.wait_for_level node (current_level + 1) in
+      let*! {cumulated_size; contents = _; hash = _} =
+        Rollup.get_inbox ~hooks ~rollup client
+      in
+      Check.(cumulated_size = inbox_limit)
+        Check.int
+        ~error_msg:"Unexpected inbox size. Expected %L. Got %R" ;
+      unit
+  end
 
   module Fail = struct
     let client_submit_batch_invalid_rollup_address ~protocols =
@@ -177,14 +256,7 @@ module Regressions = struct
         Client.init_with_protocol ~parameter_file `Client ~protocol ()
       in
       let invalid_address = "this is an invalid tx rollup address" in
-      let*? process =
-        Client.Tx_rollup.submit_batch
-          ~hooks
-          ~content:""
-          ~rollup:invalid_address
-          ~src:Constant.bootstrap1.public_key_hash
-          client
-      in
+      let*? process = submit_batch ~batch:"" ~rollup:invalid_address client in
       let* () =
         Process.check_error
           ~exit_code:1
@@ -198,9 +270,12 @@ module Regressions = struct
   end
 
   let register ~protocols =
-    rpc_state ~protocols ;
-    rpc_inbox ~protocols ;
-    rpc_commitment ~protocols ;
+    RPC.rpc_state ~protocols ;
+    RPC.rpc_inbox ~protocols ;
+    RPC.rpc_commitment ~protocols ;
+    Limits.submit_empty_batch ~protocols ;
+    Limits.submit_maximum_size_batch ~protocols ;
+    Limits.inbox_maximum_size ~protocols ;
     Fail.client_submit_batch_invalid_rollup_address ~protocols
 end
 

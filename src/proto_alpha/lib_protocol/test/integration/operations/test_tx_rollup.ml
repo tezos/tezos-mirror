@@ -476,7 +476,9 @@ let test_batch_too_big () =
   originate b contract >>=? fun (b, tx_rollup) ->
   Context.get_constants (B b) >>=? fun constant ->
   let contents =
-    String.make constant.parametric.tx_rollup_hard_size_limit_per_message 'd'
+    String.make
+      (constant.parametric.tx_rollup_hard_size_limit_per_message + 1)
+      'd'
   in
   Incremental.begin_construction b >>=? fun i ->
   Op.tx_rollup_submit_batch (I i) contract tx_rollup contents >>=? fun op ->
