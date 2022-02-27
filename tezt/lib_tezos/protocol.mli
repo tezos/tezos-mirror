@@ -47,6 +47,9 @@ val name : t -> string
     for Ithaca after it was snapshotted. *)
 val number : t -> int
 
+(** Get the directory of a protocol (e.g. ["proto_012_Psithaca"]). *)
+val directory : t -> string
+
 (** Get the name of a protocol as a tag, for use when registering tests (e.g. ["edo"]). *)
 val tag : t -> string
 

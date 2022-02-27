@@ -36,6 +36,11 @@ let name = function
 
 let number = function Hangzhou -> 011 | Ithaca -> 012 | Alpha -> 013
 
+let directory = function
+  | Alpha -> "proto_alpha"
+  | Hangzhou -> "proto_011_PtHangz2"
+  | Ithaca -> "proto_012_Psithaca"
+
 (* Test tags must be lowercase. *)
 let tag protocol = String.lowercase_ascii (name protocol)
 
@@ -55,13 +60,7 @@ let parameter_file ?(constants = default_constants) protocol =
     | Constants_mainnet -> "mainnet"
     | Constants_test -> "test"
   in
-  let directory =
-    match protocol with
-    | Alpha -> "proto_alpha"
-    | Hangzhou -> "proto_011_PtHangz2"
-    | Ithaca -> "proto_012_Psithaca"
-  in
-  sf "src/%s/parameters/%s-parameters.json" directory name
+  sf "src/%s/parameters/%s-parameters.json" (directory protocol) name
 
 let daemon_name = function
   | Alpha -> "alpha"
