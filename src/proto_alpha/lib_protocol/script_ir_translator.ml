@@ -285,10 +285,6 @@ let unparse_ty ~loc ctxt ty =
   Gas.consume ctxt (Unparse_costs.unparse_type ty) >|? fun ctxt ->
   (unparse_ty_uncarbonated ~loc ty, ctxt)
 
-let unparse_comparable_ty ~loc ctxt comp_ty =
-  Gas.consume ctxt (Unparse_costs.unparse_type comp_ty) >|? fun ctxt ->
-  (unparse_comparable_ty_uncarbonated ~loc comp_ty, ctxt)
-
 let unparse_parameter_ty ~loc ctxt ty ~entrypoints =
   Gas.consume ctxt (Unparse_costs.unparse_type ty) >|? fun ctxt ->
   (unparse_ty_and_entrypoints_uncarbonated ~loc ty entrypoints.root, ctxt)

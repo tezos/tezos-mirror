@@ -35,7 +35,7 @@ open Alpha_context
 let of_ex_token ctxt ~owner
     (Ticket_token.Ex_token {ticketer; contents_type; contents}) =
   let loc = Micheline.dummy_location in
-  Script_ir_translator.unparse_comparable_ty ~loc ctxt contents_type
+  Script_ir_translator.unparse_ty ~loc ctxt contents_type
   >>?= fun (cont_ty_unstripped, ctxt) ->
   (* We strip the annotations from the content type in order to map
      tickets with the same content type, but with different annotations, to the

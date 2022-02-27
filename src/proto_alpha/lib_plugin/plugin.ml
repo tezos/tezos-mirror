@@ -2060,11 +2060,6 @@ module RPC = struct
             return (T_sapling_state, [unparse_memo_size ~loc memo_size], [])
         | Chest_t -> return (T_chest, [], [])
         | Chest_key_t -> return (T_chest_key, [], [])
-
-      let unparse_comparable_ty :
-          type a loc.
-          loc:loc -> a comparable_ty -> (loc, Script.prim) Micheline.node =
-        unparse_ty
     end
 
     let run_operation_service ctxt ()
