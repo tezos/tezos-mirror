@@ -1981,36 +1981,6 @@ module RPC = struct
       open Michelson_v1_primitives
       open Script_typed_ir
 
-      let rec unparse_comparable_ty :
-          type a loc.
-          loc:loc -> a comparable_ty -> (loc, Script.prim) Micheline.node =
-       fun ~loc -> function
-        | Unit_t -> Prim (loc, T_unit, [], [])
-        | Never_t -> Prim (loc, T_never, [], [])
-        | Int_t -> Prim (loc, T_int, [], [])
-        | Nat_t -> Prim (loc, T_nat, [], [])
-        | Signature_t -> Prim (loc, T_signature, [], [])
-        | String_t -> Prim (loc, T_string, [], [])
-        | Bytes_t -> Prim (loc, T_bytes, [], [])
-        | Mutez_t -> Prim (loc, T_mutez, [], [])
-        | Bool_t -> Prim (loc, T_bool, [], [])
-        | Key_hash_t -> Prim (loc, T_key_hash, [], [])
-        | Key_t -> Prim (loc, T_key, [], [])
-        | Timestamp_t -> Prim (loc, T_timestamp, [], [])
-        | Address_t -> Prim (loc, T_address, [], [])
-        | Tx_rollup_l2_address_t -> Prim (loc, T_tx_rollup_l2_address, [], [])
-        | Chain_id_t -> Prim (loc, T_chain_id, [], [])
-        | Pair_t (l, r, _meta, YesYes) ->
-            let tl = unparse_comparable_ty ~loc l in
-            let tr = unparse_comparable_ty ~loc r in
-            Prim (loc, T_pair, [tl; tr], [])
-        | Union_t (l, r, _meta, YesYes) ->
-            let tl = unparse_comparable_ty ~loc l in
-            let tr = unparse_comparable_ty ~loc r in
-            Prim (loc, T_or, [tl; tr], [])
-        | Option_t (t, _meta, Yes) ->
-            Prim (loc, T_option, [unparse_comparable_ty ~loc t], [])
-
       let unparse_memo_size ~loc memo_size =
         let z = Alpha_context.Sapling.Memo_size.unparse_to_z memo_size in
         Int (loc, z)
@@ -2065,17 +2035,17 @@ module RPC = struct
             let t = unparse_ty ~loc ut in
             return (T_list, [t], [])
         | Ticket_t (ut, _meta) ->
-            let t = unparse_comparable_ty ~loc ut in
+            let t = unparse_ty ~loc ut in
             return (T_ticket, [t], [])
         | Set_t (ut, _meta) ->
-            let t = unparse_comparable_ty ~loc ut in
+            let t = unparse_ty ~loc ut in
             return (T_set, [t], [])
         | Map_t (uta, utr, _meta) ->
-            let ta = unparse_comparable_ty ~loc uta in
+            let ta = unparse_ty ~loc uta in
             let tr = unparse_ty ~loc utr in
             return (T_map, [ta; tr], [])
         | Big_map_t (uta, utr, _meta) ->
-            let ta = unparse_comparable_ty ~loc uta in
+            let ta = unparse_ty ~loc uta in
             let tr = unparse_ty ~loc utr in
             return (T_big_map, [ta; tr], [])
         | Sapling_transaction_t memo_size ->
@@ -2090,6 +2060,11 @@ module RPC = struct
             return (T_sapling_state, [unparse_memo_size ~loc memo_size], [])
         | Chest_t -> return (T_chest, [], [])
         | Chest_key_t -> return (T_chest_key, [], [])
+
+      let unparse_comparable_ty :
+          type a loc.
+          loc:loc -> a comparable_ty -> (loc, Script.prim) Micheline.node =
+        unparse_ty
     end
 
     let run_operation_service ctxt ()
