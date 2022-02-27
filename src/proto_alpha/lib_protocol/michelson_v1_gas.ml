@@ -948,9 +948,6 @@ module Cost_of = struct
        parameter fit for the UNPARSE_TYPE benchmark. *)
     let cost_UNPARSE_TYPE type_size = S.mul (S.safe_int 20) type_size
 
-    (* TODO: Add benchmarked value from [Unparse_comparable_type_benchmark]. *)
-    let cost_UNPARSE_COMPARABLE_TYPE type_size = S.mul (S.safe_int 20) type_size
-
     (* TODO: benchmark *)
     let cost_COMPARABLE_TY_OF_TY = S.safe_int 120
 
@@ -1794,11 +1791,6 @@ module Cost_of = struct
     let unparse_type ty =
       atomic_step_cost
       @@ cost_UNPARSE_TYPE Script_typed_ir.(ty_size ty |> Type_size.to_int)
-
-    let unparse_comparable_type comp_ty =
-      atomic_step_cost
-      @@ cost_UNPARSE_COMPARABLE_TYPE
-           Script_typed_ir.(ty_size comp_ty |> Type_size.to_int)
 
     let unparse_instr_cycle = atomic_step_cost cost_UNPARSING_CODE
 

@@ -276,7 +276,7 @@ let rec unparse_ty_and_entrypoints_uncarbonated :
 
 and unparse_comparable_ty_uncarbonated :
     type a loc. loc:loc -> a comparable_ty -> loc Script.michelson_node =
- fun ~loc ty -> unparse_ty_entrypoints_uncarbonated ~loc ty no_entrypoints
+ fun ~loc ty -> unparse_ty_and_entrypoints_uncarbonated ~loc ty no_entrypoints
 
 let unparse_ty_uncarbonated ~loc ty =
   unparse_ty_and_entrypoints_uncarbonated ~loc ty no_entrypoints
@@ -286,8 +286,8 @@ let unparse_ty ~loc ctxt ty =
   (unparse_ty_uncarbonated ~loc ty, ctxt)
 
 let unparse_comparable_ty ~loc ctxt comp_ty =
-  Gas.consume ctxt (Unparse_costs.unparse_comparable_type comp_ty)
-  >|? fun ctxt -> (unparse_comparable_ty_uncarbonated ~loc comp_ty, ctxt)
+  Gas.consume ctxt (Unparse_costs.unparse_type comp_ty) >|? fun ctxt ->
+  (unparse_comparable_ty_uncarbonated ~loc comp_ty, ctxt)
 
 let unparse_parameter_ty ~loc ctxt ty ~entrypoints =
   Gas.consume ctxt (Unparse_costs.unparse_type ty) >|? fun ctxt ->
