@@ -200,6 +200,14 @@ module Timestamp : sig
   val predecessor : context -> time
 end
 
+module Ratio : sig
+  type t = {numerator : int; denominator : int}
+
+  val encoding : t Data_encoding.t
+
+  val pp : Format.formatter -> t -> unit
+end
+
 module Raw_level : sig
   include BASIC_DATA
 
@@ -711,12 +719,6 @@ module Constants : sig
 
   val michelson_maximum_type_size : int
 
-  type ratio = {numerator : int; denominator : int}
-
-  val ratio_encoding : ratio Data_encoding.t
-
-  val pp_ratio : Format.formatter -> ratio -> unit
-
   (** Constants parameterized by context *)
   type parametric = {
     preserved_cycles : int;
@@ -744,13 +746,13 @@ module Constants : sig
     max_operations_time_to_live : int;
     minimal_block_delay : Period.t;
     delay_increment_per_round : Period.t;
-    minimal_participation_ratio : ratio;
+    minimal_participation_ratio : Ratio.t;
     consensus_committee_size : int;
     consensus_threshold : int;
     max_slashing_period : int;
     frozen_deposits_percentage : int;
     double_baking_punishment : Tez.t;
-    ratio_of_frozen_deposits_slashed_per_double_endorsement : ratio;
+    ratio_of_frozen_deposits_slashed_per_double_endorsement : Ratio.t;
     initial_seed : State_hash.t option;
     cache_script_size : int;
     cache_stake_distribution_cycles : int;
@@ -788,7 +790,8 @@ module Constants : sig
       endorsing_reward_per_slot : Tez.t;
     }
 
-    val generate : consensus_committee_size:int -> blocks_per_minute:ratio -> t
+    val generate :
+      consensus_committee_size:int -> blocks_per_minute:Ratio.t -> t
   end
 
   val parametric_encoding : parametric Data_encoding.t
@@ -849,7 +852,7 @@ module Constants : sig
 
   val consensus_threshold : context -> int
 
-  val minimal_participation_ratio : context -> ratio
+  val minimal_participation_ratio : context -> Ratio.t
 
   val max_slashing_period : context -> int
 
@@ -857,7 +860,8 @@ module Constants : sig
 
   val double_baking_punishment : context -> Tez.t
 
-  val ratio_of_frozen_deposits_slashed_per_double_endorsement : context -> ratio
+  val ratio_of_frozen_deposits_slashed_per_double_endorsement :
+    context -> Ratio.t
 
   val tx_rollup_enable : context -> bool
 

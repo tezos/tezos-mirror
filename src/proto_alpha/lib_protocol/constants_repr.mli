@@ -76,12 +76,6 @@ type fixed
 
 val fixed_encoding : fixed Data_encoding.encoding
 
-type ratio = {numerator : int; denominator : int}
-
-val ratio_encoding : ratio Data_encoding.t
-
-val pp_ratio : Format.formatter -> ratio -> unit
-
 type parametric = {
   preserved_cycles : int;
   blocks_per_cycle : int32;
@@ -109,7 +103,7 @@ type parametric = {
   max_operations_time_to_live : int;
   minimal_block_delay : Period_repr.t;
   delay_increment_per_round : Period_repr.t;
-  minimal_participation_ratio : ratio;
+  minimal_participation_ratio : Ratio_repr.t;
   consensus_committee_size : int;
   (* in slots *)
   consensus_threshold : int;
@@ -119,7 +113,7 @@ type parametric = {
   frozen_deposits_percentage : int;
   (* that is, (100 * delegated tz / own tz) *)
   double_baking_punishment : Tez_repr.t;
-  ratio_of_frozen_deposits_slashed_per_double_endorsement : ratio;
+  ratio_of_frozen_deposits_slashed_per_double_endorsement : Ratio_repr.t;
   initial_seed : State_hash.t option;
   cache_script_size : int;
   (* in bytes *)
@@ -211,7 +205,7 @@ module Generated : sig
 
   (* This function is meant to be used just in lib_parameters and in the
      migration code to be sure that the parameters are consistent. *)
-  val generate : consensus_committee_size:int -> blocks_per_minute:ratio -> t
+  val generate : consensus_committee_size:int -> blocks_per_minute:Ratio_repr.t -> t
 end
 
 module Proto_previous : sig
@@ -245,13 +239,13 @@ module Proto_previous : sig
     max_operations_time_to_live : int;
     minimal_block_delay : Period_repr.t;
     delay_increment_per_round : Period_repr.t;
-    minimal_participation_ratio : ratio;
+    minimal_participation_ratio : Ratio_repr.t;
     consensus_committee_size : int;
     consensus_threshold : int;
     max_slashing_period : int;
     frozen_deposits_percentage : int;
     double_baking_punishment : Tez_repr.t;
-    ratio_of_frozen_deposits_slashed_per_double_endorsement : ratio;
+    ratio_of_frozen_deposits_slashed_per_double_endorsement : Ratio_repr.t;
     delegate_selection : delegate_selection;
   }
 

@@ -46,6 +46,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    tez_repr.mli tez_repr.ml
    period_repr.mli period_repr.ml
    time_repr.mli time_repr.ml
+   ratio_repr.mli ratio_repr.ml
    round_repr.mli round_repr.ml
    block_payload_repr.mli block_payload_repr.ml
    fixed_point_repr.mli fixed_point_repr.ml
@@ -233,6 +234,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    tez_repr.mli tez_repr.ml
    period_repr.mli period_repr.ml
    time_repr.mli time_repr.ml
+   ratio_repr.mli ratio_repr.ml
    round_repr.mli round_repr.ml
    block_payload_repr.mli block_payload_repr.ml
    fixed_point_repr.mli fixed_point_repr.ml
@@ -420,6 +422,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    tez_repr.mli tez_repr.ml
    period_repr.mli period_repr.ml
    time_repr.mli time_repr.ml
+   ratio_repr.mli ratio_repr.ml
    round_repr.mli round_repr.ml
    block_payload_repr.mli block_payload_repr.ml
    fixed_point_repr.mli fixed_point_repr.ml
@@ -629,6 +632,7 @@ include Tezos_raw_protocol_alpha.Main
    Tez_repr
    Period_repr
    Time_repr
+   Ratio_repr
    Round_repr
    Block_payload_repr
    Fixed_point_repr
@@ -857,6 +861,7 @@ include Tezos_raw_protocol_alpha.Main
    tez_repr.mli tez_repr.ml
    period_repr.mli period_repr.ml
    time_repr.mli time_repr.ml
+   ratio_repr.mli ratio_repr.ml
    round_repr.mli round_repr.ml
    block_payload_repr.mli block_payload_repr.ml
    fixed_point_repr.mli fixed_point_repr.ml

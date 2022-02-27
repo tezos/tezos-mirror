@@ -21,6 +21,7 @@
         "Tez_repr",
         "Period_repr",
         "Time_repr",
+        "Ratio_repr",
         "Round_repr",
         "Block_payload_repr",
         "Fixed_point_repr",

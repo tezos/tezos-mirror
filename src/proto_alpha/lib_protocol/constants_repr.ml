@@ -61,20 +61,6 @@ let cache_layout_size = 3
 
 type fixed = unit
 
-type ratio = {numerator : int; denominator : int}
-
-let ratio_encoding =
-  let open Data_encoding in
-  conv_with_guard
-    (fun r -> (r.numerator, r.denominator))
-    (fun (numerator, denominator) ->
-      if Compare.Int.(denominator > 0) then ok {numerator; denominator}
-      else Error "The denominator must be greater than 0.")
-    (obj2 (req "numerator" uint16) (req "denominator" uint16))
-
-let pp_ratio fmt {numerator; denominator} =
-  Format.fprintf fmt "%d/%d" numerator denominator
-
 let fixed_encoding =
   let open Data_encoding in
   conv
@@ -146,13 +132,13 @@ type parametric = {
   max_operations_time_to_live : int;
   minimal_block_delay : Period_repr.t;
   delay_increment_per_round : Period_repr.t;
-  minimal_participation_ratio : ratio;
+  minimal_participation_ratio : Ratio_repr.t;
   consensus_committee_size : int;
   consensus_threshold : int;
   max_slashing_period : int;
   frozen_deposits_percentage : int;
   double_baking_punishment : Tez_repr.t;
-  ratio_of_frozen_deposits_slashed_per_double_endorsement : ratio;
+  ratio_of_frozen_deposits_slashed_per_double_endorsement : Ratio_repr.t;
   initial_seed : State_hash.t option;
   (* If a new cache is added, please also modify the
      [cache_layout_size] value. *)
@@ -406,13 +392,13 @@ let parametric_encoding =
                 (req "consensus_threshold" int31))
              (merge_objs
                 (obj6
-                   (req "minimal_participation_ratio" ratio_encoding)
+                   (req "minimal_participation_ratio" Ratio_repr.encoding)
                    (req "max_slashing_period" int31)
                    (req "frozen_deposits_percentage" int31)
                    (req "double_baking_punishment" Tez_repr.encoding)
                    (req
                       "ratio_of_frozen_deposits_slashed_per_double_endorsement"
-                      ratio_encoding)
+                      Ratio_repr.encoding)
                    (opt "initial_seed" State_hash.encoding))
                 (merge_objs
                    (obj3
@@ -500,7 +486,9 @@ let check_constants constants =
         than or equal to the consensus commitee size.")
   >>? fun () ->
   error_unless
-    (let {numerator; denominator} = constants.minimal_participation_ratio in
+    (let Ratio_repr.{numerator; denominator} =
+       constants.minimal_participation_ratio
+     in
      Compare.Int.(numerator >= 0 && denominator > 0))
     (Invalid_protocol_constants
        "The minimal participation ratio must be a non-negative valid ratio.")
@@ -532,7 +520,7 @@ let check_constants constants =
        "The double baking punishment must be non-negative.")
   >>? fun () ->
   error_unless
-    (let {numerator; denominator} =
+    (let Ratio_repr.{numerator; denominator} =
        constants.ratio_of_frozen_deposits_slashed_per_double_endorsement
      in
      Compare.Int.(numerator >= 0 && denominator > 0))
@@ -566,10 +554,11 @@ module Generated = struct
        be 80 tez. *)
     let rewards_per_minute = Tez_repr.(mul_exn one 80) in
     let rewards_per_block =
-      Tez_repr.(
-        div_exn
-          (mul_exn rewards_per_minute blocks_per_minute.denominator)
-          blocks_per_minute.numerator)
+      Ratio_repr.(
+        Tez_repr.(
+          div_exn
+            (mul_exn rewards_per_minute blocks_per_minute.denominator)
+            blocks_per_minute.numerator))
     in
     let rewards_half = Tez_repr.(div_exn rewards_per_block 2) in
     let rewards_quarter = Tez_repr.(div_exn rewards_per_block 4) in
@@ -638,13 +627,13 @@ module Proto_previous = struct
     max_operations_time_to_live : int;
     minimal_block_delay : Period_repr.t;
     delay_increment_per_round : Period_repr.t;
-    minimal_participation_ratio : ratio;
+    minimal_participation_ratio : Ratio_repr.t;
     consensus_committee_size : int;
     consensus_threshold : int;
     max_slashing_period : int;
     frozen_deposits_percentage : int;
     double_baking_punishment : Tez_repr.t;
-    ratio_of_frozen_deposits_slashed_per_double_endorsement : ratio;
+    ratio_of_frozen_deposits_slashed_per_double_endorsement : Ratio_repr.t;
     delegate_selection : delegate_selection;
   }
 
@@ -791,13 +780,13 @@ module Proto_previous = struct
                   (req "consensus_committee_size" int31)
                   (req "consensus_threshold" int31))
                (obj6
-                  (req "minimal_participation_ratio" ratio_encoding)
+                  (req "minimal_participation_ratio" Ratio_repr.encoding)
                   (req "max_slashing_period" int31)
                   (req "frozen_deposits_percentage" int31)
                   (req "double_baking_punishment" Tez_repr.encoding)
                   (req
                      "ratio_of_frozen_deposits_slashed_per_double_endorsement"
-                     ratio_encoding)
+                     Ratio_repr.encoding)
                   (dft "delegate_selection" delegate_selection_encoding Random)))))
 end
 

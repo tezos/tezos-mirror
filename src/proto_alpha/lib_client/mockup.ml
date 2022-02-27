@@ -61,14 +61,13 @@ module Protocol_constants_overrides = struct
     max_operations_time_to_live : int option;
     minimal_block_delay : Period.t option;
     delay_increment_per_round : Period.t option;
-    minimal_participation_ratio : Constants.ratio option;
+    minimal_participation_ratio : Ratio.t option;
     consensus_committee_size : int option;
     consensus_threshold : int option;
     max_slashing_period : int option;
     frozen_deposits_percentage : int option;
     double_baking_punishment : Tez.t option;
-    ratio_of_frozen_deposits_slashed_per_double_endorsement :
-      Constants.ratio option;
+    ratio_of_frozen_deposits_slashed_per_double_endorsement : Ratio.t option;
     cache_script_size : int option;
     cache_stake_distribution_cycles : int option;
     cache_sampler_state_cycles : int option;
@@ -326,15 +325,13 @@ module Protocol_constants_overrides = struct
                   (opt "consensus_threshold" int31))
                (merge_objs
                   (obj8
-                     (opt
-                        "minimal_participation_ratio"
-                        Constants.ratio_encoding)
+                     (opt "minimal_participation_ratio" Ratio.encoding)
                      (opt "max_slashing_period" int31)
                      (opt "frozen_deposits_percentage" int31)
                      (opt "double_baking_punishment" Tez.encoding)
                      (opt
                         "ratio_of_frozen_deposits_slashed_per_double_endorsement"
-                        Constants.ratio_encoding)
+                        Ratio.encoding)
                      (opt "chain_id" Chain_id.encoding)
                      (opt "initial_timestamp" Time.Protocol.encoding)
                      (opt "initial_seed" (option State_hash.encoding)))
@@ -719,7 +716,7 @@ module Protocol_constants_overrides = struct
           {
             name = "minimal_participation_ratio";
             override_value = o.minimal_participation_ratio;
-            pp = Constants.pp_ratio;
+            pp = Ratio.pp;
           };
         O
           {
@@ -756,7 +753,7 @@ module Protocol_constants_overrides = struct
             name = "ratio_of_frozen_deposits_slashed_per_double_endorsement";
             override_value =
               o.ratio_of_frozen_deposits_slashed_per_double_endorsement;
-            pp = Constants.pp_ratio;
+            pp = Ratio.pp;
           };
         O
           {
