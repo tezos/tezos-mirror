@@ -52,6 +52,8 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    fixed_point_repr.mli fixed_point_repr.ml
    saturation_repr.mli saturation_repr.ml
    gas_limit_repr.mli gas_limit_repr.ml
+   constants_parametric_repr.mli constants_parametric_repr.ml
+   constants_parametric_previous_repr.mli constants_parametric_previous_repr.ml
    constants_repr.mli constants_repr.ml
    raw_level_repr.mli raw_level_repr.ml
    fitness_repr.mli fitness_repr.ml
@@ -240,6 +242,8 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    fixed_point_repr.mli fixed_point_repr.ml
    saturation_repr.mli saturation_repr.ml
    gas_limit_repr.mli gas_limit_repr.ml
+   constants_parametric_repr.mli constants_parametric_repr.ml
+   constants_parametric_previous_repr.mli constants_parametric_previous_repr.ml
    constants_repr.mli constants_repr.ml
    raw_level_repr.mli raw_level_repr.ml
    fitness_repr.mli fitness_repr.ml
@@ -428,6 +432,8 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    fixed_point_repr.mli fixed_point_repr.ml
    saturation_repr.mli saturation_repr.ml
    gas_limit_repr.mli gas_limit_repr.ml
+   constants_parametric_repr.mli constants_parametric_repr.ml
+   constants_parametric_previous_repr.mli constants_parametric_previous_repr.ml
    constants_repr.mli constants_repr.ml
    raw_level_repr.mli raw_level_repr.ml
    fitness_repr.mli fitness_repr.ml
@@ -638,6 +644,8 @@ include Tezos_raw_protocol_alpha.Main
    Fixed_point_repr
    Saturation_repr
    Gas_limit_repr
+   Constants_parametric_repr
+   Constants_parametric_previous_repr
    Constants_repr
    Raw_level_repr
    Fitness_repr
@@ -867,6 +875,8 @@ include Tezos_raw_protocol_alpha.Main
    fixed_point_repr.mli fixed_point_repr.ml
    saturation_repr.mli saturation_repr.ml
    gas_limit_repr.mli gas_limit_repr.ml
+   constants_parametric_repr.mli constants_parametric_repr.ml
+   constants_parametric_previous_repr.mli constants_parametric_previous_repr.ml
    constants_repr.mli constants_repr.ml
    raw_level_repr.mli raw_level_repr.ml
    fitness_repr.mli fitness_repr.ml

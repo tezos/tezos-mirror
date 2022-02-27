@@ -257,7 +257,7 @@ end
 let protocol_param_key = ["protocol_parameters"]
 
 let check_constants_consistency constants =
-  let open Constants in
+  let open Constants.Parametric in
   let {blocks_per_cycle; blocks_per_commitment; blocks_per_stake_snapshot; _} =
     constants
   in

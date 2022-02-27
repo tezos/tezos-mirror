@@ -126,6 +126,7 @@ type signature = Signature.t
 module Constants = struct
   include Constants_repr
   include Constants_storage
+  module Parametric = Constants_parametric_repr
 
   let round_durations ctxt = Raw_context.round_durations ctxt
 

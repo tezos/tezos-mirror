@@ -27,6 +27,8 @@
         "Fixed_point_repr",
         "Saturation_repr",
         "Gas_limit_repr",
+        "Constants_parametric_repr",
+        "Constants_parametric_previous_repr",
         "Constants_repr",
         "Raw_level_repr",
         "Fitness_repr",

@@ -44,7 +44,7 @@ let constants_mainnet =
       ~blocks_per_minute:{numerator = 60; denominator = block_time}
   in
   {
-    Constants.preserved_cycles = 5;
+    Constants.Parametric.preserved_cycles = 5;
     blocks_per_cycle = 8192l;
     blocks_per_commitment = 64l;
     blocks_per_stake_snapshot = 512l;
@@ -180,7 +180,7 @@ let constants_sandbox =
   in
   {
     constants_mainnet with
-    Constants.preserved_cycles = 2;
+    Constants.Parametric.preserved_cycles = 2;
     blocks_per_cycle = 8l;
     blocks_per_commitment = 4l;
     blocks_per_stake_snapshot = 4l;
@@ -213,7 +213,7 @@ let constants_test =
   in
   {
     constants_mainnet with
-    Constants.preserved_cycles = 3;
+    Constants.Parametric.preserved_cycles = 3;
     blocks_per_cycle = 12l;
     blocks_per_commitment = 4l;
     blocks_per_stake_snapshot = 4l;

@@ -47,7 +47,7 @@ type t = {
   bootstrap_accounts : bootstrap_account list;
   bootstrap_contracts : bootstrap_contract list;
   commitments : Commitment_repr.t list;
-  constants : Constants_repr.parametric;
+  constants : Constants_parametric_repr.t;
   security_deposit_ramp_up_cycles : int option;
   no_reward_cycles : int option;
 }

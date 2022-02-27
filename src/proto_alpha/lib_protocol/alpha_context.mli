@@ -720,67 +720,71 @@ module Constants : sig
   val michelson_maximum_type_size : int
 
   (** Constants parameterized by context *)
-  type parametric = {
-    preserved_cycles : int;
-    blocks_per_cycle : int32;
-    blocks_per_commitment : int32;
-    blocks_per_stake_snapshot : int32;
-    cycles_per_voting_period : int32;
-    hard_gas_limit_per_operation : Gas.Arith.integral;
-    hard_gas_limit_per_block : Gas.Arith.integral;
-    proof_of_work_threshold : int64;
-    tokens_per_roll : Tez.t;
-    seed_nonce_revelation_tip : Tez.t;
-    origination_size : int;
-    baking_reward_fixed_portion : Tez.t;
-    baking_reward_bonus_per_slot : Tez.t;
-    endorsing_reward_per_slot : Tez.t;
-    cost_per_byte : Tez.t;
-    hard_storage_limit_per_operation : Z.t;
-    quorum_min : int32;
-    quorum_max : int32;
-    min_proposal_quorum : int32;
-    liquidity_baking_subsidy : Tez.t;
-    liquidity_baking_sunset_level : int32;
-    liquidity_baking_toggle_ema_threshold : int32;
-    max_operations_time_to_live : int;
-    minimal_block_delay : Period.t;
-    delay_increment_per_round : Period.t;
-    minimal_participation_ratio : Ratio.t;
-    consensus_committee_size : int;
-    consensus_threshold : int;
-    max_slashing_period : int;
-    frozen_deposits_percentage : int;
-    double_baking_punishment : Tez.t;
-    ratio_of_frozen_deposits_slashed_per_double_endorsement : Ratio.t;
-    initial_seed : State_hash.t option;
-    cache_script_size : int;
-    cache_stake_distribution_cycles : int;
-    cache_sampler_state_cycles : int;
-    tx_rollup_enable : bool;
-    tx_rollup_origination_size : int;
-    tx_rollup_hard_size_limit_per_inbox : int;
-    tx_rollup_hard_size_limit_per_message : int;
-    tx_rollup_commitment_bond : Tez.t;
-    tx_rollup_finality_period : int;
-    tx_rollup_withdraw_period : int;
-    tx_rollup_max_inboxes_count : int;
-    tx_rollup_max_messages_per_inbox : int;
-    tx_rollup_max_commitments_count : int;
-    tx_rollup_cost_per_byte_ema_factor : int;
-    tx_rollup_max_ticket_payload_size : int;
-    tx_rollup_max_withdrawals_per_batch : int;
-    tx_rollup_rejection_max_proof_size : int;
-    tx_rollup_sunset_level : int32;
-    sc_rollup_enable : bool;
-    sc_rollup_origination_size : int;
-    sc_rollup_challenge_window_in_blocks : int;
-    sc_rollup_max_available_messages : int;
-    sc_rollup_stake_amount_in_mutez : int;
-    sc_rollup_commitment_frequency_in_blocks : int;
-    sc_rollup_commitment_storage_size_in_bytes : int;
-    sc_rollup_max_lookahead_in_blocks : int32;
-  }
+  module Parametric : sig
+    type t = {
+      preserved_cycles : int;
+      blocks_per_cycle : int32;
+      blocks_per_commitment : int32;
+      blocks_per_stake_snapshot : int32;
+      cycles_per_voting_period : int32;
+      hard_gas_limit_per_operation : Gas.Arith.integral;
+      hard_gas_limit_per_block : Gas.Arith.integral;
+      proof_of_work_threshold : int64;
+      tokens_per_roll : Tez.t;
+      seed_nonce_revelation_tip : Tez.t;
+      origination_size : int;
+      baking_reward_fixed_portion : Tez.t;
+      baking_reward_bonus_per_slot : Tez.t;
+      endorsing_reward_per_slot : Tez.t;
+      cost_per_byte : Tez.t;
+      hard_storage_limit_per_operation : Z.t;
+      quorum_min : int32;
+      quorum_max : int32;
+      min_proposal_quorum : int32;
+      liquidity_baking_subsidy : Tez.t;
+      liquidity_baking_sunset_level : int32;
+      liquidity_baking_toggle_ema_threshold : int32;
+      max_operations_time_to_live : int;
+      minimal_block_delay : Period.t;
+      delay_increment_per_round : Period.t;
+      minimal_participation_ratio : Ratio.t;
+      consensus_committee_size : int;
+      consensus_threshold : int;
+      max_slashing_period : int;
+      frozen_deposits_percentage : int;
+      double_baking_punishment : Tez.t;
+      ratio_of_frozen_deposits_slashed_per_double_endorsement : Ratio.t;
+      initial_seed : State_hash.t option;
+      cache_script_size : int;
+      cache_stake_distribution_cycles : int;
+      cache_sampler_state_cycles : int;
+      tx_rollup_enable : bool;
+      tx_rollup_origination_size : int;
+      tx_rollup_hard_size_limit_per_inbox : int;
+      tx_rollup_hard_size_limit_per_message : int;
+      tx_rollup_commitment_bond : Tez.t;
+      tx_rollup_finality_period : int;
+      tx_rollup_withdraw_period : int;
+      tx_rollup_max_inboxes_count : int;
+      tx_rollup_max_messages_per_inbox : int;
+      tx_rollup_max_commitments_count : int;
+      tx_rollup_cost_per_byte_ema_factor : int;
+      tx_rollup_max_ticket_payload_size : int;
+      tx_rollup_max_withdrawals_per_batch : int;
+      tx_rollup_rejection_max_proof_size : int;
+      tx_rollup_sunset_level : int32;
+      sc_rollup_enable : bool;
+      sc_rollup_origination_size : int;
+      sc_rollup_challenge_window_in_blocks : int;
+      sc_rollup_max_available_messages : int;
+      sc_rollup_stake_amount_in_mutez : int;
+      sc_rollup_commitment_frequency_in_blocks : int;
+      sc_rollup_commitment_storage_size_in_bytes : int;
+      sc_rollup_max_lookahead_in_blocks : int32;
+    }
+
+    val encoding : t Data_encoding.t
+  end
 
   module Generated : sig
     type t = {
@@ -794,9 +798,7 @@ module Constants : sig
       consensus_committee_size:int -> blocks_per_minute:Ratio.t -> t
   end
 
-  val parametric_encoding : parametric Data_encoding.t
-
-  val parametric : context -> parametric
+  val parametric : context -> Parametric.t
 
   val preserved_cycles : context -> int
 
@@ -896,7 +898,7 @@ module Constants : sig
   val sc_rollup_max_available_messages : context -> int
 
   (** All constants: fixed and parametric *)
-  type t = private {fixed : fixed; parametric : parametric}
+  type t = private {fixed : fixed; parametric : Parametric.t}
 
   val all : context -> t
 
@@ -3360,7 +3362,7 @@ module Parameters : sig
     bootstrap_accounts : bootstrap_account list;
     bootstrap_contracts : bootstrap_contract list;
     commitments : Commitment.t list;
-    constants : Constants.parametric;
+    constants : Constants.Parametric.t;
     security_deposit_ramp_up_cycles : int option;
     no_reward_cycles : int option;
   }

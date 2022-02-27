@@ -562,7 +562,7 @@ module Protocol_constants_overrides = struct
     | Some value -> Format.fprintf ppf "@[<h>%s: %a@]" name pp value
 
   let apply_overrides (cctxt : Tezos_client_base.Client_context.printer) (o : t)
-      (c : Constants.parametric) : Constants.parametric tzresult Lwt.t =
+      (c : Constants.Parametric.t) : Constants.Parametric.t tzresult Lwt.t =
     let open Format in
     let pp_print_int32 ppf i = fprintf ppf "%li" i in
     let pp_print_int64 ppf i = fprintf ppf "%Li" i in
@@ -1047,7 +1047,7 @@ module Protocol_constants_overrides = struct
              ~default:c.sc_rollup_max_lookahead_in_blocks
              o.sc_rollup_max_lookahead_in_blocks;
        }
-        : Constants.parametric)
+        : Constants.Parametric.t)
 end
 
 module Parsed_account = struct
@@ -1160,7 +1160,7 @@ module Protocol_parameters = struct
     initial_timestamp : Time.Protocol.t;
     bootstrap_accounts : Parameters.bootstrap_account list;
     bootstrap_contracts : Parameters.bootstrap_contract list;
-    constants : Constants.parametric;
+    constants : Constants.Parametric.t;
   }
 
   let encoding : t Data_encoding.t =
@@ -1180,7 +1180,7 @@ module Protocol_parameters = struct
          (req "initial_timestamp" Time.Protocol.encoding)
          (req "bootstrap_accounts" (list Bootstrap_account.encoding))
          (req "bootstrap_contracts" (list Bootstrap_contract.encoding))
-         (req "constants" Constants.parametric_encoding))
+         (req "constants" Constants.Parametric.encoding))
 
   let default_value : t =
     let parameters =

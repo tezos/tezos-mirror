@@ -74,7 +74,7 @@ val liquidity_baking_sunset_level : Raw_context.t -> int32
 
 val liquidity_baking_toggle_ema_threshold : Raw_context.t -> int32
 
-val parametric : Raw_context.t -> Constants_repr.parametric
+val parametric : Raw_context.t -> Constants_parametric_repr.t
 
 val consensus_committee_size : Raw_context.t -> int
 

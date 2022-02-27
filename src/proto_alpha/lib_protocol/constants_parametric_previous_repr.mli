@@ -1,7 +1,9 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020-2021 Nomadic Labs <contact@nomadic-labs.com>           *)
+(* Copyright (c) 2021-2022 Trili Tech, <contact@trili.tech>                  *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,42 +25,44 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol
-open Alpha_context
+type delegate_selection =
+  | Random
+  | Round_robin_over of Signature.Public_key.t list list
 
-type unsigned_block = {
-  unsigned_block_header : Block_header.t;
-  operations : Tezos_base.Operation.t list list;
+type t = {
+  preserved_cycles : int;
+  blocks_per_cycle : int32;
+  blocks_per_commitment : int32;
+  blocks_per_stake_snapshot : int32;
+  blocks_per_voting_period : int32;
+  hard_gas_limit_per_operation : Gas_limit_repr.Arith.integral;
+  hard_gas_limit_per_block : Gas_limit_repr.Arith.integral;
+  proof_of_work_threshold : int64;
+  tokens_per_roll : Tez_repr.t;
+  seed_nonce_revelation_tip : Tez_repr.t;
+  origination_size : int;
+  baking_reward_fixed_portion : Tez_repr.t;
+  baking_reward_bonus_per_slot : Tez_repr.t;
+  endorsing_reward_per_slot : Tez_repr.t;
+  cost_per_byte : Tez_repr.t;
+  hard_storage_limit_per_operation : Z.t;
+  quorum_min : int32;
+  quorum_max : int32;
+  min_proposal_quorum : int32;
+  liquidity_baking_subsidy : Tez_repr.t;
+  liquidity_baking_sunset_level : int32;
+  liquidity_baking_escape_ema_threshold : int32;
+  max_operations_time_to_live : int;
+  minimal_block_delay : Period_repr.t;
+  delay_increment_per_round : Period_repr.t;
+  minimal_participation_ratio : Ratio_repr.t;
+  consensus_committee_size : int;
+  consensus_threshold : int;
+  max_slashing_period : int;
+  frozen_deposits_percentage : int;
+  double_baking_punishment : Tez_repr.t;
+  ratio_of_frozen_deposits_slashed_per_double_endorsement : Ratio_repr.t;
+  delegate_selection : delegate_selection;
 }
 
-type simulation_kind =
-  | Filter of Operation_pool.Prioritized.t
-  | Apply of {
-      ordered_pool : Operation_pool.ordered_pool;
-      payload_hash : Block_payload_hash.t;
-    }
-
-type simulation_mode = Local of Context.index | Node
-
-val forge_faked_protocol_data :
-  ?payload_hash:Block_payload_hash.t ->
-  payload_round:Round.t ->
-  seed_nonce_hash:Nonce_hash.t option ->
-  liquidity_baking_toggle_vote:Liquidity_baking.liquidity_baking_toggle_vote ->
-  unit ->
-  block_header_data
-
-val forge :
-  #Protocol_client_context.full ->
-  chain_id:Chain_id.t ->
-  pred_info:Baking_state.block_info ->
-  timestamp:Time.Protocol.t ->
-  liquidity_baking_toggle_vote:Liquidity_baking.liquidity_baking_toggle_vote ->
-  user_activated_upgrades:User_activated.upgrades ->
-  Baking_configuration.fees_config ->
-  seed_nonce_hash:Nonce_hash.t option ->
-  payload_round:Round.t ->
-  Baking_state.validation_mode ->
-  simulation_kind ->
-  Constants.Parametric.t ->
-  unsigned_block tzresult Lwt.t
+val encoding : t Data_encoding.encoding
