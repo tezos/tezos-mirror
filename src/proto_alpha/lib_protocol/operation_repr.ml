@@ -479,10 +479,12 @@ module Encoding = struct
           inj = (fun pkh -> Reveal pkh);
         }
 
+    let transaction_tag = 1
+
     let[@coq_axiom_with_reason "gadt"] transaction_case =
       MCase
         {
-          tag = 1;
+          tag = transaction_tag;
           name = "transaction";
           encoding =
             obj3
@@ -516,10 +518,12 @@ module Encoding = struct
               Transaction {amount; destination; parameters; entrypoint});
         }
 
+    let origination_tag = 2
+
     let[@coq_axiom_with_reason "gadt"] origination_case =
       MCase
         {
-          tag = 2;
+          tag = origination_tag;
           name = "origination";
           encoding =
             obj3
@@ -547,10 +551,12 @@ module Encoding = struct
               Origination {credit; delegate; script; preorigination = None});
         }
 
+    let delegation_tag = 3
+
     let[@coq_axiom_with_reason "gadt"] delegation_case =
       MCase
         {
-          tag = 3;
+          tag = delegation_tag;
           name = "delegation";
           encoding = obj1 (opt "delegate" Signature.Public_key_hash.encoding);
           select =
