@@ -63,22 +63,31 @@ let make_pk pk =
     (Uri.make ~scheme ~path:(Signature.Public_key.to_b58check pk) ())
 
 let neuterize sk_uri =
-  secret_key sk_uri >>=? fun sk ->
-  make_pk (Signature.Secret_key.to_public_key sk) >>?= return
+  let open Lwt_result_syntax in
+  let* sk = secret_key sk_uri in
+  let*? v = make_pk (Signature.Secret_key.to_public_key sk) in
+  return v
 
 let public_key_hash pk_uri =
-  public_key pk_uri >>=? fun pk -> return (Signature.Public_key.hash pk, Some pk)
+  let open Lwt_result_syntax in
+  let* pk = public_key pk_uri in
+  return (Signature.Public_key.hash pk, Some pk)
 
 let import_secret_key ~io:_ = public_key_hash
 
 let sign ?watermark sk_uri buf =
-  secret_key sk_uri >>=? fun sk -> return (Signature.sign ?watermark sk buf)
+  let open Lwt_result_syntax in
+  let* sk = secret_key sk_uri in
+  return (Signature.sign ?watermark sk buf)
 
 let deterministic_nonce sk_uri buf =
-  secret_key sk_uri >>=? fun sk -> return (Signature.deterministic_nonce sk buf)
+  let open Lwt_result_syntax in
+  let* sk = secret_key sk_uri in
+  return (Signature.deterministic_nonce sk buf)
 
 let deterministic_nonce_hash sk_uri buf =
-  secret_key sk_uri >>=? fun sk ->
+  let open Lwt_result_syntax in
+  let* sk = secret_key sk_uri in
   return (Signature.deterministic_nonce_hash sk buf)
 
 let supports_deterministic_nonces _ = return_true

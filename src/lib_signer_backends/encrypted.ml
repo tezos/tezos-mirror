@@ -163,22 +163,26 @@ let passwords = ref []
    given more than `retries_left` *)
 let interactive_decrypt_loop (cctxt : #Client_context.io) ?name ~retries_left
     ~encrypted_sk algo =
+  let open Lwt_tzresult_syntax in
   let rec interactive_decrypt_loop (cctxt : #Client_context.io) name
       ~current_retries ~retries ~encrypted_sk algo =
     match current_retries with
     | n when n >= retries ->
         failwith "%d incorrect password attempts" current_retries
     | _ -> (
-        cctxt#prompt_password "Enter password for encrypted key%s: " name
-        >>=? fun password ->
-        Raw.decrypt algo ~password ~encrypted_sk >>=? function
+        let* password =
+          cctxt#prompt_password "Enter password for encrypted key%s: " name
+        in
+        let* o = Raw.decrypt algo ~password ~encrypted_sk in
+        match o with
         | Some sk ->
             passwords := password :: !passwords ;
             return sk
         | None ->
-            (if retries_left == 1 then Lwt.return_unit
-            else cctxt#message "Sorry, try again.")
-            >>= fun () ->
+            let*! () =
+              if retries_left == 1 then Lwt.return_unit
+              else cctxt#message "Sorry, try again."
+            in
             interactive_decrypt_loop
               cctxt
               name
@@ -200,31 +204,40 @@ let interactive_decrypt_loop (cctxt : #Client_context.io) ?name ~retries_left
 
 (* add all passwords obtained by [ctxt#load_passwords] to the list of known passwords *)
 let password_file_load ctxt =
+  let open Lwt_syntax in
   match ctxt#load_passwords with
   | Some stream ->
-      Lwt_stream.iter
-        (fun p -> passwords := Bytes.of_string p :: !passwords)
-        stream
-      >>= fun () -> return_unit
-  | None -> return_unit
+      let* () =
+        Lwt_stream.iter
+          (fun p -> passwords := Bytes.of_string p :: !passwords)
+          stream
+      in
+      return_ok_unit
+  | None -> return_ok_unit
 
-let rec noninteractive_decrypt_loop algo ~encrypted_sk = function
+let rec noninteractive_decrypt_loop algo ~encrypted_sk =
+  let open Lwt_result_syntax in
+  function
   | [] -> return_none
   | password :: passwords -> (
-      Raw.decrypt algo ~password ~encrypted_sk >>=? function
+      let* o = Raw.decrypt algo ~password ~encrypted_sk in
+      match o with
       | None -> noninteractive_decrypt_loop algo ~encrypted_sk passwords
       | Some sk -> return_some sk)
 
 let decrypt_payload cctxt ?name encrypted_sk =
-  (match Base58.decode encrypted_sk with
-  | Some (Encrypted_ed25519 encrypted_sk) ->
-      return (Signature.Ed25519, encrypted_sk)
-  | Some (Encrypted_secp256k1 encrypted_sk) ->
-      return (Signature.Secp256k1, encrypted_sk)
-  | Some (Encrypted_p256 encrypted_sk) -> return (Signature.P256, encrypted_sk)
-  | _ -> failwith "Not a Base58Check-encoded encrypted key")
-  >>=? fun (algo, encrypted_sk) ->
-  noninteractive_decrypt_loop algo ~encrypted_sk !passwords >>=? function
+  let open Lwt_result_syntax in
+  let* (algo, encrypted_sk) =
+    match Base58.decode encrypted_sk with
+    | Some (Encrypted_ed25519 encrypted_sk) ->
+        return (Signature.Ed25519, encrypted_sk)
+    | Some (Encrypted_secp256k1 encrypted_sk) ->
+        return (Signature.Secp256k1, encrypted_sk)
+    | Some (Encrypted_p256 encrypted_sk) -> return (Signature.P256, encrypted_sk)
+    | _ -> failwith "Not a Base58Check-encoded encrypted key"
+  in
+  let* o = noninteractive_decrypt_loop algo ~encrypted_sk !passwords in
+  match o with
   | Some sk -> return sk
   | None ->
       let retries_left = if cctxt#multiple_password_retries then 3 else 1 in
@@ -235,39 +248,50 @@ let internal_decrypt (cctxt : #Client_context.prompter) ?name sk_uri =
   decrypt_payload cctxt ?name payload
 
 let decrypt (cctxt : #Client_context.prompter) ?name sk_uri =
-  password_file_load cctxt >>=? fun () ->
+  let open Lwt_result_syntax in
+  let* () = password_file_load cctxt in
   internal_decrypt (cctxt : #Client_context.prompter) ?name sk_uri
 
 let decrypt_all (cctxt : #Client_context.io_wallet) =
-  Secret_key.load cctxt >>=? fun sks ->
-  password_file_load cctxt >>=? fun () ->
+  let open Lwt_result_syntax in
+  let* sks = Secret_key.load cctxt in
+  let* () = password_file_load cctxt in
   List.iter_es
     (fun (name, sk_uri) ->
       if Uri.scheme (sk_uri : sk_uri :> Uri.t) <> Some scheme then return_unit
-      else internal_decrypt cctxt ~name sk_uri >>=? fun _ -> return_unit)
+      else
+        let* _ = internal_decrypt cctxt ~name sk_uri in
+        return_unit)
     sks
 
 let decrypt_list (cctxt : #Client_context.io_wallet) keys =
-  Secret_key.load cctxt >>=? fun sks ->
-  password_file_load cctxt >>=? fun () ->
+  let open Lwt_result_syntax in
+  let* sks = Secret_key.load cctxt in
+  let* () = password_file_load cctxt in
   List.iter_es
     (fun (name, sk_uri) ->
       if
         Uri.scheme (sk_uri : sk_uri :> Uri.t) = Some scheme
         && (keys = [] || List.mem ~equal:String.equal name keys)
-      then internal_decrypt cctxt ~name sk_uri >>=? fun _ -> return_unit
+      then
+        let* _ = internal_decrypt cctxt ~name sk_uri in
+        return_unit
       else return_unit)
     sks
 
 let rec read_password (cctxt : #Client_context.io) =
-  cctxt#prompt_password "Enter password to encrypt your key: "
-  >>=? fun password ->
-  cctxt#prompt_password "Confirm password: " >>=? fun confirm ->
+  let open Lwt_result_syntax in
+  let* password =
+    cctxt#prompt_password "Enter password to encrypt your key: "
+  in
+  let* confirm = cctxt#prompt_password "Confirm password: " in
   if not (Bytes.equal password confirm) then
-    cctxt#message "Passwords do not match." >>= fun () -> read_password cctxt
+    let*! () = cctxt#message "Passwords do not match." in
+    read_password cctxt
   else return password
 
 let encrypt sk password =
+  let open Lwt_result_syntax in
   let payload = Raw.encrypt ~password sk in
   let encoding =
     match sk with
@@ -276,10 +300,13 @@ let encrypt sk password =
     | P256 _ -> Encodings.p256
   in
   let path = Base58.simple_encode encoding payload in
-  Client_keys.make_sk_uri (Uri.make ~scheme ~path ()) >>?= return
+  let*? v = Client_keys.make_sk_uri (Uri.make ~scheme ~path ()) in
+  return v
 
 let prompt_twice_and_encrypt cctxt sk =
-  read_password cctxt >>=? fun password -> encrypt sk password
+  let open Lwt_result_syntax in
+  let* password = read_password cctxt in
+  encrypt sk password
 
 module Sapling_raw = struct
   let salt_len = 8
@@ -319,18 +346,22 @@ module Sapling_raw = struct
 end
 
 let encrypt_sapling_key cctxt sk =
-  read_password cctxt >>=? fun password ->
+  let open Lwt_result_syntax in
+  let* password = read_password cctxt in
   let path =
     Base58.simple_encode (Sapling_raw.encrypted_b58_encoding password) sk
   in
-  Client_keys.make_sapling_uri (Uri.make ~scheme ~path ()) >>?= return
+  let*? v = Client_keys.make_sapling_uri (Uri.make ~scheme ~path ()) in
+  return v
 
 let decrypt_sapling_key (cctxt : #Client_context.io) (sk_uri : sapling_uri) =
+  let open Lwt_result_syntax in
   let uri = (sk_uri :> Uri.t) in
   let payload = Uri.path uri in
   if Uri.scheme uri = Some scheme then
-    cctxt#prompt_password "Enter password to decrypt your key: "
-    >>=? fun password ->
+    let* password =
+      cctxt#prompt_password "Enter password to decrypt your key: "
+    in
     match
       Base58.simple_decode (Sapling_raw.encrypted_b58_encoding password) payload
     with
@@ -374,27 +405,34 @@ struct
   let import_secret_key = Unencrypted.import_secret_key
 
   let neuterize sk_uri =
-    decrypt C.cctxt sk_uri >>=? fun sk ->
-    Unencrypted.make_pk (Signature.Secret_key.to_public_key sk) >>?= return
+    let open Lwt_result_syntax in
+    let* sk = decrypt C.cctxt sk_uri in
+    let*? v = Unencrypted.make_pk (Signature.Secret_key.to_public_key sk) in
+    return v
 
   let sign ?watermark sk_uri buf =
-    decrypt C.cctxt sk_uri >>=? fun sk ->
+    let open Lwt_result_syntax in
+    let* sk = decrypt C.cctxt sk_uri in
     return (Signature.sign ?watermark sk buf)
 
   let deterministic_nonce sk_uri buf =
-    decrypt C.cctxt sk_uri >>=? fun sk ->
+    let open Lwt_result_syntax in
+    let* sk = decrypt C.cctxt sk_uri in
     return (Signature.deterministic_nonce sk buf)
 
   let deterministic_nonce_hash sk_uri buf =
-    decrypt C.cctxt sk_uri >>=? fun sk ->
+    let open Lwt_result_syntax in
+    let* sk = decrypt C.cctxt sk_uri in
     return (Signature.deterministic_nonce_hash sk buf)
 
   let supports_deterministic_nonces _ = return_true
 end
 
 let encrypt_pvss_key cctxt sk =
-  read_password cctxt >>=? fun password ->
+  let open Lwt_result_syntax in
+  let* password = read_password cctxt in
   let payload = Raw.encrypt_pvss ~password sk in
   let encoding = Encodings.secp256k1_scalar in
   let path = Base58.simple_encode encoding payload in
-  Client_keys.make_pvss_sk_uri (Uri.make ~scheme ~path ()) >>?= return
+  let*? v = Client_keys.make_pvss_sk_uri (Uri.make ~scheme ~path ()) in
+  return v
