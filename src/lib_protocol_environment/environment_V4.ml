@@ -194,7 +194,7 @@ struct
 
   module Set = struct
     module type S =
-      Tezos_protocol_environment_structs.V3.M.Replicated_signatures.Set.S
+      Tezos_protocol_environment_structs.V4.M.Replicated_signatures.Set.S
         with type 'a error_monad_trace := 'a Error_monad.trace
 
     module Make (Ord : Compare.COMPARABLE) : S with type elt = Ord.t =
@@ -203,7 +203,7 @@ struct
 
   module Map = struct
     module type S =
-      Tezos_protocol_environment_structs.V3.M.Replicated_signatures.Map.S
+      Tezos_protocol_environment_structs.V4.M.Replicated_signatures.Map.S
         with type 'a error_monad_trace := 'a Error_monad.trace
 
     module Make (Ord : Compare.COMPARABLE) : S with type key = Ord.t =
