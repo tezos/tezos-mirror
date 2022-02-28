@@ -1351,6 +1351,7 @@ let _tezos_context_tests =
         alcotest_lwt;
         vector;
       ]
+    ~modules:["assert"; "test_context"; "test_utils"; "test"]
 
 let _tezos_context_memory_tests =
   test
@@ -1930,6 +1931,23 @@ let _tezos_rpc_http_server_tests =
         qcheck_alcotest;
         alcotest_lwt;
       ]
+
+let _tezos_context_merkle_proof_tests =
+  test
+    "test_merkle_proof"
+    ~path:"src/lib_context/test"
+    ~opam:"src/lib_context/tezos-context"
+    ~deps:
+      [
+        tezos_base;
+        tezos_base_unix;
+        tezos_context;
+        tezos_stdlib_unix;
+        qcheck_alcotest;
+        tezos_test_helpers;
+      ]
+    ~opens:["Tezos_base__TzPervasives"; "Tezos_context"; "Tezos_stdlib_unix"]
+    ~modules:["test_merkle_proof"]
 
 let tezos_validator_lib =
   public_lib

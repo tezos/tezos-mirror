@@ -244,7 +244,6 @@ module Proof : sig
       [{length=l; segment = [i_0;..;i_n]; proof=p}] sharing the same lenght [l]
       and final proof [p]. *)
   type 'a inode_extender = {length : int; segment : index list; proof : 'a}
-  [@@deriving irmin]
 
   (** The type for compressed and partial Merkle tree proofs.
 
@@ -408,6 +407,8 @@ type ('proof, 'result) verifier :=
       operations as the generating computation, *in some order*. *)
 type tree_proof := Proof.tree Proof.t
 
+val tree_proof_encoding : tree_proof Data_encoding.t
+
 (** [verify_tree_proof] is the verifier of tree proofs. *)
 val verify_tree_proof : (tree_proof, 'a) verifier
 
@@ -416,6 +417,8 @@ val verify_tree_proof : (tree_proof, 'a) verifier
       Guarantee that the given computation performs exactly the same state
       operations as the generating computation, in the exact same order. *)
 type stream_proof := Proof.stream Proof.t
+
+val stream_proof_encoding : stream_proof Data_encoding.t
 
 (** [verify_stream] is the verifier of stream proofs. *)
 val verify_stream_proof : (stream_proof, 'a) verifier

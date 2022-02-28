@@ -248,7 +248,6 @@ module Proof_types = struct
       [{length=l; segment = [i_0;..;i_n]; proof=p}] sharing the same lenght [l]
       and final proof [p]. *)
   type 'a inode_extender = {length : int; segment : index list; proof : 'a}
-  [@@deriving irmin]
 
   (** The type for compressed and partial Merkle tree proofs.
 
@@ -365,6 +364,14 @@ module type PROOF = sig
   include module type of struct
     include Proof_types
   end
+end
+
+module type PROOF_ENCODING = sig
+  open Proof_types
+
+  val tree_proof_encoding : tree t Data_encoding.t
+
+  val stream_proof_encoding : stream t Data_encoding.t
 end
 
 module type S = sig
