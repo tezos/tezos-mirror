@@ -628,3 +628,5 @@ let increase_balance_only_call_from_token ctxt contract amount =
 
 let decrease_balance_only_call_from_token ctxt contract amount =
   update_balance ctxt contract Tez_repr.( -? ) amount
+
+let get_full_balance = Storage.Contract.Spendable_balance.get

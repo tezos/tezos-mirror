@@ -198,8 +198,9 @@ let init ctxt contract delegate =
   Contract_delegate_storage.registered ctxt delegate >>=? fun is_registered ->
   error_unless is_registered (Unregistered_delegate delegate) >>?= fun () ->
   Contract_delegate_storage.init ctxt contract delegate >>=? fun ctxt ->
-  Storage.Contract.Spendable_balance.get ctxt contract >>=? fun balance ->
-  Stake_storage.add_stake ctxt delegate balance
+  Contract_storage.get_full_balance ctxt contract
+  >>=? fun contract_full_balance ->
+  Stake_storage.add_stake ctxt delegate contract_full_balance
 
 let set c contract delegate =
   match delegate with
@@ -215,8 +216,9 @@ let set c contract delegate =
         | None -> return c
         | Some delegate ->
             (* Removes the balance of the contract from the delegate *)
-            Storage.Contract.Spendable_balance.get c contract
-            >>=? fun balance -> Stake_storage.remove_stake c delegate balance )
+            Contract_storage.get_full_balance c contract
+            >>=? fun contract_full_balance ->
+            Stake_storage.remove_stake c delegate contract_full_balance )
       >>=? fun c -> Contract_delegate_storage.delete c contract
   | Some delegate ->
       Contract_manager_storage.is_manager_key_revealed c delegate
@@ -257,10 +259,12 @@ let set c contract delegate =
           (self_delegation && not exists)
           (Empty_delegate_account delegate)
         >>?= fun () ->
-        Storage.Contract.Spendable_balance.get c contract >>=? fun balance ->
-        Stake_storage.remove_contract_stake c contract balance >>=? fun c ->
+        Contract_storage.get_full_balance c contract
+        >>=? fun contract_full_balance ->
+        Stake_storage.remove_contract_stake c contract contract_full_balance
+        >>=? fun c ->
         Contract_delegate_storage.set c contract delegate >>=? fun c ->
-        Stake_storage.add_stake c delegate balance >>=? fun c ->
+        Stake_storage.add_stake c delegate contract_full_balance >>=? fun c ->
         if self_delegation then
           Storage.Delegates.add c delegate >>= fun c -> set_active c delegate
         else return c
@@ -577,11 +581,11 @@ let get_stakes_for_selected_index ctxt index =
       let delegate_contract = Contract_repr.implicit_contract delegate in
       Storage.Contract.Frozen_deposits_limit.find ctxt delegate_contract
       >>=? fun frozen_deposits_limit ->
-      Storage.Contract.Spendable_balance.get ctxt delegate_contract
-      >>=? fun balance ->
+      Contract_storage.get_full_balance ctxt delegate_contract
+      >>=? fun contract_full_balance ->
       Frozen_deposits_storage.get ctxt delegate_contract
       >>=? fun frozen_deposits ->
-      Tez_repr.(balance +? frozen_deposits.current_amount)
+      Tez_repr.(contract_full_balance +? frozen_deposits.current_amount)
       >>?= fun total_balance ->
       let frozen_deposits_percentage =
         Constants_storage.frozen_deposits_percentage ctxt
@@ -688,8 +692,10 @@ let frozen_deposits ctxt delegate =
 
 let full_balance ctxt delegate =
   frozen_deposits ctxt delegate >>=? fun frozen_deposits ->
-  balance ctxt delegate >>=? fun balance ->
-  Lwt.return Tez_repr.(frozen_deposits.current_amount +? balance)
+  let delegate_contract = Contract_repr.implicit_contract delegate in
+  Contract_storage.get_full_balance ctxt delegate_contract
+  >>=? fun contract_full_balance ->
+  Lwt.return Tez_repr.(frozen_deposits.current_amount +? contract_full_balance)
 
 let deactivated = Delegate_activation_storage.is_inactive
 

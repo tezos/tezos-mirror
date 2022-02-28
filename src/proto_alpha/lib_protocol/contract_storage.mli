@@ -68,8 +68,9 @@ val check_counter_increment :
 val increment_counter :
   Raw_context.t -> Signature.Public_key_hash.t -> Raw_context.t tzresult Lwt.t
 
-(** [get_balance c contract] returns the balance of [contract] given raw
-    context [c]. *)
+(** [get_balance ctxt contract] returns the balance of spendable tez owned by
+    [contract] given raw context [ctxt]. This does not include the contract's
+    frozen balances. *)
 val get_balance : Raw_context.t -> Contract_repr.t -> Tez_repr.t tzresult Lwt.t
 
 val get_balance_carbonated :
@@ -177,3 +178,9 @@ val increase_balance_only_call_from_token :
     break important invariants. Consider calling [spend] instead. *)
 val decrease_balance_only_call_from_token :
   Raw_context.t -> Contract_repr.t -> Tez_repr.t -> Raw_context.t tzresult Lwt.t
+
+(** [get_full_balance ctxt contract] returns the amount of tez owned by
+    [contract]. This includes its (spendable) balance as well as all frozen
+    balances. *)
+val get_full_balance :
+  Raw_context.t -> Contract_repr.t -> Tez_repr.t tzresult Lwt.t
