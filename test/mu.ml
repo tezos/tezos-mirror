@@ -211,6 +211,13 @@ let discriminated_option e =
         (fun () -> None);
     ]
 
+type assocassoc = Datum of int | Assoc of (string * assocassoc) list
+
+type leftright =
+  | Left of leftright * bytes
+  | Right of string * leftright
+  | Unit
+
 let terminates () =
   let es =
     let open Data_encoding in
@@ -263,9 +270,95 @@ let terminates () =
       (fun () -> mu "funid" Fun.id);
     ]
   in
+  let es3 =
+    let open Data_encoding in
+    [
+      (fun () ->
+        mu "assocassoc" (fun e ->
+            union
+              [
+                case
+                  (Tag 0)
+                  ~title:"Datum"
+                  uint8
+                  (function Datum i -> Some i | _ -> None)
+                  (fun i -> Datum i);
+                case
+                  (Tag 1)
+                  ~title:"Assoc"
+                  (assoc e)
+                  (function Assoc a -> Some a | _ -> None)
+                  (fun a -> Assoc a);
+              ]));
+      (fun () ->
+        mu "assocmanual" (fun e ->
+            union
+              [
+                case
+                  (Tag 0)
+                  ~title:"Datum"
+                  uint8
+                  (function Datum i -> Some i | _ -> None)
+                  (fun i -> Datum i);
+                case
+                  (Tag 1)
+                  ~title:"Assoc"
+                  (list (tup2 string e))
+                  (function Assoc a -> Some a | _ -> None)
+                  (fun a -> Assoc a);
+              ]));
+      (fun () ->
+        mu "assocmanual" (fun e ->
+            union
+              [
+                case
+                  (Tag 0)
+                  ~title:"Datum"
+                  uint8
+                  (function Datum i -> Some i | _ -> None)
+                  (fun i -> Datum i);
+                case
+                  (Tag 1)
+                  ~title:"Assoc"
+                  (list (tup2 (Bounded.string 22) e))
+                  (function Assoc a -> Some a | _ -> None)
+                  (fun a -> Assoc a);
+              ]));
+    ]
+  in
+  let es4 =
+    let open Data_encoding in
+    [
+      (fun () ->
+        mu "rightleft" (fun e ->
+            union
+              [
+                case
+                  (Tag 0)
+                  ~title:"Left"
+                  (obj2 (req "leftright" e) (req "right" (Bounded.bytes 99)))
+                  (function Left (lr, i) -> Some (lr, i) | _ -> None)
+                  (fun (lr, i) -> Left (lr, i));
+                case
+                  (Tag 1)
+                  ~title:"Right"
+                  (obj2 (req "left" (Bounded.string 4)) (req "leftright" e))
+                  (function Right (i, lr) -> Some (i, lr) | _ -> None)
+                  (fun (i, lr) -> Right (i, lr));
+                case
+                  (Tag 2)
+                  ~title:"Unit"
+                  unit
+                  (function Unit -> Some () | _ -> None)
+                  (fun () -> Unit);
+              ]));
+    ]
+  in
   let check f = ignore @@ f () in
   List.iter check es ;
-  List.iter check es2
+  List.iter check es2 ;
+  List.iter check es3 ;
+  List.iter check es4
 
 let tests =
   [

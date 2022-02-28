@@ -911,23 +911,23 @@ let mu name ?title ?description fix =
      This partial memoization only takes a bounded amount of memory
      and is useful because in practice we decode many values before
      applying [fix] to a new argument. *)
-  let fixing = ref false in
+  let fixing = ref 0 in
   let self = ref None in
-  let fix_f = fix in
   let fix e =
     match !self with
     | Some (e0, e') when e == e0 -> e'
     | _ ->
-        if !fixing then (
-          fixing := false ;
-          invalid_arg "infinite recursion in mu initialisation")
+        (* The limit is 2 because we can be forcing it once in binary and once
+           in json "at the same time" in case of a splitted encoding. *)
+        if !fixing >= 2 then
+          invalid_arg "infinite recursion in mu initialisation"
         else (
-          fixing := true ;
-          let e' = fix_f e in
-          fixing := false ;
+          incr fixing ;
+          let e' = fix e in
           self := Some (e, e') ;
           e')
   in
+  let fix e = Fun.protect ~finally:(fun () -> fixing := 0) (fun () -> fix e) in
   (* Attempt to determine the kind. Note that this can result in memoisation
      misses: the [fix] function might be called multiple times. *)
   try
