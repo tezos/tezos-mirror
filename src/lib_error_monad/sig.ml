@@ -343,7 +343,8 @@ match res with
       You can achieve the same effect by hand with
 
 {[
-p >>= function
+let* r = p in
+match r with
 | Ok _ -> p
 | Error tr ->
    Lwt.return (Error (Trace.cons (mkerr ()) tr))

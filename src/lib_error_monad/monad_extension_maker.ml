@@ -105,7 +105,9 @@ end)
     | Error trace -> Error (Trace.cons err trace)
 
   let trace err f =
-    f >>= function
+    let open Monad.Lwt_syntax in
+    let* r = f in
+    match r with
     | Error trace -> Lwt.return_error (Trace.cons err trace)
     | ok -> Lwt.return ok
 
@@ -116,7 +118,9 @@ end)
     | ok -> ok
 
   let trace_eval mk_err f =
-    f >>= function
+    let open Monad.Lwt_syntax in
+    let* r = f in
+    match r with
     | Error trace ->
         let err = mk_err () in
         Lwt.return_error (Trace.cons err trace)
@@ -137,9 +141,11 @@ end)
   let when_ cond f = if cond then f () else return_unit
 
   let dont_wait f err_handler exc_handler =
+    let open Monad.Lwt_syntax in
     Lwt.dont_wait
       (fun () ->
-        f () >>= function
+        let* r = f () in
+        match r with
         | Ok () -> Lwt.return_unit
         | Error trace ->
             err_handler trace ;
