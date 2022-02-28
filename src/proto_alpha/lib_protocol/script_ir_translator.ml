@@ -2844,10 +2844,12 @@ let[@coq_axiom_with_reason "gadt"] rec parse_data :
   (* Sapling *)
   | (Sapling_transaction_deprecated_t memo_size, Bytes (_, bytes)) -> (
       match
-        Data_encoding.Binary.of_bytes_opt Sapling.transaction_encoding bytes
+        Data_encoding.Binary.of_bytes_opt
+          Sapling.Legacy.transaction_encoding
+          bytes
       with
       | Some transaction -> (
-          match Sapling.transaction_get_memo_size transaction with
+          match Sapling.Legacy.transaction_get_memo_size transaction with
           | None -> return (transaction, ctxt)
           | Some transac_memo_size ->
               Lwt.return
@@ -5688,7 +5690,9 @@ let[@coq_axiom_with_reason "gadt"] rec unparse_data :
         ( Gas.consume ctxt (Unparse_costs.sapling_transaction_deprecated s)
         >|? fun ctxt ->
           let bytes =
-            Data_encoding.Binary.to_bytes_exn Sapling.transaction_encoding s
+            Data_encoding.Binary.to_bytes_exn
+              Sapling.Legacy.transaction_encoding
+              s
           in
           (Bytes (loc, bytes), ctxt) )
   | (Sapling_state_t _, {id; diff; _}) ->

@@ -1280,7 +1280,7 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
           let chain_id = Script_chain_id.to_b58check sc_chain_id in
           let anti_replay = address ^ chain_id in
           let ctxt = update_context gas ctxt in
-          Sapling.verify_update ctxt state transaction anti_replay
+          Sapling.Legacy.verify_update ctxt state transaction anti_replay
           >>=? fun (ctxt, balance_state_opt) ->
           let (gas, ctxt) = local_gas_counter_and_outdated_context ctxt in
           match balance_state_opt with

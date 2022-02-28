@@ -1349,6 +1349,24 @@ module Sapling : sig
   val transaction_in_memory_size : transaction -> Cache_memory_helpers.sint
 
   val diff_in_memory_size : diff -> Cache_memory_helpers.sint
+
+  module Legacy : sig
+    type transaction = Sapling.UTXO.Legacy.transaction
+
+    val transaction_encoding : transaction Data_encoding.t
+
+    val transaction_get_memo_size : transaction -> Memo_size.t option
+
+    val transaction_in_memory_size :
+      transaction -> Saturation_repr.may_saturate Saturation_repr.t
+
+    val verify_update :
+      context ->
+      state ->
+      transaction ->
+      string ->
+      (context * (Int64.t * state) option) tzresult Lwt.t
+  end
 end
 
 module Lazy_storage : sig

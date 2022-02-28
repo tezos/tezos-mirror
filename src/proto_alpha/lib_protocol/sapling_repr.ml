@@ -176,10 +176,11 @@ let transaction_in_memory_size (transaction : Sapling.UTXO.transaction) =
   let memo_size =
     Option.value ~default:0 (transaction_get_memo_size transaction)
   in
+  let bound_data_size = string_size transaction.bound_data in
   header_size +! (word_size *? 5)
   +! (list_cell_size input_in_memory_size *? inputs)
   +! (list_cell_size (output_in_memory_size memo_size) *? outputs)
-  +! binding_sig_size +! balance_size +! root_size
+  +! binding_sig_size +! balance_size +! root_size +! bound_data_size
 
 (** Returns an approximation of the in-memory size of a Sapling diff.  *)
 let diff_in_memory_size ({commitments_and_ciphertexts; nullifiers} : diff) =

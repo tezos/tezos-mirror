@@ -361,6 +361,23 @@ module Sapling = struct
   type updates = Sapling_state.updates
 
   type alloc = Sapling_state.alloc = {memo_size : Sapling_repr.Memo_size.t}
+
+  module Legacy = struct
+    include Sapling.UTXO.Legacy
+
+    let transaction_get_memo_size transaction =
+      match transaction.outputs with
+      | [] -> None
+      | {ciphertext; _} :: _ ->
+          (* Encoding ensures all ciphertexts have the same memo size. *)
+          Some (Sapling.Ciphertext.get_memo_size ciphertext)
+
+    let transaction_in_memory_size transaction =
+      transaction_in_memory_size (cast transaction)
+
+    let verify_update ctxt state transaction key =
+      verify_update ctxt state (cast transaction) key
+  end
 end
 
 module Receipt = Receipt_repr

@@ -305,7 +305,7 @@ let rec value_size :
           x
     | Contract_t (_, _) -> ret_succ (accu ++ contract_size x)
     | Sapling_transaction_deprecated_t _ ->
-        ret_succ_adding accu (Sapling.transaction_in_memory_size x)
+        ret_succ_adding accu (Sapling.Legacy.transaction_in_memory_size x)
     | Sapling_state_t _ -> ret_succ_adding accu (sapling_state_size x)
     (* Operations are neither storable nor pushable, so they can appear neither
        in the storage nor in the script. Hence they cannot appear in the cache
