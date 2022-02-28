@@ -41,11 +41,13 @@ type mode =
   | Proxy_server of {
       sleep : float -> unit Lwt.t;
       sym_block_caching_time : int option;
+      data_dir : string option;
     }
       (** [tezos-proxy-server] is running. The [sleep] field is implemented
           by {!Lwt_unix.sleep}. We don't want to depend on it directly
           (for compiling to Javascript), hence this field. The [int option] field
-          is the value of argument [--sym-block-caching-time] *)
+          is the value of argument [--sym-block-caching-time]. The [string option]
+          value is the value of argument [--data-dir].  *)
 
 (** [build_directory printer rpc_context env mode] returns the directory
     of RPCs that is served locally by the client's light and proxy modes and

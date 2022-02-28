@@ -31,8 +31,8 @@ let name = "tezos-proxy-server"
 let config : string option Term.t =
   let doc =
     "The configuration file. Fields (see corresponding options): endpoint \
-     (string), rpc_addr (string), rpc_tls (string), and sym_block_caching_time \
-     (int)."
+     (string), rpc_addr (string), rpc_tls (string), sym_block_caching_time \
+     (int), and data_dir (string)."
   in
   let docv = "CONFIG" in
   Arg.(value & opt (some string) None & info ["c"; "config"] ~docv ~doc)
@@ -60,6 +60,15 @@ let rpc_tls : string option Term.t =
   in
   let docv = "RPC_TLS" in
   Arg.(value & opt (some string) None & info ["rpc-tls"] ~docv ~doc)
+
+let data_dir : string option Term.t =
+  let doc =
+    "Path to the data-dir of a running tezos-node, for reading the `context` \
+     subdirectory to obtain data instead of using the ../raw/bytes RPC (hereby \
+     reducing the node's IO)."
+  in
+  let docv = "DATA_DIR" in
+  Arg.(value & opt (some string) None & info ["data-dir"] ~docv ~doc)
 
 let sym_block_caching_time : int option Term.t =
   let doc =
@@ -118,6 +127,7 @@ let main_promise (config_file : string option)
          rpc_server_port;
          rpc_server_tls;
          sym_block_caching_time;
+         data_dir;
        } =
     get_runtime config_from_file config_args
   in
@@ -156,7 +166,8 @@ let main_promise (config_file : string option)
     Tezos_proxy.Proxy_services.build_directory
       printer
       http_ctxt
-      (Tezos_proxy.Proxy_services.Proxy_server {sleep; sym_block_caching_time})
+      (Tezos_proxy.Proxy_services.Proxy_server
+         {sleep; sym_block_caching_time; data_dir})
       proxy_env
   in
   let server_args : Proxy_server_main_run.args =
@@ -170,13 +181,15 @@ let main_promise (config_file : string option)
 
 let main (config_file : string option) (log_requests : bool)
     (endpoint : string option) (rpc_addr : string option)
-    (rpc_tls : string option) (sym_block_caching_time : int option) =
+    (rpc_tls : string option) (sym_block_caching_time : int option)
+    (data_dir : string option) =
   let config_args =
     Proxy_server_config.make
       ~endpoint:(Option.map Uri.of_string endpoint)
       ~rpc_addr:(Option.map Uri.of_string rpc_addr)
       ~rpc_tls
       ~sym_block_caching_time
+      ~data_dir
   in
   Lwt_main.run
     (let open Lwt_syntax in
@@ -198,7 +211,7 @@ let term : unit Term.t =
   Term.(
     ret
       (const main $ config $ log_requests $ endpoint $ rpc_addr $ rpc_tls
-     $ sym_block_caching_time))
+     $ sym_block_caching_time $ data_dir))
 
 let info =
   let doc = "Launches a server that is a readonly frontend to a Tezos node" in
