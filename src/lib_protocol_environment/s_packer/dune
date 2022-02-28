@@ -11,6 +11,6 @@
  (name s_packer))
 
 (install
- (section libexec)
  (package tezos-protocol-environment-packer)
+ (section libexec)
  (files (s_packer.exe as s_packer)))

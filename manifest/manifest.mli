@@ -196,6 +196,31 @@ module Dune : sig
 
       Such stanzas are used at toplevel to include other dune files. *)
   val include_ : string -> s_expr
+
+  (* Makes a rule stanza to generate targets.
+
+     Example: [targets_rule ?deps targets ~action] results in:
+
+     (rule
+       (targets <targets>)
+       (deps <deps>)
+       (action <action>)) *)
+  val targets_rule : ?deps:s_expr list -> string list -> action:s_expr -> s_expr
+
+  (* Makes an [install] stanza.
+
+     Example: [install files ~package ~section] creates a stanza of the form:
+
+     [(install
+       (package <package>)
+       (section <section>)
+       (files <files>))] *)
+  val install : ?package:string -> s_expr list -> section:string -> s_expr
+
+  (* Makes an [as] expression.
+
+     Example: [as_ "foo" "bar"] results in [(foo as bar)] *)
+  val as_ : string -> string -> s_expr
 end
 
 module Version : sig
@@ -522,6 +547,8 @@ val pps : ?args:string list -> target -> preprocessor
 
     - [synopsis]: short description for the [.opam] file.
 
+    - [warnings]: the argument passed to the -w flag when building.
+
     - [wrapped]: if [false], add the [(wrapped false)] stanza in the [dune] file.
       This causes the library to not come with a toplevel module with aliases to
       all other modules. Not recommended (according to the dune documentation).
@@ -560,6 +587,7 @@ type 'a maker =
   ?static_cclibs:string list ->
   ?synopsis:string ->
   ?time_measurement_ppx:bool ->
+  ?warnings:string ->
   ?wrapped:bool ->
   path:string ->
   'a ->

@@ -325,6 +325,26 @@ module Dune = struct
   let include_ name = [S "include"; S name]
 
   let file name = [S "file"; S name]
+
+  let targets_rule ?deps targets ~action =
+    [
+      S "rule";
+      [S "targets"; G (of_atom_list targets)];
+      (match deps with None -> E | Some deps -> [S "deps"; G (of_list deps)]);
+      [S "action"; action];
+    ]
+
+  let install ?package files ~section =
+    [
+      S "install";
+      (match package with
+      | None -> E
+      | Some package -> [S "package"; S package]);
+      [S "section"; S section];
+      [S "files"; G (of_list files)];
+    ]
+
+  let as_ target alias = [S target; S "as"; S alias]
 end
 
 (*****************************************************************************)
@@ -702,6 +722,7 @@ module Target = struct
     static : bool;
     static_cclibs : string list;
     synopsis : string option;
+    warnings : string option;
     wrapped : bool;
     node_wrapper_flags : string list;
   }
@@ -835,6 +856,7 @@ module Target = struct
     ?static_cclibs:string list ->
     ?synopsis:string ->
     ?time_measurement_ppx:bool ->
+    ?warnings:string ->
     ?wrapped:bool ->
     path:string ->
     'a ->
@@ -848,8 +870,8 @@ module Target = struct
       ?(nopervasives = false) ?(nostdlib = false) ?ocaml ?opam ?(opaque = false)
       ?(opens = []) ?(preprocess = []) ?(preprocessor_deps = [])
       ?(private_modules = []) ?(opam_only_deps = []) ?release ?static
-      ?static_cclibs ?synopsis ?(time_measurement_ppx = false) ?(wrapped = true)
-      ~path names =
+      ?static_cclibs ?synopsis ?(time_measurement_ppx = false) ?warnings
+      ?(wrapped = true) ~path names =
     let conflicts = List.filter_map Fun.id conflicts in
     let deps = List.filter_map Fun.id deps in
     let opam_only_deps = List.filter_map Fun.id opam_only_deps in
@@ -1029,6 +1051,7 @@ module Target = struct
         static_cclibs;
         synopsis;
         node_wrapper_flags;
+        warnings;
         wrapped;
       }
 
@@ -1313,15 +1336,19 @@ let generate_dune ~dune_file_has_static_profile (internal : Target.internal) =
     |> cons_if internal.nopervasives (Dune.S "-nopervasives")
     |> cons_if internal.nostdlib (Dune.S "-nostdlib")
     |> cons_if internal.opaque (Dune.S "-opaque")
-    |> fun flags ->
-    flags
-    @
+  in
+  let flags =
     if dune_file_has_static_profile && not internal.static then
       (* Disable static compilation for this particular target
          (the static profile is global for the dune file).
          This must be at the end of the flag list. *)
-      [Dune.(G [S "\\"; S "-ccopt"; S "-static"])]
-    else []
+      flags @ [Dune.(G [S "\\"; S "-ccopt"; S "-static"])]
+    else flags
+  in
+  let flags =
+    match internal.warnings with
+    | None -> flags
+    | Some w -> Dune.[S "-w"; S w] @ flags
   in
   let flags =
     match flags with

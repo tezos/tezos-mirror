@@ -966,12 +966,10 @@ let tezos_version =
       Dune.
         [
           (* Ensures the hash updates whenever a source file is modified. *)
-          [
-            S "rule";
-            [S "targets"; S "generated_git_info.ml"];
-            [S "deps"; [S "universe"]];
-            [S "action"; [S "run"; S "./exe/get_git_info.exe"]];
-          ];
+          targets_rule
+            ["generated_git_info.ml"]
+            ~deps:[[S "universe"]]
+            ~action:[S "run"; S "./exe/get_git_info.exe"];
         ]
 
 let _tezos_version_get_git_info =
@@ -1102,12 +1100,10 @@ let tezos_tooling =
     ~dune:
       Dune.
         [
-          [
-            S "install";
-            [S "package"; S "tezos-tooling"];
-            [S "section"; S "libexec"];
-            [S "files"; [S "lint.sh"; S "as"; S "lint.sh"]];
-          ];
+          install
+            [as_ "lint.sh" "lint.sh"]
+            ~package:"tezos-tooling"
+            ~section:"libexec";
         ]
 
 let _tezos_tooling_js_inline_tests =
@@ -1645,53 +1641,50 @@ let tezos_protocol_compiler_registerer =
     ~modules:["Registerer"]
     ~opaque:true
     ~dune:
-      [
+      Dune.
         [
-          S "rule";
-          [S "targets"; S "embedded_cmis.ml"];
-          [
-            S "action";
-            [
-              S "run";
-              G
-                [
-                  S "%{bin:ocp-ocamlres}";
-                  S "-format";
-                  S "ocaml";
-                  S "-o";
-                  S "%{targets}";
-                ];
-              S "%{lib:stdlib:camlinternalFormatBasics.cmi}";
-              S
-                "%{dep:.tezos_protocol_registerer.objs/byte/tezos_protocol_registerer__Registerer.cmi}";
-              S
-                "%{lib:tezos-protocol-environment-sigs.stdlib-compat:tezos_protocol_environment_sigs_stdlib_compat.cmi}";
-              S
-                "%{lib:tezos-protocol-environment-sigs.stdlib-compat:tezos_protocol_environment_sigs_stdlib_compat__V_all.cmi}";
-              S
-                "%{lib:tezos-protocol-environment-sigs.stdlib-compat:tezos_protocol_environment_sigs_stdlib_compat__V2.cmi}";
-              S
-                "%{lib:tezos-protocol-environment-sigs.stdlib-compat:tezos_protocol_environment_sigs_stdlib_compat__V3.cmi}";
-              S
-                "%{lib:tezos-protocol-environment-sigs.stdlib-compat:tezos_protocol_environment_sigs_stdlib_compat__V4.cmi}";
-              S
-                "%{lib:tezos-protocol-environment-sigs:tezos_protocol_environment_sigs.cmi}";
-              S
-                "%{lib:tezos-protocol-environment-sigs:tezos_protocol_environment_sigs__V0.cmi}";
-              S
-                "%{lib:tezos-protocol-environment-sigs:tezos_protocol_environment_sigs__V1.cmi}";
-              S
-                "%{lib:tezos-protocol-environment-sigs:tezos_protocol_environment_sigs__V2.cmi}";
-              S
-                "%{lib:tezos-protocol-environment-sigs:tezos_protocol_environment_sigs__V3.cmi}";
-              S
-                "%{lib:tezos-protocol-environment-sigs:tezos_protocol_environment_sigs__V4.cmi}";
-              S
-                "%{lib:tezos-protocol-environment-sigs:tezos_protocol_environment_sigs__V5.cmi}";
-            ];
-          ];
-        ];
-      ]
+          targets_rule
+            ["embedded_cmis.ml"]
+            ~action:
+              [
+                S "run";
+                G
+                  [
+                    S "%{bin:ocp-ocamlres}";
+                    S "-format";
+                    S "ocaml";
+                    S "-o";
+                    S "%{targets}";
+                  ];
+                S "%{lib:stdlib:camlinternalFormatBasics.cmi}";
+                S
+                  "%{dep:.tezos_protocol_registerer.objs/byte/tezos_protocol_registerer__Registerer.cmi}";
+                S
+                  "%{lib:tezos-protocol-environment-sigs.stdlib-compat:tezos_protocol_environment_sigs_stdlib_compat.cmi}";
+                S
+                  "%{lib:tezos-protocol-environment-sigs.stdlib-compat:tezos_protocol_environment_sigs_stdlib_compat__V_all.cmi}";
+                S
+                  "%{lib:tezos-protocol-environment-sigs.stdlib-compat:tezos_protocol_environment_sigs_stdlib_compat__V2.cmi}";
+                S
+                  "%{lib:tezos-protocol-environment-sigs.stdlib-compat:tezos_protocol_environment_sigs_stdlib_compat__V3.cmi}";
+                S
+                  "%{lib:tezos-protocol-environment-sigs.stdlib-compat:tezos_protocol_environment_sigs_stdlib_compat__V4.cmi}";
+                S
+                  "%{lib:tezos-protocol-environment-sigs:tezos_protocol_environment_sigs.cmi}";
+                S
+                  "%{lib:tezos-protocol-environment-sigs:tezos_protocol_environment_sigs__V0.cmi}";
+                S
+                  "%{lib:tezos-protocol-environment-sigs:tezos_protocol_environment_sigs__V1.cmi}";
+                S
+                  "%{lib:tezos-protocol-environment-sigs:tezos_protocol_environment_sigs__V2.cmi}";
+                S
+                  "%{lib:tezos-protocol-environment-sigs:tezos_protocol_environment_sigs__V3.cmi}";
+                S
+                  "%{lib:tezos-protocol-environment-sigs:tezos_protocol_environment_sigs__V4.cmi}";
+                S
+                  "%{lib:tezos-protocol-environment-sigs:tezos_protocol_environment_sigs__V5.cmi}";
+              ];
+        ]
 
 let tezos_protocol_compiler_lib =
   public_lib
@@ -1730,20 +1723,21 @@ let tezos_protocol_compiler_native =
       ]
     ~modules:["Native"]
     ~dune:
-      [
+      Dune.
         [
-          S "install";
-          [S "section"; S "libexec"];
-          [
-            S "files";
-            S "dune_protocol.v0";
-            S "dune_protocol.v1";
-            S "dune_protocol.template.v0";
-            S "dune_protocol.template.v1";
-            S "final_protocol_versions";
-          ];
-        ];
-      ]
+          install
+            [
+              V
+                [
+                  S "dune_protocol.v0";
+                  S "dune_protocol.v1";
+                  S "dune_protocol.template.v0";
+                  S "dune_protocol.template.v1";
+                  S "final_protocol_versions";
+                ];
+            ]
+            ~section:"libexec";
+        ]
 
 let tezos_protocol_updater =
   public_lib
@@ -1973,16 +1967,14 @@ let tezos_client_base =
     ~dune:
       Dune.
         [
-          [
-            S "rule";
-            [S "targets"; S "bip39_english.ml"];
-            [
-              S "deps";
-              [S ":exe"; S "gen/bip39_generator.exe"];
-              S "gen/bip39_english.txt";
-            ];
-            [S "action"; [S "run"; S "%{exe}"; S "%{targets}"]];
-          ];
+          targets_rule
+            ["bip39_english.ml"]
+            ~deps:
+              [
+                [S ":exe"; S "gen/bip39_generator.exe"];
+                S "gen/bip39_english.txt";
+              ]
+            ~action:[S "run"; S "%{exe}"; S "%{targets}"];
         ]
 
 let _tezos_client_base_tests =
@@ -2979,12 +2971,10 @@ let _s_packer =
     ~dune:
       Dune.
         [
-          [
-            S "install";
-            [S "section"; S "libexec"];
-            [S "package"; S "tezos-protocol-environment-packer"];
-            [S "files"; [S "s_packer.exe"; S "as"; S "s_packer"]];
-          ];
+          install
+            [as_ "s_packer.exe" "s_packer"]
+            ~package:"tezos-protocol-environment-packer"
+            ~section:"libexec";
         ]
 
 let _replace =
@@ -3001,14 +2991,7 @@ let _replace =
       ]
     ~modules:["Replace"]
     ~static:true
-    ~dune:
-      [
-        [
-          S "install";
-          [S "section"; S "libexec"];
-          [S "files"; [S "replace.exe"; S "as"; S "replace"]];
-        ];
-      ]
+    ~dune:Dune.[install [as_ "replace.exe" "replace"] ~section:"libexec"]
 
 let _tezos_validator_bin =
   public_exe
@@ -3065,15 +3048,10 @@ let _tezos_node =
     ~dune:
       Dune.
         [
-          [
-            S "install";
-            [S "package"; S "tezos-node"];
-            [S "section"; S "bin"];
-            [
-              S "files";
-              [S "tezos-sandboxed-node.sh"; S "as"; S "tezos-sandboxed-node.sh"];
-            ];
-          ];
+          install
+            [as_ "tezos-sandboxed-node.sh" "tezos-sandboxed-node.sh"]
+            ~package:"tezos-node"
+            ~section:"bin";
         ]
 
 let _tezos_client =
@@ -3110,19 +3088,14 @@ let _tezos_client =
     ~dune:
       Dune.
         [
-          [
-            S "install";
-            [S "package"; S "tezos-client"];
-            [S "section"; S "bin"];
+          install
             [
-              S "files";
-              [
-                S "tezos-init-sandboxed-client.sh";
-                S "as";
-                S "tezos-init-sandboxed-client.sh";
-              ];
-            ];
-          ];
+              as_
+                "tezos-init-sandboxed-client.sh"
+                "tezos-init-sandboxed-client.sh";
+            ]
+            ~package:"tezos-client"
+            ~section:"bin";
         ]
 
 let _tezos_codec =
