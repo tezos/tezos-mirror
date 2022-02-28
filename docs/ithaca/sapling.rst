@@ -1,5 +1,13 @@
 **The features described in this page are experimental and have not  undergone any security review.**
 
+Deprecated instruction
+======================
+
+**For security reasons the use of the type `sapling_transaction` and
+instruction `SAPLING_VERIFY_UPDATE` are discouraged and are deprecated in
+Protocol 13 which replaces them with a new encoding for the type and a new
+signature for the instruction.**
+
 Sapling integration
 ===================
 

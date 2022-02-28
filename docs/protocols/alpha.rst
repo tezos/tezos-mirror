@@ -226,8 +226,13 @@ Michelson
   (MR :gl:`!4471`)
 
 - The existing type ``sapling_transaction`` is renamed
-  ``sapling_transaction_deprecated``. Existing onchain contracts are
-  automatically converted.
+  ``sapling_transaction_deprecated`` and is deprecated. Existing onchain contracts
+  are automatically converted.
+  A new Michelson type ``sapling_transaction`` and an overload of the
+  instruction ``SAPLING_VERIFY_UPDATE`` have been added to fix the malleability
+  problem of the old instruction
+  (see :doc:`Sapling integration<../alpha/sapling>`).
+  (MRs :gl:`!4670`, :gl:`!4589`)
 
 - The protocol migration to Alpha will ensure that 8 smart contracts
   on mainnet that depend on features deprecated in Babylon, type check
