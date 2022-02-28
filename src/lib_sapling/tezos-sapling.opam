@@ -14,7 +14,7 @@ depends: [
   "integers_stubs_js"
   "ctypes" { >= "0.18.0" }
   "ctypes_stubs_js"
-  "data-encoding" { >= "0.4" & < "0.5" }
+  "data-encoding" { >= "0.5.1" & < "0.6" }
   "tezos-stdlib"
   "tezos-crypto"
   "tezos-error-monad"

@@ -89,7 +89,7 @@ let data_encoding =
     ~js_compatible:true
     ~main_module:"Data_encoding"
     "data-encoding"
-    V.(at_least "0.4" && less_than "0.5")
+    V.(at_least "0.5.1" && less_than "0.6")
 
 let digestif = external_lib ~js_compatible:true "digestif" V.(at_least "0.7.3")
 
@@ -146,7 +146,7 @@ let json_data_encoding =
   external_lib
     ~js_compatible:true
     "json-data-encoding"
-    V.(at_least "0.10" && less_than "0.11")
+    V.(at_least "0.11" && less_than "0.12")
 
 let logs = external_lib "logs" V.True
 
