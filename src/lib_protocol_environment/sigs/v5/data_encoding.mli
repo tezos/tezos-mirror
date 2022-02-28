@@ -371,9 +371,13 @@ val apply_lazy :
 module Json : sig
   val schema : ?definitions_path:string -> 'a encoding -> json_schema
 
-  val construct : 't encoding -> 't -> json
+  val construct :
+    ?include_default_fields:[`Always | `Auto | `Never] ->
+    't encoding ->
+    't ->
+    json
 
-  val destruct : 't encoding -> json -> 't
+  val destruct : ?bson_relaxation:bool -> 't encoding -> json -> 't
 
   (** JSON Error *)
 

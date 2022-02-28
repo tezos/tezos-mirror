@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs. <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2022 Nomadic Labs. <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -33,51 +33,4 @@ module Json = struct
   let construct encoding v = construct ?include_default_fields:None encoding v
 
   let destruct encoding j = destruct ?bson_relaxation:None encoding j
-end
-
-module Binary = struct
-  include Binary
-
-  (* Some errors did not exist before env-v3, they are transformed into raised
-     exceptions for backwards compatibility. *)
-
-  let read encoding bytes offset length =
-    match read_exn encoding (Bytes.unsafe_to_string bytes) offset length with
-    | v -> Some v
-    | exception
-        Read_error (User_invariant_guard s | Exception_raised_in_user_function s)
-      ->
-        failwith s
-    | exception Read_error _ -> None
-
-  let write encoding value bytes offset allowed_bytes =
-    Stdlib.Option.bind
-      (make_writer_state bytes ~offset ~allowed_bytes)
-      (fun state ->
-        match write_exn encoding value state with
-        | v -> Some v
-        | exception Write_error (Exception_raised_in_user_function s) ->
-            failwith s
-        | exception Write_error _ -> None)
-
-  let of_bytes e b =
-    match of_bytes_exn e b with
-    | v -> Some v
-    | exception
-        Read_error (User_invariant_guard s | Exception_raised_in_user_function s)
-      ->
-        failwith s
-    | exception Read_error _ -> None
-
-  (* Also removes [?buffer_size] by eta-expanding. *)
-  let to_bytes encoding value =
-    match to_bytes_exn encoding value with
-    | v -> Some v
-    | exception Write_error (Exception_raised_in_user_function s) -> failwith s
-    | exception Write_error _ -> None
-
-  let to_bytes_exn encoding value =
-    match to_bytes_exn encoding value with
-    | v -> v
-    | exception Write_error (Exception_raised_in_user_function s) -> failwith s
 end

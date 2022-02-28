@@ -267,7 +267,7 @@ struct
   module Uri = Uri
 
   module Data_encoding = struct
-    include Data_encoding
+    include Tezos_protocol_environment_structs.V4.M.Data_encoding
 
     type tag_size = [`Uint8 | `Uint16]
 
