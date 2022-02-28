@@ -262,7 +262,7 @@ module Alpha_context_helpers = struct
     let anti_replay = "anti-replay" in
     let (ins, outs) = transfer_inputs_outputs w cs is in
     (* change the wallet of this last line *)
-    Tezos_sapling.Forge.forge_transaction ins outs w.sk anti_replay cs
+    Tezos_sapling.Forge.forge_transaction_legacy ins outs w.sk anti_replay cs
 
   let client_state_alpha ctx id =
     Alpha_context.Sapling.get_diff ctx id () >>= wrap >>=? fun diff ->
@@ -305,7 +305,12 @@ module Interpreter_helpers = struct
       Tezos_sapling.Forge.make_output addr 15L (Bytes.create memo_size)
     in
     let pt =
-      Tezos_sapling.Forge.forge_transaction [] [output] wallet.sk anti_replay ps
+      Tezos_sapling.Forge.forge_transaction_legacy
+        []
+        [output]
+        wallet.sk
+        anti_replay
+        ps
     in
     let hex_string =
       "0x"
@@ -313,7 +318,7 @@ module Interpreter_helpers = struct
           (Hex.of_bytes
              Data_encoding.Binary.(
                to_bytes_exn
-                 Tezos_sapling.Core.Client.UTXO.transaction_encoding
+                 Tezos_sapling.Core.Client.UTXO.Legacy.transaction_encoding
                  pt))
     in
     hex_string
@@ -360,7 +365,7 @@ module Interpreter_helpers = struct
         in
         let tr_hex =
           to_hex
-            (Tezos_sapling.Forge.forge_transaction
+            (Tezos_sapling.Forge.forge_transaction_legacy
                ~number_dummy_inputs:0
                ~number_dummy_outputs:0
                []
@@ -368,7 +373,7 @@ module Interpreter_helpers = struct
                sk
                anti_replay
                state)
-            Tezos_sapling.Core.Client.UTXO.transaction_encoding
+            Tezos_sapling.Core.Client.UTXO.Legacy.transaction_encoding
         in
         aux
           (number_transac - 1)

@@ -383,7 +383,7 @@ module Alpha_context_tests = struct
     let vt =
       let ps = Tezos_sapling.Storage.empty ~memo_size:0 in
       (* the dummy output will have memo_size 0 *)
-      Tezos_sapling.Forge.forge_transaction
+      Tezos_sapling.Forge.forge_transaction_legacy
         ~number_dummy_outputs:1
         []
         []
@@ -485,10 +485,7 @@ module Alpha_context_tests = struct
     client_state_alpha ctx id >>=? fun cs ->
     let vt = transfer w cs [0] in
     (* fails sig check because of wrong balance *)
-    let vt_broken =
-      Tezos_sapling.Core.Validator.UTXO.
-        {vt with balance = Int64.(succ vt.balance)}
-    in
+    let vt_broken = {vt with balance = Int64.(succ vt.balance)} in
     verify_update ctx ~id vt_broken |> assert_none >>=? fun () ->
     (* randomize one output to fail check outputs *)
     (* don't randomize the ciphertext as it is not part of the proof *)
@@ -500,9 +497,7 @@ module Alpha_context_tests = struct
         cm = randomized_byte o.cm Tezos_sapling.Core.Client.Commitment.encoding;
       }
     in
-    let vt_broken =
-      Tezos_sapling.Core.Validator.UTXO.{vt with outputs = [o_wrong_cm]}
-    in
+    let vt_broken = {vt with outputs = [o_wrong_cm]} in
     verify_update ctx ~id vt_broken |> assert_none >>=? fun () ->
     (* position inside the cv *)
     let pos = Random.int 32 in
@@ -516,9 +511,7 @@ module Alpha_context_tests = struct
             Tezos_sapling.Core.Client.Ciphertext.encoding;
       }
     in
-    let vt_broken =
-      Tezos_sapling.Core.Validator.UTXO.{vt with outputs = [o_wrong_cv]}
-    in
+    let vt_broken = {vt with outputs = [o_wrong_cv]} in
     verify_update ctx ~id vt_broken |> assert_none
 
   let test_verifyupdate_two_transactions () =
@@ -539,14 +532,10 @@ module Alpha_context_tests = struct
     verify_update ctx ~id:id1 vt2 |> assert_none >>=? fun () ->
     (* Swap the root so that it passes the root_mem check but fails
        the input check *)
-    let vt1_broken =
-      Tezos_sapling.Core.Validator.UTXO.{vt2 with root = vt1.root}
-    in
+    let vt1_broken = {vt2 with root = vt1.root} in
     verify_update ctx ~id:id1 vt1_broken |> assert_none >>=? fun () ->
     (* fail the sig check *)
-    let vt1_broken =
-      Tezos_sapling.Core.Validator.UTXO.{vt1 with outputs = vt2.outputs}
-    in
+    let vt1_broken = {vt1 with outputs = vt2.outputs} in
     verify_update ctx ~id:id1 vt1_broken |> assert_none
 end
 
@@ -619,7 +608,7 @@ module Interpreter_tests = struct
     in
     let hex_transac =
       to_hex
-        (Tezos_sapling.Forge.forge_transaction
+        (Tezos_sapling.Forge.forge_transaction_legacy
            ~number_dummy_inputs:0
            ~number_dummy_outputs:0
            list_forge_input
@@ -627,7 +616,7 @@ module Interpreter_tests = struct
            wa.sk
            anti_replay
            state)
-        Tezos_sapling.Core.Client.UTXO.transaction_encoding
+        Tezos_sapling.Core.Client.UTXO.Legacy.transaction_encoding
     in
     let hex_pkh =
       to_hex
@@ -671,7 +660,7 @@ module Interpreter_tests = struct
     let output = Tezos_sapling.Forge.make_output addr_a 15L (Bytes.create 8) in
     let hex_transac =
       to_hex
-        (Tezos_sapling.Forge.forge_transaction
+        (Tezos_sapling.Forge.forge_transaction_legacy
            ~number_dummy_inputs:2
            ~number_dummy_outputs:2
            list_forge_input
@@ -679,7 +668,7 @@ module Interpreter_tests = struct
            wb.sk
            anti_replay
            state)
-        Tezos_sapling.Core.Client.UTXO.transaction_encoding
+        Tezos_sapling.Core.Client.UTXO.Legacy.transaction_encoding
     in
     let string = Format.sprintf "{Pair 0x%s None }" hex_transac in
     let parameters =
@@ -805,7 +794,7 @@ module Interpreter_tests = struct
     let hex_transac_2 =
       "0x"
       ^ to_hex
-          (Tezos_sapling.Forge.forge_transaction
+          (Tezos_sapling.Forge.forge_transaction_legacy
              [
                snd
                  (Tezos_sapling.Forge.Input.get state 0L vk
@@ -815,7 +804,7 @@ module Interpreter_tests = struct
              sk
              anti_replay
              state)
-          Tezos_sapling.Core.Client.UTXO.transaction_encoding
+          Tezos_sapling.Core.Client.UTXO.Legacy.transaction_encoding
     in
     let string_2 = Format.sprintf "{Pair %s None }" hex_transac_2 in
     let parameters_2 =
