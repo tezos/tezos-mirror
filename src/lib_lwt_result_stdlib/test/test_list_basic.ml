@@ -110,48 +110,60 @@ module Init = struct
     ()
 
   let init_s _ () =
-    let open Lwt.Infix in
-    assert_err_s (init_s ~when_negative_length:() (-10) Lwt.return)
-    >>= fun () ->
-    assert_eq_s (init_s ~when_negative_length:() 0 Lwt.return) nil_es
-    >>= fun () ->
-    assert_eq_s
-      (init_s ~when_negative_length:() 11 Lwt.return)
-      (Lwt.return_ok @@ up 10)
-    >>= fun () -> Lwt.return_unit
+    let open Lwt_syntax in
+    let* () = assert_err_s (init_s ~when_negative_length:() (-10) Lwt.return) in
+    let* () =
+      assert_eq_s (init_s ~when_negative_length:() 0 Lwt.return) nil_es
+    in
+    let* () =
+      assert_eq_s
+        (init_s ~when_negative_length:() 11 Lwt.return)
+        (Lwt.return_ok @@ up 10)
+    in
+    Lwt.return_unit
 
   let init_es _ () =
-    let open Lwt.Infix in
-    assert_err_s (init_es ~when_negative_length:() (-10) Lwt.return_ok)
-    >>= fun () ->
-    assert_eq_s (init_es ~when_negative_length:() 0 Lwt.return_ok) nil_es
-    >>= fun () ->
-    assert_eq_s
-      (init_es ~when_negative_length:() 11 Lwt.return_ok)
-      (Lwt.return_ok @@ up 10)
-    >>= fun () -> Lwt.return_unit
+    let open Lwt_syntax in
+    let* () =
+      assert_err_s (init_es ~when_negative_length:() (-10) Lwt.return_ok)
+    in
+    let* () =
+      assert_eq_s (init_es ~when_negative_length:() 0 Lwt.return_ok) nil_es
+    in
+    let* () =
+      assert_eq_s
+        (init_es ~when_negative_length:() 11 Lwt.return_ok)
+        (Lwt.return_ok @@ up 10)
+    in
+    Lwt.return_unit
 
   let init_p _ () =
-    let open Lwt.Infix in
-    assert_err_s (init_p ~when_negative_length:() (-10) Lwt.return)
-    >>= fun () ->
-    assert_eq_s (init_p ~when_negative_length:() 0 Lwt.return) nil_es
-    >>= fun () ->
-    assert_eq_s
-      (init_p ~when_negative_length:() 11 Lwt.return)
-      (Lwt.return_ok @@ up 10)
-    >>= fun () -> Lwt.return_unit
+    let open Lwt_syntax in
+    let* () = assert_err_s (init_p ~when_negative_length:() (-10) Lwt.return) in
+    let* () =
+      assert_eq_s (init_p ~when_negative_length:() 0 Lwt.return) nil_es
+    in
+    let* () =
+      assert_eq_s
+        (init_p ~when_negative_length:() 11 Lwt.return)
+        (Lwt.return_ok @@ up 10)
+    in
+    Lwt.return_unit
 
   let init_ep _ () =
-    let open Lwt.Infix in
-    assert_err_p (init_ep ~when_negative_length:() (-10) Lwt.return_ok)
-    >>= fun () ->
-    assert_eq_s (init_ep ~when_negative_length:() 0 Lwt.return_ok) nil_es
-    >>= fun () ->
-    assert_eq_s
-      (init_ep ~when_negative_length:() 11 Lwt.return_ok)
-      (Lwt.return_ok @@ up 10)
-    >>= fun () -> Lwt.return_unit
+    let open Lwt_syntax in
+    let* () =
+      assert_err_p (init_ep ~when_negative_length:() (-10) Lwt.return_ok)
+    in
+    let* () =
+      assert_eq_s (init_ep ~when_negative_length:() 0 Lwt.return_ok) nil_es
+    in
+    let* () =
+      assert_eq_s
+        (init_ep ~when_negative_length:() 11 Lwt.return_ok)
+        (Lwt.return_ok @@ up 10)
+    in
+    Lwt.return_unit
 
   let tests =
     [
@@ -256,78 +268,98 @@ module ConcatMap = struct
     ()
 
   let concat_map_s _ () =
-    let open Lwt.Infix in
-    assert_eq_s (concat_map_s Lwt.return []) nil_s >>= fun () ->
-    assert_eq_s (concat_map_s Lwt.return [[]; []; []; []]) nil_s >>= fun () ->
-    assert_eq_s (concat_map_s (fun _ -> assert false) []) nil_s >>= fun () ->
-    assert_eq_s (concat_map_s (fun _ -> Lwt.return []) [1]) nil_s >>= fun () ->
-    assert_eq_s (concat_map_s (fun x -> Lwt.return [x]) [1]) (Lwt.return [1])
-    >>= fun () ->
-    assert_eq_s
-      (concat_map_s (fun x -> Lwt.return [x; 0; x; x]) [1])
-      (Lwt.return [1; 0; 1; 1])
-    >>= fun () ->
-    assert_eq_s (concat_map_s (fun _ -> Lwt.return []) [1; 2; 3]) nil_s
-    >>= fun () ->
-    assert_eq_s
-      (concat_map_s (fun x -> Lwt.return [x]) [1; 2; 3])
-      (Lwt.return [1; 2; 3])
-    >>= fun () ->
-    assert_eq_s
-      (concat_map_s (fun x -> Lwt.return [x; x; 2 * x]) [1; 2; 3])
-      (Lwt.return [1; 1; 2; 2; 2; 4; 3; 3; 6])
-    >>= fun () -> Lwt.return_unit
+    let open Lwt_syntax in
+    let* () = assert_eq_s (concat_map_s Lwt.return []) nil_s in
+    let* () = assert_eq_s (concat_map_s Lwt.return [[]; []; []; []]) nil_s in
+    let* () = assert_eq_s (concat_map_s (fun _ -> assert false) []) nil_s in
+    let* () = assert_eq_s (concat_map_s (fun _ -> Lwt.return []) [1]) nil_s in
+    let* () =
+      assert_eq_s (concat_map_s (fun x -> Lwt.return [x]) [1]) (Lwt.return [1])
+    in
+    let* () =
+      assert_eq_s
+        (concat_map_s (fun x -> Lwt.return [x; 0; x; x]) [1])
+        (Lwt.return [1; 0; 1; 1])
+    in
+    let* () =
+      assert_eq_s (concat_map_s (fun _ -> Lwt.return []) [1; 2; 3]) nil_s
+    in
+    let* () =
+      assert_eq_s
+        (concat_map_s (fun x -> Lwt.return [x]) [1; 2; 3])
+        (Lwt.return [1; 2; 3])
+    in
+    let* () =
+      assert_eq_s
+        (concat_map_s (fun x -> Lwt.return [x; x; 2 * x]) [1; 2; 3])
+        (Lwt.return [1; 1; 2; 2; 2; 4; 3; 3; 6])
+    in
+    Lwt.return_unit
 
   let concat_map_es _ () =
-    let open Lwt.Infix in
-    assert_eq_s (concat_map_es Lwt.return_ok []) nil_es >>= fun () ->
-    assert_eq_s (concat_map_es Lwt.return_ok [[]; []; []; []]) nil_es
-    >>= fun () ->
-    assert_eq_s (concat_map_es (fun _ -> assert false) []) nil_es >>= fun () ->
-    assert_eq_s (concat_map_es (fun _ -> Lwt.return_ok []) [1]) nil_es
-    >>= fun () ->
-    assert_eq_s
-      (concat_map_es (fun x -> Lwt.return_ok [x]) [1])
-      (Lwt.return_ok [1])
-    >>= fun () ->
-    assert_eq_s
-      (concat_map_es (fun x -> Lwt.return_ok [x; 0; x; x]) [1])
-      (Lwt.return_ok [1; 0; 1; 1])
-    >>= fun () ->
-    assert_eq_s (concat_map_es (fun _ -> Lwt.return_ok []) [1; 2; 3]) nil_es
-    >>= fun () ->
-    assert_eq_s
-      (concat_map_es (fun x -> Lwt.return_ok [x]) [1; 2; 3])
-      (Lwt.return_ok [1; 2; 3])
-    >>= fun () ->
-    assert_eq_s
-      (concat_map_es (fun x -> Lwt.return_ok [x; x; 2 * x]) [1; 2; 3])
-      (Lwt.return_ok [1; 1; 2; 2; 2; 4; 3; 3; 6])
-    >>= fun () ->
-    assert_eq_s (concat_map_es (fun _ -> Lwt.return_error ()) []) nil_es
-    >>= fun () ->
-    assert_eq_s
-      (concat_map_es (fun _ -> Lwt.return_error ()) [[]; []; []; []])
-      (Lwt.return_error ())
-    >>= fun () ->
-    assert_eq_s
-      (concat_map_es (fun _ -> Lwt.return_error ()) [1])
-      (Lwt.return_error ())
-    >>= fun () ->
-    assert_eq_s
-      (concat_map_es (fun _ -> Lwt.return_error ()) [1; 2; 3])
-      (Lwt.return_error ())
-    >>= fun () ->
-    assert_eq_s
-      (concat_map_es (fun x -> Lwt.return_error x) [1; 2; 3])
-      (Lwt.return_error 1)
-    >>= fun () ->
-    assert_eq_s
-      (concat_map_es
-         (fun x -> if x <= 1 then Lwt.return_ok [x] else Lwt.return_error x)
-         [1; 2; 3])
-      (Lwt.return_error 2)
-    >>= fun () -> Lwt.return_unit
+    let open Lwt_syntax in
+    let* () = assert_eq_s (concat_map_es Lwt.return_ok []) nil_es in
+    let* () =
+      assert_eq_s (concat_map_es Lwt.return_ok [[]; []; []; []]) nil_es
+    in
+    let* () = assert_eq_s (concat_map_es (fun _ -> assert false) []) nil_es in
+    let* () =
+      assert_eq_s (concat_map_es (fun _ -> Lwt.return_ok []) [1]) nil_es
+    in
+    let* () =
+      assert_eq_s
+        (concat_map_es (fun x -> Lwt.return_ok [x]) [1])
+        (Lwt.return_ok [1])
+    in
+    let* () =
+      assert_eq_s
+        (concat_map_es (fun x -> Lwt.return_ok [x; 0; x; x]) [1])
+        (Lwt.return_ok [1; 0; 1; 1])
+    in
+    let* () =
+      assert_eq_s (concat_map_es (fun _ -> Lwt.return_ok []) [1; 2; 3]) nil_es
+    in
+    let* () =
+      assert_eq_s
+        (concat_map_es (fun x -> Lwt.return_ok [x]) [1; 2; 3])
+        (Lwt.return_ok [1; 2; 3])
+    in
+    let* () =
+      assert_eq_s
+        (concat_map_es (fun x -> Lwt.return_ok [x; x; 2 * x]) [1; 2; 3])
+        (Lwt.return_ok [1; 1; 2; 2; 2; 4; 3; 3; 6])
+    in
+    let* () =
+      assert_eq_s (concat_map_es (fun _ -> Lwt.return_error ()) []) nil_es
+    in
+    let* () =
+      assert_eq_s
+        (concat_map_es (fun _ -> Lwt.return_error ()) [[]; []; []; []])
+        (Lwt.return_error ())
+    in
+    let* () =
+      assert_eq_s
+        (concat_map_es (fun _ -> Lwt.return_error ()) [1])
+        (Lwt.return_error ())
+    in
+    let* () =
+      assert_eq_s
+        (concat_map_es (fun _ -> Lwt.return_error ()) [1; 2; 3])
+        (Lwt.return_error ())
+    in
+    let* () =
+      assert_eq_s
+        (concat_map_es (fun x -> Lwt.return_error x) [1; 2; 3])
+        (Lwt.return_error 1)
+    in
+    let* () =
+      assert_eq_s
+        (concat_map_es
+           (fun x -> if x <= 1 then Lwt.return_ok [x] else Lwt.return_error x)
+           [1; 2; 3])
+        (Lwt.return_error 2)
+    in
+    Lwt.return_unit
 
   let tests =
     [

@@ -70,13 +70,16 @@ module type S = sig
 
 {[
 let query key =
-  connect_to_server () >>=? fun c ->
-  send_query_over_connection c key >>=? fun r ->
-  check_response r >>=? fun () ->
+  let open Lwt_result_syntax in
+  let* c = connect_to_server () in
+  let* r = send_query_over_connection c key in
+  let* () = check_response r in
   return r
 
 let query key =
-  query_key >|= function
+  let open Lwt_syntax in
+  let+ r = query_key in
+  match r with
   | Ok r -> Ok r
   | Error trace -> Error (cons `Query_failure trace)
 ]} *)
