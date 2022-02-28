@@ -192,6 +192,38 @@ let doesnt_terminate () =
   in
   List.iter check es
 
+type assocassoc = Datum of int | Assoc of (string * assocassoc) list
+
+let doesnt_terminate_2 () =
+  let es =
+    let open Data_encoding in
+    [
+      (fun () ->
+        mu "assocassoc" (fun e ->
+            union
+              [
+                case
+                  (Tag 0)
+                  ~title:"Datum"
+                  uint8
+                  (function Datum i -> Some i | _ -> None)
+                  (fun i -> Datum i);
+                case
+                  (Tag 1)
+                  ~title:"Assoc"
+                  (assoc e)
+                  (function Assoc a -> Some a | _ -> None)
+                  (fun a -> Assoc a);
+              ]));
+    ]
+  in
+  let check f =
+    match f () with
+    | exception Invalid_argument _ -> ()
+    | _ -> failwith "Expected to not terminate but did"
+  in
+  List.iter check es
+
 let discriminated_option e =
   let open Data_encoding in
   union
@@ -274,5 +306,6 @@ let tests =
     ("flip-flop", `Quick, flip_flop);
     ("big", `Quick, big_test);
     ("doesnt_terminate", `Quick, doesnt_terminate);
+    ("doesnt_terminate_2", `Quick, doesnt_terminate_2);
     ("terminates", `Quick, terminates);
   ]
