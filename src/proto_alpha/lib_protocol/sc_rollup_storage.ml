@@ -211,6 +211,7 @@ module Commitment_hash = Sc_rollup_repr.Commitment_hash
 
 let originate ctxt ~kind ~boot_sector =
   Raw_context.increment_origination_nonce ctxt >>?= fun (ctxt, nonce) ->
+  let level = Raw_context.current_level ctxt in
   Sc_rollup_repr.Address.from_nonce nonce >>?= fun address ->
   Storage.Sc_rollup.PVM_kind.add ctxt address kind >>= fun ctxt ->
   Storage.Sc_rollup.Initial_level.add
@@ -219,8 +220,8 @@ let originate ctxt ~kind ~boot_sector =
     (Level_storage.current ctxt).level
   >>= fun ctxt ->
   Storage.Sc_rollup.Boot_sector.add ctxt address boot_sector >>= fun ctxt ->
-  Storage.Sc_rollup.Inbox.init ctxt address Sc_rollup_inbox.empty
-  >>=? fun (ctxt, size_diff) ->
+  let inbox = Sc_rollup_inbox_repr.empty address level.level in
+  Storage.Sc_rollup.Inbox.init ctxt address inbox >>=? fun (ctxt, size_diff) ->
   Store.Last_cemented_commitment.init ctxt address Commitment_hash.zero
   >>=? fun (ctxt, lcc_size_diff) ->
   Store.Staker_count.init ctxt address 0l >>=? fun (ctxt, stakers_size_diff) ->
@@ -239,23 +240,23 @@ let originate ctxt ~kind ~boot_sector =
 
 let kind ctxt address = Storage.Sc_rollup.PVM_kind.find ctxt address
 
-(** Try to consume n messages. *)
-let consume_n_messages ctxt rollup n =
-  let open Lwt_tzresult_syntax in
-  let* (ctxt, inbox) = Storage.Sc_rollup.Inbox.get ctxt rollup in
-  match Sc_rollup_inbox.consume_n_messages n inbox with
-  | None -> return ctxt
-  | Some inbox ->
-      let* (ctxt, size) = Storage.Sc_rollup.Inbox.update ctxt rollup inbox in
-      assert (Compare.Int.(size <= 0)) ;
-      return ctxt
-
 let last_cemented_commitment ctxt rollup =
   let open Lwt_tzresult_syntax in
   let* (ctxt, res) = Store.Last_cemented_commitment.find ctxt rollup in
   match res with
   | None -> fail (Sc_rollup_does_not_exist rollup)
   | Some lcc -> return (lcc, ctxt)
+
+(** Try to consume n messages. *)
+let consume_n_messages ctxt rollup n =
+  let open Lwt_tzresult_syntax in
+  let* (ctxt, inbox) = Storage.Sc_rollup.Inbox.get ctxt rollup in
+  Sc_rollup_inbox_repr.consume_n_messages n inbox >>?= function
+  | None -> return ctxt
+  | Some inbox ->
+      let* (ctxt, size) = Storage.Sc_rollup.Inbox.update ctxt rollup inbox in
+      assert (Compare.Int.(size <= 0)) ;
+      return ctxt
 
 let inbox ctxt rollup =
   let open Lwt_tzresult_syntax in
@@ -265,15 +266,17 @@ let inbox ctxt rollup =
   | Some inbox -> return (inbox, ctxt)
 
 let add_messages ctxt rollup messages =
-  let open Lwt_tzresult_syntax in
-  let* (ctxt, res) = Storage.Sc_rollup.Inbox.find ctxt rollup in
-  match res with
-  | None -> fail (Sc_rollup_does_not_exist rollup)
-  | Some inbox ->
-      let {Level_repr.level; _} = Raw_context.current_level ctxt in
-      let inbox = Sc_rollup_inbox.add_messages messages level inbox in
-      let* (ctxt, size) = Storage.Sc_rollup.Inbox.update ctxt rollup inbox in
-      return (inbox, Z.of_int size, ctxt)
+  let open Raw_context in
+  Storage.Sc_rollup.Inbox.get ctxt rollup >>=? fun (ctxt, inbox) ->
+  Sc_rollup_in_memory_inbox.current_messages ctxt rollup
+  |> fun current_messages ->
+  let {Level_repr.level; _} = Raw_context.current_level ctxt in
+  Sc_rollup_inbox_repr.add_messages inbox level messages current_messages
+  >>= fun (current_messages, inbox) ->
+  Sc_rollup_in_memory_inbox.set_current_messages ctxt rollup current_messages
+  |> fun ctxt ->
+  Storage.Sc_rollup.Inbox.update ctxt rollup inbox >>=? fun (ctxt, size) ->
+  return (inbox, Z.of_int size, ctxt)
 
 (* This function is called in other functions in the module only after they have
    checked for the existence of the rollup, and therefore it is not necessary

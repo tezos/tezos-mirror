@@ -74,5 +74,6 @@ let () =
       Unit_test.spec "liquidity baking" Test_liquidity_baking_repr.tests;
       Unit_test.spec "sc rollup arith" Test_sc_rollup_arith.tests;
       Unit_test.spec "merkle list" Test_merkle_list.tests;
+      Unit_test.spec "sc rollup inbox" Test_sc_rollup_inbox.tests;
     ]
   |> Lwt_main.run

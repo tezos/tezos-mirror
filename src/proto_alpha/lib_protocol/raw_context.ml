@@ -229,6 +229,7 @@ type back = {
     Tez_repr.t Signature.Public_key_hash.Map.t option;
   tx_rollup_current_messages :
     Tx_rollup_inbox_repr.Merkle.tree Tx_rollup_repr.Map.t;
+  sc_rollup_current_messages : Context.tree Sc_rollup_repr.Address.Map.t;
 }
 
 (*
@@ -785,6 +786,7 @@ let prepare ~level ~predecessor_timestamp ~timestamp ctxt =
         sampler_state = Cycle_repr.Map.empty;
         stake_distribution_for_current_cycle = None;
         tx_rollup_current_messages = Tx_rollup_repr.Map.empty;
+        sc_rollup_current_messages = Sc_rollup_repr.Address.Map.empty;
       };
   }
 
@@ -1355,4 +1357,27 @@ module Tx_rollup = struct
     in
     let back = {ctxt.back with tx_rollup_current_messages = map} in
     ({ctxt with back}, !root)
+end
+
+(*
+   To optimize message insertion in smart contract rollup inboxes, we
+   maintain the sequence of current messages of each rollup used in
+   the block in a in-memory map.
+*)
+module Sc_rollup_in_memory_inbox = struct
+  let current_messages ctxt rollup =
+    Sc_rollup_repr.Address.Map.find rollup ctxt.back.sc_rollup_current_messages
+    |> function
+    | None -> Tree.empty ctxt
+    | Some tree -> tree
+
+  let set_current_messages ctxt rollup tree =
+    let sc_rollup_current_messages =
+      Sc_rollup_repr.Address.Map.add
+        rollup
+        tree
+        ctxt.back.sc_rollup_current_messages
+    in
+    let back = {ctxt.back with sc_rollup_current_messages} in
+    {ctxt with back}
 end

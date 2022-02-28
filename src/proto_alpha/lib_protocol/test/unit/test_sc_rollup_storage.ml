@@ -477,7 +477,9 @@ let test_cement_consumes_available_messages () =
   let* (inbox, _n, ctxt) =
     lift @@ Sc_rollup_storage.add_messages ctxt rollup ["one"; "two"; "three"]
   in
-  let available_messages = Sc_rollup_inbox.number_of_available_messages inbox in
+  let available_messages =
+    Sc_rollup_inbox_repr.number_of_available_messages inbox
+  in
   let commitment =
     Sc_rollup_repr.Commitment.
       {
@@ -495,7 +497,7 @@ let test_cement_consumes_available_messages () =
   let* ctxt = lift @@ Sc_rollup_storage.cement_commitment ctxt rollup c1 in
   let* (new_inbox, _ctxt) = lift @@ Sc_rollup_storage.inbox ctxt rollup in
   let new_available_messages =
-    Sc_rollup_inbox.number_of_available_messages new_inbox
+    Sc_rollup_inbox_repr.number_of_available_messages new_inbox
   in
   let consumed_messages =
     Z.of_int32

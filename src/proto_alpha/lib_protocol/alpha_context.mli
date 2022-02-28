@@ -2443,9 +2443,15 @@ module Sc_rollup : sig
   module Inbox : sig
     type t
 
-    val encoding : t Data_encoding.encoding
-
     val pp : Format.formatter -> t -> unit
+
+    val encoding : t Data_encoding.t
+
+    val empty : Address.t -> Raw_level.t -> t
+
+    val number_of_available_messages : t -> Z.t
+
+    val consume_n_messages : int -> t -> t option tzresult
   end
 
   val rpc_arg : t RPC_arg.t

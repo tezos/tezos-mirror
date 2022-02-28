@@ -267,8 +267,9 @@ let test_rollup_inbox =
         let* () = Lwt_list.iter_s send messages in
         let* () = Client.bake_for client in
         let* inbox = RPC.Sc_rollup.get_inbox ~sc_rollup_address client in
-        (List.assoc_opt "inbox_size" (JSON.as_object inbox) |> function
-         | None -> failwith "inbox_size is undefined"
+        (List.assoc_opt "nb_available_messages" (JSON.as_object inbox)
+         |> function
+         | None -> failwith "nb_available_messages is undefined"
          | Some inbox_size ->
              Check.(
                (JSON.as_int inbox_size = n * (n + 1) / 2)

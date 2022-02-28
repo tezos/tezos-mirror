@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,30 +23,20 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Merkelizing inbox for smart contract rollups. *)
+open Protocol
+open Alpha_context
 
-(** The type of the in-memory state of the inbox for a smart contract rollup. *)
-type t
+let originated_rollup op =
+  let nonce =
+    Origination_nonce.Internal_for_tests.initial (Operation.hash_packed op)
+  in
+  Contract.Internal_for_tests.originated_contract nonce
 
-val pp : Format.formatter -> t -> unit
-
-val encoding : t Data_encoding.t
-
-(** [number_of_available_messages inbox] returns the number of
-   messages that can be consumed in [inbox]. *)
-val number_of_available_messages : t -> Z.t
-
-(** The empty inbox. *)
-val empty : t
-
-(** [add_messages msg_list level inbox] adds [msg_list] to [inbox] at
-    level [level] (preserving their order). *)
-val add_messages : string list -> Raw_level_repr.t -> t -> t
-
-(** [consume_n_messages n inbox] returns an inbox where [n] messages have
-    been consumed, or [None] if there are strictly less than [n] messages
-    available in [inbox].
-
-    @raise Invalid_argument if [n <= 0]
- *)
-val consume_n_messages : int -> t -> t option
+(** Returns a block in which a rollup originated. *)
+let originate_rollup src b baker kind boot_sector =
+  Op.sc_rollup_origination (B b) src ~fee:(Test_tez.of_int 10) kind boot_sector
+  >>=? fun operation ->
+  Incremental.begin_construction ~policy:Block.(By_account baker) b
+  >>=? fun incr ->
+  Incremental.add_operation incr operation >>=? fun incr ->
+  Incremental.finalize_block incr >|=? fun b -> b

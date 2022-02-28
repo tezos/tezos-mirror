@@ -169,13 +169,13 @@ val add_messages :
   Raw_context.t ->
   Sc_rollup_repr.t ->
   string list ->
-  (Sc_rollup_inbox.t * Z.t * Raw_context.t) tzresult Lwt.t
+  (Sc_rollup_inbox_repr.t * Z.t * Raw_context.t) tzresult Lwt.t
 
 (** [inbox context rollup] returns the current state of the inbox. *)
 val inbox :
   Raw_context.t ->
   Sc_rollup_repr.t ->
-  (Sc_rollup_inbox.t * Raw_context.t) tzresult Lwt.t
+  (Sc_rollup_inbox_repr.t * Raw_context.t) tzresult Lwt.t
 
 (** [deposit_stake context rollup staker] stakes [staker] at the last
     cemented commitment, freezing [sc_rollup_deposit] from [staker]'s account
