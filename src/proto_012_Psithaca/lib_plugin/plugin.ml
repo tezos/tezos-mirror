@@ -3622,6 +3622,12 @@ module RPC = struct
       |+ field "offset" RPC_arg.int32 0l (fun t -> t.offset)
       |> seal
 
+    let cycle_query : Cycle.t option RPC_query.t =
+      let open RPC_query in
+      query Fun.id
+      |+ opt_field "cycle" Cycle.rpc_arg (fun cycle -> cycle)
+      |> seal
+
     let current_level =
       RPC_service.get_service
         ~description:
@@ -3655,8 +3661,9 @@ module RPC = struct
     let selected_snapshot =
       RPC_service.get_service
         ~description:
-          "Returns the index of the selected snapshot for the current cycle."
-        ~query:RPC_query.empty
+          "Returns the index of the selected snapshot for the current cycle or \
+           for the specific `cycle` passed as argument, if any."
+        ~query:cycle_query
         ~output:Data_encoding.int32
         RPC_path.(open_root / "context" / "selected_snapshot")
   end
@@ -3688,7 +3695,7 @@ module RPC = struct
         | No_available_snapshots {min_cycle} -> Some min_cycle | _ -> None)
       (fun min_cycle -> No_available_snapshots {min_cycle})
 
-  let get_selected_snapshot ctxt =
+  let get_selected_snapshot ?cycle ctxt =
     (* Copy-pasted the logic from [select_distribution_for_cycle]
        in [stake_storage.ml] *)
     (* max_index can be determined by using constants only *)
@@ -3699,13 +3706,17 @@ module RPC = struct
     let preserved_cycles =
       Int32.of_int (Alpha_context.Constants.preserved_cycles ctxt)
     in
-    let current_cycle = Level.(current ctxt).cycle in
-    if Compare.Int32.(Cycle.to_int32 current_cycle <= preserved_cycles) then
+    let cycle =
+      match cycle with
+      | None -> Level.(current ctxt).cycle
+      | Some cycle -> cycle
+    in
+    if Compare.Int32.(Cycle.to_int32 cycle <= preserved_cycles) then
       (* Early cycles do not have snapshots, fail if requested *)
       fail (No_available_snapshots {min_cycle = Int32.succ preserved_cycles})
     else
       let max_index = Int32.div blocks_per_cycle blocks_per_stake_snapshot in
-      Alpha_context.Seed.for_cycle ctxt current_cycle >>=? fun seed ->
+      Alpha_context.Seed.for_cycle ctxt cycle >>=? fun seed ->
       let seed =
         (* Hackish cast *)
         Data_encoding.Binary.to_bytes_exn Seed.seed_encoding seed
@@ -3752,8 +3763,10 @@ module RPC = struct
             return (Some (first.level, last.level))) ;
     Registration.register0 ~chunked:false S.round (fun ctxt () () ->
         Round.get ctxt) ;
-    Registration.register0 ~chunked:false S.selected_snapshot (fun ctxt () () ->
-        get_selected_snapshot ctxt)
+    Registration.register0
+      ~chunked:false
+      S.selected_snapshot
+      (fun ctxt cycle () -> get_selected_snapshot ?cycle ctxt)
 
   let current_level ctxt ?(offset = 0l) block =
     RPC_context.make_call0 S.current_level ctxt block {offset} ()
