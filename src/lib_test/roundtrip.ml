@@ -60,5 +60,5 @@ let json : t =
 
     let of_input encoding x = Data_encoding.Json.construct encoding x
 
-    let to_input = Data_encoding.Json.destruct
+    let to_input encoding j = Data_encoding.Json.destruct encoding j
   end)
