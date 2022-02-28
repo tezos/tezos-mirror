@@ -171,4 +171,10 @@ let read_file filename =
   Lwt_io.read ic
 
 module String_map = Map.Make (String)
-module String_set = Set.Make (String)
+
+module String_set = struct
+  include Set.Make (String)
+
+  let pp fmt set =
+    Format.pp_print_list Format.pp_print_string fmt (elements set)
+end
