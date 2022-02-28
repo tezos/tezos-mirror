@@ -1272,6 +1272,26 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
       | ISapling_empty_state (_, memo_size, k) ->
           let state = Sapling.empty_state ~memo_size () in
           (step [@ocaml.tailcall]) g gas k ks state (accu, stack)
+      | ISapling_verify_update (_, k) -> (
+          let transaction = accu in
+          let (state, stack) = stack in
+          let address = Contract.to_b58check sc.self in
+          let sc_chain_id = Script_chain_id.make sc.chain_id in
+          let chain_id = Script_chain_id.to_b58check sc_chain_id in
+          let anti_replay = address ^ chain_id in
+          let ctxt = update_context gas ctxt in
+          Sapling.verify_update ctxt state transaction anti_replay
+          >>=? fun (ctxt, balance_state_opt) ->
+          let (gas, ctxt) = local_gas_counter_and_outdated_context ctxt in
+          match balance_state_opt with
+          | Some (balance, state) ->
+              let state =
+                Some
+                  ( Bytes.of_string transaction.bound_data,
+                    (Script_int.of_int64 balance, state) )
+              in
+              (step [@ocaml.tailcall]) (ctxt, sc) gas k ks state stack
+          | None -> (step [@ocaml.tailcall]) (ctxt, sc) gas k ks None stack)
       | ISapling_verify_update_deprecated (_, k) -> (
           let transaction = accu in
           let (state, stack) = stack in

@@ -290,6 +290,8 @@ let rec unparse_ty_entrypoints_uncarbonated :
         let ta = unparse_comparable_ty_uncarbonated ~loc uta in
         let tr = unparse_ty_entrypoints_uncarbonated ~loc utr no_entrypoints in
         (T_big_map, [ta; tr])
+    | Sapling_transaction_t memo_size ->
+        (T_sapling_transaction, [unparse_memo_size ~loc memo_size])
     | Sapling_transaction_deprecated_t memo_size ->
         (T_sapling_transaction_deprecated, [unparse_memo_size ~loc memo_size])
     | Sapling_state_t memo_size ->
@@ -363,8 +365,8 @@ let[@coq_axiom_with_reason "gadt"] rec comparable_ty_of_ty :
       (Option_key (ty, meta), ctxt)
   | Lambda_t _ | List_t _ | Ticket_t _ | Set_t _ | Map_t _ | Big_map_t _
   | Contract_t _ | Operation_t | Bls12_381_fr_t | Bls12_381_g1_t
-  | Bls12_381_g2_t | Sapling_state_t _ | Sapling_transaction_deprecated_t _
-  | Chest_key_t | Chest_t ->
+  | Bls12_381_g2_t | Sapling_state_t _ | Sapling_transaction_t _
+  | Sapling_transaction_deprecated_t _ | Chest_key_t | Chest_t ->
       let t = serialize_ty_for_error ty in
       error (Comparable_type_expected (loc, t))
 
@@ -694,6 +696,7 @@ let check_dupable_ty ctxt loc ty =
     | Bls12_381_g2_t -> return_unit
     | Bls12_381_fr_t -> return_unit
     | Sapling_state_t _ -> return_unit
+    | Sapling_transaction_t _ -> return_unit
     | Sapling_transaction_deprecated_t _ -> return_unit
     | Chest_t -> return_unit
     | Chest_key_t -> return_unit
@@ -980,6 +983,10 @@ let ty_eq :
         let+ () = memo_size_eq ms1 ms2 in
         Eq
     | (Sapling_state_t _, _) -> not_equal ()
+    | (Sapling_transaction_t ms1, Sapling_transaction_t ms2) ->
+        let+ () = memo_size_eq ms1 ms2 in
+        Eq
+    | (Sapling_transaction_t _, _) -> not_equal ()
     | ( Sapling_transaction_deprecated_t ms1,
         Sapling_transaction_deprecated_t ms2 ) ->
         let+ () = memo_size_eq ms1 ms2 in
@@ -1468,6 +1475,10 @@ let[@coq_axiom_with_reason "complex mutually recursive definition"] rec parse_ty
         >>? fun (Ex_ty tr, ctxt) ->
         check_type_annot loc annot >>? fun () ->
         map_t loc ta tr >|? fun ty -> return ctxt ty
+    | Prim (loc, T_sapling_transaction, [memo_size], annot) ->
+        check_type_annot loc annot >>? fun () ->
+        parse_memo_size memo_size >|? fun memo_size ->
+        return ctxt (sapling_transaction_t ~memo_size)
     | Prim (loc, T_sapling_transaction_deprecated, [memo_size], annot) ->
         check_type_annot loc annot >>? fun () ->
         parse_memo_size memo_size >|? fun memo_size ->
@@ -1742,6 +1753,7 @@ let check_packable ~legacy loc root =
     | Map_t (_, elt_ty, _) -> check elt_ty
     | Contract_t (_, _) when legacy -> Result.return_unit
     | Contract_t (_, _) -> error (Unexpected_contract loc)
+    | Sapling_transaction_t _ -> ok ()
     | Sapling_transaction_deprecated_t _ -> ok ()
     | Chest_key_t -> Result.return_unit
     | Chest_t -> Result.return_unit
@@ -2842,6 +2854,23 @@ let[@coq_axiom_with_reason "gadt"] rec parse_data :
     of identifiers with [allow_forged].
   *)
   (* Sapling *)
+  | (Sapling_transaction_t memo_size, Bytes (_, bytes)) -> (
+      match
+        Data_encoding.Binary.of_bytes_opt Sapling.transaction_encoding bytes
+      with
+      | Some transaction -> (
+          match Sapling.transaction_get_memo_size transaction with
+          | None -> return (transaction, ctxt)
+          | Some transac_memo_size ->
+              Lwt.return
+                ( memo_size_eq
+                    ~error_details:Informative
+                    memo_size
+                    transac_memo_size
+                >|? fun () -> (transaction, ctxt) ))
+      | None -> fail_parse_data ())
+  | (Sapling_transaction_t _, expr) ->
+      traced_fail (Invalid_kind (location expr, [Bytes_kind], kind expr))
   | (Sapling_transaction_deprecated_t memo_size, Bytes (_, bytes)) -> (
       match
         Data_encoding.Binary.of_bytes_opt
@@ -3830,6 +3859,23 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
         {apply = (fun kinfo k -> ISapling_verify_update_deprecated (kinfo, k))}
       in
       pair_t loc int_t state_ty >>?= fun pair_ty ->
+      option_t loc pair_ty >>?= fun ty ->
+      let stack = Item_t (ty, rest) in
+      typed ctxt loc instr stack
+  | ( Prim (loc, I_SAPLING_VERIFY_UPDATE, [], _),
+      Item_t
+        ( Sapling_transaction_t transaction_memo_size,
+          Item_t ((Sapling_state_t state_memo_size as state_ty), rest) ) ) ->
+      memo_size_eq
+        ~error_details:Informative
+        state_memo_size
+        transaction_memo_size
+      >>?= fun () ->
+      let instr =
+        {apply = (fun kinfo k -> ISapling_verify_update (kinfo, k))}
+      in
+      pair_t loc int_t state_ty >>?= fun pair_ty ->
+      pair_t loc bytes_t pair_ty >>?= fun pair_ty ->
       option_t loc pair_ty >>?= fun ty ->
       let stack = Item_t (ty, rest) in
       typed ctxt loc instr stack
@@ -5685,6 +5731,13 @@ let[@coq_axiom_with_reason "gadt"] rec unparse_data :
   | (Lambda_t _, Lam (_, original_code)) ->
       unparse_code ctxt ~stack_depth:(stack_depth + 1) mode original_code
   | (Never_t, _) -> .
+  | (Sapling_transaction_t _, s) ->
+      Lwt.return
+        ( Gas.consume ctxt (Unparse_costs.sapling_transaction s) >|? fun ctxt ->
+          let bytes =
+            Data_encoding.Binary.to_bytes_exn Sapling.transaction_encoding s
+          in
+          (Bytes (loc, bytes), ctxt) )
   | (Sapling_transaction_deprecated_t _, s) ->
       Lwt.return
         ( Gas.consume ctxt (Unparse_costs.sapling_transaction_deprecated s)
@@ -6080,6 +6133,7 @@ let rec has_lazy_storage : type t. t ty -> t has_lazy_storage =
   | Bls12_381_g1_t -> False_f
   | Bls12_381_g2_t -> False_f
   | Bls12_381_fr_t -> False_f
+  | Sapling_transaction_t _ -> False_f
   | Sapling_transaction_deprecated_t _ -> False_f
   | Ticket_t _ -> False_f
   | Chest_key_t -> False_f

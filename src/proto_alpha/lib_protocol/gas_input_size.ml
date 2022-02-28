@@ -75,3 +75,6 @@ let sapling_transaction_inputs : Alpha_context.Sapling.transaction -> t =
 
 let sapling_transaction_outputs : Alpha_context.Sapling.transaction -> t =
  fun tx -> List.length tx.outputs
+
+let sapling_transaction_bound_data : Alpha_context.Sapling.transaction -> t =
+ fun tx -> String.length tx.bound_data

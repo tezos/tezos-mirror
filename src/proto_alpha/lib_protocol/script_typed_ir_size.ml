@@ -105,6 +105,9 @@ let ty_traverse_f =
         ret_succ_adding accu @@ (base_compound a +! (word_size *? 2))
     | Contract_t (_ty, a) ->
         ret_succ_adding accu @@ (base_compound a +! word_size)
+    | Sapling_transaction_t _m ->
+        ret_succ_adding accu
+        @@ (base_compound_no_meta +! sapling_memo_size_size +! word_size)
     | Sapling_transaction_deprecated_t _m ->
         ret_succ_adding accu
         @@ (base_compound_no_meta +! sapling_memo_size_size +! word_size)
@@ -304,6 +307,8 @@ let rec value_size :
           ty'
           x
     | Contract_t (_, _) -> ret_succ (accu ++ contract_size x)
+    | Sapling_transaction_t _ ->
+        ret_succ_adding accu (Sapling.transaction_in_memory_size x)
     | Sapling_transaction_deprecated_t _ ->
         ret_succ_adding accu (Sapling.Legacy.transaction_in_memory_size x)
     | Sapling_state_t _ -> ret_succ_adding accu (sapling_state_size x)
@@ -583,6 +588,7 @@ and kinstr_size :
     | IAmount (kinfo, _) -> ret_succ_adding accu (base kinfo)
     | ISapling_empty_state (kinfo, _m, _) ->
         ret_succ_adding accu (base kinfo +! word_size +! sapling_memo_size_size)
+    | ISapling_verify_update (kinfo, _) -> ret_succ_adding accu (base kinfo)
     | ISapling_verify_update_deprecated (kinfo, _) ->
         ret_succ_adding accu (base kinfo)
     | IDig (kinfo, n, _, _) ->

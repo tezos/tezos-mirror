@@ -976,6 +976,10 @@ type ('before_top, 'before, 'result_top, 'result) kinstr =
       * Sapling.Memo_size.t
       * (Sapling.state, 'a * 's, 'b, 'f) kinstr
       -> ('a, 's, 'b, 'f) kinstr
+  | ISapling_verify_update :
+      (Sapling.transaction, Sapling.state * 's) kinfo
+      * ((bytes, (z num, Sapling.state) pair) pair option, 's, 'r, 'f) kinstr
+      -> (Sapling.transaction, Sapling.state * 's, 'r, 'f) kinstr
   | ISapling_verify_update_deprecated :
       (Sapling.Legacy.transaction, Sapling.state * 's) kinfo
       * ((z num, Sapling.state) pair option, 's, 'r, 'f) kinstr
@@ -1256,6 +1260,7 @@ and 'ty ty =
   | Contract_t :
       'arg ty * 'arg typed_contract ty_metadata
       -> 'arg typed_contract ty
+  | Sapling_transaction_t : Sapling.Memo_size.t -> Sapling.transaction ty
   | Sapling_transaction_deprecated_t :
       Sapling.Memo_size.t
       -> Sapling.Legacy.transaction ty
@@ -1470,6 +1475,7 @@ let kinfo_of_kinstr : type a s b f. (a, s, b, f) kinstr -> (a, s) kinfo =
   | ISelf_address (kinfo, _) -> kinfo
   | IAmount (kinfo, _) -> kinfo
   | ISapling_empty_state (kinfo, _, _) -> kinfo
+  | ISapling_verify_update (kinfo, _) -> kinfo
   | ISapling_verify_update_deprecated (kinfo, _) -> kinfo
   | IDig (kinfo, _, _, _) -> kinfo
   | IDug (kinfo, _, _, _) -> kinfo
@@ -1676,6 +1682,8 @@ let kinstr_rewritek :
   | IAmount (kinfo, k) -> IAmount (kinfo, f.apply k)
   | ISapling_empty_state (kinfo, s, k) ->
       ISapling_empty_state (kinfo, s, f.apply k)
+  | ISapling_verify_update (kinfo, k) ->
+      ISapling_verify_update (kinfo, f.apply k)
   | ISapling_verify_update_deprecated (kinfo, k) ->
       ISapling_verify_update_deprecated (kinfo, f.apply k)
   | IDig (kinfo, n, p, k) -> IDig (kinfo, n, p, f.apply k)
@@ -1732,8 +1740,9 @@ let ty_metadata : type a. a ty -> a ty_metadata = function
   | Big_map_t (_, _, meta) -> meta
   | Ticket_t (_, meta) -> meta
   | Contract_t (_, meta) -> meta
-  | Sapling_transaction_deprecated_t _ | Sapling_state_t _ | Operation_t
-  | Bls12_381_g1_t | Bls12_381_g2_t | Bls12_381_fr_t | Chest_t | Chest_key_t ->
+  | Sapling_transaction_t _ | Sapling_transaction_deprecated_t _
+  | Sapling_state_t _ | Operation_t | Bls12_381_g1_t | Bls12_381_g2_t
+  | Bls12_381_fr_t | Chest_t | Chest_key_t ->
       meta_basic
 
 let comparable_ty_metadata : type a. a comparable_ty -> a ty_metadata = function
@@ -1880,6 +1889,8 @@ let contract_t loc t =
   Type_size.compound1 loc (ty_size t) >|? fun size -> Contract_t (t, {size})
 
 let contract_unit_t = Contract_t (unit_t, {size = Type_size.two})
+
+let sapling_transaction_t ~memo_size = Sapling_transaction_t memo_size
 
 let sapling_transaction_deprecated_t ~memo_size =
   Sapling_transaction_deprecated_t memo_size
@@ -2057,6 +2068,7 @@ let kinstr_traverse i init f =
     | ISelf_address (_, k) -> (next [@ocaml.tailcall]) k
     | IAmount (_, k) -> (next [@ocaml.tailcall]) k
     | ISapling_empty_state (_, _, k) -> (next [@ocaml.tailcall]) k
+    | ISapling_verify_update (_, k) -> (next [@ocaml.tailcall]) k
     | ISapling_verify_update_deprecated (_, k) -> (next [@ocaml.tailcall]) k
     | IDig (_, _, _, k) -> (next [@ocaml.tailcall]) k
     | IDug (_, _, _, k) -> (next [@ocaml.tailcall]) k
@@ -2133,9 +2145,9 @@ let (ty_traverse, comparable_ty_traverse) =
     match (ty : t ty) with
     | Unit_t | Int_t | Nat_t | Signature_t | String_t | Bytes_t | Mutez_t
     | Key_hash_t | Key_t | Timestamp_t | Address_t | Tx_rollup_l2_address_t
-    | Bool_t | Sapling_transaction_deprecated_t _ | Sapling_state_t _
-    | Operation_t | Chain_id_t | Never_t | Bls12_381_g1_t | Bls12_381_g2_t
-    | Bls12_381_fr_t ->
+    | Bool_t | Sapling_transaction_t _ | Sapling_transaction_deprecated_t _
+    | Sapling_state_t _ | Operation_t | Chain_id_t | Never_t | Bls12_381_g1_t
+    | Bls12_381_g2_t | Bls12_381_fr_t ->
         (continue [@ocaml.tailcall]) accu
     | Ticket_t (cty, _) -> aux f accu cty continue
     | Chest_key_t | Chest_t -> (continue [@ocaml.tailcall]) accu
@@ -2213,9 +2225,9 @@ let value_traverse (type t) (ty : (t ty, t comparable_ty) union) (x : t) init f
     match ty with
     | Unit_t | Int_t | Nat_t | Signature_t | String_t | Bytes_t | Mutez_t
     | Key_hash_t | Key_t | Timestamp_t | Address_t | Tx_rollup_l2_address_t
-    | Bool_t | Sapling_transaction_deprecated_t _ | Sapling_state_t _
-    | Operation_t | Chain_id_t | Never_t | Bls12_381_g1_t | Bls12_381_g2_t
-    | Bls12_381_fr_t | Chest_key_t | Chest_t
+    | Bool_t | Sapling_transaction_t _ | Sapling_transaction_deprecated_t _
+    | Sapling_state_t _ | Operation_t | Chain_id_t | Never_t | Bls12_381_g1_t
+    | Bls12_381_g2_t | Bls12_381_fr_t | Chest_key_t | Chest_t
     | Lambda_t (_, _, _) ->
         (return [@ocaml.tailcall]) ()
     | Pair_t (ty1, ty2, _) -> (next2 [@ocaml.tailcall]) ty1 ty2 (fst x) (snd x)

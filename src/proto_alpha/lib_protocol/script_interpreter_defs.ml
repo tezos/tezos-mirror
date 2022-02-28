@@ -211,6 +211,12 @@ let cost_of_instr : type a s r f. (a, s, r, f) kinstr -> a -> s -> Gas.cost =
   | IPairing_check_bls12_381 _ ->
       let pairs = accu in
       Interp_costs.pairing_check_bls12_381 pairs
+  | ISapling_verify_update _ ->
+      let tx = accu in
+      let inputs = Gas_input_size.sapling_transaction_inputs tx in
+      let outputs = Gas_input_size.sapling_transaction_outputs tx in
+      let bound_data = Gas_input_size.sapling_transaction_bound_data tx in
+      Interp_costs.sapling_verify_update ~inputs ~outputs ~bound_data
   | ISapling_verify_update_deprecated _ ->
       let tx = accu in
       let inputs = List.length tx.inputs in

@@ -939,7 +939,12 @@ type ('before_top, 'before, 'result_top, 'result) kinstr =
       * Sapling.Memo_size.t
       * (Sapling.state, 'a * 's, 'b, 'f) kinstr
       -> ('a, 's, 'b, 'f) kinstr
+  | ISapling_verify_update :
+      (Sapling.transaction, Sapling.state * 's) kinfo
+      * ((bytes, (z num, Sapling.state) pair) pair option, 's, 'r, 'f) kinstr
+      -> (Sapling.transaction, Sapling.state * 's, 'r, 'f) kinstr
   | ISapling_verify_update_deprecated :
+      (* legacy introduced in J *)
       (Sapling.Legacy.transaction, Sapling.state * 's) kinfo
       * ((z num, Sapling.state) pair option, 's, 'r, 'f) kinstr
       -> (Sapling.Legacy.transaction, Sapling.state * 's, 'r, 'f) kinstr
@@ -1359,6 +1364,7 @@ and 'ty ty =
   | Contract_t :
       'arg ty * 'arg typed_contract ty_metadata
       -> 'arg typed_contract ty
+  | Sapling_transaction_t : Sapling.Memo_size.t -> Sapling.transaction ty
   | Sapling_transaction_deprecated_t :
       Sapling.Memo_size.t
       -> Sapling.Legacy.transaction ty
@@ -1618,6 +1624,9 @@ val big_map_t :
 val contract_t : Script.location -> 'arg ty -> 'arg typed_contract ty tzresult
 
 val contract_unit_t : unit typed_contract ty
+
+val sapling_transaction_t :
+  memo_size:Sapling.Memo_size.t -> Sapling.transaction ty
 
 val sapling_transaction_deprecated_t :
   memo_size:Sapling.Memo_size.t -> Sapling.Legacy.transaction ty
