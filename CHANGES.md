@@ -24,5 +24,14 @@ v0.4:
 - remove unused `read_error` constructor: `Invalid_size`
 - check that `int31` is actually within `int31` bounds
 - add "slicing" feature to analyse binary encoded values
+
+v0.5:  
+- add compact encoding combinators
+- add fixed-length list and fixed-length array combinators
+- fix bug wherein `mu (… option …)` caused an infinite recursion
+- fix roundtrip property of BSON
+- fix error management of lazy encodings (consistent with non-lazy encodings)
 - add a default argument to `Json.construct`: `?include_default_fields`,
   which is simply passed on to `Json_encoding.construct`
+- fix missing exported type
+
