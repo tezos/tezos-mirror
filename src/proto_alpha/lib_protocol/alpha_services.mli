@@ -47,7 +47,12 @@ module Nonce : sig
 end
 
 module Snapshot_index : sig
-  val get : 'a #RPC_context.simple -> 'a -> int shell_tzresult Lwt.t
+  val get :
+    'a #RPC_context.simple ->
+    'a ->
+    ?cycle:Cycle.t ->
+    unit ->
+    int shell_tzresult Lwt.t
 end
 
 module Contract = Contract_services
