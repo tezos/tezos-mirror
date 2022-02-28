@@ -98,6 +98,21 @@ let documentation_mentions_correct_tag_bit_counts () =
            void_case ~title:"VOID11";
          ])
     = 13) ;
+  assert (
+    let either a b =
+      union
+        [
+          case ~title:"Left" a Either.find_left Either.left;
+          case ~title:"Right" b Either.find_right Either.right;
+        ]
+    in
+    (* [bool] takes 1 bit of tag (0 bytes of case) *)
+    (* [option] takes 1 bit of union-tag + the bits the case needs *)
+    (* [(option bool)] takes 2 bits of tag (1 + 1) *)
+    (* [either] takes 1 bit of union-tag (2 cases) + the bits the cases needs *)
+    (* [(either bool bool)] takes 2 bits of tag (1 + max (1, 1)) *)
+    (* the whole encoding takes takes 3 bits of tag (1 + max (2, 2)) *)
+    tag_bit_count (either (either bool bool) (option bool)) = 3) ;
   ()
 
 let roundtrip_binary loc encoding1 encoding2 value =
@@ -178,10 +193,39 @@ let roundtrip_with_voids () =
         compatible_unions)
     incompatible_unions
 
+let roundtrip_option_bool () =
+  let open Data_encoding in
+  let encoding =
+    let open Compact in
+    let either a b =
+      union
+        [
+          case ~title:"Left" a Either.find_left Either.left;
+          case ~title:"Right" b Either.find_right Either.right;
+        ]
+    in
+    (* We also check that the whole data is encoding onto exactly one byte using
+       this [check_size] combinator. *)
+    check_size 1
+    @@ make ~tag_size:`Uint8 (either (option bool) (either bool unit))
+  in
+  let inputs =
+    [
+      Either.Left None;
+      Either.Left (Some true);
+      Either.Left (Some false);
+      Either.Right (Either.Left true);
+      Either.Right (Either.Left false);
+      Either.Right (Either.Right ());
+    ]
+  in
+  List.iter (roundtrip_binary __LOC__ encoding encoding) inputs
+
 let tests =
   [
     ( "tag_bit_count documentation",
       `Quick,
       documentation_mentions_correct_tag_bit_counts );
     ("roundtrip (heavy on void)", `Quick, roundtrip_with_voids);
+    ("roundtrip (option bool)", `Quick, roundtrip_option_bool);
   ]
