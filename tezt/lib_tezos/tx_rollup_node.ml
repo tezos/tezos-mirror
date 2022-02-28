@@ -48,7 +48,7 @@ module Parameters = struct
 
   let base_default_name = "tx-rollup-node"
 
-  let default_colors = Log.Color.[|FG.cyan; FG.magenta; FG.yellow; FG.green|]
+  let default_colors = Log.Color.[|FG.magenta; FG.yellow; FG.green; FG.cyan|]
 end
 
 open Parameters
