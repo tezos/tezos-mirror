@@ -166,4 +166,4 @@ let change_logging_configuration =
   in
   Lwt.return_unit
 
-let register ~protocols = change_logging_configuration ~protocols
+let register ~protocols = change_logging_configuration protocols

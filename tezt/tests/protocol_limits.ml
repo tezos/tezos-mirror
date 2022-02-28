@@ -79,4 +79,4 @@ let test_gas_storage_limits =
       (Tez.to_string expected_giver_balance)
   else return ()
 
-let register ~protocols = test_gas_storage_limits ~protocols
+let register ~protocols = test_gas_storage_limits protocols

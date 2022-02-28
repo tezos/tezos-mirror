@@ -4089,36 +4089,35 @@ let test_request_operations_peer =
   unit
 
 let register ~protocols =
-  Revamped.flush_mempool ~protocols ;
-  Revamped.recycling_branch_refused ~protocols ;
-  Revamped.ban_operation_branch_delayed_reevaluated ~protocols ;
-  Revamped.one_operation_per_manager_per_block_restriction_injection ~protocols ;
-  Revamped.one_operation_per_manager_per_block_restriction_propagation
-    ~protocols ;
-  Revamped.one_operation_per_manager_per_block_disable_precheck ~protocols ;
-  Revamped.one_operation_per_manager_per_block_flush ~protocols ;
-  Revamped.one_operation_per_manager_per_block_ban ~protocols ;
-  Revamped.one_operation_per_manager_per_block_flush_on_ban ~protocols ;
-  Revamped.one_operation_per_manager_per_block_inject_not_applied ~protocols ;
-  Revamped.max_refused_operations_branch_delayed ~protocols ;
-  Revamped.max_refused_operations_branch_refused ~protocols ;
-  Revamped.max_refused_operations_refused ~protocols ;
-  Revamped.max_refused_operations_outdated ~protocols ;
-  Revamped.ban_operation ~protocols ;
-  Revamped.unban_operation_and_reinject ~protocols ;
-  Revamped.unban_all_operations ~protocols ;
-  Revamped.test_prefiltered_limit ~protocols ;
-  Revamped.test_prefiltered_limit_remove ~protocols ;
-  Revamped.wrong_signed_branch_delayed_becomes_refused ~protocols ;
-  run_batched_operation ~protocols ;
-  propagation_future_endorsement ~protocols ;
-  forge_pre_filtered_operation ~protocols ;
-  refetch_failed_operation ~protocols ;
-  ban_operation_and_check_applied ~protocols ;
-  test_do_not_reclassify ~protocols ;
-  test_pending_operation_version ~protocols ;
-  force_operation_injection ~protocols ;
-  injecting_old_operation_fails ~protocols ;
-  test_get_post_mempool_filter ~protocols ;
-  test_mempool_filter_operation_arrival ~protocols ;
-  test_request_operations_peer ~protocols
+  Revamped.flush_mempool protocols ;
+  Revamped.recycling_branch_refused protocols ;
+  Revamped.ban_operation_branch_delayed_reevaluated protocols ;
+  Revamped.one_operation_per_manager_per_block_restriction_injection protocols ;
+  Revamped.one_operation_per_manager_per_block_restriction_propagation protocols ;
+  Revamped.one_operation_per_manager_per_block_disable_precheck protocols ;
+  Revamped.one_operation_per_manager_per_block_flush protocols ;
+  Revamped.one_operation_per_manager_per_block_ban protocols ;
+  Revamped.one_operation_per_manager_per_block_flush_on_ban protocols ;
+  Revamped.one_operation_per_manager_per_block_inject_not_applied protocols ;
+  Revamped.max_refused_operations_branch_delayed protocols ;
+  Revamped.max_refused_operations_branch_refused protocols ;
+  Revamped.max_refused_operations_refused protocols ;
+  Revamped.max_refused_operations_outdated protocols ;
+  Revamped.ban_operation protocols ;
+  Revamped.unban_operation_and_reinject protocols ;
+  Revamped.unban_all_operations protocols ;
+  Revamped.test_prefiltered_limit protocols ;
+  Revamped.test_prefiltered_limit_remove protocols ;
+  Revamped.wrong_signed_branch_delayed_becomes_refused protocols ;
+  run_batched_operation protocols ;
+  propagation_future_endorsement protocols ;
+  forge_pre_filtered_operation protocols ;
+  refetch_failed_operation protocols ;
+  ban_operation_and_check_applied protocols ;
+  test_do_not_reclassify protocols ;
+  test_pending_operation_version protocols ;
+  force_operation_injection protocols ;
+  injecting_old_operation_fails protocols ;
+  test_get_post_mempool_filter protocols ;
+  test_mempool_filter_operation_arrival protocols ;
+  test_request_operations_peer protocols

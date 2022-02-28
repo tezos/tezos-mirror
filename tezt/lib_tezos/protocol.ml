@@ -34,6 +34,8 @@ let name = function
   | Hangzhou -> "Hangzhou"
   | Ithaca -> "Ithaca"
 
+let number = function Hangzhou -> 011 | Ithaca -> 012 | Alpha -> 013
+
 (* Test tags must be lowercase. *)
 let tag protocol = String.lowercase_ascii (name protocol)
 
@@ -142,38 +144,59 @@ let previous_protocol = function
 
 let all = [Alpha; Hangzhou; Ithaca]
 
+type supported_protocols =
+  | Any_protocol
+  | From_protocol of int
+  | Until_protocol of int
+  | Between_protocols of int * int
+
+let is_supported supported_protocols protocol =
+  match supported_protocols with
+  | Any_protocol -> true
+  | From_protocol n -> number protocol >= n
+  | Until_protocol n -> number protocol <= n
+  | Between_protocols (a, b) ->
+      let n = number protocol in
+      a <= n && n <= b
+
+let show_supported_protocols = function
+  | Any_protocol -> "Any_protocol"
+  | From_protocol n -> sf "From_protocol %d" n
+  | Until_protocol n -> sf "Until_protocol %d" n
+  | Between_protocols (a, b) -> sf "Between_protocol (%d, %d)" a b
+
+let iter_on_supported_protocols ~title ~protocols ?(supports = Any_protocol) f =
+  match List.filter (is_supported supports) protocols with
+  | [] ->
+      failwith
+        (sf
+           "test %s was registered with ~protocols:[%s] %s, which results in \
+            an empty list of protocols"
+           title
+           (String.concat ", " (List.map name protocols))
+           (show_supported_protocols supports))
+  | supported_protocols -> List.iter f supported_protocols
+
 (* Used to ensure that [register_test] and [register_regression_test]
    share the same conventions. *)
 let add_to_test_parameters protocol title tags =
   (name protocol ^ ": " ^ title, tag protocol :: tags)
 
-let register_test ~__FILE__ ~title ~tags body ~protocols =
-  let register_with_protocol protocol =
-    let (title, tags) = add_to_test_parameters protocol title tags in
-    Test.register ~__FILE__ ~title ~tags (fun () -> body protocol)
-  in
-  List.iter register_with_protocol protocols
+let register_test ~__FILE__ ~title ~tags ?supports body protocols =
+  iter_on_supported_protocols ~title ~protocols ?supports @@ fun protocol ->
+  let (title, tags) = add_to_test_parameters protocol title tags in
+  Test.register ~__FILE__ ~title ~tags (fun () -> body protocol)
 
-let register_long_test ~__FILE__ ~title ~tags ?team ~executors ~timeout body
-    ~protocols =
-  let register_with_protocol protocol =
-    let (title, tags) = add_to_test_parameters protocol title tags in
-    Long_test.register
-      ~__FILE__
-      ~title
-      ~tags
-      ?team
-      ~executors
-      ~timeout
-      (fun () -> body protocol)
-  in
-  List.iter register_with_protocol protocols
+let register_long_test ~__FILE__ ~title ~tags ?supports ?team ~executors
+    ~timeout body protocols =
+  iter_on_supported_protocols ~title ~protocols ?supports @@ fun protocol ->
+  let (title, tags) = add_to_test_parameters protocol title tags in
+  Long_test.register ~__FILE__ ~title ~tags ?team ~executors ~timeout (fun () ->
+      body protocol)
 
-let register_regression_test ~__FILE__ ~title ~tags ~output_file body ~protocols
-    =
-  let register_with_protocol protocol =
-    let (title, tags) = add_to_test_parameters protocol title tags in
-    Regression.register ~__FILE__ ~title ~tags ~output_file (fun () ->
-        body protocol)
-  in
-  List.iter register_with_protocol protocols
+let register_regression_test ~__FILE__ ~title ~tags ?supports ~output_file body
+    protocols =
+  iter_on_supported_protocols ~title ~protocols ?supports @@ fun protocol ->
+  let (title, tags) = add_to_test_parameters protocol title tags in
+  Regression.register ~__FILE__ ~title ~tags ~output_file (fun () ->
+      body protocol)

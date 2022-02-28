@@ -95,46 +95,46 @@ let check_rpc ~group_name ~protocols ~test_mode_tag
              sub_group)
         ~tags:["rpc"; group_name; sub_group]
         ~output_file:("rpc" // sf "%s.%s.%s" group_name title_tag sub_group)
-        ~protocols
-      @@ fun protocol ->
-      (* Initialize a node with alpha protocol and data to be used for RPC calls.
-         The log of the node is not captured in the regression output. *)
-      let* parameter_file =
-        match parameter_overrides with
-        | None -> Lwt.return_none
-        | Some overrides ->
-            let* file =
-              Protocol.write_parameter_file
-                ~base:(Either.right (protocol, None))
-                overrides
-            in
-            Lwt.return_some file
-      in
-      let bake =
-        match test_mode_tag with
-        | `Client_with_proxy_server ->
-            (* Because the proxy server doesn't support genesis. *)
-            true
-        | `Client | `Light | `Proxy -> false
-      in
-      let* (node, client) =
-        Client.init_with_protocol
-          ?parameter_file
-          ?nodes_args:node_parameters
-          ~protocol
-          client_mode_tag
-          ()
-      in
-      let* () = if bake then Client.bake_for client else Lwt.return_unit in
-      let* endpoint =
-        match test_mode_tag with
-        | `Client | `Light | `Proxy -> return Client.(Node node)
-        | `Client_with_proxy_server ->
-            let* proxy_server = Proxy_server.init node in
-            return Client.(Proxy_server proxy_server)
-      in
-      let* _ = rpc ?endpoint:(Some endpoint) client in
-      unit)
+        (fun protocol ->
+          (* Initialize a node with alpha protocol and data to be used for RPC calls.
+             The log of the node is not captured in the regression output. *)
+          let* parameter_file =
+            match parameter_overrides with
+            | None -> Lwt.return_none
+            | Some overrides ->
+                let* file =
+                  Protocol.write_parameter_file
+                    ~base:(Either.right (protocol, None))
+                    overrides
+                in
+                Lwt.return_some file
+          in
+          let bake =
+            match test_mode_tag with
+            | `Client_with_proxy_server ->
+                (* Because the proxy server doesn't support genesis. *)
+                true
+            | `Client | `Light | `Proxy -> false
+          in
+          let* (node, client) =
+            Client.init_with_protocol
+              ?parameter_file
+              ?nodes_args:node_parameters
+              ~protocol
+              client_mode_tag
+              ()
+          in
+          let* () = if bake then Client.bake_for client else Lwt.return_unit in
+          let* endpoint =
+            match test_mode_tag with
+            | `Client | `Light | `Proxy -> return Client.(Node node)
+            | `Client_with_proxy_server ->
+                let* proxy_server = Proxy_server.init node in
+                return Client.(Proxy_server proxy_server)
+          in
+          let* _ = rpc ?endpoint:(Some endpoint) client in
+          unit)
+        protocols)
     rpcs
 
 (* Test the contracts RPC. *)

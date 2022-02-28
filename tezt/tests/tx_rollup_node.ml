@@ -218,6 +218,6 @@ let test_tx_node_store_inbox =
       unit)
 
 let register ~protocols =
-  test_node_configuration ~protocols ;
-  test_tx_node_is_ready ~protocols ;
-  test_tx_node_store_inbox ~protocols
+  test_node_configuration protocols ;
+  test_tx_node_is_ready protocols ;
+  test_tx_node_store_inbox protocols

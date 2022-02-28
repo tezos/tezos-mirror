@@ -183,6 +183,6 @@ let test_repropose =
   Lwt.return_unit
 
 let register ~protocols =
-  test_bake_two ~protocols ;
-  test_low_level_commands ~protocols ;
-  test_repropose ~protocols
+  test_bake_two protocols ;
+  test_low_level_commands protocols ;
+  test_repropose protocols

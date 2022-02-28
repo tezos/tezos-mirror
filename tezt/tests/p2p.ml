@@ -324,5 +324,5 @@ let register_protocol_independent () =
   test_advertised_port ()
 
 let register ~(protocols : Protocol.t list) =
-  check_peer_option ~protocols ;
-  test_one_connection ~protocols
+  check_peer_option protocols ;
+  test_one_connection protocols

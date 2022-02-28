@@ -561,5 +561,5 @@ let wrong_branch_operation_dismissal =
   check_op_not_in_baked_block client oph
 
 let register ~protocols =
-  test_ordering ~protocols ;
-  wrong_branch_operation_dismissal ~protocols
+  test_ordering protocols ;
+  wrong_branch_operation_dismissal protocols

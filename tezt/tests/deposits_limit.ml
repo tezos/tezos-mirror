@@ -29,13 +29,12 @@
    Subject:      Tests for setting and unsetting deposits limits.
 *)
 
-let test_set_deposits_limit ~protocols =
+let test_set_deposits_limit =
   Protocol.register_regression_test
     ~__FILE__
     ~output_file:("deposits_limit" // "set_desposits_limit")
     ~title:"set deposits limit"
     ~tags:["deposits_limit"]
-    ~protocols
   @@ fun protocol ->
   let* (_, client) = Client.init_with_protocol ~protocol `Client () in
   let src = Constant.bootstrap1.alias in
@@ -43,13 +42,12 @@ let test_set_deposits_limit ~protocols =
   Regression.capture result ;
   unit
 
-let test_unset_deposits_limit ~protocols =
+let test_unset_deposits_limit =
   Protocol.register_regression_test
     ~__FILE__
     ~output_file:("deposits_limit" // "unset_desposits_limit")
     ~title:"unset deposits limit"
     ~tags:["deposits_limit"]
-    ~protocols
   @@ fun protocol ->
   let* (_, client) = Client.init_with_protocol ~protocol `Client () in
   let src = Constant.bootstrap1.alias in
@@ -58,5 +56,5 @@ let test_unset_deposits_limit ~protocols =
   unit
 
 let register ~protocols =
-  test_set_deposits_limit ~protocols ;
-  test_unset_deposits_limit ~protocols
+  test_set_deposits_limit protocols ;
+  test_unset_deposits_limit protocols

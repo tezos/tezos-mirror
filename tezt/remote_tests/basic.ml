@@ -68,4 +68,4 @@ let run_node =
   let* _ = Node.wait_for_level node_1 1 and* _ = Node.wait_for_level node_2 1 in
   unit
 
-let register ~protocols = run_node ~protocols
+let register ~protocols = run_node protocols

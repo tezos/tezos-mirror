@@ -144,4 +144,4 @@ let double_bake =
   if is_operation_in_operations ops denunciation_oph then unit
   else Test.fail "Double baking evidence was not found"
 
-let register ~protocols = double_bake ~protocols
+let register ~protocols = double_bake protocols

@@ -429,9 +429,9 @@ let test_stresstest_applied_multiple_nodes_1op =
     first_client
 
 let register ~protocols =
-  test_stresstest_sources_format ~protocols ;
-  test_stresstest_applied ~protocols ;
-  test_stresstest_applied_new_bootstraps ~protocols ;
-  test_stresstest_applied_1op ~protocols ;
-  test_stresstest_applied_multiple_nodes ~protocols ;
-  test_stresstest_applied_multiple_nodes_1op ~protocols
+  test_stresstest_sources_format protocols ;
+  test_stresstest_applied protocols ;
+  test_stresstest_applied_new_bootstraps protocols ;
+  test_stresstest_applied_1op protocols ;
+  test_stresstest_applied_multiple_nodes protocols ;
+  test_stresstest_applied_multiple_nodes_1op protocols

@@ -284,5 +284,5 @@ let propagate_precheckable_bad_block =
   wait_for_cluster_at_level cluster (1 + blocks_to_bake + 1)
 
 let register ~protocols =
-  precheck_block ~protocols ;
-  propagate_precheckable_bad_block ~protocols
+  precheck_block protocols ;
+  propagate_precheckable_bad_block protocols
