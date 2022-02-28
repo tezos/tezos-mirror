@@ -2,7 +2,7 @@
 ; Edit file manifest/main.ml instead.
 
 (tests
- (names test_bounded test_time test_protocol test_compact_encoding)
+ (names test_bounded test_time test_protocol)
  (package tezos-base)
  (modes native js)
  (libraries
@@ -13,7 +13,7 @@
   tezos-test-helpers)
  (js_of_ocaml)
  (flags (:standard -open Tezos_base -open Tezos_error_monad))
- (modules test_bounded test_time test_protocol test_compact_encoding))
+ (modules test_bounded test_time test_protocol))
 
 (rule
  (alias runtest_js)
@@ -41,15 +41,6 @@
   (run
    %{dep:../../tooling/node_wrapper.exe} --secp256k1 1.1.1 --hacl 1.1.0
    %{dep:./test_protocol.bc.js})))
-
-(rule
- (alias runtest_js)
- (package tezos-base)
- (locks npm)
- (action
-  (run
-   %{dep:../../tooling/node_wrapper.exe} --secp256k1 1.1.1 --hacl 1.1.0
-   %{dep:./test_compact_encoding.bc.js})))
 
 (test
  (name test_p2p_addr)
