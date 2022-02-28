@@ -27,6 +27,8 @@
 
 open Protocol.Alpha_context
 
+let tx_rollup_withdraw_period = 60_000
+
 let constants_mainnet =
   let consensus_committee_size = 7000 in
   let block_time = 30 in
@@ -109,8 +111,10 @@ let constants_mainnet =
     tx_rollup_finality_period = 2_000;
     tx_rollup_max_unfinalized_levels = 2_100;
     (* [60_000] blocks is about two weeks. *)
-    tx_rollup_withdraw_period = 60_000;
+    tx_rollup_withdraw_period;
     tx_rollup_max_messages_per_inbox = 1_010;
+    (* Must be greater than the withdraw period. *)
+    tx_rollup_max_finalized_levels = tx_rollup_withdraw_period + 100;
     sc_rollup_enable = false;
     (* The following value is chosen to prevent spam. *)
     sc_rollup_origination_size = 6_314;

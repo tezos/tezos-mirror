@@ -35,6 +35,7 @@ type error +=
   | No_uncommitted_inbox
   | Message_size_exceeds_limit
   | Too_many_inboxes
+  | Too_many_finalized_commitments
   | Wrong_batch_count
   | Commitment_too_early of {
       provided : Tx_rollup_level_repr.t;
@@ -170,6 +171,17 @@ let () =
     empty
     (function Too_many_inboxes -> Some () | _ -> None)
     (fun () -> Too_many_inboxes) ;
+  (* Tx_rollup_too_many_finalized_commitments *)
+  register_error_kind
+    `Temporary
+    ~id:"tx_rollup_too_many_finalized_commitments"
+    ~title:"Too many finalized commitments"
+    ~description:
+      "Cannot create a new commitment because there are too many finalized \
+       commitments"
+    empty
+    (function Too_many_finalized_commitments -> Some () | _ -> None)
+    (fun () -> Too_many_finalized_commitments) ;
   (* Wrong_batch_count *)
   register_error_kind
     `Temporary

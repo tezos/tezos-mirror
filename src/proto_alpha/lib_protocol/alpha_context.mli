@@ -799,6 +799,7 @@ module Constants : sig
     tx_rollup_withdraw_period : int;
     tx_rollup_max_unfinalized_levels : int;
     tx_rollup_max_messages_per_inbox : int;
+    tx_rollup_max_finalized_levels : int;
     sc_rollup_enable : bool;
     sc_rollup_origination_size : int;
   }
@@ -897,6 +898,8 @@ module Constants : sig
   val tx_rollup_max_unfinalized_levels : context -> int
 
   val tx_rollup_max_messages_per_inbox : context -> int
+
+  val tx_rollup_max_finalized_levels : context -> int
 
   val sc_rollup_enable : context -> bool
 
@@ -2299,6 +2302,7 @@ module Tx_rollup_errors : sig
     | Inbox_count_would_exceed_limit of Tx_rollup.t
     | Message_size_exceeds_limit
     | Too_many_inboxes
+    | Too_many_finalized_commitments
     | Wrong_batch_count
     | Commitment_too_early of {
         provided : Tx_rollup_level.t;

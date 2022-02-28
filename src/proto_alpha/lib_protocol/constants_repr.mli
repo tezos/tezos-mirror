@@ -141,6 +141,9 @@ type parametric = {
   (* the maximum number of messages in an inbox.  This bounds the
      size of a commitment. *)
   tx_rollup_max_messages_per_inbox : int;
+  (* the maximum number of finalized commitments, to ensure that
+     remove_commitment is ever called *)
+  tx_rollup_max_finalized_levels : int;
   sc_rollup_enable : bool;
   sc_rollup_origination_size : int;
 }

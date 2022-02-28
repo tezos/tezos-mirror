@@ -113,6 +113,7 @@ let context_init n =
       tx_rollup_enable = true;
       tx_rollup_finality_period = 1;
       tx_rollup_withdraw_period = 1;
+      tx_rollup_max_finalized_levels = 2;
       endorsing_reward_per_slot = Tez.zero;
       baking_reward_bonus_per_slot = Tez.zero;
       baking_reward_fixed_portion = Tez.zero;
@@ -1155,6 +1156,55 @@ let test_bond_finalization () =
      Once stakable bonds are merged, check the balances. *)
   return ()
 
+(** [test_too_many_commitments] tests that you can't submit new
+      commitments if there are too many finalized commitments. *)
+let test_too_many_commitments () =
+  context_init 2 >>=? fun (b, contracts) ->
+  let contract1 =
+    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0
+  in
+  originate b contract1 >>=? fun (b, tx_rollup) ->
+  (* Transactions in block 2, 3, 4, 5 *)
+  make_transactions_in tx_rollup contract1 [2; 3; 4; 5] b >>=? fun b ->
+  Incremental.begin_construction b >>=? fun i ->
+  let rec make_commitments i level n =
+    if n = 0 then return (i, level)
+    else
+      make_commitment_for_batch i level tx_rollup >>=? fun commitment ->
+      Op.tx_rollup_commit (I i) contract1 tx_rollup commitment >>=? fun op ->
+      Incremental.add_operation i op >>=? fun i ->
+      make_commitments i (Tx_rollup_level.succ level) (n - 1)
+  in
+  make_commitments i Tx_rollup_level.root 3 >>=? fun (i, level) ->
+  (* Make sure all commitments can be finalized. *)
+  bake_until i 10l >>=? fun i ->
+  Op.tx_rollup_finalize (I i) contract1 tx_rollup >>=? fun op ->
+  Incremental.add_operation i op >>=? fun i ->
+  Op.tx_rollup_finalize (I i) contract1 tx_rollup >>=? fun op ->
+  Incremental.add_operation i op >>=? fun i ->
+  (* Fail to add a new commitment. *)
+  make_commitment_for_batch i level tx_rollup >>=? fun commitment ->
+  Op.tx_rollup_commit (I i) contract1 tx_rollup commitment >>=? fun op ->
+  Incremental.add_operation
+    i
+    op
+    ~expect_failure:
+      (check_proto_error (function
+          | Tx_rollup_errors.Too_many_finalized_commitments -> true
+          | _ -> false))
+  >>=? fun i ->
+  (* Wait out the withdrawal period. *)
+  bake_until i 12l >>=? fun i ->
+  (* Remove one finalized commitment. *)
+  Op.tx_rollup_remove_commitment (I i) contract1 tx_rollup >>=? fun op ->
+  Incremental.add_operation i op >>=? fun i ->
+  (* Now we can add a new commitment. *)
+  Op.tx_rollup_commit (I i) contract1 tx_rollup commitment >>=? fun op ->
+  Incremental.add_operation i op >>=? fun i ->
+  ignore i ;
+
+  return ()
+
 let tests =
   [
     Tztest.tztest
@@ -1214,5 +1264,9 @@ let tests =
       `Quick
       test_commitment_predecessor;
     Tztest.tztest "Test full inbox" `Quick test_full_inbox;
+    Tztest.tztest
+      "Test too many finalized commitments"
+      `Quick
+      test_too_many_commitments;
     Tztest.tztest "Test bond finalization" `Quick test_bond_finalization;
   ]
