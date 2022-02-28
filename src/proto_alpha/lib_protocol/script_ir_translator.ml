@@ -1480,9 +1480,11 @@ let[@coq_axiom_with_reason "complex mutually recursive definition"] rec parse_ty
         parse_memo_size memo_size >|? fun memo_size ->
         return ctxt (sapling_transaction_t ~memo_size)
     | Prim (loc, T_sapling_transaction_deprecated, [memo_size], annot) ->
-        check_type_annot loc annot >>? fun () ->
-        parse_memo_size memo_size >|? fun memo_size ->
-        return ctxt (sapling_transaction_deprecated_t ~memo_size)
+        if legacy then
+          check_type_annot loc annot >>? fun () ->
+          parse_memo_size memo_size >|? fun memo_size ->
+          return ctxt (sapling_transaction_deprecated_t ~memo_size)
+        else error (Deprecated_instruction T_sapling_transaction_deprecated)
     (*
     /!\ When adding new lazy storage kinds, be careful to use
     [when allow_lazy_storage] /!\
@@ -3850,18 +3852,22 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       Item_t
         ( Sapling_transaction_deprecated_t transaction_memo_size,
           Item_t ((Sapling_state_t state_memo_size as state_ty), rest) ) ) ->
-      memo_size_eq
-        ~error_details:Informative
-        state_memo_size
-        transaction_memo_size
-      >>?= fun () ->
-      let instr =
-        {apply = (fun kinfo k -> ISapling_verify_update_deprecated (kinfo, k))}
-      in
-      pair_t loc int_t state_ty >>?= fun pair_ty ->
-      option_t loc pair_ty >>?= fun ty ->
-      let stack = Item_t (ty, rest) in
-      typed ctxt loc instr stack
+      if legacy then
+        memo_size_eq
+          ~error_details:Informative
+          state_memo_size
+          transaction_memo_size
+        >>?= fun () ->
+        let instr =
+          {
+            apply = (fun kinfo k -> ISapling_verify_update_deprecated (kinfo, k));
+          }
+        in
+        pair_t loc int_t state_ty >>?= fun pair_ty ->
+        option_t loc pair_ty >>?= fun ty ->
+        let stack = Item_t (ty, rest) in
+        typed ctxt loc instr stack
+      else fail (Deprecated_instruction T_sapling_transaction_deprecated)
   | ( Prim (loc, I_SAPLING_VERIFY_UPDATE, [], _),
       Item_t
         ( Sapling_transaction_t transaction_memo_size,
