@@ -1945,6 +1945,7 @@ let _tezos_context_merkle_proof_tests =
         tezos_base;
         tezos_base_unix;
         tezos_context;
+        tezos_context_encoding;
         tezos_stdlib_unix;
         qcheck_alcotest;
         tezos_test_helpers;

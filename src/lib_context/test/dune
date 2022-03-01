@@ -25,6 +25,7 @@
   tezos-base
   tezos-base.unix
   tezos-context
+  tezos-context.encoding
   tezos-stdlib-unix
   qcheck-alcotest
   tezos-test-helpers)
