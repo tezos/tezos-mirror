@@ -115,18 +115,25 @@ let () =
 
 module Snapshot_index = struct
   module S = struct
+    let cycle_query : Cycle.t option RPC_query.t =
+      let open RPC_query in
+      query (fun x -> x)
+      |+ opt_field "cycle" Cycle.rpc_arg (fun cycle -> cycle)
+      |> seal
+
     let selected_snapshot =
       RPC_service.get_service
         ~description:
-          "Returns the index of the selected snapshot for the current cycle."
-        ~query:RPC_query.empty
+          "Returns the index of the selected snapshot for the current cycle or \
+           for the specific `cycle` passed as argument, if any."
+        ~query:cycle_query
         ~output:Data_encoding.int31
         RPC_path.(custom_root / "context" / "selected_snapshot")
   end
 
   let register () =
     let open Services_registration in
-    register0 ~chunked:false S.selected_snapshot (fun ctxt () () ->
+    register0 ~chunked:false S.selected_snapshot (fun ctxt cycle () ->
         (* max_snapshot_index can be determined using constants only *)
         let blocks_per_stake_snapshot =
           Alpha_context.Constants.blocks_per_stake_snapshot ctxt
@@ -135,10 +142,12 @@ module Snapshot_index = struct
         let preserved_cycles =
           Int32.of_int (Alpha_context.Constants.preserved_cycles ctxt)
         in
-        let current_cycle = Level.(current ctxt).cycle in
-        if
-          Compare.Int32.(
-            Cycle.to_int32 current_cycle <= Int32.succ preserved_cycles)
+        let cycle =
+          match cycle with
+          | None -> Level.(current ctxt).cycle
+          | Some cycle -> cycle
+        in
+        if Compare.Int32.(Cycle.to_int32 cycle <= Int32.succ preserved_cycles)
         then
           (* Early cycles are corner cases, fail if requested *)
           fail
@@ -149,11 +158,11 @@ module Snapshot_index = struct
           in
           Alpha_context.Stake_distribution.compute_snapshot_index
             ctxt
-            current_cycle
+            cycle
             ~max_snapshot_index)
 
-  let get ctxt block =
-    RPC_context.make_call0 S.selected_snapshot ctxt block () ()
+  let get ctxt block ?cycle () =
+    RPC_context.make_call0 S.selected_snapshot ctxt block cycle ()
 end
 
 module Contract = Contract_services
