@@ -139,6 +139,7 @@ type test = {
   body : unit -> unit Lwt.t;
   mutable session_successful_runs : Summed_durations.t;
   mutable session_failed_runs : Summed_durations.t;
+  mutable session_retries : int;
   mutable past_records_successful_runs : Summed_durations.t;
   mutable past_records_failed_runs : Summed_durations.t;
   mutable result : Log.test_result option;
@@ -279,6 +280,17 @@ let really_run test =
     | Some result -> result
   in
   return test_result
+
+let rec really_run_with_retry remaining_retry_count test =
+  match really_run test with
+  | Failed _ when remaining_retry_count > 0 ->
+      Log.warn
+        "%d retry(ies) left for test: %s"
+        remaining_retry_count
+        test.title ;
+      test.session_retries <- test.session_retries + 1 ;
+      really_run_with_retry (remaining_retry_count - 1) test
+  | x -> x
 
 let test_should_be_run ~file ~title ~tags =
   List.for_all (fun tag -> List.mem tag tags) Cli.options.tags_to_run
@@ -522,6 +534,7 @@ module Record = struct
              title;
              tags;
              body = _;
+             session_retries = _;
              session_successful_runs;
              session_failed_runs;
              past_records_successful_runs = _;
@@ -723,11 +736,12 @@ let output_junit filename =
         in
         let title = replace_entities test.title in
         echo
-          {|    <testcase id="%s" name="%s: %s" time="%f">|}
+          {|    <testcase id="%s" name="%s: %s" time="%f" retries="%d">|}
           title
           (replace_entities test.file)
           title
-          (test_time test) ;
+          (test_time test)
+          test.session_retries ;
         (match test.result with
         | None | Some Successful | Some Aborted -> ()
         | Some (Failed message) ->
@@ -772,6 +786,7 @@ let register ~__FILE__ ~title ~tags body =
         body;
         session_successful_runs = Summed_durations.zero;
         session_failed_runs = Summed_durations.zero;
+        session_retries = 0;
         past_records_successful_runs = Summed_durations.zero;
         past_records_failed_runs = Summed_durations.zero;
         result = None;
@@ -849,7 +864,7 @@ end = struct
            this test"
           test_title
     | Some test ->
-        let test_result = really_run test in
+        let test_result = really_run_with_retry Cli.options.retry test in
         Test_result test_result
 
   let rec worker_listen_loop pipe_from_scheduler pipe_to_scheduler =

@@ -48,6 +48,7 @@ type options = {
   mutable list : [`Ascii_art | `Tsv] option;
   mutable global_timeout : float option;
   mutable test_timeout : float option;
+  mutable retry : int;
   mutable regression_dir : string;
   mutable reset_regressions : bool;
   mutable delete_unknown_regression_files : bool;
@@ -81,6 +82,7 @@ let options =
     list = None;
     global_timeout = None;
     test_timeout = None;
+    retry = 0;
     regression_dir = "tezt/_regressions";
     reset_regressions = false;
     delete_unknown_regression_files = false;
@@ -273,6 +275,10 @@ let init ?args () =
           Arg.Float (fun delay -> options.test_timeout <- Some delay),
           "<SECONDS> Fail if a test takes, on its own, more than SECONDS to \
            run." );
+        ( "--retry",
+          Arg.Int (fun retry -> options.retry <- retry),
+          "<COUNT> Retry each failing test up to COUNT times. If one retry is \
+           successful, the test is considered successful." );
         ( "--regression-dir",
           Arg.String (fun dir -> options.regression_dir <- dir),
           "<PATH> Where to store the output of regression tests. Default is: \

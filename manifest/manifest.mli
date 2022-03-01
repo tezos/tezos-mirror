@@ -589,6 +589,7 @@ type 'a maker =
   ?time_measurement_ppx:bool ->
   ?warnings:string ->
   ?wrapped:bool ->
+  ?cram:bool ->
   path:string ->
   'a ->
   target
