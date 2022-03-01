@@ -700,7 +700,7 @@ class TestSaplingShieldedTez:
                 receiver=contract_name,
                 args=[
                     "--arg",
-                    '{Pair %s None }' % content,
+                    '{%s }' % content,
                     "--burn-cap",
                     "3.0",
                 ],
