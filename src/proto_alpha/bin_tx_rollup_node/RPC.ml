@@ -178,6 +178,33 @@ module Context = struct
   let register service f =
     directory := RPC_directory.register !directory service f
 
+  type address_metadata = {
+    index : Tx_rollup_l2_context_sig.address_index;
+    counter : int64;
+    public_key : Environment.Bls_signature.pk;
+  }
+
+  let bls_pk_encoding =
+    Data_encoding.(
+      conv_with_guard
+        Environment.Bls_signature.pk_to_bytes
+        (fun x ->
+          Option.fold
+            ~none:(Error "not a valid bls public key")
+            ~some:ok
+            (Environment.Bls_signature.pk_of_bytes_opt x))
+        bytes)
+
+  let address_metadata_encoding =
+    Data_encoding.(
+      conv
+        (fun {index; counter; public_key} -> (index, counter, public_key))
+        (fun (index, counter, public_key) -> {index; counter; public_key})
+      @@ obj3
+           (req "index" Tx_rollup_l2_address.Indexable.index_encoding)
+           (req "counter" int64)
+           (req "public_key" bls_pk_encoding))
+
   let balance =
     RPC_service.get_service
       ~description:"Get the balance for an l2-address and a ticket"
@@ -187,16 +214,96 @@ module Context = struct
         path / "tickets" /: Arg.ticket_indexable / "balance"
         /: Arg.address_indexable)
 
-  let get_index (context : Context.t) (i : (_, _) Indexable.t) get =
+  let tickets_count =
+    RPC_service.get_service
+      ~description:
+        "Get the number of tickets that have been involved in the transaction \
+         rollup."
+      ~query:RPC_query.empty
+      ~output:Data_encoding.int32
+      RPC_path.(path / "count" / "tickets")
+
+  let addresses_count =
+    RPC_service.get_service
+      ~description:
+        "Get the number of addresses that have been involved in the \
+         transaction rollup."
+      ~query:RPC_query.empty
+      ~output:Data_encoding.int32
+      RPC_path.(path / "count" / "addresses")
+
+  let ticket_index =
+    RPC_service.get_service
+      ~description:
+        "Get the index for the given ticket hash, or null if the ticket is not \
+         known by the rollup."
+      ~query:RPC_query.empty
+      ~output:
+        (Data_encoding.option
+           Tx_rollup_l2_context_sig.Ticket_indexable.index_encoding)
+      RPC_path.(path / "tickets" /: Arg.ticket_indexable / "index")
+
+  let address_metadata =
+    RPC_service.get_service
+      ~description:
+        "Get the metadata associated to a given address, or null if the \
+         address has not performed any transfer or withdraw on the rollup."
+      ~query:RPC_query.empty
+      ~output:(Data_encoding.option address_metadata_encoding)
+      RPC_path.(path / "addresses" /: Arg.address_indexable / "metadata")
+
+  let address_index =
+    RPC_service.get_service
+      ~description:
+        "Get the index for the given address, or null if the address is not \
+         known by the rollup."
+      ~query:RPC_query.empty
+      ~output:
+        (Data_encoding.option Tx_rollup_l2_address.Indexable.index_encoding)
+      RPC_path.(path / "addresses" /: Arg.address_indexable / "index")
+
+  let address_counter =
+    RPC_service.get_service
+      ~description:"Get the current counter for the given address."
+      ~query:RPC_query.empty
+      ~output:Data_encoding.int64
+      RPC_path.(path / "addresses" /: Arg.address_indexable / "counter")
+
+  let address_public_key =
+    RPC_service.get_service
+      ~description:
+        "Get the BLS public key associated to the given address, or null if \
+         the address has not performed any transfer or withdraw on the rollup."
+      ~query:RPC_query.empty
+      ~output:(Data_encoding.option bls_pk_encoding)
+      RPC_path.(path / "addresses" /: Arg.address_indexable / "public_key")
+
+  let get_index ?(check_index = false) (context : Context.t)
+      (i : (_, _) Indexable.t) get count =
     match Indexable.destruct i with
-    | Left i -> return (Some i)
+    | Left i ->
+        if check_index then
+          let* number_indexes = count context in
+          if Indexable.to_int32 i >= number_indexes then return None
+          else return (Some i)
+        else return (Some i)
     | Right v -> get context v
 
-  let get_address_index context address =
-    get_index context address Context.Address_index.get
+  let get_address_index ?check_index context address =
+    get_index
+      ?check_index
+      context
+      address
+      Context.Address_index.get
+      Context.Address_index.count
 
-  let get_ticket_index context ticket =
-    get_index context ticket Context.Ticket_index.get
+  let get_ticket_index ?check_index context ticket =
+    get_index
+      ?check_index
+      context
+      ticket
+      Context.Ticket_index.get
+      Context.Ticket_index.count
 
   let () =
     register balance @@ fun ((c, ticket), address) () () ->
@@ -206,6 +313,53 @@ module Context = struct
     | (None, _) | (_, None) -> return Tx_rollup_l2_qty.zero
     | (Some ticket_id, Some address_id) ->
         Context.Ticket_ledger.get c ticket_id address_id
+
+  let () = register tickets_count @@ fun c () () -> Context.Ticket_index.count c
+
+  let () =
+    register addresses_count @@ fun c () () -> Context.Address_index.count c
+
+  let () =
+    register ticket_index @@ fun (c, ticket) () () ->
+    get_ticket_index ~check_index:true c ticket
+
+  let () =
+    register address_index @@ fun (c, address) () () ->
+    get_address_index ~check_index:true c address
+
+  let () =
+    register address_metadata @@ fun (c, address) () () ->
+    let* address_index = get_address_index c address in
+    match address_index with
+    | None -> return None
+    | Some address_index -> (
+        let* metadata = Context.Address_metadata.get c address_index in
+        match metadata with
+        | None -> return None
+        | Some {counter; public_key} ->
+            return (Some {index = address_index; counter; public_key}))
+
+  let () =
+    register address_counter @@ fun (c, address) () () ->
+    let* address_index = get_address_index c address in
+    match address_index with
+    | None -> return 0L
+    | Some address_index -> (
+        let* metadata = Context.Address_metadata.get c address_index in
+        match metadata with
+        | None -> return 0L
+        | Some {counter; _} -> return counter)
+
+  let () =
+    register address_public_key @@ fun (c, address) () () ->
+    let* address_index = get_address_index c address in
+    match address_index with
+    | None -> return None
+    | Some address_index -> (
+        let* metadata = Context.Address_metadata.get c address_index in
+        match metadata with
+        | None -> return None
+        | Some {public_key; _} -> return (Some public_key))
 
   let hash_of_block_id state block_id =
     let open Lwt_syntax in
