@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,11 +23,35 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* Tests that test Tezt itself. *)
+let test_success () =
+  Test.register ~__FILE__ ~title:"Success" ~tags:["retry"; "success"]
+  @@ fun () ->
+  Log.info "Success test." ;
+  unit
 
-let () =
-  Cli.init () ;
-  Test_check.register () ;
-  Test_daemon.register () ;
-  Test_retry.register () ;
-  Test.run ()
+let test_fail_every_other_run () =
+  let should_fail = ref true in
+  Test.register
+    ~__FILE__
+    ~title:"Fail every other run test"
+    ~tags:["retry"; "fail"; "flake"]
+  @@ fun () ->
+  if !should_fail then (
+    should_fail := false ;
+    Test.fail "Failing test on first try")
+  else (
+    should_fail := true ;
+    Log.info "Works on second" ;
+    unit)
+
+let test_fail_always () =
+  Test.register
+    ~__FILE__
+    ~title:"Failing test"
+    ~tags:["retry"; "fail"; "always"]
+  @@ fun () -> Test.fail "Always failing test"
+
+let register () =
+  test_success () ;
+  test_fail_every_other_run () ;
+  test_fail_always ()

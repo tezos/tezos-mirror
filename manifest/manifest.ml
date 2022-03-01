@@ -725,6 +725,7 @@ module Target = struct
     warnings : string option;
     wrapped : bool;
     node_wrapper_flags : string list;
+    cram : bool;
   }
 
   and preprocessor = PPS of t * string list
@@ -858,6 +859,7 @@ module Target = struct
     ?time_measurement_ppx:bool ->
     ?warnings:string ->
     ?wrapped:bool ->
+    ?cram:bool ->
     path:string ->
     'a ->
     t option
@@ -871,7 +873,7 @@ module Target = struct
       ?(opens = []) ?(preprocess = []) ?(preprocessor_deps = [])
       ?(private_modules = []) ?(opam_only_deps = []) ?release ?static
       ?static_cclibs ?synopsis ?(time_measurement_ppx = false) ?warnings
-      ?(wrapped = true) ~path names =
+      ?(wrapped = true) ?(cram = false) ~path names =
     let conflicts = List.filter_map Fun.id conflicts in
     let deps = List.filter_map Fun.id deps in
     let opam_only_deps = List.filter_map Fun.id opam_only_deps in
@@ -1053,6 +1055,7 @@ module Target = struct
         node_wrapper_flags;
         warnings;
         wrapped;
+        cram;
       }
 
   let public_lib ?internal_name =
@@ -1738,16 +1741,21 @@ let dune_lang_version = "2.9"
 let generate_dune_project_files () =
   let t = Hashtbl.create 17 in
   (* Add a dune project at the root *)
-  Hashtbl.replace t "./" () ;
+  Hashtbl.replace t "./" false ;
   (* And one next to every opam files.
      Dune only understand dune files at the root of a dune project. *)
   Target.iter_internal_by_opam (fun package _internals ->
-      Hashtbl.replace t (Filename.dirname package) ()) ;
+      let cram_enabled =
+        Option.value ~default:false (Hashtbl.find_opt t package)
+        || List.exists (fun Target.{cram; _} -> cram) _internals
+      in
+      Hashtbl.replace t (Filename.dirname package) cram_enabled) ;
   Hashtbl.iter
-    (fun path () ->
+    (fun path cram ->
       write (Filename.concat path "dune-project") @@ fun fmt ->
       Format.fprintf fmt "(lang dune %s)@." dune_lang_version ;
       Format.fprintf fmt "(formatting (enabled_for ocaml))@." ;
+      if cram then Format.fprintf fmt "(cram enable)@." ;
       Format.fprintf
         fmt
         "; This file was automatically generated, do not edit.@." ;

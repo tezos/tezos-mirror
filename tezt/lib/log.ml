@@ -50,6 +50,7 @@ let channel =
     tags_not_to_run = _;
     list;
     global_timeout = _;
+    retry = _;
     test_timeout = _;
     regression_dir = _;
     reset_regressions = _;

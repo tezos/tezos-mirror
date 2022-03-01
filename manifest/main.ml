@@ -2449,6 +2449,26 @@ let tezt_tezos =
         tezos_base;
         tezos_base_unix;
       ]
+    ~cram:true
+
+let _tezt_self_tests =
+  public_exe
+    "tezt-self-tests"
+    ~internal_name:"main"
+    ~path:"tezt/self_tests"
+    ~synopsis:"Tests for the Tezos test framework based on Tezt"
+    ~bisect_ppx:false
+    ~deps:[tezt |> open_ |> open_ ~m:"Base"; tezt_tezos |> open_]
+    ~cram:true
+    ~dune:
+      Dune.
+        [
+          [
+            S "cram";
+            [S "package"; S "tezt-self-tests"];
+            [S "deps"; S "tezt.sh"; S "main.exe"];
+          ];
+        ]
 
 let tezos_openapi =
   public_lib
