@@ -212,6 +212,53 @@ let () =
       | _ -> None)
     (fun history_mode -> Tx_rollup_invalid_history_mode history_mode)
 
+type error += Tx_rollup_invalid_l2_address of Micheline.canonical_location
+
+let () =
+  register_error_kind
+    ~id:"tx_rollup.node.invalid_l2_address"
+    ~title:"Invalid transaction rollup L2 address"
+    ~description:"Not a valid transaction rollup L2 address"
+    ~pp:(fun ppf loc ->
+      Format.fprintf ppf "Not a valid transaction rollup l2 address at %d" loc)
+    `Permanent
+    Data_encoding.(obj1 (req "loc" int31))
+    (function Tx_rollup_invalid_l2_address loc -> Some loc | _ -> None)
+    (fun loc -> Tx_rollup_invalid_l2_address loc)
+
+type error += Tx_rollup_invalid_ticket_amount of Z.t
+
+let () =
+  register_error_kind
+    ~id:"tx_rollup.node.invalid_ticket_amount"
+    ~title:"Invalid transaction rollup ticket amount"
+    ~description:"Not a valid transaction rollup ticket amount"
+    ~pp:(fun ppf amount ->
+      Format.fprintf
+        ppf
+        "Not a valid transaction rollup ticket amount: %a"
+        Z.pp_print
+        amount)
+    `Permanent
+    Data_encoding.(obj1 (req "amount" z))
+    (function
+      | Tx_rollup_invalid_ticket_amount amount -> Some amount | _ -> None)
+    (fun amount -> Tx_rollup_invalid_ticket_amount amount)
+
+type error += Tx_rollup_invalid_deposit
+
+let () =
+  let description = "Not a valid transaction rollup deposit" in
+  register_error_kind
+    ~id:"tx_rollup.node.invalid_deposit"
+    ~title:"Invalid transaction rollup Deposit"
+    ~description
+    ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
+    `Permanent
+    Data_encoding.empty
+    (function Tx_rollup_invalid_deposit -> Some () | _ -> None)
+    (fun () -> Tx_rollup_invalid_deposit)
+
 type error +=
   | Tx_rollup_cannot_checkout_context of Protocol.Tx_rollup_l2_context_hash.t
 
@@ -231,3 +278,60 @@ let () =
       obj1 (req "context" Protocol.Tx_rollup_l2_context_hash.encoding))
     (function Tx_rollup_cannot_checkout_context c -> Some c | _ -> None)
     (fun c -> Tx_rollup_cannot_checkout_context c)
+
+type error +=
+  | Tx_rollup_no_rollup_origination_on_disk_and_no_rollup_genesis_given
+
+let () =
+  let description =
+    "No rollup origination on disk and no rollup genesis provided"
+  in
+  register_error_kind
+    ~id:"tx_rollup.node.no_rollup_origination_and_no_rollup_genesis_given"
+    ~title:"No rollup origination on disk and none provided"
+    ~description
+    ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
+    `Permanent
+    Data_encoding.empty
+    (function
+      | Tx_rollup_no_rollup_origination_on_disk_and_no_rollup_genesis_given ->
+          Some ()
+      | _ -> None)
+    (fun () ->
+      Tx_rollup_no_rollup_origination_on_disk_and_no_rollup_genesis_given)
+
+type error +=
+  | Tx_rollup_different_disk_stored_origination_rollup_and_given_rollup_genesis of {
+      disk_rollup_origination : Block_hash.t;
+      given_rollup_genesis : Block_hash.t;
+    }
+
+let () =
+  register_error_kind
+    ~id:
+      "tx_rollup.node.different_disk_stored_origination_rollup_and_given_rollup_genesis"
+    ~title:"Rollup origination on disk is different from the one provided"
+    ~description:
+      "Rollup origination on disk is different from the provided rollup genesis"
+    ~pp:(fun ppf (disk_rollup, given_rollup) ->
+      Format.fprintf
+        ppf
+        "Rollup origination on disk (%a) is different from the provided rollup \
+         genesis (%a)"
+        Block_hash.pp
+        disk_rollup
+        Block_hash.pp
+        given_rollup)
+    `Permanent
+    Data_encoding.(
+      obj2
+        (req "disk_rollup" Block_hash.encoding)
+        (req "given_rollup" Block_hash.encoding))
+    (function
+      | Tx_rollup_different_disk_stored_origination_rollup_and_given_rollup_genesis
+          {disk_rollup_origination; given_rollup_genesis} ->
+          Some (disk_rollup_origination, given_rollup_genesis)
+      | _ -> None)
+    (fun (disk_rollup_origination, given_rollup_genesis) ->
+      Tx_rollup_different_disk_stored_origination_rollup_and_given_rollup_genesis
+        {disk_rollup_origination; given_rollup_genesis})

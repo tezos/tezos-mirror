@@ -154,12 +154,22 @@ let init_store ~data_dir ~context ?rollup_genesis rollup =
   let* rollup_origination =
     match (store_rollup_origination, rollup_genesis) with
     | (None, None) ->
-        (* TODO/TORU: proper error *)
-        failwith "No rollup origination on disk and none provided"
+        fail
+          [
+            Error
+            .Tx_rollup_no_rollup_origination_on_disk_and_no_rollup_genesis_given;
+          ]
     | (Some {block_hash; _}, Some genesis)
       when Block_hash.(block_hash <> genesis) ->
-        (* TODO/TORU: proper error *)
-        failwith "Rollup origination on disk is different from the one provided"
+        fail
+          [
+            Error
+            .Tx_rollup_different_disk_stored_origination_rollup_and_given_rollup_genesis
+              {
+                disk_rollup_origination = block_hash;
+                given_rollup_genesis = genesis;
+              };
+          ]
     | (Some rollup_orig, _) -> return rollup_orig
     | (None, Some rollup_genesis) ->
         let block = `Hash (rollup_genesis, 0) in
