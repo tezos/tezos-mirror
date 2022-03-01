@@ -35,3 +35,5 @@ v0.5:
   which is simply passed on to `Json_encoding.construct`
 - fix missing exported type
 
+v0.5.1:  
+- fix bug wherein infinite recursion protection prevented some legitimate uses
