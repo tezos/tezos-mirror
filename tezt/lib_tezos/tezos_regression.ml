@@ -28,12 +28,12 @@ let hooks =
   let replace_variables string =
     let replacements =
       [
-        ("tz[123]\\w{33}", "[PUBLIC_KEY_HASH]");
+        ("tz[123]\\w{33}\\b", "[PUBLIC_KEY_HASH]");
         ("\\bB\\w{50}\\b", "[BLOCK_HASH]");
-        ("tru1\\w{33}", "[TX_ROLLUP_HASH]");
+        ("tru1\\w{33}\\b", "[TX_ROLLUP_HASH]");
         ("toc1\\w{50}\\b", "[TX_ROLLUP_COMMITMENT_HASH]");
-        ("edpk\\w{50}", "[PUBLIC_KEY]");
-        ("KT1\\w{33}", "[CONTRACT_HASH]");
+        ("edpk\\w{50}\\b", "[PUBLIC_KEY]");
+        ("KT1\\w{33}\\b", "[CONTRACT_HASH]");
         ("\\bo\\w{50}\\b", "[OPERATION_HASH]");
         ("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z", "[TIMESTAMP]");
         (* Ports are non-deterministic when using -j. *)
