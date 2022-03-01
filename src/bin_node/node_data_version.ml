@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2019-2021 Nomadic Labs, <contact@nomadic-labs.com>          *)
+(* Copyright (c) 2019-2022 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -50,15 +50,20 @@ let version_file_name = "version.json"
  *  - 0.0.3 : store upgrade (introducing history mode)
  *  - 0.0.4 : context upgrade (switching from LMDB to IRMIN v2)
  *  - 0.0.5 : never released (but used in 10.0~rc1 and 10.0~rc2)
- *  - 0.0.6 : store upgrade (switching from LMDB) *)
-let data_version = "0.0.6"
+ *  - 0.0.6 : store upgrade (switching from LMDB)
+ *  - 0.0.7 : context upgrade (upgrade to irmin.3.0) *)
+let data_version = "0.0.7"
 
 (* List of upgrade functions from each still supported previous
    version to the current [data_version] above. If this list grows too
    much, an idea would be to have triples (version, version,
    converter), and to sequence them dynamically instead of
    statically. *)
-let upgradable_data_version = []
+let upgradable_data_version =
+  [
+    ( "0.0.6",
+      fun ~data_dir:_ _ ~chain_name:_ ~sandbox_parameters:_ -> return_unit );
+  ]
 
 let version_encoding = Data_encoding.(obj1 (req "version" string))
 
@@ -328,6 +333,11 @@ let ensure_data_dir ?(bare = false) data_dir =
   let* o = ensure_data_dir bare data_dir in
   match o with
   | None -> return_unit
+  (* Here, we enable the automatic upgrade from "0.0.6" to
+     "0.0.7". This should be removed as soon as the "0.0.7" version or
+     above is mandatory. *)
+  | Some ("0.0.6", _upgrade) ->
+      upgrade_data_dir ~data_dir () ~chain_name:() ~sandbox_parameters:()
   | Some (version, _) ->
       fail (Data_dir_needs_upgrade {expected = data_version; actual = version})
 

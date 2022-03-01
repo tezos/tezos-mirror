@@ -8,6 +8,7 @@
  (libraries
   tezos-base
   tezos-stdlib
+  irmin-pack
   irmin-pack.mem
   tezos-context.sigs
   tezos-context.encoding

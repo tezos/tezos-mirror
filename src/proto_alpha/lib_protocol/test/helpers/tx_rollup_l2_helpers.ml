@@ -30,22 +30,21 @@ open Protocol.Tx_rollup_l2_storage_sig
 
 (* Build a Tezos context with binary trees *)
 module Store = struct
-  open Tezos_context_encoding.Context
-
   module Conf : Irmin_pack.Conf.S = struct
     let entries = 2
 
     let stable_hash = 2
 
     let inode_child_order = `Seeded_hash
+
+    let contents_length_header = None
   end
+
+  open Irmin_pack_mem.Maker (Conf)
 
   (* We could directly use a simpler encoding for commits
      instead of keeping the same as in the current context. *)
-  include
-    Irmin_pack_mem.Make (Node) (Commit) (Conf) (Metadata) (Contents) (Path)
-      (Branch)
-      (Hash)
+  include Make (Tezos_context_encoding.Context.Schema)
 end
 
 module Irmin_storage :

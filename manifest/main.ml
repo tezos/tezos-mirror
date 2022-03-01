@@ -135,10 +135,12 @@ let ipaddr =
 
 let ipaddr_unix = external_sublib ipaddr "ipaddr.unix"
 
-let irmin = external_lib "irmin" V.(at_least "2.10.0" && less_than "2.11.0")
+let irmin = external_lib "irmin" V.(at_least "3.1.0" && less_than "3.2.0")
 
 let irmin_pack =
-  external_lib "irmin-pack" V.(at_least "2.10.0" && less_than "2.11.0")
+  external_lib "irmin-pack" V.(at_least "3.1.0" && less_than "3.2.0")
+
+let irmin_pack_unix = external_sublib irmin_pack "irmin-pack.unix"
 
 let irmin_pack_mem = external_sublib irmin_pack "irmin-pack.mem"
 
@@ -1308,6 +1310,7 @@ let tezos_context_memory =
       [
         tezos_base |> open_ ~m:"TzPervasives";
         tezos_stdlib |> open_;
+        irmin_pack;
         irmin_pack_mem;
         tezos_context_sigs;
         tezos_context_encoding;
@@ -1329,6 +1332,7 @@ let tezos_context =
         digestif_c;
         irmin;
         irmin_pack;
+        irmin_pack_unix;
         tezos_stdlib_unix |> open_;
         tezos_stdlib |> open_;
         tezos_context_sigs;
@@ -1941,6 +1945,7 @@ let _tezos_context_merkle_proof_tests =
         tezos_base;
         tezos_base_unix;
         tezos_context;
+        tezos_context_encoding;
         tezos_stdlib_unix;
         qcheck_alcotest;
         tezos_test_helpers;

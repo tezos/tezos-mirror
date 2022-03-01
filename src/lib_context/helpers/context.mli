@@ -26,21 +26,13 @@
 
 open Tezos_context_encoding.Context
 
-module type DB =
-  Irmin.S
-    with type key = Path.t
-     and type contents = Contents.t
-     and type branch = Branch.t
-     and type hash = Hash.t
-     and type step = Path.step
-     and type metadata = Metadata.t
-     and type Key.step = Path.step
+module type DB = Irmin.Generic_key.S with module Schema = Schema
 
 module Make_tree (DB : DB) : sig
   include
     Tezos_context_sigs.Context.TREE
       with type t := DB.t
-       and type key := DB.key
+       and type key := DB.path
        and type value := DB.contents
        and type tree := DB.tree
 
@@ -58,13 +50,15 @@ module Make_tree (DB : DB) : sig
 
   val of_raw : raw -> DB.tree
 
-  type kinded_hash := [`Value of Context_hash.t | `Node of Context_hash.t]
+  type kinded_key := [`Value of DB.contents_key | `Node of DB.node_key]
 
   type repo = DB.repo
 
   val make_repo : unit -> DB.repo Lwt.t
 
-  val shallow : DB.repo -> kinded_hash -> DB.tree
+  val shallow : DB.repo -> kinded_key -> DB.tree
+
+  val is_shallow : DB.tree -> bool
 
   (** Exception raised by [find_tree] and [add_tree] when applied to shallow
     trees. It is exposed for so that the memory context can in turn raise it. *)
@@ -77,7 +71,7 @@ module Proof_encoding_V1 : Tezos_context_sigs.Context.PROOF_ENCODING
 module Make_proof (DB : DB) : sig
   module Proof : Tezos_context_sigs.Context.PROOF
 
-  type kinded_hash := [`Value of Context_hash.t | `Node of Context_hash.t]
+  type kinded_key := [`Value of DB.contents_key | `Node of DB.node_key]
 
   type tree_proof := Proof.tree Proof.t
 
@@ -85,7 +79,7 @@ module Make_proof (DB : DB) : sig
 
   type ('proof, 'result) producer :=
     DB.repo ->
-    kinded_hash ->
+    kinded_key ->
     (DB.tree -> (DB.tree * 'result) Lwt.t) ->
     ('proof * 'result) Lwt.t
 

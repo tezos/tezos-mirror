@@ -29,13 +29,9 @@ open QCheck2
 
 module Store = struct
   open Tezos_context_encoding.Context
-  include
-    Irmin_pack.Make_ext (Irmin_pack.Version.V1) (Conf) (Node) (Commit)
-      (Metadata)
-      (Contents)
-      (Path)
-      (Branch)
-      (Hash)
+  module Maker = Irmin_pack_unix.Maker (Conf)
+  include Maker.Make (Schema)
+  module Schema = Tezos_context_encoding.Context.Schema
 end
 
 module Proof = Tezos_context_helpers.Context.Make_proof (Store)

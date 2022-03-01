@@ -33,4 +33,6 @@ module Conf = struct
   let stable_hash = 2
 
   let inode_child_order = `Seeded_hash
+
+  let contents_length_header = Some `Varint
 end

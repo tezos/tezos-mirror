@@ -1065,7 +1065,6 @@ module Unsafe : sig
   val restore_from_snapshot :
     ?notify:(unit -> unit Lwt.t) ->
     [`Store_dir] Naming.directory ->
-    context_index:Context.index ->
     genesis:Genesis.t ->
     genesis_context_hash:Context_hash.t ->
     floating_blocks_stream:Block_repr.block Lwt_stream.t ->

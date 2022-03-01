@@ -17,6 +17,7 @@
             tezos-rpc-http
             tezos-rpc-http-server
             irmin-pack
+            irmin-pack.unix
             irmin)
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_protocol_alpha

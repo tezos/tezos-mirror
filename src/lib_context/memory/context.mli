@@ -28,7 +28,10 @@
 module Make (Encoding : module type of Tezos_context_encoding.Context) : sig
   type index
 
-  include Tezos_context_sigs.Context.S with type index := index
+  include
+    Tezos_context_sigs.Context.S
+      with type index := index
+       and type kinded_key = [`Value of Context_hash.t | `Node of Context_hash.t]
 
   val index : t -> index
 

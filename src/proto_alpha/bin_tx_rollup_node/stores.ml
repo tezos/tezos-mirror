@@ -31,20 +31,26 @@ module Conf = struct
   let stable_hash = 256
 
   let inode_child_order = `Seeded_hash
+
+  let contents_length_header = Some `Varint
 end
+
+module Kv = struct
+  open Irmin_pack_unix.KV (Conf)
+
+  include Make (Irmin.Contents.String)
+end
+
+type t = Kv.t
 
 let make_info message =
   let date = Unix.gettimeofday () |> Int64.of_float in
-  Irmin.Info.v ~author:"tx-rollup-node" ~date message
-
-module Kv = Irmin_pack.KV (Irmin_pack.Version.V2) (Conf) (Irmin.Contents.String)
-
-type t = Kv.t
+  Kv.Info.v ~author:"tx-rollup-node" date ~message
 
 let load data_dir =
   let open Lwt_syntax in
   let* repository = Kv.Repo.v (Irmin_pack.config data_dir) in
-  let* branch = Kv.master repository in
+  let* branch = Kv.main repository in
   let* () = Event.(emit irmin_store_loaded) data_dir in
   return_ok branch
 
@@ -106,8 +112,8 @@ module Make_map (M : MAP_CONF) = struct
   type value = M.value
 
   let mk key =
-    let loc = Kv.Key.v M.location in
-    Kv.Key.rcons loc @@ M.key_to_string key
+    let loc = Kv.Path.v M.location in
+    Kv.Path.rcons loc @@ M.key_to_string key
 
   let render_key key =
     Format.sprintf "%s/%s" (String.concat "/" M.location) (M.key_to_string key)
@@ -169,7 +175,7 @@ module Make_ref (R : REF_CONF) = struct
 
   type value = R.value
 
-  let key = Kv.Key.v R.location
+  let key = Kv.Path.v R.location
 
   let rendered_key = String.concat "/" R.location
 
