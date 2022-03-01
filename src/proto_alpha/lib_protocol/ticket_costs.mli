@@ -30,8 +30,6 @@
 module Constants : sig
   val cost_collect_tickets_step : Alpha_context.Gas.cost
 
-  val cost_token_and_amount_of_ticket : Alpha_context.Gas.cost
-
   val cost_compare_ticket_hash : Alpha_context.Gas.cost
 
   val cost_compare_key_contract : Alpha_context.Gas.cost

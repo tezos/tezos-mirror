@@ -26,6 +26,39 @@
 open Protocol
 open Alpha_context
 
+module Ticket_type_shared = struct
+  type config = {max_size : int}
+
+  let default_config = {max_size = Constants_repr.michelson_maximum_type_size}
+
+  let config_encoding =
+    let open Data_encoding in
+    conv
+      (fun {max_size} -> max_size)
+      (fun max_size -> {max_size})
+      (obj1 (req "max_size" int31))
+
+  type workload = {nodes : int}
+
+  let workload_encoding =
+    let open Data_encoding in
+    conv
+      (function {nodes} -> nodes)
+      (fun nodes -> {nodes})
+      (obj1 (req "nodes" int31))
+
+  let workload_to_vector {nodes} =
+    Sparse_vec.String.of_list [("nodes", float_of_int nodes)]
+
+  let tags = ["tickets"]
+end
+
+exception
+  Ticket_benchmark_error of {
+    benchmark_name : string;
+    trace : Tezos_base.TzPervasives.tztrace;
+  }
+
 (** A benchmark for {!Ticket_costs.Constants.cost_compare_ticket_hash}. *)
 module Compare_ticket_hash_benchmark : Benchmark.S = struct
   type config = unit
@@ -76,21 +109,80 @@ end
 
 let () = Registration_helpers.register (module Compare_ticket_hash_benchmark)
 
+(** A benchmark for {!Ticket_costs.Constants.cost_compare_key_contract}.
+
+    In this benchmark we only compare originated contracts; we never use
+    implicit contracts. This is justified partly by the fact that
+    currently the carbonated maps only use originated contracts as keys.
+    In addition, while developing this benchmark the implicit contracts were
+    also tested and gave almost identical timings. *)
+module Compare_key_contract_benchmark : Benchmark.S = struct
+  type config = unit
+
+  let config_encoding = Data_encoding.unit
+
+  let default_config = ()
+
+  type workload = unit
+
+  let workload_encoding = Data_encoding.unit
+
+  let workload_to_vector () = Sparse_vec.String.of_list []
+
+  let tags = ["tickets"]
+
+  let name = "COMPARE_CONTRACT"
+
+  let info = "Compare cost for Contracts"
+
+  let compare_model =
+    Model.make
+      ~conv:(fun () -> ())
+      ~model:
+        (Model.unknown_const2
+           ~const1:Builtin_benchmarks.timer_variable
+           ~const2:(Free_variable.of_string "compare_contract"))
+
+  let models = [("compare", compare_model)]
+
+  let benchmark rng_state _conf () =
+    let bytes = Base_samplers.bytes rng_state ~size:{min = 32; max = 64} in
+    let branch = Block_hash.hash_bytes [bytes] in
+    let op_hash = Operation.hash_raw {shell = {branch}; proto = bytes} in
+    let nonce = Origination_nonce.Internal_for_tests.initial op_hash in
+    let contract = Contract.Internal_for_tests.originated_contract nonce in
+    let workload = () in
+    let closure () = ignore (Contract.compare contract contract) in
+    Generator.Plain {workload; closure}
+
+  let create_benchmarks ~rng_state ~bench_num config =
+    List.repeat bench_num (benchmark rng_state config)
+
+  let () =
+    Registration_helpers.register_for_codegen
+      name
+      (Model.For_codegen compare_model)
+end
+
+let () = Registration_helpers.register (module Compare_key_contract_benchmark)
+
+(* A simple ticket type for use in the benchmarks. *)
+let ticket_ty =
+  let open Script_typed_ir in
+  WithExceptions.Result.get_ok ~loc:__LOC__ (ticket_t (-1) int_key)
+
 (* A dummy type generator, sampling linear terms of a given size.
    The generator always returns types of the shape:
 
    [pair int_or_ticket (pair int_or_ticket (pair int_or_ticket ...))]
 
    This is a worst case type for [type_has_tickets], though nested
-   unions, nested maps or nested lists would be just as bad.
- *)
+   unions, nested maps or nested lists would be just as bad. *)
 let rec dummy_type_generator ~rng_state size =
   let open Script_ir_translator in
   let open Script_typed_ir in
   let ticket_or_int =
-    if Base_samplers.uniform_bool rng_state then
-      Ex_ty
-        (match ticket_t (-1) int_key with Error _ -> assert false | Ok t -> t)
+    if Base_samplers.uniform_bool rng_state then Ex_ty ticket_ty
     else Ex_ty int_t
   in
   if size <= 1 then ticket_or_int
@@ -101,9 +193,7 @@ let rec dummy_type_generator ~rng_state size =
 
 (** A benchmark for {!Ticket_costs.Constants.cost_has_tickets_of_ty}. *)
 module Has_tickets_type_benchmark : Benchmark.S = struct
-  include Translator_benchmarks.Parse_type_shared
-
-  let tags = ["tickets"]
+  include Ticket_type_shared
 
   let name = "TYPE_HAS_TICKETS"
 
@@ -115,29 +205,23 @@ module Has_tickets_type_benchmark : Benchmark.S = struct
     let ctxt = Gas_helpers.set_limit ctxt in
     let size = Random.State.int rng_state config.max_size in
     let (Ex_ty ty) = dummy_type_generator ~rng_state size in
-    Environment.wrap_tzresult
-    @@ let* (_, ctxt') = Ticket_scanner.type_has_tickets ctxt ty in
-       let consumed =
-         Z.to_int
-           (Gas_helpers.fp_to_z
-              (Alpha_context.Gas.consumed ~since:ctxt ~until:ctxt'))
-       in
-       let nodes =
-         let size = Script_typed_ir.ty_size ty in
-         Saturation_repr.to_int @@ Script_typed_ir.Type_size.to_int size
-       in
-       let workload = Type_workload {nodes; consumed} in
-       let closure () = ignore (Ticket_scanner.type_has_tickets ctxt ty) in
-       ok (Generator.Plain {workload; closure})
+    let nodes =
+      let size = Script_typed_ir.ty_size ty in
+      Saturation_repr.to_int @@ Script_typed_ir.Type_size.to_int size
+    in
+    let workload = {nodes} in
+    let closure () = ignore (Ticket_scanner.type_has_tickets ctxt ty) in
+    ok (Generator.Plain {workload; closure})
 
   let make_bench rng_state config () =
     match make_bench_helper rng_state config () with
     | Ok closure -> closure
-    | Error err -> Translator_benchmarks.global_error name err
+    | Error trace ->
+        raise (Ticket_benchmark_error {benchmark_name = name; trace})
 
   let size_model =
     Model.make
-      ~conv:(function Type_workload {nodes; consumed = _} -> (nodes, ()))
+      ~conv:(function {nodes} -> (nodes, ()))
       ~model:
         (Model.affine
            ~intercept:
@@ -156,3 +240,75 @@ module Has_tickets_type_benchmark : Benchmark.S = struct
 end
 
 let () = Registration_helpers.register (module Has_tickets_type_benchmark)
+
+let ticket_sampler rng_state =
+  let seed = Base_samplers.uniform_bytes ~nbytes:32 rng_state in
+  let (pkh, _, _) = Signature.generate_key ~algo:Signature.Ed25519 ~seed () in
+  let ticketer = Alpha_context.Contract.implicit_contract pkh in
+  Script_typed_ir.
+    {ticketer; contents = Script_int_repr.zero; amount = Script_int_repr.one_n}
+
+(** A benchmark for {!Ticket_costs.Constants.cost_collect_tickets_step}. *)
+module Collect_tickets_benchmark : Benchmark.S = struct
+  include Ticket_type_shared
+
+  let name = "COLLECT_TICKETS_STEP"
+
+  let info = "Benchmarking tickets_of_value"
+
+  let make_bench_helper rng_state config () =
+    let open Script_typed_ir in
+    let open Result_syntax in
+    let* (ctxt, _) = Lwt_main.run (Execution_context.make ~rng_state) in
+    let ctxt = Gas_helpers.set_limit ctxt in
+    let ty =
+      match list_t (-1) ticket_ty with Error _ -> assert false | Ok t -> t
+    in
+    let (length, elements) =
+      Structure_samplers.list
+        ~range:{min = 0; max = config.max_size}
+        ~sampler:ticket_sampler
+        rng_state
+    in
+    let boxed_ticket_list = {elements; length} in
+    Environment.wrap_tzresult
+    @@ let* (has_tickets, ctxt) = Ticket_scanner.type_has_tickets ctxt ty in
+       let workload = {nodes = length} in
+       let closure () =
+         ignore
+           (Lwt_main.run
+              (Ticket_scanner.tickets_of_value
+                 ctxt
+                 ~include_lazy:true
+                 has_tickets
+                 boxed_ticket_list))
+       in
+       ok (Generator.Plain {workload; closure})
+
+  let make_bench rng_state config () =
+    match make_bench_helper rng_state config () with
+    | Ok closure -> closure
+    | Error trace ->
+        raise (Ticket_benchmark_error {benchmark_name = name; trace})
+
+  let size_model =
+    Model.make
+      ~conv:(function {nodes} -> (nodes, ()))
+      ~model:
+        (Model.affine
+           ~intercept:
+             (Free_variable.of_string (Format.asprintf "%s_const" name))
+           ~coeff:(Free_variable.of_string (Format.asprintf "%s_coeff" name)))
+
+  let models = [("size_collect_tickets_step_model", size_model)]
+
+  let create_benchmarks ~rng_state ~bench_num config =
+    List.repeat bench_num (make_bench rng_state config)
+
+  let () =
+    Registration_helpers.register_for_codegen
+      name
+      (Model.For_codegen size_model)
+end
+
+let () = Registration_helpers.register (module Collect_tickets_benchmark)

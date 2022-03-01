@@ -27,7 +27,7 @@ open Alpha_context
 module S = Saturation_repr
 
 module Constants = struct
-  (* TODO: #2315
+  (* TODO: #2508
      Fill in real benchmarked values.
      Need to create benchmark and fill in values.
   *)
@@ -39,19 +39,13 @@ module Constants = struct
   *)
   let cost_has_tickets_of_ty type_size = S.mul (S.safe_int 20) type_size
 
-  (* TODO: #2315
-     Fill in real benchmarked values.
-     Need to create benchmark and fill in values.
-  *)
-  let cost_token_and_amount_of_ticket = S.safe_int 30
-
   (* TODO: #2498
      Fill in real benchmarked values.
      Need to create benchmark and fill in values.
   *)
   let cost_compare_ticket_hash = S.safe_int 100
 
-  (* TODO: #2315
+  (* TODO: #2520
      Fill in real benchmarked values.
      Need to create benchmark and fill in values.
   *)
