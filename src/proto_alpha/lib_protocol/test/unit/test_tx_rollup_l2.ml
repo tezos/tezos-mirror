@@ -84,6 +84,11 @@ let test_irmin_storage () =
   let* e = catch (fail Test) (fun _ -> assert false) return in
   assert (e = Test) ;
 
+  (* 4. get (remove store k1) k1 = None *)
+  let* store = Irmin_storage.remove store k1 in
+  let* v = Irmin_storage.get store k1 in
+  assert (v = None) ;
+
   return_unit
 
 (** {2. Context tests. } *)

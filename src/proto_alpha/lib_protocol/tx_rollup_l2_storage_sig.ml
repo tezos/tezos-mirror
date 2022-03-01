@@ -83,4 +83,7 @@ module type STORAGE = sig
       [storage] is expected to remain usable and consistent even after
       the execution of [set]. *)
   val set : t -> bytes -> bytes -> t m
+
+  (** [remove storage key] removes [key] from the [storage]. *)
+  val remove : t -> bytes -> t m
 end
