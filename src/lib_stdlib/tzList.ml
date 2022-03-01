@@ -98,26 +98,3 @@ let shuffle ?rng_state l =
       a.(n') <- tmp)
   done ;
   Array.to_list a
-
-let filter_some l =
-  (* Written like this (building backward and with a final List.rev)
-     so that it is tail-recursive *)
-  let rec go acc = function
-    | [] -> List.rev acc
-    | None :: xs -> go acc xs
-    | Some x :: xs -> go (x :: acc) xs
-  in
-  go [] l
-
-let rec find_map f = function
-  | [] -> None
-  | x :: l -> ( match f x with None -> find_map f l | r -> r)
-
-let fold_left_i f init l =
-  List.fold_left
-    (fun (i, accu) x ->
-      let accu = f i accu x in
-      (i + 1, accu))
-    (0, init)
-    l
-  |> snd

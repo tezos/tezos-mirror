@@ -58,18 +58,3 @@ val sub : 'a list -> int -> 'a list
 (** [shuffle l] is a list that contains the same elements as [l] but in a random
     order. *)
 val shuffle : ?rng_state:Random.State.t -> 'a list -> 'a list
-
-(** [filter_some l] returns all [Some] elements of [l] *)
-val filter_some : 'a option list -> 'a list
-
-(** [find_map f l] applies [f] to the elements of [l] in order, and
-    returns the first result of the form [Some v], or [None] if none
-    exist.
-
-    Present in OCaml 4.10: this function can be removed once we catch
-    up. *)
-val find_map : ('a -> 'b option) -> 'a list -> 'b option
-
-(** [fold_left_i f init l] is equivalent to [fold_left] except that
-    the index of the element is passed as a first argument to [f]. *)
-val fold_left_i : (int -> 'b -> 'a -> 'b) -> 'b -> 'a list -> 'b
