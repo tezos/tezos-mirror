@@ -1,7 +1,6 @@
 tezt/_regressions/rpc/hangzhou.proxy.others.out
 
 ./tezos-client --mode proxy rpc get /chains/main/blocks/head/context/constants
-protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
 { "proof_of_work_nonce_size": 8, "nonce_length": 32,
   "max_anon_ops_per_block": 132, "max_operation_data_length": 32768,
   "max_proposals_per_delegate": 20, "max_micheline_node_count": 50000,
@@ -24,9 +23,9 @@ protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGen
   "liquidity_baking_subsidy": "2500000",
   "liquidity_baking_sunset_level": 4096,
   "liquidity_baking_escape_ema_threshold": 1000000 }
+protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
 
 ./tezos-client --mode proxy rpc get /chains/main/blocks/head/helpers/baking_rights
-protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
 [ { "level": 2, "delegate": "[PUBLIC_KEY_HASH]",
     "priority": 0, "estimated_time": "[TIMESTAMP]" },
   { "level": 2, "delegate": "[PUBLIC_KEY_HASH]",
@@ -37,14 +36,14 @@ protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGen
     "priority": 6, "estimated_time": "[TIMESTAMP]" },
   { "level": 2, "delegate": "[PUBLIC_KEY_HASH]",
     "priority": 8, "estimated_time": "[TIMESTAMP]" } ]
+protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
 
 ./tezos-client --mode proxy rpc get '/chains/main/blocks/head/helpers/current_level?offset=0'
-protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
 { "level": 1, "level_position": 0, "cycle": 0, "cycle_position": 0,
   "expected_commitment": false }
+protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
 
 ./tezos-client --mode proxy rpc get /chains/main/blocks/head/helpers/endorsing_rights
-protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
 [ { "level": 1, "delegate": "[PUBLIC_KEY_HASH]",
     "slots":
       [ 2, 13, 17, 19, 23, 24, 31, 34, 40, 46, 48, 53, 56, 60, 61, 62, 68,
@@ -78,7 +77,8 @@ protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGen
         106, 109, 120, 125, 145, 146, 147, 152, 159, 171, 174, 176, 179, 188,
         191, 192, 193, 197, 199, 200, 218, 245, 248 ],
     "estimated_time": "[TIMESTAMP]" } ]
+protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
 
 ./tezos-client --mode proxy rpc get /chains/main/blocks/head/helpers/levels_in_current_cycle
-protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
 { "first": 1, "last": 8 }
+protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im

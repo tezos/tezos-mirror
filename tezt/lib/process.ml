@@ -121,6 +121,7 @@ type t = {
   arguments : string list;
   color : Log.Color.t;
   lwt_process : Lwt_process.process_full;
+  mutable handle : unit Lwt.t;
   log_status_on_exit : bool;
   stdout : echo;
   stderr : echo;
@@ -221,7 +222,7 @@ let show_signal code =
   else string_of_int code
 
 let wait process =
-  let* status = process.lwt_process#status in
+  let* status = process.lwt_process#status and* () = process.handle in
   (* If we already removed [process] from [!live_processes], we already logged
      the exit status. *)
   if ID_map.mem process.id !live_processes then (
@@ -244,27 +245,41 @@ let wait process =
 (* Read process outputs and log them.
    Also take care of removing the process from [live_processes] on termination. *)
 let handle_process ~log_output process =
-  let rec handle_output name (ch : Lwt_io.input_channel) echo =
+  let stdout_rev_lines = ref [] in
+  let stderr_rev_lines = ref [] in
+  let flush_lines name rev_lines =
+    List.iter
+      (fun line ->
+        Log.debug ~prefix:name ~color:process.color "%s" line ;
+        Option.iter (fun hooks -> hooks.on_log line) process.hooks)
+      (List.rev rev_lines)
+  in
+  let rec handle_output name output_kind ch echo =
     let* line = Lwt_io.read_line_opt ch in
     match line with
     | None ->
         close_echo echo ;
         Lwt_io.close ch
     | Some line ->
-        if log_output then (
-          Log.debug ~prefix:name ~color:process.color "%s" line ;
-          Option.iter (fun hooks -> hooks.on_log line) process.hooks) ;
+        (if log_output then
+         match output_kind with
+         | `Stdout -> stdout_rev_lines := line :: !stdout_rev_lines
+         | `Stderr -> stderr_rev_lines := line :: !stderr_rev_lines) ;
         push_to_echo echo line ;
         (* TODO: here we assume that all lines end with "\n",
              but it may not always be the case:
            - there may be lines ending with "\r\n";
            - the last line may not end with "\n" before the EOF. *)
         push_to_echo echo "\n" ;
-        handle_output name ch echo
+        handle_output name output_kind ch echo
   in
-  let* () = handle_output process.name process.lwt_process#stdout process.stdout
-  and* () = handle_output process.name process.lwt_process#stderr process.stderr
+  let* () =
+    handle_output process.name `Stdout process.lwt_process#stdout process.stdout
+  and* () =
+    handle_output process.name `Stderr process.lwt_process#stderr process.stderr
   and* _ = wait process in
+  flush_lines process.name !stdout_rev_lines ;
+  flush_lines process.name !stderr_rev_lines ;
   unit
 
 (** [parse_current_environment ()], given that the current environment
@@ -352,6 +367,7 @@ let spawn_with_stdin ?runner ?(log_status_on_exit = true) ?(log_output = true)
       arguments;
       color;
       lwt_process;
+      handle = Lwt.return_unit;
       log_status_on_exit;
       stdout = create_echo ();
       stderr = create_echo ();
@@ -360,7 +376,7 @@ let spawn_with_stdin ?runner ?(log_status_on_exit = true) ?(log_output = true)
     }
   in
   live_processes := ID_map.add process.id process !live_processes ;
-  Background.register (handle_process ~log_output process) ;
+  process.handle <- handle_process ~log_output process ;
   (process, process.lwt_process#stdin)
 
 let spawn ?runner ?log_status_on_exit ?log_output ?name ?color ?env ?hooks
