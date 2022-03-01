@@ -2533,8 +2533,17 @@ module Registration_section = struct
      https://gitlab.com/dannywillems/ocaml-bls12-381/-/blob/71d0b4d467fbfaa6452d702fcc408d7a70916a80/README.md#install
   *)
   module Bls12_381 = struct
+    let check () =
+      if not Bls12_381.built_with_blst_portable then (
+        Format.eprintf
+          "BLS must be built without ADX to run the BLS benchmarks. Try \
+           compiling again after setting the environment variable \
+           BLST_PORTABLE. Aborting.@." ;
+        Stdlib.failwith "bls_not_built_with_blst_portable")
+
     let () =
       simple_benchmark
+        ~check
         ~name:Interpreter_workload.N_IAdd_bls12_381_g1
         ~kinstr:
           (IAdd_bls12_381_g1
@@ -2544,6 +2553,7 @@ module Registration_section = struct
 
     let () =
       simple_benchmark
+        ~check
         ~name:Interpreter_workload.N_IAdd_bls12_381_g2
         ~kinstr:
           (IAdd_bls12_381_g2
@@ -2553,6 +2563,7 @@ module Registration_section = struct
 
     let () =
       simple_benchmark
+        ~check
         ~name:Interpreter_workload.N_IAdd_bls12_381_fr
         ~kinstr:
           (IAdd_bls12_381_fr
@@ -2562,6 +2573,7 @@ module Registration_section = struct
 
     let () =
       simple_benchmark
+        ~check
         ~name:Interpreter_workload.N_IMul_bls12_381_g1
         ~kinstr:
           (IMul_bls12_381_g1
@@ -2571,6 +2583,7 @@ module Registration_section = struct
 
     let () =
       simple_benchmark
+        ~check
         ~name:Interpreter_workload.N_IMul_bls12_381_g2
         ~kinstr:
           (IMul_bls12_381_g2
@@ -2580,6 +2593,7 @@ module Registration_section = struct
 
     let () =
       simple_benchmark
+        ~check
         ~name:Interpreter_workload.N_IMul_bls12_381_fr
         ~kinstr:
           (IMul_bls12_381_fr
@@ -2589,6 +2603,7 @@ module Registration_section = struct
 
     let () =
       simple_benchmark
+        ~check
         ~name:Interpreter_workload.N_IMul_bls12_381_z_fr
         ~kinstr:
           (IMul_bls12_381_z_fr
@@ -2597,6 +2612,7 @@ module Registration_section = struct
 
     let () =
       benchmark_with_stack_sampler
+        ~check
         ~name:Interpreter_workload.N_IMul_bls12_381_z_fr
         ~intercept:true
         ~kinstr:
@@ -2611,6 +2627,7 @@ module Registration_section = struct
 
     let () =
       simple_benchmark
+        ~check
         ~name:Interpreter_workload.N_IMul_bls12_381_fr_z
         ~kinstr:
           (IMul_bls12_381_fr_z
@@ -2619,6 +2636,7 @@ module Registration_section = struct
 
     let () =
       benchmark_with_stack_sampler
+        ~check
         ~name:Interpreter_workload.N_IMul_bls12_381_fr_z
         ~intercept:true
         ~kinstr:
@@ -2633,6 +2651,7 @@ module Registration_section = struct
 
     let () =
       simple_benchmark
+        ~check
         ~name:Interpreter_workload.N_IInt_bls12_381_z_fr
         ~kinstr:
           (IInt_bls12_381_fr (kinfo (bls12_381_fr @$ bot), halt (int @$ bot)))
@@ -2640,6 +2659,7 @@ module Registration_section = struct
 
     let () =
       simple_benchmark
+        ~check
         ~name:Interpreter_workload.N_INeg_bls12_381_g1
         ~kinstr:
           (INeg_bls12_381_g1
@@ -2648,6 +2668,7 @@ module Registration_section = struct
 
     let () =
       simple_benchmark
+        ~check
         ~name:Interpreter_workload.N_INeg_bls12_381_g2
         ~kinstr:
           (INeg_bls12_381_g2
@@ -2656,6 +2677,7 @@ module Registration_section = struct
 
     let () =
       simple_benchmark
+        ~check
         ~name:Interpreter_workload.N_INeg_bls12_381_fr
         ~kinstr:
           (INeg_bls12_381_fr
@@ -2665,6 +2687,7 @@ module Registration_section = struct
     let () =
       let (Ty_ex_c pair_bls12_381_g1_g2) = pair bls12_381_g1 bls12_381_g2 in
       simple_benchmark
+        ~check
         ~name:Interpreter_workload.N_IPairing_check_bls12_381
         ~kinstr:
           (IPairing_check_bls12_381
