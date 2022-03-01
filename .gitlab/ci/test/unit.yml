@@ -24,6 +24,9 @@
   extends:
     - .unit_test_template_x86_64
     - .template__coverage_files
+  script:
+    - make $MAKE_TARGETS
+    - ./scripts/ci/merge_coverage.sh
   artifacts:
     when: always
     paths:

@@ -115,6 +115,7 @@ integration:pytest:
   parallel: 25
   script:
     - poetry run pytest --exitfirst --prev-junit-xml test-results.xml --job $CI_NODE_INDEX/$CI_NODE_TOTAL --color=yes --log-dir=tmp "--junitxml=reports/report_${CI_NODE_INDEX}_${CI_NODE_TOTAL}.xml" --timeout 1800
+    - ../scripts/ci/merge_coverage.sh
   artifacts:
     paths:
       - tests_python/tmp/
