@@ -554,45 +554,29 @@ end
 
 module Tx_rollup = struct
   let sub_path ?(chain = "main") ?(block = "head") ~rollup sub =
-    ["chains"; chain; "blocks"; block; "context"; "tx_rollup"; rollup; sub]
+    ["chains"; chain; "blocks"; block; "context"; "tx_rollup"; rollup] @ sub
 
   let get_state ?endpoint ?hooks ?chain ?block ~rollup client =
-    let path = sub_path ?chain ?block ~rollup "state" in
+    let path = sub_path ?chain ?block ~rollup ["state"] in
     Client.Spawn.rpc ?endpoint ?hooks GET path client
 
-  let get_inbox ?endpoint ?hooks ?chain ?block ~rollup client =
-    let path = sub_path ?chain ?block ~rollup "inbox" in
+  let get_inbox ?endpoint ?hooks ?chain ?block ~rollup ~level client =
+    let path =
+      sub_path ?chain ?block ~rollup ["inbox"; Format.sprintf "%d" level]
+    in
     Client.Spawn.rpc ?endpoint ?hooks GET path client
 
   let get_commitment ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-      ?(offset = 0) ~rollup client =
-    let path = sub_path ~chain ~block ~rollup "commitment" in
-    let query_string = [("offset", string_of_int offset)] in
-    Client.Spawn.rpc ?endpoint ?hooks ~query_string GET path client
-
-  let sub_pkh_path ?(chain = "main") ?(block = "head") ~tx_rollup
-      ~public_key_hash sub =
-    [
-      "chains";
-      chain;
-      "blocks";
-      block;
-      "context";
-      "tx_rollup";
-      tx_rollup;
-      sub;
-      public_key_hash;
-    ]
+      ~rollup ~level client =
+    let path =
+      sub_path ~chain ~block ~rollup ["commitment"; Format.sprintf "%d" level]
+    in
+    Client.Spawn.rpc ?endpoint ?hooks GET path client
 
   let get_pending_bonded_commitments ?endpoint ?hooks ?(chain = "main")
-      ?(block = "head") ~tx_rollup ~public_key_hash client =
+      ?(block = "head") ~rollup ~pkh client =
     let path =
-      sub_pkh_path
-        ~chain
-        ~block
-        ~tx_rollup
-        ~public_key_hash
-        "pending_bonded_commitments"
+      sub_path ~chain ~block ~rollup ["pending_bonded_commitments"; pkh]
     in
     Client.Spawn.rpc ?endpoint ?hooks GET path client
 end

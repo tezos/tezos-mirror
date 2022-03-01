@@ -1280,10 +1280,11 @@ let apply_manager_operation_content :
           fail Tx_rollup_operation_with_non_implicit_contract
           (* This is only called with implicit contracts *)
       | Some key ->
+          Tx_rollup_state.get ctxt tx_rollup >>=? fun (ctxt, state) ->
           ( Tx_rollup_commitment.has_bond ctxt tx_rollup key
           >>=? fun (ctxt, pending) ->
             let _ = pending in
-            (* TODO/TORU: This depends on https://gitlab.com/tezos/tezos/-/merge_requests/4437
+            (* TODO/TORU: https://gitlab.com/tezos/tezos/-/merge_requests/4437
                let bond_id = Bond_id.Tx_rollup_bond_id tx_rollup in
                match pending with
                | 0 ->
@@ -1296,8 +1297,14 @@ let apply_manager_operation_content :
             *)
             return (ctxt, []) )
           >>=? fun (ctxt, balance_updates) ->
-          Tx_rollup_commitment.add_commitment ctxt tx_rollup key commitment
-          >>=? fun ctxt ->
+          Tx_rollup_commitment.add_commitment
+            ctxt
+            tx_rollup
+            state
+            key
+            commitment
+          >>=? fun (ctxt, state) ->
+          Tx_rollup_state.update ctxt tx_rollup state >>=? fun ctxt ->
           let result =
             Tx_rollup_commit_result
               {
@@ -1327,12 +1334,44 @@ let apply_manager_operation_content :
               }
           in
           return (ctxt, result, []))
-  | Tx_rollup_finalize {tx_rollup; level} ->
-      Tx_rollup_commitment.finalize_pending_commitments ctxt tx_rollup level
-      >>=? fun ctxt ->
-      (* FIXME *)
+  | Tx_rollup_finalize_commitment {tx_rollup} ->
+      Tx_rollup_state.get ctxt tx_rollup >>=? fun (ctxt, state) ->
+      Tx_rollup_commitment.finalize_commitment ctxt tx_rollup state
+      >>=? fun (ctxt, state, level) ->
+      Tx_rollup_state.update ctxt tx_rollup state >>=? fun ctxt ->
       let result =
-        Tx_rollup_finalize_result
+        Tx_rollup_finalize_commitment_result
+          {
+            consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
+            balance_updates = [];
+            level;
+          }
+      in
+      return (ctxt, result, [])
+  | Tx_rollup_remove_commitment {tx_rollup} ->
+      Tx_rollup_state.get ctxt tx_rollup >>=? fun (ctxt, state) ->
+      Tx_rollup_commitment.remove_commitment ctxt tx_rollup state
+      >>=? fun (ctxt, state, level) ->
+      Tx_rollup_state.update ctxt tx_rollup state >>=? fun ctxt ->
+      let result =
+        Tx_rollup_remove_commitment_result
+          {
+            consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
+            balance_updates = [];
+            level;
+          }
+      in
+      return (ctxt, result, [])
+  | Tx_rollup_rejection {proof; tx_rollup; level; _} ->
+      Tx_rollup_state.get ctxt tx_rollup >>=? fun (ctxt, state) ->
+      (* TODO/TORU: Check the proof *)
+      fail_unless proof Tx_rollup_errors.Invalid_proof >>=? fun () ->
+      (* Proof is correct, removing *)
+      Tx_rollup_commitment.reject_commitment ctxt tx_rollup state level
+      >>=? fun (ctxt, state) ->
+      Tx_rollup_state.update ctxt tx_rollup state >>=? fun ctxt ->
+      let result =
+        Tx_rollup_rejection_result
           {
             consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
             balance_updates = [];
@@ -1484,21 +1523,15 @@ let precheck_manager_contents (type kind) ctxt (op : kind Kind.manager contents)
       Alpha_context.Gas.consume ctxt cost >>?= fun ctxt ->
       fail_unless
         Compare.Int.(message_size <= size_limit)
-        Tx_rollup_inbox.Tx_rollup_message_size_exceeds_limit
+        Tx_rollup_errors.Message_size_exceeds_limit
       >|=? fun () -> ctxt
-  | Tx_rollup_commit {commitment; _} ->
+  | Tx_rollup_commit {commitment; tx_rollup} ->
       assert_tx_rollup_feature_enabled ctxt >>=? fun () ->
-      (* FIXME/TORU: https://gitlab.com/tezos/tezos/-/issues/2469
-
-         We should think harder about the semantics of commitments
-         application. *)
-      let current_level = (Level.current ctxt).level in
-      fail_when
-        Raw_level.(current_level <= commitment.level)
-        (Tx_rollup_commitment.Commitment_too_early
-           (commitment.level, current_level))
+      Tx_rollup_state.get ctxt tx_rollup >>=? fun (ctxt, state) ->
+      Tx_rollup_commitment.check_commitment_level state commitment
       >|=? fun () -> ctxt
-  | Tx_rollup_return_bond _ | Tx_rollup_finalize _ ->
+  | Tx_rollup_return_bond _ | Tx_rollup_finalize_commitment _
+  | Tx_rollup_remove_commitment _ | Tx_rollup_rejection _ ->
       assert_tx_rollup_feature_enabled ctxt >|=? fun () -> ctxt
   | Sc_rollup_originate _ | Sc_rollup_add_messages _ ->
       assert_sc_rollup_feature_enabled ctxt >|=? fun () -> ctxt)
@@ -1605,25 +1638,13 @@ let burn_storage_fees :
         ( ctxt,
           storage_limit,
           Tx_rollup_origination_result {payload with balance_updates} )
-  | Tx_rollup_submit_batch_result
-      {
-        balance_updates = (_ : Receipt.balance_updates);
-        consumed_gas = (_ : Gas.Arith.fp);
-      } ->
-      (* TODO: https://gitlab.com/tezos/tezos/-/issues/2339
+      (* TODO/TORU: https://gitlab.com/tezos/tezos/-/issues/2339
           We need to charge for newly allocated storage (as we do for
           Michelson’s big map). *)
+  | Tx_rollup_submit_batch_result _ | Tx_rollup_commit_result _
+  | Tx_rollup_return_bond_result _ | Tx_rollup_finalize_commitment_result _
+  | Tx_rollup_remove_commitment_result _ | Tx_rollup_rejection_result _ ->
       return (ctxt, storage_limit, smopr)
-  | Tx_rollup_commit_result
-      {
-        balance_updates = (_ : Receipt.balance_updates);
-        consumed_gas = (_ : Gas.Arith.fp);
-      } ->
-      return (ctxt, storage_limit, smopr)
-  | Tx_rollup_return_bond_result payload ->
-      return (ctxt, storage_limit, Tx_rollup_return_bond_result payload)
-  | Tx_rollup_finalize_result payload ->
-      return (ctxt, storage_limit, Tx_rollup_finalize_result payload)
   | Sc_rollup_originate_result payload ->
       let payer = `Contract payer in
       Fees.burn_sc_rollup_origination_fees

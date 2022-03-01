@@ -134,6 +134,9 @@ type parametric = {
   tx_rollup_finality_period : int;
   (* the maximum number of levels that can be left unfinalized
      before we stop accepting new inboxes for a tx rollup *)
+  (* the minimum number of blocks to wait before removing a finalised
+     commitment from the context. *)
+  tx_rollup_withdraw_period : int;
   tx_rollup_max_unfinalized_levels : int;
   sc_rollup_enable : bool;
   sc_rollup_origination_size : int;

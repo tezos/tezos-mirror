@@ -867,24 +867,25 @@ module Tx_rollup : sig
     Client.t ->
     JSON.t Process.runnable
 
-  (** Call RPC /chain/[chain]/blocks/[block]/context/tx_rollup/[tx_rollup_id]/inbox *)
+  (** Call RPC /chain/[chain]/blocks/[block]/context/tx_rollup/[tx_rollup_id]/inbox/[level] *)
   val get_inbox :
     ?endpoint:Client.endpoint ->
     ?hooks:Process.hooks ->
     ?chain:string ->
     ?block:string ->
     rollup:string ->
+    level:int ->
     Client.t ->
     JSON.t Process.runnable
 
-  (** Call RPC /chain/[chain]/blocks/[block]/context/[rollup_hash]/commitment *)
+  (** Call RPC /chain/[chain]/blocks/[block]/context/tx_rollup/[rollup_hash]/commitment/[level] *)
   val get_commitment :
     ?endpoint:Client.endpoint ->
     ?hooks:Process.hooks ->
     ?chain:string ->
     ?block:string ->
-    ?offset:int ->
     rollup:string ->
+    level:int ->
     Client.t ->
     JSON.t Process.runnable
 
@@ -894,8 +895,8 @@ module Tx_rollup : sig
     ?hooks:Process.hooks ->
     ?chain:string ->
     ?block:string ->
-    tx_rollup:string ->
-    public_key_hash:string ->
+    rollup:string ->
+    pkh:string ->
     Client.t ->
     JSON.t Process.runnable
 end

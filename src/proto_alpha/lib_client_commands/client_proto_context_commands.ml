@@ -98,6 +98,15 @@ let tx_rollup_param =
     ~desc:"The tx rollup address that we are sending this batch to."
     tx_rollup_parameter
 
+let tx_rollup_proof_param =
+  Clic.param
+    ~name:"tx_rollup rejection proof"
+    ~desc:"The proof associated to the rejection operation"
+    (Clic.parameter (fun _ s ->
+         match bool_of_string_opt s with
+         | Some c -> return c
+         | None -> failwith "Parameter '%s' is not a boolean" s))
+
 let rollup_kind_param =
   Clic.parameter (fun _ name ->
       match Sc_rollups.from ~name with
@@ -2314,7 +2323,6 @@ let commands_rw () =
             let predecessor =
               if String.equal predecessor "" then None else Some predecessor
             in
-
             submit_tx_rollup_commitment
               cctxt
               ~chain:cctxt#chain
@@ -2335,6 +2343,244 @@ let commands_rw () =
               ~inbox_hash
               ~batches
               ~predecessor
+              ()
+            >>=? fun _res -> return_unit);
+    command
+      ~group
+      ~desc:
+        "Submit an optimistic transaction rollup finalise commitment operation."
+      (args12
+         fee_arg
+         dry_run_switch
+         verbose_signing_switch
+         simulate_switch
+         minimal_fees_arg
+         minimal_nanotez_per_byte_arg
+         minimal_nanotez_per_gas_unit_arg
+         storage_limit_arg
+         counter_arg
+         force_low_fee_arg
+         fee_cap_arg
+         burn_cap_arg)
+      (prefixes ["submit"; "tx"; "rollup"; "finalize"; "commitment"]
+      @@ prefix "to" @@ tx_rollup_param @@ prefix "from"
+      @@ ContractAlias.destination_param
+           ~name:"src"
+           ~desc:"name of the account finalizing the commitment."
+      @@ stop)
+      (fun ( fee,
+             dry_run,
+             verbose_signing,
+             simulation,
+             minimal_fees,
+             minimal_nanotez_per_byte,
+             minimal_nanotez_per_gas_unit,
+             storage_limit,
+             counter,
+             force_low_fee,
+             fee_cap,
+             burn_cap )
+           tx_rollup
+           (_, source)
+           cctxt ->
+        match Contract.is_implicit source with
+        | None -> failwith "Only implicit accounts can finalize commitments"
+        | Some source ->
+            Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+            let fee_parameter =
+              {
+                Injection.minimal_fees;
+                minimal_nanotez_per_byte;
+                minimal_nanotez_per_gas_unit;
+                force_low_fee;
+                fee_cap;
+                burn_cap;
+              }
+            in
+            submit_tx_rollup_finalize_commitment
+              cctxt
+              ~chain:cctxt#chain
+              ~block:cctxt#block
+              ?dry_run:(Some dry_run)
+              ?verbose_signing:(Some verbose_signing)
+              ?fee
+              ?storage_limit
+              ?counter
+              ?confirmations:cctxt#confirmations
+              ~simulation
+              ~source
+              ~src_pk
+              ~src_sk
+              ~fee_parameter
+              ~tx_rollup
+              ()
+            >>=? fun _res -> return_unit);
+    command
+      ~group
+      ~desc:
+        "Submit an optimistic transaction rollup remove commitment operation."
+      (args12
+         fee_arg
+         dry_run_switch
+         verbose_signing_switch
+         simulate_switch
+         minimal_fees_arg
+         minimal_nanotez_per_byte_arg
+         minimal_nanotez_per_gas_unit_arg
+         storage_limit_arg
+         counter_arg
+         force_low_fee_arg
+         fee_cap_arg
+         burn_cap_arg)
+      (prefixes ["submit"; "tx"; "rollup"; "remove"; "commitment"]
+      @@ prefix "to" @@ tx_rollup_param @@ prefix "from"
+      @@ ContractAlias.destination_param
+           ~name:"src"
+           ~desc:"name of the account removing the commitment."
+      @@ stop)
+      (fun ( fee,
+             dry_run,
+             verbose_signing,
+             simulation,
+             minimal_fees,
+             minimal_nanotez_per_byte,
+             minimal_nanotez_per_gas_unit,
+             storage_limit,
+             counter,
+             force_low_fee,
+             fee_cap,
+             burn_cap )
+           tx_rollup
+           (_, source)
+           cctxt ->
+        match Contract.is_implicit source with
+        | None ->
+            failwith
+              "Only implicit accounts can remove transaction rollup commitments"
+        | Some source ->
+            Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+            let fee_parameter =
+              {
+                Injection.minimal_fees;
+                minimal_nanotez_per_byte;
+                minimal_nanotez_per_gas_unit;
+                force_low_fee;
+                fee_cap;
+                burn_cap;
+              }
+            in
+            submit_tx_rollup_remove_commitment
+              cctxt
+              ~chain:cctxt#chain
+              ~block:cctxt#block
+              ?dry_run:(Some dry_run)
+              ?verbose_signing:(Some verbose_signing)
+              ?fee
+              ?storage_limit
+              ?counter
+              ?confirmations:cctxt#confirmations
+              ~simulation
+              ~source
+              ~src_pk
+              ~src_sk
+              ~fee_parameter
+              ~tx_rollup
+              ()
+            >>=? fun _res -> return_unit);
+    command
+      ~group
+      ~desc:"Submit an optimistic transaction rollup rejection operation."
+      (args12
+         fee_arg
+         dry_run_switch
+         verbose_signing_switch
+         simulate_switch
+         minimal_fees_arg
+         minimal_nanotez_per_byte_arg
+         minimal_nanotez_per_gas_unit_arg
+         storage_limit_arg
+         counter_arg
+         force_low_fee_arg
+         fee_cap_arg
+         burn_cap_arg)
+      (prefixes
+         ["submit"; "tx"; "rollup"; "reject"; "commitment"; "at"; "level"]
+      @@ Clic.param
+           ~name:"level"
+           ~desc:"The level"
+           Client_proto_args.int_parameter
+      @@ prefix "message"
+      @@ Clic.param
+           ~name:"message"
+           ~desc:"the message being rejected"
+           Client_proto_args.string_parameter
+      @@ prefix "at" @@ prefix "position"
+      @@ Clic.param
+           ~name:"message_position"
+           ~desc:"position of the message being rejected in the inbox"
+           int_parameter
+      @@ prefix "with" @@ prefix "proof" @@ tx_rollup_proof_param @@ prefix "to"
+      @@ tx_rollup_param @@ prefix "from"
+      @@ ContractAlias.destination_param
+           ~name:"src"
+           ~desc:"name of the account rejecting the commitment."
+      @@ stop)
+      (fun ( fee,
+             dry_run,
+             verbose_signing,
+             simulation,
+             minimal_fees,
+             minimal_nanotez_per_byte,
+             minimal_nanotez_per_gas_unit,
+             storage_limit,
+             counter,
+             force_low_fee,
+             fee_cap,
+             burn_cap )
+           level
+           message
+           message_position
+           proof
+           tx_rollup
+           (_, source)
+           cctxt ->
+        let level = Int32.of_int level in
+        match Contract.is_implicit source with
+        | None ->
+            failwith
+              "Only implicit accounts can reject transaction rollup commitments"
+        | Some source ->
+            Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+            let fee_parameter =
+              {
+                Injection.minimal_fees;
+                minimal_nanotez_per_byte;
+                minimal_nanotez_per_gas_unit;
+                force_low_fee;
+                fee_cap;
+                burn_cap;
+              }
+            in
+            submit_tx_rollup_rejection
+              cctxt
+              ~chain:cctxt#chain
+              ~block:cctxt#block
+              ?dry_run:(Some dry_run)
+              ?verbose_signing:(Some verbose_signing)
+              ?fee
+              ?storage_limit
+              ?counter
+              ?confirmations:cctxt#confirmations
+              ~simulation
+              ~source
+              ~src_pk
+              ~src_sk
+              ~fee_parameter
+              ~tx_rollup
+              ~level
+              ~message
+              ~message_position
+              ~proof
               ()
             >>=? fun _res -> return_unit);
     command

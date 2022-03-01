@@ -796,6 +796,7 @@ module Constants : sig
     tx_rollup_hard_size_limit_per_message : int;
     tx_rollup_commitment_bond : Tez.t;
     tx_rollup_finality_period : int;
+    tx_rollup_withdraw_period : int;
     tx_rollup_max_unfinalized_levels : int;
     sc_rollup_enable : bool;
     sc_rollup_origination_size : int;
@@ -1949,6 +1950,26 @@ module Ticket_hash : sig
     (t * context) tzresult
 end
 
+module Tx_rollup_level : sig
+  include BASIC_DATA
+
+  type level = t
+
+  val rpc_arg : level RPC_arg.arg
+
+  val diff : level -> level -> int32
+
+  val root : level
+
+  val succ : level -> level
+
+  val pred : level -> level option
+
+  val to_int32 : level -> int32
+
+  val of_int32 : int32 -> level tzresult
+end
+
 (** This module re-exports definitions from {!Tx_rollup_repr} and
     {!Tx_rollup_storage}. *)
 module Tx_rollup : sig
@@ -2000,11 +2021,19 @@ module Tx_rollup : sig
   val update_tx_rollups_at_block_finalization :
     context -> context tzresult Lwt.t
 
+  module Set : Set.S with type elt = tx_rollup
+
   module Internal_for_tests : sig
     (** see [tx_rollup_repr.originated_tx_rollup] for documentation *)
     val originated_tx_rollup :
       Origination_nonce.Internal_for_tests.t -> tx_rollup
   end
+end
+
+module Tx_rollup_commitment_hash : sig
+  val commitment_hash : string
+
+  include S.HASH
 end
 
 (** This module re-exports definitions from {!Tx_rollup_state_repr}
@@ -2028,20 +2057,16 @@ module Tx_rollup_state : sig
 
   val assert_exist : context -> Tx_rollup.t -> context tzresult Lwt.t
 
-  val last_inbox_level : t -> Raw_level.t option
-
-  val first_unfinalized_level :
-    context -> Tx_rollup.t -> (context * Raw_level.t option) tzresult Lwt.t
-
-  type error +=
-    | Tx_rollup_already_exists of Tx_rollup.t
-    | Tx_rollup_does_not_exist of Tx_rollup.t
-
   module Internal_for_tests : sig
     val make :
-      burn_per_byte:Tez.t ->
-      inbox_ema:int ->
-      last_inbox_level:Raw_level.t option ->
+      ?burn_per_byte:Tez.t ->
+      ?inbox_ema:int ->
+      ?last_removed_commitment_hash:Tx_rollup_commitment_hash.t ->
+      ?commitment_tail_level:Tx_rollup_level.t ->
+      ?oldest_inbox_level:Tx_rollup_level.t ->
+      ?commitment_head_level:Tx_rollup_level.t * Tx_rollup_commitment_hash.t ->
+      ?head_level:Tx_rollup_level.t * Raw_level.t ->
+      unit ->
       t
 
     val update_burn_per_byte : t -> final_size:int -> hard_limit:int -> t
@@ -2138,72 +2163,46 @@ module Tx_rollup_inbox : sig
 
   val messages :
     context ->
-    level:[`Current | `Level of Raw_level.t] ->
+    Tx_rollup_level.t ->
     Tx_rollup.t ->
     (context * Tx_rollup_message.hash list) tzresult Lwt.t
 
   val size :
     context ->
-    level:[`Current | `Level of Raw_level.t] ->
+    Tx_rollup_level.t ->
     Tx_rollup.t ->
     (context * int) tzresult Lwt.t
 
   val get :
-    context ->
-    level:[`Current | `Level of Raw_level.t] ->
-    Tx_rollup.t ->
-    (context * t) tzresult Lwt.t
+    context -> Tx_rollup_level.t -> Tx_rollup.t -> (context * t) tzresult Lwt.t
 
   val find :
     context ->
-    level:[`Current | `Level of Raw_level.t] ->
+    Tx_rollup_level.t ->
     Tx_rollup.t ->
     (context * t option) tzresult Lwt.t
 
-  val get_adjacent_levels :
-    context ->
-    Raw_level.t ->
-    Tx_rollup.t ->
-    (context * Raw_level.t option * Raw_level.t option) tzresult Lwt.t
-
   module Internal_for_tests : sig
-    type metadata = {
-      inbox_length : int32;
-      cumulated_size : int;
-      hash : hash;
-      predecessor : Raw_level_repr.t option;
-      successor : Raw_level_repr.t option;
-    }
+    type metadata = {inbox_length : int32; cumulated_size : int; hash : hash}
 
     val get_metadata :
       context ->
-      Raw_level.t ->
+      Tx_rollup_level.t ->
       Tx_rollup.t ->
       (context * metadata) tzresult Lwt.t
   end
-
-  type error +=
-    | Tx_rollup_inbox_does_not_exist of Tx_rollup.t * Raw_level.t
-    | Tx_rollup_inbox_size_would_exceed_limit of Tx_rollup.t
-    | Tx_rollup_message_size_exceeds_limit
 end
 
 (** This simply re-exports [Tx_rollup_commitments_repr] *)
 module Tx_rollup_commitment : sig
-  module Commitment_hash : sig
-    val commitment_hash : string
-
-    include S.HASH
-  end
-
   type batch_commitment = {root : bytes}
 
   val batch_commitment_equal : batch_commitment -> batch_commitment -> bool
 
   type t = {
-    level : Raw_level.t;
+    level : Tx_rollup_level.t;
     batches : batch_commitment list;
-    predecessor : Commitment_hash.t option;
+    predecessor : Tx_rollup_commitment_hash.t option;
     inbox_hash : Tx_rollup_inbox.hash;
   }
 
@@ -2212,8 +2211,10 @@ module Tx_rollup_commitment : sig
   module Submitted_commitment : sig
     type nonrec t = {
       commitment : t;
+      commitment_hash : Tx_rollup_commitment_hash.t;
       committer : Signature.Public_key_hash.t;
       submitted_at : Raw_level.t;
+      finalized_at : Raw_level.t option;
     }
 
     val encoding : t Data_encoding.t
@@ -2223,40 +2224,29 @@ module Tx_rollup_commitment : sig
 
   val encoding : t Data_encoding.t
 
-  val hash : t -> Commitment_hash.t
-
-  type error += Wrong_commitment_predecessor_level
-
-  type error += Missing_commitment_predecessor
-
-  type error += Wrong_batch_count
-
-  type error += Commitment_too_early of Raw_level.t * Raw_level.t
-
-  type error += Level_already_has_commitment of Raw_level.t
-
-  type error += Wrong_inbox_hash
-
-  type error += Retire_uncommitted_level of Raw_level.t
-
-  type error += Bond_does_not_exist of Signature.public_key_hash
-
-  type error += Bond_in_use of Signature.public_key_hash
-
-  type error += Too_many_unfinalized_levels
+  val hash : t -> Tx_rollup_commitment_hash.t
 
   val add_commitment :
     context ->
     Tx_rollup.t ->
+    Tx_rollup_state.t ->
     Signature.public_key_hash ->
     t ->
-    context tzresult Lwt.t
+    (context * Tx_rollup_state.t) tzresult Lwt.t
 
-  val get_commitment :
+  val check_commitment_level : Tx_rollup_state.t -> t -> unit tzresult Lwt.t
+
+  val find :
     context ->
     Tx_rollup.t ->
-    Raw_level.t ->
+    Tx_rollup_level.t ->
     (context * Submitted_commitment.t option) tzresult Lwt.t
+
+  val get :
+    context ->
+    Tx_rollup.t ->
+    Tx_rollup_level.t ->
+    (context * Submitted_commitment.t) tzresult Lwt.t
 
   val pending_bonded_commitments :
     context ->
@@ -2270,8 +2260,17 @@ module Tx_rollup_commitment : sig
     Signature.public_key_hash ->
     (context * bool) tzresult Lwt.t
 
-  val finalize_pending_commitments :
-    context -> Tx_rollup.t -> Raw_level.t -> context tzresult Lwt.t
+  val finalize_commitment :
+    context ->
+    Tx_rollup.t ->
+    Tx_rollup_state.t ->
+    (context * Tx_rollup_state.t * Tx_rollup_level.t) tzresult Lwt.t
+
+  val remove_commitment :
+    context ->
+    Tx_rollup.t ->
+    Tx_rollup_state.t ->
+    (context * Tx_rollup_state.t * Tx_rollup_level.t) tzresult Lwt.t
 
   val remove_bond :
     context ->
@@ -2279,17 +2278,42 @@ module Tx_rollup_commitment : sig
     Signature.public_key_hash ->
     context tzresult Lwt.t
 
-  module Internal_for_tests : sig
-    (** See [Tx_rollup_commitments_storage.retire_rollup_level]
-        for documentation *)
-    val retire_rollup_level :
-      context ->
-      Tx_rollup.t ->
-      Raw_level.t ->
-      Raw_level.t ->
-      (context * [> `No_commitment | `Commitment_too_late | `Retired]) tzresult
-      Lwt.t
-  end
+  val reject_commitment :
+    context ->
+    Tx_rollup.t ->
+    Tx_rollup_state.t ->
+    Tx_rollup_level.t ->
+    (context * Tx_rollup_state.t) tzresult Lwt.t
+end
+
+module Tx_rollup_errors : sig
+  type error +=
+    | Tx_rollup_already_exists of Tx_rollup.t
+    | Tx_rollup_does_not_exist of Tx_rollup.t
+    | Submit_batch_burn_excedeed of {burn : Tez.t; limit : Tez.t}
+    | Inbox_does_not_exist of Tx_rollup.t * Tx_rollup_level.t
+    | Inbox_size_would_exceed_limit of Tx_rollup.t
+    | Message_size_exceeds_limit
+    | Too_many_inboxes
+    | Wrong_batch_count
+    | Commitment_too_early of {
+        provided : Tx_rollup_level.t;
+        expected : Tx_rollup_level.t;
+      }
+    | Level_already_has_commitment of Tx_rollup_level.t
+    | Wrong_inbox_hash
+    | Bond_does_not_exist of Signature.public_key_hash
+    | Bond_in_use of Signature.public_key_hash
+    | No_commitment_to_finalize
+    | No_commitment_to_remove
+    | Commitment_does_not_exist of Tx_rollup_level.t
+    | Wrong_predecessor_hash of {
+        provided : Tx_rollup_commitment_hash.t option;
+        expected : Tx_rollup_commitment_hash.t option;
+      }
+    | Invalid_rejection_level_argument
+    | Invalid_proof
+    | Internal_error of string
 end
 
 (** This simply re-exports {!Destination_repr}. *)
@@ -2367,7 +2391,11 @@ module Kind : sig
 
   type tx_rollup_return_bond = Tx_rollup_return_bond_kind
 
-  type tx_rollup_finalize = Tx_rollup_finalize_kind
+  type tx_rollup_finalize_commitment = Tx_rollup_finalize_commitment_kind
+
+  type tx_rollup_remove_commitment = Tx_rollup_remove_commitment_kind
+
+  type tx_rollup_rejection = Tx_rollup_rejection_kind
 
   type sc_rollup_originate = Sc_rollup_originate_kind
 
@@ -2384,7 +2412,11 @@ module Kind : sig
     | Tx_rollup_submit_batch_manager_kind : tx_rollup_submit_batch manager
     | Tx_rollup_commit_manager_kind : tx_rollup_commit manager
     | Tx_rollup_return_bond_manager_kind : tx_rollup_return_bond manager
-    | Tx_rollup_finalize_manager_kind : tx_rollup_finalize manager
+    | Tx_rollup_finalize_commitment_manager_kind
+        : tx_rollup_finalize_commitment manager
+    | Tx_rollup_remove_commitment_manager_kind
+        : tx_rollup_remove_commitment manager
+    | Tx_rollup_rejection_manager_kind : tx_rollup_rejection manager
     | Sc_rollup_originate_manager_kind : sc_rollup_originate manager
     | Sc_rollup_add_messages_manager_kind : sc_rollup_add_messages manager
 end
@@ -2520,11 +2552,22 @@ and _ manager_operation =
       tx_rollup : Tx_rollup.t;
     }
       -> Kind.tx_rollup_return_bond manager_operation
-  | Tx_rollup_finalize : {
+  | Tx_rollup_finalize_commitment : {
       tx_rollup : Tx_rollup.t;
-      level : Raw_level.t;
     }
-      -> Kind.tx_rollup_finalize manager_operation
+      -> Kind.tx_rollup_finalize_commitment manager_operation
+  | Tx_rollup_remove_commitment : {
+      tx_rollup : Tx_rollup.t;
+    }
+      -> Kind.tx_rollup_remove_commitment manager_operation
+  | Tx_rollup_rejection : {
+      tx_rollup : Tx_rollup.t;
+      level : Tx_rollup_level.t;
+      message : string;
+      message_position : int;
+      proof : (* FIXME/TORU *) bool;
+    }
+      -> Kind.tx_rollup_rejection manager_operation
   | Sc_rollup_originate : {
       kind : Sc_rollup.Kind.t;
       boot_sector : Sc_rollup.PVM.boot_sector;
@@ -2683,7 +2726,13 @@ module Operation : sig
     val tx_rollup_return_bond_case :
       Kind.tx_rollup_return_bond Kind.manager case
 
-    val tx_rollup_finalize_case : Kind.tx_rollup_finalize Kind.manager case
+    val tx_rollup_finalize_commitment_case :
+      Kind.tx_rollup_finalize_commitment Kind.manager case
+
+    val tx_rollup_remove_commitment_case :
+      Kind.tx_rollup_remove_commitment Kind.manager case
+
+    val tx_rollup_rejection_case : Kind.tx_rollup_rejection Kind.manager case
 
     val register_global_constant_case :
       Kind.register_global_constant Kind.manager case
@@ -2727,7 +2776,13 @@ module Operation : sig
 
       val tx_rollup_return_bond_case : Kind.tx_rollup_return_bond case
 
-      val tx_rollup_finalize_case : Kind.tx_rollup_finalize case
+      val tx_rollup_finalize_commitment_case :
+        Kind.tx_rollup_finalize_commitment case
+
+      val tx_rollup_remove_commitment_case :
+        Kind.tx_rollup_remove_commitment case
+
+      val tx_rollup_rejection_case : Kind.tx_rollup_rejection case
 
       val sc_rollup_originate_case : Kind.sc_rollup_originate case
 

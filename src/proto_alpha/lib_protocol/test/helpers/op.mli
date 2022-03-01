@@ -276,7 +276,7 @@ val tx_rollup_return_bond :
   Tx_rollup.t ->
   Operation.packed tzresult Lwt.t
 
-(** [tx_rollup_Finalize ctxt source tx_rollup] finalizes the most recent
+(** [tx_rollup_finalize ctxt source tx_rollup] finalizes the most recent
     final level of a rollup. *)
 val tx_rollup_finalize :
   ?counter:Z.t ->
@@ -286,5 +286,16 @@ val tx_rollup_finalize :
   Context.t ->
   Contract.t ->
   Tx_rollup.t ->
-  Raw_level.t ->
+  Operation.packed tzresult Lwt.t
+
+(** [tx_rollup_remove_commitment ctxt source tx_rollup] tries to
+    remove a commitment from the rollup context. *)
+val tx_rollup_remove_commitment :
+  ?counter:Z.t ->
+  ?fee:Tez.tez ->
+  ?gas_limit:Gas.Arith.integral ->
+  ?storage_limit:Z.t ->
+  Context.t ->
+  Contract.t ->
+  Tx_rollup.t ->
   Operation.packed tzresult Lwt.t

@@ -213,18 +213,41 @@ let pp_manager_operation_content (type kind) source internal pp_result ppf
         source
         pp_result
         result
-  | Tx_rollup_finalize {tx_rollup; level} ->
+  | Tx_rollup_finalize_commitment {tx_rollup} ->
       Format.fprintf
         ppf
-        "@[<v 2>%s:%a level %a @,From: %a%a@]"
-        (if internal then "Internal tx rollup finalize"
-        else "Tx rollup finalize")
+        "@[<v >%s:%a @,From: %a%a@]"
+        (if internal then "Internal tx rollup finalize commitment"
+        else "Tx rollup finalize commitment")
         Tx_rollup.pp
         tx_rollup
         Contract.pp
         source
-        Raw_level.pp
-        level
+        pp_result
+        result
+  | Tx_rollup_remove_commitment {tx_rollup} ->
+      Format.fprintf
+        ppf
+        "@[<v 2>%s:%a @,From: %a%a@]"
+        (if internal then "Internal tx rollup remove commitment"
+        else "Tx rollup remove commitment")
+        Tx_rollup.pp
+        tx_rollup
+        Contract.pp
+        source
+        pp_result
+        result
+  | Tx_rollup_rejection {tx_rollup; _} ->
+      (* FIXME/TORU *)
+      Format.fprintf
+        ppf
+        "@[<v 2>%s:%a @,From: %a%a@]"
+        (if internal then "Internal tx rollup rejection"
+        else "Tx rollup rejection")
+        Tx_rollup.pp
+        tx_rollup
+        Contract.pp
+        source
         pp_result
         result
   | Sc_rollup_originate {kind; boot_sector} ->
@@ -498,8 +521,30 @@ let pp_manager_operation_contents_and_result ppf
       balance_updates ;
     Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas
   in
-  let pp_tx_rollup_finalize_result
-      (Tx_rollup_finalize_result {balance_updates; consumed_gas}) =
+  let pp_tx_rollup_finalize_commitment_result
+      (Tx_rollup_finalize_commitment_result
+        {balance_updates; consumed_gas; level}) =
+    Format.fprintf
+      ppf
+      "@,Balance updates:@,  %a"
+      pp_balance_updates
+      balance_updates ;
+    Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas ;
+    Format.fprintf ppf "@finalized level:@,  %a" Tx_rollup_level.pp level
+  in
+  let pp_tx_rollup_remove_commitment_result
+      (Tx_rollup_remove_commitment_result
+        {balance_updates; consumed_gas; level}) =
+    Format.fprintf
+      ppf
+      "@,Balance updates:@,  %a"
+      pp_balance_updates
+      balance_updates ;
+    Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas ;
+    Format.fprintf ppf "@finalized level:@,  %a" Tx_rollup_level.pp level
+  in
+  let pp_tx_rollup_rejection_result
+      (Tx_rollup_rejection_result {balance_updates; consumed_gas}) =
     Format.fprintf
       ppf
       "@,Balance updates:@,  %a"
@@ -627,17 +672,39 @@ let pp_manager_operation_contents_and_result ppf
           "@[<v 0>This tx rollup return commitment bond operation was \
            BACKTRACKED, its expected effects (as follow) were NOT applied.@]" ;
         pp_tx_rollup_return_bond_result op
-    | Applied (Tx_rollup_finalize_result _ as op) ->
+    | Applied (Tx_rollup_finalize_commitment_result _ as op) ->
         Format.fprintf
           ppf
           "This tx rollup finalize operation was successfully applied" ;
-        pp_tx_rollup_finalize_result op
-    | Backtracked ((Tx_rollup_finalize_result _ as op), _err) ->
+        pp_tx_rollup_finalize_commitment_result op
+    | Backtracked ((Tx_rollup_finalize_commitment_result _ as op), _err) ->
         Format.fprintf
           ppf
           "@[<v 0>This tx rollup finalize operation was BACKTRACKED, its \
            expected effects (as follow) were NOT applied.@]" ;
-        pp_tx_rollup_finalize_result op
+        pp_tx_rollup_finalize_commitment_result op
+    | Applied (Tx_rollup_remove_commitment_result _ as op) ->
+        Format.fprintf
+          ppf
+          "This tx rollup remove operation was successfully applied" ;
+        pp_tx_rollup_remove_commitment_result op
+    | Backtracked ((Tx_rollup_remove_commitment_result _ as op), _err) ->
+        Format.fprintf
+          ppf
+          "@[<v 0>This tx rollup remove operation was BACKTRACKED, its \
+           expected effects (as follow) were NOT applied.@]" ;
+        pp_tx_rollup_remove_commitment_result op
+    | Applied (Tx_rollup_rejection_result _ as op) ->
+        Format.fprintf
+          ppf
+          "This tx rollup rejection operation was successfully applied" ;
+        pp_tx_rollup_rejection_result op
+    | Backtracked ((Tx_rollup_rejection_result _ as op), _err) ->
+        Format.fprintf
+          ppf
+          "@[<v 0>This tx rollup rejection operation was BACKTRACKED, its \
+           expected effects (as follow) were NOT applied.@]" ;
+        pp_tx_rollup_rejection_result op
     | Applied (Sc_rollup_originate_result _ as op) ->
         Format.fprintf
           ppf

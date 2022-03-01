@@ -42,22 +42,19 @@ module S = struct
       ~description:"Get the inbox of a transaction rollup"
       ~query:RPC_query.empty
       ~output:Tx_rollup_inbox.encoding
-      RPC_path.(custom_root /: Tx_rollup.rpc_arg / "inbox")
-
-  let commitment_query =
-    let open RPC_query in
-    query (fun offset -> offset)
-    |+ opt_field ~descr:"offset" "offset" RPC_arg.int (fun t -> t)
-    |> seal
+      RPC_path.(
+        custom_root /: Tx_rollup.rpc_arg / "inbox" /: Tx_rollup_level.rpc_arg)
 
   let commitment =
     RPC_service.get_service
       ~description:"Return the commitment for a level, if any"
-      ~query:commitment_query
+      ~query:RPC_query.empty
       ~output:
-        (Data_encoding.option
-           Tx_rollup_commitment.Submitted_commitment.encoding)
-      RPC_path.(custom_root /: Tx_rollup.rpc_arg / "commitment")
+        Data_encoding.(
+          option Tx_rollup_commitment.Submitted_commitment.encoding)
+      RPC_path.(
+        custom_root /: Tx_rollup.rpc_arg / "commitment"
+        /: Tx_rollup_level.rpc_arg)
 
   let pending_bonded_commitments =
     RPC_service.get_service
@@ -74,21 +71,11 @@ let register () =
   let open Services_registration in
   opt_register1 ~chunked:false S.state (fun ctxt tx_rollup () () ->
       Tx_rollup_state.find ctxt tx_rollup >|=? snd) ;
-  opt_register1 ~chunked:false S.inbox (fun ctxt tx_rollup () () ->
-      Tx_rollup_inbox.find ctxt tx_rollup ~level:`Current >|=? snd) ;
-  register1 ~chunked:false S.commitment (fun ctxt tx_rollup offset () ->
-      let level =
-        match offset with
-        | None -> Level.current ctxt
-        | Some offset -> (
-            if Compare.Int.(offset < 0) then
-              failwith "offset should not be negative." ;
-            match Level.sub ctxt (Level.current ctxt) offset with
-            | None ->
-                failwith "the offset is not valid: The block level is negative."
-            | Some level -> level)
-      in
-      Tx_rollup_commitment.get_commitment ctxt tx_rollup level.level >|=? snd) ;
+  opt_register2 ~chunked:false S.inbox (fun ctxt tx_rollup level () () ->
+      Tx_rollup_inbox.find ctxt level tx_rollup >|=? snd) ;
+  register2 ~chunked:false S.commitment (fun ctxt tx_rollup level () () ->
+      Tx_rollup_commitment.find ctxt tx_rollup level >|=? fun (_, commitment) ->
+      commitment) ;
   register2
     ~chunked:false
     S.pending_bonded_commitments
@@ -99,8 +86,8 @@ let register () =
 let state ctxt block tx_rollup =
   RPC_context.make_call1 S.state ctxt block tx_rollup () ()
 
-let inbox ctxt block tx_rollup =
-  RPC_context.make_call1 S.inbox ctxt block tx_rollup () ()
+let inbox ctxt block tx_rollup level =
+  RPC_context.make_call2 S.inbox ctxt block tx_rollup level () ()
 
-let commitment ctxt block ?offset tx_rollup =
-  RPC_context.make_call1 S.commitment ctxt block tx_rollup offset ()
+let commitment ctxt block tx_rollup level =
+  RPC_context.make_call2 S.commitment ctxt block tx_rollup level () ()

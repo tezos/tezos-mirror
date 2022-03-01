@@ -108,6 +108,8 @@ let constants_mainnet =
     tx_rollup_commitment_bond = Tez.of_mutez_exn 10_000_000_000L;
     tx_rollup_finality_period = 2_000;
     tx_rollup_max_unfinalized_levels = 2_100;
+    (* [60_000] blocks is about two weeks. *)
+    tx_rollup_withdraw_period = 60_000;
     sc_rollup_enable = false;
     (* The following value is chosen to prevent spam. *)
     sc_rollup_origination_size = 6_314;

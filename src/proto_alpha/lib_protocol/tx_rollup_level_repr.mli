@@ -1,7 +1,9 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 Marigold <contact@marigold.dev>                        *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 Oxhead Alpha <info@oxhead-alpha.com>                   *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -22,47 +24,39 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
+type t
 
-let hooks =
-  (* Replace variables that may change between different runs by constants. *)
-  let replace_variables string =
-    let replacements =
-      [
-        ("tz[123]\\w{33}", "[PUBLIC_KEY_HASH]");
-        ("\\bB\\w{50}\\b", "[BLOCK_HASH]");
-        ("tru1\\w{33}", "[TX_ROLLUP_HASH]");
-        ("toc1\\w{50}\\b", "[TX_ROLLUP_COMMITMENT_HASH]");
-        ("edpk\\w{50}", "[PUBLIC_KEY]");
-        ("KT1\\w{33}", "[CONTRACT_HASH]");
-        ("\\bo\\w{50}\\b", "[OPERATION_HASH]");
-        ("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z", "[TIMESTAMP]");
-        (* Ports are non-deterministic when using -j. *)
-        ("/localhost:\\d{4,5}/", "/localhost:[PORT]/");
-      ]
-    in
-    List.fold_left
-      (fun string (replace, by) ->
-        replace_string ~all:true (rex replace) ~by string)
-      string
-      replacements
-  in
-  let on_spawn command arguments =
-    (* Remove arguments that shouldn't be captured in regression output. *)
-    let (arguments, _) =
-      List.fold_left
-        (fun (acc, scrub_next) arg ->
-          if scrub_next then (acc, false)
-          else
-            match arg with
-            (* scrub client global options *)
-            | "--base-dir" | "-d" | "--endpoint" | "-E" | "--sources" ->
-                (acc, true)
-            | _ -> (acc @ [replace_variables arg], false))
-        ([], (* scrub_next *) false)
-        arguments
-    in
-    let message = Log.quote_shell_command command arguments in
-    Regression.capture ("\n" ^ message)
-  in
-  let on_log output = replace_variables output |> Regression.capture in
-  {Process.on_spawn; on_log}
+type level = t
+
+(** @raise Invalid_argument when the level to encode is not positive *)
+val encoding : level Data_encoding.t
+
+val rpc_arg : level RPC_arg.arg
+
+val pp : Format.formatter -> level -> unit
+
+include Compare.S with type t := level
+
+val to_int32 : level -> int32
+
+(** @raise Invalid_argument when the level to encode is negative *)
+val of_int32_exn : int32 -> level
+
+(** Can trigger Unexpected_level error when the level to encode is negative *)
+val of_int32 : int32 -> level tzresult
+
+val diff : level -> level -> int32
+
+val root : level
+
+val succ : level -> level
+
+val pred : level -> level option
+
+(** [add l i] i must be positive *)
+val add : level -> int -> level
+
+(** [sub l i] i must be positive *)
+val sub : level -> int -> level option
+
+module Index : Storage_description.INDEX with type t = level

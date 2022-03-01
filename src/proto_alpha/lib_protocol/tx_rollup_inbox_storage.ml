@@ -25,79 +25,46 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type error +=
-  | Tx_rollup_inbox_does_not_exist of Tx_rollup_repr.t * Raw_level_repr.t
-  | Tx_rollup_inbox_size_would_exceed_limit of Tx_rollup_repr.t
-  | Tx_rollup_message_size_exceeds_limit
+open Tx_rollup_errors_repr
 
-(** [prepare_metadata ctxt rollup state level] prepares the metadata for
-    an inbox at [level]. This may involve updating the predecessor's
-    successor pointer.  It also returns a new state which point
-    the tail of the linked list of inboxes to this inbox. *)
+(** [prepare_metadata ctxt rollup state level] prepares the metadata
+    for an inbox at [level], which may imply creating it if it does
+    not already exist. *)
 let prepare_metadata :
     Raw_context.t ->
     Tx_rollup_repr.t ->
     Tx_rollup_state_repr.t ->
     Raw_level_repr.t ->
-    (Raw_context.t * Tx_rollup_state_repr.t * Tx_rollup_inbox_repr.metadata)
+    (Raw_context.t
+    * Tx_rollup_state_repr.t
+    * Tx_rollup_level_repr.t
+    * Tx_rollup_inbox_repr.metadata)
     tzresult
     Lwt.t =
  fun ctxt rollup state level ->
-  (* First, check if there are too many unfinalized levels. *)
+  (* First, check if there are too many inboxes *)
   fail_when
     Compare.Int.(
-      Tx_rollup_state_repr.unfinalized_level_count state
-      > Constants_storage.tx_rollup_max_unfinalized_levels ctxt)
-    Tx_rollup_commitment_repr.Too_many_unfinalized_levels
+      Constants_storage.tx_rollup_max_unfinalized_levels ctxt
+      <= Tx_rollup_state_repr.inboxes_count state)
+    Too_many_inboxes
   >>=? fun () ->
-  (* Consume a fix amount of gas. *)
-  (* TODO/TORU: https://gitlab.com/tezos/tezos/-/issues/2340
-     Extract the constant in a dedicated [Tx_rollup_cost] module, and
-     refine it if need be. *)
-  Raw_context.consume_gas
-    ctxt
-    Gas_limit_repr.(cost_of_gas @@ Arith.integral_of_int_exn 200)
-  >>?= fun ctxt ->
-  (* Opt-out gas accounting *)
-  let save_gas_level = Raw_context.gas_level ctxt in
-  let ctxt = Raw_context.set_gas_unlimited ctxt in
-  (* Processing *)
-  Storage.Tx_rollup.Inbox_metadata.find (ctxt, level) rollup
-  >>=? fun (ctxt, metadata) ->
-  (match metadata with
-  | Some metadata -> return (ctxt, state, metadata)
-  | None ->
-      (* First message in inbox: need to update linked list and pending
-         inbox count *)
-      let predecessor = Tx_rollup_state_repr.last_inbox_level state in
-      let new_state = Tx_rollup_state_repr.append_inbox state level in
-      Tx_rollup_state_storage.update ctxt rollup new_state >>=? fun ctxt ->
-      (match predecessor with
-      | None -> return ctxt
-      | Some predecessor_level ->
-          Storage.Tx_rollup.Inbox_metadata.get (ctxt, predecessor_level) rollup
-          >>=? fun (ctxt, predecessor_metadata) ->
-          (* Here, we update the predecessor inbox's successor to point
-             to this inbox. *)
-          Storage.Tx_rollup.Inbox_metadata.add
-            (ctxt, predecessor_level)
-            rollup
-            {predecessor_metadata with successor = Some level}
-          >|=? fun (ctxt, _, _) -> ctxt)
-      >>=? fun ctxt ->
-      let new_metadata : Tx_rollup_inbox_repr.metadata =
-        Tx_rollup_inbox_repr.empty_metadata predecessor
-      in
-      return (ctxt, new_state, new_metadata))
-  >>=? fun (ctxt, new_state, new_metadata) ->
-  (* Restore gas accounting. *)
-  let ctxt =
-    match save_gas_level with
-    | Gas_limit_repr.Unaccounted -> ctxt
-    | Gas_limit_repr.Limited {remaining = limit} ->
-        Raw_context.set_gas_limit ctxt limit
-  in
-  return (ctxt, new_state, new_metadata)
+  match Tx_rollup_state_repr.head_level state with
+  | Some (_, tezos_lvl) when Raw_level_repr.(level < tezos_lvl) ->
+      fail (Internal_error "Trying to write into an inbox from the past")
+  | Some (tx_lvl, tezos_lvl) when Raw_level_repr.(tezos_lvl = level) ->
+      (* An inbox should already exists *)
+      Storage.Tx_rollup.Inbox_metadata.get (ctxt, tx_lvl) rollup
+      >>=? fun (ctxt, metadata) -> return (ctxt, state, tx_lvl, metadata)
+  | _ ->
+      (* We need a new inbox *)
+      Tx_rollup_state_repr.record_inbox_creation state level
+      >>?= fun (state, tx_level) ->
+      let metadata = Tx_rollup_inbox_repr.empty_metadata in
+      Storage.Tx_rollup.Inbox_metadata.init (ctxt, tx_level) rollup metadata
+      >>=? fun (ctxt, _) ->
+      let ctxt = Raw_context.record_tx_rollup ctxt rollup in
+      return (ctxt, state, tx_level, metadata)
 
 (** [update_metadata metadata msg_size] updates [metadata] to account
     for a new message of [msg_size] bytes. *)
@@ -109,12 +76,12 @@ let update_metadata :
  fun metadata msg_hash msg_size ->
   let hash = Tx_rollup_inbox_repr.extend_hash metadata.hash msg_hash in
   ok
-    {
-      metadata with
-      inbox_length = Int32.succ metadata.inbox_length;
-      cumulated_size = msg_size + metadata.cumulated_size;
-      hash;
-    }
+    Tx_rollup_inbox_repr.
+      {
+        inbox_length = Int32.succ metadata.inbox_length;
+        cumulated_size = msg_size + metadata.cumulated_size;
+        hash;
+      }
 
 let append_message :
     Raw_context.t ->
@@ -126,39 +93,32 @@ let append_message :
   let level = (Raw_context.current_level ctxt).level in
   let message_size = Tx_rollup_message_repr.size message in
   prepare_metadata ctxt rollup state level
-  >>=? fun (ctxt, new_state, metadata) ->
+  >>=? fun (ctxt, new_state, tx_level, metadata) ->
   Tx_rollup_message_builder.hash ctxt message >>?= fun (ctxt, message_hash) ->
   update_metadata metadata message_hash message_size >>?= fun new_metadata ->
-  Storage.Tx_rollup.Inbox_metadata.add (ctxt, level) rollup new_metadata
-  >>=? fun (ctxt, _, _) ->
   let new_size = new_metadata.cumulated_size in
   let inbox_limit =
     Constants_storage.tx_rollup_hard_size_limit_per_inbox ctxt
   in
   fail_unless
     Compare.Int.(new_size <= inbox_limit)
-    (Tx_rollup_inbox_size_would_exceed_limit rollup)
+    (Inbox_size_would_exceed_limit rollup)
   >>=? fun () ->
+  (* Checks have passed, so we can actually record in the storage. *)
+  Storage.Tx_rollup.Inbox_metadata.add (ctxt, tx_level) rollup new_metadata
+  >>=? fun (ctxt, _, _) ->
   Storage.Tx_rollup.Inbox_contents.add
-    ((ctxt, level), rollup)
+    ((ctxt, tx_level), rollup)
     metadata.inbox_length
     message_hash
   >>=? fun (ctxt, _, _) -> return (ctxt, new_state)
 
-let get_level :
-    Raw_context.t -> [`Current | `Level of Raw_level_repr.t] -> Raw_level_repr.t
-    =
- fun ctxt -> function
-  | `Current -> (Raw_context.current_level ctxt).level
-  | `Level lvl -> lvl
-
 let messages_opt :
     Raw_context.t ->
-    level:[`Current | `Level of Raw_level_repr.t] ->
+    Tx_rollup_level_repr.t ->
     Tx_rollup_repr.t ->
     (Raw_context.t * Tx_rollup_message_repr.hash list option) tzresult Lwt.t =
- fun ctxt ~level tx_rollup ->
-  let level = get_level ctxt level in
+ fun ctxt level tx_rollup ->
   Storage.Tx_rollup.Inbox_contents.list_values ((ctxt, level), tx_rollup)
   >>=? function
   | (ctxt, []) ->
@@ -173,22 +133,21 @@ let messages_opt :
 
 let messages :
     Raw_context.t ->
-    level:[`Current | `Level of Raw_level_repr.t] ->
+    Tx_rollup_level_repr.t ->
     Tx_rollup_repr.t ->
     (Raw_context.t * Tx_rollup_message_repr.hash list) tzresult Lwt.t =
- fun ctxt ~level tx_rollup ->
-  messages_opt ctxt ~level tx_rollup >>=? function
+ fun ctxt level tx_rollup ->
+  messages_opt ctxt level tx_rollup >>=? function
   | (ctxt, Some messages) -> return (ctxt, messages)
   | (_, None) ->
-      fail (Tx_rollup_inbox_does_not_exist (tx_rollup, get_level ctxt level))
+      fail (Tx_rollup_errors_repr.Inbox_does_not_exist (tx_rollup, level))
 
 let size :
     Raw_context.t ->
-    level:[`Current | `Level of Raw_level_repr.t] ->
+    Tx_rollup_level_repr.t ->
     Tx_rollup_repr.t ->
     (Raw_context.t * int) tzresult Lwt.t =
- fun ctxt ~level tx_rollup ->
-  let level = get_level ctxt level in
+ fun ctxt level tx_rollup ->
   Storage.Tx_rollup.Inbox_metadata.find (ctxt, level) tx_rollup >>=? function
   | (ctxt, Some {cumulated_size; _}) -> return (ctxt, cumulated_size)
   | (ctxt, None) ->
@@ -198,112 +157,62 @@ let size :
         to raise the appropriate if need be.
        *)
       Tx_rollup_state_storage.assert_exist ctxt tx_rollup >>=? fun _ctxt ->
-      fail (Tx_rollup_inbox_does_not_exist (tx_rollup, level))
+      fail (Inbox_does_not_exist (tx_rollup, level))
 
 let find :
     Raw_context.t ->
-    level:[`Current | `Level of Raw_level_repr.t] ->
+    Tx_rollup_level_repr.t ->
     Tx_rollup_repr.t ->
     (Raw_context.t * Tx_rollup_inbox_repr.t option) tzresult Lwt.t =
- fun ctxt ~level tx_rollup ->
+ fun ctxt level tx_rollup ->
   let open Tx_rollup_inbox_repr in
   (*
     [messages_opt] checks whether or not [tx_rollup] is valid, so
     we do not have to do it here.
    *)
-  messages_opt ctxt ~level tx_rollup >>=? function
+  messages_opt ctxt level tx_rollup >>=? function
   | (ctxt, Some contents) ->
-      size ctxt ~level tx_rollup >>=? fun (ctxt, cumulated_size) ->
+      size ctxt level tx_rollup >>=? fun (ctxt, cumulated_size) ->
       let hash = Tx_rollup_inbox_repr.hash_hashed_inbox contents in
       return (ctxt, Some {cumulated_size; contents; hash})
   | (ctxt, None) -> return (ctxt, None)
 
 let get :
     Raw_context.t ->
-    level:[`Current | `Level of Raw_level_repr.t] ->
+    Tx_rollup_level_repr.t ->
     Tx_rollup_repr.t ->
     (Raw_context.t * Tx_rollup_inbox_repr.t) tzresult Lwt.t =
- fun ctxt ~level tx_rollup ->
+ fun ctxt level tx_rollup ->
   (*
     [inbox_opt] checks whether or not [tx_rollup] is valid, so we
     don’t have to do it here.
    *)
-  find ctxt ~level tx_rollup >>=? function
+  find ctxt level tx_rollup >>=? function
   | (ctxt, Some res) -> return (ctxt, res)
-  | (_, None) ->
-      fail (Tx_rollup_inbox_does_not_exist (tx_rollup, get_level ctxt level))
-
-let get_adjacent_levels :
-    Raw_context.t ->
-    Raw_level_repr.t ->
-    Tx_rollup_repr.t ->
-    (Raw_context.t * Raw_level_repr.t option * Raw_level_repr.t option) tzresult
-    Lwt.t =
- fun ctxt level tx_rollup ->
-  Storage.Tx_rollup.Inbox_metadata.find (ctxt, level) tx_rollup >>=? function
-  | (ctxt, Some {predecessor; successor; _}) ->
-      return (ctxt, predecessor, successor)
-  | (_, None) -> fail @@ Tx_rollup_inbox_does_not_exist (tx_rollup, level)
+  | (_, None) -> fail (Inbox_does_not_exist (tx_rollup, level))
 
 let get_metadata :
     Raw_context.t ->
-    Raw_level_repr.t ->
+    Tx_rollup_level_repr.t ->
     Tx_rollup_repr.t ->
     (Raw_context.t * Tx_rollup_inbox_repr.metadata) tzresult Lwt.t =
  fun ctxt level tx_rollup ->
   Storage.Tx_rollup.Inbox_metadata.find (ctxt, level) tx_rollup >>=? function
-  | (_, None) -> fail (Tx_rollup_inbox_does_not_exist (tx_rollup, level))
+  | (_, None) -> fail (Inbox_does_not_exist (tx_rollup, level))
   | (ctxt, Some metadata) -> return (ctxt, metadata)
 
-(* Error registration *)
-
-let () =
-  let open Data_encoding in
-  (* Tx_rollup_inbox_does_not_exist *)
-  register_error_kind
-    `Permanent
-    ~id:"tx_rollup_inbox_does_not_exist"
-    ~title:"Missing transaction rollup inbox"
-    ~description:"The transaction rollup does not have an inbox at this level"
-    ~pp:(fun ppf (addr, level) ->
-      Format.fprintf
-        ppf
-        "Transaction rollup %a does not have an inbox at level %a"
-        Tx_rollup_repr.pp
-        addr
-        Raw_level_repr.pp
-        level)
-    (obj2
-       (req "tx_rollup_address" Tx_rollup_repr.encoding)
-       (req "raw_level" Raw_level_repr.encoding))
-    (function
-      | Tx_rollup_inbox_does_not_exist (rollup, level) -> Some (rollup, level)
-      | _ -> None)
-    (fun (rollup, level) -> Tx_rollup_inbox_does_not_exist (rollup, level)) ;
-  register_error_kind
-    `Permanent
-    ~id:"tx_rollup_inbox_size_would_exceed_limit"
-    ~title:"Transaction rollup inbox’s size would exceed the limit"
-    ~description:"Transaction rollup inbox’s size would exceed the limit"
-    ~pp:(fun ppf addr ->
-      Format.fprintf
-        ppf
-        "Adding the submitted message would make the inbox of %a exceed the \
-         authorized limit at this level"
-        Tx_rollup_repr.pp
-        addr)
-    (obj1 (req "tx_rollup_address" Tx_rollup_repr.encoding))
-    (function
-      | Tx_rollup_inbox_size_would_exceed_limit rollup -> Some rollup
-      | _ -> None)
-    (fun rollup -> Tx_rollup_inbox_size_would_exceed_limit rollup) ;
-  (* Tx_rollup_message_size_exceed_limit *)
-  register_error_kind
-    `Permanent
-    ~id:"tx_rollup_message_size_exceeds_limit"
-    ~title:"A message submtitted to a transaction rollup inbox exceeds limit"
-    ~description:
-      "A message submtitted to a transaction rollup inbox exceeds limit"
-    empty
-    (function Tx_rollup_message_size_exceeds_limit -> Some () | _ -> None)
-    (fun () -> Tx_rollup_message_size_exceeds_limit)
+let remove :
+    Raw_context.t ->
+    Tx_rollup_level_repr.t ->
+    Tx_rollup_repr.t ->
+    Raw_context.t tzresult Lwt.t =
+ fun ctxt level rollup ->
+  let rec remove_messages ctxt i len =
+    if Compare.Int32.(i < len) then
+      Storage.Tx_rollup.Inbox_contents.remove ((ctxt, level), rollup) i
+      >>=? fun (ctxt, _, _) -> remove_messages ctxt (Int32.succ i) len
+    else return ctxt
+  in
+  get_metadata ctxt level rollup >>=? fun (ctxt, metadata) ->
+  Storage.Tx_rollup.Inbox_metadata.remove (ctxt, level) rollup
+  >>=? fun (ctxt, _, _) -> remove_messages ctxt 0l metadata.inbox_length

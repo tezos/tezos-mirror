@@ -35,23 +35,25 @@ let originate ctxt =
 let update_tx_rollups_at_block_finalization :
     Raw_context.t -> Raw_context.t tzresult Lwt.t =
  fun ctxt ->
-  let level = (Raw_context.current_level ctxt).level in
-  Storage.Tx_rollup.fold ctxt level ~init:(ok ctxt) ~f:(fun tx_rollup ctxt ->
-      ctxt >>?= fun ctxt ->
-      (* This call cannot failed as long as we systematically check
-         that a transaction rollup exists before creating a new
-         inbox. *)
+  let (ctxt, rollups) = Raw_context.flush_tx_rollups ctxt in
+  Tx_rollup_repr.Set.fold_es
+    (fun tx_rollup ctxt ->
       Tx_rollup_state_storage.get ctxt tx_rollup >>=? fun (ctxt, state) ->
-      Tx_rollup_inbox_storage.get ~level:(`Level level) ctxt tx_rollup
-      >>=? fun (ctxt, inbox) ->
-      let hard_limit =
-        Constants_storage.tx_rollup_hard_size_limit_per_inbox ctxt
-      in
-      let state =
-        Tx_rollup_state_repr.update_burn_per_byte
-          state
-          ~final_size:inbox.cumulated_size
-          ~hard_limit
-      in
-      Storage.Tx_rollup.State.add ctxt tx_rollup state >|=? fun (ctxt, _, _) ->
-      ctxt)
+      match Tx_rollup_state_repr.head_level state with
+      | Some (tx_level, _) ->
+          Tx_rollup_inbox_storage.get ctxt tx_level tx_rollup
+          >>=? fun (ctxt, inbox) ->
+          let hard_limit =
+            Constants_storage.tx_rollup_hard_size_limit_per_inbox ctxt
+          in
+          let state =
+            Tx_rollup_state_repr.update_burn_per_byte
+              state
+              ~final_size:inbox.cumulated_size
+              ~hard_limit
+          in
+          Storage.Tx_rollup.State.add ctxt tx_rollup state
+          >|=? fun (ctxt, _, _) -> ctxt
+      | None -> (* this cannot happen *) return ctxt)
+    rollups
+    ctxt

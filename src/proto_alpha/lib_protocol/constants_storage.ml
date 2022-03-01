@@ -170,6 +170,10 @@ let tx_rollup_finality_period c =
   let constants = Raw_context.constants c in
   constants.tx_rollup_finality_period
 
+let tx_rollup_withdraw_period c =
+  let constants = Raw_context.constants c in
+  constants.tx_rollup_withdraw_period
+
 let tx_rollup_max_unfinalized_levels c =
   let constants = Raw_context.constants c in
   constants.tx_rollup_max_unfinalized_levels

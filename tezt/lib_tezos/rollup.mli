@@ -25,9 +25,10 @@
 
 module Tx_rollup : sig
   type state = {
+    oldest_inbox_level : int option;
+    head_level : (int * int) option;
     burn_per_byte : int;
     inbox_ema : int;
-    last_inbox_level : int option;
   }
 
   type inbox = {cumulated_size : int; contents : string list; hash : string}
@@ -36,13 +37,25 @@ module Tx_rollup : sig
     ?hooks:Process.hooks -> rollup:string -> Client.t -> state Process.runnable
 
   val get_inbox :
-    ?hooks:Process.hooks -> rollup:string -> Client.t -> inbox Process.runnable
+    ?hooks:Process.hooks ->
+    rollup:string ->
+    level:int ->
+    Client.t ->
+    inbox Process.runnable
 
   val get_commitment :
     ?hooks:Process.hooks ->
     ?block:string ->
-    ?offset:int ->
     rollup:string ->
+    level:int ->
+    Client.t ->
+    JSON.t Process.runnable
+
+  val get_pending_bonded_commitments :
+    ?hooks:Process.hooks ->
+    ?block:string ->
+    rollup:string ->
+    pkh:string ->
     Client.t ->
     JSON.t Process.runnable
 
@@ -50,5 +63,13 @@ module Tx_rollup : sig
     val state : state Check.typ
 
     val inbox : inbox Check.typ
+  end
+
+  module Parameters : sig
+    type t = {finality_period : int; withdraw_period : int}
+
+    val default : t
+
+    val parameter_file : ?parameters:t -> Protocol.t -> string Lwt.t
   end
 end

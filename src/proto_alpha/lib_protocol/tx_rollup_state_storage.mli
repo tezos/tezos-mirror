@@ -31,10 +31,6 @@
     Except if the contrary is explicitly stated, the functions of this
     module are carbonated. *)
 
-type error +=
-  | Tx_rollup_already_exists of Tx_rollup_repr.t
-  | Tx_rollup_does_not_exist of Tx_rollup_repr.t
-
 (** [init ctxt tx_rollup] initializes the state of [tx_rollup].
 
     Returns the error [Tx_rollup_already_exists] iff this function has
@@ -80,11 +76,3 @@ val update :
     transaction rollup address. *)
 val assert_exist :
   Raw_context.t -> Tx_rollup_repr.t -> Raw_context.t tzresult Lwt.t
-
-(** [first_unfinalized_level] returns the first unfinalized level
-    of [tx_rollup].  If None, then there are no unfinalized levels
-    with inboxes. *)
-val first_unfinalized_level :
-  Raw_context.t ->
-  Tx_rollup_repr.t ->
-  (Raw_context.t * Raw_level_repr.t option) tzresult Lwt.t

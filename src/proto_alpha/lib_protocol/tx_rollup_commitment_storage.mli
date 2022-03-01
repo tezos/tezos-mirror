@@ -28,6 +28,12 @@
 (** This module introduces various functions to manipulate the storage related
     to commitments for transaction rollups. *)
 
+(** [check_commitment_level state commitment] fails if [commitment]
+    does not target the expected level. *)
+val check_commitment_level :
+  Tx_rollup_state_repr.t -> Tx_rollup_commitment_repr.t -> unit tzresult Lwt.t
+(* FIXME: move in Tx_rollup_commitment_repr *)
+
 (** [add_commitment context tx_rollup contract commitment] adds a
     commitment to a rollup.
 
@@ -46,9 +52,10 @@
 val add_commitment :
   Raw_context.t ->
   Tx_rollup_repr.t ->
+  Tx_rollup_state_repr.t ->
   Signature.Public_key_hash.t ->
   Tx_rollup_commitment_repr.t ->
-  Raw_context.t tzresult Lwt.t
+  (Raw_context.t * Tx_rollup_state_repr.t) tzresult Lwt.t
 
 (** [remove_bond context tx_rollup contract] removes the bond for an
     implicit contract.  This will fail if either the bond does not exist,
@@ -59,38 +66,25 @@ val remove_bond :
   Signature.public_key_hash ->
   Raw_context.t tzresult Lwt.t
 
-(** [retire_rollup_level context tx_rollup level last_level] removes all
-   data associated with a level. It decrements the bonded commitment count
-   for any contracts whose commitments have been either accepted or
-   obviated (that is, neither accepted nor rejected).  This is normally
-   used in finalization (during a Commitment operation) and is only
-   public for testing.  The [last_level] parameter is the last level
-   at which a commitment which should be accepted can have been submitted.
-
-   Returns:
-   {ul
-    {li Commitment_too_late: if we have not yet reached a level where we are allowed to finalize the commitment for this level.}
-    {li No_commitment: if there has not yet been a commitment made for this level.}
-    {li Retired: if the commitment for this level has been successfully retired.}
-   } *)
-val retire_rollup_level :
+(** [find context tx_rollup level] returns the commitment
+    for a level, if any exists.  If the rollup does not exist,
+    the error [Tx_rollup_does_not_exist] is returned. *)
+val find :
   Raw_context.t ->
   Tx_rollup_repr.t ->
-  Raw_level_repr.t ->
-  Raw_level_repr.t ->
-  (Raw_context.t * [> `Commitment_too_late | `No_commitment | `Retired])
+  Tx_rollup_level_repr.t ->
+  (Raw_context.t * Tx_rollup_commitment_repr.Submitted_commitment.t option)
   tzresult
   Lwt.t
 
-(** [get_commitment context tx_rollup level] returns the commitment
+(** [get context tx_rollup level] returns the commitment
     for a level, if any exists.  If the rollup does not exist,
     the error [Tx_rollup_does_not_exist] is returned. *)
-val get_commitment :
+val get :
   Raw_context.t ->
   Tx_rollup_repr.t ->
-  Raw_level_repr.t ->
-  (Raw_context.t * Tx_rollup_commitment_repr.Submitted_commitment.t option)
-  tzresult
+  Tx_rollup_level_repr.t ->
+  (Raw_context.t * Tx_rollup_commitment_repr.Submitted_commitment.t) tzresult
   Lwt.t
 
 (** [pending_bonded_commitments ctxt tx_rollup contract] returns the
@@ -111,16 +105,37 @@ val has_bond :
   Signature.public_key_hash ->
   (Raw_context.t * bool) tzresult Lwt.t
 
-(** [finalize_pending_commitments ctxt tx_rollup last_level_to_finalize]
-    finalizes the commitment for a level, if any.  If there is no
-    commitment for the level (or if the commitment has been
-    invalidated by a rejection of its predecessor), this
-    function is a no-op.
+(** [finalize_commitment ctxt tx_rollup state] marks the commitment of
+    the oldest inbox as final, if the commitment exists and if it is
+    old enough. Otherwise, this function returns the error
+    [No_commitment_to_finalize].
 
-    The state is adjusted as well, tracking which levels have been
-    finalized, and which are left to be finalized. *)
-val finalize_pending_commitments :
+    The state of the rollup is adjusted accordingly, and the finalized
+    level is returned. Besides, the inbox at said level is removed
+    from the context. *)
+val finalize_commitment :
   Raw_context.t ->
   Tx_rollup_repr.t ->
-  Raw_level_repr.t ->
-  Raw_context.t tzresult Lwt.t
+  Tx_rollup_state_repr.t ->
+  (Raw_context.t * Tx_rollup_state_repr.t * Tx_rollup_level_repr.t) tzresult
+  Lwt.t
+
+(** [remove_commitment ctxt tx_rollup state] tries to remove the
+    oldest finalized commitment from the layer-1 storage, if it
+    exists, and if it is old enough. Otherwise, this functions returns
+    the error [No_commitment_to_remove].
+
+    The state of the rollup is adjusted accordingly. *)
+val remove_commitment :
+  Raw_context.t ->
+  Tx_rollup_repr.t ->
+  Tx_rollup_state_repr.t ->
+  (Raw_context.t * Tx_rollup_state_repr.t * Tx_rollup_level_repr.t) tzresult
+  Lwt.t
+
+val reject_commitment :
+  Raw_context.t ->
+  Tx_rollup_repr.t ->
+  Tx_rollup_state_repr.t ->
+  Tx_rollup_level_repr.t ->
+  (Raw_context.t * Tx_rollup_state_repr.t) tzresult Lwt.t

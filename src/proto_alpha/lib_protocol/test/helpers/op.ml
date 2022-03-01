@@ -582,7 +582,7 @@ let tx_rollup_return_bond ?counter ?fee ?gas_limit ?storage_limit ctxt
   sign account.sk ctxt to_sign_op
 
 let tx_rollup_finalize ?counter ?fee ?gas_limit ?storage_limit ctxt
-    (source : Contract.t) (tx_rollup : Tx_rollup.t) (level : Raw_level.t) =
+    (source : Contract.t) (tx_rollup : Tx_rollup.t) =
   manager_operation
     ?counter
     ?fee
@@ -590,7 +590,21 @@ let tx_rollup_finalize ?counter ?fee ?gas_limit ?storage_limit ctxt
     ?storage_limit
     ~source
     ctxt
-    (Tx_rollup_finalize {tx_rollup; level})
+    (Tx_rollup_finalize_commitment {tx_rollup})
+  >>=? fun to_sign_op ->
+  Context.Contract.manager ctxt source >|=? fun account ->
+  sign account.sk ctxt to_sign_op
+
+let tx_rollup_remove_commitment ?counter ?fee ?gas_limit ?storage_limit ctxt
+    (source : Contract.t) (tx_rollup : Tx_rollup.t) =
+  manager_operation
+    ?counter
+    ?fee
+    ?gas_limit
+    ?storage_limit
+    ~source
+    ctxt
+    (Tx_rollup_remove_commitment {tx_rollup})
   >>=? fun to_sign_op ->
   Context.Contract.manager ctxt source >|=? fun account ->
   sign account.sk ctxt to_sign_op
