@@ -129,3 +129,16 @@ val remove :
   Tx_rollup_level_repr.t ->
   Tx_rollup_repr.t ->
   Raw_context.t tzresult Lwt.t
+
+(** [check_message ctxt level tx_rollup index message] checks that
+    the message at [index] in the inbox for [level] on [tx_rollup]
+    has the same hash as [message].  If there is no message
+    at that index, [Wrong_message_position] is returned.  If the
+    hash doesn't match, [Wrong_message_hash] is returned. *)
+val check_message_hash :
+  Raw_context.t ->
+  Tx_rollup_level_repr.t ->
+  Tx_rollup_repr.t ->
+  position:int ->
+  Tx_rollup_message_repr.t ->
+  Raw_context.t tzresult Lwt.t

@@ -74,3 +74,5 @@ val pp_hash : Format.formatter -> hash -> unit
 
 (** [hash_uncarbonated msg] computes the hash of [msg] without gas consumption. *)
 val hash_uncarbonated : t -> hash
+
+val hash_equal : hash -> hash -> bool

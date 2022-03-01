@@ -2247,6 +2247,14 @@ module Tx_rollup_inbox : sig
     Tx_rollup.t ->
     (context * t option) tzresult Lwt.t
 
+  val check_message_hash :
+    context ->
+    Tx_rollup_level.t ->
+    Tx_rollup.t ->
+    position:int ->
+    Tx_rollup_message.t ->
+    context tzresult Lwt.t
+
   module Internal_for_tests : sig
     type metadata = {inbox_length : int32; cumulated_size : int; hash : hash}
 
@@ -2381,6 +2389,12 @@ module Tx_rollup_errors : sig
     | Invalid_rejection_level_argument
     | Invalid_proof
     | Internal_error of string
+    | Wrong_message_position of {
+        level : Tx_rollup_level_repr.t;
+        position : int;
+        length : int;
+      }
+    | Wrong_message_hash
 end
 
 (** This simply re-exports {!Destination_repr}. *)

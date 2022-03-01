@@ -700,6 +700,10 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                         "title": "The hash of a transaction rollup inbox (Base58Check-encoded)",
                         "$ref": "#/definitions/unistring"
                       },
+                      "Tx_rollup_l2_address": {
+                        "title": "The hash of a BLS public key used to identify a L2 ticket holders (Base58Check-encoded)",
+                        "$ref": "#/definitions/unistring"
+                      },
                       "alpha.block_header.alpha.full_header": {
                         "title": "Shell header",
                         "description": "Block header's shell-related content. It contains information such as the block level, its predecessor and timestamp.",
@@ -2136,7 +2140,130 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 "maximum": 2147483647
                               },
                               "message": {
-                                "$ref": "#/definitions/unistring"
+                                "oneOf": [
+                                  {
+                                    "title": "Batch",
+                                    "type": "object",
+                                    "properties": {
+                                      "batch": {
+                                        "$ref": "#/definitions/unistring"
+                                      }
+                                    },
+                                    "required": [
+                                      "batch"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "title": "Deposit",
+                                    "type": "object",
+                                    "properties": {
+                                      "deposit": {
+                                        "type": "object",
+                                        "properties": {
+                                          "destination": {
+                                            "$ref": "#/definitions/Tx_rollup_l2_address"
+                                          },
+                                          "ticket_hash": {
+                                            "$ref": "#/definitions/script_expr"
+                                          },
+                                          "amount": {
+                                            "oneOf": [
+                                              {
+                                                "title": "small",
+                                                "description": "An int64 which fits within a uint8",
+                                                "type": "object",
+                                                "properties": {
+                                                  "kind": {
+                                                    "$ref": "#/definitions/unistring"
+                                                  },
+                                                  "value": {
+                                                    "type": "integer",
+                                                    "minimum": 0,
+                                                    "maximum": 255
+                                                  }
+                                                },
+                                                "required": [
+                                                  "value",
+                                                  "kind"
+                                                ],
+                                                "additionalProperties": false
+                                              },
+                                              {
+                                                "title": "medium",
+                                                "description": "An int64 which fits within a uint16",
+                                                "type": "object",
+                                                "properties": {
+                                                  "kind": {
+                                                    "$ref": "#/definitions/unistring"
+                                                  },
+                                                  "value": {
+                                                    "type": "integer",
+                                                    "minimum": 0,
+                                                    "maximum": 65535
+                                                  }
+                                                },
+                                                "required": [
+                                                  "value",
+                                                  "kind"
+                                                ],
+                                                "additionalProperties": false
+                                              },
+                                              {
+                                                "title": "biggish",
+                                                "description": "An int64 which fits within a uint32",
+                                                "type": "object",
+                                                "properties": {
+                                                  "kind": {
+                                                    "$ref": "#/definitions/unistring"
+                                                  },
+                                                  "value": {
+                                                    "type": "integer",
+                                                    "minimum": -2147483648,
+                                                    "maximum": 2147483647
+                                                  }
+                                                },
+                                                "required": [
+                                                  "value",
+                                                  "kind"
+                                                ],
+                                                "additionalProperties": false
+                                              },
+                                              {
+                                                "title": "bigger",
+                                                "description": "An int64 which doesn't fit within a uint32",
+                                                "type": "object",
+                                                "properties": {
+                                                  "kind": {
+                                                    "$ref": "#/definitions/unistring"
+                                                  },
+                                                  "value": {
+                                                    "$ref": "#/definitions/int64"
+                                                  }
+                                                },
+                                                "required": [
+                                                  "value",
+                                                  "kind"
+                                                ],
+                                                "additionalProperties": false
+                                              }
+                                            ]
+                                          }
+                                        },
+                                        "required": [
+                                          "amount",
+                                          "ticket_hash",
+                                          "destination"
+                                        ],
+                                        "additionalProperties": false
+                                      }
+                                    },
+                                    "required": [
+                                      "deposit"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                ]
                               },
                               "message_position": {
                                 "type": "integer",
@@ -2463,6 +2590,11 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                           "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
                         }
                       },
+                      "int64": {
+                        "title": "64 bit integers",
+                        "description": "Decimal representation of 64 bit integers",
+                        "type": "string"
+                      },
                       "micheline.alpha.michelson_v1.expression": {
                         "oneOf": [
                           {
@@ -2544,6 +2676,10 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                         "title": "Positive big number",
                         "description": "Decimal representation of a positive big number",
                         "type": "string"
+                      },
+                      "script_expr": {
+                        "title": "A script expression ID (Base58Check-encoded)",
+                        "$ref": "#/definitions/unistring"
                       },
                       "timestamp.protocol": {
                         "description": "A timestamp as seen by the protocol: second-level precision, epoch based.",
@@ -2672,7 +2808,253 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
+                          "title": "X_4"
+                        },
+                        "encoding": {
+                          "tag_size": "Uint8",
+                          "kind": {
+                            "kind": "Dynamic"
+                          },
+                          "cases": [
+                            {
+                              "tag": 0,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  }
+                                }
+                              ],
+                              "name": "case 0"
+                            },
+                            {
+                              "tag": 1,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "layout": {
+                                    "size": "Uint16",
+                                    "kind": "Int"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "size": 2,
+                                    "kind": "Float"
+                                  }
+                                }
+                              ],
+                              "name": "case 1"
+                            },
+                            {
+                              "tag": 2,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "layout": {
+                                    "size": "Int32",
+                                    "kind": "Int"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "size": 4,
+                                    "kind": "Float"
+                                  }
+                                }
+                              ],
+                              "name": "case 2"
+                            },
+                            {
+                              "tag": 3,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "layout": {
+                                    "size": "Int64",
+                                    "kind": "Int"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "size": 8,
+                                    "kind": "Float"
+                                  }
+                                }
+                              ],
+                              "name": "case 3"
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "description": {
+                          "title": "X_3"
+                        },
+                        "encoding": {
+                          "fields": [
+                            {
+                              "name": "destination",
+                              "layout": {
+                                "kind": "Bytes"
+                              },
+                              "data_kind": {
+                                "size": 20,
+                                "kind": "Float"
+                              },
+                              "kind": "named"
+                            },
+                            {
+                              "name": "ticket_hash",
+                              "layout": {
+                                "kind": "Bytes"
+                              },
+                              "data_kind": {
+                                "size": 32,
+                                "kind": "Float"
+                              },
+                              "kind": "named"
+                            },
+                            {
+                              "name": "amount",
+                              "layout": {
+                                "name": "X_4",
+                                "kind": "Ref"
+                              },
+                              "data_kind": {
+                                "kind": "Dynamic"
+                              },
+                              "kind": "named"
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "description": {
                           "title": "X_5"
+                        },
+                        "encoding": {
+                          "tag_size": "Uint8",
+                          "kind": {
+                            "kind": "Dynamic"
+                          },
+                          "cases": [
+                            {
+                              "tag": 0,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "kind": "dyn",
+                                  "num_fields": 1,
+                                  "size": "Uint30"
+                                },
+                                {
+                                  "name": "batch",
+                                  "layout": {
+                                    "kind": "String"
+                                  },
+                                  "data_kind": {
+                                    "kind": "Variable"
+                                  },
+                                  "kind": "named"
+                                }
+                              ],
+                              "name": "Batch"
+                            },
+                            {
+                              "tag": 1,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "deposit",
+                                  "layout": {
+                                    "name": "X_3",
+                                    "kind": "Ref"
+                                  },
+                                  "data_kind": {
+                                    "kind": "Dynamic"
+                                  },
+                                  "kind": "named"
+                                }
+                              ],
+                              "name": "Deposit"
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "description": {
+                          "title": "X_8"
                         },
                         "encoding": {
                           "tag_size": "Uint8",
@@ -2742,7 +3124,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "X_3"
+                          "title": "X_6"
                         },
                         "encoding": {
                           "fields": [
@@ -2780,7 +3162,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                             {
                               "name": "predecessor",
                               "layout": {
-                                "name": "X_5",
+                                "name": "X_8",
                                 "kind": "Ref"
                               },
                               "data_kind": {
@@ -3152,7 +3534,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "X_6"
+                          "title": "X_9"
                         },
                         "encoding": {
                           "fields": [
@@ -4567,7 +4949,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 {
                                   "name": "parameters",
                                   "layout": {
-                                    "name": "X_6",
+                                    "name": "X_9",
                                     "kind": "Ref"
                                   },
                                   "data_kind": {
@@ -5232,7 +5614,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 {
                                   "name": "commitment",
                                   "layout": {
-                                    "name": "X_3",
+                                    "name": "X_6",
                                     "kind": "Ref"
                                   },
                                   "data_kind": {
@@ -5593,17 +5975,13 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                   "kind": "named"
                                 },
                                 {
-                                  "kind": "dyn",
-                                  "num_fields": 1,
-                                  "size": "Uint30"
-                                },
-                                {
                                   "name": "message",
                                   "layout": {
-                                    "kind": "String"
+                                    "name": "X_5",
+                                    "kind": "Ref"
                                   },
                                   "data_kind": {
-                                    "kind": "Variable"
+                                    "kind": "Dynamic"
                                   },
                                   "kind": "named"
                                 },
@@ -6579,6 +6957,10 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       "Tx_rollup_inbox_hash": {
                         "title": "The hash of a transaction rollup inbox (Base58Check-encoded)",
+                        "$ref": "#/definitions/unistring"
+                      },
+                      "Tx_rollup_l2_address": {
+                        "title": "The hash of a BLS public key used to identify a L2 ticket holders (Base58Check-encoded)",
                         "$ref": "#/definitions/unistring"
                       },
                       "alpha.block_header.alpha.full_header": {
@@ -8017,7 +8399,130 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 "maximum": 2147483647
                               },
                               "message": {
-                                "$ref": "#/definitions/unistring"
+                                "oneOf": [
+                                  {
+                                    "title": "Batch",
+                                    "type": "object",
+                                    "properties": {
+                                      "batch": {
+                                        "$ref": "#/definitions/unistring"
+                                      }
+                                    },
+                                    "required": [
+                                      "batch"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "title": "Deposit",
+                                    "type": "object",
+                                    "properties": {
+                                      "deposit": {
+                                        "type": "object",
+                                        "properties": {
+                                          "destination": {
+                                            "$ref": "#/definitions/Tx_rollup_l2_address"
+                                          },
+                                          "ticket_hash": {
+                                            "$ref": "#/definitions/script_expr"
+                                          },
+                                          "amount": {
+                                            "oneOf": [
+                                              {
+                                                "title": "small",
+                                                "description": "An int64 which fits within a uint8",
+                                                "type": "object",
+                                                "properties": {
+                                                  "kind": {
+                                                    "$ref": "#/definitions/unistring"
+                                                  },
+                                                  "value": {
+                                                    "type": "integer",
+                                                    "minimum": 0,
+                                                    "maximum": 255
+                                                  }
+                                                },
+                                                "required": [
+                                                  "value",
+                                                  "kind"
+                                                ],
+                                                "additionalProperties": false
+                                              },
+                                              {
+                                                "title": "medium",
+                                                "description": "An int64 which fits within a uint16",
+                                                "type": "object",
+                                                "properties": {
+                                                  "kind": {
+                                                    "$ref": "#/definitions/unistring"
+                                                  },
+                                                  "value": {
+                                                    "type": "integer",
+                                                    "minimum": 0,
+                                                    "maximum": 65535
+                                                  }
+                                                },
+                                                "required": [
+                                                  "value",
+                                                  "kind"
+                                                ],
+                                                "additionalProperties": false
+                                              },
+                                              {
+                                                "title": "biggish",
+                                                "description": "An int64 which fits within a uint32",
+                                                "type": "object",
+                                                "properties": {
+                                                  "kind": {
+                                                    "$ref": "#/definitions/unistring"
+                                                  },
+                                                  "value": {
+                                                    "type": "integer",
+                                                    "minimum": -2147483648,
+                                                    "maximum": 2147483647
+                                                  }
+                                                },
+                                                "required": [
+                                                  "value",
+                                                  "kind"
+                                                ],
+                                                "additionalProperties": false
+                                              },
+                                              {
+                                                "title": "bigger",
+                                                "description": "An int64 which doesn't fit within a uint32",
+                                                "type": "object",
+                                                "properties": {
+                                                  "kind": {
+                                                    "$ref": "#/definitions/unistring"
+                                                  },
+                                                  "value": {
+                                                    "$ref": "#/definitions/int64"
+                                                  }
+                                                },
+                                                "required": [
+                                                  "value",
+                                                  "kind"
+                                                ],
+                                                "additionalProperties": false
+                                              }
+                                            ]
+                                          }
+                                        },
+                                        "required": [
+                                          "amount",
+                                          "ticket_hash",
+                                          "destination"
+                                        ],
+                                        "additionalProperties": false
+                                      }
+                                    },
+                                    "required": [
+                                      "deposit"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                ]
                               },
                               "message_position": {
                                 "type": "integer",
@@ -8344,6 +8849,11 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                           "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
                         }
                       },
+                      "int64": {
+                        "title": "64 bit integers",
+                        "description": "Decimal representation of 64 bit integers",
+                        "type": "string"
+                      },
                       "micheline.alpha.michelson_v1.expression": {
                         "oneOf": [
                           {
@@ -8456,6 +8966,10 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                         "title": "Positive big number",
                         "description": "Decimal representation of a positive big number",
                         "type": "string"
+                      },
+                      "script_expr": {
+                        "title": "A script expression ID (Base58Check-encoded)",
+                        "$ref": "#/definitions/unistring"
                       },
                       "timestamp.protocol": {
                         "description": "A timestamp as seen by the protocol: second-level precision, epoch based.",
