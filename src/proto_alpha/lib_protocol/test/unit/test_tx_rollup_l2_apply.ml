@@ -240,7 +240,7 @@ let with_initial_setup tickets contracts =
 
   return (ctxt, tidxs, rev_contracts)
 
-let transfer ?(counter = 0L) ~signer ~dest ~ticket qty =
+let transfer ?(counter = 1L) ~signer ~dest ~ticket qty =
   let open Tx_rollup_l2_batch.V1 in
   let qty = Tx_rollup_l2_qty.of_int64_exn qty in
   let content =
@@ -374,16 +374,16 @@ let test_indexes_creation () =
   (* We create a transaction for each transfer, it makes the test of each
      transaction result easier. *)
   let transaction1 =
-    [transfer ~counter:0L ~signer:pk1 ~dest:addr2 ~ticket:ticket1 10L]
+    [transfer ~counter:1L ~signer:pk1 ~dest:addr2 ~ticket:ticket1 10L]
   in
   let signature1 = sign_transaction [sk1] transaction1 in
   let transaction2 =
-    [transfer ~counter:1L ~signer:pk1 ~dest:addr3 ~ticket:ticket1 20L]
+    [transfer ~counter:2L ~signer:pk1 ~dest:addr3 ~ticket:ticket1 20L]
   in
   let signature2 = sign_transaction [sk1] transaction2 in
 
   let transaction3 =
-    [transfer ~counter:2L ~signer:pk1 ~dest:addr4 ~ticket:ticket1 30L]
+    [transfer ~counter:3L ~signer:pk1 ~dest:addr4 ~ticket:ticket1 30L]
   in
   let signature3 = sign_transaction [sk1] transaction3 in
   let batch =
@@ -424,12 +424,12 @@ let test_indexes_creation_bad () =
   let transaction1 =
     (* This transaction will fail because the number of tickets required is
        more than its own. *)
-    [transfer ~counter:0L ~signer:pk1 ~dest:addr2 ~ticket:ticket1 10000L]
+    [transfer ~counter:1L ~signer:pk1 ~dest:addr2 ~ticket:ticket1 10000L]
   in
   let signature1 = sign_transaction [sk1] transaction1 in
   let transaction2 =
     (* This is ok *)
-    [transfer ~counter:1L ~signer:pk1 ~dest:addr3 ~ticket:ticket1 1L]
+    [transfer ~counter:2L ~signer:pk1 ~dest:addr3 ~ticket:ticket1 1L]
   in
   let signature2 = sign_transaction [sk1] transaction2 in
 
@@ -560,7 +560,7 @@ let test_transaction_with_unknown_indexable () =
   let transfer1 : (Indexable.unknown, Indexable.unknown) operation =
     {
       signer = from_value pk1;
-      counter = 0L;
+      counter = 1L;
       contents =
         [
           {
@@ -579,7 +579,7 @@ let test_transaction_with_unknown_indexable () =
   let transfer2 : (Indexable.unknown, Indexable.unknown) operation =
     {
       signer = signer_of_address_index aidx2 |> Indexable.forget;
-      counter = 0L;
+      counter = 1L;
       contents =
         [
           {
@@ -745,11 +745,11 @@ let test_update_counter () =
   let transactions =
     transfers
       [
-        (pk1, addr2, ticket1, 10L, Some 0L);
-        (pk1, addr2, ticket1, 20L, Some 1L);
-        (pk1, addr2, ticket1, 30L, Some 2L);
-        (pk1, addr2, ticket1, 40L, Some 3L);
-        (pk1, addr2, ticket1, 50L, Some 4L);
+        (pk1, addr2, ticket1, 10L, Some 1L);
+        (pk1, addr2, ticket1, 20L, Some 2L);
+        (pk1, addr2, ticket1, 30L, Some 3L);
+        (pk1, addr2, ticket1, 40L, Some 4L);
+        (pk1, addr2, ticket1, 50L, Some 5L);
       ]
     |> List.map (fun x -> [x])
   in

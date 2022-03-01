@@ -446,14 +446,14 @@ module Make (Context : CONTEXT) = struct
           in
           return (ctxt, indexes)
 
-    (** [check_counter ctxt signer counter] asserts that the provided [counter] is equal
-        to the expected one associated to the [signer] in the [ctxt]. *)
+    (** [check_counter ctxt signer counter] asserts that the provided [counter] is the
+        successor of the one associated to the [signer] in the [ctxt]. *)
     let check_counter :
         ctxt -> Indexable.index_only Signer_indexable.t -> int64 -> unit m =
      fun ctxt signer counter ->
       let* metadata = get_metadata_signer ctxt signer in
       fail_unless
-        Compare.Int64.(counter = metadata.counter)
+        Compare.Int64.(counter = Int64.succ metadata.counter)
         (Counter_mismatch
            {
              account = Tx_rollup_l2_address.of_bls_pk metadata.public_key;
