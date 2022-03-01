@@ -11,7 +11,7 @@ depends: [
   "dune" { >= "2.9" }
   "tezos-stdlib"
   "tezos-crypto"
-  "data-encoding" { >= "0.4" & < "0.5" }
+  "data-encoding" { >= "0.5.1" & < "0.6" }
   "tezos-error-monad"
   "tezos-rpc"
   "tezos-clic"

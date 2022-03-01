@@ -1,6 +1,7 @@
 (rule
  (targets v4.ml)
  (deps
+   v3/data_encoding.ml
    v3/replicated_signatures.ml
    v3/lwtreslib_list_combine.ml
  )

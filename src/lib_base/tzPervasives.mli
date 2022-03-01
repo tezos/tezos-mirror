@@ -39,9 +39,6 @@ include module type of Tezos_crypto
 
 module Data_encoding : module type of struct
   include Data_encoding
-  module Compact = Compact_encoding
-
-  type 'a compact = 'a Compact.t
 end
 
 (** The following modules are part of [TzLwtreslib]. We just remove

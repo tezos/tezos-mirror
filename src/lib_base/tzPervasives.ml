@@ -29,14 +29,7 @@ include Tezos_rpc
 include Tezos_clic
 include Tezos_crypto
 include Tezos_micheline
-
-module Data_encoding = struct
-  include Data_encoding
-  module Compact = Compact_encoding
-
-  type 'a compact = 'a Compact_encoding.t
-end
-
+module Data_encoding = Data_encoding
 include Tezos_error_monad.TzLwtreslib
 
 module List = struct

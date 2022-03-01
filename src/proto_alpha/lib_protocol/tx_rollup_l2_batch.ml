@@ -59,15 +59,15 @@ let compact_destination =
     union
       [
         case
-          "layer1"
+          ~title:"layer1"
+          (payload Signature.Public_key_hash.encoding)
           (function Layer1 x -> Some x | _ -> None)
-          (fun x -> Layer1 x)
-        @@ payload Signature.Public_key_hash.encoding;
+          (fun x -> Layer1 x);
         case
-          "layer2"
+          ~title:"layer2"
+          (Indexable.compact Tx_rollup_l2_address.encoding)
           (function Layer2 x -> Some x | _ -> None)
-          (fun x -> Layer2 x)
-        @@ Indexable.compact Tx_rollup_l2_address.encoding;
+          (fun x -> Layer2 x);
       ])
 
 module V1 = struct
@@ -169,11 +169,14 @@ type ('signer, 'content) t = V1 of ('signer, 'content) V1.t
 let compact =
   Data_encoding.Compact.(
     union
-      ~tag_bits:2
-      ~inner_bits:6
+      ~union_tag_bits:2
+      ~cases_tag_bits:6
       [
-        case "V1" (function V1 x -> Some x) (fun x -> V1 x)
-        @@ V1.compact ~bits:6;
+        case
+          ~title:"V1"
+          (V1.compact ~bits:6)
+          (function V1 x -> Some x)
+          (fun x -> V1 x);
       ])
 
 (** An encoding for [t] that uses a specialized, space-efficient encoding

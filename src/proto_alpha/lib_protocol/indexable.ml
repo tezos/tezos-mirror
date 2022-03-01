@@ -102,7 +102,7 @@ let compact val_encoding =
     conv
       (function Hidden_index x -> Either.Left x | Hidden_value x -> Right x)
       (function Left x -> Hidden_index x | Right x -> Hidden_value x)
-    @@ or_int32 ~int32_kind:"index" ~alt_kind:"value" val_encoding)
+    @@ or_int32 ~int32_title:"index" ~alt_title:"value" val_encoding)
 
 let encoding : 'a Data_encoding.t -> 'a either Data_encoding.t =
  fun val_encoding ->

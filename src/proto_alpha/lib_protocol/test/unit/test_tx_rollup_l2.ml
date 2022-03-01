@@ -496,9 +496,13 @@ let test_l2_operation_size () =
   let open Protocol.Tx_rollup_l2_batch.V1 in
   let open Data_encoding in
   (* Encoding from compact encoding *)
-  let operation_content_encoding = Compact.make compact_operation_content in
-  let operation_encoding = Compact.make compact_operation in
-  let transaction_encoding = Compact.make compact_transaction in
+  let operation_content_encoding =
+    Compact.make ~tag_size:`Uint8 compact_operation_content
+  in
+  let operation_encoding = Compact.make ~tag_size:`Uint8 compact_operation in
+  let transaction_encoding =
+    Compact.make ~tag_size:`Uint8 compact_transaction
+  in
   (* Helper functions to encode and decode *)
   let encode_content op = Binary.to_bytes_exn operation_content_encoding op in
   let decode_content buffer =

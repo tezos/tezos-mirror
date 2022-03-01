@@ -25,6 +25,16 @@
 
 include Data_encoding
 
+module Json = struct
+  include Json
+
+  (* Suppress some optional parameters *)
+
+  let construct encoding v = construct ?include_default_fields:None encoding v
+
+  let destruct encoding j = destruct ?bson_relaxation:None encoding j
+end
+
 module Binary = struct
   include Binary
 

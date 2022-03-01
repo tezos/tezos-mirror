@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2022 Nomadic Labs. <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,42 +23,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module type ROUNDTRIP = sig
-  type output
+include Data_encoding
 
-  val target : string
+module Json = struct
+  include Json
 
-  val of_input : 'a Data_encoding.t -> 'a -> output
+  (* Suppress some optional parameters *)
 
-  val to_input : 'a Data_encoding.t -> output -> 'a
+  let construct encoding v = construct ?include_default_fields:None encoding v
+
+  let destruct encoding j = destruct ?bson_relaxation:None encoding j
 end
-
-type t = (module ROUNDTRIP)
-
-let target : t -> string = fun (module R : ROUNDTRIP) -> R.target
-
-let make : type a. a Data_encoding.t -> t -> a -> a =
- fun encoding (module R : ROUNDTRIP) input ->
-  R.of_input encoding input |> R.to_input encoding
-
-let binary : t =
-  (module struct
-    type output = bytes
-
-    let target = "binary"
-
-    let of_input encoding x = Data_encoding.Binary.to_bytes_exn encoding x
-
-    let to_input = Data_encoding.Binary.of_bytes_exn
-  end)
-
-let json : t =
-  (module struct
-    type output = Data_encoding.Json.json
-
-    let target = "json"
-
-    let of_input encoding x = Data_encoding.Json.construct encoding x
-
-    let to_input encoding j = Data_encoding.Json.destruct encoding j
-  end)
