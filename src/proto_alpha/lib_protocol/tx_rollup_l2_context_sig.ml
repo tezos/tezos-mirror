@@ -276,5 +276,10 @@ module type CONTEXT = sig
         that [aidx] and [tidx] have been associated to an address and
         a ticket respectively. *)
     val spend : t -> ticket_index -> address_index -> Tx_rollup_l2_qty.t -> t m
+
+    module Internal_for_tests : sig
+      val get_opt :
+        t -> ticket_index -> address_index -> Tx_rollup_l2_qty.t option m
+    end
   end
 end
