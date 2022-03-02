@@ -311,7 +311,7 @@ and _ manager_operation =
   | Tx_rollup_rejection : {
       tx_rollup : Tx_rollup_repr.t;
       level : Tx_rollup_level_repr.t;
-      message : string;
+      message : Tx_rollup_message_repr.t;
       message_position : int;
       proof : (* FIXME/TORU *) bool;
     }
@@ -679,7 +679,7 @@ module Encoding = struct
             obj5
               (req "rollup" Tx_rollup_repr.encoding)
               (req "level" Tx_rollup_level_repr.encoding)
-              (req "message" string)
+              (req "message" Tx_rollup_message_repr.encoding)
               (req "message_position" int31)
               (req "proof" bool);
           select =

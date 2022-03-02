@@ -733,9 +733,9 @@ let test_rollup_last_commitment_is_rejected =
     repeat parameters.finality_period (fun () -> Client.bake_for client)
   in
   let*! _ = RPC.Tx_rollup.get_state ~rollup client in
-  let*! () =
-    submit_rejection ~level:0 ~message:batch ~position:0 ~proof:true state
-  in
+  (* This is the encoding of [batch]. *)
+  let message = "{ \"batch\": \"blob\"}" in
+  let*! () = submit_rejection ~level:0 ~message ~position:0 ~proof:true state in
   let* () = Client.bake_for client in
   let*! _ = RPC.Tx_rollup.get_state ~rollup client in
   let* _ = RPC.get_block client in

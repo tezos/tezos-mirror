@@ -2630,7 +2630,7 @@ and _ manager_operation =
   | Tx_rollup_rejection : {
       tx_rollup : Tx_rollup.t;
       level : Tx_rollup_level.t;
-      message : string;
+      message : Tx_rollup_message.t;
       message_position : int;
       proof : (* FIXME/TORU *) bool;
     }
