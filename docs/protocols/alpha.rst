@@ -189,4 +189,4 @@ improvements of the codebase.
 
 - Extend carbonated-map with a fold operation. (MR :gl:`!4156`)
 
-- Other internal refactorings or documentation. (MRs :gl:`!4276`, `!4385`)
+- Other internal refactorings or documentation. (MRs :gl:`!4276`, `!4385`, `!4457`)

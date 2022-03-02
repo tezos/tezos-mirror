@@ -164,12 +164,15 @@ let snapshot ctxt =
   Storage.Stake.Staking_balance.snapshot ctxt index >>=? fun ctxt ->
   Storage.Stake.Active_delegate_with_one_roll.snapshot ctxt index
 
-let compute_snapshot_index ctxt cycle ~max_snapshot_index =
-  Storage.Seed.For_cycle.get ctxt cycle >>=? fun seed ->
+let compute_snapshot_index_for_seed ~max_snapshot_index seed =
   let rd = Seed_repr.initialize_new seed [Bytes.of_string "stake_snapshot"] in
   let seq = Seed_repr.sequence rd 0l in
   Seed_repr.take_int32 seq (Int32.of_int max_snapshot_index)
   |> fst |> Int32.to_int |> return
+
+let compute_snapshot_index ctxt cycle ~max_snapshot_index =
+  Storage.Seed.For_cycle.get ctxt cycle >>=? fun seed ->
+  compute_snapshot_index_for_seed ~max_snapshot_index seed
 
 let get_stakes_for_selected_index ctxt index =
   Storage.Stake.Active_delegate_with_one_roll.fold_snapshot
@@ -223,37 +226,38 @@ let get_stakes_for_selected_index ctxt index =
       Tez_repr.(total_stake +? stake_for_cycle) >>?= fun total_stake ->
       return ((delegate, stake_for_cycle) :: acc, total_stake))
 
+let sampler_for_cycle ctxt cycle =
+  let read ctxt =
+    Storage.Seed.For_cycle.get ctxt cycle >>=? fun seed ->
+    Delegate_sampler_state.get ctxt cycle >>=? fun state -> return (seed, state)
+  in
+  Raw_context.sampler_for_cycle ~read ctxt cycle
+
 let select_distribution_for_cycle ctxt cycle pubkey =
   Storage.Stake.Last_snapshot.get ctxt >>=? fun max_snapshot_index ->
-  compute_snapshot_index ctxt ~max_snapshot_index cycle
+  Storage.Seed.For_cycle.get ctxt cycle >>=? fun seed ->
+  compute_snapshot_index_for_seed ~max_snapshot_index seed
   >>=? fun selected_index ->
+  get_stakes_for_selected_index ctxt selected_index
+  >>=? fun (stakes, total_stake) ->
+  let stakes = List.sort (fun (_, x) (_, y) -> Tez_repr.compare y x) stakes in
+  Selected_distribution_for_cycle.init ctxt cycle stakes >>=? fun ctxt ->
+  Storage.Total_active_stake.add ctxt cycle total_stake >>= fun ctxt ->
   List.fold_left_es
-    (fun ctxt index ->
-      (if Compare.Int.(index = selected_index) then
-       get_stakes_for_selected_index ctxt index
-       >>=? fun (stakes, total_stake) ->
-       let stakes =
-         List.sort (fun (_, x) (_, y) -> Tez_repr.compare y x) stakes
-       in
-       Selected_distribution_for_cycle.init ctxt cycle stakes >>=? fun ctxt ->
-       Storage.Total_active_stake.add ctxt cycle total_stake >>= fun ctxt ->
-       List.fold_left_es
-         (fun acc (pkh, stake) ->
-           pubkey ctxt pkh >>=? fun pk ->
-           return (((pk, pkh), Tez_repr.to_mutez stake) :: acc))
-         []
-         stakes
-       >>=? fun stakes_pk ->
-       let state = Sampler.create stakes_pk in
-       Delegate_sampler_state.init ctxt cycle state
-      else return ctxt)
-      >>=? fun ctxt ->
-      Storage.Stake.Staking_balance.delete_snapshot ctxt index >>= fun ctxt ->
-      Storage.Stake.Active_delegate_with_one_roll.delete_snapshot ctxt index
-      >>= fun ctxt -> return ctxt)
-    ctxt
-    Misc.(0 --> (max_snapshot_index - 1))
-  >>=? fun ctxt -> Storage.Stake.Last_snapshot.update ctxt 0
+    (fun acc (pkh, stake) ->
+      pubkey ctxt pkh >>=? fun pk ->
+      return (((pk, pkh), Tez_repr.to_mutez stake) :: acc))
+    []
+    stakes
+  >>=? fun stakes_pk ->
+  let state = Sampler.create stakes_pk in
+  Delegate_sampler_state.init ctxt cycle state >>=? fun ctxt ->
+  (* pre-allocate the sampler *)
+  Raw_context.init_sampler_for_cycle ctxt cycle seed state >>?= fun ctxt ->
+  (* cleanup snapshots *)
+  Storage.Stake.Staking_balance.Snapshot.clear ctxt >>= fun ctxt ->
+  Storage.Stake.Active_delegate_with_one_roll.Snapshot.clear ctxt
+  >>= fun ctxt -> Storage.Stake.Last_snapshot.update ctxt 0
 
 let select_distribution_for_cycle_do_not_call_except_for_migration =
   select_distribution_for_cycle

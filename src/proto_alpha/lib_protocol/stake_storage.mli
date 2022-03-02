@@ -132,3 +132,16 @@ val prepare_stake_distribution : Raw_context.t -> Raw_context.t tzresult Lwt.t
     active stake at [cycle] from [ctxt]. *)
 val get_total_active_stake :
   Raw_context.t -> Cycle_repr.t -> Tez_repr.t tzresult Lwt.t
+
+(** [sampler_for_cycle ctxt cycle] reads the sampler for [cycle] from
+    [ctxt] if it has been previously inited. Otherwise it initializes
+    the sampler and caches it in [ctxt] with
+    [Raw_context.set_sampler_for_cycle]. *)
+val sampler_for_cycle :
+  Raw_context.t ->
+  Cycle_repr.t ->
+  (Raw_context.t
+  * Seed_repr.seed
+  * (Signature.public_key * Signature.public_key_hash) Sampler.t)
+  tzresult
+  Lwt.t
