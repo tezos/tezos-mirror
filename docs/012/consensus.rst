@@ -50,6 +50,10 @@ length in the `technical report <https://arxiv.org/abs/2001.11965>`_ and in a
 `Nomadic Labs's blog
 post <https://blog.nomadic-labs.com/a-look-ahead-to-tenderbake.html>`_. Here we
 only provide a user/developer perspective.
+
+.. _tb_validator:
+.. _tb_validator_012:
+
 Tenderbake is executed for each new block level by a "committee" whose members
 are called *validators*, which are delegates selected at random based on their
 stake, in the same way as endorsers are selected in Emmy*. We let
@@ -77,9 +81,16 @@ Round durations thus increase linearly with ``DELAY_INCREMENT_PER_ROUND``.
 
 Schematically, a round consists in the following steps:
 
+.. _candidate_block:
+.. _candidate_block_012:
+
+
 * a validator designated for that round injects a *candidate block* (representing a proposal) and consensus operations (representing votes) into the node to which it is attached, which then
 * diffuses those blocks and consensus operations to other nodes of the network, and thus
 * communicates them to the validators attached to those nodes, to carry out voting on which block to accept.
+
+.. _quorum:
+.. _quorum_012:
 
 Unlike Emmy*, Tenderbake has `two types of
 votes <https://blog.nomadic-labs.com/a-look-ahead-to-tenderbake.html#why-do-we-need-preendorsements>`_:
