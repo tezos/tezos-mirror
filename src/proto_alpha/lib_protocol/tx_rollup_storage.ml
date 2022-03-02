@@ -35,7 +35,7 @@ let originate ctxt =
 let update_tx_rollups_at_block_finalization :
     Raw_context.t -> Raw_context.t tzresult Lwt.t =
  fun ctxt ->
-  let (ctxt, rollups) = Raw_context.flush_tx_rollups ctxt in
+  let (ctxt, rollups) = Raw_context.get_tx_rollup_with_messages ctxt in
   Tx_rollup_repr.Set.fold_es
     (fun tx_rollup ctxt ->
       Tx_rollup_state_storage.get ctxt tx_rollup >>=? fun (ctxt, state) ->

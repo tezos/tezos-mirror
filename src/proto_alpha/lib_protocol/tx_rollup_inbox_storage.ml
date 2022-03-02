@@ -63,17 +63,17 @@ let prepare_metadata :
       let metadata = Tx_rollup_inbox_repr.empty_metadata in
       Storage.Tx_rollup.Inbox_metadata.init (ctxt, tx_level) rollup metadata
       >>=? fun (ctxt, _) ->
-      let ctxt = Raw_context.record_tx_rollup ctxt rollup in
+      let ctxt = Raw_context.set_tx_rollup_has_messages ctxt rollup in
       return (ctxt, state, tx_level, metadata)
 
-(** [update_metadata metadata msg_size] updates [metadata] to account
+(** [update_metadata metadata ~msg_hash ~msg_size] updates [metadata] to account
     for a new message of [msg_size] bytes. *)
 let update_metadata :
     Tx_rollup_inbox_repr.metadata ->
-    Tx_rollup_message_repr.hash ->
-    int ->
+    msg_hash:Tx_rollup_message_repr.hash ->
+    msg_size:int ->
     Tx_rollup_inbox_repr.metadata tzresult =
- fun metadata msg_hash msg_size ->
+ fun metadata ~msg_hash ~msg_size ->
   let hash = Tx_rollup_inbox_repr.extend_hash metadata.hash msg_hash in
   ok
     Tx_rollup_inbox_repr.
@@ -91,7 +91,7 @@ let append_message :
     (Raw_context.t * Tx_rollup_state_repr.t) tzresult Lwt.t =
  fun ctxt rollup state message ->
   let level = (Raw_context.current_level ctxt).level in
-  let message_size = Tx_rollup_message_repr.size message in
+  let msg_size = Tx_rollup_message_repr.size message in
   prepare_metadata ctxt rollup state level
   >>=? fun (ctxt, new_state, tx_level, metadata) ->
   fail_when
@@ -100,8 +100,8 @@ let append_message :
       >= Constants_storage.tx_rollup_max_messages_per_inbox ctxt)
     (Inbox_count_would_exceed_limit rollup)
   >>=? fun () ->
-  Tx_rollup_message_builder.hash ctxt message >>?= fun (ctxt, message_hash) ->
-  update_metadata metadata message_hash message_size >>?= fun new_metadata ->
+  Tx_rollup_message_builder.hash ctxt message >>?= fun (ctxt, msg_hash) ->
+  update_metadata metadata ~msg_hash ~msg_size >>?= fun new_metadata ->
   let new_size = new_metadata.cumulated_size in
   let inbox_limit =
     Constants_storage.tx_rollup_hard_size_limit_per_inbox ctxt
@@ -116,10 +116,10 @@ let append_message :
   Storage.Tx_rollup.Inbox_contents.add
     ((ctxt, tx_level), rollup)
     metadata.inbox_length
-    message_hash
+    msg_hash
   >>=? fun (ctxt, _, _) -> return (ctxt, new_state)
 
-let messages_opt :
+let message_hashes_opt :
     Raw_context.t ->
     Tx_rollup_level_repr.t ->
     Tx_rollup_repr.t ->
@@ -137,13 +137,13 @@ let messages_opt :
       return (ctxt, None)
   | (ctxt, contents) -> return (ctxt, Some contents)
 
-let messages :
+let message_hashes :
     Raw_context.t ->
     Tx_rollup_level_repr.t ->
     Tx_rollup_repr.t ->
     (Raw_context.t * Tx_rollup_message_repr.hash list) tzresult Lwt.t =
  fun ctxt level tx_rollup ->
-  messages_opt ctxt level tx_rollup >>=? function
+  message_hashes_opt ctxt level tx_rollup >>=? function
   | (ctxt, Some messages) -> return (ctxt, messages)
   | (_, None) ->
       fail (Tx_rollup_errors_repr.Inbox_does_not_exist (tx_rollup, level))
@@ -176,7 +176,7 @@ let find :
     [messages_opt] checks whether or not [tx_rollup] is valid, so
     we do not have to do it here.
    *)
-  messages_opt ctxt level tx_rollup >>=? function
+  message_hashes_opt ctxt level tx_rollup >>=? function
   | (ctxt, Some contents) ->
       size ctxt level tx_rollup >>=? fun (ctxt, cumulated_size) ->
       let hash = Tx_rollup_inbox_repr.hash_hashed_inbox contents in

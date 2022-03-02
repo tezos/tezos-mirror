@@ -77,7 +77,7 @@ let wrap m = m >|= Environment.wrap_tzresult
 (** [inbox_burn state size] computes the burn (per byte of message)
     one has to pay to submit a message to the current inbox. *)
 let inbox_burn state size =
-  Environment.wrap_tzresult (Tx_rollup_state.burn ~limit:None state size)
+  Environment.wrap_tzresult (Tx_rollup_state.burn_cost ~limit:None state size)
 
 (** [burn_per_byte state] returns the cost to insert one byte inside
     the inbox. *)
@@ -343,7 +343,7 @@ let test_burn_per_byte_update () =
         ~hard_limit
     in
     let new_burn =
-      match Alpha_context.Tx_rollup_state.burn ~limit:None state 1 with
+      match Alpha_context.Tx_rollup_state.burn_cost ~limit:None state 1 with
       | Ok x -> x
       | Error _ ->
           Stdlib.failwith "could not compute the fees for a message of 1 byte"

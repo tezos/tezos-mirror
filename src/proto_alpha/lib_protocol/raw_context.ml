@@ -227,9 +227,9 @@ type back = {
     Cycle_repr.Map.t;
   stake_distribution_for_current_cycle :
     Tez_repr.t Signature.Public_key_hash.Map.t option;
-  tx_rollups_seen : Tx_rollup_repr.Set.t;
-      (** Record the transaction rollups which have received at
-          least one message in a block. *)
+  tx_rollups_with_messages : Tx_rollup_repr.Set.t;
+      (** Contains the transaction rollups which have received at
+          least one message in this block. *)
 }
 
 (*
@@ -328,18 +328,20 @@ let[@inline] update_non_consensus_operations_rev ctxt
 let[@inline] update_sampler_state ctxt sampler_state =
   update_back ctxt {ctxt.back with sampler_state}
 
-let[@inline] record_tx_rollup ctxt tx_rollup =
+let[@inline] set_tx_rollup_has_messages ctxt tx_rollup =
   update_back
     ctxt
     {
       ctxt.back with
-      tx_rollups_seen =
-        Tx_rollup_repr.Set.add tx_rollup ctxt.back.tx_rollups_seen;
+      tx_rollups_with_messages =
+        Tx_rollup_repr.Set.add tx_rollup ctxt.back.tx_rollups_with_messages;
     }
 
-let[@inline] flush_tx_rollups ctxt =
-  ( update_back ctxt {ctxt.back with tx_rollups_seen = Tx_rollup_repr.Set.empty},
-    ctxt.back.tx_rollups_seen )
+let[@inline] get_tx_rollup_with_messages ctxt =
+  ( update_back
+      ctxt
+      {ctxt.back with tx_rollups_with_messages = Tx_rollup_repr.Set.empty},
+    ctxt.back.tx_rollups_with_messages )
 
 type error += Too_many_internal_operations (* `Permanent *)
 
@@ -798,7 +800,7 @@ let prepare ~level ~predecessor_timestamp ~timestamp ctxt =
         non_consensus_operations_rev = [];
         sampler_state = Cycle_repr.Map.empty;
         stake_distribution_for_current_cycle = None;
-        tx_rollups_seen = Tx_rollup_repr.Set.empty;
+        tx_rollups_with_messages = Tx_rollup_repr.Set.empty;
       };
   }
 

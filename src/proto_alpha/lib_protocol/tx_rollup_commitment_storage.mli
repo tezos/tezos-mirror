@@ -37,7 +37,7 @@ val check_commitment_level :
 (** [add_commitment context tx_rollup contract commitment] adds a
     commitment to a rollup.
 
-    This functions returns the errors
+    This function returns the errors
 
     {ul {li [Level_already_has_commitment] iff there is already a
             commitment at this level.}

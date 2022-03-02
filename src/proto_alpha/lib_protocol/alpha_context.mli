@@ -2059,7 +2059,7 @@ module Tx_rollup_state : sig
 
   val update : context -> Tx_rollup.t -> t -> context tzresult Lwt.t
 
-  val burn : limit:Tez.t option -> t -> int -> Tez.t tzresult
+  val burn_cost : limit:Tez.t option -> t -> int -> Tez.t tzresult
 
   val assert_exist : context -> Tx_rollup.t -> context tzresult Lwt.t
 
@@ -2167,7 +2167,7 @@ module Tx_rollup_inbox : sig
     Tx_rollup_message.t ->
     (context * Tx_rollup_state.t) tzresult Lwt.t
 
-  val messages :
+  val message_hashes :
     context ->
     Tx_rollup_level.t ->
     Tx_rollup.t ->

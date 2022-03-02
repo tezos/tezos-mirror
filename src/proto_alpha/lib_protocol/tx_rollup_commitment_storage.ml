@@ -33,7 +33,9 @@ open Tx_rollup_errors_repr
 (* This indicates a programming error. *)
 type error += (*`Temporary*) Commitment_bond_negative of int
 
-let adjust_unfinalized_commitments_count ctxt tx_rollup pkh ~delta =
+let adjust_unfinalized_commitments_count ctxt tx_rollup pkh
+    ~(dir : [`Incr | `Decr]) =
+  let delta = match dir with `Incr -> 1 | `Decr -> -1 in
   let bond_key = (tx_rollup, pkh) in
   Storage.Tx_rollup.Commitment_bond.find ctxt bond_key
   >>=? fun (ctxt, commitment) ->
@@ -114,7 +116,7 @@ let check_commitment_predecessor ctxt state commitment =
   | (None, None) -> return ctxt
   | (provided, expected) -> fail (Wrong_predecessor_hash {provided; expected})
 
-let check_commitment_batches ctxt tx_rollup commitment =
+let check_commitment_batches_and_inbox_hash ctxt tx_rollup commitment =
   Tx_rollup_inbox_storage.get_metadata ctxt commitment.level tx_rollup
   >>=? fun (ctxt, {inbox_length; hash; _}) ->
   fail_unless
@@ -138,7 +140,8 @@ let add_commitment ctxt tx_rollup state pkh commitment =
   (* Check the commitment has the correct values *)
   check_commitment_level state commitment >>=? fun () ->
   check_commitment_predecessor ctxt state commitment >>=? fun ctxt ->
-  check_commitment_batches ctxt tx_rollup commitment >>=? fun ctxt ->
+  check_commitment_batches_and_inbox_hash ctxt tx_rollup commitment
+  >>=? fun ctxt ->
   (* Everything has been sorted out, let’s update the storage *)
   let current_level = (Raw_context.current_level ctxt).level in
   let commitment_hash = Tx_rollup_commitment_repr.hash commitment in
@@ -158,7 +161,7 @@ let add_commitment ctxt tx_rollup state pkh commitment =
     commitment.level
     commitment_hash
   >>?= fun state ->
-  adjust_unfinalized_commitments_count ctxt tx_rollup pkh ~delta:1
+  adjust_unfinalized_commitments_count ctxt tx_rollup pkh ~dir:`Incr
   >>=? fun ctxt -> return (ctxt, state)
 
 let pending_bonded_commitments :
@@ -200,7 +203,7 @@ let finalize_commitment ctxt rollup state =
         ctxt
         rollup
         commitment.committer
-        ~delta:(-1)
+        ~dir:`Decr
       >>=? fun ctxt ->
       (* We remove the inbox *)
       Tx_rollup_inbox_storage.remove ctxt oldest_inbox_level rollup
@@ -237,7 +240,7 @@ let remove_commitment ctxt rollup state =
       >>=? fun () ->
       (* We remove the commitment *)
       Storage.Tx_rollup.Commitment.remove ctxt (tail, rollup)
-      >>=? fun (ctxt, _, _) ->
+      >>=? fun (ctxt, _freed_size, _existed) ->
       (* We update the state *)
       Tx_rollup_state_repr.record_commitment_deletion
         state
