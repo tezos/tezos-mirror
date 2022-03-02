@@ -636,7 +636,7 @@ module Tx_rollup : sig
   end
 
   (* A rollup can have at most one commitment per rollup level. Some
-     metadata are sauved in addition to the commitment itself. See
+     metadata are saved in addition to the commitment itself. See
      {!Tx_rollup_commitment_repr.Submitted_commitment.t} for the exact
      content. *)
   module Commitment :

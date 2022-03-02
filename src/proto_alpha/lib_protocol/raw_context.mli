@@ -124,13 +124,13 @@ val spend_collected_fees_only_call_from_token : t -> Tez_repr.t -> t tzresult
     producer's account at finalize_application *)
 val get_collected_fees : t -> Tez_repr.t
 
-(** [record_tx_rollup ctxt tx_rollup] records that [tx_rollup] has
+(** [set_tx_rollup_has_messages ctxt tx_rollup] records that [tx_rollup] has
     received at least one message at the current level. *)
-val record_tx_rollup : t -> Tx_rollup_repr.t -> t
+val set_tx_rollup_has_messages : t -> Tx_rollup_repr.t -> t
 
-(** [flush_tx_rollups ctxt] returns set of recorded transaction
+(** [get_tx_rollup_with_messages ctxt] returns set of recorded transaction
     rollups, and empties it in [ctxt]. *)
-val flush_tx_rollups : t -> t * Tx_rollup_repr.Set.t
+val get_tx_rollup_with_messages : t -> t * Tx_rollup_repr.Set.t
 
 type error += Gas_limit_too_high (* `Permanent *)
 

@@ -42,6 +42,21 @@ open Tx_rollup_errors_repr
     significance on the most N data points. The purpose of [inbox_ema]
     is to get lessened volatility of burn, that is more resistant to
     spurious spikes of [burn_per_byte].
+
+   The state of the transaction rollup also keeps track of four pointers
+   to four different rollup levels.
+
+    - The [commitment_tail_level] is the level of the oldest
+      finalized commitment still stored in the layer-1 storage.
+
+    - The [commitment_head_level] is the level of the most recent
+      unfinalized commitment in the layer-1 storage.
+
+    - The [oldest_inbox_level] is the level of the oldest inbox still stored
+      in the layer-1 storage.
+
+    - The [head_level] is the level of the most recent inbox in the
+      layer-1 storage.
 *)
 type t = {
   last_removed_commitment_hash :
@@ -59,19 +74,7 @@ type t = {
 (*
 
    The main use of a transaction rollup state is to keep track of four
-   pointers to four different rollup levels.
-
-     - The [commitment_tail_level] is the level of the oldest
-       finalized commitment still in the layer-1 storage.
-
-     - The [commitment_head_level] is the level of the most recent
-       unfinalized commitment in the layer-1 storage.
-
-     - The [oldest_inbox_level] is the level of the oldest inbox still
-       in the layer-1 storage.
-
-     - The [head_level] is the level of the most recent inbox in the
-       layer-1 storage.
+   pointers to four different rollup levels (see above).
 
    When the rollup is created, these four pointers are initialized with
    the [None] value, because no inboxes or commitments have been created
@@ -92,8 +95,8 @@ type t = {
 
    Note that the oldest inbox level is not always lesser than the
    commitment head. If the commitment head is equal to [None], it
-   means all the inboxes are “uncommitted”, that is, no commitments
-   have been submitted for them.
+   means all the inboxes currently stored in layer-1 are “uncommitted”, 
+   that is, no commitments have been submitted for them.
 
    In such a case, the rollup state is analoguous to
 
@@ -106,9 +109,9 @@ type t = {
              ^^^^^^^^^^^^^^^^
                 uncommitted
 
-   Similarly, it is possible to see the oldest inbox level set to
-   [None] (and the head level to), after every commitments in the
-   layer-1 storage have been properly finalized. In such a case, the
+   Similarly, it is possible to see the oldest inbox level and head level 
+   set to [None]. For instance, when each commitment in the
+   layer-1 storage has been properly finalized. In this case, the
    layout will be
 
      finalized
@@ -124,9 +127,9 @@ type t = {
    of [l].
 
    To implement this behavior, this module relies on four fields and
-   four functions which share the sama name. Once set to a given
+   four functions which share the same name. Once set to a given
    value, the fields are never set back to [None]. It is the purpose
-   of the functions to determine or not a value is correct, or kept in
+   of the functions to determine if a value is correct, or kept in
    memory for future use, and only the functions are exposed to other
    modules.
 
@@ -453,7 +456,7 @@ let record_commitment_deletion state level hash =
         }
   | _ -> error (Internal_error "Trying to remove an incorrect commitment")
 
-let burn ~limit state size =
+let burn_cost ~limit state size =
   Tez_repr.(state.burn_per_byte *? Int64.of_int size) >>? fun burn ->
   match limit with
   | Some limit when Tez_repr.(limit >= burn) ->

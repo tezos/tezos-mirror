@@ -25,7 +25,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** The state of a transaction rollup is a set of variables that vary
+(** The state of a transaction rollup is a set of variables whose values vary
     in time, as the rollup progresses. *)
 type t
 
@@ -51,13 +51,13 @@ val pp : Format.formatter -> t -> unit
     transaction rollup in case it becomes too intense. *)
 val update_burn_per_byte : t -> final_size:int -> hard_limit:int -> t
 
-(** [burn ~limit state size] computes the burn to be paid to submit [size]
-    bytes in the inbox of the transactional rollup.
+(** [burn_cost ~limit state size] computes the burn to be paid to submit
+    [size] bytes in the inbox of the transactional rollup.
 
     Returns [Tx_rollup_submit_batch_burn_excedeed] if the (computed) burn
     exceeds [limit].
 *)
-val burn : limit:Tez_repr.t option -> t -> int -> Tez_repr.t tzresult
+val burn_cost : limit:Tez_repr.t option -> t -> int -> Tez_repr.t tzresult
 
 (** [head_level state] returns the rollup level of the most recent
     inbox —if it exists— long with the Tezos level at which this inbox
@@ -93,7 +93,7 @@ val oldest_inbox_level : t -> Tx_rollup_level_repr.t option
 (** [next_commitment_level state] returns the expected level of the
     next valid commitment.
 
-    This functions can return the error [No_uncommitted_inbox] if
+    This function can return the error [No_uncommitted_inbox] if
     there is no inbox awaiting a commitment. *)
 val next_commitment_level : t -> Tx_rollup_level_repr.t tzresult
 
@@ -107,7 +107,7 @@ val next_commitment_predecessor :
     Tezos [level], and returns the rollup level to associate to this
     inbox.
 
-    This functions may return an [Internal_error] iff an inbox has
+    This function may return an [Internal_error] iff an inbox has
     already been created at a level greater (or equal) than
     [level]. It is the responsibility of the caller to avoid that. *)
 val record_inbox_creation :
@@ -117,7 +117,7 @@ val record_inbox_creation :
     account the deletion of the inbox stored at Tezos [level] from the
     storage.
 
-    This functions returns an [Internal_error] iff there is no inbox
+    This function returns an [Internal_error] iff there is no inbox
     in the storage of the layer-1, or if [level] is not the oldest
     level of rollup. *)
 val record_inbox_deletion : t -> Tx_rollup_level_repr.t -> t tzresult

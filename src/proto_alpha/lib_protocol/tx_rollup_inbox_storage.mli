@@ -56,7 +56,7 @@ val append_message :
   Tx_rollup_message_repr.t ->
   (Raw_context.t * Tx_rollup_state_repr.t) tzresult Lwt.t
 
-(** [messages ctxt level tx_rollup] returns the list of messages
+(** [message_hashes ctxt level tx_rollup] returns the list of messages
     hashes stored in the inbox of [tx_rollup] at level [level].
 
     Returns the errors
@@ -64,7 +64,7 @@ val append_message :
     {ul {li [Tx_rollup_does_not_exist] iff [tx_rollup] does not exist}
         {li [Inbox_does_not_exist] iff [tx_rollup] exists, but does
             not have an inbox at level [level]. }} *)
-val messages :
+val message_hashes :
   Raw_context.t ->
   Tx_rollup_level_repr.t ->
   Tx_rollup_repr.t ->
@@ -120,7 +120,7 @@ val get_metadata :
 (** [remove ctxt level tx_rollup] removes from the context the
     metadata and the contents of the inbox of [level].
 
-    This functions will returns the error [Inbox_does_not_exist] if
+    This function will returns the error [Inbox_does_not_exist] if
     there is no inbox for [level] in the storage. It is the
     reponsibility of the caller to ensure the [tx_rollup] actually
     exists. *)
