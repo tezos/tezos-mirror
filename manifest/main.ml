@@ -76,8 +76,6 @@ let conf_libev = opam_only "conf-libev" V.True
 
 let conf_rust = opam_only "conf-rust" V.True
 
-let coq_of_ocaml = opam_only "coq-of-ocaml" V.(exactly "2.5.0")
-
 let ctypes = external_lib ~js_compatible:true "ctypes" V.(at_least "0.18.0")
 
 let ctypes_stubs = external_sublib ctypes "ctypes.stubs"
@@ -1104,7 +1102,6 @@ let tezos_tooling =
     ~modules:[]
     ~deps:
       [
-        coq_of_ocaml;
         bisect_ppx;
         (* These next are only used in the CI, we add this dependency so that
            it is added to tezos/opam-repository. *)
