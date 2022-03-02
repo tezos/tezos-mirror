@@ -1153,22 +1153,22 @@ let extract_ir_sized_step :
   | IDrop (_, _), _ -> Instructions.drop
   | IDup (_, _), _ -> Instructions.dup
   | ISwap (_, _), _ -> Instructions.swap
-  | IConst (_, _, _), _ -> Instructions.const
+  | IConst (_, _, _, _), _ -> Instructions.const
   | ICons_pair (_, _), _ -> Instructions.cons_pair
   | ICar (_, _), _ -> Instructions.car
   | ICdr (_, _), _ -> Instructions.cdr
   | IUnpair (_, _), _ -> Instructions.unpair
   | ICons_some (_, _), _ -> Instructions.cons_some
-  | ICons_none (_, _), _ -> Instructions.cons_none
+  | ICons_none (_, _, _), _ -> Instructions.cons_none
   | IIf_none _, _ -> Instructions.if_none
   | IOpt_map _, _ -> Instructions.opt_map
-  | ICons_left (_, _), _ -> Instructions.left
-  | ICons_right (_, _), _ -> Instructions.right
+  | ICons_left (_, _, _), _ -> Instructions.left
+  | ICons_right (_, _, _), _ -> Instructions.right
   | IIf_left _, _ -> Instructions.if_left
   | ICons_list (_, _), _ -> Instructions.cons_list
-  | INil (_, _), _ -> Instructions.nil
+  | INil (_, _, _), _ -> Instructions.nil
   | IIf_cons _, _ -> Instructions.if_cons
-  | IList_iter (_, _, _), _ -> Instructions.list_iter
+  | IList_iter (_, _, _, _), _ -> Instructions.list_iter
   | IList_map (_, _, _), _ -> Instructions.list_map
   | IList_size (_, _), (list, _) -> Instructions.list_size (Size.list list)
   | IEmpty_set (_, _, _), _ -> Instructions.empty_set
@@ -1182,7 +1182,7 @@ let extract_ir_sized_step :
       let sz = S.OPS.elt_size v in
       Instructions.set_update sz (Size.set set)
   | ISet_size (_, _), (set, _) -> Instructions.set_size (Size.set set)
-  | IEmpty_map (_, _, _), _ -> Instructions.empty_map
+  | IEmpty_map (_, _, _, _), _ -> Instructions.empty_map
   | IMap_map _, (map, _) -> Instructions.map_map (Size.map map)
   | IMap_iter _, (map, _) -> Instructions.map_iter (Size.map map)
   | IMap_mem (_, _), (v, (map, _)) ->
@@ -1406,8 +1406,8 @@ let extract_ir_sized_step :
   | IComb_get (_, n, _, _), _ -> Instructions.comb_get (Size.of_int n)
   | IComb_set (_, n, _, _), _ -> Instructions.comb_set (Size.of_int n)
   | IDup_n (_, n, _, _), _ -> Instructions.dupn (Size.of_int n)
-  | ITicket (_, _), _ -> Instructions.ticket
-  | IRead_ticket (_, _), _ -> Instructions.read_ticket
+  | ITicket (_, _, _), _ -> Instructions.ticket
+  | IRead_ticket (_, _, _), _ -> Instructions.read_ticket
   | ISplit_ticket (_, _), (_ticket, ((amount_a, amount_b), _)) ->
       Instructions.split_ticket (Size.integer amount_a) (Size.integer amount_b)
   | IJoin_tickets (_, cmp_ty, _), ((ticket1, ticket2), _) ->
@@ -1436,7 +1436,7 @@ let extract_control_trace (type bef_top bef aft_top aft)
   | KUndip _ -> Control.undip
   | KLoop_in _ -> Control.loop_in
   | KLoop_in_left _ -> Control.loop_in_left
-  | KIter (_, xs, _) -> Control.iter (Size.of_int (List.length xs))
+  | KIter (_, _, xs, _) -> Control.iter (Size.of_int (List.length xs))
   | KList_enter_body (_, xs, ys, _, _) ->
       Control.list_enter_body
         (Size.of_int (List.length xs))

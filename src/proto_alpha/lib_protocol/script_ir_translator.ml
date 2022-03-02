@@ -1642,7 +1642,7 @@ let rec make_dug_proof_argument :
       make_dug_proof_argument loc (n - 1) x rest
       |> Option.map @@ fun (Dug_proof_argument (n', aft')) ->
          let kinfo = {iloc = loc; kstack_ty = aft'} in
-         Dug_proof_argument (KPrefix (kinfo, n'), Item_t (v, aft'))
+         Dug_proof_argument (KPrefix (kinfo, v, n'), Item_t (v, aft'))
   | _, _ -> None
 
 let rec make_comb_get_proof_argument :
@@ -1866,7 +1866,7 @@ let parse_uint10 = parse_uint ~nb_bits:10
 
 let parse_uint11 = parse_uint ~nb_bits:11
 
-(* This type is used to:
+(* The type returned by this function is used to:
    - serialize and deserialize tickets when they are stored or transferred,
    - type the READ_TICKET instruction. *)
 let opened_ticket_type loc ty = comparable_pair_3_t loc address_t ty nat_t
@@ -2948,11 +2948,11 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
        fun n stk ->
         match (Compare.Int.(n = 0), stk) with
         | true, rest -> ok @@ Dropn_proof_argument (KRest, rest)
-        | false, Item_t (_, rest) ->
+        | false, Item_t (a, rest) ->
             make_proof_argument (n - 1) rest
             >|? fun (Dropn_proof_argument (n', stack_after_drops)) ->
             let kinfo = {iloc = loc; kstack_ty = rest} in
-            Dropn_proof_argument (KPrefix (kinfo, n'), stack_after_drops)
+            Dropn_proof_argument (KPrefix (kinfo, a, n'), stack_after_drops)
         | _, _ ->
             let whole_stack = serialize_stack_for_error ctxt whole_stack in
             error (Bad_stack (loc, I_DROP, whole_n, whole_stack))
@@ -3025,7 +3025,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
             make_proof_argument (n - 1) rest
             >|? fun (Dig_proof_argument (n', x, aft')) ->
             let kinfo = {iloc = loc; kstack_ty = aft'} in
-            Dig_proof_argument (KPrefix (kinfo, n'), x, Item_t (v, aft'))
+            Dig_proof_argument (KPrefix (kinfo, v, n'), x, Item_t (v, aft'))
         | _, _ ->
             let whole_stack = serialize_stack_for_error ctxt stack in
             error (Bad_stack (loc, I_DIG, 3, whole_stack))
@@ -3074,11 +3074,11 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
         t
         d
       >>=? fun (v, ctxt) ->
-      let const = {apply = (fun kinfo k -> IConst (kinfo, v, k))} in
+      let const = {apply = (fun kinfo k -> IConst (kinfo, t, v, k))} in
       typed ctxt loc const (Item_t (t, stack))
   | Prim (loc, I_UNIT, [], annot), stack ->
       check_var_type_annot loc annot >>?= fun () ->
-      let const = {apply = (fun kinfo k -> IConst (kinfo, (), k))} in
+      let const = {apply = (fun kinfo k -> IConst (kinfo, unit_t, (), k))} in
       typed ctxt loc const (Item_t (unit_t, stack))
   (* options *)
   | Prim (loc, I_SOME, [], annot), Item_t (t, rest) ->
@@ -3089,7 +3089,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       parse_any_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy t
       >>?= fun (Ex_ty t, ctxt) ->
       check_var_type_annot loc annot >>?= fun () ->
-      let cons_none = {apply = (fun kinfo k -> ICons_none (kinfo, k))} in
+      let cons_none = {apply = (fun kinfo k -> ICons_none (kinfo, t, k))} in
       option_t loc t >>?= fun ty ->
       let stack_ty = Item_t (ty, stack) in
       typed ctxt loc cons_none stack_ty
@@ -3271,7 +3271,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       parse_any_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy tr
       >>?= fun (Ex_ty tr, ctxt) ->
       check_constr_annot loc annot >>?= fun () ->
-      let cons_left = {apply = (fun kinfo k -> ICons_left (kinfo, k))} in
+      let cons_left = {apply = (fun kinfo k -> ICons_left (kinfo, tr, k))} in
       union_t loc tl tr >>?= fun (Ty_ex_c ty) ->
       let stack_ty = Item_t (ty, rest) in
       typed ctxt loc cons_left stack_ty
@@ -3279,7 +3279,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       parse_any_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy tl
       >>?= fun (Ex_ty tl, ctxt) ->
       check_constr_annot loc annot >>?= fun () ->
-      let cons_right = {apply = (fun kinfo k -> ICons_right (kinfo, k))} in
+      let cons_right = {apply = (fun kinfo k -> ICons_right (kinfo, tl, k))} in
       union_t loc tl tr >>?= fun (Ty_ex_c ty) ->
       let stack_ty = Item_t (ty, rest) in
       typed ctxt loc cons_right stack_ty
@@ -3324,7 +3324,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       parse_any_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy t
       >>?= fun (Ex_ty t, ctxt) ->
       check_var_type_annot loc annot >>?= fun () ->
-      let nil = {apply = (fun kinfo k -> INil (kinfo, k))} in
+      let nil = {apply = (fun kinfo k -> INil (kinfo, t, k))} in
       list_t loc t >>?= fun ty -> typed ctxt loc nil (Item_t (ty, stack))
   | ( Prim (loc, I_CONS, [], annot),
       Item_t (tv, (Item_t (List_t (t, _), _) as stack)) ) ->
@@ -3421,7 +3421,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
               let hinfo = {iloc = loc; kstack_ty = rest} in
               let binfo = kinfo_of_descr ibody in
               let ibody = ibody.instr.apply binfo (IHalt hinfo) in
-              IList_iter (kinfo, ibody, k));
+              IList_iter (kinfo, elt, ibody, k));
         }
       in
       Lwt.return
@@ -3465,7 +3465,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
               let hinfo = {iloc = loc; kstack_ty = rest} in
               let binfo = kinfo_of_descr ibody in
               let ibody = ibody.instr.apply binfo (IHalt hinfo) in
-              ISet_iter (kinfo, ibody, k));
+              ISet_iter (kinfo, elt, ibody, k));
         }
       in
       Lwt.return
@@ -3507,13 +3507,13 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       parse_any_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy tv
       >>?= fun (Ex_ty tv, ctxt) ->
       check_var_type_annot loc annot >>?= fun () ->
-      let instr = {apply = (fun kinfo k -> IEmpty_map (kinfo, tk, k))} in
+      let instr = {apply = (fun kinfo k -> IEmpty_map (kinfo, tk, tv, k))} in
       map_t loc tk tv >>?= fun ty -> typed ctxt loc instr (Item_t (ty, stack))
-  | Prim (loc, I_MAP, [body], annot), Item_t (Map_t (k, elt, _), starting_rest)
+  | Prim (loc, I_MAP, [body], annot), Item_t (Map_t (kt, elt, _), starting_rest)
     -> (
       check_kind [Seq_kind] body >>?= fun () ->
       check_var_type_annot loc annot >>?= fun () ->
-      pair_t loc k elt >>?= fun (Ty_ex_c ty) ->
+      pair_t loc kt elt >>?= fun (Ty_ex_c ty) ->
       non_terminal_recursion
         ?type_logger
         tc_context
@@ -3540,10 +3540,10 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
                       let binfo = kinfo_of_descr ibody in
                       let hinfo = {iloc = loc; kstack_ty = aft} in
                       let ibody = ibody.instr.apply binfo (IHalt hinfo) in
-                      IMap_map (kinfo, ibody, k));
+                      IMap_map (kinfo, kt, ibody, k));
                 }
               in
-              map_t loc k ret >>? fun ty ->
+              map_t loc kt ret >>? fun ty ->
               let stack = Item_t (ty, rest) in
               typed_no_lwt ctxt loc instr stack )
       | Typed {aft; _} ->
@@ -3570,7 +3570,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
               let hinfo = {iloc = loc; kstack_ty = rest} in
               let binfo = kinfo_of_descr ibody in
               let ibody = ibody.instr.apply binfo (IHalt hinfo) in
-              IMap_iter (kinfo, ibody, k));
+              IMap_iter (kinfo, ty, ibody, k));
         }
       in
       Lwt.return
@@ -3961,7 +3961,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
             make_proof_argument (n - 1) rest
             >|=? fun (Dipn_proof_argument (n', ctxt, descr, aft')) ->
             let kinfo' = {iloc = loc; kstack_ty = aft'} in
-            let w = KPrefix (kinfo', n') in
+            let w = KPrefix (kinfo', v, n') in
             Dipn_proof_argument (w, ctxt, descr, Item_t (v, aft'))
         | _, _ ->
             Lwt.return
@@ -4679,7 +4679,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       check_var_annot loc annot >>?= fun () ->
       check_comparable loc t >>?= fun Eq ->
       ticket_t loc t >>?= fun res_ty ->
-      let instr = {apply = (fun kinfo k -> ITicket (kinfo, k))} in
+      let instr = {apply = (fun kinfo k -> ITicket (kinfo, t, k))} in
       let stack = Item_t (res_ty, rest) in
       typed ctxt loc instr stack
   | ( Prim (loc, I_READ_TICKET, [], annot),
@@ -4687,7 +4687,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       check_var_annot loc annot >>?= fun () ->
       let () = check_dupable_comparable_ty t in
       opened_ticket_type loc t >>?= fun result ->
-      let instr = {apply = (fun kinfo k -> IRead_ticket (kinfo, k))} in
+      let instr = {apply = (fun kinfo k -> IRead_ticket (kinfo, t, k))} in
       let stack = Item_t (result, full_stack) in
       typed ctxt loc instr stack
   | ( Prim (loc, I_SPLIT_TICKET, [], annot),

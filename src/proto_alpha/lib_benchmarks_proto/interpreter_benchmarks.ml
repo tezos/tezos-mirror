@@ -696,7 +696,7 @@ module Registration_section = struct
       simple_benchmark
         ~amplification:100
         ~name:Interpreter_workload.N_IConst
-        ~kinstr:(IConst (kinfo_unit, (), halt_unitunit))
+        ~kinstr:(IConst (kinfo_unit, unit, (), halt_unitunit))
         ()
 
     (* deep stack manipulation *)
@@ -984,7 +984,8 @@ module Registration_section = struct
     let () =
       simple_benchmark
         ~name:Interpreter_workload.N_ICons_none
-        ~kinstr:(ICons_none (kinfo_unit, halt (option unit @$ unit @$ bot)))
+        ~kinstr:
+          (ICons_none (kinfo_unit, unit, halt (option unit @$ unit @$ bot)))
         ()
 
     let () =
@@ -1033,13 +1034,13 @@ module Registration_section = struct
     let () =
       simple_benchmark
         ~name:Interpreter_workload.N_ILeft
-        ~kinstr:(ICons_left (kinfo_unit, halt (cunion unit unit @$ bot)))
+        ~kinstr:(ICons_left (kinfo_unit, unit, halt (cunion unit unit @$ bot)))
         ()
 
     let () =
       simple_benchmark
         ~name:Interpreter_workload.N_IRight
-        ~kinstr:(ICons_right (kinfo_unit, halt (cunion unit unit @$ bot)))
+        ~kinstr:(ICons_right (kinfo_unit, unit, halt (cunion unit unit @$ bot)))
         ()
 
     let () =
@@ -1067,7 +1068,7 @@ module Registration_section = struct
     let () =
       simple_benchmark
         ~name:Interpreter_workload.N_INil
-        ~kinstr:(INil (kinfo_unit, halt (list unit @$ unit @$ bot)))
+        ~kinstr:(INil (kinfo_unit, unit, halt (list unit @$ unit @$ bot)))
         ()
 
     let () =
@@ -1126,7 +1127,8 @@ module Registration_section = struct
         ~name:Interpreter_workload.N_IList_iter
         ~stack:(Script_list.empty, ((), eos))
         ~kinstr:
-          (IList_iter (kinfo1, IDrop (kinfo_unitunit, halt_unit), halt_unit))
+          (IList_iter
+             (kinfo1, unit, IDrop (kinfo_unitunit, halt_unit), halt_unit))
         ()
   end
 
@@ -1140,6 +1142,7 @@ module Registration_section = struct
     let set_iter_code =
       ISet_iter
         ( kinfo (set int @$ unit @$ bot),
+          int,
           IDrop (kinfo (int @$ unit @$ bot), halt_unit),
           halt_unit )
 
@@ -1256,7 +1259,8 @@ module Registration_section = struct
       simple_benchmark
         ~name:Interpreter_workload.N_IEmpty_map
         ~kinstr:
-          (IEmpty_map (kinfo_unit, unit, halt (map unit unit @$ unit @$ bot)))
+          (IEmpty_map
+             (kinfo_unit, unit, unit, halt (map unit unit @$ unit @$ bot)))
         ()
 
     (*
@@ -1270,6 +1274,7 @@ module Registration_section = struct
     let map_map_code =
       IMap_map
         ( kinfo (map int unit @$ unit @$ bot),
+          int,
           IFailwith (kinfo (cpair int unit @$ unit @$ bot), 0, cpair int unit),
           halt (map int unit @$ unit @$ bot) )
 
@@ -1291,6 +1296,7 @@ module Registration_section = struct
     let kmap_iter_code =
       IMap_iter
         ( kinfo (map int unit @$ unit @$ bot),
+          cpair int unit,
           IDrop (kinfo (cpair int unit @$ unit @$ bot), halt_unit),
           halt_unit )
 
@@ -1974,7 +1980,9 @@ module Registration_section = struct
         - IHalt (false on top of stack)
         - IConst false ; IHalt (true on top of stack)
        *)
-      let push_false = IConst (kinfo_unit, false, halt (bool @$ unit @$ bot)) in
+      let push_false =
+        IConst (kinfo_unit, bool, false, halt (bool @$ unit @$ bot))
+      in
       simple_benchmark
         ~name:Interpreter_workload.N_ILoop
         ~kinstr:(ILoop (kinfo (bool @$ unit @$ bot), push_false, halt_unit))
@@ -1986,7 +1994,9 @@ module Registration_section = struct
         ICons_right ->
         IHalt
        *)
-      let cons_r = ICons_right (kinfo_unit, halt (cunion unit unit @$ bot)) in
+      let cons_r =
+        ICons_right (kinfo_unit, unit, halt (cunion unit unit @$ bot))
+      in
       simple_benchmark
         ~name:Interpreter_workload.N_ILoop_left
         ~kinstr:
@@ -2759,7 +2769,7 @@ module Registration_section = struct
       simple_benchmark
         ~name:Interpreter_workload.N_ITicket
         ~kinstr:
-          (ITicket (kinfo (unit @$ nat @$ bot), halt (ticket unit @$ bot)))
+          (ITicket (kinfo (unit @$ nat @$ bot), unit, halt (ticket unit @$ bot)))
         ()
 
     let () =
@@ -2768,6 +2778,7 @@ module Registration_section = struct
         ~kinstr:
           (IRead_ticket
              ( kinfo (ticket unit @$ bot),
+               unit,
                halt (cpair address (cpair unit nat) @$ ticket unit @$ bot) ))
         ()
 
@@ -3003,7 +3014,8 @@ module Registration_section = struct
         ~cont_and_stack_sampler:(fun _cfg _rng_state ->
           let cont =
             KLoop_in
-              (IConst (kinfo_unit, false, halt (bool @$ unit @$ bot)), KNil)
+              ( IConst (kinfo_unit, bool, false, halt (bool @$ unit @$ bot)),
+                KNil )
           in
           let stack = (false, ((), eos)) in
           fun () -> Ex_stack_and_cont {stack; cont})
@@ -3020,7 +3032,8 @@ module Registration_section = struct
         ~cont_and_stack_sampler:(fun _cfg _rng_state ->
           let cont =
             KLoop_in_left
-              (ICons_right (kinfo_unit, halt (cunion unit unit @$ bot)), KNil)
+              ( ICons_right (kinfo_unit, unit, halt (cunion unit unit @$ bot)),
+                KNil )
           in
           let stack = (R (), eos) in
           fun () -> Ex_stack_and_cont {stack; cont})
@@ -3050,7 +3063,9 @@ module Registration_section = struct
         ~name:Interpreter_workload.N_KIter
         ~salt:"_empty"
         ~cont_and_stack_sampler:(fun _cfg _rng_state ->
-          let cont = KIter (IDrop (kinfo_unitunit, halt_unit), [], KNil) in
+          let cont =
+            KIter (IDrop (kinfo_unitunit, halt_unit), unit, [], KNil)
+          in
           let stack = ((), eos) in
           fun () -> Ex_stack_and_cont {stack; cont})
         ()
@@ -3068,7 +3083,9 @@ module Registration_section = struct
         ~name:Interpreter_workload.N_KIter
         ~salt:"_nonempty"
         ~cont_and_stack_sampler:(fun _cfg _rng_state ->
-          let cont = KIter (IDrop (kinfo_unitunit, halt_unit), [()], KNil) in
+          let cont =
+            KIter (IDrop (kinfo_unitunit, halt_unit), unit, [()], KNil)
+          in
           let stack = ((), eos) in
           fun () -> Ex_stack_and_cont {stack; cont})
         ()

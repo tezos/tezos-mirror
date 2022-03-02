@@ -128,7 +128,7 @@ let test_stack_overflow () =
   let enorme_et_seq n =
     let rec aux n acc =
       if n = 0 then acc
-      else aux (n - 1) (IConst (kinfo, true, IDrop (kinfo', acc)))
+      else aux (n - 1) (IConst (kinfo, Bool_t, true, IDrop (kinfo', acc)))
     in
     aux n (IHalt kinfo)
   in
@@ -173,6 +173,7 @@ let test_stack_overflow_in_lwt () =
              ( kinfo stack1,
                IConst
                  ( kinfo stack2,
+                   Unit_t,
                    (),
                    IBig_map_mem (kinfo stack3, IDrop (kinfo stack4, acc)) ) ))
     in

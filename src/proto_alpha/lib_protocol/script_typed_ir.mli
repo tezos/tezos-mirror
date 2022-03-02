@@ -439,7 +439,7 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       ('a, 'b * ('c * 's)) kinfo * ('b, 'a * ('c * 's), 'r, 'f) kinstr
       -> ('a, 'b * ('c * 's), 'r, 'f) kinstr
   | IConst :
-      ('a, 's) kinfo * 'ty * ('ty, 'a * 's, 'r, 'f) kinstr
+      ('a, 's) kinfo * ('ty, _) ty * 'ty * ('ty, 'a * 's, 'r, 'f) kinstr
       -> ('a, 's, 'r, 'f) kinstr
   (*
      Pairs
@@ -465,7 +465,7 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       ('v, 'a * 's) kinfo * ('v option, 'a * 's, 'r, 'f) kinstr
       -> ('v, 'a * 's, 'r, 'f) kinstr
   | ICons_none :
-      ('a, 's) kinfo * ('b option, 'a * 's, 'r, 'f) kinstr
+      ('a, 's) kinfo * ('b, _) ty * ('b option, 'a * 's, 'r, 'f) kinstr
       -> ('a, 's, 'r, 'f) kinstr
   | IIf_none : {
       kinfo : ('a option, 'b * 's) kinfo;
@@ -485,10 +485,14 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
      ------
    *)
   | ICons_left :
-      ('a, 'c * 's) kinfo * (('a, 'b) union, 'c * 's, 'r, 'f) kinstr
+      ('a, 'c * 's) kinfo
+      * ('b, _) ty
+      * (('a, 'b) union, 'c * 's, 'r, 'f) kinstr
       -> ('a, 'c * 's, 'r, 'f) kinstr
   | ICons_right :
-      ('b, 'c * 's) kinfo * (('a, 'b) union, 'c * 's, 'r, 'f) kinstr
+      ('b, 'c * 's) kinfo
+      * ('a, _) ty
+      * (('a, 'b) union, 'c * 's, 'r, 'f) kinstr
       -> ('b, 'c * 's, 'r, 'f) kinstr
   | IIf_left : {
       kinfo : (('a, 'b) union, 's) kinfo;
@@ -505,7 +509,7 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       ('a, 'a boxed_list * 's) kinfo * ('a boxed_list, 's, 'r, 'f) kinstr
       -> ('a, 'a boxed_list * 's, 'r, 'f) kinstr
   | INil :
-      ('a, 's) kinfo * ('b boxed_list, 'a * 's, 'r, 'f) kinstr
+      ('a, 's) kinfo * ('b, _) ty * ('b boxed_list, 'a * 's, 'r, 'f) kinstr
       -> ('a, 's, 'r, 'f) kinstr
   | IIf_cons : {
       kinfo : ('a boxed_list, 'b * 's) kinfo;
@@ -521,6 +525,7 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       -> ('a boxed_list, 'c * 's, 'r, 'f) kinstr
   | IList_iter :
       ('a boxed_list, 'b * 's) kinfo
+      * ('a, _) ty
       * ('a, 'b * 's, 'b, 's) kinstr
       * ('b, 's, 'r, 'f) kinstr
       -> ('a boxed_list, 'b * 's, 'r, 'f) kinstr
@@ -536,6 +541,7 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       -> ('a, 's, 'r, 'f) kinstr
   | ISet_iter :
       ('a set, 'b * 's) kinfo
+      * 'a comparable_ty
       * ('a, 'b * 's, 'b, 's) kinstr
       * ('b, 's, 'r, 'f) kinstr
       -> ('a set, 'b * 's, 'r, 'f) kinstr
@@ -553,15 +559,20 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
      ----
    *)
   | IEmpty_map :
-      ('a, 's) kinfo * 'b comparable_ty * (('b, 'c) map, 'a * 's, 'r, 'f) kinstr
+      ('a, 's) kinfo
+      * 'b comparable_ty
+      * ('c, _) ty
+      * (('b, 'c) map, 'a * 's, 'r, 'f) kinstr
       -> ('a, 's, 'r, 'f) kinstr
   | IMap_map :
       (('a, 'b) map, 'd * 's) kinfo
+      * 'a comparable_ty
       * ('a * 'b, 'd * 's, 'c, 'd * 's) kinstr
       * (('a, 'c) map, 'd * 's, 'r, 'f) kinstr
       -> (('a, 'b) map, 'd * 's, 'r, 'f) kinstr
   | IMap_iter :
       (('a, 'b) map, 'c * 's) kinfo
+      * ('a * 'b, _) ty
       * ('a * 'b, 'c * 's, 'c, 's) kinstr
       * ('c, 's, 'r, 'f) kinstr
       -> (('a, 'b) map, 'c * 's, 'r, 'f) kinstr
@@ -1097,10 +1108,11 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       * ('t, 'a * ('b * 's), 'r, 'f) kinstr
       -> ('a, 'b * 's, 'r, 'f) kinstr
   | ITicket :
-      ('a, n num * 's) kinfo * ('a ticket, 's, 'r, 'f) kinstr
+      ('a, n num * 's) kinfo * 'a comparable_ty * ('a ticket, 's, 'r, 'f) kinstr
       -> ('a, n num * 's, 'r, 'f) kinstr
   | IRead_ticket :
       ('a ticket, 's) kinfo
+      * 'a comparable_ty
       * (address * ('a * n num), 'a ticket * 's, 'r, 'f) kinstr
       -> ('a ticket, 's, 'r, 'f) kinstr
   | ISplit_ticket :
@@ -1232,7 +1244,10 @@ and (_, _, _, _) continuation =
   (* This continuation is executed at each iteration of a traversal.
      (Used in List, Map and Set.) *)
   | KIter :
-      ('a, 'b * 's, 'b, 's) kinstr * 'a list * ('b, 's, 'r, 'f) continuation
+      ('a, 'b * 's, 'b, 's) kinstr
+      * ('a, _) ty
+      * 'a list
+      * ('b, 's, 'r, 'f) continuation
       -> ('b, 's, 'r, 'f) continuation
   (* This continuation represents each step of a List.map. *)
   | KList_enter_body :
@@ -1433,6 +1448,7 @@ and ('a, 's) kinfo = {iloc : Script.location; kstack_ty : ('a, 's) stack_ty}
 and (_, _, _, _, _, _, _, _) stack_prefix_preservation_witness =
   | KPrefix :
       ('y, 'u) kinfo
+      * ('a, _) ty
       * ('c, 'v, 'd, 'w, 'x, 's, 'y, 'u) stack_prefix_preservation_witness
       -> ( 'c,
            'v,
@@ -1605,6 +1621,13 @@ val bool_t : bool comparable_ty
 
 val pair_t :
   Script.location -> ('a, _) ty -> ('b, _) ty -> ('a, 'b) pair ty_ex_c tzresult
+
+val pair_3_t :
+  Script.location ->
+  ('a, _) ty ->
+  ('b, _) ty ->
+  ('c, _) ty ->
+  ('a, ('b, 'c) pair) pair ty_ex_c tzresult
 
 val comparable_pair_t :
   Script.location ->

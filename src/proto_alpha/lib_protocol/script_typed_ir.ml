@@ -482,7 +482,7 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       ('a, 'b * ('c * 's)) kinfo * ('b, 'a * ('c * 's), 'r, 'f) kinstr
       -> ('a, 'b * ('c * 's), 'r, 'f) kinstr
   | IConst :
-      ('a, 's) kinfo * 'ty * ('ty, 'a * 's, 'r, 'f) kinstr
+      ('a, 's) kinfo * ('ty, _) ty * 'ty * ('ty, 'a * 's, 'r, 'f) kinstr
       -> ('a, 's, 'r, 'f) kinstr
   (*
      Pairs
@@ -508,7 +508,7 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       ('v, 'a * 's) kinfo * ('v option, 'a * 's, 'r, 'f) kinstr
       -> ('v, 'a * 's, 'r, 'f) kinstr
   | ICons_none :
-      ('a, 's) kinfo * ('b option, 'a * 's, 'r, 'f) kinstr
+      ('a, 's) kinfo * ('b, _) ty * ('b option, 'a * 's, 'r, 'f) kinstr
       -> ('a, 's, 'r, 'f) kinstr
   | IIf_none : {
       kinfo : ('a option, 'b * 's) kinfo;
@@ -528,10 +528,14 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
      ------
    *)
   | ICons_left :
-      ('a, 'c * 's) kinfo * (('a, 'b) union, 'c * 's, 'r, 'f) kinstr
+      ('a, 'c * 's) kinfo
+      * ('b, _) ty
+      * (('a, 'b) union, 'c * 's, 'r, 'f) kinstr
       -> ('a, 'c * 's, 'r, 'f) kinstr
   | ICons_right :
-      ('b, 'c * 's) kinfo * (('a, 'b) union, 'c * 's, 'r, 'f) kinstr
+      ('b, 'c * 's) kinfo
+      * ('a, _) ty
+      * (('a, 'b) union, 'c * 's, 'r, 'f) kinstr
       -> ('b, 'c * 's, 'r, 'f) kinstr
   | IIf_left : {
       kinfo : (('a, 'b) union, 's) kinfo;
@@ -548,7 +552,7 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       ('a, 'a boxed_list * 's) kinfo * ('a boxed_list, 's, 'r, 'f) kinstr
       -> ('a, 'a boxed_list * 's, 'r, 'f) kinstr
   | INil :
-      ('a, 's) kinfo * ('b boxed_list, 'a * 's, 'r, 'f) kinstr
+      ('a, 's) kinfo * ('b, _) ty * ('b boxed_list, 'a * 's, 'r, 'f) kinstr
       -> ('a, 's, 'r, 'f) kinstr
   | IIf_cons : {
       kinfo : ('a boxed_list, 'b * 's) kinfo;
@@ -564,6 +568,7 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       -> ('a boxed_list, 'c * 's, 'r, 'f) kinstr
   | IList_iter :
       ('a boxed_list, 'b * 's) kinfo
+      * ('a, _) ty
       * ('a, 'b * 's, 'b, 's) kinstr
       * ('b, 's, 'r, 'f) kinstr
       -> ('a boxed_list, 'b * 's, 'r, 'f) kinstr
@@ -579,6 +584,7 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       -> ('a, 's, 'r, 'f) kinstr
   | ISet_iter :
       ('a set, 'b * 's) kinfo
+      * 'a comparable_ty
       * ('a, 'b * 's, 'b, 's) kinstr
       * ('b, 's, 'r, 'f) kinstr
       -> ('a set, 'b * 's, 'r, 'f) kinstr
@@ -596,15 +602,20 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
      ----
    *)
   | IEmpty_map :
-      ('a, 's) kinfo * 'b comparable_ty * (('b, 'c) map, 'a * 's, 'r, 'f) kinstr
+      ('a, 's) kinfo
+      * 'b comparable_ty
+      * ('c, _) ty
+      * (('b, 'c) map, 'a * 's, 'r, 'f) kinstr
       -> ('a, 's, 'r, 'f) kinstr
   | IMap_map :
       (('a, 'b) map, 'd * 's) kinfo
+      * 'a comparable_ty
       * ('a * 'b, 'd * 's, 'c, 'd * 's) kinstr
       * (('a, 'c) map, 'd * 's, 'r, 'f) kinstr
       -> (('a, 'b) map, 'd * 's, 'r, 'f) kinstr
   | IMap_iter :
       (('a, 'b) map, 'c * 's) kinfo
+      * ('a * 'b, _) ty
       * ('a * 'b, 'c * 's, 'c, 's) kinstr
       * ('c, 's, 'r, 'f) kinstr
       -> (('a, 'b) map, 'c * 's, 'r, 'f) kinstr
@@ -1103,10 +1114,11 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       * ('t, 'a * ('b * 's), 'r, 'f) kinstr
       -> ('a, 'b * 's, 'r, 'f) kinstr
   | ITicket :
-      ('a, n num * 's) kinfo * ('a ticket, 's, 'r, 'f) kinstr
+      ('a, n num * 's) kinfo * 'a comparable_ty * ('a ticket, 's, 'r, 'f) kinstr
       -> ('a, n num * 's, 'r, 'f) kinstr
   | IRead_ticket :
       ('a ticket, 's) kinfo
+      * 'a comparable_ty
       * (address * ('a * n num), 'a ticket * 's, 'r, 'f) kinstr
       -> ('a ticket, 's, 'r, 'f) kinstr
   | ISplit_ticket :
@@ -1173,7 +1185,10 @@ and (_, _, _, _) continuation =
       ('a, 's, ('a, 'b) union, 's) kinstr * ('b, 's, 'r, 'f) continuation
       -> (('a, 'b) union, 's, 'r, 'f) continuation
   | KIter :
-      ('a, 'b * 's, 'b, 's) kinstr * 'a list * ('b, 's, 'r, 'f) continuation
+      ('a, 'b * 's, 'b, 's) kinstr
+      * ('a, _) ty
+      * 'a list
+      * ('b, 's, 'r, 'f) continuation
       -> ('b, 's, 'r, 'f) continuation
   | KList_enter_body :
       ('a, 'c * 's, 'b, 'c * 's) kinstr
@@ -1315,6 +1330,7 @@ and ('a, 's) kinfo = {iloc : Script.location; kstack_ty : ('a, 's) stack_ty}
 and (_, _, _, _, _, _, _, _) stack_prefix_preservation_witness =
   | KPrefix :
       ('y, 'u) kinfo
+      * ('a, _) ty
       * ('c, 'v, 'd, 'w, 'x, 's, 'y, 'u) stack_prefix_preservation_witness
       -> ( 'c,
            'v,
@@ -1441,32 +1457,32 @@ let kinfo_of_kinstr : type a s b f. (a, s, b, f) kinstr -> (a, s) kinfo =
   | IDrop (kinfo, _) -> kinfo
   | IDup (kinfo, _) -> kinfo
   | ISwap (kinfo, _) -> kinfo
-  | IConst (kinfo, _, _) -> kinfo
+  | IConst (kinfo, _, _, _) -> kinfo
   | ICons_pair (kinfo, _) -> kinfo
   | ICar (kinfo, _) -> kinfo
   | ICdr (kinfo, _) -> kinfo
   | IUnpair (kinfo, _) -> kinfo
   | ICons_some (kinfo, _) -> kinfo
-  | ICons_none (kinfo, _) -> kinfo
+  | ICons_none (kinfo, _, _) -> kinfo
   | IIf_none {kinfo; _} -> kinfo
   | IOpt_map {kinfo; _} -> kinfo
-  | ICons_left (kinfo, _) -> kinfo
-  | ICons_right (kinfo, _) -> kinfo
+  | ICons_left (kinfo, _, _) -> kinfo
+  | ICons_right (kinfo, _, _) -> kinfo
   | IIf_left {kinfo; _} -> kinfo
   | ICons_list (kinfo, _) -> kinfo
-  | INil (kinfo, _) -> kinfo
+  | INil (kinfo, _, _) -> kinfo
   | IIf_cons {kinfo; _} -> kinfo
   | IList_map (kinfo, _, _) -> kinfo
-  | IList_iter (kinfo, _, _) -> kinfo
+  | IList_iter (kinfo, _, _, _) -> kinfo
   | IList_size (kinfo, _) -> kinfo
   | IEmpty_set (kinfo, _, _) -> kinfo
-  | ISet_iter (kinfo, _, _) -> kinfo
+  | ISet_iter (kinfo, _, _, _) -> kinfo
   | ISet_mem (kinfo, _) -> kinfo
   | ISet_update (kinfo, _) -> kinfo
   | ISet_size (kinfo, _) -> kinfo
-  | IEmpty_map (kinfo, _, _) -> kinfo
-  | IMap_map (kinfo, _, _) -> kinfo
-  | IMap_iter (kinfo, _, _) -> kinfo
+  | IEmpty_map (kinfo, _, _, _) -> kinfo
+  | IMap_map (kinfo, _, _, _) -> kinfo
+  | IMap_iter (kinfo, _, _, _) -> kinfo
   | IMap_mem (kinfo, _) -> kinfo
   | IMap_get (kinfo, _) -> kinfo
   | IMap_update (kinfo, _) -> kinfo
@@ -1587,8 +1603,8 @@ let kinfo_of_kinstr : type a s b f. (a, s, b, f) kinstr -> (a, s) kinfo =
   | IComb_get (kinfo, _, _, _) -> kinfo
   | IComb_set (kinfo, _, _, _) -> kinfo
   | IDup_n (kinfo, _, _, _) -> kinfo
-  | ITicket (kinfo, _) -> kinfo
-  | IRead_ticket (kinfo, _) -> kinfo
+  | ITicket (kinfo, _, _) -> kinfo
+  | IRead_ticket (kinfo, _, _) -> kinfo
   | ISplit_ticket (kinfo, _) -> kinfo
   | IJoin_tickets (kinfo, _, _) -> kinfo
   | IHalt kinfo -> kinfo
@@ -1607,13 +1623,13 @@ let kinstr_rewritek :
   | IDrop (kinfo, k) -> IDrop (kinfo, f.apply k)
   | IDup (kinfo, k) -> IDup (kinfo, f.apply k)
   | ISwap (kinfo, k) -> ISwap (kinfo, f.apply k)
-  | IConst (kinfo, x, k) -> IConst (kinfo, x, f.apply k)
+  | IConst (kinfo, ty, x, k) -> IConst (kinfo, ty, x, f.apply k)
   | ICons_pair (kinfo, k) -> ICons_pair (kinfo, f.apply k)
   | ICar (kinfo, k) -> ICar (kinfo, f.apply k)
   | ICdr (kinfo, k) -> ICdr (kinfo, f.apply k)
   | IUnpair (kinfo, k) -> IUnpair (kinfo, f.apply k)
   | ICons_some (kinfo, k) -> ICons_some (kinfo, f.apply k)
-  | ICons_none (kinfo, k) -> ICons_none (kinfo, f.apply k)
+  | ICons_none (kinfo, ty, k) -> ICons_none (kinfo, ty, f.apply k)
   | IIf_none {kinfo; branch_if_none; branch_if_some; k} ->
       IIf_none
         {
@@ -1626,8 +1642,8 @@ let kinstr_rewritek :
       let body = f.apply body in
       let k = f.apply k in
       IOpt_map {kinfo; body; k}
-  | ICons_left (kinfo, k) -> ICons_left (kinfo, f.apply k)
-  | ICons_right (kinfo, k) -> ICons_right (kinfo, f.apply k)
+  | ICons_left (kinfo, ty, k) -> ICons_left (kinfo, ty, f.apply k)
+  | ICons_right (kinfo, ty, k) -> ICons_right (kinfo, ty, f.apply k)
   | IIf_left {kinfo; branch_if_left; branch_if_right; k} ->
       IIf_left
         {
@@ -1637,7 +1653,7 @@ let kinstr_rewritek :
           k = f.apply k;
         }
   | ICons_list (kinfo, k) -> ICons_list (kinfo, f.apply k)
-  | INil (kinfo, k) -> INil (kinfo, f.apply k)
+  | INil (kinfo, ty, k) -> INil (kinfo, ty, f.apply k)
   | IIf_cons {kinfo; branch_if_cons; branch_if_nil; k} ->
       IIf_cons
         {
@@ -1647,16 +1663,20 @@ let kinstr_rewritek :
           k = f.apply k;
         }
   | IList_map (kinfo, body, k) -> IList_map (kinfo, f.apply body, f.apply k)
-  | IList_iter (kinfo, body, k) -> IList_iter (kinfo, f.apply body, f.apply k)
+  | IList_iter (kinfo, ty, body, k) ->
+      IList_iter (kinfo, ty, f.apply body, f.apply k)
   | IList_size (kinfo, k) -> IList_size (kinfo, f.apply k)
   | IEmpty_set (kinfo, ty, k) -> IEmpty_set (kinfo, ty, f.apply k)
-  | ISet_iter (kinfo, body, k) -> ISet_iter (kinfo, f.apply body, f.apply k)
+  | ISet_iter (kinfo, ty, body, k) ->
+      ISet_iter (kinfo, ty, f.apply body, f.apply k)
   | ISet_mem (kinfo, k) -> ISet_mem (kinfo, f.apply k)
   | ISet_update (kinfo, k) -> ISet_update (kinfo, f.apply k)
   | ISet_size (kinfo, k) -> ISet_size (kinfo, f.apply k)
-  | IEmpty_map (kinfo, cty, k) -> IEmpty_map (kinfo, cty, f.apply k)
-  | IMap_map (kinfo, body, k) -> IMap_map (kinfo, f.apply body, f.apply k)
-  | IMap_iter (kinfo, body, k) -> IMap_iter (kinfo, f.apply body, f.apply k)
+  | IEmpty_map (kinfo, cty, ty, k) -> IEmpty_map (kinfo, cty, ty, f.apply k)
+  | IMap_map (kinfo, kty, body, k) ->
+      IMap_map (kinfo, kty, f.apply body, f.apply k)
+  | IMap_iter (kinfo, kvty, body, k) ->
+      IMap_iter (kinfo, kvty, f.apply body, f.apply k)
   | IMap_mem (kinfo, k) -> IMap_mem (kinfo, f.apply k)
   | IMap_get (kinfo, k) -> IMap_get (kinfo, f.apply k)
   | IMap_update (kinfo, k) -> IMap_update (kinfo, f.apply k)
@@ -1795,8 +1815,8 @@ let kinstr_rewritek :
   | IComb_get (kinfo, n, p, k) -> IComb_get (kinfo, n, p, f.apply k)
   | IComb_set (kinfo, n, p, k) -> IComb_set (kinfo, n, p, f.apply k)
   | IDup_n (kinfo, n, p, k) -> IDup_n (kinfo, n, p, f.apply k)
-  | ITicket (kinfo, k) -> ITicket (kinfo, f.apply k)
-  | IRead_ticket (kinfo, k) -> IRead_ticket (kinfo, f.apply k)
+  | ITicket (kinfo, ty, k) -> ITicket (kinfo, ty, f.apply k)
+  | IRead_ticket (kinfo, ty, k) -> IRead_ticket (kinfo, ty, f.apply k)
   | ISplit_ticket (kinfo, k) -> ISplit_ticket (kinfo, f.apply k)
   | IJoin_tickets (kinfo, ty, k) -> IJoin_tickets (kinfo, ty, f.apply k)
   | IHalt kinfo -> IHalt kinfo
@@ -1899,6 +1919,8 @@ let pair_t :
   Type_size.compound2 loc (ty_size l) (ty_size r) >|? fun size ->
   let (Ex_dand cmp) = dand (is_comparable l) (is_comparable r) in
   Ty_ex_c (Pair_t (l, r, {size}, cmp))
+
+let pair_3_t loc l m r = pair_t loc m r >>? fun (Ty_ex_c r) -> pair_t loc l r
 
 let comparable_pair_t loc l r =
   Type_size.compound2 loc (ty_size l) (ty_size r) >|? fun size ->
@@ -2043,35 +2065,35 @@ let kinstr_traverse i init f =
     | IDrop (_, k) -> (next [@ocaml.tailcall]) k
     | IDup (_, k) -> (next [@ocaml.tailcall]) k
     | ISwap (_, k) -> (next [@ocaml.tailcall]) k
-    | IConst (_, _, k) -> (next [@ocaml.tailcall]) k
+    | IConst (_, _, _, k) -> (next [@ocaml.tailcall]) k
     | ICons_pair (_, k) -> (next [@ocaml.tailcall]) k
     | ICar (_, k) -> (next [@ocaml.tailcall]) k
     | ICdr (_, k) -> (next [@ocaml.tailcall]) k
     | IUnpair (_, k) -> (next [@ocaml.tailcall]) k
     | ICons_some (_, k) -> (next [@ocaml.tailcall]) k
-    | ICons_none (_, k) -> (next [@ocaml.tailcall]) k
+    | ICons_none (_, _, k) -> (next [@ocaml.tailcall]) k
     | IIf_none {kinfo = _; branch_if_none = k1; branch_if_some = k2; k} ->
         (next3 [@ocaml.tailcall]) k1 k2 k
     | IOpt_map {kinfo = _; body; k} -> (next2 [@ocaml.tailcall]) body k
-    | ICons_left (_, k) -> (next [@ocaml.tailcall]) k
-    | ICons_right (_, k) -> (next [@ocaml.tailcall]) k
+    | ICons_left (_, _, k) -> (next [@ocaml.tailcall]) k
+    | ICons_right (_, _, k) -> (next [@ocaml.tailcall]) k
     | IIf_left {kinfo = _; branch_if_left = k1; branch_if_right = k2; k} ->
         (next3 [@ocaml.tailcall]) k1 k2 k
     | ICons_list (_, k) -> (next [@ocaml.tailcall]) k
-    | INil (_, k) -> (next [@ocaml.tailcall]) k
+    | INil (_, _, k) -> (next [@ocaml.tailcall]) k
     | IIf_cons {kinfo = _; branch_if_nil = k1; branch_if_cons = k2; k} ->
         (next3 [@ocaml.tailcall]) k1 k2 k
     | IList_map (_, k1, k2) -> (next2 [@ocaml.tailcall]) k1 k2
-    | IList_iter (_, k1, k2) -> (next2 [@ocaml.tailcall]) k1 k2
+    | IList_iter (_, _, k1, k2) -> (next2 [@ocaml.tailcall]) k1 k2
     | IList_size (_, k) -> (next [@ocaml.tailcall]) k
     | IEmpty_set (_, _, k) -> (next [@ocaml.tailcall]) k
-    | ISet_iter (_, k1, k2) -> (next2 [@ocaml.tailcall]) k1 k2
+    | ISet_iter (_, _, k1, k2) -> (next2 [@ocaml.tailcall]) k1 k2
     | ISet_mem (_, k) -> (next [@ocaml.tailcall]) k
     | ISet_update (_, k) -> (next [@ocaml.tailcall]) k
     | ISet_size (_, k) -> (next [@ocaml.tailcall]) k
-    | IEmpty_map (_, _, k) -> (next [@ocaml.tailcall]) k
-    | IMap_map (_, k1, k2) -> (next2 [@ocaml.tailcall]) k1 k2
-    | IMap_iter (_, k1, k2) -> (next2 [@ocaml.tailcall]) k1 k2
+    | IEmpty_map (_, _, _, k) -> (next [@ocaml.tailcall]) k
+    | IMap_map (_, _, k1, k2) -> (next2 [@ocaml.tailcall]) k1 k2
+    | IMap_iter (_, _, k1, k2) -> (next2 [@ocaml.tailcall]) k1 k2
     | IMap_mem (_, k) -> (next [@ocaml.tailcall]) k
     | IMap_get (_, k) -> (next [@ocaml.tailcall]) k
     | IMap_update (_, k) -> (next [@ocaml.tailcall]) k
@@ -2193,8 +2215,8 @@ let kinstr_traverse i init f =
     | IComb_get (_, _, _, k) -> (next [@ocaml.tailcall]) k
     | IComb_set (_, _, _, k) -> (next [@ocaml.tailcall]) k
     | IDup_n (_, _, _, k) -> (next [@ocaml.tailcall]) k
-    | ITicket (_, k) -> (next [@ocaml.tailcall]) k
-    | IRead_ticket (_, k) -> (next [@ocaml.tailcall]) k
+    | ITicket (_, _, k) -> (next [@ocaml.tailcall]) k
+    | IRead_ticket (_, _, k) -> (next [@ocaml.tailcall]) k
     | ISplit_ticket (_, k) -> (next [@ocaml.tailcall]) k
     | IJoin_tickets (_, _, k) -> (next [@ocaml.tailcall]) k
     | IOpen_chest (_, k) -> (next [@ocaml.tailcall]) k

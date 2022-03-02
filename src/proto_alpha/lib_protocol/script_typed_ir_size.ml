@@ -348,37 +348,49 @@ and kinstr_size :
     | IDrop (kinfo, _) -> ret_succ_adding accu (base kinfo)
     | IDup (kinfo, _) -> ret_succ_adding accu (base kinfo)
     | ISwap (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | IConst (kinfo, x, k) ->
+    | IConst (kinfo, ty, x, _) ->
         let accu = ret_succ_adding accu (base kinfo +! word_size) in
-        let (Ty_ex_c top_ty) = stack_top_ty (kinfo_of_kinstr k).kstack_ty in
-        (value_size [@ocaml.tailcall]) ~count_lambda_nodes accu top_ty x
+        (value_size [@ocaml.tailcall])
+          ~count_lambda_nodes
+          (accu ++ ty_size ty)
+          ty
+          x
     | ICons_pair (kinfo, _) -> ret_succ_adding accu (base kinfo)
     | ICar (kinfo, _) -> ret_succ_adding accu (base kinfo)
     | ICdr (kinfo, _) -> ret_succ_adding accu (base kinfo)
     | IUnpair (kinfo, _) -> ret_succ_adding accu (base kinfo)
     | ICons_some (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | ICons_none (kinfo, _) -> ret_succ_adding accu (base kinfo)
+    | ICons_none (kinfo, ty, _) ->
+        ret_succ_adding (accu ++ ty_size ty) (base kinfo)
     | IIf_none {kinfo; _} -> ret_succ_adding accu (base kinfo)
     | IOpt_map {kinfo; _} -> ret_succ_adding accu (base kinfo)
-    | ICons_left (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | ICons_right (kinfo, _) -> ret_succ_adding accu (base kinfo)
+    | ICons_left (kinfo, ty, _) ->
+        ret_succ_adding (accu ++ ty_size ty) (base kinfo)
+    | ICons_right (kinfo, ty, _) ->
+        ret_succ_adding (accu ++ ty_size ty) (base kinfo)
     | IIf_left {kinfo; _} -> ret_succ_adding accu (base kinfo)
     | ICons_list (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | INil (kinfo, _) -> ret_succ_adding accu (base kinfo)
+    | INil (kinfo, ty, _) -> ret_succ_adding (accu ++ ty_size ty) (base kinfo)
     | IIf_cons {kinfo; _} -> ret_succ_adding accu (base kinfo)
     | IList_map (kinfo, _, _) -> ret_succ_adding accu (base kinfo)
-    | IList_iter (kinfo, _, _) -> ret_succ_adding accu (base kinfo)
+    | IList_iter (kinfo, ty, _, _) ->
+        ret_succ_adding (accu ++ ty_size ty) (base kinfo)
     | IList_size (kinfo, _) -> ret_succ_adding accu (base kinfo)
     | IEmpty_set (kinfo, cty, _) ->
         ret_succ_adding (accu ++ ty_size cty) (base kinfo +! word_size)
-    | ISet_iter (kinfo, _, _) -> ret_succ_adding accu (base kinfo)
+    | ISet_iter (kinfo, ty, _, _) ->
+        ret_succ_adding (accu ++ ty_size ty) (base kinfo)
     | ISet_mem (kinfo, _) -> ret_succ_adding accu (base kinfo)
     | ISet_update (kinfo, _) -> ret_succ_adding accu (base kinfo)
     | ISet_size (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | IEmpty_map (kinfo, cty, _) ->
-        ret_succ_adding (accu ++ ty_size cty) (base kinfo +! word_size)
-    | IMap_map (kinfo, _, _) -> ret_succ_adding accu (base kinfo +! word_size)
-    | IMap_iter (kinfo, _, _) -> ret_succ_adding accu (base kinfo +! word_size)
+    | IEmpty_map (kinfo, cty, vty, _) ->
+        ret_succ_adding
+          (accu ++ ty_size cty ++ ty_size vty)
+          (base kinfo +! word_size)
+    | IMap_map (kinfo, ty, _, _) ->
+        ret_succ_adding (accu ++ ty_size ty) (base kinfo +! word_size)
+    | IMap_iter (kinfo, pty, _, _) ->
+        ret_succ_adding (accu ++ ty_size pty) (base kinfo +! word_size)
     | IMap_mem (kinfo, _) -> ret_succ_adding accu (base kinfo)
     | IMap_get (kinfo, _) -> ret_succ_adding accu (base kinfo)
     | IMap_update (kinfo, _) -> ret_succ_adding accu (base kinfo)
@@ -552,8 +564,10 @@ and kinstr_size :
         ret_succ_adding
           accu
           (base kinfo +! (word_size *? 2) +! dup_n_gadt_witness_size n)
-    | ITicket (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | IRead_ticket (kinfo, _) -> ret_succ_adding accu (base kinfo)
+    | ITicket (kinfo, cty, _) ->
+        ret_succ_adding (accu ++ ty_size cty) (base kinfo)
+    | IRead_ticket (kinfo, ty, _) ->
+        ret_succ_adding (accu ++ ty_size ty) (base kinfo)
     | ISplit_ticket (kinfo, _) -> ret_succ_adding accu (base kinfo)
     | IJoin_tickets (kinfo, cty, _) ->
         ret_succ_adding (accu ++ ty_size cty) (base kinfo +! word_size)
@@ -587,6 +601,7 @@ let rec kinstr_extra_size : type a s r f. (a, s, r, f) kinstr -> nodes_and_size
       | IComb_get (_, n, _, _) -> comb (n / 2)
       | IComb_set (_, n, _, _) -> comb (n / 2)
       | IDup_n (_, n, _, _) -> dup_n_gadt_witness_size n
+      | ICompare (_, ty, _) -> ty_size ty
       (* Other extra *)
       | ILambda (_, lambda, _) -> lambda_extra_size lambda
       | _ -> zero
