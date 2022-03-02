@@ -82,8 +82,6 @@ let select n l =
   in
   loop n [] l
 
-let shift = function [] -> [] | hd :: tl -> tl @ [hd]
-
 let rec product a b =
   match a with
   | [] -> []

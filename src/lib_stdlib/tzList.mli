@@ -33,9 +33,6 @@ val remove : int -> 'a list -> 'a list
 (** [repeat n x] is a list of [n] [x]'s *)
 val repeat : int -> 'a -> 'a list
 
-(** [shift (hd :: tl)] computes [tl @ [hd]] *)
-val shift : 'a list -> 'a list
-
 (** [product a b] computes the Cartesian product of two lists [a] and [b]. *)
 val product : 'a list -> 'b list -> ('a * 'b) list
 
