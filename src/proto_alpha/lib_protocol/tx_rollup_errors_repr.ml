@@ -155,9 +155,9 @@ let () =
   register_error_kind
     `Temporary
     ~id:"tx_rollup_message_size_exceeds_limit"
-    ~title:"A message submtitted to a transaction rollup inbox exceeds limit"
+    ~title:"A message submitted to a transaction rollup inbox exceeds limit"
     ~description:
-      "A message submtitted to a transaction rollup inbox exceeds limit"
+      "A message submitted to a transaction rollup inbox exceeds limit"
     empty
     (function Message_size_exceeds_limit -> Some () | _ -> None)
     (fun () -> Message_size_exceeds_limit) ;

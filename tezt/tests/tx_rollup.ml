@@ -256,7 +256,7 @@ module Regressions = struct
       Process.check_error
         ~msg:
           (rex
-             "A message submtitted to a transaction rollup inbox exceeds limit")
+             "A message submitted to a transaction rollup inbox exceeds limit")
         process
 
     let inbox_maximum_size =
