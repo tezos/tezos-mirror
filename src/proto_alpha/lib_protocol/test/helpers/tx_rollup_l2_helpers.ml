@@ -67,6 +67,11 @@ module Irmin_storage :
     let* store = Store.Tree.add store (path key) value in
     return_ok store
 
+  let remove store key =
+    let open Lwt_syntax in
+    let* store = Store.Tree.remove store (path key) in
+    return_ok store
+
   module Syntax = struct
     include Lwt_result_syntax
 

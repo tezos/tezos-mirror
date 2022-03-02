@@ -331,6 +331,12 @@ struct
     let* value = serialize_value value_encoding value in
     S.set ctxt key value
 
+  let remove : type a. t -> a key -> t m =
+   fun ctxt key ->
+    let open Syntax in
+    let* key = serialize_key key in
+    S.remove ctxt key
+
   module Address_metadata = struct
     let get ctxt idx = get ctxt (Address_metadata idx)
 
@@ -431,19 +437,25 @@ struct
   end
 
   module Ticket_ledger = struct
+    let get_opt ctxt tidx aidx = get ctxt (Ticket_ledger (tidx, aidx))
+
     let get ctxt tidx aidx =
       let open Syntax in
-      let+ res = get ctxt (Ticket_ledger (tidx, aidx)) in
-      Option.value res ~default:Tx_rollup_l2_qty.zero
+      let+ res = get_opt ctxt tidx aidx in
+      Option.value ~default:Tx_rollup_l2_qty.zero res
 
     let set ctxt tidx aidx = set ctxt (Ticket_ledger (tidx, aidx))
+
+    let remove ctxt tidx aidx = remove ctxt (Ticket_ledger (tidx, aidx))
 
     let spend ctxt tidx aidx qty =
       let open Syntax in
       let* src_balance = get ctxt tidx aidx in
       match Tx_rollup_l2_qty.sub src_balance qty with
       | None -> fail Balance_too_low
-      | Some remainder -> set ctxt tidx aidx remainder
+      | Some remainder when Tx_rollup_l2_qty.(remainder > zero) ->
+          set ctxt tidx aidx remainder
+      | Some _ -> remove ctxt tidx aidx
 
     let credit ctxt tidx aidx qty =
       let open Syntax in
@@ -452,5 +464,9 @@ struct
       match Tx_rollup_l2_qty.add balance qty with
       | None -> fail Balance_overflow
       | Some new_balance -> set ctxt tidx aidx new_balance
+
+    module Internal_for_tests = struct
+      let get_opt = get_opt
+    end
   end
 end

@@ -84,6 +84,11 @@ let test_irmin_storage () =
   let* e = catch (fail Test) (fun _ -> assert false) return in
   assert (e = Test) ;
 
+  (* 4. get (remove store k1) k1 = None *)
+  let* store = Irmin_storage.remove store k1 in
+  let* v = Irmin_storage.get store k1 in
+  assert (v = None) ;
+
   return_unit
 
 (** {2. Context tests. } *)
@@ -478,6 +483,22 @@ module Test_Ticket_ledger = struct
 
     return_unit
 
+  let test_remove_empty_balance () =
+    let* (ctxt, idx1) = context_with_one_addr in
+
+    let* ctxt = credit ctxt ticket_idx1 idx1 Tx_rollup_l2_qty.one in
+    let* qty = Internal_for_tests.get_opt ctxt ticket_idx1 idx1 in
+    assert (qty = Some Tx_rollup_l2_qty.one) ;
+
+    let* ctxt = spend ctxt ticket_idx1 idx1 Tx_rollup_l2_qty.one in
+    let* qty = Internal_for_tests.get_opt ctxt ticket_idx1 idx1 in
+    assert (qty = None) ;
+
+    let* qty = get ctxt ticket_idx1 idx1 in
+    assert (qty = Tx_rollup_l2_qty.zero) ;
+
+    return_unit
+
   let tests =
     wrap_tztest_tests
       [
@@ -487,6 +508,7 @@ module Test_Ticket_ledger = struct
         ("test credit unknown index", test_credit_unknown_index);
         ("test spend", test_spend_valid);
         ("test spend without required balance", test_spend_without_balance);
+        ("test remove empty balance", test_remove_empty_balance);
       ]
 end
 
