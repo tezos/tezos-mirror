@@ -871,6 +871,7 @@ let prepare_first_block ~level ~timestamp ctxt =
         (* Ignore reminder if any *)
         Int32.div c.blocks_per_voting_period c.blocks_per_cycle
       in
+      let tx_rollup_withdraw_period = 60_000 in
       let constants =
         Constants_repr.
           {
@@ -923,13 +924,14 @@ let prepare_first_block ~level ~timestamp ctxt =
             tx_rollup_hard_size_limit_per_message = 5_000;
             tx_rollup_commitment_bond = Tez_repr.of_mutez_exn 10_000_000_000L;
             tx_rollup_finality_period = 2_000;
-            tx_rollup_withdraw_period = 60_000;
+            tx_rollup_withdraw_period;
             tx_rollup_max_unfinalized_levels = 2_100;
             (* This is determined by [max_operation_data_length] minus
                the overhead of a commitment (192) divided by the size of an
                Irmin Merkle root (32). But we subtract 8 just in case we
                later need to increase the size of a commitment. *)
             tx_rollup_max_messages_per_inbox = 1_010;
+            tx_rollup_max_finalized_levels = tx_rollup_withdraw_period + 100;
             sc_rollup_enable = false;
             (* The following value is chosen to prevent spam. *)
             sc_rollup_origination_size = 6_314;
