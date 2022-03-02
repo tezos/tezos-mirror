@@ -917,6 +917,17 @@ let filter_map_ep f l = rev_map_ep f l |> Lwt_result.map rev_filter_some
 
 let filter_map_p f l = rev_map_p f l |> Lwt.map rev_filter_some
 
+let rev_concat_map f xs =
+  let rec aux f acc = function
+    | [] -> acc
+    | x :: xs ->
+        let ys = f x in
+        (aux [@ocaml.tailcall]) f (rev_append ys acc) xs
+  in
+  aux f [] xs
+
+let concat_map f xs = rev (rev_concat_map f xs)
+
 let concat_map_s f xs =
   let open Lwt_syntax in
   let rec aux f acc = function
@@ -1582,6 +1593,8 @@ let combine_drop xs ys =
     | ([], []) | (_ :: _, []) | ([], _ :: _) -> rev rev_combined
   in
   aux [] xs ys
+
+let product xs ys = rev_concat_map (fun x -> rev_map (fun y -> (x, y)) ys) xs
 
 (* Use Fisher-Yates shuffle as described by Knuth
    https://en.wikipedia.org/wiki/Fisher%E2%80%93Yates_shuffle *)

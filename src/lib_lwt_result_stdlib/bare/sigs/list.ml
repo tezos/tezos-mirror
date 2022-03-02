@@ -1345,6 +1345,16 @@ module type S = sig
   val combine_with_leftovers :
     'a list -> 'b list -> ('a * 'b) list * ('a list, 'b list) Either.t option
 
+  (** {3 Product} *)
+
+  (** [product xs ys] is the cartesian product of [xs] and [ys].
+
+      In other words [product xs ys] is a list containing all the pairs [(x, y)]
+      where [x] is an element of [xs] and [y] is an element of [ys].
+
+      The order of the elements in the returned list is unspecified. *)
+  val product : 'a list -> 'b list -> ('a * 'b) list
+
   (** {3 Comparison and equality}
 
       The comparison and equality functions are those of the OCaml [Stdlib]. *)

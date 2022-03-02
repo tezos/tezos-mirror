@@ -71,8 +71,3 @@ let take_n ?compare n l =
 
 let rec drop_n n l =
   if n <= 0 then l else match l with [] -> [] | _ :: xs -> drop_n (n - 1) xs
-
-let rec product a b =
-  match a with
-  | [] -> []
-  | hd :: tl -> List.map (fun x -> (hd, x)) b @ product tl b

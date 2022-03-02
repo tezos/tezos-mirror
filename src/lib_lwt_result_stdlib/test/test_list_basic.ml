@@ -231,6 +231,31 @@ module Partition = struct
   let tests = [Alcotest.test_case "partition-result" `Quick partition_result]
 end
 
+module Product = struct
+  let empty_single () =
+    assert (product [] [] = []) ;
+    assert (product [0] [] = []) ;
+    assert (product [] [0] = []) ;
+    assert (product ['a'] [0] = [('a', 0)]) ;
+    ()
+
+  let big () =
+    assert (
+      sort Stdlib.compare @@ product ['a'; 'b'; 'c'] [0]
+      = [('a', 0); ('b', 0); ('c', 0)]) ;
+    assert (sort Stdlib.compare @@ product ['a'] [0; 1] = [('a', 0); ('a', 1)]) ;
+    assert (
+      sort Stdlib.compare @@ product ['a'; 'b'; 'c'] [0; 1]
+      = [('a', 0); ('a', 1); ('b', 0); ('b', 1); ('c', 0); ('c', 1)]) ;
+    ()
+
+  let tests =
+    [
+      Alcotest.test_case "empty and singleton" `Quick empty_single;
+      Alcotest.test_case "big" `Quick big;
+    ]
+end
+
 module Shuffle = struct
   let test_small () =
     let rng = Random.State.make_self_init () in
@@ -318,4 +343,5 @@ let () =
       ("combine_*", Combine.tests);
       ("partition_*", Partition.tests);
       ("shuffle", Shuffle.tests);
+      ("product", Product.tests);
     ]

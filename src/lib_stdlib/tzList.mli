@@ -30,9 +30,6 @@ val remove : int -> 'a list -> 'a list
 (** [repeat n x] is a list of [n] [x]'s *)
 val repeat : int -> 'a -> 'a list
 
-(** [product a b] computes the Cartesian product of two lists [a] and [b]. *)
-val product : 'a list -> 'b list -> ('a * 'b) list
-
 (** [take_n n l] returns the [n] first elements of [l]. When [compare]
     is provided, it returns the [n] greatest element of [l]. *)
 val take_n : ?compare:('a -> 'a -> int) -> int -> 'a list -> 'a list
