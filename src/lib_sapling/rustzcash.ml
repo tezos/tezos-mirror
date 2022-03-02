@@ -757,6 +757,7 @@ let find_params ?(getenv_opt = Sys.getenv_opt) ?(getcwd = Sys.getcwd)
     @ cwd "_opam/share/zcash-params"
     @ env "HOME" ".zcash-params"
     @ env "HOME" ".local/share/zcash-params"
+    @ env "HOMEBREW_PREFIX" "share/zcash-params"
     @ ["/usr/local/share/zcash-params"; "/usr/share/zcash-params"]
   in
   (* Files we are looking for. *)

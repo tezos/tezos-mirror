@@ -160,6 +160,16 @@ let test_find_params () =
     (Some
        ( "/usr/share/zcash-params/sapling-spend.params",
          "/usr/share/zcash-params/sapling-output.params" )) ;
+  test
+    ~env:[("HOMEBREW_PREFIX", "/opt/homebrew")]
+    ~files:
+      [
+        "/opt/homebrew/share/zcash-params/sapling-spend.params";
+        "/opt/homebrew/share/zcash-params/sapling-output.params";
+      ]
+    (Some
+       ( "/opt/homebrew/share/zcash-params/sapling-spend.params",
+         "/opt/homebrew/share/zcash-params/sapling-output.params" )) ;
   (* Test cases where parameter files are installed in several locations
      and we expect to find the one with higher priority. *)
   let files =
