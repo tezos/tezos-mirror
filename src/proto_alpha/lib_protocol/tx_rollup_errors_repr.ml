@@ -31,6 +31,7 @@ type error +=
   | Submit_batch_burn_excedeed of {burn : Tez_repr.t; limit : Tez_repr.t}
   | Inbox_does_not_exist of Tx_rollup_repr.t * Tx_rollup_level_repr.t
   | Inbox_size_would_exceed_limit of Tx_rollup_repr.t
+  | Inbox_count_would_exceed_limit of Tx_rollup_repr.t
   | No_uncommitted_inbox
   | Message_size_exceeds_limit
   | Too_many_inboxes
@@ -102,17 +103,36 @@ let () =
     `Temporary
     ~id:"tx_rollup_inbox_size_would_exceed_limit"
     ~title:"Transaction rollup inbox’s size would exceed the limit"
-    ~description:"Transaction rollup inbox’s size would exceed the limit"
+    ~description:
+      "Transaction rollup inbox’s size in bytes would exceed the limit"
     ~pp:(fun ppf addr ->
       Format.fprintf
         ppf
         "Adding the submitted message would make the inbox of %a exceed the \
-         authorized limit at this level"
+         authorized size in bytes at this level"
         Tx_rollup_repr.pp
         addr)
     (obj1 (req "tx_rollup_address" Tx_rollup_repr.encoding))
     (function Inbox_size_would_exceed_limit rollup -> Some rollup | _ -> None)
     (fun rollup -> Inbox_size_would_exceed_limit rollup) ;
+  (* Tx_rollup_message_count_would_exceed_limit *)
+  register_error_kind
+    `Temporary
+    ~id:"tx_rollup_inbox_count_would_exceed_limit"
+    ~title:"Transaction rollup inbox’s message count would exceed the limit"
+    ~description:
+      "Transaction rollup inbox’s message count would exceed the limit"
+    ~pp:(fun ppf addr ->
+      Format.fprintf
+        ppf
+        "Adding the submitted message would make the inbox of %a exceed the \
+         authorized message count at this level"
+        Tx_rollup_repr.pp
+        addr)
+    (obj1 (req "tx_rollup_address" Tx_rollup_repr.encoding))
+    (function
+      | Inbox_count_would_exceed_limit rollup -> Some rollup | _ -> None)
+    (fun rollup -> Inbox_count_would_exceed_limit rollup) ;
   (* Tx_rollup_message_size_exceed_limit *)
   register_error_kind
     `Temporary

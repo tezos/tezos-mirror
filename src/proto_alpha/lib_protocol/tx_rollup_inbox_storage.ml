@@ -94,6 +94,12 @@ let append_message :
   let message_size = Tx_rollup_message_repr.size message in
   prepare_metadata ctxt rollup state level
   >>=? fun (ctxt, new_state, tx_level, metadata) ->
+  fail_when
+    Compare.Int.(
+      Int32.to_int metadata.inbox_length
+      >= Constants_storage.tx_rollup_max_messages_per_inbox ctxt)
+    (Inbox_count_would_exceed_limit rollup)
+  >>=? fun () ->
   Tx_rollup_message_builder.hash ctxt message >>?= fun (ctxt, message_hash) ->
   update_metadata metadata message_hash message_size >>?= fun new_metadata ->
   let new_size = new_metadata.cumulated_size in

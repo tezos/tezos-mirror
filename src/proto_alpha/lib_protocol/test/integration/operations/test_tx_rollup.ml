@@ -529,8 +529,8 @@ let fill_inbox b tx_rollup contract contents k =
 
   fill_inbox i 0 counter
 
-(** Try to add enough batch to reach the size limit of an inbox. *)
-let test_inbox_too_big () =
+(** Try to add enough large batches to reach the size limit of an inbox. *)
+let test_inbox_size_too_big () =
   context_init 1 >>=? fun (b, contracts) ->
   let contract =
     WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0
@@ -550,6 +550,56 @@ let test_inbox_too_big () =
               | Tx_rollup_errors.Inbox_size_would_exceed_limit _ -> true
               | _ -> false))
       >>=? fun _i -> return_unit)
+
+(** Try to add enough batches to reach the batch count limit of an inbox. *)
+let test_inbox_count_too_big () =
+  context_init 1 >>=? fun (b, contracts) ->
+  let contract =
+    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0
+  in
+  Context.get_constants (B b) >>=? fun constant ->
+  let message_count = constant.parametric.tx_rollup_max_messages_per_inbox in
+  let contents = "some contents" in
+  originate b contract >>=? fun (b, tx_rollup) ->
+  Incremental.begin_construction b >>=? fun i ->
+  let rec fill_inbox i counter n =
+    (* By default, the [gas_limit] is the maximum gas that can be
+       consumed by an operation. We set a lower (arbitrary) limit to
+       be able to reach the size limit of an operation. *)
+    Op.tx_rollup_submit_batch
+      ~gas_limit:(Gas.Arith.integral_of_int_exn 2_500)
+      ~counter
+      (I i)
+      contract
+      tx_rollup
+      contents
+    >>=? fun op ->
+    if n > 0 then
+      Incremental.add_operation i op >>=? fun i ->
+      fill_inbox i (Z.succ counter) (n - 1)
+    else return (i, counter)
+  in
+  Context.Contract.counter (B b) contract >>=? fun counter ->
+  fill_inbox i counter message_count >>=? fun (i, counter) ->
+  Op.tx_rollup_submit_batch
+    ~gas_limit:(Gas.Arith.integral_of_int_exn 2_500)
+    ~counter
+    (I i)
+    contract
+    tx_rollup
+    contents
+  >>=? fun op ->
+  Incremental.add_operation
+    i
+    op
+    ~expect_failure:
+      (check_proto_error @@ function
+       | Tx_rollup_errors.Inbox_count_would_exceed_limit rollup ->
+           rollup = tx_rollup
+       | _ -> false)
+  >>=? fun i ->
+  ignore i ;
+  return ()
 
 (** [test_valid_deposit] checks that a smart contract can deposit
     tickets to a transaction rollup. *)
@@ -1132,9 +1182,13 @@ let tests =
       `Quick
       test_batch_too_big;
     Tztest.tztest
-      "Try to add several batches to reach the inbox limit"
+      "Try to add several batches to reach the inbox size limit"
       `Quick
-      test_inbox_too_big;
+      test_inbox_size_too_big;
+    Tztest.tztest
+      "Try to add several batches to reach the inbox count limit"
+      `Quick
+      test_inbox_count_too_big;
     Tztest.tztest "Test deposit with valid contract" `Quick test_valid_deposit;
     Tztest.tztest
       "Test deposit with invalid parameter"
