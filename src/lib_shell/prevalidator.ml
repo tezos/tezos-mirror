@@ -1239,23 +1239,13 @@ module Make
 
   type worker = Worker.infinite Worker.queue Worker.t
 
-  (** Mimics [Data_encoding.Json.construct] but accepts argument
-      [?include_default_fields] to pass on to [Json_encoding.construct]. *)
-  let data_encoding_json_construct ?include_default_fields e v =
-    Json_encoding.construct
-      ?include_default_fields
-      (Data_encoding.Json.convert e)
-      v
-  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/1876
-     Remove this function upon the next release of [data-encoding]. *)
-
   (** Returns a json describing the prevalidator's [filter_config].
       The boolean [include_default] ([true] by default) indicates
       whether the json should include the fields which have a value
       equal to their default value. *)
   let get_filter_config_json ?(include_default = true) pv =
     let include_default_fields = if include_default then `Always else `Never in
-    data_encoding_json_construct
+    Data_encoding.Json.construct
       ~include_default_fields
       Filter.Mempool.config_encoding
       pv.filter_config
