@@ -433,11 +433,11 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       ('a, 'b * 's) kinfo * ('b, 's, 'r, 'f) kinstr
       -> ('a, 'b * 's, 'r, 'f) kinstr
   | IDup :
-      ('a, 's) kinfo * ('a, 'a * 's, 'r, 'f) kinstr
-      -> ('a, 's, 'r, 'f) kinstr
-  | ISwap :
-      ('a, 'b * 's) kinfo * ('b, 'a * 's, 'r, 'f) kinstr
+      ('a, 'b * 's) kinfo * ('a, 'a * ('b * 's), 'r, 'f) kinstr
       -> ('a, 'b * 's, 'r, 'f) kinstr
+  | ISwap :
+      ('a, 'b * ('c * 's)) kinfo * ('b, 'a * ('c * 's), 'r, 'f) kinstr
+      -> ('a, 'b * ('c * 's), 'r, 'f) kinstr
   | IConst :
       ('a, 's) kinfo * 'ty * ('ty, 'a * 's, 'r, 'f) kinstr
       -> ('a, 's, 'r, 'f) kinstr
@@ -446,8 +446,8 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
      -----
   *)
   | ICons_pair :
-      ('a, 'b * 's) kinfo * ('a * 'b, 's, 'r, 'f) kinstr
-      -> ('a, 'b * 's, 'r, 'f) kinstr
+      ('a, 'b * ('c * 's)) kinfo * ('a * 'b, 'c * 's, 'r, 'f) kinstr
+      -> ('a, 'b * ('c * 's), 'r, 'f) kinstr
   | ICar :
       ('a * 'b, 's) kinfo * ('a, 's, 'r, 'f) kinstr
       -> ('a * 'b, 's, 'r, 'f) kinstr
@@ -462,8 +462,8 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
      -------
    *)
   | ICons_some :
-      ('v, 's) kinfo * ('v option, 's, 'r, 'f) kinstr
-      -> ('v, 's, 'r, 'f) kinstr
+      ('v, 'a * 's) kinfo * ('v option, 'a * 's, 'r, 'f) kinstr
+      -> ('v, 'a * 's, 'r, 'f) kinstr
   | ICons_none :
       ('a, 's) kinfo * ('b option, 'a * 's, 'r, 'f) kinstr
       -> ('a, 's, 'r, 'f) kinstr
@@ -485,11 +485,11 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
      ------
    *)
   | ICons_left :
-      ('a, 's) kinfo * (('a, 'b) union, 's, 'r, 'f) kinstr
-      -> ('a, 's, 'r, 'f) kinstr
+      ('a, 'c * 's) kinfo * (('a, 'b) union, 'c * 's, 'r, 'f) kinstr
+      -> ('a, 'c * 's, 'r, 'f) kinstr
   | ICons_right :
-      ('b, 's) kinfo * (('a, 'b) union, 's, 'r, 'f) kinstr
-      -> ('b, 's, 'r, 'f) kinstr
+      ('b, 'c * 's) kinfo * (('a, 'b) union, 'c * 's, 'r, 'f) kinstr
+      -> ('b, 'c * 's, 'r, 'f) kinstr
   | IIf_left : {
       kinfo : (('a, 'b) union, 's) kinfo;
       branch_if_left : ('a, 's, 'c, 't) kinstr;
@@ -811,8 +811,10 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
      ----------
   *)
   | ICompare :
-      ('a, 'a * 's) kinfo * 'a comparable_ty * (z num, 's, 'r, 'f) kinstr
-      -> ('a, 'a * 's, 'r, 'f) kinstr
+      ('a, 'a * ('b * 's)) kinfo
+      * 'a comparable_ty
+      * (z num, 'b * 's, 'r, 'f) kinstr
+      -> ('a, 'a * ('b * 's), 'r, 'f) kinstr
   (*
      Comparators
      -----------
@@ -849,10 +851,10 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       * ('a typed_contract option, 's, 'r, 'f) kinstr
       -> (address, 's, 'r, 'f) kinstr
   | IView :
-      ('a, address * 's) kinfo
+      ('a, address * ('c * 's)) kinfo
       * ('a, 'b) view_signature
-      * ('b option, 's, 'r, 'f) kinstr
-      -> ('a, address * 's, 'r, 'f) kinstr
+      * ('b option, 'c * 's, 'r, 'f) kinstr
+      -> ('a, address * ('c * 's), 'r, 'f) kinstr
   | ITransfer_tokens :
       ('a, Tez.t * ('a typed_contract * 's)) kinfo
       * (operation, 's, 'r, 'f) kinstr
@@ -861,12 +863,12 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       (public_key_hash, 's) kinfo * (unit typed_contract, 's, 'r, 'f) kinstr
       -> (public_key_hash, 's, 'r, 'f) kinstr
   | ICreate_contract : {
-      kinfo : (public_key_hash option, Tez.t * ('a * 's)) kinfo;
+      kinfo : (public_key_hash option, Tez.t * ('a * ('c * 's))) kinfo;
       storage_type : ('a, _) ty;
       code : Script.expr;
-      k : (operation, address * 's, 'r, 'f) kinstr;
+      k : (operation, address * ('c * 's), 'r, 'f) kinstr;
     }
-      -> (public_key_hash option, Tez.t * ('a * 's), 'r, 'f) kinstr
+      -> (public_key_hash option, Tez.t * ('a * ('c * 's)), 'r, 'f) kinstr
   | ISet_delegate :
       (public_key_hash option, 's) kinfo * (operation, 's, 'r, 'f) kinstr
       -> (public_key_hash option, 's, 'r, 'f) kinstr
@@ -889,8 +891,8 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       (public_key, 's) kinfo * (public_key_hash, 's, 'r, 'f) kinstr
       -> (public_key, 's, 'r, 'f) kinstr
   | IPack :
-      ('a, 's) kinfo * ('a, _) ty * (bytes, 's, 'r, 'f) kinstr
-      -> ('a, 's, 'r, 'f) kinstr
+      ('a, 'b * 's) kinfo * ('a, _) ty * (bytes, 'b * 's, 'r, 'f) kinstr
+      -> ('a, 'b * 's, 'r, 'f) kinstr
   | IUnpack :
       (bytes, 's) kinfo * ('a, _) ty * ('a option, 's, 'r, 'f) kinstr
       -> (bytes, 's, 'r, 'f) kinstr
@@ -1065,35 +1067,35 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       * (bool, 's, 'r, 'f) kinstr
       -> ((Script_bls.G1.t, Script_bls.G2.t) pair boxed_list, 's, 'r, 'f) kinstr
   | IComb :
-      ('a, 's) kinfo
-      * int
-      * ('a * 's, 'b * 'u) comb_gadt_witness
-      * ('b, 'u, 'r, 'f) kinstr
-      -> ('a, 's, 'r, 'f) kinstr
-  | IUncomb :
-      ('a, 's) kinfo
-      * int
-      * ('a * 's, 'b * 'u) uncomb_gadt_witness
-      * ('b, 'u, 'r, 'f) kinstr
-      -> ('a, 's, 'r, 'f) kinstr
-  | IComb_get :
-      ('t, 's) kinfo
-      * int
-      * ('t, 'v) comb_get_gadt_witness
-      * ('v, 's, 'r, 'f) kinstr
-      -> ('t, 's, 'r, 'f) kinstr
-  | IComb_set :
       ('a, 'b * 's) kinfo
       * int
-      * ('a, 'b, 'c) comb_set_gadt_witness
-      * ('c, 's, 'r, 'f) kinstr
+      * ('a, 'b, 's, 'c, 'd, 't) comb_gadt_witness
+      * ('c, 'd * 't, 'r, 'f) kinstr
       -> ('a, 'b * 's, 'r, 'f) kinstr
-  | IDup_n :
-      ('a, 's) kinfo
+  | IUncomb :
+      ('a, 'b * 's) kinfo
       * int
-      * ('a * 's, 't) dup_n_gadt_witness
-      * ('t, 'a * 's, 'r, 'f) kinstr
-      -> ('a, 's, 'r, 'f) kinstr
+      * ('a, 'b, 's, 'c, 'd, 't) uncomb_gadt_witness
+      * ('c, 'd * 't, 'r, 'f) kinstr
+      -> ('a, 'b * 's, 'r, 'f) kinstr
+  | IComb_get :
+      ('t, 'a * 's) kinfo
+      * int
+      * ('t, 'v) comb_get_gadt_witness
+      * ('v, 'a * 's, 'r, 'f) kinstr
+      -> ('t, 'a * 's, 'r, 'f) kinstr
+  | IComb_set :
+      ('a, 'b * ('d * 's)) kinfo
+      * int
+      * ('a, 'b, 'c) comb_set_gadt_witness
+      * ('c, 'd * 's, 'r, 'f) kinstr
+      -> ('a, 'b * ('d * 's), 'r, 'f) kinstr
+  | IDup_n :
+      ('a, 'b * 's) kinfo
+      * int
+      * ('a, 'b, 's, 't) dup_n_gadt_witness
+      * ('t, 'a * ('b * 's), 'r, 'f) kinstr
+      -> ('a, 'b * 's, 'r, 'f) kinstr
   | ITicket :
       ('a, n num * 's) kinfo * ('a ticket, 's, 'r, 'f) kinstr
       -> ('a, n num * 's, 'r, 'f) kinstr
@@ -1443,17 +1445,17 @@ and (_, _, _, _, _, _, _, _) stack_prefix_preservation_witness =
          stack_prefix_preservation_witness
   | KRest : ('a, 's, 'b, 'u, 'a, 's, 'b, 'u) stack_prefix_preservation_witness
 
-and ('before, 'after) comb_gadt_witness =
-  | Comb_one : ('a * ('x * 'before), 'a * ('x * 'before)) comb_gadt_witness
+and (_, _, _, _, _, _) comb_gadt_witness =
+  | Comb_one : ('a, 'x, 'before, 'a, 'x, 'before) comb_gadt_witness
   | Comb_succ :
-      ('before, 'b * 'after) comb_gadt_witness
-      -> ('a * 'before, ('a * 'b) * 'after) comb_gadt_witness
+      ('b, 'c, 's, 'd, 'e, 't) comb_gadt_witness
+      -> ('a, 'b, 'c * 's, 'a * 'd, 'e, 't) comb_gadt_witness
 
-and ('before, 'after) uncomb_gadt_witness =
-  | Uncomb_one : ('rest, 'rest) uncomb_gadt_witness
+and (_, _, _, _, _, _) uncomb_gadt_witness =
+  | Uncomb_one : ('a, 'x, 'before, 'a, 'x, 'before) uncomb_gadt_witness
   | Uncomb_succ :
-      ('b * 'before, 'after) uncomb_gadt_witness
-      -> (('a * 'b) * 'before, 'a * 'after) uncomb_gadt_witness
+      ('b, 'c, 's, 'd, 'e, 't) uncomb_gadt_witness
+      -> ('a * 'b, 'c, 's, 'a, 'd, 'e * 't) uncomb_gadt_witness
 
 and ('before, 'after) comb_get_gadt_witness =
   | Comb_get_zero : ('b, 'b) comb_get_gadt_witness
@@ -1472,19 +1474,19 @@ and ('value, 'before, 'after) comb_set_gadt_witness =
 
 (*
 
-   [dup_n_gadt_witness ('s, 't)] ensures that there exists at least
-   [n] elements in ['s] and that the [n]-th element of ['s] is of type
+   [dup_n_gadt_witness ('a, 'b, 's, 't)] ensures that there exists at least
+   [n] elements in ['a, 'b, 's] and that the [n]-th element is of type
    ['t]. Here [n] follows Peano's encoding (0 and successor).
    Besides, [0] corresponds to the topmost element of ['s].
 
    This relational predicate is defined by induction on [n].
 
 *)
-and (_, _) dup_n_gadt_witness =
-  | Dup_n_zero : ('a * 'rest, 'a) dup_n_gadt_witness
+and (_, _, _, _) dup_n_gadt_witness =
+  | Dup_n_zero : ('a, _, _, 'a) dup_n_gadt_witness
   | Dup_n_succ :
-      ('stack, 'b) dup_n_gadt_witness
-      -> ('a * 'stack, 'b) dup_n_gadt_witness
+      ('b, 'c, 'stack, 'd) dup_n_gadt_witness
+      -> ('a, 'b, 'c * 'stack, 'd) dup_n_gadt_witness
 
 and ('input, 'output) view_signature =
   | View_signature : {

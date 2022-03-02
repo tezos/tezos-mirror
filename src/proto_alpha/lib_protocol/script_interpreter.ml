@@ -1369,8 +1369,9 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
           (step [@ocaml.tailcall]) g gas k ks check stack
       | IComb (_, _, witness, k) ->
           let rec aux :
-              type before after.
-              (before, after) comb_gadt_witness -> before -> after =
+              type a b s c d t.
+              (a, b, s, c, d, t) comb_gadt_witness -> a * (b * s) -> c * (d * t)
+              =
            fun witness stack ->
             match (witness, stack) with
             | Comb_one, stack -> stack
@@ -1383,8 +1384,10 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
           (step [@ocaml.tailcall]) g gas k ks accu stack
       | IUncomb (_, _, witness, k) ->
           let rec aux :
-              type before after.
-              (before, after) uncomb_gadt_witness -> before -> after =
+              type a b s c d t.
+              (a, b, s, c, d, t) uncomb_gadt_witness ->
+              a * (b * s) ->
+              c * (d * t) =
            fun witness stack ->
             match (witness, stack) with
             | Uncomb_one, stack -> stack
@@ -1424,8 +1427,10 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
           (step [@ocaml.tailcall]) g gas k ks accu stack
       | IDup_n (_, _, witness, k) ->
           let rec aux :
-              type before after.
-              (before, after) dup_n_gadt_witness -> before -> after =
+              type a b before after.
+              (a, b, before, after) dup_n_gadt_witness ->
+              a * (b * before) ->
+              after =
            fun witness stack ->
             match (witness, stack) with
             | Dup_n_zero, (a, _) -> a
