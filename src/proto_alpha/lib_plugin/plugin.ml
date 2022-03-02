@@ -1619,7 +1619,7 @@ module RPC = struct
             (storage, operations, lazy_storage_diff))
           (obj3
              (req "storage" Script.expr_encoding)
-             (req "operations" (list Operation.internal_operation_encoding))
+             (req "operations" (list Apply_results.internal_contents_encoding))
              (opt "lazy_storage_diff" Lazy_storage.encoding))
 
       let trace_code_input_encoding = run_code_input_encoding
@@ -1639,7 +1639,7 @@ module RPC = struct
             (storage, operations, trace, lazy_storage_diff))
           (obj4
              (req "storage" Script.expr_encoding)
-             (req "operations" (list Operation.internal_operation_encoding))
+             (req "operations" (list Apply_results.internal_contents_encoding))
              (req "trace" trace_encoding)
              (opt "lazy_storage_diff" Lazy_storage.encoding))
 
@@ -2298,7 +2298,10 @@ module RPC = struct
                        lazy_storage_diff;
                        ticket_diffs = _;
                      },
-                     _ ) -> (storage, operations, lazy_storage_diff)) ;
+                     _ ) ->
+          ( storage,
+            Apply_results.contents_of_packed_internal_operations operations,
+            lazy_storage_diff )) ;
       Registration.register0
         ~chunked:true
         S.trace_code
@@ -2365,7 +2368,11 @@ module RPC = struct
                        lazy_storage_diff;
                        ticket_diffs = _;
                      },
-                     trace ) -> (storage, operations, trace, lazy_storage_diff)) ;
+                     trace ) ->
+          ( storage,
+            Apply_results.contents_of_packed_internal_operations operations,
+            trace,
+            lazy_storage_diff )) ;
       Registration.register0
         ~chunked:true
         S.run_view
