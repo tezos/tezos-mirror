@@ -152,7 +152,7 @@ let spend ctxt src amount origin =
             ctxt
             bpkh
             amount
-          >>=? fun ctxt -> return (ctxt, Commitments bpkh)
+          >|=? fun ctxt -> (ctxt, Commitments bpkh)
       | `Delegate_balance delegate ->
           let contract = Contract_repr.implicit_contract delegate in
           Contract_storage.decrease_balance_only_call_from_token
@@ -161,13 +161,11 @@ let spend ctxt src amount origin =
             amount
           >|=? fun ctxt -> (ctxt, Contract contract)
       | `Frozen_deposits delegate ->
-          (if Tez_repr.(amount = zero) then return ctxt
-          else
-            Frozen_deposits_storage.spend_only_call_from_token
-              ctxt
-              delegate
-              amount)
-          >>=? fun ctxt -> return (ctxt, Deposits delegate)
+          Frozen_deposits_storage.spend_only_call_from_token
+            ctxt
+            delegate
+            amount
+          >|=? fun ctxt -> (ctxt, Deposits delegate)
       | `Block_fees ->
           Raw_context.spend_collected_fees_only_call_from_token ctxt amount
           >>?= fun ctxt -> return (ctxt, Block_fees)))
