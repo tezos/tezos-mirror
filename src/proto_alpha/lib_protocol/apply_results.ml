@@ -199,9 +199,6 @@ module Manager_result = struct
         op_case : 'kind Operation.Encoding.Manager_operations.case;
         encoding : 'a Data_encoding.t;
         kind : 'kind Kind.manager;
-        iselect :
-          packed_internal_operation_result ->
-          ('kind internal_operation * 'kind manager_operation_result) option;
         select :
           packed_successful_manager_operation_result ->
           'kind successful_manager_operation_result option;
@@ -211,7 +208,7 @@ module Manager_result = struct
       }
         -> 'kind case
 
-  let make ~op_case ~encoding ~kind ~iselect ~select ~proj ~inj =
+  let make ~op_case ~encoding ~kind ~select ~proj ~inj =
     let (Operation.Encoding.Manager_operations.MCase {name; _}) = op_case in
     let t =
       def (Format.asprintf "operation.alpha.operation_result.%s" name)
@@ -262,7 +259,7 @@ module Manager_result = struct
                (fun (((), errs), x) -> Backtracked (inj x, errs));
            ]
     in
-    MCase {op_case; encoding; kind; iselect; select; proj; inj; t}
+    MCase {op_case; encoding; kind; select; proj; inj; t}
 
   let[@coq_axiom_with_reason "gadt"] reveal_case =
     make
@@ -272,10 +269,6 @@ module Manager_result = struct
           obj2
             (dft "consumed_gas" Gas.Arith.n_integral_encoding Gas.Arith.zero)
             (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero))
-      ~iselect:(function
-        | Internal_operation_result (({operation = Reveal _; _} as op), res) ->
-            Some (op, res)
-        | _ -> None)
       ~select:(function
         | Successful_manager_result (Reveal_result _ as op) -> Some op
         | _ -> None)
@@ -374,11 +367,6 @@ module Manager_result = struct
     make
       ~op_case:Operation.Encoding.Manager_operations.transaction_case
       ~encoding:transaction_contract_variant_cases
-      ~iselect:(function
-        | Internal_operation_result (({operation = Transaction _; _} as op), res)
-          ->
-            Some (op, res)
-        | _ -> None)
       ~select:(function
         | Successful_manager_result (Transaction_result _ as op) -> Some op
         | _ -> None)
@@ -398,11 +386,6 @@ module Manager_result = struct
            (dft "storage_size" z Z.zero)
            (dft "paid_storage_size_diff" z Z.zero)
            (opt "lazy_storage_diff" Lazy_storage.encoding))
-      ~iselect:(function
-        | Internal_operation_result (({operation = Origination _; _} as op), res)
-          ->
-            Some (op, res)
-        | _ -> None)
       ~select:(function
         | Successful_manager_result (Origination_result _ as op) -> Some op
         | _ -> None)
@@ -454,11 +437,6 @@ module Manager_result = struct
            (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
            (dft "storage_size" z Z.zero)
            (req "global_address" Script_expr_hash.encoding))
-      ~iselect:(function
-        | Internal_operation_result
-            (({operation = Register_global_constant _; _} as op), res) ->
-            Some (op, res)
-        | _ -> None)
       ~select:(function
         | Successful_manager_result (Register_global_constant_result _ as op) ->
             Some op
@@ -495,11 +473,6 @@ module Manager_result = struct
           obj2
             (dft "consumed_gas" Gas.Arith.n_integral_encoding Gas.Arith.zero)
             (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero))
-      ~iselect:(function
-        | Internal_operation_result (({operation = Delegation _; _} as op), res)
-          ->
-            Some (op, res)
-        | _ -> None)
       ~select:(function
         | Successful_manager_result (Delegation_result _ as op) -> Some op
         | _ -> None)
@@ -519,11 +492,6 @@ module Manager_result = struct
           obj2
             (dft "consumed_gas" Gas.Arith.n_integral_encoding Gas.Arith.zero)
             (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero))
-      ~iselect:(function
-        | Internal_operation_result
-            (({operation = Set_deposits_limit _; _} as op), res) ->
-            Some (op, res)
-        | _ -> None)
       ~select:(function
         | Successful_manager_result (Set_deposits_limit_result _ as op) ->
             Some op
@@ -546,11 +514,6 @@ module Manager_result = struct
             (dft "consumed_gas" Gas.Arith.n_integral_encoding Gas.Arith.zero)
             (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
             (req "originated_rollup" Tx_rollup.encoding))
-      ~iselect:(function
-        | Internal_operation_result
-            (({operation = Tx_rollup_origination; _} as op), res) ->
-            Some (op, res)
-        | _ -> None)
       ~select:(function
         | Successful_manager_result (Tx_rollup_origination_result _ as op) ->
             Some op
@@ -585,11 +548,6 @@ module Manager_result = struct
             (req "balance_updates" Receipt.balance_updates_encoding)
             (dft "consumed_gas" Gas.Arith.n_integral_encoding Gas.Arith.zero)
             (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero))
-      ~iselect:(function
-        | Internal_operation_result
-            (({operation = Tx_rollup_submit_batch _; _} as op), res) ->
-            Some (op, res)
-        | _ -> None)
       ~select:(function
         | Successful_manager_result (Tx_rollup_submit_batch_result _ as op) ->
             Some op
@@ -612,11 +570,6 @@ module Manager_result = struct
             (req "balance_updates" Receipt.balance_updates_encoding)
             (dft "consumed_gas" Gas.Arith.n_integral_encoding Gas.Arith.zero)
             (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero))
-      ~iselect:(function
-        | Internal_operation_result
-            (({operation = Tx_rollup_commit _; _} as op), res) ->
-            Some (op, res)
-        | _ -> None)
       ~select:(function
         | Successful_manager_result (Tx_rollup_commit_result _ as op) -> Some op
         | _ -> None)
@@ -638,11 +591,6 @@ module Manager_result = struct
             (req "balance_updates" Receipt.balance_updates_encoding)
             (dft "consumed_gas" Gas.Arith.n_integral_encoding Gas.Arith.zero)
             (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero))
-      ~iselect:(function
-        | Internal_operation_result
-            (({operation = Tx_rollup_return_bond _; _} as op), res) ->
-            Some (op, res)
-        | _ -> None)
       ~select:(function
         | Successful_manager_result (Tx_rollup_return_bond_result _ as op) ->
             Some op
@@ -667,11 +615,6 @@ module Manager_result = struct
             (dft "consumed_gas" Gas.Arith.n_integral_encoding Gas.Arith.zero)
             (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
             (req "level" Tx_rollup_level.encoding))
-      ~iselect:(function
-        | Internal_operation_result
-            (({operation = Tx_rollup_finalize_commitment _; _} as op), res) ->
-            Some (op, res)
-        | _ -> None)
       ~select:(function
         | Successful_manager_result
             (Tx_rollup_finalize_commitment_result _ as op) ->
@@ -698,11 +641,6 @@ module Manager_result = struct
             (dft "consumed_gas" Gas.Arith.n_integral_encoding Gas.Arith.zero)
             (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
             (req "level" Tx_rollup_level.encoding))
-      ~iselect:(function
-        | Internal_operation_result
-            (({operation = Tx_rollup_remove_commitment _; _} as op), res) ->
-            Some (op, res)
-        | _ -> None)
       ~select:(function
         | Successful_manager_result (Tx_rollup_remove_commitment_result _ as op)
           ->
@@ -727,11 +665,6 @@ module Manager_result = struct
             (req "balance_updates" Receipt.balance_updates_encoding)
             (dft "consumed_gas" Gas.Arith.n_integral_encoding Gas.Arith.zero)
             (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero))
-      ~iselect:(function
-        | Internal_operation_result
-            (({operation = Tx_rollup_rejection _; _} as op), res) ->
-            Some (op, res)
-        | _ -> None)
       ~select:(function
         | Successful_manager_result (Tx_rollup_rejection_result _ as op) ->
             Some op
@@ -755,11 +688,6 @@ module Manager_result = struct
            (dft "consumed_gas" Gas.Arith.n_integral_encoding Gas.Arith.zero)
            (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
            (req "size" z))
-      ~iselect:(function
-        | Internal_operation_result
-            (({operation = Sc_rollup_originate _; _} as op), res) ->
-            Some (op, res)
-        | _ -> None)
       ~select:(function
         | Successful_manager_result (Sc_rollup_originate_result _ as op) ->
             Some op
@@ -787,11 +715,6 @@ module Manager_result = struct
            (req "consumed_gas" Gas.Arith.n_integral_encoding)
            (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
            (req "inbox_after" Sc_rollup.Inbox.encoding))
-      ~iselect:(function
-        | Internal_operation_result
-            (({operation = Sc_rollup_add_messages _; _} as op), res) ->
-            Some (op, res)
-        | _ -> None)
       ~select:(function
         | Successful_manager_result (Sc_rollup_add_messages_result _ as op) ->
             Some op
@@ -812,11 +735,6 @@ module Manager_result = struct
         (obj2
            (req "consumed_gas" Gas.Arith.n_integral_encoding)
            (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero))
-      ~iselect:(function
-        | Internal_operation_result
-            (({operation = Sc_rollup_cement _; _} as op), res) ->
-            Some (op, res)
-        | _ -> None)
       ~select:(function
         | Successful_manager_result (Sc_rollup_cement_result _ as op) -> Some op
         | _ -> None)
@@ -829,10 +747,15 @@ module Manager_result = struct
         Sc_rollup_cement_result {consumed_gas = consumed_milligas})
 end
 
+type 'kind iselect =
+  packed_internal_operation_result ->
+  ('kind internal_operation * 'kind manager_operation_result) option
+
 let internal_operation_result_encoding :
     packed_internal_operation_result Data_encoding.t =
   let make (type kind)
-      (Manager_result.MCase res_case : kind Manager_result.case) =
+      (Manager_result.MCase res_case : kind Manager_result.case)
+      (iselect : kind iselect) =
     let (Operation.Encoding.Manager_operations.MCase op_case) =
       res_case.op_case
     in
@@ -846,7 +769,7 @@ let internal_operation_result_encoding :
             (req "nonce" uint16))
          (merge_objs op_case.encoding (obj1 (req "result" res_case.t))))
       (fun op ->
-        match res_case.iselect op with
+        match iselect op with
         | Some (op, res) ->
             Some (((), op.source, op.nonce), (op_case.proj op.operation, res))
         | None -> None)
@@ -854,20 +777,27 @@ let internal_operation_result_encoding :
         let op = {source; operation = op_case.inj op; nonce} in
         Internal_operation_result (op, res))
   in
+  let iselect_transaction : Kind.transaction iselect = function
+    | Internal_operation_result (({operation = Transaction _; _} as op), res) ->
+        Some (op, res)
+    | _ -> None
+  in
+  let iselect_origination : Kind.origination iselect = function
+    | Internal_operation_result (({operation = Origination _; _} as op), res) ->
+        Some (op, res)
+    | _ -> None
+  in
+  let iselect_delegation : Kind.delegation iselect = function
+    | Internal_operation_result (({operation = Delegation _; _} as op), res) ->
+        Some (op, res)
+    | _ -> None
+  in
   def "operation.alpha.internal_operation_result"
   @@ union
        [
-         make Manager_result.reveal_case;
-         make Manager_result.transaction_case;
-         make Manager_result.origination_case;
-         make Manager_result.delegation_case;
-         make Manager_result.register_global_constant_case;
-         make Manager_result.set_deposits_limit_case;
-         make Manager_result.tx_rollup_origination_case;
-         make Manager_result.tx_rollup_submit_batch_case;
-         make Manager_result.sc_rollup_originate_case;
-         make Manager_result.sc_rollup_add_messages_case;
-         make Manager_result.sc_rollup_cement_case;
+         make Manager_result.transaction_case iselect_transaction;
+         make Manager_result.origination_case iselect_origination;
+         make Manager_result.delegation_case iselect_delegation;
        ]
 
 let successful_manager_operation_result_encoding :
