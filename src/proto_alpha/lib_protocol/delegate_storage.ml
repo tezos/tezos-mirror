@@ -614,21 +614,8 @@ module Random = struct
     loop state
 
   let owner c (level : Level_repr.t) offset =
-    (* TODO: https://gitlab.com/tezos/tezos/-/issues/2084
-       compute sampler at stake distribution snapshot instead of lazily. *)
     let cycle = level.Level_repr.cycle in
-    (match Raw_context.sampler_for_cycle c cycle with
-    | Error `Sampler_not_set ->
-        Seed_storage.for_cycle c cycle >>=? fun seed ->
-        Stake_storage.Delegate_sampler_state.get c cycle >>=? fun state ->
-        let (c, seed, state) =
-          match Raw_context.set_sampler_for_cycle c cycle (seed, state) with
-          | Error `Sampler_already_set -> assert false
-          | Ok c -> (c, seed, state)
-        in
-        return (c, seed, state)
-    | Ok (seed, state) -> return (c, seed, state))
-    >>=? fun (c, seed, state) ->
+    Stake_storage.sampler_for_cycle c cycle >>=? fun (c, seed, state) ->
     let sample ~int_bound ~mass_bound =
       let state = init_random_state seed level offset in
       let (i, state) = take_int64 (Int64.of_int int_bound) state in

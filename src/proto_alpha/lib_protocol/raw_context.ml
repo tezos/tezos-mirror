@@ -349,6 +349,8 @@ type error += Operation_quota_exceeded (* `Temporary *)
 
 type error += Stake_distribution_not_set (* `Branch *)
 
+type error += Sampler_already_set of Cycle_repr.t (* `Permanent *)
+
 let () =
   let open Data_encoding in
   register_error_kind
@@ -391,7 +393,23 @@ let () =
         "The stake distribution for the current cycle is not set.")
     Data_encoding.(empty)
     (function Stake_distribution_not_set -> Some () | _ -> None)
-    (fun () -> Stake_distribution_not_set)
+    (fun () -> Stake_distribution_not_set) ;
+  register_error_kind
+    `Permanent
+    ~id:"sampler_already_set"
+    ~title:"Sampler already set"
+    ~description:
+      "Internal error: Raw_context.set_sampler_for_cycle was called twice for \
+       a given cycle"
+    ~pp:(fun ppf c ->
+      Format.fprintf
+        ppf
+        "Internal error: sampler already set for cycle %a."
+        Cycle_repr.pp
+        c)
+    (obj1 (req "cycle" Cycle_repr.encoding))
+    (function Sampler_already_set c -> Some c | _ -> None)
+    (fun c -> Sampler_already_set c)
 
 let fresh_internal_nonce ctxt =
   if Compare.Int.(internal_nonce ctxt >= 65_535) then
@@ -1150,18 +1168,23 @@ let record_non_consensus_operation_hash ctxt operation_hash =
 
 let non_consensus_operations ctxt = List.rev (non_consensus_operations_rev ctxt)
 
-let set_sampler_for_cycle ctxt cycle sampler_with_seed =
+let init_sampler_for_cycle ctxt cycle seed state =
   let map = sampler_state ctxt in
-  if Cycle_repr.Map.mem cycle map then Error `Sampler_already_set
+  if Cycle_repr.Map.mem cycle map then error (Sampler_already_set cycle)
   else
-    let map = Cycle_repr.Map.add cycle sampler_with_seed map in
-    Ok (update_sampler_state ctxt map)
+    let map = Cycle_repr.Map.add cycle (seed, state) map in
+    let ctxt = update_sampler_state ctxt map in
+    ok ctxt
 
-let sampler_for_cycle ctxt cycle =
+let sampler_for_cycle ~read ctxt cycle =
   let map = sampler_state ctxt in
   match Cycle_repr.Map.find cycle map with
-  | None -> Error `Sampler_not_set
-  | Some sampler -> Ok sampler
+  | Some (seed, state) -> return (ctxt, seed, state)
+  | None ->
+      read ctxt >>=? fun (seed, state) ->
+      let map = Cycle_repr.Map.add cycle (seed, state) map in
+      let ctxt = update_sampler_state ctxt map in
+      return (ctxt, seed, state)
 
 let stake_distribution_for_current_cycle ctxt =
   match ctxt.back.stake_distribution_for_current_cycle with

@@ -224,25 +224,35 @@ val record_non_consensus_operation_hash : t -> Operation_hash.t -> t
 
 val non_consensus_operations : t -> Operation_hash.t list
 
-(** [set_sampler_for_cycle ctxt cycle sampler] evaluates to
-    [Ok c] with [c] verifying [sampler_for_cycle c cycle = sampler]
-    if no sampler was set for the same [cycle] beforehand.
-    In the other case, it returns [Error `Sampler_already_set]. *)
-val set_sampler_for_cycle :
+(** [init_sampler_for_cycle ctxt cycle seed state] caches the seeded stake
+    sampler (a.k.a. [seed, state]) for [cycle] in memory for quick access. *)
+val init_sampler_for_cycle :
   t ->
   Cycle_repr.t ->
-  Seed_repr.seed * (Signature.public_key * Signature.public_key_hash) Sampler.t ->
-  (t, [`Sampler_already_set]) result
+  Seed_repr.seed ->
+  (Signature.public_key * Signature.public_key_hash) Sampler.t ->
+  t tzresult
 
-(** [sampler_for_cycle ctxt cycle] evaluates to [Ok sampler] if a sampler was
-    set for [cycle] using [set_sampler_for_cycle].
-    Otherwise, it returns [Error `Sampler_not_set]. *)
+(** [sampler_for_cycle ~read ctxt cycle] returns the seeded stake
+    sampler for [cycle]. The sampler is read in memory if
+    [init_sampler_for_cycle] or [sampler_for_cycle] was previously
+    called for the same [cycle]. Otherwise, it is read "on-disk" with
+    the [read] function and then cached in [ctxt] like
+    [init_sampler_for_cycle]. *)
 val sampler_for_cycle :
+  read:
+    (t ->
+    (Seed_repr.seed
+    * (Signature.public_key * Signature.public_key_hash) Sampler.t)
+    tzresult
+    Lwt.t) ->
   t ->
   Cycle_repr.t ->
-  ( Seed_repr.seed * (Signature.public_key * Signature.public_key_hash) Sampler.t,
-    [`Sampler_not_set] )
-  result
+  (t
+  * Seed_repr.seed
+  * (Signature.public_key * Signature.public_key_hash) Sampler.t)
+  tzresult
+  Lwt.t
 
 (* The stake distribution is stored both in [t] and in the cache. It
    may be sufficient to only store it in the cache. *)
