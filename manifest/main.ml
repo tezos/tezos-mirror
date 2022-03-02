@@ -198,7 +198,7 @@ let ppx_blob = external_lib "ppx_blob" V.True
 
 let ppx_inline_test = external_lib "ppx_inline_test" V.True
 
-let ptime = external_lib ~js_compatible:true "ptime" V.(at_least "0.8.4")
+let ptime = external_lib ~js_compatible:true "ptime" V.(at_least "1.0.0")
 
 let ppx_deriving = external_lib "ppx_deriving" V.True
 
@@ -869,7 +869,20 @@ let tezos_base =
         ipaddr;
       ]
     ~js_compatible:true
-    ~dune:Dune.[ocamllex "point_parser"]
+    ~js_of_ocaml:[[S "javascript_files"; S "ptime.js"]]
+    ~dune:
+      Dune.
+        [
+          ocamllex "point_parser";
+          (* ptime is currently sligtly broken and I don't think a fix will land soon.
+             See https://github.com/dbuenzli/ptime/pull/27.
+             Meanwhile, we can just copy the runtime file and let dune knows about it our-selves.
+          *)
+          targets_rule
+            ["ptime.js"]
+            ~action:
+              [S "copy"; S "%{lib:ptime.clock.os:runtime.js}"; S "ptime.js"];
+        ]
 
 let tezos_base_unix =
   public_lib
