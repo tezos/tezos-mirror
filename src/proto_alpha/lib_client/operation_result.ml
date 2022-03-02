@@ -790,13 +790,17 @@ let pp_manager_operation_contents_and_result ppf
       Format.fprintf
         ppf
         "@,@[<v 2>Internal operations:@ %a@]"
-        (Format.pp_print_list (fun ppf (Internal_operation_result (op, res)) ->
+        (Format.pp_print_list
+           (fun ppf (Internal_manager_operation_result (op, res)) ->
+             let operation =
+               manager_operation_of_internal_operation op.operation
+             in
              pp_manager_operation_content
                op.source
                false
                pp_result
                ppf
-               (op.operation, res)))
+               (operation, res)))
         internal_operation_results) ;
   Format.fprintf ppf "@]"
 
@@ -958,11 +962,15 @@ let pp_operation_result ppf
   pp_contents_and_result_list ppf contents_and_result_list ;
   Format.fprintf ppf "@]@."
 
-let pp_internal_operation ppf
-    (Internal_operation {source; operation; nonce = _}) =
+let pp_internal_operation_result ppf (Apply_results.Internal_contents op) =
+  let operation = manager_operation_of_internal_operation op.operation in
   pp_manager_operation_content
-    source
+    op.source
     true
     (fun _ppf () -> ())
     ppf
     (operation, ())
+
+let pp_internal_operation ppf (Internal_operation op) =
+  let op = contents_of_internal_operation op in
+  pp_internal_operation_result ppf (Internal_contents op)
