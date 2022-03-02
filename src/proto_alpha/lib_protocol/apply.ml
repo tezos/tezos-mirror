@@ -576,7 +576,9 @@ type error +=
   | (* `Temporary *) Wrong_voting_period of {expected : int32; provided : int32}
 
 type error +=
-  | (* `Permanent *) Internal_operation_replay of packed_internal_operation
+  | (* `Permanent *)
+      Internal_operation_replay of
+      Apply_results.packed_internal_contents
 
 type denunciation_kind = Preendorsement | Endorsement | Block
 
@@ -663,7 +665,7 @@ let () =
         ppf
         "Internal operation %d was emitted twice by a script"
         nonce)
-    Operation.internal_operation_encoding
+    Apply_results.internal_contents_encoding
     (function Internal_operation_replay op -> Some op | _ -> None)
     (fun op -> Internal_operation_replay op) ;
   register_error_kind
@@ -1488,8 +1490,9 @@ let apply_internal_manager_operations ctxt mode ~payer ~chain_id ops =
     match worklist with
     | [] -> Lwt.return (Success ctxt, List.rev applied)
     | Internal_operation ({source; operation; nonce} as op) :: rest -> (
+        let op_res = Apply_results.contents_of_internal_operation op in
         (if internal_nonce_already_recorded ctxt nonce then
-         fail (Internal_operation_replay (Internal_operation op))
+         fail (Internal_operation_replay (Internal_contents op_res))
         else
           let ctxt = record_internal_nonce ctxt nonce in
           apply_manager_operation_content
@@ -1504,21 +1507,24 @@ let apply_internal_manager_operations ctxt mode ~payer ~chain_id ops =
         >>= function
         | Error errors ->
             let result =
-              Internal_operation_result
-                (op, Failed (manager_kind op.operation, errors))
+              pack_internal_manager_operation_result
+                op
+                (Failed (manager_kind op.operation, errors))
             in
             let skipped =
               List.rev_map
                 (fun (Internal_operation op) ->
-                  Internal_operation_result
-                    (op, Skipped (manager_kind op.operation)))
+                  pack_internal_manager_operation_result
+                    op
+                    (Skipped (manager_kind op.operation)))
                 rest
             in
             Lwt.return (Failure, List.rev (skipped @ result :: applied))
         | Ok (ctxt, result, emitted) ->
             apply
               ctxt
-              (Internal_operation_result (op, Applied result) :: applied)
+              (pack_internal_manager_operation_result op (Applied result)
+               :: applied)
               (emitted @ rest))
   in
   apply ctxt [] ops
@@ -1745,7 +1751,7 @@ let apply_manager_contents (type kind) ctxt mode chain_id
     ~gas_consumed_in_precheck (op : kind Kind.manager contents) :
     (success_or_failure
     * kind manager_operation_result
-    * packed_internal_operation_result list)
+    * packed_internal_manager_operation_result list)
     Lwt.t =
   let[@coq_match_with_default] (Manager_operation
                                  {
@@ -1785,17 +1791,17 @@ let apply_manager_contents (type kind) ctxt mode chain_id
           >>= function
           | Ok (ctxt, storage_limit, operation_results) -> (
               List.fold_left_es
-                (fun (ctxt, storage_limit, res) iopr ->
-                  let (Internal_operation_result (op, mopr)) = iopr in
+                (fun (ctxt, storage_limit, res) imopr ->
+                  let (Internal_manager_operation_result (op, mopr)) = imopr in
                   match mopr with
                   | Applied smopr ->
                       burn_storage_fees ctxt smopr ~storage_limit ~payer
                       >>=? fun (ctxt, storage_limit, smopr) ->
-                      let iopr =
-                        Internal_operation_result (op, Applied smopr)
+                      let imopr =
+                        Internal_manager_operation_result (op, Applied smopr)
                       in
-                      return (ctxt, storage_limit, iopr :: res)
-                  | _ -> return (ctxt, storage_limit, iopr :: res))
+                      return (ctxt, storage_limit, imopr :: res)
+                  | _ -> return (ctxt, storage_limit, imopr :: res))
                 (ctxt, storage_limit, [])
                 internal_operations_results
               >|= function
@@ -2052,9 +2058,10 @@ let mark_backtracked results =
                     op.internal_operation_results;
               },
             mark_contents_list rest )
-  and mark_internal_operation_results (Internal_operation_result (kind, result))
-      =
-    Internal_operation_result (kind, mark_manager_operation_result result)
+  and mark_internal_operation_results
+      (Internal_manager_operation_result (kind, result)) =
+    Internal_manager_operation_result
+      (kind, mark_manager_operation_result result)
   and mark_manager_operation_result :
       type kind. kind manager_operation_result -> kind manager_operation_result
       = function
