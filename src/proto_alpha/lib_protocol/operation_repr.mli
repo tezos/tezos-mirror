@@ -351,7 +351,7 @@ and _ manager_operation =
   | Tx_rollup_rejection : {
       tx_rollup : Tx_rollup_repr.t;
       level : Tx_rollup_level_repr.t;
-      message : string;
+      message : Tx_rollup_message_repr.t;
       message_position : int;
       proof : (* FIXME/TORU *) bool;
     }

@@ -55,6 +55,12 @@ type error +=
     }
   | Invalid_proof
   | Internal_error of string
+  | Wrong_message_position of {
+      level : Tx_rollup_level_repr.t;
+      position : int;
+      length : int;
+    }
+  | Wrong_message_hash
 
 let () =
   let open Data_encoding in
@@ -338,4 +344,33 @@ let () =
     ~description:"An internal error occurred"
     (obj1 (req "description" string))
     (function Internal_error str -> Some str | _ -> None)
-    (fun str -> Internal_error str)
+    (fun str -> Internal_error str) ;
+  (* Wrong_message_position *)
+  register_error_kind
+    `Branch
+    ~id:"tx_rollup_wrong_message_position"
+    ~title:"Wrong message index in rejection"
+    ~description:
+      "The rejection references the {position}^th message of the inbox {l} \
+       which contains only {inbox_length} messages"
+    (obj3
+       (req "level" Tx_rollup_level_repr.encoding)
+       (req "position" int31)
+       (req "length" int31))
+    (function
+      | Wrong_message_position {level; position; length} ->
+          Some (level, position, length)
+      | _ -> None)
+    (fun (level, position, length) ->
+      Wrong_message_position {level; position; length}) ;
+  (* Wrong_message_hash *)
+  register_error_kind
+    `Branch
+    ~id:"tx_rollup_wrong_message_hash"
+    ~title:"Wrong message hash in rejection."
+    ~description:
+      "This rejection has sent a message with a hash that doesn't match the \
+       stored one"
+    unit
+    (function Wrong_message_hash -> Some () | _ -> None)
+    (fun () -> Wrong_message_hash)

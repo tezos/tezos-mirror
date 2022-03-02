@@ -1364,9 +1364,16 @@ let apply_manager_operation_content :
           }
       in
       return (ctxt, result, [])
-  | Tx_rollup_rejection {proof; tx_rollup; level; _} ->
+  | Tx_rollup_rejection {proof; tx_rollup; level; message; message_position} ->
       Tx_rollup_state.get ctxt tx_rollup >>=? fun (ctxt, state) ->
       (* TODO/TORU: Check the proof *)
+      Tx_rollup_inbox.check_message_hash
+        ctxt
+        level
+        tx_rollup
+        ~position:message_position
+        message
+      >>=? fun ctxt ->
       fail_unless proof Tx_rollup_errors.Invalid_proof >>=? fun () ->
       (* Proof is correct, removing *)
       Tx_rollup_commitment.reject_commitment ctxt tx_rollup state level

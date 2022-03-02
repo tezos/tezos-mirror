@@ -222,3 +222,26 @@ let remove :
   get_metadata ctxt level rollup >>=? fun (ctxt, metadata) ->
   Storage.Tx_rollup.Inbox_metadata.remove (ctxt, level) rollup
   >>=? fun (ctxt, _, _) -> remove_messages ctxt 0l metadata.inbox_length
+
+let check_message_hash :
+    Raw_context.t ->
+    Tx_rollup_level_repr.t ->
+    Tx_rollup_repr.t ->
+    position:int ->
+    Tx_rollup_message_repr.t ->
+    Raw_context.t tzresult Lwt.t =
+ fun ctxt level tx_rollup ~position message ->
+  Storage.Tx_rollup.Inbox_contents.list_values ((ctxt, level), tx_rollup)
+  >>=? fun (ctxt, messages) ->
+  Option.value_e
+    ~error:
+      (Error_monad.trace_of_error
+         (Wrong_message_position
+            {level; position; length = List.length messages}))
+  @@ List.nth_opt messages position
+  >>?= fun expected_hash ->
+  Tx_rollup_message_builder.hash ctxt message >>?= fun (ctxt, actual_hash) ->
+  fail_unless
+    (Tx_rollup_message_repr.hash_equal actual_hash expected_hash)
+    Wrong_message_hash
+  >>=? fun () -> return ctxt

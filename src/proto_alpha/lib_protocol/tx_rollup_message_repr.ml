@@ -129,3 +129,5 @@ let hash_encoding = Message_hash.encoding
 
 let hash_uncarbonated msg =
   Message_hash.hash_bytes [Data_encoding.Binary.to_bytes_exn encoding msg]
+
+let hash_equal = Message_hash.equal
