@@ -36,7 +36,6 @@
 open Protocol
 open Alpha_context
 open Script_interpreter
-open Error_monad_operators
 
 let test_context () =
   Context.init3 () >>=? fun (b, _cs) ->
@@ -123,8 +122,8 @@ let test_stack_overflow () =
   in
   let stack = Bot_t in
   let descr kinstr = {kloc = 0; kbef = stack; kaft = stack; kinstr} in
-  let kinfo = {iloc = -1; kstack_ty = stack} in
-  let kinfo' = {iloc = -1; kstack_ty = Item_t (bool_t, stack)} in
+  let kinfo = {iloc = -1} in
+  let kinfo' = {iloc = -1} in
   let enorme_et_seq n =
     let rec aux n acc =
       if n = 0 then acc
@@ -153,16 +152,9 @@ let test_stack_overflow_in_lwt () =
     @@ Gas.fp_of_milligas_int (Saturation_repr.saturated :> int)
   in
   let stack = Bot_t in
-  let item ty s = Item_t (ty, s) in
-  let bool_t = bool_t in
-  big_map_t (-1) unit_t unit_t >>??= fun big_map_t ->
   let descr kinstr = {kloc = 0; kbef = stack; kaft = stack; kinstr} in
-  let kinfo s = {iloc = -1; kstack_ty = s} in
-  let stack1 = item big_map_t Bot_t in
-  let stack2 = item big_map_t (item big_map_t Bot_t) in
-  let stack3 = item unit_t stack2 in
-  let stack4 = item bool_t stack1 in
-  let push_empty_big_map k = IEmpty_big_map (kinfo stack, unit_t, unit_t, k) in
+  let kinfo = {iloc = -1} in
+  let push_empty_big_map k = IEmpty_big_map (kinfo, unit_t, unit_t, k) in
   let large_mem_seq n =
     let rec aux n acc =
       if n = 0 then acc
@@ -170,14 +162,12 @@ let test_stack_overflow_in_lwt () =
         aux
           (n - 1)
           (IDup
-             ( kinfo stack1,
+             ( kinfo,
                IConst
-                 ( kinfo stack2,
-                   Unit_t,
-                   (),
-                   IBig_map_mem (kinfo stack3, IDrop (kinfo stack4, acc)) ) ))
+                 (kinfo, Unit_t, (), IBig_map_mem (kinfo, IDrop (kinfo, acc)))
+             ))
     in
-    aux n (IDrop (kinfo stack1, IHalt (kinfo stack)))
+    aux n (IDrop (kinfo, IHalt kinfo))
   in
   let script = push_empty_big_map (large_mem_seq 1_000_000) in
   run_step ctxt (descr script) EmptyCell EmptyCell >>= function

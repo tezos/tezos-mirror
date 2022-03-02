@@ -146,6 +146,7 @@ module Internals : sig
     logger option ->
     Local_gas_counter.outdated_context * step_constants ->
     Local_gas_counter.local_gas_counter ->
+    ('a, 's) stack_ty ->
     ('a, 's, 'r, 'f) continuation ->
     'a ->
     's ->
@@ -189,6 +190,7 @@ module Internals : sig
     logger option ->
     context ->
     step_constants ->
+    ('a, 's) stack_ty ->
     ('a, 's, 'r, 'f) Script_typed_ir.kinstr ->
     'a ->
     's ->

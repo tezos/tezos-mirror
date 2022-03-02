@@ -71,12 +71,12 @@ type ('a, 's, 'b, 'u) descr = {
 }
 
 let close_descr {loc; bef; aft; instr} =
-  let kinfo = {iloc = loc; kstack_ty = aft} in
-  let kinfo' = {iloc = loc; kstack_ty = bef} in
+  let kinfo = {iloc = loc} in
+  let kinfo' = {iloc = loc} in
   let kinstr = instr.apply kinfo' (IHalt kinfo) in
   {kloc = loc; kbef = bef; kaft = aft; kinstr}
 
-let kinfo_of_descr {loc; bef; _} = {iloc = loc; kstack_ty = bef}
+let kinfo_of_descr {loc; _} = {iloc = loc}
 
 let compose_descr :
     type a s b u c v.
@@ -1641,7 +1641,7 @@ let rec make_dug_proof_argument :
   | n, Item_t (v, rest) ->
       make_dug_proof_argument loc (n - 1) x rest
       |> Option.map @@ fun (Dug_proof_argument (n', aft')) ->
-         let kinfo = {iloc = loc; kstack_ty = aft'} in
+         let kinfo = {iloc = loc} in
          Dug_proof_argument (KPrefix (kinfo, v, n'), Item_t (v, aft'))
   | _, _ -> None
 
@@ -2951,7 +2951,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
         | false, Item_t (a, rest) ->
             make_proof_argument (n - 1) rest
             >|? fun (Dropn_proof_argument (n', stack_after_drops)) ->
-            let kinfo = {iloc = loc; kstack_ty = rest} in
+            let kinfo = {iloc = loc} in
             Dropn_proof_argument (KPrefix (kinfo, a, n'), stack_after_drops)
         | _, _ ->
             let whole_stack = serialize_stack_for_error ctxt whole_stack in
@@ -3024,7 +3024,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
         | false, Item_t (v, rest) ->
             make_proof_argument (n - 1) rest
             >|? fun (Dig_proof_argument (n', x, aft')) ->
-            let kinfo = {iloc = loc; kstack_ty = aft'} in
+            let kinfo = {iloc = loc} in
             Dig_proof_argument (KPrefix (kinfo, v, n'), x, Item_t (v, aft'))
         | _, _ ->
             let whole_stack = serialize_stack_for_error ctxt stack in
@@ -3117,7 +3117,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
             ( stack_eq loc ctxt 1 aft_rest rest >>? fun (Eq, ctxt) ->
               option_t loc ret >>? fun opt_ty ->
               let final_stack = Item_t (opt_ty, rest) in
-              let hinfo = {iloc = loc; kstack_ty = Item_t (ret, aft_rest)} in
+              let hinfo = {iloc = loc} in
               let cinfo = kinfo_of_descr kibody in
               let body = kibody.instr.apply cinfo (IHalt hinfo) in
               let apply kinfo k = IOpt_map {kinfo; body; k} in
@@ -3391,7 +3391,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
             invalid_map_body
             ( stack_eq loc ctxt 1 rest starting_rest >>? fun (Eq, ctxt) ->
               let binfo = kinfo_of_descr kibody in
-              let hinfo = {iloc = loc; kstack_ty = aft} in
+              let hinfo = {iloc = loc} in
               let ibody = kibody.instr.apply binfo (IHalt hinfo) in
               let list_map =
                 {apply = (fun kinfo k -> IList_map (kinfo, ibody, k))}
@@ -3418,7 +3418,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
         {
           apply =
             (fun kinfo k ->
-              let hinfo = {iloc = loc; kstack_ty = rest} in
+              let hinfo = {iloc = loc} in
               let binfo = kinfo_of_descr ibody in
               let ibody = ibody.instr.apply binfo (IHalt hinfo) in
               IList_iter (kinfo, elt, ibody, k));
@@ -3462,7 +3462,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
         {
           apply =
             (fun kinfo k ->
-              let hinfo = {iloc = loc; kstack_ty = rest} in
+              let hinfo = {iloc = loc} in
               let binfo = kinfo_of_descr ibody in
               let ibody = ibody.instr.apply binfo (IHalt hinfo) in
               ISet_iter (kinfo, elt, ibody, k));
@@ -3538,7 +3538,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
                   apply =
                     (fun kinfo k ->
                       let binfo = kinfo_of_descr ibody in
-                      let hinfo = {iloc = loc; kstack_ty = aft} in
+                      let hinfo = {iloc = loc} in
                       let ibody = ibody.instr.apply binfo (IHalt hinfo) in
                       IMap_map (kinfo, kt, ibody, k));
                 }
@@ -3567,7 +3567,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
         {
           apply =
             (fun kinfo k ->
-              let hinfo = {iloc = loc; kstack_ty = rest} in
+              let hinfo = {iloc = loc} in
               let binfo = kinfo_of_descr ibody in
               let ibody = ibody.instr.apply binfo (IHalt hinfo) in
               IMap_iter (kinfo, ty, ibody, k));
@@ -3891,8 +3891,8 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       Item_t (arg, Item_t (Lambda_t (param, ret, _), rest)) ) ->
       check_item_ty ctxt arg param loc I_EXEC 1 2 >>?= fun (Eq, ctxt) ->
       check_var_annot loc annot >>?= fun () ->
-      let instr = {apply = (fun kinfo k -> IExec (kinfo, k))} in
       let stack = Item_t (ret, rest) in
+      let instr = {apply = (fun kinfo k -> IExec (kinfo, k))} in
       (typed ctxt loc instr stack : ((a, s) judgement * context) tzresult Lwt.t)
   | ( Prim (loc, I_APPLY, [], annot),
       Item_t
@@ -3923,8 +3923,8 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
             {
               apply =
                 (fun kinfo k ->
-                  let binfo = {iloc = descr.loc; kstack_ty = descr.bef} in
-                  let kinfoh = {iloc = descr.loc; kstack_ty = descr.aft} in
+                  let binfo = {iloc = descr.loc} in
+                  let kinfoh = {iloc = descr.loc} in
                   let b = descr.instr.apply binfo (IHalt kinfoh) in
                   IDip (kinfo, b, k));
             }
@@ -3960,7 +3960,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
         | false, Item_t (v, rest) ->
             make_proof_argument (n - 1) rest
             >|=? fun (Dipn_proof_argument (n', ctxt, descr, aft')) ->
-            let kinfo' = {iloc = loc; kstack_ty = aft'} in
+            let kinfo' = {iloc = loc} in
             let w = KPrefix (kinfo', v, n') in
             Dipn_proof_argument (w, ctxt, descr, Item_t (v, aft'))
         | _, _ ->
@@ -3971,8 +3971,8 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       error_unexpected_annot loc result_annot >>?= fun () ->
       make_proof_argument n stack
       >>=? fun (Dipn_proof_argument (n', ctxt, descr, aft)) ->
-      let kinfo = {iloc = descr.loc; kstack_ty = descr.bef} in
-      let kinfoh = {iloc = descr.loc; kstack_ty = descr.aft} in
+      let kinfo = {iloc = descr.loc} in
+      let kinfoh = {iloc = descr.loc} in
       let b = descr.instr.apply kinfo (IHalt kinfoh) in
       let res = {apply = (fun kinfo k -> IDipn (kinfo, n, n', b, k))} in
       typed ctxt loc res aft

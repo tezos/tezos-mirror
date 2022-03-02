@@ -405,15 +405,15 @@ let consume_control local_gas_counter ks =
 
 *)
 
-let log_entry logger ctxt gas k accu stack =
+let log_entry logger ctxt gas k sty accu stack =
   let kinfo = kinfo_of_kinstr k in
   let ctxt = update_context gas ctxt in
-  logger.log_entry k ctxt kinfo.iloc kinfo.kstack_ty (accu, stack)
+  logger.log_entry k ctxt kinfo.iloc sty (accu, stack)
 
-let log_exit logger ctxt gas kinfo_prev k accu stack =
-  let kinfo = kinfo_of_kinstr k in
+let log_exit logger ctxt gas kinfo_prev k sty accu stack =
+  let _kinfo = kinfo_of_kinstr k in
   let ctxt = update_context gas ctxt in
-  logger.log_exit k ctxt kinfo_prev.iloc kinfo.kstack_ty (accu, stack)
+  logger.log_exit k ctxt kinfo_prev.iloc sty (accu, stack)
 
 let log_control logger ks = logger.log_control ks
 
@@ -424,7 +424,7 @@ let get_log = function
 
 (* [log_kinstr logger i] emits an instruction to instrument the
    execution of [i] with [logger]. *)
-let log_kinstr logger i = ILog (kinfo_of_kinstr i, LogEntry, logger, i)
+let log_kinstr logger sty i = ILog (kinfo_of_kinstr i, sty, LogEntry, logger, i)
 
 (* [log_next_kinstr logger i] instruments the next instruction of [i]
    with the [logger].
@@ -438,15 +438,16 @@ let log_kinstr logger i = ILog (kinfo_of_kinstr i, LogEntry, logger, i)
    non-instrumented execution is not impacted by the ability to
    instrument it, not that the logging itself has no cost.
 *)
-let log_next_kinstr logger i =
-  let apply k =
+let log_next_kinstr logger sty i =
+  let apply sty k =
     ILog
       ( kinfo_of_kinstr k,
+        sty,
         LogExit (kinfo_of_kinstr i),
         logger,
-        log_kinstr logger k )
+        log_kinstr logger sty k )
   in
-  kinstr_rewritek i {apply}
+  kinstr_rewritek sty i {apply}
 
 (* We pass the identity function when no instrumentation is needed. *)
 let id x = x [@@inline]
@@ -493,13 +494,8 @@ let apply ctxt gas capture_ty capture lam =
           kbef = arg_stack_ty;
           kaft = descr.kaft;
           kinstr =
-            (let kinfo_const = {iloc = descr.kloc; kstack_ty = arg_stack_ty} in
-             let kinfo_pair =
-               {
-                 iloc = descr.kloc;
-                 kstack_ty = Item_t (capture_ty, arg_stack_ty);
-               }
-             in
+            (let kinfo_const = {iloc = descr.kloc} in
+             let kinfo_pair = {iloc = descr.kloc} in
              IConst
                ( kinfo_const,
                  capture_ty,
@@ -741,21 +737,19 @@ type ('a, 's, 'b, 't, 'r, 'f) step_type =
   's ->
   ('r * 'f * outdated_context * local_gas_counter) tzresult Lwt.t
 
-type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'm, 'n, 'o) kmap_exit_type =
-  (('c, 'd, 'e, 'f) continuation -> ('a, 'b, 'g, 'h) continuation) ->
+type ('a, 'b, 'e, 'f, 'm, 'n, 'o) kmap_exit_type =
   outdated_context * step_constants ->
   local_gas_counter ->
-  ('m * 'n, 'c * 'd, 'o, 'c * 'd) kinstr ->
+  ('m * 'n, 'a * 'b, 'o, 'a * 'b) kinstr ->
   ('m * 'n) list ->
   ('m, 'o) map ->
   'm ->
-  (('m, 'o) map, 'c * 'd, 'e, 'f) continuation ->
+  (('m, 'o) map, 'a * 'b, 'e, 'f) continuation ->
   'o ->
   'a * 'b ->
-  ('g * 'h * outdated_context * local_gas_counter) tzresult Lwt.t
+  ('e * 'f * outdated_context * local_gas_counter) tzresult Lwt.t
 
 type ('a, 'b, 'c, 'd, 'e, 'j, 'k) kmap_enter_type =
-  (('a, 'b * 'c, 'd, 'e) continuation -> ('a, 'b * 'c, 'd, 'e) continuation) ->
   outdated_context * step_constants ->
   local_gas_counter ->
   ('j * 'k, 'b * 'c, 'a, 'b * 'c) kinstr ->
@@ -767,7 +761,6 @@ type ('a, 'b, 'c, 'd, 'e, 'j, 'k) kmap_enter_type =
   ('d * 'e * outdated_context * local_gas_counter) tzresult Lwt.t
 
 type ('a, 'b, 'c, 'd, 'i, 'j) klist_exit_type =
-  (('a, 'b, 'c, 'd) continuation -> ('a, 'b, 'c, 'd) continuation) ->
   outdated_context * step_constants ->
   local_gas_counter ->
   ('i, 'a * 'b, 'j, 'a * 'b) kinstr ->
@@ -780,7 +773,6 @@ type ('a, 'b, 'c, 'd, 'i, 'j) klist_exit_type =
   ('c * 'd * outdated_context * local_gas_counter) tzresult Lwt.t
 
 type ('a, 'b, 'c, 'd, 'e, 'j) klist_enter_type =
-  (('b, 'a * 'c, 'd, 'e) continuation -> ('b, 'a * 'c, 'd, 'e) continuation) ->
   outdated_context * step_constants ->
   local_gas_counter ->
   ('j, 'a * 'c, 'b, 'a * 'c) kinstr ->
@@ -813,7 +805,6 @@ type ('a, 'b, 'c, 'r, 'f, 's) kloop_in_type =
   ('r * 'f * outdated_context * local_gas_counter) tzresult Lwt.t
 
 type ('a, 'b, 's, 'r, 'f, 'c) kiter_type =
-  (('a, 's, 'r, 'f) continuation -> ('a, 's, 'r, 'f) continuation) ->
   outdated_context * step_constants ->
   local_gas_counter ->
   ('b, 'a * 's, 'a, 's) kinstr ->
@@ -825,7 +816,6 @@ type ('a, 'b, 's, 'r, 'f, 'c) kiter_type =
   ('r * 'f * outdated_context * local_gas_counter) tzresult Lwt.t
 
 type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h) ilist_map_type =
-  (('a, 'b, 'c, 'd) continuation -> ('a, 'b, 'c, 'd) continuation) ->
   outdated_context * step_constants ->
   local_gas_counter ->
   ('e, 'a * 'b, 'f, 'a * 'b) kinstr ->
@@ -836,7 +826,6 @@ type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h) ilist_map_type =
   ('c * 'd * outdated_context * local_gas_counter) tzresult Lwt.t
 
 type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'cmp) ilist_iter_type =
-  (('a, 'b, 'c, 'd) continuation -> ('a, 'b, 'c, 'd) continuation) ->
   outdated_context * step_constants ->
   local_gas_counter ->
   ('e, 'a * 'b, 'a, 'b) kinstr ->
@@ -848,7 +837,6 @@ type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'cmp) ilist_iter_type =
   ('c * 'd * outdated_context * local_gas_counter) tzresult Lwt.t
 
 type ('a, 'b, 'c, 'd, 'e, 'f, 'g) iset_iter_type =
-  (('a, 'b, 'c, 'd) continuation -> ('a, 'b, 'c, 'd) continuation) ->
   outdated_context * step_constants ->
   local_gas_counter ->
   ('e, 'a * 'b, 'a, 'b) kinstr ->
@@ -860,7 +848,6 @@ type ('a, 'b, 'c, 'd, 'e, 'f, 'g) iset_iter_type =
   ('c * 'd * outdated_context * local_gas_counter) tzresult Lwt.t
 
 type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i) imap_map_type =
-  (('a, 'b, 'c, 'd) continuation -> ('a, 'b, 'c, 'd) continuation) ->
   outdated_context * step_constants ->
   local_gas_counter ->
   ('e * 'f, 'a * 'b, 'g, 'a * 'b) kinstr ->
@@ -871,7 +858,6 @@ type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i) imap_map_type =
   ('c * 'd * outdated_context * local_gas_counter) tzresult Lwt.t
 
 type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'cmp) imap_iter_type =
-  (('a, 'b, 'c, 'd) continuation -> ('a, 'b, 'c, 'd) continuation) ->
   outdated_context * step_constants ->
   local_gas_counter ->
   ('e * 'f, 'a * 'b, 'a, 'b) kinstr ->

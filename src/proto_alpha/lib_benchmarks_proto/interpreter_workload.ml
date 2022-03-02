@@ -1463,6 +1463,7 @@ let extract_control_trace (type bef_top bef aft_top aft)
 exception Stop_bench
 
 let extract_deps (type bef_top bef aft_top aft) ctxt step_constants
+    (sty : (bef_top, bef) Script_typed_ir.stack_ty)
     (kinstr : (bef_top, bef, aft_top, aft) Script_typed_ir.kinstr)
     (stack : bef_top * bef) =
   let trace = ref [] in
@@ -1485,6 +1486,7 @@ let extract_deps (type bef_top bef aft_top aft) ctxt step_constants
            (Some logger)
            ctxt
            step_constants
+           sty
            kinstr
            (fst stack)
            (snd stack))
@@ -1499,6 +1501,7 @@ let extract_deps (type bef_top bef aft_top aft) ctxt step_constants
   with Stop_bench -> List.rev !trace
 
 let extract_deps_continuation (type bef_top bef aft_top aft) ctxt step_constants
+    (stack_type : (bef_top, bef) stack_ty)
     (cont : (bef_top, bef, aft_top, aft) Script_typed_ir.continuation)
     (stack : bef_top * bef) =
   let trace = ref [] in
@@ -1524,6 +1527,7 @@ let extract_deps_continuation (type bef_top bef aft_top aft) ctxt step_constants
            (Some logger)
            (outdated_ctxt, step_constants)
            (Local_gas_counter 0xFF_FF_FF_FF)
+           stack_type
            cont
            (fst stack)
            (snd stack))

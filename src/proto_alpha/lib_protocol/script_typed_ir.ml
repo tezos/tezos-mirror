@@ -609,7 +609,7 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       -> ('a, 's, 'r, 'f) kinstr
   | IMap_map :
       (('a, 'b) map, 'd * 's) kinfo
-      * 'a comparable_ty
+      * ('a, _) ty
       * ('a * 'b, 'd * 's, 'c, 'd * 's) kinstr
       * (('a, 'c) map, 'd * 's, 'r, 'f) kinstr
       -> (('a, 'b) map, 'd * 's, 'r, 'f) kinstr
@@ -1144,7 +1144,11 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
   *)
   | IHalt : ('a, 's) kinfo -> ('a, 's, 'a, 's) kinstr
   | ILog :
-      ('a, 's) kinfo * logging_event * logger * ('a, 's, 'r, 'f) kinstr
+      ('a, 's) kinfo
+      * ('a, 's) stack_ty
+      * logging_event
+      * logger
+      * ('a, 's, 'r, 'f) kinstr
       -> ('a, 's, 'r, 'f) kinstr
 
 and logging_event =
@@ -1221,7 +1225,7 @@ and (_, _, _, _) continuation =
       step_constants * ('a, 's, 'r, 'f) continuation
       -> ('a, 's, 'r, 'f) continuation
   | KLog :
-      ('a, 's, 'r, 'f) continuation * logger
+      ('a, 's, 'r, 'f) continuation * ('a, 's) stack_ty * logger
       -> ('a, 's, 'r, 'f) continuation
 
 and ('a, 's, 'b, 'f, 'c, 'u) logging_function =
@@ -1325,7 +1329,7 @@ and ('a, 's, 'r, 'f) kdescr = {
   kinstr : ('a, 's, 'r, 'f) kinstr;
 }
 
-and ('a, 's) kinfo = {iloc : Script.location; kstack_ty : ('a, 's) stack_ty}
+and ('a, 's) kinfo = {iloc : Script.location}
 
 and (_, _, _, _, _, _, _, _) stack_prefix_preservation_witness =
   | KPrefix :
@@ -1608,220 +1612,8 @@ let kinfo_of_kinstr : type a s b f. (a, s, b, f) kinstr -> (a, s) kinfo =
   | ISplit_ticket (kinfo, _) -> kinfo
   | IJoin_tickets (kinfo, _, _) -> kinfo
   | IHalt kinfo -> kinfo
-  | ILog (kinfo, _, _, _) -> kinfo
+  | ILog (kinfo, _, _, _, _) -> kinfo
   | IOpen_chest (kinfo, _) -> kinfo
-
-type kinstr_rewritek = {
-  apply : 'b 'u 'r 'f. ('b, 'u, 'r, 'f) kinstr -> ('b, 'u, 'r, 'f) kinstr;
-}
-
-let kinstr_rewritek :
-    type a s r f. (a, s, r, f) kinstr -> kinstr_rewritek -> (a, s, r, f) kinstr
-    =
- fun i f ->
-  match i with
-  | IDrop (kinfo, k) -> IDrop (kinfo, f.apply k)
-  | IDup (kinfo, k) -> IDup (kinfo, f.apply k)
-  | ISwap (kinfo, k) -> ISwap (kinfo, f.apply k)
-  | IConst (kinfo, ty, x, k) -> IConst (kinfo, ty, x, f.apply k)
-  | ICons_pair (kinfo, k) -> ICons_pair (kinfo, f.apply k)
-  | ICar (kinfo, k) -> ICar (kinfo, f.apply k)
-  | ICdr (kinfo, k) -> ICdr (kinfo, f.apply k)
-  | IUnpair (kinfo, k) -> IUnpair (kinfo, f.apply k)
-  | ICons_some (kinfo, k) -> ICons_some (kinfo, f.apply k)
-  | ICons_none (kinfo, ty, k) -> ICons_none (kinfo, ty, f.apply k)
-  | IIf_none {kinfo; branch_if_none; branch_if_some; k} ->
-      IIf_none
-        {
-          kinfo;
-          branch_if_none = f.apply branch_if_none;
-          branch_if_some = f.apply branch_if_some;
-          k = f.apply k;
-        }
-  | IOpt_map {kinfo; body; k} ->
-      let body = f.apply body in
-      let k = f.apply k in
-      IOpt_map {kinfo; body; k}
-  | ICons_left (kinfo, ty, k) -> ICons_left (kinfo, ty, f.apply k)
-  | ICons_right (kinfo, ty, k) -> ICons_right (kinfo, ty, f.apply k)
-  | IIf_left {kinfo; branch_if_left; branch_if_right; k} ->
-      IIf_left
-        {
-          kinfo;
-          branch_if_left = f.apply branch_if_left;
-          branch_if_right = f.apply branch_if_right;
-          k = f.apply k;
-        }
-  | ICons_list (kinfo, k) -> ICons_list (kinfo, f.apply k)
-  | INil (kinfo, ty, k) -> INil (kinfo, ty, f.apply k)
-  | IIf_cons {kinfo; branch_if_cons; branch_if_nil; k} ->
-      IIf_cons
-        {
-          kinfo;
-          branch_if_cons = f.apply branch_if_cons;
-          branch_if_nil = f.apply branch_if_nil;
-          k = f.apply k;
-        }
-  | IList_map (kinfo, body, k) -> IList_map (kinfo, f.apply body, f.apply k)
-  | IList_iter (kinfo, ty, body, k) ->
-      IList_iter (kinfo, ty, f.apply body, f.apply k)
-  | IList_size (kinfo, k) -> IList_size (kinfo, f.apply k)
-  | IEmpty_set (kinfo, ty, k) -> IEmpty_set (kinfo, ty, f.apply k)
-  | ISet_iter (kinfo, ty, body, k) ->
-      ISet_iter (kinfo, ty, f.apply body, f.apply k)
-  | ISet_mem (kinfo, k) -> ISet_mem (kinfo, f.apply k)
-  | ISet_update (kinfo, k) -> ISet_update (kinfo, f.apply k)
-  | ISet_size (kinfo, k) -> ISet_size (kinfo, f.apply k)
-  | IEmpty_map (kinfo, cty, ty, k) -> IEmpty_map (kinfo, cty, ty, f.apply k)
-  | IMap_map (kinfo, kty, body, k) ->
-      IMap_map (kinfo, kty, f.apply body, f.apply k)
-  | IMap_iter (kinfo, kvty, body, k) ->
-      IMap_iter (kinfo, kvty, f.apply body, f.apply k)
-  | IMap_mem (kinfo, k) -> IMap_mem (kinfo, f.apply k)
-  | IMap_get (kinfo, k) -> IMap_get (kinfo, f.apply k)
-  | IMap_update (kinfo, k) -> IMap_update (kinfo, f.apply k)
-  | IMap_get_and_update (kinfo, k) -> IMap_get_and_update (kinfo, f.apply k)
-  | IMap_size (kinfo, k) -> IMap_size (kinfo, f.apply k)
-  | IEmpty_big_map (kinfo, cty, ty, k) ->
-      IEmpty_big_map (kinfo, cty, ty, f.apply k)
-  | IBig_map_mem (kinfo, k) -> IBig_map_mem (kinfo, f.apply k)
-  | IBig_map_get (kinfo, k) -> IBig_map_get (kinfo, f.apply k)
-  | IBig_map_update (kinfo, k) -> IBig_map_update (kinfo, f.apply k)
-  | IBig_map_get_and_update (kinfo, k) ->
-      IBig_map_get_and_update (kinfo, f.apply k)
-  | IConcat_string (kinfo, k) -> IConcat_string (kinfo, f.apply k)
-  | IConcat_string_pair (kinfo, k) -> IConcat_string_pair (kinfo, f.apply k)
-  | ISlice_string (kinfo, k) -> ISlice_string (kinfo, f.apply k)
-  | IString_size (kinfo, k) -> IString_size (kinfo, f.apply k)
-  | IConcat_bytes (kinfo, k) -> IConcat_bytes (kinfo, f.apply k)
-  | IConcat_bytes_pair (kinfo, k) -> IConcat_bytes_pair (kinfo, f.apply k)
-  | ISlice_bytes (kinfo, k) -> ISlice_bytes (kinfo, f.apply k)
-  | IBytes_size (kinfo, k) -> IBytes_size (kinfo, f.apply k)
-  | IAdd_seconds_to_timestamp (kinfo, k) ->
-      IAdd_seconds_to_timestamp (kinfo, f.apply k)
-  | IAdd_timestamp_to_seconds (kinfo, k) ->
-      IAdd_timestamp_to_seconds (kinfo, f.apply k)
-  | ISub_timestamp_seconds (kinfo, k) ->
-      ISub_timestamp_seconds (kinfo, f.apply k)
-  | IDiff_timestamps (kinfo, k) -> IDiff_timestamps (kinfo, f.apply k)
-  | IAdd_tez (kinfo, k) -> IAdd_tez (kinfo, f.apply k)
-  | ISub_tez (kinfo, k) -> ISub_tez (kinfo, f.apply k)
-  | ISub_tez_legacy (kinfo, k) -> ISub_tez_legacy (kinfo, f.apply k)
-  | IMul_teznat (kinfo, k) -> IMul_teznat (kinfo, f.apply k)
-  | IMul_nattez (kinfo, k) -> IMul_nattez (kinfo, f.apply k)
-  | IEdiv_teznat (kinfo, k) -> IEdiv_teznat (kinfo, f.apply k)
-  | IEdiv_tez (kinfo, k) -> IEdiv_tez (kinfo, f.apply k)
-  | IOr (kinfo, k) -> IOr (kinfo, f.apply k)
-  | IAnd (kinfo, k) -> IAnd (kinfo, f.apply k)
-  | IXor (kinfo, k) -> IXor (kinfo, f.apply k)
-  | INot (kinfo, k) -> INot (kinfo, f.apply k)
-  | IIs_nat (kinfo, k) -> IIs_nat (kinfo, f.apply k)
-  | INeg (kinfo, k) -> INeg (kinfo, f.apply k)
-  | IAbs_int (kinfo, k) -> IAbs_int (kinfo, f.apply k)
-  | IInt_nat (kinfo, k) -> IInt_nat (kinfo, f.apply k)
-  | IAdd_int (kinfo, k) -> IAdd_int (kinfo, f.apply k)
-  | IAdd_nat (kinfo, k) -> IAdd_nat (kinfo, f.apply k)
-  | ISub_int (kinfo, k) -> ISub_int (kinfo, f.apply k)
-  | IMul_int (kinfo, k) -> IMul_int (kinfo, f.apply k)
-  | IMul_nat (kinfo, k) -> IMul_nat (kinfo, f.apply k)
-  | IEdiv_int (kinfo, k) -> IEdiv_int (kinfo, f.apply k)
-  | IEdiv_nat (kinfo, k) -> IEdiv_nat (kinfo, f.apply k)
-  | ILsl_nat (kinfo, k) -> ILsl_nat (kinfo, f.apply k)
-  | ILsr_nat (kinfo, k) -> ILsr_nat (kinfo, f.apply k)
-  | IOr_nat (kinfo, k) -> IOr_nat (kinfo, f.apply k)
-  | IAnd_nat (kinfo, k) -> IAnd_nat (kinfo, f.apply k)
-  | IAnd_int_nat (kinfo, k) -> IAnd_int_nat (kinfo, f.apply k)
-  | IXor_nat (kinfo, k) -> IXor_nat (kinfo, f.apply k)
-  | INot_int (kinfo, k) -> INot_int (kinfo, f.apply k)
-  | IIf {kinfo; branch_if_true; branch_if_false; k} ->
-      IIf
-        {
-          kinfo;
-          branch_if_true = f.apply branch_if_true;
-          branch_if_false = f.apply branch_if_false;
-          k = f.apply k;
-        }
-  | ILoop (kinfo, kbody, k) -> ILoop (kinfo, f.apply kbody, f.apply k)
-  | ILoop_left (kinfo, kl, kr) -> ILoop_left (kinfo, f.apply kl, f.apply kr)
-  | IDip (kinfo, body, k) -> IDip (kinfo, f.apply body, f.apply k)
-  | IExec (kinfo, k) -> IExec (kinfo, f.apply k)
-  | IApply (kinfo, ty, k) -> IApply (kinfo, ty, f.apply k)
-  | ILambda (kinfo, l, k) -> ILambda (kinfo, l, f.apply k)
-  | IFailwith (kinfo, i, ty) -> IFailwith (kinfo, i, ty)
-  | ICompare (kinfo, ty, k) -> ICompare (kinfo, ty, f.apply k)
-  | IEq (kinfo, k) -> IEq (kinfo, f.apply k)
-  | INeq (kinfo, k) -> INeq (kinfo, f.apply k)
-  | ILt (kinfo, k) -> ILt (kinfo, f.apply k)
-  | IGt (kinfo, k) -> IGt (kinfo, f.apply k)
-  | ILe (kinfo, k) -> ILe (kinfo, f.apply k)
-  | IGe (kinfo, k) -> IGe (kinfo, f.apply k)
-  | IAddress (kinfo, k) -> IAddress (kinfo, f.apply k)
-  | IContract (kinfo, ty, code, k) -> IContract (kinfo, ty, code, f.apply k)
-  | ITransfer_tokens (kinfo, k) -> ITransfer_tokens (kinfo, f.apply k)
-  | IView (kinfo, view_signature, k) -> IView (kinfo, view_signature, f.apply k)
-  | IImplicit_account (kinfo, k) -> IImplicit_account (kinfo, f.apply k)
-  | ICreate_contract {kinfo; storage_type; code; k} ->
-      let k = f.apply k in
-      ICreate_contract {kinfo; storage_type; code; k}
-  | ISet_delegate (kinfo, k) -> ISet_delegate (kinfo, f.apply k)
-  | INow (kinfo, k) -> INow (kinfo, f.apply k)
-  | IMin_block_time (kinfo, k) -> IMin_block_time (kinfo, f.apply k)
-  | IBalance (kinfo, k) -> IBalance (kinfo, f.apply k)
-  | ILevel (kinfo, k) -> ILevel (kinfo, f.apply k)
-  | ICheck_signature (kinfo, k) -> ICheck_signature (kinfo, f.apply k)
-  | IHash_key (kinfo, k) -> IHash_key (kinfo, f.apply k)
-  | IPack (kinfo, ty, k) -> IPack (kinfo, ty, f.apply k)
-  | IUnpack (kinfo, ty, k) -> IUnpack (kinfo, ty, f.apply k)
-  | IBlake2b (kinfo, k) -> IBlake2b (kinfo, f.apply k)
-  | ISha256 (kinfo, k) -> ISha256 (kinfo, f.apply k)
-  | ISha512 (kinfo, k) -> ISha512 (kinfo, f.apply k)
-  | ISource (kinfo, k) -> ISource (kinfo, f.apply k)
-  | ISender (kinfo, k) -> ISender (kinfo, f.apply k)
-  | ISelf (kinfo, ty, s, k) -> ISelf (kinfo, ty, s, f.apply k)
-  | ISelf_address (kinfo, k) -> ISelf_address (kinfo, f.apply k)
-  | IAmount (kinfo, k) -> IAmount (kinfo, f.apply k)
-  | ISapling_empty_state (kinfo, s, k) ->
-      ISapling_empty_state (kinfo, s, f.apply k)
-  | ISapling_verify_update (kinfo, k) ->
-      ISapling_verify_update (kinfo, f.apply k)
-  | ISapling_verify_update_deprecated (kinfo, k) ->
-      ISapling_verify_update_deprecated (kinfo, f.apply k)
-  | IDig (kinfo, n, p, k) -> IDig (kinfo, n, p, f.apply k)
-  | IDug (kinfo, n, p, k) -> IDug (kinfo, n, p, f.apply k)
-  | IDipn (kinfo, n, p, k1, k2) -> IDipn (kinfo, n, p, f.apply k1, f.apply k2)
-  | IDropn (kinfo, n, p, k) -> IDropn (kinfo, n, p, f.apply k)
-  | IChainId (kinfo, k) -> IChainId (kinfo, f.apply k)
-  | INever kinfo -> INever kinfo
-  | IVoting_power (kinfo, k) -> IVoting_power (kinfo, f.apply k)
-  | ITotal_voting_power (kinfo, k) -> ITotal_voting_power (kinfo, f.apply k)
-  | IKeccak (kinfo, k) -> IKeccak (kinfo, f.apply k)
-  | ISha3 (kinfo, k) -> ISha3 (kinfo, f.apply k)
-  | IAdd_bls12_381_g1 (kinfo, k) -> IAdd_bls12_381_g1 (kinfo, f.apply k)
-  | IAdd_bls12_381_g2 (kinfo, k) -> IAdd_bls12_381_g2 (kinfo, f.apply k)
-  | IAdd_bls12_381_fr (kinfo, k) -> IAdd_bls12_381_fr (kinfo, f.apply k)
-  | IMul_bls12_381_g1 (kinfo, k) -> IMul_bls12_381_g1 (kinfo, f.apply k)
-  | IMul_bls12_381_g2 (kinfo, k) -> IMul_bls12_381_g2 (kinfo, f.apply k)
-  | IMul_bls12_381_fr (kinfo, k) -> IMul_bls12_381_fr (kinfo, f.apply k)
-  | IMul_bls12_381_z_fr (kinfo, k) -> IMul_bls12_381_z_fr (kinfo, f.apply k)
-  | IMul_bls12_381_fr_z (kinfo, k) -> IMul_bls12_381_fr_z (kinfo, f.apply k)
-  | IInt_bls12_381_fr (kinfo, k) -> IInt_bls12_381_fr (kinfo, f.apply k)
-  | INeg_bls12_381_g1 (kinfo, k) -> INeg_bls12_381_g1 (kinfo, f.apply k)
-  | INeg_bls12_381_g2 (kinfo, k) -> INeg_bls12_381_g2 (kinfo, f.apply k)
-  | INeg_bls12_381_fr (kinfo, k) -> INeg_bls12_381_fr (kinfo, f.apply k)
-  | IPairing_check_bls12_381 (kinfo, k) ->
-      IPairing_check_bls12_381 (kinfo, f.apply k)
-  | IComb (kinfo, n, p, k) -> IComb (kinfo, n, p, f.apply k)
-  | IUncomb (kinfo, n, p, k) -> IUncomb (kinfo, n, p, f.apply k)
-  | IComb_get (kinfo, n, p, k) -> IComb_get (kinfo, n, p, f.apply k)
-  | IComb_set (kinfo, n, p, k) -> IComb_set (kinfo, n, p, f.apply k)
-  | IDup_n (kinfo, n, p, k) -> IDup_n (kinfo, n, p, f.apply k)
-  | ITicket (kinfo, ty, k) -> ITicket (kinfo, ty, f.apply k)
-  | IRead_ticket (kinfo, ty, k) -> IRead_ticket (kinfo, ty, f.apply k)
-  | ISplit_ticket (kinfo, k) -> ISplit_ticket (kinfo, f.apply k)
-  | IJoin_tickets (kinfo, ty, k) -> IJoin_tickets (kinfo, ty, f.apply k)
-  | IHalt kinfo -> IHalt kinfo
-  | ILog (kinfo, event, logger, k) -> ILog (kinfo, event, logger, k)
-  | IOpen_chest (kinfo, k) -> IOpen_chest (kinfo, f.apply k)
 
 let meta_basic = {size = Type_size.one}
 
@@ -2221,7 +2013,7 @@ let kinstr_traverse i init f =
     | IJoin_tickets (_, _, k) -> (next [@ocaml.tailcall]) k
     | IOpen_chest (_, k) -> (next [@ocaml.tailcall]) k
     | IHalt _ -> (return [@ocaml.tailcall]) ()
-    | ILog (_, _, _, k) -> (next [@ocaml.tailcall]) k
+    | ILog (_, _, _, _, k) -> (next [@ocaml.tailcall]) k
   in
   aux init i (fun accu -> accu)
 
@@ -2369,3 +2161,755 @@ let value_traverse (type t tc) (ty : (t, tc) ty) (x : t) init f =
 
 let stack_top_ty : type a b s. (a, b * s) stack_ty -> a ty_ex_c = function
   | Item_t (ty, _) -> Ty_ex_c ty
+
+type kinstr_rewritek = {
+  apply :
+    'b 'u 'r 'f.
+    ('b, 'u) stack_ty -> ('b, 'u, 'r, 'f) kinstr -> ('b, 'u, 'r, 'f) kinstr;
+}
+
+type ('a, 's) failed_kinstr_cast = {cast : 'b 'u. ('a, 's, 'b, 'u) kinstr}
+
+type ('a, 's, 'r, 'f) ex_splitted_kinstr =
+  | Ex_splitted_kinstr :
+      ('b, 'u) stack_ty
+      * ('b, 'u, 'r, 'f) kinstr
+      * (('b, 'u, 'r, 'f) kinstr -> ('a, 's, 'r, 'f) kinstr)
+      -> ('a, 's, 'r, 'f) ex_splitted_kinstr
+  | Ex_splitted_log :
+      ('a, 's) stack_ty
+      * ('a, 's, 'r, 'f) kinstr
+      * (('a, 's, 'r, 'f) kinstr -> ('a, 's, 'r, 'f) kinstr)
+      -> ('a, 's, 'r, 'f) ex_splitted_kinstr
+  | Ex_splitted_loop_may_fail :
+      ('b, 'u) stack_ty
+      * ('b, 'u, 'r, 'f) kinstr
+      * ('c, 'v) stack_ty
+      * ('c, 'v, 't, 'g) kinstr
+      * (('b, 'u, 'r, 'f) kinstr ->
+        ('c, 'v, 't, 'g) kinstr ->
+        ('a, 's, 't, 'g) kinstr)
+      -> ('a, 's, 't, 'g) ex_splitted_kinstr
+  | Ex_splitted_loop_may_not_fail :
+      ('b, 'u) stack_ty
+      * ('b, 'u, 'r, 'f) kinstr
+      * ('c, 'v, 't, 'g) kinstr
+      * (('r, 'f) stack_ty -> ('c, 'v) stack_ty tzresult)
+      * (('b, 'u, 'r, 'f) kinstr ->
+        ('c, 'v, 't, 'g) kinstr ->
+        ('a, 's, 't, 'g) kinstr)
+      -> ('a, 's, 't, 'g) ex_splitted_kinstr
+  | Ex_splitted_if :
+      ('b, 'u) stack_ty
+      * ('b, 'u, 'r, 'f) kinstr
+      * ('c, 'v) stack_ty
+      * ('c, 'v, 'r, 'f) kinstr
+      * ('r, 'f, 't, 'g) kinstr
+      * (('b, 'u, 'r, 'f) kinstr ->
+        ('c, 'v, 'r, 'f) kinstr ->
+        ('r, 'f, 't, 'g) kinstr ->
+        ('a, 's, 't, 'g) kinstr)
+      -> ('a, 's, 't, 'g) ex_splitted_kinstr
+  | Ex_splitted_halt : ('a, 's) kinfo -> ('a, 's, 'a, 's) ex_splitted_kinstr
+  | Ex_splitted_failwith :
+      ('a, 's) kinfo
+      * Script.location
+      * ('a, _) ty
+      * ('a, 's) failed_kinstr_cast
+      -> ('a, 's, 'r, 'f) ex_splitted_kinstr
+
+let rec stack_prefix_preservation_witness_split_input :
+    type a s b t c u d v.
+    (b, t, c, u, a, s, d, v) stack_prefix_preservation_witness ->
+    (a, s) stack_ty ->
+    (b, t) stack_ty =
+ fun w s ->
+  match (w, s) with
+  | KPrefix (_, _, w), Item_t (_, s) ->
+      stack_prefix_preservation_witness_split_input w s
+  | KRest, s -> s
+
+let rec stack_prefix_preservation_witness_split_output :
+    type a s b t c u d v.
+    (b, t, c, u, a, s, d, v) stack_prefix_preservation_witness ->
+    (c, u) stack_ty ->
+    (d, v) stack_ty =
+ fun w s ->
+  match (w, s) with
+  | KPrefix (_, a, w), s ->
+      Item_t (a, stack_prefix_preservation_witness_split_output w s)
+  | KRest, s -> s
+
+let kinstr_split :
+    type a s r f.
+    (a, s) stack_ty ->
+    (a, s, r, f) kinstr ->
+    (a, s, r, f) ex_splitted_kinstr tzresult =
+ fun s i ->
+  let loc = Micheline.dummy_location in
+  match (i, s) with
+  | IDrop (kinfo, k), Item_t (_a, s) ->
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> IDrop (kinfo, k))
+  | IDup (kinfo, k), Item_t (a, s) ->
+      let s = Item_t (a, Item_t (a, s)) in
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> IDup (kinfo, k))
+  | ISwap (kinfo, k), Item_t (a, Item_t (b, s)) ->
+      let s = Item_t (b, Item_t (a, s)) in
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> ISwap (kinfo, k))
+  | IConst (kinfo, a, x, k), s ->
+      let s = Item_t (a, s) in
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> IConst (kinfo, a, x, k))
+  | ICons_pair (kinfo, k), Item_t (a, Item_t (b, s)) ->
+      pair_t loc a b >|? fun (Ty_ex_c c) ->
+      let s = Item_t (c, s) in
+      Ex_splitted_kinstr (s, k, fun k -> ICons_pair (kinfo, k))
+  | ICar (kinfo, k), Item_t (Pair_t (a, _b, _meta, _), s) ->
+      let s = Item_t (a, s) in
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> ICar (kinfo, k))
+  | ICdr (kinfo, k), Item_t (Pair_t (_a, b, _meta, _), s) ->
+      let s = Item_t (b, s) in
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> ICdr (kinfo, k))
+  | IUnpair (kinfo, k), Item_t (Pair_t (a, b, _meta, _), s) ->
+      let s = Item_t (a, Item_t (b, s)) in
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> IUnpair (kinfo, k))
+  | ICons_some (kinfo, k), Item_t (a, s) ->
+      option_t loc a >|? fun o ->
+      let s = Item_t (o, s) in
+      Ex_splitted_kinstr (s, k, fun k -> ICons_some (kinfo, k))
+  | ICons_none (kinfo, a, k), s ->
+      option_t loc a >|? fun o ->
+      let s = Item_t (o, s) in
+      Ex_splitted_kinstr (s, k, fun k -> ICons_none (kinfo, a, k))
+  | ( IIf_none {kinfo; branch_if_none; branch_if_some; k},
+      Item_t (Option_t (a, _meta, _), s) ) ->
+      ok
+      @@ Ex_splitted_if
+           ( s,
+             branch_if_none,
+             Item_t (a, s),
+             branch_if_some,
+             k,
+             fun branch_if_none branch_if_some k ->
+               IIf_none {kinfo; branch_if_none; branch_if_some; k} )
+  | IOpt_map {kinfo; body; k}, Item_t (Option_t (a, _meta, _), s) ->
+      let s = Item_t (a, s) in
+      ok
+      @@ Ex_splitted_loop_may_not_fail
+           ( s,
+             body,
+             k,
+             (function
+             | Item_t (b, s) -> option_t loc b >|? fun o -> Item_t (o, s)),
+             fun body k -> IOpt_map {kinfo; body; k} )
+  | ICons_left (kinfo, b, k), Item_t (a, s) ->
+      union_t loc a b >|? fun (Ty_ex_c c) ->
+      let s = Item_t (c, s) in
+      Ex_splitted_kinstr (s, k, fun k -> ICons_left (kinfo, b, k))
+  | ICons_right (kinfo, a, k), Item_t (b, s) ->
+      union_t loc a b >|? fun (Ty_ex_c c) ->
+      let s = Item_t (c, s) in
+      Ex_splitted_kinstr (s, k, fun k -> ICons_right (kinfo, a, k))
+  | ( IIf_left {kinfo; branch_if_left; branch_if_right; k},
+      Item_t (Union_t (a, b, _meta, _), s) ) ->
+      ok
+      @@ Ex_splitted_if
+           ( Item_t (a, s),
+             branch_if_left,
+             Item_t (b, s),
+             branch_if_right,
+             k,
+             fun branch_if_left branch_if_right k ->
+               IIf_left {kinfo; branch_if_left; branch_if_right; k} )
+  | ICons_list (kinfo, k), Item_t (_a, Item_t (l, s)) ->
+      let s = Item_t (l, s) in
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> ICons_list (kinfo, k))
+  | INil (kinfo, a, k), s ->
+      list_t loc a >|? fun l ->
+      let s = Item_t (l, s) in
+      Ex_splitted_kinstr (s, k, fun k -> INil (kinfo, a, k))
+  | ( IIf_cons {kinfo; branch_if_cons; branch_if_nil; k},
+      Item_t ((List_t (a, _meta) as l), s) ) ->
+      ok
+      @@ Ex_splitted_if
+           ( Item_t (a, Item_t (l, s)),
+             branch_if_cons,
+             s,
+             branch_if_nil,
+             k,
+             fun branch_if_cons branch_if_nil k ->
+               IIf_cons {kinfo; branch_if_cons; branch_if_nil; k} )
+  | IList_map (kinfo, body, k), Item_t (List_t (a, _meta), s) ->
+      let s = Item_t (a, s) in
+      ok
+      @@ Ex_splitted_loop_may_not_fail
+           ( s,
+             body,
+             k,
+             (function
+             | Item_t (b, s) -> list_t loc b >|? fun l -> Item_t (l, s)),
+             fun body k -> IList_map (kinfo, body, k) )
+  | IList_iter (kinfo, ty, body, k), Item_t (List_t (a, _meta), s) ->
+      let s' = Item_t (a, s) in
+      ok
+      @@ Ex_splitted_loop_may_fail
+           (s', body, s, k, fun body k -> IList_iter (kinfo, ty, body, k))
+  | IList_size (kinfo, k), Item_t (_l, s) ->
+      let s = Item_t (nat_t, s) in
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> IList_size (kinfo, k))
+  | IEmpty_set (kinfo, a, k), s ->
+      set_t loc a >|? fun b ->
+      let s = Item_t (b, s) in
+      Ex_splitted_kinstr (s, k, fun k -> IEmpty_set (kinfo, a, k))
+  | ISet_iter (kinfo, a, body, k), Item_t (_b, s) ->
+      let s' = Item_t (a, s) in
+      ok
+      @@ Ex_splitted_loop_may_fail
+           (s', body, s, k, fun body k -> ISet_iter (kinfo, a, body, k))
+  | ISet_mem (kinfo, k), Item_t (_, Item_t (_, s)) ->
+      let s = Item_t (bool_t, s) in
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> ISet_mem (kinfo, k))
+  | ISet_update (kinfo, k), Item_t (_, Item_t (_, s)) ->
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> ISet_update (kinfo, k))
+  | ISet_size (kinfo, k), Item_t (_, s) ->
+      let s = Item_t (nat_t, s) in
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> ISet_size (kinfo, k))
+  | IEmpty_map (kinfo, cty, vty, k), s ->
+      map_t loc cty vty >|? fun m ->
+      let s = Item_t (m, s) in
+      Ex_splitted_kinstr (s, k, fun k -> IEmpty_map (kinfo, cty, vty, k))
+  | IMap_map (kinfo, key_ty, body, k), Item_t (Map_t (kty, vty, _meta), s) ->
+      pair_t loc key_ty vty >|? fun (Ty_ex_c p) ->
+      let s = Item_t (p, s) in
+      Ex_splitted_loop_may_not_fail
+        ( s,
+          body,
+          k,
+          (fun (Item_t (b, s)) -> map_t loc kty b >|? fun m -> Item_t (m, s)),
+          fun body k -> IMap_map (kinfo, key_ty, body, k) )
+  | IMap_iter (kinfo, pair_ty, body, k), Item_t (_, s) ->
+      let s' = Item_t (pair_ty, s) in
+      ok
+      @@ Ex_splitted_loop_may_fail
+           (s', body, s, k, fun body k -> IMap_iter (kinfo, pair_ty, body, k))
+  | IMap_mem (kinfo, k), Item_t (_, Item_t (_, s)) ->
+      let s = Item_t (bool_t, s) in
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> IMap_mem (kinfo, k))
+  | IMap_get (kinfo, k), Item_t (_, Item_t (Map_t (_kty, vty, _meta), s)) ->
+      option_t loc vty >|? fun o ->
+      let s = Item_t (o, s) in
+      Ex_splitted_kinstr (s, k, fun k -> IMap_get (kinfo, k))
+  | IMap_update (kinfo, k), Item_t (_, Item_t (_, s)) ->
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> IMap_update (kinfo, k))
+  | IMap_get_and_update (kinfo, k), Item_t (_, s) ->
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> IMap_get_and_update (kinfo, k))
+  | IMap_size (kinfo, k), Item_t (_, s) ->
+      let s = Item_t (nat_t, s) in
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> IMap_size (kinfo, k))
+  | IEmpty_big_map (kinfo, cty, ty, k), s ->
+      big_map_t loc cty ty >|? fun b ->
+      let s = Item_t (b, s) in
+      Ex_splitted_kinstr (s, k, fun k -> IEmpty_big_map (kinfo, cty, ty, k))
+  | IBig_map_mem (kinfo, k), Item_t (_, Item_t (_, s)) ->
+      let s = Item_t (bool_t, s) in
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> IBig_map_mem (kinfo, k))
+  | IBig_map_get (kinfo, k), Item_t (_, Item_t (Big_map_t (_kty, vty, _meta), s))
+    ->
+      option_t loc vty >|? fun o ->
+      let s = Item_t (o, s) in
+      Ex_splitted_kinstr (s, k, fun k -> IBig_map_get (kinfo, k))
+  | IBig_map_update (kinfo, k), Item_t (_, Item_t (_, s)) ->
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> IBig_map_update (kinfo, k))
+  | IBig_map_get_and_update (kinfo, k), Item_t (_, s) ->
+      ok
+      @@ Ex_splitted_kinstr (s, k, fun k -> IBig_map_get_and_update (kinfo, k))
+  | IConcat_string (kinfo, k), Item_t (_, s) ->
+      let s = Item_t (string_t, s) in
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> IConcat_string (kinfo, k))
+  | IConcat_string_pair (kinfo, k), Item_t (_, s) ->
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> IConcat_string_pair (kinfo, k))
+  | ISlice_string (kinfo, k), Item_t (_, Item_t (_, Item_t (_, s))) ->
+      let s = Item_t (option_string_t, s) in
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> ISlice_string (kinfo, k))
+  | IString_size (kinfo, k), Item_t (_, s) ->
+      let s = Item_t (nat_t, s) in
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> IString_size (kinfo, k))
+  | IConcat_bytes (kinfo, k), Item_t (_, s) ->
+      let s = Item_t (bytes_t, s) in
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> IConcat_bytes (kinfo, k))
+  | IConcat_bytes_pair (kinfo, k), Item_t (_, s) ->
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> IConcat_bytes_pair (kinfo, k))
+  | ISlice_bytes (kinfo, k), Item_t (_, Item_t (_, Item_t (_, s))) ->
+      let s = Item_t (option_bytes_t, s) in
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> ISlice_bytes (kinfo, k))
+  | IBytes_size (kinfo, k), Item_t (_, s) ->
+      let s = Item_t (nat_t, s) in
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> IBytes_size (kinfo, k))
+  | IAdd_seconds_to_timestamp (kinfo, k), Item_t (_, s) ->
+      ok
+      @@ Ex_splitted_kinstr (s, k, fun k -> IAdd_seconds_to_timestamp (kinfo, k))
+  | IAdd_timestamp_to_seconds (kinfo, k), Item_t (_, Item_t (_, s)) ->
+      let s = Item_t (timestamp_t, s) in
+      ok
+      @@ Ex_splitted_kinstr (s, k, fun k -> IAdd_timestamp_to_seconds (kinfo, k))
+  | ISub_timestamp_seconds (kinfo, k), Item_t (_, Item_t (_, s)) ->
+      let s = Item_t (timestamp_t, s) in
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> ISub_timestamp_seconds (kinfo, k))
+  | IDiff_timestamps (kinfo, k), Item_t (_, Item_t (_, s)) ->
+      let s = Item_t (int_t, s) in
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> IDiff_timestamps (kinfo, k))
+  | IAdd_tez (kinfo, k), Item_t (_, s) ->
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> IAdd_tez (kinfo, k))
+  | ISub_tez (kinfo, k), Item_t (_, Item_t (_, s)) ->
+      let s = Item_t (option_mutez_t, s) in
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> ISub_tez (kinfo, k))
+  | ISub_tez_legacy (kinfo, k), Item_t (_, s) ->
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> ISub_tez_legacy (kinfo, k))
+  | IMul_teznat (kinfo, k), Item_t (_, Item_t (_, s)) ->
+      let s = Item_t (mutez_t, s) in
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> IMul_teznat (kinfo, k))
+  | IMul_nattez (kinfo, k), Item_t (_, s) ->
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> IMul_nattez (kinfo, k))
+  | IEdiv_teznat (kinfo, k), Item_t (_, Item_t (_, s)) ->
+      let s = Item_t (option_pair_mutez_mutez_t, s) in
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> IEdiv_teznat (kinfo, k))
+  | IEdiv_tez (kinfo, k), Item_t (_, Item_t (_, s)) ->
+      let s = Item_t (option_pair_nat_mutez_t, s) in
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> IEdiv_tez (kinfo, k))
+  | IOr (kinfo, k), Item_t (_, s) ->
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> IOr (kinfo, k))
+  | IAnd (kinfo, k), Item_t (_, s) ->
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> IAnd (kinfo, k))
+  | IXor (kinfo, k), Item_t (_, s) ->
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> IXor (kinfo, k))
+  | INot (kinfo, k), s ->
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> INot (kinfo, k))
+  | IIs_nat (kinfo, k), Item_t (_, s) ->
+      let s = Item_t (option_nat_t, s) in
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> IIs_nat (kinfo, k))
+  | INeg (kinfo, k), Item_t (_, s) ->
+      let s = Item_t (int_t, s) in
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> INeg (kinfo, k))
+  | IAbs_int (kinfo, k), Item_t (_, s) ->
+      let s = Item_t (nat_t, s) in
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> IAbs_int (kinfo, k))
+  | IInt_nat (kinfo, k), Item_t (_, s) ->
+      let s = Item_t (int_t, s) in
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> IInt_nat (kinfo, k))
+  | IAdd_int (kinfo, k), Item_t (_, Item_t (_, s)) ->
+      let s = Item_t (int_t, s) in
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> IAdd_int (kinfo, k))
+  | IAdd_nat (kinfo, k), Item_t (_, s) ->
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> IAdd_nat (kinfo, k))
+  | ISub_int (kinfo, k), Item_t (_, Item_t (_, s)) ->
+      let s = Item_t (int_t, s) in
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> ISub_int (kinfo, k))
+  | IMul_int (kinfo, k), Item_t (_, Item_t (_, s)) ->
+      let s = Item_t (int_t, s) in
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> IMul_int (kinfo, k))
+  | IMul_nat (kinfo, k), Item_t (_, s) ->
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> IMul_nat (kinfo, k))
+  | IEdiv_int (kinfo, k), Item_t (_, Item_t (_, s)) ->
+      let s = Item_t (option_pair_int_nat_t, s) in
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> IEdiv_int (kinfo, k))
+  | IEdiv_nat (kinfo, k), Item_t (_, Item_t (a, s)) ->
+      pair_t loc a nat_t >>? fun (Ty_ex_c p) ->
+      option_t loc p >|? fun o ->
+      let s = Item_t (o, s) in
+      Ex_splitted_kinstr (s, k, fun k -> IEdiv_nat (kinfo, k))
+  | ILsl_nat (kinfo, k), Item_t (_, s) ->
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> ILsl_nat (kinfo, k))
+  | ILsr_nat (kinfo, k), Item_t (_, s) ->
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> ILsr_nat (kinfo, k))
+  | IOr_nat (kinfo, k), Item_t (_, s) ->
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> IOr_nat (kinfo, k))
+  | IAnd_nat (kinfo, k), Item_t (_, s) ->
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> IAnd_nat (kinfo, k))
+  | IAnd_int_nat (kinfo, k), Item_t (_, s) ->
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> IAnd_int_nat (kinfo, k))
+  | IXor_nat (kinfo, k), Item_t (_, s) ->
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> IXor_nat (kinfo, k))
+  | INot_int (kinfo, k), Item_t (_, s) ->
+      let s = Item_t (int_t, s) in
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> INot_int (kinfo, k))
+  | IIf {kinfo; branch_if_true; branch_if_false; k}, Item_t (_, s) ->
+      ok
+      @@ Ex_splitted_if
+           ( s,
+             branch_if_true,
+             s,
+             branch_if_false,
+             k,
+             fun branch_if_true branch_if_false k ->
+               IIf {kinfo; branch_if_true; branch_if_false; k} )
+  | ILoop (kinfo, body, k), Item_t (_, s) ->
+      ok
+      @@ Ex_splitted_loop_may_fail
+           (s, body, s, k, fun body k -> ILoop (kinfo, body, k))
+  | ILoop_left (kinfo, kl, kr), Item_t (Union_t (a, b, _meta, _), s) ->
+      ok
+      @@ Ex_splitted_loop_may_fail
+           ( Item_t (a, s),
+             kl,
+             Item_t (b, s),
+             kr,
+             fun kl kr -> ILoop_left (kinfo, kl, kr) )
+  | IDip (kinfo, body, k), Item_t (a, s) ->
+      ok
+      @@ Ex_splitted_loop_may_not_fail
+           ( s,
+             body,
+             k,
+             (fun s -> ok @@ Item_t (a, s)),
+             fun body k -> IDip (kinfo, body, k) )
+  | IExec (kinfo, k), Item_t (_, Item_t (Lambda_t (_, b, _meta), s)) ->
+      let s = Item_t (b, s) in
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> IExec (kinfo, k))
+  | ( IApply (kinfo, ty, k),
+      Item_t (_, Item_t (Lambda_t (Pair_t (_, a, _, _), b, _), s)) ) ->
+      lambda_t loc a b >|? fun l ->
+      let s = Item_t (l, s) in
+      Ex_splitted_kinstr (s, k, fun k -> IApply (kinfo, ty, k))
+  | ILambda (kinfo, l, k), s ->
+      let (Lam (desc, _)) = l in
+      let (Item_t (a, Bot_t)) = desc.kbef in
+      let (Item_t (b, Bot_t)) = desc.kaft in
+      lambda_t loc a b >|? fun lam ->
+      let s = Item_t (lam, s) in
+      Ex_splitted_kinstr (s, k, fun k -> ILambda (kinfo, l, k))
+  | IFailwith (kinfo, i, ty), _ ->
+      ok
+      @@ Ex_splitted_failwith (kinfo, i, ty, {cast = IFailwith (kinfo, i, ty)})
+  | ICompare (kinfo, ty, k), Item_t (_, Item_t (_, s)) ->
+      let s = Item_t (int_t, s) in
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> ICompare (kinfo, ty, k))
+  | IEq (kinfo, k), Item_t (_, s) ->
+      let s = Item_t (bool_t, s) in
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> IEq (kinfo, k))
+  | INeq (kinfo, k), Item_t (_, s) ->
+      let s = Item_t (bool_t, s) in
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> INeq (kinfo, k))
+  | ILt (kinfo, k), Item_t (_, s) ->
+      let s = Item_t (bool_t, s) in
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> ILt (kinfo, k))
+  | IGt (kinfo, k), Item_t (_, s) ->
+      let s = Item_t (bool_t, s) in
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> IGt (kinfo, k))
+  | ILe (kinfo, k), Item_t (_, s) ->
+      let s = Item_t (bool_t, s) in
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> ILe (kinfo, k))
+  | IGe (kinfo, k), Item_t (_, s) ->
+      let s = Item_t (bool_t, s) in
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> IGe (kinfo, k))
+  | IAddress (kinfo, k), Item_t (_, s) ->
+      let s = Item_t (address_t, s) in
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> IAddress (kinfo, k))
+  | IContract (kinfo, ty, code, k), Item_t (_, s) ->
+      contract_t loc ty >>? fun c ->
+      option_t loc c >|? fun o ->
+      let s = Item_t (o, s) in
+      Ex_splitted_kinstr (s, k, fun k -> IContract (kinfo, ty, code, k))
+  | ITransfer_tokens (kinfo, k), Item_t (_, Item_t (_, Item_t (_, s))) ->
+      let s = Item_t (operation_t, s) in
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> ITransfer_tokens (kinfo, k))
+  | ( IView (kinfo, (View_signature {output_ty; _} as view_signature), k),
+      Item_t (_, Item_t (_, s)) ) ->
+      option_t loc output_ty >|? fun b ->
+      let s = Item_t (b, s) in
+      Ex_splitted_kinstr (s, k, fun k -> IView (kinfo, view_signature, k))
+  | IImplicit_account (kinfo, k), Item_t (_, s) ->
+      let s = Item_t (contract_unit_t, s) in
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> IImplicit_account (kinfo, k))
+  | ( ICreate_contract {kinfo; storage_type; code; k},
+      Item_t (_, Item_t (_, Item_t (_, s))) ) ->
+      let s = Item_t (operation_t, Item_t (address_t, s)) in
+      ok
+      @@ Ex_splitted_kinstr
+           (s, k, fun k -> ICreate_contract {kinfo; storage_type; code; k})
+  | ISet_delegate (kinfo, k), Item_t (_, s) ->
+      let s = Item_t (operation_t, s) in
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> ISet_delegate (kinfo, k))
+  | INow (kinfo, k), s ->
+      let s = Item_t (timestamp_t, s) in
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> INow (kinfo, k))
+  | IBalance (kinfo, k), s ->
+      let s = Item_t (mutez_t, s) in
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> IBalance (kinfo, k))
+  | ILevel (kinfo, k), s ->
+      let s = Item_t (nat_t, s) in
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> ILevel (kinfo, k))
+  | ICheck_signature (kinfo, k), Item_t (_, Item_t (_, Item_t (_, s))) ->
+      let s = Item_t (bool_t, s) in
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> ICheck_signature (kinfo, k))
+  | IHash_key (kinfo, k), Item_t (_, s) ->
+      let s = Item_t (key_hash_t, s) in
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> IHash_key (kinfo, k))
+  | IPack (kinfo, ty, k), Item_t (_, s) ->
+      let s = Item_t (bytes_t, s) in
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> IPack (kinfo, ty, k))
+  | IUnpack (kinfo, ty, k), Item_t (_, s) ->
+      option_t loc ty >|? fun o ->
+      let s = Item_t (o, s) in
+      Ex_splitted_kinstr (s, k, fun k -> IUnpack (kinfo, ty, k))
+  | IBlake2b (kinfo, k), s ->
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> IBlake2b (kinfo, k))
+  | ISha256 (kinfo, k), s ->
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> ISha256 (kinfo, k))
+  | ISha512 (kinfo, k), s ->
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> ISha512 (kinfo, k))
+  | ISource (kinfo, k), s ->
+      let s = Item_t (address_t, s) in
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> ISource (kinfo, k))
+  | ISender (kinfo, k), s ->
+      let s = Item_t (address_t, s) in
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> ISender (kinfo, k))
+  | ISelf (kinfo, ty, ep, k), s ->
+      contract_t loc ty >|? fun c ->
+      let s = Item_t (c, s) in
+      Ex_splitted_kinstr (s, k, fun k -> ISelf (kinfo, ty, ep, k))
+  | ISelf_address (kinfo, k), s ->
+      let s = Item_t (address_t, s) in
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> ISelf_address (kinfo, k))
+  | IAmount (kinfo, k), s ->
+      let s = Item_t (mutez_t, s) in
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> IAmount (kinfo, k))
+  | ISapling_empty_state (kinfo, memo_size, k), s ->
+      let s = Item_t (sapling_state_t ~memo_size, s) in
+      ok
+      @@ Ex_splitted_kinstr
+           (s, k, fun k -> ISapling_empty_state (kinfo, memo_size, k))
+  | ( ISapling_verify_update_deprecated (kinfo, k),
+      Item_t (_, Item_t (state_ty, s)) ) ->
+      pair_t loc int_t state_ty >>? fun (Ty_ex_c pair_ty) ->
+      option_t loc pair_ty >|? fun ty ->
+      let s = Item_t (ty, s) in
+      Ex_splitted_kinstr
+        (s, k, fun k -> ISapling_verify_update_deprecated (kinfo, k))
+  | ISapling_verify_update (kinfo, k), Item_t (_, Item_t (state_ty, s)) ->
+      pair_t loc int_t state_ty >>? fun (Ty_ex_c int_state_ty) ->
+      pair_t loc bytes_t int_state_ty >>? fun (Ty_ex_c pair_ty) ->
+      option_t loc pair_ty >|? fun ty ->
+      let s = Item_t (ty, s) in
+      Ex_splitted_kinstr (s, k, fun k -> ISapling_verify_update (kinfo, k))
+  | IDig (kinfo, n, p, k), s ->
+      let (Item_t (b, s)) = stack_prefix_preservation_witness_split_input p s in
+      let s = stack_prefix_preservation_witness_split_output p s in
+      let s = Item_t (b, s) in
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> IDig (kinfo, n, p, k))
+  | IDug (kinfo, n, p, k), Item_t (a, s) ->
+      let s = stack_prefix_preservation_witness_split_input p s in
+      let s = Item_t (a, s) in
+      let s = stack_prefix_preservation_witness_split_output p s in
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> IDug (kinfo, n, p, k))
+  | IDipn (kinfo, n, p, k1, k2), s ->
+      let s = stack_prefix_preservation_witness_split_input p s in
+      ok
+      @@ Ex_splitted_loop_may_not_fail
+           ( s,
+             k1,
+             k2,
+             (fun s -> ok @@ stack_prefix_preservation_witness_split_output p s),
+             fun k1 k2 -> IDipn (kinfo, n, p, k1, k2) )
+  | IDropn (kinfo, n, p, k), s ->
+      let s = stack_prefix_preservation_witness_split_input p s in
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> IDropn (kinfo, n, p, k))
+  | IChainId (kinfo, k), s ->
+      let s = Item_t (chain_id_t, s) in
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> IChainId (kinfo, k))
+  | INever kinfo, Item_t (a, _) ->
+      ok @@ Ex_splitted_failwith (kinfo, loc, a, {cast = INever kinfo})
+  | IVoting_power (kinfo, k), Item_t (_, s) ->
+      let s = Item_t (nat_t, s) in
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> IVoting_power (kinfo, k))
+  | ITotal_voting_power (kinfo, k), s ->
+      let s = Item_t (nat_t, s) in
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> ITotal_voting_power (kinfo, k))
+  | IKeccak (kinfo, k), s ->
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> IKeccak (kinfo, k))
+  | ISha3 (kinfo, k), s ->
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> ISha3 (kinfo, k))
+  | IAdd_bls12_381_g1 (kinfo, k), Item_t (_, s) ->
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> IAdd_bls12_381_g1 (kinfo, k))
+  | IAdd_bls12_381_g2 (kinfo, k), Item_t (_, s) ->
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> IAdd_bls12_381_g2 (kinfo, k))
+  | IAdd_bls12_381_fr (kinfo, k), Item_t (_, s) ->
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> IAdd_bls12_381_fr (kinfo, k))
+  | IMul_bls12_381_g1 (kinfo, k), Item_t (g1, Item_t (_, s)) ->
+      let s = Item_t (g1, s) in
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> IMul_bls12_381_g1 (kinfo, k))
+  | IMul_bls12_381_g2 (kinfo, k), Item_t (g2, Item_t (_, s)) ->
+      let s = Item_t (g2, s) in
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> IMul_bls12_381_g2 (kinfo, k))
+  | IMul_bls12_381_fr (kinfo, k), Item_t (_, s) ->
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> IMul_bls12_381_fr (kinfo, k))
+  | IMul_bls12_381_z_fr (kinfo, k), Item_t (fr, Item_t (_, s)) ->
+      let s = Item_t (fr, s) in
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> IMul_bls12_381_z_fr (kinfo, k))
+  | IMul_bls12_381_fr_z (kinfo, k), Item_t (_, s) ->
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> IMul_bls12_381_fr_z (kinfo, k))
+  | IInt_bls12_381_fr (kinfo, k), Item_t (_, s) ->
+      let s = Item_t (int_t, s) in
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> IInt_bls12_381_fr (kinfo, k))
+  | INeg_bls12_381_g1 (kinfo, k), s ->
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> INeg_bls12_381_g1 (kinfo, k))
+  | INeg_bls12_381_g2 (kinfo, k), s ->
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> INeg_bls12_381_g2 (kinfo, k))
+  | INeg_bls12_381_fr (kinfo, k), s ->
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> INeg_bls12_381_fr (kinfo, k))
+  | IPairing_check_bls12_381 (kinfo, k), Item_t (_, s) ->
+      let s = Item_t (bool_t, s) in
+      ok
+      @@ Ex_splitted_kinstr (s, k, fun k -> IPairing_check_bls12_381 (kinfo, k))
+  | IComb (kinfo, n, p, k), s ->
+      let rec aux :
+          type a b s c d t.
+          (a, b * s) stack_ty ->
+          (a, b, s, c, d, t) comb_gadt_witness ->
+          (c, d * t) stack_ty tzresult =
+       fun s w ->
+        match (w, s) with
+        | Comb_one, s -> ok s
+        | Comb_succ w, Item_t (a, s) ->
+            aux s w >>? fun (Item_t (c, t)) ->
+            pair_t loc a c >|? fun (Ty_ex_c p) -> Item_t (p, t)
+      in
+      aux s p >|? fun s ->
+      Ex_splitted_kinstr (s, k, fun k -> IComb (kinfo, n, p, k))
+  | IUncomb (kinfo, n, p, k), s ->
+      let rec aux :
+          type a b s c d t.
+          (a, b * s) stack_ty ->
+          (a, b, s, c, d, t) uncomb_gadt_witness ->
+          (c, d * t) stack_ty =
+       fun s w ->
+        match (w, s) with
+        | Uncomb_one, s -> s
+        | Uncomb_succ w, Item_t (Pair_t (a, b, _meta, _), s) ->
+            let s = aux (Item_t (b, s)) w in
+            Item_t (a, s)
+      in
+      let s = aux s p in
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> IUncomb (kinfo, n, p, k))
+  | IComb_get (kinfo, n, p, k), Item_t (c, s) ->
+      let rec aux :
+          type c cc a. (c, cc) ty -> (c, a) comb_get_gadt_witness -> a ty_ex_c =
+       fun c w ->
+        match (w, c) with
+        | Comb_get_zero, c -> Ty_ex_c c
+        | Comb_get_one, Pair_t (hd, _tl, _meta, _) -> Ty_ex_c hd
+        | Comb_get_plus_two w, Pair_t (_hd, tl, _meta, _) -> aux tl w
+      in
+      let s =
+        let (Ty_ex_c ty) = aux c p in
+        Item_t (ty, s)
+      in
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> IComb_get (kinfo, n, p, k))
+  | IComb_set (kinfo, n, p, k), Item_t (a, Item_t (b, s)) ->
+      let rec aux :
+          type a b c ca cb.
+          (a, ca) ty ->
+          (b, cb) ty ->
+          (a, b, c) comb_set_gadt_witness ->
+          c ty_ex_c tzresult =
+       fun a b w ->
+        match (w, b) with
+        | Comb_set_zero, _ -> ok (Ty_ex_c a)
+        | Comb_set_one, Pair_t (_hd, tl, _meta, _) -> pair_t loc a tl
+        | Comb_set_plus_two w, Pair_t (hd, tl, _meta, _) ->
+            aux a tl w >>? fun (Ty_ex_c c) -> pair_t loc hd c
+      in
+      aux a b p >|? fun (Ty_ex_c c) ->
+      let s = Item_t (c, s) in
+      Ex_splitted_kinstr (s, k, fun k -> IComb_set (kinfo, n, p, k))
+  | IDup_n (kinfo, n, p, k), s ->
+      let rec aux :
+          type a b s t.
+          (a, b * s) stack_ty -> (a, b, s, t) dup_n_gadt_witness -> t ty_ex_c =
+       fun s w ->
+        match (w, s) with
+        | Dup_n_succ w, Item_t (_, s) -> aux s w
+        | Dup_n_zero, Item_t (a, _) -> Ty_ex_c a
+      in
+      let s =
+        let (Ty_ex_c ty) = aux s p in
+        Item_t (ty, s)
+      in
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> IDup_n (kinfo, n, p, k))
+  | ITicket (kinfo, cty, k), Item_t (_, Item_t (_, s)) ->
+      ticket_t loc cty >|? fun t ->
+      let s = Item_t (t, s) in
+      Ex_splitted_kinstr (s, k, fun k -> ITicket (kinfo, cty, k))
+  | IRead_ticket (kinfo, a, k), s ->
+      pair_t loc a nat_t >>? fun (Ty_ex_c p) ->
+      pair_t loc address_t p >|? fun (Ty_ex_c t) ->
+      let s = Item_t (t, s) in
+      Ex_splitted_kinstr (s, k, fun k -> IRead_ticket (kinfo, a, k))
+  | ISplit_ticket (kinfo, k), Item_t (t, Item_t (_, s)) ->
+      pair_t loc t t >>? fun (Ty_ex_c p) ->
+      option_t loc p >|? fun o ->
+      let s = Item_t (o, s) in
+      Ex_splitted_kinstr (s, k, fun k -> ISplit_ticket (kinfo, k))
+  | IJoin_tickets (kinfo, ty, k), Item_t (Pair_t (t, _t, _meta, _), s) ->
+      option_t loc t >|? fun o ->
+      let s = Item_t (o, s) in
+      Ex_splitted_kinstr (s, k, fun k -> IJoin_tickets (kinfo, ty, k))
+  | IOpen_chest (kinfo, k), Item_t (_, Item_t (_, Item_t (_, s))) ->
+      let s = Item_t (union_bytes_bool_t, s) in
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> IOpen_chest (kinfo, k))
+  | IMin_block_time (kinfo, k), s ->
+      let s = Item_t (nat_t, s) in
+      ok @@ Ex_splitted_kinstr (s, k, fun k -> IMin_block_time (kinfo, k))
+  | IHalt kinfo, _s -> ok @@ Ex_splitted_halt kinfo
+  | ILog (kinfo, _stack_ty, event, logger, k), s ->
+      ok @@ Ex_splitted_log (s, k, fun k -> ILog (kinfo, s, event, logger, k))
+
+let rec kinstr_final_stack_type :
+    type a s r f.
+    (a, s) stack_ty -> (a, s, r, f) kinstr -> (r, f) stack_ty option tzresult =
+ fun s i ->
+  kinstr_split s i >>? function
+  | Ex_splitted_kinstr (s, k, _) -> kinstr_final_stack_type s k
+  | Ex_splitted_log (s, k, _) -> kinstr_final_stack_type s k
+  | Ex_splitted_loop_may_fail (_s, _body, sk, k, _) ->
+      kinstr_final_stack_type sk k
+  | Ex_splitted_loop_may_not_fail (s, body, k, f, _) -> (
+      kinstr_final_stack_type s body >>? function
+      | Some after_body ->
+          f after_body >>? fun before_k -> kinstr_final_stack_type before_k k
+      | None -> ok None)
+  | Ex_splitted_if (sa, branch_a, sb, branch_b, k, _ii) -> (
+      kinstr_final_stack_type sa branch_a >>? function
+      | Some after_branch_a -> kinstr_final_stack_type after_branch_a k
+      | None -> (
+          kinstr_final_stack_type sb branch_b >>? function
+          | Some after_branch_b -> kinstr_final_stack_type after_branch_b k
+          | None -> ok None))
+  | Ex_splitted_halt _ -> ok @@ Some s
+  | Ex_splitted_failwith (_, _, _, {cast = _}) -> ok None
+
+let kinstr_rewritek :
+    type a s r f.
+    (a, s) stack_ty ->
+    (a, s, r, f) kinstr ->
+    kinstr_rewritek ->
+    (a, s, r, f) kinstr tzresult =
+ fun s i f ->
+  kinstr_split s i >>? function
+  | Ex_splitted_kinstr (s, k, ii) -> ok @@ ii (f.apply s k)
+  | Ex_splitted_log (_s, k, ii) -> ok @@ ii k
+  | Ex_splitted_loop_may_fail (s, body, sk, k, ii) ->
+      ok @@ ii (f.apply s body) (f.apply sk k)
+  | Ex_splitted_loop_may_not_fail (s, body, k, sf, ii) ->
+      (kinstr_final_stack_type s body >>? function
+       | Some after_body -> sf after_body >|? fun before_k -> f.apply before_k k
+       | None -> ok k)
+      >|? fun k -> ii (f.apply s body) k
+  | Ex_splitted_if (sa, branch_a, sb, branch_b, k, ii) ->
+      (kinstr_final_stack_type sa branch_a >>? function
+       | Some after_branch_a -> ok @@ f.apply after_branch_a k
+       | None -> (
+           kinstr_final_stack_type sb branch_b >>? function
+           | Some after_branch_b -> ok @@ f.apply after_branch_b k
+           | None -> ok k))
+      >|? fun k -> ii (f.apply sa branch_a) (f.apply sb branch_b) k
+  | Ex_splitted_halt kinfo -> ok @@ IHalt kinfo
+  | Ex_splitted_failwith (kinfo, loc, ty, _) -> ok @@ IFailwith (kinfo, loc, ty)
