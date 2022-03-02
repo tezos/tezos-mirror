@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2022 Trili Tech  <contact@trili.tech>                       *)
+(* Copyright (c) 2021-2022 Trili Tech, <contact@trili.tech>                  *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -937,6 +937,7 @@ let prepare_first_block ~level ~timestamp ctxt =
             sc_rollup_enable = false;
             (* The following value is chosen to prevent spam. *)
             sc_rollup_origination_size = 6_314;
+            sc_rollup_challenge_window_in_blocks = 20_160;
           }
       in
       add_constants ctxt constants >>= fun ctxt -> return ctxt)

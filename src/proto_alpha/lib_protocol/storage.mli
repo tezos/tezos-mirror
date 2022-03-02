@@ -666,9 +666,11 @@ module Sc_rollup : sig
 
       - a PVM kind (provided at creation time, read-only)
       - a boot sector (provided at creation time, read-only)
+      - the L1 block level at which the rollup was created
       - a merkelized inbox, of which only the root hash is stored
-      - a tree of commitments, rooted at the last finalized commitment
+      - a tree of commitments, rooted at the last cemented commitment
       - a map from stakers to commitments
+      - a map from commitments to the time (level) of its first insertion
 
       For performance reasons we also store (per rollup):
 
@@ -689,13 +691,19 @@ module Sc_rollup : sig
        and type value = Sc_rollup_repr.PVM.boot_sector
        and type t := Raw_context.t
 
+  module Initial_level :
+    Indexed_data_storage
+      with type key = Sc_rollup_repr.t
+       and type value = Raw_level_repr.t
+       and type t := Raw_context.t
+
   module Inbox :
     Non_iterable_indexed_carbonated_data_storage
       with type key = Sc_rollup_repr.t
        and type value = Sc_rollup_inbox.t
        and type t := Raw_context.t
 
-  module Last_final_commitment :
+  module Last_cemented_commitment :
     Non_iterable_indexed_carbonated_data_storage
       with type key = Sc_rollup_repr.t
        and type value = Sc_rollup_repr.Commitment_hash.t
@@ -707,13 +715,13 @@ module Sc_rollup : sig
        and type value = Sc_rollup_repr.Commitment_hash.t
        and type t = Raw_context.t * Sc_rollup_repr.t
 
-  (** Cache: This should always be the size of [Stakers].
+  (** Cache: This should always be the number of entries in [Stakers].
 
       Combined with {!Commitment_stake_count} (see below), this ensures we can
-      check that all stakers agree on a commitment prior to finalization in
+      check that all stakers agree on a commitment prior to cementing it in
       O(1) - rather than O(n) reads.
     *)
-  module Stakers_size :
+  module Staker_count :
     Non_iterable_indexed_carbonated_data_storage
       with type key = Sc_rollup_repr.t
        and type value = int32
@@ -749,5 +757,11 @@ module Sc_rollup : sig
     Non_iterable_indexed_carbonated_data_storage
       with type key = Sc_rollup_repr.Commitment_hash.t
        and type value = int32
+       and type t = Raw_context.t * Sc_rollup_repr.t
+
+  module Commitment_added :
+    Non_iterable_indexed_carbonated_data_storage
+      with type key = Sc_rollup_repr.Commitment_hash.t
+       and type value = Raw_level_repr.t
        and type t = Raw_context.t * Sc_rollup_repr.t
 end

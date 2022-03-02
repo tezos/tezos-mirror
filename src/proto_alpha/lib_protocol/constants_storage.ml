@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2022 Trili Tech  <contact@trili.tech>                       *)
+(* Copyright (c) 2021-2022 Trili Tech, <contact@trili.tech>                  *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -197,3 +197,7 @@ let sc_rollup_enable c =
 let sc_rollup_origination_size c =
   let constants = Raw_context.constants c in
   constants.sc_rollup_origination_size
+
+let sc_rollup_challenge_window_in_blocks c =
+  let constants = Raw_context.constants c in
+  constants.sc_rollup_challenge_window_in_blocks

@@ -3,7 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2020-2021 Nomadic Labs <contact@nomadic-labs.com>           *)
-(* Copyright (c) 2022 Trili Tech  <contact@trili.tech>                       *)
+(* Copyright (c) 2021-2022 Trili Tech, <contact@trili.tech>                  *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -114,3 +114,5 @@ val delay_increment_per_round : Raw_context.t -> Period_repr.t
 val sc_rollup_enable : Raw_context.t -> bool
 
 val sc_rollup_origination_size : Raw_context.t -> int
+
+val sc_rollup_challenge_window_in_blocks : Raw_context.t -> int

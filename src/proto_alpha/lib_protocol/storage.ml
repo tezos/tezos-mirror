@@ -839,18 +839,9 @@ module Public_key_hash = struct
 
   let to_path (key : public_key_hash) l =
     match key with
-    | Ed25519 h -> (
-        match Path_Ed25519.to_path h l with
-        | s :: t -> "ed25519" :: s :: t
-        | _ -> raise (Invalid_argument "Error: No path in ed25519"))
-    | Secp256k1 h -> (
-        match Path_Secp256k1.to_path h l with
-        | s :: t -> "secp256k1" :: s :: t
-        | _ -> raise (Invalid_argument "Error: No path in secp256k1"))
-    | P256 h -> (
-        match Path_P256.to_path h l with
-        | s :: t -> "p256" :: s :: t
-        | _ -> raise (Invalid_argument "Error: No path in p256"))
+    | Ed25519 h -> "ed25519" :: Path_Ed25519.to_path h l
+    | Secp256k1 h -> "secp256k1" :: Path_Secp256k1.to_path h l
+    | P256 h -> "p256" :: Path_P256.to_path h l
 
   let of_path : _ -> public_key_hash option = function
     | "ed25519" :: rest -> (
@@ -871,8 +862,8 @@ module Public_key_hash = struct
     let l1 = Path_Ed25519.path_length
     and l2 = Path_Secp256k1.path_length
     and l3 = Path_P256.path_length in
-    assert (match (l1, l2, l3) with (1, 1, 1) -> true | _ -> false) ;
-    2
+    assert (Compare.Int.(l1 = l2 && l2 = l3)) ;
+    l1 + 1
 end
 
 module Public_key_hash_index = Make_index (Public_key_hash)
@@ -1529,6 +1520,17 @@ module Sc_rollup = struct
         let encoding = Sc_rollup_repr.PVM.boot_sector_encoding
       end)
 
+  module Initial_level =
+    Indexed_context.Make_map
+      (struct
+        let name = ["initial_level"]
+      end)
+      (struct
+        type t = Raw_level_repr.t
+
+        let encoding = Raw_level_repr.encoding
+      end)
+
   module Inbox =
     Indexed_context.Make_carbonated_map
       (struct
@@ -1540,10 +1542,10 @@ module Sc_rollup = struct
         let encoding = Sc_rollup_inbox.encoding
       end)
 
-  module Last_final_commitment =
+  module Last_cemented_commitment =
     Indexed_context.Make_carbonated_map
       (struct
-        let name = ["last_final_commitment"]
+        let name = ["last_cemented_commitment"]
       end)
       (struct
         type t = Sc_rollup_repr.Commitment_hash.t
@@ -1564,10 +1566,10 @@ module Sc_rollup = struct
         let encoding = Sc_rollup_repr.Commitment_hash.encoding
       end)
 
-  module Stakers_size =
+  module Staker_count =
     Indexed_context.Make_carbonated_map
       (struct
-        let name = ["stakers_size"]
+        let name = ["staker_count"]
       end)
       (struct
         type t = int32
@@ -1599,5 +1601,18 @@ module Sc_rollup = struct
            type t = int32
 
            let encoding = Data_encoding.int32
+         end)
+
+  module Commitment_added =
+    Make_indexed_carbonated_data_storage
+      (Make_subcontext (Registered) (Indexed_context.Raw_context)
+         (struct
+           let name = ["commitment_added"]
+         end))
+         (Make_index (Sc_rollup_repr.Commitment_hash_index))
+         (struct
+           type t = Raw_level_repr.t
+
+           let encoding = Raw_level_repr.encoding
          end)
 end

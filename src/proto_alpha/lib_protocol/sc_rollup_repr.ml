@@ -140,6 +140,8 @@ end
 
 type t = Address.t
 
+module Staker = Signature.Public_key_hash
+
 let description =
   "A smart contract rollup is identified by a base58 address starting with "
   ^ Address.prefix
@@ -168,6 +170,8 @@ let of_b58check s =
   match Base58.decode s with
   | Some (Address.Data hash) -> ok hash
   | _ -> Error (Format.sprintf "Invalid_sc_rollup_address %s" s)
+
+let pp = Address.pp
 
 let encoding =
   let open Data_encoding in
@@ -274,6 +278,12 @@ module Commitment = struct
          (req "predecessor" Commitment_hash.encoding)
          (req "number_of_messages" Number_of_messages.encoding)
          (req "number_of_ticks" Number_of_ticks.encoding))
+
+  let hash commitment =
+    let commitment_bytes =
+      Data_encoding.Binary.to_bytes_exn encoding commitment
+    in
+    Commitment_hash.hash_bytes [commitment_bytes]
 end
 
 module Kind = struct

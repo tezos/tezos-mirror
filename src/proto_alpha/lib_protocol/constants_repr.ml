@@ -3,7 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2020-2021 Nomadic Labs <contact@nomadic-labs.com>           *)
-(* Copyright (c) 2022 Trili Tech  <contact@trili.tech>                       *)
+(* Copyright (c) 2021-2022 Trili Tech, <contact@trili.tech>                  *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -171,6 +171,7 @@ type parametric = {
   tx_rollup_max_finalized_levels : int;
   sc_rollup_enable : bool;
   sc_rollup_origination_size : int;
+  sc_rollup_challenge_window_in_blocks : int;
 }
 
 let parametric_encoding =
@@ -223,8 +224,9 @@ let parametric_encoding =
                     c.tx_rollup_max_unfinalized_levels,
                     c.tx_rollup_max_messages_per_inbox,
                     c.tx_rollup_max_finalized_levels ),
-                  (c.sc_rollup_enable, c.sc_rollup_origination_size) ) ) ) ) )
-      ))
+                  ( c.sc_rollup_enable,
+                    c.sc_rollup_origination_size,
+                    c.sc_rollup_challenge_window_in_blocks ) ) ) ) ) ) ))
     (fun ( ( preserved_cycles,
              blocks_per_cycle,
              blocks_per_commitment,
@@ -271,7 +273,9 @@ let parametric_encoding =
                        tx_rollup_max_unfinalized_levels,
                        tx_rollup_max_messages_per_inbox,
                        tx_rollup_max_finalized_levels ),
-                     (sc_rollup_enable, sc_rollup_origination_size) ) ) ) ) ) ) ->
+                     ( sc_rollup_enable,
+                       sc_rollup_origination_size,
+                       sc_rollup_challenge_window_in_blocks ) ) ) ) ) ) ) ->
       {
         preserved_cycles;
         blocks_per_cycle;
@@ -321,6 +325,7 @@ let parametric_encoding =
         tx_rollup_max_finalized_levels;
         sc_rollup_enable;
         sc_rollup_origination_size;
+        sc_rollup_challenge_window_in_blocks;
       })
     (merge_objs
        (obj9
@@ -386,9 +391,10 @@ let parametric_encoding =
                          (req "tx_rollup_max_unfinalized_levels" int31)
                          (req "tx_rollup_max_messages_per_inbox" int31)
                          (req "tx_rollup_max_finalized_levels" int31))
-                      (obj2
+                      (obj3
                          (req "sc_rollup_enable" bool)
-                         (req "sc_rollup_origination_size" int31))))))))
+                         (req "sc_rollup_origination_size" int31)
+                         (req "sc_rollup_challenge_window_in_blocks" int31))))))))
 
 type t = {fixed : fixed; parametric : parametric}
 
