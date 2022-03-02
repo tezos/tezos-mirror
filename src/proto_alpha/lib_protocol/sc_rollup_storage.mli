@@ -33,14 +33,14 @@
 
     A commitment represents a claim about the state of a PVM.
 
-    We also keep auxillary state about each commitments, namely:
+    We also keep auxiliary state about each commitment, namely:
 
     {ul
       {li When it was first added.}
       {li Its current number of stakers.}
       }
 
-    This auxillary data is not part of the commitment itself. They represent
+    This auxiliary data is not part of the commitment itself. They represent
     information that the L1 knows about the claim, not the claim itself.
 
     {3 Predecessors and Boot state}
@@ -50,8 +50,8 @@
 
     Conceptually the root of this tree is the [Commitment_hash.zero].  This
     commitment claims that the PVM (Proof-generating Virtual Machine) is in a
-    boot state, implied by Machine type and boot sector, and waiting to receive
-    its first message.
+    pre-boot state and waiting to start booting by interpreting the boot sector with
+    respect to the Machine semantics.
 
     {3 Cemented and Disputable commitments}
     Commitments accepted as true by the protocol are referred to as Cemented.
@@ -62,7 +62,7 @@
     Let [Stakers(S)] mean "looking up the key S in [Stakers]".
 
     A staker [S] is directly staked on [C] if [Stakers(S) = C]. A staker [S]
-    is indirectly staked on [C] if [C] is an ancestor of [Stakers(S)].
+    is indirectly staked on [C] if [C] is an ancestor of [Stakers(S)] in the commitment tree.
 
     {3 Dispute}
     Commitments that have at least one sibling are referred to as Disputed.
