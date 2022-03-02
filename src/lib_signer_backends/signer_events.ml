@@ -25,50 +25,66 @@
 
 include Internal_event.Simple
 
-let section = ["client"; "signer"; "socket"]
+module Socket = struct
+  let section = ["client"; "signer"; "socket"]
 
-let signer_timeout =
-  declare_1
-    ~section
-    ~name:"signer_timeout"
-    ~msg:"Remote signer timeout, retrying {retry} more time(s)"
-    ~level:Error
-    ("retry", Data_encoding.int8)
+  let signer_timeout =
+    declare_1
+      ~section
+      ~name:"signer_timeout"
+      ~msg:"Remote signer timeout, retrying {retry} more time(s)"
+      ~level:Error
+      ("retry", Data_encoding.int8)
+end
 
-let ledger_not_tezos =
-  declare_2
-    ~section
-    ~name:"ledger_not_tezos"
-    ~msg:"The device at [{position}] is not a Tezos application {error}"
-    ~level:Warning
-    ("position", Data_encoding.string)
-    ("error", Data_encoding.string)
+module Ledger = struct
+  let section = ["client"; "signer"; "ledger"]
 
-let ledger_found_application =
-  declare_3
-    ~section
-    ~name:"ledger_found_application"
-    ~msg:
-      "Found a {version} application at [{position}] (git-description: \
-       {commit})"
-    ~level:Info
-    ("version", Data_encoding.string)
-    ("position", Data_encoding.string)
-    ("commit", Data_encoding.string)
+  let not_tezos =
+    declare_2
+      ~section
+      ~name:"ledger_not_tezos"
+      ~msg:"The device at [{position}] is not a Tezos application {error}"
+      ~level:Warning
+      ~pp2:Format.pp_print_text
+      ("position", Data_encoding.string)
+      ("error", Data_encoding.string)
 
-let ledger_found =
-  declare_2
-    ~section
-    ~name:"ledger_found"
-    ~msg:"Found {number} Ledger(s) {info}"
-    ~level:Debug
-    ("number", Data_encoding.int8)
-    ("info", Data_encoding.string)
+  let found_application =
+    declare_3
+      ~section
+      ~name:"ledger_found_application"
+      ~msg:
+        "Found a {version} application at [{position}] (git-description: \
+         {commit})"
+      ~level:Info
+      ("version", Data_encoding.string)
+      ("position", Data_encoding.string)
+      ("commit", Data_encoding.string)
 
-let ledger_processing =
-  declare_1
-    ~section
-    ~name:"ledger_processing"
-    ~msg:"Processing Ledger at path [{position}]"
-    ~level:Info
-    ("position", Data_encoding.string)
+  let found =
+    declare_2
+      ~section
+      ~name:"ledger_found"
+      ~msg:"Found {number} Ledger(s) {info}"
+      ~level:Debug
+      ("number", Data_encoding.int8)
+      ("info", Data_encoding.string)
+
+  let processing =
+    declare_1
+      ~section
+      ~name:"ledger_processing"
+      ~msg:"Processing Ledger at path [{position}]"
+      ~level:Info
+      ("position", Data_encoding.string)
+
+  let communication =
+    declare_1
+      ~section
+      ~name:"ledger_communication"
+      ~msg:"{message}"
+      ~level:Debug
+      ~pp1:Format.pp_print_text
+      ("message", Data_encoding.string)
+end

@@ -89,7 +89,7 @@ struct
                trace ->
           if n = 0 then Lwt.return e
           else
-            let*! () = Events.(emit signer_timeout) (pred n) in
+            let*! () = Events.(emit Socket.signer_timeout) (pred n) in
             loop (pred n)
       | Error _ as e -> Lwt.return e
       | Ok v -> Lwt.return v
