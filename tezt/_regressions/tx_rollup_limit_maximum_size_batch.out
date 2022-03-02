@@ -32,5 +32,5 @@ Node is bootstrapped.
 Error:
   { "id": "proto.alpha.tx_rollup_message_size_exceeds_limit",
   "description":
-    "A message submtitted to a transaction rollup inbox exceeds limit",
+    "A message submitted to a transaction rollup inbox exceeds limit",
   "data": {} }
