@@ -41,35 +41,33 @@ schema](https://gitlab.com/nomadic-labs/tezos-indexer/-/tree/master/src/db-schem
 for more information about the stored data.
 
 In order to estimate contents of the average block you will need a running
-PostgreSQL instance with a snapshot (either full or partial) from the Tezos
-indexer.
+PostgreSQL instance and Docker. The TPS benchmark should be built and the
+`tezos-tps-evaluation` executable should exist in the root of the Tezos
+project.
 
-[Here](https://z.lamini.ca/v970.mainnet.1729000.tar.bz2) is a snapshot containing blocks 0 to 1.729M. And
-[here](https://z.lamini.ca/recent_blocks_mainnet.2021-Oct-5.sql.bz2) is a partial snapshot between
-2021-09-03 and 2021-10-05.
+Go to the directory of the TPS benchmark `src/bin_tps_evaluation` and run:
 
-Once you have a snapshot, you can load it into the PostgreSQL instance:
-
-```bash
-bunzip2 -c v970.mainnet.1729000.tar.bz2 | psql -h <pg-instance> -U <pg-user> -a <your-db-name>
+```
+$ ./perform-analysis.sh ~/Downloads/v99-2022-janfeb.sql.bz2 2022-01-01 2022-02-28
 ```
 
-This might take a while depending on the hardware you use.
+Where
 
-Once the above command is complete you'll be able to use the
-`estimate-average-block` sub-command to query the database, e.g.:
+* `~/Downloads/v99-2022-janfeb.sql.bz2` is the name of the file that
+  contains the PostgreSQL dump from the Tezos indexer.
+* `2022-01-01` is the start date for analysis (inclusive).
+* `2022-02-28` is the end date for analysis (inclusive).
 
-```bash
-./tezos-tps-evaluation estimate-average-block -c <connection-string> --start 2021-09-01 --end 2021-09-30
-{
-  "regular": 2989498,
-  "origination": 5498,
-  "contract": {
-    "KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton": 1772827,
-    "KT1HbQepzV1nVGg8QVznG7z4RcHseD5kwqBn": 1165878
-  }
-}
-```
+Replace these arguments as necessary.
+
+Some remarks:
+
+* Loading the snapshot may take a while depending on the hardware you use.
+  Full snapshots are extremely big (at the moment of writing, a full snapshot
+  is about 29 Gb compressed and 320 Gb uncompressed on disk) and take long
+  time to load. It might be better to gain access to the live instance of
+  the database used by the Tezos indexer. I was told that one should talk to
+  Samuel Bourque and Corentin Méhat about that.
 
 ## Estimating TPS using gas
 
@@ -78,12 +76,13 @@ protocol parameters.
 
 ```
 ./tezos-tps-evaluation gas-tps --average-block=src/bin_tps_evaluation/average-block.json
-[14:47:11.293] Reading description of the average block from src/bin_tps_evaluation/average-block.json
-[14:47:11.380] Originating smart contracts
-[14:47:11.610] Waiting to reach the next level
-[14:47:41.288] Average transaction cost: 3826
-[14:47:41.288] Gas TPS: 46
-[14:47:41.313] [SUCCESS] (1/1) tezos_tps_gas
+[14:26:25.243] Starting test: tezos_tps_gas
+[14:26:27.956] Reading description of the average block from src/bin_tps_evaluation/average-block.json
+[14:26:28.061] Originating smart contracts
+[14:26:28.285] Waiting to reach the next level
+[14:26:57.514] Average transaction cost: 2899
+[14:26:57.514] Gas TPS: 60
+[14:26:57.536] [SUCCESS] (1/1) tezos_tps_gas
 ```
 
 This estimation is obtained by dividing the hard gas limit per block by the
@@ -96,7 +95,7 @@ The `gas-tps` command will also register its result in a database if
 
 The TPS benchmark is run with the `benchmark-tps` command. It spawns a
 network comprising a node, a baker, and a client. The network will use the
-same constants and parameters as the mainnet. It will wait till level 3 is
+same constants and parameters as the Mainnet. It will wait till level 3 is
 reached and after that it will run the stress test client command.
 
 The TPS parameter that is passed to the stress test command (we call this
@@ -175,18 +174,17 @@ trustworthy:
 ### Example usage
 
 ```
-./tezos-tps-evaluation benchmark-tps --average-block=src/bin_tps_evaluation/average_block.json
-[14:49:04.741] Starting test: tezos_tps_benchmark
-[14:49:04.741] Tezos TPS benchmark
-[14:49:04.741] Protocol: Alpha
-[14:49:04.741] Total number of accounts to use: 5
-[14:49:04.741] Blocks to bake: 10
-[14:49:04.742] Spinning up the network...
-[14:49:07.150] Reading description of the average block from src/bin_tps_evaluation/average-block.json
-[14:49:07.237] Originating smart contracts
-[14:49:07.482] Waiting to reach the next level
-[14:49:36.285] Average transaction cost: 3826
-[14:49:36.368] Using the parameter file: /run/user/1000/tezt-92970/1/parameters.json
+./tezos-tps-evaluation benchmark-tps --average-block=src/bin_tps_evaluation/average_block.json --lift-protocol-limits
+[12:20:57.387] Tezos TPS benchmark
+[12:20:57.387] Protocol: Alpha
+[12:20:57.387] Total number of accounts to use: 5
+[12:20:57.387] Blocks to bake: 10
+[12:20:57.387] Spinning up the network...
+[12:21:00.039] Reading description of the average block from src/bin_tps_evaluation/average-block.json
+[12:21:00.162] Originating smart contracts
+[12:21:00.374] Waiting to reach the next level
+[12:21:29.529] Average transaction cost: 2899
+[12:21:29.529] Using the parameter file: /run/user/1000/tezt-27422/1/parameters.json
 {
   "bootstrap_accounts": [
     [
@@ -214,9 +212,9 @@ trustworthy:
   "blocks_per_cycle": 8192,
   "blocks_per_commitment": 64,
   "blocks_per_stake_snapshot": 512,
-  "blocks_per_voting_period": 40960,
-  "hard_gas_limit_per_operation": "1040000",
-  "hard_gas_limit_per_block": "5200000",
+  "cycles_per_voting_period": 5,
+  "hard_gas_limit_per_operation": "2147483647",
+  "hard_gas_limit_per_block": "2147483647",
   "proof_of_work_threshold": "70368744177663",
   "tokens_per_roll": "6000000000",
   "seed_nonce_revelation_tip": "125000",
@@ -255,29 +253,32 @@ trustworthy:
   "tx_rollup_origination_size": 60000,
   "tx_rollup_hard_size_limit_per_inbox": 100000,
   "tx_rollup_hard_size_limit_per_message": 5000,
+  "tx_rollup_commitment_bond": "10000000000",
+  "tx_rollup_finality_period": 2000,
+  "tx_rollup_max_unfinalized_levels": 2100,
   "sc_rollup_enable": false,
   "sc_rollup_origination_size": 6314
 }
 
-[14:49:36.368] Waiting to reach level 3
-[14:50:06.085] The benchmark has been started
-[14:55:09.116] Produced 10 block(s) in 303.03 seconds
-[14:55:09.476] BMDJApQXVTbmjmbt4FgBYYLRMGeZPTwBoLcc1Jiawn458Xjfxm5 -> 1327
-[14:55:09.655] BLjN9qqawkAmitfQAWSfXpQbL7ffb9CmLZyYH1vMXZd1WULJZVk -> 1219
-[14:55:09.845] BLxti3mSSG1uBoyAnrua16xt3UXfQBubZoQUvdSdER3RPmFudPz -> 1232
-[14:55:10.062] BM4aRMmHtcgdYTZmL4UdcKs3C5YKUV9huYSgefq1GpFyhdNWUsd -> 1211
-[14:55:10.241] BMHiCYTxicxU89eRJ7jhmqw7dpDV2pvR2WaDzAG9Lyh4uRF9RD3 -> 1216
-[14:55:10.425] BMGGDgcD7ZFovhntAbP7CkXuxK7aeUzZCXzWYv4bYUbTrit8sN1 -> 1234
-[14:55:10.606] BLK2hupbdccZVaMraoVHAwcYU1ViQwgEsUTm35azXfzZNYrSXZ8 -> 1224
-[14:55:10.793] BMMJw2iBXgUXAgtJfCMeef1ERJ1v3qHHN3JnJePRM6hsp3K9J5N -> 1232
-[14:55:10.980] BLVjp92R3Zefzum87SaPrSxXqzPsSVn6iUz9eKrxMqrcNSPscTs -> 1226
-[14:55:11.165] BL3113yPbvWSWgeUzLugDxzitkQXdhnzzZKpCSVAuZwGTRw7shq -> 1227
-[14:55:11.165] Total applied transactions: 12348
-[14:55:11.165] Total injected transactions: 13254
-[14:55:11.165] TPS of injection (target): 46
-[14:55:11.165] TPS of injection (de facto): 43.74
-[14:55:11.165] Empirical TPS: 40.75
-[14:55:11.193] [SUCCESS] (1/1) tezos_tps_benchmark
+[12:21:29.529] Waiting to reach level 3
+[12:21:59.188] The benchmark has been started
+[12:27:01.356] Produced 10 block(s) in 302.17 seconds
+[12:27:01.959] BMTfY86i2G9iWfrQ395Coprc4Ji2P2duVKpoS1rjYzzgp27qruE -> 2014
+[12:27:02.195] BLgrwkXPzHVuXYNJV3b5o4nk5VizjGD67XG1WJh4zdxwicTBV85 -> 57
+[12:27:02.456] BLVTPZqLyq9iH4v5bZykvwEPdM5ToUG8h3iZVVcJAiuVnrdRqGH -> 2086
+[12:27:02.745] BKorq793VjQc2QULXonkLUiSWNx8A2FutEUNjFoFeJQEUeDswds -> 3791
+[12:27:02.989] BMURSqymubCeQ4tf893t8AnTcRvnUBVZ9AHzGAaindM1FKnvZVx -> 1377
+[12:27:03.223] BL4gsjMVnv96gZgvdqWA9sewTprNbB2cTYFSVnqM7v1yFpYbHv8 -> 1463
+[12:27:03.463] BLA71V1YeaXTrqtximFwf5mqjJzUhbGwNBJyFWsHVoQBK2efH4k -> 1794
+[12:27:03.675] BLMwr2nwYtm1Brmf53o2k4ZrDPmVTanUtVqmxnfZ75zguZ6rUX6 -> 125
+[12:27:03.980] BMJFTH9ye7FNvmwzgnrx5ZzUYokMHLsb3S9ChtLLdCPnvTRUCFJ -> 1791
+[12:27:04.227] BKxbmXuJf5TgtyhCGdtsRoJBxrdCDqnVvvEeuvNtYmE4PPe2zV2 -> 1656
+[12:27:04.227] Total applied transactions: 16154
+[12:27:04.227] Total injected transactions: 86111
+[12:27:04.227] TPS of injection (target): 4611686018427387903
+[12:27:04.227] TPS of injection (de facto): 284.98
+[12:27:04.227] Empirical TPS: 53.46
+[12:27:04.252] [SUCCESS] (1/1) tezos_tps_benchmark
 ```
 
 ## Automatic daily runs of the TPS benchmark
