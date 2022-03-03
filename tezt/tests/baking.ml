@@ -411,7 +411,8 @@ let assert_block_is_well_baked block =
 
 let random_permutation list =
   assert (list <> []) ;
-  Tezos_stdlib.TzList.shuffle list
+  let rng = Random.State.make_self_init () in
+  Tezos_base.TzPervasives.List.shuffle ~rng list
 
 let single_baker_increasing_fees state ~account : mempool Lwt.t =
   let* branch = get_current_head_hash state in

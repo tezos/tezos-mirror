@@ -51,7 +51,3 @@ val rev_sub : 'a list -> int -> 'a list
 
 (** [sub l n] is [l] capped to max [n] elements *)
 val sub : 'a list -> int -> 'a list
-
-(** [shuffle l] is a list that contains the same elements as [l] but in a random
-    order. *)
-val shuffle : ?rng_state:Random.State.t -> 'a list -> 'a list

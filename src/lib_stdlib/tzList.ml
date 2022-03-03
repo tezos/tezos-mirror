@@ -76,23 +76,3 @@ let rec product a b =
   match a with
   | [] -> []
   | hd :: tl -> List.map (fun x -> (hd, x)) b @ product tl b
-
-(* Use Fisher-Yates shuffle as described by Knuth
-   https://en.wikipedia.org/wiki/Fisher%E2%80%93Yates_shuffle *)
-let shuffle ?rng_state l =
-  let randint =
-    match rng_state with
-    | None -> Random.int
-    | Some rng_state -> Random.State.int rng_state
-  in
-  let a = Array.of_list l in
-  let len = Array.length a in
-  for i = len downto 2 do
-    let m = randint i in
-    let n' = i - 1 in
-    if m <> n' then (
-      let tmp = a.(m) in
-      a.(m) <- a.(n') ;
-      a.(n') <- tmp)
-  done ;
-  Array.to_list a

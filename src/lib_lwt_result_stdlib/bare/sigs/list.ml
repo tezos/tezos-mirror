@@ -1369,6 +1369,10 @@ module type S = sig
 
   val sort_uniq : ('a -> 'a -> int) -> 'a list -> 'a list
 
+  (** [shuffle l] is a list that contains the same elements as [l] but in a
+      random order. *)
+  val shuffle : rng:Random.State.t -> 'a list -> 'a list
+
   (** [merge compare xs ys] merges the lists [xs] and [ys].
 
       [merge] assumes that [xs] and [ys] are sorted according to the order

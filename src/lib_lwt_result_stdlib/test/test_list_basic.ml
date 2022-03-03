@@ -231,6 +231,35 @@ module Partition = struct
   let tests = [Alcotest.test_case "partition-result" `Quick partition_result]
 end
 
+module Shuffle = struct
+  let pp_int_list =
+    Format.pp_print_list
+      ~pp_sep:(fun ppf () -> Format.fprintf ppf "; ")
+      Format.pp_print_int
+
+  let list_size = QCheck.Gen.int_range 2 1000
+
+  let count = 1000
+
+  let test_shuffle_preserves_values =
+    QCheck.Test.make
+      ~name:"shuffle preserves value sets"
+      ~count
+      QCheck.(pair (list_of_size list_size int) int)
+      (fun (l, seed) ->
+        let rng = Random.State.make [|seed|] in
+        let l1 = List.sort Int.compare l in
+        let l2 = List.sort Int.compare (shuffle ~rng l) in
+        Lib_test.Qcheck_helpers.qcheck_eq'
+          ~pp:pp_int_list
+          ~eq:( = )
+          ~actual:l2
+          ~expected:l1
+          ())
+
+  let tests = [QCheck_alcotest.to_alcotest test_shuffle_preserves_values]
+end
+
 let () =
   Alcotest.run
     "list-basic"
@@ -241,4 +270,5 @@ let () =
       ("filter_*", FilterSmthg.tests);
       ("combine_*", Combine.tests);
       ("partition_*", Partition.tests);
+      ("shuffle", Shuffle.tests);
     ]
