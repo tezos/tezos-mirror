@@ -99,14 +99,6 @@ let shuffle ?rng_state l =
   done ;
   Array.to_list a
 
-let index_of ?(compare = Stdlib.compare) item list =
-  let rec find index = function
-    | [] -> None
-    | head :: tail ->
-        if compare head item = 0 then Some index else find (index + 1) tail
-  in
-  find 0 list
-
 let filter_some l =
   (* Written like this (building backward and with a final List.rev)
      so that it is tail-recursive *)

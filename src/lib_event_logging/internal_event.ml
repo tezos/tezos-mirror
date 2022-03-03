@@ -700,15 +700,18 @@ module Simple = struct
       if i >= len then invalid_msg "unmatched '{'" msg
       else if msg.[i] = '}' then
         let variable_name = String.sub msg atom_start (i - atom_start) in
-        match TzList.index_of variable_name variable_names with
-        | None ->
-            invalid_msg
-              (Printf.sprintf "unbound variable: %S" variable_name)
-              msg
-        | Some index ->
-            let acc = Variable index :: acc in
-            let i = i + 1 in
-            find_variable_begin acc i i
+        let rec loop index = function
+          | [] ->
+              invalid_msg
+                (Printf.sprintf "unbound variable: %S" variable_name)
+                msg
+          | varname :: _ when String.equal varname variable_name ->
+              let acc = Variable index :: acc in
+              let i = i + 1 in
+              find_variable_begin acc i i
+          | _ :: variable_names -> loop (index + 1) variable_names
+        in
+        loop 0 variable_names
       else find_variable_end acc atom_start (i + 1)
     in
     find_variable_begin [] 0 0 |> List.rev
