@@ -19,7 +19,8 @@
   tezos-stdlib
   tezos-context.sigs
   tezos-context.helpers
-  tezos-context.encoding)
+  tezos-context.encoding
+  tezos-context.memory)
  (flags
   (:standard
    -open Tezos_shell_services

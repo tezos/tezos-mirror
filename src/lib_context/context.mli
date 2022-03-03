@@ -78,6 +78,11 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) : sig
   val commit_test_chain_genesis :
     context -> Block_header.t -> Block_header.t Lwt.t
 
+  (** Extract a subtree from the {!Tezos_context.Context.t} argument and returns
+      it as a {!Tezos_context_memory.Context.tree} (note the the type change!). **)
+  val to_memory_tree :
+    t -> string list -> Tezos_context_memory.Context.tree option Lwt.t
+
   (** [merkle_tree t leaf_kind key] returns a Merkle proof for [key] (i.e.
     whose hashes reach [key]). If [leaf_kind] is [Block_services.Hole], the value
     at [key] is a hash. If [leaf_kind] is [Block_services.Raw_context],
