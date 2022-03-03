@@ -1165,6 +1165,10 @@ let apply_origination ~consume_deserialization_gas ~ctxt ~script ~internal
   in
   (ctxt, result, [])
 
+type 'kind any_manager_operation =
+  | Internal of 'kind Script_typed_ir.manager_operation
+  | External of 'kind Alpha_context.manager_operation
+
 (**
 
    Retrieving the source code of a contract from its address is costly
@@ -1186,10 +1190,10 @@ let apply_manager_operation_content :
     chain_id:Chain_id.t ->
     internal:bool ->
     gas_consumed_in_precheck:Gas.cost option ->
-    kind manager_operation ->
+    kind any_manager_operation ->
     (context
     * kind successful_manager_operation_result
-    * packed_internal_operation list)
+    * Script_typed_ir.packed_internal_operation list)
     tzresult
     Lwt.t =
  fun ctxt
@@ -1215,7 +1219,7 @@ let apply_manager_operation_content :
   (* [note]: deserialization gas has already been accounted for in the gas
      consumed by the precheck and the lazy_exprs have been forced. *)
   match operation with
-  | Reveal _ ->
+  | External (Reveal _) ->
       return
         (* No-op: action already performed by `precheck_manager_contents`. *)
         ( ctxt,
@@ -1223,8 +1227,9 @@ let apply_manager_operation_content :
              {consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt}
             : kind successful_manager_operation_result),
           [] )
-  | Transaction
-      {amount; parameters; destination = Contract contract; entrypoint} ->
+  | External
+      (Transaction
+        {amount; parameters; destination = Contract contract; entrypoint}) ->
       apply_transaction
         ~consume_deserialization_gas
         ~ctxt
@@ -1238,7 +1243,25 @@ let apply_manager_operation_content :
         ~chain_id
         ~mode
         ~internal
-  | Transaction {amount; parameters; destination = Tx_rollup dst; entrypoint} ->
+  | Internal
+      (Transaction
+        {amount; parameters; destination = Contract contract; entrypoint}) ->
+      apply_transaction
+        ~consume_deserialization_gas
+        ~ctxt
+        ~parameters
+        ~source
+        ~contract
+        ~amount
+        ~entrypoint
+        ~before_operation
+        ~payer
+        ~chain_id
+        ~mode
+        ~internal
+  | External
+      (Transaction
+        {amount; parameters; destination = Tx_rollup dst; entrypoint}) ->
       apply_transaction_to_rollup
         ~consume_deserialization_gas
         ~ctxt
@@ -1248,21 +1271,34 @@ let apply_manager_operation_content :
         ~payer
         ~dst_rollup:dst
         ~since:before_operation
-  | Tx_rollup_withdraw
-      (* FIXME/TORU: #2488 The ticket accounting for the withdraw is not done here *)
-      {
-        tx_rollup;
-        level;
-        context_hash;
-        message_index;
-        withdraw_path;
-        contents;
-        ty;
-        ticketer;
-        amount;
-        destination;
-        entrypoint;
-      } ->
+  | Internal
+      (Transaction
+        {amount; parameters; destination = Tx_rollup dst; entrypoint}) ->
+      apply_transaction_to_rollup
+        ~consume_deserialization_gas
+        ~ctxt
+        ~parameters
+        ~amount
+        ~entrypoint
+        ~payer
+        ~dst_rollup:dst
+        ~since:before_operation
+  | External
+      (Tx_rollup_withdraw
+        (* FIXME/TORU: #2488 The ticket accounting for the withdraw is not done here *)
+        {
+          tx_rollup;
+          level;
+          context_hash;
+          message_index;
+          withdraw_path;
+          contents;
+          ty;
+          ticketer;
+          amount;
+          destination;
+          entrypoint;
+        }) ->
       (* Ticket parsing and hashing *)
       Script.force_decode_in_context ~consume_deserialization_gas ctxt ty
       >>?= fun (ty, ctxt) ->
@@ -1338,7 +1374,7 @@ let apply_manager_operation_content :
       (* FIXME/TORU: #2488 the returned op will fail when ticket hardening is
          merged, it must be commented or fixed *)
       let op =
-        Internal_operation
+        Script_typed_ir.Internal_operation
           {
             source;
             (* TODO is 0 correct ? *)
@@ -1358,7 +1394,7 @@ let apply_manager_operation_content :
           {consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt}
       in
       return (ctxt, result, [op])
-  | Origination {delegate; script; preorigination; credit} ->
+  | External (Origination {delegate; script; preorigination; credit}) ->
       Script.force_decode_in_context
         ~consume_deserialization_gas
         ctxt
@@ -1374,9 +1410,27 @@ let apply_manager_operation_content :
         ~source
         ~credit
         ~before_operation
-  | Delegation delegate ->
+  | Internal (Origination {delegate; script; preorigination; credit}) ->
+      Script.force_decode_in_context
+        ~consume_deserialization_gas
+        ctxt
+        script.Script.storage
+      >>?= fun (_unparsed_storage, ctxt) ->
+      apply_origination
+        ~consume_deserialization_gas
+        ~ctxt
+        ~script
+        ~internal
+        ~preorigination
+        ~delegate
+        ~source
+        ~credit
+        ~before_operation
+  | External (Delegation delegate) ->
       apply_delegation ~ctxt ~source ~delegate ~since:before_operation
-  | Register_global_constant {value} ->
+  | Internal (Delegation delegate) ->
+      apply_delegation ~ctxt ~source ~delegate ~since:before_operation
+  | External (Register_global_constant {value}) ->
       (* Decode the value and consume gas appropriately *)
       Script.force_decode_in_context ~consume_deserialization_gas ctxt value
       >>?= fun (expr, ctxt) ->
@@ -1408,7 +1462,7 @@ let apply_manager_operation_content :
           }
       in
       return (ctxt, result, [])
-  | Set_deposits_limit limit -> (
+  | External (Set_deposits_limit limit) -> (
       (match limit with
       | None -> Result.return_unit
       | Some limit ->
@@ -1440,7 +1494,7 @@ let apply_manager_operation_content :
                   consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
                 },
               [] ))
-  | Tx_rollup_origination ->
+  | External Tx_rollup_origination ->
       Tx_rollup.originate ctxt >>=? fun (ctxt, originated_tx_rollup) ->
       let result =
         Tx_rollup_origination_result
@@ -1451,7 +1505,8 @@ let apply_manager_operation_content :
           }
       in
       return (ctxt, result, [])
-  | Tx_rollup_submit_batch {tx_rollup; content; burn_limit} ->
+  | External (Tx_rollup_submit_batch {tx_rollup; content; burn_limit}) ->
+      assert_tx_rollup_feature_enabled ctxt >>=? fun () ->
       let (message, message_size) = Tx_rollup_message.make_batch content in
       Tx_rollup_state.get ctxt tx_rollup >>=? fun (ctxt, state) ->
       Tx_rollup_state.burn_cost ~limit:burn_limit state message_size
@@ -1469,7 +1524,7 @@ let apply_manager_operation_content :
           }
       in
       return (ctxt, result, [])
-  | Tx_rollup_commit {tx_rollup; commitment} -> (
+  | External (Tx_rollup_commit {tx_rollup; commitment}) -> (
       match Contract.is_implicit source with
       | None ->
           fail Tx_rollup_operation_with_non_implicit_contract
@@ -1508,7 +1563,7 @@ let apply_manager_operation_content :
               }
           in
           return (ctxt, result, []))
-  | Tx_rollup_return_bond {tx_rollup} -> (
+  | External (Tx_rollup_return_bond {tx_rollup}) -> (
       match Contract.is_implicit source with
       | None -> fail Tx_rollup_operation_with_non_implicit_contract
       | Some key ->
@@ -1529,7 +1584,7 @@ let apply_manager_operation_content :
               }
           in
           return (ctxt, result, []))
-  | Tx_rollup_finalize_commitment {tx_rollup} ->
+  | External (Tx_rollup_finalize_commitment {tx_rollup}) ->
       Tx_rollup_state.get ctxt tx_rollup >>=? fun (ctxt, state) ->
       Tx_rollup_commitment.finalize_commitment ctxt tx_rollup state
       >>=? fun (ctxt, state, level) ->
@@ -1543,7 +1598,7 @@ let apply_manager_operation_content :
           }
       in
       return (ctxt, result, [])
-  | Tx_rollup_remove_commitment {tx_rollup} ->
+  | External (Tx_rollup_remove_commitment {tx_rollup}) ->
       Tx_rollup_state.get ctxt tx_rollup >>=? fun (ctxt, state) ->
       Tx_rollup_commitment.remove_commitment ctxt tx_rollup state
       >>=? fun (ctxt, state, level) ->
@@ -1557,7 +1612,9 @@ let apply_manager_operation_content :
           }
       in
       return (ctxt, result, [])
-  | Tx_rollup_rejection {proof; tx_rollup; level; message; message_position} ->
+  | External
+      (Tx_rollup_rejection {proof; tx_rollup; level; message; message_position})
+    ->
       Tx_rollup_state.get ctxt tx_rollup >>=? fun (ctxt, state) ->
       (* TODO/TORU: Check the proof *)
       Tx_rollup_inbox.check_message_hash
@@ -1580,7 +1637,7 @@ let apply_manager_operation_content :
           }
       in
       return (ctxt, result, [])
-  | Sc_rollup_originate {kind; boot_sector} ->
+  | External (Sc_rollup_originate {kind; boot_sector}) ->
       Sc_rollup_operations.originate ctxt ~kind ~boot_sector
       >>=? fun ({address; size}, ctxt) ->
       let consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt in
@@ -1589,13 +1646,13 @@ let apply_manager_operation_content :
           {address; consumed_gas; size; balance_updates = []}
       in
       return (ctxt, result, [])
-  | Sc_rollup_add_messages {rollup; messages} ->
+  | External (Sc_rollup_add_messages {rollup; messages}) ->
       Sc_rollup.add_messages ctxt rollup messages
       >>=? fun (inbox_after, _size, ctxt) ->
       let consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt in
       let result = Sc_rollup_add_messages_result {consumed_gas; inbox_after} in
       return (ctxt, result, [])
-  | Sc_rollup_cement {rollup; commitment} ->
+  | External (Sc_rollup_cement {rollup; commitment}) ->
       Sc_rollup.cement_commitment ctxt rollup commitment >>=? fun ctxt ->
       let consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt in
       let result = Sc_rollup_cement_result {consumed_gas} in
@@ -1607,7 +1664,8 @@ let apply_internal_manager_operations ctxt mode ~payer ~chain_id ops =
   let[@coq_struct "ctxt"] rec apply ctxt applied worklist =
     match worklist with
     | [] -> Lwt.return (Success ctxt, List.rev applied)
-    | Internal_operation ({source; operation; nonce} as op) :: rest -> (
+    | Script_typed_ir.Internal_operation ({source; operation; nonce} as op)
+      :: rest -> (
         let op_res = Apply_results.contents_of_internal_operation op in
         (if internal_nonce_already_recorded ctxt nonce then
          fail (Internal_operation_replay (Internal_contents op_res))
@@ -1621,20 +1679,20 @@ let apply_internal_manager_operations ctxt mode ~payer ~chain_id ops =
             ~chain_id
             ~internal:true
             ~gas_consumed_in_precheck:None
-            operation)
+            (Internal operation))
         >>= function
         | Error errors ->
             let result =
               pack_internal_manager_operation_result
                 op
-                (Failed (manager_kind op.operation, errors))
+                (Failed (Script_typed_ir.manager_kind op.operation, errors))
             in
             let skipped =
               List.rev_map
-                (fun (Internal_operation op) ->
+                (fun (Script_typed_ir.Internal_operation op) ->
                   pack_internal_manager_operation_result
                     op
-                    (Skipped (manager_kind op.operation)))
+                    (Skipped (Script_typed_ir.manager_kind op.operation)))
                 rest
             in
             Lwt.return (Failure, List.rev (skipped @ result :: applied))
@@ -1896,7 +1954,7 @@ let apply_manager_contents (type kind) ctxt mode chain_id
     ~internal:false
     ~gas_consumed_in_precheck
     ~chain_id
-    operation
+    (External operation)
   >>= function
   | Ok (ctxt, operation_results, internal_operations) -> (
       apply_internal_manager_operations
