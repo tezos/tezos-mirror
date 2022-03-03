@@ -44,6 +44,11 @@ module type PROOF = sig
   include Tezos_context_sigs.Context.PROOF
 end
 
+module type PROOF_ENCODING = sig
+  (** @inline *)
+  include Tezos_context_sigs.Context.PROOF_ENCODING
+end
+
 module type HASH_VERSION = sig
   (** @inline *)
   include Tezos_context_sigs.Context.HASH_VERSION

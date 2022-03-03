@@ -407,8 +407,6 @@ type ('proof, 'result) verifier :=
       operations as the generating computation, *in some order*. *)
 type tree_proof := Proof.tree Proof.t
 
-val tree_proof_encoding : tree_proof Data_encoding.t
-
 (** [verify_tree_proof] is the verifier of tree proofs. *)
 val verify_tree_proof : (tree_proof, 'a) verifier
 
@@ -418,10 +416,37 @@ val verify_tree_proof : (tree_proof, 'a) verifier
       operations as the generating computation, in the exact same order. *)
 type stream_proof := Proof.stream Proof.t
 
-val stream_proof_encoding : stream_proof Data_encoding.t
-
 (** [verify_stream] is the verifier of stream proofs. *)
 val verify_stream_proof : (stream_proof, 'a) verifier
+
+module type PROOF_ENCODING = sig
+  val tree_proof_encoding : tree_proof Data_encoding.t
+
+  val stream_proof_encoding : stream_proof Data_encoding.t
+end
+
+(** Proof encoding for binary tree Merkle proofs *)
+module Proof_encoding : sig
+  (** V1: using vanilla Data_encoding. Easier to parse by non-OCaml programs
+      but less efficient *)
+  module V1 : sig
+    (** Encoding for 32-tree proofs *)
+    module Tree32 : PROOF_ENCODING
+
+    (** Encoding for binary tree proofs *)
+    module Tree2 : PROOF_ENCODING
+  end
+
+  (** V2 : using Compact_encoding.  Smaller than V1 but more complex parser
+      is required. *)
+  module V2 : sig
+    (** Encoding for 32-tree proofs *)
+    module Tree32 : PROOF_ENCODING
+
+    (** Encoding for binary tree proofs *)
+    module Tree2 : PROOF_ENCODING
+  end
+end
 
 val register_resolver :
   'a Base58.encoding -> (t -> string -> 'a list Lwt.t) -> unit
