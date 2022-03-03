@@ -63,7 +63,6 @@ include:
   - .gitlab/ci/test/unit.yml
   - .gitlab/ci/test/integration.yml
   - .gitlab/ci/test/liquidity-baking-scripts-integrity.yml
-  - .gitlab/ci/test/coq.yml
   - .gitlab/ci/test/tezt.yml
   - .gitlab/ci/doc.yml
   - .gitlab/ci/doc/test-scripts.yml
