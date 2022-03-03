@@ -269,6 +269,16 @@ let detach_node ?(prefix = "") ?timeout ?(min_connections : int option)
           let*! () = Event.(emit bye) () in
           return_unit))
 
+let select_nth_point n points =
+  if n < 0 then
+    raise (Invalid_argument "P2p.Test.Node.select_nth_point: negative input") ;
+  let rec loop n acc = function
+    | [] -> invalid_arg "Utils.select"
+    | x :: xs when n <= 0 -> (x, List.rev_append acc xs)
+    | x :: xs -> loop (pred n) (x :: acc) xs
+  in
+  loop n [] points
+
 (**Detach one process per id in [points], each with a p2p_pool and a
    welcome worker.
 
@@ -294,7 +304,7 @@ let detach_nodes ?timeout ?prefix ?min_connections ?max_connections
         let max_incoming_connections =
           Option.map (fun f -> f n) max_incoming_connections
         in
-        let ((addr, port), other_points) = List.select n points in
+        let ((addr, port), other_points) = select_nth_point n points in
         detach_node
           ?prefix
           ?p2p_versions

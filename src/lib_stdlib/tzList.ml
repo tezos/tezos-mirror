@@ -74,14 +74,6 @@ let take_n ?compare n l =
 let rec drop_n n l =
   if n <= 0 then l else match l with [] -> [] | _ :: xs -> drop_n (n - 1) xs
 
-let select n l =
-  let rec loop n acc = function
-    | [] -> invalid_arg "Utils.select"
-    | x :: xs when n <= 0 -> (x, List.rev_append acc xs)
-    | x :: xs -> loop (pred n) (x :: acc) xs
-  in
-  loop n [] l
-
 let rec product a b =
   match a with
   | [] -> []

@@ -49,9 +49,6 @@ val drop_n : int -> 'a list -> 'a list
     exactly [n] elements, [j] is [l] and [k] is [[]]. *)
 val split_n : int -> 'a list -> 'a list * 'a list
 
-(** [select n l] is ([n]th element of [l], [l] without that element) *)
-val select : int -> 'a list -> 'a * 'a list
-
 (** [rev_sub l n] is [List.rev l] capped to max [n] elements *)
 val rev_sub : 'a list -> int -> 'a list
 
