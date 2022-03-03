@@ -1027,6 +1027,52 @@ let apply_transaction ~consume_deserialization_gas ~ctxt ~parameters ~source
         ~balance_updates
         ~allocated_destination_contract
 
+let apply_transaction_to_rollup ~consume_deserialization_gas ~ctxt ~parameters
+    ~amount ~entrypoint ~payer ~dst_rollup ~since =
+  assert_tx_rollup_feature_enabled ctxt >>=? fun () ->
+  fail_unless Tez.(amount = zero) Tx_rollup_invalid_transaction_amount
+  >>=? fun () ->
+  if Entrypoint.(entrypoint = Tx_rollup.deposit_entrypoint) then
+    Script.force_decode_in_context ~consume_deserialization_gas ctxt parameters
+    >>?= fun (parameters, ctxt) ->
+    Script_ir_translator.parse_tx_rollup_deposit_parameters ctxt parameters
+    >>?= fun (Tx_rollup.{ticketer; contents; ty; amount; destination}, ctxt) ->
+    Tx_rollup.hash_ticket ctxt dst_rollup ~contents ~ticketer ~ty
+    >>?= fun (ticket_hash, ctxt) ->
+    (* The deposit is returned to the [payer] as a withdrawal if it fails due to
+       a Balance_overflow in the recipient. The recipient of withdrawals are
+       always implicit. We set the withdrawal recipient to [payer]. *)
+    let (deposit, message_size) =
+      Tx_rollup_message.make_deposit payer destination ticket_hash amount
+    in
+    Tx_rollup_state.get ctxt dst_rollup >>=? fun (ctxt, state) ->
+    Tx_rollup_state.burn_cost ~limit:None state message_size >>?= fun cost ->
+    Token.transfer
+      ctxt
+      (`Contract (Contract.implicit_contract payer))
+      `Burned
+      cost
+    >>=? fun (ctxt, balance_updates) ->
+    Tx_rollup_inbox.append_message ctxt dst_rollup state deposit
+    >>=? fun (ctxt, state) ->
+    Tx_rollup_state.update ctxt dst_rollup state >>=? fun ctxt ->
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/2339
+       Storage fees for transaction rollup.
+       We need to charge for newly allocated storage (as we do for
+       Michelson’s big map). This also means taking into account
+       the global table of tickets. *)
+    let result =
+      Transaction_result
+        (Transaction_to_tx_rollup_result
+           {
+             balance_updates;
+             consumed_gas = Gas.consumed ~since ~until:ctxt;
+             ticket_hash;
+           })
+    in
+    return (ctxt, result, [])
+  else fail (Script_tc_errors.No_such_entrypoint entrypoint)
+
 (**
 
    Retrieving the source code of a contract from its address is costly
@@ -1101,55 +1147,15 @@ let apply_manager_operation_content :
         ~mode
         ~internal
   | Transaction {amount; parameters; destination = Tx_rollup dst; entrypoint} ->
-      assert_tx_rollup_feature_enabled ctxt >>=? fun () ->
-      fail_unless Tez.(amount = zero) Tx_rollup_invalid_transaction_amount
-      >>=? fun () ->
-      if Entrypoint.(entrypoint = Tx_rollup.deposit_entrypoint) then
-        Script.force_decode_in_context
-          ~consume_deserialization_gas
-          ctxt
-          parameters
-        >>?= fun (parameters, ctxt) ->
-        Script_ir_translator.parse_tx_rollup_deposit_parameters ctxt parameters
-        >>?= fun (Tx_rollup.{ticketer; contents; ty; amount; destination}, ctxt)
-          ->
-        Tx_rollup.hash_ticket ctxt dst ~contents ~ticketer ~ty
-        >>?= fun (ticket_hash, ctxt) ->
-        (* The deposit is returned to the [payer] as a withdrawal
-           if it fails due to a Balance_overflow in the
-           recipient. The recipient of withdrawals are always
-           implicit. We set the withdrawal recipient to [payer]. *)
-        let (deposit, message_size) =
-          Tx_rollup_message.make_deposit payer destination ticket_hash amount
-        in
-        Tx_rollup_state.get ctxt dst >>=? fun (ctxt, state) ->
-        Tx_rollup_state.burn_cost ~limit:None state message_size
-        >>?= fun cost ->
-        Token.transfer
-          ctxt
-          (`Contract (Contract.implicit_contract payer))
-          `Burned
-          cost
-        >>=? fun (ctxt, balance_updates) ->
-        Tx_rollup_inbox.append_message ctxt dst state deposit
-        >>=? fun (ctxt, state) ->
-        Tx_rollup_state.update ctxt dst state >>=? fun ctxt ->
-        (* TODO: https://gitlab.com/tezos/tezos/-/issues/2339
-           Storage fees for transaction rollup.
-           We need to charge for newly allocated storage (as we do for
-           Michelson’s big map). This also means taking into account
-           the global table of tickets. *)
-        let result =
-          Transaction_result
-            (Transaction_to_tx_rollup_result
-               {
-                 balance_updates;
-                 consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
-                 ticket_hash;
-               })
-        in
-        return (ctxt, result, [])
-      else fail (Script_tc_errors.No_such_entrypoint entrypoint)
+      apply_transaction_to_rollup
+        ~consume_deserialization_gas
+        ~ctxt
+        ~parameters
+        ~amount
+        ~entrypoint
+        ~payer
+        ~dst_rollup:dst
+        ~since:before_operation
   | Origination {delegate; script; preorigination; credit} ->
       Script.force_decode_in_context
         ~consume_deserialization_gas
