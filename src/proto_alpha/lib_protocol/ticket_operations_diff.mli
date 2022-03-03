@@ -48,5 +48,5 @@ type ticket_token_diff = private {
     tickets. *)
 val ticket_diffs_of_operations :
   Alpha_context.context ->
-  Alpha_context.packed_internal_operation list ->
+  Script_typed_ir.packed_internal_operation list ->
   (ticket_token_diff list * Alpha_context.context) tzresult Lwt.t

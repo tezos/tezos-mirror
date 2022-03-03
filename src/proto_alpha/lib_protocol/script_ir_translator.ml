@@ -480,9 +480,14 @@ let unparse_key_hash ~loc ctxt mode k =
       Gas.consume ctxt Unparse_costs.key_hash_readable >|? fun ctxt ->
       (String (loc, Signature.Public_key_hash.to_b58check k), ctxt)
 
+(* Operations are only unparsed during the production of execution traces of
+   the interpreter. *)
 let unparse_operation ~loc ctxt {piop; lazy_storage_diff = _} =
+  let iop = Apply_results.contents_of_packed_internal_operation piop in
   let bytes =
-    Data_encoding.Binary.to_bytes_exn Operation.internal_operation_encoding piop
+    Data_encoding.Binary.to_bytes_exn
+      Apply_results.internal_contents_encoding
+      iop
   in
   Gas.consume ctxt (Unparse_costs.operation bytes) >|? fun ctxt ->
   (Bytes (loc, bytes), ctxt)

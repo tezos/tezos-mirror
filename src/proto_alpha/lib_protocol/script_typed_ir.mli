@@ -78,6 +78,32 @@ type ('a, 'b) pair = 'a * 'b
 
 type ('a, 'b) union = L of 'a | R of 'b
 
+type 'kind manager_operation =
+  | Transaction :
+      Alpha_context.transaction
+      -> Kind.transaction manager_operation
+  | Origination :
+      Alpha_context.origination
+      -> Kind.origination manager_operation
+  | Delegation :
+      Signature.Public_key_hash.t option
+      -> Kind.delegation manager_operation
+
+type packed_manager_operation =
+  | Manager : 'kind manager_operation -> packed_manager_operation
+
+val manager_kind : 'kind manager_operation -> 'kind Kind.manager
+
+type 'kind internal_operation = {
+  source : Contract.contract;
+  operation : 'kind manager_operation;
+  nonce : int;
+}
+
+type packed_internal_operation =
+  | Internal_operation : 'kind internal_operation -> packed_internal_operation
+[@@ocaml.unboxed]
+
 type operation = {
   piop : packed_internal_operation;
   lazy_storage_diff : Lazy_storage.diffs option;

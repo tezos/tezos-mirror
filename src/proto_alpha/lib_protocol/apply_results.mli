@@ -45,7 +45,7 @@ type 'kind internal_manager_operation =
       -> Kind.delegation internal_manager_operation
 
 val manager_operation_of_internal_operation :
-  'kind internal_manager_operation -> 'kind manager_operation
+  'kind internal_manager_operation -> 'kind Alpha_context.manager_operation
 
 type 'kind internal_contents = {
   source : Contract.contract;
@@ -57,10 +57,11 @@ type packed_internal_contents =
   | Internal_contents : 'kind internal_contents -> packed_internal_contents
 
 val contents_of_packed_internal_operation :
-  packed_internal_operation -> packed_internal_contents
+  Script_typed_ir.packed_internal_operation -> packed_internal_contents
 
 val contents_of_packed_internal_operations :
-  packed_internal_operation list -> packed_internal_contents list
+  Script_typed_ir.packed_internal_operation list ->
+  packed_internal_contents list
 
 (** Result of applying a {!Operation.t}. Follows the same structure. *)
 type 'kind operation_metadata = {contents : 'kind contents_result_list}
@@ -271,10 +272,10 @@ and packed_internal_manager_operation_result =
       -> packed_internal_manager_operation_result
 
 val contents_of_internal_operation :
-  'kind internal_operation -> 'kind internal_contents
+  'kind Script_typed_ir.internal_operation -> 'kind internal_contents
 
 val pack_internal_manager_operation_result :
-  'kind internal_operation ->
+  'kind Script_typed_ir.internal_operation ->
   'kind manager_operation_result ->
   packed_internal_manager_operation_result
 

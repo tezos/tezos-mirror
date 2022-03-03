@@ -701,7 +701,7 @@ end)
       Script_typed_ir.{piop = transfer; lazy_storage_diff = None}
 
     and generate_transfer_tokens :
-        Alpha_context.packed_internal_operation sampler =
+        Script_typed_ir.packed_internal_operation sampler =
      fun _rng_state -> fail_sampling "generate_transfer_tokens: unimplemented"
 
     and generate_bls12_381_g1 : Script_bls.G1.t sampler =

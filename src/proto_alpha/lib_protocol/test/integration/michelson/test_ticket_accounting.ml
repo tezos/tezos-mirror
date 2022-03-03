@@ -34,6 +34,7 @@
 
 open Protocol
 open Alpha_context
+open Script_typed_ir
 
 let wrap m = m >|= Environment.wrap_tzresult
 
