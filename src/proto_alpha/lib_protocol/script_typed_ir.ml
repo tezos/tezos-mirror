@@ -98,41 +98,6 @@ type ('a, 'b) pair = 'a * 'b
 
 type ('a, 'b) union = L of 'a | R of 'b
 
-type 'kind manager_operation =
-  | Transaction :
-      Alpha_context.transaction
-      -> Kind.transaction manager_operation
-  | Origination :
-      Alpha_context.origination
-      -> Kind.origination manager_operation
-  | Delegation :
-      Signature.Public_key_hash.t option
-      -> Kind.delegation manager_operation
-
-type packed_manager_operation =
-  | Manager : 'kind manager_operation -> packed_manager_operation
-
-let manager_kind : type kind. kind manager_operation -> kind Kind.manager =
-  function
-  | Transaction _ -> Kind.Transaction_manager_kind
-  | Origination _ -> Kind.Origination_manager_kind
-  | Delegation _ -> Kind.Delegation_manager_kind
-
-type 'kind internal_operation = {
-  source : Contract.contract;
-  operation : 'kind manager_operation;
-  nonce : int;
-}
-
-type packed_internal_operation =
-  | Internal_operation : 'kind internal_operation -> packed_internal_operation
-[@@ocaml.unboxed]
-
-type operation = {
-  piop : packed_internal_operation;
-  lazy_storage_diff : Lazy_storage.diffs option;
-}
-
 module Script_chain_id = struct
   type t = Chain_id_tag of Chain_id.t [@@ocaml.unboxed]
 
@@ -1382,6 +1347,42 @@ and ('input, 'output) view_signature =
       output_ty : 'output ty;
     }
       -> ('input, 'output) view_signature
+
+and 'kind manager_operation =
+  | Transaction :
+      Alpha_context.transaction
+      -> Kind.transaction manager_operation
+  | Origination :
+      Alpha_context.origination
+      -> Kind.origination manager_operation
+  | Delegation :
+      Signature.Public_key_hash.t option
+      -> Kind.delegation manager_operation
+
+and 'kind internal_operation = {
+  source : Contract.contract;
+  operation : 'kind manager_operation;
+  nonce : int;
+}
+
+and packed_internal_operation =
+  | Internal_operation : 'kind internal_operation -> packed_internal_operation
+[@@ocaml.unboxed]
+
+and operation = {
+  piop : packed_internal_operation;
+  lazy_storage_diff : Lazy_storage.diffs option;
+}
+
+type packed_manager_operation =
+  | Manager : 'kind manager_operation -> packed_manager_operation
+[@@ocaml.unboxed]
+
+let manager_kind : type kind. kind manager_operation -> kind Kind.manager =
+  function
+  | Transaction _ -> Kind.Transaction_manager_kind
+  | Origination _ -> Kind.Origination_manager_kind
+  | Delegation _ -> Kind.Delegation_manager_kind
 
 let kinfo_of_kinstr : type a s b f. (a, s, b, f) kinstr -> (a, s) kinfo =
  fun i ->
