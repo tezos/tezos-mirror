@@ -1,7 +1,7 @@
-Protocol 006_PsCARTHA Carthage
-==============================
+Protocol Carthage
+=================
 
-This page contains all the relevant information for protocol 006 Carthage.
+This page contains all the relevant information for protocol 006 Carthage (006_PsCARTHA).
 Each of the main changes is briefly described with links to relevant
 external documentation and merge requests.
 There are dedicated sections for all the changes to RPCs and

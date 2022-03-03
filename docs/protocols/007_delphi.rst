@@ -1,7 +1,7 @@
-Protocol 007_PsDELPH1 Delphi
-============================
+Protocol Delphi
+===============
 
-This page contains all the relevant information for protocol 007 Delphi.
+This page contains all the relevant information for protocol 007 Delphi (007_PsDELPH1).
 Each of the main changes is briefly described with links to relevant
 external documentation and commits.
 The changelog section contains the most significant commit messages

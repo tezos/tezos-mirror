@@ -127,7 +127,7 @@ _`Implicit account`
     letters `tz` followed by `1`, `2` or `3` (depending on the
     signature scheme) and finally the hash of the public key.
 
-.. _glossary_michelson_012:
+.. _glossary_michelson_ithaca:
 
 Michelson
     The built-in language used by a `smart contract`_.
@@ -157,7 +157,7 @@ _`Roll`
     voting rights in a cycle_.
 
 _`Smart contract`
-    Account_ which is associated to a :ref:`Michelson <glossary_michelson_012>` script. They are
+    Account_ which is associated to a :ref:`Michelson <glossary_michelson_ithaca>` script. They are
     created with an explicit origination_ operation and are therefore
     sometimes called originated accounts. The address of a smart
     contract always starts with the letters ``KT1``.

@@ -7,7 +7,8 @@ tezos-client.html
 /api/tezos-admin-client.html
 /api/tezos-signer.html
 
-/0*/rpc.rst
+/hangzhou/rpc.rst
+/ithaca/rpc.rst
 /alpha/rpc.rst
 /shell/rpc.rst
 

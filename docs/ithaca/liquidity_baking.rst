@@ -34,8 +34,7 @@ As a safety precaution, the subsidy expires automatically at a given
 level called the liquidity baking sunset level. The sunset level can
 be renewed periodically by protocol amendment.
 
-.. _esc_hatch:
-.. _esc_hatch_011:
+.. _esc_hatch_ithaca:
 
 Escape hatch
 ~~~~~~~~~~~~
@@ -45,8 +44,8 @@ In addition to the sunset mechanism, an escape hatch is included. At every block
 ``e[0] = 0``
 ``e[n+1] = (1999 * e[n] // 2000) + (1000 if flag[n] else 0)``
 
-If at any block ``e[n] >= 1000000`` then it means that an exponential moving average with a window size on the order of two thousand blocks has had roughly a majority of blocks demanding the end of the subsidy. If that is the case, the subsidy is permanently halted (though it can be reactivated by a protocol upgrade).
+If at any block ``e[n] >= 666667`` then it means that an exponential moving average with a window size on the order of two thousand blocks has had roughly at least a third of blocks demanding the end of the subsidy. If that is the case, the subsidy is permanently halted (though it can be reactivated by a protocol upgrade).
 
-For indicative purposes, if a fraction ``f`` of blocks start signalling the flag, the threshold is reached after roughly ``2*(log(1-1/(2f)) / log(0.999))`` blocks, about 1387 blocks if everyone signals, 1964 blocks if 80% do, 3590 blocks if 60% do, etc. Recall for comparison that assuming two blocks per minute there are 2880 blocks per day.
+For indicative purposes, if a fraction ``f`` of blocks start signalling the flag, the threshold is reached after roughly ``2*(log(1-1/(3f)) / log(0.999))`` blocks, about 812 blocks if everyone signals, 1079 blocks if 80% do, 1624 blocks if 60% do, 3590 blocks if 40% do, etc. Recall for comparison that assuming two blocks per minute there are 2880 blocks per day.
 
-The escape hatch can be invoked through a JSON file containing a vote that is repeatedly submitted on each baked block, e.g. ``tezos-baker run with local node ~/.tezos-node alice --votefile "per_block_votes.json"`` where ``per_block_votes.json`` contains just ``{"liquidity_baking_escape_vote": true}``. See also the :ref:`baker man page<baker_manual_011>`.
+The escape hatch can be invoked through a JSON file containing a vote that is repeatedly submitted on each baked block, e.g. ``tezos-baker run with local node ~/.tezos-node alice --votefile "per_block_votes.json"`` where ``per_block_votes.json`` contains just ``{"liquidity_baking_escape_vote": true}``. See also the :ref:`baker man page<baker_manual_ithaca>`.

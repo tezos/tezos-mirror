@@ -11,6 +11,8 @@ protocol itself. Consequently the amendment rules themselves are subject to
 amendments.
 
 The rest of this page gives more details about the amendment and voting process.
+Other than this page, there is an excellent overview from `Jacob
+Arluck on medium <https://medium.com/tezos/amending-tezos-b77949d97e1e>`__.
 
 Periods
 -------
@@ -34,13 +36,12 @@ The five periods are as follows:
   At the end of a **proposal period**, if participation reaches a
   :ref:`proposal quorum <proposal_quorum>`, the proposal with most support is
   selected and we move to an **exploration period**. Note that support is
-  measured in the cumulated number of :ref:`rolls <Roll>` that delegates supporting the
+  measured in the cumulated number of rolls that delegates supporting the
   proposal have. E.g., a proposal supported by a single delegate with 100 rolls
   has more support than a proposal supported by two delegates with 20 rolls
   each.
 
-  If there are no proposals, or a tie between two or more proposals,
-  or if participation did not reach the proposal quorum, the process
+  If there are no proposals, or a tie between two or more proposals, the process
   moves back to a new **proposal period**.
 
 - *Exploration period*: During this period delegates can cast one
@@ -144,7 +145,7 @@ Note that Pass ballots do not count towards or against the super-majority;
 they still counts towards participation and quorum.
 
 More details can be found in the file
-:src:`src/proto_012_Psithaca/lib_protocol/amendment.ml`.
+:src:`src/proto_011_PtHangz2/lib_protocol/amendment.ml`.
 
 
 The Hash and the Protocol
@@ -242,7 +243,7 @@ above, the quorum is adaptive and that low participation would lower the
 quorum of the next vote.
 
 More details on the operations can be found in
-:src:`src/proto_012_Psithaca/lib_protocol/operation_repr.ml`.
+:src:`src/proto_011_PtHangz2/lib_protocol/operation_repr.ml`.
 The binary format is described by
 ``tezos-client describe unsigned operation``.
 
@@ -320,16 +321,11 @@ ballots can be submitted once with::
 
     tezos-client submit ballot for <delegate> <proposal> <yay|nay|pass>
 
-Further External Resources
---------------------------
-
-Further details and explanations on the voting procedure can be found at:
-
-- `Governance on-chain <https://opentezos.com/tezos-basics/governance-on-chain>`_ on Open Tezos
-- `Tezos Governance <https://www.tezosagora.org/learn#an-introduction-to-tezos-governance>`_ on Tezos Agora.
+Other resources
+~~~~~~~~~~~~~~~
 
 For more details on the client commands refer to the manual at
-:ref:`client_manual_012`.
+:ref:`client_manual_hangzhou`.
 
 For vote related RPCs check the :doc:`rpc` under the prefix
 ``votes/``.

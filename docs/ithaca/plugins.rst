@@ -27,7 +27,7 @@ In turn protocol plugins may, for example:
 
 - perform protocol-dependent computations that require data not available
   in the amendable part of the protocol like accessing the current time
-  to reason on timestamps (see :ref:`consensus_filter_012`);
+  to reason on timestamps (see :ref:`consensus_filter_ithaca`);
 - preserve the opacity/abstraction barrier of the protocol's internal data
   by performing computations on internal data without revealing it:
   e.g., there are some RPCs that can introspect the protocol-dependent
@@ -35,7 +35,7 @@ In turn protocol plugins may, for example:
 - implement some common operations that are customized for each
   protocol (e.g., :ref:`prevalidator_filters`).
 
-.. _prevalidator_filters_012:
+.. _prevalidator_filters_ithaca:
 
 Prevalidator filters
 --------------------
@@ -54,7 +54,7 @@ The interface of the prevalidator plugin is described at the `mempool plugin API
 
 The different kinds of prevalidator filters are described below.
 
-.. _fees_filter_012:
+.. _fees_filter_ithaca:
 
 Fees filter
 ...........
@@ -65,13 +65,13 @@ prevalidator filter currently restricts operations based on their
 associated fees, to reject "too cheap" or "zero-fees" operations. This
 can be configured via the ``minimal_fees``,
 ``minimal_nanotez_per_gas_unit`` and ``minimal_nanotez_per_byte`` (see
-:ref:`filter RPCs<active_filter_rpc_012>`) parameters of the filter
+:ref:`filter RPCs<active_filter_rpc_ithaca>`) parameters of the filter
 configuration of your node.
 
 This filtering strategy is implemented in the ``prefilter`` (see
 :doc:`../shell/prevalidation`).
 
-.. _consensus_filter_012:
+.. _consensus_filter_ithaca:
 
 Consensus filter
 ................
@@ -141,7 +141,7 @@ In addition to quick detection of operations that have no chance to be
 prechecked or applied in the current context, the mempool's ``prefilter`` provides
 a priority for each successfully filtered operation. Concretely, the priority is
 either ``High``, ``Medium`` or ``Low`` in the current implementation, depending
-on the :ref:`validation pass<validation_passes_proto_012>`.Some extra information (like the fees, or the gas/fees
+on the :ref:`validation pass<validation_passes_proto_ithaca>`.Some extra information (like the fees, or the gas/fees
 ratio of manager operations) are also provided along the priorities to enable
 fine-grained operations ordering.
 This extra information is similar to the one used by the baker's
@@ -187,7 +187,7 @@ to be the smallest manager operation, with 126 Bytes, so there are at most
 512 * 1024 / 126 = 4161 manager operations per block.
 
 
-.. _active_filter_rpc_012:
+.. _active_filter_rpc_ithaca:
 
 Filters RPCs
 ~~~~~~~~~~~~

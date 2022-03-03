@@ -14,7 +14,7 @@ Prechecking manager operations implements such a lighter approach, by
 discarding most invalid operations, without executing any of them.
 This is possible because the validity of an operation (in the sense,
 being able to include it in a block)
-depends on its solvability (see below :ref:`solvability_012`).
+depends on its solvability (see below :ref:`solvability_ithaca`).
 
 Fortunately, it turns out that deciding whether an operation is solvable can be achieved without
 applying it.
@@ -34,7 +34,7 @@ Note however that one can still inject successive operations with the
 same counter using the ``replace-by-fee`` feature.
 
 
-.. _solvability_012:
+.. _solvability_ithaca:
 
 Solvable operations
 -------------------

@@ -28,7 +28,8 @@ After a successful compilation, you should have the following binaries:
 - ``tezos-snoop``: a tool for modeling the performance of any piece of OCaml code, based on benchmarking (see :doc:`../developer/snoop`)
 
 The daemons other than the node are suffixed with the name of the protocol they are
-bound to. For instance, ``tezos-baker-011-PtHangz2`` is the baker
+bound to, and up to some version, also by its number.
+For instance, ``tezos-baker-011-PtHangz2`` is the baker
 for the Hangzhou protocol, and ``tezos-baker-alpha`` is the baker
 of the development protocol.
 The ``tezos-node`` daemon is not suffixed by any protocol name, because it is independent of the economic protocol. See also the `Node Protocol`_ section below.

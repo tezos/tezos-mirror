@@ -17,7 +17,7 @@ that may participate in consensus. Delegates' rights to participate are
 determined by a `follow-the-coin strategy
 <https://wiki.tezosagora.org/whitepaper#follow-the-coin-procedure>`_. This
 procedure is random, in that its result cannot be predicted too much in advance.
-The :ref:`randomness<random_seed_011>` is obtained from information already found on the
+The :ref:`randomness<random_seed_hangzhou>` is obtained from information already found on the
 blockchain. Thus, the procedure is also deterministic: delegates' rights are
 uniquely determined from the random element.
 
@@ -34,7 +34,7 @@ through a delegation operation.
 Any account can change or revoke its delegate at any time. However, the change
 only becomes effective after ``PRESERVED_CYCLES + 2`` :ref:`cycles <Cycle>`.
 The value ``PRESERVED_CYCLES`` is a
-:ref:`protocol constant <protocol_constants_011>`.
+:ref:`protocol constant <protocol_constants_hangzhou>`.
 
 A delegate participates in consensus and in governance with a weight
 proportional with their delegated stake, which includes the balances of
@@ -51,7 +51,7 @@ Active and passive delegates
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. _active_delegate:
-.. _active_delegate_011:
+.. _active_delegate_hangzhou:
 
 A delegate can be marked as either active or passive. A passive
 delegate cannot participate in the consensus algorithm.
@@ -73,7 +73,7 @@ too demanding of nodes to track assignments at such a granular level. Instead,
 Tezos works with *sets of tokens* which are called *rolls*.
 
 .. _roll_pos:
-.. _roll_pos_011:
+.. _roll_pos_hangzhou:
 
 Rolls
 ^^^^^
@@ -103,7 +103,7 @@ malicious fork cannot easily change the specific rolls assigned to them, even if
 they control the underlying tokens and shuffle them around.
 
 .. _random_seed:
-.. _random_seed_011:
+.. _random_seed_hangzhou:
 
 Random seed
 ^^^^^^^^^^^
@@ -129,7 +129,7 @@ The seed for cycle ``n`` is obtained as follows: the seed of cycle ``n-1`` is
 hashed with a constant and then with each nonce revealed in cycle ``n-1``.
 
 .. _rights:
-.. _rights_011:
+.. _rights_hangzhou:
 
 Slot selection
 ^^^^^^^^^^^^^^
@@ -150,12 +150,12 @@ receives for that role. The slot owner is obtained by running a PRNG
 - the slot (a non-negative integer)
 
 Let `n` be the cycle the level belongs to.
-The seed of the PRNG is the :ref:`random seed <random_seed_011>` associated with cycle ``n-PRESERVED_CYCLES``.
+The seed of the PRNG is the :ref:`random seed <random_seed_hangzhou>` associated with cycle ``n-PRESERVED_CYCLES``.
 The PRNG first selects a snapshot from cycle ``n-PRESERVED_CYCLES-2`` and then it selects a roll in the selected snapshot.
 The slot owner is then the roll owner.
 
 .. _protocol_constants:
-.. _protocol_constants_011:
+.. _protocol_constants_hangzhou:
 
 Protocol constants
 ------------------
@@ -170,7 +170,7 @@ The values of protocol constants can be found using a :ref:`specific RPC call <G
 In particular, the protocol constants related to the proof-of-stake mechanism are detailed below.
 
 .. _ps_constants:
-.. _ps_constants_011:
+.. _ps_constants_hangzhou:
 
 Proof-of-stake parameters
 ^^^^^^^^^^^^^^^^^^^^^^^^^
