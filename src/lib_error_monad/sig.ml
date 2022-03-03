@@ -93,11 +93,10 @@ module type CORE = sig
   val classify_error : error -> Error_classification.t
 
   (** Catch all error when 'serializing' an error. *)
-  type error +=
-    private
-    | Unclassified of string
-          (** Catch all error when 'deserializing' an error. *)
+  type error += private Unclassified of string
+  (**)
 
+  (** Catch all error when 'deserializing' an error. *)
   type error += private Unregistered_error of Data_encoding.json
 
   (** An error serializer *)
@@ -118,13 +117,12 @@ module type CORE = sig
 
   val pp_info : Format.formatter -> error_info -> unit
 
-  (**
-     [find_info_of_error e] retrieves the `error_info` associated with the
-     given error `e`.
+  (** [find_info_of_error e] retrieves the `error_info` associated with the
+      given error `e`.
 
-     @raise Invalid_argument if the error is a wrapped error from another monad
+      @raise Invalid_argument if the error is a wrapped error from another monad
 
-     @raise Not_found if the error's constructor has not been registered
+      @raise Not_found if the error's constructor has not been registered
   *)
   val find_info_of_error : error -> error_info
 
@@ -136,21 +134,19 @@ module type WITH_WRAPPED = sig
   type error
 
   module type Wrapped_error_monad = sig
-    (**
-       The purpose of this module is to wrap a specific error monad [E]
-       into a more general error monad [Eg].
+    (** The purpose of this module is to wrap a specific error monad [E]
+        into a more general error monad [Eg].
 
-       The user implementing such an interface is responsible to
-       maintain the following assertions
-       - The [Eg] error is extended locally with a specific constructor [C]
-       - [unwrapped] is equal to the [error] type of [E]
-       - [wrap] builds an [Eg] [error] value from an [E] [error] value
-       - [unwrap] matches on [Eg] error cases and extracts [E]
-         error value from [C]
+        The user implementing such an interface is responsible to
+        maintain the following assertions
+        - The [Eg] error is extended locally with a specific constructor [C]
+        - [unwrapped] is equal to the [error] type of [E]
+        - [wrap] builds an [Eg] [error] value from an [E] [error] value
+        - [unwrap] matches on [Eg] error cases and extracts [E]
+          error value from [C]
 
-       As a reference implementation,
-       see src/lib_protocol_environment/environment_V3.ml
-    *)
+        As a reference implementation,
+        see src/lib_protocol_environment/environment_V3.ml *)
 
     type unwrapped = ..
 
@@ -167,8 +163,7 @@ module type WITH_WRAPPED = sig
 
   (** Same as [register_error_kind] but for a wrapped error monad.
       The codec is defined in the module parameter. It makes the category
-      of the error [Wrapped] instead of [Main].
-  *)
+      of the error [Wrapped] instead of [Main]. *)
   val register_wrapped_error_kind :
     (module Wrapped_error_monad) ->
     id:string ->

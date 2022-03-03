@@ -84,8 +84,9 @@
 (** {2 API} *)
 
 module type S = sig
-  (** {3 The list type} *)
+  (**)
 
+  (** {3 The list type} *)
   type 'a t = 'a list = [] | ( :: ) of 'a * 'a list
 
   (** {3 Constructors and some such} *)
