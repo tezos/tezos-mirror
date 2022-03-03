@@ -236,7 +236,11 @@ let test_quantity ~count =
   in
   QCheck2.Test.make ~count ~print ~name:"quantity operation" test_gen test
 
-let test_roundtrip ~count title arb equ pp encoding =
+let test_roundtrip ~count title arb equ encoding =
+  let pp fmt x =
+    Data_encoding.Json.construct encoding x
+    |> Data_encoding.Json.to_string |> Format.pp_print_string fmt
+  in
   let test rdt input =
     let output = Roundtrip.make encoding rdt input in
     let success = equ input output in
@@ -273,14 +277,12 @@ let () =
               "batch"
               batch
               ( = )
-              pp
               Protocol.Tx_rollup_l2_batch.encoding;
             test_roundtrip
               ~count:1_000
               "message_result"
               message_result
               ( = )
-              pp
               Protocol.Tx_rollup_l2_apply.Message_result.encoding;
           ] );
     ]
