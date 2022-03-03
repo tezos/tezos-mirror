@@ -410,8 +410,206 @@ let test_ticket_deposit_from_l1_to_l2 =
       in
       unit)
 
+let sign_transaction sks txs =
+  let open Tezos_protocol_alpha.Protocol in
+  let buf =
+    Data_encoding.Binary.to_bytes_exn
+      Tx_rollup_l2_batch.V1.transaction_encoding
+      txs
+  in
+  List.map (fun sk -> Bls12_381.Signature.MinPk.Aug.sign sk buf) sks
+
+let craft_tx ~counter ~signer ~dest ~ticket qty =
+  let open Tezos_protocol_alpha.Protocol in
+  let qty = Tx_rollup_l2_qty.of_int64_exn qty in
+  let l2_addr = Tx_rollup_l2_address.of_b58check_exn dest in
+  let destination = Tx_rollup_l2_batch.Layer2 (Indexable.from_value l2_addr) in
+  let ticket_hash =
+    Indexable.from_value
+      (Tezos_protocol_alpha.Protocol.Alpha_context.Ticket_hash.of_b58check_exn
+         ticket)
+  in
+  let content = Tx_rollup_l2_batch.V1.{destination; ticket_hash; qty} in
+  let signer = Indexable.from_value signer in
+  Tx_rollup_l2_batch.V1.{signer; counter; contents = [content]}
+
+let aggregate_signature_exn signatures =
+  match Bls12_381.Signature.MinPk.aggregate_signature_opt signatures with
+  | Some res -> res
+  | None -> invalid_arg "aggregate_signature_exn"
+
+let batch signatures contents =
+  let open Tezos_protocol_alpha.Protocol.Tx_rollup_l2_batch.V1 in
+  let aggregated_signature = aggregate_signature_exn signatures in
+  {aggregated_signature; contents}
+
+let craft_batch
+    (transactions :
+      ( 'signer,
+        'content )
+      Tezos_protocol_alpha.Protocol.Tx_rollup_l2_batch.V1.transaction
+      list) sks =
+  let signatures =
+    List.map2 (fun txs sk -> sign_transaction sk txs) transactions sks
+    |> List.concat
+  in
+  batch signatures transactions
+
+(* FIXME/TORU: Must be replaced by the Tx_client.get_inbox command *)
+let tx_client_get_inbox ~tx_node ~block =
+  let* wrapped_result =
+    raw_tx_node_rpc tx_node ~url:("block/" ^ block ^ "/inbox")
+  in
+  let json = JSON.parse ~origin:"tx_client_get_balance" wrapped_result in
+  Lwt.return json
+
+(* Checks that the a ticket can be transfered within the rollup. *)
+let test_l2_to_l2_transaction =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"TX_rollup: l2 to l2 transaction"
+    ~tags:["tx_rollup"; "rollup"; "internal"; "transaction"]
+    (fun protocol ->
+      let* parameter_file = get_rollup_parameter_file ~protocol in
+      let* (node, client) =
+        Client.init_with_protocol ~parameter_file `Client ~protocol ()
+      in
+      let operator = Constant.bootstrap1.public_key_hash in
+      let* (tx_rollup_hash, tx_node) =
+        init_and_run_rollup_node ~operator node client
+      in
+      let* contract_id =
+        Client.originate_contract
+          ~alias:"rollup_deposit"
+          ~amount:Tez.zero
+          ~src:"bootstrap1"
+          ~prg:"file:./tezt/tests/contracts/proto_alpha/tx_rollup_deposit.tz"
+          ~init:"Unit"
+          ~burn_cap:Tez.(of_int 1)
+          client
+      in
+      let* () = Client.bake_for client in
+      let* _ = Node.wait_for_level node 3 in
+      Log.info
+        "The tx_rollup_deposit %s contract was successfully originated"
+        contract_id ;
+      (* Genarating some identities *)
+      let (bls_1_pkh, bls_pk_1, bls_sk_1) = generate_bls_addr client in
+      let bls_pkh_1_str = Bls_public_key_hash.to_b58check bls_1_pkh in
+      (* FIXME/TORU: Use the client *)
+      let (bls_2_pkh, _, _) = generate_bls_addr client in
+      let bls_pkh_2_str = Bls_public_key_hash.to_b58check bls_2_pkh in
+      let arg_1 =
+        make_tx_rollup_deposit_argument tx_rollup_hash bls_pkh_1_str
+      in
+      let* () =
+        Client.transfer
+          ~gas_limit:100_000
+          ~fee:Tez.one
+          ~amount:Tez.zero
+          ~burn_cap:Tez.one
+          ~storage_limit:10_000
+          ~giver:"bootstrap1"
+          ~receiver:contract_id
+          ~arg:arg_1
+          client
+      in
+      let* () = Client.bake_for client in
+      let* _ = Node.wait_for_level node 4 in
+      let* _ = Rollup_node.wait_for_tezos_level tx_node 4 in
+      let* op =
+        Client.rpc
+          Client.GET
+          ["chains"; "main"; "blocks"; "head"; "operations"; "3"; "0"]
+          client
+      in
+      let* ticket_id = get_ticket_hash_from_op op in
+      Log.info "Ticket %s was successfully emitted" ticket_id ;
+      let* () =
+        check_tz4_balance
+          ~tx_node
+          ~block:"head"
+          ~ticket_id
+          ~tz4_address:bls_pkh_1_str
+          ~expected_balance:10
+      in
+      let arg_2 =
+        make_tx_rollup_deposit_argument tx_rollup_hash bls_pkh_2_str
+      in
+      let* () =
+        Client.transfer
+          ~gas_limit:100_000
+          ~fee:Tez.one
+          ~amount:Tez.zero
+          ~burn_cap:Tez.one
+          ~storage_limit:10_000
+          ~giver:"bootstrap1"
+          ~receiver:contract_id
+          ~arg:arg_2
+          client
+      in
+      let* () = Client.bake_for client in
+      let* _ = Node.wait_for_level node 5 in
+      let* _ = Rollup_node.wait_for_tezos_level tx_node 5 in
+      let* () =
+        check_tz4_balance
+          ~tx_node
+          ~block:"head"
+          ~ticket_id
+          ~tz4_address:bls_pkh_2_str
+          ~expected_balance:10
+      in
+      Log.info "Crafting a l2 transaction" ;
+      (* FIXME/TORU: Use the client *)
+      let tx =
+        craft_tx
+          ~counter:1L
+          ~signer:bls_pk_1
+          ~dest:bls_pkh_2_str
+          ~ticket:ticket_id
+          1L
+      in
+      Log.info "Crafting a batch" ;
+      let batch = craft_batch [[tx]] [[bls_sk_1]] in
+      let raw_batch =
+        Data_encoding.Binary.to_bytes_exn
+          Tezos_protocol_alpha.Protocol.Tx_rollup_l2_batch.encoding
+          (Tezos_protocol_alpha.Protocol.Tx_rollup_l2_batch.V1 batch)
+      in
+      Log.info "Submiting a batch" ;
+      let*! () =
+        Client.Tx_rollup.submit_batch
+          ~content:(Bytes.to_string raw_batch)
+          ~rollup:tx_rollup_hash
+          ~src:operator
+          client
+      in
+      Log.info "Baking the batch" ;
+      let* () = Client.bake_for client in
+      let* _ = Node.wait_for_level node 6 in
+      let* _ = Rollup_node.wait_for_tezos_level tx_node 6 in
+      let* _node_inbox = get_node_inbox tx_node in
+      Format.printf "ticket 1 %s@." ticket_id ;
+      let* () =
+        check_tz4_balance
+          ~tx_node
+          ~block:"head"
+          ~ticket_id
+          ~tz4_address:bls_pkh_1_str
+          ~expected_balance:9
+      and* () =
+        check_tz4_balance
+          ~tx_node
+          ~block:"head"
+          ~ticket_id
+          ~tz4_address:bls_pkh_2_str
+          ~expected_balance:11
+      in
+      unit)
+
 let register ~protocols =
   test_node_configuration protocols ;
   test_tx_node_origination protocols ;
   test_tx_node_store_inbox protocols ;
-  test_ticket_deposit_from_l1_to_l2 protocols
+  test_ticket_deposit_from_l1_to_l2 protocols ;
+  test_l2_to_l2_transaction protocols
