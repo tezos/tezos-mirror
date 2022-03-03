@@ -1249,25 +1249,68 @@ let apply_manager_operation_content :
         ~dst_rollup:dst
         ~since:before_operation
   | Tx_rollup_withdraw
+      (* FIXME/TORU: #2488 The ticket accounting for the withdraw is not done here *)
       {
-        tx_rollup = _;
+        tx_rollup;
         level = _;
         context_hash = _;
         message_index = _;
         withdraw_path = _;
-        contents = _;
-        ty = _;
-        ticketer = _;
-        amount = _;
-        destination = _;
-        entrypoint = _;
+        contents;
+        ty;
+        ticketer;
+        amount;
+        destination;
+        entrypoint;
       } ->
       assert_tx_rollup_feature_enabled ctxt >>=? fun () ->
+      (* Ticket parsing and hashing *)
+      Script.force_decode_in_context ~consume_deserialization_gas ctxt ty
+      >>?= fun (ty, ctxt) ->
+      Script.force_decode_in_context ~consume_deserialization_gas ctxt contents
+      >>?= fun (contents, ctxt) ->
+      Script_ir_translator.unparse_data
+        ctxt
+        Optimized
+        Script_typed_ir.address_t
+        {destination = Contract ticketer; entrypoint = Entrypoint.default}
+      >>=? fun (ticketer_node, ctxt) ->
+      Tx_rollup.hash_ticket
+        ctxt
+        tx_rollup
+        ~contents:(Micheline.root contents)
+        ~ticketer:(Micheline.root @@ Micheline.strip_locations ticketer_node)
+        ~ty:(Micheline.root ty)
+      >>?= fun (_ticket_hash, ctxt) ->
+      (* TODO/TORU: Before calling the next function we needs to make sure that
+         this ticket hash is part of the commitment *)
+      Script_ir_translator.tx_rollup_withdraw_parameters_for_contract_call
+        ctxt
+        ~ticketer
+        ~contents
+        ~ty
+        ~amount
+      >>=? fun (parameters, ctxt) ->
+      let op =
+        Internal_operation
+          {
+            source;
+            nonce = 0;
+            operation =
+              Transaction
+                {
+                  amount = Tez.zero;
+                  parameters;
+                  destination = Contract destination;
+                  entrypoint;
+                };
+          }
+      in
       let result =
         Tx_rollup_withdraw_result
           {consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt}
       in
-      return (ctxt, result, [])
+      return (ctxt, result, [op])
   | Origination {delegate; script; preorigination; credit} ->
       Script.force_decode_in_context
         ~consume_deserialization_gas
