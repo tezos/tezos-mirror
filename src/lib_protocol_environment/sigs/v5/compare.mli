@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,37 +24,72 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** {1 [Compare]}
+
+    Monomorphic comparison for common ground types and common type constructors.
+
+    [Compare] provides a module signature for the standard comparison functions
+    and operators as well as modules of that signature for the common OCaml
+    ground types ([int], [bool], etc.) and type constructors ([list], [option],
+    etc.).
+
+    [Compare] also provides some additional helpers for comparison-related
+    tasks. *)
+
+(** {2 Signatures and a functor} *)
+
+(** [COMPARABLE] is a signature for basic comparison. It is used only for
+    instantiating full comparison modules of signature {!S} via the functor
+    {!Make}. *)
 module type COMPARABLE = sig
   type t
 
   val compare : t -> t -> int
 end
 
+(** [S] is a signature for a fully-fledge comparison module. It includes all the
+    functions and operators derived from a [compare] function. *)
 module type S = sig
   type t
 
+  (** [x = y] iff [compare x y = 0] *)
   val ( = ) : t -> t -> bool
 
+  (** [x <> y] iff [compare x y <> 0] *)
   val ( <> ) : t -> t -> bool
 
+  (** [x < y] iff [compare x y < 0] *)
   val ( < ) : t -> t -> bool
 
+  (** [x <= y] iff [compare x y <= 0] *)
   val ( <= ) : t -> t -> bool
 
+  (** [x >= y] iff [compare x y >= 0] *)
   val ( >= ) : t -> t -> bool
 
+  (** [x > y] iff [compare x y > 0] *)
   val ( > ) : t -> t -> bool
 
+  (** [compare] an alias for the functor parameter's [compare] function *)
   val compare : t -> t -> int
 
+  (** [equal x y] iff [compare x y = 0] *)
   val equal : t -> t -> bool
 
+  (** [max x y] is [x] if [x >= y] otherwise it is [y] *)
   val max : t -> t -> t
 
+  (** [min x y] is [x] if [x <= y] otherwise it is [y] *)
   val min : t -> t -> t
 end
 
 module Make (P : COMPARABLE) : S with type t := P.t
+
+(** {2 Base types}
+
+    The specialised comparison and all the specialised functions and operators
+    on the base types are compatible with the polymorphic comparison and all the
+    polymorphic functions and operators from the {!Stdlib}. *)
 
 module Char : S with type t = char
 
@@ -97,44 +133,128 @@ module String : S with type t = string
 
 module Bytes : S with type t = bytes
 
+(** [Z] is a comparison module for Zarith numbers. *)
 module Z : S with type t = Z.t
+
+(** {2 Type constructors}
+
+    Provided the functor argument(s) are compatible with the polymorphic
+    comparison of the {!Stdlib}, then the specialised comparison and all the
+    specialised functions and operators on the derived types are compatible with
+    the polymorphic comparison and all the polymorphic functions and operators
+    from the {!Stdlib}. *)
 
 module List (P : COMPARABLE) : S with type t = P.t list
 
 module Option (P : COMPARABLE) : S with type t = P.t option
 
+module Result (Ok : COMPARABLE) (Error : COMPARABLE) :
+  S with type t = (Ok.t, Error.t) result
+
+(** {2 List lengths}
+
+    Helpers for more readable {!Stdlib.List.compare_lengths} and
+    {!Stdlib.List.compare_length_with}.
+
+    These modules are intended to be used as [Module.(expression)], most often
+    within an [if] condition. E.g.,
+
+{[
+if Compare.List_length_with.(chunks > max_number_of_chunks) then
+   raise Maximum_size_exceeeded
+else
+   ..
+]}
+    *)
+
 module List_length_with : sig
+  (** [Compare.List_length_with.(l = n)] iff [l] is of length [n]. In other
+      words iff [Stdlib.List.compare_length_with l n = 0]. Note that, like
+      [compare_length_with], this comparison does not explore the list [l]
+      beyond its [n]-th element. *)
   val ( = ) : 'a list -> int -> bool
 
+  (** [Compare.List_length_with.(l <> n)] iff [l] is not of length [n]. In other
+      words iff [Stdlib.List.compare_length_with l n <> 0]. Note that, like
+      [compare_length_with], this comparison does not explore the list [l]
+      beyond its [n]-th element. *)
   val ( <> ) : 'a list -> int -> bool
 
+  (** [Compare.List_length_with.(l < n)] iff [l] is of length strictly less than
+      [n]. In other words iff [Stdlib.List.compare_length_with l n < 0]. Note
+      that, like [compare_length_with], this comparison does not explore the
+      list [l] beyond its [n]-th element. *)
   val ( < ) : 'a list -> int -> bool
 
+  (** [Compare.List_length_with.(l <= n)] iff [l] is of length less than [n]. In
+      other words iff [Stdlib.List.compare_length_with l n <= 0]. Note that,
+      like [compare_length_with], this comparison does not explore the list [l]
+      beyond its [n]-th element. *)
   val ( <= ) : 'a list -> int -> bool
 
+  (** [Compare.List_length_with.(l >= n)] iff [l] is of length greater than [n].
+      In other words iff [Stdlib.List.compare_length_with l n >= 0]. Note that,
+      like [compare_length_with], this comparison does not explore the list [l]
+      beyond its [n]-th element. *)
   val ( >= ) : 'a list -> int -> bool
 
+  (** [Compare.List_length_with.(l > n)] iff [l] is of length strictly greater
+      than [n]. In other words iff [Stdlib.List.compare_length_with l n > 0].
+      Note that, like [compare_length_with], this comparison does not explore
+      the list [l] beyond its [n]-th element. *)
   val ( > ) : 'a list -> int -> bool
 
+  (** [Compare.List_length_with.compare] is an alias for
+      [Stdlib.List.compare_length_with]. *)
   val compare : 'a list -> int -> int
 
+  (** [Compare.List_length_with.equal] is an alias for
+      [Compare.List_length_with.( = )]. *)
   val equal : 'a list -> int -> bool
 end
 
 module List_lengths : sig
+  (** [Compare.List_lengths.(xs = ys)] iff [xs] and [ys] have the same length.
+      In other words, iff [Stdlib.List.compare_lengths xs ys = 0]. Note that,
+      like [compare_lengths], this comparison only explores the lists up to the
+      length of the shortest one. *)
   val ( = ) : 'a list -> 'b list -> bool
 
+  (** [Compare.List_lengths.(xs <> ys)] iff [xs] and [ys] have different
+      lengths. In other words, iff [Stdlib.List.compare_lengths xs ys <> 0].
+      Note that, like [compare_lengths], this comparison only explores the lists
+      up to the length of the shortest one. *)
   val ( <> ) : 'a list -> 'b list -> bool
 
+  (** [Compare.List_lengths.(xs < ys)] iff [xs] is strictly shorter than [ys].
+      In other words, iff [Stdlib.List.compare_lengths xs ys < 0]. Note that,
+      like [compare_lengths], this comparison only explores the lists up to the
+      length of the shortest one. *)
   val ( < ) : 'a list -> 'b list -> bool
 
+  (** [Compare.List_lengths.(xs <= ys)] iff [xs] is shorter than [ys].
+      In other words, iff [Stdlib.List.compare_lengths xs ys <= 0]. Note that,
+      like [compare_lengths], this comparison only explores the lists up to the
+      length of the shortest one. *)
   val ( <= ) : 'a list -> 'b list -> bool
 
+  (** [Compare.List_lengths.(xs >= ys)] iff [xs] is longer than [ys].
+      In other words, iff [Stdlib.List.compare_lengths xs ys >= 0]. Note that,
+      like [compare_lengths], this comparison only explores the lists up to the
+      length of the shortest one. *)
   val ( >= ) : 'a list -> 'b list -> bool
 
+  (** [Compare.List_lengths.(xs > ys)] iff [xs] is strictly longer than [ys].
+      In other words, iff [Stdlib.List.compare_lengths xs ys > 0]. Note that,
+      like [compare_lengths], this comparison only explores the lists up to the
+      length of the shortest one. *)
   val ( > ) : 'a list -> 'b list -> bool
 
+  (** [Compare.List_lengths.compare] is an alias for
+      [Stdlib.List.compare_lengths]. *)
   val compare : 'a list -> 'b list -> int
 
+  (** [Compare.List_lengths.equal] is an alias for
+      [Compare.List_lengths.( = )]. *)
   val equal : 'a list -> 'b list -> bool
 end

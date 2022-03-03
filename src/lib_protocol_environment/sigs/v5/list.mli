@@ -81,8 +81,9 @@
     variants may return [Ok _] even though the arguments have different lengths.
 *)
 
-(** {3 The list type} *)
+(** {2 API} *)
 
+(** {3 The list type} *)
 type 'a t = 'a list = [] | ( :: ) of 'a * 'a list
 
   (** {3 Constructors and some such} *)
@@ -236,7 +237,7 @@ val append : 'a list -> 'a list -> 'a list
     say, [append (map f xs) ys] with [rev_append (rev_map f xs) ys]. *)
 val rev_append : 'a list -> 'a list -> 'a list
 
-(** [flatten xs] is an alias for {!concat}. *)
+  (** [flatten] is an alias for {!concat}. *)
 val flatten : 'a list list -> 'a list
 
 (** {3 Double-list traversals}
@@ -1118,7 +1119,9 @@ val combine_drop : 'a list -> 'b list -> ('a * 'b) list
 val combine_with_leftovers :
     'a list -> 'b list -> ('a * 'b) list * ('a list, 'b list) Either.t option
 
-(** {3 Comparison and equality} *)
+  (** {3 Comparison and equality}
+
+      The comparison and equality functions are those of the OCaml [Stdlib]. *)
 
 val compare : ('a -> 'a -> int) -> 'a list -> 'a list -> int
 
@@ -1128,7 +1131,9 @@ val compare_length_with : 'a list -> int -> int
 
 val equal : ('a -> 'a -> bool) -> 'a list -> 'a list -> bool
 
-(** {3 Sorting} *)
+  (** {3 Sorting}
+
+      The sorting functions are those of the OCaml [Stdlib]. *)
 
 val sort : ('a -> 'a -> int) -> 'a list -> 'a list
 
@@ -1138,7 +1143,9 @@ val fast_sort : ('a -> 'a -> int) -> 'a list -> 'a list
 
 val sort_uniq : ('a -> 'a -> int) -> 'a list -> 'a list
 
-(** {3 Conversion} *)
+  (** {3 Conversion}
+
+      The conversion functions are those of the OCaml [Stdlib]. *)
 
 val to_seq : 'a list -> 'a Seq.t
 

@@ -56,9 +56,10 @@ external mul : int32 -> int32 -> int32 = "%int32_mul"
 (** Multiplication. *)
 
 external div : int32 -> int32 -> int32 = "%int32_div"
-(** Integer division.  Raise [Division_by_zero] if the second
-   argument is zero.  This division rounds the real quotient of
-   its arguments towards zero, as specified for {!Stdlib.(/)}. *)
+(** Integer division. This division rounds the real quotient of
+   its arguments towards zero, as specified for {!Stdlib.(/)}.
+   @raise Division_by_zero if the second
+   argument is zero.  *)
 
 external rem : int32 -> int32 -> int32 = "%int32_mod"
 (** Integer remainder.  If [y] is not zero, the result
