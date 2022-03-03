@@ -348,6 +348,11 @@ we would revert it::
   Reversed (or previously applied) patch detected!  Assume -R? [n] n
   Apply anyway? [n] n
 
+.. warning::
+  After finishing your migration tests, mind reverting the yes-node patch to obtain a "normal" node; otherwise you may obtain spurious errors.
+  To do this, you may apply the same patch backwards using
+  ``patch -p1 --reverse < scripts/yes-node.patch``.
+  Alternatively, if you are sure that no other changes were done, you can reset the source file using ``git checkout src/lib_crypto/signature.ml``.
 
 5. Compile the Project
 ~~~~~~~~~~~~~~~~~~~~~~

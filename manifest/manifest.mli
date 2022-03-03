@@ -124,7 +124,7 @@ module Dune : sig
 
       - [alias_deps] is a list of target aliases to build before this rule.
         They are added to the [deps] stanza in [alias] stanzas
-        (resulting in [(deps (alias ...) ...)].
+        (resulting in [(deps (alias ...) ...)]).
 
       - [deps_dune] can be used to specify the arguments of the [deps] stanza
         directly as an s-expression instead.
@@ -614,7 +614,7 @@ val public_exe : ?internal_name:string -> string maker
     public names. If not given, the list of internal names is derived from the
     list of names as for [public_lib].
 
-    @raise [Invalid_arg] if the list of names is empty or if the length of
+    @raise Invalid_arg if the list of names is empty or if the length of
     [internal_names] differs from the length of the list of public names. *)
 val public_exes : ?internal_names:string list -> string list maker
 
@@ -710,7 +710,7 @@ val external_lib :
     [node_wrapper_flags]: flags to add to the [node_wrapper] executable
     command in [runtest_js] aliases. Only used for test and executable test targets.
 
-    @raise [Invalid_arg] if [main_lib] was not built with [external_lib]. *)
+    @raise Invalid_arg if [main_lib] was not built with [external_lib]. *)
 val external_sublib :
   ?main_module:string ->
   ?js_compatible:bool ->
