@@ -418,6 +418,47 @@ end = struct
 
   let error_encoding = Data_encoding.delayed error_encoding
 
+  let () =
+    (* HACK
+       There is an issue with the interaction of
+       (a) error-monad's delayed error-encoding
+       (b) data-encoding's cached json-encoding conversion
+
+       More specifically.
+
+       On the error-monad side: The [error_encoding] is a
+       [Data_encoding.delayed] encoding. The delaying allows to dynamically find
+       the list of registered errors and generate the encoding based on that.
+       (There is a cache mechanism to avoid recomputing it if no new errors have
+       been registered. That is the original purpose of the
+       [set_error_encoding_cache_dirty].)
+
+       On the data-encoding side: Each encoding is actually a record with the
+       [data-encoding] AST in one field and the [json-data-encoding] in the
+       other. The fields are used for serialisation/deserialisation in,
+       respectively, binary and in JSON. The JSON field is computed on-demand
+       (e.g., when `Data_encoding.Json.construct` is called). To avoid
+       expensive recomputations, the result of this conversion is stored in the
+       [json-data-encoding].
+
+       The end result is that, whilst the cache-invalidation mechanism can mark
+       the encoding {e inside} the [delayed] node dirty so it is recomputed on
+       each use, it cannot mark the json-encoding cache of the [delayed] node
+       itself dirty.
+
+       As a result, the json encoding for errors is set in stone as soon as it
+       is used, even if new errors are registered.
+
+       To circumvent this, we use the hack below: We explicitly tamper with the
+       internal representation of the encoding. More specifically, we reset the
+       json-encoding field of [error_encoding] to [None] to force it being
+       recomputed. *)
+    let set_older_caches_dirty = !set_error_encoding_cache_dirty in
+    set_error_encoding_cache_dirty :=
+      fun () ->
+        set_older_caches_dirty () ;
+        error_encoding.Data_encoding__Encoding.json_encoding <- None
+
   let json_of_error error = Data_encoding.Json.construct error_encoding error
 
   let error_of_json json = Data_encoding.Json.destruct error_encoding json
