@@ -675,6 +675,8 @@ struct
 
     include Error_core
     include Tezos_error_monad.TzLwtreslib.Monad
+    module Tzresult_syntax = Traced_result_syntax
+    module Lwt_tzresult_syntax = Lwt_traced_result_syntax
     include
       Tezos_error_monad.Monad_extension_maker.Make (Error_core) (TzTrace)
         (Tezos_error_monad.TzLwtreslib.Monad)
