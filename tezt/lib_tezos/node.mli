@@ -46,14 +46,13 @@
 
 (** History modes for the node. *)
 
-(** The parameter for [Full] And [Rolling] mode is called
-   [additional_cycles].
+(** The parameter for [Full] And [Rolling] mode is called [additional_cycles].
 
     For the [Full] (resp. [Rolling]) mode it controls the number of
-   contexts (resp. blocks) we preserved behind the [checkpoint] (aka
-   the no fork point]). Default in sandbox mode is [2] and [5] for
-   mainnet parameters (see [preserved_cycles] in the protocol
-   parameters). *)
+    contexts (resp. blocks) we preserved behind the [checkpoint] (aka
+    the no fork point). Default in sandbox mode is [2] and [5] for
+    mainnet parameters (see [preserved_cycles] in the protocol
+    parameters). *)
 type history_mode = Archive | Full of int option | Rolling of int option
 
 (** Values that can be passed to the node's [--media-type] argument *)

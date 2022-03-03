@@ -416,6 +416,7 @@ val update_grafana_dashboard : Grafana.dashboard -> unit
 
     The contents of this file should look like:
 
+{v
     {
         "alerts": {
             "slack_webhook_urls": {
@@ -447,6 +448,7 @@ val update_grafana_dashboard : Grafana.dashboard -> unit
         },
         "test_data_path" : "/path/to/the/test_data_path"
     }
+v}
 
     where:
 

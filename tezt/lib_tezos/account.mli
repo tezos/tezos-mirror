@@ -32,13 +32,15 @@ type secret_key =
       (** The string does NOT contain the 'unencrypted:' prefix *)
 
 (** Keys associated to an account. For example:
-    {|{
+{[
+    {
       alias = "bootstrap1";
       public_key_hash = "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx";
       public_key = "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav";
       secret_key =
         Unencrypted "edsk3gUfUPyBSfrS9CCgmCiQsTCHGkviBDusMxDJstFtojtc1zcpsh";
-    }|} *)
+    }
+]} *)
 type key = {
   alias : string;
   public_key_hash : string;
