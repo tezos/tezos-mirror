@@ -226,13 +226,13 @@ let message_result : Message_result.message_result QCheck2.Gen.t =
   in
   frequency [(2, deposit_result_gen); (8, batch_v1_result_gen)]
 
-let withdrawal : Message_result.withdrawal QCheck2.Gen.t =
+let withdrawal : Protocol.Alpha_context.Tx_rollup_withdraw.t QCheck2.Gen.t =
   let open QCheck2.Gen in
-  let open Message_result in
-  let destination = public_key_hash in
+  let open Protocol.Alpha_context.Tx_rollup_withdraw in
+  let claimer = public_key_hash in
   let* ticket_hash = ticket_hash_gen in
   let* amount = qty_gen in
-  return {destination; ticket_hash; amount}
+  return {claimer; ticket_hash; amount}
 
 let message_result_withdrawal : Message_result.t QCheck2.Gen.t =
   let open QCheck2.Gen in

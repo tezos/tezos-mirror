@@ -33,9 +33,19 @@ module Commitment_hash : sig
   include S.HASH
 end
 
-type batch_commitment = {root : bytes}
+(** The hash of the result of a layer-2 operation: that is, the hash
+    of [(l2_ctxt_hash ^ withdraw_hash)] where [l2_ctxt_hash] is the Merkle
+    tree root of the L2 context after any message (ie. deposit or batch),
+    and [withdraw_hash] is a [Tx_rollup_withdraw_repr.withdrawals_merkle_root] *)
+module Message_result_hash : S.HASH
 
-val batch_commitment_equal : batch_commitment -> batch_commitment -> bool
+(** [batch_commitment context_hash withdraw_merkle_root] computes the
+    [Message_result_hash.t] of the given context hash and withdraw merkle
+    root, which is [hash(context_hash @ withdraw_merkle_root))].  *)
+val batch_commitment :
+  bytes ->
+  Tx_rollup_withdraw_repr.withdrawals_merkle_root ->
+  Message_result_hash.t
 
 (** A commitment describes the interpretation of the messages stored in the
     inbox of a particular [level], on top of a particular layer-2 context.
@@ -49,7 +59,7 @@ val batch_commitment_equal : batch_commitment -> batch_commitment -> bool
     empty tree. *)
 type t = {
   level : Tx_rollup_level_repr.t;
-  batches : batch_commitment list;
+  batches : Message_result_hash.t list;
   predecessor : Commitment_hash.t option;
   inbox_hash : Tx_rollup_inbox_repr.hash;
 }

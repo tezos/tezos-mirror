@@ -158,12 +158,12 @@ let eq_addr_indexable = Alcotest.of_pp (Indexable.pp (fun _ _ -> ()))
 let eq_ticket_indexable = Alcotest.of_pp (Indexable.pp (fun _ _ -> ()))
 
 let pp_withdrawal fmt = function
-  | Message_result.{destination; ticket_hash; amount} ->
+  | Tx_rollup_withdraw.{claimer; ticket_hash; amount} ->
       Format.fprintf
         fmt
-        "{destination=%a; ticket_hash=%a; amount=%a}"
+        "{claimer=%a; ticket_hash=%a; amount=%a}"
         Signature.Public_key_hash.pp
-        destination
+        claimer
         Ticket_hash.pp
         ticket_hash
         Tx_rollup_l2_qty.pp
@@ -395,7 +395,7 @@ let test_returned_deposit () =
           eq_withdrawal
           "Resulting withdrawal from overflowing L1->L2 deposit"
           withdrawal
-          {destination = pkh; ticket_hash = ticket1; amount}) ;
+          {claimer = pkh; ticket_hash = ticket1; amount}) ;
       return_unit
   | (Deposit_failure reason, _) ->
       let msg =
@@ -662,7 +662,7 @@ let test_simple_l1_transaction () =
           "Resulting withdrawal from L2->L1 transfer"
           withdrawal
           {
-            destination = pkh2;
+            claimer = pkh2;
             ticket_hash = ticket1;
             amount = Tx_rollup_l2_qty.of_int64_exn 10L;
           }) ;
@@ -853,13 +853,7 @@ let test_l1_transaction_zero () =
       (list eq_withdrawal)
       "Resulting withdrawal from L2->L1 transfer"
       withdrawals
-      [
-        {
-          destination = pkh2;
-          ticket_hash = ticket1;
-          amount = Tx_rollup_l2_qty.zero;
-        };
-      ]) ;
+      [{claimer = pkh2; ticket_hash = ticket1; amount = Tx_rollup_l2_qty.zero}]) ;
 
   match results with
   | [([_], Transaction_success)] ->
@@ -938,7 +932,7 @@ let test_l1_transaction_partial () =
       withdrawals
       [
         {
-          destination = pkh2;
+          claimer = pkh2;
           ticket_hash = ticket1;
           amount = Tx_rollup_l2_qty.of_int64_exn 5L;
         };
@@ -1393,12 +1387,12 @@ let test_apply_message_batch_withdrawals () =
           withdrawals
           [
             {
-              destination = pkh2;
+              claimer = pkh2;
               ticket_hash = ticket1;
               amount = Tx_rollup_l2_qty.of_int64_exn 5L;
             };
             {
-              destination = pkh1;
+              claimer = pkh1;
               ticket_hash = ticket2;
               amount = Tx_rollup_l2_qty.of_int64_exn 10L;
             };

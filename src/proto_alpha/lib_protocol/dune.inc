@@ -75,6 +75,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    tx_rollup_l2_qty.mli tx_rollup_l2_qty.ml
    tx_rollup_l2_context_hash.mli tx_rollup_l2_context_hash.ml
    tx_rollup_repr.mli tx_rollup_repr.ml
+   tx_rollup_withdraw_repr.mli tx_rollup_withdraw_repr.ml
    tx_rollup_message_repr.mli tx_rollup_message_repr.ml
    tx_rollup_inbox_repr.mli tx_rollup_inbox_repr.ml
    tx_rollup_commitment_repr.mli tx_rollup_commitment_repr.ml
@@ -243,6 +244,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    tx_rollup_l2_qty.mli tx_rollup_l2_qty.ml
    tx_rollup_l2_context_hash.mli tx_rollup_l2_context_hash.ml
    tx_rollup_repr.mli tx_rollup_repr.ml
+   tx_rollup_withdraw_repr.mli tx_rollup_withdraw_repr.ml
    tx_rollup_message_repr.mli tx_rollup_message_repr.ml
    tx_rollup_inbox_repr.mli tx_rollup_inbox_repr.ml
    tx_rollup_commitment_repr.mli tx_rollup_commitment_repr.ml
@@ -411,6 +413,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    tx_rollup_l2_qty.mli tx_rollup_l2_qty.ml
    tx_rollup_l2_context_hash.mli tx_rollup_l2_context_hash.ml
    tx_rollup_repr.mli tx_rollup_repr.ml
+   tx_rollup_withdraw_repr.mli tx_rollup_withdraw_repr.ml
    tx_rollup_message_repr.mli tx_rollup_message_repr.ml
    tx_rollup_inbox_repr.mli tx_rollup_inbox_repr.ml
    tx_rollup_commitment_repr.mli tx_rollup_commitment_repr.ml
@@ -601,6 +604,7 @@ include Tezos_raw_protocol_alpha.Main
    Tx_rollup_l2_qty
    Tx_rollup_l2_context_hash
    Tx_rollup_repr
+   Tx_rollup_withdraw_repr
    Tx_rollup_message_repr
    Tx_rollup_inbox_repr
    Tx_rollup_commitment_repr
@@ -810,6 +814,7 @@ include Tezos_raw_protocol_alpha.Main
    tx_rollup_l2_qty.mli tx_rollup_l2_qty.ml
    tx_rollup_l2_context_hash.mli tx_rollup_l2_context_hash.ml
    tx_rollup_repr.mli tx_rollup_repr.ml
+   tx_rollup_withdraw_repr.mli tx_rollup_withdraw_repr.ml
    tx_rollup_message_repr.mli tx_rollup_message_repr.ml
    tx_rollup_inbox_repr.mli tx_rollup_inbox_repr.ml
    tx_rollup_commitment_repr.mli tx_rollup_commitment_repr.ml

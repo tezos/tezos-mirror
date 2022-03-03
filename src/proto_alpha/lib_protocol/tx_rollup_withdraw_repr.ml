@@ -1,7 +1,9 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
+(* Copyright (c) 2022 Marigold <contact@marigold.dev>                        *)
 (* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 Oxhead Alpha <info@oxheadalpha.com>                    *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,34 +25,61 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = {
-  b58check_prefix : string;
-  prefix : string;
-  hash_size : int;
-  b58check_size : int;
+type withdrawal = {
+  claimer : Signature.Public_key_hash.t;
+  ticket_hash : Ticket_hash_repr.t;
+  amount : Tx_rollup_l2_qty.t;
 }
 
-(** See {!Tx_rollup_repr}. *)
-val rollup_address : t
+type t = withdrawal
 
-(** See {!Tx_rollup_l2_address}. *)
-val l2_address : t
+let encoding : withdrawal Data_encoding.t =
+  let open Data_encoding in
+  conv
+    (fun {claimer; ticket_hash; amount} -> (claimer, ticket_hash, amount))
+    (fun (claimer, ticket_hash, amount) -> {claimer; ticket_hash; amount})
+    (obj3
+       (req "claimer" Signature.Public_key_hash.encoding)
+       (req "ticket_hash" Ticket_hash_repr.encoding)
+       (req "amount" Tx_rollup_l2_qty.encoding))
 
-(** See {!Tx_rollup_inbox_repr}. *)
-val inbox_hash : t
+module Withdraw_list_hash = struct
+  let withdraw_list_hash = Tx_rollup_prefixes.withdraw_list_hash.b58check_prefix
 
-(** See {!Tx_rollup_message_repr}. *)
-val message_hash : t
+  include
+    Blake2B.Make_merkle_tree
+      (Base58)
+      (struct
+        let name = "Withdraw_list_hash"
 
-(** See {!Tx_rollup_commitment_repr}. *)
-val commitment_hash : t
+        let title = "A hash of withdraw's list"
 
-(** See {!Tx_rollup_commitment_repr}. *)
-val message_result_hash : t
+        let b58check_prefix = withdraw_list_hash
 
-(** See {!Tx_rollup_withdraw_repr}. *)
-val withdraw_list_hash : t
+        let size = Some Tx_rollup_prefixes.withdraw_list_hash.hash_size
+      end)
+      (struct
+        type t = withdrawal
 
-(** [check_encoding spec encoding] checks that [encoding] satisfies
-    [spec]. Raises an exception otherwise. *)
-val check_encoding : t -> 'a Base58.encoding -> unit
+        let to_bytes = Data_encoding.Binary.to_bytes_exn encoding
+      end)
+
+  let () =
+    Tx_rollup_prefixes.(check_encoding withdraw_list_hash b58check_encoding)
+end
+
+type withdrawals_merkle_root = Withdraw_list_hash.t
+
+let withdrawals_merkle_root_encoding = Withdraw_list_hash.encoding
+
+type merkle_tree_path = Withdraw_list_hash.path
+
+let merkle_tree_path_encoding = Withdraw_list_hash.path_encoding
+
+let merkelize_list : t list -> withdrawals_merkle_root =
+  Withdraw_list_hash.compute
+
+let compute_path : t list -> int -> merkle_tree_path =
+  Withdraw_list_hash.compute_path
+
+let check_path : path -> t -> list_hash * int = Withdraw_list_hash.check_path

@@ -3,7 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Marigold <contact@marigold.dev>                        *)
 (* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
-(* Copyright (c) 2022 Oxhead Alpha <info@oxhead-alpha.com>                   *)
+(* Copyright (c) 2022 Oxhead Alpha <info@oxheadalpha.com>                    *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -25,60 +25,52 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Communication from the layer-1 (Tezos) to the layer-2 (a
-    transaction rollup) happens thanks to messages, crafted in the
-    layer-1 to be interpreted in the layer-2.
-
-    Messages are constructed and gathered in the layer-1, in
-    inboxes (see {!Tx_rollup_repr_storage.append_message}). *)
-
-(** Smart contract on the layer-1 can deposit tickets into a
-    transaction rollup, for the benefit of a {!Tx_rollup_l2_address.t}.
-    The [sender] is an implicit account where the deposit is returned in form of
-    a withdrawal, should the application of the deposit fail.
- *)
-type deposit = {
-  sender : Signature.Public_key_hash.t;
-  destination : Tx_rollup_l2_address.Indexable.value;
+(** A [withdrawal] gives right to a L1 address [claimer] to
+    retrieve the quantity [amount] of a ticket whose hash is [ticket_hash].
+    Withdrawals result from layer-2-to-layer-1 transfers, and from
+    failed layer-2 deposits.*)
+type withdrawal = {
+  claimer : Signature.Public_key_hash.t;
   ticket_hash : Ticket_hash_repr.t;
   amount : Tx_rollup_l2_qty.t;
 }
 
-(** A [message] is a piece of data originated from the layer-1 to be
-    interpreted by the layer-2.
-
-    Transaction rollups feature two kind of messages:
-
-    {ul {li An array of bytes that supposedly contains a valid
-            sequence of layer-2 operations; their interpretation and
-            validation is deferred to the layer-2..}
-        {li A deposit order for a L1 ticket.}} *)
-type t = Batch of string | Deposit of deposit
-
-(** [size msg] returns the number of bytes that are allocated in an
-    inbox by [msg]. *)
-val size : t -> int
-
-val deposit_encoding : deposit Data_encoding.t
+type t = withdrawal
 
 val encoding : t Data_encoding.t
 
-val pp : Format.formatter -> t -> unit
+(** A [withdrawals_merkle_root] is the hash of a list of withdrawals (as returned by
+    [Tx_rollup_l2_apply.apply_message]), stored in commitments and used
+    to validate the executions of withdrawals.
 
-(** The Blake2B hash of a message.
+    Internally [withdrawals_merkle_root] is the root element of
+    a merkle tree whose leaves are [withdrawal] hashes.
+*)
+type withdrawals_merkle_root
 
-    To avoid unnecessary storage duplication, the inboxes in the
-    layer-1 do not contain the messages, but their hashes (see
-    {!Tx_rollup_inbox_storage.append_message}). This is possible
-    because the content of the messages can be reconstructed off-chain
-    by looking at the layer-1 operations and their receipt. *)
-type hash
+val withdrawals_merkle_root_encoding : withdrawals_merkle_root Data_encoding.t
 
-val hash_encoding : hash Data_encoding.t
+(** A [merkle_tree_path] is the minimal information needed to
+   recompute a [withdrawals_merkle_root] without having all
+   withdrawals.
 
-val pp_hash : Format.formatter -> hash -> unit
+    Internally [merkle_tree_path] is the merkle tree path of sub-tree
+   hash of a [withdrawals_merkle_root] *)
+type merkle_tree_path
 
-(** [hash_uncarbonated msg] computes the hash of [msg] without gas consumption. *)
-val hash_uncarbonated : t -> hash
+val merkle_tree_path_encoding : merkle_tree_path Data_encoding.t
 
-val hash_equal : hash -> hash -> bool
+(** [merkelize_list withdrawal_list] merkelizes [withdrawal_list] into
+   a full binary tree and returns the [withdrawals_merkle_root] of
+   that tree.  *)
+val merkelize_list : t list -> withdrawals_merkle_root
+
+(** [compute_path withdrawal_list index] computes the
+   [merkle_tree_path] in the tree given by [merkelize_list
+   withdrawal_list] of the [index]th element of the
+   [withdrawal_list]. *)
+val compute_path : t list -> int -> merkle_tree_path
+
+(** [check_path path withdrawal] returns the [list_hash] computed for
+    [withdrawal] and the index on the list. *)
+val check_path : path -> t -> list_hash * int
