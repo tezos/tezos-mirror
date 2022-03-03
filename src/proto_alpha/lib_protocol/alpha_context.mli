@@ -2131,6 +2131,14 @@ module Tx_rollup : sig
     (** see [tx_rollup_repr.originated_tx_rollup] for documentation *)
     val originated_tx_rollup :
       Origination_nonce.Internal_for_tests.t -> tx_rollup
+
+    (** same as [hash_ticket] but uncarbonated *)
+    val hash_ticket_uncarbonated :
+      t ->
+      contents:Script.node ->
+      ticketer:Script.node ->
+      ty:Script.node ->
+      Ticket_hash.t tzresult
   end
 end
 
@@ -2400,7 +2408,7 @@ module Tx_rollup_commitment : sig
     t ->
     (context * Tx_rollup_state.t) tzresult Lwt.t
 
-  val check_commitment_level : Tx_rollup_state.t -> t -> unit tzresult Lwt.t
+  val check_commitment_level : Tx_rollup_state.t -> t -> unit tzresult
 
   val find :
     context ->

@@ -111,18 +111,16 @@ let get_finalized :
   | None -> fail @@ Tx_rollup_errors_repr.Commitment_does_not_exist level
   | Some commitment -> return (ctxt, commitment)
 
-(* TODO: Lwt.t is only useful for [fail_when] *)
 let check_commitment_level state commitment =
-  Tx_rollup_state_repr.next_commitment_level state >>?= fun expected_level ->
-  fail_when
+  Tx_rollup_state_repr.next_commitment_level state >>? fun expected_level ->
+  error_when
     Tx_rollup_level_repr.(commitment.level < expected_level)
     (Level_already_has_commitment commitment.level)
-  >>=? fun () ->
-  fail_when
+  >>? fun () ->
+  error_when
     Tx_rollup_level_repr.(expected_level < commitment.level)
     (Commitment_too_early
        {provided = commitment.level; expected = expected_level})
-  >>=? fun () -> return_unit
 
 (** [check_commitment_predecessor ctxt tx_rollup state commitment]
     will raise an error if the [predecessor] field of [commitment] is
@@ -161,7 +159,7 @@ let add_commitment ctxt tx_rollup state pkh commitment =
     Too_many_finalized_commitments
   >>=? fun () ->
   (* Check the commitment has the correct values *)
-  check_commitment_level state commitment >>=? fun () ->
+  check_commitment_level state commitment >>?= fun () ->
   check_commitment_predecessor ctxt state commitment >>=? fun ctxt ->
   check_commitment_batches_and_inbox_hash ctxt tx_rollup commitment
   >>=? fun ctxt ->

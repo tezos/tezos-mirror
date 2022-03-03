@@ -1738,7 +1738,7 @@ let precheck_manager_contents (type kind) ctxt (op : kind Kind.manager contents)
       assert_tx_rollup_feature_enabled ctxt >>=? fun () ->
       Tx_rollup_state.get ctxt tx_rollup >>=? fun (ctxt, state) ->
       Tx_rollup_commitment.check_commitment_level state commitment
-      >|=? fun () -> ctxt
+      >>?= fun () -> return ctxt
   | Tx_rollup_return_bond _ | Tx_rollup_finalize_commitment _
   | Tx_rollup_remove_commitment _ | Tx_rollup_rejection _ | Tx_rollup_withdraw _
     ->

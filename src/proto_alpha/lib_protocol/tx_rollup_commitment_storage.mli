@@ -31,7 +31,7 @@
 (** [check_commitment_level state commitment] fails if [commitment]
     does not target the expected level. *)
 val check_commitment_level :
-  Tx_rollup_state_repr.t -> Tx_rollup_commitment_repr.t -> unit tzresult Lwt.t
+  Tx_rollup_state_repr.t -> Tx_rollup_commitment_repr.t -> unit tzresult
 (* FIXME: move in Tx_rollup_commitment_repr *)
 
 (** [add_commitment context tx_rollup contract commitment] adds a
