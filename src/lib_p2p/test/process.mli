@@ -106,7 +106,7 @@ val receive : ('sent, 'b, 'c) t -> 'sent tzresult Lwt.t
    *)
 val wait_result : ('a, 'b, 'result) t -> 'result tzresult Lwt.t
 
-(** {2} Working with list of detached process  *)
+(** {2 Working with list of detached process} *)
 
 (** Gathering a list of error happening in parallel.
     First value is the number of the detached process,

@@ -159,6 +159,7 @@ module V1 : sig
           {li [01] means an index fitting on 2 bytes.}
           {li [10] means an index fitting on 4 bytes.}
           {li [11] means an integer fitting on 8 bytes.}
+      }
 
       Finally, the [contents] field follows this pattern
 
@@ -166,7 +167,8 @@ module V1 : sig
               list of [operation_content], {i e.g.}, [0010] means that
               there is two elements in [contents].}
           {li [1111] means that [contents] is prefixed by its number
-              of elements.} *)
+              of elements.}
+      } *)
   val compact_operation :
     (Indexable.unknown, Indexable.unknown) operation Data_encoding.Compact.t
 
@@ -185,6 +187,7 @@ module V1 : sig
           {li [110] means an index for a layer-2 address, fitting on 4 bytes.}
           {li [111] means a value (of type {!Tx_rollup_l2_address.t},
               that is a layer-2 address.}
+      }
 
       The [ticket_hash] is encoded using this logic:
 
@@ -192,13 +195,15 @@ module V1 : sig
           {li [01] means an index for a ticket hash, fitting on 2 bytes.}
           {li [10] means an index for a ticket hash, fitting on 4 bytes.}
           {li [11] means a value (of type {!Ticket_hash.t}.}
+      }
 
       The [qty] field follows a similar logic,
 
       {ul {li [00] means an integer fitting on 1 byte.}
           {li [01] means an integer fitting on 2 bytes.}
           {li [10] means an integer fitting on 4 bytes.}
-          {li [11] means an integer fitting on 8 bytes.} *)
+          {li [11] means an integer fitting on 8 bytes.}
+      } *)
   val compact_operation_content :
     Indexable.unknown operation_content Data_encoding.Compact.t
 end

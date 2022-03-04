@@ -99,7 +99,7 @@ module Durations : sig
       @param first_round_duration duration of round 0
       @param delay_increment_per_round amount of time added in from one round
                                        duration to the duration of its next round
-      @raises Invalid_argument if
+      @raise Invalid_argument if
         - first_round_duration <= 1; or
         - delay_increment_per_round is <= 0
    *)
@@ -228,7 +228,7 @@ module Internals_for_test : sig
     represents a time offset with respect to the start of the first round,
     returns a tuple [(r, round_offset)] where the round [r] is such that
     [level_offset_of_round(r) <= level_offset < level_offset_of_round(r+1)] and
-    [round_offset := level_offset - level_offset_of_round(r)]].
+    [round_offset := level_offset - level_offset_of_round(r)].
 
     round = 0      1     2    3                            r
 

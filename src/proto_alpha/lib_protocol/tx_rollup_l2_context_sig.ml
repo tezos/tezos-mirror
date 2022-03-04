@@ -139,7 +139,7 @@ module type CONTEXT = sig
         address indexed by [idx].
 
         This function can fail with [Counter_overflow] iff the counter
-        has reached the {Int64.max_int} limit.
+        has reached the [Int64.max_int] limit.
 
         This function can fail with [Unknown_address_index] if [idx]
         has not been associated with a layer-2 address already. *)

@@ -39,7 +39,7 @@ module Admin = Alpha_context.Cache.Admin
     exposed by {!Script_cache}. *)
 module Cache = Script_cache
 
-(** { 2 Constructing a dummy cached value. } *)
+(** {2 Constructing a dummy cached value} *)
 
 let make_context ~rng_state =
   Execution_context.make ~rng_state |> assert_ok_lwt |> fst

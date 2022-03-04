@@ -1644,9 +1644,9 @@ val chest_t : Script_timelock.chest ty
 
 (**
 
-   The following functions named `X_traverse` for X in { kinstr, ty,
-   comparable_ty, value } provide tail recursive top down traversals
-   over the values of these types.
+   The following functions named `X_traverse` for X in
+   [{ kinstr, ty, comparable_ty, value }] provide tail recursive top down
+   traversals over the values of these types.
 
    The traversal goes through a value and rewrites an accumulator
    along the way starting from some [init]ial value for the
