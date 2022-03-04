@@ -11,10 +11,6 @@
     # Give access to the Python dependencies/executables
     - . $HOME/.venv/bin/activate
   retry: 2
-  # avoid pushing cache for testing stage
-  cache:
-    key: "$CI_COMMIT_REF_SLUG"
-    policy: pull
 
 # Definition for the environment to run all integration tests.
 # This is also used by Tezt tests.
