@@ -57,13 +57,33 @@ end
 
 (** A simple memory table backed by [Hashtbl] *)
 module Memory_table (P : PARAMETERS) :
-  Requester.MEMORY_TABLE with type key = P.key = Hashtbl.MakeSeeded (struct
-  type t = P.key
+  Requester.MEMORY_TABLE with type key = P.key = struct
+  module Htbl = Hashtbl.MakeSeeded (struct
+    type t = P.key
 
-  let hash = Hashtbl.seeded_hash
+    let hash = Hashtbl.seeded_hash
 
-  let equal = ( = )
-end)
+    let equal = ( = )
+  end)
+
+  type key = Htbl.key
+
+  type 'a t = 'a Htbl.t
+
+  let create ~entry_type:_ ?random s = Htbl.create ?random s
+
+  let find = Htbl.find
+
+  let add = Htbl.add
+
+  let replace = Htbl.replace
+
+  let remove = Htbl.remove
+
+  let length = Htbl.length
+
+  let fold = Htbl.fold
+end
 
 (** An instance of [PROBE] that uses a [bool] parameter
  *  to decide whether the check goes through or not *)

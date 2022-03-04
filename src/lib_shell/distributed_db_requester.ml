@@ -61,7 +61,7 @@ end
 module Make_raw
     (Hash : Requester.HASH)
     (Disk_table : Requester.DISK_TABLE with type key := Hash.t)
-    (Memory_table : Requester.MEMORY_TABLE with type key := Hash.t)
+    (Memory_table : Hashtbl.SeededS with type key := Hash.t)
     (Request_message : REQUEST_MESSAGE with type hash := Hash.t)
     (Probe : Requester.PROBE
                with type key := Hash.t
@@ -100,8 +100,46 @@ module Make_raw
       if keys <> [] then send state gid keys
   end
 
+  module Monitored_memory_table = struct
+    type 'a t = {
+      table : 'a Memory_table.t;
+      metrics : Shell_metrics.Distributed_db.t;
+    }
+
+    let create ~entry_type ?random s =
+      {
+        table = Memory_table.create ?random s;
+        metrics = Shell_metrics.Distributed_db.init ~kind:Hash.name ~entry_type;
+      }
+
+    let find t x = Memory_table.find t.table x
+
+    let add t k x =
+      Memory_table.add t.table k x ;
+      Shell_metrics.Distributed_db.update
+        t.metrics
+        ~length:(Memory_table.length t.table)
+
+    let replace t k x =
+      Memory_table.replace t.table k x ;
+      Shell_metrics.Distributed_db.update
+        t.metrics
+        ~length:(Memory_table.length t.table)
+
+    let remove t k =
+      Memory_table.remove t.table k ;
+      Shell_metrics.Distributed_db.update
+        t.metrics
+        ~length:(Memory_table.length t.table)
+
+    let length t = Memory_table.length t.table
+
+    let fold f t x = Memory_table.fold f t.table x
+  end
+
   module Table =
-    Requester.Make (Hash) (Disk_table) (Memory_table) (Request) (Probe)
+    Requester.Make (Hash) (Disk_table) (Monitored_memory_table) (Request)
+      (Probe)
   include Table
 
   let state_of_t t =
@@ -133,7 +171,14 @@ module Fake_operation_storage = struct
 end
 
 module Raw_operation =
-  Make_raw (Operation_hash) (Fake_operation_storage) (Operation_hash.Table)
+  Make_raw
+    (struct
+      include Operation_hash
+
+      let name = "operation"
+    end)
+    (Fake_operation_storage)
+    (Operation_hash.Table)
     (struct
       type param = unit
 
@@ -175,7 +220,14 @@ module Block_header_storage = struct
 end
 
 module Raw_block_header =
-  Make_raw (Block_hash) (Block_header_storage) (Block_hash.Table)
+  Make_raw
+    (struct
+      include Block_hash
+
+      let name = "block_header"
+    end)
+    (Block_header_storage)
+    (Block_hash.Table)
     (struct
       type param = unit
 
@@ -285,7 +337,14 @@ module Protocol_storage = struct
 end
 
 module Raw_protocol =
-  Make_raw (Protocol_hash) (Protocol_storage) (Protocol_hash.Table)
+  Make_raw
+    (struct
+      include Protocol_hash
+
+      let name = "protocol"
+    end)
+    (Protocol_storage)
+    (Protocol_hash.Table)
     (struct
       type param = unit
 

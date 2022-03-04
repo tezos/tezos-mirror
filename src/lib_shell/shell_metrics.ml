@@ -94,6 +94,28 @@ module Worker = struct
       (Ptime.to_float_s completed)
 end
 
+module Distributed_db = struct
+  type t = {table_length : Prometheus.Gauge.t}
+
+  let init =
+    let subsystem = String.concat "_" ["node"; "distributed_db"; "requester"] in
+    let labels = ["requester_kind"; "entry_type"] in
+    let table_length =
+      let help = "Number of entries (to grab) from the network present" in
+      Prometheus.Gauge.v_labels
+        ~label_names:labels
+        ~help
+        ~namespace
+        ~subsystem
+        "table_length"
+    in
+    fun ~kind ~entry_type ->
+      {table_length = Prometheus.Gauge.labels table_length [kind; entry_type]}
+
+  let update metrics ~length =
+    Prometheus.Gauge.set metrics.table_length (float_of_int length)
+end
+
 module Block_validator = struct
   type t = {
     already_commited_blocks_count : Prometheus.Counter.t;
