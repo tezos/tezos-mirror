@@ -106,6 +106,8 @@ module Message_result : sig
   end
 
   type t = Deposit_result of deposit_result | Batch_V1_result of Batch_V1.t
+
+  val encoding : t Data_encoding.t
 end
 
 module Make (Context : CONTEXT) : sig
@@ -197,4 +199,11 @@ module Make (Context : CONTEXT) : sig
       see {!apply_deposit} and batch interpretations for various versions.
   *)
   val apply_message : ctxt -> Tx_rollup_message.t -> (ctxt * Message_result.t) m
+end
+
+module Internal_for_tests : sig
+  val address_indexes_of_list :
+    (Tx_rollup_l2_address.t * 'a) list -> 'a Address_indexes.t
+
+  val ticket_indexes_of_list : (Ticket_hash.t * 'a) list -> 'a Ticket_indexes.t
 end

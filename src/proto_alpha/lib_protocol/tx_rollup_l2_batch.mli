@@ -133,6 +133,11 @@ module V1 : sig
   val compact_transaction :
     (Indexable.unknown, Indexable.unknown) transaction Data_encoding.Compact.t
 
+  (** A specialized {!compact_transaction} where the signers are indexes only. *)
+  val compact_transaction_signer_index :
+    (Indexable.index_only, Indexable.unknown) transaction
+    Data_encoding.Compact.t
+
   (** The encoding of reference used to sign a transaction. It is
       derived from {!compact_transaction}. *)
   val transaction_encoding :
