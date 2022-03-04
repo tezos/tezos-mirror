@@ -46,5 +46,5 @@ module type ENCODING = sig
   val of_bytes_opt : bytes -> t option
 end
 
-(** Path encoding in hex: /[0-9a-f]{2}+/ *)
+(** Path encoding in hex: [/[0-9a-f]{2}+/] *)
 module Make_hex (H : ENCODING) : S with type t := H.t

@@ -228,7 +228,7 @@ module Internals_for_test : sig
     represents a time offset with respect to the start of the first round,
     returns a tuple [(r, round_offset)] where the round [r] is such that
     [level_offset_of_round(r) <= level_offset < level_offset_of_round(r+1)] and
-    [round_offset := level_offset - level_offset_of_round(r)]].
+    [round_offset := level_offset - level_offset_of_round(r)].
 
     round = 0      1     2    3                            r
 
