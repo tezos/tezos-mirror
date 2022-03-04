@@ -56,8 +56,3 @@ let rec fold_left_s_n ~n f acc l =
     | x :: l ->
         let* acc = f acc x in
         (fold_left_s_n [@ocaml.tailcall]) f ~n:(n - 1) acc l
-
-let rec find_map_s f = function
-  | [] -> Lwt.return_none
-  | x :: l ->
-      Lwt.bind (f x) (function None -> find_map_s f l | r -> Lwt.return r)

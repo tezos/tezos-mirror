@@ -107,7 +107,7 @@ let global_predecessor_lookup block_store hash pow_nth =
   (* Look in the RW block_store, then RO stores and finally in the
      cemented store *)
   let* o =
-    Lwt_utils.find_map_s
+    List.find_map_s
       (fun floating_store ->
         let* o = Floating_block_store.find_predecessors floating_store hash in
         match o with
@@ -253,7 +253,7 @@ let read_block ~read_metadata block_store key_kind =
             let fetch_block adjusted_hash =
               (* First look in the floating stores *)
               let*! o =
-                Lwt_utils.find_map_s
+                List.find_map_s
                   (fun store ->
                     Floating_block_store.read_block store adjusted_hash)
                   (block_store.rw_floating_block_store
@@ -294,7 +294,7 @@ let read_block_metadata block_store key_kind =
           else
             (* First look in the floating stores *)
             let*! o =
-              Lwt_utils.find_map_s
+              List.find_map_s
                 (fun store ->
                   Floating_block_store.read_block store adjusted_hash)
                 (block_store.rw_floating_block_store
@@ -369,7 +369,7 @@ let try_retrieve_n_predecessors floating_stores block n =
     if n = 0 then Lwt.return acc
     else
       let* o =
-        Lwt_utils.find_map_s
+        List.find_map_s
           (fun floating_store ->
             Floating_block_store.read_block_and_predecessors
               floating_store

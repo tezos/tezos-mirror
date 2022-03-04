@@ -116,7 +116,7 @@ let read_operation state h =
 let read_block {disk; _} h =
   let open Lwt_syntax in
   let* chain_stores = Store.all_chain_stores disk in
-  Lwt_utils.find_map_s
+  List.find_map_s
     (fun chain_store ->
       let* o = Store.Block.read_block_opt chain_store h in
       let* o =
@@ -140,7 +140,7 @@ let read_predecessor_header {disk; _} h offset =
       let open Lwt_syntax in
       let offset = Int32.to_int offset in
       let* chain_stores = Store.all_chain_stores disk in
-      Lwt_utils.find_map_s
+      List.find_map_s
         (fun chain_store ->
           let* o = Store.Block.read_block_opt chain_store h ~distance:offset in
           match o with
