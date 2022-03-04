@@ -582,6 +582,15 @@ let test_submit_batches_in_several_blocks =
       ~tezos_level:4
       ~tx_level:1
   in
+  let* () =
+    submit_three_batches_and_check_size
+      ~rollup
+      node
+      client
+      submission
+      ~tezos_level:5
+      ~tx_level:2
+  in
   unit
 
 let test_submit_from_originated_source =

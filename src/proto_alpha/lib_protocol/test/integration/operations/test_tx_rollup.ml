@@ -105,7 +105,7 @@ let check_batch_in_inbox :
 (** [context_init n] initializes a context with no consensus rewards
     to not interfere with balances prediction. It returns the created
     context and [n] contracts. *)
-let context_init n =
+let context_init ?(tx_rollup_max_unfinalized_levels = 2100) n =
   Context.init_with_constants
     {
       Context.default_test_contants with
@@ -114,6 +114,7 @@ let context_init n =
       tx_rollup_finality_period = 1;
       tx_rollup_withdraw_period = 1;
       tx_rollup_max_finalized_levels = 2;
+      tx_rollup_max_unfinalized_levels;
       endorsing_reward_per_slot = Tez.zero;
       baking_reward_bonus_per_slot = Tez.zero;
       baking_reward_fixed_portion = Tez.zero;
@@ -829,7 +830,8 @@ let test_deposit_by_non_internal_operation () =
 
 (** Test that block finalization changes gas rates *)
 let test_finalization () =
-  context_init 2 >>=? fun (b, contracts) ->
+  context_init ~tx_rollup_max_unfinalized_levels:5_000 2
+  >>=? fun (b, contracts) ->
   let filler = WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0 in
   let contract =
     WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0
@@ -847,7 +849,6 @@ let test_finalization () =
     constant.parametric.tx_rollup_hard_size_limit_per_message - 1
   in
   let contents = String.make tx_rollup_batch_limit 'd' in
-
   (* Repeating fill inbox and finalize block to increase EMA
      until EMA is enough to provoke a change of fees. *)
   let rec increase_ema n b tx_rollup f =
@@ -877,8 +878,15 @@ let test_finalization () =
   in
   (* Check the fees we are getting after finalization are (1) strictly
      positive, and (2) the one we can predict with
-     [update_burn_per_byte]. *)
-  let expected_state = update_burn_per_byte_n_time n state in
+     [update_burn_per_byte].
+
+     [n - 2] comes from the following facts:
+
+     - The [update_burn_per_byte] is called only on a new inbox
+
+     - The [update_burn_per_byte] needs the predecessor inbox, hence
+     it is not called on the first inbox *)
+  let expected_state = update_burn_per_byte_n_time (n - 2) state in
   burn_per_byte expected_state >>?= fun expected_burn_per_byte ->
   Context.Tx_rollup.state (B b) tx_rollup >>=? fun state ->
   burn_per_byte state >>?= fun burn_per_byte ->
