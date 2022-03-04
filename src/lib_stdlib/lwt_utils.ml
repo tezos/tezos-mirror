@@ -47,12 +47,3 @@ let worker name ~on_event ~run ~cancel =
 
 let worker name ~on_event ~run ~cancel =
   Lwt.no_cancel (worker name ~on_event ~run ~cancel)
-
-let rec fold_left_s_n ~n f acc l =
-  if n = 0 then Lwt.return (acc, l)
-  else
-    match l with
-    | [] -> Lwt.return (acc, [])
-    | x :: l ->
-        let* acc = f acc x in
-        (fold_left_s_n [@ocaml.tailcall]) f ~n:(n - 1) acc l
