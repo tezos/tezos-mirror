@@ -632,7 +632,7 @@ let fix_savepoint_and_caboose ?history_mode chain_dir block_store head genesis =
    by setting it to the lowest block with metadata which is higher
    that the last allowed fork level of the current head (and <=
    head_level).
-  Assumptions:
+   Assumptions:
    - head is valid,
    - savepoint is valid,
    - block store is valid and available. *)

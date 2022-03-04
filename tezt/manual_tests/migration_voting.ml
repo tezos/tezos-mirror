@@ -25,19 +25,19 @@
 (*****************************************************************************)
 
 (* Example of the relevant fields from metadata:
-  "level_info": {
-    "level": 1404929,
-    "level_position": 1404928,
-    "cycle": 343,
-    "cycle_position": 0,
-    "expected_commitment": false },
-  "voting_period_info": {
-    "voting_period": {
-      "index": 44,
-      "kind": "cooldown",
-      "start_position": 1404927 },
-    "position": 1,
-    "remaining": 40958 }
+   "level_info": {
+     "level": 1404929,
+     "level_position": 1404928,
+     "cycle": 343,
+     "cycle_position": 0,
+     "expected_commitment": false },
+   "voting_period_info": {
+     "voting_period": {
+       "index": 44,
+       "kind": "cooldown",
+       "start_position": 1404927 },
+     "position": 1,
+     "remaining": 40958 }
 *)
 
 let check_voting_period_invariants ~blocks_per_voting_period ~blocks_per_cycle

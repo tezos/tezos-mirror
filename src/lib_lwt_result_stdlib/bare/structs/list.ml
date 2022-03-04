@@ -23,19 +23,19 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* A note about the implementation of recursive Lwt and Lwt-result functions: 
+(* A note about the implementation of recursive Lwt and Lwt-result functions:
 
    [_s] and [_es] functions are implemented following this pattern:
 
-{[
-let rec traverse f xs =
-  | [] -> ..
-  | x :: xs -> .. f x .. traverse xs ..
+   {[
+   let rec traverse f xs =
+     | [] -> ..
+     | x :: xs -> .. f x .. traverse xs ..
 
-let traverse f xs =
-  | [] -> ..
-  | x :: xs -> .. Lwt.apply f x .. traverse xs ..
-]}
+   let traverse f xs =
+     | [] -> ..
+     | x :: xs -> .. Lwt.apply f x .. traverse xs ..
+   ]}
 
    with variations for when [f] takes more than one parameter, when the
    matching is slightly different, and so on. Whatever the variation, the
