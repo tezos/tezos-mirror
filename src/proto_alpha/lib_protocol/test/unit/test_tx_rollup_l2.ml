@@ -36,7 +36,7 @@
 open Tztest
 open Tx_rollup_l2_helpers
 open Protocol
-open Tx_rollup_l2_context
+open Tx_rollup_l2_context_sig
 
 (** {1. Storage and context tests. } *)
 
@@ -514,67 +514,157 @@ end
 
 (* ------ L2 Batch encodings ------------------------------------------------ *)
 
-let test_l2_operation_size () =
-  let open Protocol.Tx_rollup_l2_batch.V1 in
-  let open Data_encoding in
+module Test_batch_encodings = struct
+  open Lwt_result_syntax
+  open Protocol.Tx_rollup_l2_batch.V1
+  open Data_encoding
+
   (* Encoding from compact encoding *)
   let operation_content_encoding =
     Compact.make ~tag_size:`Uint8 compact_operation_content
-  in
-  let operation_encoding = Compact.make ~tag_size:`Uint8 compact_operation in
-  let transaction_encoding =
-    Compact.make ~tag_size:`Uint8 compact_transaction
-  in
+
+  let operation_encoding = Compact.make ~tag_size:`Uint8 compact_operation
+
+  let transaction_encoding = Compact.make ~tag_size:`Uint8 compact_transaction
+
   (* Helper functions to encode and decode *)
-  let encode_content op = Binary.to_bytes_exn operation_content_encoding op in
+  let encode_content op = Binary.to_bytes_exn operation_content_encoding op
+
   let decode_content buffer =
     Data_encoding.Binary.of_bytes_exn operation_content_encoding buffer
-  in
-  let encode_operation op = Binary.to_bytes_exn operation_encoding op in
-  let decode_operation buffer = Binary.of_bytes_exn operation_encoding buffer in
-  let encode_transaction t = Binary.to_bytes_exn transaction_encoding t in
+
+  let encode_operation op = Binary.to_bytes_exn operation_encoding op
+
+  let decode_operation buffer = Binary.of_bytes_exn operation_encoding buffer
+
+  let encode_transaction t = Binary.to_bytes_exn transaction_encoding t
+
   let decode_transaction buffer =
     Binary.of_bytes_exn transaction_encoding buffer
-  in
 
-  (* Assert the smallest operation_content size is 4 *)
-  let opc =
-    {
-      destination = Layer2 (Indexable.from_index_exn 0l);
-      ticket_hash = Indexable.from_index_exn 1l;
-      qty = Tx_rollup_l2_qty.of_int64_exn 12L;
-    }
-  in
-  let buffer = encode_content opc in
-  let opc' = decode_content buffer in
+  let destination_pp fmt =
+    let open Protocol.Tx_rollup_l2_batch in
+    function
+    | Layer1 pkh -> Signature.Public_key_hash.pp fmt pkh
+    | Layer2 l2 -> Tx_rollup_l2_address.Indexable.pp fmt l2
 
-  Alcotest.(check int "smallest transfer content" 4 (Bytes.length buffer)) ;
-  assert (opc = opc') ;
+  let operation_content_pp fmt = function
+    | {destination; ticket_hash; qty} ->
+        Format.fprintf
+          fmt
+          "@[<hov 2>Operation:@ destination=%a,@ ticket_hash=%a,@ qty:%a@]"
+          destination_pp
+          destination
+          Tx_rollup_l2_context_sig.Ticket_indexable.pp
+          ticket_hash
+          Tx_rollup_l2_qty.pp
+          qty
 
-  (* Assert the smallest operation size is 7 *)
-  let op =
-    {signer = Indexable.from_index_exn 2l; counter = 0L; contents = [opc]}
-  in
-  let buffer = encode_operation op in
-  let op' = decode_operation buffer in
+  let test_l2_operation_size () =
+    (* Assert the smallest operation_content size is 4 *)
+    let opc =
+      {
+        destination = Layer2 (Indexable.from_index_exn 0l);
+        ticket_hash = Indexable.from_index_exn 1l;
+        qty = Tx_rollup_l2_qty.of_int64_exn 12L;
+      }
+    in
+    let buffer = encode_content opc in
+    let opc' = decode_content buffer in
 
-  Alcotest.(check int "smallest transfer" 7 (Bytes.length buffer)) ;
-  assert (op = op') ;
+    Alcotest.(check int "smallest transfer content" 4 (Bytes.length buffer)) ;
+    assert (opc = opc') ;
 
-  (* Assert the smallest transaction size is 8 *)
-  let t = [op] in
-  let buffer = encode_transaction t in
-  let t' = decode_transaction buffer in
+    (* Assert the smallest operation size is 7 *)
+    let op =
+      {signer = Indexable.from_index_exn 2l; counter = 0L; contents = [opc]}
+    in
+    let buffer = encode_operation op in
+    let op' = decode_operation buffer in
 
-  Alcotest.(check int "smallest transaction" 8 (Bytes.length buffer)) ;
-  assert (t = t') ;
+    Alcotest.(check int "smallest transfer" 7 (Bytes.length buffer)) ;
+    assert (op = op') ;
 
-  return_unit
+    (* Assert the smallest transaction size is 8 *)
+    let t = [op] in
+    let buffer = encode_transaction t in
+    let t' = decode_transaction buffer in
+
+    Alcotest.(check int "smallest transaction" 8 (Bytes.length buffer)) ;
+    assert (t = t') ;
+
+    return_unit
+
+  let test_l2_operation_encode_guard () =
+    let invalid_indexed_l2_to_l1_op =
+      {
+        destination = Layer1 Signature.Public_key_hash.zero;
+        ticket_hash = Indexable.from_index_exn 1l;
+        qty = Tx_rollup_l2_qty.of_int64_exn 12L;
+      }
+    in
+    let* _ =
+      try
+        let buffer = encode_content invalid_indexed_l2_to_l1_op in
+        Alcotest.failf
+          "Expected encoding of layer2-to-layer1 operation_content with \
+           indexed ticket to fail. Binary output: %s"
+          Hex.(of_bytes buffer |> show)
+      with
+      | Data_encoding.Binary.Write_error
+          (Exception_raised_in_user_function
+            "(Invalid_argument\n\
+            \  \"Attempted to decode layer2 operation containing ticket \
+             index.\")")
+      ->
+        return_unit
+    in
+    return_unit
+
+  let test_l2_operation_decode_guard () =
+    let invalid_indexed_l2_to_l1_op_serialized =
+      Hex.(
+        `Hex "00000000000000000000000000000000000000000000010c" |> to_bytes
+        |> Stdlib.Option.get)
+    in
+    let* _ =
+      try
+        let invalid_indexed_l2_to_l1_op =
+          decode_content invalid_indexed_l2_to_l1_op_serialized
+        in
+        Alcotest.failf
+          "Expected decoding of layer2-to-layer1 operation_content with \
+           indexed ticket to fail. Got operation: %a"
+          operation_content_pp
+          invalid_indexed_l2_to_l1_op
+      with
+      | Data_encoding.Binary.Read_error
+          (Exception_raised_in_user_function
+            "(Invalid_argument\n\
+            \  \"Attempted to decode layer2 operation containing ticket \
+             index.\")") ->
+          return_unit
+      | e ->
+          Alcotest.failf "Got unexpected exception: %s" (Printexc.to_string e)
+    in
+    return_unit
+
+  let tests =
+    [
+      tztest "test layer-2 operation encoding size" `Quick test_l2_operation_size;
+      tztest
+        "test layer-2 operation encoding guard"
+        `Quick
+        test_l2_operation_encode_guard;
+      tztest
+        "test layer-2 operation decoding guard"
+        `Quick
+        test_l2_operation_decode_guard;
+    ]
+end
 
 let tests =
   [tztest "test irmin storage" `Quick @@ wrap_test test_irmin_storage]
   @ Test_Address_index.tests @ Test_Ticket_index.tests
   @ Test_Address_medata.tests @ Test_Ticket_ledger.tests
-  @ [
-      tztest "test layer-2 operation encoding size" `Quick test_l2_operation_size;
-    ]
+  @ Test_batch_encodings.tests

@@ -115,6 +115,10 @@ val to_int32 : 'a index -> int32
 (** [to_value x] unwraps and returns the value behind [x]. *)
 val to_value : 'a value -> 'a
 
+(** [is_value_e err x] unwraps and returns the value behind [x], and
+    throws an [err] if [x] is an index. *)
+val is_value_e : error:'trace -> ('state, 'a) t -> ('a, 'trace) result
+
 (** [in_memory_size a] returns the number of bytes allocated in RAM for [a]. *)
 val in_memory_size :
   ('a -> Cache_memory_helpers.sint) ->

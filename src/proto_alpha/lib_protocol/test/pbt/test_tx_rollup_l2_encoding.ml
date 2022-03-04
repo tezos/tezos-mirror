@@ -51,9 +51,11 @@ let bls_pk_gen =
 
 let signer_gen : Signer_indexable.either QCheck2.Gen.t =
   let open QCheck2.Gen in
-  let* choice = bool in
-  if choice then (fun pk -> from_value pk) <$> bls_pk_gen
-  else (fun x -> from_index_exn x) <$> ui32
+  frequency
+    [
+      (1, (fun pk -> from_value pk) <$> bls_pk_gen);
+      (9, (fun x -> from_index_exn x) <$> ui32);
+    ]
 
 let signer_index_gen : Signer_indexable.index QCheck2.Gen.t =
   let open QCheck2.Gen in
@@ -63,22 +65,42 @@ let l2_address_gen =
   let open QCheck2.Gen in
   Protocol.Tx_rollup_l2_address.of_bls_pk <$> bls_pk_gen
 
+let public_key_hash =
+  Signature.Public_key_hash.of_b58check_exn
+    "tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU"
+
 let destination_gen =
   let open QCheck2.Gen in
   let* choice = bool in
-  if choice then
-    return
-    @@ Layer1
-         (Signature.Public_key_hash.of_b58check_exn
-            "tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU")
+  if choice then return (Layer1 public_key_hash)
   else
     let* choice = bool in
     if choice then (fun x -> Layer2 (from_index_exn x)) <$> ui32
     else (fun x -> Layer2 (from_value x)) <$> l2_address_gen
 
-let ticket_hash_gen =
+let ticket_hash_gen : Protocol.Alpha_context.Ticket_hash.t QCheck2.Gen.t =
+  let open QCheck2.Gen in
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/2592
+     we could introduce a bit more randomness here *)
+  let ticketer_b58 = "tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU" in
+  let ticketer_pkh = Signature.Public_key_hash.of_b58check_exn ticketer_b58 in
+  let ticketer =
+    Protocol.Alpha_context.Contract.implicit_contract ticketer_pkh
+  in
+  let+ tx_rollup = l2_address_gen in
+  Tx_rollup_l2_helpers.make_unit_ticket_key ticketer tx_rollup
+
+let idx_ticket_hash_idx_gen : Ticket_indexes.key either QCheck2.Gen.t =
   let open QCheck2.Gen in
   from_index_exn <$> ui32
+
+let idx_ticket_hash_value_gen : Ticket_indexes.key either QCheck2.Gen.t =
+  let open QCheck2.Gen in
+  from_value <$> ticket_hash_gen
+
+let idx_ticket_hash_gen : Ticket_indexes.key either QCheck2.Gen.t =
+  let open QCheck2.Gen in
+  oneof [idx_ticket_hash_idx_gen; idx_ticket_hash_value_gen]
 
 let qty_gen =
   let open QCheck2.Gen in
@@ -87,9 +109,14 @@ let qty_gen =
 
 let v1_operation_content_gen =
   let open QCheck2.Gen in
-  let+ destination = destination_gen
-  and+ ticket_hash = ticket_hash_gen
-  and+ qty = qty_gen in
+  let* destination = destination_gen and+ qty = qty_gen in
+  (* in valid [operation_content]s, the ticket_hash is a value when the
+     destination is layer1 *)
+  let+ ticket_hash =
+    match destination with
+    | Layer1 _ -> idx_ticket_hash_value_gen
+    | Layer2 _ -> idx_ticket_hash_gen
+  in
   V1.{destination; ticket_hash; qty}
 
 let v1_operation_gen =
@@ -190,7 +217,7 @@ let batch_v1_result_gen : Message_result.Batch_V1.t QCheck2.Gen.t =
   let+ indexes = indexes_gen in
   Message_result.Batch_V1.Batch_result {results; indexes}
 
-let message_result : Message_result.t QCheck2.Gen.t =
+let message_result : Message_result.message_result QCheck2.Gen.t =
   let open QCheck2.Gen in
   let open Message_result in
   let batch_v1_result_gen =
@@ -198,6 +225,19 @@ let message_result : Message_result.t QCheck2.Gen.t =
     Batch_V1_result result
   in
   frequency [(2, deposit_result_gen); (8, batch_v1_result_gen)]
+
+let withdrawal : Message_result.withdrawal QCheck2.Gen.t =
+  let open QCheck2.Gen in
+  let open Message_result in
+  let destination = public_key_hash in
+  let* ticket_hash = ticket_hash_gen in
+  let* amount = qty_gen in
+  return {destination; ticket_hash; amount}
+
+let message_result_withdrawal : Message_result.t QCheck2.Gen.t =
+  let open QCheck2.Gen in
+  let+ mres = message_result and+ withdrawals = list withdrawal in
+  (mres, withdrawals)
 
 let pp fmt _ = Format.fprintf fmt "{}"
 
@@ -281,7 +321,7 @@ let () =
             test_roundtrip
               ~count:1_000
               "message_result"
-              message_result
+              message_result_withdrawal
               ( = )
               Protocol.Tx_rollup_l2_apply.Message_result.encoding;
           ] );

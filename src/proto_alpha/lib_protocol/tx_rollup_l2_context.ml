@@ -46,100 +46,6 @@ let metadata_encoding =
       (fun (counter, public_key) -> {counter; public_key})
       (obj2 (req "counter" int64) (req "public_key" pk_encoding)))
 
-type error +=
-  | Unknown_address_index of address_index
-  | Balance_too_low
-  | Balance_overflow
-  | Invalid_quantity
-  | Metadata_already_initialized of address_index
-  | Too_many_l2_addresses
-  | Too_many_l2_tickets
-  | Counter_overflow
-
-let () =
-  let open Data_encoding in
-  (* Unknown address index *)
-  register_error_kind
-    `Temporary
-    ~id:"tx_rollup_unknown_address_index"
-    ~title:"Unknown address index"
-    ~description:"Tried to increment the counter of an unknown address index"
-    (obj1 (req "index" Tx_rollup_l2_address.Indexable.index_encoding))
-    (function Unknown_address_index x -> Some x | _ -> None)
-    (fun x -> Unknown_address_index x) ;
-  (* Balance too low *)
-  register_error_kind
-    `Temporary
-    ~id:"tx_rollup_balance_too_low"
-    ~title:"Balance too low"
-    ~description:
-      "Tried to spend a ticket index from an index without the required balance"
-    empty
-    (function Balance_too_low -> Some () | _ -> None)
-    (fun () -> Balance_too_low) ;
-  (* Balance overflow *)
-  register_error_kind
-    `Temporary
-    ~id:"tx_rollup_balance_overflow"
-    ~title:"Balance overflow"
-    ~description:
-      "Tried to credit a ticket index to an index to a new balance greater \
-       than the integer 32 limit"
-    empty
-    (function Balance_overflow -> Some () | _ -> None)
-    (fun () -> Balance_overflow) ;
-  (* Invalid_quantity *)
-  register_error_kind
-    `Permanent
-    ~id:"tx_rollup_invalid_quantity"
-    ~title:"Invalid quantity"
-    ~description:
-      "Tried to credit a ticket index to an index with a quantity non-strictly \
-       positive"
-    empty
-    (function Invalid_quantity -> Some () | _ -> None)
-    (fun () -> Invalid_quantity) ;
-  (* Metadata already initialized *)
-  register_error_kind
-    `Branch
-    ~id:"tx_rollup_metadata_already_initialized"
-    ~title:"Metadata already initiliazed"
-    ~description:
-      "Tried to initialize a metadata for an index which was already \
-       initiliazed"
-    (obj1 (req "index" Tx_rollup_l2_address.Indexable.index_encoding))
-    (function Metadata_already_initialized x -> Some x | _ -> None)
-    (fun x -> Metadata_already_initialized x) ;
-  (* Too many l2 addresses associated *)
-  register_error_kind
-    `Branch
-    ~id:"tx_rollup_too_many_l2_addresses"
-    ~title:"Too many l2 addresses"
-    ~description:"The number of l2 addresses has reached the integer 32 limit"
-    empty
-    (function Too_many_l2_addresses -> Some () | _ -> None)
-    (fun () -> Too_many_l2_addresses) ;
-  (* Too many l2 tickets associated *)
-  register_error_kind
-    `Branch
-    ~id:"tx_rollup_too_many_l2_tickets"
-    ~title:"Too many l2 tickets"
-    ~description:"The number of l2 tickets has reached the integer 32 limit"
-    empty
-    (function Too_many_l2_tickets -> Some () | _ -> None)
-    (fun () -> Too_many_l2_tickets) ;
-  (* Counter overflow *)
-  register_error_kind
-    `Branch
-    ~id:"tx_rollup_counter_overflow"
-    ~title:"Counter overflow"
-    ~description:
-      "Tried to increment the counter of an address and reached the integer 64 \
-       limit"
-    empty
-    (function Counter_overflow -> Some () | _ -> None)
-    (fun () -> Counter_overflow)
-
 (** {1 Type-Safe Storage Access and Gas Accounting} *)
 
 (** A value of type ['a key] identifies a value of type ['a] in an
@@ -272,6 +178,9 @@ struct
 
   module Syntax = struct
     include S.Syntax
+
+    let ( let*? ) res f =
+      match res with Result.Ok v -> f v | Result.Error error -> fail error
 
     let fail_unless cond error =
       let open S.Syntax in

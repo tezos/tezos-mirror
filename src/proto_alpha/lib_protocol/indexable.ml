@@ -97,6 +97,10 @@ let to_int32 = function Index x -> x
 
 let to_value = function Value x -> x
 
+let is_value_e : error:'trace -> ('state, 'a) t -> ('a, 'trace) result =
+ fun ~error v ->
+  match destruct v with Left _ -> Result.error error | Right v -> Result.ok v
+
 let compact val_encoding =
   Data_encoding.Compact.(
     conv

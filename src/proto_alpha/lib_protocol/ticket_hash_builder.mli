@@ -35,3 +35,13 @@ val make :
   contents:Script_repr.node ->
   owner:Script_repr.node ->
   (Ticket_hash_repr.t * Raw_context.t) tzresult
+
+module Internal_for_tests : sig
+  (** As [make] but do not account for gas consumption *)
+  val make_uncarbonated :
+    ticketer:Script_repr.node ->
+    ty:Script_repr.node ->
+    contents:Script_repr.node ->
+    owner:Script_repr.node ->
+    Ticket_hash_repr.t tzresult
+end

@@ -120,6 +120,14 @@ let context_init n =
     }
     n
 
+(** [context_init1] initializes a context with no consensus rewards
+    to not interfere with balances prediction. It returns the created
+    context and 1 contract. *)
+let context_init1 () =
+  context_init 1 >|=? function
+  | (_, []) -> assert false
+  | (b, contract_1 :: _) -> (b, contract_1)
+
 (** [originate b contract] originates a tx_rollup from [contract],
     and returns the new block and the tx_rollup address. *)
 let originate b contract =
@@ -637,6 +645,7 @@ let test_valid_deposit () =
       let ticket_hash = make_unit_ticket_key ctxt contract tx_rollup in
       let (message, _size) =
         Tx_rollup_message.make_deposit
+          (is_implicit_exn account)
           (Tx_rollup_l2_address.Indexable.value pkh)
           ticket_hash
           (Tx_rollup_l2_qty.of_int64_exn 10L)

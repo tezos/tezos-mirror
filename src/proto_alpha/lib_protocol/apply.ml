@@ -1063,8 +1063,24 @@ let apply_manager_operation_content :
           ->
         Tx_rollup.hash_ticket ctxt dst ~contents ~ticketer ~ty
         >>?= fun (ticket_hash, ctxt) ->
+        (* The deposit is returned to the [payer] as a withdrawal
+           if it fails due to a Balance_overflow in the
+           recipient. The recipient of withdrawals are always
+           implicit. We set the withdrawal recipient to [payer]:
+           the protocol ensures that [payer] is implicit, yet we
+           must do this conversion. *)
+        Option.value_e
+          ~error:
+            (Error_monad.trace_of_error
+               Tx_rollup_operation_with_non_implicit_contract)
+          (Contract.is_implicit payer)
+        >>?= fun payer_implicit ->
         let (deposit, message_size) =
-          Tx_rollup_message.make_deposit destination ticket_hash amount
+          Tx_rollup_message.make_deposit
+            payer_implicit
+            destination
+            ticket_hash
+            amount
         in
         Tx_rollup_state.get ctxt dst >>=? fun (ctxt, state) ->
         Tx_rollup_state.burn_cost ~limit:None state message_size
