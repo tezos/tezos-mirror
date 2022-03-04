@@ -1833,6 +1833,19 @@ let execute_any_arg logger ctxt mode step_constants ~entrypoint ~internal
       },
       (script, size) )
 
+let execute_with_typed_parameter ?logger ctxt ~cached_script mode step_constants
+    ~script ~entrypoint ~parameter_ty ~parameter ~internal =
+  execute_any_arg
+    logger
+    ctxt
+    mode
+    step_constants
+    ~entrypoint
+    ~internal
+    script
+    cached_script
+    (Typed_arg (parameter_ty, parameter))
+
 let execute ?logger ctxt ~cached_script mode step_constants ~script ~entrypoint
     ~parameter ~internal =
   execute_any_arg
