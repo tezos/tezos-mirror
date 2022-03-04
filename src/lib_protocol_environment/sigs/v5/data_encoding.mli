@@ -132,84 +132,83 @@ val n : Z.t encoding
 (** {4 Other ground type encodings} *)
 
 (** Encoding of a boolean
-      (data is encoded as a byte in binary and a boolean in JSON). *)
+    (data is encoded as a byte in binary and a boolean in JSON). *)
 val bool : bool encoding
 
 (** Encoding of a string
-      - encoded as a byte sequence in binary prefixed by the length
-        of the string
-      - encoded as a string in JSON. *)
+    - encoded as a byte sequence in binary prefixed by the length
+      of the string
+    - encoded as a string in JSON. *)
 val string : string encoding
 
 (** Encoding of arbitrary bytes
-      (encoded via hex in JSON and directly as a sequence byte in binary). *)
+    (encoded via hex in JSON and directly as a sequence byte in binary). *)
 val bytes : Bytes.t encoding
 
 (** {3 Descriptor combinators} *)
 
 (** Combinator to make an optional value
-      (represented as a 1-byte tag followed by the data (or nothing) in binary
-       and either the raw value or a null in JSON).
+    (represented as a 1-byte tag followed by the data (or nothing) in binary
+     and either the raw value or a null in JSON).
 
-      Note that the JSON representation is only weakly discriminating.
-      Specifically, the value [Some None] is represented as the raw value [None]
-      and so the two are indistinguishable. For this reason, this combinator
-      does not support nesting, nor does it support use within a recursive
-      ({!mu}) encoding.
+    Note that the JSON representation is only weakly discriminating.
+    Specifically, the value [Some None] is represented as the raw value [None]
+    and so the two are indistinguishable. For this reason, this combinator
+    does not support nesting, nor does it support use within a recursive
+    ({!mu}) encoding.
 
-      @raise Invalid_argument if called on an encoding which may be represented
-      as [null] in JSON. This includes an encoding of the form [option _],
-      [conv _ _ (option _)], [dynamic_size (option _)], etc.
+    @raise Invalid_argument if called on an encoding which may be represented
+    as [null] in JSON. This includes an encoding of the form [option _],
+    [conv _ _ (option _)], [dynamic_size (option _)], etc.
 
-      @raise Invalid_argument if called within the body of a {!mu}.
-       *)
+    @raise Invalid_argument if called within the body of a {!mu}. *)
 val option : 'a encoding -> 'a option encoding
 
 (** Combinator to make a {!result} value
-      (represented as a 1-byte tag followed by the data of either type in binary,
-       and either unwrapped value in JSON (the caller must ensure that both
-       encodings do not collide)). *)
+    represented as a 1-byte tag followed by the data of either type in binary,
+    and either unwrapped value in JSON (the caller must ensure that both
+    encodings do not collide). *)
 val result : 'a encoding -> 'b encoding -> ('a, 'b) result encoding
 
 (** Array combinator.
-      - encoded as an array in JSON
-      - encoded as the concatenation of all the element in binary
-       prefixed its length in bytes
+    - encoded as an array in JSON
+    - encoded as the concatenation of all the element in binary
+     prefixed its length in bytes
 
-      @param [max_length]
-      If [max_length] is passed and the encoding of elements has fixed
-      size, a {!check_size} is automatically added for earlier rejection.
+    @param [max_length]
+    If [max_length] is passed and the encoding of elements has fixed
+    size, a {!check_size} is automatically added for earlier rejection.
 
-      @raise Invalid_argument if the inner encoding is variable. *)
+    @raise Invalid_argument if the inner encoding is variable. *)
 val array : ?max_length:int -> 'a encoding -> 'a array encoding
 
 (** List combinator.
-      - encoded as an array in JSON
-      - encoded as the concatenation of all the element in binary
-       prefixed its length in bytes
+    - encoded as an array in JSON
+    - encoded as the concatenation of all the element in binary
+     prefixed its length in bytes
 
-      @param [max_length]
-      If [max_length] is passed and the encoding of elements has fixed
-      size, a {!check_size} is automatically added for earlier rejection.
+    @param [max_length]
+    If [max_length] is passed and the encoding of elements has fixed
+    size, a {!check_size} is automatically added for earlier rejection.
 
-      @raise Invalid_argument if the inner encoding is variable. *)
+    @raise Invalid_argument if the inner encoding is variable. *)
 val list : ?max_length:int -> 'a encoding -> 'a list encoding
 
 (** Provide a transformer from one encoding to a different one.
 
-      Used to simplify nested encodings or to change the generic tuples
-      built by {!obj1}, {!tup1} and the like into proper records.
+    Used to simplify nested encodings or to change the generic tuples
+    built by {!obj1}, {!tup1} and the like into proper records.
 
-      A schema may optionally be provided as documentation of the new encoding. *)
+    A schema may optionally be provided as documentation of the new encoding. *)
 val conv :
   ('a -> 'b) -> ('b -> 'a) -> ?schema:json_schema -> 'b encoding -> 'a encoding
 
 (** [conv_with_guard] is similar to {!conv} but the function that takes in the value
-      from the outside (untrusted) world has a chance to fail.
+    from the outside (untrusted) world has a chance to fail.
 
-      Specifically, if the function returns [Error msg] then the decoding is
-      interrupted with an error carrying the message [msg]. If the function
-      returns [Ok _] then the decoding proceeds normally. *)
+    Specifically, if the function returns [Error msg] then the decoding is
+    interrupted with an error carrying the message [msg]. If the function
+    returns [Ok _] then the decoding proceeds normally. *)
 val conv_with_guard :
   ('a -> 'b) ->
   ('b -> ('a, string) result) ->
@@ -218,21 +217,21 @@ val conv_with_guard :
   'a encoding
 
 (** [with_decoding_guard g e] is similar to [e] but decoding fails if [g]
-      returns [Error _] on the decoded value. *)
+    returns [Error _] on the decoded value. *)
 val with_decoding_guard :
   ('a -> (unit, string) result) -> 'a encoding -> 'a encoding
 
 (** Association list.
-      An object in JSON, a list of pairs in binary. *)
+    An object in JSON, a list of pairs in binary. *)
 val assoc : 'a encoding -> (string * 'a) list encoding
 
 (** {3 Product descriptors} *)
 
 (** An enriched encoding to represent a component in a structured
-      type, augmenting the encoding with a name and whether it is a
-      required or optional. Fields are used to encode OCaml tuples as
-      objects in JSON, and as sequences in binary, using combinator
-      {!obj1} and the like. *)
+    type, augmenting the encoding with a name and whether it is a
+    required or optional. Fields are used to encode OCaml tuples as
+    objects in JSON, and as sequences in binary, using combinator
+    {!obj1} and the like. *)
 type 'a field
 
 (** Required field. *)
@@ -240,9 +239,9 @@ val req :
   ?title:string -> ?description:string -> string -> 't encoding -> 't field
 
 (** Optional field. Omitted entirely in JSON encoding if None.
-      Omitted in binary if the only optional field in a [`Variable]
-      encoding, otherwise a 1-byte prefix (`0` or `255`) tells if the
-      field is present or not. *)
+    Omitted in binary if the only optional field in a [`Variable]
+    encoding, otherwise a 1-byte prefix (`0` or `255`) tells if the
+    field is present or not. *)
 val opt :
   ?title:string ->
   ?description:string ->
@@ -251,7 +250,7 @@ val opt :
   't option field
 
 (** Optional field of variable length.
-      Only one can be present in a given object. *)
+    Only one can be present in a given object. *)
 val varopt :
   ?title:string ->
   ?description:string ->
@@ -260,8 +259,8 @@ val varopt :
   't option field
 
 (** Required field with a default value.
-      If the default value is passed, the field is omitted in JSON.
-      The value is always serialized in binary. *)
+    If the default value is passed, the field is omitted in JSON.
+    The value is always serialized in binary. *)
 val dft :
   ?title:string ->
   ?description:string ->
@@ -273,14 +272,14 @@ val dft :
 (** {4 Constructors for objects with N fields} *)
 
 (** These are serialized to binary by converting each internal
-      object to binary and placing them in the order of the original
-      object. These are serialized to JSON as a JSON object with the
-      field names. An object might only contains one 'variable'
-      field, typically the last one. If the encoding of more than one
-      field are 'variable', the first ones should be wrapped with
-      [dynamic_size].
+    object to binary and placing them in the order of the original
+    object. These are serialized to JSON as a JSON object with the
+    field names. An object might only contains one 'variable'
+    field, typically the last one. If the encoding of more than one
+    field are 'variable', the first ones should be wrapped with
+    [dynamic_size].
 
-      @raise Invalid_argument if more than one field is a variable one. *)
+    @raise Invalid_argument if more than one field is a variable one. *)
 
 val obj1 : 'f1 field -> 'f1 encoding
 
@@ -359,21 +358,21 @@ val obj10 :
   ('f1 * 'f2 * 'f3 * 'f4 * 'f5 * 'f6 * 'f7 * 'f8 * 'f9 * 'f10) encoding
 
 (** Create a larger object from the encodings of two smaller ones.
-      @raise Invalid_argument if both arguments are not objects  or if both
-      tuples contains a variable field.. *)
+    @raise Invalid_argument if both arguments are not objects  or if both
+    tuples contains a variable field.. *)
 val merge_objs : 'o1 encoding -> 'o2 encoding -> ('o1 * 'o2) encoding
 
 (** {4 Constructors for tuples with N fields} *)
 
 (** These are serialized to binary by converting each internal
-      object to binary and placing them in the order of the original
-      object. These are serialized to JSON as JSON arrays/lists.  Like
-      objects, a tuple might only contains one 'variable' field,
-      typically the last one. If the encoding of more than one field
-      are 'variable', the first ones should be wrapped with
-      [dynamic_size].
+    object to binary and placing them in the order of the original
+    object. These are serialized to JSON as JSON arrays/lists.  Like
+    objects, a tuple might only contains one 'variable' field,
+    typically the last one. If the encoding of more than one field
+    are 'variable', the first ones should be wrapped with
+    [dynamic_size].
 
-      @raise Invalid_argument if more than one field is a variable one. *)
+    @raise Invalid_argument if more than one field is a variable one. *)
 
 val tup1 : 'f1 encoding -> 'f1 encoding
 
@@ -453,65 +452,63 @@ val tup10 :
   ('f1 * 'f2 * 'f3 * 'f4 * 'f5 * 'f6 * 'f7 * 'f8 * 'f9 * 'f10) encoding
 
 (** Create a large tuple encoding from two smaller ones.
-      @raise Invalid_argument if both values are not tuples or if both
-      tuples contains a variable field. *)
+    @raise Invalid_argument if both values are not tuples or if both
+    tuples contains a variable field. *)
 val merge_tups : 'a1 encoding -> 'a2 encoding -> ('a1 * 'a2) encoding
 
 (** {3 Sum descriptors} *)
 
 (** A partial encoding to represent a case in a variant type.  Hides
-      the (existentially bound) type of the parameter to the specific
-      case, providing its encoder, and converter functions to and from
-      the union type. *)
+    the (existentially bound) type of the parameter to the specific
+    case, providing its encoder, and converter functions to and from
+    the union type. *)
 type 't case
 
 type case_tag = Tag of int | Json_only
 
 (** A sum descriptor can be optimized by providing a specific
-     [matching_function] which efficiently determines in which case
-     some value of type ['a] falls.
+   [matching_function] which efficiently determines in which case
+   some value of type ['a] falls.
 
-     Note that in general you should use a total function (i.e., one defined
-     over the whole of the ['a] type) for the [matching_function]. However, in
-     the case where you have a good reason to use a partial function, you should
-     raise {!No_case_matched} in the dead branches. Reasons why you may want to
-     do so include:
-     - ['a] is an open variant and you will complete the matching function
-       later, and
-     - there is a code invariant that guarantees that ['a] is not fully
-       inhabited.
-     *)
+   Note that in general you should use a total function (i.e., one defined
+   over the whole of the ['a] type) for the [matching_function]. However, in
+   the case where you have a good reason to use a partial function, you should
+   raise {!No_case_matched} in the dead branches. Reasons why you may want to
+   do so include:
+   - ['a] is an open variant and you will complete the matching function
+     later, and
+   - there is a code invariant that guarantees that ['a] is not fully
+     inhabited. *)
 type 'a matching_function = 'a -> match_result
 
 and match_result
 
 (** [matched t e u] represents the fact that a value is tagged with [t] and
-      carries the payload [u] which can be encoded with [e].
+    carries the payload [u] which can be encoded with [e].
 
-      The optional argument [tag_size] must match the one passed to the
-      {!matching} function [matched] is called inside of.
+    The optional argument [tag_size] must match the one passed to the
+    {!matching} function [matched] is called inside of.
 
-      An example is given in the documentation of {!matching}.
+    An example is given in the documentation of {!matching}.
 
-      @raise [Invalid_argument] if [t < 0]
+    @raise [Invalid_argument] if [t < 0]
 
-      @raise [Invalid_argument] if [t] does not fit in [tag_size] *)
+    @raise [Invalid_argument] if [t] does not fit in [tag_size] *)
 val matched : ?tag_size:tag_size -> int -> 'a encoding -> 'a -> match_result
 
 (** Encodes a variant constructor. Takes the encoding for the specific
-      parameters, a recognizer function that will extract the parameters
-      in case the expected case of the variant is being serialized, and
-      a constructor function for deserialization.
+    parameters, a recognizer function that will extract the parameters
+    in case the expected case of the variant is being serialized, and
+    a constructor function for deserialization.
 
-      The tag must be less than the tag size of the union in which you use the case.
-      An optional tag gives a name to a case and should be used to maintain
-      compatibility.
+    The tag must be less than the tag size of the union in which you use the case.
+    An optional tag gives a name to a case and should be used to maintain
+    compatibility.
 
-      An optional name for the case can be provided, which is used in the binary
-      documentation.
+    An optional name for the case can be provided, which is used in the binary
+    documentation.
 
-      @raise [Invalid_argument] if [case_tag] is [Tag t] with [t < 0]
-      *)
+    @raise [Invalid_argument] if [case_tag] is [Tag t] with [t < 0] *)
 val case :
   title:string ->
   ?description:string ->
@@ -523,34 +520,34 @@ val case :
 
 (** Create a single encoding from a series of cases.
 
-     In JSON, all cases are tried one after the other using the [case list]. The
-     caller is responsible for avoiding collisions. If there are collisions
-     (i.e., if multiple cases produce the same JSON output) then the encoding
-     and decoding processes might not be inverse of each other. In other words,
-     [destruct e (construct e v)] may not be equal to [v].
+    In JSON, all cases are tried one after the other using the [case list]. The
+    caller is responsible for avoiding collisions. If there are collisions
+    (i.e., if multiple cases produce the same JSON output) then the encoding
+    and decoding processes might not be inverse of each other. In other words,
+    [destruct e (construct e v)] may not be equal to [v].
 
-     In binary, a prefix tag is added to discriminate quickly between
-     cases. The default is [`Uint8] and you must use a [`Uint16] if
-     you are going to have more than 256 cases.
+    In binary, a prefix tag is added to discriminate quickly between
+    cases. The default is [`Uint8] and you must use a [`Uint16] if
+    you are going to have more than 256 cases.
 
-     The matching function is used during binary encoding of a value
-     [v] to efficiently determine which of the cases corresponds to
-     [v]. The case list is used during decoding to reconstruct a value based on
-     the encoded tag. (Decoding is optimised internally: tag look-up has a
-     constant cost.)
+    The matching function is used during binary encoding of a value
+    [v] to efficiently determine which of the cases corresponds to
+    [v]. The case list is used during decoding to reconstruct a value based on
+    the encoded tag. (Decoding is optimised internally: tag look-up has a
+    constant cost.)
 
-     The caller is responsible for ensuring that the [matching_function] and the
-     [case list] describe the same encoding. If they describe different
-     encodings, then the decoding and encoding processes will not be inverses of
-     each others. In other words, [of_bytes e (to_bytes e v)] will not be equal
-     to [v].
+    The caller is responsible for ensuring that the [matching_function] and the
+    [case list] describe the same encoding. If they describe different
+    encodings, then the decoding and encoding processes will not be inverses of
+    each others. In other words, [of_bytes e (to_bytes e v)] will not be equal
+    to [v].
 
-     If you do not wish to be responsible for this, you can use the unoptimised
-     {!union} that uses a [case list] only (see below). Beware that in {!union}
-     the complexity of the encoding is linear in the number of cases.
+    If you do not wish to be responsible for this, you can use the unoptimised
+    {!union} that uses a [case list] only (see below). Beware that in {!union}
+    the complexity of the encoding is linear in the number of cases.
 
-     Following: a basic example use. Note that the [matching_function] uses the
-     same tags, payload conversions, and payload encoding as the [case list].
+    Following: a basic example use. Note that the [matching_function] uses the
+    same tags, payload conversions, and payload encoding as the [case list].
 
 {[
 type t = A of string | B of int * int | C
@@ -582,38 +579,38 @@ let encoding_t =
     ]
 ]}
 
-     @raise [Invalid_argument] if it is given an empty [case list]
+    @raise [Invalid_argument] if it is given an empty [case list]
 
-     @raise [Invalid_argument] if there are more than one [case] with the same
-     [tag] in the [case list]
+    @raise [Invalid_argument] if there are more than one [case] with the same
+    [tag] in the [case list]
 
-     @raise [Invalid_argument] if there are more cases in the [case list] than
-     can fit in the [tag_size] *)
+    @raise [Invalid_argument] if there are more cases in the [case list] than
+    can fit in the [tag_size] *)
 val matching :
   ?tag_size:tag_size -> 't matching_function -> 't case list -> 't encoding
 
 (** Same as matching except that the matching function is
-      a linear traversal of the cases.
+    a linear traversal of the cases.
 
-     @raise [Invalid_argument] if it is given an empty [case list]
+    @raise [Invalid_argument] if it is given an empty [case list]
 
-     @raise [Invalid_argument] if there are more than one [case] with the same
-     [tag] in the [case list]
+    @raise [Invalid_argument] if there are more than one [case] with the same
+    [tag] in the [case list]
 
-     @raise [Invalid_argument] if there are more cases in the [case list] than
-     can fit in the [tag_size] *)
+    @raise [Invalid_argument] if there are more cases in the [case list] than
+    can fit in the [tag_size] *)
 val union : ?tag_size:tag_size -> 't case list -> 't encoding
 
 (** {3 Specialized descriptors} *)
 
 (** Encode enumeration via association list
-      - represented as a string in JSON and
-      - represented as an integer representing the element's position
-        in the list in binary. The integer size depends on the list size.*)
+    - represented as a string in JSON and
+    - represented as an integer representing the element's position
+      in the list in binary. The integer size depends on the list size.*)
 val string_enum : (string * 'a) list -> 'a encoding
 
 (** Create encodings that produce data of a fixed length when binary encoded.
-      See the preamble for an explanation. *)
+    See the preamble for an explanation. *)
 module Fixed : sig
   (** @raise Invalid_argument if the argument is less or equal to zero. *)
   val string : int -> string encoding
@@ -622,30 +619,30 @@ module Fixed : sig
   val bytes : int -> bytes encoding
 
   (** [add_padding e n] is a padded version of the encoding [e]. In Binary,
-        there are [n] null bytes ([\000]) added after the value encoded by [e].
-        In JSON, padding is ignored.
+      there are [n] null bytes ([\000]) added after the value encoded by [e].
+      In JSON, padding is ignored.
 
-        @raise Invalid_argument if [n <= 0]. *)
+      @raise Invalid_argument if [n <= 0]. *)
   val add_padding : 'a encoding -> int -> 'a encoding
 
   (** [list n e] is an encoding for lists of exactly [n] elements. If a list
-        of more or fewer elements is provided, then the encoding fails with the
-        [write_error List_invalid_length]. For decoding, it can fail with
-        [read_error Not_enough_data] or [read_error Extra_bytes], or it may
-        cause other failures further down the line when the AST traversal
-        becomes out-of-sync with the underlying byte-stream traversal.
+      of more or fewer elements is provided, then the encoding fails with the
+      [write_error List_invalid_length]. For decoding, it can fail with
+      [read_error Not_enough_data] or [read_error Extra_bytes], or it may
+      cause other failures further down the line when the AST traversal
+      becomes out-of-sync with the underlying byte-stream traversal.
 
-        The difference of the errors being used when encoding and decoding is
-        because when encoding we have access to the list and we can check the
-        actual length, whereas when decoding we only see bytes, sometimes too
-        many, sometimes not enough.
+      The difference of the errors being used when encoding and decoding is
+      because when encoding we have access to the list and we can check the
+      actual length, whereas when decoding we only see bytes, sometimes too
+      many, sometimes not enough.
 
-        This encoding has a narrow set of possible applications because it is
-        very restrictive. Still, it can to:
-        - mirror static guarantees about the length of some lists,
-        - special-case some common lengths of typical input in a union (see
-          example below),
-        - other ends.
+      This encoding has a narrow set of possible applications because it is
+      very restrictive. Still, it can to:
+      - mirror static guarantees about the length of some lists,
+      - special-case some common lengths of typical input in a union (see
+        example below),
+      - other ends.
 
 {[
 type expr =
@@ -678,26 +675,26 @@ let expr_encoding =
   )
 }]
 
-        Interestingly, the cases for known lengths can be generated
-        programmatically.
+      Interestingly, the cases for known lengths can be generated
+      programmatically.
 
-        @raise Invalid_argument if the argument [n] is less or equal to zero.
+      @raise Invalid_argument if the argument [n] is less or equal to zero.
 
-        @raise Invalid_argument if the argument [e] is a [`Variable]-size
-        encoding or a zero-byte encoding. *)
+      @raise Invalid_argument if the argument [e] is a [`Variable]-size
+      encoding or a zero-byte encoding. *)
   val list : int -> 'a encoding -> 'a list encoding
 
   (** See [list] above.
 
-        @raise Invalid_argument if the argument [n] is less or equal to zero.
+      @raise Invalid_argument if the argument [n] is less or equal to zero.
 
-        @raise Invalid_argument if the argument [e] is a [`Variable]-size
-        encoding or a zero-byte encoding. *)
+      @raise Invalid_argument if the argument [e] is a [`Variable]-size
+      encoding or a zero-byte encoding. *)
   val array : int -> 'a encoding -> 'a array encoding
 end
 
 (** Create encodings that produce data of a variable length when binary encoded.
-      See the preamble for an explanation. *)
+    See the preamble for an explanation. *)
 module Variable : sig
   val string : string encoding
 
@@ -708,18 +705,18 @@ module Variable : sig
   val array : ?max_length:int -> 'a encoding -> 'a array encoding
 
   (** @raise Invalid_argument if the encoding argument is variable length
-        or may lead to zero-width representation in binary. *)
+      or may lead to zero-width representation in binary. *)
   val list : ?max_length:int -> 'a encoding -> 'a list encoding
 end
 
 module Bounded : sig
   (** Encoding of a string whose length does not exceed the specified length.
-        The size field uses the smallest integer that can accommodate the
-        maximum size - e.g., [`Uint8] for very short strings, [`Uint16] for
-        longer strings, etc.
+      The size field uses the smallest integer that can accommodate the
+      maximum size - e.g., [`Uint8] for very short strings, [`Uint16] for
+      longer strings, etc.
 
-        Attempting to construct a string with a length that is too long causes
-        an [Invalid_argument] exception. *)
+      Attempting to construct a string with a length that is too long causes
+      an [Invalid_argument] exception. *)
   val string : int -> string encoding
 
   (** See {!string} above. *)
@@ -727,9 +724,9 @@ module Bounded : sig
 end
 
 (** Mark an encoding as being of dynamic size.
-      Forces the size to be stored alongside content when needed.
-      Typically used to combine two variable encodings in a same
-      objects or tuple, or to use a variable encoding in an array or a list. *)
+    Forces the size to be stored alongside content when needed.
+    Typically used to combine two variable encodings in a same
+    objects or tuple, or to use a variable encoding in an array or a list. *)
 val dynamic_size :
   ?kind:[`Uint30 | `Uint16 | `Uint8] -> 'a encoding -> 'a encoding
 
@@ -779,8 +776,8 @@ val lazy_encoding : 'a encoding -> 'a lazy_t encoding
 val force_decode : 'a lazy_t -> 'a option
 
 (** Obtain the bytes without actually deserializing.  Will serialize
-      and memoize the result if the value is not the result of a lazy
-      deserialization. *)
+    and memoize the result if the value is not the result of a lazy
+    deserialization. *)
 val force_bytes : 'a lazy_t -> bytes
 
 (** Make a lazy value from an immediate one. *)
@@ -895,7 +892,7 @@ module Compact : sig
   (** {1 Combinators} *)
 
   (** Similarly to [Data_encoding], we provide various combinators to
-        compose compact encoding together. *)
+      compose compact encoding together. *)
 
   (** {2 Base types} *)
 
