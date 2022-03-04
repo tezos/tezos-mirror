@@ -27,9 +27,7 @@ include module type of struct
   include Tezos_stdlib
 end
 
-module Error_monad : module type of struct
-  include Tezos_error_monad.Error_monad
-end
+module Error_monad = Tezos_error_monad.Error_monad
 
 include module type of Tezos_rpc
 
@@ -37,36 +35,24 @@ include module type of Tezos_clic
 
 include module type of Tezos_crypto
 
-module Data_encoding : module type of struct
-  include Data_encoding
-end
+module Data_encoding = Data_encoding
 
 (** The following modules are part of [TzLwtreslib]. We just remove
     - the [Monad] module (already available, with some name simplifications,
       from [Error_monad]), and
     - the [List] module (exported just afterwards with a small addition). *)
-module Hashtbl : module type of Tezos_error_monad.TzLwtreslib.Hashtbl
+module Hashtbl = Tezos_error_monad.TzLwtreslib.Hashtbl
 
-module Map : module type of Tezos_error_monad.TzLwtreslib.Map
-
-module Option : module type of Tezos_error_monad.TzLwtreslib.Option
-
-module Result : module type of Tezos_error_monad.TzLwtreslib.Result
-
-module Seq : module type of Tezos_error_monad.TzLwtreslib.Seq
-
-module Seq_e : module type of Tezos_error_monad.TzLwtreslib.Seq_e
-
-module Seq_s : module type of Tezos_error_monad.TzLwtreslib.Seq_s
-
-module Seq_es : module type of Tezos_error_monad.TzLwtreslib.Seq_es
-
-module Set : module type of Tezos_error_monad.TzLwtreslib.Set
-
-module Unit : module type of Tezos_error_monad.TzLwtreslib.Unit
-
-module WithExceptions :
-    module type of Tezos_error_monad.TzLwtreslib.WithExceptions
+module Map = Tezos_error_monad.TzLwtreslib.Map
+module Option = Tezos_error_monad.TzLwtreslib.Option
+module Result = Tezos_error_monad.TzLwtreslib.Result
+module Seq = Tezos_error_monad.TzLwtreslib.Seq
+module Seq_e = Tezos_error_monad.TzLwtreslib.Seq_e
+module Seq_s = Tezos_error_monad.TzLwtreslib.Seq_s
+module Seq_es = Tezos_error_monad.TzLwtreslib.Seq_es
+module Set = Tezos_error_monad.TzLwtreslib.Set
+module Unit = Tezos_error_monad.TzLwtreslib.Unit
+module WithExceptions = Tezos_error_monad.TzLwtreslib.WithExceptions
 
 module List : sig
   include module type of Tezos_stdlib.TzList
