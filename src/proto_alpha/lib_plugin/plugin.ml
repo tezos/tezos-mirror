@@ -771,7 +771,7 @@ module Mempool = struct
       (function Consensus_operation_in_far_future -> Some () | _ -> None)
       (fun () -> Consensus_operation_in_far_future)
 
-  (** {2} consensus operation filtering.
+  (** {2 consensus operation filtering}
 
      In Tenderbake, we increased a lot the number of consensus
       operations, therefore it seems necessary to be able to filter consensus
