@@ -1349,8 +1349,11 @@ and ('input, 'output) view_signature =
       -> ('input, 'output) view_signature
 
 and 'kind manager_operation =
-  | Transaction :
-      Alpha_context.transaction
+  | Transaction : {
+      transaction : Alpha_context.transaction;
+      parameters_ty : 'a ty;
+      parameters : 'a;
+    }
       -> Kind.transaction manager_operation
   | Origination :
       Alpha_context.origination

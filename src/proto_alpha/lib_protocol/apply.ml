@@ -1256,15 +1256,15 @@ let apply_internal_manager_operation_content :
   >>=? fun (ctxt, before_operation, consume_deserialization_gas) ->
   match operation with
   | Transaction
-      {amount; parameters; destination = Contract contract; entrypoint} ->
-      Script.force_decode_in_context
-        ~consume_deserialization_gas
-        ctxt
-        parameters
-      >>?= fun (parameters, ctxt) ->
+      {
+        transaction =
+          {amount; parameters = _; destination = Contract contract; entrypoint};
+        parameters_ty;
+        parameters = typed_parameters;
+      } ->
       apply_transaction
         ~ctxt
-        ~parameter:(Untyped_arg parameters)
+        ~parameter:(Typed_arg (parameters_ty, typed_parameters))
         ~source
         ~contract
         ~amount
@@ -1278,7 +1278,13 @@ let apply_internal_manager_operation_content :
       ( ctxt,
         (manager_result : kind successful_manager_operation_result),
         operations )
-  | Transaction {amount; parameters; destination = Tx_rollup dst; entrypoint} ->
+  | Transaction
+      {
+        transaction =
+          {amount; parameters; destination = Tx_rollup dst; entrypoint};
+        parameters_ty = _;
+        parameters = _;
+      } ->
       apply_transaction_to_rollup
         ~consume_deserialization_gas
         ~ctxt
@@ -1435,25 +1441,26 @@ let apply_external_manager_operation_content :
          this ticket is owns by the tx_rollup *)
       (* Now reconstruct the ticket sent as the parameter
           destination. *)
-      ( Script_ir_translator.parse_comparable_ty ctxt (Micheline.root ty)
+      Script_ir_translator.parse_comparable_ty ctxt (Micheline.root ty)
       >>?= fun (Ex_comparable_ty ty, ctxt) ->
-        Script_ir_translator.parse_comparable_data
-          ctxt
-          ty
-          (Micheline.root contents)
-        >>=? fun (contents, ctxt) ->
-        let amount =
-          Option.value
-            ~default:Script_int.zero_n
-            Script_int.(is_nat @@ of_int64 @@ Tx_rollup_l2_qty.to_int64 amount)
-        in
-        let ticket = Script_typed_ir.{ticketer; contents; amount} in
-        Script_typed_ir.ticket_t Micheline.dummy_location ty >>?= fun ty ->
-        return (ticket, ty, ctxt) >>=? fun (ticket, ticket_ty, ctxt) ->
-        Script_ir_translator.unparse_data ctxt Optimized ticket_ty ticket
-        >|=? fun (parameters, ctxt) ->
-        (Script.lazy_expr (Micheline.strip_locations parameters), ctxt) )
+      Script_ir_translator.parse_comparable_data
+        ctxt
+        ty
+        (Micheline.root contents)
+      >>=? fun (contents, ctxt) ->
+      let amount =
+        Option.value
+          ~default:Script_int.zero_n
+          Script_int.(is_nat @@ of_int64 @@ Tx_rollup_l2_qty.to_int64 amount)
+      in
+      let ticket = Script_typed_ir.{ticketer; contents; amount} in
+      Script_typed_ir.ticket_t Micheline.dummy_location ty >>?= fun ty ->
+      return (ticket, ty, ctxt) >>=? fun (ticket, ticket_ty, ctxt) ->
+      Script_ir_translator.unparse_data ctxt Optimized ticket_ty ticket
       >>=? fun (parameters, ctxt) ->
+      let parameters =
+        Script.lazy_expr (Micheline.strip_locations parameters)
+      in
       (* FIXME/TORU: #2488 the returned op will fail when ticket hardening is
          merged, it must be commented or fixed *)
       let op =
@@ -1465,10 +1472,15 @@ let apply_external_manager_operation_content :
             operation =
               Transaction
                 {
-                  amount = Tez.zero;
-                  parameters;
-                  destination = Contract destination;
-                  entrypoint;
+                  transaction =
+                    {
+                      amount = Tez.zero;
+                      parameters;
+                      destination = Contract destination;
+                      entrypoint;
+                    };
+                  parameters_ty = ticket_ty;
+                  parameters = ticket;
                 };
           }
       in

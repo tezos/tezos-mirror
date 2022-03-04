@@ -1465,7 +1465,10 @@ module View_helpers = struct
     match operations with
     | [
      Script_typed_ir.Internal_operation
-       {operation = Transaction {destination; parameters; _}; _};
+       {
+         operation = Transaction {transaction = {destination; parameters; _}; _};
+         _;
+       };
     ]
       when Destination.equal destination (Contract callback) ->
         ok parameters

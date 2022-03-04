@@ -247,13 +247,17 @@ let tickets_of_operation ctxt
   match operation with
   | Transaction
       {
-        amount = _;
-        parameters;
-        entrypoint;
-        destination = Destination.Contract destination;
+        transaction =
+          {
+            amount = _;
+            parameters;
+            entrypoint;
+            destination = Destination.Contract destination;
+          };
+        _;
       } ->
       tickets_of_transaction ctxt ~destination ~parameters ~entrypoint
-  | Transaction {destination = Destination.Tx_rollup _; _} ->
+  | Transaction {transaction = {destination = Destination.Tx_rollup _; _}; _} ->
       (* TODO: #2488
          The ticket accounting for the recipient of rollup transactions
          is currently done in the apply function, but should rather be
