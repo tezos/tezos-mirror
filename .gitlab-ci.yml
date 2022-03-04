@@ -32,10 +32,10 @@ stages:
   - sanity
   - build
   - test
+  - test_coverage
   - doc
   - build_release
   - publish_release
-  - test_coverage
   - manual
 
 # All the jobs belonging to a stage X should be in
