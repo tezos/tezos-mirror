@@ -1498,10 +1498,23 @@ module RPC = struct
     let register0_fullctxt ~chunked s f =
       patched_services :=
         RPC_directory.register ~chunked !patched_services s (fun ctxt q i ->
-            Services_registration.rpc_init ctxt >>=? fun ctxt -> f ctxt q i)
+            Services_registration.rpc_init ctxt `Head_level >>=? fun ctxt ->
+            f ctxt q i)
 
     let register0 ~chunked s f =
       register0_fullctxt ~chunked s (fun {context; _} -> f context)
+
+    let register0_fullctxt_successor_level ~chunked s f =
+      patched_services :=
+        RPC_directory.register ~chunked !patched_services s (fun ctxt q i ->
+            let mode =
+              if q#successor_level then `Successor_level else `Head_level
+            in
+            Services_registration.rpc_init ctxt mode >>=? fun ctxt -> f ctxt q i)
+
+    let register0_successor_level ~chunked s f =
+      register0_fullctxt_successor_level ~chunked s (fun {context; _} ->
+          f context)
 
     let register0_noctxt ~chunked s f =
       patched_services :=
@@ -1510,7 +1523,8 @@ module RPC = struct
     let opt_register0_fullctxt ~chunked s f =
       patched_services :=
         RPC_directory.opt_register ~chunked !patched_services s (fun ctxt q i ->
-            Services_registration.rpc_init ctxt >>=? fun ctxt -> f ctxt q i)
+            Services_registration.rpc_init ctxt `Head_level >>=? fun ctxt ->
+            f ctxt q i)
 
     let opt_register0 ~chunked s f =
       opt_register0_fullctxt ~chunked s (fun {context; _} -> f context)
@@ -1522,7 +1536,8 @@ module RPC = struct
           !patched_services
           s
           (fun (ctxt, arg) q i ->
-            Services_registration.rpc_init ctxt >>=? fun ctxt -> f ctxt arg q i)
+            Services_registration.rpc_init ctxt `Head_level >>=? fun ctxt ->
+            f ctxt arg q i)
 
     let register1 ~chunked s f =
       register1_fullctxt ~chunked s (fun {context; _} x -> f context x)
@@ -1534,7 +1549,7 @@ module RPC = struct
           !patched_services
           s
           (fun ((ctxt, arg1), arg2) q i ->
-            Services_registration.rpc_init ctxt >>=? fun ctxt ->
+            Services_registration.rpc_init ctxt `Head_level >>=? fun ctxt ->
             f ctxt arg1 arg2 q i)
 
     let register2 ~chunked s f =
@@ -1774,10 +1789,24 @@ module RPC = struct
           ~output:Apply_results.operation_data_and_metadata_encoding
           RPC_path.(path / "run_operation")
 
+      let simulate_query =
+        let open RPC_query in
+        query (fun successor_level ->
+            object
+              method successor_level = successor_level
+            end)
+        |+ flag
+             ~descr:
+               "If true, the simulation is done on the successor level of the \
+                current context."
+             "successor_level"
+             (fun t -> t#successor_level)
+        |> seal
+
       let simulate_operation =
         RPC_service.post_service
           ~description:"Simulate an operation"
-          ~query:RPC_query.empty
+          ~query:simulate_query
           ~input:
             (obj4
                (opt "blocks_before_activation" int32)
@@ -1786,6 +1815,19 @@ module RPC = struct
                (dft "latency" int16 default_operation_inclusion_latency))
           ~output:Apply_results.operation_data_and_metadata_encoding
           RPC_path.(path / "simulate_operation")
+
+      let simulate_tx_rollup_operation =
+        RPC_service.post_service
+          ~description:"Simulate a tx rollup operation"
+          ~query:RPC_query.empty
+          ~input:
+            (obj4
+               (opt "blocks_before_activation" int32)
+               (req "operation" Operation.encoding)
+               (req "chain_id" Chain_id.encoding)
+               (dft "latency" int16 default_operation_inclusion_latency))
+          ~output:Apply_results.operation_data_and_metadata_encoding
+          RPC_path.(path / "simulate_tx_rollup_operation")
 
       let entrypoint_type =
         RPC_service.post_service
@@ -2107,7 +2149,8 @@ module RPC = struct
        time of the operation.
 
     *)
-    let simulate_operation_service ctxt ()
+    let simulate_operation_service ctxt
+        (_simulate_query : < successor_level : bool >)
         (blocks_before_activation, op, chain_id, time_in_blocks) =
       Cache.Admin.future_cache_expectation
         ctxt
@@ -2543,7 +2586,7 @@ module RPC = struct
           let normalized = Unparse_types.unparse_ty ~loc:() typ in
           return @@ Micheline.strip_locations normalized) ;
       Registration.register0 ~chunked:true S.run_operation run_operation_service ;
-      Registration.register0
+      Registration.register0_successor_level
         ~chunked:true
         S.simulate_operation
         simulate_operation_service ;
@@ -2681,13 +2724,15 @@ module RPC = struct
     let run_operation ~op ~chain_id ctxt block =
       RPC_context.make_call0 S.run_operation ctxt block () (op, chain_id)
 
-    let simulate_operation ~op ~chain_id ~latency ?blocks_before_activation ctxt
-        block =
+    let simulate_operation ~op ~chain_id ~latency ?(successor_level = false)
+        ?blocks_before_activation ctxt block =
       RPC_context.make_call0
         S.simulate_operation
         ctxt
         block
-        ()
+        (object
+           method successor_level = successor_level
+        end)
         (blocks_before_activation, op, chain_id, latency)
 
     let entrypoint_type ~script ~entrypoint ctxt block =

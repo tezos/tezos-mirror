@@ -44,7 +44,25 @@ type rpc_context = {
   context : t;
 }
 
-val rpc_init : Updater.rpc_context -> rpc_context Error_monad.tzresult Lwt.t
+(** [rpc_init rpc_context mode] allows to instantiate an [rpc_context]
+   using the [Alpha_context] representation from a raw context
+   representation (the one the shell knows).
+
+    If [mode = `Head_level], the [Alpha_context] uses the same level
+   as the head of the chain (given by [rpc_context.block_header).
+
+    If [mode= `Successor_level], the [Alpha_context] uses the
+   successor level of the head.
+
+    This function aims to be used by RPCs, in particular by RPCs which
+   simulate an operation to determine the fees/gas of an
+   operation. Using the [`Head_level] can be dangerous if some storage
+   paths depend on the level. Using the successor level allows to
+   ensure that the simulation is done on a fresh level. *)
+val rpc_init :
+  Updater.rpc_context ->
+  [`Head_level | `Successor_level] ->
+  rpc_context Error_monad.tzresult Lwt.t
 
 val register0 :
   chunked:bool ->

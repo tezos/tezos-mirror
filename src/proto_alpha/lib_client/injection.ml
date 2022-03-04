@@ -281,7 +281,8 @@ let preapply (type t) (cctxt : #Protocol_client_context.full) ~chain ~block
   | _ -> failwith "Unexpected result"
 
 let simulate (type t) (cctxt : #Protocol_client_context.full) ~chain ~block
-    ?branch ?(latency = Plugin.default_operation_inclusion_latency)
+    ?(successor_level = false) ?branch
+    ?(latency = Plugin.default_operation_inclusion_latency)
     (contents : t contents_list) =
   get_branch cctxt ~chain ~block branch >>=? fun (_chain_id, branch) ->
   let op : _ Operation.t =
@@ -292,6 +293,7 @@ let simulate (type t) (cctxt : #Protocol_client_context.full) ~chain ~block
   Plugin.RPC.Scripts.simulate_operation
     cctxt
     (chain, block)
+    ~successor_level
     ~op:(Operation.pack op)
     ~chain_id
     ~latency
@@ -546,7 +548,7 @@ let safety_guard = Gas.Arith.(integral_of_int_exn 100)
 *)
 
 let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
-    ~fee_parameter ~chain ~block ?branch
+    ~fee_parameter ~chain ~block ?successor_level ?branch
     (annotated_contents : kind Annotated_manager_operation.annotated_list) :
     kind Kind.manager contents_list tzresult Lwt.t =
   Tezos_client_base.Client_confirmations.wait_for_bootstrapped cctxt
@@ -829,7 +831,13 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
         (Annotated_manager_operation.manager_list_from_annotated
            annotated_for_simulation)
       >>=? fun contents_for_simulation ->
-      simulate cctxt ~chain ~block ?branch contents_for_simulation
+      simulate
+        cctxt
+        ~chain
+        ~block
+        ?successor_level
+        ?branch
+        contents_for_simulation
       >>=? fun (_, _, result) ->
       (match detect_script_failure result with
       | Ok () -> return_unit
@@ -892,9 +900,11 @@ let tenderbake_adjust_confirmations (cctxt : #Client_context.full) = function
    were tenderbake_finality_confirmations.
  *)
 let inject_operation_internal (type kind) cctxt ~chain ~block ?confirmations
-    ?(dry_run = false) ?(simulation = false) ?(force = false) ?branch ?src_sk
-    ?verbose_signing ~fee_parameter (contents : kind contents_list) =
-  (if simulation then simulate cctxt ~chain ~block ?branch contents
+    ?(dry_run = false) ?(simulation = false) ?(force = false) ?successor_level
+    ?branch ?src_sk ?verbose_signing ~fee_parameter
+    (contents : kind contents_list) =
+  (if simulation then
+   simulate cctxt ~chain ~block ?successor_level ?branch contents
   else
     preapply
       cctxt
@@ -1015,8 +1025,8 @@ let inject_operation_internal (type kind) cctxt ~chain ~block ?confirmations
     >>= fun () -> return (oph, op.protocol_data.contents, result.contents)
 
 let inject_operation (type kind) cctxt ~chain ~block ?confirmations
-    ?(dry_run = false) ?(simulation = false) ?branch ?src_sk ?verbose_signing
-    ~fee_parameter (contents : kind contents_list) =
+    ?(dry_run = false) ?(simulation = false) ?successor_level ?branch ?src_sk
+    ?verbose_signing ~fee_parameter (contents : kind contents_list) =
   Tezos_client_base.Client_confirmations.wait_for_bootstrapped cctxt
   >>=? fun () ->
   inject_operation_internal
@@ -1026,6 +1036,7 @@ let inject_operation (type kind) cctxt ~chain ~block ?confirmations
     ?confirmations
     ~dry_run
     ~simulation
+    ?successor_level
     ?branch
     ?src_sk
     ?verbose_signing
@@ -1224,10 +1235,11 @@ let may_replace_operation (type kind) (cctxt : #full) chain from
   else (* No replace by fees requested *)
     Lwt.return_ok contents
 
-let inject_manager_operation cctxt ~chain ~block ?branch ?confirmations ?dry_run
-    ?verbose_signing ?simulation ?force ~source ~src_pk ~src_sk ~fee ~gas_limit
-    ~storage_limit ?counter ?(replace_by_fees = false) ~fee_parameter
-    (type kind) (operations : kind Annotated_manager_operation.annotated_list) :
+let inject_manager_operation cctxt ~chain ~block ?successor_level ?branch
+    ?confirmations ?dry_run ?verbose_signing ?simulation ?force ~source ~src_pk
+    ~src_sk ~fee ~gas_limit ~storage_limit ?counter ?(replace_by_fees = false)
+    ~fee_parameter (type kind)
+    (operations : kind Annotated_manager_operation.annotated_list) :
     (Operation_hash.t
     * kind Kind.manager contents_list
     * kind Kind.manager contents_result_list)
@@ -1289,7 +1301,14 @@ let inject_manager_operation cctxt ~chain ~block ?branch ?confirmations ?dry_run
       Annotated_manager_operation.set_counter counter reveal >>?= fun reveal ->
       build_contents (Z.succ counter) operations >>?= fun rest ->
       let contents = Annotated_manager_operation.Cons_manager (reveal, rest) in
-      may_patch_limits cctxt ~fee_parameter ~chain ~block ?branch contents
+      may_patch_limits
+        cctxt
+        ~fee_parameter
+        ~chain
+        ~block
+        ?successor_level
+        ?branch
+        contents
       >>=? may_replace_operation
              cctxt
              chain
@@ -1307,6 +1326,7 @@ let inject_manager_operation cctxt ~chain ~block ?branch ?confirmations ?dry_run
         ?force
         ~fee_parameter
         ?verbose_signing
+        ?successor_level
         ?branch
         ~src_sk
         contents
@@ -1320,7 +1340,14 @@ let inject_manager_operation cctxt ~chain ~block ?branch ?confirmations ?dry_run
       failwith "The manager key was previously revealed."
   | _ ->
       build_contents counter operations >>?= fun contents ->
-      may_patch_limits cctxt ~fee_parameter ~chain ~block ?branch contents
+      may_patch_limits
+        cctxt
+        ~fee_parameter
+        ~chain
+        ~block
+        ?successor_level
+        ?branch
+        contents
       >>=? may_replace_operation
              cctxt
              chain
@@ -1338,6 +1365,7 @@ let inject_manager_operation cctxt ~chain ~block ?branch ?confirmations ?dry_run
         ?simulation
         ?force
         ~fee_parameter
+        ?successor_level
         ?branch
         ~src_sk
         contents
