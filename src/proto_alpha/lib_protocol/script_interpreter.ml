@@ -1704,6 +1704,10 @@ let step logger ctxt step_constants descr stack =
    ====================
 
 *)
+type execution_arg =
+  | Typed_arg : 'a Script_typed_ir.ty * 'a -> execution_arg
+  | Untyped_arg : Script.expr -> execution_arg
+
 type execution_result = {
   ctxt : context;
   storage : Script.expr;
@@ -1712,9 +1716,8 @@ type execution_result = {
   ticket_diffs : Z.t Ticket_token_map.t;
 }
 
-let execute logger ctxt mode step_constants ~entrypoint ~internal
-    unparsed_script cached_script arg :
-    (execution_result * (ex_script * int)) tzresult Lwt.t =
+let execute_any_arg logger ctxt mode step_constants ~entrypoint ~internal
+    unparsed_script cached_script arg =
   (match cached_script with
   | None ->
       parse_script
@@ -1740,11 +1743,24 @@ let execute logger ctxt mode step_constants ~entrypoint ~internal
   >>?= fun (r, ctxt) ->
   record_trace (Bad_contract_parameter step_constants.self) r
   >>?= fun (Ex_ty_cstr (entrypoint_ty, box)) ->
-  trace
-    (Bad_contract_parameter step_constants.self)
-    (parse_data ctxt ~legacy:false ~allow_forged:internal entrypoint_ty arg)
+  (match arg with
+  | Untyped_arg arg ->
+      let arg = Micheline.root arg in
+      trace
+        (Bad_contract_parameter step_constants.self)
+        (parse_data ctxt ~legacy:false ~allow_forged:internal entrypoint_ty arg)
+      >>=? fun (parsed_arg, ctxt) -> return (box parsed_arg, ctxt)
+  | Typed_arg (parsed_arg_ty, parsed_arg) ->
+      Gas_monad.run
+        ctxt
+        (Script_ir_translator.ty_eq
+           ~error_details:Informative
+           Micheline.dummy_location
+           entrypoint_ty
+           parsed_arg_ty)
+      >>?= fun (res, ctxt) ->
+      res >>?= fun Eq -> return (box parsed_arg, ctxt))
   >>=? fun (arg, ctxt) ->
-  let arg = box arg in
   Script_ir_translator.collect_lazy_storage ctxt arg_type arg
   >>?= fun (to_duplicate, ctxt) ->
   Script_ir_translator.collect_lazy_storage ctxt storage_type old_storage
@@ -1819,7 +1835,7 @@ let execute logger ctxt mode step_constants ~entrypoint ~internal
 
 let execute ?logger ctxt ~cached_script mode step_constants ~script ~entrypoint
     ~parameter ~internal =
-  execute
+  execute_any_arg
     logger
     ctxt
     mode
@@ -1828,7 +1844,7 @@ let execute ?logger ctxt ~cached_script mode step_constants ~script ~entrypoint
     ~internal
     script
     cached_script
-    (Micheline.root parameter)
+    (Untyped_arg parameter)
 
 (*
 
