@@ -29,6 +29,14 @@ module Worker : sig
   val update : t -> Worker_types.request_status -> unit
 end
 
+module Distributed_db : sig
+  type t = {table_length : Prometheus.Gauge.t}
+
+  val init : kind:string -> entry_type:string -> t
+
+  val update : t -> length:int -> unit
+end
+
 module Block_validator : sig
   type t = {
     already_commited_blocks_count : Prometheus.Counter.t;

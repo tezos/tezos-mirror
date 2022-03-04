@@ -101,21 +101,40 @@ module Make_raw
   end
 
   module Monitored_memory_table = struct
-    type 'a t = 'a Memory_table.t
+    type 'a t = {
+      table : 'a Memory_table.t;
+      metrics : Shell_metrics.Distributed_db.t;
+    }
 
-    let create ~entry_type:_ ?random s = Memory_table.create ?random s
+    let create ~entry_type ?random s =
+      {
+        table = Memory_table.create ?random s;
+        metrics = Shell_metrics.Distributed_db.init ~kind:Hash.name ~entry_type;
+      }
 
-    let find = Memory_table.find
+    let find t x = Memory_table.find t.table x
 
-    let add = Memory_table.add
+    let add t k x =
+      Memory_table.add t.table k x ;
+      Shell_metrics.Distributed_db.update
+        t.metrics
+        ~length:(Memory_table.length t.table)
 
-    let replace = Memory_table.replace
+    let replace t k x =
+      Memory_table.replace t.table k x ;
+      Shell_metrics.Distributed_db.update
+        t.metrics
+        ~length:(Memory_table.length t.table)
 
-    let remove = Memory_table.remove
+    let remove t k =
+      Memory_table.remove t.table k ;
+      Shell_metrics.Distributed_db.update
+        t.metrics
+        ~length:(Memory_table.length t.table)
 
-    let length = Memory_table.length
+    let length t = Memory_table.length t.table
 
-    let fold = Memory_table.fold
+    let fold f t x = Memory_table.fold f t.table x
   end
 
   module Table =
