@@ -34,6 +34,7 @@
 
 open Protocol
 open Alpha_context
+open Script_typed_ir
 
 (** A local non-private type that mirrors
     [Ticket_operations_diff.ticket_token_diff]. *)
@@ -259,20 +260,39 @@ let originate block ~src ~baker ~script ~storage ~forges_tickets =
   in
   return (orig_contract, incr)
 
-let transfer_operation ~src ~destination ~parameters =
-  Script_typed_ir.Internal_operation
-    {
-      source = src;
-      operation =
-        Transaction
-          {
-            amount = Tez.zero;
-            parameters = Script.lazy_expr @@ Expr.from_string parameters;
-            entrypoint = Entrypoint.default;
-            destination = Destination.Contract destination;
-          };
-      nonce = 1;
-    }
+let transfer_operation ~incr ~src ~destination ~parameters_ty ~parameters =
+  let open Lwt_tzresult_syntax in
+  let ctxt = Incremental.alpha_ctxt incr in
+  let* (params_node, ctxt) =
+    wrap
+      (Script_ir_translator.unparse_data
+         ctxt
+         Script_ir_translator.Readable
+         parameters_ty
+         parameters)
+  in
+  let incr = Incremental.set_alpha_ctxt incr ctxt in
+  return
+    ( Script_typed_ir.Internal_operation
+        {
+          source = src;
+          operation =
+            Transaction
+              {
+                transaction =
+                  {
+                    amount = Tez.zero;
+                    parameters =
+                      Script.lazy_expr @@ Micheline.strip_locations params_node;
+                    entrypoint = Entrypoint.default;
+                    destination = Destination.Contract destination;
+                  };
+                parameters_ty;
+                parameters;
+              };
+          nonce = 1;
+        },
+      incr )
 
 let ticket_diffs_of_operations incr operations =
   wrap
@@ -301,6 +321,24 @@ let ticket_big_map_script =
         code { CAR; NIL operation ; PAIR } }
   |}
 
+let list_ticket_string_ty =
+  ticket_t Micheline.dummy_location string_key >>? fun ticket_ty ->
+  list_t Micheline.dummy_location ticket_ty
+
+let make_ticket (ticketer, contents, amount) =
+  Script_string.of_string contents >>?= fun contents ->
+  return {ticketer; contents; amount = nat amount}
+
+let make_tickets ts =
+  let* elements = List.map_es make_ticket ts in
+  return {elements; length = List.length elements}
+
+let transfer_tickets_operation ~incr ~src ~destination tickets =
+  let open Lwt_tzresult_syntax in
+  let*? parameters_ty = Environment.wrap_tzresult list_ticket_string_ty in
+  let* parameters = wrap @@ make_tickets tickets in
+  transfer_operation ~incr ~src ~destination ~parameters_ty ~parameters
+
 (** Test that no tickets are returned for operations that do not contain
     tickets. *)
 let test_non_ticket_operations () =
@@ -322,8 +360,13 @@ let test_transfer_to_non_ticket_contract () =
       ~storage:"Unit"
       ~forges_tickets:false
   in
-  let operation =
-    transfer_operation ~src ~destination:orig_contract ~parameters:"Unit"
+  let* (operation, incr) =
+    transfer_operation
+      ~incr
+      ~src
+      ~destination:orig_contract
+      ~parameters_ty:unit_t
+      ~parameters:()
   in
   let* (ticket_diffs, ctxt) = ticket_diffs_of_operations incr [operation] in
   assert_equal_ticket_token_diffs ctxt ~loc:__LOC__ ticket_diffs ~expected:[]
@@ -340,8 +383,8 @@ let test_transfer_empty_ticket_list () =
       ~storage:"{}"
       ~forges_tickets:false
   in
-  let operation =
-    transfer_operation ~src ~destination:orig_contract ~parameters:"{}"
+  let* (operation, incr) =
+    transfer_tickets_operation ~incr ~src ~destination:orig_contract []
   in
   let* (ticket_diffs, ctxt) = ticket_diffs_of_operations incr [operation] in
   assert_equal_ticket_token_diffs ctxt ~loc:__LOC__ ticket_diffs ~expected:[]
@@ -359,11 +402,12 @@ let test_transfer_one_ticket () =
       ~storage:"{}"
       ~forges_tickets:false
   in
-  let parameters =
-    Printf.sprintf {|{Pair %S "white" 1}|} (Contract.to_b58check ticketer)
-  in
-  let operation =
-    transfer_operation ~src ~destination:orig_contract ~parameters
+  let* (operation, incr) =
+    transfer_tickets_operation
+      ~incr
+      ~src
+      ~destination:orig_contract
+      [(ticketer, "white", 1)]
   in
   let* (ticket_diffs, ctxt) = ticket_diffs_of_operations incr [operation] in
   assert_equal_ticket_token_diffs
@@ -392,22 +436,17 @@ let test_transfer_multiple_tickets () =
       ~storage:"{}"
       ~forges_tickets:false
   in
-  let operation =
-    let parameters =
-      let ticketer_addr = Contract.to_b58check ticketer in
-      Printf.sprintf
-        {|{
-        Pair %S "red" 1;
-        Pair %S "blue" 2 ;
-        Pair %S "green" 3;
-        Pair %S "red" 4;}
-      |}
-        ticketer_addr
-        ticketer_addr
-        ticketer_addr
-        ticketer_addr
-    in
-    transfer_operation ~src ~destination:orig_contract ~parameters
+  let* (operation, incr) =
+    transfer_tickets_operation
+      ~incr
+      ~src
+      ~destination:orig_contract
+      [
+        (ticketer, "red", 1);
+        (ticketer, "blue", 2);
+        (ticketer, "green", 3);
+        (ticketer, "red", 4);
+      ]
   in
   let* (ticket_diffs, ctxt) = ticket_diffs_of_operations incr [operation] in
   assert_equal_ticket_token_diffs
@@ -437,31 +476,6 @@ let test_transfer_multiple_tickets () =
 let test_transfer_different_tickets () =
   let* (baker, src, block) = init () in
   let* (ticketer1, ticketer2) = two_ticketers block in
-  let parameters =
-    let ticketer1_addr = Contract.to_b58check ticketer1 in
-    let ticketer2_addr = Contract.to_b58check ticketer2 in
-    Printf.sprintf
-      {|{
-          Pair %S "red" 1;
-          Pair %S "green" 1;
-          Pair %S "blue" 1;
-          Pair %S "red" 1;
-          Pair %S "green" 1;
-          Pair %S "blue" 1 ;
-          Pair %S "red" 1;
-          Pair %S "green" 1;
-          Pair %S "blue" 1; }
-      |}
-      ticketer1_addr
-      ticketer1_addr
-      ticketer1_addr
-      ticketer2_addr
-      ticketer2_addr
-      ticketer2_addr
-      ticketer1_addr
-      ticketer1_addr
-      ticketer1_addr
-  in
   let* (destination, incr) =
     originate
       block
@@ -471,7 +485,23 @@ let test_transfer_different_tickets () =
       ~storage:"{}"
       ~forges_tickets:false
   in
-  let operation = transfer_operation ~src ~destination ~parameters in
+  let* (operation, incr) =
+    transfer_tickets_operation
+      ~incr
+      ~src
+      ~destination
+      [
+        (ticketer1, "red", 1);
+        (ticketer1, "green", 1);
+        (ticketer1, "blue", 1);
+        (ticketer2, "red", 1);
+        (ticketer2, "green", 1);
+        (ticketer2, "blue", 1);
+        (ticketer1, "red", 1);
+        (ticketer1, "green", 1);
+        (ticketer1, "blue", 1);
+      ]
+  in
   let* (ticket_diffs, ctxt) = ticket_diffs_of_operations incr [operation] in
   assert_equal_ticket_token_diffs
     ctxt
@@ -516,12 +546,7 @@ let test_transfer_to_two_contracts_with_different_tickets () =
   let* (baker, src, block) = init () in
   let* ticketer = one_ticketer block in
   let parameters =
-    let ticketer_addr = Contract.to_b58check ticketer in
-    Printf.sprintf
-      {|{Pair %S "red" 1; Pair %S "green" 1; Pair %S "blue" 1; }|}
-      ticketer_addr
-      ticketer_addr
-      ticketer_addr
+    [(ticketer, "red", 1); (ticketer, "green", 1); (ticketer, "blue", 1)]
   in
   let* (destination1, incr) =
     originate
@@ -532,8 +557,8 @@ let test_transfer_to_two_contracts_with_different_tickets () =
       ~storage:"{}"
       ~forges_tickets:false
   in
-  let operation1 =
-    transfer_operation ~src ~destination:destination1 ~parameters
+  let* (operation1, incr) =
+    transfer_tickets_operation ~incr ~src ~destination:destination1 parameters
   in
   let* block = Incremental.finalize_block incr in
   let* (destination2, incr) =
@@ -545,8 +570,8 @@ let test_transfer_to_two_contracts_with_different_tickets () =
       ~storage:"{}"
       ~forges_tickets:false
   in
-  let operation2 =
-    transfer_operation ~src ~destination:destination2 ~parameters
+  let* (operation2, incr) =
+    transfer_tickets_operation ~incr ~src ~destination:destination2 parameters
   in
   let* (ticket_diffs, ctxt) =
     ticket_diffs_of_operations incr [operation1; operation2]
@@ -851,15 +876,12 @@ let test_originate_and_transfer () =
       ~storage:"{}"
       ~forges_tickets:false
   in
-  let parameters =
-    Printf.sprintf
-      {|{Pair %S "red" 1; Pair %S "green" 1; Pair %S "blue" 1; }|}
-      ticketer_addr
-      ticketer_addr
-      ticketer_addr
-  in
-  let operation2 =
-    transfer_operation ~src ~destination:destination2 ~parameters
+  let* (operation2, incr) =
+    transfer_tickets_operation
+      ~incr
+      ~src
+      ~destination:destination2
+      [(ticketer, "red", 1); (ticketer, "green", 1); (ticketer, "blue", 1)]
   in
   let* (ticket_diffs, ctxt) =
     ticket_diffs_of_operations incr [operation1; operation2]
@@ -976,13 +998,29 @@ let test_transfer_big_map_with_tickets () =
       ~storage:"{}"
       ~forges_tickets:false
   in
-  let parameters =
-    Printf.sprintf "%d" @@ Z.to_int (Big_map.Id.unparse_to_z big_map_id)
+  let open Lwt_tzresult_syntax in
+  let*? value_type =
+    Environment.wrap_tzresult @@ ticket_t Micheline.dummy_location string_key
   in
-  let operation =
+  let*? parameters_ty =
+    Environment.wrap_tzresult
+    @@ big_map_t Micheline.dummy_location int_key value_type
+  in
+  let parameters =
+    Big_map
+      {
+        id = Some big_map_id;
+        diff = {map = Big_map_overlay.empty; size = 0};
+        key_type = int_key;
+        value_type;
+      }
+  in
+  let* (operation, incr) =
     transfer_operation
+      ~incr
       ~src:ticketer_contract
       ~destination:orig_contract
+      ~parameters_ty
       ~parameters
   in
   let* (ticket_diffs, ctxt) = ticket_diffs_of_operations incr [operation] in
