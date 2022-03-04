@@ -469,7 +469,7 @@ let assert_refine_conditions_met ctxt rollup lcc commitment =
   let check = Raw_level_repr.( = ) in
   assert_commitment_frequency ctxt rollup commitment check
 
-let refine_stake ctxt rollup level staker commitment =
+let refine_stake ctxt rollup staker commitment =
   let open Lwt_tzresult_syntax in
   let* (lcc, ctxt) = last_cemented_commitment ctxt rollup in
   let* (staked_on, ctxt) = find_staker ctxt rollup staker in
@@ -487,6 +487,7 @@ let refine_stake ctxt rollup level staker commitment =
       let* (ctxt, commitment_size_diff, _was_bound) =
         Store.Commitments.add (ctxt, rollup) new_hash commitment
       in
+      let level = (Raw_context.current_level ctxt).level in
       let* (commitment_added_size_diff, ctxt) =
         set_commitment_added ctxt rollup new_hash level
       in
@@ -519,7 +520,7 @@ let refine_stake ctxt rollup level staker commitment =
   in
   go Commitment.(commitment.predecessor) ctxt
 
-let cement_commitment ctxt rollup level new_lcc =
+let cement_commitment ctxt rollup new_lcc =
   let open Lwt_tzresult_syntax in
   let refutation_deadline_blocks =
     Constants_storage.sc_rollup_challenge_window_in_blocks ctxt
@@ -542,6 +543,7 @@ let cement_commitment ctxt rollup level new_lcc =
       if Compare.Int32.(total_staker_count <> new_lcc_stake_count) then
         fail Sc_rollup_disputed
       else if
+        let level = (Raw_context.current_level ctxt).level in
         Raw_level_repr.(level < add new_lcc_added refutation_deadline_blocks)
       then fail Sc_rollup_too_recent
       else

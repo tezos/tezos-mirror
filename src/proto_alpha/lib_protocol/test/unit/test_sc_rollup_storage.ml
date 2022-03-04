@@ -196,7 +196,6 @@ let number_of_ticks_exn n =
 
 let test_deposit_then_refine () =
   let* ctxt = new_context () in
-  let level = (Raw_context.current_level ctxt).level in
   lift
   @@ let* (rollup, ctxt) = new_sc_rollup ctxt in
      let staker =
@@ -215,7 +214,7 @@ let test_deposit_then_refine () =
          }
      in
      let* (_node, ctxt) =
-       Sc_rollup_storage.refine_stake ctxt rollup level staker commitment
+       Sc_rollup_storage.refine_stake ctxt rollup staker commitment
      in
      assert_true ctxt
 
@@ -224,8 +223,6 @@ let test_cement () =
   let challenge_window =
     Constants_storage.sc_rollup_challenge_window_in_blocks ctxt
   in
-  let level_0 = (Raw_context.current_level ctxt).level in
-  let level_after = Raw_level_repr.add level_0 challenge_window in
   lift
   @@ let* (rollup, ctxt) = new_sc_rollup ctxt in
      let staker =
@@ -244,11 +241,12 @@ let test_cement () =
          }
      in
      let* (c1, ctxt) =
-       Sc_rollup_storage.refine_stake ctxt rollup level_0 staker commitment
+       Sc_rollup_storage.refine_stake ctxt rollup staker commitment
      in
-     let* ctxt =
-       Sc_rollup_storage.cement_commitment ctxt rollup level_after c1
+     let ctxt =
+       Raw_context.Internal_for_tests.add_level ctxt challenge_window
      in
+     let* ctxt = Sc_rollup_storage.cement_commitment ctxt rollup c1 in
      assert_true ctxt
 
 let test_cement_unknown_commitment_fails () =
@@ -256,19 +254,17 @@ let test_cement_unknown_commitment_fails () =
   let challenge_window =
     Constants_storage.sc_rollup_challenge_window_in_blocks ctxt
   in
-  let level_0 = (Raw_context.current_level ctxt).level in
-  let level_after = Raw_level_repr.add level_0 challenge_window in
   let* (rollup, ctxt) = lift @@ new_sc_rollup ctxt in
   let staker =
     Sc_rollup_repr.Staker.of_b58check_exn "tz1SdKt9kjPp1HRQFkBmXtBhgMfvdgFhSjmG"
   in
+  let ctxt = Raw_context.Internal_for_tests.add_level ctxt challenge_window in
   let* ctxt = lift @@ Sc_rollup_storage.deposit_stake ctxt rollup staker in
   assert_fails_with
     ~loc:__LOC__
     (Sc_rollup_storage.cement_commitment
        ctxt
        rollup
-       level_after
        Sc_rollup_repr.Commitment_hash.zero)
     "Commitment scc12XhSULdV8bAav21e99VYLTpqAjTd7NU8Mn4zFdKPSA8auMbggG does \
      not exist"
@@ -278,8 +274,6 @@ let test_cement_with_zero_stakers_fails () =
   let challenge_window =
     Constants_storage.sc_rollup_challenge_window_in_blocks ctxt
   in
-  let level_0 = (Raw_context.current_level ctxt).level in
-  let level_after = Raw_level_repr.add level_0 challenge_window in
   let* (rollup, ctxt) = lift @@ new_sc_rollup ctxt in
   let staker =
     Sc_rollup_repr.Staker.of_b58check_exn "tz1SdKt9kjPp1HRQFkBmXtBhgMfvdgFhSjmG"
@@ -296,12 +290,14 @@ let test_cement_with_zero_stakers_fails () =
       }
   in
   let* (c1, ctxt) =
-    lift @@ Sc_rollup_storage.refine_stake ctxt rollup level_0 staker commitment
+    lift @@ Sc_rollup_storage.refine_stake ctxt rollup staker commitment
   in
+  let ctxt = Raw_context.Internal_for_tests.add_level ctxt challenge_window in
+
   let* ctxt = lift @@ Sc_rollup_storage.remove_staker ctxt rollup staker in
   assert_fails_with
     ~loc:__LOC__
-    (Sc_rollup_storage.cement_commitment ctxt rollup level_after c1)
+    (Sc_rollup_storage.cement_commitment ctxt rollup c1)
     "No stakers."
 
 let test_cement_fail_too_recent () =
@@ -309,8 +305,6 @@ let test_cement_fail_too_recent () =
   let challenge_window =
     Constants_storage.sc_rollup_challenge_window_in_blocks ctxt
   in
-  let level = (Raw_context.current_level ctxt).level in
-  let level_after = Raw_level_repr.add level (challenge_window - 1) in
   let* (rollup, ctxt) = lift @@ new_sc_rollup ctxt in
   let staker =
     Sc_rollup_repr.Staker.of_b58check_exn "tz1SdKt9kjPp1HRQFkBmXtBhgMfvdgFhSjmG"
@@ -327,18 +321,21 @@ let test_cement_fail_too_recent () =
       }
   in
   let* (c1, ctxt) =
-    lift @@ Sc_rollup_storage.refine_stake ctxt rollup level staker commitment
+    lift @@ Sc_rollup_storage.refine_stake ctxt rollup staker commitment
   in
   let* () =
     assert_fails_with
       ~loc:__LOC__
-      (Sc_rollup_storage.cement_commitment ctxt rollup level c1)
+      (Sc_rollup_storage.cement_commitment ctxt rollup c1)
       "Attempted to cement a commitment before its refutation deadline."
   in
+  let ctxt =
+    Raw_context.Internal_for_tests.add_level ctxt (challenge_window - 1)
+  in
   let* () =
     assert_fails_with
       ~loc:__LOC__
-      (Sc_rollup_storage.cement_commitment ctxt rollup level_after c1)
+      (Sc_rollup_storage.cement_commitment ctxt rollup c1)
       "Attempted to cement a commitment before its refutation deadline."
   in
   assert_true ctxt
@@ -348,8 +345,6 @@ let test_cement_deadline_uses_oldest_add_time () =
   let challenge_window =
     Constants_storage.sc_rollup_challenge_window_in_blocks ctxt
   in
-  let level_0 = (Raw_context.current_level ctxt).level in
-  let level_after = Raw_level_repr.add level_0 challenge_window in
   let* (rollup, ctxt) = lift @@ new_sc_rollup ctxt in
   let staker1 =
     Sc_rollup_repr.Staker.of_b58check_exn "tz1SdKt9kjPp1HRQFkBmXtBhgMfvdgFhSjmG"
@@ -370,21 +365,18 @@ let test_cement_deadline_uses_oldest_add_time () =
       }
   in
   let* (c1, ctxt) =
-    lift
-    @@ Sc_rollup_storage.refine_stake ctxt rollup level_0 staker1 commitment
+    lift @@ Sc_rollup_storage.refine_stake ctxt rollup staker1 commitment
   in
+  let ctxt = Raw_context.Internal_for_tests.add_level ctxt challenge_window in
+
   let* (c2, ctxt) =
-    lift
-    @@ Sc_rollup_storage.refine_stake ctxt rollup level_after staker2 commitment
+    lift @@ Sc_rollup_storage.refine_stake ctxt rollup staker2 commitment
   in
-  let* ctxt =
-    lift @@ Sc_rollup_storage.cement_commitment ctxt rollup level_after c1
-  in
+  let* ctxt = lift @@ Sc_rollup_storage.cement_commitment ctxt rollup c1 in
   assert_commitment_hash_equal ~loc:__LOC__ ctxt c1 c2
 
 let test_withdrawal_fails_when_not_staked_on_lcc () =
   let* ctxt = new_context () in
-  let level = (Raw_context.current_level ctxt).level in
   let* (rollup, ctxt) = lift @@ new_sc_rollup ctxt in
   let staker =
     Sc_rollup_repr.Staker.of_b58check_exn "tz1SdKt9kjPp1HRQFkBmXtBhgMfvdgFhSjmG"
@@ -401,7 +393,7 @@ let test_withdrawal_fails_when_not_staked_on_lcc () =
       }
   in
   let* (_node, ctxt) =
-    lift @@ Sc_rollup_storage.refine_stake ctxt rollup level staker commitment
+    lift @@ Sc_rollup_storage.refine_stake ctxt rollup staker commitment
   in
   assert_fails_with
     ~loc:__LOC__
@@ -410,7 +402,6 @@ let test_withdrawal_fails_when_not_staked_on_lcc () =
 
 let test_stake_on_existing_node () =
   let* ctxt = new_context () in
-  let level = (Raw_context.current_level ctxt).level in
   lift
   @@ let* (rollup, ctxt) = new_sc_rollup ctxt in
      let staker1 =
@@ -434,10 +425,10 @@ let test_stake_on_existing_node () =
          }
      in
      let* (_node, ctxt) =
-       Sc_rollup_storage.refine_stake ctxt rollup level staker1 commitment
+       Sc_rollup_storage.refine_stake ctxt rollup staker1 commitment
      in
      let* (_node, ctxt) =
-       Sc_rollup_storage.refine_stake ctxt rollup level staker2 commitment
+       Sc_rollup_storage.refine_stake ctxt rollup staker2 commitment
      in
      assert_true ctxt
 
@@ -446,8 +437,6 @@ let test_cement_with_two_stakers () =
   let challenge_window =
     Constants_storage.sc_rollup_challenge_window_in_blocks ctxt
   in
-  let level_0 = (Raw_context.current_level ctxt).level in
-  let level_after = Raw_level_repr.add level_0 challenge_window in
   lift
   @@ let* (rollup, ctxt) = new_sc_rollup ctxt in
      let staker1 =
@@ -471,7 +460,7 @@ let test_cement_with_two_stakers () =
          }
      in
      let* (c1, ctxt) =
-       Sc_rollup_storage.refine_stake ctxt rollup level_0 staker1 commitment1
+       Sc_rollup_storage.refine_stake ctxt rollup staker1 commitment1
      in
      let commitment2 =
        Sc_rollup_repr.Commitment.
@@ -484,11 +473,13 @@ let test_cement_with_two_stakers () =
          }
      in
      let* (_node, ctxt) =
-       Sc_rollup_storage.refine_stake ctxt rollup level_0 staker2 commitment2
+       Sc_rollup_storage.refine_stake ctxt rollup staker2 commitment2
      in
-     let* ctxt =
-       Sc_rollup_storage.cement_commitment ctxt rollup level_after c1
+     let ctxt =
+       Raw_context.Internal_for_tests.add_level ctxt challenge_window
      in
+
+     let* ctxt = Sc_rollup_storage.cement_commitment ctxt rollup c1 in
      assert_true ctxt
 
 let test_can_remove_staker () =
@@ -496,8 +487,6 @@ let test_can_remove_staker () =
   let challenge_window =
     Constants_storage.sc_rollup_challenge_window_in_blocks ctxt
   in
-  let level_0 = (Raw_context.current_level ctxt).level in
-  let level_after = Raw_level_repr.add level_0 challenge_window in
   lift
   @@ let* (rollup, ctxt) = new_sc_rollup ctxt in
      let staker1 =
@@ -521,7 +510,7 @@ let test_can_remove_staker () =
          }
      in
      let* (c1, ctxt) =
-       Sc_rollup_storage.refine_stake ctxt rollup level_0 staker1 commitment1
+       Sc_rollup_storage.refine_stake ctxt rollup staker1 commitment1
      in
      let commitment2 =
        Sc_rollup_repr.Commitment.
@@ -534,12 +523,13 @@ let test_can_remove_staker () =
          }
      in
      let* (_node, ctxt) =
-       Sc_rollup_storage.refine_stake ctxt rollup level_0 staker2 commitment2
+       Sc_rollup_storage.refine_stake ctxt rollup staker2 commitment2
      in
      let* ctxt = Sc_rollup_storage.remove_staker ctxt rollup staker1 in
-     let* ctxt =
-       Sc_rollup_storage.cement_commitment ctxt rollup level_after c1
+     let ctxt =
+       Raw_context.Internal_for_tests.add_level ctxt challenge_window
      in
+     let* ctxt = Sc_rollup_storage.cement_commitment ctxt rollup c1 in
      assert_true ctxt
 
 let test_can_remove_staker2 () =
@@ -547,8 +537,6 @@ let test_can_remove_staker2 () =
   let challenge_window =
     Constants_storage.sc_rollup_challenge_window_in_blocks ctxt
   in
-  let level_0 = (Raw_context.current_level ctxt).level in
-  let level_after = Raw_level_repr.add level_0 challenge_window in
   lift
   @@ let* (rollup, ctxt) = new_sc_rollup ctxt in
      let staker1 =
@@ -572,7 +560,7 @@ let test_can_remove_staker2 () =
          }
      in
      let* (c1, ctxt) =
-       Sc_rollup_storage.refine_stake ctxt rollup level_0 staker1 commitment1
+       Sc_rollup_storage.refine_stake ctxt rollup staker1 commitment1
      in
      let commitment2 =
        Sc_rollup_repr.Commitment.
@@ -585,17 +573,18 @@ let test_can_remove_staker2 () =
          }
      in
      let* (_node, ctxt) =
-       Sc_rollup_storage.refine_stake ctxt rollup level_0 staker2 commitment2
+       Sc_rollup_storage.refine_stake ctxt rollup staker2 commitment2
      in
      let* ctxt = Sc_rollup_storage.remove_staker ctxt rollup staker2 in
-     let* ctxt =
-       Sc_rollup_storage.cement_commitment ctxt rollup level_after c1
+     let ctxt =
+       Raw_context.Internal_for_tests.add_level ctxt challenge_window
      in
+
+     let* ctxt = Sc_rollup_storage.cement_commitment ctxt rollup c1 in
      assert_true ctxt
 
 let test_removed_staker_can_not_withdraw () =
   let* ctxt = new_context () in
-  let level_0 = (Raw_context.current_level ctxt).level in
   let* (rollup, ctxt) = lift @@ new_sc_rollup ctxt in
   let staker1 =
     Sc_rollup_repr.Staker.of_b58check_exn "tz1SdKt9kjPp1HRQFkBmXtBhgMfvdgFhSjmG"
@@ -616,8 +605,7 @@ let test_removed_staker_can_not_withdraw () =
       }
   in
   let* (c1, ctxt) =
-    lift
-    @@ Sc_rollup_storage.refine_stake ctxt rollup level_0 staker1 commitment1
+    lift @@ Sc_rollup_storage.refine_stake ctxt rollup staker1 commitment1
   in
   let commitment2 =
     Sc_rollup_repr.Commitment.
@@ -630,8 +618,7 @@ let test_removed_staker_can_not_withdraw () =
       }
   in
   let* (_node, ctxt) =
-    lift
-    @@ Sc_rollup_storage.refine_stake ctxt rollup level_0 staker2 commitment2
+    lift @@ Sc_rollup_storage.refine_stake ctxt rollup staker2 commitment2
   in
   let* ctxt = lift @@ Sc_rollup_storage.remove_staker ctxt rollup staker2 in
   assert_fails_with
@@ -641,8 +628,6 @@ let test_removed_staker_can_not_withdraw () =
 
 let test_no_cement_on_conflict () =
   let* ctxt = new_context () in
-  let level_0 = (Raw_context.current_level ctxt).level in
-  let level_after = Raw_level_repr.add level_0 5000 in
   let* (rollup, ctxt) = lift @@ new_sc_rollup ctxt in
   let staker1 =
     Sc_rollup_repr.Staker.of_b58check_exn "tz1SdKt9kjPp1HRQFkBmXtBhgMfvdgFhSjmG"
@@ -663,8 +648,7 @@ let test_no_cement_on_conflict () =
       }
   in
   let* (c1, ctxt) =
-    lift
-    @@ Sc_rollup_storage.refine_stake ctxt rollup level_0 staker1 commitment1
+    lift @@ Sc_rollup_storage.refine_stake ctxt rollup staker1 commitment1
   in
   let commitment2 =
     Sc_rollup_repr.Commitment.
@@ -677,17 +661,16 @@ let test_no_cement_on_conflict () =
       }
   in
   let* (_node, ctxt) =
-    lift
-    @@ Sc_rollup_storage.refine_stake ctxt rollup level_0 staker2 commitment2
+    lift @@ Sc_rollup_storage.refine_stake ctxt rollup staker2 commitment2
   in
+  let ctxt = Raw_context.Internal_for_tests.add_level ctxt 5000 in
   assert_fails_with
     ~loc:__LOC__
-    (Sc_rollup_storage.cement_commitment ctxt rollup level_after c1)
+    (Sc_rollup_storage.cement_commitment ctxt rollup c1)
     "Attempted to cement a disputed commitment."
 
 let test_finds_conflict_point_at_lcc () =
   let* ctxt = new_context () in
-  let level_0 = (Raw_context.current_level ctxt).level in
   lift
   @@ let* (rollup, ctxt) = new_sc_rollup ctxt in
      let staker1 =
@@ -711,7 +694,7 @@ let test_finds_conflict_point_at_lcc () =
          }
      in
      let* (c1, ctxt) =
-       Sc_rollup_storage.refine_stake ctxt rollup level_0 staker1 commitment1
+       Sc_rollup_storage.refine_stake ctxt rollup staker1 commitment1
      in
      let commitment2 =
        Sc_rollup_repr.Commitment.
@@ -724,7 +707,7 @@ let test_finds_conflict_point_at_lcc () =
          }
      in
      let* (c2, ctxt) =
-       Sc_rollup_storage.refine_stake ctxt rollup level_0 staker2 commitment2
+       Sc_rollup_storage.refine_stake ctxt rollup staker2 commitment2
      in
      let* ((left, right), ctxt) =
        Sc_rollup_storage.get_conflict_point ctxt rollup staker1 staker2

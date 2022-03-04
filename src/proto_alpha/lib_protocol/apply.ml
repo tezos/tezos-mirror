@@ -1426,8 +1426,7 @@ let apply_manager_operation_content :
       let result = Sc_rollup_add_messages_result {consumed_gas; inbox_after} in
       return (ctxt, result, [])
   | Sc_rollup_cement {rollup; commitment} ->
-      let level = (Level.current ctxt).level in
-      Sc_rollup.cement_commitment ctxt rollup level commitment >>=? fun ctxt ->
+      Sc_rollup.cement_commitment ctxt rollup commitment >>=? fun ctxt ->
       let consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt in
       let result = Sc_rollup_cement_result {consumed_gas} in
       return (ctxt, result, [])

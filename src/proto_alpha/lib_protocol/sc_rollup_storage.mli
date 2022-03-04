@@ -222,15 +222,14 @@ val withdraw_stake :
   Sc_rollup_repr.Staker.t ->
   Raw_context.t tzresult Lwt.t
 
-(** [refine_stake context rollup level staker commitment] moves the stake of
+(** [refine_stake context rollup staker commitment] moves the stake of
     [staker] to [commitment]. Because we do not assume any form of coordination
     between validators, we do not distinguish between {i adding new}
     commitments and {i staking on existing commitments}.  The storage of
     commitments is content-addressable to minimize storage duplication.
 
-    [level] should be the current Tezos block level. This must be monotonically
-    increasing in subsequent calls to [refine_stake] and [cement_commitment],
-    or behavior is undefined.
+    Subsequent calls to [refine_stake] and [cement_commitment] must use 
+    a [context] with greater level, or behavior is undefined.
 
     The first time a commitment hash is staked on, it is assigned a deadline,
     which is counted in Tezos blocks (levels). Further stakes on the block does
@@ -257,7 +256,6 @@ val withdraw_stake :
 val refine_stake :
   Raw_context.t ->
   Sc_rollup_repr.t ->
-  Raw_level_repr.t ->
   Sc_rollup_repr.Staker.t ->
   Sc_rollup_repr.Commitment.t ->
   (Sc_rollup_repr.Commitment_hash.t * Raw_context.t) tzresult Lwt.t
@@ -279,9 +277,8 @@ val last_cemented_commitment :
 (** [cement_commitment context rollup commitment] cements the given
     commitment.
 
-    [level] should be the current Tezos block level. This must be monotonically
-    increasing in subsequent calls to [refine_stake] and [cement_commitment],
-    or behavior is undefined.
+    Subsequent calls to [refine_stake] and [cement_commitment] must use 
+    a [context] with greater level, or behavior is undefined.
 
     For cementing to succeed, the following must hold:
     {ol
@@ -306,7 +303,6 @@ val last_cemented_commitment :
 val cement_commitment :
   Raw_context.t ->
   Sc_rollup_repr.t ->
-  Raw_level_repr.t ->
   Sc_rollup_repr.Commitment_hash.t ->
   Raw_context.t tzresult Lwt.t
 

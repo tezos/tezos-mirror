@@ -1859,13 +1859,12 @@ module Sc_rollup : sig
   val refine_stake :
     context ->
     t ->
-    Raw_level.t ->
     Staker.t ->
     Commitment.t ->
     (Commitment_hash.t * context) tzresult Lwt.t
 
   val cement_commitment :
-    context -> t -> Raw_level.t -> Commitment_hash.t -> context tzresult Lwt.t
+    context -> t -> Commitment_hash.t -> context tzresult Lwt.t
 
   type conflict_point = Commitment_hash.t * Commitment_hash.t
 
