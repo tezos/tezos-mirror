@@ -876,16 +876,28 @@ let apply_delegation ~ctxt ~source ~delegate ~since =
   Delegate.set ctxt source delegate >|=? fun ctxt ->
   (ctxt, Delegation_result {consumed_gas = Gas.consumed ~since ~until:ctxt}, [])
 
+type execution_arg =
+  | Typed_arg : 'a Script_typed_ir.ty * 'a -> execution_arg
+  | Untyped_arg : Script.expr -> execution_arg
+
 let apply_transaction_to_implicit ~ctxt ~contract ~parameter ~entrypoint
     ~before_operation ~balance_updates ~allocated_destination_contract =
+  let is_unit =
+    match parameter with
+    | Typed_arg (Unit_t, ()) -> true
+    | Typed_arg _ -> false
+    | Untyped_arg parameter -> (
+        match Micheline.root parameter with
+        | Prim (_, Michelson_v1_primitives.D_Unit, [], _) -> true
+        | _ -> false)
+  in
   ( (if Entrypoint.is_default entrypoint then Result.return_unit
     else error (Script_tc_errors.No_such_entrypoint entrypoint))
   >>? fun () ->
-    match Micheline.root parameter with
-    | Prim (_, Michelson_v1_primitives.D_Unit, [], _) ->
-        (* Allow [Unit] parameter to non-scripted contracts. *)
-        ok ctxt
-    | _ -> error (Script_interpreter.Bad_contract_parameter contract) )
+    if is_unit then
+      (* Only allow [Unit] parameter to implicit accounts. *)
+      ok ctxt
+    else error (Script_interpreter.Bad_contract_parameter contract) )
   >|? fun ctxt ->
   let result =
     Transaction_result
@@ -928,15 +940,28 @@ let apply_transaction_to_smart_contract ~ctxt ~source ~contract ~amount
       level;
     }
   in
-  Script_interpreter.execute
-    ctxt
-    ~cached_script:(Some script_ir)
-    mode
-    step_constants
-    ~script
-    ~parameter
-    ~entrypoint
-    ~internal
+  (match parameter with
+  | Untyped_arg parameter ->
+      Script_interpreter.execute
+        ctxt
+        ~cached_script:(Some script_ir)
+        mode
+        step_constants
+        ~script
+        ~parameter
+        ~entrypoint
+        ~internal
+  | Typed_arg (parameter_ty, parameter) ->
+      Script_interpreter.execute_with_typed_parameter
+        ctxt
+        ~cached_script:(Some script_ir)
+        mode
+        step_constants
+        ~script
+        ~parameter_ty
+        ~parameter
+        ~entrypoint
+        ~internal)
   >>=? fun ( {ctxt; storage; lazy_storage_diff; operations; ticket_diffs},
              (updated_cached_script, updated_size) ) ->
   update_script_storage_and_ticket_balances
@@ -974,11 +999,8 @@ let apply_transaction_to_smart_contract ~ctxt ~source ~contract ~amount
       in
       (ctxt, result, operations) )
 
-let apply_transaction ~consume_deserialization_gas ~ctxt ~parameters ~source
-    ~contract ~amount ~entrypoint ~before_operation ~payer ~chain_id ~mode
-    ~internal =
-  Script.force_decode_in_context ~consume_deserialization_gas ctxt parameters
-  >>?= fun (parameter, ctxt) ->
+let apply_transaction ~ctxt ~parameter ~source ~contract ~amount ~entrypoint
+    ~before_operation ~payer ~chain_id ~mode ~internal =
   (match Contract.is_implicit contract with
   | None ->
       (if Tez.(amount = zero) then
@@ -1235,10 +1257,14 @@ let apply_internal_manager_operation_content :
   match operation with
   | Transaction
       {amount; parameters; destination = Contract contract; entrypoint} ->
-      apply_transaction
+      Script.force_decode_in_context
         ~consume_deserialization_gas
+        ctxt
+        parameters
+      >>?= fun (parameters, ctxt) ->
+      apply_transaction
         ~ctxt
-        ~parameters
+        ~parameter:(Untyped_arg parameters)
         ~source
         ~contract
         ~amount
@@ -1315,10 +1341,14 @@ let apply_external_manager_operation_content :
           [] )
   | Transaction
       {amount; parameters; destination = Contract contract; entrypoint} ->
-      apply_transaction
+      Script.force_decode_in_context
         ~consume_deserialization_gas
+        ctxt
+        parameters
+      >>?= fun (parameters, ctxt) ->
+      apply_transaction
         ~ctxt
-        ~parameters
+        ~parameter:(Untyped_arg parameters)
         ~source
         ~contract
         ~amount
