@@ -108,9 +108,10 @@ let signer_of_address_index :
 
 let eq_qty = Alcotest.of_pp Tx_rollup_l2_qty.pp
 
-let check_balance ctxt name_account name_ticket description tidx aidx value =
+let check_balance ctxt name_account name_ticket description tidx aidx
+    expected_value =
   let open Syntax in
-  let value = Tx_rollup_l2_qty.of_int64_exn value in
+  let expected_value = Tx_rollup_l2_qty.of_int64_exn expected_value in
   let* res = Ticket_ledger.get ctxt tidx aidx in
   Alcotest.(
     check
@@ -120,8 +121,8 @@ let check_balance ctxt name_account name_ticket description tidx aidx value =
          name_account
          name_ticket
          description)
-      res
-      value) ;
+      expected_value
+      res) ;
   return ()
 
 let pp_metadata fmt Tx_rollup_l2_context_sig.{counter; public_key} =
@@ -155,6 +156,20 @@ let eq_ticket = Alcotest.of_pp Ticket_hash.pp
 let eq_addr_indexable = Alcotest.of_pp (Indexable.pp (fun _ _ -> ()))
 
 let eq_ticket_indexable = Alcotest.of_pp (Indexable.pp (fun _ _ -> ()))
+
+let pp_withdrawal fmt = function
+  | Message_result.{destination; ticket_hash; amount} ->
+      Format.fprintf
+        fmt
+        "{destination=%a; ticket_hash=%a; amount=%a}"
+        Signature.Public_key_hash.pp
+        destination
+        Ticket_hash.pp
+        ticket_hash
+        Tx_rollup_l2_qty.pp
+        amount
+
+let eq_withdrawal = Alcotest.of_pp pp_withdrawal
 
 let check_indexes addr_indexes ticket_indexes expected =
   let open Syntax in
@@ -219,6 +234,7 @@ let with_initial_setup tickets contracts =
   let* (ctxt, rev_contracts) =
     list_fold_left_m
       (fun (ctxt, rev_contracts) balances ->
+        let (pkh, _, _) = gen_l1_address () in
         let (sk, pk, addr) = gen_l2_address () in
         let* (ctxt, _, idx) = Address_index.get_or_associate_index ctxt addr in
 
@@ -234,7 +250,7 @@ let with_initial_setup tickets contracts =
             balances
         in
 
-        return (ctxt, (sk, pk, addr, idx) :: rev_contracts))
+        return (ctxt, (sk, pk, addr, idx, pkh) :: rev_contracts))
       (ctxt, [])
       contracts
   in
@@ -245,14 +261,12 @@ let with_initial_setup tickets contracts =
 let transfer ?(counter = 1L) ~signer ~dest ~ticket qty =
   let open Tx_rollup_l2_batch.V1 in
   let qty = Tx_rollup_l2_qty.of_int64_exn qty in
-  let content =
-    {
-      destination = Layer2 (from_value dest);
-      ticket_hash = from_value ticket;
-      qty;
-    }
-  in
+  let content = {destination = dest; ticket_hash = from_value ticket; qty} in
   {signer = from_value signer; counter; contents = [content]}
+
+let l1addr pkh = Tx_rollup_l2_batch.Layer1 pkh
+
+let l2addr addr = Tx_rollup_l2_batch.Layer2 (from_value addr)
 
 let transfers =
   List.map (fun (pk_source, dest, ticket, amount, counter) ->
@@ -346,6 +360,54 @@ let test_deposit_with_existing_indexes () =
       return_unit
   | _ -> fail_msg "Unexpected operation result"
 
+(** Test that deposit overflow withdraws the amount sent. *)
+let test_returned_deposit () =
+  let open Context_l2.Syntax in
+  let balance = Int64.max_int in
+  let* (ctxt, tidxs, accounts) =
+    with_initial_setup [ticket1] [[(ticket1, balance)]]
+  in
+  let tidx1 = nth_exn tidxs 0 in
+  let (_sk1, _pk1, addr1, idx1, pkh) = nth_exn accounts 0 in
+
+  (* my cup runneth over *)
+  let amount = Tx_rollup_l2_qty.one in
+  let deposit =
+    {sender = pkh; destination = value addr1; ticket_hash = ticket1; amount}
+  in
+  let* (ctxt, result, withdrawal_opt) = apply_deposit ctxt deposit in
+
+  (* Applying the deposit will result in a Deposit_failure, an
+     unchanged context and a withdrawal of the deposit *)
+  match (result, withdrawal_opt) with
+  | (Deposit_failure Tx_rollup_l2_context_sig.Balance_overflow, Some withdrawal)
+    ->
+      (* balance is unchanged *)
+      let* balance' = Context_l2.Ticket_ledger.get ctxt tidx1 idx1 in
+      Alcotest.(
+        check
+          eq_qty
+          "An overflowing deposit should not modify balance"
+          (Tx_rollup_l2_qty.of_int64_exn balance)
+          balance') ;
+      Alcotest.(
+        check
+          eq_withdrawal
+          "Resulting withdrawal from overflowing L1->L2 deposit"
+          withdrawal
+          {destination = pkh; ticket_hash = ticket1; amount}) ;
+      return_unit
+  | (Deposit_failure reason, _) ->
+      let msg =
+        Format.asprintf
+          "Unexpected failure for overflowing deposit: %a"
+          Environment.Error_monad.pp
+          reason
+      in
+      fail_msg msg
+  | (Deposit_success _result, _) ->
+      fail_msg "Did not expect overflowing deposit to be succesful"
+
 (** Test that all values used in a transaction creates indexes and they are
     packed in the final indexes. *)
 let test_indexes_creation () =
@@ -380,16 +442,16 @@ let test_indexes_creation () =
   (* We create a transaction for each transfer, it makes the test of each
      transaction result easier. *)
   let transaction1 =
-    [transfer ~counter:1L ~signer:pk1 ~dest:addr2 ~ticket:ticket1 10L]
+    [transfer ~counter:1L ~signer:pk1 ~dest:(l2addr addr2) ~ticket:ticket1 10L]
   in
   let signature1 = sign_transaction [sk1] transaction1 in
   let transaction2 =
-    [transfer ~counter:2L ~signer:pk1 ~dest:addr3 ~ticket:ticket1 20L]
+    [transfer ~counter:2L ~signer:pk1 ~dest:(l2addr addr3) ~ticket:ticket1 20L]
   in
   let signature2 = sign_transaction [sk1] transaction2 in
 
   let transaction3 =
-    [transfer ~counter:3L ~signer:pk1 ~dest:addr4 ~ticket:ticket1 30L]
+    [transfer ~counter:3L ~signer:pk1 ~dest:(l2addr addr4) ~ticket:ticket1 30L]
   in
   let signature3 = sign_transaction [sk1] transaction3 in
   let batch =
@@ -433,12 +495,19 @@ let test_indexes_creation_bad () =
   let transaction1 =
     (* This transaction will fail because the number of tickets required is
        more than its own. *)
-    [transfer ~counter:1L ~signer:pk1 ~dest:addr2 ~ticket:ticket1 10000L]
+    [
+      transfer
+        ~counter:1L
+        ~signer:pk1
+        ~dest:(l2addr addr2)
+        ~ticket:ticket1
+        10000L;
+    ]
   in
   let signature1 = sign_transaction [sk1] transaction1 in
   let transaction2 =
     (* This is ok *)
-    [transfer ~counter:2L ~signer:pk1 ~dest:addr3 ~ticket:ticket1 1L]
+    [transfer ~counter:2L ~signer:pk1 ~dest:(l2addr addr3) ~ticket:ticket1 1L]
   in
   let signature2 = sign_transaction [sk1] transaction2 in
 
@@ -471,7 +540,7 @@ let test_indexes_creation_bad () =
 (** The test consists of [addr1] sending [ticket1] to [addr2].
     In exchange [addr2] will send [ticket2] to [addr1]. We check both
     the transaction's status and the balances afterwards. *)
-let test_simple_transaction () =
+let test_simple_l2_transaction () =
   let open Context_l2.Syntax in
   let* (ctxt, tidxs, accounts) =
     with_initial_setup [ticket1; ticket2] [[(ticket1, 10L)]; [(ticket2, 20L)]]
@@ -480,14 +549,17 @@ let test_simple_transaction () =
   let tidx1 = nth_exn tidxs 0 in
   let tidx2 = nth_exn tidxs 1 in
 
-  let (sk1, pk1, addr1, idx1) = nth_exn accounts 0 in
-  let (sk2, pk2, addr2, idx2) = nth_exn accounts 1 in
+  let (sk1, pk1, addr1, idx1, _) = nth_exn accounts 0 in
+  let (sk2, pk2, addr2, idx2, _) = nth_exn accounts 1 in
 
   (* Then, we build a transaction with:
      [addr1] -> [addr2] & [addr2] -> [addr1]. *)
   let transaction =
     transfers
-      [(pk1, addr2, ticket1, 10L, None); (pk2, addr1, ticket2, 20L, None)]
+      [
+        (pk1, l2addr addr2, ticket1, 10L, None);
+        (pk2, l2addr addr1, ticket2, 20L, None);
+      ]
   in
   let batch = create_batch_v1 [transaction] [[sk1; sk2]] in
 
@@ -499,7 +571,7 @@ let test_simple_transaction () =
 
   match (status, _withdrawals) with
   | (Transaction_success, []) ->
-      (* Check the balance after the transaction has been applied, we ommit
+      (* Check the balance after the transaction has been applied, we omit
          the check the indexes to not pollute this test. *)
       let* () =
         check_balance
@@ -546,7 +618,379 @@ let test_simple_transaction () =
   | (Transaction_success, _) -> fail_msg "Did not expect any withdrawals"
   | (Transaction_failure _, _) -> fail_msg "The transaction should be a success"
 
-(** Thest that a valid transaction containing both indexes and values is a
+(** The test consists of [pk1] sending [ticket1] to [pkh2].
+    This results in a withdrawal. *)
+let test_simple_l1_transaction () =
+  let open Context_l2.Syntax in
+  let* (ctxt, tidxs, accounts) =
+    with_initial_setup [ticket1] [[(ticket1, 10L)]; []]
+  in
+
+  let tidx1 = nth_exn tidxs 0 in
+
+  let (sk1, pk1, _addr1, idx1, _pkh1) = nth_exn accounts 0 in
+  let (_sk2, _pk2, _addr2, _idx2, pkh2) = nth_exn accounts 1 in
+
+  (* Then, we build a transaction with:
+     [addr1] -> [pkh2] *)
+  let transaction = transfers [(pk1, l1addr pkh2, ticket1, 10L, None)] in
+  let batch = create_batch_v1 [transaction] [[sk1]] in
+
+  let* (ctxt, Batch_result {results; _}, withdrawals) =
+    Batch_V1.apply_batch ctxt batch
+  in
+
+  let status = nth_exn results 0 |> snd in
+
+  match (status, withdrawals) with
+  | (Transaction_success, [withdrawal]) ->
+      (* Check the balance after the transaction has been applied, we omit
+         the check the indexes to not pollute this test. *)
+      let* () =
+        check_balance
+          ctxt
+          "addr1"
+          "ticket1"
+          "addr1.ticket1 should be emptied"
+          tidx1
+          idx1
+          0L
+      in
+      Alcotest.(
+        check
+          eq_withdrawal
+          "Resulting withdrawal from L2->L1 transfer"
+          withdrawal
+          {
+            destination = pkh2;
+            ticket_hash = ticket1;
+            amount = Tx_rollup_l2_qty.of_int64_exn 10L;
+          }) ;
+      return_unit
+  | (Transaction_success, _) -> fail_msg "Expected exactly one withdrawal"
+  | (Transaction_failure _, _) -> fail_msg "The transaction should be a success"
+
+(** Test that [Missing_ticket] is raised if a transfer is attempted to
+    a ticket absent from the rollup. *)
+let test_l1_transaction_inexistant_ticket () =
+  let open Context_l2.Syntax in
+  (* empty context *)
+  let* (ctxt, _tidxs, accounts) = with_initial_setup [] [[]; []] in
+
+  let (sk1, pk1, _addr1, _idx1, _pkh1) = nth_exn accounts 0 in
+  let (_sk2, _pk2, _addr2, _idx2, pkh2) = nth_exn accounts 1 in
+
+  (* We build an invalid transaction with: [addr1] -> [pkh2] *)
+  let transaction = transfers [(pk1, l1addr pkh2, ticket1, 10L, None)] in
+  let batch = create_batch_v1 [transaction] [[sk1]] in
+
+  let* (_ctxt, Batch_result {results; _}, withdrawals) =
+    Batch_V1.apply_batch ctxt batch
+  in
+
+  (* Expect no withdrawals *)
+  Alcotest.(
+    check
+      (list eq_withdrawal)
+      "Resulting withdrawal from L2->L1 transfer"
+      withdrawals
+      []) ;
+
+  (* Expect error returned *)
+  let status = nth_exn results 0 |> snd in
+  expect_error_status
+    ~msg:"an invalid transaction must fail"
+    (Tx_rollup_l2_apply.Missing_ticket ticket1)
+    status
+    return_unit
+
+(** If the signer of a L2->L1 transaction does not exist (has no balance),
+    then batch application fails with Balance_too_low. *)
+let test_l1_transaction_inexistant_signer () =
+  let open Context_l2.Syntax in
+  let* (ctxt, _tidxs, accounts) =
+    with_initial_setup [ticket1; ticket2] [[(ticket1, 10L)]; [(ticket2, 20L)]]
+  in
+
+  let (_sk1, _pk1, _addr1, _idx1, _pkh1) = nth_exn accounts 0 in
+  let (_sk2, _pk2, _addr2, _idx2, pkh2) = nth_exn accounts 1 in
+  let (sk_unknown, pk_unknown, _) = gen_l2_address () in
+
+  (* Then, we build an invalid transaction with:
+     [pk_unknown] -> [pkh2] *)
+  let transaction = transfers [(pk_unknown, l1addr pkh2, ticket1, 10L, None)] in
+  let batch = create_batch_v1 [transaction] [[sk_unknown]] in
+
+  let* (_ctxt, Batch_result {results; _}, withdrawals) =
+    Batch_V1.apply_batch ctxt batch
+  in
+
+  (* Expect no withdrawals *)
+  Alcotest.(
+    check
+      (list eq_withdrawal)
+      "Resulting withdrawal from L2->L1 transfer"
+      withdrawals
+      []) ;
+
+  (* Expect error returned *)
+  let status = nth_exn results 0 |> snd in
+  expect_error_status
+    ~msg:"an invalid transaction must fail"
+    Tx_rollup_l2_context_sig.Balance_too_low
+    status
+    return_unit
+
+(** Test that [Balance_too_low] is raised if a transfer is attempted with a
+    quantity superior to the senders balance. *)
+let test_l1_transaction_overdraft () =
+  let open Context_l2.Syntax in
+  let initial_balances = [[(ticket1, 10L)]; [(ticket2, 20L)]] in
+  let* (ctxt, tidxs, accounts) =
+    with_initial_setup [ticket1; ticket2] initial_balances
+  in
+
+  let (sk1, pk1, _addr1, idx1, _pkh1) = nth_exn accounts 0 in
+  let (_sk2, _pk2, _addr2, idx2, pkh2) = nth_exn accounts 1 in
+
+  let tidx1 = nth_exn tidxs 0 in
+  let tidx2 = nth_exn tidxs 1 in
+
+  (* Then, we build an transaction with: [addr1] -> [pkh2] where addr1 attempts to spend too much*)
+  let transaction = transfers [(pk1, l1addr pkh2, ticket1, 30L, None)] in
+  let batch = create_batch_v1 [transaction] [[sk1]] in
+
+  let* (ctxt, Batch_result {results; _}, withdrawals) =
+    Batch_V1.apply_batch ctxt batch
+  in
+
+  (* Expect no withdrawals *)
+  Alcotest.(
+    check
+      (list eq_withdrawal)
+      "Resulting withdrawal from L2->L1 transfer"
+      withdrawals
+      []) ;
+
+  (* Expect error returned *)
+  let status = nth_exn results 0 |> snd in
+  expect_error_status
+    ~msg:"an invalid transaction must fail"
+    Tx_rollup_l2_context_sig.Balance_too_low
+    status
+    (let* () =
+       check_balance
+         ctxt
+         "addr1"
+         "ticket1"
+         "addr1.ticket1 should be unchanged"
+         tidx1
+         idx1
+         10L
+     in
+     let* () =
+       check_balance
+         ctxt
+         "addr2"
+         "ticket1"
+         "addr2.ticket1 should be unchanged"
+         tidx2
+         idx2
+         20L
+     in
+
+     let* () =
+       check_balance
+         ctxt
+         "addr2"
+         "ticket2"
+         "addr1.ticket2 should be unchanged (empty)"
+         tidx2
+         idx1
+         0L
+     in
+     let* () =
+       check_balance
+         ctxt
+         "addr1"
+         "ticket2"
+         "addr2.ticket1 should be unchanged (empty)"
+         tidx1
+         idx2
+         0L
+     in
+     return_unit)
+
+(** Test that withdrawals with quantity zero are possible.
+
+    TODO: https://gitlab.com/tezos/tezos/-/issues/2593
+    Should they be possible?
+ *)
+let test_l1_transaction_zero () =
+  let open Context_l2.Syntax in
+  let initial_balances = [[(ticket1, 10L)]; [(ticket2, 20L)]] in
+  let* (ctxt, tidxs, accounts) =
+    with_initial_setup [ticket1; ticket2] initial_balances
+  in
+
+  let (sk1, pk1, _addr1, idx1, _pkh1) = nth_exn accounts 0 in
+  let (_sk2, _pk2, _addr2, idx2, pkh2) = nth_exn accounts 1 in
+
+  let tidx1 = nth_exn tidxs 0 in
+  let tidx2 = nth_exn tidxs 1 in
+
+  (* Then, we build an transaction with: [addr1] -> [pkh2] with amount 0 *)
+  let transaction = transfers [(pk1, l1addr pkh2, ticket1, 0L, None)] in
+  let batch = create_batch_v1 [transaction] [[sk1]] in
+
+  let* (ctxt, Batch_result {results; _}, withdrawals) =
+    Batch_V1.apply_batch ctxt batch
+  in
+
+  (* Expect one zero-withdrawal *)
+  Alcotest.(
+    check
+      (list eq_withdrawal)
+      "Resulting withdrawal from L2->L1 transfer"
+      withdrawals
+      [
+        {
+          destination = pkh2;
+          ticket_hash = ticket1;
+          amount = Tx_rollup_l2_qty.zero;
+        };
+      ]) ;
+
+  match results with
+  | [([_], Transaction_success)] ->
+      let* () =
+        check_balance
+          ctxt
+          "addr1"
+          "ticket1"
+          "addr1.ticket1 should be unchanged"
+          tidx1
+          idx1
+          10L
+      in
+      let* () =
+        check_balance
+          ctxt
+          "addr2"
+          "ticket1"
+          "addr2.ticket2 should be unchanged"
+          tidx2
+          idx2
+          20L
+      in
+
+      let* () =
+        check_balance
+          ctxt
+          "addr2"
+          "ticket2"
+          "addr1.ticket2 should be unchanged (empty)"
+          tidx2
+          idx1
+          0L
+      in
+      let* () =
+        check_balance
+          ctxt
+          "addr1"
+          "ticket2"
+          "addr2.ticket1 should be unchanged (empty)"
+          tidx1
+          idx2
+          0L
+      in
+      return_unit
+  | _ -> fail_msg "Zero-transactions should be successful"
+
+(** Test partial L2 to L1 transaction. Ensure that a withdrawal is emitted
+    for the transferred amount and that the remainder is in the sender's
+    account. *)
+let test_l1_transaction_partial () =
+  let open Context_l2.Syntax in
+  let* (ctxt, tidxs, accounts) =
+    with_initial_setup [ticket1; ticket2] [[(ticket1, 10L)]; [(ticket2, 20L)]]
+  in
+
+  let (sk1, pk1, _addr1, idx1, _pkh1) = nth_exn accounts 0 in
+  let (_sk2, _pk2, _addr2, idx2, pkh2) = nth_exn accounts 1 in
+
+  let tidx1 = nth_exn tidxs 0 in
+  let tidx2 = nth_exn tidxs 1 in
+
+  (* Then, we build an transaction with: [addr1] -> [pkh2] , addr1 spending the ticket partially *)
+  let transaction = transfers [(pk1, l1addr pkh2, ticket1, 5L, None)] in
+  let batch = create_batch_v1 [transaction] [[sk1]] in
+
+  let* (ctxt, Batch_result {results; _}, withdrawals) =
+    Batch_V1.apply_batch ctxt batch
+  in
+
+  (* Expect one partial withdrawal *)
+  Alcotest.(
+    check
+      (list eq_withdrawal)
+      "Resulting withdrawal from L2->L1 transfer"
+      withdrawals
+      [
+        {
+          destination = pkh2;
+          ticket_hash = ticket1;
+          amount = Tx_rollup_l2_qty.of_int64_exn 5L;
+        };
+      ]) ;
+
+  match results with
+  | [([_], Transaction_success)] ->
+      let* () =
+        check_balance
+          ctxt
+          "addr1"
+          "ticket1"
+          "addr1.ticket1 should be debited"
+          tidx1
+          idx1
+          5L
+      in
+      let* () =
+        check_balance
+          ctxt
+          "addr2"
+          "ticket1"
+          "addr2.ticket2 should be unchanged"
+          tidx2
+          idx2
+          20L
+      in
+
+      let* () =
+        check_balance
+          ctxt
+          "addr2"
+          "ticket2"
+          "addr1.ticket2 should be unchanged (empty)"
+          tidx2
+          idx1
+          0L
+      in
+      let* () =
+        check_balance
+          ctxt
+          "addr1"
+          "ticket2"
+          "addr2.ticket1 should be unchanged (empty)"
+          tidx1
+          idx2
+          0L
+      in
+      return_unit
+  | _ -> fail_msg "Zero-transactions should be successful"
+
+(** Test that a valid transaction containing both indexes and values is a
     success. *)
 let test_transaction_with_unknown_indexable () =
   let open Context_l2.Syntax in
@@ -558,8 +1002,8 @@ let test_transaction_with_unknown_indexable () =
   let tidx1 = nth_exn tidxs 0 in
   let tidx2 = nth_exn tidxs 1 in
 
-  let (sk1, pk1, addr1, aidx1) = nth_exn accounts 0 in
-  let (sk2, pk2, addr2, aidx2) = nth_exn accounts 1 in
+  let (sk1, pk1, addr1, aidx1, _) = nth_exn accounts 0 in
+  let (sk2, pk2, addr2, aidx2, _) = nth_exn accounts 1 in
 
   (* Note that {!with_initial_setup} does not initialize metadatas for the
      public keys. If it was the case, we could not use this function
@@ -620,7 +1064,7 @@ let test_transaction_with_unknown_indexable () =
 
   match (status, withdrawals) with
   | (Transaction_success, []) ->
-      (* Check the balance after the transaction has been applied, we ommit
+      (* Check the balance after the transaction has been applied, we omit
          the check the indexes to not pollute this test. *)
       let* () =
         check_balance
@@ -669,7 +1113,7 @@ let test_transaction_with_unknown_indexable () =
 
 (** Test that a transaction containing at least one invalid operation
     fails and does not change the context. It is similar to
-    {!test_simple_transaction} but the second addr does not
+    {!test_simple_l2_transaction} but the second addr does not
     possess the tickets. *)
 let test_invalid_transaction () =
   let open Context_l2.Syntax in
@@ -679,14 +1123,17 @@ let test_invalid_transaction () =
 
   let tidx1 = nth_exn tidxs 0 in
 
-  let (sk1, pk1, addr1, idx1) = nth_exn accounts 0 in
-  let (sk2, pk2, addr2, idx2) = nth_exn accounts 1 in
+  let (sk1, pk1, addr1, idx1, _) = nth_exn accounts 0 in
+  let (sk2, pk2, addr2, idx2, _) = nth_exn accounts 1 in
 
   (* Then, we build a transaction with:
      [addr1] -> [addr2] & [addr2] -> [addr1]. *)
   let transaction =
     transfers
-      [(pk1, addr2, ticket1, 10L, None); (pk2, addr1, ticket2, 20L, None)]
+      [
+        (pk1, l2addr addr2, ticket1, 10L, None);
+        (pk2, l2addr addr1, ticket2, 20L, None);
+      ]
   in
   let batch = create_batch_v1 [transaction] [[sk1; sk2]] in
 
@@ -731,10 +1178,12 @@ let test_invalid_counter () =
   let open Context_l2.Syntax in
   let* (ctxt, _, accounts) = with_initial_setup [ticket1] [[]] in
 
-  let (sk1, pk1, addr1, _idx1) = nth_exn accounts 0 in
+  let (sk1, pk1, addr1, _idx1, _) = nth_exn accounts 0 in
 
   let counter = 10L in
-  let transaction = transfers [(pk1, addr2, ticket1, 10L, Some counter)] in
+  let transaction =
+    transfers [(pk1, l2addr addr2, ticket1, 10L, Some counter)]
+  in
   let batch = create_batch_v1 [transaction] [[sk1]] in
 
   let* (_ctxt, Batch_result {results; _}, _withdrawals) =
@@ -759,16 +1208,16 @@ let test_update_counter () =
   let open Context_l2.Syntax in
   let* (ctxt, _, accounts) = with_initial_setup [ticket1] [[]] in
 
-  let (sk1, pk1, _addr1, _idx1) = nth_exn accounts 0 in
+  let (sk1, pk1, _addr1, _idx1, _) = nth_exn accounts 0 in
 
   let transactions =
     transfers
       [
-        (pk1, addr2, ticket1, 10L, Some 1L);
-        (pk1, addr2, ticket1, 20L, Some 2L);
-        (pk1, addr2, ticket1, 30L, Some 3L);
-        (pk1, addr2, ticket1, 40L, Some 4L);
-        (pk1, addr2, ticket1, 50L, Some 5L);
+        (pk1, l2addr addr2, ticket1, 10L, Some 1L);
+        (pk1, l2addr addr2, ticket1, 20L, Some 2L);
+        (pk1, l2addr addr2, ticket1, 30L, Some 3L);
+        (pk1, l2addr addr2, ticket1, 40L, Some 4L);
+        (pk1, l2addr addr2, ticket1, 50L, Some 5L);
       ]
     |> List.map (fun x -> [x])
   in
@@ -805,12 +1254,15 @@ let test_pre_apply_batch () =
     with_initial_setup [ticket1; ticket2] [[(ticket1, 10L)]; [(ticket2, 20L)]]
   in
 
-  let (sk1, pk1, addr1, _idx1) = nth_exn accounts 0 in
-  let (sk2, pk2, addr2, _idx2) = nth_exn accounts 1 in
+  let (sk1, pk1, addr1, _idx1, _) = nth_exn accounts 0 in
+  let (sk2, pk2, addr2, _idx2, _) = nth_exn accounts 1 in
 
   let transaction =
     transfers
-      [(pk1, addr2, ticket1, 10L, None); (pk2, addr1, ticket2, 20L, None)]
+      [
+        (pk1, l2addr addr2, ticket1, 10L, None);
+        (pk2, l2addr addr1, ticket2, 20L, None);
+      ]
   in
   let batch1 = create_batch_v1 [transaction] [[sk1; sk2]] in
   let* (ctxt, _indexes, _) = Batch_V1.check_signature ctxt batch1 in
@@ -853,14 +1305,17 @@ let test_apply_message_batch () =
     with_initial_setup [ticket1; ticket2] [[(ticket1, 10L)]; [(ticket2, 20L)]]
   in
 
-  let (sk1, pk1, addr1, _) = nth_exn accounts 0 in
-  let (sk2, pk2, addr2, _) = nth_exn accounts 1 in
+  let (sk1, pk1, addr1, _, _) = nth_exn accounts 0 in
+  let (sk2, pk2, addr2, _, _) = nth_exn accounts 1 in
 
   (* Then, we build a transaction with:
      [addr1] -> [addr2] & [addr2] -> [addr1]. *)
   let transaction =
     transfers
-      [(pk1, addr2, ticket1, 10L, None); (pk2, addr1, ticket2, 20L, None)]
+      [
+        (pk1, l2addr addr2, ticket1, 10L, None);
+        (pk2, l2addr addr1, ticket2, 20L, None);
+      ]
   in
   let batch = create_batch_v1 [transaction] [[sk1; sk2]] in
   let (msg, _) =
@@ -878,6 +1333,142 @@ let test_apply_message_batch () =
          covered by other tests. *)
       return_unit
   | _ -> fail_msg "Invalid apply message result"
+
+(** Test a batch of transfers where some of the transfers will emit
+   withdrawals. *)
+let test_apply_message_batch_withdrawals () =
+  let open Context_l2.Syntax in
+  let* (ctxt, tidxs, accounts) =
+    with_initial_setup [ticket1; ticket2] [[(ticket1, 10L)]; [(ticket2, 20L)]]
+  in
+
+  let (sk1, pk1, addr1, idx1, pkh1) = nth_exn accounts 0 in
+  let (sk2, pk2, addr2, idx2, pkh2) = nth_exn accounts 1 in
+
+  let tidx1 = nth_exn tidxs 0 in
+  let tidx2 = nth_exn tidxs 1 in
+
+  (* Then, we build a transaction with:
+       - [pk1] -> [addr2]
+       - [pk1] -> [pkh2] (-> withdrawal)
+       - [pk2] -> [addr1]
+       - [pk2] -> [pkh1] (-> withdrawal)
+  *)
+  let transactions =
+    [
+      transfers [(pk1, l2addr addr2, ticket1, 5L, Some 1L)];
+      transfers [(pk1, l1addr pkh2, ticket1, 5L, Some 2L)];
+      transfers [(pk2, l2addr addr1, ticket2, 10L, Some 1L)];
+      transfers [(pk2, l1addr pkh1, ticket2, 10L, Some 2L)];
+    ]
+  in
+  let batch = create_batch_v1 transactions [[sk1]; [sk1]; [sk2]; [sk2]] in
+  let (msg, _) =
+    Tx_rollup_message.make_batch
+      (Data_encoding.Binary.to_string_exn
+         Tx_rollup_l2_batch.encoding
+         (V1 batch))
+  in
+
+  let* (ctxt, result) = apply_message ctxt msg in
+
+  match result with
+  | ( Message_result.Batch_V1_result
+        (Message_result.Batch_V1.Batch_result
+          {
+            results =
+              [
+                (_, Transaction_success);
+                (_, Transaction_success);
+                (_, Transaction_success);
+                (_, Transaction_success);
+              ];
+            _;
+          }),
+      withdrawals ) ->
+      Alcotest.(
+        check
+          (list eq_withdrawal)
+          "Resulting withdrawal from L2->L1 batch"
+          withdrawals
+          [
+            {
+              destination = pkh2;
+              ticket_hash = ticket1;
+              amount = Tx_rollup_l2_qty.of_int64_exn 5L;
+            };
+            {
+              destination = pkh1;
+              ticket_hash = ticket2;
+              amount = Tx_rollup_l2_qty.of_int64_exn 10L;
+            };
+          ]) ;
+      let* () =
+        check_balance
+          ctxt
+          "addr1"
+          "ticket1"
+          "addr1.ticket1 should be spent"
+          tidx1
+          idx1
+          0L
+      in
+      let* () =
+        check_balance
+          ctxt
+          "addr2"
+          "ticket1"
+          "addr2.ticket1 should be credited"
+          tidx1
+          idx2
+          5L
+      in
+
+      let* () =
+        check_balance
+          ctxt
+          "addr2"
+          "ticket2"
+          "addr1.ticket2 should be credited"
+          tidx2
+          idx1
+          10L
+      in
+      let* () =
+        check_balance
+          ctxt
+          "addr1"
+          "ticket2"
+          "addr2.ticket2 should be spent"
+          tidx2
+          idx2
+          0L
+      in
+      return_unit
+  | ( Message_result.Batch_V1_result
+        (Message_result.Batch_V1.Batch_result {results; _}),
+      _ ) ->
+      let* () =
+        if List.length results <> 4 then
+          fail_msg
+            ("Expected 4 results, got " ^ string_of_int @@ List.length results)
+        else return_unit
+      in
+      List.iter_es
+        (fun res ->
+          match res with
+          | (_, Message_result.Transaction_success) -> return_unit
+          | (_, Transaction_failure {index; reason}) ->
+              let msg =
+                Format.asprintf
+                  "Result at position %d unexpectedly failed: %a"
+                  index
+                  Environment.Error_monad.pp
+                  reason
+              in
+              fail_msg msg)
+        results
+  | _ -> fail_msg "Unexpected apply message result"
 
 let test_apply_message_deposit () =
   let open Context_l2.Syntax in
@@ -905,8 +1496,17 @@ let tests =
   wrap_tztest_tests
     [
       ("simple transaction", test_simple_deposit);
+      ("returned transaction", test_returned_deposit);
       ("deposit with existing indexes", test_deposit_with_existing_indexes);
-      ("test simple transaction", test_simple_transaction);
+      ("test simple l1 transaction", test_simple_l1_transaction);
+      ( "test simple l1 transaction: inexistant ticket",
+        test_l1_transaction_inexistant_ticket );
+      ( "test simple l1 transaction: inexistant signer",
+        test_l1_transaction_inexistant_signer );
+      ("test simple l1 transaction: overdraft", test_l1_transaction_overdraft);
+      ("test simple l1 transaction: zero", test_l1_transaction_zero);
+      ("test simple l1 transaction: partial", test_l1_transaction_partial);
+      ("test simple l2 transaction", test_simple_l2_transaction);
       ( "test simple transaction with indexes and values",
         test_transaction_with_unknown_indexable );
       ("invalid transaction", test_invalid_transaction);
@@ -916,5 +1516,7 @@ let tests =
       ("update counter", test_update_counter);
       ("pre apply batch", test_pre_apply_batch);
       ("apply batch from message", test_apply_message_batch);
+      ( "apply batch from message with withdrawals",
+        test_apply_message_batch_withdrawals );
       ("apply deposit from message", test_apply_message_deposit);
     ]

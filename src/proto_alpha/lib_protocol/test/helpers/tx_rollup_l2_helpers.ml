@@ -94,6 +94,8 @@ let empty_context : Context_l2.t = empty_storage
 
 let rng_state = Random.State.make_self_init ()
 
+let gen_l1_address ?seed () = Signature.generate_key ~algo:Ed25519 ?seed ()
+
 let gen_l2_address () =
   let seed =
     Bytes.init 32 (fun _ -> char_of_int @@ Random.State.int rng_state 255)
