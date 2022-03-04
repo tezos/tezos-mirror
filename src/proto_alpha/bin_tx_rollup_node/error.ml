@@ -185,33 +185,6 @@ let () =
       | _ -> None)
     (fun path -> Tx_rollup_unable_to_write_configuration_file path)
 
-type error +=
-  | Tx_rollup_invalid_history_mode of Tezos_shell_services.History_mode.t
-
-let () =
-  register_error_kind
-    ~id:"tx_rollup.node.invalid_history_mode"
-    ~title:"The Tezos node has an invalid history mode"
-    ~description:"Tezos node should be in 'archive' or 'full' history mode"
-    ~pp:(fun ppf history_mode ->
-      let open Tezos_shell_services.History_mode in
-      Format.fprintf
-        ppf
-        "%a and %a are accepted mode. Not %a"
-        pp
-        Archive
-        pp
-        (Full None)
-        pp
-        history_mode)
-    `Permanent
-    Data_encoding.(
-      obj1 (req "history_mode" Tezos_shell_services.History_mode.encoding))
-    (function
-      | Tx_rollup_invalid_history_mode history_mode -> Some history_mode
-      | _ -> None)
-    (fun history_mode -> Tx_rollup_invalid_history_mode history_mode)
-
 type error += Tx_rollup_invalid_l2_address of Micheline.canonical_location
 
 let () =
@@ -335,3 +308,23 @@ let () =
     (fun (disk_rollup_origination, given_rollup_genesis) ->
       Tx_rollup_different_disk_stored_origination_rollup_and_given_rollup_genesis
         {disk_rollup_origination; given_rollup_genesis})
+
+type error += Tx_rollup_no_operation_metadata of Operation_hash.t
+
+let () =
+  register_error_kind
+    ~id:"tx_rollup.node.no_operation_metadata"
+    ~title:"Operation receipt unavailable"
+    ~description:"The operation receipt is unavailable."
+    ~pp:(fun ppf op ->
+      Format.fprintf
+        ppf
+        "The operation receipt of %a is unavailable. Please make sure that the \
+         history mode of the Tezos node you are connecting to matches the \
+         requirements."
+        Operation_hash.pp
+        op)
+    `Permanent
+    Data_encoding.(obj1 (req "context" Operation_hash.encoding))
+    (function Tx_rollup_no_operation_metadata o -> Some o | _ -> None)
+    (fun o -> Tx_rollup_no_operation_metadata o)

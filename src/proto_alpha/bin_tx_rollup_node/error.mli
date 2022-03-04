@@ -57,10 +57,6 @@ type error += Tx_rollup_configuration_file_does_not_exists of string
 (** Error issued when the configuration file cannot be write. *)
 type error += Tx_rollup_unable_to_write_configuration_file of string
 
-(** Error issued when the Tezos node is not in a valid history_mode. *)
-type error +=
-  | Tx_rollup_invalid_history_mode of Tezos_shell_services.History_mode.t
-
 (** Error issued when the Tx rollup node try to parse an invalid rollup l2 address. *)
 type error += Tx_rollup_invalid_l2_address of Micheline.canonical_location
 
@@ -86,3 +82,6 @@ type error +=
       disk_rollup_origination : Block_hash.t;
       given_rollup_genesis : Block_hash.t;
     }
+
+(** Error when operation metadata is not available. *)
+type error += Tx_rollup_no_operation_metadata of Operation_hash.t

@@ -205,15 +205,19 @@ let extract_messages_from_block block_info rollup_id =
             let operation_and_result =
               pack_contents_list operation_contents result_contents
             in
-            get_related_messages acc operation_and_result
-        | None -> acc)
-    | (_, Some No_operation_metadata) | (_, None) -> acc
+            ok (get_related_messages acc operation_and_result)
+        | None ->
+            (* Should not happen *)
+            ok acc)
+    | (_, Some No_operation_metadata) | (_, None) ->
+        error (Tx_rollup_no_operation_metadata operation.hash)
   in
   match managed_operation with
-  | None -> ([], 0)
+  | None -> ok ([], 0)
   | Some managed_operations ->
-      let (rev_messages, cumulated_size) =
-        List.fold_left finalize_receipt ([], 0) managed_operations
+      let open Result_syntax in
+      let+ (rev_messages, cumulated_size) =
+        List.fold_left_e finalize_receipt ([], 0) managed_operations
       in
       (List.rev rev_messages, cumulated_size)
 
@@ -240,7 +244,7 @@ let process_messages_and_inboxes (state : State.t)
     ~(predecessor : L2block.header) ?predecessor_context block_info rollup_id =
   let open Lwt_result_syntax in
   let current_hash = block_info.Alpha_block_services.hash in
-  let (messages, cumulated_size) =
+  let*? (messages, cumulated_size) =
     extract_messages_from_block block_info rollup_id
   in
   let*! () = Event.(emit messages_application) (List.length messages) in
@@ -356,10 +360,6 @@ let rec connect ~delay cctxt =
       let* () = Lwt_unix.sleep delay in
       connect ~delay cctxt
 
-let valid_history_mode = function
-  | History_mode.Archive | History_mode.Full _ -> true
-  | _ -> false
-
 (* TODO/TORU: https://gitlab.com/tezos/tezos/-/issues/1845
    Clean exit *)
 let run ~data_dir cctxt =
@@ -376,12 +376,6 @@ let run ~data_dir cctxt =
     Lwt_exit.register_clean_up_callback
       ~loc:__LOC__
       (main_exit_callback state configuration.data_dir)
-  in
-  let* (_, _, _, history_mode) = Chain_services.checkpoint cctxt () in
-  let* () =
-    fail_unless
-      (valid_history_mode history_mode)
-      (Error.Tx_rollup_invalid_history_mode history_mode)
   in
   let rec loop () =
     let* () =
