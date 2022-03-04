@@ -578,7 +578,7 @@ let set_keys ?(expect_failure = false) ~signers ~key_groups ~overall_treshold
       ~expect_failure
       ~source:"bootstrap1"
       ~target:contract
-      ~burn_cap:Tez.(of_mutez_int 10000)
+      ~burn_cap:Tez.(of_mutez_int 20000)
       ~arg
       Tez.zero
   in
@@ -940,13 +940,33 @@ let test_update_keys : unit StateMonad.t =
       ~replay:1
       contract
   in
-  Log.info "Overall treshold can't be greater than number of keys." ;
+  Log.info "Overall threshold cannot be 0, even if there's no groups." ;
+  let* () =
+    set_keys
+      ~expect_failure:true
+      ~signers:[[Some 0]; [Some 1]; [None]]
+      ~key_groups:[]
+      ~overall_treshold:0
+      ~replay:1
+      contract
+  in
+  Log.info "Overall treshold can't be greater than the number of keys." ;
   let* () =
     set_keys
       ~expect_failure:true
       ~signers:[[Some 0]; [Some 1]; [None]]
       ~key_groups:[([3; 4], 1); ([5], 1); ([6], 1)]
       ~overall_treshold:4
+      ~replay:1
+      contract
+  in
+  Log.info "There must be at least one group" ;
+  let* () =
+    set_keys
+      ~expect_failure:true
+      ~signers:[[Some 0]; [Some 1]; [None]]
+      ~key_groups:[]
+      ~overall_treshold:2
       ~replay:1
       contract
   in
@@ -970,6 +990,17 @@ let test_update_keys : unit StateMonad.t =
       ~replay:1
       contract
   in
+  Log.info "Group cannot be empty even if its threshold is 0." ;
+  let* () =
+    set_keys
+      ~expect_failure:true
+      ~signers:[[Some 0]; [Some 1]; [None]]
+      ~key_groups:[([3; 4], 1); ([5], 1); ([], 0)]
+      ~overall_treshold:2
+      ~replay:1
+      contract
+  in
+  Log.info "An example of valid keys settings." ;
   let* () =
     set_keys
       ~signers:[[Some 0]; [Some 1]; [None]]
@@ -1032,6 +1063,33 @@ let test_update_keys : unit StateMonad.t =
       ~replay:6
       ~receiver
       ~signers:[[Some 3; Some 4]; [None]; [None]]
+      Tez.(of_int 10)
+  in
+  Log.info "Keys can be repeated on many positions." ;
+  let* () =
+    set_keys
+      ~signers:[[Some 3; Some 4]; [Some 5]; [Some 6]]
+      ~key_groups:[([3; 4], 1); ([3; 5], 1); ([3; 6], 1)]
+      ~overall_treshold:2
+      ~replay:6
+      contract
+  in
+  Log.info "Transfer is possible without using duplicated keys" ;
+  let* () =
+    sign_transfer
+      ~contract
+      ~replay:7
+      ~receiver
+      ~signers:[[None; Some 4]; [None; Some 5]; [None; Some 6]]
+      Tez.(of_int 10)
+  in
+  Log.info "The user #3 can sign everything himself." ;
+  let* () =
+    sign_transfer
+      ~contract
+      ~replay:8
+      ~receiver
+      ~signers:[[Some 3; None]; [Some 3; None]; [Some 3; None]]
       Tez.(of_int 10)
   in
   return ()
