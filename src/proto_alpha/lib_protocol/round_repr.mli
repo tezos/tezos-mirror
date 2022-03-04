@@ -99,7 +99,7 @@ module Durations : sig
       @param first_round_duration duration of round 0
       @param delay_increment_per_round amount of time added in from one round
                                        duration to the duration of its next round
-      @raises Invalid_argument if
+      @raise Invalid_argument if
         - first_round_duration <= 1; or
         - delay_increment_per_round is <= 0
    *)
