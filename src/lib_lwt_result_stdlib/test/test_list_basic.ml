@@ -232,6 +232,13 @@ module Partition = struct
 end
 
 module Shuffle = struct
+  let test_small () =
+    let rng = Random.State.make_self_init () in
+    assert (shuffle ~rng [] = []) ;
+    assert (shuffle ~rng [0] = [0]) ;
+    assert (shuffle ~rng [0; 0] = [0; 0]) ;
+    ()
+
   let pp_int_list =
     Format.pp_print_list
       ~pp_sep:(fun ppf () -> Format.fprintf ppf "; ")
@@ -248,8 +255,8 @@ module Shuffle = struct
       QCheck.(pair (list_of_size list_size int) int)
       (fun (l, seed) ->
         let rng = Random.State.make [|seed|] in
-        let l1 = List.sort Int.compare l in
-        let l2 = List.sort Int.compare (shuffle ~rng l) in
+        let l1 = sort Int.compare l in
+        let l2 = sort Int.compare (shuffle ~rng l) in
         Lib_test.Qcheck_helpers.qcheck_eq'
           ~pp:pp_int_list
           ~eq:( = )
@@ -257,7 +264,47 @@ module Shuffle = struct
           ~expected:l1
           ())
 
-  let tests = [QCheck_alcotest.to_alcotest test_shuffle_preserves_values]
+  let test_determinism_eq seed =
+    let rng1 = Random.State.make [|seed|] in
+    let rng2 = Random.State.make [|seed|] in
+    let input = [0; 1; 2; 3; 4; 5; 6; 7; 8; 9] in
+    let output1 = shuffle ~rng:rng1 input in
+    let output2 = shuffle ~rng:rng2 input in
+    assert (equal Int.equal output1 output2)
+
+  let test_determinism_eq () =
+    test_determinism_eq 0 ;
+    test_determinism_eq 1 ;
+    test_determinism_eq 3421304 ;
+    test_determinism_eq 3021782487 ;
+    test_determinism_eq 3421452345304 ;
+    test_determinism_eq 30214780913782487 ;
+    ()
+
+  let test_determinism_neq seed =
+    let rng1 = Random.State.make [|seed|] in
+    let rng2 = Random.State.make [|seed + 17|] in
+    let input = [0; 1; 2; 3; 4; 5; 6; 7; 8; 9] in
+    let output1 = shuffle ~rng:rng1 input in
+    let output2 = shuffle ~rng:rng2 input in
+    assert (not (equal Int.equal output1 output2))
+
+  let test_determinism_neq () =
+    test_determinism_neq 0 ;
+    test_determinism_neq 1 ;
+    test_determinism_neq 3421304 ;
+    test_determinism_neq 3021782487 ;
+    test_determinism_neq 3421452345304 ;
+    test_determinism_neq 30214780913782487 ;
+    ()
+
+  let tests =
+    [
+      Alcotest.test_case "small" `Quick test_small;
+      QCheck_alcotest.to_alcotest test_shuffle_preserves_values;
+      Alcotest.test_case "determinism(eq)" `Quick test_determinism_eq;
+      Alcotest.test_case "determinism(neq)" `Quick test_determinism_neq;
+    ]
 end
 
 let () =
