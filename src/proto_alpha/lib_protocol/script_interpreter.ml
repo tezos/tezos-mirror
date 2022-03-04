@@ -1704,17 +1704,17 @@ let step logger ctxt step_constants descr stack =
    ====================
 
 *)
+type execution_result = {
+  ctxt : context;
+  storage : Script.expr;
+  lazy_storage_diff : Lazy_storage.diffs option;
+  operations : packed_internal_operation list;
+  ticket_diffs : Z.t Ticket_token_map.t;
+}
+
 let execute logger ctxt mode step_constants ~entrypoint ~internal
     unparsed_script cached_script arg :
-    (Script.expr
-    * packed_internal_operation list
-    * context
-    * Lazy_storage.diffs option
-    * ex_script
-    * int
-    * Z.t Ticket_token_map.t)
-    tzresult
-    Lwt.t =
+    (execution_result * (ex_script * int)) tzresult Lwt.t =
   (match cached_script with
   | None ->
       parse_script
@@ -1772,7 +1772,7 @@ let execute logger ctxt mode step_constants ~entrypoint ~internal
     )
   >>=? fun (unparsed_storage, ctxt) ->
   let op_to_couple op = (op.piop, op.lazy_storage_diff) in
-  let (op_elems, op_diffs) =
+  let (operations, op_diffs) =
     ops.elements |> List.map op_to_couple |> List.split
   in
   let lazy_storage_diff_all =
@@ -1808,21 +1808,14 @@ let execute logger ctxt mode step_constants ~entrypoint ~internal
   let (size, cost) = Script_ir_translator.script_size script in
   Gas.consume ctxt cost >>?= fun ctxt ->
   return
-    ( unparsed_storage,
-      op_elems,
-      ctxt,
-      lazy_storage_diff_all,
-      script,
-      size,
-      ticket_diffs )
-
-type execution_result = {
-  ctxt : context;
-  storage : Script.expr;
-  lazy_storage_diff : Lazy_storage.diffs option;
-  operations : packed_internal_operation list;
-  ticket_diffs : Z.t Ticket_token_map.t;
-}
+    ( {
+        ctxt;
+        storage = unparsed_storage;
+        lazy_storage_diff = lazy_storage_diff_all;
+        operations;
+        ticket_diffs;
+      },
+      (script, size) )
 
 let execute ?logger ctxt ~cached_script mode step_constants ~script ~entrypoint
     ~parameter ~internal =
@@ -1836,15 +1829,6 @@ let execute ?logger ctxt ~cached_script mode step_constants ~script ~entrypoint
     script
     cached_script
     (Micheline.root parameter)
-  >|=? fun ( storage,
-             operations,
-             ctxt,
-             lazy_storage_diff,
-             ex_script,
-             approx_size,
-             ticket_diffs ) ->
-  ( {ctxt; storage; lazy_storage_diff; operations; ticket_diffs},
-    (ex_script, approx_size) )
 
 (*
 
