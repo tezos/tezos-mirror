@@ -1,6 +1,5 @@
 misc_checks:
-  extends: .build_template
-  stage: test
+  extends: .test_template
   needs: []
   script:
     # checks that all deps of opam packages are already installed
@@ -42,8 +41,7 @@ semgrep:
     - sh ./scripts/semgrep/lint-all-ocaml-sources.sh
 
 check_precommit_hook:
-  extends: .build_template
-  stage: test
+  extends: .test_template
   needs: []
   script:
     - ./scripts/pre_commit/pre_commit.py --test-itself
@@ -56,8 +54,6 @@ check_scripts_b58_prefix:
   # in sync with the python version used for the tests
   extends: .test_template
   needs: []
-  before_script:
-    - . $HOME/.venv/bin/activate
   script:
     - poetry run pylint scripts/b58_prefix/b58_prefix.py --disable=missing-docstring --disable=invalid-name
     - poetry run pytest scripts/b58_prefix/test_b58_prefix.py -v
