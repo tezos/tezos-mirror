@@ -616,10 +616,11 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
 
   let get_branch chain_id = Format.asprintf "%a" Chain_id.pp chain_id
 
+  let empty index = {index; tree = Store.Tree.empty (); parents = []; ops = 0}
+
   let commit_genesis index ~chain_id ~time ~protocol =
     let open Lwt_result_syntax in
-    let tree = Store.Tree.empty () in
-    let ctxt = {index; tree; parents = []; ops = 0} in
+    let ctxt = empty index in
     let* ctxt =
       match index.patch_context with
       | None -> return ctxt
@@ -861,8 +862,7 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
       let* () = aux tree Fun.id in
       Lwt.return !total_visited
 
-    let make_context index =
-      {index; tree = Store.Tree.empty (); parents = []; ops = 0}
+    let make_context index = empty index
 
     let update_context context tree = {context with tree}
 
