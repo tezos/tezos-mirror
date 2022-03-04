@@ -1,87 +1,87 @@
 tezt/_regressions/rpc/hangzhou.light.votes.out
 
 ./tezos-client --mode light rpc get /chains/main/blocks/head/votes/ballot_list
-protocol of light mode unspecified, using the node's protocol: PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx
 []
+protocol of light mode unspecified, using the node's protocol: PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx
 
 ./tezos-client --mode light rpc get /chains/main/blocks/head/votes/ballots
-protocol of light mode unspecified, using the node's protocol: PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx
 { "yay": 0, "nay": 0, "pass": 0 }
+protocol of light mode unspecified, using the node's protocol: PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx
 
 ./tezos-client --mode light rpc get /chains/main/blocks/head/votes/current_period
-protocol of light mode unspecified, using the node's protocol: PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx
 { "voting_period": { "index": 0, "kind": "proposal", "start_position": 0 },
   "position": 1, "remaining": 2 }
+protocol of light mode unspecified, using the node's protocol: PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx
 
 ./tezos-client --mode light rpc get /chains/main/blocks/head/votes/current_proposal
-protocol of light mode unspecified, using the node's protocol: PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx
 null
+protocol of light mode unspecified, using the node's protocol: PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx
 
 ./tezos-client --mode light rpc get /chains/main/blocks/head/votes/current_quorum
-protocol of light mode unspecified, using the node's protocol: PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx
 5500
+protocol of light mode unspecified, using the node's protocol: PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx
 
 ./tezos-client --mode light rpc get /chains/main/blocks/head/votes/listings
-protocol of light mode unspecified, using the node's protocol: PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx
 [ { "pkh": "[PUBLIC_KEY_HASH]", "rolls": 500 },
   { "pkh": "[PUBLIC_KEY_HASH]", "rolls": 500 },
   { "pkh": "[PUBLIC_KEY_HASH]", "rolls": 500 },
   { "pkh": "[PUBLIC_KEY_HASH]", "rolls": 500 },
   { "pkh": "[PUBLIC_KEY_HASH]", "rolls": 500 } ]
+protocol of light mode unspecified, using the node's protocol: PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx
 
 ./tezos-client --mode light rpc get /chains/main/blocks/head/votes/proposals
-protocol of light mode unspecified, using the node's protocol: PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx
 [ [ "ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp", 500 ] ]
+protocol of light mode unspecified, using the node's protocol: PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx
 
 ./tezos-client --mode light rpc get /chains/main/blocks/head/votes/successor_period
-protocol of light mode unspecified, using the node's protocol: PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx
 { "voting_period": { "index": 0, "kind": "proposal", "start_position": 0 },
   "position": 2, "remaining": 1 }
+protocol of light mode unspecified, using the node's protocol: PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx
 
 ./tezos-client --mode light rpc get /chains/main/blocks/head/votes/total_voting_power
-protocol of light mode unspecified, using the node's protocol: PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx
 2500
+protocol of light mode unspecified, using the node's protocol: PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx
 
 ./tezos-client --mode light rpc get /chains/main/blocks/head/votes/ballot_list
-protocol of light mode unspecified, using the node's protocol: PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx
 [ { "pkh": "[PUBLIC_KEY_HASH]", "ballot": "nay" },
   { "pkh": "[PUBLIC_KEY_HASH]", "ballot": "pass" },
   { "pkh": "[PUBLIC_KEY_HASH]", "ballot": "yay" } ]
+protocol of light mode unspecified, using the node's protocol: PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx
 
 ./tezos-client --mode light rpc get /chains/main/blocks/head/votes/ballots
-protocol of light mode unspecified, using the node's protocol: PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx
 { "yay": 500, "nay": 500, "pass": 500 }
+protocol of light mode unspecified, using the node's protocol: PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx
 
 ./tezos-client --mode light rpc get /chains/main/blocks/head/votes/current_period
-protocol of light mode unspecified, using the node's protocol: PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx
 { "voting_period": { "index": 1, "kind": "exploration", "start_position": 4 },
   "position": 0, "remaining": 3 }
+protocol of light mode unspecified, using the node's protocol: PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx
 
 ./tezos-client --mode light rpc get /chains/main/blocks/head/votes/current_proposal
-protocol of light mode unspecified, using the node's protocol: PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx
 "ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp"
+protocol of light mode unspecified, using the node's protocol: PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx
 
 ./tezos-client --mode light rpc get /chains/main/blocks/head/votes/current_quorum
-protocol of light mode unspecified, using the node's protocol: PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx
 5500
+protocol of light mode unspecified, using the node's protocol: PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx
 
 ./tezos-client --mode light rpc get /chains/main/blocks/head/votes/listings
-protocol of light mode unspecified, using the node's protocol: PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx
 [ { "pkh": "[PUBLIC_KEY_HASH]", "rolls": 500 },
   { "pkh": "[PUBLIC_KEY_HASH]", "rolls": 500 },
   { "pkh": "[PUBLIC_KEY_HASH]", "rolls": 500 },
   { "pkh": "[PUBLIC_KEY_HASH]", "rolls": 500 },
   { "pkh": "[PUBLIC_KEY_HASH]", "rolls": 500 } ]
+protocol of light mode unspecified, using the node's protocol: PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx
 
 ./tezos-client --mode light rpc get /chains/main/blocks/head/votes/proposals
-protocol of light mode unspecified, using the node's protocol: PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx
 []
+protocol of light mode unspecified, using the node's protocol: PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx
 
 ./tezos-client --mode light rpc get /chains/main/blocks/head/votes/successor_period
-protocol of light mode unspecified, using the node's protocol: PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx
 { "voting_period": { "index": 1, "kind": "exploration", "start_position": 4 },
   "position": 1, "remaining": 2 }
+protocol of light mode unspecified, using the node's protocol: PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx
 
 ./tezos-client --mode light rpc get /chains/main/blocks/head/votes/total_voting_power
-protocol of light mode unspecified, using the node's protocol: PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx
 2500
+protocol of light mode unspecified, using the node's protocol: PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx
