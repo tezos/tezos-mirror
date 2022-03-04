@@ -145,21 +145,21 @@ module StateMonad = struct
     let* () = decrease_balance_of account ~amount in
     assert_balance account
 
-  let initialise_vesting_state ?overall_treshold ?vesting_increment ?next_payout
-      ?payout_interval ?pour_info key_indices =
+  let initialise_vesting_state ?overall_threshold ?vesting_increment
+      ?next_payout ?payout_interval ?pour_info key_indices =
     let* keys = getf StateRecord.get_keys in
     let storage =
       Contract_storage.initial
-        ?overall_treshold
+        ?overall_threshold
         ?vesting_increment
         ?next_payout
         ?payout_interval
         ?pour_info
       @@ List.map
            Account.(
-             fun (idx, treshold) ->
+             fun (idx, threshold) ->
                let ks = List.map (fun i -> (Array.get keys i).public_key) idx in
-               (ks, treshold))
+               (ks, threshold))
            key_indices
     in
     update (fun s -> StateRecord.{s with storage})
@@ -383,14 +383,17 @@ let vest ?(expect_failure = false) ?(amount = Tez.zero) vesting_contract =
     else Contract_storage.[increment_vested_balance; next_payout])
     vesting_contract
 
-let sign_transfer ?(expect_failure = false) ~contract ~replay ~receiver ~signers
-    amount =
+let sign_transfer ?(expect_failure = false) ?data ~contract ~replay ~receiver
+    ~signers amount =
   let open StateMonad in
   let data =
     let open Test_michelson in
-    pair
-      (left @@ left @@ pair (str receiver) (tez amount))
-      (pair (str contract) (num replay))
+    Option.value
+      data
+      ~default:
+        (pair
+           (left @@ left @@ pair (str receiver) (tez amount))
+           (pair (str contract) (num replay)))
   in
   let* signatures = signatures ~typ:vesting_arg_type ~data signers in
   let arg =
@@ -538,7 +541,7 @@ let set_delegate ~delegate ~signers ~replay contract =
   let* () = assert_balance contract in
   assert_updated_storage Contract_storage.[bump_replay_counter] contract
 
-let set_keys ?(expect_failure = false) ~signers ~key_groups ~overall_treshold
+let set_keys ?(expect_failure = false) ~signers ~key_groups ~overall_threshold
     ~replay contract =
   let open StateMonad in
   let* keys = getf StateRecord.get_keys in
@@ -548,14 +551,14 @@ let set_keys ?(expect_failure = false) ~signers ~key_groups ~overall_treshold
         Contract_storage.
           {
             signatories = List.map (fun i -> (Array.get keys i).public_key) ks;
-            group_treshold = t;
+            group_threshold = t;
           })
       key_groups
   in
   let key_groups_micheline =
     let open Test_michelson in
     right @@ left
-    @@ Contract_storage.key_info_micheline {key_groups; overall_treshold}
+    @@ Contract_storage.key_info_micheline {key_groups; overall_threshold}
   in
   let typ =
     let open Test_michelson.Types in
@@ -585,7 +588,7 @@ let set_keys ?(expect_failure = false) ~signers ~key_groups ~overall_treshold
   let* () = assert_balance contract in
   assert_updated_storage
     (if expect_failure then []
-    else Contract_storage.[update_keys key_groups overall_treshold])
+    else Contract_storage.[update_keys key_groups overall_threshold])
     contract
 
 let transfer_and_pour_happy_path =
@@ -778,7 +781,7 @@ let test_invalid_transfers =
   let open StateMonad in
   let* contract = vesting_3_keys_2s in
   let* receiver = user_address 0 in
-  Log.info "Transfer with insuficient number of signatures fails." ;
+  Log.info "Transfer with insufficient number of signatures fails." ;
   let* () =
     sign_transfer
       ~expect_failure:true
@@ -936,7 +939,7 @@ let test_update_keys : unit StateMonad.t =
       ~expect_failure:true
       ~signers:[[Some 0]; [Some 1]; [None]]
       ~key_groups:[([3; 4], 1); ([5], 1); ([6], 1)]
-      ~overall_treshold:0
+      ~overall_threshold:0
       ~replay:1
       contract
   in
@@ -946,17 +949,17 @@ let test_update_keys : unit StateMonad.t =
       ~expect_failure:true
       ~signers:[[Some 0]; [Some 1]; [None]]
       ~key_groups:[]
-      ~overall_treshold:0
+      ~overall_threshold:0
       ~replay:1
       contract
   in
-  Log.info "Overall treshold can't be greater than the number of keys." ;
+  Log.info "Overall threshold can't be greater than the number of keys." ;
   let* () =
     set_keys
       ~expect_failure:true
       ~signers:[[Some 0]; [Some 1]; [None]]
       ~key_groups:[([3; 4], 1); ([5], 1); ([6], 1)]
-      ~overall_treshold:4
+      ~overall_threshold:4
       ~replay:1
       contract
   in
@@ -966,7 +969,7 @@ let test_update_keys : unit StateMonad.t =
       ~expect_failure:true
       ~signers:[[Some 0]; [Some 1]; [None]]
       ~key_groups:[]
-      ~overall_treshold:2
+      ~overall_threshold:2
       ~replay:1
       contract
   in
@@ -976,7 +979,7 @@ let test_update_keys : unit StateMonad.t =
       ~expect_failure:true
       ~signers:[[Some 0]; [Some 1]; [None]]
       ~key_groups:[([3; 4], 0); ([5], 1); ([6], 1)]
-      ~overall_treshold:2
+      ~overall_threshold:2
       ~replay:1
       contract
   in
@@ -986,7 +989,7 @@ let test_update_keys : unit StateMonad.t =
       ~expect_failure:true
       ~signers:[[Some 0]; [Some 1]; [None]]
       ~key_groups:[([3; 4], 1); ([5], 1); ([], 1)]
-      ~overall_treshold:2
+      ~overall_threshold:2
       ~replay:1
       contract
   in
@@ -996,7 +999,7 @@ let test_update_keys : unit StateMonad.t =
       ~expect_failure:true
       ~signers:[[Some 0]; [Some 1]; [None]]
       ~key_groups:[([3; 4], 1); ([5], 1); ([], 0)]
-      ~overall_treshold:2
+      ~overall_threshold:2
       ~replay:1
       contract
   in
@@ -1005,7 +1008,7 @@ let test_update_keys : unit StateMonad.t =
     set_keys
       ~signers:[[Some 0]; [Some 1]; [None]]
       ~key_groups:[([3; 4], 1); ([5], 1); ([6], 1)]
-      ~overall_treshold:2
+      ~overall_threshold:2
       ~replay:1
       contract
   in
@@ -1055,7 +1058,7 @@ let test_update_keys : unit StateMonad.t =
       ~signers:[[None; Some 4]; [Some 5]; [None]]
       Tez.(of_int 10)
   in
-  Log.info "Group treshold must be met." ;
+  Log.info "Group threshold must be met." ;
   let* () =
     sign_transfer
       ~expect_failure:true
@@ -1070,7 +1073,7 @@ let test_update_keys : unit StateMonad.t =
     set_keys
       ~signers:[[Some 3; Some 4]; [Some 5]; [Some 6]]
       ~key_groups:[([3; 4], 1); ([3; 5], 1); ([3; 6], 1)]
-      ~overall_treshold:2
+      ~overall_threshold:2
       ~replay:6
       contract
   in
@@ -1101,7 +1104,7 @@ let test_all_sigs_required =
     set_keys
       ~signers:[[Some 0]; [Some 1]; [None]]
       ~key_groups:[([3; 4], 2); ([5], 1); ([6], 1)]
-      ~overall_treshold:3
+      ~overall_threshold:3
       ~replay:0
       contract
   in
@@ -1148,7 +1151,7 @@ let test_full_contract =
       ~payout_interval:
         Ptime.Span.(of_int_s (60 * 60 * 24 * 365 / 12))
         (* Approximately one month. *)
-      ~overall_treshold:4
+      ~overall_threshold:4
       [
         ([0; 1; 2; 3], 2);
         ([4; 5; 6; 7], 2);
@@ -1302,6 +1305,31 @@ let test_full_contract =
         ]
       Tez.(of_int 200)
   in
+  Log.info "Data signed by the signers must be correct." ;
+  let* wrong_address = user_address 26 in
+  let* () =
+    sign_transfer
+      ~expect_failure:true
+      ~contract
+      ~replay:4
+      ~receiver:u27
+      ~data:
+        Test_michelson.(
+          pair
+            (left @@ left @@ pair (str wrong_address) (tez @@ Tez.of_int 200))
+            (pair (str contract) (num 4)))
+      ~signers:
+        [
+          [None; Some 1; Some 2; None];
+          [None; Some 5; Some 6; None];
+          [None; None; Some 10; Some 11];
+          [None; Some 13; None; Some 15];
+          [Some 16; None; None; None];
+          [None; Some 21; None; None];
+          [None; None; Some 26; None];
+        ]
+      Tez.(of_int 200)
+  in
 
   Log.info "Change keys." ;
   let* () =
@@ -1326,7 +1354,7 @@ let test_full_contract =
           ([5; 12; 19; 26], 1);
           ([6; 13; 20; 27], 1);
         ]
-      ~overall_treshold:4
+      ~overall_threshold:4
       ~replay:4
       contract
   in

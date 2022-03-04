@@ -27,12 +27,19 @@
    -------
    Component: Vesting contract
    Invocation: dune exec tezt/vesting_contract_test/main.exe
-   Subject: This file runs a test suite for the vesting contract. It supports
-            the original version of the contract, executed under Athens
-            protocol which is the last protocol, where this version can be
-            originated. It also can execute against the patched version under
-            protocol Alpha.
-*)
+   Subject: This file runs a test suite for the vesting contract. It
+            contains the current version of the contract in contract.tz
+            file and executes a few testing scenarios against it. These
+            tests are conceptually based on much older test suite
+            originally written in Bash:
+            https://gitlab.com/smondet/tezos/-/tree/vesting-contracts/contracts/vesting
+
+   NOTE: due to these tests' long execution time combined with the
+         fact that the contract doesn't change except when a protocol
+         migration patches legacy contracts, there's little point in
+         having these tests run in CI. Instead, it should be run
+         manually whenever a change is suspected to break it.
+ *)
 
 let tests =
   let open Vesting_test in

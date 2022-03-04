@@ -23,9 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type key_group = {signatories : string list; group_treshold : int}
+type key_group = {signatories : string list; group_threshold : int}
 
-type key_info = {key_groups : key_group list; overall_treshold : int}
+type key_info = {key_groups : key_group list; overall_threshold : int}
 
 type pour_info = {pour_dest : string; pour_authorizer : string}
 
@@ -39,19 +39,19 @@ type t = {
   pour_info : pour_info option;
 }
 
-let initial ?overall_treshold ?(vesting_increment = Tez.of_int 100)
+let initial ?overall_threshold ?(vesting_increment = Tez.of_int 100)
     ?(next_payout = Ptime.epoch) ?(payout_interval = Ptime.Span.of_int_s 60)
     ?pour_info keys =
-  let overall_treshold =
-    Option.value ~default:(List.length keys - 1) overall_treshold
+  let overall_threshold =
+    Option.value ~default:(List.length keys - 1) overall_threshold
   in
   {
     replay_counter = 0;
     key_info =
       {
         key_groups =
-          List.map (fun (ks, t) -> {signatories = ks; group_treshold = t}) keys;
-        overall_treshold;
+          List.map (fun (ks, t) -> {signatories = ks; group_threshold = t}) keys;
+        overall_threshold;
       };
     vested_balance = Tez.zero;
     vesting_increment;
@@ -60,10 +60,10 @@ let initial ?overall_treshold ?(vesting_increment = Tez.of_int 100)
     pour_info;
   }
 
-let update_keys key_groups overall_treshold s =
+let update_keys key_groups overall_threshold s =
   {
     s with
-    key_info = {key_groups; overall_treshold};
+    key_info = {key_groups; overall_threshold};
     replay_counter = s.replay_counter + 1;
   }
 
@@ -101,13 +101,13 @@ let key_groups_micheline key_groups =
   let open Test_michelson in
   list
   @@ List.map
-       (fun {signatories; group_treshold} ->
-         pair (list @@ List.map str signatories) (num group_treshold))
+       (fun {signatories; group_threshold} ->
+         pair (list @@ List.map str signatories) (num group_threshold))
        key_groups
 
-let key_info_micheline {key_groups; overall_treshold} =
+let key_info_micheline {key_groups; overall_threshold} =
   let open Test_michelson in
-  pair (key_groups_micheline key_groups) (num overall_treshold)
+  pair (key_groups_micheline key_groups) (num overall_threshold)
 
 let to_micheline storage =
   let open Test_michelson in
@@ -117,7 +117,7 @@ let to_micheline storage =
         [
           num storage.replay_counter;
           key_groups_micheline storage.key_info.key_groups;
-          num storage.key_info.overall_treshold;
+          num storage.key_info.overall_threshold;
         ];
       tuple
         [

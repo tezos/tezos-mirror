@@ -110,9 +110,7 @@
                      TRANSFER_TOKENS @transfer_op ;
                      CONS @operations }
                    { SWAP ;
-                     DIP { IF_NONE
-                             { NONE (pair address key) }
-                             { UNPAIR ; ADDRESS ; PAIR; SOME } ;
+                     DIP { MAP { UNPAIR ; ADDRESS ; PAIR } ;
                            SWAP ;
                            DUP ;
                            CAR ;
@@ -221,7 +219,7 @@
                        DUP ;
                        CAR %pour_dest @% ;
                        CONTRACT unit ;
-                       { IF_NONE { PUSH string "Bad transaction receiver" ; FAILWITH } {} } ;
+                       IF_NONE { PUSH string "Bad transaction receiver" ; FAILWITH } {} ;
                        DIP { DUP ;
                              CDR %pour_authorizer @% ;
                              DIP { CAR %pour_dest @% ;
