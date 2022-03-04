@@ -1129,32 +1129,12 @@ let apply_manager_operation_content :
         ctxt
         script.code
       >>?= fun (unparsed_code, ctxt) ->
-      let parse_script ctxt =
-        Script_ir_translator.parse_script
-          ctxt
-          ~legacy:false
-          ~allow_forged_in_storage:internal
-          script
-      in
-      (* The preorigination field is only used to early return the address of an
-         originated contract in Michelson. It cannot come from the outside. *)
-      (match preorigination with
-      | Some contract -> (
-          assert internal ;
-          (* Try to look up the script from the cache. It may have been stored
-             there when traversing operations for ticket balance updates. *)
-          Script_cache.find ctxt contract
-          >>=? fun (ctxt, _cache_key, cached_script) ->
-          match cached_script with
-          | None ->
-              parse_script ctxt >|=? fun (ex_script, ctxt) ->
-              (ex_script, contract, ctxt)
-          | Some (_script, ex_script) -> return (ex_script, contract, ctxt))
-      | None ->
-          parse_script ctxt >>=? fun (ex_script, ctxt) ->
-          Contract.fresh_contract_from_current_nonce ctxt
-          >>?= fun (ctxt, contract) -> return (ex_script, contract, ctxt))
-      >>=? fun (Ex_script parsed_script, contract, ctxt) ->
+      Script_ir_translator.parse_script
+        ctxt
+        ~legacy:false
+        ~allow_forged_in_storage:internal
+        script
+      >>=? fun (Ex_script parsed_script, ctxt) ->
       let views_result =
         Script_ir_translator.typecheck_views
           ctxt
@@ -1189,6 +1169,15 @@ let apply_manager_operation_content :
       >>=? fun (storage, ctxt) ->
       let storage = Script.lazy_expr (Micheline.strip_locations storage) in
       let script = {script with storage} in
+      (match preorigination with
+      | Some contract ->
+          assert internal ;
+          (* The preorigination field is only used to early return
+                 the address of an originated contract in Michelson.
+                 It cannot come from the outside. *)
+          ok (ctxt, contract)
+      | None -> Contract.fresh_contract_from_current_nonce ctxt)
+      >>?= fun (ctxt, contract) ->
       Contract.raw_originate
         ctxt
         ~prepaid_bootstrap_storage:false

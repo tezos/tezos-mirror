@@ -205,16 +205,16 @@ let tickets_of_origination ctxt ~preorigination script =
   | None -> fail Contract_not_originated
   | Some destination ->
       (* TODO: #2351
-         Avoid having to load the script from the cache.
+         Avoid having to parse the script here.
+         We're not able to rely on caching due to issues with lazy storage.
          After internal operations are in place we should be able to use the
          typed script directly.
       *)
-      parse_and_cache_script
+      Script_ir_translator.parse_script
         ctxt
-        ~destination
-        ~get_non_cached_script:(fun ctxt ->
-          (* For an origination operation we already have the script. *)
-          return (script, ctxt))
+        ~legacy:true
+        ~allow_forged_in_storage:true
+        script
       >>=? fun ( Script_ir_translator.Ex_script
                    {
                      storage;
