@@ -39,8 +39,8 @@ let traverse f xs =
 
    with variations for when [f] takes more than one parameter, when the
    matching is slightly different, and so on. Whatever the variation, the
-   patterns remain: one recursive function immediately shadowed by a
-   non-recursive function which only handles the first element.
+   pattern remains: one recursive function immediately shadowed by a
+   non-recursive function which only handles the head of the list.
 
    This is necessary because the application of [f] to the head of the list [x]
    is not on the right-hand side of an Lwt bind. As such, the call [f x] is not
