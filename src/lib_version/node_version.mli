@@ -38,6 +38,9 @@ type t = {
 
 and commit_info = {commit_hash : string; commit_date : string}
 
+(** the namespace used for the node metrics *)
+val namespace : string
+
 val version_encoding : Version.t Data_encoding.t
 
 val encoding : t Data_encoding.t

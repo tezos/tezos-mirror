@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let namespace = Tezos_version.Node_version.namespace
+
 module Worker = struct
   type t = {
     last_finished_request_push_timestamp : Prometheus.Gauge.t;
@@ -106,8 +108,7 @@ module Block_validator = struct
   }
 
   let init name =
-    let namespace = String.concat "_" name in
-    let subsystem = None in
+    let subsystem = Some (String.concat "_" name) in
     let already_commited_blocks_count =
       let help = "Number of requests to validate a block already handled" in
       Prometheus.Counter.v
@@ -186,8 +187,7 @@ module Chain_validator = struct
   }
 
   let init name =
-    let namespace = String.concat "_" name in
-    let subsystem = None in
+    let subsystem = Some (String.concat "_" name) in
     let label_name = "chain_id" in
     let head_level =
       let help = "Current level of the node's head" in

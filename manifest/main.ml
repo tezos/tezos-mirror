@@ -1801,6 +1801,7 @@ let tezos_store =
       [
         tezos_shell_services |> open_;
         tezos_base |> open_ |> open_ ~m:"TzPervasives";
+        tezos_version;
         index;
         irmin_pack;
         tezos_context |> open_;
