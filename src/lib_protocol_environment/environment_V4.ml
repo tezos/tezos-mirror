@@ -1126,19 +1126,17 @@ struct
     let value_of_key ~chain_id ~predecessor_context ~predecessor_timestamp
         ~predecessor_level ~predecessor_fitness ~predecessor ~timestamp =
       let open Lwt_result_syntax in
-      let* f =
-        let*! r =
-          value_of_key
-            ~chain_id
-            ~predecessor_context
-            ~predecessor_timestamp
-            ~predecessor_level
-            ~predecessor_fitness
-            ~predecessor
-            ~timestamp
-        in
-        Lwt.return (wrap_tzresult r)
+      let*! r =
+        value_of_key
+          ~chain_id
+          ~predecessor_context
+          ~predecessor_timestamp
+          ~predecessor_level
+          ~predecessor_fitness
+          ~predecessor
+          ~timestamp
       in
+      let*? f = wrap_tzresult r in
       return (fun x ->
           let*! r = f x in
           Lwt.return (wrap_tzresult r))

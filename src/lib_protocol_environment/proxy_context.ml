@@ -92,7 +92,7 @@ module C = struct
     let open Lwt_syntax in
     let* o = Local.Tree.find_tree t.tree k in
     match o with
-    | Some x -> Lwt.return_some x
+    | Some _ -> Lwt.return o
     | None -> (
         let* () = L.(S.emit proxy_context_missing) k in
         match t.proxy with
@@ -167,9 +167,7 @@ module C = struct
     let open Lwt_syntax in
     let* tree = data_tree t in
     let+ o = raw_find tree k in
-    match o with
-    | None -> None
-    | Some tree -> Some {proxy = t.proxy; path = k; tree}
+    Option.map (fun tree -> {proxy = t.proxy; path = k; tree}) o
 
   let add_tree (t : t) k (v : tree) =
     let open Lwt_syntax in

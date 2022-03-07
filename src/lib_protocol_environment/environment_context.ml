@@ -300,28 +300,24 @@ module Context = struct
   end
 
   let verify_tree_proof proof (f : tree -> (tree * 'a) Lwt.t) =
-    let open Lwt_syntax in
-    let+ r =
+    let open Lwt_result_syntax in
+    let* (tree, r) =
       Proof_context.M.verify_tree_proof proof (fun tree ->
           let tree = Proof_context.inject tree in
-          let+ (tree, r) = f tree in
-          (Proof_context.project tree, r))
+          let*! (tree, r) = f tree in
+          Lwt.return (Proof_context.project tree, r))
     in
-    match r with
-    | Ok (tree, r) -> Ok (Proof_context.inject tree, r)
-    | Error e -> Error e
+    return (Proof_context.inject tree, r)
 
   let verify_stream_proof proof (f : tree -> (tree * 'a) Lwt.t) =
-    let open Lwt_syntax in
-    let+ r =
+    let open Lwt_result_syntax in
+    let* (tree, r) =
       Proof_context.M.verify_stream_proof proof (fun tree ->
           let tree = Proof_context.inject tree in
-          let+ (tree, r) = f tree in
-          (Proof_context.project tree, r))
+          let*! (tree, r) = f tree in
+          Lwt.return (Proof_context.project tree, r))
     in
-    match r with
-    | Ok (tree, r) -> Ok (Proof_context.inject tree, r)
-    | Error e -> Error e
+    return (Proof_context.inject tree, r)
 
   type cache_key = Environment_cache.key
 
@@ -404,11 +400,10 @@ module Context = struct
 
     let get_cache_number ctxt =
       let open Lwt_syntax in
-      let* cn = find ctxt cache_number_path in
-      Option.fold_s
-        ~none:0
-        ~some:(fun v -> Lwt.return Data_encoding.(Binary.of_bytes_exn int31 v))
-        cn
+      let+ cn = find ctxt cache_number_path in
+      match cn with
+      | None -> 0
+      | Some v -> Data_encoding.(Binary.of_bytes_exn int31 v)
 
     let set_cache_number ctxt cache_number =
       if cache_number = 0 then Lwt.return ctxt
@@ -489,16 +484,11 @@ module Context = struct
       let open Lwt_syntax in
       let+ v = find ctxt cache_domain_path in
       Option.map
-        Data_encoding.(Binary.of_bytes_exn Environment_cache.domain_encoding)
+        (Data_encoding.Binary.of_bytes_exn Environment_cache.domain_encoding)
         v
 
     let find (Context {cache; _}) key =
-      let open Lwt_syntax in
-      match Environment_cache.find cache key with
-      | None -> Lwt.return_none
-      | Some value ->
-          let+ v = value () in
-          Some v
+      Option.map_s (fun value -> value ()) (Environment_cache.find cache key)
 
     let load ctxt inherited ~value_of_key =
       let open Lwt_syntax in
@@ -551,11 +541,11 @@ module Context = struct
             let cache = ref None in
             fun () ->
               match !cache with
-              | Some value -> Lwt.return value
+              | Some value -> return value
               | None ->
-                  let* r = builder key in
+                  let+ r = builder key in
                   cache := Some r ;
-                  Lwt.return r
+                  r
           in
           return_ok lazy_value)
 

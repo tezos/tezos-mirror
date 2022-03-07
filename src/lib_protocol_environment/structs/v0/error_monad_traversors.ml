@@ -23,12 +23,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Lwt.Infix (* >>= >|= *)
+open Lwt.Infix (* >>= *)
 
 let ( >>? ) = Result.bind
 
 let ( >>=? ) v f =
-  Lwt.bind v (function Error _ as err -> Lwt.return err | Ok v -> f v)
+  v >>= function Error _ as err -> Lwt.return err | Ok v -> f v
 
 let ok_nil = Ok []
 

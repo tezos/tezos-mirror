@@ -927,12 +927,8 @@ struct
 
     let copy ctxt ~from ~to_ =
       let open Lwt_syntax in
-      let* o = find_tree ctxt from in
-      match o with
-      | None -> Lwt.return_none
-      | Some sub_tree ->
-          let* t = add_tree ctxt to_ sub_tree in
-          Lwt.return_some t
+      let* sub_tree = find_tree ctxt from in
+      Tezos_error_monad.TzLwtreslib.Option.map_s (add_tree ctxt to_) sub_tree
 
     let fold_keys s root ~init ~f =
       Context.fold s root ~order:`Sorted ~init ~f:(fun k v acc ->
