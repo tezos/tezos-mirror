@@ -585,6 +585,12 @@ module Encoding = struct
           inj = (fun () -> Tx_rollup_origination);
         }
 
+    let tx_rollup_batch_content =
+      (* The content of batches is a string, but stands for an immutable byte
+         sequence. JSON only allows unicode strings so we use the [bytes]
+         encoding which is in hexadecimal for JSON. *)
+      conv Bytes.of_string Bytes.to_string bytes
+
     let[@coq_axiom_with_reason "gadt"] tx_rollup_submit_batch_case =
       MCase
         {
@@ -593,7 +599,7 @@ module Encoding = struct
           encoding =
             obj3
               (req "rollup" Tx_rollup_repr.encoding)
-              (req "content" Data_encoding.string)
+              (req "content" tx_rollup_batch_content)
               (opt "burn_limit" Tez_repr.encoding);
           select =
             (function

@@ -325,6 +325,9 @@ and _ manager_operation =
   (* [Tx_rollup_origination] allows an implicit contract to originate
      a new transactional rollup. *)
   | Tx_rollup_origination : Kind.tx_rollup_origination manager_operation
+  (* [Tx_rollup_submit_batch] allows to submit batches of L2 operations on a
+     transactional rollup. The content is a string, but stands for an immutable
+     byte sequence. *)
   | Tx_rollup_submit_batch : {
       tx_rollup : Tx_rollup_repr.t;
       content : string;

@@ -1858,7 +1858,8 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 "$ref": "#/definitions/alpha.tx_rollup_id"
                               },
                               "content": {
-                                "$ref": "#/definitions/unistring"
+                                "type": "string",
+                                "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
                               },
                               "burn_limit": {
                                 "$ref": "#/definitions/alpha.mutez"
@@ -5499,7 +5500,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 {
                                   "name": "content",
                                   "layout": {
-                                    "kind": "String"
+                                    "kind": "Bytes"
                                   },
                                   "data_kind": {
                                     "kind": "Variable"
@@ -8133,7 +8134,8 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 "$ref": "#/definitions/alpha.tx_rollup_id"
                               },
                               "content": {
-                                "$ref": "#/definitions/unistring"
+                                "type": "string",
+                                "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
                               },
                               "burn_limit": {
                                 "$ref": "#/definitions/alpha.mutez"

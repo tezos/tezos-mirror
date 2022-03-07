@@ -214,6 +214,35 @@ module Regressions = struct
           client
       in
       unit
+
+    let batch_encoding =
+      Protocol.register_regression_test
+        ~__FILE__
+        ~output_file:"tx_rollup_batch_encoding"
+        ~title:"RPC (tx_rollups, regression) - batch encoding"
+        ~tags:["tx_rollup"; "batch"; "encoding"]
+      @@ fun protocol ->
+      let* ({client; rollup = _; node = _} as state) =
+        init_with_tx_rollup ~protocol ()
+      in
+      (* Batch with all possible characters. *)
+      let batch = String.init 256 Char.chr in
+      let* () = submit_batch ~batch state in
+      let* block = RPC.get_block ~block:"head" client in
+      let op = JSON.(block |-> "operations" |=> 3 |=> 0 |-> "contents" |=> 0) in
+      Check.(
+        ((JSON.(op |-> "kind" |> as_string) = "tx_rollup_submit_batch")
+           ~error_msg:"Unexpected operation. Got: %L. Expected: %R.")
+          string) ;
+      let batch_content = JSON.(op |-> "content") in
+      let batch_content_str = JSON.encode batch_content in
+      Regression.capture batch_content_str ;
+      if not (JSON.is_string batch_content) then
+        Test.fail
+          ~__LOC__
+          "Batch content in JSON should be a string: %s."
+          batch_content_str ;
+      unit
   end
 
   module Limits = struct
@@ -427,6 +456,7 @@ module Regressions = struct
     RPC.rpc_inbox protocols ;
     RPC.rpc_commitment protocols ;
     RPC.rpc_pending_bonded_commitment protocols ;
+    RPC.batch_encoding protocols ;
     Limits.submit_empty_batch protocols ;
     Limits.submit_maximum_size_batch protocols ;
     Limits.inbox_maximum_size protocols ;
