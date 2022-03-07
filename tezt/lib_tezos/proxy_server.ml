@@ -27,6 +27,7 @@ type argument =
   (* If you're considering adding [--endpoint] and [--rpc-addr],
      beware that, for the moment, they are automatically computed in
      {!create} below *)
+  | Data_dir
   | Symbolic_block_caching_time of int
 
 module Parameters = struct

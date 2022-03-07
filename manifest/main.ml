@@ -3216,6 +3216,7 @@ let _tezos_proxy_server =
          tezos_rpc_http_client_unix;
          tezos_rpc_http_server;
          tezos_shell_services;
+         tezos_shell_context;
          tezos_version;
        ]
       @ Protocol.all_optionally [Protocol.client; Protocol.plugin])
