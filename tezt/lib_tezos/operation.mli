@@ -90,6 +90,27 @@ val mk_reveal :
   Client.t ->
   manager_operation_content Lwt.t
 
+(** [mk_rejection] allows to construct a mangager operation
+   representing a tx_rollup rejection operation.
+
+    - Default [counter] is the successor of the counter of [source].
+    - Default [fee] is [1_000_000] mutez.
+    - Default [gas_limit] is [1_000_000] gas.
+    - Default [storage_limit] is [0]. *)
+val mk_rejection :
+  source:Account.key ->
+  ?counter:int ->
+  ?fee:int ->
+  ?gas_limit:int ->
+  ?storage_limit:int ->
+  tx_rollup:string ->
+  proof:bool ->
+  level:int ->
+  message:[`Batch of string] ->
+  message_position:int ->
+  Client.t ->
+  manager_operation_content Lwt.t
+
 (** [mk_call] allows to construct a manager operation representing a call
     to a smart contract [entrypoint] with a given parameter [arg] from an
     implicit account [source].
@@ -336,3 +357,25 @@ val inject_transfers :
   number_of_operations:int ->
   Client.t ->
   [`OpHash of string] list Lwt.t
+
+(** [inject_rejection] is a high-level wrapper around the tx_rollup
+   rejection operation (see {!mk_transfer}). *)
+val inject_rejection :
+  ?protocol:Protocol.t ->
+  ?async:bool ->
+  ?force:bool ->
+  ?wait_for_injection:Node.t ->
+  ?branch:string ->
+  source:Account.key ->
+  ?signer:Account.key ->
+  ?counter:int ->
+  ?fee:int ->
+  ?gas_limit:int ->
+  ?storage_limit:int ->
+  tx_rollup:string ->
+  proof:bool ->
+  level:int ->
+  message:[`Batch of string] ->
+  message_position:int ->
+  Client.t ->
+  [> `OpHash of string] Lwt.t
