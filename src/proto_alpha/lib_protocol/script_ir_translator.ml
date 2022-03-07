@@ -1824,6 +1824,61 @@ type 'before dup_n_proof_argument =
       ('before, 'a) dup_n_gadt_witness * 'a ty
       -> 'before dup_n_proof_argument
 
+let rec make_dug_proof_argument :
+    type a s x.
+    location ->
+    int ->
+    x ty ->
+    (a, s) stack_ty ->
+    (a, s, x) dug_proof_argument option =
+ fun loc n x stk ->
+  match (n, stk) with
+  | (0, rest) -> Some (Dug_proof_argument (KRest, Item_t (x, rest)))
+  | (n, Item_t (v, rest)) ->
+      make_dug_proof_argument loc (n - 1) x rest
+      |> Option.map @@ fun (Dug_proof_argument (n', aft')) ->
+         let kinfo = {iloc = loc; kstack_ty = aft'} in
+         Dug_proof_argument (KPrefix (kinfo, n'), Item_t (v, aft'))
+  | (_, _) -> None
+
+let rec make_comb_get_proof_argument :
+    type b. int -> b ty -> b comb_get_proof_argument option =
+ fun n ty ->
+  match (n, ty) with
+  | (0, value_ty) -> Some (Comb_get_proof_argument (Comb_get_zero, value_ty))
+  | (1, Pair_t (hd_ty, _, _annot)) ->
+      Some (Comb_get_proof_argument (Comb_get_one, hd_ty))
+  | (n, Pair_t (_, tl_ty, _annot)) ->
+      make_comb_get_proof_argument (n - 2) tl_ty
+      |> Option.map
+         @@ fun (Comb_get_proof_argument (comb_get_left_witness, ty')) ->
+         Comb_get_proof_argument (Comb_get_plus_two comb_get_left_witness, ty')
+  | _ -> None
+
+let rec make_comb_set_proof_argument :
+    type value before a s.
+    context ->
+    (a, s) stack_ty ->
+    location ->
+    int ->
+    value ty ->
+    before ty ->
+    (value, before) comb_set_proof_argument tzresult =
+ fun ctxt stack_ty loc n value_ty ty ->
+  match (n, ty) with
+  | (0, _) -> ok @@ Comb_set_proof_argument (Comb_set_zero, value_ty)
+  | (1, Pair_t (_hd_ty, tl_ty, _)) ->
+      pair_t loc value_ty tl_ty >|? fun after_ty ->
+      Comb_set_proof_argument (Comb_set_one, after_ty)
+  | (n, Pair_t (hd_ty, tl_ty, _)) ->
+      make_comb_set_proof_argument ctxt stack_ty loc (n - 2) value_ty tl_ty
+      >>? fun (Comb_set_proof_argument (comb_set_left_witness, tl_ty')) ->
+      pair_t loc hd_ty tl_ty' >|? fun after_ty ->
+      Comb_set_proof_argument (Comb_set_plus_two comb_set_left_witness, after_ty)
+  | _ ->
+      let whole_stack = serialize_stack_for_error ctxt stack_ty in
+      error (Bad_stack (loc, I_UPDATE, 2, whole_stack))
+
 let find_entrypoint (type full error_trace)
     ~(error_details : error_trace error_details) (full : full ty)
     (entrypoints : full entrypoints) entrypoint :
@@ -3095,32 +3150,17 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       typed ctxt loc dig (Item_t (x, aft))
   | (Prim (loc, I_DIG, (([] | _ :: _ :: _) as l), _), _) ->
       fail (Invalid_arity (loc, I_DIG, 1, List.length l))
-  | (Prim (loc, I_DUG, [n], result_annot), Item_t (x, whole_stack)) ->
+  | (Prim (loc, I_DUG, [n], result_annot), Item_t (x, whole_stack)) -> (
       parse_uint10 n >>?= fun whole_n ->
       Gas.consume ctxt (Typecheck_costs.proof_argument whole_n) >>?= fun ctxt ->
-      let rec make_proof_argument :
-          type a s x.
-          int ->
-          x ty ->
-          (a, s) stack_ty ->
-          (a, s, x) dug_proof_argument tzresult =
-       fun n x stk ->
-        match (Compare.Int.(n = 0), stk) with
-        | (true, rest) -> ok @@ Dug_proof_argument (KRest, Item_t (x, rest))
-        | (false, Item_t (v, rest)) ->
-            make_proof_argument (n - 1) x rest
-            >|? fun (Dug_proof_argument (n', aft')) ->
-            let kinfo = {iloc = loc; kstack_ty = aft'} in
-            Dug_proof_argument (KPrefix (kinfo, n'), Item_t (v, aft'))
-        | (_, _) ->
-            let whole_stack = serialize_stack_for_error ctxt whole_stack in
-            error (Bad_stack (loc, I_DUG, whole_n, whole_stack))
-      in
       error_unexpected_annot loc result_annot >>?= fun () ->
-      make_proof_argument whole_n x whole_stack
-      >>?= fun (Dug_proof_argument (n', aft)) ->
-      let dug = {apply = (fun kinfo k -> IDug (kinfo, whole_n, n', k))} in
-      typed ctxt loc dug aft
+      match make_dug_proof_argument loc whole_n x whole_stack with
+      | None ->
+          let whole_stack = serialize_stack_for_error ctxt whole_stack in
+          fail (Bad_stack (loc, I_DUG, whole_n, whole_stack))
+      | Some (Dug_proof_argument (n', aft)) ->
+          let dug = {apply = (fun kinfo k -> IDug (kinfo, whole_n, n', k))} in
+          typed ctxt loc dug aft)
   | (Prim (loc, I_DUG, [_], result_annot), stack) ->
       Lwt.return
         ( error_unexpected_annot loc result_annot >>? fun () ->
@@ -3284,62 +3324,26 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       >>?= fun (Uncomb_proof_argument (witness, after_ty)) ->
       let uncomb = {apply = (fun kinfo k -> IUncomb (kinfo, n, witness, k))} in
       typed ctxt loc uncomb after_ty
-  | (Prim (loc, I_GET, [n], annot), Item_t (comb_ty, rest_ty)) ->
+  | (Prim (loc, I_GET, [n], annot), Item_t (comb_ty, rest_ty)) -> (
       check_var_annot loc annot >>?= fun () ->
-      let rec make_proof_argument :
-          type b. int -> b ty -> b comb_get_proof_argument tzresult =
-       fun n ty ->
-        match (n, ty) with
-        | (0, value_ty) ->
-            ok @@ Comb_get_proof_argument (Comb_get_zero, value_ty)
-        | (1, Pair_t (hd_ty, _, _annot)) ->
-            ok @@ Comb_get_proof_argument (Comb_get_one, hd_ty)
-        | (n, Pair_t (_, tl_ty, _annot)) ->
-            make_proof_argument (n - 2) tl_ty
-            >|? fun (Comb_get_proof_argument (comb_get_left_witness, ty')) ->
-            Comb_get_proof_argument
-              (Comb_get_plus_two comb_get_left_witness, ty')
-        | _ ->
-            let whole_stack = serialize_stack_for_error ctxt stack_ty in
-            error (Bad_stack (loc, I_GET, 1, whole_stack))
-      in
       parse_uint11 n >>?= fun n ->
       Gas.consume ctxt (Typecheck_costs.proof_argument n) >>?= fun ctxt ->
-      make_proof_argument n comb_ty
-      >>?= fun (Comb_get_proof_argument (witness, ty')) ->
-      let after_stack_ty = Item_t (ty', rest_ty) in
-      let comb_get =
-        {apply = (fun kinfo k -> IComb_get (kinfo, n, witness, k))}
-      in
-      typed ctxt loc comb_get after_stack_ty
+      match make_comb_get_proof_argument n comb_ty with
+      | None ->
+          let whole_stack = serialize_stack_for_error ctxt stack_ty in
+          fail (Bad_stack (loc, I_GET, 1, whole_stack))
+      | Some (Comb_get_proof_argument (witness, ty')) ->
+          let after_stack_ty = Item_t (ty', rest_ty) in
+          let comb_get =
+            {apply = (fun kinfo k -> IComb_get (kinfo, n, witness, k))}
+          in
+          typed ctxt loc comb_get after_stack_ty)
   | ( Prim (loc, I_UPDATE, [n], annot),
       Item_t (value_ty, Item_t (comb_ty, rest_ty)) ) ->
       check_var_annot loc annot >>?= fun () ->
-      let rec make_proof_argument :
-          type value before.
-          int ->
-          value ty ->
-          before ty ->
-          (value, before) comb_set_proof_argument tzresult =
-       fun n value_ty ty ->
-        match (n, ty) with
-        | (0, _) -> ok @@ Comb_set_proof_argument (Comb_set_zero, value_ty)
-        | (1, Pair_t (_hd_ty, tl_ty, _)) ->
-            pair_t loc value_ty tl_ty >|? fun after_ty ->
-            Comb_set_proof_argument (Comb_set_one, after_ty)
-        | (n, Pair_t (hd_ty, tl_ty, _)) ->
-            make_proof_argument (n - 2) value_ty tl_ty
-            >>? fun (Comb_set_proof_argument (comb_set_left_witness, tl_ty')) ->
-            pair_t loc hd_ty tl_ty' >|? fun after_ty ->
-            Comb_set_proof_argument
-              (Comb_set_plus_two comb_set_left_witness, after_ty)
-        | _ ->
-            let whole_stack = serialize_stack_for_error ctxt stack_ty in
-            error (Bad_stack (loc, I_UPDATE, 2, whole_stack))
-      in
       parse_uint11 n >>?= fun n ->
       Gas.consume ctxt (Typecheck_costs.proof_argument n) >>?= fun ctxt ->
-      make_proof_argument n value_ty comb_ty
+      make_comb_set_proof_argument ctxt stack_ty loc n value_ty comb_ty
       >>?= fun (Comb_set_proof_argument (witness, after_ty)) ->
       let after_stack_ty = Item_t (after_ty, rest_ty) in
       let comb_set =
