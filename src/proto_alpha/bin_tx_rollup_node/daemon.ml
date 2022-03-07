@@ -111,7 +111,9 @@ let process_messages_and_inboxes state rollup_genesis block_info rollup_id =
   let open Lwt_result_syntax in
   let current_hash = block_info.Alpha_block_services.hash in
   let predecessor_hash = block_info.header.shell.predecessor in
-  let*! has_previous_state = State.block_already_seen state predecessor_hash in
+  let*! has_previous_state =
+    State.tezos_block_already_seen state predecessor_hash
+  in
   let*? () =
     error_unless
       (has_previous_state || Block_hash.equal rollup_genesis current_hash)
@@ -121,8 +123,10 @@ let process_messages_and_inboxes state rollup_genesis block_info rollup_id =
   let messages_len = List.length messages in
   let inbox = messages_to_inbox messages in
   let*! () = Event.(emit messages_application) messages_len in
-  let* () = State.save_inbox state current_hash inbox in
   (* TODO/TORU: Build + save L2 block  *)
+  let* () =
+    State.save_inbox state L2block.Hash.zero (* TODO/TORU: Placeholder *) inbox
+  in
   let*! () =
     Event.(emit inbox_stored)
       ( current_hash,
@@ -142,13 +146,13 @@ and process_block cctxt state rollup_genesis block_info rollup_id =
   let open Lwt_result_syntax in
   let current_hash = block_info.hash in
   let predecessor_hash = block_info.header.shell.predecessor in
-  let*! was_processed = State.block_already_seen state current_hash in
+  let*! was_processed = State.tezos_block_already_seen state current_hash in
   if was_processed then
     let*! () = Event.(emit block_already_seen) current_hash in
     return_unit
   else
     let*! predecessor_was_processed =
-      State.block_already_seen state predecessor_hash
+      State.tezos_block_already_seen state predecessor_hash
     in
     let* () =
       if
@@ -163,7 +167,8 @@ and process_block cctxt state rollup_genesis block_info rollup_id =
     let* () =
       process_messages_and_inboxes state rollup_genesis block_info rollup_id
     in
-    let* () = State.set_new_head state current_hash in
+    (* TODO/TORU: Set new L2 block head
+       let* () = State.set_new_head state current_hash in *)
     let*! () = Event.(emit new_tezos_head) current_hash in
     let*! () = Event.(emit block_processed) current_hash in
     return_unit

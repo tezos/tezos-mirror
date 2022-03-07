@@ -43,24 +43,70 @@ val init :
   rollup_genesis:Block_hash.t ->
   t tzresult Lwt.t
 
-(** [set_new_head state hash] saves the Tezos head that has just been processed in a
-    reference cell. *)
-val set_new_head : t -> Block_hash.t -> unit tzresult Lwt.t
+(** {2 Reading the state from disk}  *)
 
-(** [get_head state] returns the head that has just been processed from the reference cell. *)
-val get_head : t -> Block_hash.t option Lwt.t
+(** Retrieve the current head of the rollup. Note that the current head can go
+    in the past or change in case of reorganisations at the L1 layer.  *)
+val get_head : t -> L2block.header option Lwt.t
 
-(** [block_already_seen state block] returns [true] iff [block] has already been processed. *)
-val block_already_seen : t -> Block_hash.t -> bool Lwt.t
+(** Retrieve an L2 block by its hash *)
+val get_block : t -> L2block.hash -> L2block.t option Lwt.t
 
-(** [save_inbox state hash inbox] saves the inbox relative to the block referenced by
-    the hash given as
-    an argument. *)
-val save_inbox : t -> Block_hash.t -> Inbox.t -> unit tzresult Lwt.t
+(** Retrieve the block hash associated to a given level in the current
+    chain. Note that levels can be reaffected in case of reorganisation at the L1
+    layer. *)
+val get_level : t -> L2block.level -> L2block.hash option Lwt.t
 
-(** [find_inbox state hash] Find the inbox stored at [hash]. *)
-val find_inbox : t -> Block_hash.t -> Inbox.t option Lwt.t
+(** Retrieve an inbox associated to an L2 block *)
+val get_inbox : t -> L2block.hash -> Inbox.t option Lwt.t
 
-(** [rollup_operation_index] returns the index where are rollup operation (currently
-    as manager operation) stored into a [Block_info.t]. *)
+(** Retrieve the header of an L2 block *)
+val get_header : t -> L2block.hash -> L2block.header option Lwt.t
+
+(** Retrieve the L2 block hash corresponding to the given Tezos block. When
+    there is no inbox for an L1 block, we associate to it the L2 block of its
+    predecessor. So [get_tezos_l2_block_hash state h] returns L2 block hash at
+    which the rollup was when the Tezos node was at block [h]. *)
+val get_tezos_l2_block_hash : t -> Block_hash.t -> L2block.hash option Lwt.t
+
+(** Same as {!get_tezos_block} but retrieves the associated header at the same time. *)
+val get_tezos_l2_block : t -> Block_hash.t -> L2block.header option Lwt.t
+
+(** Same as {!get_level} but retrieves the associated header at the same time. *)
+val get_level_l2_block : t -> L2block.level -> L2block.header option Lwt.t
+
+(** Returns [true] if the Tezos block was already processed by the rollup node. *)
+val tezos_block_already_processed : t -> Block_hash.t -> bool Lwt.t
+
+(** {2 Saving the state to disk}  *)
+
+(** Set the current head of the rollup. *)
+val set_head : t -> L2block.header -> unit tzresult Lwt.t
+
+(** Save an L2 block to disk:
+    - Save both the header and the inbox
+    - Make the level point to this block
+    - Associate this L2 block with the corresponding Tezos block
+ *)
+val save_block : t -> L2block.t -> (L2block.hash, tztrace) result Lwt.t
+
+(** Make a level point to a given L2 block. If the level already points to a
+    block, it is changed. *)
+val save_level : t -> L2block.level -> L2block.hash -> unit tzresult Lwt.t
+
+(** Save an inbox to disk *)
+val save_inbox : t -> L2block.hash -> Inbox.t -> unit tzresult Lwt.t
+
+(** Save an L2 block header to disk *)
+val save_header : t -> L2block.hash -> L2block.header -> unit tzresult Lwt.t
+
+(** Associate an L2 block to a Tezos block *)
+val save_tezos_l2_block_hash :
+  t -> Block_hash.t -> L2block.hash -> unit tzresult Lwt.t
+
+(** {2 Misc}  *)
+
+(** [rollup_operation_index] returns the index in which the rollup operation are
+    stored into a [Block_info.t]. Currently, the manager operation validation
+    pass is used. *)
 val rollup_operation_index : int

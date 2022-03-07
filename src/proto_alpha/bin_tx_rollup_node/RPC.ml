@@ -47,7 +47,7 @@ let register_current_tezos_head state dir =
   let open Lwt_tzresult_syntax in
   RPC_directory.register0 dir current_tezos_head (fun () () ->
       let*! head = State.get_head state in
-      return head)
+      Option.map_es (fun head -> return head.L2block.tezos_block) head)
 
 let register_current_inbox state dir =
   let open Lwt_tzresult_syntax in
@@ -55,8 +55,8 @@ let register_current_inbox state dir =
       let*! head = State.get_head state in
       match head with
       | None -> return None
-      | Some hash ->
-          let*! inbox = State.find_inbox state hash in
+      | Some head ->
+          let*! inbox = State.get_inbox state (L2block.hash_header head) in
           return (Option.map Inbox.to_protocol_inbox inbox))
 
 let register state =
