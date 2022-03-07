@@ -75,6 +75,10 @@ end
 
 (** {2 References} *)
 
+(** A persistent reference to the rollup origination block (initialized on first
+   run). *)
+module Rollup_origination : REF with type value = Block_hash.t * int32
+
 (** A persistent reference cell that stores the header of the head of the
     rollup. *)
 module L2_head : REF with type value = L2block.header

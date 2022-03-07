@@ -30,17 +30,26 @@ open Protocol.Alpha_context
     type stored in the Irmin store. The [State] module allows access to this stored
     data. *)
 
-type t
+(** The origination block and level of the rollup is kept in the state. *)
+type rollup_origination = {block_hash : Block_hash.t; block_level : int32}
 
-(** [init ~data_dir ~context ~rollup ~block_origination_hash]
-    checks that the rollup [rollup_id] is created inside the block
-    identified by the hash [block_origination_hash], and creates an
-    initial state and context for the rollup node if that is the case. *)
+type t = private {
+  store : Stores.t;
+  context_index : Context.index;
+  rollup_origination : rollup_origination;
+}
+
+(** [init ~data_dir ~context ~rollup_genesis rollup] creates a new state for the
+    rollup node with a new store and context.  If the [rollup_genesis] block hash
+    is provided, checks that the rollup [rollup_id] is created inside the block
+    identified by the hash. Otherwise, the genesis information is read from the
+    disk. Note that if a [rollup_genesis] is provided, it must also match the one
+    on disk. *)
 val init :
   data_dir:string ->
   context:#Protocol_client_context.full ->
-  rollup:Tx_rollup.t ->
-  rollup_genesis:Block_hash.t ->
+  ?rollup_genesis:Block_hash.t ->
+  Tx_rollup.t ->
   t tzresult Lwt.t
 
 (** {2 Reading the state from disk}  *)

@@ -229,6 +229,15 @@ module Make_ref (R : REF_CONF) = struct
     set_aux store value
 end
 
+module Rollup_origination = Make_ref (struct
+  let location = ["tx_rollup"; "origination"]
+
+  type value = Block_hash.t * int32
+
+  let value_encoding =
+    Data_encoding.tup2 Block_hash.encoding Data_encoding.int32
+end)
+
 module L2_head = Make_ref (struct
   let location = ["tx_rollup"; "head"]
 

@@ -33,7 +33,7 @@ type t = {
   data_dir : string;
   client_keys : Client_keys.Public_key_hash.t;
   rollup_id : Protocol.Alpha_context.Tx_rollup.t;
-  rollup_genesis : Block_hash.t;
+  rollup_genesis : Block_hash.t option;
   rpc_addr : string;
   rpc_port : int;
   reconnection_delay : float;

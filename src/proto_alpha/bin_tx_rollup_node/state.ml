@@ -30,7 +30,13 @@ open Protocol.Apply_results
 open Protocol_client_context
 module Block_hash_map = Map.Make (Block_hash)
 
-type t = {store : Stores.t; context_index : Context.index}
+type rollup_origination = {block_hash : Block_hash.t; block_level : int32}
+
+type t = {
+  store : Stores.t;
+  context_index : Context.index;
+  rollup_origination : rollup_origination;
+}
 
 (* Stands for the manager operation pass, in which the rollup transactions are
    stored. *)
@@ -136,24 +142,55 @@ let check_origination_in_block_info rollup block_info =
   | Some _ -> return_unit
   | None -> fail @@ Error.Tx_rollup_not_originated_in_the_given_block rollup
 
-let init_store ~data_dir ~context ~rollup ~rollup_genesis =
+let init_store ~data_dir ~context ?rollup_genesis rollup =
   let open Lwt_result_syntax in
-  let block = `Hash (rollup_genesis, 0) in
-  let* block_info =
-    Alpha_block_services.info context ~chain:context#chain ~block ()
+  let* store = Stores.load (Node_data.store_dir data_dir) in
+  let*! origination_info = Stores.Rollup_origination.find store in
+  let store_rollup_origination =
+    Option.map
+      (fun (block_hash, block_level) -> {block_hash; block_level})
+      origination_info
   in
-  let* () = check_origination_in_block_info rollup block_info in
-  Stores.load (Node_data.store_dir data_dir)
+  let* rollup_origination =
+    match (store_rollup_origination, rollup_genesis) with
+    | (None, None) ->
+        (* TODO/TORU: proper error *)
+        failwith "No rollup origination on disk and none provided"
+    | (Some {block_hash; _}, Some genesis)
+      when Block_hash.(block_hash <> genesis) ->
+        (* TODO/TORU: proper error *)
+        failwith "Rollup origination on disk is different from the one provided"
+    | (Some rollup_orig, _) -> return rollup_orig
+    | (None, Some rollup_genesis) ->
+        let block = `Hash (rollup_genesis, 0) in
+        let* block_info =
+          Alpha_block_services.info context ~chain:context#chain ~block ()
+        in
+        let* () = check_origination_in_block_info rollup block_info in
+        let rollup_orig =
+          {
+            block_hash = rollup_genesis;
+            block_level = block_info.header.shell.level;
+          }
+        in
+        let* () =
+          Stores.Rollup_origination.set
+            store
+            (rollup_orig.block_hash, rollup_orig.block_level)
+        in
+        return rollup_orig
+  in
+  return (store, rollup_origination)
 
 let init_context ~data_dir =
   let open Lwt_result_syntax in
   let*! index = Context.init (Node_data.context_dir data_dir) in
   return index
 
-let init ~data_dir ~context ~rollup ~rollup_genesis =
+let init ~data_dir ~context ?rollup_genesis rollup =
   let open Lwt_result_syntax in
-  let store = init_store ~data_dir ~context ~rollup ~rollup_genesis in
+  let store_orig = init_store ~data_dir ~context ?rollup_genesis rollup in
   let context_index = init_context ~data_dir in
-  let* store = store in
+  let* (store, rollup_origination) = store_orig in
   let* context_index = context_index in
-  return {store; context_index}
+  return {store; context_index; rollup_origination}

@@ -140,7 +140,7 @@ let configuration_init_command =
     (fun ( data_dir,
            client_keys,
            rollup_id,
-           block_hash,
+           rollup_genesis,
            rpc_addr,
            rpc_port,
            reconnection_delay )
@@ -149,9 +149,6 @@ let configuration_init_command =
       let*! () = Event.(emit preamble_warning) () in
       let* client_keys = to_tzresult "Missing arg --operator" client_keys in
       let* rollup_id = to_tzresult "Missing arg --rollup_id" rollup_id in
-      let* rollup_genesis =
-        to_tzresult "Missing arg --rollup_genesis" block_hash
-      in
       let config =
         Configuration.
           {

@@ -135,19 +135,26 @@ let process_messages_and_inboxes state rollup_genesis block_info rollup_id =
   in
   return_unit
 
-let rec process_hash cctxt state rollup_genesis current_hash rollup_id =
+let rec process_hash cctxt state current_hash rollup_id =
   let open Lwt_result_syntax in
   let chain = cctxt#chain in
   let block = `Hash (current_hash, 0) in
   let* block_info = Alpha_block_services.info cctxt ~chain ~block () in
-  process_block cctxt state rollup_genesis block_info rollup_id
+  process_block cctxt state block_info rollup_id
 
-and process_block cctxt state rollup_genesis block_info rollup_id =
+and process_block cctxt state block_info rollup_id =
   let open Lwt_result_syntax in
   let current_hash = block_info.hash in
   let predecessor_hash = block_info.header.shell.predecessor in
   let*! was_processed = State.tezos_block_already_seen state current_hash in
-  if was_processed then
+  if block_info.header.shell.level < state.State.rollup_origination.block_level
+  then
+    (* We went back too far because the genesis block is in another branch *)
+    fail [Tx_rollup_originated_in_fork]
+  else if
+    Block_hash.equal state.State.rollup_origination.block_hash current_hash
+  then return_unit
+  else if was_processed then
     let*! () = Event.(emit block_already_seen) current_hash in
     return_unit
   else
@@ -155,29 +162,23 @@ and process_block cctxt state rollup_genesis block_info rollup_id =
       State.tezos_block_already_seen state predecessor_hash
     in
     let* () =
-      if
-        (not predecessor_was_processed)
-        && not (Block_hash.equal rollup_genesis current_hash)
-      then
+      if not predecessor_was_processed then
         let*! () = Event.(emit processing_block_predecessor) predecessor_hash in
-        process_hash cctxt state rollup_genesis predecessor_hash rollup_id
+        process_hash cctxt state predecessor_hash rollup_id
       else return ()
     in
     let*! () = Event.(emit processing_block) (current_hash, predecessor_hash) in
-    let* () =
-      process_messages_and_inboxes state rollup_genesis block_info rollup_id
-    in
+    let* () = process_messages_and_inboxes state block_info rollup_id in
     (* TODO/TORU: Set new L2 block head
        let* () = State.set_new_head state current_hash in *)
     let*! () = Event.(emit new_tezos_head) current_hash in
     let*! () = Event.(emit block_processed) current_hash in
     return_unit
 
-let process_inboxes cctxt state rollup_genesis current_hash rollup_id =
+let process_inboxes cctxt state current_hash rollup_id =
   let open Lwt_result_syntax in
   let*! () = Event.(emit new_block) current_hash in
-  let* () = process_hash cctxt state rollup_genesis current_hash rollup_id in
-  return_unit
+  process_hash cctxt state current_hash rollup_id
 
 let main_exit_callback state data_dir exit_status =
   let open Lwt_syntax in
@@ -200,6 +201,8 @@ let valid_history_mode = function
   | History_mode.Archive | History_mode.Full _ -> true
   | _ -> false
 
+(* TODO/TORU: https://gitlab.com/tezos/tezos/-/issues/2551
+   Clean exit *)
 let run ~data_dir cctxt =
   let open Lwt_result_syntax in
   let*! () = Event.(emit starting_node) () in
@@ -207,9 +210,7 @@ let run ~data_dir cctxt =
        configuration) =
     Configuration.load ~data_dir
   in
-  let* state =
-    State.init ~data_dir ~context:cctxt ~rollup:rollup_id ~rollup_genesis
-  in
+  let* state = State.init ~data_dir ~context:cctxt ?rollup_genesis rollup_id in
   let* _rpc_server = RPC.start configuration state in
   let _ =
     (* Register cleaner callback *)
@@ -233,17 +234,14 @@ let run ~data_dir cctxt =
           let*! () =
             Lwt_stream.iter_s
               (fun (current_hash, _header) ->
-                let*! r =
-                  process_inboxes
-                    cctxt
-                    state
-                    rollup_genesis
-                    current_hash
-                    rollup_id
-                in
+                let*! r = process_inboxes cctxt state current_hash rollup_id in
                 match r with
-                | Ok () -> Lwt.return ()
-                | Error _ ->
+                | Ok state -> Lwt.return ()
+                | Error (Tx_rollup_originated_in_fork :: _ as e) ->
+                    Format.eprintf "%a@.Exiting.@." pp_print_trace e ;
+                    Lwt_exit.exit_and_raise 1
+                | Error e ->
+                    Format.eprintf "%a@." pp_print_trace e ;
                     let () = interupt () in
                     Lwt.return ())
               block_stream
