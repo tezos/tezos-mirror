@@ -57,6 +57,20 @@ end
 
 open ListGen
 
+module IsEmpty = struct
+  let is_empty _ =
+    assert (is_empty [] = true) ;
+    assert (is_empty ['a'] = false) ;
+    assert (is_empty [0] = false) ;
+    assert (is_empty [0; 1; 2] = false) ;
+    assert (is_empty [[]] = false) ;
+    assert (is_empty [None] = false) ;
+    assert (is_empty [""] = false) ;
+    ()
+
+  let tests = [Alcotest.test_case "is_empty" `Quick is_empty]
+end
+
 module Nth = struct
   let nth _ =
     assert (nth (up 10) 0 = Some 0) ;
@@ -221,6 +235,7 @@ let () =
   Alcotest.run
     "list-basic"
     [
+      ("is_empty", IsEmpty.tests);
       ("nth", Nth.tests);
       ("last", Last.tests);
       ("filter_*", FilterSmthg.tests);

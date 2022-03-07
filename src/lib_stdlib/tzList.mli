@@ -24,9 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [is_empty l] returns [true] iff [l = []]. *)
-val is_empty : 'a list -> bool
-
 (** [remove nb list] remove the first [nb] elements from the list [list]. *)
 val remove : int -> 'a list -> 'a list
 

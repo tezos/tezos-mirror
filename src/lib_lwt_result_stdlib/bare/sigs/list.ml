@@ -106,6 +106,9 @@ module type S = sig
   (** [cons x xs] is [x :: xs] *)
   val cons : 'a -> 'a list -> 'a list
 
+  (** [is_empty xs] is [true] iff [xs] is [[]] *)
+  val is_empty : 'a list -> bool
+
   (** {3 Safe wrappers}
 
       This part of the module simply shadows some functions from {!Stdlib.List}

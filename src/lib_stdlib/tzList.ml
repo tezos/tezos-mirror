@@ -24,8 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let is_empty = function [] -> true | _ -> false
-
 let rev_sub l n =
   if n < 0 then invalid_arg "Utils.rev_sub: `n` must be non-negative." ;
   let rec append_rev_sub acc l = function

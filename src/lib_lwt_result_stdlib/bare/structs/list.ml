@@ -62,6 +62,8 @@ let nil_s = Lwt_syntax.return_nil
 
 let nil_es = Lwt_result_syntax.return_nil
 
+let is_empty = function [] -> true | _ :: _ -> false
+
 let hd = function x :: _ -> Some x | [] -> None
 
 let tl = function _ :: xs -> Some xs | [] -> None
