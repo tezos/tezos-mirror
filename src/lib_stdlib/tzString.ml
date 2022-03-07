@@ -23,12 +23,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let split delim ?(dup = true) ?(limit = max_int) path =
+let split delim ?(limit = max_int) path =
   let l = String.length path in
   let rec do_slashes acc limit i =
     if i >= l then List.rev acc
-    else if path.[i] = delim then
-      if dup then do_slashes acc limit (i + 1) else do_split acc limit (i + 1)
+    else if path.[i] = delim then do_slashes acc limit (i + 1)
     else do_split acc limit i
   and do_split acc limit i =
     if limit <= 0 then

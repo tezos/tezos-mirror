@@ -23,15 +23,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Splits a string on a delimiter character. If [dup] is set to [true],
-    groups multiple delimiters and strips delimiters at the
-    beginning and end of string. If [limit] is passed, stops after [limit]
-    split(s). [dups] defaults to [true] and [limit] defaults to [max_int].
-    Examples:
-    - [split ~dup:true ',' ",hello,,world,"] returns ["hello"; "world"]
-    - [split ~dup:false ',' ",,hello,,,world,,"] returns [""; "hello"; ""; ""; "world"; ""]
- *)
-val split : char -> ?dup:bool -> ?limit:int -> string -> string list
+(** Splits a string on a delimiter character. It strips delimiters at the
+    beginning and at the end. It considers groups of delimiters as one. If
+    [limit] is passed, stops after [limit] split(s). [limit] defaults to
+    [max_int].
+
+    For example,
+    [split ',' ",hello,,world,"] returns ["hello"; "world"] *)
+val split : char -> ?limit:int -> string -> string list
 
 (** [true] if input has prefix *)
 val has_prefix : prefix:string -> string -> bool
