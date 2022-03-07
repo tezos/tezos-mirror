@@ -130,12 +130,13 @@ let extract_messages_from_block block_info rollup_id =
   in
   let rec get_messages :
       type kind.
+      source:public_key_hash ->
       kind manager_operation ->
       kind manager_operation_result ->
       packed_internal_operation_result list ->
       Tx_rollup_message.t list * int ->
       Tx_rollup_message.t list * int =
-   fun op result internal_operation_results (messages, cumulated_size) ->
+   fun ~source op result internal_operation_results (messages, cumulated_size) ->
     let message_and_size =
       match (op, result) with
       | ( Tx_rollup_submit_batch {tx_rollup; content; burn_limit = _},
@@ -157,6 +158,7 @@ let extract_messages_from_block block_info rollup_id =
           |> Result.to_option
           |> Option.map @@ fun Tx_rollup.{amount; destination; _} ->
              Tx_rollup_message.make_deposit
+               source
                destination
                ticket_hash
                amount
@@ -170,7 +172,7 @@ let extract_messages_from_block block_info rollup_id =
     (* Add messages from internal operations *)
     List.fold_left
       (fun acc (Internal_operation_result ({operation; _}, result)) ->
-        get_messages operation result [] acc)
+        get_messages ~source operation result [] acc)
       acc
       internal_operation_results
   in
@@ -181,18 +183,28 @@ let extract_messages_from_block block_info rollup_id =
       Tx_rollup_message.t list * int =
    fun acc -> function
     | Single_and_result
-        ( Manager_operation {operation; _},
+        ( Manager_operation {operation; source; _},
           Manager_operation_result
             {operation_result; internal_operation_results; _} ) ->
-        get_messages operation operation_result internal_operation_results acc
+        get_messages
+          ~source
+          operation
+          operation_result
+          internal_operation_results
+          acc
     | Single_and_result (_, _) -> acc
     | Cons_and_result
-        ( Manager_operation {operation; _},
+        ( Manager_operation {operation; source; _},
           Manager_operation_result
             {operation_result; internal_operation_results; _},
           rest ) ->
         let acc =
-          get_messages operation operation_result internal_operation_results acc
+          get_messages
+            ~source
+            operation
+            operation_result
+            internal_operation_results
+            acc
         in
         get_related_messages acc rest
   in
