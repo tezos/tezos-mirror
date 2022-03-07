@@ -114,11 +114,13 @@ let block_processed =
     ~level:Notice
     ("block_hash", Block_hash.encoding)
 
-let block_already_seen =
+let block_already_processed =
   declare_1
     ~section
-    ~name:"tx_rollup_node_block_already_seen"
-    ~msg:"the block {block_hash} has already been seen, nothing more to be done"
+    ~name:"tx_rollup_node_block_already_processed"
+    ~msg:
+      "the block {block_hash} has already been processed, nothing more to be \
+       done"
     ~level:Notice
     ("block_hash", Block_hash.encoding)
 
@@ -138,18 +140,28 @@ let messages_application =
     ~level:Notice
     ("number", Data_encoding.int31)
 
-let inbox_stored =
+let rollup_block =
   declare_3
+    ~section
+    ~name:"tx_rollup_level"
+    ~msg:"Level {level}: L2 block {hash} at Tezos {tezos_hash}"
+    ~level:Notice
+    ("level", L2block.level_encoding)
+    ("hash", L2block.Hash.encoding)
+    ("tezos_hash", Block_hash.encoding)
+
+let inbox_stored =
+  declare_4
     ~section
     ~name:"tx_rollup_node_inbox_stored"
     ~msg:
-      "an inbox with size {cumulated_size} has been stored for {block_hash}: \
-       {messages}"
+      "an inbox with size {cumulated_size} and resulting context hash \
+       {context_hash} has been stored for {block_hash}: {messages}"
     ~level:Notice
     ("block_hash", Block_hash.encoding)
-    ( "messages",
-      Data_encoding.list Protocol.Alpha_context.Tx_rollup_message.encoding )
+    ("messages", Data_encoding.list Inbox.message_encoding)
     ("cumulated_size", Data_encoding.int31)
+    ("context_hash", Protocol.Tx_rollup_l2_context_hash.encoding)
 
 let irmin_store_loaded =
   declare_1

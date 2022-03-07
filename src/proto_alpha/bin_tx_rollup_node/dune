@@ -18,6 +18,7 @@
             tezos-rpc-http
             tezos-rpc-http-server
             tezos-context.encoding
+            tezos-micheline
             irmin-pack
             irmin-pack.unix
             irmin)
@@ -30,5 +31,6 @@
                    -open Tezos_client_commands
                    -open Tezos_baking_alpha_commands
                    -open Tezos_stdlib_unix
+                   -open Tezos_micheline
                    -open Tezos_client_base
                    -open Tezos_client_base_unix)))

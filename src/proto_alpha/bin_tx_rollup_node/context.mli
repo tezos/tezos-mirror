@@ -23,12 +23,16 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Protocol.Tx_rollup_l2_context_sig.CONTEXT
-
-(** A block-indexed (key x value) store directory.  *)
+(** A block-indexed (key x value) store directory. *)
 type index
 
-type context = t
+(** Type of persitant context. *)
+type context
+
+include
+  Protocol.Tx_rollup_l2_context_sig.CONTEXT
+    with type t = context
+     and type 'a m = 'a tzresult Lwt.t
 
 val index : context -> index
 

@@ -49,6 +49,22 @@ let () =
       | _ -> None)
     (fun rollup_id -> Tx_rollup_not_originated_in_the_given_block rollup_id)
 
+type error += Tx_rollup_originated_in_fork
+
+let () =
+  register_error_kind
+    ~id:"tx_rollup.node.originated_in_fork"
+    ~title:"transaction rollup was originated in another branch"
+    ~description:"The transaction rollup was originated in another branch."
+    ~pp:(fun ppf () ->
+      Format.fprintf
+        ppf
+        "The transaction rollup was originated in another branch.")
+    `Permanent
+    Data_encoding.(unit)
+    (function Tx_rollup_originated_in_fork -> Some () | _ -> None)
+    (fun () -> Tx_rollup_originated_in_fork)
+
 type error += Tx_rollup_block_predecessor_not_processed of Block_hash.t
 
 let () =
@@ -197,33 +213,21 @@ let () =
     (fun history_mode -> Tx_rollup_invalid_history_mode history_mode)
 
 type error +=
-  | Tx_rollup_unsupported_context_version of {
-      current : Protocol.Tx_rollup_l2_context_hash.Version.t;
-      expected : Protocol.Tx_rollup_l2_context_hash.Version.t;
-    }
+  | Tx_rollup_cannot_checkout_context of Protocol.Tx_rollup_l2_context_hash.t
 
 let () =
   register_error_kind
-    ~id:"tx_rollup.node.invalid_context_version"
-    ~title:"The Tezos node has an invalid context version"
-    ~description:"The Tezos node has an invalid context version"
-    ~pp:(fun ppf (current, expected) ->
+    ~id:"tx_rollup.node.cannot_checkout_context"
+    ~title:"Cannot checkout the L2 context"
+    ~description:"The rollup node cannot checkout the L2 context."
+    ~pp:(fun ppf ctxt ->
       Format.fprintf
         ppf
-        "Tx rollup node has context version %a but was expected to have \
-         version %a."
-        Protocol.Tx_rollup_l2_context_hash.Version.pp
-        current
-        Protocol.Tx_rollup_l2_context_hash.Version.pp
-        expected)
+        "Cannot checkout L2 context %a"
+        Protocol.Tx_rollup_l2_context_hash.pp
+        ctxt)
     `Permanent
     Data_encoding.(
-      obj2
-        (req "current" Protocol.Tx_rollup_l2_context_hash.Version.encoding)
-        (req "expected" Protocol.Tx_rollup_l2_context_hash.Version.encoding))
-    (function
-      | Tx_rollup_unsupported_context_version {current; expected} ->
-          Some (current, expected)
-      | _ -> None)
-    (fun (current, expected) ->
-      Tx_rollup_unsupported_context_version {current; expected})
+      obj1 (req "context" Protocol.Tx_rollup_l2_context_hash.encoding))
+    (function Tx_rollup_cannot_checkout_context c -> Some c | _ -> None)
+    (fun c -> Tx_rollup_cannot_checkout_context c)
