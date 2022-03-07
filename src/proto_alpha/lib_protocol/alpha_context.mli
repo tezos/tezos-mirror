@@ -2425,6 +2425,8 @@ module Sc_rollup : sig
     val boot_sector_encoding : boot_sector Data_encoding.t
 
     val boot_sector_of_string : string -> boot_sector
+
+    val boot_sector_to_string : boot_sector -> string
   end
 
   module Address : S.HASH

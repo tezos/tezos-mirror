@@ -46,6 +46,8 @@ module PVM : sig
   val boot_sector_encoding : boot_sector Data_encoding.t
 
   val boot_sector_of_string : string -> boot_sector
+
+  val boot_sector_to_string : boot_sector -> string
 end
 
 (** A smart-contract rollup has an address starting with "scr1". *)
