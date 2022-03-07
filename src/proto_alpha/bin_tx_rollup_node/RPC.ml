@@ -29,7 +29,11 @@ open Tezos_rpc
 open Tezos_rpc_http
 open Tezos_rpc_http_server
 
-type block_id = [`Head | `Block of Block_hash.t]
+type block_id =
+  [ `Head
+  | `L2_block of L2block.hash
+  | `Tezos_block of Block_hash.t
+  | `Level of L2block.level ]
 
 type context_id = [block_id | `Context of Tx_rollup_l2_context_hash.t]
 
@@ -74,14 +78,27 @@ module Arg = struct
 
   let construct_block_id = function
     | `Head -> "head"
-    | `Block h -> Block_hash.to_b58check h
+    | `L2_block h -> L2block.Hash.to_b58check h
+    | `Tezos_block h -> Block_hash.to_b58check h
+    | `Level l -> L2block.level_to_string l
 
   let destruct_block_id h =
-    if h = "head" then Ok `Head
-    else
-      match Block_hash.of_b58check_opt h with
-      | Some b -> Ok (`Block b)
-      | None -> Error "Cannot parse block id"
+    match h with
+    | "head" -> Ok `Head
+    | "genesis" -> Ok (`Level L2block.Genesis)
+    | _ -> (
+        match Int32.of_string_opt h with
+        | Some l -> (
+            match Alpha_context.Tx_rollup_level.of_int32 l with
+            | Error _ -> Error "Invalid rollup level"
+            | Ok l -> Ok (`Level (L2block.Rollup_level l)))
+        | None -> (
+            match Block_hash.of_b58check_opt h with
+            | Some b -> Ok (`Tezos_block b)
+            | None -> (
+                match L2block.Hash.of_b58check_opt h with
+                | Some b -> Ok (`L2_block b)
+                | None -> Error "Cannot parse block id")))
 
   let construct_context_id = function
     | #block_id as id -> construct_block_id id
@@ -97,7 +114,7 @@ module Arg = struct
 
   let block_id : block_id RPC_arg.t =
     RPC_arg.make
-      ~descr:"A Tezos block identifier."
+      ~descr:"An L2 block identifier."
       ~name:"block_id"
       ~construct:construct_block_id
       ~destruct:destruct_block_id
@@ -105,7 +122,7 @@ module Arg = struct
 
   let context_id : context_id RPC_arg.t =
     RPC_arg.make
-      ~descr:"A Tezos block or context identifier."
+      ~descr:"An L2 block or context identifier."
       ~name:"context_id"
       ~construct:construct_context_id
       ~destruct:destruct_context_id
@@ -125,42 +142,118 @@ module Block = struct
 
   let block =
     RPC_service.get_service
-      ~description:"Get the block hash handled in the tx-rollup-node"
+      ~description:"Get the L2 block in the tx-rollup-node"
       ~query:RPC_query.empty
-      ~output:(Data_encoding.option Block_hash.encoding)
+      ~output:
+        Data_encoding.(
+          option
+          @@ merge_objs
+               (obj1 (req "hash" L2block.Hash.encoding))
+               L2block.encoding)
       path
+
+  let header =
+    RPC_service.get_service
+      ~description:"Get the L2 block header in the tx-rollup-node"
+      ~query:RPC_query.empty
+      ~output:
+        Data_encoding.(
+          option
+          @@ merge_objs
+               (obj1 (req "hash" L2block.Hash.encoding))
+               L2block.header_encoding)
+      RPC_path.(path / "header")
 
   let inbox =
     RPC_service.get_service
-      ~description:"Get the tx-rollup-node inbox for a given Tezos block"
+      ~description:"Get the tx-rollup-node inbox for a given block"
       ~query:RPC_query.empty
-      ~output:(Data_encoding.option Alpha_context.Tx_rollup_inbox.encoding)
+      ~output:
+        Data_encoding.(
+          option
+          @@ merge_objs
+               (obj1 (req "hash" Alpha_context.Tx_rollup_inbox.hash_encoding))
+               Inbox.encoding)
       RPC_path.(path / "inbox")
 
-  let hash_of_block_id state block_id =
+  let proto_inbox =
+    RPC_service.get_service
+      ~description:"Get the tx-rollup-node \"protocol\" inbox for a given block"
+      ~query:RPC_query.empty
+      ~output:(Data_encoding.option Alpha_context.Tx_rollup_inbox.encoding)
+      RPC_path.(path / "proto_inbox")
+
+  let block_of_id state block_id =
+    let open Lwt_syntax in
     match block_id with
-    | `Block b -> Lwt.return (Some b)
-    | `Head -> State.get_head state
+    | `L2_block b -> Lwt.return (Some b)
+    | `Tezos_block b -> State.get_tezos_l2_block_hash state b
+    | `Head ->
+        let+ head = State.get_head state in
+        Option.map L2block.hash_header head
+    | `Level l -> State.get_level state l
 
   let () =
-    register block @@ fun (state, block) () () ->
-    let*! block = hash_of_block_id state block in
-    match block with
+    register block @@ fun (state, block_id) () () ->
+    let*! hash = block_of_id state block_id in
+    match hash with
     | None -> return None
-    | Some block -> (
-        let*! context_hash = State.context_hash state block in
-        match context_hash with
-        | Some _ -> return (Some block)
-        | None -> return None)
+    | Some hash -> (
+        let*! block = State.get_block state hash in
+        match block with
+        | None -> return None
+        | Some block -> return (Some (L2block.hash_header block.header, block)))
 
   let () =
-    register inbox @@ fun (state, block) () () ->
-    let*! block = hash_of_block_id state block in
-    match block with
+    register header @@ fun (state, block_id) () () ->
+    let*! header =
+      match block_id with
+      | `Head -> State.get_head state
+      | `L2_block b -> State.get_header state b
+      | _ -> (
+          let*! hash = block_of_id state block_id in
+          match hash with
+          | None -> Lwt.return None
+          | Some hash -> State.get_header state hash)
+    in
+    match header with
     | None -> return None
-    | Some block ->
-        let*! inbox = State.find_inbox state block in
-        return (Option.map Inbox.to_protocol_inbox inbox)
+    | Some header -> return (Some (L2block.hash_header header, header))
+
+  let () =
+    register inbox @@ fun (state, block_id) () () ->
+    let*! hash = block_of_id state block_id in
+    match hash with
+    | None -> return None
+    | Some hash -> (
+        let*! block = State.get_block state hash in
+        match block with
+        | None -> return None
+        | Some block -> (
+            match block_id with
+            | `Tezos_block b when Block_hash.(block.header.tezos_block <> b) ->
+                (* Tezos block has no l2 inbox *)
+                return None
+            | _ ->
+                return
+                  (Some (Inbox.hash_contents block.inbox.contents, block.inbox))
+            ))
+
+  let () =
+    register proto_inbox @@ fun (state, block_id) () () ->
+    let*! hash = block_of_id state block_id in
+    match hash with
+    | None -> return None
+    | Some hash -> (
+        let*! block = State.get_block state hash in
+        match block with
+        | None -> return None
+        | Some block -> (
+            match block_id with
+            | `Tezos_block b when Block_hash.(block.header.tezos_block <> b) ->
+                (* Tezos block has no l2 inbox *)
+                return None
+            | _ -> return (Some (Inbox.to_protocol_inbox block.inbox))))
 
   let build_directory state =
     !directory
@@ -361,34 +454,32 @@ module Context = struct
         | None -> return None
         | Some {public_key; _} -> return (Some public_key))
 
-  let hash_of_block_id state block_id =
+  let context_of_block_id state block_id =
     let open Lwt_syntax in
-    let+ block = Block.hash_of_block_id state block_id in
-    match block with
-    | None -> Stdlib.failwith "Unknwon Tezos block"
-    | Some b -> b
+    let*! header =
+      match block_id with
+      | `Head -> State.get_head state
+      | `L2_block b -> State.get_header state b
+      | _ -> (
+          let*! hash = Block.block_of_id state block_id in
+          match hash with
+          | None -> Lwt.return None
+          | Some hash -> State.get_header state hash)
+    in
+    match header with
+    | None -> Stdlib.failwith "Unknown block id"
+    | Some b -> return b.context
 
-  let hash_of_context_id state context_id =
-    let open Lwt_syntax in
+  let context_of_id state context_id =
     match context_id with
-    | #block_id as block -> (
-        let* block = hash_of_block_id state block in
-        let+ ch = State.context_hash state block in
-        match ch with
-        | None ->
-            Format.kasprintf
-              Stdlib.failwith
-              "No rollup context for block %a"
-              Block_hash.pp
-              block
-        | Some ch -> ch)
+    | #block_id as block_id -> context_of_block_id state block_id
     | `Context c -> Lwt.return c
 
   let build_directory state =
     !directory
     |> RPC_directory.map (fun ((), context_id) ->
            let open Lwt_syntax in
-           let* context_hash = hash_of_context_id state context_id in
+           let* context_hash = context_of_id state context_id in
            Context.checkout_exn state.State.context_index context_hash)
     |> RPC_directory.prefix RPC_path.(open_root / "context" /: Arg.context_id)
 end
