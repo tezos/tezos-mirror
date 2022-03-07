@@ -2,8 +2,6 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
-(* Copyright (c) 2022 Marigold, <contact@marigold.dev>                       *)
-(* Copyright (c) 2022 Oxhead Alpha <info@oxhead-alpha.com>                   *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -25,43 +23,55 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** A non-compact representation of inboxes that represents complete messages
-    and not their hashes. *)
-
 open Protocol
 open Alpha_context
 
-(** Alias for type of inbox hashes *)
-type hash = Tx_rollup_inbox.hash
+(**  {2 Types for L2 block and header} *)
 
-(** Result of application of an inbox message *)
-type message_result =
-  | Interpreted of Tx_rollup_l2_apply.Message_result.t
-      (** The message was interpreted by the rollup node but may have failed *)
-  | Discarded of tztrace
-      (** The message was discarded because it could not be interpreted *)
+(** Hash with b58check encoding BTx(53), for hashes of L2 block headers *)
+module Hash : S.HASH
 
-(** Type of inbox message with the context hash resulting from the application
-    of the message *)
-type message = {
-  message : Tx_rollup_message.t;
-  result : message_result;
-  context_hash : Tx_rollup_l2_context_hash.t;
+(** Alias for block (header) hashes *)
+type hash = Hash.t
+
+(** The level of an L2 block  *)
+type level =
+  | Genesis
+      (** When the rollup has not received any inbox, it is at level Genesis  *)
+  | Rollup_level of Tx_rollup_level.t
+      (** When the rollup has had at least one inbox *)
+
+(** Type of L2 block headers *)
+type header = {
+  level : level;  (** The level of the L2 block *)
+  inbox_hash : Tx_rollup_inbox.hash;
+      (** The hash of the inbox's contents associated with this L2 block *)
+  tezos_block : Block_hash.t;
+      (** The Tezos block on which this L2 block in anchored, i.e. the Tezos block
+      in which the inbox was sent *)
+  predecessor : hash;  (** The hash predecessor L2 block *)
+  context : Tx_rollup_l2_context_hash.t;
+      (** The hash of the context resulting of the application of the L2 block's inbox *)
 }
 
-(** The type representing an inbox whose contents are the messages and not the
-    hashed messages. *)
-type t = {contents : message list; cumulated_size : int}
+(** L2 blocks are composed of a header and an inbox. The inbox contains the
+    actual messages.  *)
+type t = {header : header; inbox : Inbox.t}
 
-(** [to_protocol_inbox node_inbox] will hash the contents of [node_inbox] to
-    produces an [Tx_rollup_inbox.t]. *)
-val to_protocol_inbox : t -> Tx_rollup_inbox.t
+(**  {2 Encoding} *)
 
-(** Encoding for inbox messages *)
-val message_encoding : message Data_encoding.t
+val level_encoding : level Data_encoding.t
 
-(** Encoding for inboxes *)
+val level_to_string : level -> string
+
+val header_encoding : header Data_encoding.t
+
 val encoding : t Data_encoding.t
 
-(** Hash contents of inbox. This gives the inbox hash. *)
-val hash_contents : message list -> hash
+(**  {2 Hashing} *)
+
+(** The predefined hash for the Genesis L2 block *)
+val genesis_hash : hash
+
+(** Returns the hash of an L2 block header *)
+val hash_header : header -> hash

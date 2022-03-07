@@ -31,13 +31,26 @@ open Protocol_client_context
 open Protocol.Alpha_context
 
 let messages_to_inbox messages =
-  let cumulated_size =
-    List.fold_left (fun acc x -> acc + String.length x) 0 messages
+  let (rev_contents, cumulated_size) =
+    List.fold_left
+      (fun (acc, cumulated_size) msg ->
+        let (message, size) = Tx_rollup_message.make_batch msg in
+        (* TODO/TORU apply message *)
+        let message =
+          Inbox.
+            {
+              message;
+              result = Discarded [] (* TODO: Placeholder *);
+              context_hash =
+                Protocol.Tx_rollup_l2_context_hash.zero (* TODO: Placeholder *);
+            }
+        in
+        (message :: acc, cumulated_size + size))
+      ([], 0)
+      messages
   in
-  let make_batch msg = fst @@ Tx_rollup_message.make_batch msg in
-  let contents = List.map make_batch messages in
-  let hash = Tx_rollup_inbox.hash_inbox contents in
-  Inbox.{contents; cumulated_size; hash}
+  let contents = List.rev rev_contents in
+  Inbox.{contents; cumulated_size}
 
 let compute_messages block_info rollup_id =
   let managed_operation =
@@ -109,9 +122,12 @@ let process_messages_and_inboxes state rollup_genesis block_info rollup_id =
   let inbox = messages_to_inbox messages in
   let*! () = Event.(emit messages_application) messages_len in
   let* () = State.save_inbox state current_hash inbox in
+  (* TODO/TORU: Build + save L2 block  *)
   let*! () =
     Event.(emit inbox_stored)
-      (current_hash, inbox.contents, inbox.cumulated_size)
+      ( current_hash,
+        List.map (fun m -> m.Inbox.message) inbox.contents,
+        inbox.cumulated_size )
   in
   return_unit
 

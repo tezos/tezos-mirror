@@ -25,37 +25,73 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol.Alpha_context
+open Protocol
+open Alpha_context
 
-type t = {
-  contents : Tx_rollup_message.t list;
-  cumulated_size : int;
-  hash : Tx_rollup_inbox.hash;
+type hash = Tx_rollup_inbox.hash
+
+type message_result =
+  | Interpreted of Tx_rollup_l2_apply.Message_result.t
+  | Discarded of tztrace
+
+type message = {
+  message : Tx_rollup_message.t;
+  result : message_result;
+  context_hash : Tx_rollup_l2_context_hash.t;
 }
 
-let pp fmt {contents; cumulated_size; hash} =
-  Format.fprintf
-    fmt
-    "tx rollup inbox: %d messages using %d bytes with hash %a"
-    (List.length contents)
-    cumulated_size
-    Tx_rollup_inbox.pp_hash
-    hash
+type t = {contents : message list; cumulated_size : int}
+
+let message_result_encoding =
+  let open Data_encoding in
+  union
+    [
+      case
+        ~title:"interpreted"
+        (Tag 0)
+        Tx_rollup_l2_apply.Message_result.encoding
+        (function Interpreted r -> Some r | _ -> None)
+        (fun r -> Interpreted r);
+      case
+        ~title:"discarded"
+        (Tag 1)
+        (obj1
+           (req "discarded" (obj1 (req "reason" Error_monad.trace_encoding))))
+        (function Discarded e -> Some e | _ -> None)
+        (fun e -> Discarded e);
+    ]
+
+let message_encoding =
+  let open Data_encoding in
+  conv
+    (fun {message; result; context_hash} -> (message, result, context_hash))
+    (fun (message, result, context_hash) -> {message; result; context_hash})
+    (obj3
+       (req "message" Tx_rollup_message.encoding)
+       (req "result" message_result_encoding)
+       (req "context_hash" Tx_rollup_l2_context_hash.encoding))
 
 let encoding =
   let open Data_encoding in
   conv
-    (fun {contents; cumulated_size; hash} -> (contents, cumulated_size, hash))
-    (fun (contents, cumulated_size, hash) -> {contents; cumulated_size; hash})
-    (obj3
-       (req "contents" @@ list Tx_rollup_message.encoding)
-       (req "cumulated_size" int31)
-       (req "hash" Tx_rollup_inbox.hash_encoding))
+    (fun {contents; cumulated_size} -> (contents, cumulated_size))
+    (fun (contents, cumulated_size) -> {contents; cumulated_size})
+    (obj2
+       (req "contents" @@ list message_encoding)
+       (req "cumulated_size" int31))
 
-let to_protocol_inbox {contents; cumulated_size; hash} =
+let to_protocol_contents contents =
+  List.map
+    (fun {message; _} -> Tx_rollup_message.hash_uncarbonated message)
+    contents
+
+let hash_contents contents =
+  Tx_rollup_inbox.hash_inbox @@ List.map (fun {message; _} -> message) contents
+
+let to_protocol_inbox {contents; cumulated_size} =
   Tx_rollup_inbox.
     {
-      contents = List.map Tx_rollup_message.hash_uncarbonated contents;
+      contents = to_protocol_contents contents;
       cumulated_size;
-      hash;
+      hash = hash_contents contents;
     }
