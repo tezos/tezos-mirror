@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Nomadic Development. <contact@tezcore.com>             *)
 (* Copyright (c) 2021-2022 Nomadic Labs, <contact@nomadic-labs.com>          *)
+(* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -2850,9 +2851,8 @@ module RPC = struct
     open Data_encoding
 
     module S = struct
-      let path =
-        (RPC_path.(open_root / "context" / "sc_rollup")
-          : RPC_context.t RPC_path.context)
+      let path : RPC_context.t RPC_path.context =
+        RPC_path.(open_root / "context" / "sc_rollup")
 
       let kind =
         RPC_service.get_service
@@ -2867,6 +2867,13 @@ module RPC = struct
           ~query:RPC_query.empty
           ~output:Sc_rollup.Inbox.encoding
           RPC_path.(path /: Sc_rollup.Address.rpc_arg / "inbox")
+
+      let root =
+        RPC_service.get_service
+          ~description:"List of all originated smart contract rollups"
+          ~query:RPC_query.empty
+          ~output:(Data_encoding.list Sc_rollup.Address.encoding)
+          path
     end
 
     let kind ctxt block sc_rollup_address =
@@ -2884,9 +2891,16 @@ module RPC = struct
       Registration.register1 ~chunked:true S.kind @@ fun ctxt address () () ->
       Alpha_context.Sc_rollup.kind ctxt address
 
+    let register_root () =
+      Registration.register0 ~chunked:true S.root (fun context () () ->
+          Sc_rollup.list context)
+
     let register () =
       register_kind () ;
-      register_inbox ()
+      register_inbox () ;
+      register_root ()
+
+    let list ctxt block = RPC_context.make_call0 S.root ctxt block () ()
   end
 
   module Forge = struct

@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
-(* Copyright (c) 2021-2022 Trili Tech, <contact@trili.tech>                  *)
+(* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -631,3 +631,5 @@ let remove_staker ctxt rollup staker =
             (go [@ocaml.tailcall]) pred ctxt
         in
         go staked_on ctxt
+
+let list ctxt = Storage.Sc_rollup.PVM_kind.keys ctxt >|= Result.return

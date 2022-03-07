@@ -3,7 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2019-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
-(* Copyright (c) 2021-2022 Trili Tech, <contact@trili.tech>                  *)
+(* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -1880,6 +1880,8 @@ module Sc_rollup : sig
     context -> t -> Commitment_hash.t -> (Commitment.t * context) tzresult Lwt.t
 
   val remove_staker : context -> t -> Staker.t -> context tzresult Lwt.t
+
+  val list : context -> t list tzresult Lwt.t
 end
 
 module Block_payload : sig

@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2019 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -2760,6 +2761,18 @@ let commands_rw () =
           ~fee_parameter
           ()
         >>=? fun _res -> return_unit);
+    command
+      ~group
+      ~desc:"List originated smart-contract rollups."
+      no_options
+      (prefixes ["list"; "sc"; "rollups"] @@ stop)
+      (fun () (cctxt : Protocol_client_context.full) ->
+        Plugin.RPC.Sc_rollup.list cctxt (cctxt#chain, cctxt#block)
+        >>=? fun rollups ->
+        List.iter_s
+          (fun addr -> cctxt#message "%s" (Sc_rollup.Address.to_b58check addr))
+          rollups
+        >>= fun () -> return_unit);
   ]
 
 let commands network () =

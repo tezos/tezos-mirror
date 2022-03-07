@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -582,10 +583,15 @@ module Tx_rollup = struct
 end
 
 module Sc_rollup = struct
+  let root_path ~chain ~block =
+    ["chains"; chain; "blocks"; block; "context"; "sc_rollup"]
+
+  let list ?endpoint ?hooks ?(chain = "main") ?(block = "head") client =
+    let path = root_path ~chain ~block in
+    Client.rpc ?endpoint ?hooks GET path client
+
   let path ~chain ~block ~sc_rollup_address =
-    [
-      "chains"; chain; "blocks"; block; "context"; "sc_rollup"; sc_rollup_address;
-    ]
+    root_path ~chain ~block @ [sc_rollup_address]
 
   let get_inbox ?endpoint ?hooks ?(chain = "main") ?(block = "head")
       ~sc_rollup_address client =

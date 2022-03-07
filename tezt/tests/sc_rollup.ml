@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -28,6 +29,8 @@
    Component:    Smart Contract Optimistic Rollups
    Invocation:   dune exec tezt/tests/main.exe -- --file sc_rollup.ml
 *)
+
+open Base
 
 (*
 
@@ -117,6 +120,18 @@ let with_fresh_rollup f tezos_node tezos_client bootstrap1_key =
   in
   let* () = Client.bake_for tezos_client in
   f rollup_address sc_rollup_node configuration_filename
+
+let with_fresh_rollups n f node client bootstrap1 =
+  let rec go n addrs k =
+    if n < 1 then k addrs
+    else
+      with_fresh_rollup
+        (fun addr _ _ -> go (n - 1) (String_set.add addr addrs) k)
+        node
+        client
+        bootstrap1
+  in
+  go n String_set.empty f
 
 let test_rollup_node_configuration =
   let output_file = "sc_rollup_node_configuration" in
@@ -259,9 +274,46 @@ let test_rollup_inbox =
         node
         client)
 
+let test_rollup_list =
+  let open Lwt.Syntax in
+  let go node client bootstrap1 =
+    let* rollups = RPC.Sc_rollup.list client in
+    let rollups = JSON.as_list rollups in
+    let () =
+      match rollups with
+      | _ :: _ ->
+          failwith "Expected initial list of originated SCORUs to be empty"
+      | [] -> ()
+    in
+
+    with_fresh_rollups
+      10
+      (fun scoru_addresses ->
+        let* () = Client.bake_for client in
+        let+ rollups = RPC.Sc_rollup.list client in
+        let rollups =
+          JSON.as_list rollups |> List.map JSON.as_string |> String_set.of_list
+        in
+        Check.(
+          (rollups = scoru_addresses)
+            (comparable_module (module String_set))
+            ~error_msg:"%L %R"))
+      node
+      client
+      bootstrap1
+  in
+
+  test
+    ~__FILE__
+    ~output_file:"sc_rollup_list"
+    ~tags:["list"]
+    "list originated rollups"
+    (fun protocol -> setup ~protocol go)
+
 let register ~protocols =
   test_origination protocols ;
   test_rollup_node_configuration protocols ;
   test_rollup_node_running protocols ;
   test_rollup_client_gets_address protocols ;
-  test_rollup_inbox protocols
+  test_rollup_inbox protocols ;
+  test_rollup_list protocols
