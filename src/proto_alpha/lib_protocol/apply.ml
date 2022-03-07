@@ -877,14 +877,14 @@ let apply_delegation ~ctxt ~source ~delegate ~since =
   (ctxt, Delegation_result {consumed_gas = Gas.consumed ~since ~until:ctxt}, [])
 
 type execution_arg =
-  | Typed_arg : 'a Script_typed_ir.ty * 'a -> execution_arg
+  | Typed_arg : Script.location * 'a Script_typed_ir.ty * 'a -> execution_arg
   | Untyped_arg : Script.expr -> execution_arg
 
 let apply_transaction_to_implicit ~ctxt ~contract ~parameter ~entrypoint
     ~before_operation ~balance_updates ~allocated_destination_contract =
   let is_unit =
     match parameter with
-    | Typed_arg (Unit_t, ()) -> true
+    | Typed_arg (_, Unit_t, ()) -> true
     | Typed_arg _ -> false
     | Untyped_arg parameter -> (
         match Micheline.root parameter with
@@ -951,13 +951,14 @@ let apply_transaction_to_smart_contract ~ctxt ~source ~contract ~amount
         ~parameter
         ~entrypoint
         ~internal
-  | Typed_arg (parameter_ty, parameter) ->
+  | Typed_arg (location, parameter_ty, parameter) ->
       Script_interpreter.execute_with_typed_parameter
         ctxt
         ~cached_script:(Some script_ir)
         mode
         step_constants
         ~script
+        ~location
         ~parameter_ty
         ~parameter
         ~entrypoint
@@ -1259,12 +1260,13 @@ let apply_internal_manager_operation_content :
       {
         transaction =
           {amount; parameters = _; destination = Contract contract; entrypoint};
+        location;
         parameters_ty;
         parameters = typed_parameters;
       } ->
       apply_transaction
         ~ctxt
-        ~parameter:(Typed_arg (parameters_ty, typed_parameters))
+        ~parameter:(Typed_arg (location, parameters_ty, typed_parameters))
         ~source
         ~contract
         ~amount
@@ -1282,6 +1284,7 @@ let apply_internal_manager_operation_content :
       {
         transaction =
           {amount; parameters; destination = Tx_rollup dst; entrypoint};
+        location = _;
         parameters_ty = _;
         parameters = _;
       } ->
@@ -1479,6 +1482,7 @@ let apply_external_manager_operation_content :
                       destination = Contract destination;
                       entrypoint;
                     };
+                  location = Micheline.location ticketer_node;
                   parameters_ty = ticket_ty;
                   parameters = ticket;
                 };

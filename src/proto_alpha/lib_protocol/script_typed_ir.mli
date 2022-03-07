@@ -1494,6 +1494,7 @@ and 'kind manager_operation =
          typed version in order to produce the receipt
          ([Apply_results.internal_manager_operation]). *)
       transaction : Alpha_context.transaction;
+      location : Script.location;
       parameters_ty : 'a ty;
       parameters : 'a;
     }

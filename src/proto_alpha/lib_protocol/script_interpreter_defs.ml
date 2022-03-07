@@ -504,7 +504,7 @@ let apply ctxt gas capture_ty capture lam =
    creates an operation that transfers an amount of [tez] to
    a contract determined by [(destination, entrypoint)]
    instantiated with argument [parameters] of type [parameters_ty]. *)
-let transfer (ctxt, sc) gas amount parameters_ty parameters destination
+let transfer (ctxt, sc) gas amount location parameters_ty parameters destination
     entrypoint =
   (* [craft_transfer_parameters ctxt tp p] reorganizes, if need be, the
      parameters submitted by the interpreter to prepare them for the
@@ -573,7 +573,9 @@ let transfer (ctxt, sc) gas amount parameters_ty parameters destination
     in
     {amount; destination; entrypoint; parameters}
   in
-  let operation = Transaction {transaction; parameters_ty; parameters} in
+  let operation =
+    Transaction {transaction; location; parameters_ty; parameters}
+  in
   fresh_internal_nonce ctxt >>?= fun (ctxt, nonce) ->
   let iop = {source = sc.self; operation; nonce} in
   let res = {piop = Internal_operation iop; lazy_storage_diff} in

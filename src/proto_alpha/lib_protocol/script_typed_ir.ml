@@ -1351,6 +1351,7 @@ and ('input, 'output) view_signature =
 and 'kind manager_operation =
   | Transaction : {
       transaction : Alpha_context.transaction;
+      location : Script.location;
       parameters_ty : 'a ty;
       parameters : 'a;
     }

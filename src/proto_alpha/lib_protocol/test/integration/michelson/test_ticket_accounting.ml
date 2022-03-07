@@ -380,6 +380,7 @@ let transfer_operation ctxt ~src ~destination ~arg_type ~arg =
                     entrypoint = Entrypoint.default;
                     destination = Destination.Contract destination;
                   };
+                location = Micheline.dummy_location;
                 parameters_ty = arg_type;
                 parameters = arg;
               };

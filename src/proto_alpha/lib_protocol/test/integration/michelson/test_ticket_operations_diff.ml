@@ -287,6 +287,7 @@ let transfer_operation ~incr ~src ~destination ~parameters_ty ~parameters =
                     entrypoint = Entrypoint.default;
                     destination = Destination.Contract destination;
                   };
+                location = Micheline.dummy_location;
                 parameters_ty;
                 parameters;
               };

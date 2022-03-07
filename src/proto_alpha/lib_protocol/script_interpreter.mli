@@ -126,6 +126,7 @@ val execute_with_typed_parameter :
   script:Script.t ->
   entrypoint:Entrypoint.t ->
   parameter_ty:'a Script_typed_ir.ty ->
+  location:Script.location ->
   parameter:'a ->
   internal:bool ->
   (execution_result * (Script_ir_translator.ex_script * int)) tzresult Lwt.t

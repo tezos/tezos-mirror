@@ -162,8 +162,8 @@ let cast_transaction_parameter (type a b) ctxt location
   >>?= fun (res, ctxt) ->
   res >>?= fun Script_ir_translator.Eq -> return ((parameters : a), ctxt)
 
-let tickets_of_transaction ctxt ~destination ~entrypoint ~parameters_ty
-    ~parameters =
+let tickets_of_transaction ctxt ~destination ~entrypoint ~location
+    ~parameters_ty ~parameters =
   match Contract.is_implicit destination with
   | Some _ -> return (None, ctxt)
   | None ->
@@ -266,6 +266,7 @@ let tickets_of_operation ctxt
             entrypoint;
             destination = Destination.Contract destination;
           };
+        location;
         parameters_ty;
         parameters;
       } ->
@@ -273,6 +274,7 @@ let tickets_of_operation ctxt
         ctxt
         ~destination
         ~entrypoint
+        ~location
         ~parameters_ty
         ~parameters
   | Transaction {transaction = {destination = Destination.Tx_rollup _; _}; _} ->

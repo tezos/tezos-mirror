@@ -1009,11 +1009,19 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
               let accu = maybe_contract in
               (step [@ocaml.tailcall]) (ctxt, sc) gas k ks accu stack
           | None -> (step [@ocaml.tailcall]) (ctxt, sc) gas k ks None stack)
-      | ITransfer_tokens (_, k) ->
+      | ITransfer_tokens (kinfo, k) ->
           let p = accu in
           let (amount, (Typed_contract {arg_ty; address}, stack)) = stack in
           let {destination; entrypoint} = address in
-          transfer (ctxt, sc) gas amount arg_ty p destination entrypoint
+          transfer
+            (ctxt, sc)
+            gas
+            amount
+            kinfo.iloc
+            arg_ty
+            p
+            destination
+            entrypoint
           >>=? fun (accu, ctxt, gas) ->
           (step [@ocaml.tailcall]) (ctxt, sc) gas k ks accu stack
       | IImplicit_account (_, k) ->
@@ -1705,7 +1713,7 @@ let step logger ctxt step_constants descr stack =
 
 *)
 type execution_arg =
-  | Typed_arg : 'a Script_typed_ir.ty * 'a -> execution_arg
+  | Typed_arg : Script.location * 'a Script_typed_ir.ty * 'a -> execution_arg
   | Untyped_arg : Script.expr -> execution_arg
 
 type execution_result = {
@@ -1750,12 +1758,12 @@ let execute_any_arg logger ctxt mode step_constants ~entrypoint ~internal
         (Bad_contract_parameter step_constants.self)
         (parse_data ctxt ~legacy:false ~allow_forged:internal entrypoint_ty arg)
       >>=? fun (parsed_arg, ctxt) -> return (box parsed_arg, ctxt)
-  | Typed_arg (parsed_arg_ty, parsed_arg) ->
+  | Typed_arg (location, parsed_arg_ty, parsed_arg) ->
       Gas_monad.run
         ctxt
         (Script_ir_translator.ty_eq
            ~error_details:Informative
-           Micheline.dummy_location
+           location
            entrypoint_ty
            parsed_arg_ty)
       >>?= fun (res, ctxt) ->
@@ -1834,7 +1842,7 @@ let execute_any_arg logger ctxt mode step_constants ~entrypoint ~internal
       (script, size) )
 
 let execute_with_typed_parameter ?logger ctxt ~cached_script mode step_constants
-    ~script ~entrypoint ~parameter_ty ~parameter ~internal =
+    ~script ~entrypoint ~parameter_ty ~location ~parameter ~internal =
   execute_any_arg
     logger
     ctxt
@@ -1844,7 +1852,7 @@ let execute_with_typed_parameter ?logger ctxt ~cached_script mode step_constants
     ~internal
     script
     cached_script
-    (Typed_arg (parameter_ty, parameter))
+    (Typed_arg (location, parameter_ty, parameter))
 
 let execute ?logger ctxt ~cached_script mode step_constants ~script ~entrypoint
     ~parameter ~internal =
