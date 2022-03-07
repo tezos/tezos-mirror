@@ -142,7 +142,7 @@ let fetch_and_compile_protocols pv ?peer ?timeout (block : Store.Block.t) =
   let state = Distributed_db.store pv.db in
   let*! chain_stores = Store.all_chain_stores state in
   let*! o =
-    Lwt_utils.find_map_s
+    List.find_map_s
       (fun chain_store ->
         let*! b = Store.Block.is_known chain_store hash in
         match b with

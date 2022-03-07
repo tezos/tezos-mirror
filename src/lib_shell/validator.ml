@@ -99,7 +99,7 @@ let get_active_chains {active_chains; _} =
 let read_block store h =
   let open Lwt_syntax in
   let* chain_stores = Store.all_chain_stores store in
-  Lwt_utils.find_map_s
+  List.find_map_s
     (fun chain_store ->
       let+ b = Store.Block.read_block_opt chain_store h in
       Option.map (fun b -> (Store.Chain.chain_id chain_store, b)) b)
