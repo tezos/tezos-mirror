@@ -40,8 +40,8 @@ let node_rpc node service =
       let* result = get ~url in
       return (Some (result |> JSON.parse ~origin:service))
 
-let get_node_inbox node =
-  let* json = node_rpc node "block/head/inbox" in
+let get_node_inbox ?(block = "head") node =
+  let* json = node_rpc node @@ "block/" ^ block ^ "/proto_inbox" in
   match json with
   | None -> return Rollup.{cumulated_size = 0; contents = []; hash = ""}
   | Some json ->
@@ -178,13 +178,14 @@ let test_tx_node_store_inbox =
       in
       let* () = Client.bake_for client in
       let* _ = Node.wait_for_level node 3 in
-      let* node_inbox = get_node_inbox tx_node in
+      let* node_inbox_head = get_node_inbox tx_node in
+      let* node_inbox_0 = get_node_inbox ~block:"0" tx_node in
       let*! inbox = Rollup.get_inbox ~hooks ~rollup ~level:0 client in
       (* Enusre that stored inboxes on daemon side are equivalent of inboxes
          returned by the rpc call. *)
       Check.(
         (( = )
-           node_inbox.cumulated_size
+           node_inbox_head.cumulated_size
            inbox.cumulated_size
            ~error_msg:
              "Cumulated size of inboxes computed by the rollup node should be \
@@ -192,11 +193,18 @@ let test_tx_node_store_inbox =
           int) ;
       Check.(
         ( = )
-          node_inbox.contents
+          node_inbox_head.contents
           inbox.contents
           ~error_msg:
             "Content of inboxes computed by the rollup node should be equal to \
              the contents given by the RPC"
+          (list string)) ;
+      Check.(
+        ( = )
+          node_inbox_head.contents
+          node_inbox_0.contents
+          ~error_msg:
+            "Content of inbox at head (%L) and level 0 (%R) are different"
           (list string)) ;
       let snd_batch = "tezos_tezos" in
       let*! () =
@@ -209,12 +217,20 @@ let test_tx_node_store_inbox =
       in
       let* () = Client.bake_for client in
       let* _ = Node.wait_for_level node 4 in
-      let* node_inbox = get_node_inbox tx_node in
+      let* node_inbox_head = get_node_inbox tx_node in
+      let* node_inbox_1 = get_node_inbox ~block:"1" tx_node in
       let*! inbox = Rollup.get_inbox ~hooks ~rollup ~level:1 client in
       (* Enusre that stored inboxes on daemon side are equivalent of inboxes
          returned by the rpc call. *)
-      assert (Int.equal node_inbox.cumulated_size inbox.cumulated_size) ;
-      assert (List.equal String.equal node_inbox.contents inbox.contents) ;
+      assert (Int.equal node_inbox_head.cumulated_size inbox.cumulated_size) ;
+      assert (List.equal String.equal node_inbox_head.contents inbox.contents) ;
+      Check.(
+        ( = )
+          node_inbox_head.contents
+          node_inbox_1.contents
+          ~error_msg:
+            "Content of inbox at head (%L) and level 1 (%R) are different"
+          (list string)) ;
       unit)
 
 let register ~protocols =
