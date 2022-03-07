@@ -65,8 +65,7 @@ module Make_tree (DB : DB) : sig
   exception Context_dangling_hash of string
 end
 
-(* Encoding of Merkle proofs using vanilla Data_encoding.  Easier to parse but slightly inefficient. *)
-module Proof_encoding_V1 : Tezos_context_sigs.Context.PROOF_ENCODING
+module Proof_encoding = Merkle_proof_encoding
 
 module Make_proof (DB : DB) : sig
   module Proof : Tezos_context_sigs.Context.PROOF
