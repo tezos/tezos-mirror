@@ -85,7 +85,7 @@ end
 let rec raw_context_size = function
   | Tezos_shell_services.Block_services.Key _ | Cut -> 0
   | Dir map ->
-      TzString.Map.fold (fun _key v acc -> acc + 1 + raw_context_size v) map 0
+      String.Map.fold (fun _key v acc -> acc + 1 + raw_context_size v) map 0
 
 let rec raw_context_to_tree
     (raw : Tezos_shell_services.Block_services.raw_context) :
@@ -103,7 +103,7 @@ let rec raw_context_to_tree
         | Some u -> Local.Tree.add_tree tree [string] u
       in
       let* dir =
-        TzString.Map.bindings map
+        String.Map.bindings map
         |> List.fold_left_s add_to_tree (Local.Tree.empty Local.empty)
       in
       if Local.Tree.is_empty dir then return_none else return_some dir
@@ -129,7 +129,7 @@ type rpc_context_args = {
   block : Tezos_shell_services.Block_services.block;
 }
 
-module StringMap = TzString.Map
+module StringMap = String.Map
 
 module Tree : Proxy.TREE with type t = Local.tree with type key = Local.key =
 struct

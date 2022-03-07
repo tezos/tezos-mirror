@@ -650,7 +650,7 @@ module Manpage = struct
     let log_sections =
       String.concat
         " "
-        (TzString.Set.elements (Internal_event.get_registered_sections ()))
+        (List.of_seq (Internal_event.get_registered_sections ()))
     in
     [
       `S "DEBUG";

@@ -23,9 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Set = Set.Make (String)
-module Map = Map.Make (String)
-
 let split delim ?(dup = true) ?(limit = max_int) path =
   let l = String.length path in
   let rec do_slashes acc limit i =

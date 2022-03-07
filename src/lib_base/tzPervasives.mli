@@ -67,6 +67,10 @@ module String : sig
 
   module Hashtbl :
     Tezos_error_monad.TzLwtreslib.Hashtbl.SeededS with type key = t
+
+  module Map : Tezos_error_monad.TzLwtreslib.Map.S with type key = t
+
+  module Set : Tezos_error_monad.TzLwtreslib.Set.S with type elt = t
 end
 
 module Time = Time

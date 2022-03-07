@@ -27,7 +27,7 @@ open Lib_test.Qcheck2_helpers
 
 let raw_context_gen =
   let open Tezos_shell_services.Block_services in
-  let module MapGen = MakeMapGen (TzString.Map) in
+  let module MapGen = MakeMapGen (String.Map) in
   let open QCheck2 in
   let open Gen in
   (* Factor used to limit the depth of the tree. *)
@@ -75,7 +75,7 @@ let irmin_hash_gen = QCheck2.Gen.oneofl irmin_hashes
 
 let merkle_node_gen =
   let open Tezos_shell_services.Block_services in
-  let module MapGen = MakeMapGen (TzString.Map) in
+  let module MapGen = MakeMapGen (String.Map) in
   let open QCheck2.Gen in
   let max_depth_factor = 4 in
   fix
@@ -102,7 +102,7 @@ let print_merkle_node =
   Format.asprintf "%a" Tezos_shell_services.Block_services.pp_merkle_node
 
 let merkle_tree_gen =
-  let open MakeMapGen (TzString.Map) in
+  let open MakeMapGen (String.Map) in
   gen_of_size
     QCheck2.Gen.(0 -- 5)
     (QCheck2.Gen.small_string ?gen:None)

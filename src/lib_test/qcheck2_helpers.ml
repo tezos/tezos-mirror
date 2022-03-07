@@ -181,7 +181,14 @@ let endpoint_gen =
   let+ s = url_string_gen in
   Uri.of_string s
 
-module MakeMapGen (Map : Stdlib.Map.S) = struct
+module MakeMapGen (Map : sig
+  type 'a t
+
+  type key
+
+  val of_seq : (key * 'a) Seq.t -> 'a t
+end) =
+struct
   open QCheck2
 
   let gen_of_size (size_gen : int Gen.t) (key_gen : Map.key Gen.t)

@@ -87,8 +87,8 @@ module type S = sig
   end
 end
 
-module Make (M : Map.S) : S with type t = R.t M.t and type basis = M.key =
-struct
+module Make (M : Tezos_error_monad.TzLwtreslib.Map.S) :
+  S with type t = R.t M.t and type basis = M.key = struct
   type t = R.t M.t
 
   type basis = M.key
@@ -133,11 +133,11 @@ struct
   let set vec i e =
     if R.compare e R.zero = 0 then M.remove i vec else M.add i e vec
 
-  let get_exn vec i = M.find i vec
+  let get_opt vec i = M.find i vec
 
-  let get_opt vec i = M.find_opt i vec
+  let get_exn vec i = WithExceptions.Option.get ~loc:__LOC__ @@ M.find i vec
 
-  let get vec i = try M.find i vec with Not_found -> R.zero
+  let get vec i = Option.value ~default:R.zero @@ M.find i vec
 
   let swap vec i j =
     match (M.find_opt i vec, M.find_opt j vec) with
@@ -187,5 +187,6 @@ struct
   end
 end
 
-module Make_compare (X : Map.OrderedType) = Make (Map.Make (X))
-module String = Make (TzString.Map)
+module Make_compare (X : Map.OrderedType) =
+  Make (Tezos_error_monad.TzLwtreslib.Map.Make (X))
+module String = Make (String.Map)

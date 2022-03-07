@@ -103,16 +103,16 @@ let rec remove_data_in_node =
   | Data _ -> None
   | Continue mtree ->
       let mtree' = remove_data_in_tree mtree in
-      if TzString.Map.is_empty mtree' then None else Some (Continue mtree')
+      if String.Map.is_empty mtree' then None else Some (Continue mtree')
 
 and remove_data_in_tree mtree =
-  let pairs = TzString.Map.bindings mtree in
+  let pairs = String.Map.bindings mtree in
   let pairs' = Light_lib.Bifunctor.second remove_data_in_node pairs in
   let lift_opt (x, y_opt) =
     match y_opt with None -> None | Some y -> Some (x, y)
   in
   let pairs'' = List.map lift_opt pairs' |> filter_none in
-  List.to_seq pairs'' |> TzString.Map.of_seq
+  List.to_seq pairs'' |> String.Map.of_seq
 
 (** Test that translating a [merkle_tree] to an Irmin tree yields
     an Irmin tree that is included in the original [merkle_tree].
@@ -199,7 +199,7 @@ let rec union_merkle_node n1 n2 =
 and union_merkle_tree t1 t2 =
   let conflict = ref false in
   let merge =
-    TzString.Map.union
+    String.Map.union
       (fun _key val1 val2 ->
         let node = union_merkle_node val1 val2 in
         if Option.is_none node then conflict := true ;
@@ -299,7 +299,7 @@ let test_union_merkle_empty =
   let repo = Lwt_main.run (Store.Tree.make_repo ()) in
   let res =
     Lwt_main.run
-    @@ Merkle.union_irmin_tree_merkle_tree repo tree TzString.Map.empty
+    @@ Merkle.union_irmin_tree_merkle_tree repo tree String.Map.empty
     |> get_ok
   in
   Light_lib.check_irmin_tree_eq tree res
@@ -321,15 +321,15 @@ let test_shape_ignores_key =
   assume @@ not (is_continue node1 && is_continue node2) ;
   let rec deep_add current_key value mtree =
     match current_key with
-    | [last_fragment] -> TzString.Map.add last_fragment value mtree
+    | [last_fragment] -> String.Map.add last_fragment value mtree
     | hd_key :: tl_key ->
-        TzString.Map.update
+        String.Map.update
           hd_key
           (fun mnode_opt ->
             let subtree =
               match mnode_opt with
               | Some (Continue subtree) -> subtree
-              | _ -> TzString.Map.empty
+              | _ -> String.Map.empty
             in
             Some (Continue (deep_add tl_key value subtree)))
           mtree
@@ -487,9 +487,9 @@ module Consensus = struct
         else Ok generated
     in
     let rand = Random.State.make (Array.of_list seed) in
-    if (not TzString.Map.(is_empty mtree)) && Random.State.int rand 10 = 0 then
+    if (not String.Map.(is_empty mtree)) && Random.State.int rand 10 = 0 then
       (* The empty tree is an important edge case, hence this conditional *)
-      Ok TzString.Map.empty
+      Ok String.Map.empty
     else gen_rec ~rand 128
 
   (* [mock_light_rpc mtree [(endpoint1, true); (endpoint2, false)] seed]

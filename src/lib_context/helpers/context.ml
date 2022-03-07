@@ -88,13 +88,13 @@ module Make_tree (Store : DB) = struct
           t
           init
 
-  type raw = [`Value of bytes | `Tree of raw TzString.Map.t]
+  type raw = [`Value of bytes | `Tree of raw String.Map.t]
 
   type concrete = Store.Tree.concrete
 
   let rec raw_of_concrete : type a. (raw -> a) -> concrete -> a =
    fun k -> function
-    | `Tree l -> raw_of_node (fun l -> k (`Tree (TzString.Map.of_seq l))) l
+    | `Tree l -> raw_of_node (fun l -> k (`Tree (String.Map.of_seq l))) l
     | `Contents (v, _) -> k (`Value v)
 
   and raw_of_node :
@@ -113,7 +113,7 @@ module Make_tree (Store : DB) = struct
 
   let rec concrete_of_raw : type a. (concrete -> a) -> raw -> a =
    fun k -> function
-    | `Tree l -> concrete_of_node (fun l -> k (`Tree l)) (TzString.Map.to_seq l)
+    | `Tree l -> concrete_of_node (fun l -> k (`Tree l)) (String.Map.to_seq l)
     | `Value v -> k (`Contents (v, ()))
 
   and concrete_of_node :
@@ -133,8 +133,8 @@ module Make_tree (Store : DB) = struct
     mu "Tree.raw" (fun encoding ->
         let map_encoding =
           conv
-            TzString.Map.bindings
-            (fun bindings -> TzString.Map.of_seq (List.to_seq bindings))
+            String.Map.bindings
+            (fun bindings -> String.Map.of_seq (List.to_seq bindings))
             (list (tup2 string encoding))
         in
         union

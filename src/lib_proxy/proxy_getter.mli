@@ -28,7 +28,7 @@ module Local := Local_context
 (** The size of a tree, for logging *)
 val raw_context_size : Tezos_shell_services.Block_services.raw_context -> int
 
-module StringMap = TzString.Map
+module StringMap = String.Map
 
 module type REQUESTS_TREE = sig
   (** The point of this data structure is as follows:

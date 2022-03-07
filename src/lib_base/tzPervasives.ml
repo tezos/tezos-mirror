@@ -48,6 +48,9 @@ module String = struct
 
     let hash = Hashtbl.seeded_hash
   end)
+
+  module Map = Tezos_error_monad.TzLwtreslib.Map.Make (String)
+  module Set = Tezos_error_monad.TzLwtreslib.Set.Make (String)
 end
 
 module Time = Time

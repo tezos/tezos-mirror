@@ -33,7 +33,7 @@
 (** Tests [Proxy_getter] by instantiating the [Make] functor with
     a mock of [PROTO_RPC]. It tests the basic behavior of the API. *)
 
-module StringMap = TzString.Map
+module StringMap = String.Map
 module Local = Tezos_proxy.Local_context
 
 (** Alias to make "empty list" intention more explicit *)
@@ -72,7 +72,7 @@ let mock_proto_rpc () =
         | [] -> Tezos_shell_services.Block_services.Key Bytes.empty
         | hd :: tail ->
             Tezos_shell_services.Block_services.Dir
-              (TzString.Map.singleton hd (mock_raw_context tail))
+              (String.Map.singleton hd (mock_raw_context tail))
       in
       (* Remember call *)
       Stack.push k calls ;

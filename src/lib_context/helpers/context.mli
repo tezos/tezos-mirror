@@ -42,7 +42,7 @@ module Make_tree (DB : DB) : sig
 
   val of_value : _ -> DB.contents -> DB.tree Lwt.t
 
-  type raw = [`Value of DB.contents | `Tree of raw TzString.Map.t]
+  type raw = [`Value of DB.contents | `Tree of raw String.Map.t]
 
   val raw_encoding : raw Data_encoding.t
 

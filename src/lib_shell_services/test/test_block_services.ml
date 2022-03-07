@@ -33,9 +33,9 @@
 let make_directory n f =
   let rec aux acc n =
     if n <= 0 then acc
-    else aux (TzString.Map.add (string_of_int n) (f n) acc) (n - 1)
+    else aux (String.Map.add (string_of_int n) (f n) acc) (n - 1)
   in
-  Block_services.Dir (aux TzString.Map.empty n)
+  Block_services.Dir (aux String.Map.empty n)
 
 (** Check that JSON-encoding for a large directory never stack-overflows.
     This test fails for json-data-encoding.0.9.1 and older. *)

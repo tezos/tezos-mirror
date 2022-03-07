@@ -55,7 +55,7 @@ let testable_string_list_ignoring_order : string list Alcotest.testable =
     include StringListTestable
 
     let equal v1 v2 =
-      TzString.Set.equal (TzString.Set.of_list v1) (TzString.Set.of_list v2)
+      String.Set.equal (String.Set.of_list v1) (String.Set.of_list v2)
   end in
   (module M)
 

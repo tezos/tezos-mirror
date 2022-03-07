@@ -184,12 +184,12 @@ let operation_list_quota_encoding =
     (fun (max_size, max_op) -> {max_size; max_op})
     (obj2 (req "max_size" int31) (opt "max_op" int31))
 
-type raw_context = Key of Bytes.t | Dir of raw_context TzString.Map.t | Cut
+type raw_context = Key of Bytes.t | Dir of raw_context String.Map.t | Cut
 
 let rec raw_context_eq rc1 rc2 =
   match (rc1, rc2) with
   | (Key bytes1, Key bytes2) -> Bytes.equal bytes1 bytes2
-  | (Dir dir1, Dir dir2) -> TzString.Map.(equal raw_context_eq dir1 dir2)
+  | (Dir dir1, Dir dir2) -> String.Map.(equal raw_context_eq dir1 dir2)
   | (Cut, Cut) -> true
   | _ -> false
 
@@ -202,7 +202,7 @@ let rec pp_raw_context ppf = function
         "{@[<v 1>@,%a@]@,}"
         (Format.pp_print_list ~pp_sep:Format.pp_print_cut (fun ppf (s, t) ->
              Format.fprintf ppf "%s : %a" s pp_raw_context t))
-        (TzString.Map.bindings l)
+        (String.Map.bindings l)
 
 let raw_context_encoding =
   mu "raw_context" (fun encoding ->
@@ -218,12 +218,12 @@ let raw_context_encoding =
             (Tag 1)
             (assoc encoding)
             ~title:"Dir"
-            (function Dir map -> Some (TzString.Map.bindings map) | _ -> None)
+            (function Dir map -> Some (String.Map.bindings map) | _ -> None)
             (fun bindings ->
               Dir
                 (List.fold_left
-                   (fun wip_map (k, v) -> TzString.Map.add k v wip_map)
-                   TzString.Map.empty
+                   (fun wip_map (k, v) -> String.Map.add k v wip_map)
+                   String.Map.empty
                    bindings));
           case
             (Tag 2)
@@ -234,16 +234,16 @@ let raw_context_encoding =
         ])
 
 let raw_context_insert =
-  let default = Dir TzString.Map.empty in
+  let default = Dir String.Map.empty in
   (* not tail recursive but over the length of [k], which is small *)
   let rec aux (k, v) ctx =
-    let d = match ctx with Dir d -> d | Key _ | Cut -> TzString.Map.empty in
+    let d = match ctx with Dir d -> d | Key _ | Cut -> String.Map.empty in
     match k with
     | [] -> v
-    | [kh] -> Dir (TzString.Map.add kh v d)
+    | [kh] -> Dir (String.Map.add kh v d)
     | kh :: ktl ->
         Dir
-          (TzString.Map.update
+          (String.Map.update
              kh
              (fun ctxtopt ->
                let ctx' = Option.value ctxtopt ~default in
@@ -259,7 +259,7 @@ type merkle_node =
   | Data of raw_context
   | Continue of merkle_tree
 
-and merkle_tree = merkle_node TzString.Map.t
+and merkle_tree = merkle_node String.Map.t
 
 let rec merkle_node_eq n1 n2 =
   match (n1, n2) with
@@ -268,8 +268,7 @@ let rec merkle_node_eq n1 n2 =
   | (Continue mtree1, Continue mtree2) -> merkle_tree_eq mtree1 mtree2
   | _ -> false
 
-and merkle_tree_eq mtree1 mtree2 =
-  TzString.Map.equal merkle_node_eq mtree1 mtree2
+and merkle_tree_eq mtree1 mtree2 = String.Map.equal merkle_node_eq mtree1 mtree2
 
 type merkle_leaf_kind = Hole | Raw_context
 
@@ -281,7 +280,7 @@ let rec pp_merkle_node ppf = function
   | Continue tree -> Format.fprintf ppf "Continue(%a)" pp_merkle_tree tree
 
 and pp_merkle_tree ppf mtree =
-  let pairs = TzString.Map.bindings mtree in
+  let pairs = String.Map.bindings mtree in
   Format.fprintf
     ppf
     "{@[<v 1>@,%a@]@,}"
@@ -292,11 +291,11 @@ and pp_merkle_tree ppf mtree =
 let stringmap_encoding value_encoding =
   let open Data_encoding in
   conv
-    TzString.Map.bindings
+    String.Map.bindings
     (fun l ->
       List.fold_left
-        (fun acc (k, v) -> TzString.Map.add k v acc)
-        TzString.Map.empty
+        (fun acc (k, v) -> String.Map.add k v acc)
+        String.Map.empty
         l)
     (list (tup2 string value_encoding))
 
