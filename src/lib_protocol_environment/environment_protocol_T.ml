@@ -177,7 +177,8 @@ struct
   include P
 
   let init context header =
-    Context.Cache.set_cache_layout context [] >>= fun context ->
+    let open Lwt_syntax in
+    let* context = Context.Cache.set_cache_layout context [] in
     init context header
 
   let begin_partial_application ~chain_id ~ancestor_context

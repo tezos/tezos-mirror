@@ -26,25 +26,37 @@
 let of_memory_tree (t : Tezos_context_memory.Context.tree) : Proxy_delegate.t =
   (module struct
     let proxy_dir_mem key =
-      Tezos_context_memory.Context.Tree.mem_tree t key >>= Lwt_syntax.return_ok
+      let open Lwt_syntax in
+      let* v = Tezos_context_memory.Context.Tree.mem_tree t key in
+      return_ok v
 
     let proxy_get key =
-      Tezos_context_memory.Context.Tree.find_tree t key >>= Lwt_syntax.return_ok
+      let open Lwt_syntax in
+      let* v = Tezos_context_memory.Context.Tree.find_tree t key in
+      return_ok v
 
     let proxy_mem key =
-      Tezos_context_memory.Context.Tree.mem t key >>= Lwt_syntax.return_ok
+      let open Lwt_syntax in
+      let* v = Tezos_context_memory.Context.Tree.mem t key in
+      return_ok v
   end : Proxy_delegate.T)
 
 let of_memory_context (m : Tezos_context_memory.Context.t) : Proxy_delegate.t =
   (module struct
     let proxy_dir_mem key =
-      Tezos_context_memory.Context.mem_tree m key >>= Lwt_syntax.return_ok
+      let open Lwt_syntax in
+      let* v = Tezos_context_memory.Context.mem_tree m key in
+      return_ok v
 
     let proxy_get key =
-      Tezos_context_memory.Context.find_tree m key >>= Lwt_syntax.return_ok
+      let open Lwt_syntax in
+      let* v = Tezos_context_memory.Context.find_tree m key in
+      return_ok v
 
     let proxy_mem key =
-      Tezos_context_memory.Context.mem m key >>= Lwt_syntax.return_ok
+      let open Lwt_syntax in
+      let* v = Tezos_context_memory.Context.mem m key in
+      return_ok v
   end : Proxy_delegate.T)
 
 let make_index ~(context_path : string) : Tezos_context.Context.index Lwt.t =

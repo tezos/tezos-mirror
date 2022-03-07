@@ -25,12 +25,19 @@
 
 open Tezos_error_monad.Error_monad
 
-let record_trace_eval mk_err = function
-  | Error trace -> mk_err () >>? fun err -> Error (TzTrace.cons err trace)
+let record_trace_eval mk_err =
+  let open Result_syntax in
+  function
+  | Error trace ->
+      let* err = mk_err () in
+      fail (TzTrace.cons err trace)
   | ok -> ok
 
 let trace_eval mk_err f =
-  f >>= function
+  let open Lwt_result_syntax in
+  let*! r = f in
+  match r with
   | Error trace ->
-      mk_err () >>=? fun err -> Lwt.return_error (TzTrace.cons err trace)
+      let* err = mk_err () in
+      Lwt.return_error (TzTrace.cons err trace)
   | ok -> Lwt.return ok

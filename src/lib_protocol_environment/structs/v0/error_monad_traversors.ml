@@ -25,10 +25,10 @@
 
 open Lwt.Infix (* >>= >|= *)
 
-let ( >>? ) v f = match v with Error _ as err -> err | Ok v -> f v
+let ( >>? ) = Result.bind
 
 let ( >>=? ) v f =
-  v >>= function Error _ as err -> Lwt.return err | Ok v -> f v
+  Lwt.bind v (function Error _ as err -> Lwt.return err | Ok v -> f v)
 
 let ok_nil = Ok []
 
