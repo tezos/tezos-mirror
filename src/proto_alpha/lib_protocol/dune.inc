@@ -95,6 +95,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    lazy_storage_kind.mli lazy_storage_kind.ml
    receipt_repr.mli receipt_repr.ml
    migration_repr.mli migration_repr.ml
+   sc_rollup_tick_repr.mli sc_rollup_tick_repr.ml
    raw_context_intf.ml
    raw_context.mli raw_context.ml
    storage_costs.mli storage_costs.ml
@@ -268,6 +269,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    lazy_storage_kind.mli lazy_storage_kind.ml
    receipt_repr.mli receipt_repr.ml
    migration_repr.mli migration_repr.ml
+   sc_rollup_tick_repr.mli sc_rollup_tick_repr.ml
    raw_context_intf.ml
    raw_context.mli raw_context.ml
    storage_costs.mli storage_costs.ml
@@ -441,6 +443,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    lazy_storage_kind.mli lazy_storage_kind.ml
    receipt_repr.mli receipt_repr.ml
    migration_repr.mli migration_repr.ml
+   sc_rollup_tick_repr.mli sc_rollup_tick_repr.ml
    raw_context_intf.ml
    raw_context.mli raw_context.ml
    storage_costs.mli storage_costs.ml
@@ -636,6 +639,7 @@ include Tezos_raw_protocol_alpha.Main
    Lazy_storage_kind
    Receipt_repr
    Migration_repr
+   Sc_rollup_tick_repr
    Raw_context_intf
    Raw_context
    Storage_costs
@@ -850,6 +854,7 @@ include Tezos_raw_protocol_alpha.Main
    lazy_storage_kind.mli lazy_storage_kind.ml
    receipt_repr.mli receipt_repr.ml
    migration_repr.mli migration_repr.ml
+   sc_rollup_tick_repr.mli sc_rollup_tick_repr.ml
    raw_context_intf.ml
    raw_context.mli raw_context.ml
    storage_costs.mli storage_costs.ml

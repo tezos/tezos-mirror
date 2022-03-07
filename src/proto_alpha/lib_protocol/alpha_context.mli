@@ -2396,6 +2396,29 @@ end
 
 (** See {!Sc_rollup_storage} and {!Sc_rollup_repr}. *)
 module Sc_rollup : sig
+  (** See {!Sc_rollup_tick_repr}. *)
+  module Tick : sig
+    type t
+
+    val initial : t
+
+    val next : t -> t
+
+    val distance : t -> t -> Z.t
+
+    val of_int : int -> t option
+
+    val to_int : t -> int option
+
+    val encoding : t Data_encoding.t
+
+    val pp : Format.formatter -> t -> unit
+
+    include Compare.S with type t := t
+
+    module Map : Map.S with type key = t
+  end
+
   module PVM : sig
     type boot_sector
 
