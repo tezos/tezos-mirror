@@ -125,8 +125,16 @@ let context_init ?(tx_rollup_max_unfinalized_levels = 2100) n =
     context and 1 contract. *)
 let context_init1 () =
   context_init 1 >|=? function
-  | (_, []) -> assert false
   | (b, contract_1 :: _) -> (b, contract_1)
+  | (_, _) -> assert false
+
+(** [context_init2] initializes a context with no consensus rewards
+    to not interfere with balances prediction. It returns the created
+    context and 2 contracts. *)
+let context_init2 () =
+  context_init 2 >|=? function
+  | (b, contract_1 :: contract_2 :: _) -> (b, contract_1, contract_2)
+  | (_, _) -> assert false
 
 (** [originate b contract] originates a tx_rollup from [contract],
     and returns the new block and the tx_rollup address. *)
@@ -140,10 +148,7 @@ let originate b contract =
     the state with the tx_rollup, and the baked block with the batch submitted.
 *)
 let init_originate_and_submit ?(batch = String.make 5 'c') () =
-  context_init 1 >>=? fun (b, contracts) ->
-  let contract =
-    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0
-  in
+  context_init1 () >>=? fun (b, contract) ->
   originate b contract >>=? fun (b, tx_rollup) ->
   Context.Contract.balance (B b) contract >>=? fun balance ->
   Context.Tx_rollup.state (B b) tx_rollup >>=? fun state ->
@@ -417,10 +422,7 @@ let test_add_batch_with_limit () =
      [Tez.zero], so [cost] >= [limit] *)
   let burn_limit = Tez.zero in
   let contents = String.make 5 'd' in
-  context_init 1 >>=? fun (b, contracts) ->
-  let contract =
-    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0
-  in
+  context_init1 () >>=? fun (b, contract) ->
   originate b contract >>=? fun (b, tx_rollup) ->
   Incremental.begin_construction b >>=? fun i ->
   Op.tx_rollup_submit_batch (I i) contract tx_rollup contents ~burn_limit
@@ -482,10 +484,7 @@ let test_add_two_batches () =
 
 (** Try to add a batch too large in an inbox. *)
 let test_batch_too_big () =
-  context_init 1 >>=? fun (b, contracts) ->
-  let contract =
-    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0
-  in
+  context_init1 () >>=? fun (b, contract) ->
   originate b contract >>=? fun (b, tx_rollup) ->
   Context.get_constants (B b) >>=? fun constant ->
   let contents =
@@ -539,10 +538,7 @@ let fill_inbox b tx_rollup contract contents k =
 
 (** Try to add enough large batches to reach the size limit of an inbox. *)
 let test_inbox_size_too_big () =
-  context_init 1 >>=? fun (b, contracts) ->
-  let contract =
-    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0
-  in
+  context_init1 () >>=? fun (b, contract) ->
   Context.get_constants (B b) >>=? fun constant ->
   let tx_rollup_batch_limit =
     constant.parametric.tx_rollup_hard_size_limit_per_message - 1
@@ -561,10 +557,7 @@ let test_inbox_size_too_big () =
 
 (** Try to add enough batches to reach the batch count limit of an inbox. *)
 let test_inbox_count_too_big () =
-  context_init 1 >>=? fun (b, contracts) ->
-  let contract =
-    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0
-  in
+  context_init1 () >>=? fun (b, contract) ->
   Context.get_constants (B b) >>=? fun constant ->
   let message_count = constant.parametric.tx_rollup_max_messages_per_inbox in
   let contents = "some contents" in
@@ -614,10 +607,7 @@ let test_inbox_count_too_big () =
 let test_valid_deposit () =
   let (_, _, pkh) = gen_l2_account () in
 
-  context_init 1 >>=? fun (b, contracts) ->
-  let account =
-    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0
-  in
+  context_init1 () >>=? fun (b, account) ->
   originate b account >>=? fun (b, tx_rollup) ->
   Contract_helpers.originate_contract
     "contracts/tx_rollup_deposit.tz"
@@ -660,10 +650,7 @@ let test_valid_deposit () =
     sending a deposit order. *)
 let test_valid_deposit_inexistant_rollup () =
   let (_, _, pkh) = gen_l2_account () in
-  context_init 1 >>=? fun (b, contracts) ->
-  let account =
-    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0
-  in
+  context_init1 () >>=? fun (b, account) ->
   Contract_helpers.originate_contract
     "contracts/tx_rollup_deposit.tz"
     "Unit"
@@ -691,10 +678,7 @@ let test_valid_deposit_inexistant_rollup () =
 let test_invalid_deposit_not_ticket () =
   let (_, _, pkh) = gen_l2_account () in
 
-  context_init 1 >>=? fun (b, contracts) ->
-  let account =
-    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0
-  in
+  context_init1 () >>=? fun (b, account) ->
   originate b account >>=? fun (b, tx_rollup) ->
   Contract_helpers.originate_contract
     "contracts/tx_rollup_deposit_incorrect_param.tz"
@@ -721,10 +705,7 @@ let test_invalid_deposit_not_ticket () =
 let test_invalid_entrypoint () =
   let (_, _, pkh) = gen_l2_account () in
 
-  context_init 1 >>=? fun (b, contracts) ->
-  let account =
-    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0
-  in
+  context_init1 () >>=? fun (b, account) ->
   originate b account >>=? fun (b, tx_rollup) ->
   Contract_helpers.originate_contract
     "contracts/tx_rollup_deposit_incorrect_param.tz"
@@ -749,10 +730,7 @@ let test_invalid_entrypoint () =
 (** [test_invalid_l2_address] checks that a smart contract cannot make
     a deposit order to something that is not a valid layer-2 address. *)
 let test_invalid_l2_address () =
-  context_init 1 >>=? fun (b, contracts) ->
-  let account =
-    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0
-  in
+  context_init1 () >>=? fun (b, account) ->
   originate b account >>=? fun (b, tx_rollup) ->
   Contract_helpers.originate_contract
     "contracts/tx_rollup_deposit.tz"
@@ -780,10 +758,7 @@ let test_invalid_l2_address () =
     transaction rollup fails if the [amount] parameter is not null. *)
 let test_valid_deposit_invalid_amount () =
   let (_, _, pkh) = gen_l2_account () in
-  context_init 1 >>=? fun (b, contracts) ->
-  let account =
-    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0
-  in
+  context_init1 () >>=? fun (b, account) ->
   originate b account >>=? fun (b, tx_rollup) ->
   Contract_helpers.originate_contract
     "contracts/tx_rollup_deposit_one_mutez.tz"
@@ -807,10 +782,7 @@ let test_valid_deposit_invalid_amount () =
     to the deposit entrypoint of a transaction rollup fails if it is
     not internal. *)
 let test_deposit_by_non_internal_operation () =
-  context_init 1 >>=? fun (b, contracts) ->
-  let account =
-    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0
-  in
+  context_init1 () >>=? fun (b, account) ->
   originate b account >>=? fun (b, tx_rollup) ->
   Op.unsafe_transaction (B b) account (Tx_rollup tx_rollup) Tez.zero
   >>=? fun operation ->
@@ -903,13 +875,7 @@ let test_finalization () =
     level, and ensures that this fails.  It adds a commitment with
     the wrong batch count and ensures that that fails. *)
 let test_commitment_duplication () =
-  context_init 2 >>=? fun (b, contracts) ->
-  let contract1 =
-    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0
-  in
-  let contract2 =
-    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 1
-  in
+  context_init2 () >>=? fun (b, contract1, contract2) ->
   let pkh1 = is_implicit_exn contract1 in
   originate b contract1 >>=? fun (b, tx_rollup) ->
   Context.Contract.balance (B b) contract1 >>=? fun _balance ->
@@ -1010,10 +976,7 @@ let tx_level level = assert_ok @@ Tx_rollup_level.of_int32 level
 
 (** [test_commitment_predecessor] tests commitment predecessor edge cases  *)
 let test_commitment_predecessor () =
-  context_init 1 >>=? fun (b, contracts) ->
-  let contract1 =
-    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0
-  in
+  context_init1 () >>=? fun (b, contract1) ->
   originate b contract1 >>=? fun (b, tx_rollup) ->
   (* Transactions in blocks 2, 3, 6 *)
   make_transactions_in tx_rollup contract1 [2; 3; 6] b >>=? fun b ->
@@ -1112,10 +1075,7 @@ let test_full_inbox () =
 (** [test_bond_finalization] tests that level retirement in fact
     allows bonds to be returned. *)
 let test_bond_finalization () =
-  context_init 2 >>=? fun (b, contracts) ->
-  let contract1 =
-    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0
-  in
+  context_init1 () >>=? fun (b, contract1) ->
   let pkh1 = is_implicit_exn contract1 in
   originate b contract1 >>=? fun (b, tx_rollup) ->
   (* Transactions in block 2, 3, 4 *)
@@ -1163,10 +1123,7 @@ let test_bond_finalization () =
 (** [test_too_many_commitments] tests that you can't submit new
       commitments if there are too many finalized commitments. *)
 let test_too_many_commitments () =
-  context_init 2 >>=? fun (b, contracts) ->
-  let contract1 =
-    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0
-  in
+  context_init1 () >>=? fun (b, contract1) ->
   originate b contract1 >>=? fun (b, tx_rollup) ->
   (* Transactions in block 2, 3, 4, 5 *)
   make_transactions_in tx_rollup contract1 [2; 3; 4; 5] b >>=? fun b ->
