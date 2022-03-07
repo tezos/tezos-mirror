@@ -93,8 +93,8 @@ class faked_wallet ~base_dir ~filesystem : Client_context.wallet =
 
     method read_file fname =
       match String.Hashtbl.find filesystem fname with
-      | None -> failwith "faked_wallet: cannot ead file (%s)" fname
-      | Some content -> return content
+      | None -> failwith "faked_wallet: cannot read file (%s)" fname
+      | Some (content, _mtime) -> return content
 
     method private filename alias_name =
       Filename.concat
@@ -131,8 +131,20 @@ class faked_wallet ~base_dir ~filesystem : Client_context.wallet =
         let filename = self#filename alias_name in
         let json = Data_encoding.Json.construct encoding list in
         let str = Ezjsonm.value_to_string (json :> Ezjsonm.value) in
-        String.Hashtbl.replace filesystem filename str ;
+        String.Hashtbl.replace
+          filesystem
+          filename
+          (str, Some (Ptime.to_float_s (Ptime_clock.now ()))) ;
         return_unit
+
+    method last_modification_time : string -> float option tzresult Lwt.t =
+      let open Lwt_tzresult_syntax in
+      fun alias_name ->
+        let filename = self#filename alias_name in
+        let file = String.Hashtbl.find_opt filesystem filename in
+        match file with
+        | None -> return_none
+        | Some (_content, mtime) -> return mtime
   end
 
 class faked_io_wallet ~base_dir ~filesystem : Client_context.io_wallet =
