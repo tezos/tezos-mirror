@@ -926,22 +926,10 @@ module Internal_result = struct
           (function Manager (Origination _ as op) -> Some op | _ -> None);
         proj =
           (function
-          | Origination
-              {
-                credit;
-                delegate;
-                script;
-                preorigination =
-                  _
-                  (* the hash is only used internally
-                             when originating from smart
-                             contracts, don't serialize it *);
-                _;
-              } ->
-              (credit, delegate, script));
+          | Origination {credit; delegate; script} -> (credit, delegate, script));
         inj =
           (fun (credit, delegate, script) ->
-            Origination {credit; delegate; script; preorigination = None});
+            Origination {credit; delegate; script});
       }
 
   let[@coq_axiom_with_reason "gadt"] delegation_case =

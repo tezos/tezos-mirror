@@ -231,20 +231,13 @@ let tickets_of_origination ctxt ~preorigination
         entrypoints = _;
         code_size = _;
       }) =
-  match preorigination with
-  | None -> fail Contract_not_originated
-  | Some contract ->
-      (* Extract any tickets from the storage. Note that if the type of the
-         contract storage does not contain tickets, storage is not scanned. *)
-      Ticket_scanner.type_has_tickets ctxt storage_type
-      >>?= fun (has_tickets, ctxt) ->
-      Ticket_scanner.tickets_of_value
-        ctxt
-        ~include_lazy:true
-        has_tickets
-        storage
-      >|=? fun (tickets, ctxt) ->
-      (Some {tickets; destination = Destination.Contract contract}, ctxt)
+  (* Extract any tickets from the storage. Note that if the type of the contract
+     storage does not contain tickets, storage is not scanned. *)
+  Ticket_scanner.type_has_tickets ctxt storage_type
+  >>?= fun (has_tickets, ctxt) ->
+  Ticket_scanner.tickets_of_value ctxt ~include_lazy:true has_tickets storage
+  >|=? fun (tickets, ctxt) ->
+  (Some {tickets; destination = Destination.Contract preorigination}, ctxt)
 
 let tickets_of_operation ctxt
     (Script_typed_ir.Internal_operation {source = _; operation; nonce = _}) =
@@ -295,7 +288,8 @@ let tickets_of_operation ctxt
       else return (None, ctxt)
   | Origination
       {
-        origination = {delegate = _; script = _; credit = _; preorigination};
+        origination = {delegate = _; script = _; credit = _};
+        preorigination;
         script;
       } ->
       tickets_of_origination ctxt ~preorigination script

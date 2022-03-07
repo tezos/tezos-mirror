@@ -644,7 +644,6 @@ let create_contract (ctxt, sc) gas storage_type param_type lambda views
     {
       credit;
       delegate;
-      preorigination = Some contract;
       script =
         {code = Script.lazy_expr code; storage = Script.lazy_expr storage};
     }
@@ -662,7 +661,9 @@ let create_contract (ctxt, sc) gas storage_type param_type lambda views
         code_size;
       }
   in
-  let operation = Origination {origination; script} in
+  let operation =
+    Origination {origination; preorigination = contract; script}
+  in
   fresh_internal_nonce ctxt >>?= fun (ctxt, nonce) ->
   let piop = Internal_operation {source = sc.self; operation; nonce} in
   let res = {piop; lazy_storage_diff} in

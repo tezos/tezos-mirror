@@ -310,15 +310,15 @@ let originated_contract op =
 
 exception Impossible
 
-let contract_origination ?counter ?delegate ~script ?(preorigination = None)
-    ?public_key ?credit ?fee ?gas_limit ?storage_limit ctxt source =
+let contract_origination ?counter ?delegate ~script ?public_key ?credit ?fee
+    ?gas_limit ?storage_limit ctxt source =
   Context.Contract.manager ctxt source >>=? fun account ->
   let default_credit = Tez.of_mutez @@ Int64.of_int 1000001 in
   let default_credit =
     WithExceptions.Option.to_exn ~none:Impossible default_credit
   in
   let credit = Option.value ~default:default_credit credit in
-  let operation = Origination {delegate; script; credit; preorigination} in
+  let operation = Origination {delegate; script; credit} in
   manager_operation
     ?counter
     ?public_key

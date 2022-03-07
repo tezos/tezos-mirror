@@ -1535,6 +1535,7 @@ and 'kind manager_operation =
       -> Kind.transaction manager_operation
   | Origination : {
       origination : Alpha_context.origination;
+      preorigination : Contract.t;
       script : ('arg, 'storage) script;
     }
       -> Kind.origination manager_operation

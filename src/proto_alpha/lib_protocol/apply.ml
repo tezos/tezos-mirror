@@ -1141,7 +1141,7 @@ let apply_transaction_to_tx_rollup ~ctxt ~parameters_ty ~parameters ~amount
   else fail (Script_tc_errors.No_such_entrypoint entrypoint)
 
 let apply_origination ~consume_deserialization_gas ~ctxt ~parsed_script ~script
-    ~internal ~preorigination ~delegate ~source ~credit ~before_operation =
+    ~internal ~preoriginate ~delegate ~source ~credit ~before_operation =
   Script.force_decode_in_context
     ~consume_deserialization_gas
     ctxt
@@ -1203,15 +1203,7 @@ let apply_origination ~consume_deserialization_gas ~ctxt ~parsed_script ~script
   Gas.consume ctxt (Script.strip_locations_cost code) >>?= fun ctxt ->
   let code = Script.lazy_expr (Micheline.strip_locations code) in
   let script = {Script.code; storage} in
-  (match preorigination with
-  | Some contract ->
-      assert internal ;
-      (* The preorigination field is only used to early return the address of
-         an originated contract in Michelson.
-         It cannot come from the outside. *)
-      ok (ctxt, contract)
-  | None -> Contract.fresh_contract_from_current_nonce ctxt)
-  >>?= fun (ctxt, contract) ->
+  preoriginate ctxt >>?= fun (contract, ctxt) ->
   Contract.raw_originate
     ctxt
     ~prepaid_bootstrap_storage:false
@@ -1341,7 +1333,8 @@ let apply_internal_manager_operation_content :
         ~since:before_operation
   | Origination
       {
-        origination = {delegate; script; preorigination; credit};
+        origination = {delegate; script; credit};
+        preorigination;
         script = parsed_script;
       } ->
       apply_origination
@@ -1350,7 +1343,7 @@ let apply_internal_manager_operation_content :
         ~parsed_script:(Some parsed_script)
         ~script
         ~internal
-        ~preorigination
+        ~preoriginate:(fun ctxt -> ok (preorigination, ctxt))
         ~delegate
         ~source
         ~credit
@@ -1559,14 +1552,21 @@ let apply_external_manager_operation_content :
           }
       in
       return (ctxt, result, [op])
-  | Origination {delegate; script; preorigination; credit} ->
+  | Origination {delegate; script; credit} ->
+      (* The preorigination field is only used to early return the address of
+         an originated contract in Michelson.
+         It cannot come from the outside. *)
+      let preoriginate ctxt =
+        Contract.fresh_contract_from_current_nonce ctxt
+        >|? fun (ctxt, contract) -> (contract, ctxt)
+      in
       apply_origination
         ~consume_deserialization_gas
         ~ctxt
         ~parsed_script:None
         ~script
         ~internal
-        ~preorigination
+        ~preoriginate
         ~delegate
         ~source
         ~credit

@@ -119,7 +119,6 @@ val contract_origination :
   ?counter:Z.t ->
   ?delegate:public_key_hash ->
   script:Script.t ->
-  ?preorigination:Contract.contract option ->
   ?public_key:public_key ->
   ?credit:Tez.tez ->
   ?fee:Tez.tez ->

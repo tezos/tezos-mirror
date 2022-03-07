@@ -3202,13 +3202,7 @@ module RPC = struct
           ~storage_limit
           [
             Manager
-              (Origination
-                 {
-                   delegate = delegatePubKey;
-                   script;
-                   credit = balance;
-                   preorigination = None;
-                 });
+              (Origination {delegate = delegatePubKey; script; credit = balance});
           ]
 
       let delegation ctxt block ~branch ~source ?sourcePubKey ~counter ~fee
