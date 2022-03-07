@@ -2021,6 +2021,8 @@ module Ticket_hash : sig
 
   val pp : Format.formatter -> t -> unit
 
+  val zero : t
+
   val of_script_expr_hash : Script_expr_hash.t -> t
 
   val to_b58check : t -> string

@@ -27,6 +27,8 @@ include Script_expr_hash
 
 let of_script_expr_hash t = t
 
+let zero = zero
+
 include Compare.Make (struct
   type nonrec t = t
 
