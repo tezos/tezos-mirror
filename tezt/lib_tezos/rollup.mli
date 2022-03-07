@@ -27,6 +27,7 @@ module Tx_rollup : sig
   type state = {
     oldest_inbox_level : int option;
     head_level : (int * int) option;
+    commitment_head_level : (int * string) option;
     burn_per_byte : int;
     inbox_ema : int;
   }
