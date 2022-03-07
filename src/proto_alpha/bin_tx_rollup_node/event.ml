@@ -56,14 +56,22 @@ let starting_node =
     ~level:Notice
     ()
 
-let node_is_ready =
+let rpc_server_is_ready =
   declare_2
     ~section
-    ~name:"tx_rollup_node_is_ready"
-    ~msg:"the transaction rollup node is listening to {addr}:{port}"
+    ~name:"tx_rollup_node_rpc_server_is_ready"
+    ~msg:"the transaction rollup node RPC server is listening to {addr}:{port}"
     ~level:Notice
     ("addr", Data_encoding.string)
     ("port", Data_encoding.uint16)
+
+let node_is_ready =
+  declare_0
+    ~section
+    ~name:"tx_rollup_node_is_ready"
+    ~msg:"the transaction rollup node is ready"
+    ~level:Notice
+    ()
 
 let node_is_shutting_down =
   declare_1
@@ -107,12 +115,13 @@ let processing_block =
     ("predecessor_hash", Block_hash.encoding)
 
 let block_processed =
-  declare_1
+  declare_2
     ~section
-    ~name:"oru_processed"
-    ~msg:"block processed with hash: {block_hash}"
+    ~name:"tx_rollup_node_tezos_block_processed"
+    ~msg:"tezos block {block_hash} at level {level} was sucessfully processed"
     ~level:Notice
     ("block_hash", Block_hash.encoding)
+    ("level", Data_encoding.int32)
 
 let block_already_processed =
   declare_1
