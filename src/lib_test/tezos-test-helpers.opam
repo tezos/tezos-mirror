@@ -15,7 +15,7 @@ depends: [
   "qcheck-alcotest" { >= "0.15" }
   "alcotest" { >= "1.5.0" }
   "lwt" { >= "5.4.0" }
-  "pure-splitmix" { = "0.2" }
+  "pure-splitmix" { = "0.3" }
   "data-encoding" { >= "0.5.1" & < "0.6" }
 ]
 build: [

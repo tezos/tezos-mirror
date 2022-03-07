@@ -168,7 +168,7 @@ let lwt_log_core = external_sublib ~js_compatible:true lwt_log "lwt_log.core"
 
 let lwt_unix = external_sublib lwt "lwt.unix"
 
-let lwt_watcher = external_lib "lwt-watcher" V.(exactly "0.1")
+let lwt_watcher = external_lib "lwt-watcher" V.(exactly "0.2")
 
 let mtime = external_lib ~js_compatible:true "mtime" V.(at_least "1.0.0")
 
@@ -205,7 +205,7 @@ let ppx_deriving_show = external_sublib ppx_deriving "ppx_deriving.show"
 let ptime_clock_os = external_sublib ~js_compatible:true ptime "ptime.clock.os"
 
 let pure_splitmix =
-  external_lib ~js_compatible:true "pure-splitmix" V.(exactly "0.2")
+  external_lib ~js_compatible:true "pure-splitmix" V.(exactly "0.3")
 
 let prbnmcn_stats = external_lib "prbnmcn-stats" V.(exactly "0.0.2")
 

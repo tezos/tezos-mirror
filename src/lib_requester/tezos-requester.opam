@@ -11,7 +11,7 @@ depends: [
   "dune" { >= "2.9" }
   "tezos-base"
   "tezos-stdlib-unix"
-  "lwt-watcher" { = "0.1" }
+  "lwt-watcher" { = "0.2" }
   "tezos-test-helpers" {with-test}
   "tezos-base-test-helpers" {with-test}
   "tezos-stdlib" {with-test}
