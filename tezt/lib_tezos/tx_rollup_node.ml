@@ -42,9 +42,12 @@ module Parameters = struct
     rpc_port : int;
     dormant_mode : bool;
     mutable pending_ready : unit option Lwt.u list;
+    mutable pending_level : (int * int option Lwt.u) list;
   }
 
-  type session_state = {mutable ready : bool}
+  type 'a known = Unknown | Known of 'a
+
+  type session_state = {mutable ready : bool; mutable level : int known}
 
   let base_default_name = "tx-rollup-node"
 
@@ -114,8 +117,33 @@ let set_ready node =
   | Running status -> status.session_state.ready <- true) ;
   trigger_ready node (Some ())
 
-let handle_event node {name; value = _} =
-  match name with "tx_rollup_node_is_ready.v0" -> set_ready node | _ -> ()
+let update_level node current_level =
+  (match node.status with
+  | Not_running -> ()
+  | Running status -> (
+      match status.session_state.level with
+      | Unknown -> status.session_state.level <- Known current_level
+      | Known old_level ->
+          status.session_state.level <- Known (max old_level current_level))) ;
+  let pending = node.persistent_state.pending_level in
+  node.persistent_state.pending_level <- [] ;
+  List.iter
+    (fun ((level, resolver) as pending) ->
+      if current_level >= level then
+        Lwt.wakeup_later resolver (Some current_level)
+      else
+        node.persistent_state.pending_level <-
+          pending :: node.persistent_state.pending_level)
+    pending
+
+let handle_event node {name; value} =
+  match name with
+  | "tx_rollup_node_is_ready.v0" -> set_ready node
+  | "tx_rollup_node_tezos_block_processed.v0" -> (
+      match JSON.(value |-> "level" |> as_int_opt) with
+      | Some level -> update_level node level
+      | None -> ())
+  | _ -> ()
 
 let wait_for_ready node =
   match node.status with
@@ -125,6 +153,21 @@ let wait_for_ready node =
       node.persistent_state.pending_ready <-
         resolver :: node.persistent_state.pending_ready ;
       check_event node "tx_rollup_node_is_ready.v0" promise
+
+let wait_for_tezos_level node level =
+  match node.status with
+  | Running {session_state = {level = Known current_level; _}; _}
+    when current_level >= level ->
+      return current_level
+  | Not_running | Running _ ->
+      let (promise, resolver) = Lwt.task () in
+      node.persistent_state.pending_level <-
+        (level, resolver) :: node.persistent_state.pending_level ;
+      check_event
+        node
+        "tx_rollup_node_tezos_block_processed.v0"
+        ~where:("level >= " ^ string_of_int level)
+        promise
 
 let create ?(path = Constant.tx_rollup_node) ?runner ?data_dir
     ?(addr = "127.0.0.1") ?port ?(dormant_mode = false) ?color ?event_pipe ?name
@@ -152,6 +195,7 @@ let create ?(path = Constant.tx_rollup_node) ?runner ?data_dir
         operator;
         client;
         pending_ready = [];
+        pending_level = [];
         dormant_mode;
       }
   in
@@ -175,7 +219,7 @@ let do_runlike_command node arguments =
     unit
   in
   let arguments = make_arguments node @ arguments in
-  run node {ready = false} arguments ~on_terminate
+  run node {ready = false; level = Unknown} arguments ~on_terminate
 
 let run node =
   do_runlike_command node ["run"; "--data-dir"; node.persistent_state.data_dir]

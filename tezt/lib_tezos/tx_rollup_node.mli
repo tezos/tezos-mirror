@@ -53,6 +53,14 @@ val endpoint : t -> string
     If such an event already occurred, return immediately. *)
 val wait_for_ready : t -> unit Lwt.t
 
+(** Wait for a given Tezos chain level.
+
+    More precisely, wait until the rollup node have successfully
+    validated a block of given [level], received from the Tezos node
+    it is connected to.
+    If such an event already occurred, return immediately. *)
+val wait_for_tezos_level : t -> int -> int Lwt.t
+
 (** Connected to a tezos node.
     Returns the name of the configuration file. *)
 val config_init : t -> string -> string -> string Lwt.t
