@@ -45,7 +45,7 @@ let all = [Kind.Example_arith]
 
 let kind_of_string = function "arith" -> Some Kind.Example_arith | _ -> None
 
-let example_arith_pvm = (module Sc_rollup_arith : PVM.S)
+let example_arith_pvm = (module Sc_rollup_arith.ProtocolImplementation : PVM.S)
 
 let of_kind = function Kind.Example_arith -> example_arith_pvm
 
