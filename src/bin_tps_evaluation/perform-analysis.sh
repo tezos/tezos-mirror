@@ -14,7 +14,7 @@
 set -e
 
 if [[ $# -ne 3 ]]; then
-    echo "3 parameters are required" >&2
+    echo "Usage: $0 <psql_indexer_dump_file> <start_date> <end_date>" >&2
     exit 1
 fi
 
@@ -23,11 +23,8 @@ declare -r START_DATE="$2"
 declare -r END_DATE="$3"
 declare -r RESULT_FILE="$START_DATE-to-$END_DATE.json"
 
-pushd analysis-docker-image
-docker build . -t tezos-analysis
-popd
-docker run -d --name=tezos_history_analysis -p 5432:5432 tezos-analysis:latest
-bunzip2 -c "$DATABASE_DUMP_FILE" | psql -h localhost -U tezos -a tezos
+docker run -d --name tezos_history_analysis -p 5432:5432 -e POSTGRES_HOST_AUTH_METHOD=trust -e POSTGRES_USER=tezos postgres:14-alpine
+bunzip2 -c "$DATABASE_DUMP_FILE" | docker exec -i tezos_history_analysis psql -U tezos -a tezos
 ../../tezos-tps-evaluation estimate-average-block -c postgresql://tezos:tezos@localhost:5432 --start "$START_DATE" --end "$END_DATE" > "$RESULT_FILE"
 cp "$RESULT_FILE" "average-block.json"
 docker stop tezos_history_analysis
