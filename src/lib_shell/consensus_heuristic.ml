@@ -126,6 +126,7 @@ module Worker = struct
     }
 
   let rec loop t () =
+    let open Lwt_syntax in
     (* If we cancel the worker, we cancel [t.result]. This triggers
        the cancellation of [loop] if t.result was not fulfilled. If
        [t.job] is not a cancelable promise, the cancellation will stop
@@ -133,9 +134,11 @@ module Worker = struct
        [Need_more_candidates] for example, we will rerun the
        [loop]. To provent this, we wrap [t.job] as a cancelable
        promise. *)
-    Lwt.wrap_in_cancelable (t.job ()) >>= function
+    let* v = Lwt.wrap_in_cancelable (t.job ()) in
+    match v with
     | Need_more_candidates | No_consensus _ ->
-        Systime_os.sleep t.restart_delay >>= fun () -> loop t ()
+        let* () = Systime_os.sleep t.restart_delay in
+        loop t ()
     | Consensus data ->
         t.expired <- Systime_os.sleep t.expire_time ;
         (* We call [List.rev] to ensure hooks are called in the same

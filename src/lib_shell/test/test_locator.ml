@@ -51,14 +51,14 @@ let zero = Bytes.create 0
 
 (* adds n blocks on top of an initialized chain *)
 let make_empty_chain chain_store n : Block_hash.t Lwt.t =
-  Store.Block.read_block_opt chain_store genesis_hash
-  >|= WithExceptions.Option.get ~loc:__LOC__
-  >>= fun genesis ->
-  Store.Block.context_exn chain_store genesis >>= fun empty_context ->
+  let open Lwt_result_syntax in
+  let*! genesis = Store.Block.read_block_opt chain_store genesis_hash in
+  let genesis = WithExceptions.Option.get ~loc:__LOC__ genesis in
+  let*! empty_context = Store.Block.context_exn chain_store genesis in
   let header = Store.Block.header genesis in
   let timestamp = Store.Block.timestamp genesis in
   let empty_context_hash = Context.hash ~time:timestamp empty_context in
-  Context.commit ~time:header.shell.timestamp empty_context >>= fun context ->
+  let*! context = Context.commit ~time:header.shell.timestamp empty_context in
   let header = {header with shell = {header.shell with context}} in
   let context_hash = empty_context_hash in
   let message = None in
@@ -89,14 +89,17 @@ let make_empty_chain chain_store n : Block_hash.t Lwt.t =
           ops_metadata_hashes = None;
         }
       in
-      Store.Block.store_block
-        chain_store
-        ~block_header:header
-        ~operations:[]
-        result
-      >>=? fun _ -> loop (lvl + 1) (Block_header.hash header)
+      let* _ =
+        Store.Block.store_block
+          chain_store
+          ~block_header:header
+          ~operations:[]
+          result
+      in
+      loop (lvl + 1) (Block_header.hash header)
   in
-  loop 1 genesis_hash >>= function
+  let*! r = loop 1 genesis_hash in
+  match r with
   | Ok b -> Lwt.return b
   | Error err ->
       Error_monad.pp_print_trace Format.err_formatter err ;
@@ -106,12 +109,12 @@ let make_empty_chain chain_store n : Block_hash.t Lwt.t =
    proto_level at given fork points *)
 let make_multiple_protocol_chain (chain_store : Store.Chain.t)
     ~(chain_length : int) ~fork_points =
-  Store.Block.read_block_opt chain_store genesis_hash
-  >|= WithExceptions.Option.get ~loc:__LOC__
-  >>= fun genesis ->
-  Store.Block.context_exn chain_store genesis >>= fun empty_context ->
+  let open Lwt_result_syntax in
+  let*! genesis = Store.Block.read_block_opt chain_store genesis_hash in
+  let genesis = WithExceptions.Option.get ~loc:__LOC__ genesis in
+  let*! empty_context = Store.Block.context_exn chain_store genesis in
   let header = Store.Block.header genesis in
-  Context.commit ~time:header.shell.timestamp empty_context >>= fun context ->
+  let*! context = Context.commit ~time:header.shell.timestamp empty_context in
   let genesis_header = {header with shell = {header.shell with context}} in
   let empty_result =
     {
@@ -163,24 +166,29 @@ let make_multiple_protocol_chain (chain_store : Store.Chain.t)
           ops_metadata_hashes = None;
         }
       in
-      Store.Block.store_block
-        chain_store
-        ~block_header:header
-        ~operations:[]
-        validation_result
-      >>=? function
+      let* o =
+        Store.Block.store_block
+          chain_store
+          ~block_header:header
+          ~operations:[]
+          validation_result
+      in
+      match o with
       | None -> assert false
       | Some b ->
-          Store.Chain.set_head chain_store b >>=? fun _pred_head ->
+          let* _pred_head = Store.Chain.set_head chain_store b in
           let block_store = Store.Unsafe.get_block_store chain_store in
-          Block_store.await_merging block_store >>= fun () ->
-          Store.Chain.may_update_protocol_level
-            chain_store
-            ~protocol_level:proto_level
-            (b, genesis_protocol)
-          >>=? fun () -> loop remaining_fork_points (lvl + 1) header
+          let*! () = Block_store.await_merging block_store in
+          let* () =
+            Store.Chain.may_update_protocol_level
+              chain_store
+              ~protocol_level:proto_level
+              (b, genesis_protocol)
+          in
+          loop remaining_fork_points (lvl + 1) header
   in
-  loop fork_points 1 genesis_header >>= function
+  let*! r = loop fork_points 1 genesis_header in
+  match r with
   | Ok b -> Lwt.return (Block_header.hash b)
   | Error err ->
       Error_monad.pp_print_trace Format.err_formatter err ;
@@ -210,43 +218,36 @@ let time ?(runs = 1) f =
     (res, sum /. float runs)
 
 let rec repeat f n =
+  let open Lwt_result_syntax in
   if n < 0 then invalid_arg "repeat: negative arg"
   else if n = 0 then return_unit
-  else f () >>=? fun () -> repeat f (n - 1)
+  else
+    let* () = f () in
+    repeat f (n - 1)
 
 (* ----------------------------------------------------- *)
 
-(*
-let print_block b =
-  Printf.printf
-    "%6i %s\n"
-    (Int32.to_int (Store.Block.level b))
-    (Block_hash.to_b58check (Store.Block.hash b))
-
-let print_block_h chain bh =
-  Store.Block.read_block_opt chain bh >|= WithExceptions.Option.get ~loc:__LOC__
-  >|= fun b -> print_block b
-*)
 (* returns the predecessor at distance one, reading the header *)
 let linear_predecessor chain_store (bh : Block_hash.t) :
     Block_hash.t option Lwt.t =
-  Store.Block.read_block_opt chain_store bh
-  >|= WithExceptions.Option.get ~loc:__LOC__
-  >>= fun b ->
-  Store.Block.read_predecessor_opt chain_store b >|= function
-  | None -> None
-  | Some pred -> Some (Store.Block.hash pred)
+  let open Lwt_syntax in
+  let* b = Store.Block.read_block_opt chain_store bh in
+  let b = WithExceptions.Option.get ~loc:__LOC__ b in
+  let+ o = Store.Block.read_predecessor_opt chain_store b in
+  match o with None -> None | Some pred -> Some (Store.Block.hash pred)
 
 (* returns the predecessors at distance n, traversing all n intermediate blocks *)
 let linear_predecessor_n chain_store (bh : Block_hash.t) (distance : int) :
     Block_hash.t option Lwt.t =
+  let open Lwt_syntax in
   (* let _ = Printf.printf "LP: %4i " distance; print_block_h chain bh in *)
   if distance < 1 then invalid_arg "distance<1"
   else
     let rec loop bh distance =
       if distance = 0 then Lwt.return_some bh (* reached distance *)
       else
-        linear_predecessor chain_store bh >>= function
+        let* o = linear_predecessor chain_store bh in
+        match o with
         | None -> Lwt.return_none
         | Some pred -> loop pred (distance - 1)
     in
@@ -257,20 +258,21 @@ let linear_predecessor_n chain_store (bh : Block_hash.t) (distance : int) :
     block and it is the block at the distance requested
 *)
 let test_pred (base_dir : string) : unit tzresult Lwt.t =
+  let open Lwt_result_syntax in
   let size_chain = 1000 in
-  Shell_test_helpers.init_chain base_dir >>= fun store ->
+  let*! store = Shell_test_helpers.init_chain base_dir in
   let chain_store = Store.main_chain_store store in
-  make_empty_chain chain_store size_chain >>= fun head ->
+  let*! head = make_empty_chain chain_store size_chain in
   let test_once distance =
-    linear_predecessor_n chain_store head distance >>= fun lin_res ->
-    Store.Block.read_block_opt chain_store head
-    >|= WithExceptions.Option.get ~loc:__LOC__
-    >>= fun head_block ->
-    Store.Block.read_ancestor_hash
-      chain_store
-      (Store.Block.hash head_block)
-      ~distance
-    >>=? fun exp_res ->
+    let*! lin_res = linear_predecessor_n chain_store head distance in
+    let*! head_block = Store.Block.read_block_opt chain_store head in
+    let head_block = WithExceptions.Option.get ~loc:__LOC__ head_block in
+    let* exp_res =
+      Store.Block.read_ancestor_hash
+        chain_store
+        (Store.Block.hash head_block)
+        ~distance
+    in
     match (lin_res, exp_res) with
     | (None, None) -> return_unit
     | (None, Some _) | (Some _, None) ->
@@ -278,13 +280,11 @@ let test_pred (base_dir : string) : unit tzresult Lwt.t =
     | (Some lin_res, Some exp_res) ->
         (* check that the two results are the same *)
         assert (lin_res = exp_res) ;
-        Store.Block.read_block_opt chain_store lin_res
-        >|= WithExceptions.Option.get ~loc:__LOC__
-        >>= fun pred ->
+        let*! pred = Store.Block.read_block_opt chain_store lin_res in
+        let pred = WithExceptions.Option.get ~loc:__LOC__ pred in
         let level_pred = Int32.to_int (Store.Block.level pred) in
-        Store.Block.read_block_opt chain_store head
-        >|= WithExceptions.Option.get ~loc:__LOC__
-        >>= fun head ->
+        let*! head = Store.Block.read_block_opt chain_store head in
+        let head = WithExceptions.Option.get ~loc:__LOC__ head in
         let level_start = Int32.to_int (Store.Block.level head) in
         (* check distance using the level *)
         assert (level_start - distance = level_pred) ;
@@ -340,6 +340,7 @@ let compute_size_chain size_locator =
     $ generate_locator_plot.sh timing.dat
 *)
 let bench_locator base_dir =
+  let open Lwt_result_syntax in
   let size_chain = 80000 in
   (* timing locators with average over [runs] times *)
   let runs = 10 in
@@ -350,7 +351,7 @@ let bench_locator base_dir =
   (* size after which locator always reaches genesis *)
   let locator_limit = compute_size_locator size_chain in
   let _ = Printf.printf "#locator_limit %i\n" locator_limit in
-  Shell_test_helpers.init_chain base_dir >>= fun store ->
+  let*! store = Shell_test_helpers.init_chain base_dir in
   let chain_store = Store.main_chain_store store in
   time1 (fun () -> make_empty_chain chain_store size_chain)
   |> fun (res, t_chain) ->
@@ -360,18 +361,18 @@ let bench_locator base_dir =
       size_chain
       t_chain
   in
-  res >>= fun head ->
+  let*! head = res in
   let check_locator max_size : unit tzresult Lwt.t =
-    Store.Chain.caboose chain_store >>= fun (caboose, _) ->
-    Store.Block.read_block chain_store head >>=? fun block ->
+    let*! (caboose, _) = Store.Chain.caboose chain_store in
+    let* block = Store.Block.read_block chain_store head in
     time ~runs (fun () ->
         Store.Chain.compute_locator chain_store ~max_size block seed)
     |> fun (l_exp, t_exp) ->
     time ~runs (fun () ->
         compute_linear_locator chain_store ~caboose ~max_size block)
     |> fun (l_lin, t_lin) ->
-    l_exp >>= fun {Block_locator.history = l_exp; _} ->
-    l_lin >>= fun {Block_locator.history = l_lin; _} ->
+    let*! {Block_locator.history = l_exp; _} = l_exp in
+    let*! {Block_locator.history = l_lin; _} = l_lin in
     let _ = Printf.printf "%10i %f %f\n" max_size t_exp t_lin in
     Lwt.return
     @@ List.iter2
@@ -384,118 +385,139 @@ let bench_locator base_dir =
   in
   let stop = locator_limit + 20 in
   let rec loop size =
-    if size < stop then check_locator size >>=? fun _ -> loop (size + 5)
+    if size < stop then
+      let* _ = check_locator size in
+      loop (size + 5)
     else return_unit
   in
   loop 1
 
 let test_protocol_locator base_dir =
-  Shell_test_helpers.init_chain base_dir >>= fun store ->
+  let open Lwt_result_syntax in
+  let*! store = Shell_test_helpers.init_chain base_dir in
   let chain_store = Store.main_chain_store store in
   let chain_length = 200 in
   let fork_points = [1; 10; 50; 66; 150] in
   (* further_points = List.tl fork_points @ [chain_length] *)
   let further_points = [10; 50; 66; 150; chain_length] in
   let fork_points_assoc =
-    List.map2
-      ~when_different_lengths:()
-      (fun x y -> (x, y))
-      fork_points
-      further_points
-    >|? List.mapi (fun i x -> (i + 1, x))
+    let open Result_syntax in
+    let+ v =
+      List.combine ~when_different_lengths:() fork_points further_points
+    in
+    List.mapi (fun i x -> (i + 1, x)) v
   in
   let fork_points_assoc =
     match fork_points_assoc with
     | Ok fork_points_assoc -> fork_points_assoc
     | Error () -> assert false
   in
-  make_multiple_protocol_chain chain_store ~chain_length ~fork_points
-  >>= fun head_hash ->
-  Lwt_list.iter_s
-    (fun (proto_level, (inf, sup)) ->
-      Store.Chain.compute_protocol_locator chain_store ~proto_level seed
-      >>= function
-      | None ->
-          Assert.fail_msg
-            "bad locator for proto level %d (%d, %d)"
-            proto_level
-            inf
-            sup
-      | Some locator -> (
-          let open Block_locator in
-          let steps = to_steps seed locator in
-          let has_lower_bound = ref false in
-          List.iter_es
-            (fun {block; predecessor; _} ->
-              Store.Block.read_block chain_store block >>=? fun block ->
-              Store.Block.read_block chain_store predecessor
-              >>=? fun predecessor ->
-              has_lower_bound :=
-                !has_lower_bound
-                || Int32.to_int (Store.Block.level predecessor) = inf ;
-              Assert.is_true
-                ~msg:"same proto_level"
-                (Store.Block.proto_level block
-                 = Store.Block.proto_level predecessor
-                && Store.Block.proto_level block = proto_level) ;
-              Assert.is_true
-                ~msg:"increasing levels"
-                Compare.Int32.(
-                  Store.Block.level block >= Store.Block.level predecessor
-                  && Store.Block.level predecessor >= Int32.of_int inf
-                  && Store.Block.level block <= Int32.of_int sup) ;
-              return_unit)
-            steps
-          >>= function
-          | Error error ->
-              Format.kasprintf Stdlib.failwith "%a" pp_print_trace error
-          | Ok () ->
-              Assert.is_true
-                ~msg:"locator contains the lower bound block"
-                !has_lower_bound ;
-              Lwt.return_unit))
-    fork_points_assoc
-  >>= fun () ->
-  (Store.Chain.compute_protocol_locator chain_store ~proto_level:0 seed
-   >>= function
-   | Some {Block_locator.head_header; history; _} ->
-       Assert.is_true ~msg:"no block in locator" (history = []) ;
-       Store.Block.read_block chain_store genesis_hash >>=? fun b ->
-       Assert.is_true
-         ~msg:"single header is genesis"
-         (Block_header.equal (Store.Block.header b) head_header) ;
-       return_unit
-   | None -> Alcotest.fail "missing genesis locator")
-  >>=? fun () ->
-  (Store.Chain.compute_protocol_locator chain_store ~proto_level:6 seed
-   >>= function
-   | Some _ -> Alcotest.fail "unexpected locator"
-   | None -> return_unit)
-  >>=? fun () ->
+  let*! head_hash =
+    make_multiple_protocol_chain chain_store ~chain_length ~fork_points
+  in
+  let*! () =
+    List.iter_s
+      (fun (proto_level, (inf, sup)) ->
+        let*! o =
+          Store.Chain.compute_protocol_locator chain_store ~proto_level seed
+        in
+        match o with
+        | None ->
+            Assert.fail_msg
+              "bad locator for proto level %d (%d, %d)"
+              proto_level
+              inf
+              sup
+        | Some locator -> (
+            let open Block_locator in
+            let steps = to_steps seed locator in
+            let has_lower_bound = ref false in
+            let*! r =
+              List.iter_es
+                (fun {block; predecessor; _} ->
+                  let* block = Store.Block.read_block chain_store block in
+                  let* predecessor =
+                    Store.Block.read_block chain_store predecessor
+                  in
+                  has_lower_bound :=
+                    !has_lower_bound
+                    || Int32.to_int (Store.Block.level predecessor) = inf ;
+                  Assert.is_true
+                    ~msg:"same proto_level"
+                    (Store.Block.proto_level block
+                     = Store.Block.proto_level predecessor
+                    && Store.Block.proto_level block = proto_level) ;
+                  Assert.is_true
+                    ~msg:"increasing levels"
+                    Compare.Int32.(
+                      Store.Block.level block >= Store.Block.level predecessor
+                      && Store.Block.level predecessor >= Int32.of_int inf
+                      && Store.Block.level block <= Int32.of_int sup) ;
+                  return_unit)
+                steps
+            in
+            match r with
+            | Error error ->
+                Format.kasprintf Stdlib.failwith "%a" pp_print_trace error
+            | Ok () ->
+                Assert.is_true
+                  ~msg:"locator contains the lower bound block"
+                  !has_lower_bound ;
+                Lwt.return_unit))
+      fork_points_assoc
+  in
+  let* () =
+    let*! o =
+      Store.Chain.compute_protocol_locator chain_store ~proto_level:0 seed
+    in
+    match o with
+    | Some {Block_locator.head_header; history; _} ->
+        Assert.is_true ~msg:"no block in locator" (history = []) ;
+        let* b = Store.Block.read_block chain_store genesis_hash in
+        Assert.is_true
+          ~msg:"single header is genesis"
+          (Block_header.equal (Store.Block.header b) head_header) ;
+        return_unit
+    | None -> Alcotest.fail "missing genesis locator"
+  in
+  let* () =
+    let*! o =
+      Store.Chain.compute_protocol_locator chain_store ~proto_level:6 seed
+    in
+    match o with
+    | Some _ -> Alcotest.fail "unexpected locator"
+    | None -> return_unit
+  in
   (* Delete some blocks: only the last protocol remains with only 30+1 blocks *)
   let genesis = Store.Chain.genesis chain_store in
-  Store.close_store store >>= fun () ->
+  let*! () = Store.close_store store in
   let open Filename.Infix in
   let history_mode = History_mode.Rolling (Some {offset = 0}) in
-  Store.may_switch_history_mode
-    ~store_dir:(base_dir // "store")
-    ~context_dir:(base_dir // "context")
-    genesis
-    ~new_history_mode:(Rolling (Some {offset = 0}))
-  >>=? fun () ->
-  Shell_test_helpers.init_chain ~history_mode base_dir >>= fun store ->
+  let* () =
+    Store.may_switch_history_mode
+      ~store_dir:(base_dir // "store")
+      ~context_dir:(base_dir // "context")
+      genesis
+      ~new_history_mode:(Rolling (Some {offset = 0}))
+  in
+  let*! store = Shell_test_helpers.init_chain ~history_mode base_dir in
   let chain_store = Store.main_chain_store store in
-  Store.Chain.caboose chain_store >>= fun (caboose_hash, _) ->
-  List.iter_es
-    (fun i ->
-      Store.Chain.compute_protocol_locator chain_store ~proto_level:i seed
-      >>= function
-      | Some _ -> Alcotest.fail "unexpected pruned locator"
-      | None -> return_unit)
-    (1 -- 4)
-  >>=? fun () ->
-  Store.Chain.compute_protocol_locator chain_store ~proto_level:5 seed
-  >>= function
+  let*! (caboose_hash, _) = Store.Chain.caboose chain_store in
+  let* () =
+    List.iter_es
+      (fun i ->
+        let*! o =
+          Store.Chain.compute_protocol_locator chain_store ~proto_level:i seed
+        in
+        match o with
+        | Some _ -> Alcotest.fail "unexpected pruned locator"
+        | None -> return_unit)
+      (1 -- 4)
+  in
+  let*! o =
+    Store.Chain.compute_protocol_locator chain_store ~proto_level:5 seed
+  in
+  match o with
   | None -> Alcotest.fail "unexpected missing locator after pruning"
   | Some locator ->
       let open Block_locator in
@@ -503,26 +525,28 @@ let test_protocol_locator base_dir =
       let has_lower_bound = ref false in
       let inf = 170 in
       let sup = 200 in
-      List.iter_es
-        (fun {block; predecessor; _} ->
-          Store.Block.read_block chain_store block >>=? fun block ->
-          Store.Block.read_block chain_store predecessor >>=? fun predecessor ->
-          has_lower_bound :=
-            !has_lower_bound
-            || Int32.to_int (Store.Block.level predecessor) = inf ;
-          Assert.is_true
-            ~msg:"same proto_level after pruning"
-            (Store.Block.proto_level block = Store.Block.proto_level predecessor
-            && Store.Block.proto_level block = 5) ;
-          Assert.is_true
-            ~msg:"increasing levels after pruning"
-            Compare.Int32.(
-              Store.Block.level block >= Store.Block.level predecessor
-              && Store.Block.level predecessor >= Int32.of_int inf
-              && Store.Block.level block <= Int32.of_int sup) ;
-          return_unit)
-        steps
-      >>=? fun () ->
+      let* () =
+        List.iter_es
+          (fun {block; predecessor; _} ->
+            let* block = Store.Block.read_block chain_store block in
+            let* predecessor = Store.Block.read_block chain_store predecessor in
+            has_lower_bound :=
+              !has_lower_bound
+              || Int32.to_int (Store.Block.level predecessor) = inf ;
+            Assert.is_true
+              ~msg:"same proto_level after pruning"
+              (Store.Block.proto_level block
+               = Store.Block.proto_level predecessor
+              && Store.Block.proto_level block = 5) ;
+            Assert.is_true
+              ~msg:"increasing levels after pruning"
+              Compare.Int32.(
+                Store.Block.level block >= Store.Block.level predecessor
+                && Store.Block.level predecessor >= Int32.of_int inf
+                && Store.Block.level block <= Int32.of_int sup) ;
+            return_unit)
+          steps
+      in
       let last_hash =
         (WithExceptions.Option.get ~loc:__LOC__ @@ List.hd steps).predecessor
       in
@@ -540,7 +564,9 @@ let test_protocol_locator base_dir =
 let wrap n f =
   Alcotest_lwt.test_case n `Quick (fun _ () ->
       Lwt_utils_unix.with_tempdir "tezos_test_" (fun dir ->
-          f dir >>= function
+          let open Lwt_syntax in
+          let* r = f dir in
+          match r with
           | Ok () -> Lwt.return_unit
           | Error error ->
               Format.kasprintf Stdlib.failwith "%a" pp_print_trace error))

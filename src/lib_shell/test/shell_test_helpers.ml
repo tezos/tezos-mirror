@@ -68,21 +68,26 @@ let genesis : Genesis.t =
 let chain_id = Chain_id.of_block_hash genesis_block_hash
 
 let patch_context ctxt =
-  Context.add ctxt ["version"] (Bytes.of_string "demo_noops") >>= return
+  let open Lwt_syntax in
+  let* v = Context.add ctxt ["version"] (Bytes.of_string "demo_noops") in
+  return_ok v
 
 (** [init_chain base_dir] with working directory [base_dir] returns a new state
     with a single genesis block *)
 let init_chain ?(history_mode = History_mode.Archive) base_dir =
+  let open Lwt_syntax in
   let store_dir = base_dir // "store" in
   let context_dir = base_dir // "context" in
-  Store.init
-    ~store_dir
-    ~context_dir
-    ~history_mode
-    ~allow_testchains:true
-    ~patch_context
-    state_genesis_block
-  >>= function
+  let* r =
+    Store.init
+      ~store_dir
+      ~context_dir
+      ~history_mode
+      ~allow_testchains:true
+      ~patch_context
+      state_genesis_block
+  in
+  match r with
   | Error err ->
       Format.kasprintf Lwt.fail_with "init error: %a" pp_print_trace err
   | Ok store -> Lwt.return store

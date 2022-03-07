@@ -25,6 +25,7 @@
 (*****************************************************************************)
 
 let build_rpc_directory state =
+  let open Lwt_syntax in
   let dir : unit RPC_directory.t ref = ref RPC_directory.empty in
   let register0 s f =
     dir := RPC_directory.register !dir s (fun () p q -> f p q)
@@ -47,9 +48,9 @@ let build_rpc_directory state =
               Prevalidator.pipeline_length t ))
           workers
       in
-      return statuses) ;
+      return_ok statuses) ;
   register1 Worker_services.Prevalidators.S.state (fun chain () () ->
-      Chain_directory.get_chain_id state chain >>= fun chain_id ->
+      let* chain_id = Chain_directory.get_chain_id state chain in
       let workers = Prevalidator.running_workers () in
       let (_, _, t) =
         (* NOTE: it is technically possible to use the Prevalidator interface to
@@ -61,11 +62,11 @@ let build_rpc_directory state =
       let status = Prevalidator.status t in
       let pending_requests = Prevalidator.pending_requests t in
       let current_request = Prevalidator.current_request t in
-      return {Worker_types.status; pending_requests; current_request}) ;
+      return_ok {Worker_types.status; pending_requests; current_request}) ;
   (* Workers : Block_validator *)
   register0 Worker_services.Block_validator.S.state (fun () () ->
       let w = Block_validator.running_worker () in
-      return
+      return_ok
         {
           Worker_types.status = Block_validator.status w;
           pending_requests = Block_validator.pending_requests w;
@@ -73,8 +74,8 @@ let build_rpc_directory state =
         }) ;
   (* Workers : Peer validators *)
   register1 Worker_services.Peer_validators.S.list (fun chain () () ->
-      Chain_directory.get_chain_id state chain >>= fun chain_id ->
-      return
+      let* chain_id = Chain_directory.get_chain_id state chain in
+      return_ok
         (List.filter_map
            (fun ((id, peer_id), w) ->
              if Chain_id.equal id chain_id then
@@ -86,7 +87,7 @@ let build_rpc_directory state =
              else None)
            (Peer_validator.running_workers ()))) ;
   register2 Worker_services.Peer_validators.S.state (fun chain peer_id () () ->
-      Chain_directory.get_chain_id state chain >>= fun chain_id ->
+      let* chain_id = Chain_directory.get_chain_id state chain in
       let equal (acid, apid) (bcid, bpid) =
         Chain_id.equal acid bcid && P2p_peer.Id.equal apid bpid
       in
@@ -97,7 +98,7 @@ let build_rpc_directory state =
              (chain_id, peer_id)
              (Peer_validator.running_workers ())
       in
-      return
+      return_ok
         {
           Worker_types.status = Peer_validator.status w;
           pending_requests = [];
@@ -105,7 +106,7 @@ let build_rpc_directory state =
         }) ;
   (* Workers : Net validators *)
   register0 Worker_services.Chain_validators.S.list (fun () () ->
-      return
+      return_ok
         (List.map
            (fun (id, w) ->
              ( id,
@@ -114,7 +115,7 @@ let build_rpc_directory state =
                Chain_validator.pending_requests_length w ))
            (Chain_validator.running_workers ()))) ;
   register1 Worker_services.Chain_validators.S.state (fun chain () () ->
-      Chain_directory.get_chain_id state chain >>= fun chain_id ->
+      let* chain_id = Chain_directory.get_chain_id state chain in
       let w =
         WithExceptions.Option.to_exn ~none:Not_found
         @@ List.assoc
@@ -122,7 +123,7 @@ let build_rpc_directory state =
              chain_id
              (Chain_validator.running_workers ())
       in
-      return
+      return_ok
         {
           Worker_types.status = Chain_validator.status w;
           pending_requests = Chain_validator.pending_requests w;
@@ -130,7 +131,7 @@ let build_rpc_directory state =
         }) ;
   (* DistributedDB *)
   register1 Worker_services.Chain_validators.S.ddb_state (fun chain () () ->
-      Chain_directory.get_chain_id state chain >>= fun chain_id ->
+      let* chain_id = Chain_directory.get_chain_id state chain in
       let w =
         WithExceptions.Option.to_exn ~none:Not_found
         @@ List.assoc
@@ -138,5 +139,5 @@ let build_rpc_directory state =
              chain_id
              (Chain_validator.running_workers ())
       in
-      return (Chain_validator.ddb_information w)) ;
+      return_ok (Chain_validator.ddb_information w)) ;
   !dir

@@ -317,46 +317,50 @@ let handle_live_operations ~classes ~(block_store : 'block block_tools)
        Operation_hash.t ->
        Operation.t ->
        'protocol_data Prevalidation.operation option) old_mempool =
+  let open Lwt_syntax in
   let rec pop_block ancestor (block : 'block) mempool =
     let hash = block_store.hash block in
     if Block_hash.equal hash ancestor then Lwt.return mempool
     else
       let operations = block_store.operations block in
-      List.fold_left_s
-        (List.fold_left_s (fun mempool op ->
-             let oph = Operation.hash op in
-             chain.inject_operation oph op >|= fun () ->
-             match parse oph op with
-             | None ->
-                 (* There are hidden invariants between the shell and
-                    the economic protocol which should ensure this will
-                    (almost) never happen in practice:
+      let* mempool =
+        List.fold_left_s
+          (List.fold_left_s (fun mempool op ->
+               let oph = Operation.hash op in
+               let+ () = chain.inject_operation oph op in
+               match parse oph op with
+               | None ->
+                   (* There are hidden invariants between the shell and
+                      the economic protocol which should ensure this will
+                      (almost) never happen in practice:
 
-                        1. Decoding/encoding an operation only depends
-                    on the protocol and not the current context.
+                          1. Decoding/encoding an operation only depends
+                      on the protocol and not the current context.
 
-                        2. It is not possible to have a reorganisation
-                    where one branch is using one protocol and another
-                    branch on another protocol.
+                          2. It is not possible to have a reorganisation
+                      where one branch is using one protocol and another
+                      branch on another protocol.
 
-                        3. Ok, actually there might be one case using
-                    [user_activated_upgrades] where this could happen,
-                    but this is quite rare.
+                          3. Ok, actually there might be one case using
+                      [user_activated_upgrades] where this could happen,
+                      but this is quite rare.
 
-                      If this happens, we classifies an operation as
-                    unparsable and it is ok. *)
-                 add_unparsable oph classes ;
-                 mempool
-             | Some parsed_op -> Operation_hash.Map.add oph parsed_op mempool))
-        mempool
-        operations
-      >>= fun mempool ->
-      chain.read_predecessor_opt block >>= function
+                        If this happens, we classifies an operation as
+                      unparsable and it is ok. *)
+                   add_unparsable oph classes ;
+                   mempool
+               | Some parsed_op -> Operation_hash.Map.add oph parsed_op mempool))
+          mempool
+          operations
+      in
+      let* o = chain.read_predecessor_opt block in
+      match o with
       | None ->
           (* Can this happen? If yes, there's nothing more to pop anyway,
              so returning the accumulator. It's not the mempool that
              should crash, should this case happen. *)
-          Event.(emit predecessor_less_block ancestor) >|= fun () -> mempool
+          let+ () = Event.(emit predecessor_less_block ancestor) in
+          mempool
       | Some predecessor ->
           (* This is a tailcall, which is nice; that is why we annotate
              here. But it is not required for the code to be correct.
@@ -373,10 +377,12 @@ let handle_live_operations ~classes ~(block_store : 'block block_tools)
       mempool
       operations
   in
-  chain.new_blocks ~from_block:from_branch ~to_block:to_branch
-  >>= fun (ancestor, path) ->
-  pop_block (block_store.hash ancestor) from_branch old_mempool
-  >|= fun mempool ->
+  let* (ancestor, path) =
+    chain.new_blocks ~from_block:from_branch ~to_block:to_branch
+  in
+  let+ mempool =
+    pop_block (block_store.hash ancestor) from_branch old_mempool
+  in
   let new_mempool = List.fold_left push_block mempool path in
   let (new_mempool, outdated) =
     Operation_hash.Map.partition
@@ -390,26 +396,28 @@ let handle_live_operations ~classes ~(block_store : 'block block_tools)
 let recycle_operations ~from_branch ~to_branch ~live_blocks ~classes ~parse
     ~pending ~(block_store : 'block block_tools) ~(chain : 'block chain_tools)
     ~handle_branch_refused =
-  handle_live_operations
-    ~classes
-    ~block_store
-    ~chain
-    ~from_branch
-    ~to_branch
-    ~is_branch_alive:(fun branch -> Block_hash.Set.mem branch live_blocks)
-    ~parse
-    (Operation_hash.Map.union
-       (fun _key v _ -> Some v)
-       (to_map
-          ~applied:true
-          ~prechecked:true
-          ~branch_delayed:true
-          ~branch_refused:handle_branch_refused
-          ~refused:false
-          ~outdated:false
-          classes)
-       pending)
-  >|= fun pending ->
+  let open Lwt_syntax in
+  let+ pending =
+    handle_live_operations
+      ~classes
+      ~block_store
+      ~chain
+      ~from_branch
+      ~to_branch
+      ~is_branch_alive:(fun branch -> Block_hash.Set.mem branch live_blocks)
+      ~parse
+      (Operation_hash.Map.union
+         (fun _key v _ -> Some v)
+         (to_map
+            ~applied:true
+            ~prechecked:true
+            ~branch_delayed:true
+            ~branch_refused:handle_branch_refused
+            ~refused:false
+            ~outdated:false
+            classes)
+         pending)
+  in
   (* Non parsable operations that were previously included in a block
      will be removed by the call to [flush]. However, as explained in
      [handle_live_operations] it should never happen in practice. *)

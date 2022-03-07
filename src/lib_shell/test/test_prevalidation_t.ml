@@ -65,14 +65,18 @@ module Init = struct
   let wrap_tzresult_lwt (f : Context.t -> unit tzresult Lwt.t) () :
       unit tzresult Lwt.t =
     Lwt_utils_unix.with_tempdir "tezos_test_" (fun base_dir ->
+        let open Lwt_result_syntax in
         let root = Filename.concat base_dir "context" in
-        Context.init root >>= fun idx ->
-        Context.commit_genesis
-          idx
-          ~chain_id
-          ~time:genesis_time
-          ~protocol:genesis_protocol
-        >>=? fun genesis -> Context.checkout_exn idx genesis >>= f)
+        let*! idx = Context.init root in
+        let* genesis =
+          Context.commit_genesis
+            idx
+            ~chain_id
+            ~time:genesis_time
+            ~protocol:genesis_protocol
+        in
+        let*! v = Context.checkout_exn idx genesis in
+        f v)
 
   let genesis_block (context_hash : Context_hash.t) : Store.Block.t =
     let block_hash : Block_hash.t = Block_hash.hash_string ["genesis"] in
@@ -113,6 +117,7 @@ let chain_store = ()
 
 (** Test that [create] returns [Ok] in a pristine context. *)
 let test_create ctxt =
+  let open Lwt_result_syntax in
   let live_operations = Operation_hash.Set.empty in
   let timestamp : Time.Protocol.t = now () in
   let (module Prevalidation) =
@@ -121,8 +126,10 @@ let test_create ctxt =
   let predecessor : Store.Block.t =
     Init.genesis_block @@ Context.hash ~time:timestamp ctxt
   in
-  Prevalidation.create chain_store ~predecessor ~live_operations ~timestamp ()
-  >|=? ignore
+  let* _ =
+    Prevalidation.create chain_store ~predecessor ~live_operations ~timestamp ()
+  in
+  return_unit
 
 (** A generator of [Prevalidation.operation] values that make sure
     to return distinct operations (hashes are not fake and they are
@@ -163,6 +170,7 @@ let mk_ops (type a)
 (** Test that [Prevalidation.apply_operations] only returns [Branch_delayed _]
     when the protocol's [apply_operation] crashes. *)
 let test_apply_operation_crash ctxt =
+  let open Lwt_result_syntax in
   let live_operations = Operation_hash.Set.empty in
   let timestamp : Time.Protocol.t = now () in
   let (module P) = create_prevalidation (module Mock_protocol) ctxt in
@@ -172,10 +180,9 @@ let test_apply_operation_crash ctxt =
   let predecessor : Store.Block.t =
     Init.genesis_block @@ Context.hash ~time:timestamp ctxt
   in
-  P.create chain_store ~predecessor ~live_operations ~timestamp ()
-  >>=? fun pv ->
+  let* pv = P.create chain_store ~predecessor ~live_operations ~timestamp () in
   let apply_op pv op =
-    P.apply_operation pv op >|= fun application_result ->
+    let*! application_result = P.apply_operation pv op in
     match application_result with
     | Applied _ | Branch_refused _ | Refused _ | Outdated _ ->
         (* These cases should not happen because
@@ -183,9 +190,10 @@ let test_apply_operation_crash ctxt =
         assert false
     | Branch_delayed _ ->
         (* This is the only allowed case. *)
-        pv
+        Lwt.return pv
   in
-  Lwt_list.fold_left_s apply_op pv ops >>= fun _ -> return_unit
+  let*! _ = List.fold_left_s apply_op pv ops in
+  return_unit
 
 (** Logical implication *)
 let ( ==> ) a b = (not a) || b
@@ -214,6 +222,7 @@ let mk_live_operations (type a) rand (ops : a Prevalidation.operation list) =
 (** Test that [Prevalidation.apply_operations] returns [Outdated]
     for operations in [live_operations] *)
 let test_apply_operation_live_operations ctxt =
+  let open Lwt_result_syntax in
   let timestamp : Time.Protocol.t = now () in
   let rand : Random.State.t = mk_rand () in
   let (module Protocol : Tezos_protocol_environment.PROTOCOL
@@ -237,15 +246,14 @@ let test_apply_operation_live_operations ctxt =
   let predecessor : Store.Block.t =
     Init.genesis_block @@ Context.hash ~time:timestamp ctxt
   in
-  P.create chain_store ~predecessor ~live_operations ~timestamp ()
-  >>=? fun pv ->
+  let* pv = P.create chain_store ~predecessor ~live_operations ~timestamp () in
   let op_in_live_operations op =
     Operation_hash.Set.mem
       (Internal_for_tests.to_raw op |> Operation.hash)
       live_operations
   in
   let apply_op pv (op : _ Prevalidation.operation) =
-    P.apply_operation pv op >|= fun application_result ->
+    let*! application_result = P.apply_operation pv op in
     let (next_pv, result_is_outdated) =
       match application_result with
       | Applied (next_pv, _receipt) -> (next_pv, false)
@@ -254,14 +262,16 @@ let test_apply_operation_live_operations ctxt =
     in
     (* Here is the main check of this test: *)
     assert (op_in_live_operations op ==> result_is_outdated) ;
-    next_pv
+    Lwt.return next_pv
   in
-  Lwt_list.fold_left_s apply_op pv ops >>= fun _ -> return_unit
+  let*! _ = List.fold_left_s apply_op pv ops in
+  return_unit
 
 (** Test that [Prevalidation.apply_operations] makes field [applied]
     grow and that it grows only for operations on which the protocol
     [apply_operation] returns [Ok]. *)
 let test_apply_operation_applied ctxt =
+  let open Lwt_result_syntax in
   let timestamp : Time.Protocol.t = now () in
   let rand : Random.State.t = mk_rand () in
   let (module Protocol : Tezos_protocol_environment.PROTOCOL
@@ -285,12 +295,11 @@ let test_apply_operation_applied ctxt =
   let predecessor : Store.Block.t =
     Init.genesis_block @@ Context.hash ~time:timestamp ctxt
   in
-  P.create chain_store ~predecessor ~live_operations ~timestamp ()
-  >>=? fun pv ->
+  let* pv = P.create chain_store ~predecessor ~live_operations ~timestamp () in
   let to_applied = P.Internal_for_tests.to_applied in
   let apply_op pv (op : _ Prevalidation.operation) =
     let applied_before = to_applied pv in
-    P.apply_operation pv op >|= fun application_result ->
+    let*! application_result = P.apply_operation pv op in
     let (next_pv, result_is_applied) =
       match application_result with
       | Applied (next_pv, _receipt) -> (next_pv, true)
@@ -312,9 +321,10 @@ let test_apply_operation_applied ctxt =
       (* Physical equality: intended, the [applied] field should
          not be changed in this case. *)
       assert (applied_after == applied_before) ;
-    next_pv
+    Lwt.return next_pv
   in
-  Lwt_list.fold_left_s apply_op pv ops >>= fun _ -> return_unit
+  let*! _ = List.fold_left_s apply_op pv ops in
+  return_unit
 
 let () =
   Alcotest_lwt.run

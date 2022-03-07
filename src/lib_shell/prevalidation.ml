@@ -141,11 +141,12 @@ module MakeAbstract
     safe_binary_of_bytes Proto.operation_data_encoding proto
 
   let parse hash (raw : Operation.t) =
+    let open Tzresult_syntax in
     let size = Data_encoding.Binary.length Operation.encoding raw in
     if size > Proto.max_operation_data_length then
-      error (Oversized_operation {size; max = Proto.max_operation_data_length})
+      fail (Oversized_operation {size; max = Proto.max_operation_data_length})
     else
-      parse_unsafe raw.proto >|? fun protocol_data ->
+      let+ protocol_data = parse_unsafe raw.proto in
       {
         hash;
         raw;
@@ -169,6 +170,7 @@ module MakeAbstract
       () =
     (* The prevalidation module receives input from the system byt handles
        protocol values. It translates timestamps here. *)
+    let open Lwt_tzresult_syntax in
     let {
       Block_header.shell =
         {
@@ -181,49 +183,54 @@ module MakeAbstract
     } =
       Store.Block.header predecessor
     in
-    Chain_store.context chain_store predecessor >>=? fun predecessor_context ->
+    let* predecessor_context = Chain_store.context chain_store predecessor in
     let predecessor_hash = Store.Block.hash predecessor in
-    Block_validation.update_testchain_status
-      predecessor_context
-      ~predecessor_hash
-      timestamp
-    >>= fun predecessor_context ->
-    (match protocol_data with
-    | None -> return_none
-    | Some protocol_data -> (
-        match
-          Data_encoding.Binary.of_bytes_opt
-            Proto.block_header_data_encoding
-            protocol_data
-        with
-        | None -> failwith "Invalid block header"
-        | Some protocol_data -> return_some protocol_data))
-    >>=? fun protocol_data ->
+    let*! predecessor_context =
+      Block_validation.update_testchain_status
+        predecessor_context
+        ~predecessor_hash
+        timestamp
+    in
+    let* protocol_data =
+      match protocol_data with
+      | None -> return_none
+      | Some protocol_data -> (
+          match
+            Data_encoding.Binary.of_bytes_opt
+              Proto.block_header_data_encoding
+              protocol_data
+          with
+          | None -> failwith "Invalid block header"
+          | Some protocol_data -> return_some protocol_data)
+    in
     let predecessor_context =
       Shell_context.wrap_disk_context predecessor_context
     in
-    Proto.begin_construction
-      ~chain_id:(Chain_store.chain_id chain_store)
-      ~predecessor_context
-      ~predecessor_timestamp
-      ~predecessor_fitness
-      ~predecessor_level
-      ~predecessor:predecessor_hash
-      ~timestamp
-      ?protocol_data
-      ~cache:`Lazy
-      ()
-    >>=? fun state -> return {state; applied = []; live_operations}
+    let* state =
+      Proto.begin_construction
+        ~chain_id:(Chain_store.chain_id chain_store)
+        ~predecessor_context
+        ~predecessor_timestamp
+        ~predecessor_fitness
+        ~predecessor_level
+        ~predecessor:predecessor_hash
+        ~timestamp
+        ?protocol_data
+        ~cache:`Lazy
+        ()
+    in
+    return {state; applied = []; live_operations}
 
   let apply_operation pv op =
+    let open Lwt_syntax in
     if Operation_hash.Set.mem op.hash pv.live_operations then
       (* As of November 2021, it is dubious that this case can happen.
          If it can, it is more likely to be because of a consensus operation;
          hence the returned error. *)
       Lwt.return (Outdated [Endorsement_branch_not_live])
     else
-      protect (fun () -> Proto.apply_operation pv.state op.protocol)
-      >|= function
+      let+ r = protect (fun () -> Proto.apply_operation pv.state op.protocol) in
+      match r with
       | Ok (state, receipt) -> (
           let pv =
             {

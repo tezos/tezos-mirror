@@ -154,7 +154,8 @@ module Make_raw
     Table.create ?random_table ?global_input request_param disk
 
   let shutdown t =
-    Requester_event.(emit shutting_down_requester) () >>= fun () ->
+    let open Lwt_syntax in
+    let* () = Requester_event.(emit shutting_down_requester) () in
     Table.shutdown t
 end
 
@@ -202,21 +203,31 @@ module Block_header_storage = struct
   type value = Block_header.t
 
   let known chain_store hash =
-    Store.Block.is_known_valid chain_store hash >>= function
+    let open Lwt_syntax in
+    let* b = Store.Block.is_known_valid chain_store hash in
+    match b with
     | true -> Lwt.return_true
     | false -> Store.Block.is_known_prechecked chain_store hash
 
   let read chain_store h =
-    (Store.Block.read_block chain_store h >>= function
-     | Ok b -> return b
-     | Error _ -> Store.Block.read_prechecked_block chain_store h)
-    >>=? fun b -> return (Store.Block.header b)
+    let open Lwt_result_syntax in
+    let* b =
+      let*! r = Store.Block.read_block chain_store h in
+      match r with
+      | Ok b -> return b
+      | Error _ -> Store.Block.read_prechecked_block chain_store h
+    in
+    return (Store.Block.header b)
 
   let read_opt chain_store h =
-    (Store.Block.read_block_opt chain_store h >>= function
-     | Some b -> Lwt.return_some b
-     | None -> Store.Block.read_prechecked_block_opt chain_store h)
-    >>= fun b -> Lwt.return (Option.map Store.Block.header b)
+    let open Lwt_syntax in
+    let* b =
+      let* o = Store.Block.read_block_opt chain_store h in
+      match o with
+      | Some b -> Lwt.return_some b
+      | None -> Store.Block.read_prechecked_block_opt chain_store h
+    in
+    Lwt.return (Option.map Store.Block.header b)
 end
 
 module Raw_block_header =
@@ -261,7 +272,8 @@ module Operations_storage = struct
   let known chain_store (h, _) = Store.Block.is_known_valid chain_store h
 
   let read chain_store (h, i) =
-    Store.Block.read_block chain_store h >>=? fun b ->
+    let open Lwt_result_syntax in
+    let* b = Store.Block.read_block chain_store h in
     let ops =
       List.nth (Store.Block.operations b) i
       |> WithExceptions.Option.to_exn ~none:Not_found
@@ -269,7 +281,9 @@ module Operations_storage = struct
     return ops
 
   let read_opt chain_store (h, i) =
-    Store.Block.read_block_opt chain_store h >>= function
+    let open Lwt_syntax in
+    let* o = Store.Block.read_block_opt chain_store h in
+    match o with
     | None -> Lwt.return_none
     | Some b -> Lwt.return (List.nth (Store.Block.operations b) i)
 end
@@ -331,9 +345,9 @@ module Protocol_storage = struct
   let read_opt store ph = Store.Protocol.read store ph
 
   let read store ph =
-    read_opt store ph >>= function
-    | None -> fail_with_exn Not_found
-    | Some p -> return p
+    let open Lwt_syntax in
+    let* o = read_opt store ph in
+    match o with None -> fail_with_exn Not_found | Some p -> return_ok p
 end
 
 module Raw_protocol =

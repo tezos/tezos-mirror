@@ -25,6 +25,7 @@
 (*****************************************************************************)
 
 let read_partial_context =
+  let open Lwt_syntax in
   let init = Block_services.Dir TzString.Map.empty in
   fun context path depth ->
     if depth = 0 then Lwt.return Block_services.Cut
@@ -34,7 +35,8 @@ let read_partial_context =
            folding over a value is a no-op".
          Therefore, we first need to check that whether its a value.
       *)
-      Context.find context path >>= function
+      let* o = Context.find context path in
+      match o with
       | Some v -> Lwt.return (Block_services.Key v)
       | None ->
           (* try to read as directory *)
@@ -50,7 +52,8 @@ let read_partial_context =
                 (* only [=] case is possible because [~depth] is [(`Le depth)] *)
                 Lwt.return (raw_context_insert (k, Cut) acc)
               else
-                Context.Tree.to_value tree >|= function
+                let+ o = Context.Tree.to_value tree in
+                match o with
                 | None -> acc
                 | Some v -> raw_context_insert (k, Key v) acc)
 
@@ -97,15 +100,19 @@ let build_raw_header_rpc_directory (module Proto : Block_services.PROTO) =
       return (Data_encoding.Binary.to_bytes_exn Block_header.encoding header)) ;
   (* protocols *)
   register0 S.protocols (fun (chain_store, _hash, header) () () ->
-      Store.Chain.find_protocol
-        chain_store
-        ~protocol_level:header.shell.proto_level
-      >>= fun next_proto ->
+      let open Lwt_result_syntax in
+      let*! next_proto =
+        Store.Chain.find_protocol
+          chain_store
+          ~protocol_level:header.shell.proto_level
+      in
       let next_protocol_hash =
         WithExceptions.Option.to_exn ~none:Not_found next_proto
       in
-      Store.Block.read_block_opt chain_store header.shell.predecessor
-      >>= function
+      let*! o =
+        Store.Block.read_block_opt chain_store header.shell.predecessor
+      in
+      match o with
       | None ->
           return
             {
@@ -115,10 +122,11 @@ let build_raw_header_rpc_directory (module Proto : Block_services.PROTO) =
             }
       | Some pred_block ->
           let pred_header = Store.Block.header pred_block in
-          Store.Chain.find_protocol
-            chain_store
-            ~protocol_level:pred_header.shell.proto_level
-          >>= fun current_protocol ->
+          let*! current_protocol =
+            Store.Chain.find_protocol
+              chain_store
+              ~protocol_level:pred_header.shell.proto_level
+          in
           let protocol_hash =
             WithExceptions.Option.to_exn ~none:Not_found current_protocol
           in
@@ -132,6 +140,7 @@ let build_raw_header_rpc_directory (module Proto : Block_services.PROTO) =
 
 let build_raw_rpc_directory (module Proto : Block_services.PROTO)
     (module Next_proto : Registered_protocol.T) =
+  let open Lwt_result_syntax in
   let dir : (Store.chain_store * Store.Block.block) RPC_directory.t ref =
     ref RPC_directory.empty
   in
@@ -156,18 +165,21 @@ let build_raw_rpc_directory (module Proto : Block_services.PROTO)
   let module Block_services = Block_services.Make (Proto) (Next_proto) in
   let module S = Block_services.S in
   register0 S.live_blocks (fun (chain_store, block) () () ->
-      Store.Chain.compute_live_blocks chain_store ~block
-      >>=? fun (live_blocks, _) -> return live_blocks) ;
+      let* (live_blocks, _) =
+        Store.Chain.compute_live_blocks chain_store ~block
+      in
+      return live_blocks) ;
   (* block metadata *)
   let block_metadata chain_store block =
-    Store.Block.get_block_metadata chain_store block >>=? fun metadata ->
+    let* metadata = Store.Block.get_block_metadata chain_store block in
     let protocol_data =
       Data_encoding.Binary.of_bytes_exn
         Proto.block_header_metadata_encoding
         (Store.Block.block_metadata metadata)
     in
-    Store.Block.testchain_status chain_store block
-    >>=? fun (test_chain_status, _) ->
+    let* (test_chain_status, _) =
+      Store.Block.testchain_status chain_store block
+    in
     let max_operations_ttl = Store.Block.max_operations_ttl metadata in
     return
       {
@@ -223,7 +235,8 @@ let build_raw_rpc_directory (module Proto : Block_services.PROTO)
   let operations chain_store block =
     let chain_id = Store.Chain.chain_id chain_store in
     let ops = Store.Block.operations block in
-    Store.Block.get_block_metadata_opt chain_store block >>= function
+    let*! o = Store.Block.get_block_metadata_opt chain_store block in
+    match o with
     | None ->
         return (List.map (List.map (convert_without_metadata chain_id)) ops)
     | Some metadata ->
@@ -251,7 +264,8 @@ let build_raw_rpc_directory (module Proto : Block_services.PROTO)
       let (ops, _path) = Store.Block.operations_path block i in
       Lwt.catch
         (fun () ->
-          Store.Block.get_block_metadata_opt chain_store block >>= function
+          let*! o = Store.Block.get_block_metadata_opt chain_store block in
+          match o with
           | None -> return (List.map (convert_without_metadata chain_id) ops)
           | Some metadata -> (
               let opss_metadata = Store.Block.operations_metadata metadata in
@@ -276,7 +290,8 @@ let build_raw_rpc_directory (module Proto : Block_services.PROTO)
           let op =
             List.nth ops j |> WithExceptions.Option.to_exn ~none:Not_found
           in
-          Store.Block.get_block_metadata_opt chain_store block >>= function
+          let*! o = Store.Block.get_block_metadata_opt chain_store block in
+          match o with
           | None -> return (convert_without_metadata chain_id op)
           | Some metadata ->
               let opss_metadata = Store.Block.operations_metadata metadata in
@@ -313,16 +328,18 @@ let build_raw_rpc_directory (module Proto : Block_services.PROTO)
   register1
     S.Operation_metadata_hashes.operation_metadata_hashes_in_pass
     (fun (_, block) i () () ->
-      fail_opt (Store.Block.operations_metadata_hashes block)
-      >>=? fun ops_metadata_hashes ->
+      let* ops_metadata_hashes =
+        fail_opt (Store.Block.operations_metadata_hashes block)
+      in
       fail_opt (List.nth_opt ops_metadata_hashes i)) ;
   register2
     S.Operation_metadata_hashes.operation_metadata_hash
     (fun (_, block) i j () () ->
       Lwt.catch
         (fun () ->
-          fail_opt (Store.Block.operations_metadata_hashes_path block i)
-          >>=? fun hashes ->
+          let* hashes =
+            fail_opt (Store.Block.operations_metadata_hashes_path block i)
+          in
           return
             (List.nth hashes j |> WithExceptions.Option.to_exn ~none:Not_found))
         (fun _ -> Lwt.fail Not_found)) ;
@@ -331,13 +348,16 @@ let build_raw_rpc_directory (module Proto : Block_services.PROTO)
       let depth = Option.value ~default:max_int q#depth in
       (* [depth] is defined as a [uint] not an [int] *)
       assert (depth >= 0) ;
-      Store.Block.context chain_store block >>=? fun context ->
-      Context.mem context path >>= fun mem ->
-      Context.mem_tree context path >>= fun dir_mem ->
+      let* context = Store.Block.context chain_store block in
+      let*! mem = Context.mem context path in
+      let*! dir_mem = Context.mem_tree context path in
       if not (mem || dir_mem) then Lwt.fail Not_found
-      else read_partial_context context path depth >>= Lwt.return_ok) ;
+      else
+        let*! v = read_partial_context context path depth in
+        Lwt.return_ok v) ;
   register1 S.Context.merkle_tree (fun (chain_store, block) path query () ->
-      Store.Block.context_opt chain_store block >>= function
+      let*! o = Store.Block.context_opt chain_store block in
+      match o with
       | None -> return None
       | Some context ->
           let holey = Option.value ~default:false query#holey in
@@ -345,7 +365,8 @@ let build_raw_rpc_directory (module Proto : Block_services.PROTO)
             let open Tezos_shell_services.Block_services in
             if holey then Hole else Raw_context
           in
-          Context.merkle_tree context leaf_kind path >>= return_some) ;
+          let*! v = Context.merkle_tree context leaf_kind path in
+          return_some v) ;
   (* info *)
   register0 S.info (fun (chain_store, block) () () ->
       let chain_id = Store.Chain.chain_id chain_store in
@@ -357,11 +378,11 @@ let build_raw_rpc_directory (module Proto : Block_services.PROTO)
           Proto.block_header_data_encoding
           header.protocol_data
       in
-      (block_metadata chain_store block >>= function
-       | Ok metadata -> return_some metadata
-       | Error _ -> return_none)
-      >>=? fun metadata ->
-      operations chain_store block >>=? fun operations ->
+      let* metadata =
+        let*! metadata = block_metadata chain_store block in
+        return (Option.of_result metadata)
+      in
+      let* operations = operations chain_store block in
       return
         {
           Block_services.hash;
@@ -401,9 +422,10 @@ let build_raw_rpc_directory (module Proto : Block_services.PROTO)
               operations)
           p.operations
       in
-      (try return (Block_validator.running_worker ())
-       with _ -> failwith "Block validator is not running")
-      >>=? fun bv ->
+      let* bv =
+        try return (Block_validator.running_worker ())
+        with _ -> failwith "Block validator is not running"
+      in
       Block_validator.preapply
         bv
         chain_store
@@ -412,36 +434,40 @@ let build_raw_rpc_directory (module Proto : Block_services.PROTO)
         ~protocol_data
         operations) ;
   register0 S.Helpers.Preapply.operations (fun (chain_store, block) () ops ->
-      Store.Block.context chain_store block >>=? fun ctxt ->
+      let* ctxt = Store.Block.context chain_store block in
       let predecessor = Store.Block.hash block in
       let header = Store.Block.shell_header block in
       let predecessor_context = Shell_context.wrap_disk_context ctxt in
-      Next_proto.begin_construction
-        ~chain_id:(Store.Chain.chain_id chain_store)
-        ~predecessor_context
-        ~predecessor_timestamp:header.timestamp
-        ~predecessor_level:header.level
-        ~predecessor_fitness:header.fitness
-        ~predecessor
-        ~timestamp:(Time.System.to_protocol (Time.System.now ()))
-        ~cache:`Lazy
-        ()
-      >>=? fun state ->
-      List.fold_left_es
-        (fun (state, acc) op ->
-          Next_proto.apply_operation state op >>=? fun (state, result) ->
-          return (state, (op.protocol_data, result) :: acc))
-        (state, [])
-        ops
-      >>=? fun (state, acc) ->
+      let* state =
+        Next_proto.begin_construction
+          ~chain_id:(Store.Chain.chain_id chain_store)
+          ~predecessor_context
+          ~predecessor_timestamp:header.timestamp
+          ~predecessor_level:header.level
+          ~predecessor_fitness:header.fitness
+          ~predecessor
+          ~timestamp:(Time.System.to_protocol (Time.System.now ()))
+          ~cache:`Lazy
+          ()
+      in
+      let* (state, acc) =
+        List.fold_left_es
+          (fun (state, acc) op ->
+            let* (state, result) = Next_proto.apply_operation state op in
+            return (state, (op.protocol_data, result) :: acc))
+          (state, [])
+          ops
+      in
       (* A pre application must not commit into the protocol caches.
          Hence, we set [cache_nonce] to None. *)
-      Next_proto.finalize_block state None >>=? fun _ -> return (List.rev acc)) ;
+      let* _ = Next_proto.finalize_block state None in
+      return (List.rev acc)) ;
   register1 S.Helpers.complete (fun (chain_store, block) prefix () () ->
-      Store.Block.context chain_store block >>=? fun ctxt ->
-      Base58.complete prefix >>= fun l1 ->
+      let* ctxt = Store.Block.context chain_store block in
+      let*! l1 = Base58.complete prefix in
       let ctxt = Shell_context.wrap_disk_context ctxt in
-      Next_proto.complete_b58prefix ctxt prefix >>= fun l2 -> return (l1 @ l2)) ;
+      let*! l2 = Next_proto.complete_b58prefix ctxt prefix in
+      return (l1 @ l2)) ;
   (* merge protocol rpcs... *)
   merge
     (RPC_directory.map
@@ -458,7 +484,8 @@ let build_raw_rpc_directory (module Proto : Block_services.PROTO)
   merge
     (RPC_directory.map
        (fun (chain_store, block) ->
-         ( Store.Block.context_exn chain_store block >>= fun context ->
+         let*! r =
+           let*! context = Store.Block.context_exn chain_store block in
            let predecessor_context = Shell_context.wrap_disk_context context in
            let chain_id = Store.Chain.chain_id chain_store in
            let Block_header.
@@ -478,28 +505,31 @@ let build_raw_rpc_directory (module Proto : Block_services.PROTO)
            *)
            let predecessor = Store.Block.hash block in
            let timestamp = Time.System.to_protocol (Time.System.now ()) in
-           Next_proto.value_of_key
-             ~chain_id
-             ~predecessor_context
-             ~predecessor_timestamp
-             ~predecessor_level
-             ~predecessor_fitness
-             ~predecessor
-             ~timestamp
-           >>=? fun value_of_key ->
-           Tezos_protocol_environment.Context.load_cache
-             predecessor
-             predecessor_context
-             `Lazy
-             value_of_key
-           >>=? fun context ->
+           let* value_of_key =
+             Next_proto.value_of_key
+               ~chain_id
+               ~predecessor_context
+               ~predecessor_timestamp
+               ~predecessor_level
+               ~predecessor_fitness
+               ~predecessor
+               ~timestamp
+           in
+           let* context =
+             Tezos_protocol_environment.Context.load_cache
+               predecessor
+               predecessor_context
+               `Lazy
+               value_of_key
+           in
            return
              {
                Tezos_protocol_environment.block_hash = Store.Block.hash block;
                block_header = Store.Block.shell_header block;
                context;
-             } )
-         >>= function
+             }
+         in
+         match r with
          | Ok result -> Lwt.return result
          | Error _ -> Lwt.fail Not_found)
        proto_services) ;
@@ -511,11 +541,14 @@ let get_protocol hash =
   | Some protocol -> protocol
 
 let get_directory chain_store block =
-  Store.Chain.get_rpc_directory chain_store block >>= function
+  let open Lwt_syntax in
+  let* o = Store.Chain.get_rpc_directory chain_store block in
+  match o with
   | Some dir -> Lwt.return dir
   | None -> (
-      Store.Block.protocol_hash_exn chain_store block
-      >>= fun next_protocol_hash ->
+      let* next_protocol_hash =
+        Store.Block.protocol_hash_exn chain_store block
+      in
       let (module Next_proto) = get_protocol next_protocol_hash in
       let build_fake_rpc_directory () =
         build_raw_rpc_directory
@@ -525,43 +558,53 @@ let get_directory chain_store block =
       if Store.Block.is_genesis chain_store (Store.Block.hash block) then
         Lwt.return (build_fake_rpc_directory ())
       else
-        (Store.Block.read_predecessor_opt chain_store block >>= function
-         | None ->
-             (* No predecessors (e.g. pruned caboose), return the
-                current protocol *)
-             Lwt.return (module Next_proto : Registered_protocol.T)
-         | Some pred ->
-             Store.Chain.savepoint chain_store >>= fun (_, savepoint_level) ->
-             (if Compare.Int32.(Store.Block.level pred < savepoint_level) then
-              Store.Chain.find_protocol
-                chain_store
-                ~protocol_level:(Store.Block.proto_level pred)
-              >>= fun predecessor_protocol ->
-              let protocol_hash =
-                WithExceptions.Option.to_exn
-                  ~none:Not_found
-                  predecessor_protocol
+        let* (module Proto) =
+          let* o = Store.Block.read_predecessor_opt chain_store block in
+          match o with
+          | None ->
+              (* No predecessors (e.g. pruned caboose), return the
+                 current protocol *)
+              Lwt.return (module Next_proto : Registered_protocol.T)
+          | Some pred ->
+              let* (_, savepoint_level) = Store.Chain.savepoint chain_store in
+              let* protocol_hash =
+                if Compare.Int32.(Store.Block.level pred < savepoint_level) then
+                  let* predecessor_protocol =
+                    Store.Chain.find_protocol
+                      chain_store
+                      ~protocol_level:(Store.Block.proto_level pred)
+                  in
+                  let protocol_hash =
+                    WithExceptions.Option.to_exn
+                      ~none:Not_found
+                      predecessor_protocol
+                  in
+                  Lwt.return protocol_hash
+                else Store.Block.protocol_hash_exn chain_store pred
               in
-              Lwt.return protocol_hash
-             else Store.Block.protocol_hash_exn chain_store pred)
-             >>= fun protocol_hash -> Lwt.return (get_protocol protocol_hash))
-        >>= fun (module Proto) ->
-        Store.Chain.get_rpc_directory chain_store block >>= function
+              Lwt.return (get_protocol protocol_hash)
+        in
+        let* o = Store.Chain.get_rpc_directory chain_store block in
+        match o with
         | Some dir -> Lwt.return dir
         | None ->
             let dir =
               build_raw_rpc_directory (module Proto) (module Next_proto)
             in
-            Store.Chain.set_rpc_directory
-              chain_store
-              ~protocol_hash:Proto.hash
-              ~next_protocol_hash:Next_proto.hash
-              dir
-            >>= fun () -> Lwt.return dir)
+            let* () =
+              Store.Chain.set_rpc_directory
+                chain_store
+                ~protocol_hash:Proto.hash
+                ~next_protocol_hash:Next_proto.hash
+                dir
+            in
+            Lwt.return dir)
 
 let build_rpc_directory chain_store block =
-  Store.Chain.block_of_identifier_opt chain_store block >>= function
+  let open Lwt_syntax in
+  let* o = Store.Chain.block_of_identifier_opt chain_store block in
+  match o with
   | None -> Lwt.fail Not_found
   | Some b ->
-      get_directory chain_store b >>= fun dir ->
+      let* dir = get_directory chain_store b in
       Lwt.return (RPC_directory.map (fun _ -> Lwt.return (chain_store, b)) dir)
