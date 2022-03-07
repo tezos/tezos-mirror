@@ -33,9 +33,6 @@ val remove : int -> 'a list -> 'a list
 (** [repeat n x] is a list of [n] [x]'s *)
 val repeat : int -> 'a -> 'a list
 
-(** [shift (hd :: tl)] computes [tl @ [hd]] *)
-val shift : 'a list -> 'a list
-
 (** [product a b] computes the Cartesian product of two lists [a] and [b]. *)
 val product : 'a list -> 'b list -> ('a * 'b) list
 
@@ -52,9 +49,6 @@ val drop_n : int -> 'a list -> 'a list
     exactly [n] elements, [j] is [l] and [k] is [[]]. *)
 val split_n : int -> 'a list -> 'a list * 'a list
 
-(** [select n l] is ([n]th element of [l], [l] without that element) *)
-val select : int -> 'a list -> 'a * 'a list
-
 (** [rev_sub l n] is [List.rev l] capped to max [n] elements *)
 val rev_sub : 'a list -> int -> 'a list
 
@@ -64,21 +58,3 @@ val sub : 'a list -> int -> 'a list
 (** [shuffle l] is a list that contains the same elements as [l] but in a random
     order. *)
 val shuffle : ?rng_state:Random.State.t -> 'a list -> 'a list
-
-(** Get the index of an element in a list. *)
-val index_of : ?compare:('a -> 'a -> int) -> 'a -> 'a list -> int option
-
-(** [filter_some l] returns all [Some] elements of [l] *)
-val filter_some : 'a option list -> 'a list
-
-(** [find_map f l] applies [f] to the elements of [l] in order, and
-    returns the first result of the form [Some v], or [None] if none
-    exist.
-
-    Present in OCaml 4.10: this function can be removed once we catch
-    up. *)
-val find_map : ('a -> 'b option) -> 'a list -> 'b option
-
-(** [fold_left_i f init l] is equivalent to [fold_left] except that
-    the index of the element is passed as a first argument to [f]. *)
-val fold_left_i : (int -> 'b -> 'a -> 'b) -> 'b -> 'a list -> 'b

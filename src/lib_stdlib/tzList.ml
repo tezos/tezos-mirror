@@ -74,16 +74,6 @@ let take_n ?compare n l =
 let rec drop_n n l =
   if n <= 0 then l else match l with [] -> [] | _ :: xs -> drop_n (n - 1) xs
 
-let select n l =
-  let rec loop n acc = function
-    | [] -> invalid_arg "Utils.select"
-    | x :: xs when n <= 0 -> (x, List.rev_append acc xs)
-    | x :: xs -> loop (pred n) (x :: acc) xs
-  in
-  loop n [] l
-
-let shift = function [] -> [] | hd :: tl -> tl @ [hd]
-
 let rec product a b =
   match a with
   | [] -> []
@@ -108,34 +98,3 @@ let shuffle ?rng_state l =
       a.(n') <- tmp)
   done ;
   Array.to_list a
-
-let index_of ?(compare = Stdlib.compare) item list =
-  let rec find index = function
-    | [] -> None
-    | head :: tail ->
-        if compare head item = 0 then Some index else find (index + 1) tail
-  in
-  find 0 list
-
-let filter_some l =
-  (* Written like this (building backward and with a final List.rev)
-     so that it is tail-recursive *)
-  let rec go acc = function
-    | [] -> List.rev acc
-    | None :: xs -> go acc xs
-    | Some x :: xs -> go (x :: acc) xs
-  in
-  go [] l
-
-let rec find_map f = function
-  | [] -> None
-  | x :: l -> ( match f x with None -> find_map f l | r -> r)
-
-let fold_left_i f init l =
-  List.fold_left
-    (fun (i, accu) x ->
-      let accu = f i accu x in
-      (i + 1, accu))
-    (0, init)
-    l
-  |> snd
