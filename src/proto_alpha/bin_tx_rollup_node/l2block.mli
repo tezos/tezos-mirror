@@ -70,8 +70,8 @@ val encoding : t Data_encoding.t
 
 (**  {2 Hashing} *)
 
-(** The predefined hash for the Genesis L2 block *)
-val genesis_hash : hash
+(** A predefined hash for the Genesis L2 block for a given rollup address *)
+val genesis_hash : Tx_rollup.t -> hash
 
 (** Returns the hash of an L2 block header *)
 val hash_header : header -> hash

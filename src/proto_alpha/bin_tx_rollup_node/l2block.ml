@@ -113,7 +113,7 @@ let encoding =
     (fun (header, inbox) -> {header; inbox})
     (obj2 (req "header" header_encoding) (req "inbox" Inbox.encoding))
 
-let genesis_hash = Hash.zero (* TODO/TORU: change by something else *)
+let genesis_hash rollup = Hash.hash_string [Tx_rollup.to_b58check rollup]
 
 let hash_header h =
   match h.level with

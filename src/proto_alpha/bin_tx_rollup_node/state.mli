@@ -36,6 +36,7 @@ type rollup_origination = {block_hash : Block_hash.t; block_level : int32}
 type t = private {
   store : Stores.t;
   context_index : Context.index;
+  rollup : Tx_rollup.t;
   rollup_origination : rollup_origination;
 }
 

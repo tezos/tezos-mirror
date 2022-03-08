@@ -35,6 +35,7 @@ type rollup_origination = {block_hash : Block_hash.t; block_level : int32}
 type t = {
   store : Stores.t;
   context_index : Context.index;
+  rollup : Tx_rollup.t;
   rollup_origination : rollup_origination;
 }
 
@@ -203,4 +204,4 @@ let init ~data_dir ~context ?rollup_genesis rollup =
   let context_index = init_context ~data_dir in
   let* (store, rollup_origination) = store_orig in
   let* context_index = context_index in
-  return {store; context_index; rollup_origination}
+  return {store; context_index; rollup; rollup_origination}

@@ -243,7 +243,8 @@ let create_genesis_block state tezos_block =
       level = Genesis;
       inbox_hash;
       tezos_block;
-      predecessor = L2block.genesis_hash;
+      predecessor = L2block.genesis_hash state.rollup;
+      (* Genesis block is its own predecessor *)
       context = context_hash;
     }
   in
