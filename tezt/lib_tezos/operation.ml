@@ -204,7 +204,7 @@ let manager_op_content_to_json_string
       let message =
         match message with `Batch str -> `O [("batch", `String str)]
       in
-      let message_position = `Float (float_of_int message_position) in
+      let message_position = `String (string_of_int message_position) in
       mk_jsonm
         ~rollup
         ~proof
