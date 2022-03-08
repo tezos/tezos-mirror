@@ -1335,6 +1335,8 @@ let apply_manager_operation_content :
         >|=? fun (parameters, ctxt) ->
         (Script.lazy_expr (Micheline.strip_locations parameters), ctxt) )
       >>=? fun (parameters, ctxt) ->
+      (* FIXME/TORU: #2488 the returned op will fail when ticket hardening is
+         merged, it must be commented or fixed *)
       let op =
         Internal_operation
           {
