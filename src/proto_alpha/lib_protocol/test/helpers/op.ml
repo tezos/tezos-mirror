@@ -608,3 +608,32 @@ let tx_rollup_remove_commitment ?counter ?fee ?gas_limit ?storage_limit ctxt
   >>=? fun to_sign_op ->
   Context.Contract.manager ctxt source >|=? fun account ->
   sign account.sk ctxt to_sign_op
+
+let tx_rollup_withdraw ?counter ?fee ?gas_limit ?storage_limit ctxt
+    ~(source : Contract.t) (tx_rollup : Tx_rollup.t) (level : Tx_rollup_level.t)
+    ~context_hash ~message_index ~contents ~ty ~ticketer amount ~destination
+    withdraw_path entrypoint =
+  manager_operation
+    ?counter
+    ?fee
+    ?gas_limit
+    ?storage_limit
+    ~source
+    ctxt
+    (Tx_rollup_withdraw
+       {
+         tx_rollup;
+         level;
+         context_hash;
+         message_index;
+         withdraw_path;
+         contents;
+         ty;
+         ticketer;
+         amount;
+         destination;
+         entrypoint;
+       })
+  >>=? fun to_sign_op ->
+  Context.Contract.manager ctxt source >|=? fun account ->
+  sign account.sk ctxt to_sign_op

@@ -51,7 +51,9 @@ let check_proto_error_f f t =
       return_unit
   | _ -> failwith "Unexpected error: %a" Error_monad.pp_print_trace t
 
-let check_proto_error e = check_proto_error_f (( = ) e)
+(** [check_proto_error e t] checks that the first error of [t]
+    equals [e]. *)
+let check_proto_error e t = check_proto_error_f (( = ) e) t
 
 (** [test_disable_feature_flag] try to originate a tx rollup with the feature
     flag is deactivated and check it fails *)
@@ -185,8 +187,9 @@ let is_implicit_exn x =
   | Some x -> x
   | None -> raise (Invalid_argument "is_implicit_exn")
 
-(** [make_ticket_key ty contents ticketer tx_rollup] computes the key hash
-    of ticket crafted by [ticketer] and owned by [tx_rollup]. *)
+(** [make_ticket_key ty contents ticketer tx_rollup] computes the ticket hash
+    of the ticket containing [contents] of type [ty], crafted by [ticketer] and
+    owned by [tx_rollup]. *)
 let make_ticket_key ~ty ~contents ~ticketer tx_rollup =
   let open Tezos_micheline.Micheline in
   let ticketer =
@@ -202,7 +205,7 @@ let make_ticket_key ~ty ~contents ~ticketer tx_rollup =
   | Ok x -> x
   | Error _ -> raise (Invalid_argument "make_ticket_key")
 
-(** [make_unit_ticket_key ticketer tx_rollup] computes the key hash of
+(** [make_unit_ticket_key ticketer tx_rollup] computes the ticket hash of
     the unit ticket crafted by [ticketer] and owned by [tx_rollup]. *)
 let make_unit_ticket_key ~ticketer tx_rollup =
   let open Tezos_micheline.Micheline in
@@ -230,6 +233,8 @@ let print_deposit_arg tx_rollup account =
 let assert_ok res = match res with Ok r -> r | Error _ -> assert false
 
 let raw_level level = assert_ok @@ Raw_level.of_int32 level
+
+let merkle_root_empty_withdraw_list = Tx_rollup_withdraw.merkelize_list []
 
 (* Make a valid commitment for a batch.  TODO/TORU: roots are still wrong, of
    course, until we get Merkle proofs In the mean time provides the list of
@@ -1185,6 +1190,903 @@ let test_too_many_commitments () =
 
   return ()
 
+module Withdraw = struct
+  (** [context_init_withdraw n] initializes a context with [n + 1] accounts, one rollup and a
+      withdrawal recipient contract. *)
+  let context_init_withdraw n =
+    context_init (n + 1) >>=? fun (b, accounts) ->
+    let account1 =
+      WithExceptions.Option.get ~loc:__LOC__ @@ List.nth accounts 0
+    in
+    originate b account1 >>=? fun (b, tx_rollup) ->
+    Contract_helpers.originate_contract
+      "contracts/tx_rollup_withdraw.tz"
+      "None"
+      account1
+      b
+      (is_implicit_exn account1)
+    >>=? fun (withdraw_contract, b) ->
+    return (account1, accounts, tx_rollup, withdraw_contract, b)
+
+  (** [context_init1_withdraw] initializes a context with one account, one rollup and a
+      withdrawal recipient contract. *)
+  let context_init1_withdraw () =
+    context_init_withdraw 0
+    >>=? fun (account1, _accounts, tx_rollup, withdraw_contract, b) ->
+    return (account1, tx_rollup, withdraw_contract, b)
+
+  (** [context_init2_withdraw] initializes a context with two accounts, one rollup and a
+      withdrawal recipient contract. *)
+  let context_init2_withdraw () =
+    context_init_withdraw 1
+    >>=? fun (account1, accounts, tx_rollup, withdraw_contract, b) ->
+    let account2 =
+      WithExceptions.Option.get ~loc:__LOC__ @@ List.nth accounts 1
+    in
+    return (account1, account2, tx_rollup, withdraw_contract, b)
+
+  (** [context_finalize_batch_with_withdrawals account tx_rollup batch withdrawals b]
+      submits a batch containing the message [batch] to [tx_rollup] in the block [b].
+      In the following block, it adds a commitment for that block containing
+      [withdrawals] (same format as in [make_commitment_for_batch]).
+      In the third and final block, it finalizes the commitment.
+
+      It returns the commitment and a list of dummy context hashes
+      that was mocked as the result of the applying the batch.
+   *)
+  let context_finalize_batch_with_withdrawals ~account ~tx_rollup
+      ?(batch = "batch") ~withdrawals b =
+    Op.tx_rollup_submit_batch (B b) account tx_rollup batch
+    >>=? fun operation ->
+    Block.bake ~operation b >>=? fun b ->
+    (* Make a commitment for the dummy batch. Mock the
+       list of withdrawals as per
+       [withdrawals]. Include the commitment in an operation and bake. *)
+    Incremental.begin_construction b >>=? fun i ->
+    make_commitment_for_batch i Tx_rollup_level.root tx_rollup withdrawals
+    >>=? fun (commitment, context_hash_list) ->
+    Op.tx_rollup_commit (I i) account tx_rollup commitment >>=? fun operation ->
+    Incremental.add_operation i operation >>=? fun i ->
+    Incremental.finalize_block i >>=? fun b ->
+    (* 3. Finalize the commitment *)
+    Op.tx_rollup_finalize (B b) account tx_rollup >>=? fun operation ->
+    Block.bake ~operation b >>=? fun b ->
+    return (commitment, context_hash_list, b)
+
+  module Nat_ticket = struct
+    let ty = Expr.from_string "nat"
+
+    let contents_nat = 1
+
+    let contents = Expr.from_string (string_of_int contents_nat)
+
+    let amount = Tx_rollup_l2_qty.of_int64_exn 10L
+
+    let ticket_hash ~ticketer ~tx_rollup =
+      make_ticket_key
+        ~ty:(Tezos_micheline.Micheline.root ty)
+        ~contents:(Tezos_micheline.Micheline.root contents)
+        ~ticketer
+        tx_rollup
+
+    let withdrawal ~ticketer ?(recipient = ticketer) tx_rollup :
+        Tx_rollup_withdraw.t =
+      {
+        claimer = is_implicit_exn recipient;
+        ticket_hash = ticket_hash ~ticketer ~tx_rollup;
+        amount;
+      }
+  end
+
+  (** [test_valid_withdraw] checks that a smart contract can deposit tickets to a
+    transaction rollup. *)
+  let test_valid_withdraw () =
+    context_init1_withdraw ()
+    >>=? fun (account1, tx_rollup, withdraw_contract, b) ->
+    (* The withdrawal execution operation must include proof that the
+       level it specifies allows the withdrawal it executes.
+
+       Currently, for a withdrawal execution [(level, rollup)]
+       the protocol only verifies that:
+       - at [level], there is a commitment for [rollup]
+
+       It does not yet verify that the effects of the inbox at [level] actually
+       enables a withdrawal.
+
+       In this test, we simply add dummy batch and a commitment for that batch to
+       to some level, which ensures that the withdrawal can be executed.
+
+       Instead of a dummy batch, a more complete test would add:
+
+       - A deposit operation
+       - A L2->L1 operation
+
+       This will result in a withdrawal that can be executed.
+    *)
+
+    (* 1. Create a ticket and it's withdrawal *)
+    let withdraw = Nat_ticket.withdrawal ~ticketer:account1 tx_rollup in
+
+    (* 2 Add a batch message to [b], a commitment for that inbox
+       containing the withdrawal at index 0, and finalize that
+       commitment *)
+    context_finalize_batch_with_withdrawals
+      ~account:account1
+      ~tx_rollup
+      ~withdrawals:[(0, [withdraw])]
+      b
+    >>=? fun (_commitment, context_hash_list, b) ->
+    (* -- At this point, everything is in place for
+       the user to execute the withdrawal -- *)
+
+    (* 3. Now execute the withdrawal. The ticket should be received by
+       withdraw_contract at the default entrypoint. *)
+    (let entrypoint = Entrypoint.default in
+     let context_hash =
+       WithExceptions.Option.get ~loc:__LOC__ @@ List.nth context_hash_list 0
+     in
+     let withdraw_proof = Tx_rollup_withdraw.compute_path [withdraw] 0 in
+     Op.tx_rollup_withdraw
+       (B b)
+       ~source:account1
+       tx_rollup
+       Tx_rollup_level.root
+       ~context_hash
+       ~contents:(Script.lazy_expr Nat_ticket.contents)
+       ~ty:(Script.lazy_expr Nat_ticket.ty)
+       ~ticketer:account1
+       Nat_ticket.amount
+       ~destination:withdraw_contract
+       withdraw_proof
+       ~message_index:0
+       entrypoint)
+    >>=? fun operation ->
+    Block.bake ~operation b >>=? fun b ->
+    (* 4. Finally, we assert that [withdraw_contract] has received the
+       ticket as expected *)
+    Incremental.begin_construction b >>=? fun i ->
+    let ctxt = Incremental.alpha_ctxt i in
+    wrap @@ Contract.get_storage ctxt withdraw_contract
+    >>=? fun (_ctxt, found_storage) ->
+    Format.printf
+      "found_storage %s"
+      (match found_storage with
+      | Some storage -> Expr.to_string storage
+      | None -> "None") ;
+    let expected_storage =
+      Format.sprintf
+        "(Some (Pair 0x%s (Pair %d %s)))"
+        (Hex.show
+           (Hex.of_string
+              (Data_encoding.Binary.to_string_exn Contract.encoding account1)))
+        Nat_ticket.contents_nat
+        (Tx_rollup_l2_qty.to_string Nat_ticket.amount)
+      |> Expr.from_string |> Option.some
+    in
+    if expected_storage = found_storage then return_unit
+    else Alcotest.fail "Storage didn't match"
+
+  (** [test_invalid_withdraw_no_commitment] checks that attempting to
+   withdraw from a level with no commited inbox raises an error. *)
+  let test_invalid_withdraw_no_commitment () =
+    context_init1_withdraw ()
+    >>=? fun (account1, tx_rollup, withdraw_contract, b) ->
+    Incremental.begin_construction b >>=? fun i ->
+    let entrypoint = Entrypoint.default in
+    let context_hash = Bytes.make 20 'c' in
+    (* A dummy proof *)
+    let dummy_withdraw_proof =
+      let ticket_hash = Ticket_hash.zero in
+      let dummy_withdraw : Tx_rollup_withdraw.t =
+        {
+          claimer = is_implicit_exn account1;
+          ticket_hash;
+          amount = Nat_ticket.amount;
+        }
+      in
+      Tx_rollup_withdraw.compute_path [dummy_withdraw] 0
+    in
+    Op.tx_rollup_withdraw
+      (I i)
+      ~source:account1
+      tx_rollup
+      Tx_rollup_level.root
+      ~context_hash
+      ~message_index:0
+      ~contents:(Script.lazy_expr Nat_ticket.contents)
+      ~ty:(Script.lazy_expr Nat_ticket.ty)
+      ~ticketer:account1
+      Nat_ticket.amount
+      ~destination:withdraw_contract
+      dummy_withdraw_proof
+      entrypoint
+    >>=? fun operation ->
+    Incremental.add_operation
+      ~expect_failure:
+        (check_proto_error_f @@ function
+         | Tx_rollup_errors.No_finalized_commitment_for_level
+             {level; window = None} ->
+             Tx_rollup_level.(level = root)
+         | _ -> false)
+      i
+      operation
+    >>=? fun _ -> return_unit
+
+  (** [test_invalid_withdraw_missing_withdraw_in_commitment] tries
+     withdrawing when the commitment in question has no withdrawals
+     associated. *)
+  let test_invalid_withdraw_missing_withdraw_in_commitment () =
+    context_init1_withdraw ()
+    >>=? fun (account1, tx_rollup, withdraw_contract, b) ->
+    let batch = "batch" in
+    Op.tx_rollup_submit_batch (B b) account1 tx_rollup batch
+    >>=? fun operation ->
+    Block.bake ~operation b >>=? fun b ->
+    let withdraw = Nat_ticket.withdrawal ~ticketer:account1 tx_rollup in
+    context_finalize_batch_with_withdrawals
+      ~account:account1
+      ~tx_rollup
+      ~withdrawals:[(0, [])]
+      b
+    >>=? fun (_commitment, context_hash_list, b) ->
+    Incremental.begin_construction b >>=? fun i ->
+    (let entrypoint = Entrypoint.default in
+     let context_hash =
+       WithExceptions.Option.get ~loc:__LOC__ @@ List.nth context_hash_list 0
+     in
+     let withdraw_path = Tx_rollup_withdraw.compute_path [withdraw] 0 in
+     Op.tx_rollup_withdraw
+       (I i)
+       ~source:account1
+       tx_rollup
+       Tx_rollup_level.root
+       ~context_hash
+       ~message_index:0
+       ~contents:(Script.lazy_expr Nat_ticket.contents)
+       ~ty:(Script.lazy_expr Nat_ticket.ty)
+       ~ticketer:account1
+       Nat_ticket.amount
+       ~destination:withdraw_contract
+       withdraw_path
+       entrypoint)
+    >>=? fun operation ->
+    Incremental.add_operation
+      ~expect_failure:(check_proto_error Tx_rollup_errors.Withdraw_invalid_path)
+      i
+      operation
+    >>=? fun _ -> return_unit
+
+  (** [test_invalid_withdraw_tickets] test withdrawing with tickets
+     that do not correspond to the given proof and asserts that errors
+     are raised. *)
+  let test_invalid_withdraw_tickets () =
+    context_init1_withdraw ()
+    >>=? fun (account1, tx_rollup, withdraw_contract, b) ->
+    let batch = "batch" in
+    Op.tx_rollup_submit_batch (B b) account1 tx_rollup batch
+    >>=? fun operation ->
+    Block.bake ~operation b >>=? fun b ->
+    let withdraw = Nat_ticket.withdrawal ~ticketer:account1 tx_rollup in
+
+    context_finalize_batch_with_withdrawals
+      ~account:account1
+      ~tx_rollup
+      ~withdrawals:[(0, [withdraw])]
+      b
+    >>=? fun (_commitment, context_hash_list, b) ->
+    (* Try executing the withdrawal with invalid amounts *)
+    let entrypoint = Entrypoint.default in
+    let context_hash =
+      WithExceptions.Option.get ~loc:__LOC__ @@ List.nth context_hash_list 0
+    in
+    Incremental.begin_construction b >>=? fun i ->
+    List.iter_es
+      (fun amount ->
+        (let withdraw_path =
+           Tx_rollup_withdraw.compute_path [{withdraw with amount}] 0
+         in
+         Op.tx_rollup_withdraw
+           (I i)
+           ~source:account1
+           tx_rollup
+           Tx_rollup_level.root
+           ~context_hash
+           ~message_index:0
+           ~contents:(Script.lazy_expr Nat_ticket.contents)
+           ~ty:(Script.lazy_expr Nat_ticket.ty)
+           ~ticketer:account1
+           amount
+           ~destination:withdraw_contract
+           withdraw_path
+           entrypoint)
+        >>=? fun operation ->
+        Incremental.add_operation
+          ~expect_failure:
+            (check_proto_error Tx_rollup_errors.Withdraw_invalid_path)
+          i
+          operation
+        >>=? fun _i -> return_unit)
+      [Tx_rollup_l2_qty.of_int64_exn 9L; Tx_rollup_l2_qty.of_int64_exn 11L]
+    >>=? fun () ->
+    (* Try with wrong type *)
+    (let withdraw_path = Tx_rollup_withdraw.compute_path [withdraw] 0 in
+     Op.tx_rollup_withdraw
+       (I i)
+       ~source:account1
+       tx_rollup
+       Tx_rollup_level.root
+       ~context_hash
+       ~message_index:0
+       ~contents:(Script.lazy_expr Nat_ticket.contents)
+       ~ty:(Script.lazy_expr @@ Expr.from_string "unit")
+       ~ticketer:account1
+       Nat_ticket.amount
+       ~destination:withdraw_contract
+       withdraw_path
+       entrypoint)
+    >>=? fun operation ->
+    Incremental.add_operation
+      ~expect_failure:(check_proto_error Tx_rollup_errors.Withdraw_invalid_path)
+      i
+      operation
+    >>=? fun _i ->
+    (* Try with wrong contents *)
+    (let withdraw_path = Tx_rollup_withdraw.compute_path [withdraw] 0 in
+     Op.tx_rollup_withdraw
+       (I i)
+       ~source:account1
+       tx_rollup
+       Tx_rollup_level.root
+       ~context_hash
+       ~message_index:0
+       ~contents:(Script.lazy_expr @@ Expr.from_string "2")
+       ~ty:(Script.lazy_expr Nat_ticket.ty)
+       ~ticketer:account1
+       Nat_ticket.amount
+       ~destination:withdraw_contract
+       withdraw_path
+       entrypoint)
+    >>=? fun operation ->
+    Incremental.add_operation
+      ~expect_failure:(check_proto_error Tx_rollup_errors.Withdraw_invalid_path)
+      i
+      operation
+    >>=? fun _i ->
+    (* Try with wrong ticketer *)
+    (let withdraw_path = Tx_rollup_withdraw.compute_path [withdraw] 0 in
+     Op.tx_rollup_withdraw
+       (I i)
+       ~source:account1
+       tx_rollup
+       Tx_rollup_level.root
+       ~context_hash
+       ~message_index:0
+       ~contents:(Script.lazy_expr Nat_ticket.contents)
+       ~ty:(Script.lazy_expr Nat_ticket.ty)
+       ~ticketer:withdraw_contract
+       Nat_ticket.amount
+       ~destination:withdraw_contract
+       withdraw_path
+       entrypoint)
+    >>=? fun operation ->
+    Incremental.add_operation
+      ~expect_failure:(check_proto_error Tx_rollup_errors.Withdraw_invalid_path)
+      i
+      operation
+    >>=? fun _i -> return_unit
+
+  (** [test_invalid_withdraw_invalid_proof] tries withdrawing with
+     an invalid proof. *)
+  let test_invalid_withdraw_invalid_proof () =
+    context_init1_withdraw ()
+    >>=? fun (account1, tx_rollup, withdraw_contract, b) ->
+    let batch = "batch" in
+    Op.tx_rollup_submit_batch (B b) account1 tx_rollup batch
+    >>=? fun operation ->
+    Block.bake ~operation b >>=? fun b ->
+    let withdrawal1 : Tx_rollup_withdraw.t =
+      Nat_ticket.withdrawal ~ticketer:account1 tx_rollup
+    in
+    let withdrawal2 : Tx_rollup_withdraw.t =
+      {withdrawal1 with amount = Tx_rollup_l2_qty.of_int64_exn 5L}
+    in
+    context_finalize_batch_with_withdrawals
+      ~account:account1
+      ~tx_rollup
+      ~withdrawals:[(0, [withdrawal1; withdrawal2])]
+      b
+    >>=? fun (_commitment, context_hash_list, b) ->
+    let entrypoint = Entrypoint.default in
+    let context_hash =
+      WithExceptions.Option.get ~loc:__LOC__ @@ List.nth context_hash_list 0
+    in
+
+    Incremental.begin_construction b >>=? fun i ->
+    (let invalid_withdraw_path =
+       (* We're sending the parameters for withdrawal1, but we calculate
+          the proof for withdrawal2 *)
+       Tx_rollup_withdraw.compute_path [withdrawal1; withdrawal2] 1
+     in
+     Op.tx_rollup_withdraw
+       (I i)
+       ~source:account1
+       tx_rollup
+       Tx_rollup_level.root
+       ~context_hash
+       ~message_index:0
+       ~contents:(Script.lazy_expr Nat_ticket.contents)
+       ~ty:(Script.lazy_expr Nat_ticket.ty)
+       ~ticketer:account1
+       Nat_ticket.amount
+       ~destination:withdraw_contract
+       invalid_withdraw_path
+       entrypoint)
+    >>=? fun operation ->
+    Incremental.add_operation
+      ~expect_failure:(check_proto_error Tx_rollup_errors.Withdraw_invalid_path)
+      i
+      operation
+    >>=? fun _ ->
+    (let invalid_withdraw_path =
+       (* We give the proof for a list of withdrawals that does not correspond
+          to the list in the commitment *)
+       Tx_rollup_withdraw.compute_path [withdrawal1] 0
+     in
+     Op.tx_rollup_withdraw
+       (I i)
+       ~source:account1
+       tx_rollup
+       Tx_rollup_level.root
+       ~context_hash
+       ~message_index:0
+       ~contents:(Script.lazy_expr Nat_ticket.contents)
+       ~ty:(Script.lazy_expr Nat_ticket.ty)
+       ~ticketer:account1
+       Nat_ticket.amount
+       ~destination:withdraw_contract
+       invalid_withdraw_path
+       entrypoint)
+    >>=? fun operation ->
+    Incremental.add_operation
+      ~expect_failure:(check_proto_error Tx_rollup_errors.Withdraw_invalid_path)
+      i
+      operation
+    >>=? fun _ -> return_unit
+
+  (** [test_invalid_withdraw_already_consumed] asserts that withdrawing the same
+      withdrawal twice raises [Withdraw_already_consumed]. *)
+  let test_invalid_withdraw_already_consumed () =
+    context_init1_withdraw ()
+    >>=? fun (account1, tx_rollup, withdraw_contract, b) ->
+    let withdraw = Nat_ticket.withdrawal ~ticketer:account1 tx_rollup in
+    context_finalize_batch_with_withdrawals
+      ~account:account1
+      ~tx_rollup
+      ~withdrawals:[(0, [withdraw])]
+      b
+    >>=? fun (_commitment, context_hash_list, b) ->
+    let entrypoint = Entrypoint.default in
+    let context_hash =
+      WithExceptions.Option.get ~loc:__LOC__ @@ List.nth context_hash_list 0
+    in
+    let withdraw_proof = Tx_rollup_withdraw.compute_path [withdraw] 0 in
+    (* Execute withdraw *)
+    Op.tx_rollup_withdraw
+      (B b)
+      ~source:account1
+      tx_rollup
+      Tx_rollup_level.root
+      ~context_hash
+      ~contents:(Script.lazy_expr Nat_ticket.contents)
+      ~ty:(Script.lazy_expr Nat_ticket.ty)
+      ~ticketer:account1
+      Nat_ticket.amount
+      ~destination:withdraw_contract
+      withdraw_proof
+      ~message_index:0
+      entrypoint
+    >>=? fun operation ->
+    Block.bake ~operation b >>=? fun b ->
+    (* Execute again *)
+    Incremental.begin_construction b >>=? fun i ->
+    Op.tx_rollup_withdraw
+      (I i)
+      ~source:account1
+      tx_rollup
+      Tx_rollup_level.root
+      ~context_hash
+      ~contents:(Script.lazy_expr Nat_ticket.contents)
+      ~ty:(Script.lazy_expr Nat_ticket.ty)
+      ~ticketer:account1
+      Nat_ticket.amount
+      ~destination:withdraw_contract
+      withdraw_proof
+      ~message_index:0
+      entrypoint
+    >>=? fun operation ->
+    Incremental.add_operation
+      ~expect_failure:
+        (check_proto_error Tx_rollup_errors.Withdraw_already_consumed)
+      i
+      operation
+    >>=? fun _ -> return_unit
+
+  (** [test_invalid_withdraw_someone_elses] asserts that attempting to
+     execute a withdrawal with an erroneous [recipient] creates an
+     incorrect proof.  *)
+  let test_invalid_withdraw_someone_elses () =
+    context_init2_withdraw ()
+    >>=? fun (account1, account2, tx_rollup, withdraw_contract, b) ->
+    let withdraw =
+      Nat_ticket.withdrawal
+        ~ticketer:account1 (* Explicit for clarity *)
+        ~recipient:account1
+        tx_rollup
+    in
+    context_finalize_batch_with_withdrawals
+      ~account:account1
+      ~tx_rollup
+      ~withdrawals:[(0, [withdraw])]
+      b
+    >>=? fun (_commitment, context_hash_list, b) ->
+    let entrypoint = Entrypoint.default in
+    let context_hash =
+      WithExceptions.Option.get ~loc:__LOC__ @@ List.nth context_hash_list 0
+    in
+    let withdraw_proof = Tx_rollup_withdraw.compute_path [withdraw] 0 in
+    (* Execute again *)
+    Incremental.begin_construction b >>=? fun i ->
+    Op.tx_rollup_withdraw
+      (I i)
+      (* The source of the withdrawal execution is not the recipient set in [withdraw] *)
+      ~source:account2
+      tx_rollup
+      Tx_rollup_level.root
+      ~context_hash
+      ~contents:(Script.lazy_expr Nat_ticket.contents)
+      ~ty:(Script.lazy_expr Nat_ticket.ty)
+      ~ticketer:account1
+      Nat_ticket.amount
+      ~destination:withdraw_contract
+      withdraw_proof
+      ~message_index:0
+      entrypoint
+    >>=? fun operation ->
+    Incremental.add_operation
+      ~expect_failure:(check_proto_error Tx_rollup_errors.Withdraw_invalid_path)
+      i
+      operation
+    >>=? fun _ -> return_unit
+
+  (** [test_invalid_withdraw_illtyped_entrypoint] asserts that
+     attempting to withdraw nat tickets to a contract taking unit
+     tickets raises [Bad_contract_parameter]. *)
+  let test_invalid_withdraw_illtyped_entrypoint () =
+    context_init1 () >>=? fun (b, account1) ->
+    originate b account1 >>=? fun (b, tx_rollup) ->
+    Contract_helpers.originate_contract
+      "contracts/tx_rollup_withdraw_unit_tickets.tz"
+      "None"
+      account1
+      b
+      (is_implicit_exn account1)
+    >>=? fun (withdraw_contract_unit_tickets, b) ->
+    let withdraw = Nat_ticket.withdrawal ~ticketer:account1 tx_rollup in
+    context_finalize_batch_with_withdrawals
+      ~account:account1
+      ~tx_rollup
+      ~withdrawals:[(0, [withdraw])]
+      b
+    >>=? fun (_commitment, context_hash_list, b) ->
+    let entrypoint = Entrypoint.default in
+    let context_hash =
+      WithExceptions.Option.get ~loc:__LOC__ @@ List.nth context_hash_list 0
+    in
+    let withdraw_proof = Tx_rollup_withdraw.compute_path [withdraw] 0 in
+    Incremental.begin_construction b >>=? fun i ->
+    Op.tx_rollup_withdraw
+      (I i)
+      ~source:account1
+      tx_rollup
+      Tx_rollup_level.root
+      ~context_hash
+      ~contents:(Script.lazy_expr Nat_ticket.contents)
+      ~ty:(Script.lazy_expr Nat_ticket.ty)
+      ~ticketer:account1
+      Nat_ticket.amount
+      ~destination:withdraw_contract_unit_tickets
+      withdraw_proof
+      ~message_index:0
+      entrypoint
+    >>=? fun operation ->
+    Incremental.add_operation
+      ~expect_failure:
+        (check_proto_error
+       @@ Script_interpreter.Bad_contract_parameter
+            withdraw_contract_unit_tickets)
+      i
+      operation
+    >>=? fun _ -> return_unit
+
+  (** [test_invalid_withdraw_bad_entrypoint] asserts that
+     attempting to withdraw nat tickets to a contract taking unit
+     tickets raises [Bad_contract_parameter]. *)
+  let test_invalid_withdraw_bad_entrypoint () =
+    context_init1_withdraw ()
+    >>=? fun (account1, tx_rollup, withdraw_contract, b) ->
+    let withdraw = Nat_ticket.withdrawal ~ticketer:account1 tx_rollup in
+    context_finalize_batch_with_withdrawals
+      ~account:account1
+      ~tx_rollup
+      ~withdrawals:[(0, [withdraw])]
+      b
+    >>=? fun (_commitment, context_hash_list, b) ->
+    let inexistant_entrypoint = Entrypoint.of_string_strict_exn "foobar" in
+    let context_hash =
+      WithExceptions.Option.get ~loc:__LOC__ @@ List.nth context_hash_list 0
+    in
+    let withdraw_proof = Tx_rollup_withdraw.compute_path [withdraw] 0 in
+    Incremental.begin_construction b >>=? fun i ->
+    Op.tx_rollup_withdraw
+      (I i)
+      ~source:account1
+      tx_rollup
+      Tx_rollup_level.root
+      ~context_hash
+      ~contents:(Script.lazy_expr Nat_ticket.contents)
+      ~ty:(Script.lazy_expr Nat_ticket.ty)
+      ~ticketer:account1
+      Nat_ticket.amount
+      ~destination:withdraw_contract
+      withdraw_proof
+      ~message_index:0
+      inexistant_entrypoint
+    >>=? fun operation ->
+    Incremental.add_operation
+      ~expect_failure:
+        (check_proto_error
+       @@ Script_interpreter.Bad_contract_parameter withdraw_contract)
+      i
+      operation
+    >>=? fun _ -> return_unit
+
+  (** [test_invalid_message_index] checks that attempting to withdraw from a
+      level with a wrong message index raises an error. *)
+  let test_invalid_message_index () =
+    context_init1_withdraw ()
+    >>=? fun (account1, tx_rollup, withdraw_contract, b) ->
+    (* 1. Create and submit two dummy batch *)
+    let batch1 = "batch" in
+    Op.tx_rollup_submit_batch (B b) account1 tx_rollup batch1
+    >>=? fun operation ->
+    Block.bake ~operation b >>=? fun b ->
+    (* 2.1 Create a ticket and its hash *)
+    let ty = Expr.from_string "nat" in
+    let contents_nat = 1 in
+    let contents = Expr.from_string (string_of_int contents_nat) in
+    let amount = Tx_rollup_l2_qty.of_int64_exn 10L in
+    let ticket_hash =
+      make_ticket_key
+        ~ty:(Tezos_micheline.Micheline.root ty)
+        ~contents:(Tezos_micheline.Micheline.root contents)
+        ~ticketer:account1
+        tx_rollup
+    in
+
+    (* 2.2 Create a withdrawal for the ticket *)
+    let withdraw : Tx_rollup_withdraw.t =
+      {claimer = is_implicit_exn account1; ticket_hash; amount}
+    in
+
+    (* 2.3 Finally, make a commitment for the dummy batch.  mock the
+       list of withdrawals to include the previously created
+       [withdrawal]. Include the commitment in an operation and bake
+       it. *)
+    Incremental.begin_construction b >>=? fun i ->
+    make_commitment_for_batch i Tx_rollup_level.root tx_rollup [(0, [withdraw])]
+    >>=? fun (commitment, context_hash_list) ->
+    Op.tx_rollup_commit (I i) account1 tx_rollup commitment
+    >>=? fun operation ->
+    Incremental.add_operation i operation >>=? fun i ->
+    Incremental.finalize_block i >>=? fun b ->
+    (* 3. Finalize the commitment *)
+    Op.tx_rollup_finalize (B b) account1 tx_rollup >>=? fun operation ->
+    Block.bake ~operation b >>=? fun b ->
+    (* -- At this point, everything is in place for
+       the user to execute the withdrawal -- *)
+
+    (* 4. Now execute the withdrawal. The ticket should be received
+       by withdraw_contract at the default entrypoint. *)
+    (let entrypoint = Entrypoint.default in
+     let context_hash =
+       WithExceptions.Option.get ~loc:__LOC__ @@ List.nth context_hash_list 0
+     in
+     let withdraw_proof = Tx_rollup_withdraw.compute_path [withdraw] 0 in
+     Op.tx_rollup_withdraw
+       (B b)
+       ~source:account1
+       tx_rollup
+       Tx_rollup_level.root
+       ~context_hash
+       ~contents:(Script.lazy_expr contents)
+       ~ty:(Script.lazy_expr ty)
+       ~ticketer:account1
+       amount
+       ~destination:withdraw_contract
+       withdraw_proof
+       ~message_index:1
+       entrypoint)
+    >>=? fun operation ->
+    Incremental.begin_construction b >>=? fun i ->
+    (* 5. try with wrong message_index *)
+    Incremental.add_operation
+      ~expect_failure:(check_proto_error Tx_rollup_errors.Withdraw_invalid_path)
+      i
+      operation
+    >>=? fun _i -> return_unit
+
+  (** [test_too_late_withdrawal] checks that attempting to withdraw from a
+      level of a commitment already removed fails. *)
+  let test_too_late_withdrawal () =
+    context_init1_withdraw ()
+    >>=? fun (account1, tx_rollup, withdraw_contract, b) ->
+    let withdraw = Nat_ticket.withdrawal ~ticketer:account1 tx_rollup in
+    context_finalize_batch_with_withdrawals
+      ~account:account1
+      ~tx_rollup
+      ~withdrawals:[(0, [withdraw])]
+      b
+    >>=? fun (_commitment, context_hash_list, b) ->
+    (* Remove the commitment *)
+    Op.tx_rollup_remove_commitment (B b) account1 tx_rollup
+    >>=? fun operation ->
+    Block.bake ~operation b >>=? fun b ->
+    (* At this point, the withdrawal can no longer be executed *)
+    (let entrypoint = Entrypoint.default in
+     let context_hash =
+       WithExceptions.Option.get ~loc:__LOC__ @@ List.nth context_hash_list 0
+     in
+     let withdraw_proof = Tx_rollup_withdraw.compute_path [withdraw] 0 in
+     Op.tx_rollup_withdraw
+       (B b)
+       ~source:account1
+       tx_rollup
+       Tx_rollup_level.root
+       ~context_hash
+       ~contents:(Script.lazy_expr Nat_ticket.contents)
+       ~ty:(Script.lazy_expr Nat_ticket.ty)
+       ~ticketer:account1
+       Nat_ticket.amount
+       ~destination:withdraw_contract
+       withdraw_proof
+       ~message_index:0
+       entrypoint)
+    >>=? fun operation ->
+    Incremental.begin_construction b >>=? fun i ->
+    (* 5. try with correct withdraw but too late *)
+    Incremental.add_operation
+      ~expect_failure:
+        (check_proto_error_f @@ function
+         | Tx_rollup_errors.No_finalized_commitment_for_level
+             {level; window = None} ->
+             Tx_rollup_level.(level = root)
+         | _error -> false)
+      i
+      operation
+    >>=? fun _i -> return_unit
+
+  (** [test_withdrawal_accounting_is_cleaned_up_after_removal]
+      Check that withdrawal accounting is cleaned
+      up along with the commitment.
+   *)
+  let test_withdrawal_accounting_is_cleaned_up_after_removal () =
+    let open Error_monad_operators in
+    context_init1_withdraw ()
+    >>=? fun (account1, tx_rollup, withdraw_contract, b) ->
+    let assert_consumed b ~msg consumed_expected =
+      Incremental.begin_construction b >>=? fun i ->
+      let ctxt = Incremental.alpha_ctxt i in
+      Alpha_context.Tx_rollup_withdraw.mem
+        ctxt
+        tx_rollup
+        Tx_rollup_level.root
+        ~message_index:0
+        ~withdraw_index:0
+      >>=?? fun (consumed_actual, _) ->
+      Alcotest.(check bool msg consumed_expected consumed_actual) ;
+      return_unit
+    in
+
+    let withdraw = Nat_ticket.withdrawal ~ticketer:account1 tx_rollup in
+    context_finalize_batch_with_withdrawals
+      ~account:account1
+      ~tx_rollup
+      ~withdrawals:[(0, [withdraw])]
+      b
+    >>=? fun (_commitment, context_hash_list, b) ->
+    assert_consumed b ~msg:"should not be consumed before withdrawal" false
+    >>=? fun () ->
+    (* Exexute with withdrawal *)
+    (let entrypoint = Entrypoint.default in
+     let context_hash =
+       WithExceptions.Option.get ~loc:__LOC__ @@ List.nth context_hash_list 0
+     in
+     let withdraw_proof = Tx_rollup_withdraw.compute_path [withdraw] 0 in
+     Op.tx_rollup_withdraw
+       (B b)
+       ~source:account1
+       tx_rollup
+       Tx_rollup_level.root
+       ~context_hash
+       ~contents:(Script.lazy_expr Nat_ticket.contents)
+       ~ty:(Script.lazy_expr Nat_ticket.ty)
+       ~ticketer:account1
+       Nat_ticket.amount
+       ~destination:withdraw_contract
+       withdraw_proof
+       ~message_index:0
+       entrypoint)
+    >>=? fun operation ->
+    Block.bake ~operation b >>=? fun b ->
+    assert_consumed b ~msg:"should be consumed after withdrawal" true
+    >>=? fun () ->
+    (* Remove the commitment *)
+    Op.tx_rollup_remove_commitment (B b) account1 tx_rollup
+    >>=? fun operation ->
+    Block.bake ~operation b >>=? fun b ->
+    assert_consumed
+      b
+      ~msg:"consumtion memory should be removed with commitment"
+      false
+    >>=? fun () -> return_unit
+
+  let tests =
+    [
+      Tztest.tztest "Test withdraw" `Quick test_valid_withdraw;
+      Tztest.tztest
+        "Test withdraw w/ missing commitment"
+        `Quick
+        test_invalid_withdraw_no_commitment;
+      Tztest.tztest
+        "Test withdraw w/ missing withdraw in commitment"
+        `Quick
+        test_invalid_withdraw_missing_withdraw_in_commitment;
+      Tztest.tztest
+        "Test withdraw w/ invalid amount"
+        `Quick
+        test_invalid_withdraw_tickets;
+      Tztest.tztest
+        "Test withdraw w/ invalid proof"
+        `Quick
+        test_invalid_withdraw_invalid_proof;
+      Tztest.tztest
+        "Test withdraw twice"
+        `Quick
+        test_invalid_withdraw_already_consumed;
+      Tztest.tztest
+        "Test withdraw someone elses's withdraw"
+        `Quick
+        test_invalid_withdraw_someone_elses;
+      Tztest.tztest
+        "Test withdraw with an ill-typed entrypoint"
+        `Quick
+        test_invalid_withdraw_illtyped_entrypoint;
+      Tztest.tztest
+        "Test withdraw with missing entrypoint"
+        `Quick
+        test_invalid_withdraw_bad_entrypoint;
+      Tztest.tztest
+        "Test withdraw w/ an invalid message index"
+        `Quick
+        test_invalid_message_index;
+      Tztest.tztest "Test withdrawing too late" `Quick test_too_late_withdrawal;
+      Tztest.tztest
+        "Test withdrawing is cleaned up after removal"
+        `Quick
+        test_withdrawal_accounting_is_cleaned_up_after_removal;
+    ]
+end
+
 let tests =
   [
     Tztest.tztest
@@ -1250,3 +2152,4 @@ let tests =
       test_too_many_commitments;
     Tztest.tztest "Test bond finalization" `Quick test_bond_finalization;
   ]
+  @ Withdraw.tests

@@ -299,3 +299,42 @@ val tx_rollup_remove_commitment :
   Contract.t ->
   Tx_rollup.t ->
   Operation.packed tzresult Lwt.t
+
+(** [tx_rollup_withdraw] executes a tx rollup withdrawal.
+
+    The arguments are:
+
+    - [Context.t]: the context on which to apply the operation
+    - [source:Contract.t]: the source contract of the operation
+    - [Tx_rollup.t]: the rollup to which the withdrawal pertains
+    - [Tx_rollup_level.t]: the level on which the withdrawal was commited
+    - [context_hash:bytes]: the hash of the context of the rollup when the withdrawal was commited
+    - [message_index:int]: the inbox index of the message that that emitted this withdrawal
+    - [contents:Script.lazy_expr]: the contents of the ticket of the withdrawal
+    - [ty:Script.lazy_expr]: the type of the ticket of the withdrawal
+    - [ticketer:Contract.t]: the ticketer of the ticket of the withdrawal
+    - [Tx_rollup_l2_qty.t]: the qty of the ticket of the withdrawal
+    - [destination:Contract.t]: the destination contract that should received the ticket of the withdrawal
+    - [Tx_rollup_withdraw.merkle_tree_path]: the proof that this withdrawal was contained in the commitment
+    - [Entrypoint_repr.t]: the entrypoint of the destination contract to which the ticket should be sent
+
+ *)
+val tx_rollup_withdraw :
+  ?counter:counter ->
+  ?fee:Tez.t ->
+  ?gas_limit:Gas.Arith.integral ->
+  ?storage_limit:counter ->
+  Context.t ->
+  source:Contract.t ->
+  Tx_rollup.t ->
+  Tx_rollup_level.t ->
+  context_hash:bytes ->
+  message_index:int ->
+  contents:Script.lazy_expr ->
+  ty:Script.lazy_expr ->
+  ticketer:Contract.t ->
+  Tx_rollup_l2_qty.t ->
+  destination:Contract.t ->
+  Tx_rollup_withdraw.merkle_tree_path ->
+  Entrypoint_repr.t ->
+  (packed_operation, tztrace) result Lwt.t
