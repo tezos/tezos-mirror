@@ -936,7 +936,11 @@ let rev_concat_map_s f xs =
         let* ys = f x in
         (aux [@ocaml.tailcall]) f (rev_append ys acc) xs
   in
-  aux f [] xs
+  match xs with
+  | [] -> return_nil
+  | x :: xs ->
+      let* ys = Lwt.apply f x in
+      (aux [@ocaml.tailcall]) f (rev ys) xs
 
 let concat_map_s f xs =
   let open Lwt_syntax in
@@ -966,7 +970,11 @@ let rev_concat_map_es f xs =
         let* ys = f x in
         (aux [@ocaml.tailcall]) f (rev_append ys acc) xs
   in
-  aux f [] xs
+  match xs with
+  | [] -> return_nil
+  | x :: xs ->
+      let* ys = Lwt.apply f x in
+      (aux [@ocaml.tailcall]) f (rev ys) xs
 
 let concat_map_es f xs =
   let open Lwt_result_syntax in
