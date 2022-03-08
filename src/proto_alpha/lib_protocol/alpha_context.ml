@@ -263,6 +263,7 @@ end
 
 module Tx_rollup_withdraw = struct
   include Tx_rollup_withdraw_repr
+  include Tx_rollup_withdraw_storage
 end
 
 module Tx_rollup_message = struct

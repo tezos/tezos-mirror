@@ -132,6 +132,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    global_constants_costs.mli global_constants_costs.ml
    global_constants_storage.mli global_constants_storage.ml
    tx_rollup_state_storage.mli tx_rollup_state_storage.ml
+   tx_rollup_withdraw_storage.mli tx_rollup_withdraw_storage.ml
    tx_rollup_inbox_storage.mli tx_rollup_inbox_storage.ml
    tx_rollup_commitment_storage.mli tx_rollup_commitment_storage.ml
    tx_rollup_storage.mli tx_rollup_storage.ml
@@ -301,6 +302,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    global_constants_costs.mli global_constants_costs.ml
    global_constants_storage.mli global_constants_storage.ml
    tx_rollup_state_storage.mli tx_rollup_state_storage.ml
+   tx_rollup_withdraw_storage.mli tx_rollup_withdraw_storage.ml
    tx_rollup_inbox_storage.mli tx_rollup_inbox_storage.ml
    tx_rollup_commitment_storage.mli tx_rollup_commitment_storage.ml
    tx_rollup_storage.mli tx_rollup_storage.ml
@@ -470,6 +472,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    global_constants_costs.mli global_constants_costs.ml
    global_constants_storage.mli global_constants_storage.ml
    tx_rollup_state_storage.mli tx_rollup_state_storage.ml
+   tx_rollup_withdraw_storage.mli tx_rollup_withdraw_storage.ml
    tx_rollup_inbox_storage.mli tx_rollup_inbox_storage.ml
    tx_rollup_commitment_storage.mli tx_rollup_commitment_storage.ml
    tx_rollup_storage.mli tx_rollup_storage.ml
@@ -661,6 +664,7 @@ include Tezos_raw_protocol_alpha.Main
    Global_constants_costs
    Global_constants_storage
    Tx_rollup_state_storage
+   Tx_rollup_withdraw_storage
    Tx_rollup_inbox_storage
    Tx_rollup_commitment_storage
    Tx_rollup_storage
@@ -871,6 +875,7 @@ include Tezos_raw_protocol_alpha.Main
    global_constants_costs.mli global_constants_costs.ml
    global_constants_storage.mli global_constants_storage.ml
    tx_rollup_state_storage.mli tx_rollup_state_storage.ml
+   tx_rollup_withdraw_storage.mli tx_rollup_withdraw_storage.ml
    tx_rollup_inbox_storage.mli tx_rollup_inbox_storage.ml
    tx_rollup_commitment_storage.mli tx_rollup_commitment_storage.ml
    tx_rollup_storage.mli tx_rollup_storage.ml

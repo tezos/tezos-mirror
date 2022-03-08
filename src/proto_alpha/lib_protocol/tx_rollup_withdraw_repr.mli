@@ -71,6 +71,29 @@ val merkelize_list : t list -> withdrawals_merkle_root
    [withdrawal_list]. *)
 val compute_path : t list -> int -> merkle_tree_path
 
-(** [check_path path withdrawal] returns the [list_hash] computed for
-    [withdrawal] and the index on the list. *)
-val check_path : path -> t -> list_hash * int
+(** [check_path merkle_tree_path withdrawal] returns the
+   [withdrawals_merkle_root] computed for [withdrawal] and the index
+   on the list. *)
+val check_path : merkle_tree_path -> t -> withdrawals_merkle_root * int
+
+(** [Withdrawal_accounting] provides an interface for the storage to
+   account for which withdrawals (as identified by their index) have
+   been consumed. *)
+module Withdrawal_accounting : sig
+  type t
+
+  val encoding : t Data_encoding.t
+
+  (** The state of withdrawal accounting where no
+      withdrawals have been consumed. *)
+  val empty : t
+
+  (** [get l index] returns [true] if the withdrawal identified by
+      [index] has been been consumed (as registered through
+      {!Withdrawal_accounting.set}). Fails when [index] is negative. *)
+  val get : t -> int -> bool tzresult
+
+  (** [set l index] registers that the withdrawal identified by
+      [index] has been consumed. Fails when [index] is negative. *)
+  val set : t -> int -> t tzresult
+end

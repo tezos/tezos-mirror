@@ -30,9 +30,6 @@ let just_ctxt (ctxt, _, _) = ctxt
 open Tx_rollup_commitment_repr
 open Tx_rollup_errors_repr
 
-(* This indicates a programming error. *)
-type error += (*`Temporary*) Commitment_bond_negative of int
-
 let adjust_unfinalized_commitments_count ctxt tx_rollup pkh
     ~(dir : [`Incr | `Decr]) =
   let delta = match dir with `Incr -> 1 | `Decr -> -1 in
@@ -84,6 +81,32 @@ let get :
     Lwt.t =
  fun ctxt tx_rollup level ->
   find ctxt tx_rollup level >>=? fun (ctxt, commitment) ->
+  match commitment with
+  (* TODO: why not use directly `.get` and get the default error for a missing key ? *)
+  | None -> fail @@ Tx_rollup_errors_repr.Commitment_does_not_exist level
+  | Some commitment -> return (ctxt, commitment)
+
+let get_finalized :
+    Raw_context.t ->
+    Tx_rollup_repr.t ->
+    Tx_rollup_level_repr.t ->
+    (Raw_context.t * Tx_rollup_commitment_repr.Submitted_commitment.t) tzresult
+    Lwt.t =
+ fun ctxt tx_rollup level ->
+  Tx_rollup_state_storage.assert_exist ctxt tx_rollup >>=? fun ctxt ->
+  Storage.Tx_rollup.State.get ctxt tx_rollup >>=? fun (ctxt, state) ->
+  Tx_rollup_state_repr.finalized_commitments_range state >>?= fun window ->
+  (match window with
+  | Some (first, last) ->
+      error_unless
+        Tx_rollup_level_repr.(first <= level && level <= last)
+        (Tx_rollup_errors_repr.No_finalized_commitment_for_level {level; window})
+  | None ->
+      error
+        (Tx_rollup_errors_repr.No_finalized_commitment_for_level {level; window}))
+  >>?= fun () ->
+  Storage.Tx_rollup.Commitment.find ctxt (level, tx_rollup)
+  >>=? fun (ctxt, commitment) ->
   match commitment with
   | None -> fail @@ Tx_rollup_errors_repr.Commitment_does_not_exist level
   | Some commitment -> return (ctxt, commitment)

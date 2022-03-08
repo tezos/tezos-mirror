@@ -154,6 +154,18 @@ let hash c =
   let bytes = Data_encoding.Binary.to_bytes_exn encoding c in
   Commitment_hash.hash_bytes [bytes]
 
+let check_batch_commitment :
+    t ->
+    context_hash:bytes ->
+    Tx_rollup_withdraw_repr.withdrawals_merkle_root ->
+    message_index:int ->
+    bool =
+ fun {batches; _} ~context_hash withdraw_merkle_root ~message_index ->
+  let computed = batch_commitment context_hash withdraw_merkle_root in
+  match List.nth batches message_index with
+  | Some expected -> Message_result_hash.(computed = expected)
+  | None -> false
+
 module Index = struct
   type t = Commitment_hash.t
 

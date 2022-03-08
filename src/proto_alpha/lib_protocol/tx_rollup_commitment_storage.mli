@@ -87,6 +87,17 @@ val get :
   (Raw_context.t * Tx_rollup_commitment_repr.Submitted_commitment.t) tzresult
   Lwt.t
 
+(** [get_finalized context tx_rollup level] returns the
+    commitment for a level, if any exists and is finalized. If the rollup does not
+    exist, the error [Tx_rollup_does_not_exist] is returned. If the commitment
+    is not finalized the error [Tx_rollup_commitment_not_final] is returned *)
+val get_finalized :
+  Raw_context.t ->
+  Tx_rollup_repr.t ->
+  Tx_rollup_level_repr.t ->
+  (Raw_context.t * Tx_rollup_commitment_repr.Submitted_commitment.t) tzresult
+  Lwt.t
+
 (** [pending_bonded_commitments ctxt tx_rollup contract] returns the
     number of commitments that [contract] has made that are still
     pending (that is, still subject to rejection). *)

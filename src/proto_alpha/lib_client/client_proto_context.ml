@@ -871,7 +871,10 @@ let submit_tx_rollup_commitment (cctxt : #full) ~chain ~block ?confirmations
     (fun root ->
       match Hex.to_bytes (`Hex root) with
       | Some content ->
-          return @@ Tx_rollup_commitment.Message_result_hash.hash content []
+          return
+          @@ Tx_rollup_commitment.batch_commitment
+               content
+               (Tx_rollup_withdraw.merkelize_list [])
       | None ->
           failwith
             "%s is not a valid binary text encoded using the hexadecimal \

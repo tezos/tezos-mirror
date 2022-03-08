@@ -113,6 +113,7 @@
         "Global_constants_costs",
         "Global_constants_storage",
         "Tx_rollup_state_storage",
+        "Tx_rollup_withdraw_storage",
         "Tx_rollup_inbox_storage",
         "Tx_rollup_commitment_storage",
         "Tx_rollup_storage",

@@ -161,6 +161,14 @@ val record_commitment_deletion :
   Tx_rollup_commitment_repr.Commitment_hash.t ->
   t tzresult
 
+(** [finalized_commitments_range state] returns the window of finalized
+    commitments that have not yet been cleaned out
+
+    This function returns an [Internal_error] if the state is inconsistent, 
+    which should not be possible. *)
+val finalized_commitments_range :
+  t -> (Tx_rollup_level_repr.t * Tx_rollup_level_repr.t) option tzresult
+
 module Internal_for_tests : sig
   (** [make] returns a state for tests *)
   val make :
