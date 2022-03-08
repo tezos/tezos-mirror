@@ -199,6 +199,7 @@ val import :
   dst_store_dir:string ->
   dst_context_dir:string ->
   chain_name:Distributed_db_version.Name.t ->
+  configured_history_mode:History_mode.t option ->
   user_activated_upgrades:User_activated.upgrades ->
   user_activated_protocol_overrides:User_activated.protocol_overrides ->
   Genesis.t ->

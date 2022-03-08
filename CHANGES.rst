@@ -55,6 +55,10 @@ Node
   upgrade is instantaneous. However, be careful that previous versions of Octez
   will refuse to run on a data directory which was used with Octez 12.0.
 
+- Added a check to ensure the consistency between the imported
+  snapshot history mode and the one stored in the targeted data
+  directory configuration file.
+
 Client
 ------
 
