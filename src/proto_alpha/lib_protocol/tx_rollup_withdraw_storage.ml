@@ -72,3 +72,21 @@ let mem :
   >>?= fun consumed_withdraw_opt ->
   let already_consumed = Option.value ~default:false consumed_withdraw_opt in
   return (already_consumed, ctxt)
+
+let remove :
+    Raw_context.t ->
+    Tx_rollup_repr.t ->
+    Tx_rollup_level_repr.t ->
+    inbox_length:int32 ->
+    Raw_context.t tzresult Lwt.t =
+ fun ctxt rollup level ~inbox_length ->
+  let rec remove_withdrawal_accounting ctxt i len =
+    if Compare.Int32.(i < len) then
+      Storage.Tx_rollup.Consumed_withdraw.remove ((ctxt, level), rollup) i
+      >>=? fun (ctxt, _, _) ->
+      remove_withdrawal_accounting ctxt (Int32.succ i) len
+    else return ctxt
+  in
+  (* for each message in the inbox, the storage contains one set of
+     executed withdrawals that should be removed *)
+  remove_withdrawal_accounting ctxt 0l inbox_length

@@ -262,6 +262,12 @@ let remove_commitment ctxt rollup state =
       (* We remove the commitment *)
       Storage.Tx_rollup.Commitment.remove ctxt (tail, rollup)
       >>=? fun (ctxt, _freed_size, _existed) ->
+      let inbox_length =
+        (* safe because inbox cannot be more than int32 *)
+        Int32.of_int @@ List.length commitment.commitment.batches
+      in
+      Tx_rollup_withdraw_storage.remove ctxt rollup tail ~inbox_length
+      >>=? fun ctxt ->
       (* We update the state *)
       Tx_rollup_state_repr.record_commitment_deletion
         state

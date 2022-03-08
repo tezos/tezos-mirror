@@ -47,3 +47,15 @@ val mem :
   message_index:int ->
   withdraw_index:int ->
   (bool * Raw_context.t) tzresult Lwt.t
+
+(** [remove ctxt tx_rollup lvl] removes all withdrawal accounting for
+    [tx_rollup] at [lvl]. This must not be called before the
+    corresponding commitment is deleted. Otherwise, it would be
+    possible to retrieve the same withdrawal multiple times. This
+    function consumes gas and so returns a new context.  *)
+val remove :
+  Raw_context.t ->
+  Tx_rollup_repr.t ->
+  Tx_rollup_level_repr.t ->
+  inbox_length:int32 ->
+  Raw_context.t tzresult Lwt.t
