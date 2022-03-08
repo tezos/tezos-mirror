@@ -14,13 +14,21 @@
             tezos-client-base-unix
             tezos-client-commands
             tezos-client-alpha
+            tezos-context.encoding
+            tezos-context.helpers
             tezos-protocol-alpha-parameters
             tezos-protocol-plugin-alpha
             tezos-rpc
             tezos-rpc-http
             tezos-rpc-http-server
+            tezos-shell-services
             tezos-sc-rollup-alpha
-            )
+            data-encoding
+            irmin-pack
+            irmin-pack.unix
+            irmin
+            ringo
+            ringo-lwt)
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_client_commands
                    -open Tezos_stdlib_unix
@@ -31,5 +39,6 @@
                    -open Tezos_protocol_plugin_alpha
                    -open Tezos_protocol_alpha_parameters
                    -open Tezos_rpc
+                   -open Tezos_shell_services
                    -open Tezos_sc_rollup_alpha
                    )))

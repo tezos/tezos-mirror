@@ -14,10 +14,16 @@ depends: [
   "tezos-rpc"
   "tezos-rpc-http"
   "tezos-rpc-http-server"
+  "tezos-shell-services"
   "tezos-sc-rollup-alpha"
   "tezos-protocol-alpha"
   "tezos-protocol-alpha-parameters"
   "tezos-protocol-plugin-alpha"
+  "data-encoding"
+  "irmin"
+  "irmin-pack"
+  "ringo"
+  "ringo-lwt"
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]

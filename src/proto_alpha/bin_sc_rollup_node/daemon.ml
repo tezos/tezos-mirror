@@ -23,22 +23,43 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* For the moment, the daemon does nothing. *)
-let daemonize () = Lwt_utils.never_ending ()
+let on_layer_1_chain_event cctxt chain_event = Inbox.update cctxt chain_event
 
-let install_finalizer rpc_server =
+let iter_stream stream handle =
+  let rec go () =
+    Lwt.bind (Lwt_stream.get stream) @@ fun tok ->
+    match tok with
+    | None -> return_unit
+    | Some element -> Lwt_result.bind (handle element) go
+  in
+  go ()
+
+let daemonize cctxt store layer_1_chain_events =
+  Lwt.no_cancel
+  @@ iter_stream layer_1_chain_events
+  @@ on_layer_1_chain_event cctxt store
+
+let install_finalizer store rpc_server =
+  let open Lwt_syntax in
   Lwt_exit.register_clean_up_callback ~loc:__LOC__ @@ fun exit_status ->
-  RPC_server.shutdown rpc_server >>= fun () ->
-  Event.shutdown_node exit_status >>= Tezos_base_unix.Internal_event_unix.close
+  let* () = RPC_server.shutdown rpc_server in
+  let* () = Store.close store in
+  let* () = Event.shutdown_node exit_status in
+  Tezos_base_unix.Internal_event_unix.close ()
 
 let run ~data_dir (cctxt : Protocol_client_context.full) =
+  let open Lwt_tzresult_syntax in
   let start () =
-    Event.starting_node () >>= fun () ->
-    Configuration.load ~data_dir >>=? fun configuration ->
-    let Configuration.{rpc_addr; rpc_port; _} = configuration in
-    Layer1.start configuration cctxt >>=? fun () ->
-    RPC_server.start configuration >>=? fun rpc_server ->
-    let _ = install_finalizer rpc_server in
-    Event.node_is_ready ~rpc_addr ~rpc_port >>= daemonize
+    let*! () = Event.starting_node () in
+    let* configuration = Configuration.load ~data_dir in
+    let open Configuration in
+    let {rpc_addr; rpc_port; sc_rollup_address; _} = configuration in
+    let*! store = Store.load configuration in
+    let* tezos_heads = Layer1.start configuration cctxt store in
+    let*! () = Inbox.start store sc_rollup_address in
+    let* rpc_server = RPC_server.start store configuration in
+    let _ = install_finalizer store rpc_server in
+    let*! () = Event.node_is_ready ~rpc_addr ~rpc_port in
+    daemonize cctxt store tezos_heads
   in
-  Lwt.catch start fail_with_exn
+  start ()

@@ -2447,15 +2447,81 @@ module Sc_rollup : sig
 
     val encoding : t Data_encoding.t
 
-    type history
-
-    val history_encoding : history Data_encoding.t
-
     val empty : Address.t -> Raw_level.t -> t
 
     val number_of_available_messages : t -> Z.t
 
     val consume_n_messages : int -> t -> t option tzresult
+
+    module type MerkelizedOperations = sig
+      type tree
+
+      type message = tree
+
+      type messages = tree
+
+      type history
+
+      val history_encoding : history Data_encoding.t
+
+      val pp_history : Format.formatter -> history -> unit
+
+      val history_at_genesis : bound:int64 -> history
+
+      val add_messages :
+        history ->
+        t ->
+        Raw_level.t ->
+        string list ->
+        messages ->
+        (messages * history * t) tzresult Lwt.t
+
+      val add_messages_no_history :
+        t ->
+        Raw_level_repr.t ->
+        string list ->
+        message ->
+        (message * t, error trace) result Lwt.t
+
+      val get_message : messages -> Z.t -> message option Lwt.t
+
+      val get_message_payload : messages -> Z.t -> string option Lwt.t
+
+      type inclusion_proof
+
+      val pp_inclusion_proof : Format.formatter -> inclusion_proof -> unit
+
+      val number_of_proof_steps : inclusion_proof -> int
+
+      val produce_inclusion_proof : history -> t -> t -> inclusion_proof option
+
+      val verify_inclusion_proof : inclusion_proof -> t -> t -> bool
+    end
+
+    include MerkelizedOperations with type tree = Context.tree
+
+    module type TREE = sig
+      type t
+
+      type tree
+
+      type key = string list
+
+      type value = bytes
+
+      val find : tree -> key -> value option Lwt.t
+
+      val find_tree : tree -> key -> tree option Lwt.t
+
+      val add : tree -> key -> value -> tree Lwt.t
+
+      val is_empty : tree -> bool
+
+      val hash : tree -> Context_hash.t
+    end
+
+    module MakeHashingScheme (Tree : TREE) :
+      MerkelizedOperations with type tree = Tree.tree
   end
 
   val rpc_arg : t RPC_arg.t

@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,34 +23,64 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Tezos_rpc
-open Protocol
-open Alpha_context
+module Simple = struct
+  include Internal_event.Simple
 
-let sc_rollup_address () =
-  RPC_service.get_service
-    ~description:"Smart-contract rollup address"
-    ~query:RPC_query.empty
-    ~output:Sc_rollup.Address.encoding
-    RPC_path.(open_root / "sc_rollup_address")
+  let section = ["sc_rollup_node"; "layer_1"]
 
-let current_tezos_head () =
-  RPC_service.get_service
-    ~description:"Tezos head known to the smart-contract rollup node"
-    ~query:RPC_query.empty
-    ~output:(Data_encoding.option Block_hash.encoding)
-    RPC_path.(open_root / "tezos_head")
+  let starting =
+    declare_0
+      ~section
+      ~name:"sc_rollup_node_layer_1_starting"
+      ~msg:"Starting layer 1 tracker of the smart contract rollup node"
+      ~level:Notice
+      ()
 
-let current_tezos_level () =
-  RPC_service.get_service
-    ~description:"Tezos level known to the smart-contract rollup node"
-    ~query:RPC_query.empty
-    ~output:(Data_encoding.option Data_encoding.int32)
-    RPC_path.(open_root / "tezos_level")
+  let stopping =
+    declare_0
+      ~section
+      ~name:"sc_rollup_node_layer_1_stopping"
+      ~msg:"Stopping layer 1 tracker of the smart contract rollup node"
+      ~level:Notice
+      ()
 
-let current_inbox () =
-  RPC_service.get_service
-    ~description:"Current inbox"
-    ~query:RPC_query.empty
-    ~output:Sc_rollup.Inbox.encoding
-    RPC_path.(open_root / "inbox")
+  let setting_new_head =
+    declare_2
+      ~section
+      ~name:"sc_rollup_node_layer_1_new_head"
+      ~msg:"Setting layer 1 head to {hash} at level {level}"
+      ~level:Notice
+      ("hash", Block_hash.encoding)
+      ("level", Data_encoding.int32)
+
+  let rollback =
+    declare_2
+      ~section
+      ~name:"sc_rollup_node_layer_1_rollback"
+      ~msg:"Rolling back layer 1 head to {hash} at level {level}"
+      ~level:Notice
+      ("hash", Block_hash.encoding)
+      ("level", Data_encoding.int32)
+
+  let reacting_to_reorganization =
+    declare_2
+      ~section
+      ~name:"sc_rollup_node_layer_1_reorganization"
+      ~msg:
+        "Reacting to layer 1 reorganization: rollback to {rollback_hash}, \
+         process {new_blocks}"
+      ~level:Notice
+      ("rollback_hash", Block_hash.encoding)
+      ("new_blocks", Data_encoding.list Block_hash.encoding)
+end
+
+let starting = Simple.(emit starting)
+
+let stopping = Simple.(emit stopping)
+
+let setting_new_head hash level = Simple.(emit setting_new_head (hash, level))
+
+let reacting_to_reorganization h hs =
+  Simple.(emit reacting_to_reorganization (h, hs))
+
+let rollback h hs = Simple.(emit rollback (h, hs))

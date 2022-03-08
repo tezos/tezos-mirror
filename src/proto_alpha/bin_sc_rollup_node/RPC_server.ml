@@ -33,14 +33,38 @@ let register_sc_rollup_address configuration dir =
     (Sc_rollup_services.sc_rollup_address ())
     (fun () () -> return @@ configuration.Configuration.sc_rollup_address)
 
-let register configuration =
-  RPC_directory.empty |> register_sc_rollup_address configuration
+let register_current_tezos_head store dir =
+  RPC_directory.register0
+    dir
+    (Sc_rollup_services.current_tezos_head ())
+    (fun () () -> Layer1.current_head_hash store >>= return)
 
-let start configuration =
+let register_current_tezos_level store dir =
+  RPC_directory.register0
+    dir
+    (Sc_rollup_services.current_tezos_level ())
+    (fun () () -> Layer1.current_level store >>= return)
+
+let register_current_inbox store dir =
+  RPC_directory.opt_register0
+    dir
+    (Sc_rollup_services.current_inbox ())
+    (fun () () ->
+      Layer1.current_head_hash store >>= function
+      | Some head_hash -> Inbox.inbox_of_hash store head_hash >>= return_some
+      | None -> return None)
+
+let register store configuration =
+  RPC_directory.empty
+  |> register_sc_rollup_address configuration
+  |> register_current_tezos_head store
+  |> register_current_inbox store
+
+let start store configuration =
   let Configuration.{rpc_addr; rpc_port; _} = configuration in
   let rpc_addr = P2p_addr.of_string_exn rpc_addr in
   let host = Ipaddr.V6.to_string rpc_addr in
-  let dir = register configuration in
+  let dir = register store configuration in
   let node = `TCP (`Port rpc_port) in
   let acl = RPC_server.Acl.default rpc_addr in
   Lwt.catch

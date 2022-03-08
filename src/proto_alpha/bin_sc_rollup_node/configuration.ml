@@ -62,10 +62,12 @@ let encoding : t Data_encoding.t =
        (dft "rpc-port" ~description:"RPC port" int16 default_rpc_port))
 
 let save config =
+  let open Lwt_syntax in
   let json = Data_encoding.Json.construct encoding config in
-  Lwt_utils_unix.create_dir config.data_dir >>= fun () ->
+  let* () = Lwt_utils_unix.create_dir config.data_dir in
   Lwt_utils_unix.Json.write_file (filename config) json
 
 let load ~data_dir =
-  Lwt_utils_unix.Json.read_file (relative_filename data_dir) >>=? fun json ->
-  return (Data_encoding.Json.destruct encoding json)
+  let open Lwt_tzresult_syntax in
+  let+ json = Lwt_utils_unix.Json.read_file (relative_filename data_dir) in
+  Data_encoding.Json.destruct encoding json
