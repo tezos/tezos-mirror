@@ -204,7 +204,7 @@ in the :ref:`introduction <howtoget>`.
    developer/contributing
    developer/merge_team
    developer/guidelines
-   developer/repository
+   developer/repository_scope
    developer/time_measurement_ppx
    README
 
