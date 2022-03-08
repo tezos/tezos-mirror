@@ -185,21 +185,31 @@ let is_implicit_exn x =
   | Some x -> x
   | None -> raise (Invalid_argument "is_implicit_exn")
 
-(** [make_unit_ticket_key ctxt ticketer tx_rollup] computes the key hash of
-    the unit ticket crafted by [ticketer] and owned by [tx_rollup]. *)
-let make_unit_ticket_key ctxt ticketer tx_rollup =
+(** [make_ticket_key ty contents ticketer tx_rollup] computes the key hash
+    of ticket crafted by [ticketer] and owned by [tx_rollup]. *)
+let make_ticket_key ~ty ~contents ~ticketer tx_rollup =
   let open Tezos_micheline.Micheline in
-  let open Michelson_v1_primitives in
   let ticketer =
     Bytes (0, Data_encoding.Binary.to_bytes_exn Contract.encoding ticketer)
   in
+  match
+    Alpha_context.Tx_rollup.Internal_for_tests.hash_ticket_uncarbonated
+      ~ticketer
+      ~ty
+      ~contents
+      tx_rollup
+  with
+  | Ok x -> x
+  | Error _ -> raise (Invalid_argument "make_ticket_key")
+
+(** [make_unit_ticket_key ticketer tx_rollup] computes the key hash of
+    the unit ticket crafted by [ticketer] and owned by [tx_rollup]. *)
+let make_unit_ticket_key ~ticketer tx_rollup =
+  let open Tezos_micheline.Micheline in
+  let open Michelson_v1_primitives in
   let ty = Prim (0, T_unit, [], []) in
   let contents = Prim (0, D_Unit, [], []) in
-  match
-    Alpha_context.Tx_rollup.hash_ticket ctxt ~ticketer ~ty ~contents tx_rollup
-  with
-  | Ok (x, _) -> x
-  | Error _ -> raise (Invalid_argument "make_unit_ticket_key")
+  make_ticket_key ~ty ~contents ~ticketer tx_rollup
 
 let rng_state = Random.State.make_self_init ()
 
@@ -631,7 +641,7 @@ let test_valid_deposit () =
   Incremental.begin_construction b >|=? Incremental.alpha_ctxt >>=? fun ctxt ->
   Context.Tx_rollup.inbox (B b) tx_rollup Tx_rollup_level.root >>=? function
   | {contents = [hash]; _} ->
-      let ticket_hash = make_unit_ticket_key ctxt contract tx_rollup in
+      let ticket_hash = make_unit_ticket_key ~ticketer:contract tx_rollup in
       let (message, _size) =
         Tx_rollup_message.make_deposit
           (is_implicit_exn account)
