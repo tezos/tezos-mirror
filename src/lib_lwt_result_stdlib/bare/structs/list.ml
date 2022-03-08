@@ -928,10 +928,25 @@ let rev_concat_map f xs =
 
 let concat_map f xs = rev (rev_concat_map f xs)
 
-let concat_map_s f xs =
+let rev_concat_map_s f xs =
   let open Lwt_syntax in
   let rec aux f acc = function
-    | [] -> return (rev acc)
+    | [] -> return acc
+    | x :: xs ->
+        let* ys = f x in
+        (aux [@ocaml.tailcall]) f (rev_append ys acc) xs
+  in
+  aux f [] xs
+
+let concat_map_s f xs =
+  let open Lwt_syntax in
+  let+ ys = rev_concat_map_s f xs in
+  rev ys
+
+let rev_concat_map_e f xs =
+  let open Result_syntax in
+  let rec aux f acc = function
+    | [] -> return acc
     | x :: xs ->
         let* ys = f x in
         (aux [@ocaml.tailcall]) f (rev_append ys acc) xs
@@ -940,8 +955,13 @@ let concat_map_s f xs =
 
 let concat_map_e f xs =
   let open Result_syntax in
+  let+ ys = rev_concat_map_e f xs in
+  rev ys
+
+let rev_concat_map_es f xs =
+  let open Lwt_result_syntax in
   let rec aux f acc = function
-    | [] -> return (rev acc)
+    | [] -> return acc
     | x :: xs ->
         let* ys = f x in
         (aux [@ocaml.tailcall]) f (rev_append ys acc) xs
@@ -950,13 +970,8 @@ let concat_map_e f xs =
 
 let concat_map_es f xs =
   let open Lwt_result_syntax in
-  let rec aux f acc = function
-    | [] -> return (rev acc)
-    | x :: xs ->
-        let* ys = f x in
-        (aux [@ocaml.tailcall]) f (rev_append ys acc) xs
-  in
-  aux f [] xs
+  let+ ys = rev_concat_map_es f xs in
+  rev ys
 
 let concat_map_p f xs = Lwt.map flatten @@ Lwt_syntax.all (map f xs)
 

@@ -1006,6 +1006,7 @@ module type S = sig
   (** [filter_map_p] is a variant of {!filter_map_s} where the promises are evaluated concurrently. *)
   val filter_map_p : ('a -> 'b option Lwt.t) -> 'a list -> 'b list Lwt.t
 
+  (** [concat_map f xs] is [concat (map f xs)] but more efficient. *)
   val concat_map : ('a -> 'b list) -> 'a list -> 'b list
 
   (** [concat_map_s] is an Lwt-aware variant of {!concat_map}. *)
@@ -1029,6 +1030,22 @@ module type S = sig
     ('a -> ('b list, 'error) result Lwt.t) ->
     'a list ->
     ('b list, 'error list) result Lwt.t
+
+  (** [rev_concat_map f xs] is [rev (concat_map f xs)] but more efficient.*)
+  val rev_concat_map : ('a -> 'b list) -> 'a list -> 'b list
+
+  (** [rev_concat_map_s] is an Lwt-aware variant of {!rev_concat_map}. *)
+  val rev_concat_map_s : ('a -> 'b list Lwt.t) -> 'a list -> 'b list Lwt.t
+
+  (** [rev_concat_map_e] is a Result-aware variant of {!rev_concat_map}. *)
+  val rev_concat_map_e :
+    ('a -> ('b list, 'error) result) -> 'a list -> ('b list, 'error) result
+
+  (** [rev_concat_map_es] is an Lwt-Result-aware variant of {!rev_concat_map}. *)
+  val rev_concat_map_es :
+    ('a -> ('b list, 'error) result Lwt.t) ->
+    'a list ->
+    ('b list, 'error) result Lwt.t
 
   val fold_left : ('a -> 'b -> 'a) -> 'a -> 'b list -> 'a
 

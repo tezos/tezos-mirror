@@ -113,6 +113,8 @@ end
 module TestRevMapRevMap (M : sig
   include BASE
 
+  include Traits.REV_VANILLA with type 'a t := 'a t
+
   include Traits.MAP_PARALLEL with type 'a t := 'a t
 
   include Traits.REVMAP_PARALLEL with type 'a t := 'a t
@@ -198,6 +200,139 @@ end) : Test = struct
           (M.rev_map_ep fn_ep input))
 
   let tests = [rev_map; rev_map_e; rev_map_s; rev_map_es; rev_map_p; rev_map_ep]
+end
+
+module TestRevConcatMapRevConcatMap (M : sig
+  include BASE
+
+  include Traits.REV_VANILLA with type 'a t := 'a t
+
+  include Traits.CONCATMAP_SEQUENTIAL with type 'a t := 'a t
+
+  include Traits.REV_CONCATMAP_SEQUENTIAL with type 'a t := 'a t
+end) : Test = struct
+  open QCheck
+
+  let rev_concatmap =
+    Test.make
+      ~name:(Format.asprintf "%s.{rev concat_map,rev_concat_map}" M.name)
+      (quad Test_fuzzing_helpers.Fn.arith one one many)
+      (fun (Fun (_, fn), consta, constb, input) ->
+        let input = M.of_list input in
+        let fn = ConcatMapOf.fns M.of_list fn consta constb in
+        eq
+          (let r = M.concat_map fn input in
+           M.rev r)
+          (M.rev_concat_map fn input))
+
+  let rev_concatmap_s =
+    Test.make
+      ~name:(Format.asprintf "%s.{rev concat_map_s,rev_concat_map_s}" M.name)
+      (quad Test_fuzzing_helpers.Fn.arith one one many)
+      (fun (Fun (_, fn), consta, constb, input) ->
+        let input = M.of_list input in
+        let fn = ConcatMapSOf.fns M.of_list fn consta constb in
+        let open Lwt_syntax in
+        eq_s
+          (let+ r = M.concat_map_s fn input in
+           M.rev r)
+          (M.rev_concat_map_s fn input))
+
+  let rev_concatmap_e =
+    Test.make
+      ~name:(Format.asprintf "%s.{rev concat_map_e,rev_concat_map_e}" M.name)
+      (quad Test_fuzzing_helpers.Fn.arith one one many)
+      (fun (Fun (_, fn), consta, constb, input) ->
+        let input = M.of_list input in
+        let fn = ConcatMapEOf.fns M.of_list fn consta constb in
+        let open Result_syntax in
+        eq_e
+          (let+ r = M.concat_map_e fn input in
+           M.rev r)
+          (M.rev_concat_map_e fn input))
+
+  let rev_concatmap_es =
+    Test.make
+      ~name:(Format.asprintf "%s.{rev concat_map_es,rev_concat_map_es}" M.name)
+      (quad Test_fuzzing_helpers.Fn.arith one one many)
+      (fun (Fun (_, fn), consta, constb, input) ->
+        let input = M.of_list input in
+        let fn = ConcatMapESOf.fns M.of_list fn consta constb in
+        let open Lwt_result_syntax in
+        eq_es
+          (let+ r = M.concat_map_es fn input in
+           M.rev r)
+          (M.rev_concat_map_es fn input))
+
+  let tests =
+    [rev_concatmap; rev_concatmap_s; rev_concatmap_e; rev_concatmap_es]
+end
+
+module TestConcatMapConcatMap (M : sig
+  include BASE
+
+  include Traits.REV_VANILLA with type 'a t := 'a t
+
+  include Traits.CONCATMAP_SEQUENTIAL with type 'a t := 'a t
+
+  include Traits.CONCAT_VANILLA with type 'a t := 'a t
+
+  include Traits.MAP_SEQUENTIAL with type 'a t := 'a t
+end) : Test = struct
+  open QCheck
+
+  let concatmap =
+    Test.make
+      ~name:(Format.asprintf "%s.{concat map,concat_map}" M.name)
+      (quad Test_fuzzing_helpers.Fn.arith one one many)
+      (fun (Fun (_, fn), consta, constb, input) ->
+        let input = M.of_list input in
+        let fn = ConcatMapOf.fns M.of_list fn consta constb in
+        eq
+          (let r = M.map fn input in
+           M.concat r)
+          (M.concat_map fn input))
+
+  let concatmap_s =
+    Test.make
+      ~name:(Format.asprintf "%s.{concat map_s,concat_map_s}" M.name)
+      (quad Test_fuzzing_helpers.Fn.arith one one many)
+      (fun (Fun (_, fn), consta, constb, input) ->
+        let input = M.of_list input in
+        let fn = ConcatMapSOf.fns M.of_list fn consta constb in
+        let open Lwt_syntax in
+        eq_s
+          (let+ r = M.map_s fn input in
+           M.concat r)
+          (M.concat_map_s fn input))
+
+  let concatmap_e =
+    Test.make
+      ~name:(Format.asprintf "%s.{concat map_e,concat_map_e}" M.name)
+      (quad Test_fuzzing_helpers.Fn.arith one one many)
+      (fun (Fun (_, fn), consta, constb, input) ->
+        let input = M.of_list input in
+        let fn = ConcatMapEOf.fns M.of_list fn consta constb in
+        let open Result_syntax in
+        eq_e
+          (let+ r = M.map_e fn input in
+           M.concat r)
+          (M.concat_map_e fn input))
+
+  let concatmap_es =
+    Test.make
+      ~name:(Format.asprintf "%s.{concat map_es,concat_map_es}" M.name)
+      (quad Test_fuzzing_helpers.Fn.arith one one many)
+      (fun (Fun (_, fn), consta, constb, input) ->
+        let input = M.of_list input in
+        let fn = ConcatMapESOf.fns M.of_list fn consta constb in
+        let open Lwt_result_syntax in
+        eq_es
+          (let+ r = M.map_es fn input in
+           M.concat r)
+          (M.concat_map_es fn input))
+
+  let tests = [concatmap; concatmap_s; concatmap_e; concatmap_es]
 end
 
 module TestIterAgainstStdlibList (M : sig
@@ -1612,6 +1747,8 @@ end
 
 module TestDoubleTraversorsStdlibList (M : sig
   include BASE
+
+  include Traits.REV_VANILLA with type 'a t := 'a t
 
   include Traits.COMBINE_VANILLA with type 'a t := 'a t
 
