@@ -69,23 +69,22 @@ let interp_messages ctxt messages cumulated_size =
       let inbox = Inbox.{contents; cumulated_size} in
       (ctxt, Some inbox)
 
-(* TODO/TORU return proper errors or option *)
 let parse_tx_rollup_l2_address :
     Script.node -> Protocol.Tx_rollup_l2_address.Indexable.value tzresult =
   let open Protocol in
   let open Micheline in
   function
-  | Bytes (_loc, bytes) (* As unparsed with [Optimized]. *) -> (
+  | Bytes (loc, bytes) (* As unparsed with [Optimized]. *) -> (
       match Tx_rollup_l2_address.of_bytes_opt bytes with
       | Some txa -> ok (Tx_rollup_l2_address.Indexable.value txa)
-      | None -> error_with "Not a valid transaction rollup L2 address")
-  | String (_loc, str) (* As unparsed with [Readable]. *) -> (
+      | None -> error (Error.Tx_rollup_invalid_l2_address loc))
+  | String (loc, str) (* As unparsed with [Readable]. *) -> (
       match Tx_rollup_l2_address.of_b58check_opt str with
       | Some txa -> ok (Tx_rollup_l2_address.Indexable.value txa)
-      | None -> error_with "Not a valid transaction rollup L2 address")
-  | _expr -> error_with "Not a valid transaction rollup L2 address"
+      | None -> error (Error.Tx_rollup_invalid_l2_address loc))
+  | Int (loc, _) | Prim (loc, _, _, _) | Seq (loc, _) ->
+      error (Error.Tx_rollup_invalid_l2_address loc)
 
-(* TODO/TORU: return proper errors or option *)
 (* TODO/TORU: expose uncarbonated parse_tx_rollup_deposit_parameters in protocol *)
 let parse_tx_rollup_deposit_parameters :
     Script.expr -> Tx_rollup.deposit_parameters tzresult =
@@ -117,10 +116,11 @@ let parse_tx_rollup_deposit_parameters :
       | Int (_, v) when Compare.Z.(Z.zero < v && v <= Z.of_int64 Int64.max_int)
         ->
           ok @@ Tx_rollup_l2_qty.of_int64_exn (Z.to_int64 v)
-      | Int (_, _) -> error_with "Tx_rollup_invalid_ticket_amount"
-      | _expr -> error_with "Invalid deposit")
+      | Int (_, invalid_amount) ->
+          error (Error.Tx_rollup_invalid_ticket_amount invalid_amount)
+      | _expr -> error Error.Tx_rollup_invalid_deposit)
       >|? fun amount -> Tx_rollup.{ticketer; contents; ty; amount; destination}
-  | _expr -> error_with "Invalid deposit"
+  | _expr -> error Error.Tx_rollup_invalid_deposit
 
 let extract_messages_from_block block_info rollup_id =
   let managed_operation =

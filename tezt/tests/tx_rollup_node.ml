@@ -41,7 +41,7 @@ let node_rpc node service =
       return (Some (result |> JSON.parse ~origin:service))
 
 let get_node_inbox node =
-  let* json = node_rpc node "current_inbox" in
+  let* json = node_rpc node "block/head/inbox" in
   match json with
   | None -> return Rollup.{cumulated_size = 0; contents = []; hash = ""}
   | Some json ->
