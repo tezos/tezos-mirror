@@ -540,19 +540,14 @@ let start_waiting_for_endorsement_quorum state =
 let compute_round proposal round_durations =
   let open Protocol in
   let open Baking_state in
-  (* If our current proposal is the transition block, we suppose a
-     never ending round 0 *)
-  if Protocol_hash.(proposal.block.protocol <> proposal.block.next_protocol)
-  then ok Round.zero
-  else
-    let timestamp = Time.System.now () |> Time.System.to_protocol in
-    let predecessor_block = proposal.predecessor in
-    Environment.wrap_tzresult
-    @@ Alpha_context.Round.round_of_timestamp
-         round_durations
-         ~predecessor_timestamp:predecessor_block.shell.timestamp
-         ~predecessor_round:predecessor_block.round
-         ~timestamp
+  let timestamp = Time.System.now () |> Time.System.to_protocol in
+  let predecessor_block = proposal.predecessor in
+  Environment.wrap_tzresult
+  @@ Alpha_context.Round.round_of_timestamp
+       round_durations
+       ~predecessor_timestamp:predecessor_block.shell.timestamp
+       ~predecessor_round:predecessor_block.round
+       ~timestamp
 
 let update_to_level state level_update =
   let {new_level_proposal; compute_new_state} = level_update in
