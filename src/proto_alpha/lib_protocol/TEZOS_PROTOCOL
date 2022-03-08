@@ -139,6 +139,7 @@
         "Michelson_v1_gas",
         "Script_list",
         "Script_tc_context",
+        "Apply_results",
         "Script_ir_translator",
         "Script_cache",
         "Script_tc_errors_registration",
@@ -161,7 +162,6 @@
 
         "Baking",
         "Amendment",
-        "Apply_results",
         "Apply",
 
         "Services_registration",
