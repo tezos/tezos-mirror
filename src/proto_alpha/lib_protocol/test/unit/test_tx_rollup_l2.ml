@@ -603,23 +603,21 @@ module Test_batch_encodings = struct
         qty = Tx_rollup_l2_qty.of_int64_exn 12L;
       }
     in
-    let* _ =
-      try
-        let buffer = encode_content invalid_indexed_l2_to_l1_op in
-        Alcotest.failf
-          "Expected encoding of layer2-to-layer1 operation_content with \
-           indexed ticket to fail. Binary output: %s"
-          Hex.(of_bytes buffer |> show)
-      with
-      | Data_encoding.Binary.Write_error
-          (Exception_raised_in_user_function
-            "(Invalid_argument\n\
-            \  \"Attempted to decode layer2 operation containing ticket \
-             index.\")")
-      ->
+    try
+      let buffer = encode_content invalid_indexed_l2_to_l1_op in
+      Alcotest.failf
+        "Expected encoding of layer2-to-layer1 operation_content with indexed \
+         ticket to fail. Binary output: %s"
+        Hex.(of_bytes buffer |> show)
+    with
+    | Data_encoding.Binary.Write_error (Exception_raised_in_user_function _) ->
         return_unit
-    in
-    return_unit
+    | Data_encoding.Binary.Write_error e ->
+        Alcotest.failf
+          "Got unexpected exception Write_error: %a"
+          Binary.pp_write_error
+          e
+    | e -> Alcotest.failf "Got unexpected exception: %s" (Printexc.to_string e)
 
   let test_l2_operation_decode_guard () =
     let invalid_indexed_l2_to_l1_op_serialized =
@@ -627,27 +625,24 @@ module Test_batch_encodings = struct
         `Hex "00000000000000000000000000000000000000000000010c" |> to_bytes
         |> Stdlib.Option.get)
     in
-    let* _ =
-      try
-        let invalid_indexed_l2_to_l1_op =
-          decode_content invalid_indexed_l2_to_l1_op_serialized
-        in
+    try
+      let invalid_indexed_l2_to_l1_op =
+        decode_content invalid_indexed_l2_to_l1_op_serialized
+      in
+      Alcotest.failf
+        "Expected decoding of layer2-to-layer1 operation_content with indexed \
+         ticket to fail. Got operation: %a"
+        operation_content_pp
+        invalid_indexed_l2_to_l1_op
+    with
+    | Data_encoding.Binary.Read_error (Exception_raised_in_user_function _) ->
+        return_unit
+    | Data_encoding.Binary.Read_error e ->
         Alcotest.failf
-          "Expected decoding of layer2-to-layer1 operation_content with \
-           indexed ticket to fail. Got operation: %a"
-          operation_content_pp
-          invalid_indexed_l2_to_l1_op
-      with
-      | Data_encoding.Binary.Read_error
-          (Exception_raised_in_user_function
-            "(Invalid_argument\n\
-            \  \"Attempted to decode layer2 operation containing ticket \
-             index.\")") ->
-          return_unit
-      | e ->
-          Alcotest.failf "Got unexpected exception: %s" (Printexc.to_string e)
-    in
-    return_unit
+          "Got unexpected exception Read_error: %a"
+          Binary.pp_read_error
+          e
+    | e -> Alcotest.failf "Got unexpected exception: %s" (Printexc.to_string e)
 
   let tests =
     [
