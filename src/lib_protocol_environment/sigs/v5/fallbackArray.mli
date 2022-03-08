@@ -68,8 +68,17 @@ val iter : ('a -> unit) -> 'a t -> unit
    array is [f (fallback a)]. *)
 val map : ('a -> 'b) -> 'a t -> 'b t
 
-(** [fold a init f] traverses [a] from the cell indexed [0] to the
+(** [fold f a init] traverses [a] from the cell indexed [0] to the
    cell indexed [length a - 1] and transforms [accu] into [f accu x]
    where [x] is the content of the cell under focus. [accu] is
    [init] on the first iteration. *)
 val fold : ('b -> 'a -> 'b) -> 'a t -> 'b -> 'b
+
+(** [fold_map f a init fallback] traverses [a] from the cell indexed
+   [0] to the cell indexed [length a - 1] and transforms [accu] into
+   [fst (f accu x)] where [x] is the content of the cell under
+   focus. [accu] is [init] on the first iteration. The function also
+   returns a fresh array containing [snd (f accu x)] for each [x].
+   [fallback] is required to initialize a fresh array before it can be
+   filled. *)
+val fold_map : ('b -> 'a -> 'b * 'c) -> 'a t -> 'b -> 'c -> 'b * 'c t

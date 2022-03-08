@@ -1,5 +1,7 @@
+bls_signature.mli
 bytes.mli
 char.mli
+either.mli
 format.mli
 hex.mli
 int32.mli

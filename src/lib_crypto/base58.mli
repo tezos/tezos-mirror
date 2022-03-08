@@ -113,8 +113,8 @@ type 'a encoding = private {
   wrap : 'a -> data;
 }
 
-(** Register a new encoding. The function might raise `Invalid_arg` if
-    the provided [prefix] overlap with a previously registered
+(** Register a new encoding. The function might raise [Invalid_arg] if
+    the provided [prefix] overlaps with a previously registered
     prefix. The [to_raw] and [of_raw] are the ad-hoc
     serialisation/deserialisation for the data. The [wrap] should wrap
     the deserialised value into the extensible sum-type [data] (see

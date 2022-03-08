@@ -43,6 +43,7 @@ module type PrefixedName = sig
   val b58check_prefix : string
 end
 
+(** Builds a new Hash type using Blake2B. *)
 module Make_minimal (Name : Name) : S.MINIMAL_HASH
 
 module type Register = sig

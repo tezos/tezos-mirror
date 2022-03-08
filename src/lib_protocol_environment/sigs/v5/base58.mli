@@ -25,12 +25,24 @@
 
 type 'a encoding
 
+(** Decoder for a given kind of data. It returns [None] when
+    the decoded data does not start with the expected prefix. *)
 val simple_decode : 'a encoding -> string -> 'a option
 
+(** Encoder for a given kind of data. *)
 val simple_encode : 'a encoding -> 'a -> string
 
+(** An extensible sum-type for decoded data: one case per known
+    "prefix". See for instance [Hash.Block_hash.Hash] or
+    [Environment.Ed25519.Public_key_hash]. *)
 type data = ..
 
+(** Register a new encoding. The function might raise [Invalid_arg] if
+    the provided [prefix] overlaps with a previously registered
+    prefix. The [to_raw] and [of_raw] are the ad-hoc
+    serialisation/deserialisation for the data. The [wrap] should wrap
+    the deserialised value into the extensible sum-type [data] (see
+    the generic function [decode]). *)
 val register_encoding :
   prefix:string ->
   length:int ->
@@ -39,6 +51,9 @@ val register_encoding :
   wrap:('a -> data) ->
   'a encoding
 
+(** Checks that an encoding has a certain prefix and length. *)
 val check_encoded_prefix : 'a encoding -> string -> int -> unit
 
+(** Generic decoder. It returns [None] when the decoded data does
+    not start with a registered prefix. *)
 val decode : string -> data option

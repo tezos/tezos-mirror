@@ -24,6 +24,8 @@
 (*****************************************************************************)
 
 (** Assuming [x >= 0], [numbits x] is the number of bits needed to
-   represent [x]. This is also the unique [k] such that [2^{k - 1}
-   <= x < 2^k] if [x > 0] and [0] otherwise. *)
+    represent [x]. This is also the unique [k] such that
+    [2^{k - 1} <= x < 2^k] if [x > 0] and [0] otherwise.
+
+    The behaviour is unspecified if [x < 0].*)
 val numbits : int -> int
