@@ -1,10 +1,16 @@
 (executable
  (name tenderbrute_main)
- (libraries tezos-baking-alpha.tenderbrute)
- (flags (:standard
-          -open Tezos_base__TzPervasives
-          -open Tezos_base
-          -open Tezos_client_base
-          -open Tezos_client_alpha
-          -open Tezos_protocol_alpha
-          -linkall)))
+ (libraries
+  tezos-base
+  tezos-client-base
+  tezos-client-alpha
+  tezos-protocol-alpha
+  tezos-baking-alpha.tenderbrute)
+ (link_flags (:standard -linkall))
+ (flags
+  (:standard
+   -open Tezos_base.TzPervasives
+   -open Tezos_base
+   -open Tezos_client_base
+   -open Tezos_client_alpha
+   -open Tezos_protocol_alpha)))
