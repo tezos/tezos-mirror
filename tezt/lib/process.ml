@@ -265,17 +265,28 @@ let handle_process ~log_output process =
         push_to_echo echo "\n" ;
         handle_output name ch echo lines
   in
-  let* stdout_lines =
-    handle_output process.name process.lwt_process#stdout process.stdout []
-  and* stderr_lines =
-    handle_output process.name process.lwt_process#stderr process.stderr []
-  and* _ = wait process in
-  match process.hooks with
-  | None -> unit
-  | Some hooks ->
-      List.iter hooks.on_log stdout_lines ;
-      List.iter hooks.on_log stderr_lines ;
-      unit
+  let promise =
+    let* stdout_lines =
+      handle_output process.name process.lwt_process#stdout process.stdout []
+    and* stderr_lines =
+      handle_output process.name process.lwt_process#stderr process.stderr []
+    and* _ = wait process in
+    match process.hooks with
+    | None -> unit
+    | Some hooks ->
+        List.iter hooks.on_log stdout_lines ;
+        List.iter hooks.on_log stderr_lines ;
+        unit
+  in
+  (* As long as the process is running, we don't want to stop reading its output.
+     So we return a non-cancelable promise.
+     This also makes sure that if [wait] is called twice, and one of the two
+     instances is canceled, the other instance will not also be canceled.
+     Indeed, canceling one instance of [wait] would cancel [process.handle],
+     which is also used by the other instance of [wait].
+     This can happen in particular if a test is [wait]ing for a process and
+     the user presses Ctrl+C, which triggers [clean_up], which calls [wait]. *)
+  Lwt.no_cancel promise
 
 (** [parse_current_environment ()], given that the current environment
     is "K1=V2; K2=V2" (see `export` in a terminal)
