@@ -34,6 +34,7 @@ end
 module String = struct
   include String
   include Tezos_stdlib.TzString
+  module Set = Tezos_error_monad.TzLwtreslib.Set.Make (String)
 end
 
 let valid_char c =
@@ -165,13 +166,13 @@ end = struct
   let pp fmt section = Format.fprintf fmt "%s" (String.concat "." section.path)
 end
 
-let registered_sections = ref TzString.Set.empty
+let registered_sections = ref String.Set.empty
 
-let get_registered_sections () = !registered_sections
+let get_registered_sections () = String.Set.to_seq !registered_sections
 
 let register_section section =
   registered_sections :=
-    TzString.Set.add
+    String.Set.add
       (Lwt_log_core.Section.name (Section.to_lwt_log section))
       !registered_sections
 
@@ -1259,7 +1260,7 @@ module Legacy_logging = struct
       let section = Some section
     end
 
-    let () = registered_sections := TzString.Set.add P.name !registered_sections
+    let () = registered_sections := String.Set.add P.name !registered_sections
 
     module Event = Make (Definition)
 

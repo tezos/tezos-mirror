@@ -38,8 +38,8 @@ let rec raw_context_rm_empty =
   function
   | Key _ as rc -> Some rc
   | Dir dir ->
-      let dir' = TzString.Map.filter_map (fun _ -> raw_context_rm_empty) dir in
-      if TzString.Map.is_empty dir' then None else Some (Dir dir')
+      let dir' = String.Map.filter_map (fun _ -> raw_context_rm_empty) dir in
+      if String.Map.is_empty dir' then None else Some (Dir dir')
   | Cut -> None
 
 let rec merkle_node_rm_empty =
@@ -54,15 +54,15 @@ let rec merkle_node_rm_empty =
 (** [merkle_tree_rm_empty mtree] returns [None] if [mtree] is empty, otherwise
     a variant of [mtree] where empty subtrees have been removed. *)
 and merkle_tree_rm_empty mtree =
-  let mtree' = TzString.Map.filter_map (fun _ -> merkle_node_rm_empty) mtree in
-  if TzString.Map.is_empty mtree' then None else Some mtree'
+  let mtree' = String.Map.filter_map (fun _ -> merkle_node_rm_empty) mtree in
+  if String.Map.is_empty mtree' then None else Some mtree'
 
 (** [merkle_tree_rm_empty mtree] returns a variant of [mtree] where
     empty subtrees have been removed. *)
 let merkle_tree_rm_empty mtree =
-  Option.value ~default:TzString.Map.empty @@ merkle_tree_rm_empty mtree
+  Option.value ~default:String.Map.empty @@ merkle_tree_rm_empty mtree
 
-module StringMap = TzString.Map
+module StringMap = String.Map
 
 type simple_tree = SLeaf | SDir of simple_tree StringMap.t
 
@@ -89,7 +89,7 @@ let rec raw_context_to_simple_tree raw_context : simple_tree =
   match raw_context with
   | Cut -> SLeaf
   | Key _ -> SLeaf
-  | Dir dir -> SDir (TzString.Map.map raw_context_to_simple_tree dir)
+  | Dir dir -> SDir (String.Map.map raw_context_to_simple_tree dir)
 
 let is_empty = function SLeaf -> true | SDir dir -> StringMap.is_empty dir
 

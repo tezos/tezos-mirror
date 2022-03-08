@@ -129,7 +129,7 @@ end
 
 let resolve_domain_name =
   let resolver =
-    TzString.Map.of_seq
+    String.Map.of_seq
     @@ List.to_seq
          [
            ( "localhost",
@@ -137,7 +137,7 @@ let resolve_domain_name =
            ("127.0.0.1", List.map Ipaddr.V6.of_int64 [(0L, 281472812449793L)]);
          ]
   in
-  fun addr -> TzString.Map.find_opt addr resolver |> Option.value ~default:[]
+  fun addr -> String.Map.find_opt addr resolver |> Option.value ~default:[]
 
 let resolve_domain_names_in_policy =
   RPC_server.Acl.Internal_for_test.resolve_domain_names (fun {addr; port; _} ->

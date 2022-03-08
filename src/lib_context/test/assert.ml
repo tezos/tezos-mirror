@@ -108,7 +108,7 @@ let equal_raw_tree ?(msg = "") r1 r2 =
         equal_string ~msg (Bytes.to_string v1) (Bytes.to_string v2) ;
         true
     | (`Tree t1, `Tree t2) ->
-        if not (TzString.Map.equal aux t1 t2) then fail "<tree>" "<tree>" msg ;
+        if not (String.Map.equal aux t1 t2) then fail "<tree>" "<tree>" msg ;
         true
     | (`Tree _, `Value v) -> fail "<tree>" (Bytes.to_string v) msg
     | (`Value v, `Tree _) -> fail "<tree>" (Bytes.to_string v) msg

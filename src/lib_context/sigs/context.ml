@@ -401,7 +401,7 @@ module type S = sig
     (** {2 Data Encoding} *)
 
     (** The type for in-memory, raw contexts. *)
-    type raw = [`Value of bytes | `Tree of raw TzString.Map.t]
+    type raw = [`Value of bytes | `Tree of raw String.Map.t]
 
     (** [raw_encoding] is the data encoding for raw trees. *)
     val raw_encoding : raw Data_encoding.t

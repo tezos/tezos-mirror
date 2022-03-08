@@ -74,7 +74,7 @@ type operation_list_quota = {max_size : int; max_op : int option}
 (** The low-level storage exposed as a tree *)
 type raw_context =
   | Key of Bytes.t  (** A leaf, containing a value *)
-  | Dir of raw_context TzString.Map.t
+  | Dir of raw_context String.Map.t
       (** A directory, mapping keys to nested [raw_context]s *)
   | Cut
       (** An omitted piece, because it is too deep compared to the maximum
@@ -106,7 +106,7 @@ type merkle_node =
   | Continue of merkle_tree  (** An edge to a more nested tree *)
 
 (** The type of Merkle tree used by the light mode *)
-and merkle_tree = merkle_node TzString.Map.t
+and merkle_tree = merkle_node String.Map.t
 
 (** [merkle_tree_eq mtree1 mtree2] tests whether [mtree1] and [mtree2] are equal,
  *  that is, have the same constructors; and the constructor's content

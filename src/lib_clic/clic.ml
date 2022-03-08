@@ -24,6 +24,8 @@
 (*****************************************************************************)
 
 open Error_monad
+module StringMap = Map.Make (String)
+module StringSet = Set.Make (String)
 
 type ('p, 'ctx) parameter = {
   converter : 'ctx -> string -> 'p tzresult Lwt.t;
@@ -759,14 +761,14 @@ let parse_arg :
     type a ctx.
     ?command:_ command ->
     (a, ctx) arg ->
-    string list TzString.Map.t ->
+    string list StringMap.t ->
     ctx ->
     a tzresult Lwt.t =
  fun ?command spec args_dict ctx ->
   let open Lwt_tzresult_syntax in
   match spec with
   | Arg {label = {long; short = _}; kind = {converter; _}; _} -> (
-      match TzString.Map.find_opt long args_dict with
+      match StringMap.find_opt long args_dict with
       | None | Some [] -> return_none
       | Some [s] ->
           let+ x =
@@ -785,13 +787,13 @@ let parse_arg :
                 converter function."
                long)
       | Ok default -> (
-          match TzString.Map.find_opt long args_dict with
+          match StringMap.find_opt long args_dict with
           | None | Some [] -> return default
           | Some [s] ->
               trace (Bad_option_argument (long, command)) (converter ctx s)
           | Some (_ :: _) -> fail (Multiple_occurrences (long, command))))
   | Switch {label = {long; short = _}; _} -> (
-      match TzString.Map.find_opt long args_dict with
+      match StringMap.find_opt long args_dict with
       | None | Some [] -> return_false
       | Some [_] -> return_true
       | Some (_ :: _) -> fail (Multiple_occurrences (long, command)))
@@ -802,7 +804,7 @@ let rec parse_args :
     type a ctx.
     ?command:_ command ->
     (a, ctx) args ->
-    string list TzString.Map.t ->
+    string list StringMap.t ->
     ctx ->
     a tzresult Lwt.t =
  fun ?command spec args_dict ctx ->
@@ -814,13 +816,11 @@ let rec parse_args :
       let+ rest = parse_args ?command rest args_dict ctx in
       (arg, rest)
 
-let empty_args_dict = TzString.Map.empty
+let empty_args_dict = StringMap.empty
 
 let rec make_arities_dict :
     type a b.
-    (a, b) args ->
-    (int * string) TzString.Map.t ->
-    (int * string) TzString.Map.t =
+    (a, b) args -> (int * string) StringMap.t -> (int * string) StringMap.t =
  fun args acc ->
   match args with
   | NoArgs -> acc
@@ -828,9 +828,9 @@ let rec make_arities_dict :
       let recur {long; short} num =
         (match short with
         | None -> acc
-        | Some c -> TzString.Map.add ("-" ^ String.make 1 c) (num, long) acc)
-        |> TzString.Map.add ("-" ^ long) (num, long)
-        |> TzString.Map.add ("--" ^ long) (num, long)
+        | Some c -> StringMap.add ("-" ^ String.make 1 c) (num, long) acc)
+        |> StringMap.add ("-" ^ long) (num, long)
+        |> StringMap.add ("--" ^ long) (num, long)
         |> make_arities_dict rest
       in
       match arg with
@@ -853,9 +853,9 @@ let check_version_flag = function
   | _ -> return_unit
 
 let add_occurrence long value acc =
-  match TzString.Map.find_opt long acc with
-  | Some v -> TzString.Map.add long v acc
-  | None -> TzString.Map.add long [value] acc
+  match StringMap.find_opt long acc with
+  | Some v -> StringMap.add long v acc
+  | None -> StringMap.add long [value] acc
 
 let make_args_dict_consume ?command spec args =
   let open Lwt_tzresult_syntax in
@@ -866,35 +866,35 @@ let make_args_dict_consume ?command spec args =
     | [] -> return (acc, [])
     | arg :: tl ->
         if String.length arg > 0 && arg.[0] = '-' then
-          if TzString.Map.mem arg arities then
-            let (arity, long) = TzString.Map.find arg arities in
-            let* () = check_help_flag ?command tl in
-            match (arity, tl) with
-            | (0, tl') ->
-                make_args_dict
-                  completing
-                  arities
-                  (add_occurrence long "" acc)
-                  tl'
-            | (1, value :: tl') ->
-                make_args_dict
-                  completing
-                  arities
-                  (add_occurrence long value acc)
-                  tl'
-            | (1, []) when completing -> return (acc, [])
-            | (1, []) -> fail (Option_expected_argument (arg, None))
-            | (_, _) ->
-                Stdlib.failwith
-                  "cli_entries: Arguments with arity not equal to 1 or 0 \
-                   unsupported"
-          else fail (Unknown_option (arg, None))
+          match StringMap.find arg arities with
+          | Some (arity, long) -> (
+              let* () = check_help_flag ?command tl in
+              match (arity, tl) with
+              | (0, tl') ->
+                  make_args_dict
+                    completing
+                    arities
+                    (add_occurrence long "" acc)
+                    tl'
+              | (1, value :: tl') ->
+                  make_args_dict
+                    completing
+                    arities
+                    (add_occurrence long value acc)
+                    tl'
+              | (1, []) when completing -> return (acc, [])
+              | (1, []) -> fail (Option_expected_argument (arg, None))
+              | (_, _) ->
+                  Stdlib.failwith
+                    "cli_entries: Arguments with arity not equal to 1 or 0 \
+                     unsupported")
+          | None -> fail (Unknown_option (arg, None))
         else return (acc, args)
   in
   make_args_dict
     false
-    (make_arities_dict spec TzString.Map.empty)
-    TzString.Map.empty
+    (make_arities_dict spec StringMap.empty)
+    StringMap.empty
     args
 
 let make_args_dict_filter ?command spec args =
@@ -903,32 +903,32 @@ let make_args_dict_filter ?command spec args =
     let* () = check_help_flag ?command args in
     match args with
     | [] -> return (dict, other_args)
-    | arg :: tl ->
-        if TzString.Map.mem arg arities then
-          let (arity, long) = TzString.Map.find arg arities in
-          let* () = check_help_flag ?command tl in
-          match (arity, tl) with
-          | (0, tl) ->
-              make_args_dict
-                arities
-                (add_occurrence long "" dict, other_args)
-                tl
-          | (1, value :: tl') ->
-              make_args_dict
-                arities
-                (add_occurrence long value dict, other_args)
-                tl'
-          | (1, []) -> fail (Option_expected_argument (arg, command))
-          | (_, _) ->
-              Stdlib.failwith
-                "cli_entries: Arguments with arity not equal to 1 or 0 \
-                 unsupported"
-        else make_args_dict arities (dict, arg :: other_args) tl
+    | arg :: tl -> (
+        match StringMap.find arg arities with
+        | Some (arity, long) -> (
+            let* () = check_help_flag ?command tl in
+            match (arity, tl) with
+            | (0, tl) ->
+                make_args_dict
+                  arities
+                  (add_occurrence long "" dict, other_args)
+                  tl
+            | (1, value :: tl') ->
+                make_args_dict
+                  arities
+                  (add_occurrence long value dict, other_args)
+                  tl'
+            | (1, []) -> fail (Option_expected_argument (arg, command))
+            | (_, _) ->
+                Stdlib.failwith
+                  "cli_entries: Arguments with arity not equal to 1 or 0 \
+                   unsupported")
+        | None -> make_args_dict arities (dict, arg :: other_args) tl)
   in
   let+ (dict, remaining) =
     make_args_dict
-      (make_arities_dict spec TzString.Map.empty)
-      (TzString.Map.empty, [])
+      (make_arities_dict spec StringMap.empty)
+      (StringMap.empty, [])
       args
   in
   (dict, List.rev remaining)
@@ -1812,18 +1812,18 @@ let complete_arg : type a ctx. ctx -> (a, ctx) arg -> string list tzresult Lwt.t
   | Switch _ -> return_nil
   | Constant _ -> return_nil
 
-let rec remaining_spec :
-    type a ctx. TzString.Set.t -> (a, ctx) args -> string list =
+let rec remaining_spec : type a ctx. StringSet.t -> (a, ctx) args -> string list
+    =
  fun seen -> function
   | NoArgs -> []
   | AddArg (Constant _, rest) -> remaining_spec seen rest
   | AddArg (arg, rest) ->
       let {long; _} = get_arg_label arg in
-      if TzString.Set.mem long seen then remaining_spec seen rest
+      if StringSet.mem long seen then remaining_spec seen rest
       else get_arg arg @ remaining_spec seen rest
 
 let complete_options (type ctx) continuation args args_spec ind (ctx : ctx) =
-  let arities = make_arities_dict args_spec TzString.Map.empty in
+  let arities = make_arities_dict args_spec StringMap.empty in
   let rec complete_spec :
       type a. string -> (a, ctx) args -> string list tzresult Lwt.t =
    fun name -> function
@@ -1840,21 +1840,21 @@ let complete_options (type ctx) continuation args args_spec ind (ctx : ctx) =
         let+ cont_args = continuation args 0 in
         cont_args @ remaining_spec seen args_spec
     | [] -> Stdlib.failwith "cli_entries internal autocomplete error"
-    | arg :: tl ->
-        if TzString.Map.mem arg arities then
-          let (arity, long) = TzString.Map.find arg arities in
-          let seen = TzString.Set.add long seen in
-          match (arity, tl) with
-          | (0, args) when ind = 0 ->
-              let+ cont_args = continuation args 0 in
-              remaining_spec seen args_spec @ cont_args
-          | (0, args) -> help args (ind - 1) seen
-          | (1, _) when ind = 1 -> complete_spec arg args_spec
-          | (1, _ :: tl) -> help tl (ind - 2) seen
-          | _ -> Stdlib.failwith "cli_entries internal error, invalid arity"
-        else continuation args ind
+    | arg :: tl -> (
+        match StringMap.find arg arities with
+        | Some (arity, long) -> (
+            let seen = StringSet.add long seen in
+            match (arity, tl) with
+            | (0, args) when ind = 0 ->
+                let+ cont_args = continuation args 0 in
+                remaining_spec seen args_spec @ cont_args
+            | (0, args) -> help args (ind - 1) seen
+            | (1, _) when ind = 1 -> complete_spec arg args_spec
+            | (1, _ :: tl) -> help tl (ind - 2) seen
+            | _ -> Stdlib.failwith "cli_entries internal error, invalid arity")
+        | None -> continuation args ind)
   in
-  help args ind TzString.Set.empty
+  help args ind StringSet.empty
 
 let complete_next_tree cctxt =
   let open Lwt_result_syntax in

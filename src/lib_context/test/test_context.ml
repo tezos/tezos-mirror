@@ -435,10 +435,10 @@ let test_raw {idx; genesis; _} =
       let* tree = find_tree ctxt [] in
       let tree = WithExceptions.Option.get ~loc:__LOC__ tree in
       let* raw = Tree.to_raw tree in
-      let a = TzString.Map.singleton "toto" (`Value foo1) in
-      let b = TzString.Map.singleton "toto" (`Value foo2) in
-      let c = TzString.Map.add "bar" (`Tree b) a in
-      let d = TzString.Map.singleton "foo" (`Tree c) in
+      let a = String.Map.singleton "toto" (`Value foo1) in
+      let b = String.Map.singleton "toto" (`Value foo2) in
+      let c = String.Map.add "bar" (`Tree b) a in
+      let d = String.Map.singleton "foo" (`Tree c) in
       let e = `Tree d in
       Assert.equal_raw_tree ~msg:__LOC__ e raw ;
       Lwt.return ()

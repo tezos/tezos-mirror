@@ -23,10 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Set : Set.S with type elt = string
-
-module Map : Map.S with type key = string
-
 (** Splits a string on slashes, grouping multiple slashes, and
     ignoring slashes at the beginning and end of string. *)
 val split_path : string -> string list

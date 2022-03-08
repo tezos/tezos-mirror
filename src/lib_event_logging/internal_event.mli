@@ -90,7 +90,7 @@ end
 
 (** All the section that has been registered. Currently, sections are registered
     by the `Simple` module and the `Legacy_logging` module. *)
-val get_registered_sections : unit -> TzString.Set.t
+val get_registered_sections : unit -> string Seq.t
 
 val register_section : Section.t -> unit
 

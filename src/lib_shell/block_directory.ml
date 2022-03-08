@@ -26,7 +26,7 @@
 
 let read_partial_context =
   let open Lwt_syntax in
-  let init = Block_services.Dir TzString.Map.empty in
+  let init = Block_services.Dir String.Map.empty in
   fun context path depth ->
     if depth = 0 then Lwt.return Block_services.Cut
     else

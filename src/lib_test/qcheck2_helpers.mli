@@ -140,7 +140,13 @@ val sublist : 'a list -> 'a list QCheck2.Gen.t
 val holey : 'a list -> 'a list QCheck2.Gen.t
 
 (** Map-related generators. *)
-module MakeMapGen (Map : Stdlib.Map.S) : sig
+module MakeMapGen (Map : sig
+  type 'a t
+
+  type key
+
+  val of_seq : (key * 'a) Seq.t -> 'a t
+end) : sig
   (** [gen_of_size size_gen key_gen val_gen] is a generator of Map where the keys
       are generated with [key_gen] and the values with [val_gen].
       The number of entries in the map is decided by [size_gen]. *)
