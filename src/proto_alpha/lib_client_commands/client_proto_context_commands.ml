@@ -709,7 +709,8 @@ let transfer_command amount source destination (cctxt : #Client_context.printer)
       fee_cap,
       burn_cap,
       entrypoint,
-      replace_by_fees ) =
+      replace_by_fees,
+      successor_level ) =
   let fee_parameter =
     {
       Injection.minimal_fees;
@@ -789,6 +790,7 @@ let transfer_command amount source destination (cctxt : #Client_context.printer)
         ?storage_limit
         ?counter
         ~replace_by_fees
+        ~successor_level
         ())
   >>= report_michelson_errors
         ~no_print_source
@@ -1348,7 +1350,7 @@ let commands_rw () =
     command
       ~group
       ~desc:"Transfer tokens / call a smart contract."
-      (args18
+      (args19
          fee_arg
          dry_run_switch
          verbose_signing_switch
@@ -1366,7 +1368,8 @@ let commands_rw () =
          fee_cap_arg
          burn_cap_arg
          entrypoint_arg
-         replace_by_fees_arg)
+         replace_by_fees_arg
+         successor_level_arg)
       (prefixes ["transfer"]
       @@ tez_param ~name:"qty" ~desc:"amount taken from source"
       @@ prefix "from"
@@ -1395,7 +1398,8 @@ let commands_rw () =
              fee_cap,
              burn_cap,
              entrypoint,
-             replace_by_fees )
+             replace_by_fees,
+             successor_level )
            amount
            (_, source)
            (_, destination)
@@ -1422,7 +1426,8 @@ let commands_rw () =
             fee_cap,
             burn_cap,
             entrypoint,
-            replace_by_fees ));
+            replace_by_fees,
+            successor_level ));
     command
       ~group
       ~desc:"Register a global constant"
@@ -1507,7 +1512,7 @@ let commands_rw () =
     command
       ~group
       ~desc:"Call a smart contract (same as 'transfer 0')."
-      (args18
+      (args19
          fee_arg
          dry_run_switch
          verbose_signing_switch
@@ -1525,7 +1530,8 @@ let commands_rw () =
          fee_cap_arg
          burn_cap_arg
          entrypoint_arg
-         replace_by_fees_arg)
+         replace_by_fees_arg
+         successor_level_arg)
       (prefixes ["call"]
       @@ ContractAlias.destination_param
            ~name:"dst"
@@ -1552,7 +1558,8 @@ let commands_rw () =
              fee_cap,
              burn_cap,
              entrypoint,
-             replace_by_fees )
+             replace_by_fees,
+             successor_level )
            (_, destination)
            (_, source)
            cctxt ->
@@ -1579,7 +1586,8 @@ let commands_rw () =
             fee_cap,
             burn_cap,
             entrypoint,
-            replace_by_fees ));
+            replace_by_fees,
+            successor_level ));
     command
       ~group
       ~desc:"Reveal the public key of the contract manager."

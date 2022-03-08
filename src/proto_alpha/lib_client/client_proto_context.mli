@@ -213,6 +213,7 @@ val transfer_with_script :
   ?simulation:bool ->
   ?force:bool ->
   ?branch:int ->
+  ?successor_level:bool ->
   source:public_key_hash ->
   src_pk:public_key ->
   src_sk:Client_keys.sk_uri ->
@@ -240,6 +241,7 @@ val transfer :
   ?simulation:bool ->
   ?force:bool ->
   ?branch:int ->
+  ?successor_level:bool ->
   source:public_key_hash ->
   src_pk:public_key ->
   src_sk:Client_keys.sk_uri ->

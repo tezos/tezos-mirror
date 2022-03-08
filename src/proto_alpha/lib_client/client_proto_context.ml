@@ -105,9 +105,10 @@ let build_transaction_operation ~amount ~parameters
     operation
 
 let transfer_with_script (cctxt : #full) ~chain ~block ?confirmations ?dry_run
-    ?verbose_signing ?simulation ?(force = false) ?branch ~source ~src_pk
-    ~src_sk ~destination ?(entrypoint = Entrypoint.default) ~parameters ~amount
-    ?fee ?gas_limit ?storage_limit ?counter ~fee_parameter ?replace_by_fees () =
+    ?verbose_signing ?simulation ?(force = false) ?branch ?successor_level
+    ~source ~src_pk ~src_sk ~destination ?(entrypoint = Entrypoint.default)
+    ~parameters ~amount ?fee ?gas_limit ?storage_limit ?counter ~fee_parameter
+    ?replace_by_fees () =
   let contents =
     build_transaction_operation
       ~amount
@@ -129,6 +130,7 @@ let transfer_with_script (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ?simulation
     ~force
     ?branch
+    ?successor_level
     ~source
     ~fee:(Limit.of_option fee)
     ~gas_limit:(Limit.of_option gas_limit)
@@ -147,9 +149,9 @@ let transfer_with_script (cctxt : #full) ~chain ~block ?confirmations ?dry_run
       return ((oph, op, result), contracts)
 
 let transfer (cctxt : #full) ~chain ~block ?confirmations ?dry_run
-    ?verbose_signing ?simulation ?(force = false) ?branch ~source ~src_pk
-    ~src_sk ~destination ?entrypoint ?arg ~amount ?fee ?gas_limit ?storage_limit
-    ?counter ~fee_parameter ?replace_by_fees () =
+    ?verbose_signing ?simulation ?(force = false) ?branch ?successor_level
+    ~source ~src_pk ~src_sk ~destination ?entrypoint ?arg ~amount ?fee
+    ?gas_limit ?storage_limit ?counter ~fee_parameter ?replace_by_fees () =
   parse_arg_transfer arg >>=? fun parameters ->
   transfer_with_script
     (cctxt : #full)
@@ -161,6 +163,7 @@ let transfer (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ?simulation
     ~force
     ?branch
+    ?successor_level
     ~source
     ~src_pk
     ~src_sk

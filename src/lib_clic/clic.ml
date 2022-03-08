@@ -1436,6 +1436,71 @@ let args18 spec1 spec2 spec3 spec4 spec5 spec6 spec7 spec8 spec9 spec10 spec11
             spec18 ));
     }
 
+let args19 spec1 spec2 spec3 spec4 spec5 spec6 spec7 spec8 spec9 spec10 spec11
+    spec12 spec13 spec14 spec15 spec16 spec17 spec18 spec19 =
+  Argument
+    {
+      spec =
+        spec1
+        >> (spec2
+           >> (spec3
+              >> (spec4
+                 >> (spec5
+                    >> (spec6
+                       >> (spec7
+                          >> (spec8
+                             >> (spec9
+                                >> (spec10
+                                   >> (spec11
+                                      >> (spec12
+                                         >> (spec13
+                                            >> (spec14
+                                               >> (spec15
+                                                  >> (spec16
+                                                     >> (spec17
+                                                        >> (spec18
+                                                          >> (spec19 >> NoArgs)
+                                                           )))))))))))))))));
+      converter =
+        (fun ( arg1,
+               ( arg2,
+                 ( arg3,
+                   ( arg4,
+                     ( arg5,
+                       ( spec6,
+                         ( spec7,
+                           ( spec8,
+                             ( spec9,
+                               ( spec10,
+                                 ( spec11,
+                                   ( spec12,
+                                     ( spec13,
+                                       ( spec14,
+                                         ( spec15,
+                                           ( spec16,
+                                             (spec17, (spec18, (spec19, ()))) )
+                                         ) ) ) ) ) ) ) ) ) ) ) ) ) ) ) ->
+          ( arg1,
+            arg2,
+            arg3,
+            arg4,
+            arg5,
+            spec6,
+            spec7,
+            spec8,
+            spec9,
+            spec10,
+            spec11,
+            spec12,
+            spec13,
+            spec14,
+            spec15,
+            spec16,
+            spec17,
+            spec18,
+            spec19 ));
+    }
+
 (* Some combinators for writing commands concisely. *)
 let param ~name ~desc kind next = Param (name, desc, kind, next)
 
