@@ -321,13 +321,14 @@ and _ manager_operation =
       level : Tx_rollup_level_repr.t;
       message : Tx_rollup_message_repr.t;
       message_position : int;
-      proof : (* FIXME/TORU *) bool;
+      previous_message_result : Tx_rollup_commitment_repr.message_result;
+      proof : Tx_rollup_l2_proof.t;
     }
       -> Kind.tx_rollup_rejection manager_operation
   | Tx_rollup_withdraw : {
       tx_rollup : Tx_rollup_repr.t;
       level : Tx_rollup_level_repr.t;
-      context_hash : bytes;
+      context_hash : Context_hash.t;
       message_index : int;
       withdraw_path : Tx_rollup_withdraw_repr.merkle_tree_path;
       contents : Script_repr.lazy_expr;
@@ -712,11 +713,14 @@ module Encoding = struct
           tag = tx_rollup_operation_rejection_tag;
           name = "tx_rollup_rejection";
           encoding =
-            obj5
+            obj6
               (req "rollup" Tx_rollup_repr.encoding)
               (req "level" Tx_rollup_level_repr.encoding)
               (req "message" Tx_rollup_message_repr.encoding)
               (req "message_position" n)
+              (req
+                 "previous_message_result"
+                 Tx_rollup_commitment_repr.message_result_encoding)
               (req "proof" bool);
           select =
             (function
@@ -724,16 +728,34 @@ module Encoding = struct
           proj =
             (function
             | Tx_rollup_rejection
-                {tx_rollup; level; message; message_position; proof} ->
-                (tx_rollup, level, message, Z.of_int message_position, proof));
+                {
+                  tx_rollup;
+                  level;
+                  message;
+                  message_position;
+                  previous_message_result;
+                  proof;
+                } ->
+                ( tx_rollup,
+                  level,
+                  message,
+                  Z.of_int message_position,
+                  previous_message_result,
+                  proof ));
           inj =
-            (fun (tx_rollup, level, message, message_position, proof) ->
+            (fun ( tx_rollup,
+                   level,
+                   message,
+                   message_position,
+                   previous_message_result,
+                   proof ) ->
               Tx_rollup_rejection
                 {
                   tx_rollup;
                   level;
                   message;
                   message_position = Z.to_int message_position;
+                  previous_message_result;
                   proof;
                 });
         }
@@ -748,7 +770,7 @@ module Encoding = struct
               (obj10
                  (req "tx_rollup" Tx_rollup_repr.encoding)
                  (req "level" Tx_rollup_level_repr.encoding)
-                 (req "context_hash" bytes)
+                 (req "context_hash" Context_hash.encoding)
                  (req "message_index" int31)
                  (req
                     "withdraw_path"

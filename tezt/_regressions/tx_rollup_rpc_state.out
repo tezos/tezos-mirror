@@ -1,6 +1,6 @@
 tezt/_regressions/tx_rollup_rpc_state.out
 
 ./tezos-client rpc get '/chains/main/blocks/head/context/tx_rollup/[TX_ROLLUP_HASH]/state'
-{ "last_removed_commitment_hash": null, "commitment_tail_level": null,
+{ "last_removed_commitment_hashes": null, "commitment_tail_level": null,
   "oldest_inbox_level": null, "commitment_head_level": null,
   "head_level": null, "burn_per_byte": "0", "inbox_ema": 0 }

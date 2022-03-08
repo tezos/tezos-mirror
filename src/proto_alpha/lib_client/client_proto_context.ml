@@ -869,19 +869,13 @@ let submit_tx_rollup_commitment (cctxt : #full) ~chain ~block ?confirmations
   Environment.wrap_tzresult (Tx_rollup_level.of_int32 level) >>?= fun level ->
   List.map_es
     (fun root ->
-      match Hex.to_bytes (`Hex root) with
-      | Some content ->
-          return
-          @@ Tx_rollup_commitment.batch_commitment
-               content
-               (Tx_rollup_withdraw.merkelize_list [])
-      | None ->
-          failwith
-            "%s is not a valid binary text encoded using the hexadecimal \
-             notation"
-            root)
+      match
+        Alpha_context.Tx_rollup_message_result_hash.of_b58check_opt root
+      with
+      | Some content -> return content
+      | None -> failwith "%s is not a valid message result hash notation" root)
     (String.split_on_char '!' batches)
-  >>=? fun batches ->
+  >>=? fun messages ->
   let predecessor =
     Option.map
       (fun pred_str -> Tx_rollup_commitment_hash.of_b58check_exn pred_str)
@@ -889,7 +883,7 @@ let submit_tx_rollup_commitment (cctxt : #full) ~chain ~block ?confirmations
   in
   let inbox_hash = Tx_rollup_inbox.hash_of_b58check_exn inbox_hash in
   let commitment : Tx_rollup_commitment.t =
-    {level; batches; predecessor; inbox_hash}
+    {level; messages; predecessor; inbox_hash}
   in
   let contents :
       Kind.tx_rollup_commit Annotated_manager_operation.annotated_list =
@@ -997,13 +991,28 @@ let submit_tx_rollup_remove_commitment (cctxt : #full) ~chain ~block
 let submit_tx_rollup_rejection (cctxt : #full) ~chain ~block ?confirmations
     ?dry_run ?verbose_signing ?simulation ?fee ?gas_limit ?storage_limit
     ?counter ~source ~src_pk ~src_sk ~fee_parameter ~level ~tx_rollup ~message
-    ~message_position ~proof () =
+    ~message_position ~context_hash ~withdrawals_merkle_root ~proof () =
   (match Data_encoding.Json.from_string message with
   | Ok json -> return json
   | Error err -> failwith "Message is not a valid JSON-encoded message: %s" err)
   >>=? fun json ->
   let message = Data_encoding.Json.(destruct Tx_rollup_message.encoding json) in
   Environment.wrap_tzresult (Tx_rollup_level.of_int32 level) >>?= fun level ->
+  (match Context_hash.of_b58check_opt context_hash with
+  | Some hash -> return hash
+  | None ->
+      failwith "%s is not a valid notation for a context hash" context_hash)
+  >>=? fun context_hash ->
+  (match
+     Tx_rollup_withdraw.withdrawals_merkle_root_of_b58check_opt
+       withdrawals_merkle_root
+   with
+  | Some hash -> return hash
+  | None ->
+      failwith
+        "%s is not a valid notation for a withdraw list hash"
+        withdrawals_merkle_root)
+  >>=? fun withdrawals_merkle_root ->
   let contents :
       Kind.tx_rollup_rejection Annotated_manager_operation.annotated_list =
     Annotated_manager_operation.Single_manager
@@ -1012,7 +1021,14 @@ let submit_tx_rollup_rejection (cctxt : #full) ~chain ~block ?confirmations
          ~gas_limit:(Limit.of_option gas_limit)
          ~storage_limit:(Limit.of_option storage_limit)
          (Tx_rollup_rejection
-            {tx_rollup; level; message; message_position; proof}))
+            {
+              tx_rollup;
+              level;
+              message;
+              message_position;
+              previous_message_result = {context_hash; withdrawals_merkle_root};
+              proof;
+            }))
   in
   Injection.inject_manager_operation
     cctxt

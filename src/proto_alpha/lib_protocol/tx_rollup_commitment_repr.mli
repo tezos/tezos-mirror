@@ -39,13 +39,34 @@ end
     and [withdraw_hash] is a [Tx_rollup_withdraw_repr.withdrawals_merkle_root] *)
 module Message_result_hash : S.HASH
 
-(** [batch_commitment context_hash withdraw_merkle_root] computes the
-    [Message_result_hash.t] of the given context hash and withdraw merkle
-    root, which is [hash(context_hash @ withdraw_merkle_root))].  *)
-val batch_commitment :
-  bytes ->
-  Tx_rollup_withdraw_repr.withdrawals_merkle_root ->
-  Message_result_hash.t
+type message_result = {
+  context_hash : Context_hash.t;
+  withdrawals_merkle_root : Tx_rollup_withdraw_repr.withdrawals_merkle_root;
+}
+
+val message_result_encoding : message_result Data_encoding.t
+
+(** [hash_message_result result] computes the [Message_result_hash.t]
+    of the given context hash and withdraw list hash, that is
+    [hash(result.context_hash @ result.withdrawals_merkle_root))].  *)
+val hash_message_result : message_result -> Message_result_hash.t
+
+val pp_message_result_hash : Format.formatter -> Message_result_hash.t -> unit
+
+(** [empty_l2_context_hash] is the context hash of the layer-2 context
+    just after its origination. *)
+val empty_l2_context_hash : Context_hash.t
+
+(** [initial_message_result_hash] is equal to
+
+{[
+hash_message_result
+  {
+    context_hash = empty_l2_context_hash;
+    withdrawals_merkle_root = Tx_rollup_withdraw_repr.empty_withdrawals_merkle_root;
+  }
+]} *)
+val initial_message_result_hash : Message_result_hash.t
 
 (** A commitment describes the interpretation of the messages stored in the
     inbox of a particular [level], on top of a particular layer-2 context.
@@ -59,7 +80,7 @@ val batch_commitment :
     empty tree. *)
 type t = {
   level : Tx_rollup_level_repr.t;
-  batches : Message_result_hash.t list;
+  messages : Message_result_hash.t list;
   predecessor : Commitment_hash.t option;
   inbox_hash : Tx_rollup_inbox_repr.hash;
 }
@@ -72,16 +93,10 @@ val encoding : t Data_encoding.t
 
 val hash : t -> Commitment_hash.t
 
-(** [check_batch_commitment commitment context_hash withdraw_merkle_root n]
-    returns true if the message result hash of the [n]th batch in
-    [commitment] corresponds to [context_hash] and
-    [withdraw_merkle_root]. *)
-val check_batch_commitment :
-  t ->
-  context_hash:bytes ->
-  Tx_rollup_withdraw_repr.withdrawals_merkle_root ->
-  message_index:int ->
-  bool
+(** [check_message_result commitment result message_index] returns true
+    if the message result hash of the batch in [commitment] indexed by
+    [message_index] corresponds to the hash of [result]. *)
+val check_message_result : t -> message_result -> message_index:int -> bool
 
 module Index : Storage_description.INDEX with type t = Commitment_hash.t
 

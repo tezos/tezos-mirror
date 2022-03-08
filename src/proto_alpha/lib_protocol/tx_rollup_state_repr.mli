@@ -149,9 +149,10 @@ val record_commitment_rejection :
   Tx_rollup_commitment_repr.Commitment_hash.t option ->
   t tzresult
 
-(** [record_commitment_deletion state level hash] updates [state] to
-    take into account the deletion of a commitment at a given rollup
-    [level], and of given [hash].
+(** [record_commitment_deletion state level msg_hash commitment_hash]
+    updates [state] to take into account the deletion of a commitment
+    at a given rollup [level], and of given [commitment_hash] and
+    whose last message commitment is [msg_hash].
 
     This function returns an [Internal_error] if [level] is not the
     commitment tail, that is the oldest finalized commitment. *)
@@ -159,6 +160,7 @@ val record_commitment_deletion :
   t ->
   Tx_rollup_level_repr.t ->
   Tx_rollup_commitment_repr.Commitment_hash.t ->
+  Tx_rollup_commitment_repr.Message_result_hash.t ->
   t tzresult
 
 (** [finalized_commitments_range state] returns the window of finalized
@@ -169,12 +171,28 @@ val record_commitment_deletion :
 val finalized_commitments_range :
   t -> (Tx_rollup_level_repr.t * Tx_rollup_level_repr.t) option tzresult
 
+(** [check_level_can_be_rejected state level] raises
+    [Cannot_reject_level] iff there does not exist a commitment at
+    [level] that is not yet finalized. *)
+val check_level_can_be_rejected : t -> Tx_rollup_level_repr.t -> unit tzresult
+
+(** [last_removed_commitment_hashes state] returns two hashes
+    associated to the last removed commitment: the message result
+    hash and the last commitment hash. *)
+val last_removed_commitment_hashes :
+  t ->
+  (Tx_rollup_commitment_repr.Message_result_hash.t
+  * Tx_rollup_commitment_repr.Commitment_hash.t)
+  option
+
 module Internal_for_tests : sig
   (** [make] returns a state for tests *)
   val make :
     ?burn_per_byte:Tez_repr.t ->
     ?inbox_ema:int ->
-    ?last_removed_commitment_hash:Tx_rollup_commitment_repr.Commitment_hash.t ->
+    ?last_removed_commitment_hashes:
+      Tx_rollup_commitment_repr.Message_result_hash.t
+      * Tx_rollup_commitment_repr.Commitment_hash.t ->
     ?commitment_tail_level:Tx_rollup_level_repr.t ->
     ?oldest_inbox_level:Tx_rollup_level_repr.t ->
     ?commitment_head_level:

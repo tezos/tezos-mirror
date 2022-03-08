@@ -102,7 +102,8 @@ let submit_remove_commitment ?(src = Constant.bootstrap1.public_key_hash)
   Client.Tx_rollup.submit_remove_commitment ~hooks ~rollup ~src client
 
 let submit_rejection ?(src = Constant.bootstrap1.public_key_hash) ~level
-    ~message ~position ~proof {rollup; client; node = _} =
+    ~message ~position ~proof {rollup; client; node = _} ~context_hash
+    ~withdraw_list_hash =
   Client.Tx_rollup.submit_rejection
     ~hooks
     ~level
@@ -111,6 +112,8 @@ let submit_rejection ?(src = Constant.bootstrap1.public_key_hash) ~level
     ~proof
     ~rollup
     ~src
+    ~context_hash
+    ~withdraw_list_hash
     client
 
 (* This module only registers regressions tests. Those regressions
@@ -163,7 +166,7 @@ module Regressions = struct
       let* () =
         submit_commitment
           ~level:0
-          ~roots:["root"]
+          ~roots:[Constant.tx_rollup_initial_message_result]
           ~inbox_hash:inbox.hash
           ~predecessor:None
           state
@@ -191,7 +194,7 @@ module Regressions = struct
       let* () =
         submit_commitment
           ~level:0
-          ~roots:["root"]
+          ~roots:[Constant.tx_rollup_initial_message_result]
           ~inbox_hash:inbox.hash
           ~predecessor:None
           state
@@ -438,7 +441,7 @@ module Regressions = struct
       let* () =
         submit_commitment
           ~level:0
-          ~roots:["root"]
+          ~roots:[Constant.tx_rollup_initial_message_result]
           ~inbox_hash:inbox.hash
           ~predecessor:None
           state
@@ -658,7 +661,7 @@ let test_rollup_with_two_commitments =
   let* () =
     submit_commitment
       ~level:0
-      ~roots:["root"]
+      ~roots:[Constant.tx_rollup_initial_message_result]
       ~inbox_hash:inbox.hash
       ~predecessor:None
       state
@@ -720,7 +723,7 @@ let test_rollup_with_two_commitments =
   let* () =
     submit_commitment
       ~level:1
-      ~roots:["root"]
+      ~roots:[Constant.tx_rollup_initial_message_result]
       ~inbox_hash:inbox.hash
       ~predecessor
       state
@@ -764,7 +767,7 @@ let test_rollup_last_commitment_is_rejected =
   let* () =
     submit_commitment
       ~level:0
-      ~roots:["root"]
+      ~roots:[Constant.tx_rollup_initial_message_result]
       ~inbox_hash:inbox.hash
       ~predecessor:None
       state
@@ -775,7 +778,16 @@ let test_rollup_last_commitment_is_rejected =
   let*! _ = RPC.Tx_rollup.get_state ~rollup client in
   (* This is the encoding of [batch]. *)
   let message = "{ \"batch\": \"blob\"}" in
-  let*! () = submit_rejection ~level:0 ~message ~position:0 ~proof:true state in
+  let*! () =
+    submit_rejection
+      ~level:0
+      ~message
+      ~position:0
+      ~proof:true
+      ~context_hash:Constant.tx_rollup_empty_l2_context
+      ~withdraw_list_hash:Constant.tx_rollup_empty_withdraw_list
+      state
+  in
   let* () = Client.bake_for client in
   let*! _ = RPC.Tx_rollup.get_state ~rollup client in
   let* _ = RPC.get_block client in
@@ -798,7 +810,7 @@ let test_rollup_wrong_rejection =
   let* () =
     submit_commitment
       ~level:0
-      ~roots:["root"]
+      ~roots:[Constant.tx_rollup_initial_message_result]
       ~inbox_hash:inbox.hash
       ~predecessor:None
       state
@@ -816,6 +828,9 @@ let test_rollup_wrong_rejection =
       ~level:0
       ~message
       ~message_position:0
+      ~previous_message_result:
+        ( Constant.tx_rollup_empty_l2_context,
+          Constant.tx_rollup_empty_withdraw_list )
       state.client
   in
   let* () = Client.bake_for client in

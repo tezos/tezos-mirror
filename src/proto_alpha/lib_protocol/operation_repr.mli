@@ -366,7 +366,8 @@ and _ manager_operation =
       level : Tx_rollup_level_repr.t;
       message : Tx_rollup_message_repr.t;
       message_position : int;
-      proof : (* FIXME/TORU *) bool;
+      previous_message_result : Tx_rollup_commitment_repr.message_result;
+      proof : Tx_rollup_l2_proof.t;
     }
       -> Kind.tx_rollup_rejection manager_operation
       (** [Tx_rollup_withdraw] allows an implicit account (the "claimer") to
@@ -382,7 +383,7 @@ and _ manager_operation =
           (** The rollup from where the tickets are retrieved *)
       level : Tx_rollup_level_repr.t;
           (** The level at which the withdrawal was enabled *)
-      context_hash : bytes;
+      context_hash : Context_hash.t;
           (** The hash of the l2 context resulting from the execution of the
           inbox from where this withdrawal was enabled. *)
       message_index : int;

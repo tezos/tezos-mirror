@@ -33,6 +33,7 @@ let hooks =
         ("txr1\\w{33}\\b", "[TX_ROLLUP_HASH]");
         ("tz4\\w{33}\\b", "[TX_ROLLUP_PUBLIC_KEY_HASH]");
         ("txi\\w{50}\\b", "[TX_ROLLUP_INBOX_HASH]");
+        ("txmr\\w{50}\\b", "[TX_ROLLUP_MESSAGE_RESULT_HASH]");
         ("txm\\w{50}\\b", "[TX_ROLLUP_MESSAGE_HASH]");
         ("txmr\\w{50}\\b", "[TX_ROLLUP_MESSAGE_RESULT_HASH]");
         ("txc\\w{50}\\b", "[TX_ROLLUP_COMMITMENT_HASH]");

@@ -2528,8 +2528,18 @@ let commands_rw () =
            ~name:"message_position"
            ~desc:"position of the message being rejected in the inbox"
            int_parameter
-      @@ prefix "with" @@ prefix "proof" @@ tx_rollup_proof_param @@ prefix "to"
-      @@ tx_rollup_param @@ prefix "from"
+      @@ prefix "with" @@ prefix "proof" @@ tx_rollup_proof_param
+      @@ prefixes ["with"; "agreed"; "context"; "hash"]
+      @@ Clic.param
+           ~name:"context_hash"
+           ~desc:"the context hash of the layer 2"
+           Client_proto_args.string_parameter
+      @@ prefixes ["and"; "withdraw"; "list"]
+      @@ Clic.param
+           ~name:"withdrawals_merkle_root"
+           ~desc:"the hash of the merkelised withdraw list"
+           Client_proto_args.string_parameter
+      @@ prefix "to" @@ tx_rollup_param @@ prefix "from"
       @@ ContractAlias.destination_param
            ~name:"src"
            ~desc:"name of the account rejecting the commitment."
@@ -2550,6 +2560,8 @@ let commands_rw () =
            message
            message_position
            proof
+           context_hash
+           withdrawals_merkle_root
            tx_rollup
            (_, source)
            cctxt ->
@@ -2590,6 +2602,8 @@ let commands_rw () =
               ~message
               ~message_position
               ~proof
+              ~context_hash
+              ~withdrawals_merkle_root
               ()
             >>=? fun _res -> return_unit);
     command

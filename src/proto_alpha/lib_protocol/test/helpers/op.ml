@@ -637,3 +637,27 @@ let tx_rollup_withdraw ?counter ?fee ?gas_limit ?storage_limit ctxt
   >>=? fun to_sign_op ->
   Context.Contract.manager ctxt source >|=? fun account ->
   sign account.sk ctxt to_sign_op
+
+let tx_rollup_reject ?counter ?fee ?gas_limit ?storage_limit ctxt
+    (source : Contract.t) (tx_rollup : Tx_rollup.t) (level : Tx_rollup_level.t)
+    (message : Tx_rollup_message.t) ~(message_position : int) ~(proof : bool)
+    ~(previous_message_result : Tx_rollup_commitment.message_result) =
+  manager_operation
+    ?counter
+    ?fee
+    ?gas_limit
+    ?storage_limit
+    ~source
+    ctxt
+    (Tx_rollup_rejection
+       {
+         tx_rollup;
+         level;
+         message;
+         message_position;
+         proof;
+         previous_message_result;
+       })
+  >>=? fun to_sign_op ->
+  Context.Contract.manager ctxt source >|=? fun account ->
+  sign account.sk ctxt to_sign_op

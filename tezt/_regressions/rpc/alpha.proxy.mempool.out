@@ -2285,12 +2285,29 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                               "message_position": {
                                 "$ref": "#/definitions/positive_bignum"
                               },
+                              "previous_message_result": {
+                                "type": "object",
+                                "properties": {
+                                  "context_hash": {
+                                    "$ref": "#/definitions/Context_hash"
+                                  },
+                                  "withdrawals_merkle_root": {
+                                    "$ref": "#/definitions/Withdraw_list_hash"
+                                  }
+                                },
+                                "required": [
+                                  "withdrawals_merkle_root",
+                                  "context_hash"
+                                ],
+                                "additionalProperties": false
+                              },
                               "proof": {
                                 "type": "boolean"
                               }
                             },
                             "required": [
                               "proof",
+                              "previous_message_result",
                               "message_position",
                               "message",
                               "level",
@@ -2338,8 +2355,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 "maximum": 2147483647
                               },
                               "context_hash": {
-                                "type": "string",
-                                "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                                "$ref": "#/definitions/Context_hash"
                               },
                               "message_index": {
                                 "type": "integer",
@@ -3992,7 +4008,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 {
                                   "name": "parameters",
                                   "layout": {
-                                    "name": "X_12",
+                                    "name": "X_13",
                                     "kind": "Ref"
                                   },
                                   "data_kind": {
@@ -4657,7 +4673,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 {
                                   "name": "commitment",
                                   "layout": {
-                                    "name": "X_10",
+                                    "name": "X_11",
                                     "kind": "Ref"
                                   },
                                   "data_kind": {
@@ -5040,6 +5056,18 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                   "kind": "named"
                                 },
                                 {
+                                  "name": "previous_message_result",
+                                  "layout": {
+                                    "name": "X_10",
+                                    "kind": "Ref"
+                                  },
+                                  "data_kind": {
+                                    "size": 64,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
                                   "name": "proof",
                                   "layout": {
                                     "kind": "Bool"
@@ -5148,17 +5176,13 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                   "kind": "named"
                                 },
                                 {
-                                  "kind": "dyn",
-                                  "num_fields": 1,
-                                  "size": "Uint30"
-                                },
-                                {
                                   "name": "context_hash",
                                   "layout": {
                                     "kind": "Bytes"
                                   },
                                   "data_kind": {
-                                    "kind": "Variable"
+                                    "size": 32,
+                                    "kind": "Float"
                                   },
                                   "kind": "named"
                                 },
@@ -6253,7 +6277,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "X_12"
+                          "title": "X_13"
                         },
                         "encoding": {
                           "fields": [
@@ -6636,7 +6660,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "X_10"
+                          "title": "X_11"
                         },
                         "encoding": {
                           "fields": [
@@ -6673,7 +6697,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                             {
                               "name": "predecessor",
                               "layout": {
-                                "name": "X_11",
+                                "name": "X_12",
                                 "kind": "Ref"
                               },
                               "data_kind": {
@@ -6697,7 +6721,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "X_11"
+                          "title": "X_12"
                         },
                         "encoding": {
                           "tag_size": "Uint8",
@@ -6761,6 +6785,37 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 }
                               ],
                               "name": "Some"
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "description": {
+                          "title": "X_10"
+                        },
+                        "encoding": {
+                          "fields": [
+                            {
+                              "name": "context_hash",
+                              "layout": {
+                                "kind": "Bytes"
+                              },
+                              "data_kind": {
+                                "size": 32,
+                                "kind": "Float"
+                              },
+                              "kind": "named"
+                            },
+                            {
+                              "name": "withdrawals_merkle_root",
+                              "layout": {
+                                "kind": "Bytes"
+                              },
+                              "data_kind": {
+                                "size": 32,
+                                "kind": "Float"
+                              },
+                              "kind": "named"
                             }
                           ]
                         }
@@ -9530,12 +9585,29 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                               "message_position": {
                                 "$ref": "#/definitions/positive_bignum"
                               },
+                              "previous_message_result": {
+                                "type": "object",
+                                "properties": {
+                                  "context_hash": {
+                                    "$ref": "#/definitions/Context_hash"
+                                  },
+                                  "withdrawals_merkle_root": {
+                                    "$ref": "#/definitions/Withdraw_list_hash"
+                                  }
+                                },
+                                "required": [
+                                  "withdrawals_merkle_root",
+                                  "context_hash"
+                                ],
+                                "additionalProperties": false
+                              },
                               "proof": {
                                 "type": "boolean"
                               }
                             },
                             "required": [
                               "proof",
+                              "previous_message_result",
                               "message_position",
                               "message",
                               "level",
@@ -9583,8 +9655,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 "maximum": 2147483647
                               },
                               "context_hash": {
-                                "type": "string",
-                                "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                                "$ref": "#/definitions/Context_hash"
                               },
                               "message_index": {
                                 "type": "integer",

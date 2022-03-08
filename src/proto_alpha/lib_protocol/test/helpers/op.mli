@@ -328,7 +328,7 @@ val tx_rollup_withdraw :
   source:Contract.t ->
   Tx_rollup.t ->
   Tx_rollup_level.t ->
-  context_hash:bytes ->
+  context_hash:Context_hash.t ->
   message_index:int ->
   contents:Script.lazy_expr ->
   ty:Script.lazy_expr ->
@@ -338,3 +338,20 @@ val tx_rollup_withdraw :
   Tx_rollup_withdraw.merkle_tree_path ->
   Entrypoint_repr.t ->
   (packed_operation, tztrace) result Lwt.t
+
+(** [tx_rollup_reject ctxt source tx_rollup tx_rollup level message
+    index proof] Rejects a tx rollup commitment. *)
+val tx_rollup_reject :
+  ?counter:Z.t ->
+  ?fee:Tez.tez ->
+  ?gas_limit:Gas.Arith.integral ->
+  ?storage_limit:Z.t ->
+  Context.t ->
+  Contract.t ->
+  Tx_rollup.t ->
+  Tx_rollup_level.t ->
+  Tx_rollup_message.t ->
+  message_position:int ->
+  proof:bool ->
+  previous_message_result:Tx_rollup_commitment.message_result ->
+  Operation.packed tzresult Lwt.t

@@ -958,8 +958,9 @@ module Tx_rollup : sig
     unit Process.runnable
 
   (** Run [tezos-client submit tx rollup rejection commitment at level
-     <level> message <message> at <position> with <proof> to
-     <tx_rollup> from <src>]. *)
+     <level> message <message> at <position> with <proof> with agreed
+     context hash <context_hash> and withdraw list
+     <withdraw_list_hash> to <tx_rollup> from <src>]. *)
   val submit_rejection :
     ?wait:string ->
     ?burn_cap:Tez.t ->
@@ -969,6 +970,8 @@ module Tx_rollup : sig
     message:string ->
     position:int ->
     proof:bool ->
+    context_hash:string ->
+    withdraw_list_hash:string ->
     rollup:string ->
     src:string ->
     t ->
