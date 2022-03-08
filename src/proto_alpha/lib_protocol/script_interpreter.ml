@@ -1716,6 +1716,26 @@ type execution_arg =
   | Typed_arg : Script.location * 'a Script_typed_ir.ty * 'a -> execution_arg
   | Untyped_arg : Script.expr -> execution_arg
 
+let lift_execution_arg (type a) ctxt ~internal (entrypoint_ty : a ty)
+    (box : a -> 'b) arg : ('b * context) tzresult Lwt.t =
+  (match arg with
+  | Untyped_arg arg ->
+      let arg = Micheline.root arg in
+      parse_data ctxt ~legacy:false ~allow_forged:internal entrypoint_ty arg
+  | Typed_arg (location, parsed_arg_ty, parsed_arg) ->
+      Gas_monad.run
+        ctxt
+        (Script_ir_translator.ty_eq
+           ~error_details:Informative
+           location
+           entrypoint_ty
+           parsed_arg_ty)
+      >>?= fun (res, ctxt) ->
+      res >>?= fun Eq ->
+      let parsed_arg : a = parsed_arg in
+      return (parsed_arg, ctxt))
+  >>=? fun (entrypoint_arg, ctxt) -> return (box entrypoint_arg, ctxt)
+
 type execution_result = {
   script : Script_ir_translator.ex_script;
   code_size : int;
@@ -1752,23 +1772,9 @@ let execute_any_arg logger ctxt mode step_constants ~entrypoint ~internal
   >>?= fun (r, ctxt) ->
   record_trace (Bad_contract_parameter step_constants.self) r
   >>?= fun (Ex_ty_cstr (entrypoint_ty, box)) ->
-  (match arg with
-  | Untyped_arg arg ->
-      let arg = Micheline.root arg in
-      trace
-        (Bad_contract_parameter step_constants.self)
-        (parse_data ctxt ~legacy:false ~allow_forged:internal entrypoint_ty arg)
-      >>=? fun (parsed_arg, ctxt) -> return (box parsed_arg, ctxt)
-  | Typed_arg (location, parsed_arg_ty, parsed_arg) ->
-      Gas_monad.run
-        ctxt
-        (Script_ir_translator.ty_eq
-           ~error_details:Informative
-           location
-           entrypoint_ty
-           parsed_arg_ty)
-      >>?= fun (res, ctxt) ->
-      res >>?= fun Eq -> return (box parsed_arg, ctxt))
+  trace
+    (Bad_contract_parameter step_constants.self)
+    (lift_execution_arg ctxt ~internal entrypoint_ty box arg)
   >>=? fun (arg, ctxt) ->
   Script_ir_translator.collect_lazy_storage ctxt arg_type arg
   >>?= fun (to_duplicate, ctxt) ->
