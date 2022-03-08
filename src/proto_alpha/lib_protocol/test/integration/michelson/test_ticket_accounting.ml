@@ -282,12 +282,13 @@ let empty_big_map ctxt ~key_type ~value_type =
   let open Script_typed_ir in
   let* (ctxt, big_map_id) = wrap @@ Big_map.fresh ~temporary:false ctxt in
   return
-    ( {
-        id = Some big_map_id;
-        diff = {map = Big_map_overlay.empty; size = 0};
-        key_type;
-        value_type;
-      },
+    ( Big_map
+        {
+          id = Some big_map_id;
+          diff = {map = Big_map_overlay.empty; size = 0};
+          key_type;
+          value_type;
+        },
       ctxt )
 
 let make_big_map ctxt contract ~key_type ~value_type entries =
@@ -297,12 +298,13 @@ let make_big_map ctxt contract ~key_type ~value_type entries =
     new_big_map ctxt contract ~key_type ~value_type entries
   in
   return
-    ( {
-        id = Some big_map_id;
-        diff = {map = Big_map_overlay.empty; size = 0};
-        key_type;
-        value_type;
-      },
+    ( Big_map
+        {
+          id = Some big_map_id;
+          diff = {map = Big_map_overlay.empty; size = 0};
+          key_type;
+          value_type;
+        },
       ctxt )
 
 let originate_script block ~script ~storage ~src ~baker ~forges_tickets =

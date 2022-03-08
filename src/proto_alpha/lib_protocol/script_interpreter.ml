@@ -447,14 +447,17 @@ and ilsr_nat : type a b c d e f. (a, b, c, d, e, f) ilsr_nat_type =
   | None -> get_log logger >>=? fun log -> fail (Overflow (kinfo.iloc, log))
   | Some r -> (step [@ocaml.tailcall]) g gas k ks r stack
 
-and ifailwith : type a b. (a, b) ifailwith_type =
- fun logger (ctxt, _) gas kloc tv accu ->
-  let v = accu in
-  let ctxt = update_context gas ctxt in
-  trace Cannot_serialize_failure (unparse_data ctxt Optimized tv v)
-  >>=? fun (v, _ctxt) ->
-  let v = Micheline.strip_locations v in
-  get_log logger >>=? fun log -> fail (Reject (kloc, v, log))
+and ifailwith : ifailwith_type =
+  {
+    ifailwith =
+      (fun logger (ctxt, _) gas kloc tv accu ->
+        let v = accu in
+        let ctxt = update_context gas ctxt in
+        trace Cannot_serialize_failure (unparse_data ctxt Optimized tv v)
+        >>=? fun (v, _ctxt) ->
+        let v = Micheline.strip_locations v in
+        get_log logger >>=? fun log -> fail (Reject (kloc, v, log)));
+  }
 
 and iexec : type a b c d e f g. (a, b, c, d, e, f, g) iexec_type =
  fun logger g gas k ks accu stack ->
@@ -927,7 +930,9 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
           (step [@ocaml.tailcall]) (ctxt, sc) gas k ks lam' stack
       | ILambda (_, lam, k) ->
           (step [@ocaml.tailcall]) g gas k ks lam (accu, stack)
-      | IFailwith (_, kloc, tv) -> ifailwith None g gas kloc tv accu
+      | IFailwith (_, kloc, tv) ->
+          let {ifailwith} = ifailwith in
+          ifailwith None g gas kloc tv accu
       (* comparison *)
       | ICompare (_, ty, k) ->
           let a = accu in
@@ -981,7 +986,8 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
           >>=? fun (opt, ctxt, gas) ->
           (step [@ocaml.tailcall]) (ctxt, sc) gas k ks opt stack
       | IAddress (_, k) ->
-          (step [@ocaml.tailcall]) g gas k ks accu.address stack
+          let (Typed_contract {address; _}) = accu in
+          (step [@ocaml.tailcall]) g gas k ks address stack
       | IContract (kinfo, t, entrypoint, k) -> (
           let addr = accu in
           let entrypoint_opt =
@@ -1005,11 +1011,9 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
           | None -> (step [@ocaml.tailcall]) (ctxt, sc) gas k ks None stack)
       | ITransfer_tokens (_, k) ->
           let p = accu in
-          let (amount, (tcontract, stack)) = stack in
-          let tp = tcontract.arg_ty in
-          let destination = tcontract.address.destination in
-          let entrypoint = tcontract.address.entrypoint in
-          transfer (ctxt, sc) gas amount tp p destination entrypoint
+          let (amount, (Typed_contract {arg_ty; address}, stack)) = stack in
+          let {destination; entrypoint} = address in
+          transfer (ctxt, sc) gas amount arg_ty p destination entrypoint
           >>=? fun (accu, ctxt, gas) ->
           (step [@ocaml.tailcall]) (ctxt, sc) gas k ks accu stack
       | IImplicit_account (_, k) ->
@@ -1021,7 +1025,7 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
               entrypoint = Entrypoint.default;
             }
           in
-          let res = {arg_ty; address} in
+          let res = Typed_contract {arg_ty; address} in
           (step [@ocaml.tailcall]) g gas k ks res stack
       | IView (_, View_signature {name; input_ty; output_ty}, k) -> (
           let input = accu in
@@ -1211,7 +1215,8 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
           (step [@ocaml.tailcall]) g gas k ks res (accu, stack)
       | ISelf (_, ty, entrypoint, k) ->
           let destination : Destination.t = Contract sc.self in
-          let res = {arg_ty = ty; address = {destination; entrypoint}} in
+          let address = {destination; entrypoint} in
+          let res = Typed_contract {arg_ty = ty; address} in
           (step [@ocaml.tailcall]) g gas k ks res (accu, stack)
       | ISelf_address (_, k) ->
           let destination : Destination.t = Contract sc.self in
@@ -1560,6 +1565,7 @@ and log :
       let extra = (kinfo, k) in
       (ilsr_nat [@ocaml.tailcall]) (Some logger) g gas extra ks accu stack
   | IFailwith (_, kloc, tv) ->
+      let {ifailwith} = ifailwith in
       (ifailwith [@ocaml.tailcall]) (Some logger) g gas kloc tv accu
   | IExec (_, k) ->
       (iexec [@ocaml.tailcall]) (Some logger) g gas k ks accu stack

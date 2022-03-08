@@ -82,7 +82,22 @@ type ex_parameter_ty_and_entrypoints =
 type ex_stack_ty =
   | Ex_stack_ty : ('a, 's) Script_typed_ir.stack_ty -> ex_stack_ty
 
-type ex_script = Ex_script : ('a, 'b) Script_typed_ir.script -> ex_script
+type ex_script =
+  | Ex_script : {
+      code :
+        ( ('arg, 'storage) Script_typed_ir.pair,
+          ( Script_typed_ir.operation Script_typed_ir.boxed_list,
+            'storage )
+          Script_typed_ir.pair )
+        Script_typed_ir.lambda;
+      arg_type : 'arg Script_typed_ir.ty;
+      storage : 'storage;
+      storage_type : 'storage Script_typed_ir.ty;
+      views : Script_typed_ir.view_map;
+      entrypoints : 'arg Script_typed_ir.entrypoints;
+      code_size : Cache_memory_helpers.sint;
+    }
+      -> ex_script
 
 type toplevel = {
   code_field : Script.node;
@@ -91,24 +106,26 @@ type toplevel = {
   views : Script_typed_ir.view_map;
 }
 
-type ('arg, 'storage) code = {
-  code :
-    ( ('arg, 'storage) Script_typed_ir.pair,
-      ( Script_typed_ir.operation Script_typed_ir.boxed_list,
-        'storage )
-      Script_typed_ir.pair )
-    Script_typed_ir.lambda;
-  arg_type : 'arg Script_typed_ir.ty;
-  storage_type : 'storage Script_typed_ir.ty;
-  views : Script_typed_ir.view_map;
-  entrypoints : 'arg Script_typed_ir.entrypoints;
-  code_size : Cache_memory_helpers.sint;
-      (** This is an over-approximation of the value size in memory, in
+type ('arg, 'storage) code =
+  | Code : {
+      code :
+        ( ('arg, 'storage) Script_typed_ir.pair,
+          ( Script_typed_ir.operation Script_typed_ir.boxed_list,
+            'storage )
+          Script_typed_ir.pair )
+        Script_typed_ir.lambda;
+      arg_type : 'arg Script_typed_ir.ty;
+      storage_type : 'storage Script_typed_ir.ty;
+      views : Script_typed_ir.view_map;
+      entrypoints : 'arg Script_typed_ir.entrypoints;
+      code_size : Cache_memory_helpers.sint;
+          (** This is an over-approximation of the value size in memory, in
          bytes, of the contract's static part, that is its source
          code. This includes the code of the contract as well as the code
          of the views. The storage size is not taken into account by this
          field as it has a dynamic size. *)
-}
+    }
+      -> ('arg, 'storage) code
 
 type ex_code = Ex_code : ('a, 'c) code -> ex_code
 
@@ -390,10 +407,7 @@ val parse_script :
 
 (* Gas accounting may not be perfect in this function, as it is only called by RPCs. *)
 val unparse_script :
-  context ->
-  unparsing_mode ->
-  ('a, 'b) Script_typed_ir.script ->
-  (Script.t * context) tzresult Lwt.t
+  context -> unparsing_mode -> ex_script -> (Script.t * context) tzresult Lwt.t
 
 val parse_contract :
   context ->

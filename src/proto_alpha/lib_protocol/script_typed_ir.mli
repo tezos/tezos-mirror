@@ -385,16 +385,6 @@ and 'arg nested_entrypoints =
 (** [no_entrypoints] is [{name = None; nested = Entrypoints_None}] *)
 val no_entrypoints : _ entrypoints
 
-type ('arg, 'storage) script = {
-  code : (('arg, 'storage) pair, (operation boxed_list, 'storage) pair) lambda;
-  arg_type : 'arg ty;
-  storage : 'storage;
-  storage_type : 'storage ty;
-  views : view_map;
-  entrypoints : 'arg entrypoints;
-  code_size : Cache_memory_helpers.sint;
-}
-
 (* ---- Instructions --------------------------------------------------------*)
 
 (*
@@ -496,7 +486,7 @@ type ('arg, 'storage) script = {
    [1]: http://www.complang.tuwien.ac.at/projects/interpreters.html
 
  *)
-and ('before_top, 'before, 'result_top, 'result) kinstr =
+type ('before_top, 'before, 'result_top, 'result) kinstr =
   (*
      Stack
      -----
@@ -1211,7 +1201,12 @@ and ('arg, 'ret) lambda =
       -> ('arg, 'ret) lambda
 [@@coq_force_gadt]
 
-and 'arg typed_contract = {arg_ty : 'arg ty; address : address}
+and 'arg typed_contract =
+  | Typed_contract : {
+      arg_ty : 'arg ty;
+      address : address;
+    }
+      -> 'arg typed_contract
 
 (*
 
@@ -1432,12 +1427,14 @@ and ('top_ty, 'resty) stack_ty =
   | Item_t : 'ty ty * ('ty2, 'rest) stack_ty -> ('ty, 'ty2 * 'rest) stack_ty
   | Bot_t : (empty_cell, empty_cell) stack_ty
 
-and ('key, 'value) big_map = {
-  id : Big_map.Id.t option;
-  diff : ('key, 'value) big_map_overlay;
-  key_type : 'key comparable_ty;
-  value_type : 'value ty;
-}
+and ('key, 'value) big_map =
+  | Big_map : {
+      id : Big_map.Id.t option;
+      diff : ('key, 'value) big_map_overlay;
+      key_type : 'key comparable_ty;
+      value_type : 'value ty;
+    }
+      -> ('key, 'value) big_map
 
 and ('a, 's, 'r, 'f) kdescr = {
   kloc : Script.location;
@@ -1530,12 +1527,13 @@ and (_, _) dup_n_gadt_witness =
       ('stack, 'b) dup_n_gadt_witness
       -> ('a * 'stack, 'b) dup_n_gadt_witness
 
-and ('a, 'b) view_signature =
-  | View_signature of {
+and ('input, 'output) view_signature =
+  | View_signature : {
       name : Script_string.t;
-      input_ty : 'a ty;
-      output_ty : 'b ty;
+      input_ty : 'input ty;
+      output_ty : 'output ty;
     }
+      -> ('input, 'output) view_signature
 
 val kinfo_of_kinstr : ('a, 's, 'b, 'f) kinstr -> ('a, 's) kinfo
 

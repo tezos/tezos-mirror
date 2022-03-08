@@ -438,7 +438,7 @@ let unparse_tx_rollup_l2_address ~loc ctxt mode
       let b58check = Tx_rollup_l2_address.to_b58check tx_address in
       (String (loc, b58check), ctxt)
 
-let unparse_contract ~loc ctxt mode {arg_ty = _; address} =
+let unparse_contract ~loc ctxt mode (Typed_contract {arg_ty = _; address}) =
   unparse_address ~loc ctxt mode address
 
 let unparse_signature ~loc ctxt mode s =
@@ -1754,16 +1754,35 @@ type toplevel = {
   views : view_map;
 }
 
-type ('arg, 'storage) code = {
-  code : (('arg, 'storage) pair, (operation boxed_list, 'storage) pair) lambda;
-  arg_type : 'arg ty;
-  storage_type : 'storage ty;
-  views : view_map;
-  entrypoints : 'arg entrypoints;
-  code_size : Cache_memory_helpers.sint;
-}
+type ('arg, 'storage) code =
+  | Code : {
+      code :
+        (('arg, 'storage) pair, (operation boxed_list, 'storage) pair) lambda;
+      arg_type : 'arg ty;
+      storage_type : 'storage ty;
+      views : view_map;
+      entrypoints : 'arg entrypoints;
+      code_size : Cache_memory_helpers.sint;
+    }
+      -> ('arg, 'storage) code
 
-type ex_script = Ex_script : ('a, 'c) script -> ex_script
+type ex_script =
+  | Ex_script : {
+      code :
+        (('arg, 'storage) pair, (operation boxed_list, 'storage) pair) lambda;
+      arg_type : 'arg ty;
+      storage : 'storage;
+      storage_type : 'storage ty;
+      views : view_map;
+      entrypoints : 'arg entrypoints;
+      code_size : Cache_memory_helpers.sint;
+          (* This is an over-approximation of the value size in memory, in
+             bytes, of the contract's static part, that is its source
+             code. This includes the code of the contract as well as the code
+             of the views. The storage size is not taken into account by this
+             field as it has a dynamic size. *)
+    }
+      -> ex_script
 
 type ex_code = Ex_code : ('a, 'c) code -> ex_code
 
@@ -2638,7 +2657,7 @@ let[@coq_axiom_with_reason "gadt"] rec parse_data :
             arg_ty
             address.destination
             ~entrypoint:address.entrypoint
-          >|=? fun (ctxt, _) -> ({arg_ty; address}, ctxt) )
+          >|=? fun (ctxt, _) -> (Typed_contract {arg_ty; address}, ctxt) )
   (* Pairs *)
   | (Pair_t (tl, tr, _), expr) ->
       let r_witness = comb_witness1 tr in
@@ -2789,7 +2808,8 @@ let[@coq_axiom_with_reason "gadt"] rec parse_data :
                     >>? fun (eq, ctxt) ->
                     eq >|? fun Eq -> (Some id, ctxt) )
           else traced_fail (Unexpected_forged_value loc))
-      >|=? fun (id, ctxt) -> ({id; diff; key_type = tk; value_type = tv}, ctxt)
+      >|=? fun (id, ctxt) ->
+      (Big_map {id; diff; key_type = tk; value_type = tv}, ctxt)
   | (Never_t, expr) -> Lwt.return @@ traced_no_lwt @@ parse_never expr
   (* Bls12_381 types *)
   | (Bls12_381_g1_t, Bytes (_, bs)) -> (
@@ -5031,7 +5051,8 @@ and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_contra
               >>? fun (eq, ctxt) ->
                 eq >|? fun Eq ->
                 let destination : Destination.t = Contract contract in
-                (ctxt, {arg_ty = arg; address = {destination; entrypoint}}) )
+                let address = {destination; entrypoint} in
+                (ctxt, Typed_contract {arg_ty = arg; address}) )
           else fail (No_such_entrypoint entrypoint)
       | None -> (
           (* Originated account *)
@@ -5069,7 +5090,8 @@ and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_contra
                        loc
                   >>? fun (entrypoint_arg, ctxt) ->
                   entrypoint_arg >|? fun (entrypoint, arg_ty) ->
-                  (ctxt, {arg_ty; address = {destination; entrypoint}}) )))
+                  let address = {destination; entrypoint} in
+                  (ctxt, Typed_contract {arg_ty; address}) )))
   | Tx_rollup tx_rollup ->
       Tx_rollup_state.assert_exist ctxt tx_rollup >>=? fun ctxt ->
       if Entrypoint.(entrypoint = Tx_rollup.deposit_entrypoint) then
@@ -5077,7 +5099,8 @@ and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_contra
            [parse_contract] and [parse_tx_rollup_deposit_parameters]. *)
         match arg with
         | Pair_t (Ticket_t (_, _), Tx_rollup_l2_address_t, _) ->
-            return (ctxt, {arg_ty = arg; address = {destination; entrypoint}})
+            let address = {destination; entrypoint} in
+            return (ctxt, Typed_contract {arg_ty = arg; address})
         | _ ->
             fail
             @@ Tx_rollup_bad_deposit_parameter (loc, serialize_ty_for_error arg)
@@ -5222,9 +5245,8 @@ let parse_contract_for_script :
                 match eq with
                 | Ok Eq ->
                     let destination : Destination.t = Contract contract in
-                    let contract =
-                      {arg_ty = arg; address = {destination; entrypoint}}
-                    in
+                    let address = {destination; entrypoint} in
+                    let contract = Typed_contract {arg_ty = arg; address} in
                     (ctxt, Some contract)
                 | Error Inconsistent_types_fast -> (ctxt, None) )
           else
@@ -5276,9 +5298,8 @@ let parse_contract_for_script :
                           match entrypoint_arg with
                           | Ok (entrypoint, arg_ty) ->
                               let destination = Destination.Contract contract in
-                              let contract =
-                                {arg_ty; address = {destination; entrypoint}}
-                              in
+                              let address = {destination; entrypoint} in
+                              let contract = Typed_contract {arg_ty; address} in
                               (ctxt, Some contract)
                           | Error Inconsistent_types_fast -> (ctxt, None))) )))
   | Tx_rollup tx_rollup -> (
@@ -5291,10 +5312,8 @@ let parse_contract_for_script :
                entrypoint = Alpha_context.Tx_rollup.deposit_entrypoint) -> (
           Tx_rollup_state.find ctxt tx_rollup >|=? function
           | (ctxt, Some _) ->
-              ( ctxt,
-                Some
-                  {arg_ty = arg; address = {destination = contract; entrypoint}}
-              )
+              let address = {destination = contract; entrypoint} in
+              (ctxt, Some (Typed_contract {arg_ty = arg; address}))
           | (ctxt, None) -> (ctxt, None))
       | _ -> return (ctxt, None))
 
@@ -5358,7 +5377,8 @@ let parse_code :
     Gas.consume ctxt (Script_typed_ir_size_costs.nodes_cost ~nodes)
     >>? fun ctxt ->
     ok
-      ( Ex_code {code; arg_type; storage_type; views; entrypoints; code_size},
+      ( Ex_code
+          (Code {code; arg_type; storage_type; views; entrypoints; code_size}),
         ctxt ))
 
 let parse_storage :
@@ -5398,7 +5418,8 @@ let[@coq_axiom_with_reason "gadt"] parse_script :
  fun ?type_logger ctxt ~legacy ~allow_forged_in_storage {code; storage} ->
   parse_code ~legacy ctxt ?type_logger ~code
   >>=? fun ( Ex_code
-               {code; arg_type; storage_type; views; entrypoints; code_size},
+               (Code
+                 {code; arg_type; storage_type; views; entrypoints; code_size}),
              ctxt ) ->
   parse_storage
     ?type_logger
@@ -5612,10 +5633,10 @@ let[@coq_axiom_with_reason "gadt"] rec unparse_data :
       let items = Script_map.fold (fun k v acc -> (k, v) :: acc) map [] in
       unparse_items ctxt ~stack_depth:(stack_depth + 1) mode kt vt items
       >|=? fun (items, ctxt) -> (Micheline.Seq (loc, items), ctxt)
-  | (Big_map_t (_kt, _vt, _), {id = Some id; diff = {size; _}; _})
+  | (Big_map_t (_kt, _vt, _), Big_map {id = Some id; diff = {size; _}; _})
     when Compare.Int.( = ) size 0 ->
       return (Micheline.Int (loc, Big_map.Id.unparse_to_z id), ctxt)
-  | (Big_map_t (kt, vt, _), {id = Some id; diff = {map; _}; _}) ->
+  | (Big_map_t (kt, vt, _), Big_map {id = Some id; diff = {map; _}; _}) ->
       let items =
         Big_map_overlay.fold (fun _ (k, v) acc -> (k, v) :: acc) map []
       in
@@ -5640,7 +5661,7 @@ let[@coq_axiom_with_reason "gadt"] rec unparse_data :
             [Int (loc, Big_map.Id.unparse_to_z id); Seq (loc, items)],
             [] ),
         ctxt )
-  | (Big_map_t (kt, vt, _), {id = None; diff = {map; _}; _}) ->
+  | (Big_map_t (kt, vt, _), Big_map {id = None; diff = {map; _}; _}) ->
       let items =
         Big_map_overlay.fold
           (fun _ (k, v) acc ->
@@ -5776,7 +5797,7 @@ and[@coq_axiom_with_reason "gadt"] unparse_code ctxt ~stack_depth mode code =
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/1688
    Refactor the sharing part of unparse_script and create_contract *)
 let unparse_script ctxt mode
-    {code; arg_type; storage; storage_type; entrypoints; views; _} =
+    (Ex_script {code; arg_type; storage; storage_type; entrypoints; views; _}) =
   let (Lam (_, original_code)) = code in
   Gas.consume ctxt Unparse_costs.unparse_script >>?= fun ctxt ->
   unparse_code ctxt ~stack_depth:0 mode original_code >>=? fun (code, ctxt) ->
@@ -5841,14 +5862,15 @@ let pack_data ctxt ty data =
 (* ---------------- Big map -------------------------------------------------*)
 
 let empty_big_map key_type value_type =
-  {
-    id = None;
-    diff = {map = Big_map_overlay.empty; size = 0};
-    key_type;
-    value_type;
-  }
+  Big_map
+    {
+      id = None;
+      diff = {map = Big_map_overlay.empty; size = 0};
+      key_type;
+      value_type;
+    }
 
-let big_map_mem ctxt key {id; diff; key_type; _} =
+let big_map_mem ctxt key (Big_map {id; diff; key_type; _}) =
   hash_comparable_data ctxt key_type key >>=? fun (key, ctxt) ->
   match (Big_map_overlay.find key diff.map, id) with
   | (None, None) -> return (false, ctxt)
@@ -5857,7 +5879,7 @@ let big_map_mem ctxt key {id; diff; key_type; _} =
   | (Some (_, None), _) -> return (false, ctxt)
   | (Some (_, Some _), _) -> return (true, ctxt)
 
-let big_map_get_by_hash ctxt key {id; diff; value_type; _} =
+let big_map_get_by_hash ctxt key (Big_map {id; diff; value_type; _}) =
   match (Big_map_overlay.find key diff.map, id) with
   | (Some (_, x), _) -> return (x, ctxt)
   | (None, None) -> return (None, ctxt)
@@ -5874,29 +5896,30 @@ let big_map_get_by_hash ctxt key {id; diff; value_type; _} =
             (Micheline.root value)
           >|=? fun (x, ctxt) -> (Some x, ctxt))
 
-let big_map_get ctxt key map =
-  hash_comparable_data ctxt map.key_type key >>=? fun (key_hash, ctxt) ->
+let big_map_get ctxt key (Big_map {key_type; _} as map) =
+  hash_comparable_data ctxt key_type key >>=? fun (key_hash, ctxt) ->
   big_map_get_by_hash ctxt key_hash map
 
-let big_map_update_by_hash ctxt key_hash key value map =
+let big_map_update_by_hash ctxt key_hash key value (Big_map map) =
   let contains = Big_map_overlay.mem key_hash map.diff.map in
   return
-    ( {
-        map with
-        diff =
-          {
-            map = Big_map_overlay.add key_hash (key, value) map.diff.map;
-            size = (if contains then map.diff.size else map.diff.size + 1);
-          };
-      },
+    ( Big_map
+        {
+          map with
+          diff =
+            {
+              map = Big_map_overlay.add key_hash (key, value) map.diff.map;
+              size = (if contains then map.diff.size else map.diff.size + 1);
+            };
+        },
       ctxt )
 
-let big_map_update ctxt key value map =
-  hash_comparable_data ctxt map.key_type key >>=? fun (key_hash, ctxt) ->
+let big_map_update ctxt key value (Big_map {key_type; _} as map) =
+  hash_comparable_data ctxt key_type key >>=? fun (key_hash, ctxt) ->
   big_map_update_by_hash ctxt key_hash key value map
 
-let big_map_get_and_update ctxt key value map =
-  hash_comparable_data ctxt map.key_type key >>=? fun (key_hash, ctxt) ->
+let big_map_get_and_update ctxt key value (Big_map {key_type; _} as map) =
+  hash_comparable_data ctxt key_type key >>=? fun (key_hash, ctxt) ->
   big_map_update_by_hash ctxt key_hash key value map >>=? fun (map', ctxt) ->
   big_map_get_by_hash ctxt key_hash map >>=? fun (old_value, ctxt) ->
   return ((old_value, map'), ctxt)
@@ -5908,7 +5931,7 @@ type lazy_storage_ids = Lazy_storage.IdSet.t
 let no_lazy_storage_id = Lazy_storage.IdSet.empty
 
 let diff_of_big_map ctxt mode ~temporary ~ids_to_copy
-    {id; key_type; value_type; diff} =
+    (Big_map {id; key_type; value_type; diff}) =
   (match id with
   | Some id ->
       if Lazy_storage.IdSet.mem Big_map id ids_to_copy then
@@ -6088,11 +6111,13 @@ let[@coq_axiom_with_reason "gadt"] extract_lazy_storage_updates ctxt mode
         diff_of_big_map ctxt mode ~temporary ~ids_to_copy map
         >|=? fun (diff, id, ctxt) ->
         let map =
-          {
-            map with
-            diff = {map = Big_map_overlay.empty; size = 0};
-            id = Some id;
-          }
+          let (Big_map map) = map in
+          Big_map
+            {
+              map with
+              diff = {map = Big_map_overlay.empty; size = 0};
+              id = Some id;
+            }
         in
         let diff = Lazy_storage.make Big_map id diff in
         let ids_to_copy = Lazy_storage.IdSet.add Big_map id ids_to_copy in
@@ -6189,14 +6214,14 @@ let[@coq_axiom_with_reason "gadt"] rec fold_lazy_storage :
  fun ~f ~init ctxt ty x ~has_lazy_storage ->
   Gas.consume ctxt Typecheck_costs.parse_instr_cycle >>? fun ctxt ->
   match (has_lazy_storage, ty, x) with
-  | (Big_map_f, Big_map_t (_, _, _), {id = Some id; _}) ->
+  | (Big_map_f, Big_map_t (_, _, _), Big_map {id = Some id; _}) ->
       Gas.consume ctxt Typecheck_costs.parse_instr_cycle >>? fun ctxt ->
       ok (f.f Big_map id (Fold_lazy_storage.Ok init), ctxt)
   | (Sapling_state_f, Sapling_state_t _, {id = Some id; _}) ->
       Gas.consume ctxt Typecheck_costs.parse_instr_cycle >>? fun ctxt ->
       ok (f.f Sapling_state id (Fold_lazy_storage.Ok init), ctxt)
   | (False_f, _, _) -> ok (Fold_lazy_storage.Ok init, ctxt)
-  | (Big_map_f, Big_map_t (_, _, _), {id = None; _}) ->
+  | (Big_map_f, Big_map_t (_, _, _), Big_map {id = None; _}) ->
       ok (Fold_lazy_storage.Ok init, ctxt)
   | (Sapling_state_f, Sapling_state_t _, {id = None; _}) ->
       ok (Fold_lazy_storage.Ok init, ctxt)

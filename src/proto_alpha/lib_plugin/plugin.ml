@@ -2437,14 +2437,15 @@ module RPC = struct
           let code = Script.lazy_expr expr in
           Script_ir_translator.parse_code ~legacy ctxt ~code
           >>=? fun ( Ex_code
-                       {
-                         code;
-                         arg_type;
-                         storage_type;
-                         views;
-                         entrypoints;
-                         code_size;
-                       },
+                       (Code
+                         {
+                           code;
+                           arg_type;
+                           storage_type;
+                           views;
+                           entrypoints;
+                           code_size;
+                         }),
                      ctxt ) ->
           Script_ir_translator.parse_data
             ~legacy
@@ -2739,8 +2740,8 @@ module RPC = struct
                 ~legacy:true
                 ~allow_forged_in_storage:true
                 script
-              >>=? fun (Ex_script script, ctxt) ->
-              unparse_script ctxt unparsing_mode script
+              >>=? fun (ex_script, ctxt) ->
+              unparse_script ctxt unparsing_mode ex_script
               >>=? fun (script, ctxt) ->
               Script.force_decode_in_context
                 ~consume_deserialization_gas:When_needed
@@ -2763,8 +2764,8 @@ module RPC = struct
                 ~legacy:true
                 ~allow_forged_in_storage:true
                 script
-              >>=? fun (Ex_script script, ctxt) ->
-              unparse_script ctxt unparsing_mode script
+              >>=? fun (ex_script, ctxt) ->
+              unparse_script ctxt unparsing_mode ex_script
               >>=? fun (script, _ctxt) -> return_some script)
 
     let get_storage_normalized ctxt block ~contract ~unparsing_mode =

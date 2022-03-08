@@ -58,8 +58,8 @@ let test_unparse_view () =
     ~legacy:true
     ~allow_forged_in_storage:false
     script
-  >>=?? fun (Ex_script script, ctx) ->
-  Script_ir_translator.unparse_script ctx Readable script
+  >>=?? fun (ex_script, ctx) ->
+  Script_ir_translator.unparse_script ctx Readable ex_script
   >>=?? fun (unparse_script, _ctx) ->
   let aft = Data_encoding.force_bytes unparse_script.code in
   Alcotest.(check bytes) "didn't match" bef aft |> return
@@ -449,9 +449,10 @@ let test_parse_comb_data () =
     let open Script_typed_ir in
     let diff = {map = Big_map_overlay.empty; size = 0} in
     let nat_key_ty = nat_key in
-    {id = Some big_map_id; diff; key_type = nat_key_ty; value_type = nat_ty}
+    Big_map
+      {id = Some big_map_id; diff; key_type = nat_key_ty; value_type = nat_ty}
   in
-  let equal (nat1, big_map1) (nat2, big_map2) =
+  let equal (nat1, Big_map big_map1) (nat2, Big_map big_map2) =
     (* Custom equal needed because big maps contain boxed maps containing functional values *)
     nat1 = nat2 && big_map1.id = big_map2.id
     && big_map1.key_type = big_map2.key_type

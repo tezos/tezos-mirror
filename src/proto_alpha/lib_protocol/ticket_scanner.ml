@@ -473,7 +473,7 @@ module Ticket_collection = struct
    fun ctxt
        val_hty
        key_ty
-       {Script_typed_ir.id; diff = {map = _; size}; key_type = _; value_type}
+       (Big_map {id; diff = {map = _; size}; key_type = _; value_type})
        acc
        k ->
     consume_gas_steps ctxt ~num_steps:1 >>?= fun ctxt ->
@@ -512,19 +512,23 @@ module Ticket_collection = struct
         return (ex_tickets, ctxt))
 end
 
-type 'a has_tickets = 'a Ticket_inspection.has_tickets * 'a Script_typed_ir.ty
+type 'a has_tickets =
+  | Has_tickets :
+      'a Ticket_inspection.has_tickets * 'a Script_typed_ir.ty
+      -> 'a has_tickets
 
 let type_has_tickets ctxt ty =
   Ticket_inspection.has_tickets_of_ty ctxt ty >|? fun (has_tickets, ctxt) ->
-  ((has_tickets, ty), ctxt)
+  (Has_tickets (has_tickets, ty), ctxt)
 
-let tickets_of_value ctxt ~include_lazy (ht, ty) =
+let tickets_of_value ctxt ~include_lazy (Has_tickets (ht, ty)) =
   Ticket_collection.tickets_of_value ctxt ~include_lazy ht ty
 
-let has_tickets (ht, _) =
+let has_tickets (Has_tickets (ht, _)) =
   match ht with Ticket_inspection.False_ht -> false | _ -> true
 
-let tickets_of_node ctxt ~include_lazy (ht, ty) expr =
+let tickets_of_node ctxt ~include_lazy has_tickets expr =
+  let (Has_tickets (ht, ty)) = has_tickets in
   match ht with
   | Ticket_inspection.False_ht -> return ([], ctxt)
   | _ ->
@@ -535,4 +539,4 @@ let tickets_of_node ctxt ~include_lazy (ht, ty) expr =
         ty
         expr
       >>=? fun (value, ctxt) ->
-      tickets_of_value ctxt ~include_lazy (ht, ty) value
+      tickets_of_value ctxt ~include_lazy has_tickets value

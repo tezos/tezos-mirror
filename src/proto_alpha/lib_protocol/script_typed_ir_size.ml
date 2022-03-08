@@ -189,7 +189,7 @@ let comb_set_gadt_witness_size = peano_shape_proof
 
 let dup_n_gadt_witness_size = peano_shape_proof
 
-let contract_size {arg_ty; address} =
+let contract_size (Typed_contract {arg_ty; address}) =
   ret_adding (ty_size arg_ty) (h2w +! address_size address)
 
 let sapling_state_size {Sapling.id; diff; memo_size = _} =
@@ -358,7 +358,7 @@ and big_map_size :
     b ty ->
     (a, b) big_map ->
     nodes_and_size =
- fun ~count_lambda_nodes accu cty ty' {id; diff; key_type; value_type} ->
+ fun ~count_lambda_nodes accu cty ty' (Big_map {id; diff; key_type; value_type}) ->
   (* [Map.bindings] cannot overflow and only consumes a
      logarithmic amount of stack. *)
   let diff_size =
