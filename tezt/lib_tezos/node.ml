@@ -46,6 +46,7 @@ type argument =
   | Disable_operations_precheck
   | Media_type of media_type
   | Metadata_size_limit of int option
+  | Metrics_addr of string
 
 let make_argument = function
   | Network x -> ["--network"; x]
@@ -69,6 +70,7 @@ let make_argument = function
   | Media_type media_type -> ["--media-type"; string_of_media_type media_type]
   | Metadata_size_limit None -> ["--metadata-size-limit"; "unlimited"]
   | Metadata_size_limit (Some i) -> ["--metadata-size-limit"; string_of_int i]
+  | Metrics_addr metrics_addr -> ["--metrics-addr"; metrics_addr]
 
 let make_arguments arguments = List.flatten (List.map make_argument arguments)
 
