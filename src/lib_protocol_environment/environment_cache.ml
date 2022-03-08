@@ -426,15 +426,18 @@ let from_cache initial domain ~value_of_key =
       caches
   in
   let fold_cache_keys subdomain cache =
+    let open Lwt_result_syntax in
     KeyMap.fold_es
       (fun key entry cache ->
-        (match lookup initial key with
-        | None -> value_of_key key
-        | Some (value, entry') ->
-            if Bytes.equal entry.cache_nonce entry'.cache_nonce then
-              return value
-            else value_of_key key)
-        >>=? fun value -> return (update_cache_key cache key value entry))
+        let* value =
+          match lookup initial key with
+          | None -> value_of_key key
+          | Some (value, entry') ->
+              if Bytes.equal entry.cache_nonce entry'.cache_nonce then
+                return value
+              else value_of_key key
+        in
+        return (update_cache_key cache key value entry))
       subdomain.keys
       cache
   in

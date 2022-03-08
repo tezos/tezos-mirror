@@ -622,9 +622,10 @@ let same_cache_keys cache cache' =
        (0 -- (number_of_caches cache - 1))
 
 let from_cache_with_same_domain_copies (_, _, cache) =
+  let open Lwt_result_syntax in
   let (cache, domain) = sync cache ~cache_nonce:Bytes.empty in
-  from_cache cache domain ~value_of_key:(fun _ -> assert false)
-  >>=? fun cache' -> return (same_cache_keys cache cache')
+  let* cache' = from_cache cache domain ~value_of_key:(fun _ -> assert false) in
+  return (same_cache_keys cache cache')
 
 let check_from_cache_with_same_domain_copies =
   QCheck.Test.make
@@ -651,6 +652,7 @@ type Context.cache_value += Int of int
 
 let load_cache_correctly_restores_cache_in_memory builder mode
     (layout, entries, _) =
+  let open Lwt_result_syntax in
   let entries =
     List.map
       (fun (cache_index, identifier, _, value) ->
@@ -658,7 +660,7 @@ let load_cache_correctly_restores_cache_in_memory builder mode
       entries
   in
   let ctxt = Memory_context.empty in
-  Context.Cache.set_cache_layout ctxt layout >>= fun ctxt ->
+  let*! ctxt = Context.Cache.set_cache_layout ctxt layout in
   let ctxt =
     List.fold_left
       (fun ctxt (key, value) ->
@@ -666,27 +668,30 @@ let load_cache_correctly_restores_cache_in_memory builder mode
       ctxt
       entries
   in
-  Context.Cache.sync ctxt ~cache_nonce:Bytes.empty >>= fun ctxt0 ->
+  let*! ctxt0 = Context.Cache.sync ctxt ~cache_nonce:Bytes.empty in
   (* We want to avoid a cache hit in the cache of caches. *)
   let block = Block_hash.hash_string [string_of_int (Random.bits ())] in
   let ctxt0 = Context.Cache.clear ctxt0 in
-  Context.load_cache block ctxt0 mode (builder entries) >>=? fun ctxt1 ->
+  let* ctxt1 = Context.load_cache block ctxt0 mode (builder entries) in
   (* We force the execution of [value_of_key] even in Lazy mode by
      performing lookups in the cache. *)
-  List.iter_es
-    (fun (key, value) ->
-      Lwt.catch
-        (fun () ->
-          Context.Cache.find ctxt1 key >>= function
-          | None -> QCheck.Test.fail_report "Unexpected missing key"
-          | Some (Int value') ->
-              if value <> value' then
-                QCheck.Test.fail_report "Invalid fetched value from cache"
-              else return_unit
-          | Some _ -> QCheck.Test.fail_report "Unexpected value type in cache")
-        (fun _ -> failwith "Lookup raised an exception"))
-    entries
-  >>=? fun () -> Context.Cache.Internal_for_tests.same_cache_domains ctxt0 ctxt1
+  let* () =
+    List.iter_es
+      (fun (key, value) ->
+        Lwt.catch
+          (fun () ->
+            let*! o = Context.Cache.find ctxt1 key in
+            match o with
+            | None -> QCheck.Test.fail_report "Unexpected missing key"
+            | Some (Int value') ->
+                if value <> value' then
+                  QCheck.Test.fail_report "Invalid fetched value from cache"
+                else return_unit
+            | Some _ -> QCheck.Test.fail_report "Unexpected value type in cache")
+          (fun _ -> failwith "Lookup raised an exception"))
+      entries
+  in
+  Context.Cache.Internal_for_tests.same_cache_domains ctxt0 ctxt1
 
 let load_cache_correctly_restores_cache_in_memory_normal_case =
   let builder entries key =

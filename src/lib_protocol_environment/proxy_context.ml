@@ -84,24 +84,32 @@ module C = struct
   type elt = Key of value | Dir of Local.tree
 
   let elt t =
-    Local.Tree.to_value t >|= function Some v -> Key v | None -> Dir t
+    let open Lwt_syntax in
+    let+ o = Local.Tree.to_value t in
+    match o with Some v -> Key v | None -> Dir t
 
   let raw_find (t : tree) k =
-    Local.Tree.find_tree t.tree k >>= function
-    | Some x -> Lwt.return_some x
+    let open Lwt_syntax in
+    let* o = Local.Tree.find_tree t.tree k in
+    match o with
+    | Some _ -> Lwt.return o
     | None -> (
-        L.(S.emit proxy_context_missing) k >>= fun () ->
+        let* () = L.(S.emit proxy_context_missing) k in
         match t.proxy with
         | None -> Lwt.return_none
         | Some (module ProxyDelegation) -> (
-            ProxyDelegation.proxy_get (t.path @ k) >>= function
+            let* r = ProxyDelegation.proxy_get (t.path @ k) in
+            match r with
             | Error err ->
-                L.(S.emit delegation_error ("get", err)) >>= fun () ->
+                let* () = L.(S.emit delegation_error ("get", err)) in
                 Lwt.return_none
             | Ok x -> Lwt.return x))
 
   let raw_mem_aux kind (t : tree) k =
-    Local.Tree.find_tree t.tree k >|= Option.map Local.Tree.kind >>= function
+    let open Lwt_syntax in
+    let* o = Local.Tree.find_tree t.tree k in
+    let o = Option.map Local.Tree.kind o in
+    match o with
     | Some `Value -> Lwt.return (kind = `Value)
     | Some `Tree -> Lwt.return (kind = `Tree)
     | None -> (
@@ -113,12 +121,13 @@ module C = struct
               | `Value -> ProxyDelegation.proxy_mem
               | `Tree -> ProxyDelegation.proxy_dir_mem
             in
-            mem (t.path @ k) >>= function
+            let* r = mem (t.path @ k) in
+            match r with
             | Error err ->
                 let msg =
                   match kind with `Value -> "mem" | `Tree -> "dir_mem"
                 in
-                L.(S.emit delegation_error (msg, err)) >>= fun () ->
+                let* () = L.(S.emit delegation_error (msg, err)) in
                 Lwt.return_false
             | Ok x -> Lwt.return x))
 
@@ -128,40 +137,56 @@ module C = struct
 
   (* The tree under /data *)
   let data_tree (t : t) =
-    Local.find_tree t.local [] >|= function
+    let open Lwt_syntax in
+    let+ o = Local.find_tree t.local [] in
+    match o with
     | None -> {proxy = t.proxy; path = []; tree = Local.Tree.empty t.local}
     | Some tree -> {proxy = t.proxy; path = []; tree}
 
-  let mem t k = data_tree t >>= fun tree -> raw_mem tree k
+  let mem t k =
+    let open Lwt_syntax in
+    let* tree = data_tree t in
+    raw_mem tree k
 
-  let mem_tree t k = data_tree t >>= fun tree -> raw_mem_tree tree k
+  let mem_tree t k =
+    let open Lwt_syntax in
+    let* tree = data_tree t in
+    raw_mem_tree tree k
 
   let find t k =
-    data_tree t >>= fun tree ->
-    raw_find tree k >>= function
+    let open Lwt_syntax in
+    let* tree = data_tree t in
+    let* o = raw_find tree k in
+    match o with
     | None -> Lwt.return_none
-    | Some v -> ( elt v >|= function Key v -> Some v | _ -> None)
+    | Some v -> (
+        let+ k = elt v in
+        match k with Key v -> Some v | _ -> None)
 
   let find_tree t k =
-    data_tree t >>= fun tree ->
-    raw_find tree k >|= function
-    | None -> None
-    | Some tree -> Some {proxy = t.proxy; path = k; tree}
+    let open Lwt_syntax in
+    let* tree = data_tree t in
+    let+ o = raw_find tree k in
+    Option.map (fun tree -> {proxy = t.proxy; path = k; tree}) o
 
   let add_tree (t : t) k (v : tree) =
-    Local.add_tree t.local k v.tree >|= fun local ->
+    let open Lwt_syntax in
+    let+ local = Local.add_tree t.local k v.tree in
     if t.local == local then t else {t with local}
 
   let add (t : t) k v =
-    Local.add t.local k v >|= fun local ->
+    let open Lwt_syntax in
+    let+ local = Local.add t.local k v in
     if t.local == local then t else {t with local}
 
   let remove (t : t) k =
-    Local.remove t.local k >|= fun local ->
+    let open Lwt_syntax in
+    let+ local = Local.remove t.local k in
     if t.local == local then t else {t with local}
 
   let raw_list (t : tree) ?offset ?length k =
-    Local.Tree.list t.tree ?offset ?length k >|= fun ls ->
+    let open Lwt_syntax in
+    let+ ls = Local.Tree.list t.tree ?offset ?length k in
     List.fold_left
       (fun acc (k, tree) ->
         let v = {proxy = t.proxy; path = t.path @ [k]; tree} in
@@ -170,12 +195,19 @@ module C = struct
       (List.rev ls)
 
   let list t ?offset ?length k =
-    data_tree t >>= fun tree -> raw_list tree ?offset ?length k
+    let open Lwt_syntax in
+    let* tree = data_tree t in
+    raw_list tree ?offset ?length k
 
-  let length t k = data_tree t >>= fun t -> Local.Tree.length t.tree k
+  let length t k =
+    let open Lwt_syntax in
+    let* t = data_tree t in
+    Local.Tree.length t.tree k
 
   let fold ?depth (t : t) root ~order ~init ~f =
-    find_tree t root >>= function
+    let open Lwt_syntax in
+    let* o = find_tree t root in
+    match o with
     | None -> Lwt.return init
     | Some tr ->
         Local.Tree.fold ?depth tr.tree [] ~order ~init ~f:(fun k tree acc ->
@@ -183,14 +215,18 @@ module C = struct
             f k tree acc)
 
   let set_protocol (t : t) p =
-    Local.add_protocol t.local p >|= fun local -> {t with local}
+    let open Lwt_syntax in
+    let+ local = Local.add_protocol t.local p in
+    {t with local}
 
   let get_protocol (t : t) = Local.get_protocol t.local
 
   let fork_test_chain c ~protocol:_ ~expiration:_ = Lwt.return c
 
   let set_hash_version (t : t) v =
-    Local.set_hash_version t.local v >|=? fun local -> {t with local}
+    let open Lwt_result_syntax in
+    let+ local = Local.set_hash_version t.local v in
+    {t with local}
 
   let get_hash_version (t : t) = Local.get_hash_version t.local
 
@@ -206,11 +242,13 @@ module C = struct
     let is_empty t = Local.Tree.is_empty t.tree
 
     let add t k v =
-      Local.Tree.add t.tree k v >|= fun tree ->
+      let open Lwt_syntax in
+      let+ tree = Local.Tree.add t.tree k v in
       if tree == t.tree then t else {t with tree}
 
     let add_tree t k v =
-      Local.Tree.add_tree t.tree k v.tree >|= fun tree ->
+      let open Lwt_syntax in
+      let+ tree = Local.Tree.add_tree t.tree k v.tree in
       if tree == t.tree then t else {t with tree}
 
     let mem = raw_mem
@@ -218,19 +256,24 @@ module C = struct
     let mem_tree = raw_mem_tree
 
     let find t k =
-      raw_find t k >>= function
+      let open Lwt_syntax in
+      let* o = raw_find t k in
+      match o with
       | None -> Lwt.return_none
       | Some tree -> Local.Tree.to_value tree
 
     let find_tree t k =
-      raw_find t k >|= function
+      let open Lwt_syntax in
+      let+ o = raw_find t k in
+      match o with
       | None -> None
       | Some tree ->
           if k = [] then Some t
           else Some {proxy = t.proxy; path = t.path @ k; tree}
 
     let remove t k =
-      Local.Tree.remove t.tree k >|= fun tree ->
+      let open Lwt_syntax in
+      let+ tree = Local.Tree.remove t.tree k in
       if tree == t.tree then t else {t with tree}
 
     let length t k = Local.Tree.length t.tree k
@@ -245,7 +288,8 @@ module C = struct
     let to_value t = Local.Tree.to_value t.tree
 
     let of_value t v =
-      Local.Tree.of_value t.M.local v >|= fun tree ->
+      let open Lwt_syntax in
+      let+ tree = Local.Tree.of_value t.M.local v in
       {proxy = t.proxy; path = []; tree}
 
     let list = raw_list
@@ -257,12 +301,15 @@ module C = struct
 
   let of_local tree = {proxy = None; path = []; tree}
 
-  let map_f f tree = f (of_local tree) >|= fun (t, r) -> (t.tree, r)
+  let map_f f tree =
+    let open Lwt_syntax in
+    let+ (t, r) = f (of_local tree) in
+    (t.tree, r)
 
   let verify verifier proof f =
-    verifier proof (map_f f) >|= function
-    | Ok (t, r) -> Ok (of_local t, r)
-    | Error _ as e -> e
+    let open Lwt_syntax in
+    let+ r = verifier proof (map_f f) in
+    match r with Ok (t, r) -> Ok (of_local t, r) | Error _ as e -> e
 
   let verify_tree_proof p f = verify Local.verify_tree_proof p f
 

@@ -662,8 +662,10 @@ struct
     include RPC_directory
 
     let gen_register dir service handler =
+      let open Lwt_syntax in
       gen_register dir service (fun p q i ->
-          handler p q i >>= function
+          let* r = handler p q i in
+          match r with
           | `Ok o -> RPC_answer.return_chunked o
           | `OkStream s -> RPC_answer.return_stream s
           | `Created s -> Lwt.return (`Created s)
@@ -685,21 +687,27 @@ struct
               Lwt.return (`Error e))
 
     let register dir service handler =
+      let open Lwt_syntax in
       gen_register dir service (fun p q i ->
-          handler p q i >>= function
+          let* r = handler p q i in
+          match r with
           | Ok o -> RPC_answer.return o
           | Error e -> RPC_answer.fail e)
 
     let opt_register dir service handler =
+      let open Lwt_syntax in
       gen_register dir service (fun p q i ->
-          handler p q i >>= function
+          let* r = handler p q i in
+          match r with
           | Ok (Some o) -> RPC_answer.return o
           | Ok None -> RPC_answer.not_found
           | Error e -> RPC_answer.fail e)
 
     let lwt_register dir service handler =
+      let open Lwt_syntax in
       gen_register dir service (fun p q i ->
-          handler p q i >>= fun o -> RPC_answer.return o)
+          let* o = handler p q i in
+          RPC_answer.return o)
 
     open Curry
 
@@ -828,25 +836,33 @@ struct
     let make_call3 = (make_call3 : _ -> _ simple -> _ :> _ -> _ #simple -> _)
 
     let make_opt_call0 s ctxt block q i =
-      make_call0 s ctxt block q i >>= function
+      let open Lwt_syntax in
+      let* r = make_call0 s ctxt block q i in
+      match r with
       | Error [RPC_context.Not_found _] -> Lwt.return_ok None
       | Error _ as v -> Lwt.return v
       | Ok v -> Lwt.return_ok (Some v)
 
     let make_opt_call1 s ctxt block a1 q i =
-      make_call1 s ctxt block a1 q i >>= function
+      let open Lwt_syntax in
+      let* r = make_call1 s ctxt block a1 q i in
+      match r with
       | Error [RPC_context.Not_found _] -> Lwt.return_ok None
       | Error _ as v -> Lwt.return v
       | Ok v -> Lwt.return_ok (Some v)
 
     let make_opt_call2 s ctxt block a1 a2 q i =
-      make_call2 s ctxt block a1 a2 q i >>= function
+      let open Lwt_syntax in
+      let* r = make_call2 s ctxt block a1 a2 q i in
+      match r with
       | Error [RPC_context.Not_found _] -> Lwt.return_ok None
       | Error _ as v -> Lwt.return v
       | Ok v -> Lwt.return_ok (Some v)
 
     let make_opt_call3 s ctxt block a1 a2 a3 q i =
-      make_call3 s ctxt block a1 a2 a3 q i >>= function
+      let open Lwt_syntax in
+      let* r = make_call3 s ctxt block a1 a2 a3 q i in
+      match r with
       | Error [RPC_context.Not_found _] -> Lwt.return_ok None
       | Error _ as v -> Lwt.return v
       | Ok v -> Lwt.return_ok (Some v)
@@ -935,46 +951,67 @@ struct
 
     let begin_partial_application ~chain_id ~ancestor_context
         ~predecessor_timestamp ~predecessor_fitness raw_block =
-      begin_partial_application
-        ~chain_id
-        ~ancestor_context
-        ~predecessor_timestamp
-        ~predecessor_fitness
-        raw_block
-      >|= wrap_tzresult
+      let open Lwt_syntax in
+      let+ r =
+        begin_partial_application
+          ~chain_id
+          ~ancestor_context
+          ~predecessor_timestamp
+          ~predecessor_fitness
+          raw_block
+      in
+      wrap_tzresult r
 
     let begin_application ~chain_id ~predecessor_context ~predecessor_timestamp
         ~predecessor_fitness raw_block =
-      begin_application
-        ~chain_id
-        ~predecessor_context
-        ~predecessor_timestamp
-        ~predecessor_fitness
-        raw_block
-      >|= wrap_tzresult
+      let open Lwt_syntax in
+      let+ r =
+        begin_application
+          ~chain_id
+          ~predecessor_context
+          ~predecessor_timestamp
+          ~predecessor_fitness
+          raw_block
+      in
+      wrap_tzresult r
 
     let begin_construction ~chain_id ~predecessor_context ~predecessor_timestamp
         ~predecessor_level ~predecessor_fitness ~predecessor ~timestamp
         ?protocol_data () =
-      begin_construction
-        ~chain_id
-        ~predecessor_context
-        ~predecessor_timestamp
-        ~predecessor_level
-        ~predecessor_fitness
-        ~predecessor
-        ~timestamp
-        ?protocol_data
-        ()
-      >|= wrap_tzresult
+      let open Lwt_syntax in
+      let+ r =
+        begin_construction
+          ~chain_id
+          ~predecessor_context
+          ~predecessor_timestamp
+          ~predecessor_level
+          ~predecessor_fitness
+          ~predecessor
+          ~timestamp
+          ?protocol_data
+          ()
+      in
+      wrap_tzresult r
 
-    let current_context c = current_context c >|= wrap_tzresult
+    let current_context c =
+      let open Lwt_syntax in
+      let+ r = current_context c in
+      wrap_tzresult r
 
-    let apply_operation c o = apply_operation c o >|= wrap_tzresult
+    let apply_operation c o =
+      let open Lwt_syntax in
+      let+ r = apply_operation c o in
+      wrap_tzresult r
 
-    let finalize_block c = finalize_block c >|= wrap_tzresult
+    let finalize_block c =
+      let open Lwt_syntax in
+      let+ r = finalize_block c in
+      wrap_tzresult r
 
-    let init c bh = init c bh >|= wrap_tzresult
+    let init c bh =
+      let open Lwt_syntax in
+      let+ r = init c bh in
+      wrap_tzresult r
   end
 
   module Lift (P : Updater.PROTOCOL) = IgnoreCaches (struct

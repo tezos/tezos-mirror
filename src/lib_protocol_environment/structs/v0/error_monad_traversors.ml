@@ -23,9 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Lwt.Infix (* >>= >|= *)
+open Lwt.Infix (* >>= *)
 
-let ( >>? ) v f = match v with Error _ as err -> err | Ok v -> f v
+let ( >>? ) = Result.bind
 
 let ( >>=? ) v f =
   v >>= function Error _ as err -> Lwt.return err | Ok v -> f v
