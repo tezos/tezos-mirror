@@ -375,12 +375,12 @@ let rec connect ~delay cctxt =
 
 (* TODO/TORU: https://gitlab.com/tezos/tezos/-/issues/1845
    Clean exit *)
-let run ~data_dir cctxt =
+let run configuration cctxt =
   let open Lwt_result_syntax in
   let*! () = Event.(emit starting_node) () in
-  let* ({data_dir; rollup_id; rollup_genesis; reconnection_delay; _} as
-       configuration) =
-    Configuration.load ~data_dir
+  let {Configuration.data_dir; rollup_id; rollup_genesis; reconnection_delay; _}
+      =
+    configuration
   in
   let* state = State.init ~data_dir ~context:cctxt ?rollup_genesis rollup_id in
   let* _rpc_server = RPC.start configuration state in
@@ -388,7 +388,7 @@ let run ~data_dir cctxt =
     (* Register cleaner callback *)
     Lwt_exit.register_clean_up_callback
       ~loc:__LOC__
-      (main_exit_callback state configuration.data_dir)
+      (main_exit_callback state data_dir)
   in
   let*! () = Event.(emit node_is_ready) () in
   let rec loop () =

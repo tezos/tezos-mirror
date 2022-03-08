@@ -23,6 +23,7 @@
   tezos-client-base-unix
   tezos-rpc
   tezos-rpc-http
+  tezos-rpc-http-client-unix
   tezos-rpc-http-server)
  (flags
   (:standard
@@ -35,6 +36,10 @@
    -open Tezos_client_commands
    -open Tezos_baking_alpha_commands
    -open Tezos_stdlib_unix
+   -open Tezos_rpc
+   -open Tezos_rpc_http
+   -open Tezos_rpc_http_client_unix
+   -open Tezos_rpc_http_server
    -open Tezos_micheline
    -open Tezos_client_base
    -open Tezos_client_base_unix)))

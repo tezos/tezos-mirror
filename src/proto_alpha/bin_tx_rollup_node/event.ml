@@ -57,13 +57,12 @@ let starting_node =
     ()
 
 let rpc_server_is_ready =
-  declare_2
+  declare_1
     ~section
     ~name:"tx_rollup_node_rpc_server_is_ready"
-    ~msg:"the transaction rollup node RPC server is listening to {addr}:{port}"
+    ~msg:"the transaction rollup node RPC server is listening on {addr}"
     ~level:Notice
-    ("addr", Data_encoding.string)
-    ("port", Data_encoding.uint16)
+    ("addr", P2p_point.Id.encoding)
 
 let node_is_ready =
   declare_0

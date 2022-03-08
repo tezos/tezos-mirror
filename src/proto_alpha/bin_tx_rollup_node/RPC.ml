@@ -25,9 +25,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 open Protocol
-open Tezos_rpc
-open Tezos_rpc_http
-open Tezos_rpc_http_server
 
 type block_id =
   [ `Head
@@ -459,28 +456,19 @@ let register state =
     [Block.build_directory; Context.build_directory]
 
 let launch ~host ~acl ~node ~dir () =
-  let open Lwt_tzresult_syntax in
-  let*! r =
-    RPC_server.launch
-      ~media_types:Media_type.all_media_types
-      ~host
-      ~acl
-      node
-      dir
-  in
-  return r
+  RPC_server.launch ~media_types:Media_type.all_media_types ~host ~acl node dir
 
 let start configuration state =
-  let open Lwt_syntax in
-  let Configuration.{rpc_addr; rpc_port; _} = configuration in
-  let addr = P2p_addr.of_string_exn rpc_addr in
-  let host = Ipaddr.V6.to_string addr in
+  let open Lwt_result_syntax in
+  let Configuration.{rpc_addr; _} = configuration in
+  let (host, rpc_port) = rpc_addr in
+  let host = P2p_addr.to_string host in
   let dir = register state in
   let node = `TCP (`Port rpc_port) in
-  let acl = RPC_server.Acl.default addr in
+  let acl = RPC_server.Acl.allow_all in
   Lwt.catch
     (fun () ->
-      let* rpc_server = launch ~host ~acl ~node ~dir () in
-      let* () = Event.(emit rpc_server_is_ready) (rpc_addr, rpc_port) in
-      Lwt.return rpc_server)
+      let*! rpc_server = launch ~host ~acl ~node ~dir () in
+      let*! () = Event.(emit rpc_server_is_ready) rpc_addr in
+      return rpc_server)
     fail_with_exn

@@ -38,4 +38,4 @@
 
      When the daemon needs to send Tezos operations, it does so by assuming the
    identity in the state. *)
-val run : data_dir:string -> Protocol_client_context.full -> unit tzresult Lwt.t
+val run : Configuration.t -> Protocol_client_context.full -> unit tzresult Lwt.t
