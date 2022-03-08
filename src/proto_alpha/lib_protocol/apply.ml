@@ -963,8 +963,15 @@ let apply_transaction_to_smart_contract ~ctxt ~source ~contract ~amount
         ~parameter
         ~entrypoint
         ~internal)
-  >>=? fun ( {ctxt; storage; lazy_storage_diff; operations; ticket_diffs},
-             (updated_cached_script, updated_size) ) ->
+  >>=? fun ( {
+               script = updated_cached_script;
+               code_size = updated_size;
+               storage;
+               lazy_storage_diff;
+               operations;
+               ticket_diffs;
+             },
+             ctxt ) ->
   update_script_storage_and_ticket_balances
     ctxt
     ~self:contract
@@ -3083,13 +3090,14 @@ let apply_liquidity_baking_subsidy ctxt ~toggle_vote =
              ~entrypoint:Entrypoint.default
              ~internal:false
            >>=? fun ( {
-                        ctxt;
+                        script = updated_cached_script;
+                        code_size = updated_size;
                         storage;
                         lazy_storage_diff;
                         operations;
                         ticket_diffs;
                       },
-                      (updated_cached_script, updated_size) ) ->
+                      ctxt ) ->
            match operations with
            | _ :: _ ->
                (* No internal operations are expected here. Something bad may be happening. *)

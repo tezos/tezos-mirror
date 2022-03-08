@@ -1466,8 +1466,17 @@ module View_helpers = struct
     | [
      Script_typed_ir.Internal_operation
        {
-         operation = Transaction {transaction = {destination; parameters; _}; _};
-         _;
+         operation =
+           Transaction
+             {
+               transaction =
+                 {destination; parameters; entrypoint = _; amount = _};
+               parameters = _;
+               parameters_ty = _;
+               location = _;
+             };
+         source = _;
+         nonce = _;
        };
     ]
       when Destination.equal destination (Contract callback) ->
@@ -1930,11 +1939,10 @@ module RPC = struct
           ~entrypoint
           ~parameter
           ~internal:true
-        >>=? fun ( {ctxt; storage; lazy_storage_diff; operations; ticket_diffs},
-                   _ ) ->
+        >>=? fun res ->
         logger.get_log () >|=? fun trace ->
         let trace = Option.value ~default:[] trace in
-        ({ctxt; storage; lazy_storage_diff; operations; ticket_diffs}, trace)
+        (res, trace)
     end
 
     let typecheck_data :
@@ -2300,7 +2308,8 @@ module RPC = struct
             ~parameter
             ~internal:true
           >|=? fun ( {
-                       ctxt = _;
+                       script = _;
+                       code_size = _;
                        Script_interpreter.storage;
                        operations;
                        lazy_storage_diff;
@@ -2369,13 +2378,15 @@ module RPC = struct
             ~script:{storage; code}
             ~entrypoint
             ~parameter
-          >|=? fun ( {
-                       ctxt = _;
-                       Script_interpreter.storage;
-                       operations;
-                       lazy_storage_diff;
-                       ticket_diffs = _;
-                     },
+          >|=? fun ( ( {
+                         script = _;
+                         code_size = _;
+                         Script_interpreter.storage;
+                         operations;
+                         lazy_storage_diff;
+                         ticket_diffs = _;
+                       },
+                       _ctxt ),
                      trace ) ->
           ( storage,
             Apply_results.contents_of_packed_internal_operations operations,
@@ -2466,7 +2477,15 @@ module RPC = struct
             ~entrypoint
             ~parameter
             ~internal:true
-          >>=? fun ({Script_interpreter.operations; _}, (_, _)) ->
+          >>=? fun ( {
+                       Script_interpreter.operations;
+                       script = _;
+                       code_size = _;
+                       storage = _;
+                       lazy_storage_diff = _;
+                       ticket_diffs = _;
+                     },
+                     _ctxt ) ->
           View_helpers.extract_parameter_from_operations
             entrypoint
             operations

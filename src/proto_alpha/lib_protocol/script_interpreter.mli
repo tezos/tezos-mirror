@@ -51,7 +51,8 @@ type error += Cannot_serialize_storage
 type error += Michelson_too_many_recursive_calls
 
 type execution_result = {
-  ctxt : context;
+  script : Script_ir_translator.ex_script;
+  code_size : int;
   storage : Script.expr;
   lazy_storage_diff : Lazy_storage.diffs option;
   operations : packed_internal_operation list;
@@ -109,7 +110,7 @@ val execute :
   entrypoint:Entrypoint.t ->
   parameter:Script.expr ->
   internal:bool ->
-  (execution_result * (Script_ir_translator.ex_script * int)) tzresult Lwt.t
+  (execution_result * context) tzresult Lwt.t
 
 (** [execute_with_typed_parameter ?logger ctxt ~cached_script mode
    step_constant ~script ~entrypoint loc ~parameter_ty ~parameter ~internal]
@@ -129,7 +130,7 @@ val execute_with_typed_parameter :
   location:Script.location ->
   parameter:'a ->
   internal:bool ->
-  (execution_result * (Script_ir_translator.ex_script * int)) tzresult Lwt.t
+  (execution_result * context) tzresult Lwt.t
 
 (** [kstep logger ctxt step_constants kinstr accu stack] interprets the
     script represented by [kinstr] under the context [ctxt]. This will

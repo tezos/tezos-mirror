@@ -1717,7 +1717,8 @@ type execution_arg =
   | Untyped_arg : Script.expr -> execution_arg
 
 type execution_result = {
-  ctxt : context;
+  script : Script_ir_translator.ex_script;
+  code_size : int;
   storage : Script.expr;
   lazy_storage_diff : Lazy_storage.diffs option;
   operations : packed_internal_operation list;
@@ -1833,13 +1834,14 @@ let execute_any_arg logger ctxt mode step_constants ~entrypoint ~internal
   Gas.consume ctxt cost >>?= fun ctxt ->
   return
     ( {
-        ctxt;
+        script;
+        code_size = size;
         storage = unparsed_storage;
         lazy_storage_diff = lazy_storage_diff_all;
         operations;
         ticket_diffs;
       },
-      (script, size) )
+      ctxt )
 
 let execute_with_typed_parameter ?logger ctxt ~cached_script mode step_constants
     ~script ~entrypoint ~parameter_ty ~location ~parameter ~internal =
