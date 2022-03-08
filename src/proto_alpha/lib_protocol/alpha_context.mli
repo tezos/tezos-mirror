@@ -804,6 +804,7 @@ module Constants : sig
     tx_rollup_max_finalized_levels : int;
     tx_rollup_cost_per_byte_ema_factor : int;
     tx_rollup_max_ticket_payload_size : int;
+    tx_rollup_rejection_max_proof_size : int;
     sc_rollup_enable : bool;
     sc_rollup_origination_size : int;
     sc_rollup_challenge_window_in_blocks : int;
@@ -909,6 +910,8 @@ module Constants : sig
   val tx_rollup_max_finalized_levels : context -> int
 
   val tx_rollup_max_ticket_payload_size : context -> int
+
+  val tx_rollup_rejection_max_proof_size : context -> int
 
   val sc_rollup_enable : context -> bool
 
@@ -1907,7 +1910,6 @@ module Tx_rollup_errors : sig
         expected : Tx_rollup_commitment_hash.t option;
       }
     | Invalid_rejection_level_argument
-    | Invalid_proof
     | Internal_error of string
     | Wrong_message_position of {
         level : Tx_rollup_level.t;
@@ -1932,6 +1934,12 @@ module Tx_rollup_errors : sig
       }
     | Deposit_wrong_ticketer of Tx_rollup.t
     | Wrong_deposit_parameters
+    | Proof_failed_to_reject
+    | Proof_produced_rejected_state
+    | Proof_invalid_before of {
+        agreed : Context_hash.t;
+        provided : Context_hash.t;
+      }
 end
 
 module Bond_id : sig

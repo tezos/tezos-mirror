@@ -54,7 +54,17 @@ val hash_message_result : message_result -> Message_result_hash.t
 val pp_message_result_hash : Format.formatter -> Message_result_hash.t -> unit
 
 (** [empty_l2_context_hash] is the context hash of the layer-2 context
-    just after its origination. *)
+    just after its origination.
+
+    The empty layer2 context hash is the hash of the underlying Irmin tree.
+    One important note is: an empty tree *must* not be hashed when it's empty.
+    See https://github.com/mirage/irmin/issues/1304.
+
+    Our solution is to write data in the tree to have a non-empty one.
+    We write the {!Tx_rollup_l2_context.Ticket_count} default value (i.e. 0)
+    and the {!Tx_rollup_l2_context.Address_count} as well in the tree. Then
+    we hash the resulting tree to create this constant.
+*)
 val empty_l2_context_hash : Context_hash.t
 
 (** [initial_message_result_hash] is equal to

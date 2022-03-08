@@ -122,6 +122,10 @@ let constants_mainnet =
     tx_rollup_max_finalized_levels = tx_rollup_withdraw_period + 100;
     tx_rollup_cost_per_byte_ema_factor = 120;
     tx_rollup_max_ticket_payload_size = 10_240;
+    (* Must be smaller than maximum limit of a manager operation
+       (minus overhead), since we need to limit our proofs to those
+       that can fit in an operation. *)
+    tx_rollup_rejection_max_proof_size = 30000;
     sc_rollup_enable = false;
     (* The following value is chosen to prevent spam. *)
     sc_rollup_origination_size = 6_314;

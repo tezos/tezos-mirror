@@ -2308,7 +2308,699 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 "additionalProperties": false
                               },
                               "proof": {
-                                "type": "boolean"
+                                "type": "object",
+                                "properties": {
+                                  "version": {
+                                    "type": "integer",
+                                    "minimum": -32768,
+                                    "maximum": 32767
+                                  },
+                                  "before": {
+                                    "oneOf": [
+                                      {
+                                        "title": "Value",
+                                        "type": "object",
+                                        "properties": {
+                                          "kind": {
+                                            "$ref": "#/definitions/unistring"
+                                          },
+                                          "value": {
+                                            "type": "object",
+                                            "properties": {
+                                              "value": {
+                                                "$ref": "#/definitions/Context_hash"
+                                              }
+                                            },
+                                            "required": [
+                                              "value"
+                                            ],
+                                            "additionalProperties": false
+                                          }
+                                        },
+                                        "required": [
+                                          "value",
+                                          "kind"
+                                        ],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "title": "Node",
+                                        "type": "object",
+                                        "properties": {
+                                          "kind": {
+                                            "$ref": "#/definitions/unistring"
+                                          },
+                                          "value": {
+                                            "type": "object",
+                                            "properties": {
+                                              "node": {
+                                                "$ref": "#/definitions/Context_hash"
+                                              }
+                                            },
+                                            "required": [
+                                              "node"
+                                            ],
+                                            "additionalProperties": false
+                                          }
+                                        },
+                                        "required": [
+                                          "value",
+                                          "kind"
+                                        ],
+                                        "additionalProperties": false
+                                      }
+                                    ]
+                                  },
+                                  "after": {
+                                    "oneOf": [
+                                      {
+                                        "title": "Value",
+                                        "type": "object",
+                                        "properties": {
+                                          "kind": {
+                                            "$ref": "#/definitions/unistring"
+                                          },
+                                          "value": {
+                                            "type": "object",
+                                            "properties": {
+                                              "value": {
+                                                "$ref": "#/definitions/Context_hash"
+                                              }
+                                            },
+                                            "required": [
+                                              "value"
+                                            ],
+                                            "additionalProperties": false
+                                          }
+                                        },
+                                        "required": [
+                                          "value",
+                                          "kind"
+                                        ],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "title": "Node",
+                                        "type": "object",
+                                        "properties": {
+                                          "kind": {
+                                            "$ref": "#/definitions/unistring"
+                                          },
+                                          "value": {
+                                            "type": "object",
+                                            "properties": {
+                                              "node": {
+                                                "$ref": "#/definitions/Context_hash"
+                                              }
+                                            },
+                                            "required": [
+                                              "node"
+                                            ],
+                                            "additionalProperties": false
+                                          }
+                                        },
+                                        "required": [
+                                          "value",
+                                          "kind"
+                                        ],
+                                        "additionalProperties": false
+                                      }
+                                    ]
+                                  },
+                                  "state": {
+                                    "type": "array",
+                                    "items": {
+                                      "oneOf": [
+                                        {
+                                          "title": "Inode",
+                                          "type": "object",
+                                          "properties": {
+                                            "kind": {
+                                              "$ref": "#/definitions/unistring"
+                                            },
+                                            "value": {
+                                              "type": "object",
+                                              "properties": {
+                                                "inode": {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "length": {
+                                                      "oneOf": [
+                                                        {
+                                                          "title": "small",
+                                                          "description": "An int64 which fits within a uint8",
+                                                          "type": "object",
+                                                          "properties": {
+                                                            "kind": {
+                                                              "$ref": "#/definitions/unistring"
+                                                            },
+                                                            "value": {
+                                                              "type": "integer",
+                                                              "minimum": 0,
+                                                              "maximum": 255
+                                                            }
+                                                          },
+                                                          "required": [
+                                                            "value",
+                                                            "kind"
+                                                          ],
+                                                          "additionalProperties": false
+                                                        },
+                                                        {
+                                                          "title": "medium",
+                                                          "description": "An int64 which fits within a uint16",
+                                                          "type": "object",
+                                                          "properties": {
+                                                            "kind": {
+                                                              "$ref": "#/definitions/unistring"
+                                                            },
+                                                            "value": {
+                                                              "type": "integer",
+                                                              "minimum": 0,
+                                                              "maximum": 65535
+                                                            }
+                                                          },
+                                                          "required": [
+                                                            "value",
+                                                            "kind"
+                                                          ],
+                                                          "additionalProperties": false
+                                                        },
+                                                        {
+                                                          "title": "biggish",
+                                                          "description": "An int64 which fits within a uint32",
+                                                          "type": "object",
+                                                          "properties": {
+                                                            "kind": {
+                                                              "$ref": "#/definitions/unistring"
+                                                            },
+                                                            "value": {
+                                                              "type": "integer",
+                                                              "minimum": -2147483648,
+                                                              "maximum": 2147483647
+                                                            }
+                                                          },
+                                                          "required": [
+                                                            "value",
+                                                            "kind"
+                                                          ],
+                                                          "additionalProperties": false
+                                                        },
+                                                        {
+                                                          "title": "bigger",
+                                                          "description": "An int64 which doesn't fit within a uint32",
+                                                          "type": "object",
+                                                          "properties": {
+                                                            "kind": {
+                                                              "$ref": "#/definitions/unistring"
+                                                            },
+                                                            "value": {
+                                                              "$ref": "#/definitions/int64"
+                                                            }
+                                                          },
+                                                          "required": [
+                                                            "value",
+                                                            "kind"
+                                                          ],
+                                                          "additionalProperties": false
+                                                        }
+                                                      ]
+                                                    },
+                                                    "proofs": {
+                                                      "type": "array",
+                                                      "items": [
+                                                        {
+                                                          "oneOf": [
+                                                            {
+                                                              "title": "none",
+                                                              "type": "object",
+                                                              "properties": {
+                                                                "kind": {
+                                                                  "$ref": "#/definitions/unistring"
+                                                                },
+                                                                "value": {}
+                                                              },
+                                                              "required": [
+                                                                "value",
+                                                                "kind"
+                                                              ],
+                                                              "additionalProperties": false
+                                                            },
+                                                            {
+                                                              "title": "some",
+                                                              "type": "object",
+                                                              "properties": {
+                                                                "kind": {
+                                                                  "$ref": "#/definitions/unistring"
+                                                                },
+                                                                "value": {
+                                                                  "$ref": "#/definitions/Context_hash"
+                                                                }
+                                                              },
+                                                              "required": [
+                                                                "value",
+                                                                "kind"
+                                                              ],
+                                                              "additionalProperties": false
+                                                            }
+                                                          ]
+                                                        },
+                                                        {
+                                                          "oneOf": [
+                                                            {
+                                                              "title": "none",
+                                                              "type": "object",
+                                                              "properties": {
+                                                                "kind": {
+                                                                  "$ref": "#/definitions/unistring"
+                                                                },
+                                                                "value": {}
+                                                              },
+                                                              "required": [
+                                                                "value",
+                                                                "kind"
+                                                              ],
+                                                              "additionalProperties": false
+                                                            },
+                                                            {
+                                                              "title": "some",
+                                                              "type": "object",
+                                                              "properties": {
+                                                                "kind": {
+                                                                  "$ref": "#/definitions/unistring"
+                                                                },
+                                                                "value": {
+                                                                  "$ref": "#/definitions/Context_hash"
+                                                                }
+                                                              },
+                                                              "required": [
+                                                                "value",
+                                                                "kind"
+                                                              ],
+                                                              "additionalProperties": false
+                                                            }
+                                                          ]
+                                                        }
+                                                      ],
+                                                      "additionalItems": false
+                                                    }
+                                                  },
+                                                  "required": [
+                                                    "proofs",
+                                                    "length"
+                                                  ],
+                                                  "additionalProperties": false
+                                                }
+                                              },
+                                              "required": [
+                                                "inode"
+                                              ],
+                                              "additionalProperties": false
+                                            }
+                                          },
+                                          "required": [
+                                            "value",
+                                            "kind"
+                                          ],
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "title": "other_elts",
+                                          "type": "object",
+                                          "properties": {
+                                            "kind": {
+                                              "$ref": "#/definitions/unistring"
+                                            },
+                                            "value": {
+                                              "type": "object",
+                                              "properties": {
+                                                "other_elts": {
+                                                  "oneOf": [
+                                                    {
+                                                      "title": "Node",
+                                                      "type": "object",
+                                                      "properties": {
+                                                        "kind": {
+                                                          "$ref": "#/definitions/unistring"
+                                                        },
+                                                        "value": {
+                                                          "type": "object",
+                                                          "properties": {
+                                                            "node": {
+                                                              "type": "array",
+                                                              "items": {
+                                                                "type": "array",
+                                                                "items": [
+                                                                  {
+                                                                    "type": "string",
+                                                                    "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                                                                  },
+                                                                  {
+                                                                    "oneOf": [
+                                                                      {
+                                                                        "title": "Value",
+                                                                        "type": "object",
+                                                                        "properties": {
+                                                                          "kind": {
+                                                                            "$ref": "#/definitions/unistring"
+                                                                          },
+                                                                          "value": {
+                                                                            "type": "object",
+                                                                            "properties": {
+                                                                              "value": {
+                                                                                "$ref": "#/definitions/Context_hash"
+                                                                              }
+                                                                            },
+                                                                            "required": [
+                                                                              "value"
+                                                                            ],
+                                                                            "additionalProperties": false
+                                                                          }
+                                                                        },
+                                                                        "required": [
+                                                                          "value",
+                                                                          "kind"
+                                                                        ],
+                                                                        "additionalProperties": false
+                                                                      },
+                                                                      {
+                                                                        "title": "Node",
+                                                                        "type": "object",
+                                                                        "properties": {
+                                                                          "kind": {
+                                                                            "$ref": "#/definitions/unistring"
+                                                                          },
+                                                                          "value": {
+                                                                            "type": "object",
+                                                                            "properties": {
+                                                                              "node": {
+                                                                                "$ref": "#/definitions/Context_hash"
+                                                                              }
+                                                                            },
+                                                                            "required": [
+                                                                              "node"
+                                                                            ],
+                                                                            "additionalProperties": false
+                                                                          }
+                                                                        },
+                                                                        "required": [
+                                                                          "value",
+                                                                          "kind"
+                                                                        ],
+                                                                        "additionalProperties": false
+                                                                      }
+                                                                    ]
+                                                                  }
+                                                                ],
+                                                                "additionalItems": false
+                                                              }
+                                                            }
+                                                          },
+                                                          "required": [
+                                                            "node"
+                                                          ],
+                                                          "additionalProperties": false
+                                                        }
+                                                      },
+                                                      "required": [
+                                                        "value",
+                                                        "kind"
+                                                      ],
+                                                      "additionalProperties": false
+                                                    },
+                                                    {
+                                                      "title": "other_elts",
+                                                      "type": "object",
+                                                      "properties": {
+                                                        "kind": {
+                                                          "$ref": "#/definitions/unistring"
+                                                        },
+                                                        "value": {
+                                                          "type": "object",
+                                                          "properties": {
+                                                            "other_elts": {
+                                                              "oneOf": [
+                                                                {
+                                                                  "title": "Value",
+                                                                  "type": "object",
+                                                                  "properties": {
+                                                                    "kind": {
+                                                                      "$ref": "#/definitions/unistring"
+                                                                    },
+                                                                    "value": {
+                                                                      "type": "object",
+                                                                      "properties": {
+                                                                        "value": {
+                                                                          "oneOf": [
+                                                                            {
+                                                                              "title": "short_bytes",
+                                                                              "type": "object",
+                                                                              "properties": {
+                                                                                "kind": {
+                                                                                  "$ref": "#/definitions/unistring"
+                                                                                },
+                                                                                "value": {
+                                                                                  "type": "string",
+                                                                                  "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                                                                                }
+                                                                              },
+                                                                              "required": [
+                                                                                "value",
+                                                                                "kind"
+                                                                              ],
+                                                                              "additionalProperties": false
+                                                                            },
+                                                                            {
+                                                                              "title": "medium_bytes",
+                                                                              "type": "object",
+                                                                              "properties": {
+                                                                                "kind": {
+                                                                                  "$ref": "#/definitions/unistring"
+                                                                                },
+                                                                                "value": {
+                                                                                  "type": "string",
+                                                                                  "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                                                                                }
+                                                                              },
+                                                                              "required": [
+                                                                                "value",
+                                                                                "kind"
+                                                                              ],
+                                                                              "additionalProperties": false
+                                                                            },
+                                                                            {
+                                                                              "title": "long_bytes",
+                                                                              "description": "This case is void. No data is accepted.",
+                                                                              "type": "object",
+                                                                              "properties": {
+                                                                                "kind": {
+                                                                                  "$ref": "#/definitions/unistring"
+                                                                                },
+                                                                                "value": {}
+                                                                              },
+                                                                              "required": [
+                                                                                "value",
+                                                                                "kind"
+                                                                              ],
+                                                                              "additionalProperties": false
+                                                                            },
+                                                                            {
+                                                                              "title": "unlimited_bytes",
+                                                                              "type": "object",
+                                                                              "properties": {
+                                                                                "kind": {
+                                                                                  "$ref": "#/definitions/unistring"
+                                                                                },
+                                                                                "value": {
+                                                                                  "type": "string",
+                                                                                  "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                                                                                }
+                                                                              },
+                                                                              "required": [
+                                                                                "value",
+                                                                                "kind"
+                                                                              ],
+                                                                              "additionalProperties": false
+                                                                            }
+                                                                          ]
+                                                                        }
+                                                                      },
+                                                                      "required": [
+                                                                        "value"
+                                                                      ],
+                                                                      "additionalProperties": false
+                                                                    }
+                                                                  },
+                                                                  "required": [
+                                                                    "value",
+                                                                    "kind"
+                                                                  ],
+                                                                  "additionalProperties": false
+                                                                },
+                                                                {
+                                                                  "title": "Inode_extender",
+                                                                  "type": "object",
+                                                                  "properties": {
+                                                                    "kind": {
+                                                                      "$ref": "#/definitions/unistring"
+                                                                    },
+                                                                    "value": {
+                                                                      "type": "object",
+                                                                      "properties": {
+                                                                        "inode_extender": {
+                                                                          "type": "object",
+                                                                          "properties": {
+                                                                            "length": {
+                                                                              "oneOf": [
+                                                                                {
+                                                                                  "title": "small",
+                                                                                  "description": "An int64 which fits within a uint8",
+                                                                                  "type": "object",
+                                                                                  "properties": {
+                                                                                    "kind": {
+                                                                                      "$ref": "#/definitions/unistring"
+                                                                                    },
+                                                                                    "value": {
+                                                                                      "type": "integer",
+                                                                                      "minimum": 0,
+                                                                                      "maximum": 255
+                                                                                    }
+                                                                                  },
+                                                                                  "required": [
+                                                                                    "value",
+                                                                                    "kind"
+                                                                                  ],
+                                                                                  "additionalProperties": false
+                                                                                },
+                                                                                {
+                                                                                  "title": "medium",
+                                                                                  "description": "An int64 which fits within a uint16",
+                                                                                  "type": "object",
+                                                                                  "properties": {
+                                                                                    "kind": {
+                                                                                      "$ref": "#/definitions/unistring"
+                                                                                    },
+                                                                                    "value": {
+                                                                                      "type": "integer",
+                                                                                      "minimum": 0,
+                                                                                      "maximum": 65535
+                                                                                    }
+                                                                                  },
+                                                                                  "required": [
+                                                                                    "value",
+                                                                                    "kind"
+                                                                                  ],
+                                                                                  "additionalProperties": false
+                                                                                },
+                                                                                {
+                                                                                  "title": "biggish",
+                                                                                  "description": "An int64 which fits within a uint32",
+                                                                                  "type": "object",
+                                                                                  "properties": {
+                                                                                    "kind": {
+                                                                                      "$ref": "#/definitions/unistring"
+                                                                                    },
+                                                                                    "value": {
+                                                                                      "type": "integer",
+                                                                                      "minimum": -2147483648,
+                                                                                      "maximum": 2147483647
+                                                                                    }
+                                                                                  },
+                                                                                  "required": [
+                                                                                    "value",
+                                                                                    "kind"
+                                                                                  ],
+                                                                                  "additionalProperties": false
+                                                                                },
+                                                                                {
+                                                                                  "title": "bigger",
+                                                                                  "description": "An int64 which doesn't fit within a uint32",
+                                                                                  "type": "object",
+                                                                                  "properties": {
+                                                                                    "kind": {
+                                                                                      "$ref": "#/definitions/unistring"
+                                                                                    },
+                                                                                    "value": {
+                                                                                      "$ref": "#/definitions/int64"
+                                                                                    }
+                                                                                  },
+                                                                                  "required": [
+                                                                                    "value",
+                                                                                    "kind"
+                                                                                  ],
+                                                                                  "additionalProperties": false
+                                                                                }
+                                                                              ]
+                                                                            },
+                                                                            "segment": {
+                                                                              "type": "string",
+                                                                              "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                                                                            },
+                                                                            "proof": {
+                                                                              "$ref": "#/definitions/Context_hash"
+                                                                            }
+                                                                          },
+                                                                          "required": [
+                                                                            "proof",
+                                                                            "segment",
+                                                                            "length"
+                                                                          ],
+                                                                          "additionalProperties": false
+                                                                        }
+                                                                      },
+                                                                      "required": [
+                                                                        "inode_extender"
+                                                                      ],
+                                                                      "additionalProperties": false
+                                                                    }
+                                                                  },
+                                                                  "required": [
+                                                                    "value",
+                                                                    "kind"
+                                                                  ],
+                                                                  "additionalProperties": false
+                                                                }
+                                                              ]
+                                                            }
+                                                          },
+                                                          "required": [
+                                                            "other_elts"
+                                                          ],
+                                                          "additionalProperties": false
+                                                        }
+                                                      },
+                                                      "required": [
+                                                        "value",
+                                                        "kind"
+                                                      ],
+                                                      "additionalProperties": false
+                                                    }
+                                                  ]
+                                                }
+                                              },
+                                              "required": [
+                                                "other_elts"
+                                              ],
+                                              "additionalProperties": false
+                                            }
+                                          },
+                                          "required": [
+                                            "value",
+                                            "kind"
+                                          ],
+                                          "additionalProperties": false
+                                        }
+                                      ]
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "state",
+                                  "after",
+                                  "before",
+                                  "version"
+                                ],
+                                "additionalProperties": false
                               }
                             },
                             "required": [
@@ -4015,7 +4707,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 {
                                   "name": "parameters",
                                   "layout": {
-                                    "name": "X_13",
+                                    "name": "X_138",
                                     "kind": "Ref"
                                   },
                                   "data_kind": {
@@ -4680,7 +5372,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 {
                                   "name": "commitment",
                                   "layout": {
-                                    "name": "X_11",
+                                    "name": "X_136",
                                     "kind": "Ref"
                                   },
                                   "data_kind": {
@@ -5095,11 +5787,11 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 {
                                   "name": "proof",
                                   "layout": {
-                                    "kind": "Bool"
+                                    "name": "X_135",
+                                    "kind": "Ref"
                                   },
                                   "data_kind": {
-                                    "size": 1,
-                                    "kind": "Float"
+                                    "kind": "Dynamic"
                                   },
                                   "kind": "named"
                                 }
@@ -6302,7 +6994,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "X_13"
+                          "title": "X_138"
                         },
                         "encoding": {
                           "fields": [
@@ -6685,7 +7377,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "X_11"
+                          "title": "X_136"
                         },
                         "encoding": {
                           "fields": [
@@ -6722,7 +7414,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                             {
                               "name": "predecessor",
                               "layout": {
-                                "name": "X_12",
+                                "name": "X_137",
                                 "kind": "Ref"
                               },
                               "data_kind": {
@@ -6746,7 +7438,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "X_12"
+                          "title": "X_137"
                         },
                         "encoding": {
                           "tag_size": "Uint8",
@@ -6810,6 +7502,1542 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 }
                               ],
                               "name": "Some"
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "description": {
+                          "title": "X_135"
+                        },
+                        "encoding": {
+                          "tag_size": "Uint8",
+                          "kind": {
+                            "kind": "Dynamic"
+                          },
+                          "cases": [
+                            {
+                              "tag": 0,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "layout": {
+                                    "size": "Int16",
+                                    "kind": "Int"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "size": 2,
+                                    "kind": "Float"
+                                  }
+                                },
+                                {
+                                  "layout": {
+                                    "kind": "Bytes"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "size": 32,
+                                    "kind": "Float"
+                                  }
+                                },
+                                {
+                                  "layout": {
+                                    "kind": "Bytes"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "size": 32,
+                                    "kind": "Float"
+                                  }
+                                },
+                                {
+                                  "layout": {
+                                    "name": "X_11",
+                                    "kind": "Ref"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "kind": "Dynamic"
+                                  }
+                                }
+                              ],
+                              "name": "case 0"
+                            },
+                            {
+                              "tag": 1,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "layout": {
+                                    "size": "Int16",
+                                    "kind": "Int"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "size": 2,
+                                    "kind": "Float"
+                                  }
+                                },
+                                {
+                                  "layout": {
+                                    "kind": "Bytes"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "size": 32,
+                                    "kind": "Float"
+                                  }
+                                },
+                                {
+                                  "layout": {
+                                    "kind": "Bytes"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "size": 32,
+                                    "kind": "Float"
+                                  }
+                                },
+                                {
+                                  "layout": {
+                                    "name": "X_11",
+                                    "kind": "Ref"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "kind": "Dynamic"
+                                  }
+                                }
+                              ],
+                              "name": "case 1"
+                            },
+                            {
+                              "tag": 2,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "layout": {
+                                    "size": "Int16",
+                                    "kind": "Int"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "size": 2,
+                                    "kind": "Float"
+                                  }
+                                },
+                                {
+                                  "layout": {
+                                    "kind": "Bytes"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "size": 32,
+                                    "kind": "Float"
+                                  }
+                                },
+                                {
+                                  "layout": {
+                                    "kind": "Bytes"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "size": 32,
+                                    "kind": "Float"
+                                  }
+                                },
+                                {
+                                  "layout": {
+                                    "name": "X_11",
+                                    "kind": "Ref"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "kind": "Dynamic"
+                                  }
+                                }
+                              ],
+                              "name": "case 2"
+                            },
+                            {
+                              "tag": 3,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "layout": {
+                                    "size": "Int16",
+                                    "kind": "Int"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "size": 2,
+                                    "kind": "Float"
+                                  }
+                                },
+                                {
+                                  "layout": {
+                                    "kind": "Bytes"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "size": 32,
+                                    "kind": "Float"
+                                  }
+                                },
+                                {
+                                  "layout": {
+                                    "kind": "Bytes"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "size": 32,
+                                    "kind": "Float"
+                                  }
+                                },
+                                {
+                                  "layout": {
+                                    "name": "X_11",
+                                    "kind": "Ref"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "kind": "Dynamic"
+                                  }
+                                }
+                              ],
+                              "name": "case 3"
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "description": {
+                          "title": "X_134"
+                        },
+                        "encoding": {
+                          "tag_size": "Uint8",
+                          "kind": {
+                            "kind": "Dynamic"
+                          },
+                          "cases": [
+                            {
+                              "tag": 0,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  }
+                                },
+                                {
+                                  "layout": {
+                                    "name": "X_133",
+                                    "kind": "Ref"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "size": 0,
+                                    "kind": "Float"
+                                  }
+                                }
+                              ],
+                              "name": "case 0"
+                            },
+                            {
+                              "tag": 1,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "layout": {
+                                    "size": "Uint16",
+                                    "kind": "Int"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "size": 2,
+                                    "kind": "Float"
+                                  }
+                                },
+                                {
+                                  "layout": {
+                                    "name": "X_133",
+                                    "kind": "Ref"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "size": 0,
+                                    "kind": "Float"
+                                  }
+                                }
+                              ],
+                              "name": "case 1"
+                            },
+                            {
+                              "tag": 2,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "layout": {
+                                    "size": "Int32",
+                                    "kind": "Int"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "size": 4,
+                                    "kind": "Float"
+                                  }
+                                },
+                                {
+                                  "layout": {
+                                    "name": "X_133",
+                                    "kind": "Ref"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "size": 0,
+                                    "kind": "Float"
+                                  }
+                                }
+                              ],
+                              "name": "case 2"
+                            },
+                            {
+                              "tag": 3,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "layout": {
+                                    "size": "Int64",
+                                    "kind": "Int"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "size": 8,
+                                    "kind": "Float"
+                                  }
+                                },
+                                {
+                                  "layout": {
+                                    "name": "X_133",
+                                    "kind": "Ref"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "size": 0,
+                                    "kind": "Float"
+                                  }
+                                }
+                              ],
+                              "name": "case 3"
+                            },
+                            {
+                              "tag": 4,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  }
+                                },
+                                {
+                                  "layout": {
+                                    "name": "X_129",
+                                    "kind": "Ref"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "size": 32,
+                                    "kind": "Float"
+                                  }
+                                }
+                              ],
+                              "name": "case 4"
+                            },
+                            {
+                              "tag": 5,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "layout": {
+                                    "size": "Uint16",
+                                    "kind": "Int"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "size": 2,
+                                    "kind": "Float"
+                                  }
+                                },
+                                {
+                                  "layout": {
+                                    "name": "X_129",
+                                    "kind": "Ref"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "size": 32,
+                                    "kind": "Float"
+                                  }
+                                }
+                              ],
+                              "name": "case 5"
+                            },
+                            {
+                              "tag": 6,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "layout": {
+                                    "size": "Int32",
+                                    "kind": "Int"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "size": 4,
+                                    "kind": "Float"
+                                  }
+                                },
+                                {
+                                  "layout": {
+                                    "name": "X_129",
+                                    "kind": "Ref"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "size": 32,
+                                    "kind": "Float"
+                                  }
+                                }
+                              ],
+                              "name": "case 6"
+                            },
+                            {
+                              "tag": 7,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "layout": {
+                                    "size": "Int64",
+                                    "kind": "Int"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "size": 8,
+                                    "kind": "Float"
+                                  }
+                                },
+                                {
+                                  "layout": {
+                                    "name": "X_129",
+                                    "kind": "Ref"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "size": 32,
+                                    "kind": "Float"
+                                  }
+                                }
+                              ],
+                              "name": "case 7"
+                            },
+                            {
+                              "tag": 8,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  }
+                                },
+                                {
+                                  "layout": {
+                                    "name": "X_129",
+                                    "kind": "Ref"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "size": 32,
+                                    "kind": "Float"
+                                  }
+                                }
+                              ],
+                              "name": "case 8"
+                            },
+                            {
+                              "tag": 9,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "layout": {
+                                    "size": "Uint16",
+                                    "kind": "Int"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "size": 2,
+                                    "kind": "Float"
+                                  }
+                                },
+                                {
+                                  "layout": {
+                                    "name": "X_129",
+                                    "kind": "Ref"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "size": 32,
+                                    "kind": "Float"
+                                  }
+                                }
+                              ],
+                              "name": "case 9"
+                            },
+                            {
+                              "tag": 10,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "layout": {
+                                    "size": "Int32",
+                                    "kind": "Int"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "size": 4,
+                                    "kind": "Float"
+                                  }
+                                },
+                                {
+                                  "layout": {
+                                    "name": "X_129",
+                                    "kind": "Ref"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "size": 32,
+                                    "kind": "Float"
+                                  }
+                                }
+                              ],
+                              "name": "case 10"
+                            },
+                            {
+                              "tag": 11,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "layout": {
+                                    "size": "Int64",
+                                    "kind": "Int"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "size": 8,
+                                    "kind": "Float"
+                                  }
+                                },
+                                {
+                                  "layout": {
+                                    "name": "X_129",
+                                    "kind": "Ref"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "size": 32,
+                                    "kind": "Float"
+                                  }
+                                }
+                              ],
+                              "name": "case 11"
+                            },
+                            {
+                              "tag": 12,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  }
+                                },
+                                {
+                                  "layout": {
+                                    "name": "X_121",
+                                    "kind": "Ref"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "size": 64,
+                                    "kind": "Float"
+                                  }
+                                }
+                              ],
+                              "name": "case 12"
+                            },
+                            {
+                              "tag": 13,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "layout": {
+                                    "size": "Uint16",
+                                    "kind": "Int"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "size": 2,
+                                    "kind": "Float"
+                                  }
+                                },
+                                {
+                                  "layout": {
+                                    "name": "X_121",
+                                    "kind": "Ref"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "size": 64,
+                                    "kind": "Float"
+                                  }
+                                }
+                              ],
+                              "name": "case 13"
+                            },
+                            {
+                              "tag": 14,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "layout": {
+                                    "size": "Int32",
+                                    "kind": "Int"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "size": 4,
+                                    "kind": "Float"
+                                  }
+                                },
+                                {
+                                  "layout": {
+                                    "name": "X_121",
+                                    "kind": "Ref"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "size": 64,
+                                    "kind": "Float"
+                                  }
+                                }
+                              ],
+                              "name": "case 14"
+                            },
+                            {
+                              "tag": 15,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "layout": {
+                                    "size": "Int64",
+                                    "kind": "Int"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "size": 8,
+                                    "kind": "Float"
+                                  }
+                                },
+                                {
+                                  "layout": {
+                                    "name": "X_121",
+                                    "kind": "Ref"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "size": 64,
+                                    "kind": "Float"
+                                  }
+                                }
+                              ],
+                              "name": "case 15"
+                            },
+                            {
+                              "tag": 128,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "layout": {
+                                    "kind": "Zero_width"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "size": 0,
+                                    "kind": "Float"
+                                  }
+                                }
+                              ],
+                              "name": "case 128"
+                            },
+                            {
+                              "tag": 129,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "layout": {
+                                    "layout": {
+                                      "name": "X_16",
+                                      "kind": "Ref"
+                                    },
+                                    "kind": "Seq",
+                                    "length_limit": {
+                                      "kind": "exactly",
+                                      "exactly": 1
+                                    }
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "kind": "Variable"
+                                  }
+                                }
+                              ],
+                              "name": "case 129"
+                            },
+                            {
+                              "tag": 130,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "layout": {
+                                    "layout": {
+                                      "name": "X_16",
+                                      "kind": "Ref"
+                                    },
+                                    "kind": "Seq",
+                                    "length_limit": {
+                                      "kind": "exactly",
+                                      "exactly": 2
+                                    }
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "kind": "Variable"
+                                  }
+                                }
+                              ],
+                              "name": "case 130"
+                            },
+                            {
+                              "tag": 131,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "kind": "dyn",
+                                  "num_fields": 1,
+                                  "size": "Uint30"
+                                },
+                                {
+                                  "layout": {
+                                    "layout": {
+                                      "name": "X_16",
+                                      "kind": "Ref"
+                                    },
+                                    "kind": "Seq"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "kind": "Variable"
+                                  }
+                                }
+                              ],
+                              "name": "case 131"
+                            },
+                            {
+                              "tag": 192,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "kind": "dyn",
+                                  "num_fields": 1,
+                                  "size": "Uint8"
+                                },
+                                {
+                                  "layout": {
+                                    "kind": "Bytes"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "kind": "Variable"
+                                  }
+                                }
+                              ],
+                              "name": "case 192"
+                            },
+                            {
+                              "tag": 193,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "kind": "dyn",
+                                  "num_fields": 1,
+                                  "size": "Uint16"
+                                },
+                                {
+                                  "layout": {
+                                    "kind": "Bytes"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "kind": "Variable"
+                                  }
+                                }
+                              ],
+                              "name": "case 193"
+                            },
+                            {
+                              "tag": 195,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "kind": "dyn",
+                                  "num_fields": 1,
+                                  "size": "Uint30"
+                                },
+                                {
+                                  "layout": {
+                                    "kind": "Bytes"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "kind": "Variable"
+                                  }
+                                }
+                              ],
+                              "name": "case 195"
+                            },
+                            {
+                              "tag": 224,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  }
+                                },
+                                {
+                                  "layout": {
+                                    "name": "X_116",
+                                    "kind": "Ref"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "kind": "Dynamic"
+                                  }
+                                },
+                                {
+                                  "layout": {
+                                    "kind": "Bytes"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "size": 32,
+                                    "kind": "Float"
+                                  }
+                                }
+                              ],
+                              "name": "case 224"
+                            },
+                            {
+                              "tag": 225,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "layout": {
+                                    "size": "Uint16",
+                                    "kind": "Int"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "size": 2,
+                                    "kind": "Float"
+                                  }
+                                },
+                                {
+                                  "layout": {
+                                    "name": "X_116",
+                                    "kind": "Ref"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "kind": "Dynamic"
+                                  }
+                                },
+                                {
+                                  "layout": {
+                                    "kind": "Bytes"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "size": 32,
+                                    "kind": "Float"
+                                  }
+                                }
+                              ],
+                              "name": "case 225"
+                            },
+                            {
+                              "tag": 226,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "layout": {
+                                    "size": "Int32",
+                                    "kind": "Int"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "size": 4,
+                                    "kind": "Float"
+                                  }
+                                },
+                                {
+                                  "layout": {
+                                    "name": "X_116",
+                                    "kind": "Ref"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "kind": "Dynamic"
+                                  }
+                                },
+                                {
+                                  "layout": {
+                                    "kind": "Bytes"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "size": 32,
+                                    "kind": "Float"
+                                  }
+                                }
+                              ],
+                              "name": "case 226"
+                            },
+                            {
+                              "tag": 227,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "layout": {
+                                    "size": "Int64",
+                                    "kind": "Int"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "size": 8,
+                                    "kind": "Float"
+                                  }
+                                },
+                                {
+                                  "layout": {
+                                    "name": "X_116",
+                                    "kind": "Ref"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "kind": "Dynamic"
+                                  }
+                                },
+                                {
+                                  "layout": {
+                                    "kind": "Bytes"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "size": 32,
+                                    "kind": "Float"
+                                  }
+                                }
+                              ],
+                              "name": "case 227"
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "description": {
+                          "title": "X_133"
+                        },
+                        "encoding": {
+                          "fields": []
+                        }
+                      },
+                      {
+                        "description": {
+                          "title": "X_129"
+                        },
+                        "encoding": {
+                          "fields": [
+                            {
+                              "layout": {
+                                "kind": "Bytes"
+                              },
+                              "kind": "anon",
+                              "data_kind": {
+                                "size": 32,
+                                "kind": "Float"
+                              }
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "description": {
+                          "title": "X_121"
+                        },
+                        "encoding": {
+                          "fields": [
+                            {
+                              "layout": {
+                                "kind": "Bytes"
+                              },
+                              "kind": "anon",
+                              "data_kind": {
+                                "size": 32,
+                                "kind": "Float"
+                              }
+                            },
+                            {
+                              "layout": {
+                                "kind": "Bytes"
+                              },
+                              "kind": "anon",
+                              "data_kind": {
+                                "size": 32,
+                                "kind": "Float"
+                              }
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "description": {
+                          "title": "X_117"
+                        },
+                        "encoding": {
+                          "tag_size": "Uint8",
+                          "kind": {
+                            "size": 33,
+                            "kind": "Float"
+                          },
+                          "cases": [
+                            {
+                              "tag": 0,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "Context_hash",
+                                  "layout": {
+                                    "kind": "Bytes"
+                                  },
+                                  "data_kind": {
+                                    "size": 32,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                }
+                              ],
+                              "name": "case 0"
+                            },
+                            {
+                              "tag": 1,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "Context_hash",
+                                  "layout": {
+                                    "kind": "Bytes"
+                                  },
+                                  "data_kind": {
+                                    "size": 32,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                }
+                              ],
+                              "name": "case 1"
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "description": {
+                          "title": "X_116"
+                        },
+                        "encoding": {
+                          "fields": [
+                            {
+                              "kind": "dyn",
+                              "num_fields": 1,
+                              "size": "Uint8"
+                            },
+                            {
+                              "layout": {
+                                "kind": "Bytes"
+                              },
+                              "kind": "anon",
+                              "data_kind": {
+                                "kind": "Variable"
+                              }
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "description": {
+                          "title": "X_11"
+                        },
+                        "encoding": {
+                          "fields": [
+                            {
+                              "kind": "dyn",
+                              "num_fields": 1,
+                              "size": "Uint30"
+                            },
+                            {
+                              "layout": {
+                                "layout": {
+                                  "name": "X_134",
+                                  "kind": "Ref"
+                                },
+                                "kind": "Seq"
+                              },
+                              "kind": "anon",
+                              "data_kind": {
+                                "kind": "Variable"
+                              }
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "description": {
+                          "title": "X_16"
+                        },
+                        "encoding": {
+                          "fields": [
+                            {
+                              "layout": {
+                                "name": "X_116",
+                                "kind": "Ref"
+                              },
+                              "kind": "anon",
+                              "data_kind": {
+                                "kind": "Dynamic"
+                              }
+                            },
+                            {
+                              "layout": {
+                                "name": "X_117",
+                                "kind": "Ref"
+                              },
+                              "kind": "anon",
+                              "data_kind": {
+                                "size": 33,
+                                "kind": "Float"
+                              }
                             }
                           ]
                         }
@@ -9633,7 +11861,699 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 "additionalProperties": false
                               },
                               "proof": {
-                                "type": "boolean"
+                                "type": "object",
+                                "properties": {
+                                  "version": {
+                                    "type": "integer",
+                                    "minimum": -32768,
+                                    "maximum": 32767
+                                  },
+                                  "before": {
+                                    "oneOf": [
+                                      {
+                                        "title": "Value",
+                                        "type": "object",
+                                        "properties": {
+                                          "kind": {
+                                            "$ref": "#/definitions/unistring"
+                                          },
+                                          "value": {
+                                            "type": "object",
+                                            "properties": {
+                                              "value": {
+                                                "$ref": "#/definitions/Context_hash"
+                                              }
+                                            },
+                                            "required": [
+                                              "value"
+                                            ],
+                                            "additionalProperties": false
+                                          }
+                                        },
+                                        "required": [
+                                          "value",
+                                          "kind"
+                                        ],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "title": "Node",
+                                        "type": "object",
+                                        "properties": {
+                                          "kind": {
+                                            "$ref": "#/definitions/unistring"
+                                          },
+                                          "value": {
+                                            "type": "object",
+                                            "properties": {
+                                              "node": {
+                                                "$ref": "#/definitions/Context_hash"
+                                              }
+                                            },
+                                            "required": [
+                                              "node"
+                                            ],
+                                            "additionalProperties": false
+                                          }
+                                        },
+                                        "required": [
+                                          "value",
+                                          "kind"
+                                        ],
+                                        "additionalProperties": false
+                                      }
+                                    ]
+                                  },
+                                  "after": {
+                                    "oneOf": [
+                                      {
+                                        "title": "Value",
+                                        "type": "object",
+                                        "properties": {
+                                          "kind": {
+                                            "$ref": "#/definitions/unistring"
+                                          },
+                                          "value": {
+                                            "type": "object",
+                                            "properties": {
+                                              "value": {
+                                                "$ref": "#/definitions/Context_hash"
+                                              }
+                                            },
+                                            "required": [
+                                              "value"
+                                            ],
+                                            "additionalProperties": false
+                                          }
+                                        },
+                                        "required": [
+                                          "value",
+                                          "kind"
+                                        ],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "title": "Node",
+                                        "type": "object",
+                                        "properties": {
+                                          "kind": {
+                                            "$ref": "#/definitions/unistring"
+                                          },
+                                          "value": {
+                                            "type": "object",
+                                            "properties": {
+                                              "node": {
+                                                "$ref": "#/definitions/Context_hash"
+                                              }
+                                            },
+                                            "required": [
+                                              "node"
+                                            ],
+                                            "additionalProperties": false
+                                          }
+                                        },
+                                        "required": [
+                                          "value",
+                                          "kind"
+                                        ],
+                                        "additionalProperties": false
+                                      }
+                                    ]
+                                  },
+                                  "state": {
+                                    "type": "array",
+                                    "items": {
+                                      "oneOf": [
+                                        {
+                                          "title": "Inode",
+                                          "type": "object",
+                                          "properties": {
+                                            "kind": {
+                                              "$ref": "#/definitions/unistring"
+                                            },
+                                            "value": {
+                                              "type": "object",
+                                              "properties": {
+                                                "inode": {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "length": {
+                                                      "oneOf": [
+                                                        {
+                                                          "title": "small",
+                                                          "description": "An int64 which fits within a uint8",
+                                                          "type": "object",
+                                                          "properties": {
+                                                            "kind": {
+                                                              "$ref": "#/definitions/unistring"
+                                                            },
+                                                            "value": {
+                                                              "type": "integer",
+                                                              "minimum": 0,
+                                                              "maximum": 255
+                                                            }
+                                                          },
+                                                          "required": [
+                                                            "value",
+                                                            "kind"
+                                                          ],
+                                                          "additionalProperties": false
+                                                        },
+                                                        {
+                                                          "title": "medium",
+                                                          "description": "An int64 which fits within a uint16",
+                                                          "type": "object",
+                                                          "properties": {
+                                                            "kind": {
+                                                              "$ref": "#/definitions/unistring"
+                                                            },
+                                                            "value": {
+                                                              "type": "integer",
+                                                              "minimum": 0,
+                                                              "maximum": 65535
+                                                            }
+                                                          },
+                                                          "required": [
+                                                            "value",
+                                                            "kind"
+                                                          ],
+                                                          "additionalProperties": false
+                                                        },
+                                                        {
+                                                          "title": "biggish",
+                                                          "description": "An int64 which fits within a uint32",
+                                                          "type": "object",
+                                                          "properties": {
+                                                            "kind": {
+                                                              "$ref": "#/definitions/unistring"
+                                                            },
+                                                            "value": {
+                                                              "type": "integer",
+                                                              "minimum": -2147483648,
+                                                              "maximum": 2147483647
+                                                            }
+                                                          },
+                                                          "required": [
+                                                            "value",
+                                                            "kind"
+                                                          ],
+                                                          "additionalProperties": false
+                                                        },
+                                                        {
+                                                          "title": "bigger",
+                                                          "description": "An int64 which doesn't fit within a uint32",
+                                                          "type": "object",
+                                                          "properties": {
+                                                            "kind": {
+                                                              "$ref": "#/definitions/unistring"
+                                                            },
+                                                            "value": {
+                                                              "$ref": "#/definitions/int64"
+                                                            }
+                                                          },
+                                                          "required": [
+                                                            "value",
+                                                            "kind"
+                                                          ],
+                                                          "additionalProperties": false
+                                                        }
+                                                      ]
+                                                    },
+                                                    "proofs": {
+                                                      "type": "array",
+                                                      "items": [
+                                                        {
+                                                          "oneOf": [
+                                                            {
+                                                              "title": "none",
+                                                              "type": "object",
+                                                              "properties": {
+                                                                "kind": {
+                                                                  "$ref": "#/definitions/unistring"
+                                                                },
+                                                                "value": {}
+                                                              },
+                                                              "required": [
+                                                                "value",
+                                                                "kind"
+                                                              ],
+                                                              "additionalProperties": false
+                                                            },
+                                                            {
+                                                              "title": "some",
+                                                              "type": "object",
+                                                              "properties": {
+                                                                "kind": {
+                                                                  "$ref": "#/definitions/unistring"
+                                                                },
+                                                                "value": {
+                                                                  "$ref": "#/definitions/Context_hash"
+                                                                }
+                                                              },
+                                                              "required": [
+                                                                "value",
+                                                                "kind"
+                                                              ],
+                                                              "additionalProperties": false
+                                                            }
+                                                          ]
+                                                        },
+                                                        {
+                                                          "oneOf": [
+                                                            {
+                                                              "title": "none",
+                                                              "type": "object",
+                                                              "properties": {
+                                                                "kind": {
+                                                                  "$ref": "#/definitions/unistring"
+                                                                },
+                                                                "value": {}
+                                                              },
+                                                              "required": [
+                                                                "value",
+                                                                "kind"
+                                                              ],
+                                                              "additionalProperties": false
+                                                            },
+                                                            {
+                                                              "title": "some",
+                                                              "type": "object",
+                                                              "properties": {
+                                                                "kind": {
+                                                                  "$ref": "#/definitions/unistring"
+                                                                },
+                                                                "value": {
+                                                                  "$ref": "#/definitions/Context_hash"
+                                                                }
+                                                              },
+                                                              "required": [
+                                                                "value",
+                                                                "kind"
+                                                              ],
+                                                              "additionalProperties": false
+                                                            }
+                                                          ]
+                                                        }
+                                                      ],
+                                                      "additionalItems": false
+                                                    }
+                                                  },
+                                                  "required": [
+                                                    "proofs",
+                                                    "length"
+                                                  ],
+                                                  "additionalProperties": false
+                                                }
+                                              },
+                                              "required": [
+                                                "inode"
+                                              ],
+                                              "additionalProperties": false
+                                            }
+                                          },
+                                          "required": [
+                                            "value",
+                                            "kind"
+                                          ],
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "title": "other_elts",
+                                          "type": "object",
+                                          "properties": {
+                                            "kind": {
+                                              "$ref": "#/definitions/unistring"
+                                            },
+                                            "value": {
+                                              "type": "object",
+                                              "properties": {
+                                                "other_elts": {
+                                                  "oneOf": [
+                                                    {
+                                                      "title": "Node",
+                                                      "type": "object",
+                                                      "properties": {
+                                                        "kind": {
+                                                          "$ref": "#/definitions/unistring"
+                                                        },
+                                                        "value": {
+                                                          "type": "object",
+                                                          "properties": {
+                                                            "node": {
+                                                              "type": "array",
+                                                              "items": {
+                                                                "type": "array",
+                                                                "items": [
+                                                                  {
+                                                                    "type": "string",
+                                                                    "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                                                                  },
+                                                                  {
+                                                                    "oneOf": [
+                                                                      {
+                                                                        "title": "Value",
+                                                                        "type": "object",
+                                                                        "properties": {
+                                                                          "kind": {
+                                                                            "$ref": "#/definitions/unistring"
+                                                                          },
+                                                                          "value": {
+                                                                            "type": "object",
+                                                                            "properties": {
+                                                                              "value": {
+                                                                                "$ref": "#/definitions/Context_hash"
+                                                                              }
+                                                                            },
+                                                                            "required": [
+                                                                              "value"
+                                                                            ],
+                                                                            "additionalProperties": false
+                                                                          }
+                                                                        },
+                                                                        "required": [
+                                                                          "value",
+                                                                          "kind"
+                                                                        ],
+                                                                        "additionalProperties": false
+                                                                      },
+                                                                      {
+                                                                        "title": "Node",
+                                                                        "type": "object",
+                                                                        "properties": {
+                                                                          "kind": {
+                                                                            "$ref": "#/definitions/unistring"
+                                                                          },
+                                                                          "value": {
+                                                                            "type": "object",
+                                                                            "properties": {
+                                                                              "node": {
+                                                                                "$ref": "#/definitions/Context_hash"
+                                                                              }
+                                                                            },
+                                                                            "required": [
+                                                                              "node"
+                                                                            ],
+                                                                            "additionalProperties": false
+                                                                          }
+                                                                        },
+                                                                        "required": [
+                                                                          "value",
+                                                                          "kind"
+                                                                        ],
+                                                                        "additionalProperties": false
+                                                                      }
+                                                                    ]
+                                                                  }
+                                                                ],
+                                                                "additionalItems": false
+                                                              }
+                                                            }
+                                                          },
+                                                          "required": [
+                                                            "node"
+                                                          ],
+                                                          "additionalProperties": false
+                                                        }
+                                                      },
+                                                      "required": [
+                                                        "value",
+                                                        "kind"
+                                                      ],
+                                                      "additionalProperties": false
+                                                    },
+                                                    {
+                                                      "title": "other_elts",
+                                                      "type": "object",
+                                                      "properties": {
+                                                        "kind": {
+                                                          "$ref": "#/definitions/unistring"
+                                                        },
+                                                        "value": {
+                                                          "type": "object",
+                                                          "properties": {
+                                                            "other_elts": {
+                                                              "oneOf": [
+                                                                {
+                                                                  "title": "Value",
+                                                                  "type": "object",
+                                                                  "properties": {
+                                                                    "kind": {
+                                                                      "$ref": "#/definitions/unistring"
+                                                                    },
+                                                                    "value": {
+                                                                      "type": "object",
+                                                                      "properties": {
+                                                                        "value": {
+                                                                          "oneOf": [
+                                                                            {
+                                                                              "title": "short_bytes",
+                                                                              "type": "object",
+                                                                              "properties": {
+                                                                                "kind": {
+                                                                                  "$ref": "#/definitions/unistring"
+                                                                                },
+                                                                                "value": {
+                                                                                  "type": "string",
+                                                                                  "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                                                                                }
+                                                                              },
+                                                                              "required": [
+                                                                                "value",
+                                                                                "kind"
+                                                                              ],
+                                                                              "additionalProperties": false
+                                                                            },
+                                                                            {
+                                                                              "title": "medium_bytes",
+                                                                              "type": "object",
+                                                                              "properties": {
+                                                                                "kind": {
+                                                                                  "$ref": "#/definitions/unistring"
+                                                                                },
+                                                                                "value": {
+                                                                                  "type": "string",
+                                                                                  "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                                                                                }
+                                                                              },
+                                                                              "required": [
+                                                                                "value",
+                                                                                "kind"
+                                                                              ],
+                                                                              "additionalProperties": false
+                                                                            },
+                                                                            {
+                                                                              "title": "long_bytes",
+                                                                              "description": "This case is void. No data is accepted.",
+                                                                              "type": "object",
+                                                                              "properties": {
+                                                                                "kind": {
+                                                                                  "$ref": "#/definitions/unistring"
+                                                                                },
+                                                                                "value": {}
+                                                                              },
+                                                                              "required": [
+                                                                                "value",
+                                                                                "kind"
+                                                                              ],
+                                                                              "additionalProperties": false
+                                                                            },
+                                                                            {
+                                                                              "title": "unlimited_bytes",
+                                                                              "type": "object",
+                                                                              "properties": {
+                                                                                "kind": {
+                                                                                  "$ref": "#/definitions/unistring"
+                                                                                },
+                                                                                "value": {
+                                                                                  "type": "string",
+                                                                                  "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                                                                                }
+                                                                              },
+                                                                              "required": [
+                                                                                "value",
+                                                                                "kind"
+                                                                              ],
+                                                                              "additionalProperties": false
+                                                                            }
+                                                                          ]
+                                                                        }
+                                                                      },
+                                                                      "required": [
+                                                                        "value"
+                                                                      ],
+                                                                      "additionalProperties": false
+                                                                    }
+                                                                  },
+                                                                  "required": [
+                                                                    "value",
+                                                                    "kind"
+                                                                  ],
+                                                                  "additionalProperties": false
+                                                                },
+                                                                {
+                                                                  "title": "Inode_extender",
+                                                                  "type": "object",
+                                                                  "properties": {
+                                                                    "kind": {
+                                                                      "$ref": "#/definitions/unistring"
+                                                                    },
+                                                                    "value": {
+                                                                      "type": "object",
+                                                                      "properties": {
+                                                                        "inode_extender": {
+                                                                          "type": "object",
+                                                                          "properties": {
+                                                                            "length": {
+                                                                              "oneOf": [
+                                                                                {
+                                                                                  "title": "small",
+                                                                                  "description": "An int64 which fits within a uint8",
+                                                                                  "type": "object",
+                                                                                  "properties": {
+                                                                                    "kind": {
+                                                                                      "$ref": "#/definitions/unistring"
+                                                                                    },
+                                                                                    "value": {
+                                                                                      "type": "integer",
+                                                                                      "minimum": 0,
+                                                                                      "maximum": 255
+                                                                                    }
+                                                                                  },
+                                                                                  "required": [
+                                                                                    "value",
+                                                                                    "kind"
+                                                                                  ],
+                                                                                  "additionalProperties": false
+                                                                                },
+                                                                                {
+                                                                                  "title": "medium",
+                                                                                  "description": "An int64 which fits within a uint16",
+                                                                                  "type": "object",
+                                                                                  "properties": {
+                                                                                    "kind": {
+                                                                                      "$ref": "#/definitions/unistring"
+                                                                                    },
+                                                                                    "value": {
+                                                                                      "type": "integer",
+                                                                                      "minimum": 0,
+                                                                                      "maximum": 65535
+                                                                                    }
+                                                                                  },
+                                                                                  "required": [
+                                                                                    "value",
+                                                                                    "kind"
+                                                                                  ],
+                                                                                  "additionalProperties": false
+                                                                                },
+                                                                                {
+                                                                                  "title": "biggish",
+                                                                                  "description": "An int64 which fits within a uint32",
+                                                                                  "type": "object",
+                                                                                  "properties": {
+                                                                                    "kind": {
+                                                                                      "$ref": "#/definitions/unistring"
+                                                                                    },
+                                                                                    "value": {
+                                                                                      "type": "integer",
+                                                                                      "minimum": -2147483648,
+                                                                                      "maximum": 2147483647
+                                                                                    }
+                                                                                  },
+                                                                                  "required": [
+                                                                                    "value",
+                                                                                    "kind"
+                                                                                  ],
+                                                                                  "additionalProperties": false
+                                                                                },
+                                                                                {
+                                                                                  "title": "bigger",
+                                                                                  "description": "An int64 which doesn't fit within a uint32",
+                                                                                  "type": "object",
+                                                                                  "properties": {
+                                                                                    "kind": {
+                                                                                      "$ref": "#/definitions/unistring"
+                                                                                    },
+                                                                                    "value": {
+                                                                                      "$ref": "#/definitions/int64"
+                                                                                    }
+                                                                                  },
+                                                                                  "required": [
+                                                                                    "value",
+                                                                                    "kind"
+                                                                                  ],
+                                                                                  "additionalProperties": false
+                                                                                }
+                                                                              ]
+                                                                            },
+                                                                            "segment": {
+                                                                              "type": "string",
+                                                                              "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                                                                            },
+                                                                            "proof": {
+                                                                              "$ref": "#/definitions/Context_hash"
+                                                                            }
+                                                                          },
+                                                                          "required": [
+                                                                            "proof",
+                                                                            "segment",
+                                                                            "length"
+                                                                          ],
+                                                                          "additionalProperties": false
+                                                                        }
+                                                                      },
+                                                                      "required": [
+                                                                        "inode_extender"
+                                                                      ],
+                                                                      "additionalProperties": false
+                                                                    }
+                                                                  },
+                                                                  "required": [
+                                                                    "value",
+                                                                    "kind"
+                                                                  ],
+                                                                  "additionalProperties": false
+                                                                }
+                                                              ]
+                                                            }
+                                                          },
+                                                          "required": [
+                                                            "other_elts"
+                                                          ],
+                                                          "additionalProperties": false
+                                                        }
+                                                      },
+                                                      "required": [
+                                                        "value",
+                                                        "kind"
+                                                      ],
+                                                      "additionalProperties": false
+                                                    }
+                                                  ]
+                                                }
+                                              },
+                                              "required": [
+                                                "other_elts"
+                                              ],
+                                              "additionalProperties": false
+                                            }
+                                          },
+                                          "required": [
+                                            "value",
+                                            "kind"
+                                          ],
+                                          "additionalProperties": false
+                                        }
+                                      ]
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "state",
+                                  "after",
+                                  "before",
+                                  "version"
+                                ],
+                                "additionalProperties": false
                               }
                             },
                             "required": [

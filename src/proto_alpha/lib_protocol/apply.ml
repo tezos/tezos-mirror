@@ -1792,13 +1792,22 @@ let apply_external_manager_operation_content :
         message_path
       >>=? fun ctxt ->
       (* Check [proof] *)
+      let parameters =
+        Tx_rollup_l2_apply.
+          {
+            tx_rollup_max_withdrawals_per_batch =
+              Constants.tx_rollup_max_withdrawals_per_batch ctxt;
+          }
+      in
       Tx_rollup_l2_verifier.verify_proof
+        parameters
         message
         proof
         ~agreed:previous_message_result
         ~rejected
-      >>= fun verified ->
-      fail_unless verified Tx_rollup_errors.Invalid_proof >>=? fun () ->
+        ~max_proof_size:
+          (Alpha_context.Constants.tx_rollup_rejection_max_proof_size ctxt)
+      >>=? fun () ->
       (* Proof is correct, removing *)
       Tx_rollup_commitment.reject_commitment ctxt tx_rollup state level
       >>=? fun (ctxt, state) ->

@@ -104,7 +104,7 @@ val mk_rejection :
   ?gas_limit:int ->
   ?storage_limit:int ->
   tx_rollup:string ->
-  proof:bool ->
+  proof:string ->
   level:int ->
   message:[`Batch of string] ->
   message_position:int ->
@@ -375,7 +375,7 @@ val inject_rejection :
   ?gas_limit:int ->
   ?storage_limit:int ->
   tx_rollup:string ->
-  proof:bool ->
+  proof:string ->
   level:int ->
   message:[`Batch of string] ->
   message_position:int ->

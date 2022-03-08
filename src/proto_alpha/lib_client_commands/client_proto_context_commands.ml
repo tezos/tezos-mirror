@@ -103,10 +103,7 @@ let tx_rollup_proof_param =
   Clic.param
     ~name:"tx_rollup rejection proof"
     ~desc:"The proof associated to the rejection operation"
-    (Clic.parameter (fun _ s ->
-         match bool_of_string_opt s with
-         | Some c -> return c
-         | None -> failwith "Parameter '%s' is not a boolean" s))
+    string_parameter
 
 let rollup_kind_param =
   Clic.parameter (fun _ name ->

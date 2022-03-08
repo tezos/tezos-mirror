@@ -26,14 +26,30 @@
 
 open Alpha_context
 
-(** [verify_proof message proof ~agreed ~rejected] verifies a Merkle
-    proof for a L2 message, starting from the state [agreed].  If the
-    [proof] is correct, and the final Merkle hash is not equal to
-    [rejected], then [verify_proof] returns true.
-*)
+module Verifier_storage : sig
+  include
+    Tx_rollup_l2_storage_sig.STORAGE
+      with type t = Context.tree
+       and type 'a m = ('a, error) result Lwt.t
+end
+
+module Verifier_context : sig
+  include Tx_rollup_l2_context_sig.CONTEXT with type t = Verifier_storage.t
+end
+
+(** [verify_proof message proof ~agreed ~rejected ~max_proof_size] verifies
+    a Merkle proof for a L2 message, starting from the state [agreed]. If the
+    [proof] is correct, and the final Merkle hash is not equal to [rejected],
+    then [verify_proof] passes.
+    Note that if the proof is larger than [max_proof_size] and the final
+    Merkle hash is equal to [rejected], the needed proof for the rejected
+    commitment is too large, thus, [verify_proof] passes and the commitment
+    is rejected. *)
 val verify_proof :
+  Tx_rollup_l2_apply.parameters ->
   Tx_rollup_message.t ->
   Tx_rollup_l2_proof.t ->
   agreed:Tx_rollup_commitment.message_result ->
   rejected:Tx_rollup_message_result_hash.t ->
-  bool Lwt.t
+  max_proof_size:int ->
+  unit tzresult Lwt.t

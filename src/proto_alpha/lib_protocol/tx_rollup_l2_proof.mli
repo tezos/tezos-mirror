@@ -24,7 +24,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** TODO/TORU: replace with actual proof type and add a docstring *)
-type t = bool
+(* The type of a Merkle proof for a L2 message *)
+type t = Context.Proof.stream Context.Proof.t
 
 val encoding : t Data_encoding.t

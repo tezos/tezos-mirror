@@ -45,7 +45,7 @@ type manager_op_kind =
   | Reveal of string (* public key *)
   | Origination of {code : micheline; storage : micheline; balance : int}
   | Rejection of {
-      proof : bool;
+      proof : string;
       tx_rollup : string;
       level : int;
       message : [`Batch of string];
@@ -222,7 +222,7 @@ let manager_op_content_to_json_string
         previous_message_result;
       } ->
       let rollup = `String tx_rollup in
-      let proof = `Bool proof in
+      let proof = Ezjsonm.value_from_string proof in
       let level = `Float (float_of_int level) in
       let message =
         match message with `Batch str -> `O [("batch", `String str)]

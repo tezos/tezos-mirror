@@ -869,7 +869,7 @@ let test_rollup_last_commitment_is_rejected =
       ~message
       ~position:0
       ~path:(path |> JSON.encode)
-      ~proof:true
+      ~proof:Constant.tx_rollup_proof_initial_state
       ~context_hash:Constant.tx_rollup_empty_l2_context
       ~withdraw_list_hash:Constant.tx_rollup_empty_withdraw_list
       state
@@ -915,11 +915,23 @@ let test_rollup_wrong_rejection =
       client
   in
   let message_path = List.map (fun x -> JSON.as_string x) (JSON.as_list path) in
+  (* The proof is invalid, as the submitted batch is stupid, the after
+     hash should be the same as before. *)
   let* (`OpHash _op) =
     Operation.inject_rejection
       ~source:Constant.bootstrap1
       ~tx_rollup:state.rollup
-      ~proof:false
+      ~proof:
+        {|{ "version": 3,
+  "before":
+    { "kind": "Node",
+      "value":
+        { "node": "CoVu7Pqp1Gh3z33mink5T5Q2kAQKtnn3GHxVhyehdKZpQMBxFBGF" } },
+  "after":
+    { "kind": "Node",
+      "value":
+        { "node": "CoUeJrcPBj3T3iJL3PY4jZHnmZa5rRZ87VQPdSBNBcwZRMWJGh9j" } },
+  "state": [] }|}
       ~level:0
       ~message
       ~message_position:0
@@ -944,7 +956,7 @@ let test_rollup_wrong_rejection =
   let error_id =
     JSON.(operation_result |-> "errors" |=> 0 |-> "id" |> as_string)
   in
-  Check.(error_id = "proto.alpha.tx_rollup_invalid_proof")
+  Check.(error_id = "proto.alpha.tx_rollup_proof_failed_to_reject")
     Check.string
     ~error_msg:"Expected error id: %R. Got %L" ;
   match state.unfinalized_commitments with

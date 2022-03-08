@@ -1018,6 +1018,11 @@ let submit_tx_rollup_rejection (cctxt : #full) ~chain ~block ?confirmations
   | Error err ->
       failwith "Message path is not a valid JSON-encoded message: %s" err)
   >>=? fun message_path ->
+  (match Data_encoding.Json.from_string proof with
+  | Ok json ->
+      Data_encoding.Json.destruct Tx_rollup_l2_proof.encoding json |> return
+  | Error err -> failwith "Proof is not a valid JSON-encoded message: %s" err)
+  >>=? fun proof ->
   let contents :
       Kind.tx_rollup_rejection Annotated_manager_operation.annotated_list =
     Annotated_manager_operation.Single_manager
