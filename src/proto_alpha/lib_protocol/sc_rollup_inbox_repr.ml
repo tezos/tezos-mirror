@@ -99,6 +99,9 @@ type history_proof_hash = Context.Proof.hash
 
 type history_proof = (proof_hash, history_proof_hash) Skip_list.cell
 
+let history_proof_encoding =
+  Skip_list.encoding Context_hash.encoding Context_hash.encoding
+
 let pp_history_proof fmt cell =
   Format.fprintf
     fmt
@@ -248,6 +251,8 @@ module type MerkelizedOperations = sig
 
   type history
 
+  val history_encoding : history Data_encoding.t
+
   val pp_history : Format.formatter -> history -> unit
 
   val history_at_genesis : bound:int64 -> history
@@ -320,6 +325,26 @@ module MakeHashingScheme
     counter : int64;
   }
 
+  let history_encoding =
+    let open Data_encoding in
+    let events_encoding = Context_hash.Map.encoding history_proof_encoding in
+    let sequence_encoding =
+      conv
+        (fun m -> Int64_map.bindings m)
+        (List.fold_left (fun m (k, v) -> Int64_map.add k v m) Int64_map.empty)
+        (list (tup2 int64 Context_hash.encoding))
+    in
+    conv
+      (fun {events; sequence; bound; counter} ->
+        (events, sequence, bound, counter))
+      (fun (events, sequence, bound, counter) ->
+        {events; sequence; bound; counter})
+      (obj4
+         (req "events" events_encoding)
+         (req "sequence" sequence_encoding)
+         (req "bound" int64)
+         (req "counter" int64))
+
   let pp_history fmt history =
     Context_hash.Map.bindings history.events |> fun bindings ->
     let pp_binding fmt (hash, history_proof) =
@@ -356,9 +381,7 @@ module MakeHashingScheme
       in
       if Int64.(equal history.counter history.bound) then
         match Int64_map.min_binding history.sequence with
-        | None ->
-            (* This should not happen if [bound > 0]. *)
-            history
+        | None -> history
         | Some (l, h) ->
             let sequence = Int64_map.remove l history.sequence in
             let events = Context_hash.Map.remove h events in

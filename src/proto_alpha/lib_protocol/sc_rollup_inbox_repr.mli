@@ -165,6 +165,8 @@ module type MerkelizedOperations = sig
      a witness of the latest state of the history. *)
   type history
 
+  val history_encoding : history Data_encoding.t
+
   val pp_history : Format.formatter -> history -> unit
 
   (** The beginning of the history is an empty sequence of [messages].
