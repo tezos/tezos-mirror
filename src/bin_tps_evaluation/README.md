@@ -40,10 +40,9 @@ refer to the Tezos indexer's [SQL
 schema](https://gitlab.com/nomadic-labs/tezos-indexer/-/tree/master/src/db-schema)
 for more information about the stored data.
 
-In order to estimate contents of the average block you will need a running
-PostgreSQL instance and Docker. The TPS benchmark should be built and the
-`tezos-tps-evaluation` executable should exist in the root of the Tezos
-project.
+In order to estimate contents of the average block you will need Docker and
+`bunzip`. The TPS benchmark should be built and the `tezos-tps-evaluation`
+executable should exist in the root of the Tezos project.
 
 Go to the directory of the TPS benchmark `src/bin_tps_evaluation` and run:
 
