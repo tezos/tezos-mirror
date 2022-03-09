@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,10 +23,57 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let () =
-  Long_test.init () ;
-  Dashboard.update_grafana_dashboard () ;
-  Benchmark_tps_command.register () ;
-  Estimate_average_block_command.register () ;
-  Gas_tps_command.register () ;
-  Test.run ()
+module Test = struct
+  let benchmark_tps = "tezos_tps_benchmark"
+
+  let gas_tps = "tezos_gas_tps"
+
+  let estimate_average_block = "tezos_tps_estimate_avearage"
+end
+
+module Measurement = struct
+  let gas_tps_evaluation = "gas_tps_evaluation"
+
+  let defacto_tps_of_injection = "defacto_tps_of_injection"
+
+  let empirical_tps = "empirical_tps"
+end
+
+module Tag = struct
+  let lifted_protocol_limits = "lifted_protocol_limits"
+end
+
+let update_grafana_dashboard () =
+  let field = "duration" in
+  let graph test measurement tags =
+    Grafana.simple_graph ~yaxis_format:"ops" ~tags ~measurement ~test ~field ()
+  in
+  Long_test.update_grafana_dashboard
+    {
+      uid = "tps";
+      title = "TPS Evaluation";
+      description = "TPS Evaluation data";
+      panels =
+        [
+          Row "Gas TPS";
+          graph Test.gas_tps Measurement.gas_tps_evaluation [];
+          Row "Empirical TPS (with protocol limits)";
+          graph
+            Test.benchmark_tps
+            Measurement.defacto_tps_of_injection
+            [(Tag.lifted_protocol_limits, "false")];
+          graph
+            Test.benchmark_tps
+            Measurement.empirical_tps
+            [(Tag.lifted_protocol_limits, "false")];
+          Row "Empirical TPS (without protocol limits)";
+          graph
+            Test.benchmark_tps
+            Measurement.defacto_tps_of_injection
+            [(Tag.lifted_protocol_limits, "true")];
+          graph
+            Test.benchmark_tps
+            Measurement.empirical_tps
+            [(Tag.lifted_protocol_limits, "true")];
+        ];
+    }

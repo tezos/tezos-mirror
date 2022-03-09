@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,10 +23,32 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let () =
-  Long_test.init () ;
-  Dashboard.update_grafana_dashboard () ;
-  Benchmark_tps_command.register () ;
-  Estimate_average_block_command.register () ;
-  Gas_tps_command.register () ;
-  Test.run ()
+module Test : sig
+  (** Name of the tps benchmark tezt test. *)
+  val benchmark_tps : string
+
+  (** Name of the gas tps tezt test. *)
+  val gas_tps : string
+
+  (** Name of the tezt test that performs estimation of the average block. *)
+  val estimate_average_block : string
+end
+
+module Measurement : sig
+  (** Name of the measurement of gas TPS. *)
+  val gas_tps_evaluation : string
+
+  (** Name of the measurement of de facto TPS of injection. *)
+  val defacto_tps_of_injection : string
+
+  (** Name of the measurement of empirical TPS. *)
+  val empirical_tps : string
+end
+
+module Tag : sig
+  (** The tag that tells whether protocol limited were lifted. *)
+  val lifted_protocol_limits : string
+end
+
+(** Re-generate TPS evaluation dashboard definition. *)
+val update_grafana_dashboard : unit -> unit
