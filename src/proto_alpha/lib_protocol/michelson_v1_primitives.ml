@@ -381,7 +381,7 @@ let string_of_prim = function
   | T_address -> "address"
   | T_tx_rollup_l2_address -> "tx_rollup_l2_address"
   | T_sapling_state -> "sapling_state"
-  | T_sapling_transaction -> "sapling_transaction"
+  | T_sapling_transaction -> "sapling_transaction_deprecated"
   | T_chain_id -> "chain_id"
   | T_never -> "never"
   | T_bls12_381_g1 -> "bls12_381_g1"
@@ -533,7 +533,7 @@ let prim_of_string = function
   | "address" -> ok T_address
   | "tx_rollup_l2_address" -> ok T_tx_rollup_l2_address
   | "sapling_state" -> ok T_sapling_state
-  | "sapling_transaction" -> ok T_sapling_transaction
+  | "sapling_transaction_deprecated" -> ok T_sapling_transaction
   | "chain_id" -> ok T_chain_id
   | "never" -> ok T_never
   | "bls12_381_g1" -> ok T_bls12_381_g1
@@ -733,7 +733,7 @@ let prim_encoding =
          ("bls12_381_g2", T_bls12_381_g2);
          ("bls12_381_fr", T_bls12_381_fr);
          ("sapling_state", T_sapling_state);
-         ("sapling_transaction", T_sapling_transaction);
+         ("sapling_transaction_deprecated", T_sapling_transaction);
          ("SAPLING_EMPTY_STATE", I_SAPLING_EMPTY_STATE);
          ("SAPLING_VERIFY_UPDATE", I_SAPLING_VERIFY_UPDATE);
          ("ticket", T_ticket);
