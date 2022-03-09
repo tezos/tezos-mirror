@@ -24,17 +24,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [is_empty l] returns [true] iff [l = []]. *)
-val is_empty : 'a list -> bool
-
 (** [remove nb list] remove the first [nb] elements from the list [list]. *)
 val remove : int -> 'a list -> 'a list
 
 (** [repeat n x] is a list of [n] [x]'s *)
 val repeat : int -> 'a -> 'a list
-
-(** [product a b] computes the Cartesian product of two lists [a] and [b]. *)
-val product : 'a list -> 'b list -> ('a * 'b) list
 
 (** [take_n n l] returns the [n] first elements of [l]. When [compare]
     is provided, it returns the [n] greatest element of [l]. *)
@@ -54,7 +48,3 @@ val rev_sub : 'a list -> int -> 'a list
 
 (** [sub l n] is [l] capped to max [n] elements *)
 val sub : 'a list -> int -> 'a list
-
-(** [shuffle l] is a list that contains the same elements as [l] but in a random
-    order. *)
-val shuffle : ?rng_state:Random.State.t -> 'a list -> 'a list

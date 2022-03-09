@@ -93,21 +93,6 @@ let pp_int_list =
 
 let count = 1000
 
-let test_shuffle_preserves_values =
-  QCheck.Test.make
-    ~name:"shuffle preserves value sets"
-    ~count
-    QCheck.(list_of_size list_size int)
-    (fun l ->
-      let l1 = List.sort Int.compare l in
-      let l2 = List.sort Int.compare (TzList.shuffle l) in
-      Lib_test.Qcheck_helpers.qcheck_eq'
-        ~pp:pp_int_list
-        ~eq:( = )
-        ~actual:l2
-        ~expected:l1
-        ())
-
 let test_take_drop =
   QCheck.Test.make
     ~name:"(take_n n l @@ drop_n n l) = l"
@@ -129,7 +114,6 @@ let () =
         [
           ("take_n", `Quick, test_take_n);
           ("drop_n", `Quick, test_drop_n);
-          QCheck_alcotest.to_alcotest test_shuffle_preserves_values;
           QCheck_alcotest.to_alcotest test_take_drop;
         ] );
     ]

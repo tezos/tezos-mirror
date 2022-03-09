@@ -55,6 +55,8 @@ let () =
       (* Test internal consistency *)
       ("TestIterFold", (module TestIterFold : F));
       ("TestRevMapRevMap", (module TestRevMapRevMap : F));
+      ("TestRevConcatMapRevConcatMap", (module TestRevConcatMapRevConcatMap : F));
+      ("TestConcatMapConcatMap", (module TestConcatMapConcatMap : F));
       ("Filters", (module TestFilters : F));
       ("Partitions", (module TestPartitions : F));
       ("PartitionMap", (module TestPartitionMap : F));

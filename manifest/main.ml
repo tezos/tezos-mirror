@@ -466,6 +466,7 @@ let _tezos_lwt_result_stdlib_tests =
     [
       "test_hashtbl";
       "test_list_basic";
+      "test_list_basic_lwt";
       "test_seq_basic";
       "test_generic";
       "test_fuzzing_seq";

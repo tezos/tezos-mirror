@@ -106,6 +106,9 @@ module type S = sig
   (** [cons x xs] is [x :: xs] *)
   val cons : 'a -> 'a list -> 'a list
 
+  (** [is_empty xs] is [true] iff [xs] is [[]] *)
+  val is_empty : 'a list -> bool
+
   (** {3 Safe wrappers}
 
       This part of the module simply shadows some functions from {!Stdlib.List}
@@ -1003,6 +1006,7 @@ module type S = sig
   (** [filter_map_p] is a variant of {!filter_map_s} where the promises are evaluated concurrently. *)
   val filter_map_p : ('a -> 'b option Lwt.t) -> 'a list -> 'b list Lwt.t
 
+  (** [concat_map f xs] is [concat (map f xs)] but more efficient. *)
   val concat_map : ('a -> 'b list) -> 'a list -> 'b list
 
   (** [concat_map_s] is an Lwt-aware variant of {!concat_map}. *)
@@ -1026,6 +1030,22 @@ module type S = sig
     ('a -> ('b list, 'error) result Lwt.t) ->
     'a list ->
     ('b list, 'error list) result Lwt.t
+
+  (** [rev_concat_map f xs] is [rev (concat_map f xs)] but more efficient.*)
+  val rev_concat_map : ('a -> 'b list) -> 'a list -> 'b list
+
+  (** [rev_concat_map_s] is an Lwt-aware variant of {!rev_concat_map}. *)
+  val rev_concat_map_s : ('a -> 'b list Lwt.t) -> 'a list -> 'b list Lwt.t
+
+  (** [rev_concat_map_e] is a Result-aware variant of {!rev_concat_map}. *)
+  val rev_concat_map_e :
+    ('a -> ('b list, 'error) result) -> 'a list -> ('b list, 'error) result
+
+  (** [rev_concat_map_es] is an Lwt-Result-aware variant of {!rev_concat_map}. *)
+  val rev_concat_map_es :
+    ('a -> ('b list, 'error) result Lwt.t) ->
+    'a list ->
+    ('b list, 'error) result Lwt.t
 
   val fold_left : ('a -> 'b -> 'a) -> 'a -> 'b list -> 'a
 
@@ -1342,6 +1362,16 @@ module type S = sig
   val combine_with_leftovers :
     'a list -> 'b list -> ('a * 'b) list * ('a list, 'b list) Either.t option
 
+  (** {3 Product} *)
+
+  (** [product xs ys] is the cartesian product of [xs] and [ys].
+
+      In other words [product xs ys] is a list containing all the pairs [(x, y)]
+      where [x] is an element of [xs] and [y] is an element of [ys].
+
+      The order of the elements in the returned list is unspecified. *)
+  val product : 'a list -> 'b list -> ('a * 'b) list
+
   (** {3 Comparison and equality}
 
       The comparison and equality functions are those of the OCaml [Stdlib]. *)
@@ -1365,6 +1395,10 @@ module type S = sig
   val fast_sort : ('a -> 'a -> int) -> 'a list -> 'a list
 
   val sort_uniq : ('a -> 'a -> int) -> 'a list -> 'a list
+
+  (** [shuffle l] is a list that contains the same elements as [l] but in a
+      random order. *)
+  val shuffle : rng:Random.State.t -> 'a list -> 'a list
 
   (** [merge compare xs ys] merges the lists [xs] and [ys].
 

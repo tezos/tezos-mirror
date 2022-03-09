@@ -298,8 +298,8 @@ let unnormalize_source src_org =
 (** Samples from [state.pool]. Used to generate the destination of a
     transfer, and its source only when [state.shuffled_pool] is [None]
     meaning that [--single-op-per-pkh-per-block] is not set. *)
-let sample_any_source_from_pool state rng_state =
-  let idx = Random.State.int rng_state state.pool_size in
+let sample_any_source_from_pool state rng =
+  let idx = Random.State.int rng state.pool_size in
   match List.nth state.pool idx with
   | None -> assert false
   | Some src_org -> Lwt.return src_org.source
@@ -307,10 +307,10 @@ let sample_any_source_from_pool state rng_state =
 (** Generates the source of a transfer. If [state.shuffled_pool] has a
     value (meaning that [--single-op-per-pkh-per-block] is active) then
     it is sampled from there, otherwise from [state.pool]. *)
-let rec sample_source_from_pool state rng_state
-    (cctxt : Protocol_client_context.full) =
+let rec sample_source_from_pool state rng (cctxt : Protocol_client_context.full)
+    =
   match state.shuffled_pool with
-  | None -> sample_any_source_from_pool state rng_state
+  | None -> sample_any_source_from_pool state rng
   | Some (source :: l) ->
       state.shuffled_pool <- Some l ;
       debug_msg (fun () ->
@@ -327,13 +327,13 @@ let rec sample_source_from_pool state rng_state
         state.last_block
       >>= fun () ->
       Lwt_condition.wait state.new_block_condition >>= fun () ->
-      sample_source_from_pool state rng_state cctxt
+      sample_source_from_pool state rng cctxt
 
-let random_seed rng_state =
-  Bytes.init 32 (fun _ -> Char.chr (Random.State.int rng_state 256))
+let random_seed rng =
+  Bytes.init 32 (fun _ -> Char.chr (Random.State.int rng 256))
 
-let generate_fresh_source pool rng_state =
-  let seed = random_seed rng_state in
+let generate_fresh_source pool rng =
+  let seed = random_seed rng in
   let (pkh, pk, sk) = Signature.generate_key ~seed () in
   let fresh = {source = {pkh; pk; sk}; origin = Explicit} in
   pool.pool <- fresh :: pool.pool ;
@@ -351,8 +351,8 @@ let on_new_head (cctxt : Protocol_client_context.full) f =
 (* We perform rejection sampling of valid sources.
    We could maintain a local cache of existing contracts with sufficient balance. *)
 let rec sample_transfer (cctxt : Protocol_client_context.full) chain block
-    (parameters : parameters) (state : state) rng_state =
-  sample_source_from_pool state rng_state cctxt >>= fun src ->
+    (parameters : parameters) (state : state) rng =
+  sample_source_from_pool state rng cctxt >>= fun src ->
   Alpha_services.Contract.balance
     cctxt
     (chain, block)
@@ -367,19 +367,17 @@ let rec sample_transfer (cctxt : Protocol_client_context.full) chain block
     >>= fun () ->
     (* Sampled source has zero balance: the transfer that created that
              address was not included yet. Retry *)
-    sample_transfer cctxt chain block parameters state rng_state
+    sample_transfer cctxt chain block parameters state rng
   else
-    let fresh =
-      Random.State.float rng_state 1.0 < parameters.fresh_probability
-    in
+    let fresh = Random.State.float rng 1.0 < parameters.fresh_probability in
     (match
        Smart_contracts.select
          parameters.smart_contracts
-         (Random.State.float rng_state 1.0)
+         (Random.State.float rng 1.0)
      with
     | None ->
-        (if fresh then Lwt.return (generate_fresh_source state rng_state)
-        else sample_any_source_from_pool state rng_state)
+        (if fresh then Lwt.return (generate_fresh_source state rng)
+        else sample_any_source_from_pool state rng)
         >|= fun dest ->
         Ok
           ( Implicit dest.pkh,
@@ -399,7 +397,7 @@ let rec sample_transfer (cctxt : Protocol_client_context.full) chain block
           let max_fraction = Int64.of_float (mutez *. fraction) in
           let amount =
             if max_fraction = 0L then 1L
-            else max 1L (Random.State.int64 rng_state max_fraction)
+            else max 1L (Random.State.int64 rng max_fraction)
           in
           Tez.of_mutez_exn amount
     in
@@ -458,8 +456,8 @@ let manager_op_of_transfer parameters
 
 let cost_of_manager_operation = Gas.Arith.integral_of_int_exn 1_000
 
-let inject_transfer (cctxt : Protocol_client_context.full) parameters state
-    rng_state chain block transfer =
+let inject_transfer (cctxt : Protocol_client_context.full) parameters state rng
+    chain block transfer =
   Alpha_services.Contract.counter cctxt (chain, block) transfer.src.pkh
   >>=? fun pcounter ->
   Shell_services.Blocks.hash cctxt ~chain ~block () >>=? fun branch ->
@@ -476,7 +474,7 @@ let inject_transfer (cctxt : Protocol_client_context.full) parameters state
       state.shuffled_pool <-
         Some
           (List.shuffle
-             ~rng_state
+             ~rng
              (List.map (fun src_org -> src_org.source) state.pool)) ;
     return ())
   else
@@ -694,7 +692,7 @@ let stat_on_exit (cctxt : Protocol_client_context.full) state =
   ratio_injected_included_op ()
 
 let launch (cctxt : Protocol_client_context.full) (parameters : parameters)
-    state rng_state save_pool_callback =
+    state rng save_pool_callback =
   let injected = ref 0 in
   let dt = 1. /. parameters.tps in
   let terminated () =
@@ -711,7 +709,7 @@ let launch (cctxt : Protocol_client_context.full) (parameters : parameters)
       let start = Mtime_clock.elapsed () in
       debug_msg (fun () -> cctxt#message "launch.loop: invoke sample_transfer")
       >>= fun () ->
-      sample_transfer cctxt cctxt#chain cctxt#block parameters state rng_state
+      sample_transfer cctxt cctxt#chain cctxt#block parameters state rng
       >>=? fun transfer ->
       debug_msg (fun () -> cctxt#message "launch.loop: invoke inject_transfer")
       >>= fun () ->
@@ -719,7 +717,7 @@ let launch (cctxt : Protocol_client_context.full) (parameters : parameters)
         cctxt
         parameters
         state
-        rng_state
+        rng
         cctxt#chain
         cctxt#block
         transfer
@@ -745,7 +743,7 @@ let launch (cctxt : Protocol_client_context.full) (parameters : parameters)
               state.shuffled_pool <-
                 Some
                   (List.shuffle
-                     ~rng_state
+                     ~rng
                      (List.map (fun src_org -> src_org.source) state.pool))) ;
             Lwt_condition.broadcast state.new_block_condition () ;
             Lwt.return_unit))
@@ -1056,7 +1054,7 @@ let generate_random_transactions =
           else Lwt.return_unit)
           >>= fun () ->
           let counters = Signature.Public_key_hash.Table.create 1023 in
-          let rng_state = Random.State.make [|parameters.seed|] in
+          let rng = Random.State.make [|parameters.seed|] in
           Shell_services.Blocks.hash cctxt () >>=? fun current_head_on_start ->
           Shell_services.Blocks.hash cctxt ~block:(`Head 2) ()
           >>=? fun current_target_block ->
@@ -1070,7 +1068,7 @@ let generate_random_transactions =
                 (if parameters.single_op_per_pkh_per_block then
                  Some
                    (List.shuffle
-                      ~rng_state
+                      ~rng
                       (List.map (fun src_org -> src_org.source) sources))
                 else None);
               revealed = Signature.Public_key_hash.Set.empty;
@@ -1104,7 +1102,7 @@ let generate_random_transactions =
                ~loc:__LOC__
                ~after:[exit_callback_id]
                (fun _retcode -> save_injected_operations ())) ;
-          launch cctxt parameters state rng_state save_pool)
+          launch cctxt parameters state rng save_pool)
 
 let estimate_transaction_cost parameters (cctxt : Protocol_client_context.full)
     : Gas.Arith.integral tzresult Lwt.t =
@@ -1146,10 +1144,10 @@ let estimate_transaction_cost parameters (cctxt : Protocol_client_context.full)
           injected_operations = Block_hash.Table.create 1023;
         }
       in
-      let rng_state = Random.State.make [|parameters.seed|] in
+      let rng = Random.State.make [|parameters.seed|] in
       let chain = cctxt#chain in
       let block = cctxt#block in
-      sample_transfer cctxt chain block parameters state rng_state
+      sample_transfer cctxt chain block parameters state rng
       >>=? fun transfer ->
       Alpha_services.Contract.counter cctxt (chain, block) transfer.src.pkh
       >>=? fun current_counter ->
