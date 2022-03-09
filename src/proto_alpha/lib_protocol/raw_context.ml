@@ -1187,6 +1187,13 @@ let init_stake_distribution_for_current_cycle ctxt
         Some stake_distribution_for_current_cycle;
     }
 
+module Internal_for_tests = struct
+  let add_level ctxt l =
+    let new_level = Level_repr.Internal_for_tests.add_level ctxt.back.level l in
+    let new_back = {ctxt.back with level = new_level} in
+    {ctxt with back = new_back}
+end
+
 module type CONSENSUS = sig
   type t
 
