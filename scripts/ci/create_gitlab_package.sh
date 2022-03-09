@@ -56,3 +56,24 @@ do
   gitlab_upload "tezos-${architecture}.tar.gz" "tezos-${gitlab_package_name}-linux-${architecture}.tar.gz"
   cd ..
 done
+
+# Source code archives automatically published in a GitLab release do not have a static checksum,
+# which is mandatory for the opam repository, because they are dynamically generated
+# => create and upload manually
+echo 'Upload tarball of source code and its checksums'
+
+source_tarball="tezos-${gitlab_package_name}.tar.bz2"
+
+# Create tarball
+git archive "${CI_COMMIT_TAG}" --format=tar | bzip2 > "${source_tarball}"
+
+# Check tarball is valid
+tar -tjf "${source_tarball}" > /dev/null
+
+# Checksums
+sha256sum "${source_tarball}" > "${source_tarball}.sha256"
+sha512sum "${source_tarball}" > "${source_tarball}.sha512"
+
+gitlab_upload "${source_tarball}" "${source_tarball}"
+gitlab_upload "${source_tarball}.sha256" "${source_tarball}.sha256"
+gitlab_upload "${source_tarball}.sha512" "${source_tarball}.sha512"
