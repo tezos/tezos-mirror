@@ -116,11 +116,11 @@ module Node_metrics_command = struct
         (fun fmt v -> Format.fprintf fmt "%a" LabelName.pp v)
         fmt
     in
-    Format.printf "name,metric_type,help,label_names\n" ;
+    Format.printf "@[<v>Name,Type,Description,Labels" ;
     List.iter
       (fun (v, _) ->
         Format.printf
-          "%a,%s,%s,%a\n"
+          "@,@[%a@],%s,\"%s\",%a"
           MetricName.pp
           v.MetricInfo.name
           (metric_type_to_string v.MetricInfo.metric_type)
@@ -128,7 +128,8 @@ module Node_metrics_command = struct
           pp_label_names
           v.MetricInfo.label_names)
       (Prometheus.MetricFamilyMap.to_list
-         Prometheus.CollectorRegistry.(collect default))
+         Prometheus.CollectorRegistry.(collect default)) ;
+    Format.printf "@]@."
 
   module Term = struct
     let process _ = `Ok (dump_metrics ())

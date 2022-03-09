@@ -206,6 +206,7 @@ in the :ref:`introduction <howtoget>`.
    developer/guidelines
    developer/repository_scope
    developer/time_measurement_ppx
+   developer/openmetrics
    README
 
 .. toctree::
