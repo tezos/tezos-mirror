@@ -26,7 +26,7 @@ let pp_type_name fmtr (t : type_name) =
   | `TTx_rollup_l2_address -> "tx_rollup_l2_address"
   | `TContract -> "contract"
   | `TBls12_381_fr -> "bls12_381_fr"
-  | `TSapling_transaction -> "sapling_transaction"
+  | `TSapling_transaction -> "sapling_transaction_deprecated"
   | `TTimestamp -> "timestamp"
   | `TKey_hash -> "key_hash"
   | `TBig_map -> "big_map"
