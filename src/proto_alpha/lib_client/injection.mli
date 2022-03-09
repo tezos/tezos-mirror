@@ -58,6 +58,7 @@ val simulate :
   #Protocol_client_context.full ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
+  ?successor_level:bool ->
   ?branch:int ->
   ?latency:int ->
   'kind contents_list ->
@@ -76,6 +77,7 @@ val inject_operation :
   ?confirmations:int ->
   ?dry_run:bool ->
   ?simulation:bool ->
+  ?successor_level:bool ->
   ?branch:int ->
   ?src_sk:Client_keys.sk_uri ->
   ?verbose_signing:bool ->
@@ -96,6 +98,7 @@ val inject_manager_operation :
   #Protocol_client_context.full ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
+  ?successor_level:bool ->
   ?branch:int ->
   ?confirmations:int ->
   ?dry_run:bool ->

@@ -2094,9 +2094,6 @@ module Tx_rollup : sig
 
   val originate : context -> (context * tx_rollup) tzresult Lwt.t
 
-  val update_tx_rollups_at_block_finalization :
-    context -> context tzresult Lwt.t
-
   module Set : Set.S with type elt = tx_rollup
 
   module Internal_for_tests : sig
@@ -2132,6 +2129,8 @@ module Tx_rollup_state : sig
   val burn_cost : limit:Tez.t option -> t -> int -> Tez.t tzresult
 
   val assert_exist : context -> Tx_rollup.t -> context tzresult Lwt.t
+
+  val head_level : t -> (Tx_rollup_level.t * Raw_level.t) option
 
   module Internal_for_tests : sig
     val make :

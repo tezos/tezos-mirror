@@ -31,29 +31,3 @@ let fresh_tx_rollup_from_current_nonce ctxt =
 let originate ctxt =
   fresh_tx_rollup_from_current_nonce ctxt >>?= fun (ctxt, tx_rollup) ->
   Tx_rollup_state_storage.init ctxt tx_rollup >|=? fun ctxt -> (ctxt, tx_rollup)
-
-let update_tx_rollups_at_block_finalization :
-    Raw_context.t -> Raw_context.t tzresult Lwt.t =
- fun ctxt ->
-  let (ctxt, rollups) = Raw_context.get_tx_rollup_with_messages ctxt in
-  Tx_rollup_repr.Set.fold_es
-    (fun tx_rollup ctxt ->
-      Tx_rollup_state_storage.get ctxt tx_rollup >>=? fun (ctxt, state) ->
-      match Tx_rollup_state_repr.head_level state with
-      | Some (tx_level, _) ->
-          Tx_rollup_inbox_storage.get ctxt tx_level tx_rollup
-          >>=? fun (ctxt, inbox) ->
-          let hard_limit =
-            Constants_storage.tx_rollup_hard_size_limit_per_inbox ctxt
-          in
-          let state =
-            Tx_rollup_state_repr.update_burn_per_byte
-              state
-              ~final_size:inbox.cumulated_size
-              ~hard_limit
-          in
-          Storage.Tx_rollup.State.add ctxt tx_rollup state
-          >|=? fun (ctxt, _, _) -> ctxt
-      | None -> (* this cannot happen *) return ctxt)
-    rollups
-    ctxt

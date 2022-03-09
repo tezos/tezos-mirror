@@ -471,6 +471,12 @@ let replace_by_fees_arg =
        precheck mode)."
     ()
 
+let successor_level_arg =
+  switch
+    ~long:"simulate-successor-level"
+    ~doc:"Make the simulate on the successor level of the current head."
+    ()
+
 let no_waiting_for_endorsements_arg =
   switch
     ~long:"no-waiting-for-late-endorsements"

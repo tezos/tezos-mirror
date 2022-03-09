@@ -80,6 +80,8 @@ val no_waiting_for_endorsements_arg : (bool, full) Clic.arg
 
 val replace_by_fees_arg : (bool, full) Clic.arg
 
+val successor_level_arg : (bool, full) Clic.arg
+
 val await_endorsements_arg : (bool, full) Clic.arg
 
 val force_switch : (bool, full) Clic.arg
