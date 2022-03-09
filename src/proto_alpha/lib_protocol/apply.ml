@@ -886,7 +886,7 @@ let apply_manager_operation_content :
     type kind.
     Alpha_context.t ->
     Script_ir_translator.unparsing_mode ->
-    payer:Contract.t ->
+    payer:public_key_hash ->
     source:Contract.t ->
     chain_id:Chain_id.t ->
     internal:bool ->
@@ -999,7 +999,7 @@ let apply_manager_operation_content :
             let open Script_interpreter in
             {
               source;
-              payer;
+              payer = Contract.implicit_contract payer;
               self = destination;
               amount;
               chain_id;
@@ -1078,26 +1078,18 @@ let apply_manager_operation_content :
         (* The deposit is returned to the [payer] as a withdrawal
            if it fails due to a Balance_overflow in the
            recipient. The recipient of withdrawals are always
-           implicit. We set the withdrawal recipient to [payer]:
-           the protocol ensures that [payer] is implicit, yet we
-           must do this conversion. *)
-        Option.value_e
-          ~error:
-            (Error_monad.trace_of_error
-               Tx_rollup_operation_with_non_implicit_contract)
-          (Contract.is_implicit payer)
-        >>?= fun payer_implicit ->
+           implicit. We set the withdrawal recipient to [payer]. *)
         let (deposit, message_size) =
-          Tx_rollup_message.make_deposit
-            payer_implicit
-            destination
-            ticket_hash
-            amount
+          Tx_rollup_message.make_deposit payer destination ticket_hash amount
         in
         Tx_rollup_state.get ctxt dst >>=? fun (ctxt, state) ->
         Tx_rollup_state.burn_cost ~limit:None state message_size
         >>?= fun cost ->
-        Token.transfer ctxt (`Contract payer) `Burned cost
+        Token.transfer
+          ctxt
+          (`Contract (Contract.implicit_contract payer))
+          `Burned
+          cost
         >>=? fun (ctxt, balance_updates) ->
         Tx_rollup_inbox.append_message ctxt dst state deposit
         >>=? fun (ctxt, state) ->
@@ -1598,13 +1590,13 @@ let burn_storage_fees :
     context ->
     kind successful_manager_operation_result ->
     storage_limit:Z.t ->
-    payer:Contract.t ->
+    payer:public_key_hash ->
     (context * Z.t * kind successful_manager_operation_result) tzresult Lwt.t =
  fun ctxt smopr ~storage_limit ~payer ->
+  let payer = `Contract (Contract.implicit_contract payer) in
   match smopr with
   | Transaction_result (Transaction_to_contract_result payload) ->
       let consumed = payload.paid_storage_size_diff in
-      let payer = `Contract payer in
       Fees.burn_storage_fees ctxt ~storage_limit ~payer consumed
       >>=? fun (ctxt, storage_limit, storage_bus) ->
       (if payload.allocated_destination_contract then
@@ -1637,7 +1629,6 @@ let burn_storage_fees :
       return (ctxt, storage_limit, Transaction_result payload)
   | Origination_result payload ->
       let consumed = payload.paid_storage_size_diff in
-      let payer = `Contract payer in
       Fees.burn_storage_fees ctxt ~storage_limit ~payer consumed
       >>=? fun (ctxt, storage_limit, storage_bus) ->
       Fees.burn_origination_fees ctxt ~storage_limit ~payer
@@ -1660,7 +1651,6 @@ let burn_storage_fees :
   | Reveal_result _ | Delegation_result _ -> return (ctxt, storage_limit, smopr)
   | Register_global_constant_result payload ->
       let consumed = payload.size_of_constant in
-      let payer = `Contract payer in
       Fees.burn_storage_fees ctxt ~storage_limit ~payer consumed
       >>=? fun (ctxt, storage_limit, storage_bus) ->
       let balance_updates = storage_bus @ payload.balance_updates in
@@ -1676,7 +1666,6 @@ let burn_storage_fees :
             } )
   | Set_deposits_limit_result _ -> return (ctxt, storage_limit, smopr)
   | Tx_rollup_origination_result payload ->
-      let payer = `Contract payer in
       Fees.burn_tx_rollup_origination_fees ctxt ~storage_limit ~payer
       >>=? fun (ctxt, storage_limit, origination_bus) ->
       let balance_updates = origination_bus @ payload.balance_updates in
@@ -1692,7 +1681,6 @@ let burn_storage_fees :
   | Tx_rollup_remove_commitment_result _ | Tx_rollup_rejection_result _ ->
       return (ctxt, storage_limit, smopr)
   | Sc_rollup_originate_result payload ->
-      let payer = `Contract payer in
       Fees.burn_sc_rollup_origination_fees
         ctxt
         ~storage_limit
@@ -1723,12 +1711,13 @@ let apply_manager_contents (type kind) ctxt mode chain_id
   (* We do not expose the internal scaling to the users. Instead, we multiply
        the specified gas limit by the internal scaling. *)
   let ctxt = Gas.set_limit ctxt gas_limit in
+  let payer = source in
   let source = Contract.implicit_contract source in
   apply_manager_operation_content
     ctxt
     mode
     ~source
-    ~payer:source
+    ~payer
     ~internal:false
     ~gas_consumed_in_precheck
     ~chain_id
@@ -1738,12 +1727,12 @@ let apply_manager_contents (type kind) ctxt mode chain_id
       apply_internal_manager_operations
         ctxt
         mode
-        ~payer:source
+        ~payer
         ~chain_id
         internal_operations
       >>= function
       | (Success ctxt, internal_operations_results) -> (
-          burn_storage_fees ctxt operation_results ~storage_limit ~payer:source
+          burn_storage_fees ctxt operation_results ~storage_limit ~payer
           >>= function
           | Ok (ctxt, storage_limit, operation_results) -> (
               List.fold_left_es
@@ -1751,7 +1740,7 @@ let apply_manager_contents (type kind) ctxt mode chain_id
                   let (Internal_operation_result (op, mopr)) = iopr in
                   match mopr with
                   | Applied smopr ->
-                      burn_storage_fees ctxt smopr ~storage_limit ~payer:source
+                      burn_storage_fees ctxt smopr ~storage_limit ~payer
                       >>=? fun (ctxt, storage_limit, smopr) ->
                       let iopr =
                         Internal_operation_result (op, Applied smopr)
