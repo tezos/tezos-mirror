@@ -153,6 +153,10 @@ Michelson
   obtained from the protocol's ``minimal_block_delay`` constant.
   (MR :gl:`!4471`)
 
+- The existing type ``sapling_transaction`` is renamed
+  ``sapling_transaction_deprecated``. Existing onchain contracts are
+  automatically converted.
+
 Internal
 --------
 
