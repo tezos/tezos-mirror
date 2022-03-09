@@ -23,10 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Splits a string on slashes, grouping multiple slashes, and
-    ignoring slashes at the beginning and end of string. *)
-val split_path : string -> string list
-
 (** Splits a string on a delimiter character. If [dup] is set to [true],
     groups multiple delimiters and strips delimiters at the
     beginning and end of string. If [limit] is passed, stops after [limit]

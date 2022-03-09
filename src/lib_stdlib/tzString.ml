@@ -45,8 +45,6 @@ let split delim ?(dup = true) ?(limit = max_int) path =
   in
   if limit > 0 then do_slashes [] limit 0 else [path]
 
-let split_path path = split '/' path
-
 let has_prefix ~prefix s =
   let x = String.length prefix in
   let n = String.length s in
