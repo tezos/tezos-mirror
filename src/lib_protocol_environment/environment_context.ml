@@ -299,8 +299,67 @@ module Context = struct
       | _ -> err_implementation_mismatch ~expected:impl_name ~got:t.impl_name
   end
 
+  (* In-memory context for proof, using [Context_binary] which produces more
+     compact Merkle proofs. *)
+  module Proof_context_binary = struct
+    module M = struct
+      include Tezos_context_memory.Context_binary
+
+      let set_protocol = add_protocol
+
+      let fork_test_chain c ~protocol:_ ~expiration:_ = Lwt.return c
+    end
+
+    let equality_witness : (M.t, M.tree) equality_witness = equality_witness ()
+
+    let ops = (module M : S with type t = 'ctxt and type tree = 'tree)
+
+    let impl_name = "proof_binary"
+
+    let inject : M.tree -> tree =
+     fun tree -> Tree {ops; tree; equality_witness; impl_name}
+
+    let project : tree -> M.tree =
+     fun (Tree t) ->
+      match equiv t.equality_witness equality_witness with
+      | (Some Refl, Some Refl) -> t.tree
+      | _ -> err_implementation_mismatch ~expected:impl_name ~got:t.impl_name
+  end
+
+  module type Proof_context = sig
+    module M : S
+
+    val inject : M.tree -> tree
+
+    val project : tree -> M.tree
+  end
+
+  type proof_version_expanded =
+    Tezos_context_helpers.Context.proof_version_expanded
+
+  let decode_proof_version = Tezos_context_helpers.Context.decode_proof_version
+
+  let proof_context_of_proof_version_expanded :
+      proof_version_expanded -> (module Proof_context) = function
+    | {is_binary = true; _} -> (module Proof_context_binary)
+    | {is_binary = false; _} -> (module Proof_context)
+
+  let proof_context ~kind proof =
+    match decode_proof_version proof.Proof.version with
+    | Error `Invalid_proof_version ->
+        Lwt.fail_with "Environment_context.verify_tree_proof: Invalid version"
+    | Ok v ->
+        if kind = `Tree && v.is_stream then
+          Lwt.fail_with
+            "Environment_context.verify_tree_proof: Received stream proof"
+        else if kind = `Stream && not v.is_stream then
+          Lwt.fail_with
+            "Environment_context.verify_stream_proof: Received tree proof"
+        else Lwt.return_ok (proof_context_of_proof_version_expanded v)
+
   let verify_tree_proof proof (f : tree -> (tree * 'a) Lwt.t) =
     let open Lwt_result_syntax in
+    let* (module Proof_context) = proof_context ~kind:`Tree proof in
     let* (tree, r) =
       Proof_context.M.verify_tree_proof proof (fun tree ->
           let tree = Proof_context.inject tree in
@@ -311,6 +370,7 @@ module Context = struct
 
   let verify_stream_proof proof (f : tree -> (tree * 'a) Lwt.t) =
     let open Lwt_result_syntax in
+    let* (module Proof_context) = proof_context ~kind:`Stream proof in
     let* (tree, r) =
       Proof_context.M.verify_stream_proof proof (fun tree ->
           let tree = Proof_context.inject tree in
