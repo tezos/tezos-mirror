@@ -2287,7 +2287,7 @@ types:
       - '0x7a06a770'
       - '"NetXynUjJNZm7wi"'
 
-  sapling_transaction:
+  sapling_transaction_deprecated:
     documentation_short: A Sapling transaction
     proposed-in: ['PtEdoTezd3RHSC31mpxxo1npxFjoWWcFgQtxapi51Z8TLu6v6Uq']
     passable: true
@@ -2298,13 +2298,13 @@ types:
     comparable: false
     duplicable: true
     documentation: |
-      ``sapling_transaction ms`` is the type of Sapling
+      ``sapling_transaction_deprecated ms`` is the type of Sapling
       transactions of memo-size ``ms``.
 
       Please see the `Sapling integration <https://tezos.gitlab.io/008/sapling.html>`_
       page for a more comprehensive description of the Sapling protocol.
     insertions:
-      - 'sapling_transaction 8'
+      - 'sapling_transaction_deprecated 8'
 
   sapling_state:
     documentation_short: A Sapling state
