@@ -30,8 +30,11 @@ let hooks =
       [
         ("tz[123]\\w{33}\\b", "[PUBLIC_KEY_HASH]");
         ("\\bB\\w{50}\\b", "[BLOCK_HASH]");
-        ("tru1\\w{33}\\b", "[TX_ROLLUP_HASH]");
-        ("toc1\\w{50}\\b", "[TX_ROLLUP_COMMITMENT_HASH]");
+        ("txr1\\w{33}\\b", "[TX_ROLLUP_HASH]");
+        ("tz4\\w{33}\\b", "[TX_ROLLUP_PUBLIC_KEY_HASH]");
+        ("txi\\w{50}\\b", "[TX_ROLLUP_INBOX_HASH]");
+        ("txm\\w{50}\\b", "[TX_ROLLUP_MESSAGE_HASH]");
+        ("txc\\w{50}\\b", "[TX_ROLLUP_COMMITMENT_HASH]");
         ("edpk\\w{50}\\b", "[PUBLIC_KEY]");
         ("KT1\\w{33}\\b", "[CONTRACT_HASH]");
         ("\\bo\\w{50}\\b", "[OPERATION_HASH]");

@@ -24,7 +24,8 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
-let hash_size = 32
+
+let hash_size = Tx_rollup_prefixes.inbox_hash.hash_size
 
 module Inbox_hash =
   Blake2B.Make
@@ -34,12 +35,13 @@ module Inbox_hash =
 
       let title = "The hash of a transaction rollup inbox"
 
-      let b58check_prefix = "\004\200" (* i(51) *)
+      let b58check_prefix = Tx_rollup_prefixes.inbox_hash.b58check_prefix
 
       let size = Some hash_size
     end)
 
-let () = Base58.check_encoded_prefix Inbox_hash.b58check_encoding "i" 51
+let () =
+  Tx_rollup_prefixes.(check_encoding inbox_hash Inbox_hash.b58check_encoding)
 
 type hash = Inbox_hash.t
 

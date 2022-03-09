@@ -62,7 +62,7 @@ messages (as stored in the inbox) onto the layer-2 context, and for
 posting the resulting hashes in the layer-1. In “optimistic rollup”,
 the word “optimistic” refers to the assumption that at least one
 honest transaction rollup node will always be active to reject
-erroneous hash. 
+erroneous hash.
 The presence of a single honest node is sufficient to guarantee the correct application of the layer-2 operations in the rollup.
 In its absence, nothing prevents a rogue node to post a
 maliciously tampered layer-2 context.
@@ -87,7 +87,7 @@ Note that it is possible to create any number of transaction rollups on
 Tezos. They are identified with **transaction rollup addresses**,
 assigned by the layer-1 at their respective creation (called
 origination in Tezos to mimic the terminology used for smart
-contract).  They are prefixed by ``tru1`` when encoded in a base58
+contract).  They are prefixed by ``txr1`` when encoded in a base58
 alphabet (see also the :ref:`kinds of address prefixes in Tezos <address_prefixes>`).
 
 Workflow Overview
@@ -101,7 +101,7 @@ higher throughput than what is possible on Tezos natively.
 Analogous to layer-1 addresses, **layer-2 addresses** identify assets
 holders in the layer-2 ledger, meaning layer-2 addresses own and
 exchange Michelson tickets.
-They are prefixed by ``tru2`` when encoded in a base58 alphabet.
+They are prefixed by ``tz4`` when encoded in a base58 alphabet.
 
 The expected workflow proceeds as follows.
 
@@ -139,7 +139,7 @@ Origination
 Anyone can originate a transaction rollup on Tezos, as the result of
 the layer-1 operation ``Tx_rollup_origination``. In a similar manner
 as contracts, transaction rollups are assigned an address, prefixed by
-``tru1`` when encoded with a base58 alphabet.
+``txr1`` when encoded with a base58 alphabet.
 
 Exchanging Tickets
 ******************
@@ -150,7 +150,7 @@ more details on how these exchanges happen, it is necessary to discuss
 how layer-2 addresses and tickets are identified in the layer-2.
 
 First, a layer-2 address is primarily identified by a Blake2B,
-20-bytes long hash of a BLS public key (prefixed by ``tru2`` when
+20-bytes long hash of a BLS public key (prefixed by ``tz4`` when
 encoded with a base58 encoding). Besides, the layer-2 assigns an
 integer to each layer-2 address, which can be used in place of the
 hash of the BLS public key. This design choice allows for reducing the
@@ -179,7 +179,7 @@ is a pair consisting of:
    which can either be a natural number or a base58 encoded public key
    hash.
 
-Only smart contracts can send tickets to rollups. 
+Only smart contracts can send tickets to rollups.
 
 Here is a minimal example of a smart contract depositing ``unit``
 tickets to a Transaction Rollup::
@@ -249,7 +249,7 @@ given ticket in a given quantity for the benefit of a given
 address. More precisely, the payload consists in
 
 #. A destination address. It can either be a layer-1 address, that is
-   a ``tz1``, or a layer-2 address, that is a ``tru2`` or the integer
+   a ``tz1``, or a layer-2 address, that is a ``tz4`` or the integer
    associated with this address by the layer-2.
 #. A ticket hash identifying the asset to exchange, or the integer
    associated with this ticket hash by the layer-2.
@@ -321,9 +321,9 @@ The origination of a transaction rollup burns ꜩ15.
 A transaction rollup address is attributed to the new transaction
 rollup. This address is derived from the hash of the Tezos operation with the
 origination operation similarly to the smart contract origination. It is always
-prefixed by ``tru1``. For instance,::
+prefixed by ``txr1``. For instance,::
 
-   tru1HdK6HiR31Xo1bSAr4mwwCek8ExgwuUeHm
+   txr1YNMEtkj5Vkqsbdmt7xaxBTMRZjzS96UAi
 
 is a valid transaction rollup address.
 

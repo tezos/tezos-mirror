@@ -1,9 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Marigold <contact@marigold.dev>                        *)
 (* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
-(* Copyright (c) 2022 Oxhead Alpha <info@oxhead-alpha.com>                   *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -25,53 +23,52 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include
-  Blake2B.Make
-    (Base58)
-    (struct
-      let name = "Tx_rollup_l2_address"
+type t = {
+  b58check_prefix : string;
+  prefix : string;
+  hash_size : int;
+  b58check_size : int;
+}
 
-      let title =
-        "The hash of a BLS public key used to identify a L2 ticket holders"
+let rollup_address =
+  {
+    b58check_prefix = "\001\128\120\031";
+    prefix = "txr1";
+    hash_size = 20;
+    b58check_size = 37;
+  }
 
-      let b58check_prefix = Tx_rollup_prefixes.l2_address.b58check_prefix
+let l2_address =
+  {
+    b58check_prefix = "\006\161\166";
+    prefix = "tz4";
+    hash_size = 20;
+    b58check_size = 36;
+  }
 
-      let size = Some Tx_rollup_prefixes.l2_address.hash_size
-    end)
+let inbox_hash =
+  {
+    b58check_prefix = "\079\148\196";
+    prefix = "txi";
+    hash_size = 32;
+    b58check_size = 53;
+  }
 
-include Compare.Make (struct
-  type nonrec t = t
+let message_hash =
+  {
+    b58check_prefix = "\079\149\030";
+    prefix = "txm";
+    hash_size = 32;
+    b58check_size = 53;
+  }
 
-  let compare = compare
-end)
+let commitment_hash =
+  {
+    b58check_prefix = "\079\148\017";
+    prefix = "txc";
+    hash_size = 32;
+    b58check_size = 53;
+  }
 
-type address = t
-
-let () = Tx_rollup_prefixes.(check_encoding l2_address b58check_encoding)
-
-let of_bls_pk : Bls_signature.pk -> t =
- fun pk -> hash_bytes [Bls_signature.pk_to_bytes pk]
-
-let in_memory_size : t -> Cache_memory_helpers.sint =
- fun _ ->
-  let open Cache_memory_helpers in
-  header_size +! word_size
-  +! string_size_gen Tx_rollup_prefixes.l2_address.hash_size
-
-let size _ = Tx_rollup_prefixes.l2_address.hash_size
-
-module Indexable = struct
-  include Indexable.Make (struct
-    type nonrec t = t
-
-    let encoding = encoding
-
-    let compare = compare
-
-    let pp = pp
-  end)
-
-  let in_memory_size x = Indexable.in_memory_size in_memory_size x
-
-  let size x = Indexable.size size x
-end
+let check_encoding {prefix; b58check_size; _} encoding =
+  Base58.check_encoded_prefix encoding prefix b58check_size

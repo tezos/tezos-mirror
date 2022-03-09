@@ -28,6 +28,6 @@ This sequence of operations was run:
 
 
 ./tezos-client rpc get '/chains/main/blocks/head/context/tx_rollup/[TX_ROLLUP_HASH]/inbox/0'
-{ "contents": [ "M22FciVGoiULYX21PdQPj9Jv5a9rEZeEjRLw4Mi9YTzyENMQdk1" ],
+{ "contents": [ "[TX_ROLLUP_MESSAGE_HASH]" ],
   "cumulated_size": 4,
-  "hash": "i3RQpwA1RgvBitqJGtQkzpNd16N52GSX63WuBh49r2ZkFziPoq5" }
+  "hash": "[TX_ROLLUP_INBOX_HASH]" }

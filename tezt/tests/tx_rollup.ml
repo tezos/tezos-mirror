@@ -494,7 +494,7 @@ let submit_three_batches_and_check_size ~rollup ~tezos_level ~tx_level node
             0
             batches;
         contents = List.map (fun (_, _, batch) -> batch) batches;
-        hash = "i3VPWHwmJwHeGv86J3KnKAnFBfyXLB6nvYcwaFdnwwMBePDeo57";
+        hash = "txi2hmtibM1ez7ZPbPy8CqSnc9PC3t6E8yqy3YkMB5HgGdoUFWVJ6";
       }
   in
   let*! inbox = Rollup.get_inbox ~hooks ~rollup ~level:tx_level client in
@@ -554,13 +554,13 @@ let test_submit_batches_in_several_blocks =
     [
       ( batch1,
         Constant.bootstrap1.public_key_hash,
-        "M292FuoYJhEhgpQDTpKvXSagLopdXtGXRMyLyxhPTd982dqxoaE" );
+        "txm37A8bG21TrYeVYD8XEQXzHq97SsPqWYY4B95TSRYCre1bUhLx2" );
       ( batch2,
         Constant.bootstrap2.public_key_hash,
-        "M21VEKoBenkHCZC8WpUDtxzv4uoixG1iGUxUvMg4UGc88CRWFNF" );
+        "txm2yd71FfMZN8AEL8BXNhuWi4sDRxpDFjPBAH1rR6YrKe7Bfffm6" );
       ( batch3,
         Constant.bootstrap3.public_key_hash,
-        "M21tdhc2Wn76n164oJvyKW4JVZsDSDeuDsbLgp61XZWtrXjL5WA" );
+        "txm2z2WP4WDYiwjgE4U1qTL3mTHsVTJAtvLZo8nJq3c9EQqSHJBS7" );
     ]
   in
   (* Let’s try once and see if everything goes as expected *)

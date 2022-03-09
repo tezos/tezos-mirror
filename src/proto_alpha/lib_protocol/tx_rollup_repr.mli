@@ -29,7 +29,7 @@
     tx rollup's hash from origination nonce. *)
 
 (** A specialized Blake2B implementation for hashing tx_rollup identifiers with
-    "tru1" as a base58 prefix *)
+    "txr1" as a base58 prefix *)
 module Hash : sig
   val rollup_hash : string
 

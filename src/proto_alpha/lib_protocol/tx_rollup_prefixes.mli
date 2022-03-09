@@ -1,9 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Marigold <contact@marigold.dev>                        *)
 (* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
-(* Copyright (c) 2022 Oxhead Alpha <info@oxhead-alpha.com>                   *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -25,53 +23,28 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include
-  Blake2B.Make
-    (Base58)
-    (struct
-      let name = "Tx_rollup_l2_address"
+type t = {
+  b58check_prefix : string;
+  prefix : string;
+  hash_size : int;
+  b58check_size : int;
+}
 
-      let title =
-        "The hash of a BLS public key used to identify a L2 ticket holders"
+(** See {!Tx_rollup_repr}. *)
+val rollup_address : t
 
-      let b58check_prefix = Tx_rollup_prefixes.l2_address.b58check_prefix
+(** See {!Tx_rollup_l2_address}. *)
+val l2_address : t
 
-      let size = Some Tx_rollup_prefixes.l2_address.hash_size
-    end)
+(** See {!Tx_rollup_inbox_repr}. *)
+val inbox_hash : t
 
-include Compare.Make (struct
-  type nonrec t = t
+(** See {!Tx_rollup_message_repr}. *)
+val message_hash : t
 
-  let compare = compare
-end)
+(** See {!Tx_rollup_commitment_repr}. *)
+val commitment_hash : t
 
-type address = t
-
-let () = Tx_rollup_prefixes.(check_encoding l2_address b58check_encoding)
-
-let of_bls_pk : Bls_signature.pk -> t =
- fun pk -> hash_bytes [Bls_signature.pk_to_bytes pk]
-
-let in_memory_size : t -> Cache_memory_helpers.sint =
- fun _ ->
-  let open Cache_memory_helpers in
-  header_size +! word_size
-  +! string_size_gen Tx_rollup_prefixes.l2_address.hash_size
-
-let size _ = Tx_rollup_prefixes.l2_address.hash_size
-
-module Indexable = struct
-  include Indexable.Make (struct
-    type nonrec t = t
-
-    let encoding = encoding
-
-    let compare = compare
-
-    let pp = pp
-  end)
-
-  let in_memory_size x = Indexable.in_memory_size in_memory_size x
-
-  let size x = Indexable.size size x
-end
+(** [check_encoding spec encoding] checks that [encoding] satisfies
+    [spec]. Raises an exception otherwise. *)
+val check_encoding : t -> 'a Base58.encoding -> unit

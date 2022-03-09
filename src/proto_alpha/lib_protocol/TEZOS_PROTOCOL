@@ -13,6 +13,7 @@
         "Blinded_public_key_hash",
         "Block_payload_hash",
         "Origination_nonce",
+        "Tx_rollup_prefixes",
 
         "Slot_repr",
         "Tez_repr",

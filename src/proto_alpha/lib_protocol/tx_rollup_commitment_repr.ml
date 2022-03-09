@@ -26,7 +26,7 @@
 (*****************************************************************************)
 
 module Commitment_hash = struct
-  let commitment_hash = "\017\249\195\013" (* toc1(54) *)
+  let commitment_hash = Tx_rollup_prefixes.commitment_hash.b58check_prefix
 
   module H =
     Blake2B.Make
@@ -38,12 +38,12 @@ module Commitment_hash = struct
 
         let b58check_prefix = commitment_hash
 
-        let size = Some 32
+        let size = Some Tx_rollup_prefixes.commitment_hash.hash_size
       end)
 
   include H
 
-  let () = Base58.check_encoded_prefix b58check_encoding "toc1" 54
+  let () = Tx_rollup_prefixes.(check_encoding commitment_hash b58check_encoding)
 
   include Path_encoding.Make_hex (H)
 

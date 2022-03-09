@@ -114,4 +114,4 @@ let max_op_ttl = 120
 
 (** A valid base58 encoded layer-2 address to be used to test
     transaction rollups. *)
-let tx_rollup_l2_address = "tru2SS5NXzR5nWQkMAQGeqjmRqFcb4oQH9D2u"
+let tx_rollup_l2_address = "tz4MSfZsn6kMDczShy8PMeB628TNukn9hi2K"
