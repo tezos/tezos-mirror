@@ -53,7 +53,7 @@ let bls12_381_legacy = external_lib "bls12-381-legacy" V.True
 
 let bls12_381_unix = external_lib "bls12-381-unix" V.True
 
-let camlzip = external_lib "camlzip" V.(exactly "1.10")
+let camlzip = external_lib "camlzip" V.(exactly "1.11")
 
 let caqti = external_lib "caqti" V.True
 
@@ -259,7 +259,7 @@ let str = external_lib ~js_compatible:true "str" ~opam:"" V.True
 
 let tar = external_lib "tar" V.True
 
-let tar_unix = external_lib "tar-unix" V.(exactly "1.1.0")
+let tar_unix = external_lib "tar-unix" V.(exactly "2.0.0")
 
 let tezos_rust_lib = opam_only "tezos-rust-libs" V.(exactly "1.1")
 
