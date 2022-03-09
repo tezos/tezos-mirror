@@ -1544,474 +1544,6 @@ module Contract : sig
   end
 end
 
-module Receipt : sig
-  type balance =
-    | Contract of Contract.t
-    | Block_fees
-    | Deposits of public_key_hash
-    | Nonce_revelation_rewards
-    | Double_signing_evidence_rewards
-    | Endorsing_rewards
-    | Baking_rewards
-    | Baking_bonuses
-    | Storage_fees
-    | Double_signing_punishments
-    | Lost_endorsing_rewards of Signature.Public_key_hash.t * bool * bool
-    | Liquidity_baking_subsidies
-    | Burned
-    | Commitments of Blinded_public_key_hash.t
-    | Bootstrap
-    | Invoice
-    | Initial_commitments
-    | Minted
-
-  val compare_balance : balance -> balance -> int
-
-  type balance_update = Debited of Tez.t | Credited of Tez.t
-
-  type update_origin =
-    | Block_application
-    | Protocol_migration
-    | Subsidy
-    | Simulation
-
-  val compare_update_origin : update_origin -> update_origin -> int
-
-  type balance_updates = (balance * balance_update * update_origin) list
-
-  val balance_updates_encoding : balance_updates Data_encoding.t
-
-  val group_balance_updates : balance_updates -> balance_updates tzresult
-end
-
-module Delegate : sig
-  val init :
-    context ->
-    Contract.t ->
-    Signature.Public_key_hash.t ->
-    context tzresult Lwt.t
-
-  val find : context -> Contract.t -> public_key_hash option tzresult Lwt.t
-
-  val set :
-    context -> Contract.t -> public_key_hash option -> context tzresult Lwt.t
-
-  val frozen_deposits_limit :
-    context -> Signature.Public_key_hash.t -> Tez.t option tzresult Lwt.t
-
-  val set_frozen_deposits_limit :
-    context -> Signature.Public_key_hash.t -> Tez.t option -> context Lwt.t
-
-  val fold :
-    context ->
-    order:[`Sorted | `Undefined] ->
-    init:'a ->
-    f:(public_key_hash -> 'a -> 'a Lwt.t) ->
-    'a Lwt.t
-
-  val list : context -> public_key_hash list Lwt.t
-
-  val check_delegate : context -> public_key_hash -> unit tzresult Lwt.t
-
-  type participation_info = {
-    expected_cycle_activity : int;
-    minimal_cycle_activity : int;
-    missed_slots : int;
-    missed_levels : int;
-    remaining_allowed_missed_slots : int;
-    expected_endorsing_rewards : Tez.t;
-  }
-
-  val delegate_participation_info :
-    context -> public_key_hash -> participation_info tzresult Lwt.t
-
-  val cycle_end :
-    context ->
-    Cycle.t ->
-    Nonce.unrevealed list ->
-    (context * Receipt.balance_updates * Signature.Public_key_hash.t list)
-    tzresult
-    Lwt.t
-
-  val already_slashed_for_double_endorsing :
-    context -> public_key_hash -> Level.t -> bool tzresult Lwt.t
-
-  val already_slashed_for_double_baking :
-    context -> public_key_hash -> Level.t -> bool tzresult Lwt.t
-
-  val punish_double_endorsing :
-    context ->
-    public_key_hash ->
-    Level.t ->
-    (context * Tez.t * Receipt.balance_updates) tzresult Lwt.t
-
-  val punish_double_baking :
-    context ->
-    public_key_hash ->
-    Level.t ->
-    (context * Tez.t * Receipt.balance_updates) tzresult Lwt.t
-
-  val full_balance : context -> public_key_hash -> Tez.t tzresult Lwt.t
-
-  type level_participation = Participated | Didn't_participate
-
-  val record_baking_activity_and_pay_rewards_and_fees :
-    context ->
-    payload_producer:Signature.Public_key_hash.t ->
-    block_producer:Signature.Public_key_hash.t ->
-    baking_reward:Tez.t ->
-    reward_bonus:Tez.t option ->
-    (context * Receipt.balance_updates) tzresult Lwt.t
-
-  val record_endorsing_participation :
-    context ->
-    delegate:Signature.Public_key_hash.t ->
-    participation:level_participation ->
-    endorsing_power:int ->
-    context tzresult Lwt.t
-
-  type deposits = {initial_amount : Tez.t; current_amount : Tez.t}
-
-  val frozen_deposits : context -> public_key_hash -> deposits tzresult Lwt.t
-
-  val staking_balance :
-    context -> Signature.Public_key_hash.t -> Tez.t tzresult Lwt.t
-
-  val delegated_contracts :
-    context -> Signature.Public_key_hash.t -> Contract.t list Lwt.t
-
-  val delegated_balance :
-    context -> Signature.Public_key_hash.t -> Tez.t tzresult Lwt.t
-
-  val registered : context -> Signature.Public_key_hash.t -> bool tzresult Lwt.t
-
-  val deactivated :
-    context -> Signature.Public_key_hash.t -> bool tzresult Lwt.t
-
-  val last_cycle_before_deactivation :
-    context -> Signature.Public_key_hash.t -> Cycle.t tzresult Lwt.t
-
-  val pubkey : context -> public_key_hash -> public_key tzresult Lwt.t
-
-  val prepare_stake_distribution : context -> context tzresult Lwt.t
-end
-
-module Voting_period : sig
-  type kind = Proposal | Exploration | Cooldown | Promotion | Adoption
-
-  val kind_encoding : kind Data_encoding.encoding
-
-  val pp_kind : Format.formatter -> kind -> unit
-
-  (* This type should be abstract *)
-  type voting_period = private {
-    index : int32;
-    kind : kind;
-    start_position : int32;
-  }
-
-  type t = voting_period
-
-  include BASIC_DATA with type t := t
-
-  val encoding : voting_period Data_encoding.t
-
-  val pp : Format.formatter -> voting_period -> unit
-
-  val reset : context -> context tzresult Lwt.t
-
-  val succ : context -> context tzresult Lwt.t
-
-  val get_current : context -> voting_period tzresult Lwt.t
-
-  val get_current_kind : context -> kind tzresult Lwt.t
-
-  val is_last_block : context -> bool tzresult Lwt.t
-
-  type info = {voting_period : t; position : int32; remaining : int32}
-
-  val info_encoding : info Data_encoding.t
-
-  val pp_info : Format.formatter -> info -> unit
-
-  val get_rpc_current_info : context -> info tzresult Lwt.t
-
-  val get_rpc_succ_info : context -> info tzresult Lwt.t
-end
-
-module Vote : sig
-  type proposal = Protocol_hash.t
-
-  val record_proposal :
-    context -> Protocol_hash.t -> public_key_hash -> context tzresult Lwt.t
-
-  val get_proposals : context -> int64 Protocol_hash.Map.t tzresult Lwt.t
-
-  val clear_proposals : context -> context Lwt.t
-
-  val recorded_proposal_count_for_delegate :
-    context -> public_key_hash -> int tzresult Lwt.t
-
-  val listings_encoding :
-    (Signature.Public_key_hash.t * int64) list Data_encoding.t
-
-  val update_listings : context -> context tzresult Lwt.t
-
-  val in_listings : context -> public_key_hash -> bool Lwt.t
-
-  val get_listings : context -> (public_key_hash * int64) list Lwt.t
-
-  type ballot = Yay | Nay | Pass
-
-  val get_voting_power_free :
-    context -> Signature.Public_key_hash.t -> int64 tzresult Lwt.t
-
-  val get_voting_power :
-    context -> Signature.Public_key_hash.t -> (context * int64) tzresult Lwt.t
-
-  val get_total_voting_power_free : context -> int64 tzresult Lwt.t
-
-  val get_total_voting_power : context -> (context * int64) tzresult Lwt.t
-
-  val ballot_encoding : ballot Data_encoding.t
-
-  type ballots = {yay : int64; nay : int64; pass : int64}
-
-  val ballots_encoding : ballots Data_encoding.t
-
-  val has_recorded_ballot : context -> public_key_hash -> bool Lwt.t
-
-  val record_ballot :
-    context -> public_key_hash -> ballot -> context tzresult Lwt.t
-
-  val get_ballots : context -> ballots tzresult Lwt.t
-
-  val get_ballot_list : context -> (public_key_hash * ballot) list Lwt.t
-
-  val clear_ballots : context -> context Lwt.t
-
-  val get_current_quorum : context -> int32 tzresult Lwt.t
-
-  val get_participation_ema : context -> int32 tzresult Lwt.t
-
-  val set_participation_ema : context -> int32 -> context tzresult Lwt.t
-
-  val get_current_proposal : context -> proposal tzresult Lwt.t
-
-  val find_current_proposal : context -> proposal option tzresult Lwt.t
-
-  val init_current_proposal : context -> proposal -> context tzresult Lwt.t
-
-  val clear_current_proposal : context -> context tzresult Lwt.t
-end
-
-(** See {!Sc_rollup_storage} and {!Sc_rollup_repr}. *)
-module Sc_rollup : sig
-  module PVM : sig
-    type boot_sector
-
-    val boot_sector_of_string : string -> boot_sector
-  end
-
-  module Address : S.HASH
-
-  type t = Address.t
-
-  module Kind : sig
-    type t = Example_arith
-
-    val encoding : t Data_encoding.t
-  end
-
-  module Staker :
-    S.SIGNATURE_PUBLIC_KEY_HASH with type t = Signature.Public_key_hash.t
-
-  module Commitment_hash : S.HASH
-
-  module State_hash : S.HASH
-
-  module Number_of_messages : Bounded.Int32.S
-
-  module Number_of_ticks : Bounded.Int32.S
-
-  module Commitment : sig
-    type t = {
-      compressed_state : State_hash.t;
-      inbox_level : Raw_level_repr.t;
-      predecessor : Commitment_hash.t;
-      number_of_messages : Number_of_messages.t;
-      number_of_ticks : Number_of_ticks.t;
-    }
-
-    val encoding : t Data_encoding.t
-
-    val hash : t -> Commitment_hash.t
-  end
-
-  val originate :
-    context ->
-    kind:Kind.t ->
-    boot_sector:PVM.boot_sector ->
-    (t * Z.t * context) tzresult Lwt.t
-
-  val kind : context -> t -> Kind.t option tzresult Lwt.t
-
-  module Inbox : sig
-    type t
-
-    val encoding : t Data_encoding.encoding
-
-    val pp : Format.formatter -> t -> unit
-  end
-
-  val rpc_arg : t RPC_arg.t
-
-  val add_messages :
-    context -> t -> string list -> (Inbox.t * Z.t * context) tzresult Lwt.t
-
-  val inbox : context -> t -> (Inbox.t * context) tzresult Lwt.t
-
-  val deposit_stake : context -> t -> Staker.t -> context tzresult Lwt.t
-
-  val withdraw_stake : context -> t -> Staker.t -> context tzresult Lwt.t
-
-  val refine_stake :
-    context ->
-    t ->
-    Staker.t ->
-    Commitment.t ->
-    (Commitment_hash.t * context) tzresult Lwt.t
-
-  val cement_commitment :
-    context -> t -> Commitment_hash.t -> context tzresult Lwt.t
-
-  type conflict_point = Commitment_hash.t * Commitment_hash.t
-
-  val get_conflict_point :
-    context ->
-    t ->
-    Staker.t ->
-    Staker.t ->
-    (conflict_point * context) tzresult Lwt.t
-
-  val get_commitment :
-    context -> t -> Commitment_hash.t -> (Commitment.t * context) tzresult Lwt.t
-
-  val remove_staker : context -> t -> Staker.t -> context tzresult Lwt.t
-
-  val list : context -> t list tzresult Lwt.t
-end
-
-module Block_payload : sig
-  val hash :
-    predecessor:Block_hash.t ->
-    Round.t ->
-    Operation_list_hash.t ->
-    Block_payload_hash.t
-end
-
-module Block_header : sig
-  type contents = {
-    payload_hash : Block_payload_hash.t;
-    payload_round : Round.t;
-    seed_nonce_hash : Nonce_hash.t option;
-    proof_of_work_nonce : bytes;
-    liquidity_baking_toggle_vote :
-      Liquidity_baking_repr.liquidity_baking_toggle_vote;
-  }
-
-  type protocol_data = {contents : contents; signature : Signature.t}
-
-  type t = {shell : Block_header.shell_header; protocol_data : protocol_data}
-
-  type block_header = t
-
-  type raw = Block_header.t
-
-  type shell_header = Block_header.shell_header
-
-  type block_watermark = Block_header of Chain_id.t
-
-  val to_watermark : block_watermark -> Signature.watermark
-
-  val of_watermark : Signature.watermark -> block_watermark option
-
-  module Proof_of_work : sig
-    val check_hash : Block_hash.t -> int64 -> bool
-
-    val check_header_proof_of_work_stamp :
-      shell_header -> contents -> int64 -> bool
-
-    val check_proof_of_work_stamp :
-      proof_of_work_threshold:int64 -> block_header -> unit tzresult
-  end
-
-  val raw : block_header -> raw
-
-  val hash : block_header -> Block_hash.t
-
-  val hash_raw : raw -> Block_hash.t
-
-  val encoding : block_header Data_encoding.encoding
-
-  val raw_encoding : raw Data_encoding.t
-
-  val contents_encoding : contents Data_encoding.t
-
-  val unsigned_encoding : (shell_header * contents) Data_encoding.t
-
-  val protocol_data_encoding : protocol_data Data_encoding.encoding
-
-  val shell_header_encoding : shell_header Data_encoding.encoding
-
-  (** The maximum size of block headers in bytes *)
-  val max_header_length : int
-
-  type error += Invalid_stamp
-
-  val check_timestamp :
-    Round.round_durations ->
-    timestamp:Time.t ->
-    round:Round.t ->
-    predecessor_timestamp:Time.t ->
-    predecessor_round:Round.t ->
-    unit tzresult
-
-  val check_signature :
-    t -> Chain_id.t -> Signature.Public_key.t -> unit tzresult
-
-  val begin_validate_block_header :
-    block_header:t ->
-    chain_id:Chain_id.t ->
-    predecessor_timestamp:Time.t ->
-    predecessor_round:Round.t ->
-    fitness:Fitness.t ->
-    timestamp:Time.t ->
-    delegate_pk:Signature.public_key ->
-    round_durations:Round.round_durations ->
-    proof_of_work_threshold:int64 ->
-    expected_commitment:bool ->
-    unit tzresult
-
-  type locked_round_evidence = {
-    preendorsement_round : Round.t;
-    preendorsement_count : int;
-  }
-
-  type checkable_payload_hash =
-    | No_check
-    | Expected_payload_hash of Block_payload_hash.t
-
-  val finalize_validate_block_header :
-    block_header_contents:contents ->
-    round:Round.t ->
-    fitness:Fitness.t ->
-    checkable_payload_hash:checkable_payload_hash ->
-    locked_round_evidence:locked_round_evidence option ->
-    consensus_threshold:int ->
-    unit tzresult
-end
-
 (** This module re-exports functions from {!Ticket_hash_repr}. See
     documentation of the functions there. *)
 module Ticket_hash : sig
@@ -2568,6 +2100,474 @@ module Destination : sig
   val in_memory_size : t -> Cache_memory_helpers.sint
 
   type error += Invalid_destination_b58check of string
+end
+
+module Receipt : sig
+  type balance =
+    | Contract of Contract.t
+    | Block_fees
+    | Deposits of public_key_hash
+    | Nonce_revelation_rewards
+    | Double_signing_evidence_rewards
+    | Endorsing_rewards
+    | Baking_rewards
+    | Baking_bonuses
+    | Storage_fees
+    | Double_signing_punishments
+    | Lost_endorsing_rewards of Signature.Public_key_hash.t * bool * bool
+    | Liquidity_baking_subsidies
+    | Burned
+    | Commitments of Blinded_public_key_hash.t
+    | Bootstrap
+    | Invoice
+    | Initial_commitments
+    | Minted
+
+  val compare_balance : balance -> balance -> int
+
+  type balance_update = Debited of Tez.t | Credited of Tez.t
+
+  type update_origin =
+    | Block_application
+    | Protocol_migration
+    | Subsidy
+    | Simulation
+
+  val compare_update_origin : update_origin -> update_origin -> int
+
+  type balance_updates = (balance * balance_update * update_origin) list
+
+  val balance_updates_encoding : balance_updates Data_encoding.t
+
+  val group_balance_updates : balance_updates -> balance_updates tzresult
+end
+
+module Delegate : sig
+  val init :
+    context ->
+    Contract.t ->
+    Signature.Public_key_hash.t ->
+    context tzresult Lwt.t
+
+  val find : context -> Contract.t -> public_key_hash option tzresult Lwt.t
+
+  val set :
+    context -> Contract.t -> public_key_hash option -> context tzresult Lwt.t
+
+  val frozen_deposits_limit :
+    context -> Signature.Public_key_hash.t -> Tez.t option tzresult Lwt.t
+
+  val set_frozen_deposits_limit :
+    context -> Signature.Public_key_hash.t -> Tez.t option -> context Lwt.t
+
+  val fold :
+    context ->
+    order:[`Sorted | `Undefined] ->
+    init:'a ->
+    f:(public_key_hash -> 'a -> 'a Lwt.t) ->
+    'a Lwt.t
+
+  val list : context -> public_key_hash list Lwt.t
+
+  val check_delegate : context -> public_key_hash -> unit tzresult Lwt.t
+
+  type participation_info = {
+    expected_cycle_activity : int;
+    minimal_cycle_activity : int;
+    missed_slots : int;
+    missed_levels : int;
+    remaining_allowed_missed_slots : int;
+    expected_endorsing_rewards : Tez.t;
+  }
+
+  val delegate_participation_info :
+    context -> public_key_hash -> participation_info tzresult Lwt.t
+
+  val cycle_end :
+    context ->
+    Cycle.t ->
+    Nonce.unrevealed list ->
+    (context * Receipt.balance_updates * Signature.Public_key_hash.t list)
+    tzresult
+    Lwt.t
+
+  val already_slashed_for_double_endorsing :
+    context -> public_key_hash -> Level.t -> bool tzresult Lwt.t
+
+  val already_slashed_for_double_baking :
+    context -> public_key_hash -> Level.t -> bool tzresult Lwt.t
+
+  val punish_double_endorsing :
+    context ->
+    public_key_hash ->
+    Level.t ->
+    (context * Tez.t * Receipt.balance_updates) tzresult Lwt.t
+
+  val punish_double_baking :
+    context ->
+    public_key_hash ->
+    Level.t ->
+    (context * Tez.t * Receipt.balance_updates) tzresult Lwt.t
+
+  val full_balance : context -> public_key_hash -> Tez.t tzresult Lwt.t
+
+  type level_participation = Participated | Didn't_participate
+
+  val record_baking_activity_and_pay_rewards_and_fees :
+    context ->
+    payload_producer:Signature.Public_key_hash.t ->
+    block_producer:Signature.Public_key_hash.t ->
+    baking_reward:Tez.t ->
+    reward_bonus:Tez.t option ->
+    (context * Receipt.balance_updates) tzresult Lwt.t
+
+  val record_endorsing_participation :
+    context ->
+    delegate:Signature.Public_key_hash.t ->
+    participation:level_participation ->
+    endorsing_power:int ->
+    context tzresult Lwt.t
+
+  type deposits = {initial_amount : Tez.t; current_amount : Tez.t}
+
+  val frozen_deposits : context -> public_key_hash -> deposits tzresult Lwt.t
+
+  val staking_balance :
+    context -> Signature.Public_key_hash.t -> Tez.t tzresult Lwt.t
+
+  val delegated_contracts :
+    context -> Signature.Public_key_hash.t -> Contract.t list Lwt.t
+
+  val delegated_balance :
+    context -> Signature.Public_key_hash.t -> Tez.t tzresult Lwt.t
+
+  val registered : context -> Signature.Public_key_hash.t -> bool tzresult Lwt.t
+
+  val deactivated :
+    context -> Signature.Public_key_hash.t -> bool tzresult Lwt.t
+
+  val last_cycle_before_deactivation :
+    context -> Signature.Public_key_hash.t -> Cycle.t tzresult Lwt.t
+
+  val pubkey : context -> public_key_hash -> public_key tzresult Lwt.t
+
+  val prepare_stake_distribution : context -> context tzresult Lwt.t
+end
+
+module Voting_period : sig
+  type kind = Proposal | Exploration | Cooldown | Promotion | Adoption
+
+  val kind_encoding : kind Data_encoding.encoding
+
+  val pp_kind : Format.formatter -> kind -> unit
+
+  (* This type should be abstract *)
+  type voting_period = private {
+    index : int32;
+    kind : kind;
+    start_position : int32;
+  }
+
+  type t = voting_period
+
+  include BASIC_DATA with type t := t
+
+  val encoding : voting_period Data_encoding.t
+
+  val pp : Format.formatter -> voting_period -> unit
+
+  val reset : context -> context tzresult Lwt.t
+
+  val succ : context -> context tzresult Lwt.t
+
+  val get_current : context -> voting_period tzresult Lwt.t
+
+  val get_current_kind : context -> kind tzresult Lwt.t
+
+  val is_last_block : context -> bool tzresult Lwt.t
+
+  type info = {voting_period : t; position : int32; remaining : int32}
+
+  val info_encoding : info Data_encoding.t
+
+  val pp_info : Format.formatter -> info -> unit
+
+  val get_rpc_current_info : context -> info tzresult Lwt.t
+
+  val get_rpc_succ_info : context -> info tzresult Lwt.t
+end
+
+module Vote : sig
+  type proposal = Protocol_hash.t
+
+  val record_proposal :
+    context -> Protocol_hash.t -> public_key_hash -> context tzresult Lwt.t
+
+  val get_proposals : context -> int64 Protocol_hash.Map.t tzresult Lwt.t
+
+  val clear_proposals : context -> context Lwt.t
+
+  val recorded_proposal_count_for_delegate :
+    context -> public_key_hash -> int tzresult Lwt.t
+
+  val listings_encoding :
+    (Signature.Public_key_hash.t * int64) list Data_encoding.t
+
+  val update_listings : context -> context tzresult Lwt.t
+
+  val in_listings : context -> public_key_hash -> bool Lwt.t
+
+  val get_listings : context -> (public_key_hash * int64) list Lwt.t
+
+  type ballot = Yay | Nay | Pass
+
+  val get_voting_power_free :
+    context -> Signature.Public_key_hash.t -> int64 tzresult Lwt.t
+
+  val get_voting_power :
+    context -> Signature.Public_key_hash.t -> (context * int64) tzresult Lwt.t
+
+  val get_total_voting_power_free : context -> int64 tzresult Lwt.t
+
+  val get_total_voting_power : context -> (context * int64) tzresult Lwt.t
+
+  val ballot_encoding : ballot Data_encoding.t
+
+  type ballots = {yay : int64; nay : int64; pass : int64}
+
+  val ballots_encoding : ballots Data_encoding.t
+
+  val has_recorded_ballot : context -> public_key_hash -> bool Lwt.t
+
+  val record_ballot :
+    context -> public_key_hash -> ballot -> context tzresult Lwt.t
+
+  val get_ballots : context -> ballots tzresult Lwt.t
+
+  val get_ballot_list : context -> (public_key_hash * ballot) list Lwt.t
+
+  val clear_ballots : context -> context Lwt.t
+
+  val get_current_quorum : context -> int32 tzresult Lwt.t
+
+  val get_participation_ema : context -> int32 tzresult Lwt.t
+
+  val set_participation_ema : context -> int32 -> context tzresult Lwt.t
+
+  val get_current_proposal : context -> proposal tzresult Lwt.t
+
+  val find_current_proposal : context -> proposal option tzresult Lwt.t
+
+  val init_current_proposal : context -> proposal -> context tzresult Lwt.t
+
+  val clear_current_proposal : context -> context tzresult Lwt.t
+end
+
+(** See {!Sc_rollup_storage} and {!Sc_rollup_repr}. *)
+module Sc_rollup : sig
+  module PVM : sig
+    type boot_sector
+
+    val boot_sector_of_string : string -> boot_sector
+  end
+
+  module Address : S.HASH
+
+  type t = Address.t
+
+  module Kind : sig
+    type t = Example_arith
+
+    val encoding : t Data_encoding.t
+  end
+
+  module Staker :
+    S.SIGNATURE_PUBLIC_KEY_HASH with type t = Signature.Public_key_hash.t
+
+  module Commitment_hash : S.HASH
+
+  module State_hash : S.HASH
+
+  module Number_of_messages : Bounded.Int32.S
+
+  module Number_of_ticks : Bounded.Int32.S
+
+  module Commitment : sig
+    type t = {
+      compressed_state : State_hash.t;
+      inbox_level : Raw_level_repr.t;
+      predecessor : Commitment_hash.t;
+      number_of_messages : Number_of_messages.t;
+      number_of_ticks : Number_of_ticks.t;
+    }
+
+    val encoding : t Data_encoding.t
+
+    val hash : t -> Commitment_hash.t
+  end
+
+  val originate :
+    context ->
+    kind:Kind.t ->
+    boot_sector:PVM.boot_sector ->
+    (t * Z.t * context) tzresult Lwt.t
+
+  val kind : context -> t -> Kind.t option tzresult Lwt.t
+
+  module Inbox : sig
+    type t
+
+    val encoding : t Data_encoding.encoding
+
+    val pp : Format.formatter -> t -> unit
+  end
+
+  val rpc_arg : t RPC_arg.t
+
+  val add_messages :
+    context -> t -> string list -> (Inbox.t * Z.t * context) tzresult Lwt.t
+
+  val inbox : context -> t -> (Inbox.t * context) tzresult Lwt.t
+
+  val deposit_stake : context -> t -> Staker.t -> context tzresult Lwt.t
+
+  val withdraw_stake : context -> t -> Staker.t -> context tzresult Lwt.t
+
+  val refine_stake :
+    context ->
+    t ->
+    Staker.t ->
+    Commitment.t ->
+    (Commitment_hash.t * context) tzresult Lwt.t
+
+  val cement_commitment :
+    context -> t -> Commitment_hash.t -> context tzresult Lwt.t
+
+  type conflict_point = Commitment_hash.t * Commitment_hash.t
+
+  val get_conflict_point :
+    context ->
+    t ->
+    Staker.t ->
+    Staker.t ->
+    (conflict_point * context) tzresult Lwt.t
+
+  val get_commitment :
+    context -> t -> Commitment_hash.t -> (Commitment.t * context) tzresult Lwt.t
+
+  val remove_staker : context -> t -> Staker.t -> context tzresult Lwt.t
+
+  val list : context -> t list tzresult Lwt.t
+end
+
+module Block_payload : sig
+  val hash :
+    predecessor:Block_hash.t ->
+    Round.t ->
+    Operation_list_hash.t ->
+    Block_payload_hash.t
+end
+
+module Block_header : sig
+  type contents = {
+    payload_hash : Block_payload_hash.t;
+    payload_round : Round.t;
+    seed_nonce_hash : Nonce_hash.t option;
+    proof_of_work_nonce : bytes;
+    liquidity_baking_toggle_vote :
+      Liquidity_baking_repr.liquidity_baking_toggle_vote;
+  }
+
+  type protocol_data = {contents : contents; signature : Signature.t}
+
+  type t = {shell : Block_header.shell_header; protocol_data : protocol_data}
+
+  type block_header = t
+
+  type raw = Block_header.t
+
+  type shell_header = Block_header.shell_header
+
+  type block_watermark = Block_header of Chain_id.t
+
+  val to_watermark : block_watermark -> Signature.watermark
+
+  val of_watermark : Signature.watermark -> block_watermark option
+
+  module Proof_of_work : sig
+    val check_hash : Block_hash.t -> int64 -> bool
+
+    val check_header_proof_of_work_stamp :
+      shell_header -> contents -> int64 -> bool
+
+    val check_proof_of_work_stamp :
+      proof_of_work_threshold:int64 -> block_header -> unit tzresult
+  end
+
+  val raw : block_header -> raw
+
+  val hash : block_header -> Block_hash.t
+
+  val hash_raw : raw -> Block_hash.t
+
+  val encoding : block_header Data_encoding.encoding
+
+  val raw_encoding : raw Data_encoding.t
+
+  val contents_encoding : contents Data_encoding.t
+
+  val unsigned_encoding : (shell_header * contents) Data_encoding.t
+
+  val protocol_data_encoding : protocol_data Data_encoding.encoding
+
+  val shell_header_encoding : shell_header Data_encoding.encoding
+
+  (** The maximum size of block headers in bytes *)
+  val max_header_length : int
+
+  type error += Invalid_stamp
+
+  val check_timestamp :
+    Round.round_durations ->
+    timestamp:Time.t ->
+    round:Round.t ->
+    predecessor_timestamp:Time.t ->
+    predecessor_round:Round.t ->
+    unit tzresult
+
+  val check_signature :
+    t -> Chain_id.t -> Signature.Public_key.t -> unit tzresult
+
+  val begin_validate_block_header :
+    block_header:t ->
+    chain_id:Chain_id.t ->
+    predecessor_timestamp:Time.t ->
+    predecessor_round:Round.t ->
+    fitness:Fitness.t ->
+    timestamp:Time.t ->
+    delegate_pk:Signature.public_key ->
+    round_durations:Round.round_durations ->
+    proof_of_work_threshold:int64 ->
+    expected_commitment:bool ->
+    unit tzresult
+
+  type locked_round_evidence = {
+    preendorsement_round : Round.t;
+    preendorsement_count : int;
+  }
+
+  type checkable_payload_hash =
+    | No_check
+    | Expected_payload_hash of Block_payload_hash.t
+
+  val finalize_validate_block_header :
+    block_header_contents:contents ->
+    round:Round.t ->
+    fitness:Fitness.t ->
+    checkable_payload_hash:checkable_payload_hash ->
+    locked_round_evidence:locked_round_evidence option ->
+    consensus_threshold:int ->
+    unit tzresult
 end
 
 module Kind : sig
