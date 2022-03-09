@@ -65,29 +65,32 @@ let test_context_mem_fct (proxy : Context.t) : unit Lwt.t =
   let open Lwt_syntax in
   let assert_mem key expected =
     let* res = Context.mem proxy key in
-    Assert.equal_bool ~msg:("Context.mem " ^ key_to_string key) expected res ;
-    Lwt.return_unit
+    Assert.equal_bool
+      ~msg:(Printf.sprintf "Context.mem [%s], got %b" (key_to_string key) res)
+      expected
+      res ;
+    return_unit
   in
   let* () = assert_mem ["version"] true in
   let* () = assert_mem ["a"; "b"] true in
   let* () = assert_mem ["a"; "c"] true in
-  let* () = assert_mem ["a"; "d"] false in
-  Lwt.return_unit
+  assert_mem ["a"; "d"] false
 
 let test_context_mem_tree_fct (proxy : Context.t) : unit Lwt.t =
   let open Lwt_syntax in
   let assert_mem_tree key expected =
     let* res = Context.mem_tree proxy key in
     Assert.equal_bool
-      ~msg:("Context.mem_tree " ^ key_to_string key)
+      ~msg:
+        (Printf.sprintf "Context.mem_tree [%s], got %b" (key_to_string key) res)
       expected
       res ;
-    Lwt.return_unit
+    return_unit
   in
   let* () = assert_mem_tree ["a"] true in
   let* () = assert_mem_tree ["b"] false in
-  let* () = assert_mem_tree ["a"; "b"] false in
-  Lwt.return_unit
+  let* () = assert_mem_tree ["a"; "b"] true in
+  assert_mem_tree ["a"; "x"] false
 
 let test_context_find_fct (proxy : Context.t) : unit Lwt.t =
   let open Lwt_syntax in
