@@ -204,22 +204,22 @@ let init ctxt contract delegate =
 
 let set c contract delegate =
   match delegate with
-  | None ->
-      ( (* check if contract is a registered delegate *)
-        (match Contract_repr.is_implicit contract with
-        | Some pkh ->
-            Contract_delegate_storage.registered c pkh >>=? fun is_registered ->
-            fail_when is_registered (No_deletion pkh)
-        | None -> return_unit)
+  | None -> (
+      (* check if contract is a registered delegate *)
+      (match Contract_repr.is_implicit contract with
+      | Some pkh ->
+          Contract_delegate_storage.registered c pkh >>=? fun is_registered ->
+          fail_when is_registered (No_deletion pkh)
+      | None -> return_unit)
       >>=? fun () ->
-        Contract_delegate_storage.find c contract >>=? function
-        | None -> return c
-        | Some delegate ->
-            (* Removes the balance of the contract from the delegate *)
-            Contract_storage.get_balance_and_frozen_bonds c contract
-            >>=? fun balance_and_frozen_bonds ->
-            Stake_storage.remove_stake c delegate balance_and_frozen_bonds )
-      >>=? fun c -> Contract_delegate_storage.delete c contract
+      Contract_delegate_storage.find c contract >>=? function
+      | None -> return c
+      | Some delegate ->
+          (* Removes the balance of the contract from the delegate *)
+          Contract_storage.get_balance_and_frozen_bonds c contract
+          >>=? fun balance_and_frozen_bonds ->
+          Stake_storage.remove_stake c delegate balance_and_frozen_bonds
+          >>=? fun c -> Contract_delegate_storage.delete c contract)
   | Some delegate ->
       Contract_manager_storage.is_manager_key_revealed c delegate
       >>=? fun known_delegate ->
