@@ -25,6 +25,7 @@
 
 open Clic
 open Lwt_result_syntax
+module Base = Tezos_client_base
 
 type t = {base_dir : string; endpoint : Uri.t}
 
@@ -85,3 +86,28 @@ let parse argv =
     Clic.parse_global_options (global_options ()) default argv
   in
   return (make opts, argv)
+
+class type sc_client_context =
+  object
+    inherit Base.Client_context.io_wallet
+
+    inherit RPC_context.generic
+  end
+
+class unix_sc_client_context ~base_dir ~password_filename ~rpc_config :
+  sc_client_context =
+  object
+    inherit Client_context_unix.unix_io_wallet ~base_dir ~password_filename
+
+    inherit
+      Tezos_rpc_http_client_unix.RPC_client_unix.http_ctxt
+        rpc_config
+        (Tezos_rpc_http.Media_type.Command_line.of_command_line
+           rpc_config.media_type)
+  end
+
+let make_unix_client_context {base_dir; endpoint} =
+  let rpc_config =
+    {Tezos_rpc_http_client_unix.RPC_client_unix.default_config with endpoint}
+  in
+  new unix_sc_client_context ~base_dir ~rpc_config ~password_filename:None
