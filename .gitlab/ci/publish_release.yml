@@ -1,17 +1,21 @@
 ---
-release-on-gitlab:
-  image: registry.gitlab.com/gitlab-org/release-cli
+gitlab:release:
   extends:
     - .rules_template__release_tag
-  variables:
-    PACKAGE_REGISTRY_URL: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${CI_PROJECT_NAMESPACE}/${CI_COMMIT_TAG}"
+  image: registry.gitlab.com/gitlab-org/release-cli:v0.11.0
   stage: publish_release
-  script:
-    - apk --no-cache --virtual add jq curl
-    - scripts/release/create-gitlab-release.sh
   dependencies:
-    - build:static-arm64-linux-binaries
     - build:static-x86_64-linux-binaries
+    - build:static-arm64-linux-binaries
+    - docker:merge_manifests
+  script:
+    - apk --no-cache --virtual add jq curl git
+    # we run the smoketest only for x86_64 since this job is executed on x86_64
+    - ./scripts/ci/static_smoke_test.sh x86_64 version
+    # create a GitLab generic package
+    - ./scripts/ci/create_gitlab_package.sh
+    # create a GitLab release
+    - ./scripts/ci/create_gitlab_release.sh
 
 # Note: here we rely on $IMAGE_ARCH_PREFIX to be empty.
 # Otherwise, $DOCKER_IMAGE_TAG would contain $IMAGE_ARCH_PREFIX too.
@@ -23,10 +27,11 @@ docker:merge_manifests:
     - .image_template__latest # Docker-in-Docker (dind)
     - .docker_registry_auth # Sets up a before_script
   stage: publish_release
-  # this job does not need artifacts from previous jobs.
-  dependencies: []
   script:
     - apk add git
     # Environment variables from before_script
     - . ./scripts/ci/docker.env
     - ./scripts/ci/docker_merge_manifests.sh
+  needs:
+    - docker:build_amd64
+    - docker:build_arm64
