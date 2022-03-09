@@ -36,27 +36,32 @@ val encoding : t Data_encoding.t
 
 val pp : Format.formatter -> t -> unit
 
-(** [update_burn_per_byte state ~factor ~final_size ~hard_limit]
-   updates the cost per byte to be paid for each message submitted to
-   the rollup.  This is done by computing a moving average for
-   [factor] snapshots. Each snapshot being the size of the total
-   messages for the rollup. Hence each snapshot contributes to [1/(1 +
-   factor)] to the average.
+(** [update_burn_per_byte state ~elapsed ~factor ~final_size
+    ~hard_limit] updates the cost per byte to be paid for each message
+    submitted to the rollup.  This is done by computing a moving
+    average for [factor] snapshots. Each snapshot being the size of the
+    total messages for the rollup. Hence each snapshot contributes to
+    [1/(1 + factor)] to the average.
 
-    Once the moving average [ma] is computed, we use the [hard limit]
-   to know whether the cost per byte should be updated:
+    It may happen that the rollup does not receive any message for
+    some period of time. The parameter [elapsed] allows that to be taken
+    into account. If [elapsed=n] with [n>=1] it is similar as if
+    [update_burn_per_byte] was called [n] times with [final_size=0].
 
-    1. If [ma <= 80] then the cost per byte is decreased
+    Once the exponential moving average [ema] is computed, we use the
+    [hard limit] to know whether the cost per byte should be updated:
 
-    2. If [80 < ma <= 90] then the cost per byte is stable
+    1. If [ema <= 80] then the cost per byte is decreased
 
-    3. If [90 < ma] then the cost ber byte is increased
+    2. If [80 < ema <= 90] then the cost per byte is stable
+
+    3. If [90 < ema] then the cost ber byte is increased
 
     The rationale behind this mechanics is to adapt the cost of a
-   transactionnal rollup depending on its activity. This can be used
-   to prevent from some spamming attacks. *)
+    transactional rollup depending on its activity. This can be used
+    to prevent from some spamming attacks. *)
 val update_burn_per_byte :
-  t -> factor:int -> final_size:int -> hard_limit:int -> t
+  t -> elapsed:int -> factor:int -> final_size:int -> hard_limit:int -> t
 
 (** [burn_cost ~limit state size] computes the burn to be paid to submit
     [size] bytes in the inbox of the transactional rollup.

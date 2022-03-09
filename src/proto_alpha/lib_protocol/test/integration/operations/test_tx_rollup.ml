@@ -365,7 +365,7 @@ let test_two_originations () =
 (** [test_burn_per_byte_update] checks [update_burn_per_byte] behaves
     according to its docstring. *)
 let test_burn_per_byte_update () =
-  let test ~inbox_ema ~burn_per_byte ~final_size ~hard_limit ~result =
+  let test ~inbox_ema ~burn_per_byte ~elapsed ~final_size ~hard_limit ~result =
     let burn_per_byte = Tez.of_mutez_exn burn_per_byte in
     let result = Tez.of_mutez_exn result in
     let state =
@@ -378,6 +378,7 @@ let test_burn_per_byte_update () =
     let state =
       Alpha_context.Tx_rollup_state.Internal_for_tests.update_burn_per_byte
         state
+        ~elapsed
         ~factor
         ~final_size
         ~hard_limit
@@ -390,11 +391,51 @@ let test_burn_per_byte_update () =
     in
     Assert.equal_tez ~loc:__LOC__ result new_burn
   in
-
+  test
+    ~inbox_ema:1_000
+    ~burn_per_byte:1_000L
+    ~elapsed:0
+    ~final_size:1_000
+    ~hard_limit:1_100
+    ~result:1_000L
+  >>=? fun () ->
+  test
+    ~inbox_ema:1_000
+    ~burn_per_byte:1_000L
+    ~elapsed:10
+    ~final_size:1_000
+    ~hard_limit:1_100
+    ~result:816L
+  >>=? fun () ->
+  test
+    ~inbox_ema:1_000
+    ~burn_per_byte:1_000L
+    ~elapsed:25
+    ~final_size:1_000
+    ~hard_limit:1_100
+    ~result:383L
+  >>=? fun () ->
+  test
+    ~inbox_ema:1_000
+    ~burn_per_byte:1_000L
+    ~elapsed:50
+    ~final_size:1_000
+    ~hard_limit:1_100
+    ~result:113L
+  >>=? fun () ->
+  test
+    ~inbox_ema:1_000
+    ~burn_per_byte:1_000L
+    ~elapsed:113
+    ~final_size:1_000
+    ~hard_limit:1_100
+    ~result:0L
+  >>=? fun () ->
   (* Fees per byte should remain constant *)
   test
     ~inbox_ema:1_000
     ~burn_per_byte:1_000L
+    ~elapsed:0
     ~final_size:1_000
     ~hard_limit:1_100
     ~result:1_000L
@@ -403,6 +444,7 @@ let test_burn_per_byte_update () =
   test
     ~inbox_ema:1_000
     ~burn_per_byte:1_000L
+    ~elapsed:0
     ~final_size:1_000
     ~hard_limit:1_000
     ~result:1_050L
@@ -411,6 +453,7 @@ let test_burn_per_byte_update () =
   test
     ~inbox_ema:1_000
     ~burn_per_byte:1_000L
+    ~elapsed:0
     ~final_size:1_000
     ~hard_limit:1_500
     ~result:950L
@@ -419,6 +462,7 @@ let test_burn_per_byte_update () =
   test
     ~inbox_ema:1_000
     ~burn_per_byte:0L
+    ~elapsed:0
     ~final_size:1_000
     ~hard_limit:1_000
     ~result:1L
@@ -860,9 +904,11 @@ let test_finalization () =
   let rec update_burn_per_byte_n_time n state =
     if n > 0 then
       let factor = 120 (* default factor *) in
+      let elapsed = 0 (* the inbox was filled at every block *) in
       let state =
         Alpha_context.Tx_rollup_state.Internal_for_tests.update_burn_per_byte
           state
+          ~elapsed
           ~factor
           ~final_size:inbox_size
           ~hard_limit:tx_rollup_hard_size_limit_per_inbox

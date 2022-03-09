@@ -268,14 +268,13 @@ let pp fmt
              c))
       last_removed_commitment_hashes)
 
-let update_burn_per_byte :
+let update_burn_per_byte_helper :
     t -> factor:int -> final_size:int -> hard_limit:int -> t =
  fun ({burn_per_byte; inbox_ema; _} as state) ~factor ~final_size ~hard_limit ->
   let threshold_increase = 90 in
   let threshold_decrease = 80 in
   let variation_factor = 5L in
   let smoothing = 2 in
-
   (* The formula of the multiplier of EMA :
 
        smoothing / (1 + N)
@@ -313,6 +312,25 @@ let update_burn_per_byte :
   (* In the (very unlikely) event of an overflow, we force the burn to
      be the maximum amount. *)
   | Error _ -> {state with burn_per_byte = Tez_repr.max_mutez; inbox_ema}
+
+let rec update_burn_per_byte :
+    t -> elapsed:int -> factor:int -> final_size:int -> hard_limit:int -> t =
+ fun state ~elapsed ~factor ~final_size ~hard_limit ->
+  (* factor is expected to be a low number ~ 100 *)
+  if Compare.Int.(elapsed > factor) then
+    (* We do not need to compute precisely the new state. *)
+    {state with burn_per_byte = Tez_repr.zero; inbox_ema = 0}
+  else if Compare.Int.(elapsed <= 0) then
+    (* Base case, we take into a account the [final_size] once. *)
+    update_burn_per_byte_helper state ~factor ~final_size ~hard_limit
+  else
+    (* For all the blocks that do not contain inboxes, we act as if
+       the inbox size was [0]. *)
+    let state' =
+      update_burn_per_byte_helper state ~factor ~final_size:0 ~hard_limit
+    in
+    let elapsed = elapsed - 1 in
+    update_burn_per_byte state' ~elapsed ~factor ~final_size ~hard_limit
 
 let inboxes_count {head_level; oldest_inbox_level; _} =
   match (oldest_inbox_level, head_level) with

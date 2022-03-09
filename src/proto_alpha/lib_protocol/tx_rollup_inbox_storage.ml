@@ -152,9 +152,27 @@ let prepare_metadata :
           let factor =
             Constants_storage.tx_rollup_cost_per_byte_ema_factor ctxt
           in
+          let elapsed =
+            match current_level with
+            | None -> 0
+            | Some (_, tezos_level) ->
+                let diff = Raw_level_repr.diff level tezos_level in
+                (* Only [diff = Int32.one] should be checked
+                   theoritically. If [diff < Int32.one], it likely
+                   means there is a problem in the state machine since
+                   this function was called twice for the same
+                   level. This problem is caught at other
+                   places. However, if this assumption is broken, I
+                   prefer to consider that it counts as if there was
+                   no empty blocks between the first call and the
+                   second call to this function. *)
+                if Compare.Int32.(diff <= Int32.one) then 0
+                else Int32.to_int diff
+          in
           let state =
             Tx_rollup_state_repr.update_burn_per_byte
               state
+              ~elapsed
               ~factor
               ~final_size:inbox.cumulated_size
               ~hard_limit

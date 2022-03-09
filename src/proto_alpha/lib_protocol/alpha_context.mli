@@ -1618,7 +1618,7 @@ module Tx_rollup_state : sig
       t
 
     val update_burn_per_byte :
-      t -> factor:int -> final_size:int -> hard_limit:int -> t
+      t -> elapsed:int -> factor:int -> final_size:int -> hard_limit:int -> t
 
     val get_inbox_ema : t -> int
   end
