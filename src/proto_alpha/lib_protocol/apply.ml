@@ -1041,9 +1041,13 @@ let apply_transaction_to_rollup ~consume_deserialization_gas ~ctxt ~parameters
     >>?= fun (Tx_rollup.{ticketer; contents; ty; amount; destination}, ctxt) ->
     Tx_rollup.hash_ticket ctxt dst_rollup ~contents ~ticketer ~ty
     >>?= fun (ticket_hash, ctxt) ->
-    (* The deposit is returned to the [payer] as a withdrawal if it fails due to
-       a Balance_overflow in the recipient. The recipient of withdrawals are
-       always implicit. We set the withdrawal recipient to [payer]. *)
+    (* If the ticket deposit fails on L2 for some reason
+       (e.g. [Balance_overflow] in the recipient), then it is
+       returned to [payer]. As [payer] is implicit, it cannot own
+       tickets directly. Therefore, erroneous deposits are
+       returned using the L2 withdrawal mechanism: a failing
+       deposit emits a withdrawal that can be executed by
+       [payer]. *)
     let (deposit, message_size) =
       Tx_rollup_message.make_deposit payer destination ticket_hash amount
     in
