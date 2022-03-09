@@ -981,45 +981,47 @@ val show_voting_period : ?endpoint:endpoint -> t -> string Lwt.t
 (** Same as [show_voting_period], but do not wait for the process to exit. *)
 val spawn_show_voting_period : ?endpoint:endpoint -> t -> Process.t
 
-(** Run [tezos-client originate sc rollup from <src> of kind <kind> booting with <boot_sector>]. *)
-val originate_sc_rollup :
-  ?wait:string ->
-  ?burn_cap:Tez.t ->
-  src:string ->
-  kind:string ->
-  boot_sector:string ->
-  t ->
-  string Lwt.t
+module Sc_rollup : sig
+  (** Run [tezos-client originate sc rollup from <src> of kind <kind> booting with <boot_sector>]. *)
+  val originate :
+    ?wait:string ->
+    ?burn_cap:Tez.t ->
+    src:string ->
+    kind:string ->
+    boot_sector:string ->
+    t ->
+    string Lwt.t
 
-(** Same as [originate_sc_rollup], but do not wait for the process to exit. *)
-val spawn_originate_sc_rollup :
-  ?wait:string ->
-  ?burn_cap:Tez.t ->
-  src:string ->
-  kind:string ->
-  boot_sector:string ->
-  t ->
-  Process.t
+  (** Same as [originate], but do not wait for the process to exit. *)
+  val spawn_originate :
+    ?wait:string ->
+    ?burn_cap:Tez.t ->
+    src:string ->
+    kind:string ->
+    boot_sector:string ->
+    t ->
+    Process.t
 
-(** Run [tezos-client send rollup message <msg> from <src> to <dst>]. *)
-val send_sc_rollup_message :
-  ?wait:string ->
-  ?burn_cap:Tez.t ->
-  msg:string ->
-  src:string ->
-  dst:string ->
-  t ->
-  unit Lwt.t
+  (** Run [tezos-client send rollup message <msg> from <src> to <dst>]. *)
+  val send_message :
+    ?wait:string ->
+    ?burn_cap:Tez.t ->
+    msg:string ->
+    src:string ->
+    dst:string ->
+    t ->
+    unit Lwt.t
 
-(** Same as [send_sc_rollup_message], but do not wait for the process to exit. *)
-val spawn_send_sc_rollup_message :
-  ?wait:string ->
-  ?burn_cap:Tez.t ->
-  msg:string ->
-  src:string ->
-  dst:string ->
-  t ->
-  Process.t
+  (** Same as [send_message], but do not wait for the process to exit. *)
+  val spawn_send_message :
+    ?wait:string ->
+    ?burn_cap:Tez.t ->
+    msg:string ->
+    src:string ->
+    dst:string ->
+    t ->
+    Process.t
+end
 
 (** {2 High-Level Functions} *)
 
@@ -1065,7 +1067,7 @@ val init_with_node :
     - Create [additional_account_count] accounts with
       [default_accounts_balance]
     - Activate the given protocol with [additional_account_count]
-      additional bootstrap accounts whose aliases are given by 
+      additional bootstrap accounts whose aliases are given by
      [Account.bootstrap].
 
     In addition to the client, returns the first created node

@@ -88,7 +88,7 @@ let test_origination =
     (fun protocol ->
       setup ~protocol @@ fun _node client bootstrap1_key ->
       let* rollup_address =
-        Client.originate_sc_rollup
+        Client.Sc_rollup.originate
           ~burn_cap:Tez.(of_int 9999999)
           ~src:bootstrap1_key
           ~kind:"arith"
@@ -107,7 +107,7 @@ let test_origination =
 *)
 let with_fresh_rollup f tezos_node tezos_client bootstrap1_key =
   let* rollup_address =
-    Client.originate_sc_rollup
+    Client.Sc_rollup.originate
       ~burn_cap:Tez.(of_int 9999999)
       ~src:bootstrap1_key
       ~kind:"arith"
@@ -243,7 +243,7 @@ let test_rollup_inbox =
       ( with_fresh_rollup @@ fun sc_rollup_address _sc_rollup_node _filename ->
         let send msg =
           let* () =
-            Client.send_sc_rollup_message
+            Client.Sc_rollup.send_message
               ~src:"bootstrap1"
               ~dst:sc_rollup_address
               ~msg
