@@ -26,4 +26,4 @@
 (** [all ()] is the list of commands recognized by the smart-contract
    rollup client. These commands may depend on the client
    configuration. *)
-val all : unit -> Configuration.t Clic.command list
+val all : unit -> Configuration.sc_client_context Clic.command list

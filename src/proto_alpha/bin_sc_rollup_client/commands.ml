@@ -32,9 +32,8 @@ let get_sc_rollup_addresses_command () =
       "Retrieve the smart-contract rollup address the node is interacting with."
     no_options
     (fixed ["get"; "sc"; "rollup"; "address"])
-    (fun () configuration ->
-      RPC.get_sc_rollup_addresses_command configuration >>=? fun addr ->
-      Format.printf "@[%a@]" Sc_rollup.Address.pp addr ;
-      return ())
+    (fun () (cctxt : #Configuration.sc_client_context) ->
+      RPC.get_sc_rollup_addresses_command cctxt >>=? fun addr ->
+      cctxt#message "@[%a@]" Sc_rollup.Address.pp addr >>= fun () -> return_unit)
 
 let all () = [get_sc_rollup_addresses_command ()]
