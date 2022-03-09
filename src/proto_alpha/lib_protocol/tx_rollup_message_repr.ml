@@ -112,7 +112,7 @@ let size = function
       let amount_size = 8 in
       sender_size + destination_size + key_hash_size + amount_size
 
-let hash_size = 32
+let hash_size = Tx_rollup_prefixes.message_hash.hash_size
 
 module Message_hash =
   Blake2B.Make
@@ -122,12 +122,14 @@ module Message_hash =
 
       let title = "The hash of a transaction rollup inbox’s message"
 
-      let b58check_prefix = "\002\085" (* M(51) *)
+      let b58check_prefix = Tx_rollup_prefixes.message_hash.b58check_prefix
 
       let size = Some hash_size
     end)
 
-let () = Base58.check_encoded_prefix Message_hash.b58check_encoding "M" 51
+let () =
+  Tx_rollup_prefixes.(
+    check_encoding message_hash Message_hash.b58check_encoding)
 
 type hash = Message_hash.t
 

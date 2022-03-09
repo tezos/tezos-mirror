@@ -28,11 +28,11 @@ This sequence of operations was run:
 
 
 ./tezos-client rpc get '/chains/main/blocks/head/context/tx_rollup/[TX_ROLLUP_HASH]/inbox/0'
-{ "contents": [ "M22FciVGoiULYX21PdQPj9Jv5a9rEZeEjRLw4Mi9YTzyENMQdk1" ],
+{ "contents": [ "[TX_ROLLUP_MESSAGE_HASH]" ],
   "cumulated_size": 4,
-  "hash": "i3RQpwA1RgvBitqJGtQkzpNd16N52GSX63WuBh49r2ZkFziPoq5" }
+  "hash": "[TX_ROLLUP_INBOX_HASH]" }
 
-./tezos-client --wait none submit tx rollup commitment 0 i3RQpwA1RgvBitqJGtQkzpNd16N52GSX63WuBh49r2ZkFziPoq5  726f6f74 to '[TX_ROLLUP_HASH]' from '[PUBLIC_KEY_HASH]'
+./tezos-client --wait none submit tx rollup commitment 0 '[TX_ROLLUP_INBOX_HASH]'  726f6f74 to '[TX_ROLLUP_HASH]' from '[PUBLIC_KEY_HASH]'
 Node is bootstrapped.
 Estimated gas: 3280.860 units (will add 100 for safety)
 Estimated storage: no bytes added
@@ -52,7 +52,7 @@ This sequence of operations was run:
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000632
       payload fees(the block proposer) ....... +ꜩ0.000632
-    Tx rollup commitment:[TX_ROLLUP_HASH], commitment 0 : batches = 726f6f74 predecessor  for inbox i3RQpwA1RgvBitqJGtQkzpNd16N52GSX63WuBh49r2ZkFziPoq5
+    Tx rollup commitment:[TX_ROLLUP_HASH], commitment 0 : batches = 726f6f74 predecessor  for inbox [TX_ROLLUP_INBOX_HASH]
       From: [PUBLIC_KEY_HASH]
       This tx rollup commit operation was successfully applied
       Balance updates:

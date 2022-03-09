@@ -40,10 +40,8 @@ let () =
     (function Invalid_rollup_notation loc -> Some loc | _ -> None)
     (fun loc -> Invalid_rollup_notation loc)
 
-let hash_size = 20
-
 module Hash = struct
-  let rollup_hash = "\001\127\181\221" (* tru1(37) *)
+  let rollup_hash = Tx_rollup_prefixes.rollup_address.b58check_prefix
 
   module H =
     Blake2B.Make
@@ -55,12 +53,12 @@ module Hash = struct
 
         let b58check_prefix = rollup_hash
 
-        let size = Some hash_size
+        let size = Some Tx_rollup_prefixes.rollup_address.hash_size
       end)
 
   include H
 
-  let () = Base58.check_encoded_prefix b58check_encoding "tru1" 37
+  let () = Tx_rollup_prefixes.(check_encoding rollup_address b58check_encoding)
 
   include Path_encoding.Make_hex (H)
 end
@@ -79,7 +77,8 @@ include Compare_impl
 
 let in_memory_size _ =
   let open Cache_memory_helpers in
-  header_size +! word_size +! string_size_gen hash_size
+  header_size +! word_size
+  +! string_size_gen Tx_rollup_prefixes.rollup_address.hash_size
 
 let to_b58check rollup = Hash.to_b58check rollup
 

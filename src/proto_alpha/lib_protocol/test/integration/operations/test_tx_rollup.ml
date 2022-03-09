@@ -405,7 +405,7 @@ let test_add_batch () =
   let length = List.length contents in
   let expected_hash =
     Tx_rollup_inbox.hash_of_b58check_exn
-      "i3smFXyzYSSsi14AwTBJ9xqV2CvYajp6cUzPFRshWeLoUB942Kw"
+      "txi369dxdaFA9LzUXUcY4MHafPDizuLnrHXuQzRXQyrPGFdMu3Eq3"
   in
   Alcotest.(check int "Expect an inbox with a single item" 1 length) ;
   Alcotest.(check int "Expect cumulated size" contents_size cumulated_size) ;
@@ -675,7 +675,7 @@ let test_valid_deposit_inexistant_rollup () =
   >>=? fun (contract, b) ->
   Incremental.begin_construction b >>=? fun i ->
   let parameters =
-    print_deposit_arg (`Raw "tru1HdK6HiR31Xo1bSAr4mwwCek8ExgwuUeHm") (`Hash pkh)
+    print_deposit_arg (`Raw "txr1UTQm2gtoVJNvJRGfwora8GmM7D5dnEcdb") (`Hash pkh)
   in
   let fee = Test_tez.of_int 10 in
   Op.transaction ~fee (I i) account contract Tez.zero ~parameters >>=? fun op ->
