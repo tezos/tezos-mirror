@@ -1569,13 +1569,14 @@ let apply_external_manager_operation_content :
         else return (ctxt, []) )
       >>=? fun (ctxt, balance_updates) ->
       Tx_rollup_commitment.add_commitment ctxt tx_rollup state source commitment
-      >>=? fun (ctxt, state) ->
+      >>=? fun (ctxt, state, paid_storage_size_diff) ->
       Tx_rollup_state.update ctxt tx_rollup state >>=? fun ctxt ->
       let result =
         Tx_rollup_commit_result
           {
             consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
             balance_updates;
+            paid_storage_size_diff;
           }
       in
       return (ctxt, result, [])
@@ -1601,7 +1602,7 @@ let apply_external_manager_operation_content :
   | Tx_rollup_finalize_commitment {tx_rollup} ->
       Tx_rollup_state.get ctxt tx_rollup >>=? fun (ctxt, state) ->
       Tx_rollup_commitment.finalize_commitment ctxt tx_rollup state
-      >>=? fun (ctxt, state, level) ->
+      >>=? fun (ctxt, state, level, paid_storage_size_diff) ->
       Tx_rollup_state.update ctxt tx_rollup state >>=? fun ctxt ->
       let result =
         Tx_rollup_finalize_commitment_result
@@ -1609,6 +1610,7 @@ let apply_external_manager_operation_content :
             consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
             balance_updates = [];
             level;
+            paid_storage_size_diff;
           }
       in
       return (ctxt, result, [])

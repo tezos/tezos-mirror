@@ -214,6 +214,7 @@ and _ successful_manager_operation_result =
   | Tx_rollup_commit_result : {
       balance_updates : Receipt.balance_updates;
       consumed_gas : Gas.Arith.fp;
+      paid_storage_size_diff : Z.t;
     }
       -> Kind.tx_rollup_commit successful_manager_operation_result
   | Tx_rollup_return_bond_result : {
@@ -225,6 +226,7 @@ and _ successful_manager_operation_result =
       balance_updates : Receipt.balance_updates;
       consumed_gas : Gas.Arith.fp;
       level : Tx_rollup_level.t;
+      paid_storage_size_diff : Z.t;
     }
       -> Kind.tx_rollup_finalize_commitment successful_manager_operation_result
   | Tx_rollup_remove_commitment_result : {

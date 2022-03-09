@@ -1818,7 +1818,7 @@ module Tx_rollup_commitment : sig
     Tx_rollup_state.t ->
     Signature.public_key_hash ->
     t ->
-    (context * Tx_rollup_state.t) tzresult Lwt.t
+    (context * Tx_rollup_state.t * Z.t) tzresult Lwt.t
 
   val check_commitment_level :
     Raw_level.t -> Tx_rollup_state.t -> t -> unit tzresult
@@ -1871,7 +1871,7 @@ module Tx_rollup_commitment : sig
     context ->
     Tx_rollup.t ->
     Tx_rollup_state.t ->
-    (context * Tx_rollup_state.t * Tx_rollup_level.t) tzresult Lwt.t
+    (context * Tx_rollup_state.t * Tx_rollup_level.t * Z.t) tzresult Lwt.t
 
   val remove_commitment :
     context ->
