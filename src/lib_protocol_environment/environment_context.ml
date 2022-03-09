@@ -268,7 +268,11 @@ module Context = struct
 
     let clear ?depth (Tree {ops = (module Ops); tree; _}) =
       Ops.Tree.clear ?depth tree
+
+    let config (Tree {ops = (module Ops); tree; _}) = Ops.Tree.config tree
   end
+
+  let config (Context {ops = (module Ops); ctxt; _}) = Ops.config ctxt
 
   (* Proof *)
   module Proof = Tezos_context_sigs.Context.Proof_types
@@ -378,6 +382,8 @@ module Context = struct
           Lwt.return (Proof_context.project tree, r))
     in
     return (Proof_context.inject tree, r)
+
+  let equal_config = Tezos_context_sigs.Config.equal
 
   type cache_key = Environment_cache.key
 

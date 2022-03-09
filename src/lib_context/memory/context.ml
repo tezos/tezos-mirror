@@ -43,13 +43,14 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
   end
 
   module Tree = struct
-    include Tezos_context_helpers.Context.Make_tree (Store)
+    include Tezos_context_helpers.Context.Make_tree (Conf) (Store)
 
     let shallow repo key = Store.Tree.shallow repo (Kinded_key.to_irmin_key key)
   end
 
   include Tree
   include Tezos_context_helpers.Context.Make_proof (Store) (Conf)
+  include Tezos_context_helpers.Context.Make_config (Conf)
 
   let produce_tree_proof t key =
     produce_tree_proof
