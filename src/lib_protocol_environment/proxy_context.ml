@@ -226,8 +226,33 @@ module C = struct
 
   let length t k =
     let open Lwt_syntax in
-    let* t = data_tree t in
-    Local.Tree.length t.tree k
+    let local_raw_length () =
+      let* t = data_tree t in
+      Local.Tree.length t.tree k
+    in
+    match t.proxy with
+    | None -> local_raw_length ()
+    | Some (module ProxyDelegation) -> (
+        let* tree = ProxyDelegation.proxy_get k in
+        match tree with
+        | Ok v -> (
+            match v with
+            | Some tree ->
+                (* [tree] is the value at [k], so we need to pass [] as the key
+                   in the call to [length]: *)
+                Local.Tree.length tree []
+            | None -> local_raw_length ())
+        | Error err ->
+            (* We are in trouble here. The delegate failed; but we can't
+               forward the error to the caller, because this function is
+               [Lwt.t], but not in [tzresult Lwt.t]. To keep track of the error,
+               we log it and are left with deciding what to return. We could call
+               [length] on the local tree ([local_raw_length]) but it doesn't make
+               much sense, because in production this tree is almost
+               completely empty. That is why we return the default value, i.e. zero.
+               It's not a perfect choice, but we prefer that than failing. *)
+            let+ () = L.(S.emit delegation_error ("get", err)) in
+            0)
 
   let fold ?depth (t : t) root ~order ~init ~f =
     let open Lwt_syntax in
