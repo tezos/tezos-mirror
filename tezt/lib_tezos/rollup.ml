@@ -27,6 +27,7 @@ module Tx_rollup = struct
   type state = {
     oldest_inbox_level : int option;
     head_level : (int * int) option;
+    commitment_head_level : (int * string) option;
     burn_per_byte : int;
     inbox_ema : int;
   }
@@ -40,15 +41,27 @@ module Tx_rollup = struct
       in
       let head_level =
         JSON.(
-          json |-> "head_level" |> as_opt
-          |> Option.map @@ fun x ->
-             as_list x |> function
-             | [x; y] -> (as_int x, as_int y)
-             | _ -> raise (Invalid_argument "Rollup.get_state.parse"))
+          match json |-> "head_level" |> as_opt with
+          | None -> None
+          | Some json ->
+              Some (json |-> "level" |> as_int, json |-> "tezos_level" |> as_int))
+      in
+      let commitment_head_level =
+        JSON.(
+          match json |-> "commitment_head_level" |> as_opt with
+          | None -> None
+          | Some json ->
+              Some (json |-> "level" |> as_int, json |-> "hash" |> as_string))
       in
       let burn_per_byte = JSON.(json |-> "burn_per_byte" |> as_int) in
       let inbox_ema = JSON.(json |-> "inbox_ema" |> as_int) in
-      {oldest_inbox_level; head_level; burn_per_byte; inbox_ema}
+      {
+        oldest_inbox_level;
+        commitment_head_level;
+        head_level;
+        burn_per_byte;
+        inbox_ema;
+      }
     in
     let runnable = RPC.Tx_rollup.get_state ?hooks ~rollup client in
     Process.runnable_map parse runnable
@@ -80,9 +93,24 @@ module Tx_rollup = struct
     let state : state Check.typ =
       let open Check in
       convert
-        (fun {head_level; oldest_inbox_level; burn_per_byte; inbox_ema} ->
-          (head_level, oldest_inbox_level, burn_per_byte, inbox_ema))
-        (tuple4 (option (tuple2 int int)) (option int) int int)
+        (fun {
+               head_level;
+               commitment_head_level;
+               oldest_inbox_level;
+               burn_per_byte;
+               inbox_ema;
+             } ->
+          ( head_level,
+            commitment_head_level,
+            oldest_inbox_level,
+            burn_per_byte,
+            inbox_ema ))
+        (tuple5
+           (option (tuple2 int int))
+           (option (tuple2 int string))
+           (option int)
+           int
+           int)
 
     let inbox : inbox Check.typ =
       let open Check in

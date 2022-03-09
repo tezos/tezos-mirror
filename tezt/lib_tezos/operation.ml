@@ -44,6 +44,13 @@ type manager_op_kind =
     }
   | Reveal of string (* public key *)
   | Origination of {code : micheline; storage : micheline; balance : int}
+  | Rejection of {
+      proof : bool;
+      tx_rollup : string;
+      level : int;
+      message : [`Batch of string];
+      message_position : int;
+    }
 
 (* This is the manager operations' content type *)
 type manager_operation_content = {
@@ -121,6 +128,12 @@ let mk_reveal ~source ?counter ?(fee = 1_000) ?(gas_limit = 1040)
   mk_manager_op ~source ?counter ~fee ~gas_limit ~storage_limit client
   @@ Reveal source.Account.public_key
 
+let mk_rejection ~source ?counter ?(fee = 1_000_000) ?(gas_limit = 1_000_000)
+    ?(storage_limit = 0) ~tx_rollup ~proof ~level ~message ~message_position
+    client =
+  mk_manager_op ~source ?counter ~fee ~gas_limit ~storage_limit client
+  @@ Rejection {tx_rollup; proof; level; message; message_position}
+
 let mk_origination ~source ?counter ?(fee = 1_000_000) ?(gas_limit = 100_000)
     ?(storage_limit = 10_000) ~code ~init_storage ?(init_balance = 0) client =
   mk_manager_op ~source ?counter ~fee ~gas_limit ~storage_limit client
@@ -131,7 +144,9 @@ let manager_op_content_to_json_string
     {op_kind; fee; gas_limit; storage_limit; source; counter} client =
   let jz_string_of_int n = Ezjsonm.string @@ string_of_int n in
   let mk_jsonm ?(amount = `Null) ?(destination = `Null) ?(parameter = `Null)
-      ?(public_key = `Null) ?(balance = `Null) ?(script = `Null) kind =
+      ?(public_key = `Null) ?(balance = `Null) ?(script = `Null)
+      ?(proof = `Null) ?(rollup = `Null) ?(message = `Null)
+      ?(message_position = `Null) ?(level = `Null) kind =
     let filter = List.filter (fun (_k, v) -> v <> `Null) in
     return
     @@ `O
@@ -153,6 +168,11 @@ let manager_op_content_to_json_string
               (* Smart Contract origination *)
               ("balance", balance);
               ("script", script);
+              ("proof", proof);
+              ("rollup", rollup);
+              ("message", message);
+              ("message_position", message_position);
+              ("level", level);
             ])
   in
   match op_kind with
@@ -177,6 +197,21 @@ let manager_op_content_to_json_string
       let* storage = data_to_json client storage in
       let script : Ezjsonm.value = `O [("code", code); ("storage", storage)] in
       mk_jsonm ~balance:(jz_string_of_int balance) ~script "origination"
+  | Rejection {proof; tx_rollup; level; message; message_position} ->
+      let rollup = `String tx_rollup in
+      let proof = `Bool proof in
+      let level = `Float (float_of_int level) in
+      let message =
+        match message with `Batch str -> `O [("batch", `String str)]
+      in
+      let message_position = `String (string_of_int message_position) in
+      mk_jsonm
+        ~rollup
+        ~proof
+        ~level
+        ~message
+        ~message_position
+        "tx_rollup_rejection"
 
 (* construct a JSON operations with contents and branch *)
 let manager_op_to_json_string ~branch operations_json =
@@ -297,6 +332,33 @@ let inject_transfer ?protocol ?async ?force ?wait_for_injection ?branch ~source
       ?storage_limit
       ~dest
       ?amount
+      client
+  in
+  forge_and_inject_operation
+    ?protocol
+    ?async
+    ?force
+    ?wait_for_injection
+    ?branch
+    ~batch:[op]
+    ~signer
+    client
+
+let inject_rejection ?protocol ?async ?force ?wait_for_injection ?branch ~source
+    ?(signer = source) ?counter ?fee ?gas_limit ?storage_limit ~tx_rollup ~proof
+    ~level ~message ~message_position client =
+  let* op =
+    mk_rejection
+      ~source
+      ?counter
+      ?fee
+      ?gas_limit
+      ?storage_limit
+      ~tx_rollup
+      ~proof
+      ~level
+      ~message
+      ~message_position
       client
   in
   forge_and_inject_operation

@@ -2250,9 +2250,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 ]
                               },
                               "message_position": {
-                                "type": "integer",
-                                "minimum": -1073741824,
-                                "maximum": 1073741823
+                                "$ref": "#/definitions/positive_bignum"
                               },
                               "proof": {
                                 "type": "boolean"
@@ -6032,13 +6030,11 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 {
                                   "name": "message_position",
                                   "layout": {
-                                    "min": -1073741824,
-                                    "max": 1073741823,
-                                    "kind": "RangedInt"
+                                    "name": "N.t",
+                                    "kind": "Ref"
                                   },
                                   "data_kind": {
-                                    "size": 4,
-                                    "kind": "Float"
+                                    "kind": "Dynamic"
                                   },
                                   "kind": "named"
                                 },
@@ -8675,9 +8671,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 ]
                               },
                               "message_position": {
-                                "type": "integer",
-                                "minimum": -1073741824,
-                                "maximum": 1073741823
+                                "$ref": "#/definitions/positive_bignum"
                               },
                               "proof": {
                                 "type": "boolean"

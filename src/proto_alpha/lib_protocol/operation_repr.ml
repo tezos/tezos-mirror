@@ -697,7 +697,7 @@ module Encoding = struct
               (req "rollup" Tx_rollup_repr.encoding)
               (req "level" Tx_rollup_level_repr.encoding)
               (req "message" Tx_rollup_message_repr.encoding)
-              (req "message_position" int31)
+              (req "message_position" n)
               (req "proof" bool);
           select =
             (function
@@ -706,11 +706,17 @@ module Encoding = struct
             (function
             | Tx_rollup_rejection
                 {tx_rollup; level; message; message_position; proof} ->
-                (tx_rollup, level, message, message_position, proof));
+                (tx_rollup, level, message, Z.of_int message_position, proof));
           inj =
             (fun (tx_rollup, level, message, message_position, proof) ->
               Tx_rollup_rejection
-                {tx_rollup; level; message; message_position; proof});
+                {
+                  tx_rollup;
+                  level;
+                  message;
+                  message_position = Z.to_int message_position;
+                  proof;
+                });
         }
 
     let[@coq_axiom_with_reason "gadt"] sc_rollup_originate_case =

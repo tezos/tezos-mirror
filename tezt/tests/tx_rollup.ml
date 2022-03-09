@@ -528,6 +528,7 @@ let test_submit_batches_in_several_blocks =
       {
         oldest_inbox_level = None;
         head_level = None;
+        commitment_head_level = None;
         burn_per_byte = 0;
         inbox_ema = 0;
       }
@@ -780,9 +781,70 @@ let test_rollup_last_commitment_is_rejected =
   let* _ = RPC.get_block client in
   unit
 
+let test_rollup_wrong_rejection =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"wrong rejection"
+    ~tags:["tx_rollup"; "rejection"; "batch"]
+  @@ fun protocol ->
+  let parameters = Parameters.{finality_period = 1; withdraw_period = 1} in
+  let* ({rollup; client; node = _} as state) =
+    init_with_tx_rollup ~parameters ~protocol ()
+  in
+  let batch = "blob" in
+  let* () = submit_batch ~batch state in
+  let* () = Client.bake_for client in
+  let*! inbox = Rollup.get_inbox ~hooks ~rollup ~level:0 client in
+  let* () =
+    submit_commitment
+      ~level:0
+      ~roots:["root"]
+      ~inbox_hash:inbox.hash
+      ~predecessor:None
+      state
+  in
+  let* () =
+    repeat parameters.finality_period (fun () -> Client.bake_for client)
+  in
+  (* This is the encoding of [batch]. *)
+  let message = `Batch batch in
+  let* (`OpHash _op) =
+    Operation.inject_rejection
+      ~source:Constant.bootstrap1
+      ~tx_rollup:state.rollup
+      ~proof:false
+      ~level:0
+      ~message
+      ~message_position:0
+      state.client
+  in
+  let* () = Client.bake_for client in
+  let*! state = Rollup.get_state ~rollup client in
+  let* json = RPC.get_block client in
+  let operation_result =
+    JSON.(
+      json |-> "operations" |=> 3 |=> 0 |-> "contents" |=> 0 |-> "metadata"
+      |-> "operation_result")
+  in
+  let status = JSON.(operation_result |-> "status" |> as_string) in
+  Check.(status = "failed")
+    Check.string
+    ~error_msg:"Expected status: %R. Got %L" ;
+  let error_id =
+    JSON.(operation_result |-> "errors" |=> 0 |-> "id" |> as_string)
+  in
+  Check.(error_id = "proto.alpha.tx_rollup_invalid_proof")
+    Check.string
+    ~error_msg:"Expected error id: %R. Got %L" ;
+  match state.commitment_head_level with
+  | Some (0, _) -> unit
+  | None | Some _ ->
+      Test.fail "Wrong rollup state: Expected commitment head at level 0"
+
 let register ~protocols =
   Regressions.register protocols ;
   test_submit_batches_in_several_blocks protocols ;
   test_submit_from_originated_source protocols ;
   test_rollup_with_two_commitments protocols ;
-  test_rollup_last_commitment_is_rejected protocols
+  test_rollup_last_commitment_is_rejected protocols ;
+  test_rollup_wrong_rejection protocols
