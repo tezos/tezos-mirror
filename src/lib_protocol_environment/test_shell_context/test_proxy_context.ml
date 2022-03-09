@@ -132,18 +132,21 @@ let test_context_find_tree_fct (proxy : Context.t) : unit Lwt.t =
 
 let test_context_list_fct (proxy : Context.t) : unit Lwt.t =
   let open Lwt_syntax in
-  let assert_list key fct =
-    let* res = Context.list proxy key in
-    Assert.equal_bool ~msg:("Context.list " ^ key_to_string key) true (fct res) ;
-    Lwt.return_unit
+  let assert_list key expected_keys =
+    let+ res = Context.list proxy key in
+    Assert.equal_string_list
+      ~msg:
+        (Printf.sprintf
+           "Context.list [%s], got [%s]"
+           (key_to_string key)
+           (String.concat ", " (List.map fst res)))
+      (List.map fst res)
+      expected_keys
   in
-  let* () = assert_list ["version"] (( = ) []) in
-  let* () = assert_list ["a"; "b"] (( = ) []) in
-  let* () = assert_list ["a"; "x"] (( = ) []) in
-  let* () =
-    assert_list ["a"] (fun res -> List.map (fun (i, _) -> i) res = ["b"; "c"])
-  in
-  Lwt.return_unit
+  let* () = assert_list ["version"] [] in
+  let* () = assert_list ["a"; "b"] [] in
+  let* () = assert_list ["a"; "x"] [] in
+  assert_list ["a"] ["b"; "c"]
 
 (******************************************************************************)
 
