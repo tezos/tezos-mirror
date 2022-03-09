@@ -89,6 +89,8 @@ module Kind = struct
 
   type sc_rollup_add_messages = Sc_rollup_add_messages_kind
 
+  type sc_rollup_cement = Sc_rollup_cement_kind
+
   type 'a manager =
     | Reveal_manager_kind : reveal manager
     | Transaction_manager_kind : transaction manager
@@ -107,6 +109,7 @@ module Kind = struct
     | Tx_rollup_rejection_manager_kind : tx_rollup_rejection manager
     | Sc_rollup_originate_manager_kind : sc_rollup_originate manager
     | Sc_rollup_add_messages_manager_kind : sc_rollup_add_messages manager
+    | Sc_rollup_cement_manager_kind : sc_rollup_cement manager
 end
 
 type 'a consensus_operation_type =
@@ -326,6 +329,11 @@ and _ manager_operation =
       messages : string list;
     }
       -> Kind.sc_rollup_add_messages manager_operation
+  | Sc_rollup_cement : {
+      rollup : Sc_rollup_repr.t;
+      commitment : Sc_rollup_repr.Commitment_hash.t;
+    }
+      -> Kind.sc_rollup_cement manager_operation
 
 and counter = Z.t
 
@@ -348,6 +356,7 @@ let manager_kind : type kind. kind manager_operation -> kind Kind.manager =
   | Tx_rollup_rejection _ -> Kind.Tx_rollup_rejection_manager_kind
   | Sc_rollup_originate _ -> Kind.Sc_rollup_originate_manager_kind
   | Sc_rollup_add_messages _ -> Kind.Sc_rollup_add_messages_manager_kind
+  | Sc_rollup_cement _ -> Kind.Sc_rollup_cement_manager_kind
 
 type 'kind internal_operation = {
   source : Contract_repr.contract;
@@ -430,6 +439,8 @@ let sc_rollup_operation_tag_offset = 200
 let sc_rollup_operation_origination_tag = sc_rollup_operation_tag_offset + 0
 
 let sc_rollup_operation_add_message_tag = sc_rollup_operation_tag_offset + 1
+
+let sc_rollup_operation_cement_tag = sc_rollup_operation_tag_offset + 2
 
 module Encoding = struct
   open Data_encoding
@@ -741,6 +752,25 @@ module Encoding = struct
               Sc_rollup_add_messages {rollup; messages});
         }
 
+    let[@coq_axiom_with_reason "gadt"] sc_rollup_cement_case =
+      MCase
+        {
+          tag = sc_rollup_operation_cement_tag;
+          name = "sc_rollup_cement";
+          encoding =
+            obj2
+              (req "rollup" Sc_rollup_repr.encoding)
+              (req "commitment" Sc_rollup_repr.Commitment_hash.encoding);
+          select =
+            (function
+            | Manager (Sc_rollup_cement _ as op) -> Some op | _ -> None);
+          proj =
+            (function
+            | Sc_rollup_cement {rollup; commitment} -> (rollup, commitment));
+          inj =
+            (fun (rollup, commitment) -> Sc_rollup_cement {rollup; commitment});
+        }
+
     let encoding =
       let make (MCase {tag; name; encoding; select; proj; inj}) =
         case
@@ -769,6 +799,7 @@ module Encoding = struct
           make tx_rollup_rejection_case;
           make sc_rollup_originate_case;
           make sc_rollup_add_messages_case;
+          make sc_rollup_cement_case;
         ]
   end
 
@@ -1110,6 +1141,11 @@ module Encoding = struct
       sc_rollup_operation_add_message_tag
       Manager_operations.sc_rollup_add_messages_case
 
+  let sc_rollup_cement_case =
+    make_manager_case
+      sc_rollup_operation_cement_tag
+      Manager_operations.sc_rollup_cement_case
+
   let contents_encoding =
     let make (Case {tag; name; encoding; select; proj; inj}) =
       case
@@ -1147,6 +1183,7 @@ module Encoding = struct
            make tx_rollup_rejection_case;
            make sc_rollup_originate_case;
            make sc_rollup_add_messages_case;
+           make sc_rollup_cement_case;
          ]
 
   let contents_list_encoding =
@@ -1365,6 +1402,8 @@ let equal_manager_operation_kind :
   | (Sc_rollup_originate _, _) -> None
   | (Sc_rollup_add_messages _, Sc_rollup_add_messages _) -> Some Eq
   | (Sc_rollup_add_messages _, _) -> None
+  | (Sc_rollup_cement _, Sc_rollup_cement _) -> Some Eq
+  | (Sc_rollup_cement _, _) -> None
 
 let equal_contents_kind : type a b. a contents -> b contents -> (a, b) eq option
     =
@@ -1458,6 +1497,7 @@ let internal_manager_operation_size (type a) (op : a manager_operation) =
              pkh_opt )
   | Sc_rollup_originate _ -> (Nodes.zero, h2w)
   | Sc_rollup_add_messages _ -> (Nodes.zero, h2w)
+  | Sc_rollup_cement _ -> (Nodes.zero, h2w)
   | Reveal _ ->
       (* Reveals can't occur as internal operations *)
       assert false

@@ -222,6 +222,10 @@ and _ successful_manager_operation_result =
       inbox_after : Sc_rollup.Inbox.t;
     }
       -> Kind.sc_rollup_add_messages successful_manager_operation_result
+  | Sc_rollup_cement_result : {
+      consumed_gas : Gas.Arith.fp;
+    }
+      -> Kind.sc_rollup_cement successful_manager_operation_result
 
 and packed_successful_manager_operation_result =
   | Successful_manager_result :

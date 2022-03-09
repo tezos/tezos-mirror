@@ -705,7 +705,7 @@ let bake_n_with_all_balance_updates ?(baking_mode = Application) ?policy
               | Tx_rollup_finalize_commitment_result _
               | Tx_rollup_remove_commitment_result _
               | Tx_rollup_rejection_result _ | Sc_rollup_originate_result _
-              | Sc_rollup_add_messages_result _ ->
+              | Sc_rollup_add_messages_result _ | Sc_rollup_cement_result _ ->
                   balance_updates_rev
               | Transaction_result
                   (Transaction_to_contract_result {balance_updates; _})
@@ -744,7 +744,8 @@ let bake_n_with_origination_results ?(baking_mode = Application) ?policy n b =
             | Successful_manager_result (Tx_rollup_remove_commitment_result _)
             | Successful_manager_result (Tx_rollup_rejection_result _)
             | Successful_manager_result (Sc_rollup_originate_result _)
-            | Successful_manager_result (Sc_rollup_add_messages_result _) ->
+            | Successful_manager_result (Sc_rollup_add_messages_result _)
+            | Successful_manager_result (Sc_rollup_cement_result _) ->
                 origination_results_rev
             | Successful_manager_result (Origination_result x) ->
                 Origination_result x :: origination_results_rev)

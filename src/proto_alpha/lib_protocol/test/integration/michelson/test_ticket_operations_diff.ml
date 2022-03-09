@@ -288,6 +288,12 @@ let sc_rollup_add_message ~src =
       nonce = 1;
     }
 
+let sc_rollup_cement ~src =
+  let rollup = Sc_rollup.Address.hash_string ["Dummy"] in
+  let commitment = Sc_rollup.Commitment_hash.hash_string ["Dummy"] in
+  Internal_operation
+    {source = src; operation = Sc_rollup_cement {rollup; commitment}; nonce = 1}
+
 let tx_rollup_originate_operation ~src =
   Internal_operation
     {source = src; operation = Tx_rollup_origination; nonce = 1}
@@ -360,6 +366,7 @@ let test_non_ticket_operations () =
       set_deposits_limit_operation ~src;
       tx_rollup_originate_operation ~src;
       sc_rollup_add_message ~src;
+      sc_rollup_cement ~src;
       sc_rollup_origination_operation ~src;
     ]
   in

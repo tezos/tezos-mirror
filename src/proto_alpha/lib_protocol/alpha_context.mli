@@ -2495,6 +2495,8 @@ module Kind : sig
 
   type sc_rollup_add_messages = Sc_rollup_add_messages_kind
 
+  type sc_rollup_cement = Sc_rollup_cement_kind
+
   type 'a manager =
     | Reveal_manager_kind : reveal manager
     | Transaction_manager_kind : transaction manager
@@ -2513,6 +2515,7 @@ module Kind : sig
     | Tx_rollup_rejection_manager_kind : tx_rollup_rejection manager
     | Sc_rollup_originate_manager_kind : sc_rollup_originate manager
     | Sc_rollup_add_messages_manager_kind : sc_rollup_add_messages manager
+    | Sc_rollup_cement_manager_kind : sc_rollup_cement manager
 end
 
 type 'a consensus_operation_type =
@@ -2672,6 +2675,11 @@ and _ manager_operation =
       messages : string list;
     }
       -> Kind.sc_rollup_add_messages manager_operation
+  | Sc_rollup_cement : {
+      rollup : Sc_rollup.t;
+      commitment : Sc_rollup.Commitment_hash.t;
+    }
+      -> Kind.sc_rollup_cement manager_operation
 
 and counter = Z.t
 
@@ -2838,6 +2846,8 @@ module Operation : sig
     val sc_rollup_add_messages_case :
       Kind.sc_rollup_add_messages Kind.manager case
 
+    val sc_rollup_cement_case : Kind.sc_rollup_cement Kind.manager case
+
     module Manager_operations : sig
       type 'b case =
         | MCase : {
@@ -2881,6 +2891,8 @@ module Operation : sig
       val sc_rollup_originate_case : Kind.sc_rollup_originate case
 
       val sc_rollup_add_messages_case : Kind.sc_rollup_add_messages case
+
+      val sc_rollup_cement_case : Kind.sc_rollup_cement case
     end
   end
 
