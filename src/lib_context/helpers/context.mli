@@ -67,7 +67,7 @@ end
 
 module Proof_encoding = Merkle_proof_encoding
 
-module Make_proof (DB : DB) : sig
+module Make_proof (DB : DB) (Store_conf : Tezos_context_encoding.Context.Conf) : sig
   module Proof : Tezos_context_sigs.Context.PROOF
 
   type kinded_key := [`Value of DB.contents_key | `Node of DB.node_key]
@@ -97,3 +97,11 @@ module Make_proof (DB : DB) : sig
 end
 
 type error += Unsupported_context_hash_version of Context_hash.Version.t
+
+(** See [Tezos_context_sigs.Context.Proof_types.t] *)
+type proof_version_expanded = {is_stream : bool; is_binary : bool}
+
+val decode_proof_version :
+  int -> (proof_version_expanded, [`Invalid_proof_version]) result
+
+val encode_proof_version : is_stream:bool -> is_binary:bool -> int

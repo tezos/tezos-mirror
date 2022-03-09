@@ -199,3 +199,5 @@ module Schema = struct
   module Node = Node
   module Commit = Commit
 end
+
+module type Conf = Irmin_pack.Conf.S

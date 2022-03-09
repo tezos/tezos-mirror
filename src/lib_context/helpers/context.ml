@@ -38,6 +38,22 @@ module Kinded_hash = struct
     | `Node h -> `Node (Hash.to_context_hash h)
 end
 
+type proof_version_expanded = {is_stream : bool; is_binary : bool}
+
+let stream_mask = 0b1
+
+let binary_mask = 0b10
+
+let decode_proof_version v =
+  let extract_bit v mask = (v land mask <> 0, v land lnot mask) in
+  let (is_stream, v) = extract_bit v stream_mask in
+  let (is_binary, v) = extract_bit v binary_mask in
+  if v <> 0 then Error `Invalid_proof_version else Ok {is_stream; is_binary}
+
+let encode_proof_version ~is_stream ~is_binary =
+  (if is_stream then stream_mask else 0)
+  lor if is_binary then binary_mask else 0
+
 module Make_tree (Store : DB) = struct
   include Store.Tree
 
@@ -219,7 +235,10 @@ end
 
 module Proof_encoding = Merkle_proof_encoding
 
-module Make_proof (Store : DB) = struct
+module Make_proof
+    (Store : DB)
+    (Store_conf : Tezos_context_encoding.Context.Conf) =
+struct
   module DB_proof = Store.Tree.Proof
 
   module Proof = struct
@@ -295,11 +314,17 @@ module Make_proof (Store : DB) = struct
       let to_stream : DB_proof.stream -> stream = Seq.map to_stream_elt
     end
 
-    let of_proof f p =
+    let is_binary =
+      if Store_conf.entries = 2 then true
+      else if Store_conf.entries = 32 then false
+      else assert false
+
+    let of_proof ~is_stream f p =
       let before = Kinded_hash.to_context_hash (DB_proof.before p) in
       let after = Kinded_hash.to_context_hash (DB_proof.after p) in
       let state = f (DB_proof.state p) in
-      {version = 0; before; after; state}
+      let version = encode_proof_version ~is_stream ~is_binary in
+      {version; before; after; state}
 
     let to_proof f p =
       let before = Kinded_hash.of_context_hash p.before in
@@ -307,11 +332,11 @@ module Make_proof (Store : DB) = struct
       let state = f p.state in
       DB_proof.v ~before ~after state
 
-    let to_tree = of_proof State.to_tree
+    let to_tree = of_proof ~is_stream:false State.to_tree
 
     let of_tree = to_proof State.of_tree
 
-    let to_stream = of_proof State.to_stream
+    let to_stream = of_proof ~is_stream:true State.to_stream
 
     let of_stream = to_proof State.of_stream
   end

@@ -46,3 +46,5 @@ module Schema :
      and type Branch.t = string
      and module Info = Irmin.Info.Default
      and type Hash.t = Hash.t
+
+module type Conf = Irmin_pack.Conf.S

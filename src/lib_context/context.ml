@@ -306,7 +306,7 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
   type kinded_key = [`Node of Store.node_key | `Value of Store.contents_key]
 
   module Tree = Tezos_context_helpers.Context.Make_tree (Store)
-  include Tezos_context_helpers.Context.Make_proof (Store)
+  include Tezos_context_helpers.Context.Make_proof (Store) (Conf)
 
   let mem ctxt key = Tree.mem ctxt.tree (data_key key)
 

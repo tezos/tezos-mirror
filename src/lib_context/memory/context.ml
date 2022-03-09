@@ -49,7 +49,7 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
   end
 
   include Tree
-  include Tezos_context_helpers.Context.Make_proof (Store)
+  include Tezos_context_helpers.Context.Make_proof (Store) (Conf)
 
   let produce_tree_proof t key =
     produce_tree_proof
