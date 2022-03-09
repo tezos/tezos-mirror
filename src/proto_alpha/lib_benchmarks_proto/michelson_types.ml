@@ -96,8 +96,16 @@ let set k = match set_t (-1) k with Error _ -> assert false | Ok t -> t
 let pair k1 k2 =
   match pair_t (-1) k1 k2 with Error _ -> assert false | Ok t -> t
 
+(* (will become) comparable pair type constructor *)
+let cpair k1 k2 =
+  match pair_t (-1) k1 k2 with Error _ -> assert false | Ok t -> t
+
 (* union type constructor*)
 let union k1 k2 =
+  match union_t (-1) k1 k2 with Error _ -> assert false | Ok t -> t
+
+(* (will become) comparable union type constructor *)
+let cunion k1 k2 =
   match union_t (-1) k1 k2 with Error _ -> assert false | Ok t -> t
 
 let lambda x y =
