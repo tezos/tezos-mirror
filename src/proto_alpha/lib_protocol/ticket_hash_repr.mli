@@ -42,6 +42,16 @@ val encoding : t Data_encoding.t
 
 val pp : Format.formatter -> t -> unit
 
+val to_b58check : t -> string
+
+val of_b58check_opt : string -> t option
+
+val of_b58check_exn : string -> t
+
+val of_bytes_exn : bytes -> t
+
+val of_bytes_opt : bytes -> t option
+
 include Compare.S with type t := t
 
 val of_script_expr_hash : Script_expr_hash.t -> t

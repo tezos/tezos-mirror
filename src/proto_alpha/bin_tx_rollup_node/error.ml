@@ -49,6 +49,22 @@ let () =
       | _ -> None)
     (fun rollup_id -> Tx_rollup_not_originated_in_the_given_block rollup_id)
 
+type error += Tx_rollup_originated_in_fork
+
+let () =
+  register_error_kind
+    ~id:"tx_rollup.node.originated_in_fork"
+    ~title:"transaction rollup was originated in another branch"
+    ~description:"The transaction rollup was originated in another branch."
+    ~pp:(fun ppf () ->
+      Format.fprintf
+        ppf
+        "The transaction rollup was originated in another branch.")
+    `Permanent
+    Data_encoding.(unit)
+    (function Tx_rollup_originated_in_fork -> Some () | _ -> None)
+    (fun () -> Tx_rollup_originated_in_fork)
+
 type error += Tx_rollup_block_predecessor_not_processed of Block_hash.t
 
 let () =
@@ -169,29 +185,146 @@ let () =
       | _ -> None)
     (fun path -> Tx_rollup_unable_to_write_configuration_file path)
 
-type error +=
-  | Tx_rollup_invalid_history_mode of Tezos_shell_services.History_mode.t
+type error += Tx_rollup_invalid_l2_address of Micheline.canonical_location
 
 let () =
   register_error_kind
-    ~id:"tx_rollup.node.invalid_history_mode"
-    ~title:"The Tezos node has an invalid history mode"
-    ~description:"Tezos node should be in 'archive' or 'full' history mode"
-    ~pp:(fun ppf history_mode ->
-      let open Tezos_shell_services.History_mode in
+    ~id:"tx_rollup.node.invalid_l2_address"
+    ~title:"Invalid transaction rollup L2 address"
+    ~description:"Not a valid transaction rollup L2 address"
+    ~pp:(fun ppf loc ->
+      Format.fprintf ppf "Not a valid transaction rollup l2 address at %d" loc)
+    `Permanent
+    Data_encoding.(obj1 (req "loc" int31))
+    (function Tx_rollup_invalid_l2_address loc -> Some loc | _ -> None)
+    (fun loc -> Tx_rollup_invalid_l2_address loc)
+
+type error += Tx_rollup_invalid_ticket_amount of Z.t
+
+let () =
+  register_error_kind
+    ~id:"tx_rollup.node.invalid_ticket_amount"
+    ~title:"Invalid transaction rollup ticket amount"
+    ~description:"Not a valid transaction rollup ticket amount"
+    ~pp:(fun ppf amount ->
       Format.fprintf
         ppf
-        "%a and %a are accepted mode. Not %a"
-        pp
-        Archive
-        pp
-        (Full None)
-        pp
-        history_mode)
+        "Not a valid transaction rollup ticket amount: %a"
+        Z.pp_print
+        amount)
+    `Permanent
+    Data_encoding.(obj1 (req "amount" z))
+    (function
+      | Tx_rollup_invalid_ticket_amount amount -> Some amount | _ -> None)
+    (fun amount -> Tx_rollup_invalid_ticket_amount amount)
+
+type error += Tx_rollup_invalid_deposit
+
+let () =
+  let description = "Not a valid transaction rollup deposit" in
+  register_error_kind
+    ~id:"tx_rollup.node.invalid_deposit"
+    ~title:"Invalid transaction rollup Deposit"
+    ~description
+    ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
+    `Permanent
+    Data_encoding.empty
+    (function Tx_rollup_invalid_deposit -> Some () | _ -> None)
+    (fun () -> Tx_rollup_invalid_deposit)
+
+type error +=
+  | Tx_rollup_cannot_checkout_context of Protocol.Tx_rollup_l2_context_hash.t
+
+let () =
+  register_error_kind
+    ~id:"tx_rollup.node.cannot_checkout_context"
+    ~title:"Cannot checkout the L2 context"
+    ~description:"The rollup node cannot checkout the L2 context."
+    ~pp:(fun ppf ctxt ->
+      Format.fprintf
+        ppf
+        "Cannot checkout L2 context %a"
+        Protocol.Tx_rollup_l2_context_hash.pp
+        ctxt)
     `Permanent
     Data_encoding.(
-      obj1 (req "history_mode" Tezos_shell_services.History_mode.encoding))
+      obj1 (req "context" Protocol.Tx_rollup_l2_context_hash.encoding))
+    (function Tx_rollup_cannot_checkout_context c -> Some c | _ -> None)
+    (fun c -> Tx_rollup_cannot_checkout_context c)
+
+type error +=
+  | Tx_rollup_no_rollup_origination_on_disk_and_no_rollup_genesis_given
+
+let () =
+  let description =
+    "No rollup origination on disk and no rollup genesis provided"
+  in
+  register_error_kind
+    ~id:"tx_rollup.node.no_rollup_origination_and_no_rollup_genesis_given"
+    ~title:"No rollup origination on disk and none provided"
+    ~description
+    ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
+    `Permanent
+    Data_encoding.empty
     (function
-      | Tx_rollup_invalid_history_mode history_mode -> Some history_mode
+      | Tx_rollup_no_rollup_origination_on_disk_and_no_rollup_genesis_given ->
+          Some ()
       | _ -> None)
-    (fun history_mode -> Tx_rollup_invalid_history_mode history_mode)
+    (fun () ->
+      Tx_rollup_no_rollup_origination_on_disk_and_no_rollup_genesis_given)
+
+type error +=
+  | Tx_rollup_different_disk_stored_origination_rollup_and_given_rollup_genesis of {
+      disk_rollup_origination : Block_hash.t;
+      given_rollup_genesis : Block_hash.t;
+    }
+
+let () =
+  register_error_kind
+    ~id:
+      "tx_rollup.node.different_disk_stored_origination_rollup_and_given_rollup_genesis"
+    ~title:"Rollup origination on disk is different from the one provided"
+    ~description:
+      "Rollup origination on disk is different from the provided rollup genesis"
+    ~pp:(fun ppf (disk_rollup, given_rollup) ->
+      Format.fprintf
+        ppf
+        "Rollup origination on disk (%a) is different from the provided rollup \
+         genesis (%a)"
+        Block_hash.pp
+        disk_rollup
+        Block_hash.pp
+        given_rollup)
+    `Permanent
+    Data_encoding.(
+      obj2
+        (req "disk_rollup" Block_hash.encoding)
+        (req "given_rollup" Block_hash.encoding))
+    (function
+      | Tx_rollup_different_disk_stored_origination_rollup_and_given_rollup_genesis
+          {disk_rollup_origination; given_rollup_genesis} ->
+          Some (disk_rollup_origination, given_rollup_genesis)
+      | _ -> None)
+    (fun (disk_rollup_origination, given_rollup_genesis) ->
+      Tx_rollup_different_disk_stored_origination_rollup_and_given_rollup_genesis
+        {disk_rollup_origination; given_rollup_genesis})
+
+type error += Tx_rollup_no_operation_metadata of Operation_hash.t
+
+let () =
+  register_error_kind
+    ~id:"tx_rollup.node.no_operation_metadata"
+    ~title:"Operation receipt unavailable"
+    ~description:"The operation receipt is unavailable."
+    ~pp:(fun ppf op ->
+      Format.fprintf
+        ppf
+        "The operation receipt of %a is unavailable. Please make sure that the \
+         history mode of the Tezos node you are connecting to matches the \
+         requirements."
+        Operation_hash.pp
+        op)
+    `Permanent
+    Data_encoding.(obj1 (req "context" Operation_hash.encoding))
+    (function Tx_rollup_no_operation_metadata o -> Some o | _ -> None)
+    (fun o -> Tx_rollup_no_operation_metadata o)

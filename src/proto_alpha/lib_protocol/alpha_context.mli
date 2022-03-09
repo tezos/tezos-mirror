@@ -2004,6 +2004,16 @@ module Ticket_hash : sig
 
   val of_script_expr_hash : Script_expr_hash.t -> t
 
+  val to_b58check : t -> string
+
+  val of_b58check_opt : string -> t option
+
+  val of_b58check_exn : string -> t
+
+  val of_bytes_exn : bytes -> t
+
+  val of_bytes_opt : bytes -> t option
+
   val equal : t -> t -> bool
 
   val compare : t -> t -> int

@@ -8,22 +8,29 @@
  (name main_tx_rollup_node_alpha)
  (public_name tezos-tx-rollup-node-alpha)
  (instrumentation (backend bisect_ppx))
- ;(public_name tezos-rollup-alpha)
- (libraries tezos-client-base
+ (libraries tezos-base
+            tezos-crypto
+            tezos-client-base
             tezos-client-base-unix
             tezos-client-commands
             tezos-baking-alpha-commands
             tezos-rpc
             tezos-rpc-http
             tezos-rpc-http-server
+            tezos-context.encoding
+            tezos-micheline
             irmin-pack
             irmin-pack.unix
             irmin)
  (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_base
+                   -open Tezos_crypto
                    -open Tezos_protocol_alpha
+                   -open Tezos_protocol_environment_alpha
                    -open Tezos_client_alpha
                    -open Tezos_client_commands
                    -open Tezos_baking_alpha_commands
                    -open Tezos_stdlib_unix
+                   -open Tezos_micheline
                    -open Tezos_client_base
                    -open Tezos_client_base_unix)))

@@ -29,52 +29,186 @@ open Protocol.Apply_results
 open Tezos_shell_services
 open Protocol_client_context
 open Protocol.Alpha_context
+open Error
 
-let messages_to_inbox messages =
-  let cumulated_size =
-    List.fold_left (fun acc x -> acc + String.length x) 0 messages
+(* TODO/TORU: Move application logic in other module *)
+
+let checkout_context (state : State.t) ctxt_hash =
+  let open Lwt_syntax in
+  let+ context = Context.checkout state.context_index ctxt_hash in
+  Option.to_result ~none:[Tx_rollup_cannot_checkout_context ctxt_hash] context
+
+let interp_messages ctxt messages cumulated_size =
+  let open Lwt_syntax in
+  let+ (ctxt, _ctxt_hash, rev_contents) =
+    List.fold_left_s
+      (fun (ctxt, ctxt_hash, acc) message ->
+        let+ apply_res = Apply.apply_message ctxt message in
+        let (ctxt, ctxt_hash, result) =
+          match apply_res with
+          | Ok (ctxt, result) ->
+              (* The message was successfully interpreted but the status in
+                 [result] may indicate that the application failed. The context
+                 may have been modified with e.g. updated counters. *)
+              (ctxt, Context.hash ctxt, Inbox.Interpreted result)
+          | Error err ->
+              (* The message was discarded before attempting to interpret it. The
+                 context is not modified. For instance if a batch is unparsable,
+                 or the BLS signature is incorrect, or a counter is wrong, etc. *)
+              (ctxt, ctxt_hash, Inbox.Discarded err)
+        in
+        let inbox_message = {Inbox.message; result; context_hash = ctxt_hash} in
+        (ctxt, ctxt_hash, inbox_message :: acc))
+      (ctxt, Context.hash ctxt, [])
+      messages
   in
-  let make_batch msg = fst @@ Tx_rollup_message.make_batch msg in
-  let contents = List.map make_batch messages in
-  let hash = Tx_rollup_inbox.hash_inbox contents in
-  Inbox.{contents; cumulated_size; hash}
+  match rev_contents with
+  | [] -> (ctxt, None)
+  | _ ->
+      let contents = List.rev rev_contents in
+      let inbox = Inbox.{contents; cumulated_size} in
+      (ctxt, Some inbox)
 
-let compute_messages block_info rollup_id =
+let parse_tx_rollup_l2_address :
+    Script.node -> Protocol.Tx_rollup_l2_address.Indexable.value tzresult =
+  let open Protocol in
+  let open Micheline in
+  function
+  | Bytes (loc, bytes) (* As unparsed with [Optimized]. *) -> (
+      match Tx_rollup_l2_address.of_bytes_opt bytes with
+      | Some txa -> ok (Tx_rollup_l2_address.Indexable.value txa)
+      | None -> error (Error.Tx_rollup_invalid_l2_address loc))
+  | String (loc, str) (* As unparsed with [Readable]. *) -> (
+      match Tx_rollup_l2_address.of_b58check_opt str with
+      | Some txa -> ok (Tx_rollup_l2_address.Indexable.value txa)
+      | None -> error (Error.Tx_rollup_invalid_l2_address loc))
+  | Int (loc, _) | Prim (loc, _, _, _) | Seq (loc, _) ->
+      error (Error.Tx_rollup_invalid_l2_address loc)
+
+(* TODO/TORU: expose uncarbonated parse_tx_rollup_deposit_parameters in protocol *)
+let parse_tx_rollup_deposit_parameters :
+    Script.expr -> Tx_rollup.deposit_parameters tzresult =
+ fun parameters ->
+  let open Micheline in
+  let open Protocol in
+  (* /!\ This pattern matching needs to remain in sync with the
+     Script_ir_translator.parse_tx_rollup_deposit_parameters. *)
+  match root parameters with
+  | Seq
+      ( _,
+        [
+          Prim
+            ( _,
+              D_Pair,
+              [
+                Prim
+                  ( _,
+                    D_Pair,
+                    [ticketer; Prim (_, D_Pair, [contents; amount], _)],
+                    _ );
+                bls;
+              ],
+              _ );
+          ty;
+        ] ) ->
+      parse_tx_rollup_l2_address bls >>? fun destination ->
+      (match amount with
+      | Int (_, v) when Compare.Z.(Z.zero < v && v <= Z.of_int64 Int64.max_int)
+        ->
+          ok @@ Tx_rollup_l2_qty.of_int64_exn (Z.to_int64 v)
+      | Int (_, invalid_amount) ->
+          error (Error.Tx_rollup_invalid_ticket_amount invalid_amount)
+      | _expr -> error Error.Tx_rollup_invalid_deposit)
+      >|? fun amount -> Tx_rollup.{ticketer; contents; ty; amount; destination}
+  | _expr -> error Error.Tx_rollup_invalid_deposit
+
+let extract_messages_from_block block_info rollup_id =
   let managed_operation =
     List.nth_opt
       block_info.Alpha_block_services.operations
       State.rollup_operation_index
   in
+  let rec get_messages :
+      type kind.
+      source:public_key_hash ->
+      kind manager_operation ->
+      kind manager_operation_result ->
+      packed_internal_operation_result list ->
+      Tx_rollup_message.t list * int ->
+      Tx_rollup_message.t list * int =
+   fun ~source op result internal_operation_results (messages, cumulated_size) ->
+    let message_and_size =
+      match (op, result) with
+      | ( Tx_rollup_submit_batch {tx_rollup; content; burn_limit = _},
+          Applied (Tx_rollup_submit_batch_result _) )
+        when Tx_rollup.equal rollup_id tx_rollup ->
+          (* Batch message *)
+          Some (Tx_rollup_message.make_batch content)
+      | ( Transaction
+            {amount = _; parameters; destination = Tx_rollup dst; entrypoint},
+          Applied
+            (Transaction_result
+              (Transaction_to_tx_rollup_result {ticket_hash; _})) )
+        when Tx_rollup.equal dst rollup_id
+             && Entrypoint.(entrypoint = Tx_rollup.deposit_entrypoint) ->
+          (* Deposit message *)
+          Option.bind (Data_encoding.force_decode parameters)
+          @@ fun parameters ->
+          parse_tx_rollup_deposit_parameters parameters
+          |> Result.to_option
+          |> Option.map @@ fun Tx_rollup.{amount; destination; _} ->
+             Tx_rollup_message.make_deposit
+               source
+               destination
+               ticket_hash
+               amount
+      | (_, _) -> None
+    in
+    let acc =
+      match message_and_size with
+      | None -> (messages, cumulated_size)
+      | Some (msg, size) -> (msg :: messages, cumulated_size + size)
+    in
+    (* Add messages from internal operations *)
+    List.fold_left
+      (fun acc (Internal_operation_result ({operation; _}, result)) ->
+        get_messages ~source operation result [] acc)
+      acc
+      internal_operation_results
+  in
   let rec get_related_messages :
-      type kind. string list -> kind contents_and_result_list -> string list =
+      type kind.
+      Tx_rollup_message.t list * int ->
+      kind contents_and_result_list ->
+      Tx_rollup_message.t list * int =
    fun acc -> function
     | Single_and_result
-        ( Manager_operation
-            {
-              operation =
-                Tx_rollup_submit_batch {tx_rollup; content; burn_limit = _};
-              _;
-            },
+        ( Manager_operation {operation; source; _},
           Manager_operation_result
-            {operation_result = Applied (Tx_rollup_submit_batch_result _); _} )
-      when Tx_rollup.equal rollup_id tx_rollup ->
-        List.rev (content :: acc)
+            {operation_result; internal_operation_results; _} ) ->
+        get_messages
+          ~source
+          operation
+          operation_result
+          internal_operation_results
+          acc
+    | Single_and_result (_, _) -> acc
     | Cons_and_result
-        ( Manager_operation
-            {
-              operation =
-                Tx_rollup_submit_batch {tx_rollup; content; burn_limit = _};
-              _;
-            },
+        ( Manager_operation {operation; source; _},
           Manager_operation_result
-            {operation_result = Applied (Tx_rollup_submit_batch_result _); _},
-          xs )
-      when Tx_rollup.equal rollup_id tx_rollup ->
-        get_related_messages (content :: acc) xs
-    | Single_and_result _ -> List.rev acc
-    | Cons_and_result (_, _, xs) -> get_related_messages acc xs
+            {operation_result; internal_operation_results; _},
+          rest ) ->
+        let acc =
+          get_messages
+            ~source
+            operation
+            operation_result
+            internal_operation_results
+            acc
+        in
+        get_related_messages acc rest
   in
-  let finalize_receipt operation =
+  let finalize_receipt acc operation =
     match Alpha_block_services.(operation.protocol_data, operation.receipt) with
     | ( Operation_data {contents = operation_contents; _},
         Some (Operation_metadata {contents = result_contents}) ) -> (
@@ -83,84 +217,149 @@ let compute_messages block_info rollup_id =
             let operation_and_result =
               pack_contents_list operation_contents result_contents
             in
-            get_related_messages [] operation_and_result
-        | None -> [])
-    | (_, Some No_operation_metadata) | (_, None) -> []
+            ok (get_related_messages acc operation_and_result)
+        | None ->
+            (* Should not happen *)
+            ok acc)
+    | (_, Some No_operation_metadata) | (_, None) ->
+        error (Tx_rollup_no_operation_metadata operation.hash)
   in
   match managed_operation with
-  | None -> []
+  | None -> ok ([], 0)
   | Some managed_operations ->
-      (* We can use [List.concat_map] because we do not expect many batches per
-         rollup and per block. *)
-      managed_operations |> List.concat_map finalize_receipt
+      let open Result_syntax in
+      let+ (rev_messages, cumulated_size) =
+        List.fold_left_e finalize_receipt ([], 0) managed_operations
+      in
+      (List.rev rev_messages, cumulated_size)
 
-let process_messages_and_inboxes state rollup_genesis block_info rollup_id =
+let create_genesis_block state tezos_block =
+  let open Lwt_result_syntax in
+  let ctxt = Context.empty state.State.context_index in
+  let*! context_hash = Context.commit ctxt in
+  let inbox_hash = Tx_rollup_inbox.hash_inbox [] in
+  let header : L2block.header =
+    {
+      level = Genesis;
+      inbox_hash;
+      tezos_block;
+      predecessor = L2block.genesis_hash state.rollup;
+      (* Genesis block is its own predecessor *)
+      context = context_hash;
+    }
+  in
+  let inbox : Inbox.t = {contents = []; cumulated_size = 0} in
+  let genesis_block = L2block.{header; inbox} in
+  let+ _block_hash = State.save_block state genesis_block in
+  (genesis_block, ctxt)
+
+let process_messages_and_inboxes (state : State.t)
+    ~(predecessor : L2block.header) ?predecessor_context block_info rollup_id =
   let open Lwt_result_syntax in
   let current_hash = block_info.Alpha_block_services.hash in
-  let predecessor_hash = block_info.header.shell.predecessor in
-  let*! has_previous_state = State.block_already_seen state predecessor_hash in
-  let*? () =
-    error_unless
-      (has_previous_state || Block_hash.equal rollup_genesis current_hash)
-      (Error.Tx_rollup_block_predecessor_not_processed predecessor_hash)
+  let*? (messages, cumulated_size) =
+    extract_messages_from_block block_info rollup_id
   in
-  let messages = compute_messages block_info rollup_id in
-  let messages_len = List.length messages in
-  let inbox = messages_to_inbox messages in
-  let*! () = Event.(emit messages_application) messages_len in
-  let* () = State.save_inbox state current_hash inbox in
-  let*! () =
-    Event.(emit inbox_stored)
-      (current_hash, inbox.contents, inbox.cumulated_size)
+  let*! () = Event.(emit messages_application) (List.length messages) in
+  let* predecessor_context =
+    match predecessor_context with
+    | None -> checkout_context state predecessor.context
+    | Some context -> return context
   in
-  return_unit
+  let*! (context, inbox) =
+    interp_messages predecessor_context messages cumulated_size
+  in
+  match inbox with
+  | None ->
+      (* No inbox at this block *)
+      return (predecessor, predecessor_context)
+  | Some inbox ->
+      let*! context_hash = Context.commit context in
+      let inbox_hash = Inbox.hash_contents inbox.contents in
+      let level =
+        match predecessor.level with
+        | Genesis -> L2block.Rollup_level Tx_rollup_level.root
+        | Rollup_level l -> Rollup_level (Tx_rollup_level.succ l)
+      in
+      let header : L2block.header =
+        {
+          level;
+          inbox_hash;
+          tezos_block = current_hash;
+          predecessor = L2block.hash_header predecessor;
+          context = context_hash;
+        }
+      in
+      let block = L2block.{header; inbox} in
+      let* hash = State.save_block state block in
+      let*! () =
+        Event.(emit rollup_block) (header.level, hash, header.tezos_block)
+      in
+      return (block.header, context)
 
-let rec process_hash cctxt state rollup_genesis current_hash rollup_id =
+let rec process_block cctxt state current_hash rollup_id :
+    (L2block.header * Context.context option, tztrace) result Lwt.t =
   let open Lwt_result_syntax in
-  let chain = cctxt#chain in
-  let block = `Hash (current_hash, 0) in
-  let* block_info = Alpha_block_services.info cctxt ~chain ~block () in
-  process_block cctxt state rollup_genesis block_info rollup_id
-
-and process_block cctxt state rollup_genesis block_info rollup_id =
-  let open Lwt_result_syntax in
-  let current_hash = block_info.hash in
-  let predecessor_hash = block_info.header.shell.predecessor in
-  let*! was_processed = State.block_already_seen state current_hash in
-  if was_processed then
-    let*! () = Event.(emit block_already_seen) current_hash in
-    return_unit
+  if Block_hash.equal state.State.rollup_origination.block_hash current_hash
+  then
+    (* This is the rollup origination block, create L2 genesis block *)
+    let+ (genesis_block, genesis_ctxt) =
+      create_genesis_block state current_hash
+    in
+    (genesis_block.header, Some genesis_ctxt)
   else
-    let*! predecessor_was_processed =
-      State.block_already_seen state predecessor_hash
-    in
-    let* () =
-      if
-        (not predecessor_was_processed)
-        && not (Block_hash.equal rollup_genesis current_hash)
-      then
+    let*! l2_header = State.get_tezos_l2_block state current_hash in
+    match l2_header with
+    | Some l2_header ->
+        (* Already processed *)
+        let*! () = Event.(emit block_already_processed) current_hash in
+        let* () = State.set_head state l2_header in
+        return (l2_header, None)
+    | None ->
+        let* block_info =
+          Alpha_block_services.info
+            cctxt
+            ~chain:cctxt#chain
+            ~block:(`Hash (current_hash, 0))
+            ()
+        in
+        let predecessor_hash = block_info.header.shell.predecessor in
+        let* () =
+          fail_when
+            (block_info.header.shell.level
+           < state.State.rollup_origination.block_level)
+            Tx_rollup_originated_in_fork
+        in
+        (* Handle predecessor Tezos block first *)
         let*! () = Event.(emit processing_block_predecessor) predecessor_hash in
-        process_hash cctxt state rollup_genesis predecessor_hash rollup_id
-      else return ()
-    in
-    let*! () = Event.(emit processing_block) (current_hash, predecessor_hash) in
-    let* () =
-      process_messages_and_inboxes state rollup_genesis block_info rollup_id
-    in
-    let* () = State.set_new_head state current_hash in
-    let*! () = Event.(emit new_tezos_head) current_hash in
-    let*! () = Event.(emit block_processed) current_hash in
-    return_unit
+        let* (l2_predecessor_header, predecessor_context) =
+          process_block cctxt state predecessor_hash rollup_id
+        in
+        let*! () =
+          Event.(emit processing_block) (current_hash, predecessor_hash)
+        in
+        let* (l2_header, context) =
+          process_messages_and_inboxes
+            state
+            ~predecessor:l2_predecessor_header
+            ?predecessor_context
+            block_info
+            rollup_id
+        in
+        let* () = State.set_head state l2_header in
+        let*! () = Event.(emit new_tezos_head) current_hash in
+        let*! () = Event.(emit block_processed) current_hash in
+        return (l2_header, Some context)
 
-let process_inboxes cctxt state rollup_genesis current_hash rollup_id =
+let process_head cctxt state current_hash rollup_id =
   let open Lwt_result_syntax in
   let*! () = Event.(emit new_block) current_hash in
-  let* () = process_hash cctxt state rollup_genesis current_hash rollup_id in
-  return_unit
+  process_block cctxt state current_hash rollup_id
 
-let main_exit_callback data_dir exit_status =
+let main_exit_callback state data_dir exit_status =
   let open Lwt_syntax in
   let* () = Stores.close data_dir in
+  let* () = Context.close state.State.context_index in
   let* () = Event.(emit node_is_shutting_down) exit_status in
   Tezos_base_unix.Internal_event_unix.close ()
 
@@ -174,10 +373,8 @@ let rec connect ~delay cctxt =
       let* () = Lwt_unix.sleep delay in
       connect ~delay cctxt
 
-let valid_history_mode = function
-  | History_mode.Archive | History_mode.Full _ -> true
-  | _ -> false
-
+(* TODO/TORU: https://gitlab.com/tezos/tezos/-/issues/1845
+   Clean exit *)
 let run ~data_dir cctxt =
   let open Lwt_result_syntax in
   let*! () = Event.(emit starting_node) () in
@@ -185,21 +382,13 @@ let run ~data_dir cctxt =
        configuration) =
     Configuration.load ~data_dir
   in
-  let* state =
-    State.init ~data_dir ~context:cctxt ~rollup:rollup_id ~rollup_genesis
-  in
+  let* state = State.init ~data_dir ~context:cctxt ?rollup_genesis rollup_id in
   let* _rpc_server = RPC.start configuration state in
   let _ =
     (* Register cleaner callback *)
     Lwt_exit.register_clean_up_callback
       ~loc:__LOC__
-      (main_exit_callback configuration.data_dir)
-  in
-  let* (_, _, _, history_mode) = Chain_services.checkpoint cctxt () in
-  let* () =
-    fail_unless
-      (valid_history_mode history_mode)
-      (Error.Tx_rollup_invalid_history_mode history_mode)
+      (main_exit_callback state configuration.data_dir)
   in
   let rec loop () =
     let* () =
@@ -211,17 +400,14 @@ let run ~data_dir cctxt =
           let*! () =
             Lwt_stream.iter_s
               (fun (current_hash, _header) ->
-                let*! r =
-                  process_inboxes
-                    cctxt
-                    state
-                    rollup_genesis
-                    current_hash
-                    rollup_id
-                in
+                let*! r = process_head cctxt state current_hash rollup_id in
                 match r with
-                | Ok () -> Lwt.return ()
-                | Error _ ->
+                | Ok (_, _) -> Lwt.return ()
+                | Error (Tx_rollup_originated_in_fork :: _ as e) ->
+                    Format.eprintf "%a@.Exiting.@." pp_print_trace e ;
+                    Lwt_exit.exit_and_raise 1
+                | Error e ->
+                    Format.eprintf "%a@." pp_print_trace e ;
                     let () = interupt () in
                     Lwt.return ())
               block_stream

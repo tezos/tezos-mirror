@@ -43,7 +43,7 @@ val close : string -> unit Lwt.t
 
 (** An interface that describes a generic Key-Value storage. *)
 module type MAP = sig
-  type t
+  type nonrec t = t
 
   type key
 
@@ -60,7 +60,7 @@ end
 
 (** An interface that describes a generic value reference. *)
 module type REF = sig
-  type t
+  type nonrec t = t
 
   type value
 
@@ -73,11 +73,30 @@ end
 
 (** {1 Storages} *)
 
-(** Persistent storage for inboxes, indexed by a block hash. Each block has a
-    single inbox. *)
-module Inboxes :
-  MAP with type key = Block_hash.t and type value = Inbox.t and type t = t
+(** {2 References} *)
 
-(** A persistent reference cell that stores the last Tezos head processed
-    by the daemon. *)
-module Tezos_head : REF with type value = Block_hash.t and type t = t
+(** A persistent reference to the rollup origination block (initialized on first
+   run). *)
+module Rollup_origination : REF with type value = Block_hash.t * int32
+
+(** A persistent reference cell that stores the header of the head of the
+    rollup. *)
+module L2_head : REF with type value = L2block.header
+
+(** {2 Maps} *)
+
+(** Persistent storage for mapping Tezos blocks to their L2 counterpart. *)
+module Tezos_blocks :
+  MAP with type key = Block_hash.t and type value = L2block.hash
+
+(** Persistent storage for inboxes, indexed by an L2 block hash. Each block has
+    a single inbox. *)
+module Inboxes : MAP with type key = L2block.hash and type value = Inbox.t
+
+(** Persistent storage for transaction L2 block headers. *)
+module L2_blocks :
+  MAP with type key = L2block.hash and type value = L2block.header
+
+(** Persistent storage for associating an L2 block hash to each rollup level. *)
+module Rollup_levels :
+  MAP with type key = L2block.level and type value = L2block.hash

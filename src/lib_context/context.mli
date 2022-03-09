@@ -68,6 +68,10 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) : sig
 
   val compute_testchain_genesis : Block_hash.t -> Block_hash.t
 
+  (** Build an empty context from an index. The resulting context is not yet
+      commited. *)
+  val empty : index -> t
+
   val commit_genesis :
     index ->
     chain_id:Chain_id.t ->

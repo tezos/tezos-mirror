@@ -2,8 +2,6 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
-(* Copyright (c) 2022 Marigold, <contact@marigold.dev>                       *)
-(* Copyright (c) 2022 Oxhead Alpha <info@oxhead-alpha.com>                   *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -25,43 +23,57 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** A non-compact representation of inboxes that represents complete messages
-    and not their hashes. *)
+(** A block-indexed (key x value) store directory. *)
+type index
 
-open Protocol
-open Alpha_context
+(** Type of persitant context. *)
+type context
 
-(** Alias for type of inbox hashes *)
-type hash = Tx_rollup_inbox.hash
+include
+  Protocol.Tx_rollup_l2_context_sig.CONTEXT
+    with type t = context
+     and type 'a m = 'a tzresult Lwt.t
 
-(** Result of application of an inbox message *)
-type message_result =
-  | Interpreted of Tx_rollup_l2_apply.Message_result.t
-      (** The message was interpreted by the rollup node but may have failed *)
-  | Discarded of tztrace
-      (** The message was discarded because it could not be interpreted *)
+val index : context -> index
 
-(** Type of inbox message with the context hash resulting from the application
-    of the message *)
-type message = {
-  message : Tx_rollup_message.t;
-  result : message_result;
-  context_hash : Tx_rollup_l2_context_hash.t;
-}
+(** Open or initialize a versioned store at a given path. *)
+val init :
+  ?patch_context:(context -> context tzresult Lwt.t) ->
+  ?readonly:bool ->
+  string ->
+  index Lwt.t
 
-(** The type representing an inbox whose contents are the messages and not the
-    hashed messages. *)
-type t = {contents : message list; cumulated_size : int}
+(** Build an empty context from an index. The resulting context is not yet
+    commited. *)
+val empty : index -> t
 
-(** [to_protocol_inbox node_inbox] will hash the contents of [node_inbox] to
-    produces an [Tx_rollup_inbox.t]. *)
-val to_protocol_inbox : t -> Tx_rollup_inbox.t
+(** Close the index. Does not fail when the context is already closed. *)
+val close : index -> unit Lwt.t
 
-(** Encoding for inbox messages *)
-val message_encoding : message Data_encoding.t
+(** Sync the context with disk. Only useful for read-only instances.
+    Does not fail when the context is not in read-only mode. *)
+val sync : index -> unit Lwt.t
 
-(** Encoding for inboxes *)
-val encoding : t Data_encoding.t
+(** {2 Accessing and Updating Versions} *)
 
-(** Hash contents of inbox. This gives the inbox hash. *)
-val hash_contents : message list -> hash
+(** Returns true if there is a commit with this context hash *)
+val exists : index -> Protocol.Tx_rollup_l2_context_hash.t -> bool Lwt.t
+
+(** Checkout the context associated to a context hash. The context must have
+    been committed (with {!commit}). Resolves with [None] if there is no such
+    commit. *)
+val checkout :
+  index -> Protocol.Tx_rollup_l2_context_hash.t -> context option Lwt.t
+
+(** Same as {!checkout} but resolves with an exception if there is no such
+    commit. *)
+val checkout_exn :
+  index -> Protocol.Tx_rollup_l2_context_hash.t -> context Lwt.t
+
+(** Hash a context. The hash can be done with an additional [message]. *)
+val hash : ?message:string -> t -> Protocol.Tx_rollup_l2_context_hash.t
+
+(** Create a commit and return the context hash. The hash can be done with an
+    additional [message]. *)
+val commit :
+  ?message:string -> context -> Protocol.Tx_rollup_l2_context_hash.t Lwt.t

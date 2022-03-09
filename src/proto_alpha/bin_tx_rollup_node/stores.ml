@@ -25,6 +25,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* TODO/TORU: https://gitlab.com/tezos/tezos/-/issues/2589
+   Don't use Irmin for store but rather https://github.com/mirage/index *)
+
 module Conf = struct
   let entries = 32
 
@@ -77,7 +80,7 @@ module type MAP_CONF = sig
 end
 
 module type REF = sig
-  type t
+  type nonrec t = t
 
   type value
 
@@ -89,7 +92,7 @@ module type REF = sig
 end
 
 module type MAP = sig
-  type t
+  type nonrec t = t
 
   type key
 
@@ -226,22 +229,67 @@ module Make_ref (R : REF_CONF) = struct
     set_aux store value
 end
 
-module Inboxes = Make_map (struct
-  let location = ["tx_rollup"; "inboxes"]
+module Rollup_origination = Make_ref (struct
+  let location = ["tx_rollup"; "origination"]
+
+  type value = Block_hash.t * int32
+
+  let value_encoding =
+    Data_encoding.tup2 Block_hash.encoding Data_encoding.int32
+end)
+
+module L2_head = Make_ref (struct
+  let location = ["tx_rollup"; "head"]
+
+  type value = L2block.header
+
+  let value_encoding = L2block.header_encoding
+end)
+
+module Tezos_blocks = Make_map (struct
+  let location = ["tezos"; "blocks"]
 
   type key = Block_hash.t
 
+  type value = L2block.hash
+
+  let key_to_string = Block_hash.to_string
+
+  let value_encoding = L2block.Hash.encoding
+end)
+
+module Inboxes = Make_map (struct
+  let location = ["tx_rollup"; "inboxes"]
+
+  type key = L2block.hash
+
   type value = Inbox.t
 
-  let key_to_string = Block_hash.to_b58check
+  let key_to_string = L2block.Hash.to_b58check
 
   let value_encoding = Inbox.encoding
 end)
 
-module Tezos_head = Make_ref (struct
-  let location = ["tezos"; "head"]
+module L2_blocks = Make_map (struct
+  let location = ["tx_rollup"; "blocks"]
 
-  type value = Block_hash.t
+  type key = L2block.hash
 
-  let value_encoding = Block_hash.encoding
+  type value = L2block.header
+
+  let key_to_string = L2block.Hash.to_b58check
+
+  let value_encoding = L2block.header_encoding
+end)
+
+module Rollup_levels = Make_map (struct
+  let location = ["tx_rollup"; "levels"]
+
+  type key = L2block.level
+
+  type value = L2block.hash
+
+  let key_to_string = L2block.level_to_string
+
+  let value_encoding = L2block.Hash.encoding
 end)

@@ -2,8 +2,6 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
-(* Copyright (c) 2022 Marigold, <contact@marigold.dev>                       *)
-(* Copyright (c) 2022 Oxhead Alpha <info@oxhead-alpha.com>                   *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -25,43 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** A non-compact representation of inboxes that represents complete messages
-    and not their hashes. *)
+open Filename.Infix
 
-open Protocol
-open Alpha_context
+type t = string
 
-(** Alias for type of inbox hashes *)
-type hash = Tx_rollup_inbox.hash
+let store_dir data_dir = data_dir // "store"
 
-(** Result of application of an inbox message *)
-type message_result =
-  | Interpreted of Tx_rollup_l2_apply.Message_result.t
-      (** The message was interpreted by the rollup node but may have failed *)
-  | Discarded of tztrace
-      (** The message was discarded because it could not be interpreted *)
-
-(** Type of inbox message with the context hash resulting from the application
-    of the message *)
-type message = {
-  message : Tx_rollup_message.t;
-  result : message_result;
-  context_hash : Tx_rollup_l2_context_hash.t;
-}
-
-(** The type representing an inbox whose contents are the messages and not the
-    hashed messages. *)
-type t = {contents : message list; cumulated_size : int}
-
-(** [to_protocol_inbox node_inbox] will hash the contents of [node_inbox] to
-    produces an [Tx_rollup_inbox.t]. *)
-val to_protocol_inbox : t -> Tx_rollup_inbox.t
-
-(** Encoding for inbox messages *)
-val message_encoding : message Data_encoding.t
-
-(** Encoding for inboxes *)
-val encoding : t Data_encoding.t
-
-(** Hash contents of inbox. This gives the inbox hash. *)
-val hash_contents : message list -> hash
+let context_dir data_dir = data_dir // "context"
