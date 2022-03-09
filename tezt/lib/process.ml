@@ -245,42 +245,48 @@ let wait process =
 (* Read process outputs and log them.
    Also take care of removing the process from [live_processes] on termination. *)
 let handle_process ~log_output process =
-  let stdout_rev_lines = ref [] in
-  let stderr_rev_lines = ref [] in
-  let flush_lines name rev_lines =
-    List.iter
-      (fun line ->
-        Log.debug ~prefix:name ~color:process.color "%s" line ;
-        Option.iter (fun hooks -> hooks.on_log line) process.hooks)
-      (List.rev rev_lines)
-  in
-  let rec handle_output name output_kind ch echo =
+  let rec handle_output name ch echo lines =
     let* line = Lwt_io.read_line_opt ch in
     match line with
     | None ->
         close_echo echo ;
-        Lwt_io.close ch
+        let* () = Lwt_io.close ch in
+        return (List.rev lines)
     | Some line ->
-        (if log_output then
-         match output_kind with
-         | `Stdout -> stdout_rev_lines := line :: !stdout_rev_lines
-         | `Stderr -> stderr_rev_lines := line :: !stderr_rev_lines) ;
+        if log_output then Log.debug ~prefix:name ~color:process.color "%s" line ;
+        let lines =
+          match process.hooks with None -> lines | Some _ -> line :: lines
+        in
         push_to_echo echo line ;
         (* TODO: here we assume that all lines end with "\n",
              but it may not always be the case:
            - there may be lines ending with "\r\n";
            - the last line may not end with "\n" before the EOF. *)
         push_to_echo echo "\n" ;
-        handle_output name output_kind ch echo
+        handle_output name ch echo lines
   in
-  let* () =
-    handle_output process.name `Stdout process.lwt_process#stdout process.stdout
-  and* () =
-    handle_output process.name `Stderr process.lwt_process#stderr process.stderr
-  and* _ = wait process in
-  flush_lines process.name !stdout_rev_lines ;
-  flush_lines process.name !stderr_rev_lines ;
-  unit
+  let promise =
+    let* stdout_lines =
+      handle_output process.name process.lwt_process#stdout process.stdout []
+    and* stderr_lines =
+      handle_output process.name process.lwt_process#stderr process.stderr []
+    and* _ = wait process in
+    match process.hooks with
+    | None -> unit
+    | Some hooks ->
+        List.iter hooks.on_log stdout_lines ;
+        List.iter hooks.on_log stderr_lines ;
+        unit
+  in
+  (* As long as the process is running, we don't want to stop reading its output.
+     So we return a non-cancelable promise.
+     This also makes sure that if [wait] is called twice, and one of the two
+     instances is canceled, the other instance will not also be canceled.
+     Indeed, canceling one instance of [wait] would cancel [process.handle],
+     which is also used by the other instance of [wait].
+     This can happen in particular if a test is [wait]ing for a process and
+     the user presses Ctrl+C, which triggers [clean_up], which calls [wait]. *)
+  Lwt.no_cancel promise
 
 (** [parse_current_environment ()], given that the current environment
     is "K1=V2; K2=V2" (see `export` in a terminal)

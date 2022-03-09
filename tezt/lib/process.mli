@@ -52,6 +52,10 @@ type hooks = {
     output lines.
 
     Parameter [hooks] allows to attach some hooks to the process.
+    Warning: if you use [hooks], all the process output is stored in memory
+    until it finishes. So this can use a lot of memory. Also, note that [stdout]
+    is sent to the hook first, then [stderr]. The two outputs are not interleaved.
+    This is to make it more predictable for regression tests.
 
     Note that this function can only be called if [Background.register] is
     allowed (which is the case inside functions given to [Test.register]).
