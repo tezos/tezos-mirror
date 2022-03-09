@@ -88,6 +88,13 @@ Overrides `michelson-print-errors' and `michelson-highlight-errors'"
   :type 'boolean
   :group 'michelson-options)
 
+(defcustom michelson-extra-flags nil
+  "Additional flags to pass to tezos-client when type checking."
+  :type '(list string)
+  :group 'michelson-options)
+
+(put 'michelson-extra-flags 'safe-local-variable t)
+
 (defvar michelson-face-instruction
   'michelson-face-instruction
   "Face name for Michelson instructions.")
@@ -452,7 +459,8 @@ Overrides `michelson-print-errors' and `michelson-highlight-errors'"
                            (concat "container:" tmp-file)
                          tmp-file))
                      "-details"
-                     "--emacs"))))
+                     "--emacs")
+                   michelson-extra-flags)))
       (michelson-async-command-to-string
        command
        (lambda (output)
