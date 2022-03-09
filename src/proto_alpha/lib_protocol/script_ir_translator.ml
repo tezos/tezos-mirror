@@ -291,7 +291,7 @@ let rec unparse_ty_entrypoints_uncarbonated :
         let tr = unparse_ty_entrypoints_uncarbonated ~loc utr no_entrypoints in
         (T_big_map, [ta; tr])
     | Sapling_transaction_t memo_size ->
-        (T_sapling_transaction, [unparse_memo_size ~loc memo_size])
+        (T_sapling_transaction_deprecated, [unparse_memo_size ~loc memo_size])
     | Sapling_state_t memo_size ->
         (T_sapling_state, [unparse_memo_size ~loc memo_size])
     | Chest_key_t -> (T_chest_key, [])
@@ -1467,7 +1467,7 @@ let[@coq_axiom_with_reason "complex mutually recursive definition"] rec parse_ty
         >>? fun (Ex_ty tr, ctxt) ->
         check_type_annot loc annot >>? fun () ->
         map_t loc ta tr >|? fun ty -> return ctxt ty
-    | Prim (loc, T_sapling_transaction, [memo_size], annot) ->
+    | Prim (loc, T_sapling_transaction_deprecated, [memo_size], annot) ->
         check_type_annot loc annot >>? fun () ->
         parse_memo_size memo_size >|? fun memo_size ->
         return ctxt (sapling_transaction_t ~memo_size)
