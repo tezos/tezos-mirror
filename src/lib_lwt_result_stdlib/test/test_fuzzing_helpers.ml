@@ -578,13 +578,17 @@ let eq_s ?pp a b =
    example:
    {[
    eq_s
-     (let acc = ref init in
-     M.iter_s (IterSOf.fn_s acc fn) input >|= fun () -> !acc)
+     Lwt_syntax.(
+      let acc = ref init in
+      let+ () = M.iter_s (IterSOf.fn_s acc fn) input in
+      !acc)
      (M.fold_left_s (FoldSOf.fn_s fn) init input)
 
    eq_es
-     (let acc = ref init in
-     M.iter_es (IterESOf.fn acc fn) (M.of_list input) >|=? fun () -> !acc)
+     Lwt_result_syntax.(
+      let acc = ref init in
+      let+ () = M.iter_es (IterESOf.fn acc fn) (M.of_list input) in
+      !acc)
      (Lwt.return_ok @@ with_stdlib_iter (fn, init, input))
    ]}
 *)

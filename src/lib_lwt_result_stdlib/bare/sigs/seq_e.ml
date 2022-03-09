@@ -186,9 +186,10 @@ fold_left_e
 {[
 fold_left_es
   (fun acc item ->
-    f acc item >|= Result.map_error (fun e -> Either.Right e))
+    let+ r = f acc item in
+    Result.map_error Either.right r)
   init
-  (s |> map_error (fun e -> Either.Left e))
+  (s |> map_error Either.left)
 ]}
   *)
   val fold_left_es_discriminated :
