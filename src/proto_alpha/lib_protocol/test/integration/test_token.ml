@@ -178,9 +178,8 @@ let test_transferring_to_sink ctxt sink amount expected_bupds =
   (* Test transferring to go beyond capacity. *)
   wrap (Token.balance ctxt' sink) >>=? fun (ctxt', bal) ->
   let amount = Tez.of_mutez_exn Int64.max_int -! bal +! Tez.one_mutez in
-  wrap (Token.transfer ctxt' `Minted sink amount) >>= function
-  | Error _ -> return_unit
-  | Ok _ -> failwith "Transferring (Int64.max - balance + 1) should fail."
+  wrap (Token.transfer ctxt' `Minted sink amount) >>= fun res ->
+  Assert.proto_error_with_info ~loc:__LOC__ res "Overflowing tez addition"
 
 let test_transferring_to_contract ctxt =
   let (pkh, _pk, _sk) = Signature.generate_key () in
@@ -322,10 +321,15 @@ let test_transferring_from_bounded_source ctxt src amount expected_bupds =
   balance_no_fail ctxt src >>=? fun (ctxt, balance) ->
   Assert.equal_tez ~loc:__LOC__ balance Tez.zero >>=? fun () ->
   (* Test transferring from an empty account. *)
-  (wrap (Token.transfer ctxt src `Burned Tez.one) >>= function
-   | Error _ -> return_unit
-   | Ok _ -> failwith "Transferring from an empty account should fail.")
-  >>=? fun () ->
+  wrap (Token.transfer ctxt src `Burned Tez.one) >>= fun res ->
+  let error_title =
+    match src with
+    | `Contract _ -> "Balance too low"
+    | `Delegate_balance _ | `Frozen_deposits _ | `Frozen_bonds _ ->
+        "Storage error (fatal internal error)"
+    | _ -> "Underflowing tez subtraction"
+  in
+  Assert.proto_error_with_info ~loc:__LOC__ res error_title >>=? fun () ->
   (* Transferring zero must be a noop, and must not return balance updates. *)
   wrap (Token.transfer ctxt src `Burned Tez.zero) >>=? fun (ctxt', bupds) ->
   Assert.equal_bool ~loc:__LOC__ (ctxt == ctxt' && bupds = []) true
@@ -343,10 +347,10 @@ let test_transferring_from_bounded_source ctxt src amount expected_bupds =
   (* Test transferring a smaller amount. *)
   wrap (Token.transfer ctxt `Minted src amount) >>=? fun (ctxt, _) ->
   (match src with
-  | `Frozen_bonds _ -> (
-      wrap (Token.transfer ctxt src `Burned amount) >>= function
-      | Ok _ -> failwith "Partial withdrawals are forbidden for frozen bonds."
-      | Error _ -> return_unit)
+  | `Frozen_bonds _ ->
+      wrap (Token.transfer ctxt src `Burned amount) >>= fun res ->
+      let error_title = "Partial spending of frozen bonds" in
+      Assert.proto_error_with_info ~loc:__LOC__ res error_title
   | _ ->
       wrap (Token.transfer ctxt src `Burned amount) >>=? fun (ctxt', bupds) ->
       check_src_balances ctxt ctxt' src amount >>=? fun _ ->
@@ -354,9 +358,14 @@ let test_transferring_from_bounded_source ctxt src amount expected_bupds =
   >>=? fun () ->
   (* Test transferring more than available. *)
   wrap (Token.balance ctxt src) >>=? fun (ctxt, balance) ->
-  wrap (Token.transfer ctxt src `Burned (balance +! Tez.one)) >>= function
-  | Error _ -> return_unit
-  | Ok _ -> failwith "Transferring more than available should fail."
+  wrap (Token.transfer ctxt src `Burned (balance +! Tez.one)) >>= fun res ->
+  let error_title =
+    match src with
+    | `Contract _ -> "Balance too low"
+    | `Frozen_bonds _ -> "Partial spending of frozen bonds"
+    | _ -> "Underflowing tez subtraction"
+  in
+  Assert.proto_error_with_info ~loc:__LOC__ res error_title
 
 let test_transferring_from_contract ctxt =
   let (pkh, _pk, _sk) = Signature.generate_key () in
