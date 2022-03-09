@@ -1,5 +1,5 @@
 storage (unit);
-parameter (list (sapling_transaction 8));
+parameter (list (sapling_transaction_deprecated 8));
 code { UNPAIR ;
        SAPLING_EMPTY_STATE 8;
        SWAP ;
