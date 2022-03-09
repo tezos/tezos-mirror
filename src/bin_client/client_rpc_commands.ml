@@ -455,7 +455,7 @@ let display_answer (cctxt : #Client_context.full) :
 let call ?body meth raw_url (cctxt : #Client_context.full) =
   let open Lwt_result_syntax in
   let uri = Uri.of_string raw_url in
-  let args = String.split_path (Uri.path uri) in
+  let args = String.split '/' (Uri.path uri) in
   let* s = RPC_description.describe cctxt ~recurse:false args in
   match s with
   | Static {services; _} -> (
