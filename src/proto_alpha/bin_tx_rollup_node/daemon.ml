@@ -133,7 +133,7 @@ let extract_messages_from_block block_info rollup_id =
       source:public_key_hash ->
       kind manager_operation ->
       kind manager_operation_result ->
-      packed_internal_operation_result list ->
+      packed_internal_manager_operation_result list ->
       Tx_rollup_message.t list * int ->
       Tx_rollup_message.t list * int =
    fun ~source op result internal_operation_results (messages, cumulated_size) ->
@@ -171,7 +171,8 @@ let extract_messages_from_block block_info rollup_id =
     in
     (* Add messages from internal operations *)
     List.fold_left
-      (fun acc (Internal_operation_result ({operation; _}, result)) ->
+      (fun acc (Internal_manager_operation_result ({operation; _}, result)) ->
+        let operation = manager_operation_of_internal_operation operation in
         get_messages ~source operation result [] acc)
       acc
       internal_operation_results
