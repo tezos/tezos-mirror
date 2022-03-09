@@ -144,6 +144,9 @@ type parametric = {
   (* the maximum number of finalized commitments, to ensure that
      remove_commitment is ever called *)
   tx_rollup_max_finalized_levels : int;
+  (* The number of blocks used to compute the ema factor determining
+     the cost per byte for new messages in the inbox. *)
+  tx_rollup_cost_per_byte_ema_factor : int;
   sc_rollup_enable : bool;
   sc_rollup_origination_size : int;
   sc_rollup_challenge_window_in_blocks : int;
