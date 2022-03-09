@@ -5,8 +5,7 @@ opam:create_pipeline:
     - .rules_template__trigger_opam_pipeline
   stage: packaging
   script:
-    - ./scripts/generate_opam_pipeline.sh
-    - cat opam-ci.yml
+    - ./scripts/generate_opam_pipeline.sh | tee opam-ci.yml
   needs: []
   artifacts:
     paths:
