@@ -431,12 +431,19 @@ val parse_contract_for_script :
 val parse_tx_rollup_deposit_parameters :
   context -> Script.expr -> (Tx_rollup.deposit_parameters * context) tzresult
 
+(** ['a ex_ty_cstr] is like [ex_ty], but also adds to the existential a function
+    used to reconstruct a value of type ['a] from the internal type of the
+    existential. Typically, it will be used to go from the type of an
+    entry-point to the full type of a contract. *)
+type 'a ex_ty_cstr =
+  | Ex_ty_cstr : 'b Script_typed_ir.ty * ('b -> 'a) -> 'a ex_ty_cstr
+
 val find_entrypoint :
   error_details:'error_trace error_details ->
   't Script_typed_ir.ty ->
   't Script_typed_ir.entrypoints ->
   Entrypoint.t ->
-  ((Script.node -> Script.node) * ex_ty, 'error_trace) Gas_monad.t
+  ('t ex_ty_cstr, 'error_trace) Gas_monad.t
 
 val list_entrypoints :
   context ->
@@ -508,6 +515,14 @@ val get_single_sapling_state :
   'a Script_typed_ir.ty ->
   'a ->
   (Sapling.Id.t option * context) tzresult
+
+(** [code_size ctxt code views] returns an overapproximation of the size of
+    the in-memory representation of [code] and [views] in the context [ctxt]. *)
+val code_size :
+  context ->
+  ('a, 'b) Script_typed_ir.lambda ->
+  Script_typed_ir.view_map ->
+  (Cache_memory_helpers.sint * context) tzresult
 
 (** [script_size script] returns an overapproximation of the size of
     the in-memory representation of [script] as well as the cost

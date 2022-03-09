@@ -37,7 +37,8 @@ open Alpha_context
 open Apply_results
 
 type error +=
-  | (* `Permanent *) Internal_operation_replay of packed_internal_operation
+  | (* `Permanent *)
+      Internal_operation_replay of packed_internal_contents
 
 type error += (* Permanent *) Gas_quota_exceeded_init_deserialize
 

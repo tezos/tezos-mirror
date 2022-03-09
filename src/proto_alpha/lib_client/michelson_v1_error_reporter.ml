@@ -403,7 +403,7 @@ let report_errors ~details ~show_source ?parsed ppf errs =
         Format.fprintf
           ppf
           "@[<v 2>Internal operation replay attempt:@,%a@]"
-          Operation_result.pp_internal_operation
+          Operation_result.pp_internal_operation_result
           op ;
         if rest <> [] then Format.fprintf ppf "@," ;
         print_trace locations rest

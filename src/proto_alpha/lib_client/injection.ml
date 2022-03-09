@@ -349,7 +349,7 @@ let estimated_gas_single (type kind)
   in
   consumed_gas operation_result >>? fun gas ->
   List.fold_left_e
-    (fun acc (Internal_operation_result (_, r)) ->
+    (fun acc (Internal_manager_operation_result (_, r)) ->
       consumed_gas r >>? fun gas -> Ok (Gas.Arith.add acc gas))
     gas
     internal_operation_results
@@ -402,7 +402,7 @@ let estimated_storage_single (type kind) ~tx_rollup_origination_size
   in
   storage_size_diff operation_result >>? fun storage ->
   List.fold_left_e
-    (fun acc (Internal_operation_result (_, r)) ->
+    (fun acc (Internal_manager_operation_result (_, r)) ->
       storage_size_diff r >>? fun storage -> Ok (Z.add acc storage))
     storage
     internal_operation_results
@@ -462,7 +462,7 @@ let originated_contracts_single (type kind)
   originated_contracts operation_result >>? fun contracts ->
   let contracts = List.rev contracts in
   List.fold_left_e
-    (fun acc (Internal_operation_result (_, r)) ->
+    (fun acc (Internal_manager_operation_result (_, r)) ->
       originated_contracts r >>? fun contracts ->
       Ok (List.rev_append contracts acc))
     contracts
@@ -508,7 +508,8 @@ let detect_script_failure : type kind. kind operation_metadata -> _ =
       in
       detect_script_failure operation_result >>? fun () ->
       List.iter_e
-        (fun (Internal_operation_result (_, r)) -> detect_script_failure r)
+        (fun (Internal_manager_operation_result (_, r)) ->
+          detect_script_failure r)
         internal_operation_results
     in
     function

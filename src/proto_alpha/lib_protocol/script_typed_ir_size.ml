@@ -198,12 +198,6 @@ let sapling_state_size {Sapling.id; diff; memo_size = _} =
   +! Sapling.diff_in_memory_size diff
   +! sapling_memo_size_size
 
-let operation_size {piop; lazy_storage_diff} =
-  ret_adding
-    (Operation.packed_internal_operation_in_memory_size piop
-    ++ option_size_vec Lazy_storage.diffs_in_memory_size lazy_storage_diff)
-    h2w
-
 let chain_id_size = h1w +? Chain_id.size
 
 (* [contents] is handle by the recursion scheme in [value_size] *)
@@ -313,7 +307,10 @@ let rec value_size :
     | Sapling_transaction_t _ ->
         ret_succ_adding accu (Sapling.transaction_in_memory_size x)
     | Sapling_state_t _ -> ret_succ_adding accu (sapling_state_size x)
-    | Operation_t -> ret_succ (accu ++ operation_size x)
+    (* Operations are neither storable nor pushable, so they can appear neither
+       in the storage nor in the script. Hence they cannot appear in the cache
+       and we never need to measure their size. *)
+    | Operation_t -> assert false
     | Chain_id_t -> ret_succ_adding accu chain_id_size
     | Never_t -> ( match x with _ -> .)
     | Bls12_381_g1_t -> ret_succ_adding accu !!Bls12_381.G1.size_in_memory

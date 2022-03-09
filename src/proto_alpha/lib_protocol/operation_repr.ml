@@ -193,6 +193,20 @@ type raw = Operation.t = {shell : Operation.shell_header; proto : bytes}
 
 let raw_encoding = Operation.encoding
 
+type transaction = {
+  amount : Tez_repr.tez;
+  parameters : Script_repr.lazy_expr;
+  entrypoint : Entrypoint_repr.t;
+  destination : Destination_repr.t;
+}
+
+type origination = {
+  delegate : Signature.Public_key_hash.t option;
+  script : Script_repr.t;
+  credit : Tez_repr.tez;
+  preorigination : Contract_repr.t option;
+}
+
 type 'kind operation = {
   shell : Operation.shell_header;
   protocol_data : 'kind protocol_data;
@@ -263,20 +277,8 @@ and _ contents =
 
 and _ manager_operation =
   | Reveal : Signature.Public_key.t -> Kind.reveal manager_operation
-  | Transaction : {
-      amount : Tez_repr.tez;
-      parameters : Script_repr.lazy_expr;
-      entrypoint : Entrypoint_repr.t;
-      destination : Destination_repr.t;
-    }
-      -> Kind.transaction manager_operation
-  | Origination : {
-      delegate : Signature.Public_key_hash.t option;
-      script : Script_repr.t;
-      credit : Tez_repr.tez;
-      preorigination : Contract_repr.t option;
-    }
-      -> Kind.origination manager_operation
+  | Transaction : transaction -> Kind.transaction manager_operation
+  | Origination : origination -> Kind.origination manager_operation
   | Delegation :
       Signature.Public_key_hash.t option
       -> Kind.delegation manager_operation
@@ -477,10 +479,12 @@ module Encoding = struct
           inj = (fun pkh -> Reveal pkh);
         }
 
+    let transaction_tag = 1
+
     let[@coq_axiom_with_reason "gadt"] transaction_case =
       MCase
         {
-          tag = 1;
+          tag = transaction_tag;
           name = "transaction";
           encoding =
             obj3
@@ -514,10 +518,12 @@ module Encoding = struct
               Transaction {amount; destination; parameters; entrypoint});
         }
 
+    let origination_tag = 2
+
     let[@coq_axiom_with_reason "gadt"] origination_case =
       MCase
         {
-          tag = 2;
+          tag = origination_tag;
           name = "origination";
           encoding =
             obj3
@@ -545,10 +551,12 @@ module Encoding = struct
               Origination {credit; delegate; script; preorigination = None});
         }
 
+    let delegation_tag = 3
+
     let[@coq_axiom_with_reason "gadt"] delegation_case =
       MCase
         {
-          tag = 3;
+          tag = delegation_tag;
           name = "delegation";
           encoding = obj1 (opt "delegate" Signature.Public_key_hash.encoding);
           select =
@@ -1464,83 +1472,3 @@ let equal : type a b. a operation -> b operation -> (a, b) eq option =
     equal_contents_kind_list
       op1.protocol_data.contents
       op2.protocol_data.contents
-
-open Cache_memory_helpers
-
-let script_lazy_expr_size (expr : Script_repr.lazy_expr) =
-  let fun_value expr = ret_adding (expr_size expr) word_size in
-  let fun_bytes bytes = (Nodes.zero, word_size +! bytes_size bytes) in
-  let fun_combine expr_size bytes_size = expr_size ++ bytes_size in
-  ret_adding
-    (Data_encoding.apply_lazy ~fun_value ~fun_bytes ~fun_combine expr)
-    header_size
-
-let script_repr_size ({code; storage} : Script_repr.t) =
-  ret_adding (script_lazy_expr_size code ++ script_lazy_expr_size storage) h2w
-
-let internal_manager_operation_size (type a) (op : a manager_operation) =
-  match op with
-  | Transaction {amount = _; parameters; entrypoint; destination} ->
-      ret_adding
-        (script_lazy_expr_size parameters)
-        (h4w +! int64_size
-        +! Entrypoint_repr.in_memory_size entrypoint
-        +! Destination_repr.in_memory_size destination)
-  | Origination {delegate; script; credit = _; preorigination} ->
-      ret_adding
-        (script_repr_size script)
-        (h4w
-        +! option_size
-             (fun _ -> Contract_repr.public_key_hash_in_memory_size)
-             delegate
-        +! int64_size
-        +! option_size Contract_repr.in_memory_size preorigination)
-  | Delegation pkh_opt ->
-      ( Nodes.zero,
-        h1w
-        +! option_size
-             (fun _ -> Contract_repr.public_key_hash_in_memory_size)
-             pkh_opt )
-  | Sc_rollup_originate _ -> (Nodes.zero, h2w)
-  | Sc_rollup_add_messages _ -> (Nodes.zero, h2w)
-  | Sc_rollup_cement _ -> (Nodes.zero, h2w)
-  | Reveal _ ->
-      (* Reveals can't occur as internal operations *)
-      assert false
-  | Register_global_constant _ ->
-      (* Global constant registrations can't occur as internal operations *)
-      assert false
-  | Set_deposits_limit _ ->
-      (* Set_deposits_limit can't occur as internal operations *)
-      assert false
-  | Tx_rollup_origination ->
-      (* Tx_rollup_origination operation can’t occur as internal operations *)
-      assert false
-  | Tx_rollup_submit_batch _ ->
-      (* Tx_rollup_submit_batch operation can’t occur as internal operations *)
-      assert false
-  | Tx_rollup_commit _ ->
-      (* Tx_rollup_commit operation can’t occur as internal operations *)
-      assert false
-  | Tx_rollup_return_bond _ ->
-      (* Tx_rollup_return_bond operation can’t occur as internal operations *)
-      assert false
-  | Tx_rollup_finalize_commitment _ ->
-      (* Tx_rollup_finalize_commitment operation can’t occur as internal operations *)
-      assert false
-  | Tx_rollup_remove_commitment _ ->
-      (* Tx_rollup_remove_commitment operation can’t occur as internal operations *)
-      assert false
-  | Tx_rollup_rejection _ ->
-      (* Tx_rollup_rejection_commitment operation can’t occur as internal operations *)
-      assert false
-
-let packed_internal_operation_in_memory_size :
-    packed_internal_operation -> nodes_and_size = function
-  | Internal_operation iop ->
-      let {source; operation; nonce = _} = iop in
-      let source_size = Contract_repr.in_memory_size source in
-      let nonce_size = word_size in
-      ret_adding
-        (internal_manager_operation_size operation)
-        (h2w +! source_size +! nonce_size)

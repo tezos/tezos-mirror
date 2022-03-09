@@ -2547,6 +2547,20 @@ val consensus_content_encoding : consensus_content Data_encoding.t
 
 val pp_consensus_content : Format.formatter -> consensus_content -> unit
 
+type transaction = {
+  amount : Tez.tez;
+  parameters : Script.lazy_expr;
+  entrypoint : Entrypoint.t;
+  destination : Destination.t;
+}
+
+type origination = {
+  delegate : Signature.Public_key_hash.t option;
+  script : Script.t;
+  credit : Tez.tez;
+  preorigination : Contract.t option;
+}
+
 type 'kind operation = {
   shell : Operation.shell_header;
   protocol_data : 'kind protocol_data;
@@ -2617,20 +2631,8 @@ and _ contents =
 
 and _ manager_operation =
   | Reveal : Signature.Public_key.t -> Kind.reveal manager_operation
-  | Transaction : {
-      amount : Tez.tez;
-      parameters : Script.lazy_expr;
-      entrypoint : Entrypoint.t;
-      destination : Destination.t;
-    }
-      -> Kind.transaction manager_operation
-  | Origination : {
-      delegate : Signature.Public_key_hash.t option;
-      script : Script.t;
-      credit : Tez.tez;
-      preorigination : Contract.t option;
-    }
-      -> Kind.origination manager_operation
+  | Transaction : transaction -> Kind.transaction manager_operation
+  | Origination : origination -> Kind.origination manager_operation
   | Delegation :
       Signature.Public_key_hash.t option
       -> Kind.delegation manager_operation
@@ -2775,9 +2777,6 @@ module Operation : sig
 
   val internal_operation_encoding : packed_internal_operation Data_encoding.t
 
-  val packed_internal_operation_in_memory_size :
-    packed_internal_operation -> Cache_memory_helpers.nodes_and_size
-
   val pack : 'kind operation -> packed_operation
 
   type ('a, 'b) eq = Eq : ('a, 'a) eq
@@ -2870,9 +2869,15 @@ module Operation : sig
 
       val reveal_case : Kind.reveal case
 
+      val transaction_tag : int
+
       val transaction_case : Kind.transaction case
 
+      val origination_tag : int
+
       val origination_case : Kind.origination case
+
+      val delegation_tag : int
 
       val delegation_case : Kind.delegation case
 

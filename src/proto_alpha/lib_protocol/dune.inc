@@ -155,6 +155,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    michelson_v1_gas.mli michelson_v1_gas.ml
    script_list.mli script_list.ml
    script_tc_context.mli script_tc_context.ml
+   apply_results.mli apply_results.ml
    script_ir_translator.mli script_ir_translator.ml
    script_cache.mli script_cache.ml
    script_tc_errors_registration.mli script_tc_errors_registration.ml
@@ -174,7 +175,6 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    sc_rollups.mli sc_rollups.ml
    baking.mli baking.ml
    amendment.mli amendment.ml
-   apply_results.mli apply_results.ml
    apply.mli apply.ml
    services_registration.mli services_registration.ml
    constants_services.mli constants_services.ml
@@ -320,6 +320,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    michelson_v1_gas.mli michelson_v1_gas.ml
    script_list.mli script_list.ml
    script_tc_context.mli script_tc_context.ml
+   apply_results.mli apply_results.ml
    script_ir_translator.mli script_ir_translator.ml
    script_cache.mli script_cache.ml
    script_tc_errors_registration.mli script_tc_errors_registration.ml
@@ -339,7 +340,6 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    sc_rollups.mli sc_rollups.ml
    baking.mli baking.ml
    amendment.mli amendment.ml
-   apply_results.mli apply_results.ml
    apply.mli apply.ml
    services_registration.mli services_registration.ml
    constants_services.mli constants_services.ml
@@ -485,6 +485,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    michelson_v1_gas.mli michelson_v1_gas.ml
    script_list.mli script_list.ml
    script_tc_context.mli script_tc_context.ml
+   apply_results.mli apply_results.ml
    script_ir_translator.mli script_ir_translator.ml
    script_cache.mli script_cache.ml
    script_tc_errors_registration.mli script_tc_errors_registration.ml
@@ -504,7 +505,6 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    sc_rollups.mli sc_rollups.ml
    baking.mli baking.ml
    amendment.mli amendment.ml
-   apply_results.mli apply_results.ml
    apply.mli apply.ml
    services_registration.mli services_registration.ml
    constants_services.mli constants_services.ml
@@ -672,6 +672,7 @@ include Tezos_raw_protocol_alpha.Main
    Michelson_v1_gas
    Script_list
    Script_tc_context
+   Apply_results
    Script_ir_translator
    Script_cache
    Script_tc_errors_registration
@@ -691,7 +692,6 @@ include Tezos_raw_protocol_alpha.Main
    Sc_rollups
    Baking
    Amendment
-   Apply_results
    Apply
    Services_registration
    Constants_services
@@ -878,6 +878,7 @@ include Tezos_raw_protocol_alpha.Main
    michelson_v1_gas.mli michelson_v1_gas.ml
    script_list.mli script_list.ml
    script_tc_context.mli script_tc_context.ml
+   apply_results.mli apply_results.ml
    script_ir_translator.mli script_ir_translator.ml
    script_cache.mli script_cache.ml
    script_tc_errors_registration.mli script_tc_errors_registration.ml
@@ -897,7 +898,6 @@ include Tezos_raw_protocol_alpha.Main
    sc_rollups.mli sc_rollups.ml
    baking.mli baking.ml
    amendment.mli amendment.ml
-   apply_results.mli apply_results.ml
    apply.mli apply.ml
    services_registration.mli services_registration.ml
    constants_services.mli constants_services.ml

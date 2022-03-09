@@ -29,6 +29,9 @@ open Alpha_context
 val pp_internal_operation :
   Format.formatter -> packed_internal_operation -> unit
 
+val pp_internal_operation_result :
+  Format.formatter -> Apply_results.packed_internal_contents -> unit
+
 val pp_operation_result :
   Format.formatter ->
   'kind contents_list * 'kind Apply_results.contents_result_list ->

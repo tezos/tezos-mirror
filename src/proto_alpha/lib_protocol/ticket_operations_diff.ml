@@ -178,7 +178,7 @@ let tickets_of_transaction ctxt ~destination ~parameters ~entrypoint =
            entrypoints
            entrypoint)
       >>?= fun (res, ctxt) ->
-      res >>?= fun (_f, Ex_ty entry_arg_ty) ->
+      res >>?= fun (Ex_ty_cstr (entry_arg_ty, _f)) ->
       Ticket_scanner.type_has_tickets ctxt entry_arg_ty
       >>?= fun (has_tickets, ctxt) ->
       (* Load the tickets from the parameters. *)
