@@ -1363,7 +1363,7 @@ let extract_ir_sized_step :
   | (ISelf_address (_, _), _) -> Instructions.self_address
   | (IAmount (_, _), _) -> Instructions.amount
   | (ISapling_empty_state (_, _, _), _) -> Instructions.sapling_empty_state
-  | (ISapling_verify_update (_, _), (transaction, (_state, _))) ->
+  | (ISapling_verify_update_deprecated (_, _), (transaction, (_state, _))) ->
       let inputs = Size.sapling_transaction_inputs transaction in
       let outputs = Size.sapling_transaction_outputs transaction in
       let state = Size.zero in

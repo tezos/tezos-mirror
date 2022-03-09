@@ -211,11 +211,11 @@ let cost_of_instr : type a s r f. (a, s, r, f) kinstr -> a -> s -> Gas.cost =
   | IPairing_check_bls12_381 _ ->
       let pairs = accu in
       Interp_costs.pairing_check_bls12_381 pairs
-  | ISapling_verify_update _ ->
+  | ISapling_verify_update_deprecated _ ->
       let tx = accu in
       let inputs = List.length tx.inputs in
       let outputs = List.length tx.outputs in
-      Interp_costs.sapling_verify_update ~inputs ~outputs
+      Interp_costs.sapling_verify_update_deprecated ~inputs ~outputs
   | ISplit_ticket _ ->
       let ticket = accu and ((amount_a, amount_b), _) = stack in
       Interp_costs.split_ticket ticket.amount amount_a amount_b

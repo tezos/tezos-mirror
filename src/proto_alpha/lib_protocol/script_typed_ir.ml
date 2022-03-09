@@ -1033,7 +1033,7 @@ type ('before_top, 'before, 'result_top, 'result) kinstr =
       * Sapling.Memo_size.t
       * (Sapling.state, 'a * 's, 'b, 'f) kinstr
       -> ('a, 's, 'b, 'f) kinstr
-  | ISapling_verify_update :
+  | ISapling_verify_update_deprecated :
       (Sapling.transaction, Sapling.state * 's) kinfo
       * ((z num, Sapling.state) pair option, 's, 'r, 'f) kinstr
       -> (Sapling.transaction, Sapling.state * 's, 'r, 'f) kinstr
@@ -1527,7 +1527,7 @@ let kinfo_of_kinstr : type a s b f. (a, s, b, f) kinstr -> (a, s) kinfo =
   | ISelf_address (kinfo, _) -> kinfo
   | IAmount (kinfo, _) -> kinfo
   | ISapling_empty_state (kinfo, _, _) -> kinfo
-  | ISapling_verify_update (kinfo, _) -> kinfo
+  | ISapling_verify_update_deprecated (kinfo, _) -> kinfo
   | IDig (kinfo, _, _, _) -> kinfo
   | IDug (kinfo, _, _, _) -> kinfo
   | IDipn (kinfo, _, _, _, _) -> kinfo
@@ -1733,8 +1733,8 @@ let kinstr_rewritek :
   | IAmount (kinfo, k) -> IAmount (kinfo, f.apply k)
   | ISapling_empty_state (kinfo, s, k) ->
       ISapling_empty_state (kinfo, s, f.apply k)
-  | ISapling_verify_update (kinfo, k) ->
-      ISapling_verify_update (kinfo, f.apply k)
+  | ISapling_verify_update_deprecated (kinfo, k) ->
+      ISapling_verify_update_deprecated (kinfo, f.apply k)
   | IDig (kinfo, n, p, k) -> IDig (kinfo, n, p, f.apply k)
   | IDug (kinfo, n, p, k) -> IDug (kinfo, n, p, f.apply k)
   | IDipn (kinfo, n, p, k1, k2) -> IDipn (kinfo, n, p, f.apply k1, f.apply k2)
@@ -2057,7 +2057,7 @@ let kinstr_traverse i init f =
     | ISelf_address (_, k) -> (next [@ocaml.tailcall]) k
     | IAmount (_, k) -> (next [@ocaml.tailcall]) k
     | ISapling_empty_state (_, _, k) -> (next [@ocaml.tailcall]) k
-    | ISapling_verify_update (_, k) -> (next [@ocaml.tailcall]) k
+    | ISapling_verify_update_deprecated (_, k) -> (next [@ocaml.tailcall]) k
     | IDig (_, _, _, k) -> (next [@ocaml.tailcall]) k
     | IDug (_, _, _, k) -> (next [@ocaml.tailcall]) k
     | IDipn (_, _, _, k1, k2) -> (next2 [@ocaml.tailcall]) k1 k2

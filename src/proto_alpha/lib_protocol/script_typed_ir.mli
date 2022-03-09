@@ -991,7 +991,7 @@ type ('before_top, 'before, 'result_top, 'result) kinstr =
       * Sapling.Memo_size.t
       * (Sapling.state, 'a * 's, 'b, 'f) kinstr
       -> ('a, 's, 'b, 'f) kinstr
-  | ISapling_verify_update :
+  | ISapling_verify_update_deprecated :
       (Sapling.transaction, Sapling.state * 's) kinfo
       * ((z num, Sapling.state) pair option, 's, 'r, 'f) kinstr
       -> (Sapling.transaction, Sapling.state * 's, 'r, 'f) kinstr

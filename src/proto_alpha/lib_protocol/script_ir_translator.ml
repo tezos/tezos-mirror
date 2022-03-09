@@ -3825,7 +3825,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
         transaction_memo_size
       >>?= fun () ->
       let instr =
-        {apply = (fun kinfo k -> ISapling_verify_update (kinfo, k))}
+        {apply = (fun kinfo k -> ISapling_verify_update_deprecated (kinfo, k))}
       in
       pair_t loc int_t state_ty >>?= fun pair_ty ->
       option_t loc pair_ty >>?= fun ty ->

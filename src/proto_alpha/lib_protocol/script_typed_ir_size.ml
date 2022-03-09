@@ -583,7 +583,8 @@ and kinstr_size :
     | IAmount (kinfo, _) -> ret_succ_adding accu (base kinfo)
     | ISapling_empty_state (kinfo, _m, _) ->
         ret_succ_adding accu (base kinfo +! word_size +! sapling_memo_size_size)
-    | ISapling_verify_update (kinfo, _) -> ret_succ_adding accu (base kinfo)
+    | ISapling_verify_update_deprecated (kinfo, _) ->
+        ret_succ_adding accu (base kinfo)
     | IDig (kinfo, n, _, _) ->
         ret_succ_adding
           accu
