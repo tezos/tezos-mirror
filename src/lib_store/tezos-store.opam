@@ -19,7 +19,7 @@ depends: [
   "tezos-protocol-updater"
   "tezos-stdlib-unix"
   "tezos-stdlib"
-  "lwt-watcher" { = "0.1" }
+  "lwt-watcher" { = "0.2" }
   "ringo-lwt" { = "0.7" }
   "camlzip" { = "1.10" }
   "tar"
