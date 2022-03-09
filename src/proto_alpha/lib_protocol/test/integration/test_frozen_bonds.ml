@@ -282,25 +282,25 @@ let test_total_stake ~user_is_delegate () =
     (List.sort Bond_id.compare [bond_id1; bond_id2])
   >>=? fun () ->
   (* Check that the stake of user contract is balance + two deposits. *)
-  Contract.get_full_balance ctxt user_contract >>>=? fun stake ->
-  Contract.frozen_balance ctxt user_contract >>>=? fun frozen_balance ->
+  Contract.get_balance_and_frozen_bonds ctxt user_contract >>>=? fun stake ->
+  Contract.get_frozen_bonds ctxt user_contract >>>=? fun frozen_bonds ->
   Token.balance ctxt user_account >>>=? fun (ctxt, balance) ->
-  Assert.equal_tez ~loc:__LOC__ (stake -! balance) frozen_balance >>=? fun () ->
+  Assert.equal_tez ~loc:__LOC__ (stake -! balance) frozen_bonds >>=? fun () ->
   Assert.equal_tez ~loc:__LOC__ (stake -! balance) (deposit_amount *! 2L)
   >>=? fun () ->
   (* Punish for one deposit. *)
   Token.transfer ctxt deposit_account2 `Burned deposit_amount
   >>>=? fun (ctxt, _) ->
   (* Check that stake of contract is balance + deposit. *)
-  Contract.get_full_balance ctxt user_contract >>>=? fun stake ->
-  Contract.frozen_balance ctxt user_contract >>>=? fun frozen_balance ->
-  Assert.equal_tez ~loc:__LOC__ (stake -! balance) frozen_balance >>=? fun () ->
+  Contract.get_balance_and_frozen_bonds ctxt user_contract >>>=? fun stake ->
+  Contract.get_frozen_bonds ctxt user_contract >>>=? fun frozen_bonds ->
+  Assert.equal_tez ~loc:__LOC__ (stake -! balance) frozen_bonds >>=? fun () ->
   Assert.equal_tez ~loc:__LOC__ (stake -! balance) deposit_amount >>=? fun () ->
   (* Punish for the other deposit. *)
   Token.transfer ctxt deposit_account1 `Burned deposit_amount
   >>>=? fun (ctxt, _) ->
   (* Check that stake of contract is equal to balance. *)
-  Contract.get_full_balance ctxt user_contract >>>=? fun stake ->
+  Contract.get_balance_and_frozen_bonds ctxt user_contract >>>=? fun stake ->
   Assert.equal_tez ~loc:__LOC__ stake balance
 
 let tests =

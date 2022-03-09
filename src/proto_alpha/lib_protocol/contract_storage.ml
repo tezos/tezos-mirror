@@ -654,13 +654,13 @@ let increase_balance_only_call_from_token ctxt contract amount =
 let decrease_balance_only_call_from_token ctxt contract amount =
   update_balance ctxt contract Tez_repr.( -? ) amount
 
-let frozen_balance ctxt contract =
+let get_frozen_bonds ctxt contract =
   Storage.Contract.Total_frozen_bonds.find ctxt contract
   >|=? Option.value ~default:Tez_repr.zero
 
-let get_full_balance ctxt contract =
+let get_balance_and_frozen_bonds ctxt contract =
   Storage.Contract.Spendable_balance.get ctxt contract >>=? fun balance ->
-  frozen_balance ctxt contract >>=? fun total_bonds ->
+  get_frozen_bonds ctxt contract >>=? fun total_bonds ->
   Lwt.return Tez_repr.(balance +? total_bonds)
 
 let bond_allocated ctxt contract bond_id =

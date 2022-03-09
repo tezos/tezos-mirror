@@ -43,10 +43,10 @@ val info :
 val balance :
   'a #RPC_context.simple -> 'a -> Contract.t -> Tez.t shell_tzresult Lwt.t
 
-val frozen_balance :
+val frozen_bonds :
   'a #RPC_context.simple -> 'a -> Contract.t -> Tez.t shell_tzresult Lwt.t
 
-val full_balance :
+val balance_and_frozen_bonds :
   'a #RPC_context.simple -> 'a -> Contract.t -> Tez.t shell_tzresult Lwt.t
 
 val manager_key :

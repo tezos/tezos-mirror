@@ -2041,9 +2041,9 @@ module Contract : sig
   val originated_from_current_nonce :
     since:context -> until:context -> contract list tzresult Lwt.t
 
-  val frozen_balance : context -> contract -> Tez.t tzresult Lwt.t
+  val get_frozen_bonds : context -> contract -> Tez.t tzresult Lwt.t
 
-  val get_full_balance : context -> contract -> Tez.t tzresult Lwt.t
+  val get_balance_and_frozen_bonds : context -> contract -> Tez.t tzresult Lwt.t
 
   val fold_on_bond_ids :
     context ->
