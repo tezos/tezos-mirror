@@ -1736,7 +1736,7 @@ Domain specific data types
 
 -  ``bls12_381_fr`` : An element of the scalar field F\ :sub:`r`\ , used for scalar multiplication on the BLS12-381 curves G\ :sub:`1`\  and G\ :sub:`2`\ .
 
--  ``sapling_transaction ms``: A :doc:`Sapling <sapling>` transaction
+-  ``sapling_transaction_deprecated ms``: A :doc:`Sapling <sapling>` transaction
 
 -  ``sapling_state ms``: A :doc:`Sapling <sapling>` state
 
@@ -2250,7 +2250,7 @@ comprehensive description of the Sapling protocol.
 
 ::
 
-    :: sapling_transaction ms : sapling_state ms : 'S   ->   option (pair int (sapling_state ms)): 'S
+    :: sapling_transaction_deprecated ms : sapling_state ms : 'S   ->   option (pair int (sapling_state ms)): 'S
 
     > SAPLING_VERIFY_UPDATE / t : s : S  =>  Some (Pair b s') : S
         iff the transaction t successfully applied on state s resulting
@@ -3767,7 +3767,7 @@ Full grammar
       | bls12_381_g1
       | bls12_381_g2
       | bls12_381_fr
-      | sapling_transaction <natural number constant>
+      | sapling_transaction_deprecated <natural number constant>
       | sapling_state <natural number constant>
       | chest
       | chest_key
