@@ -3099,7 +3099,10 @@ end
 
 module Fees : sig
   val record_paid_storage_space :
-    context -> Contract.t -> (context * Z.t * Z.t) tzresult Lwt.t
+    context ->
+    Contract.t ->
+    ticket_table_size_diff:Z.t ->
+    (context * Z.t * Z.t) tzresult Lwt.t
 
   val record_global_constant_storage_space : context -> Z.t -> context * Z.t
 

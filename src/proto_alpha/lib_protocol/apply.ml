@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -863,6 +864,12 @@ let assert_tx_rollup_feature_enabled ctxt =
 let assert_sc_rollup_feature_enabled ctxt =
   fail_unless (Constants.sc_rollup_enable ctxt) Sc_rollup_feature_disabled
 
+let update_script_storage_and_ticket_balances ctxt ~self storage
+    lazy_storage_diff ticket_diffs operations =
+  Contract.update_script_storage ctxt self storage lazy_storage_diff
+  >>=? fun ctxt ->
+  Ticket_accounting.update_ticket_balances ctxt ~self ~ticket_diffs operations
+
 (**
 
    Retrieving the source code of a contract from its address is costly
@@ -1010,15 +1017,20 @@ let apply_manager_operation_content :
             ~parameter
             ~entrypoint
             ~internal
-          >>=? fun ( {ctxt; storage; lazy_storage_diff; operations},
+          >>=? fun ( {ctxt; storage; lazy_storage_diff; operations; ticket_diffs},
                      (updated_cached_script, updated_size) ) ->
-          Contract.update_script_storage
+          update_script_storage_and_ticket_balances
             ctxt
-            destination
+            ~self:destination
             storage
             lazy_storage_diff
-          >>=? fun ctxt ->
-          Fees.record_paid_storage_space ctxt destination
+            ticket_diffs
+            operations
+          >>=? fun (ticket_table_size_diff, ctxt) ->
+          Fees.record_paid_storage_space
+            ctxt
+            destination
+            ~ticket_table_size_diff
           >>=? fun (ctxt, new_size, paid_storage_size_diff) ->
           Contract.originated_from_current_nonce
             ~since:before_operation
@@ -1178,7 +1190,10 @@ let apply_manager_operation_content :
       >>=? fun ctxt ->
       Token.transfer ctxt (`Contract source) (`Contract contract) credit
       >>=? fun (ctxt, balance_updates) ->
-      Fees.record_paid_storage_space ctxt contract
+      Fees.record_paid_storage_space
+        ctxt
+        contract
+        ~ticket_table_size_diff:Z.zero
       >|=? fun (ctxt, size, paid_storage_size_diff) ->
       let result =
         Origination_result
@@ -2727,7 +2742,13 @@ let apply_liquidity_baking_subsidy ctxt ~escape_vote =
              ~cached_script:(Some script_ir)
              ~entrypoint:Entrypoint.default
              ~internal:false
-           >>=? fun ( {ctxt; storage; lazy_storage_diff; operations},
+           >>=? fun ( {
+                        ctxt;
+                        storage;
+                        lazy_storage_diff;
+                        operations;
+                        ticket_diffs;
+                      },
                       (updated_cached_script, updated_size) ) ->
            match operations with
            | _ :: _ ->
@@ -2735,15 +2756,18 @@ let apply_liquidity_baking_subsidy ctxt ~escape_vote =
                return (backtracking_ctxt, [])
            | [] ->
                (* update CPMM storage *)
-               Contract.update_script_storage
+               update_script_storage_and_ticket_balances
                  ctxt
-                 liquidity_baking_cpmm_contract
+                 ~self:liquidity_baking_cpmm_contract
                  storage
                  lazy_storage_diff
-               >>=? fun ctxt ->
+                 ticket_diffs
+                 operations
+               >>=? fun (ticket_table_size_diff, ctxt) ->
                Fees.record_paid_storage_space
                  ctxt
                  liquidity_baking_cpmm_contract
+                 ~ticket_table_size_diff
                >>=? fun (ctxt, new_size, paid_storage_size_diff) ->
                let consumed_gas =
                  Gas.consumed ~since:backtracking_ctxt ~until:ctxt

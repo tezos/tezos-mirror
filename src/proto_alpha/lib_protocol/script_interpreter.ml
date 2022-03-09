@@ -1691,7 +1691,8 @@ let execute logger ctxt mode step_constants ~entrypoint ~internal
     * context
     * Lazy_storage.diffs option
     * ex_script
-    * int)
+    * int
+    * Z.t Ticket_token_map.t)
     tzresult
     Lwt.t =
   (match cached_script with
@@ -1707,7 +1708,7 @@ let execute logger ctxt mode step_constants ~entrypoint ~internal
                  code_size;
                  code;
                  arg_type;
-                 storage;
+                 storage = old_storage;
                  storage_type;
                  entrypoints;
                  views;
@@ -1725,12 +1726,12 @@ let execute logger ctxt mode step_constants ~entrypoint ~internal
   >>=? fun (arg, ctxt) ->
   Script_ir_translator.collect_lazy_storage ctxt arg_type arg
   >>?= fun (to_duplicate, ctxt) ->
-  Script_ir_translator.collect_lazy_storage ctxt storage_type storage
+  Script_ir_translator.collect_lazy_storage ctxt storage_type old_storage
   >>?= fun (to_update, ctxt) ->
   trace
     (Runtime_contract_error step_constants.self)
-    (interp logger (ctxt, step_constants) code (arg, storage))
-  >>=? fun ((ops, storage), ctxt) ->
+    (interp logger (ctxt, step_constants) code (arg, old_storage))
+  >>=? fun ((ops, new_storage), ctxt) ->
   Script_ir_translator.extract_lazy_storage_diff
     ctxt
     mode
@@ -1738,7 +1739,7 @@ let execute logger ctxt mode step_constants ~entrypoint ~internal
     ~to_duplicate
     ~to_update
     storage_type
-    storage
+    new_storage
   >>=? fun (storage, lazy_storage_diff, ctxt) ->
   trace
     Cannot_serialize_storage
@@ -1749,38 +1750,57 @@ let execute logger ctxt mode step_constants ~entrypoint ~internal
         >>? fun ctxt -> ok (Micheline.strip_locations unparsed_storage, ctxt) )
     )
   >>=? fun (unparsed_storage, ctxt) ->
-  Lwt.return
-    (let op_to_couple op = (op.piop, op.lazy_storage_diff) in
-     let (ops, op_diffs) =
-       ops.elements |> List.map op_to_couple |> List.split
-     in
-     let lazy_storage_diff =
-       match
-         List.flatten
-           (List.map
-              (Option.value ~default:[])
-              (op_diffs @ [lazy_storage_diff]))
-       with
-       | [] -> None
-       | diff -> Some diff
-     in
-     let script =
-       Ex_script
-         {code_size; code; arg_type; storage; storage_type; entrypoints; views}
-     in
-     (* We consume gas after the fact in order to not have to instrument
-        [script_size] (for efficiency).
-        This is safe, as we already pay gas proportional to storage size
-        in [unparse_data]. *)
-     let (size, cost) = Script_ir_translator.script_size script in
-     Gas.consume ctxt cost >>? fun ctxt ->
-     ok (unparsed_storage, ops, ctxt, lazy_storage_diff, script, size))
+  let op_to_couple op = (op.piop, op.lazy_storage_diff) in
+  let (op_elems, op_diffs) =
+    ops.elements |> List.map op_to_couple |> List.split
+  in
+  let lazy_storage_diff_all =
+    match
+      List.flatten
+        (List.map (Option.value ~default:[]) (op_diffs @ [lazy_storage_diff]))
+    with
+    | [] -> None
+    | diff -> Some diff
+  in
+  let script =
+    Ex_script
+      {code_size; code; arg_type; storage; storage_type; entrypoints; views}
+  in
+  Ticket_scanner.type_has_tickets ctxt arg_type
+  >>?= fun (arg_type_has_tickets, ctxt) ->
+  Ticket_scanner.type_has_tickets ctxt storage_type
+  >>?= fun (storage_type_has_tickets, ctxt) ->
+  (* Collect the ticket diffs *)
+  Ticket_accounting.ticket_diffs
+    ctxt
+    ~arg_type_has_tickets
+    ~storage_type_has_tickets
+    ~arg
+    ~old_storage
+    ~new_storage
+    ~lazy_storage_diff:(Option.value ~default:[] lazy_storage_diff)
+  >>=? fun (ticket_diffs, ctxt) ->
+  (* We consume gas after the fact in order to not have to instrument
+     [script_size] (for efficiency).
+     This is safe, as we already pay gas proportional to storage size
+     in [unparse_data]. *)
+  let (size, cost) = Script_ir_translator.script_size script in
+  Gas.consume ctxt cost >>?= fun ctxt ->
+  return
+    ( unparsed_storage,
+      op_elems,
+      ctxt,
+      lazy_storage_diff_all,
+      script,
+      size,
+      ticket_diffs )
 
 type execution_result = {
   ctxt : context;
   storage : Script.expr;
   lazy_storage_diff : Lazy_storage.diffs option;
   operations : packed_internal_operation list;
+  ticket_diffs : Z.t Ticket_token_map.t;
 }
 
 let execute ?logger ctxt ~cached_script mode step_constants ~script ~entrypoint
@@ -1795,8 +1815,15 @@ let execute ?logger ctxt ~cached_script mode step_constants ~script ~entrypoint
     script
     cached_script
     (Micheline.root parameter)
-  >|=? fun (storage, operations, ctxt, lazy_storage_diff, ex_script, approx_size)
-    -> ({ctxt; storage; lazy_storage_diff; operations}, (ex_script, approx_size))
+  >|=? fun ( storage,
+             operations,
+             ctxt,
+             lazy_storage_diff,
+             ex_script,
+             approx_size,
+             ticket_diffs ) ->
+  ( {ctxt; storage; lazy_storage_diff; operations; ticket_diffs},
+    (ex_script, approx_size) )
 
 (*
 

@@ -47,7 +47,7 @@ Contract memorized as level.
 Injected block at minimal timestamp
 Injected block at minimal timestamp
 Node is bootstrapped.
-Estimated gas: 2049.598 units (will add 100 for safety)
+Estimated gas: 2050.718 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[BLOCK_HASH]'
@@ -58,13 +58,13 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [CONTRACT_HASH]
-    Fee to the baker: ꜩ0.000467
+    Fee to the baker: ꜩ0.000468
     Expected counter: [EXPECTED_COUNTER]
-    Gas limit: 2150
+    Gas limit: 2151
     Storage limit: 0 bytes
     Balance updates:
-      [CONTRACT_HASH] ... -ꜩ0.000467
-      payload fees(the block proposer) ....... +ꜩ0.000467
+      [CONTRACT_HASH] ... -ꜩ0.000468
+      payload fees(the block proposer) ....... +ꜩ0.000468
     Transaction:
       Amount: ꜩ500
       From: [CONTRACT_HASH]
@@ -72,7 +72,7 @@ This sequence of operations was run:
       This transaction was successfully applied
       Updated storage: 4
       Storage size: 40 bytes
-      Consumed gas: 2049.598
+      Consumed gas: 2050.718
       Balance updates:
         [CONTRACT_HASH] ... -ꜩ500
         [CONTRACT_HASH] ... +ꜩ500
@@ -89,7 +89,7 @@ Injected block at minimal timestamp
 Injected block at minimal timestamp
 4
 Node is bootstrapped.
-Estimated gas: 1202.385 units (will add 100 for safety)
+Estimated gas: 1203.505 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[BLOCK_HASH]'
@@ -102,7 +102,7 @@ This sequence of operations was run:
     From: [CONTRACT_HASH]
     Fee to the baker: ꜩ0.000383
     Expected counter: [EXPECTED_COUNTER]
-    Gas limit: 1303
+    Gas limit: 1304
     Storage limit: 0 bytes
     Balance updates:
       [CONTRACT_HASH] ... -ꜩ0.000383
@@ -114,7 +114,7 @@ This sequence of operations was run:
       This transaction was successfully applied
       Updated storage: 7
       Storage size: 40 bytes
-      Consumed gas: 1202.385
+      Consumed gas: 1203.505
       Balance updates:
         [CONTRACT_HASH] ... -ꜩ500
         [CONTRACT_HASH] ... +ꜩ500

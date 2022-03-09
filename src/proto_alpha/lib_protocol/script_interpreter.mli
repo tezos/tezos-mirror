@@ -55,6 +55,7 @@ type execution_result = {
   storage : Script.expr;
   lazy_storage_diff : Lazy_storage.diffs option;
   operations : packed_internal_operation list;
+  ticket_diffs : Z.t Ticket_token_map.t;
 }
 
 type step_constants = Script_typed_ir.step_constants = {

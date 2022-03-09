@@ -149,7 +149,7 @@ let parse_and_cache_script ctxt ~destination ~get_non_cached_script =
       Script_cache.insert ctxt destination (script, ex_script) size
       >>?= fun ctxt -> return (ex_script, ctxt)
 
-let tickets_of_transaction ctxt ~destination ~parameters =
+let tickets_of_transaction ctxt ~destination ~parameters ~entrypoint =
   match Contract.is_implicit destination with
   | Some _ -> return (None, ctxt)
   | None ->
@@ -167,8 +167,19 @@ let tickets_of_transaction ctxt ~destination ~parameters =
           match script_opt with
           | None -> fail (Failed_to_get_script destination)
           | Some script -> return (script, ctxt))
-      >>=? fun (Script_ir_translator.Ex_script {arg_type; _}, ctxt) ->
-      Ticket_scanner.type_has_tickets ctxt arg_type
+      >>=? fun (Script_ir_translator.Ex_script {arg_type; entrypoints; _}, ctxt)
+        ->
+      (* Find the entrypoint type for the given entrypoint. *)
+      Gas_monad.run
+        ctxt
+        (Script_ir_translator.find_entrypoint
+           ~error_details:Informative
+           arg_type
+           entrypoints
+           entrypoint)
+      >>?= fun (res, ctxt) ->
+      res >>?= fun (_f, Ex_ty entry_arg_ty) ->
+      Ticket_scanner.type_has_tickets ctxt entry_arg_ty
       >>?= fun (has_tickets, ctxt) ->
       (* Load the tickets from the parameters. *)
       (* TODO: #2350
@@ -194,16 +205,16 @@ let tickets_of_origination ctxt ~preorigination script =
   | None -> fail Contract_not_originated
   | Some destination ->
       (* TODO: #2351
-         Avoid having to load the script from the cache.
+         Avoid having to parse the script here.
+         We're not able to rely on caching due to issues with lazy storage.
          After internal operations are in place we should be able to use the
          typed script directly.
       *)
-      parse_and_cache_script
+      Script_ir_translator.parse_script
         ctxt
-        ~destination
-        ~get_non_cached_script:(fun ctxt ->
-          (* For an origination operation we already have the script. *)
-          return (script, ctxt))
+        ~legacy:true
+        ~allow_forged_in_storage:true
+        script
       >>=? fun ( Script_ir_translator.Ex_script
                    {
                      storage;
@@ -239,10 +250,10 @@ let tickets_of_operation ctxt
       {
         amount = _;
         parameters;
-        entrypoint = _;
+        entrypoint;
         destination = Destination.Contract destination;
       } ->
-      tickets_of_transaction ctxt ~destination ~parameters
+      tickets_of_transaction ctxt ~destination ~parameters ~entrypoint
   | Transaction {destination = Destination.Tx_rollup _; _} ->
       (* TODO: #2488
          The ticket accounting for the recipient of rollup transactions
