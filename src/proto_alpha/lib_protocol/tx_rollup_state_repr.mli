@@ -36,20 +36,27 @@ val encoding : t Data_encoding.t
 
 val pp : Format.formatter -> t -> unit
 
-(** [update_burn_per_byte state ~final_size ~hard_limit] updates the
-    burn to be paid for each byte submitted to a transaction rollup
-    inbox, based on the ratio of the [hard_limit] maximum amount of
-    byte an inbox can use and the [final_size] amount of bytes it uses
-    at the end of the construction of a Tezos block.
+(** [update_burn_per_byte state ~factor ~final_size ~hard_limit]
+   updates the cost per byte to be paid for each message submitted to
+   the rollup.  This is done by computing a moving average for
+   [factor] snapshots. Each snapshot being the size of the total
+   messages for the rollup. Hence each snapshot contributes to [1/(1 +
+   factor)] to the average.
 
-    In a nutshell, if the ratio is lesser than 80%, the burn per byte
-    are reduced. If the ratio is somewhere between 80% and 90%, the
-    burn per byte remain constant. If the ratio is greater than 90%,
-    then the burn per byte are increased.
+    Once the moving average [ma] is computed, we use the [hard limit]
+   to know whether the cost per byte should be updated:
 
-    The rationale behind this mechanics is to reduce the activity of a
-    transaction rollup in case it becomes too intense. *)
-val update_burn_per_byte : t -> final_size:int -> hard_limit:int -> t
+    1. If [ma <= 80] then the cost per byte is decreased
+
+    2. If [80 < ma <= 90] then the cost per byte is stable
+
+    3. If [90 < ma] then the cost ber byte is increased
+
+    The rationale behind this mechanics is to adapt the cost of a
+   transactionnal rollup depending on its activity. This can be used
+   to prevent from some spamming attacks. *)
+val update_burn_per_byte :
+  t -> factor:int -> final_size:int -> hard_limit:int -> t
 
 (** [burn_cost ~limit state size] computes the burn to be paid to submit
     [size] bytes in the inbox of the transactional rollup.

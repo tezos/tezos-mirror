@@ -149,9 +149,13 @@ let prepare_metadata :
           let hard_limit =
             Constants_storage.tx_rollup_hard_size_limit_per_inbox ctxt
           in
+          let factor =
+            Constants_storage.tx_rollup_cost_per_byte_ema_factor ctxt
+          in
           let state =
             Tx_rollup_state_repr.update_burn_per_byte
               state
+              ~factor
               ~final_size:inbox.cumulated_size
               ~hard_limit
           in

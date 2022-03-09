@@ -268,26 +268,23 @@ let pp fmt
              c))
       last_removed_commitment_hashes)
 
-let update_burn_per_byte : t -> final_size:int -> hard_limit:int -> t =
- fun ({burn_per_byte; inbox_ema; _} as state) ~final_size ~hard_limit ->
+let update_burn_per_byte :
+    t -> factor:int -> final_size:int -> hard_limit:int -> t =
+ fun ({burn_per_byte; inbox_ema; _} as state) ~factor ~final_size ~hard_limit ->
   let threshold_increase = 90 in
   let threshold_decrease = 80 in
   let variation_factor = 5L in
+  let smoothing = 2 in
+
   (* The formula of the multiplier of EMA :
 
        smoothing / (1 + N)
 
-     Suppose the period we want to observe is an hour and
-     producing a block takes 30 seconds, then, N is equal
-     to 120. The common choice of smoothing is 2. Therefore,
-     multiplier of EMA:
-
-       2 / (1 + 120) ~= 0.0165 *)
-  let inbox_ema_multiplier = 165 in
+     Suppose the period we want to observe is given by the
+     [factor]. The common choice of smoothing is 2.
+  *)
   let inbox_ema =
-    ((final_size * inbox_ema_multiplier)
-    + (inbox_ema * (10000 - inbox_ema_multiplier)))
-    / 10000
+    inbox_ema + ((final_size - inbox_ema) * smoothing / (1 + factor))
   in
   let percentage = inbox_ema * 100 / hard_limit in
   let computation =

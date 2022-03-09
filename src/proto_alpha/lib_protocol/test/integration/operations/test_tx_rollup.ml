@@ -374,9 +374,11 @@ let test_burn_per_byte_update () =
         ~inbox_ema
         ()
     in
+    let factor = 120 (* default factor *) in
     let state =
       Alpha_context.Tx_rollup_state.Internal_for_tests.update_burn_per_byte
         state
+        ~factor
         ~final_size
         ~hard_limit
     in
@@ -857,9 +859,11 @@ let test_finalization () =
   >>=? fun (b, n, inbox_size) ->
   let rec update_burn_per_byte_n_time n state =
     if n > 0 then
+      let factor = 120 (* default factor *) in
       let state =
         Alpha_context.Tx_rollup_state.Internal_for_tests.update_burn_per_byte
           state
+          ~factor
           ~final_size:inbox_size
           ~hard_limit:tx_rollup_hard_size_limit_per_inbox
       in
