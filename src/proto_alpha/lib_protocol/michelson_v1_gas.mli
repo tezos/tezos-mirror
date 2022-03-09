@@ -504,7 +504,7 @@ module Cost_of : sig
 
     val operation : bytes -> Gas.cost
 
-    val sapling_transaction : Sapling.transaction -> Gas.cost
+    val sapling_transaction_deprecated : Sapling.transaction -> Gas.cost
 
     val sapling_diff : Sapling.diff -> Gas.cost
 

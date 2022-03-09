@@ -204,7 +204,7 @@ module Ticket_inspection = struct
           ~pair:(fun ht1 ht2 -> Big_map_ht (ht1, ht2))
           k
     | Contract_t _ -> (k [@ocaml.tailcall]) False_ht
-    | Sapling_transaction_t _ -> (k [@ocaml.tailcall]) False_ht
+    | Sapling_transaction_deprecated_t _ -> (k [@ocaml.tailcall]) False_ht
     | Sapling_state_t _ -> (k [@ocaml.tailcall]) False_ht
     | Operation_t ->
         (* Operations may contain tickets but they should never be passed

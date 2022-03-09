@@ -1830,7 +1830,7 @@ module Cost_of = struct
     (* Reuse 006 costs. *)
     let operation bytes = Script.bytes_node_cost bytes
 
-    let sapling_transaction (t : Sapling.transaction) =
+    let sapling_transaction_deprecated (t : Sapling.transaction) =
       let inputs = List.length t.inputs in
       let outputs = List.length t.outputs in
       atomic_step_cost (cost_SAPLING_TRANSACTION_ENCODING ~inputs ~outputs)

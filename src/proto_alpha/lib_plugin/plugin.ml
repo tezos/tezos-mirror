@@ -2067,7 +2067,7 @@ module RPC = struct
             let ta = unparse_comparable_ty ~loc uta in
             let tr = unparse_ty ~loc utr in
             return (T_big_map, [ta; tr], [])
-        | Sapling_transaction_t memo_size ->
+        | Sapling_transaction_deprecated_t memo_size ->
             return
               ( T_sapling_transaction_deprecated,
                 [unparse_memo_size ~loc memo_size],

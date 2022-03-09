@@ -309,7 +309,7 @@ end)
       | `TInt -> Ex_ty int_t
       | `TSapling_state -> Ex_ty (sapling_state_t ~memo_size)
       | `TSapling_transaction_deprecated ->
-          Ex_ty (sapling_transaction_t ~memo_size)
+          Ex_ty (sapling_transaction_deprecated_t ~memo_size)
       | `TChain_id -> Ex_ty chain_id_t
       | `TBls12_381_g1 -> Ex_ty bls12_381_g1_t
       | `TBls12_381_g2 -> Ex_ty bls12_381_g2_t
@@ -580,7 +580,7 @@ end)
         | Ticket_t (contents_ty, _) ->
             let ty = comparable_downcast contents_ty in
             generate_ticket ty
-        | Sapling_transaction_t _ ->
+        | Sapling_transaction_deprecated_t _ ->
             fail_sampling
               "Michelson_samplers: sapling transactions not handled yet"
         | Sapling_state_t _ ->

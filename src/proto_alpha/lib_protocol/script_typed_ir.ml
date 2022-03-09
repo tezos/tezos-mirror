@@ -1313,7 +1313,9 @@ and 'ty ty =
   | Contract_t :
       'arg ty * 'arg typed_contract ty_metadata
       -> 'arg typed_contract ty
-  | Sapling_transaction_t : Sapling.Memo_size.t -> Sapling.transaction ty
+  | Sapling_transaction_deprecated_t :
+      Sapling.Memo_size.t
+      -> Sapling.transaction ty
   | Sapling_state_t : Sapling.Memo_size.t -> Sapling.state ty
   | Operation_t : operation ty
   | Chain_id_t : Script_chain_id.t ty
@@ -1785,8 +1787,8 @@ let ty_metadata : type a. a ty -> a ty_metadata = function
   | Big_map_t (_, _, meta) -> meta
   | Ticket_t (_, meta) -> meta
   | Contract_t (_, meta) -> meta
-  | Sapling_transaction_t _ | Sapling_state_t _ | Operation_t | Bls12_381_g1_t
-  | Bls12_381_g2_t | Bls12_381_fr_t | Chest_t | Chest_key_t ->
+  | Sapling_transaction_deprecated_t _ | Sapling_state_t _ | Operation_t
+  | Bls12_381_g1_t | Bls12_381_g2_t | Bls12_381_fr_t | Chest_t | Chest_key_t ->
       meta_basic
 
 let ty_size t = (ty_metadata t).size
@@ -1883,7 +1885,8 @@ let contract_t loc t =
 
 let contract_unit_t = Contract_t (unit_t, {size = Type_size.two})
 
-let sapling_transaction_t ~memo_size = Sapling_transaction_t memo_size
+let sapling_transaction_deprecated_t ~memo_size =
+  Sapling_transaction_deprecated_t memo_size
 
 let sapling_state_t ~memo_size = Sapling_state_t memo_size
 
@@ -2130,8 +2133,9 @@ let (ty_traverse, comparable_ty_traverse) =
     match (ty : t ty) with
     | Unit_t | Int_t | Nat_t | Signature_t | String_t | Bytes_t | Mutez_t
     | Key_hash_t | Key_t | Timestamp_t | Address_t | Tx_rollup_l2_address_t
-    | Bool_t | Sapling_transaction_t _ | Sapling_state_t _ | Operation_t
-    | Chain_id_t | Never_t | Bls12_381_g1_t | Bls12_381_g2_t | Bls12_381_fr_t ->
+    | Bool_t | Sapling_transaction_deprecated_t _ | Sapling_state_t _
+    | Operation_t | Chain_id_t | Never_t | Bls12_381_g1_t | Bls12_381_g2_t
+    | Bls12_381_fr_t ->
         (continue [@ocaml.tailcall]) accu
     | Ticket_t (cty, _) -> aux f accu cty continue
     | Chest_key_t | Chest_t -> (continue [@ocaml.tailcall]) accu
@@ -2209,9 +2213,9 @@ let value_traverse (type t) (ty : (t ty, t comparable_ty) union) (x : t) init f
     match ty with
     | Unit_t | Int_t | Nat_t | Signature_t | String_t | Bytes_t | Mutez_t
     | Key_hash_t | Key_t | Timestamp_t | Address_t | Tx_rollup_l2_address_t
-    | Bool_t | Sapling_transaction_t _ | Sapling_state_t _ | Operation_t
-    | Chain_id_t | Never_t | Bls12_381_g1_t | Bls12_381_g2_t | Bls12_381_fr_t
-    | Chest_key_t | Chest_t
+    | Bool_t | Sapling_transaction_deprecated_t _ | Sapling_state_t _
+    | Operation_t | Chain_id_t | Never_t | Bls12_381_g1_t | Bls12_381_g2_t
+    | Bls12_381_fr_t | Chest_key_t | Chest_t
     | Lambda_t (_, _, _) ->
         (return [@ocaml.tailcall]) ()
     | Pair_t (ty1, ty2, _) -> (next2 [@ocaml.tailcall]) ty1 ty2 (fst x) (snd x)

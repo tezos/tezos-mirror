@@ -105,7 +105,7 @@ let ty_traverse_f =
         ret_succ_adding accu @@ (base_compound a +! (word_size *? 2))
     | Contract_t (_ty, a) ->
         ret_succ_adding accu @@ (base_compound a +! word_size)
-    | Sapling_transaction_t _m ->
+    | Sapling_transaction_deprecated_t _m ->
         ret_succ_adding accu
         @@ (base_compound_no_meta +! sapling_memo_size_size +! word_size)
     | Sapling_state_t _m ->
@@ -304,7 +304,7 @@ let rec value_size :
           ty'
           x
     | Contract_t (_, _) -> ret_succ (accu ++ contract_size x)
-    | Sapling_transaction_t _ ->
+    | Sapling_transaction_deprecated_t _ ->
         ret_succ_adding accu (Sapling.transaction_in_memory_size x)
     | Sapling_state_t _ -> ret_succ_adding accu (sapling_state_size x)
     (* Operations are neither storable nor pushable, so they can appear neither
