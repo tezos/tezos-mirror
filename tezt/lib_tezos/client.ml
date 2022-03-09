@@ -1357,9 +1357,10 @@ let show_voting_period ?endpoint client =
   | Some period -> return period
 
 module Sc_rollup = struct
-  let spawn_originate ?(wait = "none") ?burn_cap ~src ~kind ~boot_sector client
-      =
+  let spawn_originate ?hooks ?(wait = "none") ?burn_cap ~src ~kind ~boot_sector
+      client =
     spawn_command
+      ?hooks
       client
       (["--wait"; wait]
       @ [
@@ -1385,15 +1386,17 @@ module Sc_rollup = struct
     | None -> Test.fail "Cannot extract rollup address from receipt."
     | Some x -> return x
 
-  let originate ?wait ?burn_cap ~src ~kind ~boot_sector client =
+  let originate ?hooks ?wait ?burn_cap ~src ~kind ~boot_sector client =
     let process =
-      spawn_originate ?wait ?burn_cap ~src ~kind ~boot_sector client
+      spawn_originate ?hooks ?wait ?burn_cap ~src ~kind ~boot_sector client
     in
     let* output = Process.check_and_read_stdout process in
     parse_rollup_address_in_receipt output
 
-  let spawn_send_message ?(wait = "none") ?burn_cap ~msg ~src ~dst client =
+  let spawn_send_message ?hooks ?(wait = "none") ?burn_cap ~msg ~src ~dst client
+      =
     spawn_command
+      ?hooks
       client
       (["--wait"; wait]
       @ ["send"; "sc"; "rollup"; "message"; msg; "from"; src; "to"; dst]
@@ -1402,8 +1405,10 @@ module Sc_rollup = struct
           ~some:(fun burn_cap -> ["--burn-cap"; Tez.to_string burn_cap])
           burn_cap)
 
-  let send_message ?wait ?burn_cap ~msg ~src ~dst client =
-    let process = spawn_send_message ?wait ?burn_cap ~msg ~src ~dst client in
+  let send_message ?hooks ?wait ?burn_cap ~msg ~src ~dst client =
+    let process =
+      spawn_send_message ?hooks ?wait ?burn_cap ~msg ~src ~dst client
+    in
     Process.check process
 end
 

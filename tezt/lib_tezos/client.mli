@@ -984,6 +984,7 @@ val spawn_show_voting_period : ?endpoint:endpoint -> t -> Process.t
 module Sc_rollup : sig
   (** Run [tezos-client originate sc rollup from <src> of kind <kind> booting with <boot_sector>]. *)
   val originate :
+    ?hooks:Process.hooks ->
     ?wait:string ->
     ?burn_cap:Tez.t ->
     src:string ->
@@ -994,6 +995,7 @@ module Sc_rollup : sig
 
   (** Same as [originate], but do not wait for the process to exit. *)
   val spawn_originate :
+    ?hooks:Process.hooks ->
     ?wait:string ->
     ?burn_cap:Tez.t ->
     src:string ->
@@ -1004,6 +1006,7 @@ module Sc_rollup : sig
 
   (** Run [tezos-client send rollup message <msg> from <src> to <dst>]. *)
   val send_message :
+    ?hooks:Process.hooks ->
     ?wait:string ->
     ?burn_cap:Tez.t ->
     msg:string ->
@@ -1014,6 +1017,7 @@ module Sc_rollup : sig
 
   (** Same as [send_message], but do not wait for the process to exit. *)
   val spawn_send_message :
+    ?hooks:Process.hooks ->
     ?wait:string ->
     ?burn_cap:Tez.t ->
     msg:string ->
