@@ -53,7 +53,7 @@ let bls12_381_legacy = external_lib "bls12-381-legacy" V.True
 
 let bls12_381_unix = external_lib "bls12-381-unix" V.True
 
-let camlzip = external_lib "camlzip" V.(exactly "1.10")
+let camlzip = external_lib "camlzip" V.(exactly "1.11")
 
 let caqti = external_lib "caqti" V.True
 
