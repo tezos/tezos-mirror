@@ -24,6 +24,7 @@ Global options (must come before the command):
   -w --wait <none|<int>>: how many confirmation blocks before to consider an operation as included
   -p --protocol <hash>: use commands of a specific protocol
   -l --log-requests: log all requests to the node
+  --better-errors: Error reporting is more detailed. Can be used if a call to an RPC fails or if you don't know the input accepted by the RPC. It may happen that the RPC calls take more time however.
   -A --addr <IP addr|host>: [DEPRECATED: use --endpoint instead] IP address of the node
   -P --port <number>: [DEPRECATED: use --endpoint instead] RPC port of the node
   -S --tls: [DEPRECATED: use --endpoint instead] use TLS to connect to node.

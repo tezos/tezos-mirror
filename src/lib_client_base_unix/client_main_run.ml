@@ -187,6 +187,11 @@ let setup_default_proxy_client_config parsed_args base_dir rpc_config mode =
           p.Client_config.protocol,
           p.Client_config.sources )
   in
+  let verbose_rpc_error_diagnostics =
+    match parsed_args with
+    | None -> false
+    | Some parsed_args -> parsed_args.better_errors
+  in
   match mode with
   | `Mode_client ->
       return
@@ -197,6 +202,7 @@ let setup_default_proxy_client_config parsed_args base_dir rpc_config mode =
            ~password_filename
            ~base_dir
            ~rpc_config
+           ~verbose_rpc_error_diagnostics
   | (`Mode_light | `Mode_proxy) as mode ->
       let printer = new unix_logger ~base_dir in
       let rpc_context =
@@ -348,6 +354,7 @@ let main (module C : M) ~select_commands =
             ~password_filename:None
             ~base_dir:C.default_base_dir
             ~rpc_config:RPC_client_unix.default_config
+            ~verbose_rpc_error_diagnostics:false
         in
         let*! r =
           let* (parsed, remaining) = C.parse_config_args full original_args in

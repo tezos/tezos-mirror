@@ -160,6 +160,7 @@ val rpc_path_query_to_string : ?query_string:query_string -> path -> string
     [("TEZOS_LOG", Protocol.daemon_name protocol ^ ".proxy_rpc->debug")] to enable
     logging. *)
 val rpc :
+  ?better_errors:bool ->
   ?endpoint:endpoint ->
   ?hooks:Process.hooks ->
   ?env:string String_map.t ->
@@ -172,6 +173,7 @@ val rpc :
 
 (** Same as [rpc], but do not wait for the process to exit. *)
 val spawn_rpc :
+  ?better_errors:bool ->
   ?endpoint:endpoint ->
   ?hooks:Process.hooks ->
   ?env:string String_map.t ->
@@ -186,6 +188,7 @@ module Spawn : sig
   (* FIXME: This module is temporary and is here to make the new
      interface cohabits with the old one. *)
   val rpc :
+    ?better_errors:bool ->
     ?endpoint:endpoint ->
     ?hooks:Process.hooks ->
     ?env:string String_map.t ->
