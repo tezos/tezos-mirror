@@ -26,17 +26,27 @@
 (** Testing
     -------
     Component:    Proxy context (without delegation for now)
-    Invocation:   dune exec src/lib_protocol_environment/test/test_proxy_context.exe
-    Dependencies: src/lib_protocol_environment/test/assert.ml
+    Invocation:   dune exec src/lib_protocol_environment/test_shell_context/test_proxy_context.exe
+    Dependencies: src/lib_protocol_environment/test_shell_context/assert.ml
     Subject:      Low-level operations on proxy contexts.
 *)
 
 (* Generates data inside the context of the block *)
-let create_block (ctxt : Context.t) : Context.t Lwt.t =
+let create_block (ctxt : Tezos_context_memory.Context.t) :
+    Tezos_context_memory.Context.t Lwt.t =
   let open Lwt_syntax in
-  let* ctxt = Context.add ctxt ["a"; "b"] (Bytes.of_string "Novembre") in
-  let* ctxt = Context.add ctxt ["a"; "c"] (Bytes.of_string "Juin") in
-  let* ctxt = Context.add ctxt ["version"] (Bytes.of_string "0.0") in
+  let* ctxt =
+    Tezos_context_memory.Context.add
+      ctxt
+      ["a"; "b"]
+      (Bytes.of_string "November")
+  in
+  let* ctxt =
+    Tezos_context_memory.Context.add ctxt ["a"; "c"] (Bytes.of_string "June")
+  in
+  let* ctxt =
+    Tezos_context_memory.Context.add ctxt ["version"] (Bytes.of_string "0.0")
+  in
   Lwt.return ctxt
 
 let key_to_string : String.t list -> String.t = String.concat ";"
@@ -44,8 +54,11 @@ let key_to_string : String.t list -> String.t = String.concat ";"
 (* Initialize the Context before starting the tests *)
 let init_contexts (f : Context.t -> unit Lwt.t) _ () : 'a Lwt.t =
   let open Lwt_syntax in
-  let proxy_genesis : Context.t = Proxy_context.empty None in
-  let* proxy = create_block proxy_genesis in
+  let* ctxt = create_block Tezos_context_memory.Context.empty in
+  let proxy : Context.t =
+    Proxy_context.empty
+      (Some (Tezos_shell_context.Proxy_delegate_maker.of_memory_context ctxt))
+  in
   f proxy
 
 let test_context_mem_fct (proxy : Context.t) : unit Lwt.t =
@@ -81,32 +94,38 @@ let test_context_find_fct (proxy : Context.t) : unit Lwt.t =
   let assert_find key expected =
     let* res = Context.find proxy key in
     Assert.equal_bytes_option
-      ~msg:("Context.find " ^ key_to_string key)
+      ~msg:
+        (Printf.sprintf
+           "Context.find [%s], is some: %b"
+           (key_to_string key)
+           (Option.is_some res))
       expected
       res ;
-    Lwt.return_unit
+    return_unit
   in
   let* () = assert_find ["version"] (Some (Bytes.of_string "0.0")) in
-  let* () = assert_find ["a"; "b"] (Some (Bytes.of_string "Novembre")) in
+  let* () = assert_find ["a"; "b"] (Some (Bytes.of_string "November")) in
   let* () = assert_find ["a"] None in
-  let* () = assert_find ["a"; "x"] None in
-  Lwt.return_unit
+  assert_find ["a"; "x"] None
 
 let test_context_find_tree_fct (proxy : Context.t) : unit Lwt.t =
   let open Lwt_syntax in
   let assert_find_tree key expected =
     let* res = Context.find_tree proxy key in
     Assert.equal_bool
-      ~msg:("Context.find_tree " ^ key_to_string key)
+      ~msg:
+        (Printf.sprintf
+           "Context.find_tree [%s], is some: %b"
+           (key_to_string key)
+           (Option.is_some res))
       expected
       (Option.is_some res) ;
-    Lwt.return_unit
+    return_unit
   in
   let* () = assert_find_tree ["version"] true in
   let* () = assert_find_tree ["a"; "b"] true in
   let* () = assert_find_tree ["a"] true in
-  let* () = assert_find_tree ["a"; "x"] false in
-  Lwt.return_unit
+  assert_find_tree ["a"; "x"] false
 
 let test_context_list_fct (proxy : Context.t) : unit Lwt.t =
   let open Lwt_syntax in

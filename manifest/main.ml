@@ -1600,24 +1600,6 @@ protocols.|}
         "Proxy_delegate";
       ]
 
-let _tezos_protocol_environment_tests =
-  tests
-    [
-      "test"; "test_mem_context_array_theory"; "test_cache"; "test_proxy_context";
-    ]
-    ~path:"src/lib_protocol_environment/test"
-    ~opam:"src/lib_protocol_environment/tezos-protocol-environment"
-    ~deps:
-      [
-        tezos_base |> open_ ~m:"TzPervasives";
-        tezos_base_unix;
-        tezos_protocol_environment |> open_;
-        alcotest_lwt;
-        tezos_test_helpers;
-        qcheck_alcotest;
-        lwt_unix;
-      ]
-
 let tezos_shell_context =
   public_lib
     "tezos-shell-context"
@@ -1631,6 +1613,37 @@ let tezos_shell_context =
         tezos_context;
       ]
     ~modules:["Proxy_delegate_maker"; "Shell_context"]
+
+let _tezos_protocol_environment_tests =
+  tests
+    ["test"; "test_mem_context_array_theory"; "test_cache"]
+    ~path:"src/lib_protocol_environment/test"
+    ~opam:"src/lib_protocol_environment/tezos-protocol-environment"
+    ~deps:
+      [
+        tezos_base |> open_ ~m:"TzPervasives";
+        tezos_base_unix;
+        tezos_protocol_environment |> open_;
+        alcotest_lwt;
+        tezos_test_helpers;
+        qcheck_alcotest;
+        lwt_unix;
+      ]
+
+let _tezos_protocol_shell_context_tests =
+  tests
+    ["test_proxy_context"]
+    ~path:"src/lib_protocol_environment/test_shell_context"
+    ~opam:"src/lib_protocol_environment/tezos-shell-context-test"
+    ~synopsis:"Testing the Shell Context"
+    ~deps:
+      [
+        tezos_shell_context;
+        alcotest_lwt;
+        tezos_test_helpers |> open_;
+        tezos_base |> open_ ~m:"TzPervasives";
+        tezos_protocol_environment |> open_;
+      ]
 
 let tezos_protocol_compiler_registerer =
   public_lib
