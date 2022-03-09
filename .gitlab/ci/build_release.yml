@@ -63,22 +63,3 @@ docker:build_arm64:
   stage: build
   tags:
     - arm64
-
-upload-gitlab-packages:
-  extends:
-    - .rules_template__master_and_releases
-  image: registry.gitlab.com/gitlab-org/release-cli
-  variables:
-    PACKAGE_REGISTRY_URL: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/tezos/${CI_COMMIT_TAG}"
-  stage: build_release
-  needs:
-    - build:static-arm64-linux-binaries
-    - build:static-x86_64-linux-binaries
-  script:
-    - apk --no-cache --virtual add jq curl git
-      # we run the smoketest only for x86_64 since this job is executed
-      # on x86_64
-    - scripts/ci/static_smoke_test.sh x86_64 version
-    - scripts/release/upload-static-binaries-to-package-registry.sh x86_64
-    - scripts/release/upload-static-binaries-to-package-registry.sh arm64
-    - scripts/release/upload-tarball-to-package-registry.sh
