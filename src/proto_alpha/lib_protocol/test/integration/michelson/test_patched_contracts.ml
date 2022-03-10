@@ -72,6 +72,8 @@ let script_hash_testable =
     included in the migration; and that the diff is correct. *)
 module Legacy_patch_test (Patches : LEGACY_SCRIPT_PATCHES) :
   LEGACY_PATCH_TESTS with type t = Patches.t = struct
+  open Lwt_result_syntax
+
   type t = Patches.t
 
   let readable_micheline m =
@@ -89,7 +91,6 @@ module Legacy_patch_test (Patches : LEGACY_SCRIPT_PATCHES) :
   (* Test that the hashes of the scripts in ./patched_contract/<hash>.original.tz
      match hashes of the contracts being updated by the migration. *)
   let test_original_contract legacy_script_hash () =
-    let open Lwt_result_syntax in
     let*! code = read_file ~ext:"original.tz" legacy_script_hash in
     let michelson = Michelson_v1_parser.parse_toplevel ~check:true code in
     let*? prog = Micheline_parser.no_parsing_error michelson in
@@ -109,7 +110,6 @@ module Legacy_patch_test (Patches : LEGACY_SCRIPT_PATCHES) :
      migration correspond to the content of the `./patched_contracts/<hash>.tz`
      files *)
   let test_patched_contract patch () =
-    let open Lwt_result_syntax in
     let*! expected_michelson = read_file @@ Patches.script_hash patch in
     let*? program =
       Micheline_parser.no_parsing_error
@@ -137,7 +137,6 @@ module Legacy_patch_test (Patches : LEGACY_SCRIPT_PATCHES) :
      are the results of the `diff` command on the corresponding
      original and patched files *)
   let verify_diff legacy_script_hash () =
-    let open Lwt_result_syntax in
     let*! expected_diff = read_file ~ext:"diff" legacy_script_hash in
     let original_code = contract_path ~ext:"original.tz" legacy_script_hash in
     (* The other test asserts that this is indeed the patched code. *)
@@ -157,6 +156,22 @@ module Legacy_patch_test (Patches : LEGACY_SCRIPT_PATCHES) :
     in
     let*! actual_diff = Lwt_process.pread diff_cmd in
     Alcotest.(check string) "same diff" expected_diff actual_diff ;
+    return ()
+
+  let typecheck_patched_script code () =
+    (* Number 3 below controls how much accounts should be
+       created. This number shouldn't be too small or the context
+       won't have enough tokens to form a roll. *)
+    let* (block, _) = Context.init 3 in
+    let* inc = Incremental.begin_construction block in
+    let ctxt = Incremental.alpha_ctxt inc in
+    let* _ =
+      Lwt.map Environment.wrap_tzresult
+      @@ Script_ir_translator.parse_code
+           ~legacy:false
+           ~code:(Script_repr.lazy_expr code)
+           ctxt
+    in
     return ()
 
   let tests (patch : Patches.t) =
@@ -180,6 +195,10 @@ module Legacy_patch_test (Patches : LEGACY_SCRIPT_PATCHES) :
         (Format.asprintf "verify patch for %a" Script_expr_hash.pp script_hash)
         `Quick
         (verify_diff script_hash);
+      Tztest.tztest
+        (Format.asprintf "type check %a" Script_expr_hash.pp script_hash)
+        `Quick
+        (typecheck_patched_script @@ Patches.code patch);
     ]
 end
 
