@@ -443,6 +443,7 @@ val transfer :
   ?counter:int ->
   ?arg:string ->
   ?force:bool ->
+  ?expect_failure:bool ->
   amount:Tez.t ->
   giver:string ->
   receiver:string ->
@@ -496,6 +497,10 @@ val spawn_multiple_transfers :
   json_batch:string ->
   t ->
   Process.t
+
+(** Run tezos-client get delegate for <src>. Returns [Some address] if delegate
+    is set or [None] otherwise. *)
+val get_delegate : ?endpoint:endpoint -> src:string -> t -> string option Lwt.t
 
 (** Run [tezos-client set delegate for <src> to <delegate>]. *)
 val set_delegate :
@@ -1128,3 +1133,28 @@ val spawn_command :
   t ->
   string list ->
   Process.t
+
+(** Register public key for given account with given client. *)
+val spawn_register_key : string -> t -> Process.t
+
+(** Register public key for given account with given client. *)
+val register_key : string -> t -> unit Lwt.t
+
+(** Get contract storage for a contract. Returns a Micheline expression
+    representing the storage as a string. *)
+val contract_storage :
+  ?unparsing_mode:[`Optimized | `Optimized_legacy | `Readable] ->
+  string ->
+  t ->
+  string Lwt.t
+
+(** Sign a string of bytes with secret key of the given account. *)
+val sign_bytes : signer:string -> data:string -> t -> string Lwt.t
+
+(** Use tezos-client to convert a script between given forms. *)
+val convert_script :
+  script:string ->
+  src_format:[`Michelson | `Json | `Binary] ->
+  dst_format:[`Michelson | `Json | `Binary] ->
+  t ->
+  string Lwt.t

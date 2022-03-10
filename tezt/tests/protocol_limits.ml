@@ -58,10 +58,7 @@ let test_gas_storage_limits =
   let* giver_balance = Client.get_balance_for ~account:giver client in
   let* receiver_balance = Client.get_balance_for ~account:receiver client in
   let expected_receiver_balance = Tez.(initial_receiver_balance + amount) in
-  let expected_giver_balance =
-    Tez.(
-      of_mutez_int @@ (to_mutez initial_giver_balance - to_mutez (fee + amount)))
-  in
+  let expected_giver_balance = Tez.(initial_giver_balance - (fee + amount)) in
   let* () =
     if receiver_balance <> expected_receiver_balance then
       Test.fail

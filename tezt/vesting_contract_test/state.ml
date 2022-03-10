@@ -23,35 +23,92 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Testing
-    -------
-    Component:    Protocol
-    Invocation:   dune runtest src/proto_alpha/lib_protocol/test/integration/michelson
-    Subject:      Integration > Michelson
-*)
+type ('a, 's) t = 's -> 'a * 's
 
-let () =
-  Alcotest_lwt.run
-    "protocol > integration > michelson"
-    [
-      ("global table of constants", Test_global_constants_storage.tests);
-      ("interpretation", Test_interpretation.tests);
-      ("lazy storage diff", Test_lazy_storage_diff.tests);
-      ("sapling", Test_sapling.tests);
-      ("script typed ir size", Test_script_typed_ir_size.tests);
-      ("temp big maps", Test_temp_big_maps.tests);
-      ("ticket balance key", Test_ticket_balance_key.tests);
-      ("ticket scanner", Test_ticket_scanner.tests);
-      ("ticket storage", Test_ticket_storage.tests);
-      ("ticket lazy storage diff", Test_ticket_lazy_storage_diff.tests);
-      ("ticket operations diff", Test_ticket_operations_diff.tests);
-      ("ticket accounting", Test_ticket_accounting.tests);
-      ("ticket balance", Test_ticket_balance.tests);
-      ("ticket manager", Test_ticket_manager.tests);
-      ("timelock", Test_timelock.tests);
-      ("typechecking", Test_typechecking.tests);
-      ("script cache", Test_script_cache.tests);
-      ("block time instructions", Test_block_time_instructions.tests);
-      ("patched contracts", Test_patched_contracts.tests);
-    ]
-  |> Lwt_main.run
+let get : ('s, 's) t = fun s -> (s, s)
+
+let getf : ('s -> 'a) -> ('a, 's) t = fun f s -> (f s, s)
+
+let put : 's -> (unit, 's) t = fun s _ -> ((), s)
+
+let update : ('s -> 's) -> (unit, 's) t = fun f s -> ((), f s)
+
+let map : ('a -> 'b) -> ('a, 's) t -> ('b, 's) t =
+ fun f m s ->
+  let (a, s') = m s in
+  (f a, s')
+
+let bind : ('a -> ('b, 's) t) -> ('a, 's) t -> ('b, 's) t =
+ fun f m s ->
+  let (a, s') = m s in
+  f a s'
+
+module type MONAD = sig
+  type 'a t
+
+  val return : 'a -> 'a t
+
+  val map : ('a -> 'b) -> 'a t -> 'b t
+
+  val bind : 'a t -> ('a -> 'b t) -> 'b t
+end
+
+module Monad (State : sig
+  type t
+end)
+(M : MONAD) =
+struct
+  type nonrec 'a t = State.t -> ('a * State.t) M.t
+
+  let return a s = M.return (a, s)
+
+  let map f m s = M.map (fun (a, s') -> (f a, s')) @@ m s
+
+  let bind m f s = M.bind (m s) @@ fun (a, s') -> f a s'
+
+  let ( >|= ) m f = map f m
+
+  let ( let+ ) m f = map f m
+
+  let ( >>= ) m f = bind m f
+
+  let ( let* ) m f = bind m f
+
+  let lift m s = M.map (fun a -> (a, s)) m
+
+  let get s = M.return (s, s)
+
+  let getf f s = M.return (f s, s)
+
+  let put s _ = M.return ((), s)
+
+  let update f s = M.return ((), f s)
+
+  let run s m = m s
+
+  let eval s m = M.map fst (m s)
+
+  let exec s m = M.map snd (m s)
+
+  let rec list_map : ('a -> 'b t) -> 'a list -> 'b list t =
+   fun f l ->
+    match l with
+    | [] -> return []
+    | x :: xs ->
+        let* y = f x in
+        let* ys = list_map f xs in
+        return (y :: ys)
+
+  let iter_int : (int -> unit t) -> int -> unit t =
+   fun f i ->
+    let rec exec i =
+      if i < 0 then return ()
+      else
+        let* () = f i in
+        exec (i - 1)
+    in
+    exec (i - 1)
+
+  let opt_map : ('a -> 'b t) -> 'a option -> 'b option t =
+   fun f -> function None -> return None | Some a -> map Option.some (f a)
+end

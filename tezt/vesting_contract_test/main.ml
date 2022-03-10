@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Metastate AG <hello@metastate.dev>                     *)
+(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,50 +23,45 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Helpers for dealing with units of tez.
+(* Testing
+   -------
+   Component: Vesting contract
+   Invocation: dune exec tezt/vesting_contract_test/main.exe
+   Subject: This file runs a test suite for the vesting contract. It
+            contains the current version of the contract in contract.tz
+            file and executes a few testing scenarios against it. These
+            tests are conceptually based on much older test suite
+            originally written in Bash:
+            https://gitlab.com/smondet/tezos/-/tree/vesting-contracts/contracts/vesting
 
-    Please note that none of the functions here perform any bounds checks. *)
+   NOTE: due to these tests' long execution time combined with the
+         fact that the contract doesn't change except when a protocol
+         migration patches legacy contracts, there's little point in
+         having these tests run in CI. Instead, it should be run
+         manually whenever a change is suspected to break it.
+ *)
 
-(** A unit of tez *)
-type t
+let tests =
+  let open Vesting_test in
+  [
+    (transfer_and_pour_happy_path, "transfer_and_pour_happy_path", 6);
+    (test_delegation, "test_delegation", 5);
+    (test_invalid_transfers, "test_invalid_transfers", 6);
+    (test_update_keys, "test_update_keys", 8);
+    (test_all_sigs_required, "test_all_sigs_required", 7);
+    (test_full_contract, "test_full_contract", 28);
+  ]
 
-(** Make [t] from the whole number of tez. This doesn't perform any bounds
-    checks. *)
-val of_int : int -> t
-
-(** Make [t] from the whole number of micro tez. This doesn't perform any bounds
-    checks. *)
-val of_mutez_int : int -> t
-
-(** 0 tez *)
-val zero : t
-
-(** 1 tez *)
-val one : t
-
-(** Convert [t] to a string. *)
-val to_string : t -> string
-
-(** Convert [t] to a mutez integer. *)
-val mutez_int64 : t -> int64
-
-(** Convert [t] to a float of tez. *)
-val to_float : t -> float
-
-(** Convert [t] to an [int]. *)
-val to_mutez : t -> int
-
-(** Addition. This doesn't perform any bounds checks. *)
-val ( + ) : t -> t -> t
-
-(** Subtraction. This doesn't perform any bound checks. *)
-val ( - ) : t -> t -> t
-
-(** Parsing. Parse a floating point number of tez.
-
-    Any string of digits followed by an optional point and another string
-    of digits should parse successfully, provided that the expressed number
-    is within bounds allowed for tez (up to 6 decimal places). For example:
-    "123.4356" will parse, while
-    "1.24723953794217492" won't, because it's too precise. *)
-val parse_floating : string -> t
+let () =
+  (* Register your tests here. *)
+  Cli.init () ;
+  List.iter
+    (fun (test, title, user_count) ->
+      Test.register
+        ~__FILE__
+        ~title
+        ~tags:["vesting"; title]
+        (Vesting_test.execute ~contract:"contract.tz" ~user_count test))
+    tests ;
+  (* [Test.run] must be the last function to be called. *)
+  Test.run ()

@@ -227,6 +227,16 @@ Michelson
   ``sapling_transaction_deprecated``. Existing onchain contracts are
   automatically converted.
 
+- The protocol migration to Alpha will ensure that 8 smart contracts
+  on mainnet that depend on features deprecated in Babylon, type check
+  under the new protocol without the ``--legacy`` flag.  This will be
+  ensured by patching the contracts. Their behaviour will remain
+  unchanged which was tested by replaying historic transactions to
+  these smart contracts with the updated code. For more information on
+  which contracts are patched and how the change can be tested read
+  the description of the MR that brought the migration. (MR
+  :gl:`!3730`)
+
 Internal
 --------
 

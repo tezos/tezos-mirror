@@ -1,0 +1,9 @@
+(executable
+ (name main)
+ (libraries tezos-stdlib
+            tezos-alpha-test-helpers
+            tezos-micheline
+            tezos-protocol-alpha
+            tezt-tezos
+            ptime)
+ (flags (:standard -open Tezt -open Tezt_tezos -open Tezt.Base -open Tezos_stdlib)))

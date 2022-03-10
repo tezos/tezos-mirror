@@ -629,7 +629,7 @@ let spawn_transfer ?hooks ?endpoint ?(wait = "none") ?burn_cap ?fee ?gas_limit
     @ if force then ["--force"] else [])
 
 let transfer ?hooks ?endpoint ?wait ?burn_cap ?fee ?gas_limit ?storage_limit
-    ?counter ?arg ?force ~amount ~giver ~receiver client =
+    ?counter ?arg ?force ?expect_failure ~amount ~giver ~receiver client =
   spawn_transfer
     ?endpoint
     ?hooks
@@ -645,7 +645,7 @@ let transfer ?hooks ?endpoint ?wait ?burn_cap ?fee ?gas_limit ?storage_limit
     ~giver
     ~receiver
     client
-  |> Process.check
+  |> Process.check ?expect_failure
 
 let spawn_multiple_transfers ?endpoint ?(wait = "none") ?burn_cap ?fee_cap
     ?gas_limit ?storage_limit ?counter ?arg ~giver ~json_batch client =
@@ -691,6 +691,15 @@ let multiple_transfers ?endpoint ?wait ?burn_cap ?fee_cap ?gas_limit
     ~json_batch
     client
   |> Process.check
+
+let spawn_get_delegate ?endpoint ~src client =
+  spawn_command ?endpoint client ["get"; "delegate"; "for"; src]
+
+let get_delegate ?endpoint ~src client =
+  let* output =
+    spawn_get_delegate ?endpoint ~src client |> Process.check_and_read_stdout
+  in
+  Lwt.return (output =~* rex "(tz[a-zA-Z0-9]+) \\(.*\\)")
 
 let spawn_set_delegate ?endpoint ?(wait = "none") ~src ~delegate client =
   spawn_command
@@ -1563,3 +1572,53 @@ let init_with_protocol ?path ?admin_path ?name ?color ?base_dir ?event_level
   in
   let* _ = Node.wait_for_level node 1 in
   return (node, client)
+
+let spawn_register_key owner client =
+  spawn_command
+    client
+    ["--wait"; "none"; "register"; "key"; owner; "as"; "delegate"]
+
+let register_key owner client = spawn_register_key owner client |> Process.check
+
+let contract_storage ?unparsing_mode address client =
+  let unparsing_mode_to_string = function
+    | `Optimized -> "Optimized"
+    | `Optimized_legacy -> "Optimized_legacy"
+    | `Readable -> "Readable"
+  in
+  spawn_command
+    client
+    (["get"; "contract"; "storage"; "for"; address]
+    @ Option.fold
+        ~none:[]
+        ~some:(fun u -> ["--unparsing-mode"; unparsing_mode_to_string u])
+        unparsing_mode)
+  |> Process.check_and_read_stdout
+
+let sign_bytes ~signer ~data client =
+  let* output =
+    spawn_command client ["sign"; "bytes"; data; "for"; signer]
+    |> Process.check_and_read_stdout
+  in
+  match output =~* rex "Signature: ([a-zA-Z0-9]+)" with
+  | Some signature -> Lwt.return signature
+  | None -> Test.fail "Couldn't sign message '%s' for %s." data signer
+
+let convert_script ~script ~src_format ~dst_format client =
+  let fmt_to_string = function
+    | `Michelson -> "michelson"
+    | `Binary -> "binary"
+    | `Json -> "json"
+  in
+  spawn_command
+    client
+    [
+      "convert";
+      "script";
+      script;
+      "from";
+      fmt_to_string src_format;
+      "to";
+      fmt_to_string dst_format;
+    ]
+  |> Process.check_and_read_stdout

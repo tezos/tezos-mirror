@@ -1,0 +1,12 @@
+--- patched_contracts/expruZKjVy3JbWcJmjtnvMGvRamkDhMgM3urGGdne3pkN9VKgK7VnD.original.tz
++++ patched_contracts/expruZKjVy3JbWcJmjtnvMGvRamkDhMgM3urGGdne3pkN9VKgK7VnD.patched.tz
+@@ -293,7 +293,8 @@
+                      { IF_LEFT
+                          { RENAME @amt_slash_33 ;
+                            { DIP { { DIP { DUP @storage } ; SWAP } } ; SWAP } ;
+-                           PUSH @dest (contract :UnitContract unit) "tz1LBEKXaxQbd5Gtzbc1ATCwc3pppu81aWGc" ;
++                           PUSH key_hash "tz1LBEKXaxQbd5Gtzbc1ATCwc3pppu81aWGc";
++                           IMPLICIT_ACCOUNT @dest;
+                            { DIP { { DIP { DUP @amt } ; SWAP } } ; SWAP } ;
+                            UNIT ;
+                            TRANSFER_TOKENS @op ;

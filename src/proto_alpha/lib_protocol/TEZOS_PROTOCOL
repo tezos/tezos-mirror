@@ -105,6 +105,7 @@
         "Liquidity_baking_lqt",
         "Liquidity_baking_migration",
 
+        "Legacy_script_patches_for_J",
         "Init_storage",
         "Sapling_validator",
 

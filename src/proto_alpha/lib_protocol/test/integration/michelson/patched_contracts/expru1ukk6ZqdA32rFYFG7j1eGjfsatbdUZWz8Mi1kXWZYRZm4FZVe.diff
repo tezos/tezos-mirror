@@ -1,0 +1,83 @@
+--- patched_contracts/expru1ukk6ZqdA32rFYFG7j1eGjfsatbdUZWz8Mi1kXWZYRZm4FZVe.original.tz
++++ patched_contracts/expru1ukk6ZqdA32rFYFG7j1eGjfsatbdUZWz8Mi1kXWZYRZm4FZVe.patched.tz
+@@ -243,7 +243,7 @@
+                           CAR ;
+                           CDR ;
+                           CONTRACT %transfer (pair address (pair address nat)) ;
+-                          IF_NONE { FAILWITH } {} ;
++                          IF_NONE { CDR; FAILWITH } {} ;
+                           PUSH mutez 0 ;
+                           DIG 3 ;
+                           SELF ;
+@@ -432,7 +432,7 @@
+                           CAR ;
+                           CDR ;
+                           CONTRACT %transfer (pair address (pair address nat)) ;
+-                          IF_NONE { FAILWITH } {} ;
++                          IF_NONE { CDR; FAILWITH } {} ;
+                           PUSH mutez 0 ;
+                           DIG 3 ;
+                           SELF ;
+@@ -744,7 +744,7 @@
+                      CDR ;
+                      CAR ;
+                      CONTRACT unit ;
+-                     IF_NONE { FAILWITH } {} ;
++                     IF_NONE { CDR; FAILWITH } {} ;
+                      DIG 3 ;
+                      UNIT ;
+                      TRANSFER_TOKENS ;
+@@ -755,7 +755,7 @@
+                            CAR ;
+                            CDR ;
+                            CONTRACT %transfer (pair address (pair address nat)) ;
+-                           IF_NONE { FAILWITH } {} ;
++                           IF_NONE { CDR; FAILWITH } {} ;
+                            PUSH mutez 0 ;
+                            DIG 3 ;
+                            DIG 4 ;
+@@ -909,7 +909,7 @@
+                          CAR ;
+                          CDR ;
+                          CONTRACT %transfer (pair address (pair address nat)) ;
+-                         IF_NONE { FAILWITH } {} ;
++                         IF_NONE { CDR; FAILWITH } {} ;
+                          PUSH mutez 0 ;
+                          DIG 3 ;
+                          DIG 5 ;
+@@ -1074,7 +1074,7 @@
+                                CAR ;
+                                CDR ;
+                                CONTRACT %transfer (pair address (pair address nat)) ;
+-                               IF_NONE { FAILWITH } {} ;
++                               IF_NONE { CDR; FAILWITH } {} ;
+                                PUSH mutez 0 ;
+                                DIG 3 ;
+                                SELF ;
+@@ -1240,7 +1240,7 @@
+                      CAR ;
+                      CAR ;
+                      CONTRACT %xtzToToken (pair address (pair nat timestamp)) ;
+-                     IF_NONE { FAILWITH } {} ;
++                     IF_NONE { CDR; FAILWITH } {} ;
+                      DIG 2 ;
+                      DIP 3 { DUP } ;
+                      DIG 3 ;
+@@ -1260,7 +1260,7 @@
+                      CAR ;
+                      CDR ;
+                      CONTRACT %transfer (pair address (pair address nat)) ;
+-                     IF_NONE { FAILWITH } {} ;
++                     IF_NONE { CDR; FAILWITH } {} ;
+                      PUSH mutez 0 ;
+                      DIG 3 ;
+                      SELF ;
+@@ -1313,7 +1313,7 @@
+                          CAR ;
+                          CDR ;
+                          CONTRACT %getBalance (pair address (contract nat)) ;
+-                         IF_NONE { FAILWITH } {} ;
++                         IF_NONE { CDR; FAILWITH } {} ;
+                          PUSH mutez 0 ;
+                          SELF %updateTokenPoolInternal ;
+                          SELF ;
