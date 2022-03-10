@@ -2422,6 +2422,8 @@ module Sc_rollup : sig
   module PVM : sig
     type boot_sector
 
+    val boot_sector_encoding : boot_sector Data_encoding.t
+
     val boot_sector_of_string : string -> boot_sector
   end
 
