@@ -281,6 +281,8 @@ struct
       let+ count = get ctxt Address_count in
       Option.value ~default:0l count
 
+    let init_counter ctxt = set ctxt Address_count 0l
+
     let associate_index ctxt addr =
       let open Syntax in
       let* i = count ctxt in
@@ -315,6 +317,8 @@ struct
       let open Syntax in
       let+ count = get ctxt Ticket_count in
       Option.value ~default:0l count
+
+    let init_counter ctxt = set ctxt Ticket_count 0l
 
     let associate_index ctxt ticket =
       let open Syntax in
