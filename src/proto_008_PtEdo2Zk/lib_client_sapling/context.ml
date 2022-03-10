@@ -103,23 +103,6 @@ module Shielded_tez_contract_input = struct
   let as_arg t = Format.asprintf "%a" pp_michelson t
 end
 
-(** The inputs and outputs are shuffled to prevent meta-data analysis. **)
-module Shuffle = struct
-  let list l =
-    let a = Array.of_list l in
-    let len = Array.length a in
-    for i = len downto 2 do
-      let idx = Random.int i in
-      let swp_idx = i - 1 in
-      let tmp = a.(swp_idx) in
-      a.(swp_idx) <- a.(idx) ;
-      a.(idx) <- tmp
-    done ;
-    Array.to_list a
-
-  let pair x y = if Random.bool () then [y; x] else [x; y]
-end
-
 type error += Balance_too_low of Shielded_tez.t * Shielded_tez.t
 
 let register_error_kind category ~id ~title ~description ?pp encoding from_error
@@ -227,12 +210,6 @@ module Account = struct
         else acc)
       account.unspents
       account
-
-  let pick_input c =
-    let ( >|? ) x f = Option.map f x in
-    Input_set.choose c.unspents >|? fun unspent ->
-    let c = remove_unspent c unspent in
-    (unspent, c)
 
   let pp_unspent : Format.formatter -> t -> unit =
    fun ppf a ->
@@ -427,124 +404,3 @@ module Client_state = struct
     let state = Map.add contract contract_state state in
     write cctxt state >>=? fun () -> return contract_state
 end
-
-(** Truncate or pad the message to fit the memo_size *)
-let adjust_message_length (cctxt : #Client_context.full) ?message memo_size =
-  match message with
-  | None ->
-      cctxt#warning
-        "no message provided, adding a zeroes filled message of the required \
-         length: %d "
-        memo_size
-      >|= fun () -> Bytes.make memo_size '\000'
-  | Some message ->
-      let message_length = Bytes.length message in
-      if message_length = memo_size then Lwt.return message
-      else if message_length > memo_size then
-        cctxt#warning
-          "Your message is too long (%d bytes) and will therefore be truncated \
-           to %d bytes"
-          message_length
-          memo_size
-        >|= fun () -> Bytes.sub message 0 memo_size
-      else
-        cctxt#warning
-          "Your message is too short (%d bytes) and will therefore be \
-           right-padded with zero bytes to reach a %d-byte length"
-          message_length
-          memo_size
-        >|= fun () ->
-        Bytes.cat message (Bytes.make (memo_size - message_length) '\000')
-
-let create_payment ~message dst amount =
-  let amount = Shielded_tez.to_mutez amount in
-  F.make_output dst amount message
-
-(** Return a list of inputs belonging to an account sufficient to cover an
-    amount, together with the change remaining. *)
-let get_shielded_amount amount account =
-  let balance = Account.balance account in
-  error_unless (balance >= amount) (Balance_too_low (balance, amount))
-  >|? fun () ->
-  let to_pay = Shielded_tez.to_mutez amount in
-  let inputs_to_spend = [] in
-  let rec loop to_pay chosen_inputs account =
-    if Int64.(compare to_pay zero) > 0 then
-      Account.pick_input account |> function
-      | None ->
-          Stdlib.failwith "Not enough inputs" (* TODO raise a proper error *)
-      | Some (next_in, account) ->
-          let next_val = F.Input.amount next_in in
-          let rest_to_pay = Int64.sub to_pay next_val in
-          loop rest_to_pay (next_in :: chosen_inputs) account
-    else
-      let change =
-        WithExceptions.Option.get ~loc:__LOC__
-        @@ Shielded_tez.of_mutez @@ Int64.abs to_pay
-      in
-      (chosen_inputs, change)
-  in
-  loop to_pay inputs_to_spend account
-
-let create_payback ~memo_size address amount =
-  let plaintext_message = Bytes.make memo_size '\000' in
-  let amount = Shielded_tez.to_mutez amount in
-  F.make_output address amount plaintext_message
-
-(* The caller should check that the account exists already *)
-let unshield ~src ~dst ~backdst amount (state : Contract_state.t) anti_replay =
-  let vk = Viewing_key.of_sk src in
-  let account =
-    Contract_state.find_account vk state
-    |> WithExceptions.Option.get ~loc:__LOC__
-  in
-  get_shielded_amount amount account >|? fun (inputs, change) ->
-  let memo_size = Storage.get_memo_size state.storage in
-  let payback = create_payback ~memo_size backdst change in
-  let sapling_transaction =
-    F.forge_transaction
-      (Shuffle.list inputs)
-      [payback]
-      src
-      anti_replay
-      state.storage
-  in
-  Shielded_tez_contract_input.create ~pkh:dst sapling_transaction
-
-let shield cctxt ~dst ?message amount (state : Contract_state.t) anti_replay =
-  let shielded_amount = Shielded_tez.of_tez amount in
-  let memo_size = Storage.get_memo_size Contract_state.(state.storage) in
-  adjust_message_length cctxt ?message memo_size >>= fun message ->
-  let payment = create_payment ~message dst shielded_amount in
-  let negative_amount = Int64.neg (Tez.to_mutez amount) in
-  let sapling_transaction =
-    F.forge_shield_transaction
-      [payment]
-      negative_amount
-      anti_replay
-      Contract_state.(state.storage)
-  in
-  return (Shielded_tez_contract_input.create sapling_transaction)
-
-(* The caller should check that the account exists already *)
-let transfer cctxt ~src ~dst ~backdst ?message amount (state : Contract_state.t)
-    anti_replay =
-  let vk = Viewing_key.of_sk src in
-  let account =
-    Contract_state.find_account vk state
-    |> WithExceptions.Option.get ~loc:__LOC__
-  in
-  let memo_size = Storage.get_memo_size state.storage in
-  adjust_message_length cctxt ?message memo_size >|= fun message ->
-  get_shielded_amount amount account >|? fun (inputs, change) ->
-  let payment = create_payment ~message dst amount in
-  let payback = create_payback ~memo_size backdst change in
-  let sapling_transaction =
-    F.forge_transaction
-      (Shuffle.list inputs)
-      (Shuffle.pair payback payment)
-      src
-      anti_replay
-      state.storage
-  in
-  sapling_transaction

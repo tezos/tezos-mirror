@@ -85,7 +85,7 @@ module type V4 = sig
        and type Timelock.chest = Timelock.chest
        and type Timelock.chest_key = Timelock.chest_key
        and type Timelock.opening_result = Timelock.opening_result
-       and module Sapling = Tezos_sapling.Core.Validator
+       and module Sapling = Tezos_sapling.Core.Validator_legacy
        and type Bls_signature.pk = Bls12_381.Signature.MinPk.pk
 
   (** An [Ecoproto_error e] is a shell error that carry a protocol error.

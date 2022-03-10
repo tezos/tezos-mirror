@@ -576,11 +576,12 @@ module Cost_of = struct
     (* model N_ISapling_verify_update *)
     (* Approximating 1.27167 x term *)
     (* Approximating 38.72115 x term *)
-    let cost_N_ISapling_verify_update_deprecated size1 size2 =
+    let cost_N_ISapling_verify_update size1 size2 bound_data =
       let open S_syntax in
       let v1 = S.safe_int size1 in
       let v0 = S.safe_int size2 in
-      S.safe_int 84_050 + (v1 + (v1 lsr 2)) + (S.safe_int 39 * v0)
+      let bd = S.safe_int bound_data in
+      S.safe_int 84_050 + (v1 + (v1 lsr 2)) + (S.safe_int 39 * v0) + (bd lsr 2)
 
     (* model N_ISelf_address *)
     let cost_N_ISelf_address = S.safe_int 15
@@ -970,8 +971,8 @@ module Cost_of = struct
     let cost_FIND_ENTRYPOINT = cost_N_ICompare 31 31
 
     (* model SAPLING_TRANSACTION_ENCODING *)
-    let cost_SAPLING_TRANSACTION_ENCODING ~inputs ~outputs =
-      S.safe_int (1500 + (inputs * 160) + (outputs * 320))
+    let cost_SAPLING_TRANSACTION_ENCODING ~inputs ~outputs ~bound_data =
+      S.safe_int (1500 + (inputs * 160) + (outputs * 320) + (bound_data lsr 3))
 
     (* model SAPLING_DIFF_ENCODING *)
     let cost_SAPLING_DIFF_ENCODING ~nfs ~cms =
@@ -1259,8 +1260,11 @@ module Cost_of = struct
 
     let dupn n = atomic_step_cost (cost_N_IDupN n)
 
+    let sapling_verify_update ~inputs ~outputs ~bound_data =
+      atomic_step_cost (cost_N_ISapling_verify_update inputs outputs bound_data)
+
     let sapling_verify_update_deprecated ~inputs ~outputs =
-      atomic_step_cost (cost_N_ISapling_verify_update_deprecated inputs outputs)
+      atomic_step_cost (cost_N_ISapling_verify_update inputs outputs 0)
 
     let sapling_empty_state = atomic_step_cost cost_N_ISapling_empty_state
 
@@ -1830,10 +1834,18 @@ module Cost_of = struct
     (* Reuse 006 costs. *)
     let operation bytes = Script.bytes_node_cost bytes
 
-    let sapling_transaction_deprecated (t : Sapling.transaction) =
+    let sapling_transaction (t : Sapling.transaction) =
+      let inputs = Size.sapling_transaction_inputs t in
+      let outputs = Size.sapling_transaction_outputs t in
+      let bound_data = Size.sapling_transaction_bound_data t in
+      atomic_step_cost
+        (cost_SAPLING_TRANSACTION_ENCODING ~inputs ~outputs ~bound_data)
+
+    let sapling_transaction_deprecated (t : Sapling.Legacy.transaction) =
       let inputs = List.length t.inputs in
       let outputs = List.length t.outputs in
-      atomic_step_cost (cost_SAPLING_TRANSACTION_ENCODING ~inputs ~outputs)
+      atomic_step_cost
+        (cost_SAPLING_TRANSACTION_ENCODING ~inputs ~outputs ~bound_data:0)
 
     let sapling_diff (d : Sapling.diff) =
       let nfs = List.length d.nullifiers in

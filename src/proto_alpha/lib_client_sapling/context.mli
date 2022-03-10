@@ -21,7 +21,7 @@
  * SOFTWARE. *)
 
 (**
-   This module allows the creation Sapling transactions: shield, unshield and
+   This module allows the creation of Sapling transactions: shield, unshield and
    transfer.
    Because Sapling uses an UTXO model, it is necessary for the client to
    maintain locally the set of unspent outputs for each viewing key, for each
@@ -54,18 +54,8 @@ module Shielded_tez : sig
   val ( +? ) : t -> t -> t tzresult
 end
 
-(** Actual input to a smart contract handling Sapling transactions *)
-module Shielded_tez_contract_input : sig
-  type t
-
-  val create : ?pkh:Signature.Public_key_hash.t -> UTXO.transaction -> t
-
-  val encoding : t Data_encoding.t
-
-  val pp : Format.formatter -> t -> unit
-
-  val as_arg : t -> string
-end
+(** Convert a Sapling transaction to a suitable argument for the Smart Contract. *)
+val sapling_transaction_as_arg : UTXO.transaction -> string
 
 (** Account corresponding to a contract and a viewing key *)
 module Account : sig
@@ -122,7 +112,7 @@ val shield :
   Tez.t ->
   Contract_state.t ->
   string ->
-  Shielded_tez_contract_input.t tzresult Lwt.t
+  UTXO.transaction tzresult Lwt.t
 
 (** [unshield ~src_name ~src ~dst ~backdst stez cstate storage] returns
     a transaction unshielding [stez] shielded tokens from a sapling wallet
@@ -133,12 +123,12 @@ val shield :
    *)
 val unshield :
   src:Spending_key.t ->
-  dst:Signature.public_key_hash ->
+  bound_data:string ->
   backdst:Viewing_key.address ->
   Shielded_tez.t ->
   Contract_state.t ->
   string ->
-  Shielded_tez_contract_input.t tzresult
+  UTXO.transaction tzresult
 
 (** [transfer ~message ~src ~dst ~backdst amount cstate anti-replay] creates a
     Sapling transaction of [amount] shielded tez from Sapling wallet [src] to

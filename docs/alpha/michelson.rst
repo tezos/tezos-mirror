@@ -1736,7 +1736,7 @@ Domain specific data types
 
 -  ``bls12_381_fr`` : An element of the scalar field F\ :sub:`r`\ , used for scalar multiplication on the BLS12-381 curves G\ :sub:`1`\  and G\ :sub:`2`\ .
 
--  ``sapling_transaction_deprecated ms``: A :doc:`Sapling <sapling>` transaction
+-  ``sapling_transaction ms``: A :doc:`Sapling <sapling>` transaction
 
 -  ``sapling_state ms``: A :doc:`Sapling <sapling>` state
 
@@ -2250,11 +2250,11 @@ comprehensive description of the Sapling protocol.
 
 ::
 
-    :: sapling_transaction_deprecated ms : sapling_state ms : 'S   ->   option (pair int (sapling_state ms)): 'S
+    :: sapling_transaction ms : sapling_state ms : 'S   ->   option (pair bytes (pair int (sapling_state ms))): 'S
 
-    > SAPLING_VERIFY_UPDATE / t : s : S  =>  Some (Pair b s') : S
+    > SAPLING_VERIFY_UPDATE / t : s : S  =>  Some (Pair bound_data (Pair balance s')) : S
         iff the transaction t successfully applied on state s resulting
-        in balance b and an updated state s'
+        in the bound_data and the balance of the transaction and an updated state s'
     > SAPLING_VERIFY_UPDATE / t : s : S  =>  None : S
         iff the transaction t is invalid with respect to the state
 
@@ -2267,7 +2267,6 @@ comprehensive description of the Sapling protocol.
     > SAPLING_EMPTY_STATE ms /  S  =>  sapling_state ms : S
         with `sapling_state ms` being the empty state (ie. no one can spend tokens from it)
         with memo_size `ms`
-
 
 .. _MichelsonTickets_alpha:
 
@@ -3767,7 +3766,7 @@ Full grammar
       | bls12_381_g1
       | bls12_381_g2
       | bls12_381_fr
-      | sapling_transaction_deprecated <natural number constant>
+      | sapling_transaction <natural number constant>
       | sapling_state <natural number constant>
       | chest
       | chest_key

@@ -2224,6 +2224,11 @@ BLS12-381 primitives
 Sapling operations
 ~~~~~~~~~~~~~~~~~~
 
+**For security reasons the use of the type `sapling_transaction` and
+instruction `SAPLING_VERIFY_UPDATE` are discouraged and are deprecated in
+Protocol 13 which replaces them with a new encoding for the type and a new
+signature for the instruction.**
+
 Please see the :doc:`Sapling integration<sapling>` page for a more
 comprehensive description of the Sapling protocol.
 

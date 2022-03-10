@@ -2461,11 +2461,12 @@ module Registration_section = struct
 
         let kinstr =
           let spl_state = sapling_state memo_size in
-          let spl_tx = sapling_transaction_deprecated memo_size in
+          let spl_tx = sapling_transaction memo_size in
           let pair_int_spl_state = pair int spl_state in
-          ISapling_verify_update_deprecated
+          let pair_bytes_pair_int_spl_state = pair bytes pair_int_spl_state in
+          ISapling_verify_update
             ( kinfo (spl_tx @$ spl_state @$ bot),
-              halt (option pair_int_spl_state @$ bot) )
+              halt (option pair_bytes_pair_int_spl_state @$ bot) )
 
         let prepare_sapling_execution_environment sapling_forge_rng_seed
             sapling_transition =

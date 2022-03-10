@@ -123,5 +123,6 @@ let () =
   Deposits_limit.register ~protocols:[Ithaca; Alpha] ;
   (* Relies on a feature only available since J. *)
   Run_script.register ~protocols:[Alpha] ;
+  Sapling.register ~protocols:[Alpha] ;
   (* Test.run () should be the last statement, don't register afterwards! *)
   Test.run ()

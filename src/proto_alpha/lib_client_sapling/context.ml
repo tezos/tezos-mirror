@@ -60,51 +60,19 @@ end = struct
     WithExceptions.Option.get ~loc:__LOC__ @@ of_mutez i
 end
 
-module Shielded_tez_contract_input = struct
-  type t = UTXO.transaction * Signature.public_key_hash option
-
-  let create ?pkh tr = (tr, pkh)
-
-  let encoding =
-    let open Data_encoding in
-    obj2
-      (req "transaction" UTXO.transaction_encoding)
-      (opt "pkh" Signature.Public_key_hash.encoding)
-
-  let pp ppf t =
-    let open Data_encoding in
-    let json = Json.construct encoding t in
-    Json.pp ppf json
-
-  let michelson (tr, pkopt) =
-    let open Tezos_micheline in
-    let open Protocol.Alpha_context in
-    let a =
-      Micheline.Bytes
-        (0, Data_encoding.Binary.to_bytes_exn UTXO.transaction_encoding tr)
-    in
-    let b =
-      match pkopt with
-      | None -> Micheline.Prim (0, Script.D_None, [], [])
-      | Some v ->
-          let value =
-            Micheline.Bytes
-              ( 0,
-                Data_encoding.Binary.to_bytes_exn
-                  Signature.Public_key_hash.encoding
-                  v )
-          in
-          Micheline.Prim (0, Script.D_Some, [value], [])
-    in
-    Micheline.strip_locations
-    @@ Micheline.Seq (0, [Micheline.Prim (0, Script.D_Pair, [a; b], [])])
-
+let sapling_transaction_as_arg t =
   let pp_michelson ppf t =
-    let value = michelson t in
-    Michelson_v1_printer.print_expr ppf value
-
-  let as_arg t = Format.asprintf "%a" pp_michelson t
-end
+    let open Tezos_micheline in
+    let list_of_transactions_expr =
+      let transaction_expr =
+        Micheline.Bytes
+          (0, Data_encoding.Binary.to_bytes_exn UTXO.transaction_encoding t)
+      in
+      Micheline.strip_locations @@ Micheline.Seq (0, [transaction_expr])
+    in
+    Michelson_v1_printer.print_expr ppf list_of_transactions_expr
+  in
+  Format.asprintf "%a" pp_michelson t
 
 (** The inputs and outputs are shuffled to prevent meta-data analysis. **)
 module Shuffle = struct
@@ -495,7 +463,8 @@ let create_payback ~memo_size address amount =
   F.make_output address amount plaintext_message
 
 (* The caller should check that the account exists already *)
-let unshield ~src ~dst ~backdst amount (state : Contract_state.t) anti_replay =
+let unshield ~src ~bound_data ~backdst amount (state : Contract_state.t)
+    anti_replay =
   let vk = Viewing_key.of_sk src in
   let account =
     Contract_state.find_account vk state
@@ -504,15 +473,13 @@ let unshield ~src ~dst ~backdst amount (state : Contract_state.t) anti_replay =
   get_shielded_amount amount account >|? fun (inputs, change) ->
   let memo_size = Storage.get_memo_size state.storage in
   let payback = create_payback ~memo_size backdst change in
-  let sapling_transaction =
-    F.forge_transaction
-      (Shuffle.list inputs)
-      [payback]
-      src
-      anti_replay
-      state.storage
-  in
-  Shielded_tez_contract_input.create ~pkh:dst sapling_transaction
+  F.forge_transaction
+    (Shuffle.list inputs)
+    [payback]
+    src
+    anti_replay
+    ~bound_data
+    state.storage
 
 let shield cctxt ~dst ?message amount (state : Contract_state.t) anti_replay =
   let shielded_amount = Shielded_tez.of_tez amount in
@@ -520,14 +487,13 @@ let shield cctxt ~dst ?message amount (state : Contract_state.t) anti_replay =
   adjust_message_length cctxt ?message memo_size >>= fun message ->
   let payment = create_payment ~message dst shielded_amount in
   let negative_amount = Int64.neg (Tez.to_mutez amount) in
-  let sapling_transaction =
-    F.forge_shield_transaction
-      [payment]
-      negative_amount
-      anti_replay
-      Contract_state.(state.storage)
-  in
-  return (Shielded_tez_contract_input.create sapling_transaction)
+  return
+  @@ F.forge_shield_transaction
+       [payment]
+       negative_amount
+       anti_replay
+       ~bound_data:""
+       Contract_state.(state.storage)
 
 (* The caller should check that the account exists already *)
 let transfer cctxt ~src ~dst ~backdst ?message amount (state : Contract_state.t)
@@ -548,6 +514,7 @@ let transfer cctxt ~src ~dst ~backdst ?message amount (state : Contract_state.t)
       (Shuffle.pair payback payment)
       src
       anti_replay
+      ~bound_data:""
       state.storage
   in
   sapling_transaction

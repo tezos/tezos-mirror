@@ -342,6 +342,9 @@ module Cost_of : sig
 
     val sapling_empty_state : Gas.cost
 
+    val sapling_verify_update :
+      inputs:int -> outputs:int -> bound_data:int -> Gas.cost
+
     val sapling_verify_update_deprecated : inputs:int -> outputs:int -> Gas.cost
 
     val ticket : Gas.cost
@@ -504,7 +507,9 @@ module Cost_of : sig
 
     val operation : bytes -> Gas.cost
 
-    val sapling_transaction_deprecated : Sapling.transaction -> Gas.cost
+    val sapling_transaction : Sapling.transaction -> Gas.cost
+
+    val sapling_transaction_deprecated : Sapling.Legacy.transaction -> Gas.cost
 
     val sapling_diff : Sapling.diff -> Gas.cost
 

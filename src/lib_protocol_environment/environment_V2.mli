@@ -78,7 +78,7 @@ module type V2 = sig
             ('m, 'pr, 'p, 'q, 'i, 'o) RPC_service.t
        and type Error_monad.shell_tztrace = Error_monad.tztrace
        and type 'a Error_monad.shell_tzresult = ('a, Error_monad.tztrace) result
-       and module Sapling = Tezos_sapling.Core.Validator
+       and module Sapling = Tezos_sapling.Core.Validator_legacy
 
   (** An [Ecoproto_error e] is a shell error that carry a protocol error.
 

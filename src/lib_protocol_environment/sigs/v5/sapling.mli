@@ -105,11 +105,28 @@ module UTXO : sig
     binding_sig : binding_sig;
     balance : Int64.t;
     root : Hash.t;
+    bound_data : string;
   }
 
   val transaction_encoding : transaction Data_encoding.t
 
   val binding_sig_encoding : binding_sig Data_encoding.t
+
+  module Legacy : sig
+    type transaction_new = transaction
+
+    type transaction = {
+      inputs : input list;
+      outputs : output list;
+      binding_sig : binding_sig;
+      balance : Int64.t;
+      root : Hash.t;
+    }
+
+    val transaction_encoding : transaction Data_encoding.t
+
+    val cast : transaction -> transaction_new
+  end
 end
 
 module Verification : sig

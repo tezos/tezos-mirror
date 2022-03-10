@@ -155,7 +155,8 @@ module Client = struct
     let new_state = {wallet with unspent_inputs; balance} in
     (transaction, new_state)
 
-  let pay wallet address_o amount memo tez chain_state key =
+  let pay wallet address_o amount ~memo ?(bound_data = "") tez chain_state key =
+    let memo = Bytes.of_string memo in
     assert (Int64.(add wallet.balance tez) >= amount) ;
     let rec gather_input to_pay balance inputs unspent_input =
       if to_pay > 0L then
@@ -194,6 +195,7 @@ module Client = struct
         outputs
         wallet.sk
         key
+        ~bound_data
         chain_state
     in
     let new_state = {wallet with unspent_inputs; balance} in

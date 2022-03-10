@@ -386,10 +386,11 @@ let generate ~(nb_input : int) ~(nb_output : int) ~(nb_nf : int) ~(nb_cm : int)
           inputs
           outputs
           ~balance
+          ~bound_data:""
           anti_replay
       in
       let transaction =
-        Tezos_sapling.Core.Validator.UTXO.
+        Tezos_sapling.Core.Validator.UTXO.Legacy.
           {inputs; outputs; binding_sig; balance; root}
       in
       return transaction)

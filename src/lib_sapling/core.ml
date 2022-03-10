@@ -731,7 +731,7 @@ module Raw = struct
       @@ conv R.of_binding_sig R.to_binding_sig (Fixed.bytes 64)
 
     (* Create sighash for binding_sig *)
-    let hash_transaction inputs outputs key =
+    let hash_transaction inputs outputs ~bound_data key =
       let input_bytes =
         List.map (Data_encoding.Binary.to_string_exn input_encoding) inputs
       in
@@ -739,7 +739,9 @@ module Raw = struct
         List.map (Data_encoding.Binary.to_string_exn output_encoding) outputs
       in
       let h =
-        Blake2B.(to_bytes (hash_string ~key (input_bytes @ output_bytes)))
+        Blake2B.(
+          to_bytes
+            (hash_string ~key (input_bytes @ output_bytes @ [bound_data])))
       in
       R.to_sighash h
 
@@ -749,6 +751,7 @@ module Raw = struct
       binding_sig : binding_sig;
       balance : int64;
       root : Hash.t;
+      bound_data : string;
     }
 
     let transaction_encoding =
@@ -769,25 +772,88 @@ module Raw = struct
       def
         "sapling.transaction"
         ~description:
-          "A Sapling transaction with inputs, outputs, balance, root and \
-           binding sig."
+          "A Sapling transaction with inputs, outputs, balance, root, \
+           bound_data and binding sig."
       @@ conv
            (fun t ->
              check_memo_size t.outputs ;
-             (t.inputs, t.outputs, t.binding_sig, t.balance, t.root))
-           (fun (inputs, outputs, binding_sig, balance, root) ->
+             ( t.inputs,
+               t.outputs,
+               t.binding_sig,
+               t.balance,
+               t.root,
+               t.bound_data ))
+           (fun (inputs, outputs, binding_sig, balance, root, bound_data) ->
              check_memo_size outputs ;
-             {inputs; outputs; binding_sig; balance; root})
-           (obj5
+             {inputs; outputs; binding_sig; balance; root; bound_data})
+           (obj6
               (req "inputs" (list ~max_length:5208 input_encoding))
               (req "outputs" (list ~max_length:2019 output_encoding))
               (req "binding_sig" binding_sig_encoding)
               (req "balance" int64)
-              (req "root" Hash.encoding))
+              (req "root" Hash.encoding)
+              (req "bound_data" string))
 
     let max_amount = R.max_amount
 
     let valid_amount = R.valid_amount
+
+    module Legacy = struct
+      type transaction_new = transaction
+
+      type transaction = {
+        inputs : input list;
+        outputs : output list;
+        binding_sig : binding_sig;
+        balance : int64;
+        root : Hash.t;
+      }
+
+      let transaction_encoding =
+        let open Data_encoding in
+        let check_memo_size outputs =
+          let size =
+            match outputs with
+            | o :: _ -> Ciphertext.get_memo_size o.ciphertext
+            | _ ->
+                (* never actually used *)
+                -1
+          in
+          List.iter
+            (fun output ->
+              assert (Ciphertext.get_memo_size output.ciphertext = size))
+            outputs
+        in
+        def
+          "sapling.transaction_legacy"
+          ~description:
+            "A Sapling legacy transaction with inputs, outputs, balance, root \
+             and binding sig."
+        @@ conv
+             (fun t ->
+               check_memo_size t.outputs ;
+               (t.inputs, t.outputs, t.binding_sig, t.balance, t.root))
+             (fun (inputs, outputs, binding_sig, balance, root) ->
+               check_memo_size outputs ;
+               {inputs; outputs; binding_sig; balance; root})
+             (obj5
+                (req "inputs" (list ~max_length:5208 input_encoding))
+                (req "outputs" (list ~max_length:2019 output_encoding))
+                (req "binding_sig" binding_sig_encoding)
+                (req "balance" int64)
+                (req "root" Hash.encoding))
+
+      let cast : transaction -> transaction_new =
+       fun t ->
+        {
+          inputs = t.inputs;
+          outputs = t.outputs;
+          root = t.root;
+          binding_sig = t.binding_sig;
+          balance = t.balance;
+          bound_data = "";
+        }
+    end
   end
 
   module Proving = struct
@@ -825,8 +891,8 @@ module Raw = struct
         rcm
         ~amount
 
-    let make_binding_sig ctx inputs outputs ~balance key =
-      let sighash = UTXO.hash_transaction inputs outputs key in
+    let make_binding_sig ctx inputs outputs ~balance ~bound_data key =
+      let sighash = UTXO.hash_transaction inputs outputs ~bound_data key in
       R.make_binding_sig ctx ~balance sighash
   end
 
@@ -867,7 +933,13 @@ module Raw = struct
        under ctx times (commitment of the balance with randomness zero) *)
     let final_check ctx transaction key =
       let open UTXO in
-      let hash = hash_transaction transaction.inputs transaction.outputs key in
+      let hash =
+        hash_transaction
+          transaction.inputs
+          transaction.outputs
+          ~bound_data:transaction.bound_data
+          key
+      in
       R.final_check ctx transaction.balance transaction.binding_sig hash
   end
 
@@ -966,6 +1038,27 @@ module Validator :
      and type Nullifier.t = Client.Nullifier.t
      and module UTXO = Client.UTXO =
   Client
+
+(* This module is for backward compatibility with a previous definition of
+   [transaction] which didn't have any [bound_data]. *)
+module Validator_legacy = struct
+  include Validator
+
+  module UTXO = struct
+    include UTXO
+    include UTXO.Legacy
+  end
+
+  module Verification = struct
+    include Verification
+
+    let final_check ctx transaction key =
+      Validator.Verification.final_check
+        ctx
+        (Validator.UTXO.Legacy.cast transaction)
+        key
+  end
+end
 
 module Wallet :
   Core_sig.Wallet

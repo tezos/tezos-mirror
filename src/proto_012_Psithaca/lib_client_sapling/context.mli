@@ -31,6 +31,7 @@
 *)
 
 open Tezos_sapling.Core.Client
+module UTXO = Tezos_sapling.Core.Validator_legacy.UTXO
 
 module Tez : module type of Protocol.Alpha_context.Tez
 

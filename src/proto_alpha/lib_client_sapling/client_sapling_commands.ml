@@ -64,12 +64,32 @@ let anti_replay cctxt contract =
   let chain_id = Chain_id.to_b58check chain_id in
   return (address ^ chain_id)
 
+(** The shielded tez contract expects the recipient pkh encoded in Micheline
+    in the bound_data of an unshield operation. *)
+let bound_data_of_public_key_hash cctxt dst =
+  let open Tezos_micheline in
+  let open Protocol.Michelson_v1_primitives in
+  let pkh_bytes =
+    Data_encoding.Binary.to_bytes_exn Signature.Public_key_hash.encoding dst
+  in
+  let micheline_bytes = Micheline.(Bytes (0, pkh_bytes) |> strip_locations) in
+  let micheline_pkh_type =
+    Micheline.(Prim (0, T_key_hash, [], []) |> strip_locations)
+  in
+  Plugin.RPC.Scripts.pack_data
+    cctxt
+    (cctxt#chain, cctxt#block)
+    ~data:micheline_bytes
+    ~ty:micheline_pkh_type
+  >>=? fun (bound_data, _) -> return (Bytes.to_string bound_data)
+
 let do_unshield cctxt contract src_name stez dst =
   anti_replay cctxt contract >>=? fun anti_replay ->
   Wallet.new_address cctxt src_name None >>=? fun (src, _, backdst) ->
   Context.Client_state.sync_and_scan cctxt contract >>=? fun contract_state ->
+  bound_data_of_public_key_hash cctxt dst >>=? fun bound_data ->
   Lwt.return
-  @@ Context.unshield ~src ~dst ~backdst stez contract_state anti_replay
+  @@ Context.unshield ~src ~bound_data ~backdst stez contract_state anti_replay
 
 let do_shield cctxt ?message contract utez dst =
   anti_replay cctxt contract >>=? fun anti_replay ->
@@ -185,7 +205,7 @@ let shield_cmd =
       >>= fun () ->
       do_shield cctxt ?message contract_dst amount sapling_dst
       >>=? fun sapling_input ->
-      let arg = Shielded_tez_contract_input.as_arg sapling_input in
+      let arg = sapling_transaction_as_arg sapling_input in
       let fee_parameter =
         {
           Injection.minimal_fees;
@@ -294,7 +314,7 @@ let unshield_cmd =
       >>= fun () ->
       keys_of_implicit_account cctxt tz_dst >>=? fun (source, src_pk, src_sk) ->
       do_unshield cctxt contract_dst name stez source >>=? fun sapling_input ->
-      let arg = Shielded_tez_contract_input.as_arg sapling_input in
+      let arg = sapling_transaction_as_arg sapling_input in
       let fee_parameter =
         {
           Injection.minimal_fees;
@@ -502,8 +522,7 @@ let submit_shielded_cmd =
              UTXO.transaction_encoding
              Hex.(to_bytes_exn (`Hex hex)))
       >>=? fun transaction ->
-      return Shielded_tez_contract_input.(as_arg (create transaction))
-      >>=? fun contract_input ->
+      return (sapling_transaction_as_arg transaction) >>=? fun contract_input ->
       let chain = cctxt#chain and block = cctxt#block in
       keys_of_implicit_account cctxt source >>=? fun (source, src_pk, src_sk) ->
       let open Protocol.Alpha_context in

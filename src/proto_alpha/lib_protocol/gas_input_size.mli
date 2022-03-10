@@ -51,3 +51,5 @@ val of_micheline : ('a, 'b) Micheline.node -> micheline_size
 val sapling_transaction_inputs : Alpha_context.Sapling.transaction -> t
 
 val sapling_transaction_outputs : Alpha_context.Sapling.transaction -> t
+
+val sapling_transaction_bound_data : Alpha_context.Sapling.transaction -> t
