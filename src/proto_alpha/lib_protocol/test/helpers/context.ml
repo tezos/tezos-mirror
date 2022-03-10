@@ -265,6 +265,12 @@ module Contract = struct
   let balance ctxt contract =
     Alpha_services.Contract.balance rpc_ctxt ctxt contract
 
+  let frozen_bonds ctxt contract =
+    Alpha_services.Contract.frozen_bonds rpc_ctxt ctxt contract
+
+  let balance_and_frozen_bonds ctxt contract =
+    Alpha_services.Contract.balance_and_frozen_bonds rpc_ctxt ctxt contract
+
   let counter ctxt contract =
     match Contract.is_implicit contract with
     | None -> invalid_arg "Helpers.Context.counter"
