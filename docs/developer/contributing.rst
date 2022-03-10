@@ -98,43 +98,54 @@ This Git strategy is a variant of the `git rebase workflow <https://www.atlassia
 Workflow of an MR
 -----------------
 
-This section presents a global view of our MR workflow. Details about the
-individual steps in this workflow are described in the following sections.
+This section presents a global view of our MR workflow. Details about
+the individual steps in this workflow are described in the following
+sections.
 
 Our code review process uses GitLab. First a developer creates a new
-branch for :ref:`preparing the MR <preparing_MR>`.
-As this is a private new branch, the developer is free to
-rebase, squash commits, rewrite history (``git push --force``), etc. at will.
+branch for :ref:`preparing the MR <preparing_MR>`.  As this is a
+private new branch, the developer is free to rebase, squash commits,
+rewrite history (``git push --force``), etc. at will.
 
-Once the code is ready to be shared with the rest of the team, the developer
-:ref:`opens a Merge Request <creating_MR>`.
-It is useful to explain why the MR is created, to
-add a precise description of the code
-changes, and to check if those are in line with the initial
-requirements (if responding to an issue), or to the stated reasons (otherwise).
-Dependencies on other merge requests, other relationships to MRs, to
-issues, etc, should also be mentioned.
+Once the code is ready to be shared with the rest of the team, the
+developer :ref:`opens a Merge Request <creating_MR>`.  It is useful to
+explain why the MR is created, to add a precise description of the
+code changes, and to check if those are in line with the initial
+requirements (if responding to an issue), or to the stated reasons
+(otherwise).  Dependencies on other merge requests, other
+relationships to MRs, to issues, etc, should also be mentioned.
 
-While the code is still not ready to be peer reviewed, but it is merely a
-work in progress, the developer prefixes the MR with ``Draft:``. This will tell everybody
-they can look at the code, comment, but there is still work to be done and the
-branch can change and history be rewritten.
+While the code is still not ready to be peer reviewed, but it is
+merely a work in progress, the developer prefixes the MR with
+``Draft:`` and assigns it to themselves.  This will tell everybody
+they can look at the code, comment, but there is still work to be done
+and the branch can change and history be rewritten. Alternatively, the
+MR title can be prefixed with ``WIP:``.  ``Draft:`` prefix is
+sometimes set automatically by GitLab, so ``WIP:`` is in a sense less
+ambiguous.
 
-Finally, when the code is ready for the :ref:`code review <code_review>`, the developer removes the Draft status of the
-MR and freezes the branch. From this moment on, the developer will refrain to
-rewrite history, but he/she can add new commits and rebase the branch for
-syncing it with master (this can be done regularly to make sure the branch does
-not get stale). At this point the developer interacts with the reviewers to
-address their comments and suggestions.
+Finally, when the code is ready for the :ref:`code review
+<code_review>`, the developer removes the Draft status (or ``WIP:``
+prefix) of the MR and freezes the branch. From this moment on, the
+developer will refrain from rewriting history, but he/she can add new
+commits and rebase the branch for syncing it with master (this can be
+done regularly to make sure the branch does not get stale). At this
+point the developer interacts with the reviewers to address their
+comments and suggestions.
 
-GitLab allows both to comment on the code and to add general comments on the
-MR.  Each comment should be addressed by the developer. He/she can add
-additional commits to address each comment. This incremental approach will make
-it easier for the reviewer to keep interacting till each discussion is
-resolved. When the reviewer is satisfied, he/she will mark the discussion resolved.
+GitLab allows both to comment on the code and to add general comments
+on the MR.  Each comment should be addressed by the developer. He/she
+can add additional commits to address each comment. This incremental
+approach will make it easier for the reviewer to keep interacting till
+each discussion is resolved. When the reviewer is satisfied, he/she
+will mark the discussion resolved.
 
-When all discussions are resolved, you should squash any fix-up commits that were applied (don't forget to edit the commit message appropriately).
-Then, the reviewer will rebase the branch and merge the MR in the master branch.
+When all discussions are resolved, and the MR has got at least two
+approvals from Octez Merge Team members, the developer should squash
+any fix-up commits that were applied (remembering to edit the commit
+message appropriately). Then anyone can assign the MR to the `Nomadic
+Margebot <https://gitlab.com/nomadic-margebot>`__, which will
+automatically rebase the branch on top of master and finally merge it.
 
 .. _preparing_MR:
 
