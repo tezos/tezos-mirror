@@ -32,7 +32,8 @@
 
 (* This example is included in the documentation (docs/developers/tezt.rst).
    It is part of the tests to ensure we keep it up-to-date. *)
-let check_node_initialization history_mode =
+let check_node_initialization (history_mode : Node.history_mode) :
+    Protocol.t list -> unit =
   Protocol.register_test
     ~__FILE__
     ~title:
