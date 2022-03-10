@@ -26,7 +26,7 @@ let pp_type_name fmtr (t : type_name) =
   | `TTx_rollup_l2_address -> "tx_rollup_l2_address"
   | `TContract -> "contract"
   | `TBls12_381_fr -> "bls12_381_fr"
-  | `TSapling_transaction -> "sapling_transaction"
+  | `TSapling_transaction_deprecated -> "sapling_transaction_deprecated"
   | `TTimestamp -> "timestamp"
   | `TKey_hash -> "key_hash"
   | `TBig_map -> "big_map"
@@ -84,7 +84,8 @@ let rec tnames_of_type :
   | Script_typed_ir.Big_map_t (kty, vty, _) ->
       tnames_of_comparable_type kty (tnames_of_type vty (`TBig_map :: acc))
   | Script_typed_ir.Contract_t (ty, _) -> tnames_of_type ty (`TContract :: acc)
-  | Script_typed_ir.Sapling_transaction_t _ -> `TSapling_transaction :: acc
+  | Script_typed_ir.Sapling_transaction_deprecated_t _ ->
+      `TSapling_transaction_deprecated :: acc
   | Script_typed_ir.Sapling_state_t _ -> `TSapling_state :: acc
   | Script_typed_ir.Operation_t -> `TOperation :: acc
   | Script_typed_ir.Chain_id_t -> `TChain_id :: acc

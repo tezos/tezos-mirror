@@ -2461,9 +2461,9 @@ module Registration_section = struct
 
         let kinstr =
           let spl_state = sapling_state memo_size in
-          let spl_tx = sapling_transaction memo_size in
+          let spl_tx = sapling_transaction_deprecated memo_size in
           let pair_int_spl_state = pair int spl_state in
-          ISapling_verify_update
+          ISapling_verify_update_deprecated
             ( kinfo (spl_tx @$ spl_state @$ bot),
               halt (option pair_int_spl_state @$ bot) )
 

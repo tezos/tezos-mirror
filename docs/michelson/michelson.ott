@@ -221,7 +221,7 @@ type, ty, vty :: ty_ ::=
   | lambda ty1 ty2      :: :: lambda
   | map kty vty     :: :: map
   | big_map kty vty :: :: big_map
-  | sapling_transaction n :: :: sapling_transaction
+  | sapling_transaction_deprecated n :: :: sapling_transaction_deprecated
   | sapling_state n :: :: sapling_state
   | ticket cty :: :: ticket
   | bls12_381_g1 :: :: bls12_381_g1 {{ tex \ottkw{bls12\_381\_g1}  }}
@@ -1091,7 +1091,7 @@ Typing :: 't_' ::=
        ctx :- DIP n instr :: A @ B => A @ C
 
        -------------------------------------------- :: SAPLING_VERIFY_UPDATE
-       ctx :- SAPLING_VERIFY_UPDATE :: sapling_transaction ms : sapling_state ms : A => option (pair int (sapling_state ms)) : A
+       ctx :- SAPLING_VERIFY_UPDATE :: sapling_transaction_deprecated ms : sapling_state ms : A => option (pair int (sapling_state ms)) : A
 
 
        -------------------------------------------- :: SAPLING_EMPTY_STATE

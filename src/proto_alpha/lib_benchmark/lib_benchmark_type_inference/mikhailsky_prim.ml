@@ -174,7 +174,7 @@ type prim =
   | T_chain_id
   | T_never
   | T_sapling_state
-  | T_sapling_transaction
+  | T_sapling_transaction_deprecated
   | T_bls12_381_g1
   | T_bls12_381_g2
   | T_bls12_381_fr
@@ -338,7 +338,8 @@ let relation =
     (T_unit, Michelson_v1_primitives.T_unit);
     (T_operation, Michelson_v1_primitives.T_operation);
     (T_address, Michelson_v1_primitives.T_address);
-    (T_sapling_transaction, Michelson_v1_primitives.T_sapling_transaction);
+    ( T_sapling_transaction_deprecated,
+      Michelson_v1_primitives.T_sapling_transaction_deprecated );
     (T_sapling_state, Michelson_v1_primitives.T_sapling_state);
     (T_chain_id, Michelson_v1_primitives.T_chain_id);
     (T_never, Michelson_v1_primitives.T_never);
@@ -510,7 +511,7 @@ let string_of_prim prim =
   | T_chain_id -> "T_chain_id"
   | T_never -> "T_never"
   | T_sapling_state -> "T_sapling_state"
-  | T_sapling_transaction -> "T_sapling_transaction"
+  | T_sapling_transaction_deprecated -> "T_sapling_transaction_deprecated"
   | T_bls12_381_g1 -> "T_bls12_381_g1"
   | T_bls12_381_g2 -> "T_bls12_381_g2"
   | T_bls12_381_fr -> "T_bls12_381_fr"
@@ -560,8 +561,9 @@ let kind (x : prim) =
   | T_bool | T_contract | T_int | T_key | T_key_hash | T_lambda | T_list | T_map
   | T_big_map | T_nat | T_option | T_or | T_pair | T_set | T_signature
   | T_string | T_bytes | T_mutez | T_timestamp | T_unit | T_operation
-  | T_address | T_chain_id | T_never | T_sapling_state | T_sapling_transaction
-  | T_bls12_381_g1 | T_bls12_381_g2 | T_bls12_381_fr | T_ticket ->
+  | T_address | T_chain_id | T_never | T_sapling_state
+  | T_sapling_transaction_deprecated | T_bls12_381_g1 | T_bls12_381_g2
+  | T_bls12_381_fr | T_ticket ->
       Type_kind
   (* Holes in programs and data. *)
   (* Annotations. *)

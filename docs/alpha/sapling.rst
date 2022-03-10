@@ -176,7 +176,7 @@ Michelson: verify update
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
 We introduce two new Michelson types `sapling_state` and
-`sapling_transaction`, and two instructions called
+`sapling_transaction_deprecated`, and two instructions called
 `SAPLING_VERIFY_UPDATE` and `SAPLING_EMPTY_STATE`
 (see the :doc:`Michelson reference<michelson>`
 for more details).
@@ -397,7 +397,7 @@ changes is kept by the interpreter and applied at the end of each
 smart contract call.
 
 In the Michelson interpreter two new types are added, `sapling_state` and
-`sapling_transaction`, and the instruction `SAPLING_VERIFY_UPDATE`.
+`sapling_transaction_deprecated`, and the instruction `SAPLING_VERIFY_UPDATE`.
 
 Client
 ^^^^^^

@@ -2,7 +2,7 @@
 # the tez, updated by a sapling transaction. The second parameter is an optional
 # implicit account used to claim funds when unshielding.
 storage (sapling_state 8);
-parameter (list (pair (sapling_transaction 8) (option key_hash) ) );
+parameter (list (pair (sapling_transaction_deprecated 8) (option key_hash) ) );
 code { # Stack manipulation
        UNPAIR;
        NIL operation;

@@ -213,7 +213,7 @@ module Micheline_sampler = struct
       T_unit;
       T_operation;
       T_address;
-      T_sapling_transaction;
+      T_sapling_transaction_deprecated;
       T_sapling_state;
       T_chain_id;
       T_never;

@@ -118,7 +118,8 @@ let operation = operation_t
 
 let sapling_state memo_size = sapling_state_t ~memo_size
 
-let sapling_transaction memo_size = sapling_transaction_t ~memo_size
+let sapling_transaction_deprecated memo_size =
+  sapling_transaction_deprecated_t ~memo_size
 
 let bls12_381_g1 = bls12_381_g1_t
 

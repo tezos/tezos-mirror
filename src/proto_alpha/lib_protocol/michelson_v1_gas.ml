@@ -576,7 +576,7 @@ module Cost_of = struct
     (* model N_ISapling_verify_update *)
     (* Approximating 1.27167 x term *)
     (* Approximating 38.72115 x term *)
-    let cost_N_ISapling_verify_update size1 size2 =
+    let cost_N_ISapling_verify_update_deprecated size1 size2 =
       let open S_syntax in
       let v1 = S.safe_int size1 in
       let v0 = S.safe_int size2 in
@@ -1259,8 +1259,8 @@ module Cost_of = struct
 
     let dupn n = atomic_step_cost (cost_N_IDupN n)
 
-    let sapling_verify_update ~inputs ~outputs =
-      atomic_step_cost (cost_N_ISapling_verify_update inputs outputs)
+    let sapling_verify_update_deprecated ~inputs ~outputs =
+      atomic_step_cost (cost_N_ISapling_verify_update_deprecated inputs outputs)
 
     let sapling_empty_state = atomic_step_cost cost_N_ISapling_empty_state
 
@@ -1830,7 +1830,7 @@ module Cost_of = struct
     (* Reuse 006 costs. *)
     let operation bytes = Script.bytes_node_cost bytes
 
-    let sapling_transaction (t : Sapling.transaction) =
+    let sapling_transaction_deprecated (t : Sapling.transaction) =
       let inputs = List.length t.inputs in
       let outputs = List.length t.outputs in
       atomic_step_cost (cost_SAPLING_TRANSACTION_ENCODING ~inputs ~outputs)

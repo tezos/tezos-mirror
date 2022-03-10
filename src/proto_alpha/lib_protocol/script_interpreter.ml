@@ -1272,7 +1272,7 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
       | ISapling_empty_state (_, memo_size, k) ->
           let state = Sapling.empty_state ~memo_size () in
           (step [@ocaml.tailcall]) g gas k ks state (accu, stack)
-      | ISapling_verify_update (_, k) -> (
+      | ISapling_verify_update_deprecated (_, k) -> (
           let transaction = accu in
           let (state, stack) = stack in
           let address = Contract.to_b58check sc.self in

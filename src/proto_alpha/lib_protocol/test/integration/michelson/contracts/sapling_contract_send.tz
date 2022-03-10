@@ -1,5 +1,5 @@
 storage (unit);
-parameter (pair (contract (or (sapling_transaction 8) (sapling_state 8))) (sapling_transaction 8));
+parameter (pair (contract (or (sapling_transaction_deprecated 8) (sapling_state 8))) (sapling_transaction_deprecated 8));
 code { UNPAIR ;
        UNPAIR;
        SWAP ;
@@ -11,7 +11,7 @@ code { UNPAIR ;
        DROP ;
        PUSH mutez 0;
        SWAP ;
-       RIGHT (sapling_transaction 8);
+       RIGHT (sapling_transaction_deprecated 8);
        TRANSFER_TOKENS;
        NIL operation;
        SWAP;

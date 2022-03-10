@@ -1,5 +1,5 @@
 storage (pair (sapling_state :left 8) (sapling_state :right 8) );
-parameter (pair bool (pair (sapling_transaction :left 8) (sapling_transaction :right 8)) );
+parameter (pair bool (pair (sapling_transaction_deprecated :left 8) (sapling_transaction_deprecated :right 8)) );
 code { UNPAIR ;
        UNPAIR ;
        DIP {UNPAIR} ;
