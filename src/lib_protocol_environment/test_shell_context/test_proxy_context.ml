@@ -148,6 +148,23 @@ let test_context_list_fct (proxy : Context.t) : unit Lwt.t =
   let* () = assert_list ["a"; "x"] [] in
   assert_list ["a"] ["b"; "c"]
 
+let test_context_fold_fct (proxy : Context.t) : unit Lwt.t =
+  let open Lwt_syntax in
+  let assert_fold key exp =
+    let* res =
+      Context.fold proxy key ~order:`Undefined ~init:"" ~f:(fun k _ acc ->
+          return (acc ^ ":" ^ key_to_string k))
+    in
+    Assert.equal
+      ~msg:(Printf.sprintf "Context.fold [%s], got %S" (key_to_string key) res)
+      exp
+      res ;
+    return_unit
+  in
+  let* () = assert_fold ["a"; "b"] "" in
+  let* () = assert_fold ["a"] "::b:c" in
+  assert_fold [] "::a:a;b:a;c:version"
+
 (******************************************************************************)
 
 let tests =
@@ -157,6 +174,7 @@ let tests =
     ("find", test_context_find_fct);
     ("find_tree", test_context_find_tree_fct);
     ("list", test_context_list_fct);
+    ("fold", test_context_fold_fct);
   ]
 
 let tests : unit Alcotest_lwt.test_case list =
