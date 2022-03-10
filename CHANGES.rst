@@ -43,7 +43,7 @@ Node
   must be used for RPC requests to the node. The value can be  ``json``,
   ``binary`` or ``any``. By default, the value is set to ``any``.
 
-- Added an option ``--listen-prometheus <PORT>`` to ``tezos-node run`` to
+- Added an option ``--metrics-addr <ADDR>:<PORT>`` to ``tezos-node`` to
   expose some metrics using the Prometheus format.
 
 - Adds ``tezos-node storage head-commmit`` command to print the current

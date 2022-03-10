@@ -63,6 +63,7 @@ type t = {
   latency : int option;
   allow_all_rpc : P2p_point.Id.addr_port_id list;
   media_type : Media_type.Command_line.t;
+  metrics_addr : string list;
 }
 
 type error +=
@@ -152,7 +153,7 @@ let wrap data_dir config_file network connections max_download_speed
     bootstrap_threshold private_mode disable_mempool disable_mempool_precheck
     enable_testchain expected_pow rpc_listen_addrs rpc_tls cors_origins
     cors_headers log_output history_mode synchronisation_threshold latency
-    disable_config_validation allow_all_rpc media_type =
+    disable_config_validation allow_all_rpc media_type metrics_addr =
   let actual_data_dir =
     Option.value ~default:Node_config_file.default_data_dir data_dir
   in
@@ -195,6 +196,7 @@ let wrap data_dir config_file network connections max_download_speed
     latency;
     allow_all_rpc;
     media_type;
+    metrics_addr;
   }
 
 module Manpage = struct
@@ -374,6 +376,17 @@ module Term = struct
       value
       & opt (some (conv network_parser)) None
       & info ~docs ~doc ~docv:"NETWORK" ["network"])
+
+  let metrics_addr =
+    let doc = "Port on which to provide metrics over HTTP." in
+    Arg.(
+      value & opt_all string []
+      & info
+          ~docs
+          ~doc
+          ~docv:
+            "ADDR:PORT or :PORT (by default ADDR is localhost and PORT is 9932)"
+          ["metrics-addr"])
 
   (* P2p args *)
 
@@ -616,7 +629,7 @@ module Term = struct
     $ disable_mempool $ disable_mempool_precheck $ enable_testchain
     $ expected_pow $ rpc_listen_addrs $ rpc_tls $ cors_origins $ cors_headers
     $ log_output $ history_mode $ synchronisation_threshold $ latency
-    $ disable_config_validation $ allow_all_rpc $ media_type
+    $ disable_config_validation $ allow_all_rpc $ media_type $ metrics_addr
 end
 
 let read_config_file args =
@@ -735,6 +748,7 @@ let read_and_patch_config_file ?(may_override_network = false)
     latency;
     allow_all_rpc;
     media_type;
+    metrics_addr;
   } =
     args
   in
@@ -867,6 +881,7 @@ let read_and_patch_config_file ?(may_override_network = false)
     ~rpc_listen_addrs
     ~allow_all_rpc
     ~media_type
+    ~metrics_addr
     ~private_mode
     ~disable_mempool
     ~disable_mempool_precheck

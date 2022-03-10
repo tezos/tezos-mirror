@@ -26,12 +26,13 @@ Usage
 -----
 
 To instruct the Octez node to produce metrics, the user needs to pass the option
-``--listen-prometheus=<N>``. The port specified on the command line is the port
-where the integrated open metrics server will be available.
-
+``--metrics-addr=<ADDR>:<PORT>``. The port specified on the command line is the port
+where the integrated open metrics server will be available (9932 by default).
+The address defaults to localhost. 
+When the option is not supplied at all, no metrics are produced.
 Ex.::
 
-  tezos-node run --listen-prometheus=9091
+  tezos-node run --metrics-addr=:9091
 
 To query the open metrics server the user can simply query the node.
 
@@ -61,4 +62,3 @@ source - using adequate values:
       scheme: http
       static_configs:
         - targets: ['localhost:9091']
-
