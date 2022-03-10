@@ -342,63 +342,6 @@ type _ comparable_ty =
       'v comparable_ty * 'v option ty_metadata
       -> 'v option comparable_ty
 
-let meta_basic = {size = Type_size.one}
-
-let comparable_ty_metadata : type a. a comparable_ty -> a ty_metadata = function
-  | Unit_key | Never_key | Int_key | Nat_key | Signature_key | String_key
-  | Bytes_key | Mutez_key | Bool_key | Key_hash_key | Key_key | Timestamp_key
-  | Chain_id_key | Address_key | Tx_rollup_l2_address_key ->
-      meta_basic
-  | Pair_key (_, _, meta) -> meta
-  | Union_key (_, _, meta) -> meta
-  | Option_key (_, meta) -> meta
-
-let comparable_ty_size t = (comparable_ty_metadata t).size
-
-let unit_key = Unit_key
-
-let never_key = Never_key
-
-let int_key = Int_key
-
-let nat_key = Nat_key
-
-let signature_key = Signature_key
-
-let string_key = String_key
-
-let bytes_key = Bytes_key
-
-let mutez_key = Mutez_key
-
-let bool_key = Bool_key
-
-let key_hash_key = Key_hash_key
-
-let key_key = Key_key
-
-let timestamp_key = Timestamp_key
-
-let chain_id_key = Chain_id_key
-
-let address_key = Address_key
-
-let tx_rollup_l2_address_key = Tx_rollup_l2_address_key
-
-let pair_key loc l r =
-  Type_size.compound2 loc (comparable_ty_size l) (comparable_ty_size r)
-  >|? fun size -> Pair_key (l, r, {size})
-
-let pair_3_key loc l m r = pair_key loc m r >>? fun r -> pair_key loc l r
-
-let union_key loc l r =
-  Type_size.compound2 loc (comparable_ty_size l) (comparable_ty_size r)
-  >|? fun size -> Union_key (l, r, {size})
-
-let option_key loc t =
-  Type_size.compound1 loc (comparable_ty_size t) >|? fun size ->
-  Option_key (t, {size})
-
 (*
 
    This signature contains the exact set of functions used in the
@@ -1772,6 +1715,8 @@ let kinstr_rewritek :
   | ILog (kinfo, event, logger, k) -> ILog (kinfo, event, logger, k)
   | IOpen_chest (kinfo, k) -> IOpen_chest (kinfo, f.apply k)
 
+let meta_basic = {size = Type_size.one}
+
 let ty_metadata : type a. a ty -> a ty_metadata = function
   | Unit_t | Never_t | Int_t | Nat_t | Signature_t | String_t | Bytes_t
   | Mutez_t | Bool_t | Key_hash_t | Key_t | Timestamp_t | Chain_id_t | Address_t
@@ -1791,43 +1736,90 @@ let ty_metadata : type a. a ty -> a ty_metadata = function
   | Bls12_381_g1_t | Bls12_381_g2_t | Bls12_381_fr_t | Chest_t | Chest_key_t ->
       meta_basic
 
+let comparable_ty_metadata : type a. a comparable_ty -> a ty_metadata = function
+  | Unit_key | Never_key | Int_key | Nat_key | Signature_key | String_key
+  | Bytes_key | Mutez_key | Bool_key | Key_hash_key | Key_key | Timestamp_key
+  | Chain_id_key | Address_key | Tx_rollup_l2_address_key ->
+      meta_basic
+  | Pair_key (_, _, meta) -> meta
+  | Union_key (_, _, meta) -> meta
+  | Option_key (_, meta) -> meta
+
 let ty_size t = (ty_metadata t).size
+
+let comparable_ty_size t = (comparable_ty_metadata t).size
 
 let unit_t = Unit_t
 
+let unit_key = Unit_key
+
 let int_t = Int_t
+
+let int_key = Int_key
 
 let nat_t = Nat_t
 
+let nat_key = Nat_key
+
 let signature_t = Signature_t
+
+let signature_key = Signature_key
 
 let string_t = String_t
 
+let string_key = String_key
+
 let bytes_t = Bytes_t
+
+let bytes_key = Bytes_key
 
 let mutez_t = Mutez_t
 
+let mutez_key = Mutez_key
+
 let key_hash_t = Key_hash_t
+
+let key_hash_key = Key_hash_key
 
 let key_t = Key_t
 
+let key_key = Key_key
+
 let timestamp_t = Timestamp_t
+
+let timestamp_key = Timestamp_key
 
 let address_t = Address_t
 
+let address_key = Address_key
+
 let bool_t = Bool_t
 
+let bool_key = Bool_key
+
 let tx_rollup_l2_address_t = Tx_rollup_l2_address_t
+
+let tx_rollup_l2_address_key = Tx_rollup_l2_address_key
 
 let pair_t loc l r =
   Type_size.compound2 loc (ty_size l) (ty_size r) >|? fun size ->
   Pair_t (l, r, {size})
+
+let pair_key loc l r =
+  Type_size.compound2 loc (comparable_ty_size l) (comparable_ty_size r)
+  >|? fun size -> Pair_key (l, r, {size})
+
+let pair_3_key loc l m r = pair_key loc m r >>? fun r -> pair_key loc l r
 
 let union_t loc l r =
   Type_size.compound2 loc (ty_size l) (ty_size r) >|? fun size ->
   Union_t (l, r, {size})
 
 let union_bytes_bool_t = Union_t (bytes_t, bool_t, {size = Type_size.three})
+
+let union_key loc l r =
+  Type_size.compound2 loc (comparable_ty_size l) (comparable_ty_size r)
+  >|? fun size -> Union_key (l, r, {size})
 
 let lambda_t loc l r =
   Type_size.compound2 loc (ty_size l) (ty_size r) >|? fun size ->
@@ -1861,6 +1853,10 @@ let option_pair_int_nat_t =
   Option_t
     (Pair_t (int_t, nat_t, {size = Type_size.three}), {size = Type_size.four})
 
+let option_key loc t =
+  Type_size.compound1 loc (comparable_ty_size t) >|? fun size ->
+  Option_key (t, {size})
+
 let list_t loc t =
   Type_size.compound1 loc (ty_size t) >|? fun size -> List_t (t, {size})
 
@@ -1892,7 +1888,11 @@ let sapling_state_t ~memo_size = Sapling_state_t memo_size
 
 let chain_id_t = Chain_id_t
 
+let chain_id_key = Chain_id_key
+
 let never_t = Never_t
+
+let never_key = Never_key
 
 let bls12_381_g1_t = Bls12_381_g1_t
 

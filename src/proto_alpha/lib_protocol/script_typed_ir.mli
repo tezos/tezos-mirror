@@ -217,58 +217,6 @@ type _ comparable_ty =
       'v comparable_ty * 'v option ty_metadata
       -> 'v option comparable_ty
 
-val unit_key : unit comparable_ty
-
-val never_key : never comparable_ty
-
-val int_key : z num comparable_ty
-
-val nat_key : n num comparable_ty
-
-val signature_key : signature comparable_ty
-
-val string_key : Script_string.t comparable_ty
-
-val bytes_key : Bytes.t comparable_ty
-
-val mutez_key : Tez.t comparable_ty
-
-val bool_key : bool comparable_ty
-
-val key_hash_key : public_key_hash comparable_ty
-
-val key_key : public_key comparable_ty
-
-val timestamp_key : Script_timestamp.t comparable_ty
-
-val chain_id_key : Script_chain_id.t comparable_ty
-
-val address_key : address comparable_ty
-
-val tx_rollup_l2_address_key : tx_rollup_l2_address comparable_ty
-
-val pair_key :
-  Script.location ->
-  'a comparable_ty ->
-  'b comparable_ty ->
-  ('a, 'b) pair comparable_ty tzresult
-
-val pair_3_key :
-  Script.location ->
-  'a comparable_ty ->
-  'b comparable_ty ->
-  'c comparable_ty ->
-  ('a, ('b, 'c) pair) pair comparable_ty tzresult
-
-val union_key :
-  Script.location ->
-  'a comparable_ty ->
-  'b comparable_ty ->
-  ('a, 'b) union comparable_ty tzresult
-
-val option_key :
-  Script.location -> 'v comparable_ty -> 'v option comparable_ty tzresult
-
 module type Boxed_set_OPS = sig
   type t
 
@@ -1549,6 +1497,58 @@ val kinstr_rewritek :
 val ty_size : 'a ty -> 'a Type_size.t
 
 val comparable_ty_size : 'a comparable_ty -> 'a Type_size.t
+
+val unit_key : unit comparable_ty
+
+val never_key : never comparable_ty
+
+val int_key : z num comparable_ty
+
+val nat_key : n num comparable_ty
+
+val signature_key : signature comparable_ty
+
+val string_key : Script_string.t comparable_ty
+
+val bytes_key : Bytes.t comparable_ty
+
+val mutez_key : Tez.t comparable_ty
+
+val bool_key : bool comparable_ty
+
+val key_hash_key : public_key_hash comparable_ty
+
+val key_key : public_key comparable_ty
+
+val timestamp_key : Script_timestamp.t comparable_ty
+
+val chain_id_key : Script_chain_id.t comparable_ty
+
+val address_key : address comparable_ty
+
+val tx_rollup_l2_address_key : tx_rollup_l2_address comparable_ty
+
+val pair_key :
+  Script.location ->
+  'a comparable_ty ->
+  'b comparable_ty ->
+  ('a, 'b) pair comparable_ty tzresult
+
+val pair_3_key :
+  Script.location ->
+  'a comparable_ty ->
+  'b comparable_ty ->
+  'c comparable_ty ->
+  ('a, ('b, 'c) pair) pair comparable_ty tzresult
+
+val union_key :
+  Script.location ->
+  'a comparable_ty ->
+  'b comparable_ty ->
+  ('a, 'b) union comparable_ty tzresult
+
+val option_key :
+  Script.location -> 'v comparable_ty -> 'v option comparable_ty tzresult
 
 val unit_t : unit ty
 
