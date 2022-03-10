@@ -178,7 +178,7 @@ module Dune = struct
       ?(preprocess = Stdlib.List.[]) ?(preprocessor_deps = Stdlib.List.[])
       ?(wrapped = true) ?modules ?modules_without_implementation ?modes
       ?foreign_stubs ?c_library_flags ?(private_modules = Stdlib.List.[])
-      ?(deps = Stdlib.List.[]) ?js_of_ocaml (names : string list) =
+      ?(deps = Stdlib.List.[]) ?js_of_ocaml ?action (names : string list) =
     [
       V
         [
@@ -244,6 +244,7 @@ module Dune = struct
             ] );
           (opt c_library_flags @@ fun x -> [S "c_library_flags"; of_atom_list x]);
           (match deps with [] -> E | _ -> S "deps" :: of_list deps);
+          opt action (fun action -> S "action" :: action);
         ];
     ]
 
@@ -726,6 +727,7 @@ module Target = struct
     wrapped : bool;
     node_wrapper_flags : string list;
     cram : bool;
+    action : Dune.s_expr option;
   }
 
   and preprocessor = PPS of t * string list
@@ -860,6 +862,7 @@ module Target = struct
     ?warnings:string ->
     ?wrapped:bool ->
     ?cram:bool ->
+    ?action:Dune.s_expr ->
     path:string ->
     'a ->
     t option
@@ -873,7 +876,7 @@ module Target = struct
       ?(opens = []) ?(preprocess = []) ?(preprocessor_deps = [])
       ?(private_modules = []) ?(opam_only_deps = []) ?release ?static
       ?static_cclibs ?synopsis ?(time_measurement_ppx = false) ?warnings
-      ?(wrapped = true) ?(cram = false) ~path names =
+      ?(wrapped = true) ?(cram = false) ?action ~path names =
     let conflicts = List.filter_map Fun.id conflicts in
     let deps = List.filter_map Fun.id deps in
     let opam_only_deps = List.filter_map Fun.id opam_only_deps in
@@ -1056,6 +1059,7 @@ module Target = struct
         warnings;
         wrapped;
         cram;
+        action;
       }
 
   let public_lib ?internal_name =
@@ -1460,6 +1464,7 @@ let generate_dune ~dune_file_has_static_profile (internal : Target.internal) =
       ~private_modules:internal.private_modules
       ~deps:(List.map Dune.file internal.dep_files)
       ?js_of_ocaml:internal.js_of_ocaml
+      ?action:internal.action
     :: documentation :: create_empty_files :: internal.dune)
 
 let static_profile (cclibs : string list) =

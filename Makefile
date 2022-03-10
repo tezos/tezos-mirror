@@ -127,10 +127,6 @@ build-sandbox:
 	@dune build --profile=$(PROFILE) $(COVERAGE_OPTIONS) src/bin_sandbox/main.exe
 	@cp -f _build/default/src/bin_sandbox/main.exe tezos-sandbox
 
-.PHONY: build-test
-build-test: build-sandbox
-	@dune build --profile=$(PROFILE) $(COVERAGE_OPTIONS) @buildtest
-
 .PHONY: test-protocol-compile
 test-protocol-compile:
 	@dune build --profile=$(PROFILE) $(COVERAGE_OPTIONS) @runtest_compile_protocol

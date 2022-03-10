@@ -20,8 +20,6 @@ The application is not built by default, one needs:
 
     make build-sandbox
 
-(or ``make build-test``).
-
 Usage
 -----
 

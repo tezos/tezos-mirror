@@ -2892,8 +2892,8 @@ let _tezos_micheline_rewriting_tests =
       ]
 
 let _tezos_store_tests =
-  test_exes
-    ["test"]
+  test
+    "test"
     ~path:"src/lib_store/test"
     ~opam:"src/lib_store/tezos-store"
     ~deps:
@@ -2910,17 +2910,19 @@ let _tezos_store_tests =
         Protocol.(plugin_exn alpha) |> open_;
         alcotest_lwt;
       ]
+    ~action:Dune.[setenv "SLOW_TEST" "false" @@ run_exe "test" []]
     ~dune:
+      (* [test_slow_manual] is a very long test, running a huge
+         combination of tests that are useful for local testing for a
+         given test suite. In addition to that, there is a memory leak
+         is the tests (that could be in alcotest) which makes the test
+         to consumes like > 10Gb of ram. For these reasons, we do not
+         run these tests in the CI. *)
       Dune.
         [
-          alias_rule "buildtest" ~deps:["test.exe"];
           alias_rule
-            "runtest_store"
-            ~action:(setenv "SLOW_TEST" "false" @@ run_exe "test" []);
-          alias_rule
-            "runtest"
-            ~package:"tezos-store"
-            ~alias_deps:["runtest_store"];
+            "test_slow_manual"
+            ~action:(setenv "SLOW_TEST" "true" @@ run_exe "test" []);
         ]
 
 let _tezos_shell_tests =
