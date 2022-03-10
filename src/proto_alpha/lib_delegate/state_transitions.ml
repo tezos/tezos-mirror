@@ -532,18 +532,24 @@ let end_of_round state current_round =
       let new_state = {state with round_state = new_round_state} in
       do_nothing new_state
   | Some (delegate, _) ->
-      Events.(
-        emit
-          proposal_slot
-          (current_round, state.level_state.current_level, new_round, delegate))
-      >>= fun () ->
-      (* We have a delegate, we need to determine what to inject *)
-      propose_block_action
-        new_state
-        delegate
-        new_round
-        state.level_state.latest_proposal
-      >>= fun action -> Lwt.return (new_state, action)
+      let last_proposal = state.level_state.latest_proposal.block in
+      if Protocol_hash.(last_proposal.protocol <> Protocol.hash) then
+        (* Do not inject a block for the previous protocol! (Let the
+           baker of the previous protocol do it.) *)
+        do_nothing new_state
+      else
+        Events.(
+          emit
+            proposal_slot
+            (current_round, state.level_state.current_level, new_round, delegate))
+        >>= fun () ->
+        (* We have a delegate, we need to determine what to inject *)
+        propose_block_action
+          new_state
+          delegate
+          new_round
+          state.level_state.latest_proposal
+        >>= fun action -> Lwt.return (new_state, action)
 
 let time_to_bake state at_round =
   (* It is now time to update the state level *)
