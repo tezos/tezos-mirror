@@ -124,6 +124,17 @@ module Arg = struct
       ~construct:construct_context_id
       ~destruct:destruct_context_id
       ()
+
+  let l2_transaction : L2_transaction.hash RPC_arg.t =
+    RPC_arg.make
+      ~descr:"An L2 transaction identifier."
+      ~name:"l2_transaction_hash"
+      ~construct:L2_transaction.Hash.to_b58check
+      ~destruct:(fun s ->
+        match L2_transaction.Hash.of_b58check_opt s with
+        | None -> Error "Cannot parse L2 transaction hash"
+        | Some h -> Ok h)
+      ()
 end
 
 module Block = struct
@@ -450,7 +461,7 @@ module Context_RPC = struct
 end
 
 module Injection = struct
-  let path = RPC_path.(open_root / "injection")
+  let path = RPC_path.(open_root / "queue")
 
   let directory : Batcher.state RPC_directory.t ref = ref RPC_directory.empty
 
@@ -463,17 +474,38 @@ module Injection = struct
     | Some batcher_state ->
         !directory |> RPC_directory.map (fun () -> Lwt.return batcher_state)
 
-  let transaction =
+  let inject_transaction =
     RPC_service.post_service
       ~description:"Inject an L2 tranasction in the queue of the rollup node."
       ~query:RPC_query.empty
       ~input:L2_transaction.encoding
-      ~output:Data_encoding.unit
-      RPC_path.(path / "transaction")
+      ~output:L2_transaction.Hash.encoding
+      RPC_path.(path / "injection" / "transaction")
+
+  let get_transaction =
+    RPC_service.get_service
+      ~description:"Retrieve an L2 transaction in the queue."
+      ~query:RPC_query.empty
+      ~output:(Data_encoding.option L2_transaction.encoding)
+      RPC_path.(path / "transaction" /: Arg.l2_transaction)
+
+  let get_queue =
+    RPC_service.get_service
+      ~description:"Get the whole queue of L2 transactions."
+      ~query:RPC_query.empty
+      ~output:(Data_encoding.list L2_transaction.encoding)
+      path
 
   let () =
-    register transaction (fun state () transaction ->
+    register inject_transaction (fun state () transaction ->
         Batcher.register_transaction state transaction)
+
+  let () =
+    register get_transaction (fun (state, tr_hash) () () ->
+        return @@ Batcher.find_transaction state tr_hash)
+
+  let () =
+    register get_queue (fun state () () -> return @@ Batcher.get_queue state)
 end
 
 let register state =

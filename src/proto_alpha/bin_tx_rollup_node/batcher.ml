@@ -80,9 +80,12 @@ let register_transaction ?(apply = true) state (tr : L2_transaction.t) =
       (context, result)
     else return (context, None)
   in
-  L2_transaction.Hash_queue.add tr ?result state.batcher_state.transactions ;
-  state.batcher_state.incr_context <- context ;
-  ()
+  L2_transaction.Hash_queue.add tr ?result state.transactions ;
+  if prev_context == context then
+    (* Only update internal context if it was not changed due to a head block
+       change in the meantime. *)
+    state.incr_context <- context ;
+  L2_transaction.hash tr
 
 let inject_operations (type kind) (cctxt : Protocol_client_context.full) state
     (operations : kind manager_operation list) =
