@@ -19,10 +19,37 @@ This protocol requires a different protocol environment than Ithaca.
 It requires protocol environment V5, compared to V4 for Ithaca.
 (MR :gl:`!4071`)
 
+- Remove compatibility layers. (MR :gl:`!4215`)
+
+- Lwtreslib updates from stdlib 4.13. (MR :gl:`!4279`)
+
+- Update to data encoding 0.5 and support compact encoding. (MRs :gl:`!4339`,
+  :gl:`!4582`)
+
+- Add Merkle proofs to the protocol. (MRs :gl:`!4086`, :gl:`!4307`, :gl:`!4509`,
+  :gl:`!4536`, :gl:`!4694`)
+
+- Update Bls_signature to bls12-381.3.0.1. (MRs :gl:`!4383`, :gl:`!4732`)
+
+- Add pk/signature_size_in_bytes in Bls_signature. (MR :gl:`!4492`)
+
+- Add size_in_memory for BLS types and reset test configurations of for the
+  typed IR size to previous values. (MR :gl:`!4464`)
+
+- Provide let* binding operators. (MR :gl:`!4365`)
+
+- Expose ``Blake2b.Make_merkle_tree``. (MR :gl:`!4618`)
+
+- Sync interfaces with upstreams. (MR :gl:`!4617`)
+
+- Export context configuration. (MR :gl:`!4601`)
+
+- Remove unused function register_resolver. (MR :gl:`!4591`)
+
 Liquidity Baking
 ----------------
 
-Several changes are made to the Liquidity Baking Escape Vote:
+Several changes are made to the Liquidity Baking Escape Vote (MR :gl:`!4201`):
 
 - The options are renamed ``On`` (instead of ``false``) and ``Off``
   (instead of ``true``) to reduce confusion.
@@ -55,28 +82,44 @@ Several changes are made to the Liquidity Baking Escape Vote:
 Transaction Optimistic Rollups
 ------------------------------
 
-- Feature flag & origination. (MR :gl:`!3915`)
+Rollups is a new feature of the protocol supporting execution of transactions
+off-chain. See separate :doc:`documentation <../alpha/transaction_rollups>` for
+details. (MRs :gl:`!3915`, :gl:`!4198`, :gl:`!4200`, :gl:`!4203`, :gl:`!4332`,
+:gl:`!4428`, :gl:`!4309`, :gl:`!4360`, :gl:`!4369`, :gl:`!4447`, :gl:`!4357`,
+:gl:`!4344`, :gl:`!4480`, :gl:`!4275`, :gl:`!4017`, :gl:`!4489`, :gl:`!4499`,
+:gl:`!4496`, :gl:`!4515`, :gl:`!4453`, :gl:`!4508`, :gl:`!4531`, :gl:`!4484`,
+:gl:`!4495`, :gl:`!4446`, :gl:`!4561`, :gl:`!4538`, :gl:`!4593`, :gl:`!4583`,
+:gl:`!4548`, :gl:`!4594`, :gl:`!4590`, :gl:`!4603`, :gl:`!4604`, :gl:`!4576`,
+:gl:`!4517`, :gl:`!4572`, :gl:`!4634`, :gl:`!4653`, :gl:`!4521`, :gl:`!4649`,
+:gl:`!4668`, :gl:`!4523`, :gl:`!4664`, :gl:`!4635`, :gl:`!4667`, :gl:`!4758`,
+:gl:`!4703`, :gl:`!4739`, :gl:`!4702`, :gl:`!4755`, :gl:`!4756`, :gl:`!4768`,
+:gl:`!4750`, :gl:`!4733`, :gl:`!4726`, :gl:`!4780`, :gl:`!4779`, :gl:`!4784`,
+:gl:`!4772`, :gl:`!4782`, :gl:`!4790`, :gl:`!4801`, :gl:`!4740`, :gl:`!4376`,
+:gl:`!4793`)
+
+Smart Contract Optimistic Rollups (ongoing)
+-------------------------------------------
+
+Support for execution of smart contracts inside rollups is in progress and is
+not enabled yet. (MRs :gl:`!3941`, :gl:`!4000`, :gl:`!4020`, :gl:`!4148`,
+:gl:`!4173`, :gl:`!4483`, :gl:`!4563`, :gl:`!4629`, :gl:`!4586`, :gl:`!4621`,
+:gl:`!4700`, :gl:`!4343`, :gl:`!4770`, :gl:`!4791`, :gl:`!4498`, :gl:`!4620`,
+:gl:`!4568`, :gl:`!4289`)
 
 Tickets Hardening
 -----------------
 
-- Tickets lazy storage diff. (MR :gl:`!4011`)
-
-Smart Contract Optimistic Rollups
----------------------------------
-
-- Add smart-contract rollup creation. (MR :gl:`!3941`)
-
-- Add a smart contract rollup node. (MR :gl:`!4000`)
-
-- Add Inbox. (MR :gl:`!4020`)
+Ticket handling has been improved via runtime token validation layer, which adds
+extra layer of protection for ticket semantics. (MRs :gl:`!4011`, :gl:`!3826`,
+:gl:`!4303`, :gl:`!4168`, :gl:`!4323`, :gl:`!4334`, :gl:`!4426`, :gl:`!4491`,
+:gl:`!4341`, :gl:`!4190`)
 
 Voting procedure
 ----------------
 
 The voting power of a delegate is no longer rounded to rolls, it is
 now instead the full staking power of the delegate, currently
-expressed in mutez.
+expressed in mutez. (MR :gl:`!4265`)
 
 Breaking Changes
 ----------------
@@ -104,7 +147,7 @@ Breaking Changes
   The voting power that was represented by ``int32`` (denoting rolls)
   is now represented by an ``int64`` (denoting mutez). Furthermore, in
   the RPC ``/chains/<chain_id>/blocks/<block>/votes/listings``, the
-  field ``rolls`` has been replaced by the field ``voting_power``.
+  field ``rolls`` has been replaced by the field ``voting_power``. (MR :gl:`!4265`)
 
 - Encoding of transaction and origination operations no longer contains
   deprecated `big_map_diff` field. `lazy_storage_diff` should be used
@@ -170,6 +213,13 @@ Minor Changes
 
 - Change ``blocks_per_voting period`` in context with ``cycles_per_voting_period`` (MR :gl:`!4456`)
 
+- Use dedicated error for duplicate ballots. (MR :gl:`!4209`)
+
+- Allow committee size to be < 4. (MR :gl:`!4308`)
+
+- Remove delegate_selection parameter and introduce initial_seed parameter.
+  (MR :gl:`!3842`)
+
 - Retrieve a contract's public key before prechecking an operation. (MR :gl:`!4877`)
 
 Michelson
@@ -223,7 +273,7 @@ Michelson
   ``VOTING_POWER`` to query the staking power of a contract in
   ``mutez``: the value returned by ``VOTING_POWER`` is still of type`
   ``nat`` and it should only be considered relative to
-  ``TOTAL_VOTING_POWER``.
+  ``TOTAL_VOTING_POWER``. (MR :gl:`!4265`)
 
 - The new type ``tx_rollup_l2_address`` has been introduced. It is
   used to identify accounts on transaction rollups’ legders. Values of
@@ -252,8 +302,14 @@ Michelson
   unchanged which was tested by replaying historic transactions to
   these smart contracts with the updated code. For more information on
   which contracts are patched and how the change can be tested read
-  the description of the MR that brought the migration. (MR
-  :gl:`!3730`)
+  the description of the MR that brought the migration. (MRs
+  :gl:`!3730`, :gl:`!4681`)
+
+RPC Changes
+-----------
+
+- Add ``selected_snapshot`` RPC that replaces deleted ``roll_snapshot``.
+  (MRs :gl:`!4479`, :gl:`!4585`)
 
 Internal
 --------
@@ -265,30 +321,54 @@ improvements of the codebase.
   instead of being read from the context each time this instruction is
   executed. (MR :gl:`!3871`)
 
-- Separate ``origination_nonce`` into its own module. (MR :gl:`!3928`)
-
 - Faster gas monad. (MR :gl:`!4034`)
 
-- Simplify cache limits for sampler state. (MR :gl:`!4041`)
+- Carbonated map utility module. (MRs :gl:`!3845`, :gl:`!4156`)
 
-- Tenderbrute - bruteforce seeds to obtain desired delegate selections in tests.
-  (MR :gl:`!3842`)
+- Rewrite step constants explicitly when entering a view. (MR :gl:`!4230`)
 
-- Clean Script_typed_ir_size.mli. (MR :gl:`!4088`)
+- Update migration for Ithaca. (MR :gl:`!4107`)
 
-- Improvements on merge type error flag. (MR :gl:`!3696`)
+- Tenderbake: Optimizing round_and_offset. (MR :gl:`!4009`)
 
-- Make entrypoint type abstract. (MR :gl:`!3755`)
+- Make protocol easier to translate to Coq. (MR :gl:`!4260`)
 
-- Make ``Slot_repr.t`` abstract. (MR :gl:`!4128`)
+- Generalize the destination argument of Transaction. (MR :gl:`!4205`)
 
-- Fix injectivity of types. (MR :gl:`!3863`)
+- Do not propagate operations conditioned by a feature flag. (MR :gl:`!4330`)
 
-- Split ``Ticket_storage`` in two and extract ``Ticket_hash_repr``.
-  (MR :gl:`!4190`)
+- Optimize local gas counter exhaustion checking. (MR :gl:`!4305`)
 
-- Carbonated map utility module. (MR :gl:`!3845`)
+- Fix edge case in pseudorandom computations. (MR :gl:`!4385`)
 
-- Extend carbonated-map with a fold operation. (MR :gl:`!4156`)
+- Ensure voting periods end at cycle ends. (MR :gl:`!4425`)
 
-- Other internal refactorings or documentation. (MRs :gl:`!4276`, `!4385`, `!4457`)
+- Gas: move Size module to lib_protocol. (MR :gl:`!4337`)
+
+- Cleanup Tenderbake code. (MRs :gl:`!4423`, :gl:`!4436`, :gl:`!4225`,)
+
+- Fix coq:lint error ignoring message (MR :gl:`!4473`)
+
+- Take user/automatic protocol upgrades into account during operation
+  simulation. (MR :gl:`!4433`)
+
+- Improve gas model of unparse_script. (MR :gl:`!4328`)
+
+- Remove unreachable code (MR :gl:`!4615`)
+
+- Separate internal operations. (MRs :gl:`!4613`, :gl:`!4623`, :gl:`!4632`,
+  :gl:`!4643`)
+
+- Stakable frozen bonds. (MR :gl:`!4437`)
+
+- Rename first_level_of_Tenderbake for consistency. (MR :gl:`!4825`)
+
+- Internal refactorings in Michelson typechecker and interpreter. (MRs
+  :gl:`!4502`, :gl:`!4693`, :gl:`!4692`, :gl:`!4658`, :gl:`!4507`, :gl:`!4578`,
+  :gl:`!4506`, :gl:`!4133`, :gl:`!4429`, :gl:`!4427`, :gl:`!4298`, :gl:`!4297`,
+  :gl:`!4363`, :gl:`!4364`, :gl:`!3863`, :gl:`!3696`)
+
+- Other internal refactorings or documentation. (MRs :gl:`!4276`,
+  :gl:`!4457`, :gl:`!3928`, :gl:`!4041`, :gl:`!4088`, :gl:`!3755`,
+  :gl:`!4128`, :gl:`!4262`, :gl:`!4257`, :gl:`!4293`, :gl:`!4444`,
+  :gl:`!4224`, :gl:`!4432`, :gl:`!4468`, :gl:`!4777`, :gl:`!4820`, :gl:`!4287`)
