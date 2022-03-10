@@ -262,6 +262,15 @@ val spawn_version : t -> Process.t
 (** Run [tezos-client import secret key]. *)
 val import_secret_key : ?endpoint:endpoint -> t -> Account.key -> unit Lwt.t
 
+(** Run [tezos-client import secret key] for remote signer. *)
+val import_signer_key :
+  ?endpoint:endpoint -> ?force:bool -> t -> Account.key -> Uri.t -> unit Lwt.t
+
+(** Same as [import_secret_key] for signer, but do not wait for the
+    process to exit. *)
+val spawn_import_signer_key :
+  ?endpoint:endpoint -> ?force:bool -> t -> Account.key -> Uri.t -> Process.t
+
 (** Same as [import_secret_key], but do not wait for the process to exit. *)
 val spawn_import_secret_key :
   ?endpoint:endpoint -> t -> Account.key -> Process.t
@@ -1074,7 +1083,9 @@ val init_with_protocol :
   ?additional_bootstrap_account_count:int ->
   ?default_accounts_balance:int ->
   ?parameter_file:string ->
+  ?timestamp:string ->
   ?timestamp_delay:float ->
+  ?keys:Account.key list ->
   [`Client | `Light | `Proxy] ->
   protocol:Protocol.t ->
   unit ->

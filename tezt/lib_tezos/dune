@@ -7,6 +7,7 @@
  (libraries
   tezt
   tezt-performance-regression
+  uri
   hex
   tezos-base
   tezos-base.unix)

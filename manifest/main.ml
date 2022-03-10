@@ -2462,6 +2462,7 @@ let tezt_tezos =
       [
         tezt |> open_ |> open_ ~m:"Base";
         tezt_performance_regression |> open_;
+        uri;
         hex;
         tezos_base;
         tezos_base_unix;

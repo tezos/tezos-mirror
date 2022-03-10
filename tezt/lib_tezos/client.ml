@@ -348,6 +348,19 @@ let spawn_import_secret_key ?endpoint client (key : Account.key) =
   in
   spawn_command ?endpoint client ["import"; "secret"; "key"; key.alias; sk_uri]
 
+let spawn_import_signer_key ?endpoint ?(force = false) client
+    (key : Account.key) signer_uri =
+  let uri = Uri.with_path signer_uri key.public_key_hash in
+  spawn_command
+    ?endpoint
+    client
+    (["import"; "secret"; "key"; key.alias; Uri.to_string uri]
+    @ if force then ["--force"] else [])
+
+let import_signer_key ?endpoint ?force client key signer_uri =
+  spawn_import_signer_key ?endpoint ?force client key signer_uri
+  |> Process.check
+
 let import_secret_key ?endpoint client key =
   spawn_import_secret_key ?endpoint client key |> Process.check
 
@@ -1544,8 +1557,8 @@ let init_with_node ?path ?admin_path ?name ?color ?base_dir ?event_level
 
 let init_with_protocol ?path ?admin_path ?name ?color ?base_dir ?event_level
     ?event_sections_levels ?nodes_args ?additional_bootstrap_account_count
-    ?default_accounts_balance ?parameter_file ?timestamp_delay tag ~protocol ()
-    =
+    ?default_accounts_balance ?parameter_file ?timestamp ?timestamp_delay ?keys
+    tag ~protocol () =
   let* (node, client) =
     init_with_node
       ?path
@@ -1556,6 +1569,7 @@ let init_with_protocol ?path ?admin_path ?name ?color ?base_dir ?event_level
       ?event_level
       ?event_sections_levels
       ?nodes_args
+      ?keys
       tag
       ()
   in
@@ -1568,7 +1582,12 @@ let init_with_protocol ?path ?admin_path ?name ?color ?base_dir ?event_level
       client
   in
   let* () =
-    activate_protocol ?parameter_file ~protocol ?timestamp_delay client
+    activate_protocol
+      ?parameter_file
+      ~protocol
+      ?timestamp
+      ?timestamp_delay
+      client
   in
   let* _ = Node.wait_for_level node 1 in
   return (node, client)
