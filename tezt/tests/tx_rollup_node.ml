@@ -23,10 +23,15 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* Testing
+   -------
+   Component:    Tx_rollup_node
+   Invocation:   dune exec tezt/tests/main.exe -- --file tx_rollup_node.ml
+   Subject:      Various test scenarios for the Tx rollup node
+*)
+
 module Rollup = Rollup.Tx_rollup
 module Rollup_node = Rollup_node.Tx_node
-
-let hooks = Tezos_regression.hooks
 
 let get_block_hash block_json =
   JSON.(block_json |-> "hash" |> as_string) |> return
@@ -52,41 +57,25 @@ let get_node_inbox ?(block = "head") node =
       let hash = JSON.(json |-> "hash" |> as_string) in
       return Rollup.{cumulated_size; contents; hash}
 
-let test ~__FILE__ ?output_file ?(tags = []) title k =
-  match output_file with
-  | None ->
-      Protocol.register_test ~__FILE__ ~title ~tags:("tx_rollup" :: tags) k
-  | Some output_file ->
-      Protocol.register_regression_test
-        ~output_file
-        ~__FILE__
-        ~title
-        ~tags:("tx_rollup" :: tags)
-        k
-
-let setup f ~protocol =
+let get_rollup_parameter_file ~protocol =
   let enable_tx_rollup = [(["tx_rollup_enable"], Some "true")] in
   let base = Either.right (protocol, None) in
-  let* parameter_file = Protocol.write_parameter_file ~base enable_tx_rollup in
-  let* (node, client) =
-    Client.init_with_protocol ~parameter_file `Client ~protocol ()
-  in
-  let bootstrap1_key = Constant.bootstrap1 in
-  let bootstrap2_key = Constant.bootstrap2 in
-  f node client bootstrap1_key bootstrap2_key
+  Protocol.write_parameter_file ~base enable_tx_rollup
 
-let test_with_setup ~__FILE__ ?output_file ?(tags = []) title f =
-  test ~__FILE__ ?output_file ~tags title (fun protocol ->
-      setup ~protocol (f protocol))
-
+(* Checks that the configuration is stored and that the required
+   fields are present. *)
 let test_node_configuration =
-  let output_file = "tx_node_configuration" in
-  test_with_setup
+  Protocol.register_test
     ~__FILE__
-    ~output_file
-    "TX_rollup: configuration"
-    (fun _protocol node client bootstrap1_key _ ->
-      let operator = bootstrap1_key.public_key_hash in
+    ~title:"TX_rollup: configuration"
+    ~tags:["tx_rollup"; "configuration"]
+    (fun protocol ->
+      let* parameter_file = get_rollup_parameter_file ~protocol in
+      let* (node, client) =
+        Client.init_with_protocol ~parameter_file `Client ~protocol ()
+      in
+      let operator = Constant.bootstrap1.public_key_hash in
+      (* Originate a rollup with a given operator *)
       let*! tx_rollup_hash = Client.Tx_rollup.originate ~src:operator client in
       let* json = RPC.get_block client in
       let* block_hash = get_block_hash json in
@@ -101,56 +90,91 @@ let test_node_configuration =
       let* filename =
         Rollup_node.config_init tx_rollup_node tx_rollup_hash block_hash
       in
-      let configuration =
+      Log.info "Tx_rollup configuration file was successfully created" ;
+      let () =
         let open Ezjsonm in
+        let req = ["client-keys"; "rollup-id"] in
+        (* TODO: add optional args checks *)
         match from_channel @@ open_in filename with
         | `O fields ->
-            `O
-              (List.map
-                 (fun (k, v) ->
-                   let x =
-                     if k = "data-dir" || k = "block-hash" || k = "rpc-port"
-                     then `String "<variable>"
-                     else v
-                   in
-                   (k, x))
-                 fields)
-            |> to_string
-        | _ -> failwith "Unexpected configuration format"
+            List.iter
+              (fun k ->
+                if List.exists (fun (key, _v) -> String.equal k key) fields then
+                  ()
+                else Test.fail "unexpected configuration field")
+              req
+        | _ -> Test.fail "Unexpected configuration format"
       in
-      let () = Regression.capture configuration in
       unit)
 
-let test_tx_node_is_ready =
-  test_with_setup
+let init_and_run_rollup_node ~operator node client =
+  let*! tx_rollup_hash = Client.Tx_rollup.originate ~src:operator client in
+  let* () = Client.bake_for client in
+  let* _ = Node.wait_for_level node 2 in
+  Log.info "Tx_rollup %s was successfully originated" tx_rollup_hash ;
+  let* json = RPC.get_block client in
+  let* block_hash = get_block_hash json in
+  let tx_node =
+    Rollup_node.create
+      ~rollup_id:tx_rollup_hash
+      ~rollup_genesis:block_hash
+      ~operator
+      client
+      node
+  in
+  let* _ = Rollup_node.config_init tx_node tx_rollup_hash block_hash in
+  let* () = Rollup_node.run tx_node in
+  Log.info "Tx_rollup node is now running" ;
+  let* () = Rollup_node.wait_for_ready tx_node in
+  Lwt.return (tx_rollup_hash, tx_node)
+
+(* Checks that the tx_node is ready after originating an associated
+   rollup key. *)
+let test_tx_node_origination =
+  Protocol.register_test
     ~__FILE__
-    "TX_rollup: test if the node is ready"
-    (fun _protocol node client bootstrap1_key _ ->
-      let operator = bootstrap1_key.public_key_hash in
-      let*! tx_rollup_hash = Client.Tx_rollup.originate ~src:operator client in
-      let* () = Client.bake_for client in
-      let* _ = Node.wait_for_level node 2 in
-      let* json = RPC.get_block client in
-      let* block_hash = get_block_hash json in
-      let tx_node =
-        Rollup_node.create
-          ~rollup_id:tx_rollup_hash
-          ~rollup_genesis:block_hash
-          ~operator
-          client
-          node
+    ~title:"TX_rollup: test if the node is ready"
+    ~tags:["tx_rollup"; "ready"; "originate"]
+    (fun protocol ->
+      let* parameter_file = get_rollup_parameter_file ~protocol in
+      let* (node, client) =
+        Client.init_with_protocol ~parameter_file `Client ~protocol ()
       in
-      let* _ = Rollup_node.config_init tx_node tx_rollup_hash block_hash in
-      let* () = Rollup_node.run tx_node in
-      let* () = Rollup_node.wait_for_ready tx_node in
+      let operator = Constant.bootstrap1.public_key_hash in
+      let* _tx_node = init_and_run_rollup_node ~operator node client in
       unit)
 
+let check_inbox_equality (i1 : Rollup.inbox) (i2 : Rollup.inbox) =
+  Check.(
+    (( = )
+       i1.cumulated_size
+       i2.cumulated_size
+       ~error_msg:
+         "Cumulated size of inboxes computed by the rollup node should be \
+          equal to the cumulated size given by the RPC")
+      int) ;
+  Check.(
+    ( = )
+      i1.contents
+      i2.contents
+      ~error_msg:
+        "Content of inboxes computed by the rollup node should be equal to the \
+         cumulated size given by the RPC"
+      (list string))
+
+(* Checks that an inbox received by the tx_rollup node is well stored
+   and available in a percistent way. *)
 let test_tx_node_store_inbox =
-  test_with_setup
+  Protocol.register_test
     ~__FILE__
-    "TX_rollup: test"
-    (fun _protocol node client bootstrap1_key _ ->
-      let operator = bootstrap1_key.public_key_hash in
+    ~title:"TX_rollup: store inbox"
+    ~tags:["tx_rollup"; "store"; "inbox"]
+    (fun protocol ->
+      let* parameter_file = get_rollup_parameter_file ~protocol in
+      let* (node, client) =
+        Client.init_with_protocol ~parameter_file `Client ~protocol ()
+      in
+      let operator = Constant.bootstrap1.public_key_hash in
       let*! rollup = Client.Tx_rollup.originate ~src:operator client in
       let* () = Client.bake_for client in
       let* _ = Node.wait_for_level node 2 in
@@ -167,10 +191,9 @@ let test_tx_node_store_inbox =
       let* _ = Rollup_node.config_init tx_node rollup block_hash in
       let* () = Rollup_node.run tx_node in
       (* Submit a batch *)
-      let batch = "tezos" in
+      let batch = "tezos_l2_batch_1" in
       let*! () =
         Client.Tx_rollup.submit_batch
-          ~hooks
           ~content:batch
           ~rollup
           ~src:Constant.bootstrap1.public_key_hash
@@ -178,38 +201,15 @@ let test_tx_node_store_inbox =
       in
       let* () = Client.bake_for client in
       let* _ = Node.wait_for_level node 3 in
-      let* node_inbox_head = get_node_inbox tx_node in
-      let* node_inbox_0 = get_node_inbox ~block:"0" tx_node in
-      let*! inbox = Rollup.get_inbox ~hooks ~rollup ~level:0 client in
-      (* Enusre that stored inboxes on daemon side are equivalent of inboxes
-         returned by the rpc call. *)
-      Check.(
-        (( = )
-           node_inbox_head.cumulated_size
-           inbox.cumulated_size
-           ~error_msg:
-             "Cumulated size of inboxes computed by the rollup node should be \
-              equal to the cumulated size given by the RPC")
-          int) ;
-      Check.(
-        ( = )
-          node_inbox_head.contents
-          inbox.contents
-          ~error_msg:
-            "Content of inboxes computed by the rollup node should be equal to \
-             the contents given by the RPC"
-          (list string)) ;
-      Check.(
-        ( = )
-          node_inbox_head.contents
-          node_inbox_0.contents
-          ~error_msg:
-            "Content of inbox at head (%L) and level 0 (%R) are different"
-          (list string)) ;
-      let snd_batch = "tezos_tezos" in
+      let* _ = Rollup_node.wait_for_tezos_level tx_node 3 in
+      let* node_inbox_1 = get_node_inbox ~block:"0" tx_node in
+      let*! inbox_1 = Rollup.get_inbox ~rollup ~level:0 client in
+      (* Ensure that stored inboxes on daemon's side are equivalent of
+         inboxes returned by the rpc call. *)
+      check_inbox_equality node_inbox_1 inbox_1 ;
+      let snd_batch = "tezos_l2_batch_2" in
       let*! () =
         Client.Tx_rollup.submit_batch
-          ~hooks
           ~content:snd_batch
           ~rollup
           ~src:Constant.bootstrap1.public_key_hash
@@ -217,23 +217,21 @@ let test_tx_node_store_inbox =
       in
       let* () = Client.bake_for client in
       let* _ = Node.wait_for_level node 4 in
-      let* node_inbox_head = get_node_inbox tx_node in
-      let* node_inbox_1 = get_node_inbox ~block:"1" tx_node in
-      let*! inbox = Rollup.get_inbox ~hooks ~rollup ~level:1 client in
-      (* Enusre that stored inboxes on daemon side are equivalent of inboxes
+      let* _ = Rollup_node.wait_for_tezos_level tx_node 4 in
+      let* node_inbox_2 = get_node_inbox ~block:"1" tx_node in
+      let*! inbox_2 = Rollup.get_inbox ~rollup ~level:1 client in
+      (* Ensure that stored inboxes on daemon side are equivalent of inboxes
          returned by the rpc call. *)
-      assert (Int.equal node_inbox_head.cumulated_size inbox.cumulated_size) ;
-      assert (List.equal String.equal node_inbox_head.contents inbox.contents) ;
-      Check.(
-        ( = )
-          node_inbox_head.contents
-          node_inbox_1.contents
-          ~error_msg:
-            "Content of inbox at head (%L) and level 1 (%R) are different"
-          (list string)) ;
+      check_inbox_equality node_inbox_2 inbox_2 ;
+      (* Stop the node and try to get the inbox once again*)
+      let* () = Rollup_node.terminate tx_node in
+      let* () = Rollup_node.run tx_node in
+      let* () = Rollup_node.wait_for_ready tx_node in
+      let*! inbox_after_restart = Rollup.get_inbox ~rollup ~level:1 client in
+      check_inbox_equality node_inbox_2 inbox_after_restart ;
       unit)
 
 let register ~protocols =
   test_node_configuration protocols ;
-  test_tx_node_is_ready protocols ;
+  test_tx_node_origination protocols ;
   test_tx_node_store_inbox protocols

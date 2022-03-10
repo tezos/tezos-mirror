@@ -325,10 +325,10 @@ let rec process_block cctxt state current_hash rollup_id :
             ()
         in
         let predecessor_hash = block_info.header.shell.predecessor in
+        let block_level = block_info.header.shell.level in
         let* () =
           fail_when
-            (block_info.header.shell.level
-           < state.State.rollup_origination.block_level)
+            (block_level < state.State.rollup_origination.block_level)
             Tx_rollup_originated_in_fork
         in
         (* Handle predecessor Tezos block first *)
@@ -349,7 +349,7 @@ let rec process_block cctxt state current_hash rollup_id :
         in
         let* () = State.set_head state l2_header in
         let*! () = Event.(emit new_tezos_head) current_hash in
-        let*! () = Event.(emit block_processed) current_hash in
+        let*! () = Event.(emit block_processed) (current_hash, block_level) in
         return (l2_header, Some context)
 
 let process_head cctxt state current_hash rollup_id =
@@ -391,6 +391,7 @@ let run ~data_dir cctxt =
       ~loc:__LOC__
       (main_exit_callback state configuration.data_dir)
   in
+  let*! () = Event.(emit node_is_ready) () in
   let rec loop () =
     let* () =
       Lwt.catch

@@ -513,6 +513,6 @@ let start configuration state =
   Lwt.catch
     (fun () ->
       let* rpc_server = launch ~host ~acl ~node ~dir () in
-      let* () = Event.(emit node_is_ready) (rpc_addr, rpc_port) in
+      let* () = Event.(emit rpc_server_is_ready) (rpc_addr, rpc_port) in
       Lwt.return rpc_server)
     fail_with_exn
