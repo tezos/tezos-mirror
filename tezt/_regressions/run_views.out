@@ -14,24 +14,24 @@ view "calls_count" unit nat { CDR ; SIZE };
 view "last_caller" unit (option address) { CDR ; IF_CONS { DIP { DROP } ; SOME } { NONE address } };
 ' --init '{}' --burn-cap 1
 Node is bootstrapped.
-Estimated gas: 1416.979 units (will add 100 for safety)
+Estimated gas: 1428.389 units (will add 100 for safety)
 Estimated storage: 409 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
-Operation hash is 'ooc2fqNbndGdD9wZCqr7TX7DvhRbqXytK4D2566peGJCUithWky'
+Operation hash is 'opMEqaWvCQxSydDPwdqpsCwjnCmgiLhpouq5LovBLGCvMVpgCpk'
 NOT waiting for the operation to be included.
 Use command
-  tezos-client wait for ooc2fqNbndGdD9wZCqr7TX7DvhRbqXytK4D2566peGJCUithWky to be included --confirmations 1 --branch BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU
+  tezos-client wait for opMEqaWvCQxSydDPwdqpsCwjnCmgiLhpouq5LovBLGCvMVpgCpk to be included --confirmations 1 --branch BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU
 and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx
-    Fee to the baker: ꜩ0.000531
+    Fee to the baker: ꜩ0.000532
     Expected counter: 1
-    Gas limit: 1517
+    Gas limit: 1529
     Storage limit: 429 bytes
     Balance updates:
-      tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ0.000531
-      payload fees(the block proposer) ....... +ꜩ0.000531
+      tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ0.000532
+      payload fees(the block proposer) ....... +ꜩ0.000532
     Origination:
       From: tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx
       Credit: ꜩ0
@@ -48,17 +48,17 @@ This sequence of operations was run:
         No delegate for this contract
         This origination was successfully applied
         Originated contracts:
-          KT1DxqpeVEc9Kn1apiDhQ15SAVLgVgacnKFu
+          KT1TLT2cXZCtenEAXzkndiAQGJXWenkwThRv
         Storage size: 152 bytes
         Paid storage size diff: 152 bytes
-        Consumed gas: 1416.979
+        Consumed gas: 1428.389
         Balance updates:
           tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ0.038
           storage fees ........................... +ꜩ0.038
           tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ0.06425
           storage fees ........................... +ꜩ0.06425
 
-New contract KT1DxqpeVEc9Kn1apiDhQ15SAVLgVgacnKFu originated.
+New contract KT1TLT2cXZCtenEAXzkndiAQGJXWenkwThRv originated.
 Contract memorized as register_calls.
 
 ./tezos-client --mode mockup --base-dir '<masked>' --wait none originate contract check_caller transferring 0 from bootstrap1 running '
@@ -89,24 +89,24 @@ code {
      }
    ' --init None --burn-cap 1
 Node is bootstrapped.
-Estimated gas: 1431.964 units (will add 100 for safety)
+Estimated gas: 1450.510 units (will add 100 for safety)
 Estimated storage: 465 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
-Operation hash is 'op7JLarsoBA5eFWszbVySr14hSoFh7ZtZnM7pA7wZSuDWbnTJhu'
+Operation hash is 'ooToBC9P3HGdhPJ1Dhq9gdQFF79cYzJMiYXgvo86DMCMvMknJXg'
 NOT waiting for the operation to be included.
 Use command
-  tezos-client wait for op7JLarsoBA5eFWszbVySr14hSoFh7ZtZnM7pA7wZSuDWbnTJhu to be included --confirmations 1 --branch BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU
+  tezos-client wait for ooToBC9P3HGdhPJ1Dhq9gdQFF79cYzJMiYXgvo86DMCMvMknJXg to be included --confirmations 1 --branch BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU
 and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx
-    Fee to the baker: ꜩ0.000589
+    Fee to the baker: ꜩ0.000591
     Expected counter: 2
-    Gas limit: 1532
+    Gas limit: 1551
     Storage limit: 485 bytes
     Balance updates:
-      tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ0.000589
-      payload fees(the block proposer) ....... +ꜩ0.000589
+      tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ0.000591
+      payload fees(the block proposer) ....... +ꜩ0.000591
     Origination:
       From: tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx
       Credit: ꜩ0
@@ -131,28 +131,28 @@ This sequence of operations was run:
         No delegate for this contract
         This origination was successfully applied
         Originated contracts:
-          KT1Ut2jH9cLnfwNuTNyVbuWSDu8ZfdtoyMm8
+          KT1LvTWVW1cc4DeSPCseMsiPdDDkTKvMrNZb
         Storage size: 208 bytes
         Paid storage size diff: 208 bytes
-        Consumed gas: 1431.964
+        Consumed gas: 1450.510
         Balance updates:
           tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ0.052
           storage fees ........................... +ꜩ0.052
           tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ0.06425
           storage fees ........................... +ꜩ0.06425
 
-New contract KT1Ut2jH9cLnfwNuTNyVbuWSDu8ZfdtoyMm8 originated.
+New contract KT1LvTWVW1cc4DeSPCseMsiPdDDkTKvMrNZb originated.
 Contract memorized as check_caller.
 
-./tezos-client --mode mockup --base-dir '<masked>' --wait none transfer 1 from bootstrap1 to KT1Ut2jH9cLnfwNuTNyVbuWSDu8ZfdtoyMm8 --burn-cap 1 --arg '"KT1DxqpeVEc9Kn1apiDhQ15SAVLgVgacnKFu"'
+./tezos-client --mode mockup --base-dir '<masked>' --wait none transfer 1 from bootstrap1 to KT1LvTWVW1cc4DeSPCseMsiPdDDkTKvMrNZb --burn-cap 1 --arg '"KT1TLT2cXZCtenEAXzkndiAQGJXWenkwThRv"'
 Node is bootstrapped.
 Estimated gas: 4888.778 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
-Operation hash is 'ooXzTo1H8guT9xpiWE4ucn9d9o1J79Y9p6PPNoSafHSdnb7vqYz'
+Operation hash is 'ooKWNQj6RVsDFCJvsHjGrXsUzUS1jecE3iZFN3zNd6HP9aBKzo8'
 NOT waiting for the operation to be included.
 Use command
-  tezos-client wait for ooXzTo1H8guT9xpiWE4ucn9d9o1J79Y9p6PPNoSafHSdnb7vqYz to be included --confirmations 1 --branch BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU
+  tezos-client wait for ooKWNQj6RVsDFCJvsHjGrXsUzUS1jecE3iZFN3zNd6HP9aBKzo8 to be included --confirmations 1 --branch BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU
 and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
@@ -167,26 +167,26 @@ This sequence of operations was run:
     Transaction:
       Amount: ꜩ1
       From: tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx
-      To: KT1Ut2jH9cLnfwNuTNyVbuWSDu8ZfdtoyMm8
-      Parameter: "KT1DxqpeVEc9Kn1apiDhQ15SAVLgVgacnKFu"
+      To: KT1LvTWVW1cc4DeSPCseMsiPdDDkTKvMrNZb
+      Parameter: "KT1TLT2cXZCtenEAXzkndiAQGJXWenkwThRv"
       This transaction was successfully applied
       Updated storage: None
       Storage size: 208 bytes
       Consumed gas: 4889.576
       Balance updates:
         tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ1
-        KT1Ut2jH9cLnfwNuTNyVbuWSDu8ZfdtoyMm8 ... +ꜩ1
+        KT1LvTWVW1cc4DeSPCseMsiPdDDkTKvMrNZb ... +ꜩ1
 
 
-./tezos-client --mode mockup --base-dir '<masked>' --wait none transfer 1 from bootstrap1 to KT1DxqpeVEc9Kn1apiDhQ15SAVLgVgacnKFu --burn-cap 1
+./tezos-client --mode mockup --base-dir '<masked>' --wait none transfer 1 from bootstrap1 to KT1TLT2cXZCtenEAXzkndiAQGJXWenkwThRv --burn-cap 1
 Node is bootstrapped.
 Estimated gas: 2068.289 units (will add 100 for safety)
 Estimated storage: 27 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
-Operation hash is 'ooWggEMDp7m8EvUUXvCveSQTZhGZto7EM5dGmFG9i4npaSHvPcd'
+Operation hash is 'ont8dBoUoexyjc6TFAWPjK4vYwyYHPqY6aoQkuEqs2Y9PjAbLzQ'
 NOT waiting for the operation to be included.
 Use command
-  tezos-client wait for ooWggEMDp7m8EvUUXvCveSQTZhGZto7EM5dGmFG9i4npaSHvPcd to be included --confirmations 1 --branch BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU
+  tezos-client wait for ont8dBoUoexyjc6TFAWPjK4vYwyYHPqY6aoQkuEqs2Y9PjAbLzQ to be included --confirmations 1 --branch BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU
 and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
@@ -201,7 +201,7 @@ This sequence of operations was run:
     Transaction:
       Amount: ꜩ1
       From: tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx
-      To: KT1DxqpeVEc9Kn1apiDhQ15SAVLgVgacnKFu
+      To: KT1TLT2cXZCtenEAXzkndiAQGJXWenkwThRv
       This transaction was successfully applied
       Updated storage: { 0x000002298c03ed7d454a101eb7022bc95f7e5f41ac78 }
       Storage size: 179 bytes
@@ -211,18 +211,18 @@ This sequence of operations was run:
         tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ0.00675
         storage fees ........................... +ꜩ0.00675
         tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ1
-        KT1DxqpeVEc9Kn1apiDhQ15SAVLgVgacnKFu ... +ꜩ1
+        KT1TLT2cXZCtenEAXzkndiAQGJXWenkwThRv ... +ꜩ1
 
 
-./tezos-client --mode mockup --base-dir '<masked>' --wait none transfer 1 from bootstrap1 to KT1Ut2jH9cLnfwNuTNyVbuWSDu8ZfdtoyMm8 --burn-cap 1 --arg '"KT1DxqpeVEc9Kn1apiDhQ15SAVLgVgacnKFu"'
+./tezos-client --mode mockup --base-dir '<masked>' --wait none transfer 1 from bootstrap1 to KT1LvTWVW1cc4DeSPCseMsiPdDDkTKvMrNZb --burn-cap 1 --arg '"KT1TLT2cXZCtenEAXzkndiAQGJXWenkwThRv"'
 Node is bootstrapped.
 Estimated gas: 6201.785 units (will add 100 for safety)
 Estimated storage: 27 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
-Operation hash is 'opA9apLwUjeEBp137pKgW2HPWWaUPV17ThiK6TFV39KmuBF7kFJ'
+Operation hash is 'ooFASM67gHgN4XhEL3aSdGGyocUQtLecdh1iiVqGAFJ6r3YYpE5'
 NOT waiting for the operation to be included.
 Use command
-  tezos-client wait for opA9apLwUjeEBp137pKgW2HPWWaUPV17ThiK6TFV39KmuBF7kFJ to be included --confirmations 1 --branch BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU
+  tezos-client wait for ooFASM67gHgN4XhEL3aSdGGyocUQtLecdh1iiVqGAFJ6r3YYpE5 to be included --confirmations 1 --branch BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU
 and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
@@ -237,8 +237,8 @@ This sequence of operations was run:
     Transaction:
       Amount: ꜩ1
       From: tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx
-      To: KT1Ut2jH9cLnfwNuTNyVbuWSDu8ZfdtoyMm8
-      Parameter: "KT1DxqpeVEc9Kn1apiDhQ15SAVLgVgacnKFu"
+      To: KT1LvTWVW1cc4DeSPCseMsiPdDDkTKvMrNZb
+      Parameter: "KT1TLT2cXZCtenEAXzkndiAQGJXWenkwThRv"
       This transaction was successfully applied
       Updated storage: (Some 0x000002298c03ed7d454a101eb7022bc95f7e5f41ac78)
       Storage size: 235 bytes
@@ -248,5 +248,5 @@ This sequence of operations was run:
         tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ0.00675
         storage fees ........................... +ꜩ0.00675
         tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ1
-        KT1Ut2jH9cLnfwNuTNyVbuWSDu8ZfdtoyMm8 ... +ꜩ1
+        KT1LvTWVW1cc4DeSPCseMsiPdDDkTKvMrNZb ... +ꜩ1
 

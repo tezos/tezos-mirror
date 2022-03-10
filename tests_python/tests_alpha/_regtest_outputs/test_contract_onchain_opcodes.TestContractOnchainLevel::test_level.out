@@ -1,7 +1,7 @@
 tests_alpha/test_contract_onchain_opcodes.py::TestContractOnchainLevel::test_level
 
 Node is bootstrapped.
-Estimated gas: 1406.044 units (will add 100 for safety)
+Estimated gas: 1409.664 units (will add 100 for safety)
 Estimated storage: 300 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[BLOCK_HASH]'
@@ -14,7 +14,7 @@ This sequence of operations was run:
     From: [CONTRACT_HASH]
     Fee to the baker: ꜩ0.000424
     Expected counter: [EXPECTED_COUNTER]
-    Gas limit: 1507
+    Gas limit: 1510
     Storage limit: 320 bytes
     Balance updates:
       [CONTRACT_HASH] ... -ꜩ0.000424
@@ -33,7 +33,7 @@ This sequence of operations was run:
           [CONTRACT_HASH]
         Storage size: 43 bytes
         Paid storage size diff: 43 bytes
-        Consumed gas: 1406.044
+        Consumed gas: 1409.664
         Balance updates:
           [CONTRACT_HASH] ... -ꜩ0.01075
           storage fees ........................... +ꜩ0.01075

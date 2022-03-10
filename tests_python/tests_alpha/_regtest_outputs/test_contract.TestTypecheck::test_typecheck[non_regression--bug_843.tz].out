@@ -1,0 +1,14 @@
+tests_alpha/test_contract.py::TestTypecheck::test_typecheck[non_regression/bug_843.tz]
+
+Well typed
+Gas remaining: 1039347.149 units remaining
+{ parameter never ;
+  storage (pair address (lambda unit unit)) ;
+  code { CAR
+         /* [ never ] */ ;
+         PUSH address "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+         /* [ address : never ] */ ;
+         DROP
+         /* [ never ] */ ;
+         NEVER
+         /* [] */ } }
