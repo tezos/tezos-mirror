@@ -167,8 +167,10 @@ module type MerkelizedOperations = sig
 
   val pp_history : Format.formatter -> history -> unit
 
-  (** The beginning of the history is an empty sequence of [messages].*)
-  val history_at_genesis : history
+  (** The beginning of the history is an empty sequence of [messages].
+      Fail with {!Invalid_bound_on_history} if [bound] is not strictly
+      positive. *)
+  val history_at_genesis : bound:int64 -> history
 
   (** [add_messages history inbox level payloads messages] inserts a list of
      [payloads] as new messages in the [messages] of the current

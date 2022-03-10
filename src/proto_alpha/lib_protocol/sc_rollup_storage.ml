@@ -300,7 +300,8 @@ let add_messages ctxt rollup messages =
       node to produce inclusion proofs when needed.
     *)
   Sc_rollup_inbox_repr.(
-    add_messages history_at_genesis inbox level messages current_messages)
+    let history = history_at_genesis ~bound:0L in
+    add_messages history inbox level messages current_messages)
   >>=? fun (current_messages, _, inbox) ->
   Sc_rollup_in_memory_inbox.set_current_messages ctxt rollup current_messages
   |> fun ctxt ->

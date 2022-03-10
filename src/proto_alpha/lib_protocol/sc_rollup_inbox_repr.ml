@@ -250,7 +250,7 @@ module type MerkelizedOperations = sig
 
   val pp_history : Format.formatter -> history -> unit
 
-  val history_at_genesis : history
+  val history_at_genesis : bound:int64 -> history
 
   val add_messages :
     history ->
@@ -311,10 +311,17 @@ module MakeHashingScheme
     List.map to_bytes (current_messages_hash :: back_pointers_hashes)
     |> hash_bytes
 
-  type history = history_proof Context_hash.Map.t
+  module Int64_map = Map.Make (Int64)
+
+  type history = {
+    events : history_proof Context_hash.Map.t;
+    sequence : Context_hash.t Int64_map.t;
+    bound : int64;
+    counter : int64;
+  }
 
   let pp_history fmt history =
-    Context_hash.Map.bindings history |> fun bindings ->
+    Context_hash.Map.bindings history.events |> fun bindings ->
     let pp_binding fmt (hash, history_proof) =
       Format.fprintf
         fmt
@@ -326,13 +333,48 @@ module MakeHashingScheme
     in
     Format.pp_print_list pp_binding fmt bindings
 
-  let history_at_genesis = Context_hash.Map.empty
+  let history_at_genesis ~bound =
+    {
+      events = Context_hash.Map.empty;
+      sequence = Int64_map.empty;
+      bound;
+      counter = 0L;
+    }
+
+  let remember ptr cell history =
+    if Compare.Int64.(history.bound <= 0L) then history
+    else
+      let events = Context_hash.Map.add ptr cell history.events in
+      let counter = Int64.succ history.counter in
+      let history =
+        {
+          events;
+          sequence = Int64_map.add history.counter ptr history.sequence;
+          bound = history.bound;
+          counter;
+        }
+      in
+      if Int64.(equal history.counter history.bound) then
+        match Int64_map.min_binding history.sequence with
+        | None ->
+            (* This should not happen if [bound > 0]. *)
+            history
+        | Some (l, h) ->
+            let sequence = Int64_map.remove l history.sequence in
+            let events = Context_hash.Map.remove h events in
+            {
+              counter = Int64.pred history.counter;
+              bound = history.bound;
+              sequence;
+              events;
+            }
+      else history
 
   let archive_if_needed history inbox target_level =
     let archive_level history inbox =
       let prev_cell = inbox.old_levels_messages in
       let prev_cell_ptr = hash_old_levels_messages prev_cell in
-      let history = Context_hash.Map.add prev_cell_ptr prev_cell history in
+      let history = remember prev_cell_ptr prev_cell history in
       let old_levels_messages =
         Skip_list.next ~prev_cell ~prev_cell_ptr inbox.current_messages_hash
       in
@@ -397,10 +439,8 @@ module MakeHashingScheme
   let produce_inclusion_proof history inbox1 inbox2 =
     let cell_ptr = hash_old_levels_messages inbox2.old_levels_messages in
     let target_index = Skip_list.index inbox1.old_levels_messages in
-    let history =
-      Context_hash.Map.add cell_ptr inbox2.old_levels_messages history
-    in
-    let deref ptr = Context_hash.Map.find_opt ptr history in
+    let history = remember cell_ptr inbox2.old_levels_messages history in
+    let deref ptr = Context_hash.Map.find_opt ptr history.events in
     Skip_list.back_path ~deref ~cell_ptr ~target_index
     |> Option.map (lift_ptr_path deref)
     |> Option.join

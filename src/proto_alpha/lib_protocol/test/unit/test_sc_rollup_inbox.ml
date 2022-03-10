@@ -58,7 +58,7 @@ let setup_inbox_with_messages list_of_payloads f =
   create_context () >>=? fun ctxt ->
   let empty_messages = Context.Tree.empty ctxt in
   let inbox = empty rollup level in
-  let history = history_at_genesis in
+  let history = history_at_genesis ~bound:10000L in
   let rec aux level history inbox inboxes messages = function
     | [] -> return (messages, history, inbox, inboxes)
     | payloads :: ps ->
