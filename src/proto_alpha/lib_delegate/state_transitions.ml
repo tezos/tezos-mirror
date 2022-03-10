@@ -418,12 +418,12 @@ let propose_fresh_block_action ~endorsements ?last_proposal
   in
   Lwt.return @@ Inject_block {block_to_bake; updated_state}
 
-let repropose_block_action state delegate round (proposal : proposal) =
-  (* Possible cases: 1. There was a proposal but the PQC was not
-     reached 2. There was a proposal and the PQC and/or QC was
-     reached *)
-  (* We repropose the [endorsable_payload] if it exists, not the
-     [locked_round] as it may be older. *)
+let propose_block_action state delegate round (proposal : proposal) =
+  (* Possible cases:
+     1. There was a proposal but the PQC was not reached.
+     2. There was a proposal and the PQC was reached. We repropose the
+     [endorsable_payload] if it exists, not the [locked_round] as it
+     may be older. *)
   match state.level_state.endorsable_payload with
   | None ->
       Events.(emit no_endorsable_payload_fresh_block ()) >>= fun () ->
@@ -538,7 +538,7 @@ let end_of_round state current_round =
           (current_round, state.level_state.current_level, new_round, delegate))
       >>= fun () ->
       (* We have a delegate, we need to determine what to inject *)
-      repropose_block_action
+      propose_block_action
         new_state
         delegate
         new_round

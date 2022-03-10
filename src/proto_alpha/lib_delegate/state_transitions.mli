@@ -64,7 +64,7 @@ val propose_fresh_block_action :
   Round.t ->
   action Lwt.t
 
-val repropose_block_action :
+val propose_block_action :
   state -> delegate -> Round.t -> proposal -> action Lwt.t
 
 val end_of_round : state -> Round.t -> (state * action) Lwt.t
