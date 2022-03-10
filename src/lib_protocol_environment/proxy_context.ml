@@ -295,6 +295,8 @@ module C = struct
     let list = raw_list
 
     let clear ?depth t = Local.Tree.clear ?depth t.tree
+
+    let config t = Local.Tree.config t.tree
   end
 
   module Proof = Local.Proof
@@ -314,6 +316,10 @@ module C = struct
   let verify_tree_proof p f = verify Local.verify_tree_proof p f
 
   let verify_stream_proof p f = verify Local.verify_stream_proof p f
+
+  let config t = Local.config t.M.local
+
+  let equal_config = Local.equal_config
 end
 
 open Tezos_protocol_environment

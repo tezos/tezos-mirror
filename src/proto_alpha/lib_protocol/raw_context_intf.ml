@@ -31,6 +31,10 @@
 (** The tree depth of a fold. See the [fold] function for more information. *)
 type depth = [`Eq of int | `Le of int | `Lt of int | `Ge of int | `Gt of int]
 
+(** The type for context configuration. If two trees or stores have the
+    same configuration, they will generate the same context hash. *)
+type config = Context.config
+
 module type VIEW = sig
   (* Same as [Environment_context.VIEW] but with extra getters and
      setters functions. *)
@@ -176,6 +180,11 @@ module type VIEW = sig
     init:'a ->
     f:(key -> tree -> 'a -> 'a Lwt.t) ->
     'a Lwt.t
+
+  (** {2 Hash configurations} *)
+
+  (** [config t] is [t]'s hash configuration. *)
+  val config : t -> config
 end
 
 module Kind = struct
@@ -502,6 +511,10 @@ module type T = sig
 
   (** [verify_stream] is the verifier of stream proofs. *)
   val verify_stream_proof : (stream_proof, 'a) verifier
+
+  (** The equality function for context configurations. If two context have the
+      same configuration, they will generate the same context hashes. *)
+  val equal_config : config -> config -> bool
 
   (** Internally used in {!Storage_functors} to escape from a view. *)
   val project : t -> root

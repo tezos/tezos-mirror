@@ -1026,6 +1026,8 @@ let list ctxt ?offset ?length k = Context.list (context ctxt) ?offset ?length k
 let fold ?depth ctxt k ~order ~init ~f =
   Context.fold ?depth (context ctxt) k ~order ~init ~f
 
+let config ctxt = Context.config (context ctxt)
+
 module Proof = Context.Proof
 
 module Tree :
@@ -1090,6 +1092,8 @@ end
 let verify_tree_proof proof f = Context.verify_tree_proof proof f
 
 let verify_stream_proof proof f = Context.verify_stream_proof proof f
+
+let equal_config = Context.equal_config
 
 let project x = x
 

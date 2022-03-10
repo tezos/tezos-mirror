@@ -117,6 +117,11 @@ module type VIEW = sig
     init:'a ->
     f:(key -> tree -> 'a -> 'a Lwt.t) ->
     'a Lwt.t
+
+  (** {2 Configuration} *)
+
+  (** [config t] is [t]'s hash configuration. *)
+  val config : t -> Config.t
 end
 
 module Kind = struct
@@ -397,6 +402,8 @@ module type PROOF_ENCODING = sig
 end
 
 module type S = sig
+  val equal_config : Config.t -> Config.t -> bool
+
   include VIEW with type key = string list and type value = bytes
 
   module Proof : PROOF

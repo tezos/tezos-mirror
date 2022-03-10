@@ -31,6 +31,13 @@
 (** The tree depth of a fold. See the [fold] function for more information. *)
 type depth = [`Eq of int | `Le of int | `Lt of int | `Ge of int | `Gt of int]
 
+(** The type for context configuration. *)
+type config
+
+(** The equality function for context configurations. If two context have the
+    same configuration, they will generate the same context hashes. *)
+val equal_config : config -> config -> bool
+
 module type VIEW = sig
   (** The type for context views. *)
   type t
@@ -122,6 +129,11 @@ module type VIEW = sig
     init:'a ->
     f:(key -> tree -> 'a -> 'a Lwt.t) ->
     'a Lwt.t
+
+  (** {2 Configuration} *)
+
+  (** [config t] is [t]'s hash configuration. *)
+  val config : t -> config
 end
 
 module Kind : sig

@@ -257,6 +257,10 @@ end
 module V5 = struct
   type depth = V4.depth
 
+  type config = Tezos_context_sigs.Config.t
+
+  let equal_config = Tezos_context_sigs.Config.equal
+
   module type VIEW = VIEW
 
   module Kind = Kind
@@ -264,6 +268,8 @@ module V5 = struct
   module type TREE = TREE
 
   module type S = sig
+    val equal_config : config -> config -> bool
+
     include VIEW with type key = string list and type value = bytes
 
     module Tree : sig

@@ -54,8 +54,19 @@ let encode_proof_version ~is_stream ~is_binary =
   (if is_stream then stream_mask else 0)
   lor if is_binary then binary_mask else 0
 
-module Make_tree (Store : DB) = struct
+module Make_config (Conf : Conf) = struct
+  let equal_config = Tezos_context_sigs.Config.equal
+
+  let config _ =
+    Tezos_context_sigs.Config.v
+      ~entries:Conf.entries
+      ~stable_hash:Conf.stable_hash
+      ~inode_child_order:Conf.inode_child_order
+end
+
+module Make_tree (Conf : Conf) (Store : DB) = struct
   include Store.Tree
+  include Make_config (Conf)
 
   let pp = Irmin.Type.pp Store.tree_t
 

@@ -28,7 +28,7 @@ open Tezos_context_encoding.Context
 
 module type DB = Irmin.Generic_key.S with module Schema = Schema
 
-module Make_tree (DB : DB) : sig
+module Make_tree (Conf : Conf) (DB : DB) : sig
   include
     Tezos_context_sigs.Context.TREE
       with type t := DB.t
@@ -94,6 +94,13 @@ module Make_proof (DB : DB) (Store_conf : Tezos_context_encoding.Context.Conf) :
   val produce_stream_proof : (stream_proof, 'a) producer
 
   val verify_stream_proof : (stream_proof, 'a) verifier
+end
+
+module Make_config (Conf : Irmin_pack.Conf.S) : sig
+  val equal_config :
+    Tezos_context_sigs.Config.t -> Tezos_context_sigs.Config.t -> bool
+
+  val config : 'a -> Tezos_context_sigs.Config.t
 end
 
 type error += Unsupported_context_hash_version of Context_hash.Version.t

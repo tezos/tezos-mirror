@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2018-2021 Tarides <contact@tarides.com>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,81 +23,17 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module M = struct
-  type t = unit
+(** The type for context configuration. *)
+type t
 
-  type key = string list
+(** The equality function for context configurations. If two context have the
+    same configuration, they will generate the same context hashes. *)
+val equal : t -> t -> bool
 
-  type value = Bytes.t
-
-  type tree = |
-
-  module Tree = struct
-    let pp _ _ = assert false
-
-    let hash _ = assert false
-
-    let empty _ = assert false
-
-    let equal _ _ = assert false
-
-    let is_empty _ = assert false
-
-    let mem _ _ = assert false
-
-    let kind _ = assert false
-
-    let to_value _ = assert false
-
-    let of_value _ _ = assert false
-
-    let find _ _ = assert false
-
-    let add _ _ _ = assert false
-
-    let remove _ _ = assert false
-
-    let mem_tree _ _ = assert false
-
-    let find_tree _ _ = assert false
-
-    let add_tree _ _ = assert false
-
-    let clear ?depth:_ _ = assert false
-
-    let list _ ?offset:_ ?length:_ _ = assert false
-
-    let length _ _ = assert false
-
-    let fold ?depth:_ _ _ ~order:_ ~init:_ ~f:_ = assert false
-
-    let config _ = assert false
-  end
-
-  include Tree
-  module Proof = Memory_context.M.Proof
-
-  let set_protocol _ _ = assert false
-
-  let get_protocol _ = assert false
-
-  let fork_test_chain _ ~protocol:_ ~expiration:_ = assert false
-
-  let set_hash_version _ _ = assert false
-
-  let get_hash_version _ = assert false
-
-  let verify_tree_proof _ _ = assert false
-
-  let verify_stream_proof _ _ = assert false
-
-  let equal_config _ _ = assert false
-
-  let config _ = assert false
-end
-
-open Tezos_protocol_environment
-include Environment_context.Register (M)
-
-let empty =
-  Context.make ~ops ~ctxt:() ~kind:Context ~equality_witness ~impl_name:"dummy"
+(** Constructor. *)
+val v :
+  entries:int ->
+  stable_hash:int ->
+  inode_child_order:
+    [`Custom of depth:int -> bytes -> int | `Hash_bits | `Seeded_hash] ->
+  t
