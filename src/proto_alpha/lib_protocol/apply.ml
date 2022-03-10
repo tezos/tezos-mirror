@@ -1080,6 +1080,11 @@ let apply_origination ~consume_deserialization_gas ~ctxt ~script ~internal
   Script.force_decode_in_context
     ~consume_deserialization_gas
     ctxt
+    script.Script.storage
+  >>?= fun (_unparsed_storage, ctxt) ->
+  Script.force_decode_in_context
+    ~consume_deserialization_gas
+    ctxt
     script.Script.code
   >>?= fun (unparsed_code, ctxt) ->
   Script_ir_translator.parse_script
@@ -1395,11 +1400,6 @@ let apply_manager_operation_content :
       in
       return (ctxt, result, [op])
   | External (Origination {delegate; script; preorigination; credit}) ->
-      Script.force_decode_in_context
-        ~consume_deserialization_gas
-        ctxt
-        script.Script.storage
-      >>?= fun (_unparsed_storage, ctxt) ->
       apply_origination
         ~consume_deserialization_gas
         ~ctxt
@@ -1411,11 +1411,6 @@ let apply_manager_operation_content :
         ~credit
         ~before_operation
   | Internal (Origination {delegate; script; preorigination; credit}) ->
-      Script.force_decode_in_context
-        ~consume_deserialization_gas
-        ctxt
-        script.Script.storage
-      >>?= fun (_unparsed_storage, ctxt) ->
       apply_origination
         ~consume_deserialization_gas
         ~ctxt
