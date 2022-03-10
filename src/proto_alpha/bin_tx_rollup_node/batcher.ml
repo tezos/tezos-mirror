@@ -63,16 +63,24 @@ let register_transaction ?(apply = true) state (tr : L2_transaction.t) =
     Tx_rollup_l2_batch.V1.
       {contents = [tr.transaction]; aggregated_signature = tr.signature}
   in
-  let context = state.batcher_state.incr_context in
-  let+ context =
+  let context = state.incr_context in
+  let prev_context = context in
+  let+ (context, result) =
     if apply then
-      let+ (context, _result, _) =
+      let+ (context, result, _) =
         L2_apply.Batch_V1.apply_batch context state.parameters batch
       in
-      context
-    else return context
+      let result =
+        match result with
+        | Tx_rollup_l2_apply.Message_result.Batch_V1.Batch_result
+            {results = [(_tr, r)]; _} ->
+            Some r
+        | _ -> None
+      in
+      (context, result)
+    else return (context, None)
   in
-  L2_transaction.Hash_queue.add tr state.batcher_state.transactions ;
+  L2_transaction.Hash_queue.add tr ?result state.batcher_state.transactions ;
   state.batcher_state.incr_context <- context ;
   ()
 
