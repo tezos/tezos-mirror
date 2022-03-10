@@ -435,7 +435,7 @@ As in Emmy*, the protocol-specific header contains the fields:
 - ``signature``: a digital signature of the shell and protocol headers (excluding the signature itself)
 - ``seed_nonce_hash``: a commitment to :ref:`a random number<random_seed_alpha>`, used to generate entropy on the chain
 - ``proof_of_work_nonce``: a nonce used to pass a low-difficulty proof-of-work for the block, as a spam prevention measure
-- ``liquidity_baking_escape_vote``: :ref:`a flag<esc_hatch_alpha>` that requests ending the subsidy.
+- ``liquidity_baking_toggle_vote``: :ref:`a vote<toggle_alpha>` to continue the Liquidity Baking Subsidy, stop it, or abstain.
 
 There are two additional fields: ``payload_hash`` and ``payload_round`` which are needed for establishing if a block is :ref:`final<finality_alpha>`.
 

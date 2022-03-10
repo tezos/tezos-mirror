@@ -81,6 +81,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    tx_rollup_errors_repr.ml
    tx_rollup_state_repr.mli tx_rollup_state_repr.ml
    vote_repr.mli vote_repr.ml
+   liquidity_baking_repr.mli liquidity_baking_repr.ml
    block_header_repr.mli block_header_repr.ml
    destination_repr.mli destination_repr.ml
    operation_repr.mli operation_repr.ml
@@ -120,7 +121,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    vote_storage.mli vote_storage.ml
    fees_storage.mli fees_storage.ml
    ticket_storage.mli ticket_storage.ml
-   liquidity_baking_repr.mli liquidity_baking_repr.ml
+   liquidity_baking_storage.mli liquidity_baking_storage.ml
    liquidity_baking_cpmm.ml
    liquidity_baking_lqt.ml
    liquidity_baking_migration.mli liquidity_baking_migration.ml
@@ -247,6 +248,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    tx_rollup_errors_repr.ml
    tx_rollup_state_repr.mli tx_rollup_state_repr.ml
    vote_repr.mli vote_repr.ml
+   liquidity_baking_repr.mli liquidity_baking_repr.ml
    block_header_repr.mli block_header_repr.ml
    destination_repr.mli destination_repr.ml
    operation_repr.mli operation_repr.ml
@@ -286,7 +288,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    vote_storage.mli vote_storage.ml
    fees_storage.mli fees_storage.ml
    ticket_storage.mli ticket_storage.ml
-   liquidity_baking_repr.mli liquidity_baking_repr.ml
+   liquidity_baking_storage.mli liquidity_baking_storage.ml
    liquidity_baking_cpmm.ml
    liquidity_baking_lqt.ml
    liquidity_baking_migration.mli liquidity_baking_migration.ml
@@ -413,6 +415,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    tx_rollup_errors_repr.ml
    tx_rollup_state_repr.mli tx_rollup_state_repr.ml
    vote_repr.mli vote_repr.ml
+   liquidity_baking_repr.mli liquidity_baking_repr.ml
    block_header_repr.mli block_header_repr.ml
    destination_repr.mli destination_repr.ml
    operation_repr.mli operation_repr.ml
@@ -452,7 +455,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    vote_storage.mli vote_storage.ml
    fees_storage.mli fees_storage.ml
    ticket_storage.mli ticket_storage.ml
-   liquidity_baking_repr.mli liquidity_baking_repr.ml
+   liquidity_baking_storage.mli liquidity_baking_storage.ml
    liquidity_baking_cpmm.ml
    liquidity_baking_lqt.ml
    liquidity_baking_migration.mli liquidity_baking_migration.ml
@@ -601,6 +604,7 @@ include Tezos_raw_protocol_alpha.Main
    Tx_rollup_errors_repr
    Tx_rollup_state_repr
    Vote_repr
+   Liquidity_baking_repr
    Block_header_repr
    Destination_repr
    Operation_repr
@@ -640,7 +644,7 @@ include Tezos_raw_protocol_alpha.Main
    Vote_storage
    Fees_storage
    Ticket_storage
-   Liquidity_baking_repr
+   Liquidity_baking_storage
    Liquidity_baking_cpmm
    Liquidity_baking_lqt
    Liquidity_baking_migration
@@ -808,6 +812,7 @@ include Tezos_raw_protocol_alpha.Main
    tx_rollup_errors_repr.ml
    tx_rollup_state_repr.mli tx_rollup_state_repr.ml
    vote_repr.mli vote_repr.ml
+   liquidity_baking_repr.mli liquidity_baking_repr.ml
    block_header_repr.mli block_header_repr.ml
    destination_repr.mli destination_repr.ml
    operation_repr.mli operation_repr.ml
@@ -847,7 +852,7 @@ include Tezos_raw_protocol_alpha.Main
    vote_storage.mli vote_storage.ml
    fees_storage.mli fees_storage.ml
    ticket_storage.mli ticket_storage.ml
-   liquidity_baking_repr.mli liquidity_baking_repr.ml
+   liquidity_baking_storage.mli liquidity_baking_storage.ml
    liquidity_baking_cpmm.ml
    liquidity_baking_lqt.ml
    liquidity_baking_migration.mli liquidity_baking_migration.ml

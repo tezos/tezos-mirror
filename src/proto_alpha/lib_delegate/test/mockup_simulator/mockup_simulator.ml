@@ -824,8 +824,8 @@ let genesis_protocol_data (baker_sk : Signature.secret_key)
         payload_round = Alpha_context.Round.zero;
         proof_of_work_nonce;
         seed_nonce_hash = None;
-        liquidity_baking_escape_vote =
-          Baking_configuration.default_liquidity_baking_escape_vote;
+        liquidity_baking_toggle_vote =
+          Baking_configuration.default_liquidity_baking_toggle_vote;
       }
   in
   let unsigned_header =

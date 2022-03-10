@@ -209,6 +209,18 @@ let protocol_parameters_json t : Ezjsonm.t =
     let list_of_zs = list (fun i -> string (Int.to_string i)) in
     let pre_alpha_specific_parameters =
       match subkind with
+      | `Alpha ->
+          [("liquidity_baking_toggle_ema_threshold", int 1000000000)
+          ]
+      | `Hangzhou ->
+          [("liquidity_baking_escape_ema_threshold", int 1000000)
+          ]
+      | `Ithaca ->
+          [("liquidity_baking_escape_ema_threshold", int 666667)
+          ]
+      | _ -> failwith "unsupported protocol" in
+    let pre_ithaca_specific_parameters =
+      match subkind with
       | `Ithaca | `Alpha ->
           [ ("max_operations_time_to_live", int 120)
           ; ("blocks_per_stake_snapshot", int t.blocks_per_roll_snapshot)
@@ -248,8 +260,8 @@ let protocol_parameters_json t : Ezjsonm.t =
       | `Ithaca | `Hangzhou ->
           [("blocks_per_voting_period", int t.blocks_per_voting_period)]
       | _ -> failwith "unsupported protocol" in
-    alpha_specific_parameters @ pre_alpha_specific_parameters
-    @ blocks_or_cycle_per_voting_period in
+    alpha_specific_parameters @ pre_alpha_specific_parameters @
+    pre_ithaca_specific_parameters @ blocks_or_cycle_per_voting_period in
   let common =
     [ ( "bootstrap_accounts"
       , list make_account (t.bootstrap_accounts @ [(t.dictator, 10_000_000L)])
@@ -267,7 +279,7 @@ let protocol_parameters_json t : Ezjsonm.t =
     ; ("quorum_max", int 7_000); ("min_proposal_quorum", int 500)
     ; ("liquidity_baking_subsidy", string "2500000")
     ; ("liquidity_baking_sunset_level", int 525600)
-    ; ("liquidity_baking_escape_ema_threshold", int 1000000) ] in
+    ] in
   match custom_parameters t with
   | Some s -> s
   | None -> dict (common @ extra_post_babylon_stuff t.kind)

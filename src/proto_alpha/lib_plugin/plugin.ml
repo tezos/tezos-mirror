@@ -2991,7 +2991,11 @@ module RPC = struct
                   "proof_of_work_nonce"
                   (Fixed.bytes Alpha_context.Constants.proof_of_work_nonce_size)
                   empty_proof_of_work_nonce)
-               (dft "liquidity_baking_escape_vote" bool false))
+               Liquidity_baking.(
+                 dft
+                   "liquidity_baking_toggle_vote"
+                   liquidity_baking_toggle_vote_encoding
+                   LB_pass))
           ~output:(obj1 (req "protocol_data" bytes))
           RPC_path.(path / "protocol_data")
     end
@@ -3014,7 +3018,7 @@ module RPC = struct
             payload_round,
             seed_nonce_hash,
             proof_of_work_nonce,
-            liquidity_baking_escape_vote )
+            liquidity_baking_toggle_vote )
         ->
           return
             (Data_encoding.Binary.to_bytes_exn
@@ -3024,7 +3028,7 @@ module RPC = struct
                  payload_round;
                  seed_nonce_hash;
                  proof_of_work_nonce;
-                 liquidity_baking_escape_vote;
+                 liquidity_baking_toggle_vote;
                }))
 
     module Manager = struct
@@ -3179,7 +3183,7 @@ module RPC = struct
     let protocol_data ctxt block ?(payload_hash = Block_payload_hash.zero)
         ?(payload_round = Round.zero) ?seed_nonce_hash
         ?(proof_of_work_nonce = empty_proof_of_work_nonce)
-        ~liquidity_baking_escape_vote () =
+        ~liquidity_baking_toggle_vote () =
       RPC_context.make_call0
         S.protocol_data
         ctxt
@@ -3189,7 +3193,7 @@ module RPC = struct
           payload_round,
           seed_nonce_hash,
           proof_of_work_nonce,
-          liquidity_baking_escape_vote )
+          liquidity_baking_toggle_vote )
   end
 
   module Parse = struct

@@ -36,7 +36,8 @@ let node_network_config t =
           [ ("level", int t.level)
           ; ("replacement_protocol", string t.protocol_hash) ] ] )
 
-let keyed_daemons t ~client ~key ~node =
-  [ Tezos_daemon.baker_of_node ~name_tag:t.name ~exec:t.baker ~client node ~key
+let keyed_daemons t ~client ~key ~lb_vote ~node =
+  [ Tezos_daemon.baker_of_node ~name_tag:t.name ~exec:t.baker ~client node
+      ~key ~lb_vote:(lb_vote t.protocol_hash)
   ; Tezos_daemon.endorser_of_node ~name_tag:t.name ~exec:t.endorser ~client
       node ~key ]

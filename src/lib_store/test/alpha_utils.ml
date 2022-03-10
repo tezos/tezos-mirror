@@ -247,14 +247,15 @@ module Forge = struct
 
   let make_contents ~payload_hash ~payload_round
       ?(proof_of_work_nonce = default_proof_of_work_nonce)
-      ?(liquidity_baking_escape_vote = false) ~seed_nonce_hash () =
+      ?(liquidity_baking_toggle_vote = Liquidity_baking.LB_pass)
+      ~seed_nonce_hash () =
     Block_header.
       {
         payload_hash;
         payload_round;
         proof_of_work_nonce;
         seed_nonce_hash;
-        liquidity_baking_escape_vote;
+        liquidity_baking_toggle_vote;
       }
 
   let make_shell ~level ~predecessor ~timestamp ~fitness ~operations_hash

@@ -68,7 +68,7 @@ module Forge : sig
   val contents :
     ?proof_of_work_nonce:Bytes.t ->
     ?seed_nonce_hash:Nonce_hash.t ->
-    ?liquidity_baking_escape_vote:bool ->
+    ?liquidity_baking_toggle_vote:Liquidity_baking.liquidity_baking_toggle_vote ->
     payload_hash:Block_payload_hash.t ->
     payload_round:Round.t ->
     unit ->
@@ -86,7 +86,7 @@ module Forge : sig
     ?policy:baker_policy ->
     ?timestamp:Timestamp.time ->
     ?operations:Operation.packed list ->
-    ?liquidity_baking_escape_vote:bool ->
+    ?liquidity_baking_toggle_vote:Liquidity_baking.liquidity_baking_toggle_vote ->
     t ->
     header tzresult Lwt.t
 
@@ -184,7 +184,7 @@ val bake :
   ?timestamp:Timestamp.time ->
   ?operation:Operation.packed ->
   ?operations:Operation.packed list ->
-  ?liquidity_baking_escape_vote:bool ->
+  ?liquidity_baking_toggle_vote:Liquidity_baking.liquidity_baking_toggle_vote ->
   t ->
   t tzresult Lwt.t
 
@@ -192,7 +192,7 @@ val bake :
 val bake_n :
   ?baking_mode:baking_mode ->
   ?policy:baker_policy ->
-  ?liquidity_baking_escape_vote:bool ->
+  ?liquidity_baking_toggle_vote:Liquidity_baking.liquidity_baking_toggle_vote ->
   int ->
   t ->
   block tzresult Lwt.t
@@ -202,7 +202,7 @@ val bake_n :
 val bake_n_with_all_balance_updates :
   ?baking_mode:baking_mode ->
   ?policy:baker_policy ->
-  ?liquidity_baking_escape_vote:bool ->
+  ?liquidity_baking_toggle_vote:Liquidity_baking.liquidity_baking_toggle_vote ->
   int ->
   t ->
   (block * Alpha_context.Receipt.balance_updates) tzresult Lwt.t
@@ -221,14 +221,14 @@ val bake_n_with_origination_results :
   tzresult
   Lwt.t
 
-(** Version of bake_n that returns the liquidity baking escape EMA after [n] blocks. **)
-val bake_n_with_liquidity_baking_escape_ema :
+(** Version of bake_n that returns the liquidity baking toggle EMA after [n] blocks. **)
+val bake_n_with_liquidity_baking_toggle_ema :
   ?baking_mode:baking_mode ->
   ?policy:baker_policy ->
-  ?liquidity_baking_escape_vote:bool ->
+  ?liquidity_baking_toggle_vote:Liquidity_baking.liquidity_baking_toggle_vote ->
   int ->
   t ->
-  (block * Alpha_context.Liquidity_baking.escape_ema) tzresult Lwt.t
+  (block * Alpha_context.Liquidity_baking.Toggle_EMA.t) tzresult Lwt.t
 
 val current_cycle : t -> Cycle.t tzresult Lwt.t
 

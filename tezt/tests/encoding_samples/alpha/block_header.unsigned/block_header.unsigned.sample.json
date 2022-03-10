@@ -12,7 +12,7 @@
   "context": "CoVDyf9y9gHfAkPWofBJffo4X4bWjmehH2LeVonDcCKKzyQYwqdk",
   "proof_of_work_nonce": "101895ca00000000",
   "seed_nonce_hash": "nceUFoeQDgkJCmzdMWh19ZjBYqQD3N9fe6bXQ1ZsUKKvMn7iun5Z3",
-  "liquidity_baking_escape_vote": false,
+  "liquidity_baking_toggle_vote": "off",
   "payload_hash": "vh1g87ZG6scSYxKhspAUzprQVuLAyoa5qMBKcUfjgnQGnFb3dJcG",
   "payload_round":0
 }

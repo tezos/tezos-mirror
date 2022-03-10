@@ -30,7 +30,12 @@ class TestManyNodesBootstrap:
         for i in range(1, NEW_NODES):
             sandbox.add_node(i, params=constants.NODE_PARAMS)
         for i in range(3):
-            sandbox.add_baker(i, [f'bootstrap{i + 1}'], proto=protocol.DAEMON)
+            sandbox.add_baker(
+                i,
+                [f'bootstrap{i + 1}'],
+                proto=protocol.DAEMON,
+                run_params=['--liquidity-baking-toggle-vote', 'pass'],
+            )
 
     def test_add_nodes(self, sandbox: Sandbox):
         for i in range(NEW_NODES, NUM_NODES):

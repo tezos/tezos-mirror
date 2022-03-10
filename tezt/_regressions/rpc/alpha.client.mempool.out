@@ -733,8 +733,8 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                           "seed_nonce_hash": {
                             "$ref": "#/definitions/cycle_nonce"
                           },
-                          "liquidity_baking_escape_vote": {
-                            "type": "boolean"
+                          "liquidity_baking_toggle_vote": {
+                            "$ref": "#/definitions/alpha.liquidity_baking_toggle_vote"
                           },
                           "signature": {
                             "$ref": "#/definitions/Signature"
@@ -742,7 +742,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                         },
                         "required": [
                           "signature",
-                          "liquidity_baking_escape_vote",
+                          "liquidity_baking_toggle_vote",
                           "proof_of_work_nonce",
                           "payload_round",
                           "payload_hash",
@@ -924,6 +924,14 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                             ],
                             "additionalProperties": false
                           }
+                        ]
+                      },
+                      "alpha.liquidity_baking_toggle_vote": {
+                        "type": "string",
+                        "enum": [
+                          "off",
+                          "on",
+                          "pass"
                         ]
                       },
                       "alpha.michelson.v1.primitives": {
@@ -4131,9 +4139,10 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                               "kind": "named"
                             },
                             {
-                              "name": "liquidity_baking_escape_vote",
+                              "name": "liquidity_baking_toggle_vote",
                               "layout": {
-                                "kind": "Bool"
+                                "size": "Int8",
+                                "kind": "Int"
                               },
                               "data_kind": {
                                 "size": 1,
@@ -7154,8 +7163,8 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                           "seed_nonce_hash": {
                             "$ref": "#/definitions/cycle_nonce"
                           },
-                          "liquidity_baking_escape_vote": {
-                            "type": "boolean"
+                          "liquidity_baking_toggle_vote": {
+                            "$ref": "#/definitions/alpha.liquidity_baking_toggle_vote"
                           },
                           "signature": {
                             "$ref": "#/definitions/Signature"
@@ -7163,7 +7172,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                         },
                         "required": [
                           "signature",
-                          "liquidity_baking_escape_vote",
+                          "liquidity_baking_toggle_vote",
                           "proof_of_work_nonce",
                           "payload_round",
                           "payload_hash",
@@ -7345,6 +7354,14 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                             ],
                             "additionalProperties": false
                           }
+                        ]
+                      },
+                      "alpha.liquidity_baking_toggle_vote": {
+                        "type": "string",
+                        "enum": [
+                          "off",
+                          "on",
+                          "pass"
                         ]
                       },
                       "alpha.michelson.v1.primitives": {

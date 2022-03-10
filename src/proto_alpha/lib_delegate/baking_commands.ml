@@ -141,11 +141,27 @@ let keep_alive_arg =
     ~long:"keep-alive"
     ()
 
-let liquidity_baking_escape_vote_switch =
-  Clic.switch
-    ~doc:"Vote to end the liquidity baking subsidy."
-    ~long:"liquidity-baking-escape-vote"
-    ()
+let liquidity_baking_toggle_vote_parameter =
+  Clic.parameter
+    ~autocomplete:(fun _ctxt -> return ["on"; "off"; "pass"])
+    (let open Protocol.Alpha_context.Liquidity_baking in
+    fun _ctxt -> function
+      | "on" -> return LB_on
+      | "off" -> return LB_off
+      | "pass" -> return LB_pass
+      | s ->
+          failwith
+            "unexpected vote: %s, expected either \"on\", \"off\", or \"pass\"."
+            s)
+
+let liquidity_baking_toggle_vote_arg =
+  Clic.arg
+    ~doc:
+      "Vote to continue (option \"on\") or end (option \"off\") the liquidity \
+       baking subsidy. Or choose to pass (option \"pass\")."
+    ~long:"liquidity-baking-toggle-vote"
+    ~placeholder:"vote"
+    liquidity_baking_toggle_vote_parameter
 
 let get_delegates (cctxt : Protocol_client_context.full)
     (pkhs : Signature.public_key_hash list) =
@@ -311,7 +327,7 @@ let baker_commands () : Protocol_client_context.full Clic.command list =
          minimal_nanotez_per_gas_unit_arg
          minimal_nanotez_per_byte_arg
          keep_alive_arg
-         liquidity_baking_escape_vote_switch
+         liquidity_baking_toggle_vote_arg
          per_block_vote_file_arg
          operations_arg)
       (prefixes ["run"; "with"; "local"; "node"]
@@ -325,12 +341,19 @@ let baker_commands () : Protocol_client_context.full Clic.command list =
              minimal_nanotez_per_gas_unit,
              minimal_nanotez_per_byte,
              keep_alive,
-             liquidity_baking_escape_vote,
+             liquidity_baking_toggle_vote,
              per_block_vote_file,
              extra_operations )
            node_data_path
            sources
            cctxt ->
+        (match liquidity_baking_toggle_vote with
+        | None ->
+            failwith
+              "Missing liquidity baking toggle vote, please use the \
+               --liquidity-baking-toggle-vote option"
+        | Some vote -> return vote)
+        >>=? fun liquidity_baking_toggle_vote ->
         may_lock_pidfile pidfile @@ fun () ->
         get_delegates cctxt sources >>=? fun delegates ->
         let context_path = Filename.Infix.(node_data_path // "context") in
@@ -339,7 +362,7 @@ let baker_commands () : Protocol_client_context.full Clic.command list =
           ~minimal_fees
           ~minimal_nanotez_per_gas_unit
           ~minimal_nanotez_per_byte
-          ~liquidity_baking_escape_vote
+          ~liquidity_baking_toggle_vote
           ?per_block_vote_file
           ?extra_operations
           ~chain:cctxt#chain

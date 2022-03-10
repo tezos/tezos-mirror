@@ -142,7 +142,7 @@ type parametric = {
   min_proposal_quorum : int32;
   liquidity_baking_subsidy : Tez_repr.t;
   liquidity_baking_sunset_level : int32;
-  liquidity_baking_escape_ema_threshold : int32;
+  liquidity_baking_toggle_ema_threshold : int32;
   max_operations_time_to_live : int;
   minimal_block_delay : Period_repr.t;
   delay_increment_per_round : Period_repr.t;
@@ -199,7 +199,7 @@ let parametric_encoding =
               c.min_proposal_quorum,
               c.liquidity_baking_subsidy,
               c.liquidity_baking_sunset_level,
-              c.liquidity_baking_escape_ema_threshold,
+              c.liquidity_baking_toggle_ema_threshold,
               c.max_operations_time_to_live,
               c.minimal_block_delay,
               c.delay_increment_per_round,
@@ -248,7 +248,7 @@ let parametric_encoding =
                  min_proposal_quorum,
                  liquidity_baking_subsidy,
                  liquidity_baking_sunset_level,
-                 liquidity_baking_escape_ema_threshold,
+                 liquidity_baking_toggle_ema_threshold,
                  max_operations_time_to_live,
                  minimal_block_delay,
                  delay_increment_per_round,
@@ -298,7 +298,7 @@ let parametric_encoding =
         min_proposal_quorum;
         liquidity_baking_subsidy;
         liquidity_baking_sunset_level;
-        liquidity_baking_escape_ema_threshold;
+        liquidity_baking_toggle_ema_threshold;
         max_operations_time_to_live;
         minimal_block_delay;
         delay_increment_per_round;
@@ -358,7 +358,7 @@ let parametric_encoding =
                 (req "min_proposal_quorum" int32)
                 (req "liquidity_baking_subsidy" Tez_repr.encoding)
                 (req "liquidity_baking_sunset_level" int32)
-                (req "liquidity_baking_escape_ema_threshold" int32)
+                (req "liquidity_baking_toggle_ema_threshold" int32)
                 (req "max_operations_time_to_live" int16)
                 (req "minimal_block_delay" Period_repr.encoding)
                 (req "delay_increment_per_round" Period_repr.encoding)
@@ -580,7 +580,7 @@ module Proto_previous = struct
     min_proposal_quorum : int32;
     liquidity_baking_subsidy : Tez_repr.t;
     liquidity_baking_sunset_level : int32;
-    liquidity_baking_escape_ema_threshold : int32;
+    liquidity_baking_toggle_ema_threshold : int32;
     max_operations_time_to_live : int;
     minimal_block_delay : Period_repr.t;
     delay_increment_per_round : Period_repr.t;
@@ -619,7 +619,7 @@ module Proto_previous = struct
                 c.min_proposal_quorum,
                 c.liquidity_baking_subsidy,
                 c.liquidity_baking_sunset_level,
-                c.liquidity_baking_escape_ema_threshold,
+                c.liquidity_baking_toggle_ema_threshold,
                 c.max_operations_time_to_live,
                 c.minimal_block_delay,
                 c.delay_increment_per_round,
@@ -652,7 +652,7 @@ module Proto_previous = struct
                    min_proposal_quorum,
                    liquidity_baking_subsidy,
                    liquidity_baking_sunset_level,
-                   liquidity_baking_escape_ema_threshold,
+                   liquidity_baking_toggle_ema_threshold,
                    max_operations_time_to_live,
                    minimal_block_delay,
                    delay_increment_per_round,
@@ -686,7 +686,7 @@ module Proto_previous = struct
           min_proposal_quorum;
           liquidity_baking_subsidy;
           liquidity_baking_sunset_level;
-          liquidity_baking_escape_ema_threshold;
+          liquidity_baking_toggle_ema_threshold;
           max_operations_time_to_live;
           minimal_block_delay;
           delay_increment_per_round;
@@ -730,7 +730,7 @@ module Proto_previous = struct
                   (req "min_proposal_quorum" int32)
                   (req "liquidity_baking_subsidy" Tez_repr.encoding)
                   (req "liquidity_baking_sunset_level" int32)
-                  (req "liquidity_baking_escape_ema_threshold" int32)
+                  (req "liquidity_baking_toggle_ema_threshold" int32)
                   (req "max_operations_time_to_live" int16)
                   (req "minimal_block_delay" Period_repr.encoding)
                   (req "delay_increment_per_round" Period_repr.encoding)

@@ -1,7 +1,7 @@
 Liquidity Baking
 ================
 
-Liquidity baking incentivizes large amounts of decentralized liquidity provision between tez and tzBTC by minting a small amount of tez every block and depositing it inside of a constant product market making smart-contract. It includes an escape hatch mechanism as a contingency.
+Liquidity baking incentivizes large amounts of decentralized liquidity provision between tez and tzBTC by minting a small amount of tez every block and depositing it inside of a constant product market making smart-contract.
 
 Contracts
 ~~~~~~~~~
@@ -34,18 +34,53 @@ As a safety precaution, the subsidy expires automatically at a given
 level called the liquidity baking sunset level. The sunset level can
 be renewed periodically by protocol amendment.
 
-.. _esc_hatch_alpha:
+.. _toggle_alpha:
 
-Escape hatch
-~~~~~~~~~~~~
+Toggle vote
+~~~~~~~~~~~
 
-In addition to the sunset mechanism, an escape hatch is included. At every block, the baker producing the block can choose to include a flag that requests ending the subsidy. The context maintains an exponential moving average of that flag calculated as such with integer arithmetic:
+In addition to the sunset mechanism, the subsidy can be paused by a
+mechanism called the Liquidity Baking Toggle Vote. At every block, the
+baker producing the block includes a flag that requests ending the
+subsidy or on the contrary continuing or restarting it. The context
+maintains an exponential moving average of that flag. The baker has
+three options for this flag: ``Off`` to request ending the subsidy,
+``On`` to request continuing or restarting the subsidy, and ``Pass``
+to abstain.
 
-``e[0] = 0``
-``e[n+1] = (1999 * e[n] // 2000) + (1000 if flag[n] else 0)``
+``e[n+1] = e[n]`` if the flag is set to ``Pass``.
+``e[n+1] = (1999 * e[n] // 2000) + 1_000_000`` if the flag is set to ``Off``.
+``e[n+1] = (1999 * e[n] // 2000)`` if the flag is set to ``On``.
+When computing ``e[n+1]``, the division is rounded toward ``1_000_000_000```.
 
-If at any block ``e[n] >= 666667`` then it means that an exponential moving average with a window size on the order of two thousand blocks has had roughly at least a third of blocks demanding the end of the subsidy. If that is the case, the subsidy is permanently halted (though it can be reactivated by a protocol upgrade).
+If at any block ``e[n] >= 1_000_000_000`` then it means that an
+exponential moving average with a window size on the order of two
+thousand non-abstaining blocks has had roughly at least a half of the
+blocks demanding the end of the subsidy. If that is the case, the
+subsidy is halted but can be reactivated if for some later block
+``e[n] < 1_000_000_000``.
 
-For indicative purposes, if a fraction ``f`` of blocks start signalling the flag, the threshold is reached after roughly ``2*(log(1-1/(3f)) / log(0.999))`` blocks, about 812 blocks if everyone signals, 1079 blocks if 80% do, 1624 blocks if 60% do, 3590 blocks if 40% do, etc. Recall for comparison that assuming two blocks per minute there are 2880 blocks per day.
+For indicative purposes, if among the non-abstaining blocks a fraction
+``f`` of blocks use it to request ending the subsidy, the threshold is
+reached after roughly ``2*(log(1-1/(2f)) / log(0.999))``
+non-abstaining blocks, about 1386 blocks if everyone signals, 1963
+blocks if 80% do, 3583 blocks if 60% do etc. Recall for comparison
+that assuming two blocks per minute there are 2880 blocks per day.
 
-The escape hatch can be invoked through a JSON file containing a vote that is repeatedly submitted on each baked block, e.g. ``tezos-baker run with local node ~/.tezos-node alice --votefile "per_block_votes.json"`` where ``per_block_votes.json`` contains just ``{"liquidity_baking_escape_vote": true}``. See also the :ref:`baker man page<baker_manual_alpha>`.
+When producing blocks using Octez baking daemon ``tezos-baker``, there
+are two command-line options affecting toggle vote. The mandatory
+``--liquidity-baking-toggle-vote <on|off|pass>`` option sets the
+default value for the flag. Moreover, the path of a JSON file can be
+given to the optional ``--votefile <path>`` option
+e.g. ``tezos-baker-<protocol codename> run with local node
+~/.tezos-node alice --liquidity-baking-toggle-vote on --votefile
+"per_block_votes.json"``. The content of the JSON file will be
+repeatedly submitted on each baked block, where
+``per_block_votes.json`` contains just
+``{"liquidity_baking_toggle_vote": "pass"}`` (to abstain),
+``{"liquidity_baking_toggle_vote": "off"}`` (to request ending the
+subsidy), or ``{"liquidity_baking_toggle_vote": "on"}`` (to request
+continuing the subsidy). When the ``--votefile`` option is present it
+takes precedence over ``--liquidity-baking-toggle-vote`` which is only
+used in case an error occurs while attempting to read the vote
+file. See also the :ref:`baker man page<baker_manual_alpha>`.

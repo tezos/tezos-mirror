@@ -67,6 +67,11 @@ let leq ~loc (cmp : 'a -> 'a -> int) msg pp a b =
       b
   else return_unit
 
+let lt ~loc (cmp : 'a -> 'a -> int) msg pp a b =
+  if cmp a b >= 0 then
+    failwith "@[@[[%s]@] - @[%s : %a is not less than %a@]@]" loc msg pp a pp b
+  else return_unit
+
 let not_equal ~loc (cmp : 'a -> 'a -> bool) msg pp a b =
   if cmp a b then
     failwith "@[@[[%s]@] - @[%s : %a is equal to %a@]@]" loc msg pp a pp b
@@ -97,6 +102,12 @@ let leq_int ~loc (a : int) (b : int) =
 (* int32 *)
 let equal_int32 ~loc (a : int32) (b : int32) =
   equal ~loc Int32.equal "Int32 aren't equal" Int32.pp a b
+
+let leq_int32 ~loc (a : int32) (b : int32) =
+  leq ~loc Compare.Int32.compare "Int32 comparison" Int32.pp a b
+
+let lt_int32 ~loc (a : int32) (b : int32) =
+  lt ~loc Compare.Int32.compare "Int32 comparison" Int32.pp a b
 
 (* int64 *)
 let equal_int64 ~loc (a : int64) (b : int64) =

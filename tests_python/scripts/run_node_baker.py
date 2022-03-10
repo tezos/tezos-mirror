@@ -25,7 +25,12 @@ def scenario(contract, storage, round_duration, proto):
         sandbox.add_node(1, params=constants.NODE_PARAMS)
         utils.activate_protocol(sandbox.client(1), proto_hash, parameters)
         accounts = [f'bootstrap{i}' for i in range(1, 6)]
-        sandbox.add_baker(1, accounts, proto=proto_daemon)
+        sandbox.add_baker(
+            1,
+            accounts,
+            proto=proto_daemon,
+            run_params=['--liquidity-baking-toggle-vote', 'pass'],
+        )
         client = sandbox.client(1)
         if contract:
             args = ['--init', storage, '--burn-cap', '10.0']

@@ -75,6 +75,23 @@ Client
 Baker / Endorser / Accuser
 --------------------------
 
+- The ``--liquidity-baking-escape-vote`` command-line has been renamed
+  to ``--liquidity-baking-toggle-vote``.
+
+- The ``--liquidity-baking-toggle-vote`` command-line option is made
+  mandatory. The ``--votefile`` option can still be used to change
+  vote without restarting the baker daemon, if both options are
+  provided ``--votefile`` takes precedence and
+  ``--liquidity-baking-toggle-vote`` is only used to define the
+  default behavior of the daemon when an error occurs while reading
+  the vote file.
+
+- The format of the vote file provided by the ``--votefile`` option
+  has changed too; the ``liquidity_baking_escape_vote`` key is renamed
+  to ``liquidity_baking_toggle_vote`` and the value must now be one of
+  the following strings: ``"on"`` to vote to continue Liquidity
+  Baking, ``"off"`` to vote to stop it, or ``"pass"`` to abstain.
+
 Signer
 ------
 

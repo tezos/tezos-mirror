@@ -268,15 +268,17 @@ let inject_block ~state_recorder state block_to_bake ~updated_state =
   let user_activated_upgrades =
     state.global_state.config.user_activated_upgrades
   in
-  (* Set liquidity_baking_escape_vote for this block *)
-  let default = state.global_state.config.liquidity_baking_escape_vote in
+  (* Set liquidity_baking_toggle_vote for this block *)
+  let default = state.global_state.config.liquidity_baking_toggle_vote in
   (match state.global_state.config.per_block_vote_file with
   | None -> Lwt.return default
   | Some per_block_vote_file ->
-      Liquidity_baking_vote_file.read_liquidity_baking_escape_vote_no_fail
+      Liquidity_baking_vote_file.read_liquidity_baking_toggle_vote_no_fail
         ~default
         ~per_block_vote_file)
-  >>= fun liquidity_baking_escape_vote ->
+  >>= fun liquidity_baking_toggle_vote ->
+  Events.(emit vote_for_liquidity_baking_toggle) liquidity_baking_toggle_vote
+  >>= fun () ->
   Block_forge.forge
     cctxt
     ~chain_id
@@ -284,7 +286,7 @@ let inject_block ~state_recorder state block_to_bake ~updated_state =
     ~timestamp
     ~seed_nonce_hash
     ~payload_round
-    ~liquidity_baking_escape_vote
+    ~liquidity_baking_toggle_vote
     ~user_activated_upgrades
     state.global_state.config.fees
     simulation_mode

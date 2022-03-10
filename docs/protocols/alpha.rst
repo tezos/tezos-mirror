@@ -19,6 +19,39 @@ This protocol requires a different protocol environment than Ithaca.
 It requires protocol environment V5, compared to V4 for Ithaca.
 (MR :gl:`!4071`)
 
+Liquidity Baking
+----------------
+
+Several changes are made to the Liquidity Baking Escape Vote:
+
+- The options are renamed ``On`` (instead of ``false``) and ``Off``
+  (instead of ``true``) to reduce confusion.
+
+- A third ``Pass`` option is added. When this option is used the
+  exponential moving average (EMA) of escape votes is not affected by
+  the block. Note to developers of baking software: we don't recommend to
+  use this option as a default value; instead we recommend to force the user
+  to explicitly choose one of the three options; this behavior has been
+  implemented in Octez' ``tezos-baker``.
+
+- The escape hatch threshold is reset to 50% to account for the new
+  symmetry in the escape vote introduced by ``Pass`` option.
+
+- The precision of the EMA computation has been increased by a factor
+  of 1000. To achieve this without overflowing, this computation is
+  now performed using arbitrary-precision arithmetic. The EMA itself
+  and the EMA threshold are still stored on 32bits.
+
+- EMA is always rounded toward the threshold.
+
+- When the EMA reaches the threshold, the deactivation of the subsidy
+  is not permanent anymore. If the proportion of bakers voting ``On``
+  later increases and the EMA falls back below the threshold then the
+  subsidy is restarted.
+
+- The Liquidity Baking Escape Vote is renamed into "Liquidity Baking
+  Toggle Vote".
+
 Transaction Optimistic Rollups
 ------------------------------
 
@@ -76,6 +109,43 @@ Breaking Changes
 - Encoding of transaction and origination operations no longer contains
   deprecated `big_map_diff` field. `lazy_storage_diff` should be used
   instead. (MR: :gl:`!4387`)
+
+- The JSON and binary encodings for Liquidity Baking Toggle Votes have
+  changed as follows:
+
+.. list-table:: Changes to encodings of Liquidity Baking Toggle Vote
+   :widths: 20 20 20 20 20
+   :header-rows: 1
+
+   * - Vote option
+     - Old binary encoding
+     - Old JSON encoding
+     - New binary encoding
+     - New JSON encoding
+
+   * - ``On``
+     - ``0x00``
+     - ``false``
+     - ``0x00``
+     - ``"on"``
+
+   * - ``Off``
+     - any other byte
+     - ``true``
+     - ``0x01``
+     - ``"off"``
+
+   * - ``Pass``
+     - N/A
+     - N/A
+     - ``0x02``
+     - ``"pass"``
+
+- The values of the Liquidity Baking EMA in block receipts and the
+  Liquidity Baking EMA threshold in the constants have been scaled by
+  1000, the new value of the threshold is 1,000,000,000. To compute
+  the proportion Off/(On + Off) of toggle votes the following formula
+  can be used: liquidity_baking_toggle_ema / 2,000,000,000.
 
 Bug Fixes
 ---------

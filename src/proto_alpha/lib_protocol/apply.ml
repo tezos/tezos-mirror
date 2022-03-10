@@ -2711,10 +2711,10 @@ let init_allowed_consensus_operations ctxt ~endorsement_level
        ~allowed_endorsements
        ~allowed_preendorsements)
 
-let apply_liquidity_baking_subsidy ctxt ~escape_vote =
+let apply_liquidity_baking_subsidy ctxt ~toggle_vote =
   Liquidity_baking.on_subsidy_allowed
     ctxt
-    ~escape_vote
+    ~toggle_vote
     (fun ctxt liquidity_baking_cpmm_contract ->
       let ctxt =
         (* We set a gas limit of 1/20th the block limit, which is ~10x
@@ -2866,7 +2866,7 @@ type 'a full_construction = {
   block_producer : Signature.public_key_hash;
   round : Round.t;
   implicit_operations_results : packed_successful_manager_operation_result list;
-  liquidity_baking_escape_ema : Liquidity_baking.escape_ema;
+  liquidity_baking_toggle_ema : Liquidity_baking.Toggle_EMA.t;
 }
 
 let begin_full_construction ctxt ~predecessor_timestamp ~predecessor_level
@@ -2898,11 +2898,11 @@ let begin_full_construction ctxt ~predecessor_timestamp ~predecessor_level
     ~endorsement_level:predecessor_level
     ~preendorsement_level:current_level
   >>=? fun ctxt ->
-  let escape_vote = protocol_data.liquidity_baking_escape_vote in
-  apply_liquidity_baking_subsidy ctxt ~escape_vote
+  let toggle_vote = protocol_data.liquidity_baking_toggle_vote in
+  apply_liquidity_baking_subsidy ctxt ~toggle_vote
   >|=? fun ( ctxt,
              liquidity_baking_operations_results,
-             liquidity_baking_escape_ema ) ->
+             liquidity_baking_toggle_ema ) ->
   {
     ctxt;
     protocol_data;
@@ -2910,10 +2910,10 @@ let begin_full_construction ctxt ~predecessor_timestamp ~predecessor_level
     block_producer;
     round;
     implicit_operations_results = liquidity_baking_operations_results;
-    liquidity_baking_escape_ema;
+    liquidity_baking_toggle_ema;
   }
 
-let begin_partial_construction ctxt ~predecessor_level ~escape_vote =
+let begin_partial_construction ctxt ~predecessor_level ~toggle_vote =
   (* In the mempool, only consensus operations for [predecessor_level]
      (that is, head's level) are allowed, contrary to block validation
      where endorsements are for the previous level and
@@ -2922,7 +2922,7 @@ let begin_partial_construction ctxt ~predecessor_level ~escape_vote =
     ctxt
     ~endorsement_level:predecessor_level
     ~preendorsement_level:predecessor_level
-  >>=? fun ctxt -> apply_liquidity_baking_subsidy ctxt ~escape_vote
+  >>=? fun ctxt -> apply_liquidity_baking_subsidy ctxt ~toggle_vote
 
 let begin_application ctxt chain_id (block_header : Block_header.t) fitness
     ~predecessor_timestamp ~predecessor_level ~predecessor_round =
@@ -2958,19 +2958,19 @@ let begin_application ctxt chain_id (block_header : Block_header.t) fitness
     ~endorsement_level:predecessor_level
     ~preendorsement_level:current_level
   >>=? fun ctxt ->
-  let escape_vote =
+  let toggle_vote =
     block_header.Block_header.protocol_data.contents
-      .liquidity_baking_escape_vote
+      .liquidity_baking_toggle_vote
   in
-  apply_liquidity_baking_subsidy ctxt ~escape_vote
+  apply_liquidity_baking_subsidy ctxt ~toggle_vote
   >|=? fun ( ctxt,
              liquidity_baking_operations_results,
-             liquidity_baking_escape_ema ) ->
+             liquidity_baking_toggle_ema ) ->
   ( ctxt,
     payload_producer_pk,
     block_producer,
     liquidity_baking_operations_results,
-    liquidity_baking_escape_ema )
+    liquidity_baking_toggle_ema )
 
 type finalize_application_mode =
   | Finalize_full_construction of {
@@ -3072,7 +3072,7 @@ let record_endorsing_participation ctxt =
     ctxt
 
 let finalize_application ctxt (mode : finalize_application_mode) protocol_data
-    ~payload_producer ~block_producer liquidity_baking_escape_ema
+    ~payload_producer ~block_producer liquidity_baking_toggle_ema
     implicit_operations_results ~round ~predecessor ~migration_balance_updates =
   (* Then we finalize the consensus. *)
   let level = Alpha_context.Level.current ctxt in
@@ -3151,7 +3151,7 @@ let finalize_application ctxt (mode : finalize_application_mode) protocol_data
         consumed_gas;
         deactivated;
         balance_updates;
-        liquidity_baking_escape_ema;
+        liquidity_baking_toggle_ema;
         implicit_operations_results;
       }
   in

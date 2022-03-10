@@ -30,7 +30,7 @@
                   src/proto_alpha/lib_protocol/test/integration/main.exe \
                   -- test "^liquidity baking$"
     Subject:      Test liquidity baking subsidies, CPMM storage updates,
-                  sunset shut off, and escape hatch shut off.
+                  sunset shut off, and toggle vote.
 *)
 
 open Liquidity_baking_machine
@@ -147,67 +147,70 @@ let liquidity_baking_sunset_level n () =
     expected_credit
   >>=? fun () -> return_unit
 
-(* Test that subsidy shuts off at correct escape level alternating baking [n_vote_false] blocks with liquidity_baking_escape_vote = false and [n_vote_true] blocks with it true followed by [bake_after_escape] blocks with it false. *)
-(* Escape level is roughly 2*(log(1-1/(2*percent_flagging)) / log(0.999)) *)
-let liquidity_baking_escape_hatch n_vote_false n_vote_true escape_level
-    bake_after_escape () =
+(* Test that subsidy shuts off at correct level alternating baking
+   blocks with liquidity_baking_toggle_vote set to [LB_on], [LB_off], and [LB_pass] followed by [bake_after_toggle] blocks with it set to [LB_pass]. *)
+(* Expected level is roughly 2*(log(1-1/(2*p)) / log(0.999)) where [p] is the proportion [LB_off / (LB_on + LB_off)]. *)
+let liquidity_baking_toggle ~n_vote_on ~n_vote_off ~n_vote_pass expected_level
+    bake_after () =
   Context.init ~consensus_threshold:0 1 >>=? fun (blk, _contracts) ->
   Context.get_liquidity_baking_cpmm_address (B blk) >>=? fun liquidity_baking ->
   Context.Contract.balance (B blk) liquidity_baking >>=? fun old_balance ->
-  let rec bake_escaping blk i =
-    if i < escape_level then
-      Block.bake_n n_vote_false blk >>=? fun blk ->
-      Block.bake_n ~liquidity_baking_escape_vote:true n_vote_true blk
-      >>=? fun blk -> bake_escaping blk (i + n_vote_false + n_vote_true)
-    else return blk
-  in
-  bake_escaping blk 0 >>=? fun blk ->
-  Block.bake_n bake_after_escape blk >>=? fun blk ->
   Context.get_liquidity_baking_subsidy (B blk)
   >>=? fun liquidity_baking_subsidy ->
-  liquidity_baking_subsidy *? Int64.of_int escape_level
-  >>?= fun expected_balance ->
+  let rec bake_stopping blk i =
+    if i < expected_level then
+      Block.bake_n ~liquidity_baking_toggle_vote:LB_on n_vote_on blk
+      >>=? fun blk ->
+      Block.bake_n ~liquidity_baking_toggle_vote:LB_off n_vote_off blk
+      >>=? fun blk ->
+      Block.bake_n ~liquidity_baking_toggle_vote:LB_pass n_vote_pass blk
+      >>=? fun blk ->
+      bake_stopping blk (i + n_vote_on + n_vote_off + n_vote_pass)
+    else return blk
+  in
+  bake_stopping blk 0 >>=? fun blk ->
+  Context.Contract.balance (B blk) liquidity_baking >>=? fun balance ->
+  Block.bake_n ~liquidity_baking_toggle_vote:LB_pass bake_after blk
+  >>=? fun blk ->
+  Assert.balance_is ~loc:__LOC__ (B blk) liquidity_baking balance >>=? fun () ->
+  liquidity_baking_subsidy *? Int64.of_int (expected_level - 1)
+  >>?= fun expected_final_balance ->
   Assert.balance_was_credited
     ~loc:__LOC__
     (B blk)
     liquidity_baking
     old_balance
-    expected_balance
+    expected_final_balance
   >>=? fun () -> return_unit
 
-(* 100% of blocks have liquidity_baking_escape_vote = true *)
-let liquidity_baking_escape_hatch_100 n () =
-  liquidity_baking_escape_hatch 0 1 812 n ()
+(* 100% of blocks have liquidity_baking_toggle_vote = LB_off *)
+let liquidity_baking_toggle_100 n () =
+  liquidity_baking_toggle ~n_vote_on:0 ~n_vote_off:1 ~n_vote_pass:0 1386 n ()
 
-(* 80% of blocks have liquidity_baking_escape_vote = true *)
-let liquidity_baking_escape_hatch_80 n () =
-  liquidity_baking_escape_hatch 1 4 1079 n ()
+(* 80% of blocks have liquidity_baking_toggle_vote = LB_off *)
+let liquidity_baking_toggle_80 n () =
+  liquidity_baking_toggle ~n_vote_on:1 ~n_vote_off:4 ~n_vote_pass:0 1963 n ()
 
-(* 60% of blocks have liquidity_baking_escape_vote = true *)
-let liquidity_baking_escape_hatch_60 n () =
-  liquidity_baking_escape_hatch 2 3 1624 n ()
+(* 60% of blocks have liquidity_baking_toggle_vote = LB_off *)
+let liquidity_baking_toggle_60 n () =
+  liquidity_baking_toggle ~n_vote_on:2 ~n_vote_off:3 ~n_vote_pass:0 3583 n ()
 
-(* 40% of blocks have liquidity_baking_escape_vote = true *)
-let liquidity_baking_escape_hatch_40 n () =
-  liquidity_baking_escape_hatch 3 2 3590 n ()
-
-(* 33% of blocks have liquidity_baking_escape_vote = true.
-   Escape hatch should not be activated. *)
-let liquidity_baking_escape_hatch_33 n () =
+(* 50% of blocks have liquidity_baking_toggle_vote = LB_off.
+   Subsidy should not be stopped. *)
+let liquidity_baking_toggle_50 n () =
   Context.init ~consensus_threshold:0 1 >>=? fun (blk, _contracts) ->
   Context.get_liquidity_baking_cpmm_address (B blk) >>=? fun liquidity_baking ->
   Context.get_constants (B blk) >>=? fun csts ->
   let sunset = csts.parametric.liquidity_baking_sunset_level in
   Context.Contract.balance (B blk) liquidity_baking >>=? fun old_balance ->
-  let rec bake_33_percent_escaping blk i =
+  let rec bake_50_percent_escaping blk i =
     if i < Int32.to_int sunset + n then
-      Block.bake blk >>=? fun blk ->
-      Block.bake blk >>=? fun blk ->
-      Block.bake ~liquidity_baking_escape_vote:true blk >>=? fun blk ->
-      bake_33_percent_escaping blk (i + 3)
+      Block.bake ~liquidity_baking_toggle_vote:LB_on blk >>=? fun blk ->
+      Block.bake ~liquidity_baking_toggle_vote:LB_off blk >>=? fun blk ->
+      bake_50_percent_escaping blk (i + 2)
     else return blk
   in
-  bake_33_percent_escaping blk 0 >>=? fun blk ->
+  bake_50_percent_escaping blk 0 >>=? fun blk ->
   Context.get_liquidity_baking_subsidy (B blk)
   >>=? fun liquidity_baking_subsidy ->
   (liquidity_baking_subsidy *? Int64.(sub (of_int32 sunset) 1L))
@@ -220,31 +223,64 @@ let liquidity_baking_escape_hatch_33 n () =
     expected_balance
   >>=? fun () -> return_unit
 
-(* Test that the escape EMA in block metadata is correct. *)
-let liquidity_baking_escape_ema n_vote_false n_vote_true escape_level
-    bake_after_escape expected_escape_ema () =
+(* Test that the subsidy can restart if LB_on votes regain majority.
+   Bake n_votes with LB_off, check that the subsidy is paused, bake
+   n_votes with LB_on, check that the subsidy flows.
+ *)
+let liquidity_baking_restart n_votes n () =
+  Context.init ~consensus_threshold:0 1 >>=? fun (blk, _contracts) ->
+  Context.get_liquidity_baking_cpmm_address (B blk) >>=? fun liquidity_baking ->
+  Block.bake_n ~liquidity_baking_toggle_vote:LB_off n_votes blk >>=? fun blk ->
+  Context.Contract.balance (B blk) liquidity_baking
+  >>=? fun balance_when_paused ->
+  Block.bake_n ~liquidity_baking_toggle_vote:LB_pass n blk >>=? fun blk ->
+  Assert.balance_is ~loc:__LOC__ (B blk) liquidity_baking balance_when_paused
+  >>=? fun () ->
+  Block.bake_n ~liquidity_baking_toggle_vote:LB_on n_votes blk >>=? fun blk ->
+  Context.Contract.balance (B blk) liquidity_baking
+  >>=? fun balance_when_restarted ->
+  Block.bake_n ~liquidity_baking_toggle_vote:LB_pass n blk >>=? fun blk ->
+  Context.get_liquidity_baking_subsidy (B blk)
+  >>=? fun liquidity_baking_subsidy ->
+  liquidity_baking_subsidy *? Int64.of_int n >>?= fun expected_balance ->
+  Assert.balance_was_credited
+    ~loc:__LOC__
+    (B blk)
+    liquidity_baking
+    balance_when_restarted
+    expected_balance
+  >>=? fun () -> return_unit
+
+(* Test that the toggle EMA in block metadata is correct. *)
+let liquidity_baking_toggle_ema n_vote_on n_vote_off level bake_after
+    expected_toggle_ema () =
   Context.init ~consensus_threshold:0 1 >>=? fun (blk, _contracts) ->
   let rec bake_escaping blk i =
-    if i < escape_level then
-      Block.bake_n n_vote_false blk >>=? fun blk ->
-      Block.bake_n ~liquidity_baking_escape_vote:true n_vote_true blk
-      >>=? fun blk -> bake_escaping blk (i + n_vote_false + n_vote_true)
+    if i < level then
+      Block.bake_n ~liquidity_baking_toggle_vote:LB_on n_vote_on blk
+      >>=? fun blk ->
+      Block.bake_n ~liquidity_baking_toggle_vote:LB_off n_vote_off blk
+      >>=? fun blk -> bake_escaping blk (i + n_vote_on + n_vote_off)
     else return blk
   in
   bake_escaping blk 0 >>=? fun blk ->
-  (* We only need to return the escape EMA at the end. *)
-  Block.bake_n_with_liquidity_baking_escape_ema bake_after_escape blk
-  >>=? fun (_blk, escape_ema) ->
-  Assert.leq_int ~loc:__LOC__ (Int32.to_int escape_ema) expected_escape_ema
+  (* We only need to return the toggle EMA at the end. *)
+  Block.bake_n_with_liquidity_baking_toggle_ema bake_after blk
+  >>=? fun (_blk, toggle_ema) ->
+  Assert.leq_int
+    ~loc:__LOC__
+    (toggle_ema |> Alpha_context.Liquidity_baking.Toggle_EMA.to_int32
+   |> Int32.to_int)
+    expected_toggle_ema
   >>=? fun () -> return_unit
 
-(* With no bakers setting the escape vote, EMA should be zero. *)
-let liquidity_baking_escape_ema_zero () =
-  liquidity_baking_escape_ema 0 0 0 100 0 ()
+(* With no bakers setting the toggle vote, EMA should be zero. *)
+let liquidity_baking_toggle_ema_zero () =
+  liquidity_baking_toggle_ema 0 0 0 100 0 ()
 
-(* The EMA should be not much over the threshold after the escape hatch has been activated. We add 1_000 to the constant to give room for the last update. *)
-let liquidity_baking_escape_ema_threshold () =
-  liquidity_baking_escape_ema 0 1 812 1 667_667 ()
+(* The EMA should be not much over the threshold after the subsidy has been stopped by a toggle vote. We add 1_000_000 to the constant to give room for the last update. *)
+let liquidity_baking_toggle_ema_threshold () =
+  liquidity_baking_toggle_ema 0 1 1386 1 1_001_000_000 ()
 
 let liquidity_baking_storage n () =
   Context.init ~consensus_threshold:0 1 >>=? fun (blk, _contracts) ->
@@ -442,90 +478,80 @@ let tests =
       `Quick
       (liquidity_baking_sunset_level 100);
     Tztest.tztest
-      "test liquidity baking escape hatch with 100% of bakers flagging when \
+      "test liquidity baking toggle vote with 100% of bakers voting LB_off \
        baking one block longer"
       `Quick
-      (liquidity_baking_escape_hatch_100 1);
+      (liquidity_baking_toggle_100 1);
     Tztest.tztest
-      "test liquidity baking escape hatch with 100% of bakers flagging when \
+      "test liquidity baking toggle vote with 100% of bakers voting LB_off \
        baking two blocks longer"
       `Quick
-      (liquidity_baking_escape_hatch_100 2);
+      (liquidity_baking_toggle_100 2);
     Tztest.tztest
-      "test liquidity baking escape hatch with 100% of bakers flagging when \
+      "test liquidity baking toggle vote with 100% of bakers voting LB_off \
        baking 100 blocks longer"
       `Quick
-      (liquidity_baking_escape_hatch_100 100);
+      (liquidity_baking_toggle_100 100);
     Tztest.tztest
-      "test liquidity baking escape hatch with 80% of bakers flagging when \
+      "test liquidity baking toggle vote with 80% of bakers voting LB_off \
        baking one block longer"
       `Quick
-      (liquidity_baking_escape_hatch_80 1);
+      (liquidity_baking_toggle_80 1);
     Tztest.tztest
-      "test liquidity baking escape hatch with 80% of bakers flagging when \
+      "test liquidity baking toggle vote with 80% of bakers voting LB_off \
        baking two blocks longer"
       `Quick
-      (liquidity_baking_escape_hatch_80 2);
+      (liquidity_baking_toggle_80 2);
     Tztest.tztest
-      "test liquidity baking escape hatch with 80% of bakers flagging when \
+      "test liquidity baking toggle vote with 80% of bakers voting LB_off \
        baking 100 blocks longer"
       `Quick
-      (liquidity_baking_escape_hatch_80 100);
+      (liquidity_baking_toggle_80 100);
     Tztest.tztest
-      "test liquidity baking escape hatch with 60% of bakers flagging when \
+      "test liquidity baking toggle vote with 60% of bakers voting LB_off \
        baking one block longer"
       `Quick
-      (liquidity_baking_escape_hatch_60 1);
+      (liquidity_baking_toggle_60 1);
     Tztest.tztest
-      "test liquidity baking escape hatch with 60% of bakers flagging when \
+      "test liquidity baking toggle vote with 60% of bakers voting LB_off \
        baking two blocks longer"
       `Quick
-      (liquidity_baking_escape_hatch_60 2);
+      (liquidity_baking_toggle_60 2);
     Tztest.tztest
-      "test liquidity baking escape hatch with 60% of bakers flagging when \
+      "test liquidity baking toggle vote with 60% of bakers voting LB_off \
        baking 100 blocks longer"
       `Quick
-      (liquidity_baking_escape_hatch_60 100);
+      (liquidity_baking_toggle_60 100);
     Tztest.tztest
-      "test liquidity baking escape hatch with 40% of bakers flagging when \
-       baking one block longer"
+      "test liquidity baking shuts off at sunset level with toggle vote at 50% \
+       and baking one block longer"
       `Quick
-      (liquidity_baking_escape_hatch_40 1);
+      (liquidity_baking_toggle_50 1);
     Tztest.tztest
-      "test liquidity baking escape hatch with 40% of bakers flagging when \
-       baking two blocks longer"
+      "test liquidity baking shuts off at sunset level with toggle vote at 50% \
+       and baking two blocks longer"
       `Quick
-      (liquidity_baking_escape_hatch_40 2);
+      (liquidity_baking_toggle_50 2);
     Tztest.tztest
-      "test liquidity baking escape hatch with 40% of bakers flagging when \
-       baking 100 blocks longer"
+      "test liquidity baking shuts off at sunset level with toggle vote at 50% \
+       and baking 100 blocks longer"
       `Quick
-      (liquidity_baking_escape_hatch_40 100);
+      (liquidity_baking_toggle_50 100);
     Tztest.tztest
-      "test liquidity baking shuts off at sunset level with escape hatch at \
-       33% and baking one block longer"
+      "test a liquidity baking restart with 100% of bakers voting off, then \
+       pass, then on"
       `Quick
-      (liquidity_baking_escape_hatch_33 1);
+      (liquidity_baking_restart 2000 1);
     Tztest.tztest
-      "test liquidity baking shuts off at sunset level with escape hatch at \
-       33% and baking two blocks longer"
+      "test liquidity baking toggle ema in block metadata is zero with no \
+       bakers voting LB_off."
       `Quick
-      (liquidity_baking_escape_hatch_33 2);
+      liquidity_baking_toggle_ema_zero;
     Tztest.tztest
-      "test liquidity baking shuts off at sunset level with escape hatch at \
-       33% and baking 100 blocks longer"
+      "test liquidity baking toggle ema is equal to the threshold after the \
+       subsidy has been stopped by a toggle vote"
       `Quick
-      (liquidity_baking_escape_hatch_33 100);
-    Tztest.tztest
-      "test liquidity baking escape ema in block metadata is zero with no \
-       bakers flagging."
-      `Quick
-      liquidity_baking_escape_ema_zero;
-    Tztest.tztest
-      "test liquidity baking escape ema is equal to the threshold after the \
-       escape hatch has been activated"
-      `Quick
-      liquidity_baking_escape_ema_threshold;
+      liquidity_baking_toggle_ema_threshold;
     Tztest.tztest
       "test liquidity baking storage is updated"
       `Quick
