@@ -65,18 +65,27 @@ let l2_address_gen =
   let open QCheck2.Gen in
   Protocol.Tx_rollup_l2_address.of_bls_pk <$> bls_pk_gen
 
+let idx_l2_address_idx_gen =
+  let open QCheck2.Gen in
+  from_index_exn <$> ui32
+
+let idx_l2_address_value_gen =
+  let open QCheck2.Gen in
+  from_value <$> l2_address_gen
+
+let idx_l2_address_gen =
+  let open QCheck2.Gen in
+  oneof [idx_l2_address_idx_gen; idx_l2_address_value_gen]
+
 let public_key_hash =
   Signature.Public_key_hash.of_b58check_exn
     "tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU"
 
-let destination_gen =
+let public_key_hash_gen =
   let open QCheck2.Gen in
-  let* choice = bool in
-  if choice then return (Layer1 public_key_hash)
-  else
-    let* choice = bool in
-    if choice then (fun x -> Layer2 (from_index_exn x)) <$> ui32
-    else (fun x -> Layer2 (from_value x)) <$> l2_address_gen
+  let+ seed = seed_gen in
+  let (pkh, _, _) = Tx_rollup_l2_helpers.gen_l1_address ~seed () in
+  pkh
 
 let ticket_hash_gen : Protocol.Alpha_context.Ticket_hash.t QCheck2.Gen.t =
   let open QCheck2.Gen in
@@ -107,17 +116,22 @@ let qty_gen =
   Protocol.Tx_rollup_l2_qty.of_int64_exn
   <$> graft_corners ui64 [0L; 1L; 2L; Int64.max_int] ()
 
-let v1_operation_content_gen =
+let v1_withdraw_gen =
   let open QCheck2.Gen in
-  let* destination = destination_gen and+ qty = qty_gen in
-  (* in valid [operation_content]s, the ticket_hash is a value when the
-     destination is layer1 *)
-  let+ ticket_hash =
-    match destination with
-    | Layer1 _ -> idx_ticket_hash_value_gen
-    | Layer2 _ -> idx_ticket_hash_gen
-  in
-  V1.{destination; ticket_hash; qty}
+  let+ destination = public_key_hash_gen
+  and+ ticket_hash = ticket_hash_gen
+  and+ qty = qty_gen in
+  V1.Withdraw {destination; ticket_hash; qty}
+
+let v1_transfer_gen =
+  let open QCheck2.Gen in
+  let+ destination = idx_l2_address_gen
+  and+ ticket_hash = idx_ticket_hash_gen
+  and+ qty = qty_gen in
+  V1.Transfer {destination; ticket_hash; qty}
+
+let v1_operation_content_gen =
+  QCheck2.Gen.oneof [v1_withdraw_gen; v1_transfer_gen]
 
 let v1_operation_gen =
   let open QCheck2.Gen in

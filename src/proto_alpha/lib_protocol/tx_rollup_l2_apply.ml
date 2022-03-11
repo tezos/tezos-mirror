@@ -561,9 +561,6 @@ module Make (Context : CONTEXT) = struct
 
         {ul {li The destination address index.}
             {li The ticket exchanged index.}}
-
-        If the transfer is layer2-to-layer1, then it also returns
-        the resulting withdrawal.
     *)
     let apply_operation_content :
         ctxt ->
@@ -571,19 +568,13 @@ module Make (Context : CONTEXT) = struct
         Signer_indexable.index ->
         'content operation_content ->
         (ctxt * indexes * Tx_rollup_withdraw.withdrawal option) m =
-     fun ctxt indexes source_idx {destination; ticket_hash; qty} ->
-      match destination with
-      | Layer1 l1_dest ->
-          (* To withdraw, the ticket must be given in the form of a
-             value. Furthermore, the ticket must already exist in the
+     fun ctxt indexes source_idx op_content ->
+      match op_content with
+      | Withdraw {destination = claimer; ticket_hash; qty = amount} ->
+          (* To withdraw, the ticket must already exist in the
              rollup and be indexed (the ticket must have already been
              assigned an index in the content: otherwise the ticket has
-             not been seen before and we can't withdraw from
-             it). Therefore, we do not create any new associations in
-             the ticket index. *)
-          let*? ticket_hash =
-            Indexable.is_value_e ~error:Unexpectedly_indexed_ticket ticket_hash
-          in
+             not been seen before and we can't withdraw from it). *)
           let* tidx_opt = Ticket_index.get ctxt ticket_hash in
           let*? tidx =
             Option.value_e ~error:(Missing_ticket ticket_hash) tidx_opt
@@ -591,13 +582,13 @@ module Make (Context : CONTEXT) = struct
           let source_idx = address_of_signer_index source_idx in
           (* spend the ticket -- this is responsible for checking that
              the source has the required balance *)
-          let* ctxt = Ticket_ledger.spend ctxt tidx source_idx qty in
-          let withdrawal =
-            Tx_rollup_withdraw.{claimer = l1_dest; ticket_hash; amount = qty}
-          in
+          let* ctxt = Ticket_ledger.spend ctxt tidx source_idx amount in
+          let withdrawal = Tx_rollup_withdraw.{claimer; ticket_hash; amount} in
           return (ctxt, indexes, Some withdrawal)
-      | Layer2 l2_dest ->
-          let* (ctxt, created_addr, dest_idx) = address_index ctxt l2_dest in
+      | Transfer {destination; ticket_hash; qty} ->
+          let* (ctxt, created_addr, dest_idx) =
+            address_index ctxt destination
+          in
           let* (ctxt, created_ticket, tidx) = ticket_index ctxt ticket_hash in
           let source_idx = address_of_signer_index source_idx in
           let* ctxt = transfer ctxt source_idx dest_idx tidx qty in

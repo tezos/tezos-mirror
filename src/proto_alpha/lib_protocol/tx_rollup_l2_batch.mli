@@ -86,21 +86,28 @@ end
 
 (** {1 Layer-2 Batches Definitions} *)
 
-type 'status destination =
-  | Layer1 of Signature.Public_key_hash.t
-  | Layer2 of 'status Tx_rollup_l2_address.Indexable.t
-
-val compact_destination : Indexable.unknown destination Data_encoding.Compact.t
-
 (** The operations are versioned, to let the possibility to propose
     new features in future iterations of the protocol. *)
 
 module V1 : sig
-  type 'status operation_content = {
-    destination : 'status destination;
-    ticket_hash : 'status Ticket_indexable.t;
-    qty : Tx_rollup_l2_qty.t;
-  }
+  type 'status operation_content =
+    | Withdraw of {
+        destination : Signature.Public_key_hash.t;
+        ticket_hash : Alpha_context.Ticket_hash.t;
+        qty : Tx_rollup_l2_qty.t;
+      }
+        (** A [Withdraw] removes [qty] of the tickets represented by
+            [ticket_hash] from the operation's signer in layer-2, and
+            permits [destination] to retrieve those tickets in layer-1
+            through a [Tx_rollup_withdraw] operation. *)
+    | Transfer of {
+        destination : 'status Tx_rollup_l2_address.Indexable.t;
+        ticket_hash : 'status Ticket_indexable.t;
+        qty : Tx_rollup_l2_qty.t;
+      }
+        (** A [Transfer] moves [qty] of the tickets represented by
+            [ticket_hash] from the operation's signer in layer-2 to
+            [destination] in layer-2. *)
 
   type ('signer, 'content) operation = {
     signer : 'signer Signer_indexable.t;

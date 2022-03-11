@@ -39,21 +39,6 @@ let signer_encoding =
       | None -> Error "not a BLS public key")
     (Fixed.bytes Bls_signature.pk_size_in_bytes)
 
-(* A version of Data_encoding.Compact.conv that can check an invariant
-   at encoding and decoding.
-
-   It is used at runtime to enforce the invariant that transfers to L1
-   accounts should reference tickets by value.
-
-   TODO: does this makes sense? Wouldn't it be easier to have the
-   type of operation_content enforce this invariant?
-*)
-let with_coding_guard guard encoding =
-  let guard_conv x =
-    match guard x with Ok () -> x | Error s -> raise (Invalid_argument s)
-  in
-  Data_encoding.Compact.conv guard_conv guard_conv encoding
-
 module Signer_indexable = Indexable.Make (struct
   type t = Bls_signature.pk
 
@@ -65,32 +50,18 @@ module Signer_indexable = Indexable.Make (struct
   let encoding = signer_encoding
 end)
 
-type 'status destination =
-  | Layer1 of Signature.Public_key_hash.t
-  | Layer2 of 'status Tx_rollup_l2_address.Indexable.t
-
-let compact_destination =
-  Data_encoding.Compact.(
-    union
-      [
-        case
-          ~title:"layer1"
-          (payload Signature.Public_key_hash.encoding)
-          (function Layer1 x -> Some x | _ -> None)
-          (fun x -> Layer1 x);
-        case
-          ~title:"layer2"
-          (Indexable.compact Tx_rollup_l2_address.encoding)
-          (function Layer2 x -> Some x | _ -> None)
-          (fun x -> Layer2 x);
-      ])
-
 module V1 = struct
-  type 'status operation_content = {
-    destination : 'status destination;
-    ticket_hash : 'status Ticket_indexable.t;
-    qty : Tx_rollup_l2_qty.t;
-  }
+  type 'status operation_content =
+    | Withdraw of {
+        destination : Signature.Public_key_hash.t;
+        ticket_hash : Alpha_context.Ticket_hash.t;
+        qty : Tx_rollup_l2_qty.t;
+      }
+    | Transfer of {
+        destination : 'status Tx_rollup_l2_address.Indexable.t;
+        ticket_hash : 'status Ticket_indexable.t;
+        qty : Tx_rollup_l2_qty.t;
+      }
 
   type ('signer, 'content) operation = {
     signer : 'signer Signer_indexable.t;
@@ -112,27 +83,36 @@ module V1 = struct
   (* --- [operation_content]                                                    *)
 
   let compact_operation_content =
-    Data_encoding.Compact.(
-      conv
-        (fun {destination; ticket_hash; qty} -> (destination, ticket_hash, qty))
-        (fun (destination, ticket_hash, qty) -> {destination; ticket_hash; qty})
-      @@ obj3
-           (req "destination" compact_destination)
-           (req "ticket_hash" Ticket_indexable.compact)
-           (req "qty" Tx_rollup_l2_qty.compact_encoding))
-
-  let compact_operation_content =
-    with_coding_guard
-      (function
-        | {destination; ticket_hash; _} -> (
-            match (destination, Indexable.destruct ticket_hash) with
-            | (Layer1 _, Left _) ->
-                (* Layer2-to-layer1 transfers must include the value of the ticket_hash *)
-                Result.error
-                  "Attempted to decode layer2 operation containing ticket \
-                   index."
-            | _ -> Result.ok ()))
-      compact_operation_content
+    let open Data_encoding.Compact in
+    union
+      [
+        case
+          ~title:"withdraw"
+          (obj3
+             (req "destination" (payload Signature.Public_key_hash.encoding))
+             (req "ticket_hash" (payload Alpha_context.Ticket_hash.encoding))
+             (req "qty" Tx_rollup_l2_qty.compact_encoding))
+          (function
+            | Withdraw {destination; ticket_hash; qty} ->
+                Some (destination, ticket_hash, qty)
+            | _ -> None)
+          (fun (destination, ticket_hash, qty) ->
+            Withdraw {destination; ticket_hash; qty});
+        case
+          ~title:"transfer"
+          (obj3
+             (req
+                "destination"
+                (Indexable.compact Tx_rollup_l2_address.encoding))
+             (req "ticket_hash" Ticket_indexable.compact)
+             (req "qty" Tx_rollup_l2_qty.compact_encoding))
+          (function
+            | Transfer {destination; ticket_hash; qty} ->
+                Some (destination, ticket_hash, qty)
+            | _ -> None)
+          (fun (destination, ticket_hash, qty) ->
+            Transfer {destination; ticket_hash; qty});
+      ]
 
   let operation_content_encoding =
     Data_encoding.Compact.make ~tag_size compact_operation_content
