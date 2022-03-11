@@ -397,7 +397,8 @@
                                               SWAP } } ;
                                       SWAP } ;
                                     { CDR ; CDR ; CDR ; CDR ; CDR ; CAR %inBaker } ;
-                                    SUB ;
+                                    SUB_MUTEZ ;
+                                    IF_NONE { PUSH string "negative mutez!"; FAILWITH } {} ;
                                     PAIR %inBaker ;
                                     SWAP ;
                                     PAIR %totalSupply ;

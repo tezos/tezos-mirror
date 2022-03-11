@@ -159,7 +159,7 @@ module Legacy_patch_test (Patches : LEGACY_SCRIPT_PATCHES) :
     return ()
 
   let typecheck_patched_script code () =
-    (* Number 3 below controls how much accounts should be
+    (* Number 3 below controls how many accounts should be
        created. This number shouldn't be too small or the context
        won't have enough tokens to form a roll. *)
     let* (block, _) = Context.init 3 in
