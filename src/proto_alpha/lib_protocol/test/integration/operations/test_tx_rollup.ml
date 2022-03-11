@@ -138,9 +138,29 @@ let sint_testable : _ Saturation_repr.t Alcotest.testable =
 let tx_rollup_state_testable : Tx_rollup_state.t Alcotest.testable =
   Alcotest.testable Tx_rollup_state.pp ( = )
 
+let zestable : Z.t Alcotest.testable = Alcotest.testable Z.pp_print Z.equal
+
+(** [tx_rollup_state_testable_no_storage] compares two
+   [Tx_rollup_state.t], but ignores differences in the fields
+   [allocated_storage] and [occupied_storage_size] like *)
+let tx_rollup_state_testable_no_storage : Tx_rollup_state.t Alcotest.testable =
+  let copy_storage ~state_from state =
+    let open Tx_rollup_state.Internal_for_tests in
+    state
+    |> set_allocated_storage (get_allocated_storage state_from)
+    |> set_occupied_storage (get_occupied_storage state_from)
+  in
+  Alcotest.testable Tx_rollup_state.pp (fun a b ->
+      a = copy_storage ~state_from:a b)
+
 let wrap = Environment.wrap_tzresult
 
 let wrap_lwt m = m >|= wrap
+
+(** [occupied_storage_size ctxt tx_rollup] returns occupied storage size *)
+let occupied_storage_size ctxt tx_rollup =
+  Context.Tx_rollup.state ctxt tx_rollup >|=? fun state ->
+  Alpha_context.Tx_rollup_state.Internal_for_tests.get_occupied_storage state
 
 (** [inbox_burn state size] computes the burn (per byte of message)
     one has to pay to submit a message to the current inbox. *)
@@ -157,7 +177,8 @@ let burn_per_byte state = inbox_burn state 1
 let context_init ?(tx_rollup_max_inboxes_count = 2100)
     ?(tx_rollup_rejection_max_proof_size = 30_000)
     ?(tx_rollup_max_ticket_payload_size = 10_240)
-    ?(tx_rollup_finality_period = 1) n =
+    ?(tx_rollup_finality_period = 1) ?(tx_rollup_origination_size = 60_000)
+    ?(cost_per_byte = Tez.zero) n =
   Context.init_with_constants
     {
       Context.default_test_constants with
@@ -166,12 +187,14 @@ let context_init ?(tx_rollup_max_inboxes_count = 2100)
       tx_rollup_finality_period;
       tx_rollup_withdraw_period = 1;
       tx_rollup_max_commitments_count = 3;
+      tx_rollup_origination_size;
       tx_rollup_rejection_max_proof_size;
       tx_rollup_max_inboxes_count;
       endorsing_reward_per_slot = Tez.zero;
       baking_reward_bonus_per_slot = Tez.zero;
       baking_reward_fixed_portion = Tez.zero;
       tx_rollup_max_ticket_payload_size;
+      cost_per_byte;
     }
     n
 
@@ -180,12 +203,14 @@ let context_init ?(tx_rollup_max_inboxes_count = 2100)
     context and 1 contract. *)
 let context_init1 ?tx_rollup_max_inboxes_count
     ?tx_rollup_max_ticket_payload_size ?tx_rollup_rejection_max_proof_size
-    ?tx_rollup_finality_period () =
+    ?tx_rollup_finality_period ?tx_rollup_origination_size ?cost_per_byte () =
   context_init
     ?tx_rollup_max_inboxes_count
     ?tx_rollup_max_ticket_payload_size
     ?tx_rollup_rejection_max_proof_size
     ?tx_rollup_finality_period
+    ?tx_rollup_origination_size
+    ?cost_per_byte
     1
   >|=? function
   | (b, contract_1 :: _) -> (b, contract_1)
@@ -195,8 +220,12 @@ let context_init1 ?tx_rollup_max_inboxes_count
     to not interfere with balances prediction. It returns the created
     context and 2 contracts. *)
 let context_init2 ?tx_rollup_max_inboxes_count
-    ?tx_rollup_max_ticket_payload_size () =
-  context_init ?tx_rollup_max_inboxes_count ?tx_rollup_max_ticket_payload_size 2
+    ?tx_rollup_max_ticket_payload_size ?cost_per_byte () =
+  context_init
+    ?tx_rollup_max_inboxes_count
+    ?tx_rollup_max_ticket_payload_size
+    ?cost_per_byte
+    2
   >|=? function
   | (b, contract_1 :: contract_2 :: _) -> (b, contract_1, contract_2)
   | (_, _) -> assert false
@@ -212,13 +241,14 @@ let originate b contract =
     Returns the first contract and its balance, the originated tx_rollup,
     the state with the tx_rollup, and the baked block with the batch submitted.
 *)
-let init_originate_and_submit ?(batch = String.make 5 'c') () =
-  context_init1 () >>=? fun (b, contract) ->
+let init_originate_and_submit ?(batch = String.make 5 'c')
+    ?tx_rollup_origination_size () =
+  context_init1 ?tx_rollup_origination_size () >>=? fun (b, contract) ->
   originate b contract >>=? fun (b, tx_rollup) ->
   Context.Contract.balance (B b) contract >>=? fun balance ->
-  Context.Tx_rollup.state (B b) tx_rollup >>=? fun state ->
   Op.tx_rollup_submit_batch (B b) contract tx_rollup batch >>=? fun operation ->
   Block.bake ~operation b >>=? fun b ->
+  Context.Tx_rollup.state (B b) tx_rollup >>=? fun state ->
   return ((contract, balance), state, tx_rollup, b)
 
 let l2_parameters : Context.t -> Tx_rollup_l2_apply.parameters tzresult Lwt.t =
@@ -570,6 +600,27 @@ let test_add_batch () =
   inbox_burn state contents_size >>?= fun cost ->
   Assert.balance_was_debited ~loc:__LOC__ (B b) contract balance cost
 
+(** [test_storage_burn_for_adding_batch] originates a tx rollup with small [tx_rollup_origination_size],
+    fills one of its inbox with an arbitrary batch of data and cause additional storage burn. *)
+let test_storage_burn_for_adding_batch () =
+  let contents_size = 5 in
+  let contents = String.make contents_size 'c' in
+  let tx_rollup_origination_size = 1 in
+  init_originate_and_submit ~tx_rollup_origination_size ~batch:contents ()
+  >>=? fun ((contract, balance), state, _tx_rollup, b) ->
+  Context.get_constants (B b) >>=? fun {parametric = {cost_per_byte; _}; _} ->
+  let final_allocated_storage =
+    Alpha_context.Tx_rollup_state.Internal_for_tests.get_occupied_storage state
+  in
+  let extra_storage_space =
+    Z.(sub final_allocated_storage @@ of_int tx_rollup_origination_size)
+  in
+  assert (Z.zero < extra_storage_space) ;
+  inbox_burn state contents_size >>?= fun cost ->
+  cost_per_byte *? Z.to_int64 extra_storage_space >>?= fun storage_burn_cost ->
+  cost +? storage_burn_cost >>?= fun cost ->
+  Assert.balance_was_debited ~loc:__LOC__ (B b) contract balance cost
+
 let test_add_batch_with_limit () =
   (* From an empty context the burn will be [Tez.zero], we set the hard limit to
      [Tez.zero], so [cost] >= [limit] *)
@@ -840,6 +891,37 @@ let test_valid_deposit () =
       inbox
       expected_inbox) ;
   return_unit
+
+(** [test_additional_space_allocation_for_valid_deposit] originates a tx rollup with small [tx_rollup_origination_size], make a valid deposit and check additional space allocation *)
+let test_additional_space_allocation_for_valid_deposit () =
+  let (_, _, pkh) = gen_l2_account () in
+  let tx_rollup_origination_size = 1 in
+  context_init1 ~tx_rollup_origination_size () >>=? fun (b, account) ->
+  originate b account >>=? fun (b, tx_rollup) ->
+  Contract_helpers.originate_contract
+    "contracts/tx_rollup_deposit.tz"
+    "Unit"
+    account
+    b
+    (is_implicit_exn account)
+  >>=? fun (contract, b) ->
+  let parameters = print_deposit_arg (`Typed tx_rollup) (`Hash pkh) in
+  let fee = Test_tez.of_int 10 in
+  Op.transaction
+    ~counter:(Z.of_int 2)
+    ~fee
+    (B b)
+    account
+    contract
+    Tez.zero
+    ~parameters
+  >>=? fun operation ->
+  Block.bake ~operation b >>=? fun b ->
+  occupied_storage_size (B b) tx_rollup >>=? fun final_allocated_storage ->
+  let extra_storage_space =
+    Z.(sub final_allocated_storage @@ of_int tx_rollup_origination_size)
+  in
+  return @@ assert (Z.zero < extra_storage_space)
 
 (** [test_valid_deposit_inexistant_rollup] checks that the Michelson
     interpreter checks the existence of a transaction rollup prior to
@@ -1260,6 +1342,12 @@ let test_finalization () =
   (* Predict the cost we had to pay. *)
   Context.Tx_rollup.state (B b) tx_rollup >>=? fun state ->
   inbox_burn state contents_size >>?= fun cost ->
+  (* Add upfront cost for the commitment hash   *)
+  Context.get_constants (B b) >>=? fun {parametric = {cost_per_byte; _}; _} ->
+  cost_per_byte
+  *? Int64.of_int Tx_rollup_commitment_repr.Message_result_hash.size
+  >>?= fun upfront_cost ->
+  upfront_cost +? cost >>?= fun cost ->
   Assert.balance_was_debited ~loc:__LOC__ (B b) contract balance cost
 
 (** [test_commitment_duplication] originates a rollup, and makes a
@@ -1402,6 +1490,176 @@ let assert_ok res =
   | Error _ -> raise (Invalid_argument "Error: assert_ok")
 
 let tx_level level = assert_ok @@ Tx_rollup_level.of_int32 level
+
+(** [test_storage_burn_for_commitment] test storage space allocation
+    for adding and removing commitment and bond. *)
+let test_storage_burn_for_commitment () =
+  let check_storage_delta ~__POS__ msg ~size_before ~size_after ~expected_delta
+      =
+    Alcotest.(
+      check
+        ~pos:__POS__
+        zestable
+        msg
+        (Z.of_int expected_delta)
+        Z.(sub size_after size_before))
+  in
+  let tx_rollup_origination_size = 1 in
+  context_init1 ~tx_rollup_origination_size () >>=? fun (b, contract) ->
+  originate b contract >>=? fun (b, tx_rollup) ->
+  make_transactions_in tx_rollup contract [2; 3; 4] b >>=? fun b ->
+  (* test allocated storage size and balance before/after submit commitment *)
+  Incremental.begin_construction b >>=? fun i ->
+  occupied_storage_size (B b) tx_rollup >>=? fun storage_size_before_commit ->
+  make_incomplete_commitment_for_batch i Tx_rollup_level.root tx_rollup []
+  >>=? fun (commitment, _) ->
+  Op.tx_rollup_commit (I i) contract tx_rollup commitment >>=? fun op ->
+  Incremental.add_operation i op >>=? fun i ->
+  occupied_storage_size (I i) tx_rollup >>=? fun storage_size_after_commit ->
+  (* extra space should be allocated for submitting commitment *)
+  let commitment_add_delta = 99 in
+  check_storage_delta
+    ~__POS__
+    "Size increase after adding commitment"
+    ~size_before:storage_size_before_commit
+    ~size_after:storage_size_after_commit
+    ~expected_delta:commitment_add_delta ;
+  Incremental.finalize_block i >>=? fun b ->
+  (* test freed storage space after finalize *)
+  Op.tx_rollup_finalize (B b) contract tx_rollup >>=? fun op ->
+  Block.bake ~operation:op b >>=? fun b ->
+  occupied_storage_size (B b) tx_rollup >>=? fun freed_space_after_finalize ->
+  let inbox_delta = -36 in
+  check_storage_delta
+    ~__POS__
+    "Storage space is freed after finalize"
+    ~size_before:storage_size_after_commit
+    ~size_after:freed_space_after_finalize
+    ~expected_delta:inbox_delta ;
+
+  (* test freed storage space after remove commitment *)
+  Op.tx_rollup_remove_commitment (B b) contract tx_rollup >>=? fun operation ->
+  Block.bake b ~operation >>=? fun b ->
+  occupied_storage_size (B b) tx_rollup
+  >>=? fun freed_space_after_remove_commitment ->
+  let commitment_remove_delta = -135 in
+  check_storage_delta
+    ~__POS__
+    "Storage space is freed after removing commitment"
+    ~size_before:freed_space_after_finalize
+    ~size_after:freed_space_after_remove_commitment
+    ~expected_delta:commitment_remove_delta ;
+  let msg_preallocation_delta =
+    Tx_rollup_commitment_repr.Message_result_hash.size
+  in
+  let finalization_delta = 4 in
+  Alcotest.(
+    check
+      ~pos:__POS__
+      int
+      "The delta of adding and removing a commitment is zero (modulo \
+       preallocation)"
+      (-(commitment_add_delta + msg_preallocation_delta + finalization_delta))
+      commitment_remove_delta) ;
+  (* test freed storage space after return bond *)
+  Op.tx_rollup_return_bond (B b) contract tx_rollup >>=? fun operation ->
+  Block.bake b ~operation >>=? fun b ->
+  occupied_storage_size (B b) tx_rollup
+  >>=? fun freed_space_after_return_bond ->
+  let bond_remove_delta = 0 in
+  check_storage_delta
+    ~__POS__
+    "Storage space is freed after removing bond"
+    ~size_before:freed_space_after_remove_commitment
+    ~size_after:freed_space_after_return_bond
+    ~expected_delta:bond_remove_delta ;
+  return_unit
+
+(** [test_storage_burn_for_commitment] test storage space allocation for adding and removing commitment and bond. *)
+let test_storage_burn_for_commitment_and_bond () =
+  let check_storage_delta ~__POS__ msg ~size_before ~size_after ~expected_delta
+      =
+    Alcotest.(
+      check
+        ~pos:__POS__
+        zestable
+        msg
+        (Z.of_int expected_delta)
+        Z.(sub size_after size_before))
+  in
+  let tx_rollup_origination_size = 1 in
+  context_init1 ~tx_rollup_origination_size () >>=? fun (b, contract) ->
+  originate b contract >>=? fun (b, tx_rollup) ->
+  make_transactions_in tx_rollup contract [2; 3; 4] b >>=? fun b ->
+  (* test allocated storage size and balance before/after submit commitment *)
+  Incremental.begin_construction b >>=? fun i ->
+  occupied_storage_size (B b) tx_rollup >>=? fun storage_size_before_commit ->
+  make_incomplete_commitment_for_batch i Tx_rollup_level.root tx_rollup []
+  >>=? fun (commitment, _) ->
+  Op.tx_rollup_commit (I i) contract tx_rollup commitment >>=? fun op ->
+  Incremental.add_operation i op >>=? fun i ->
+  occupied_storage_size (I i) tx_rollup >>=? fun storage_size_after_commit ->
+  (* extra space should be allocated for submitting commitment *)
+  let commitment_sans_preallocation_delta = 99 in
+  let adjust_unfinalized_commitments_count_delta = 4 in
+  let commitment_add_delta =
+    commitment_sans_preallocation_delta
+    + adjust_unfinalized_commitments_count_delta
+  in
+  check_storage_delta
+    ~__POS__
+    "Size increase after adding commitment"
+    ~size_before:storage_size_before_commit
+    ~size_after:storage_size_after_commit
+    ~expected_delta:commitment_add_delta ;
+  Incremental.finalize_block i >>=? fun b ->
+  (* test freed storage space after finalize *)
+  Op.tx_rollup_finalize (B b) contract tx_rollup >>=? fun op ->
+  Block.bake ~operation:op b >>=? fun b ->
+  occupied_storage_size (B b) tx_rollup >>=? fun freed_space_after_finalize ->
+  let inbox_delta = -40 in
+  let commitment_finalization_delta = 4 in
+  check_storage_delta
+    ~__POS__
+    "Storage space is freed after finalize"
+    ~size_before:storage_size_after_commit
+    ~size_after:freed_space_after_finalize
+    ~expected_delta:(inbox_delta + commitment_finalization_delta) ;
+
+  (* test freed storage space after remove commitment *)
+  Op.tx_rollup_remove_commitment (B b) contract tx_rollup >>=? fun operation ->
+  Block.bake b ~operation >>=? fun b ->
+  occupied_storage_size (B b) tx_rollup
+  >>=? fun freed_space_after_remove_commitment ->
+  let commitment_remove_delta = -135 in
+  check_storage_delta
+    ~__POS__
+    "Storage space is freed after removing commitment"
+    ~size_before:freed_space_after_finalize
+    ~size_after:freed_space_after_remove_commitment
+    ~expected_delta:commitment_remove_delta ;
+  Alcotest.(
+    check
+      ~pos:__POS__
+      int
+      "The delta of adding and removing a commitment is zero (modulo \
+       preallocation)"
+      (-commitment_add_delta
+     - Tx_rollup_commitment_repr.Message_result_hash.size)
+      commitment_remove_delta) ;
+  (* test freed storage space after return bond *)
+  Op.tx_rollup_return_bond (B b) contract tx_rollup >>=? fun operation ->
+  Block.bake b ~operation >>=? fun b ->
+  occupied_storage_size (B b) tx_rollup
+  >>=? fun freed_space_after_return_bond ->
+  let bond_remove_delta = -4 in
+  check_storage_delta
+    ~__POS__
+    "Storage space is freed after removing bond"
+    ~size_before:freed_space_after_remove_commitment
+    ~size_after:freed_space_after_return_bond
+    ~expected_delta:bond_remove_delta ;
+  return_unit
 
 (** [test_commitment_predecessor] tests commitment predecessor edge cases  *)
 let test_commitment_predecessor () =
@@ -2814,7 +3072,7 @@ let test_state () =
   Context.Tx_rollup.state (B b) tx_rollup >>=? fun state_after_reject ->
   Alcotest.(
     check
-      tx_rollup_state_testable
+      tx_rollup_state_testable_no_storage
       "state unchanged by commit/reject at root"
       initial_state
       state_after_reject) ;
@@ -2837,7 +3095,7 @@ let test_state () =
   Context.Tx_rollup.state (B b) tx_rollup >>=? fun state_after_reject ->
   Alcotest.(
     check
-      tx_rollup_state_testable
+      tx_rollup_state_testable_no_storage
       "state unchanged by commit/reject at root"
       initial_state
       state_after_reject) ;
@@ -2978,6 +3236,53 @@ let test_state_with_deleted () =
   ignore b ;
   return_unit
 
+(** [test_state_message_storage_preallocation] verifies that message
+   commitment burn is charged upfront. *)
+let test_state_message_storage_preallocation () =
+  let open Error_monad_operators in
+  context_init1 () >>=? fun (b, account1) ->
+  originate b account1 >>=? fun (b, tx_rollup) ->
+  Incremental.begin_construction b >>=? fun i ->
+  let ctxt = Incremental.alpha_ctxt i in
+  let (message, _) = Tx_rollup_message.make_batch "bogus" in
+  let message_hash = Tx_rollup_message.hash_uncarbonated message in
+  let _inbox_hash = Tx_rollup_inbox.Merkle.merklize_list [message_hash] in
+  let state = Tx_rollup_state.initial_state ~pre_allocated_storage:Z.zero in
+  let occupied_storage_before =
+    Tx_rollup_state.Internal_for_tests.get_occupied_storage state
+  in
+  Tx_rollup_inbox.append_message ctxt tx_rollup state message
+  >>=?? fun (ctxt, state, _) ->
+  let occupied_storage_after =
+    Tx_rollup_state.Internal_for_tests.get_occupied_storage state
+  in
+  (* The size an empty inbox as created in
+     {!Tx_rollup_inbox_storage.prepare_inbox}. *)
+  let inbox_preparation = 40 in
+  Alcotest.check
+    ~pos:__POS__
+    zestable
+    "the storage occupied by the first message is the size of the inbox plus \
+     the preallocation for commiting the message"
+    (Z.of_int
+       (inbox_preparation + Tx_rollup_commitment_repr.Message_result_hash.size))
+    (Z.sub occupied_storage_after occupied_storage_before) ;
+  let occupied_storage_before =
+    Tx_rollup_state.Internal_for_tests.get_occupied_storage state
+  in
+  Tx_rollup_inbox.append_message ctxt tx_rollup state message
+  >>=?? fun (_ctxt, state, _) ->
+  let occupied_storage_after =
+    Tx_rollup_state.Internal_for_tests.get_occupied_storage state
+  in
+  Alcotest.check
+    ~pos:__POS__
+    zestable
+    "the storage occupied by the second message is just the preallocation"
+    (Z.of_int Tx_rollup_commitment_repr.Message_result_hash.size)
+    (Z.sub occupied_storage_after occupied_storage_before) ;
+  return_unit
+
 module Withdraw = struct
   module Nat_ticket = struct
     let ty_str = "nat"
@@ -3017,8 +3322,9 @@ module Withdraw = struct
 
   (** [context_init_withdraw n] initializes a context with [n + 1] accounts, one rollup and a
       withdrawal recipient contract. *)
-  let context_init_withdraw n =
-    context_init (n + 1) >>=? fun (block, accounts) ->
+  let context_init_withdraw ?tx_rollup_origination_size n =
+    context_init ?tx_rollup_origination_size (n + 1)
+    >>=? fun (block, accounts) ->
     let account1 =
       WithExceptions.Option.get ~loc:__LOC__ @@ List.nth accounts 0
     in
@@ -3255,6 +3561,8 @@ module Withdraw = struct
     let withdrawals_merkle_root =
       Tx_rollup_withdraw.Merkle.merklize_list withdrawals_list
     in
+    occupied_storage_size (B block) tx_rollup
+    >>=? fun storage_size_before_withdraw ->
     Op.tx_rollup_withdraw
       (B block)
       ~source:account1
@@ -3275,6 +3583,13 @@ module Withdraw = struct
     Block.bake ~operation block >>=? fun block ->
     (* 4.1 We assert that [withdraw_contract] has received the ticket as
        expected *)
+    occupied_storage_size (B block) tx_rollup
+    >>=? fun storage_size_after_withdraw ->
+    let extra_storage_space =
+      Z.(sub storage_size_after_withdraw storage_size_before_withdraw)
+    in
+    (* extra space should be allocated for withdraw*)
+    assert (Z.zero < extra_storage_space) ;
     Incremental.begin_construction block >>=? fun i ->
     let ctxt = Incremental.alpha_ctxt i in
     wrap_lwt @@ Contract.get_storage ctxt withdraw_contract
@@ -4602,5 +4917,21 @@ let tests =
       "Test state with deleted commitment"
       `Quick
       test_state_with_deleted;
+    Tztest.tztest
+      "Test upfront message preallocation"
+      `Quick
+      test_state_message_storage_preallocation;
+    Tztest.tztest
+      "Test storage burn for submitting batch"
+      `Quick
+      test_storage_burn_for_adding_batch;
+    Tztest.tztest
+      "Test additional space allocation for deposit"
+      `Quick
+      test_additional_space_allocation_for_valid_deposit;
+    Tztest.tztest
+      "Test additional space allocation for commitment"
+      `Quick
+      test_storage_burn_for_commitment;
   ]
   @ Withdraw.tests @ Rejection.tests @ parsing_tests

@@ -664,4 +664,16 @@ module Internal_for_tests = struct
     }
 
   let get_inbox_ema : t -> int = fun {inbox_ema; _} -> inbox_ema
+
+  let get_occupied_storage : t -> Z.t =
+   fun {occupied_storage; _} -> occupied_storage
+
+  let set_occupied_storage : Z.t -> t -> t =
+   fun occupied_storage st -> {st with occupied_storage}
+
+  let get_allocated_storage : t -> Z.t =
+   fun {allocated_storage; _} -> allocated_storage
+
+  let set_allocated_storage : Z.t -> t -> t =
+   fun allocated_storage st -> {st with allocated_storage}
 end

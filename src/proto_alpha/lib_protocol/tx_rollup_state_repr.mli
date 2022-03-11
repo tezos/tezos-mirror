@@ -245,4 +245,12 @@ module Internal_for_tests : sig
     t
 
   val get_inbox_ema : t -> int
+
+  val get_occupied_storage : t -> Z.t
+
+  val set_occupied_storage : Z.t -> t -> t
+
+  val get_allocated_storage : t -> Z.t
+
+  val set_allocated_storage : Z.t -> t -> t
 end

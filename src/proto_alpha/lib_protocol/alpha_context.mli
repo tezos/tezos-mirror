@@ -1609,6 +1609,14 @@ module Tx_rollup_state : sig
     val get_inbox_ema : t -> int
 
     val record_inbox_deletion : t -> Tx_rollup_level.t -> t tzresult
+
+    val get_occupied_storage : t -> Z.t
+
+    val set_occupied_storage : Z.t -> t -> t
+
+    val get_allocated_storage : t -> Z.t
+
+    val set_allocated_storage : Z.t -> t -> t
   end
 end
 
