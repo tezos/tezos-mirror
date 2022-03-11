@@ -32,12 +32,15 @@
 
 open Base
 
+let hooks = Tezos_regression.hooks
+
 (*
 
    Helpers
    =======
 
 *)
+
 let test ~__FILE__ ?output_file ?(tags = []) title f =
   let tags = "sc_rollup" :: tags in
   match output_file with
@@ -87,17 +90,16 @@ let test_origination =
     "origination of a SCORU executes without error"
     (fun protocol ->
       setup ~protocol @@ fun _node client bootstrap1_key ->
-      let* rollup_address =
-        Client.originate_sc_rollup
+      let* _rollup_address =
+        Client.Sc_rollup.originate
+          ~hooks
           ~burn_cap:Tez.(of_int 9999999)
           ~src:bootstrap1_key
           ~kind:"arith"
           ~boot_sector:""
           client
       in
-      let* () = Client.bake_for client in
-      Regression.capture rollup_address ;
-      return ())
+      Client.bake_for client)
 
 (* Configuration of a rollup node
    ------------------------------
@@ -107,7 +109,8 @@ let test_origination =
 *)
 let with_fresh_rollup f tezos_node tezos_client bootstrap1_key =
   let* rollup_address =
-    Client.originate_sc_rollup
+    Client.Sc_rollup.originate
+      ~hooks
       ~burn_cap:Tez.(of_int 9999999)
       ~src:bootstrap1_key
       ~kind:"arith"
@@ -156,7 +159,7 @@ let test_rollup_node_configuration =
         | _ ->
             failwith "The configuration file does not have the expected format."
       in
-      Regression.capture read_configuration ;
+      Log.info "Read configuration:\n %s" read_configuration ;
       return ())
 
 (* Launching a rollup node
@@ -243,7 +246,8 @@ let test_rollup_inbox =
       ( with_fresh_rollup @@ fun sc_rollup_address _sc_rollup_node _filename ->
         let send msg =
           let* () =
-            Client.send_sc_rollup_message
+            Client.Sc_rollup.send_message
+              ~hooks
               ~src:"bootstrap1"
               ~dst:sc_rollup_address
               ~msg

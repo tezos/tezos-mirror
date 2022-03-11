@@ -1,2 +1,31 @@
 tezt/_regressions/sc_rollup_node_configuration.out
-{"sc-rollup-address":"scr1Yw3y3iekKyKiHWgvWQVfz3YeY3dQBwFvG"}
+
+./tezos-client --wait none originate sc rollup from '[PUBLIC_KEY_HASH]' of kind arith booting with  --burn-cap 9999999
+Node is bootstrapped.
+Estimated gas: 1600.304 units (will add 100 for safety)
+Estimated storage: 6436 bytes added (will add 20 for safety)
+Operation successfully injected in the node.
+Operation hash is '[OPERATION_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  tezos-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.000402
+    Expected counter: 1
+    Gas limit: 1701
+    Storage limit: 6456 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000402
+      payload fees(the block proposer) ....... +ꜩ0.000402
+    Originate smart contract rollup of kind arith with boot sector ''
+      This smart contract rollup origination was successfully applied
+      Consumed gas: 1600.304
+      Storage size: 6436 bytes
+      Address: [SC_ROLLUP_HASH]
+      Balance updates:
+        [PUBLIC_KEY_HASH] ... -ꜩ1.609
+        storage fees ........................... +ꜩ1.609
+
