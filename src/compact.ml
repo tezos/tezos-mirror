@@ -302,23 +302,13 @@ let partial_encoding_of_case_layout : type a. a case_layout -> a Encoding.t =
  fun (Case_layout layout) -> partial_encoding_of_case_layout_open layout
 
 let case_to_json_data_encoding_case_open :
-    type a b layout. int -> (a, b, layout) case_open -> a Encoding.case =
- fun tag {title; description; proj; inj; compact} ->
+    type a b layout. (a, b, layout) case_open -> a Encoding.case =
+ fun {title; description; proj; inj; compact} ->
   let (module C : S with type input = b and type layout = layout) = compact in
-  Encoding.case
-    (Encoding.Tag tag)
-    ~title
-    ?description
-    Encoding.(obj2 (req "kind" string) (req "value" C.json_encoding))
-    (fun x -> match proj x with Some x -> Some (title, x) | None -> None)
-    (function
-      | title', x when String.equal title title' -> inj x
-      | _ ->
-          raise
-          @@ Invalid_argument "case_to_data_encoding_case_open: Incorrect kind")
+  Encoding.case ~title ?description Encoding.Json_only C.json_encoding proj inj
 
-let case_to_json_data_encoding_case : type a. int -> a case -> a Encoding.case =
- fun tag (Case layout) -> case_to_json_data_encoding_case_open tag layout
+let case_to_json_data_encoding_case : type a. a case -> a Encoding.case =
+ fun (Case layout) -> case_to_json_data_encoding_case_open layout
 
 let void_case : type a. title:string -> a case =
  fun ~title ->
@@ -396,7 +386,7 @@ let union :
     let tag layout = tag_with_case_layout cases_tag_len layout
 
     let json_encoding : input Encoding.t =
-      Encoding.union @@ List.mapi case_to_json_data_encoding_case cases
+      Encoding.union @@ List.map case_to_json_data_encoding_case cases
   end)
 
 let payload : type a. a Encoding.t -> a t =
