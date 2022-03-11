@@ -154,43 +154,43 @@ let () =
       C.call_service media_types repeat_service ((), r) () (`Bool true)
       |> Lwt_main.run
       |> function
-      | (_meth, _uri, service_result) -> service_result
+      | _meth, _uri, service_result -> service_result
     in
     List.iter (function r -> assert (is_ok_some (call r))) [0; 1; 2; 3]
   in
   let test1 () =
     (* Test an URI that doesn't exist *)
-    let (uri, meth) = (Uri.of_string "nimporte/quoi", `POST) in
-    let (response, _body) = S.call meth uri |> Lwt_main.run in
+    let uri, meth = (Uri.of_string "nimporte/quoi", `POST) in
+    let response, _body = S.call meth uri |> Lwt_main.run in
     assert (code_of_response response = 404)
   in
   let test2 () =
     (* Test an URI that exists but uses a wrong method (GET whereas POST
        is expected) *)
-    let (uri, meth) = (Uri.of_string "foo/1/repeat", `GET) in
-    let (response, _body) = S.call meth uri |> Lwt_main.run in
+    let uri, meth = (Uri.of_string "foo/1/repeat", `GET) in
+    let response, _body = S.call meth uri |> Lwt_main.run in
     assert (code_of_response response = 405)
   in
   let test3 () =
     (* Test a valid URI but send an unexpectedly empty body *)
-    let (uri, meth) = (Uri.of_string "foo/1/repeat", `POST) in
-    let (response, _body) = S.call meth uri |> Lwt_main.run in
+    let uri, meth = (Uri.of_string "foo/1/repeat", `POST) in
+    let response, _body = S.call meth uri |> Lwt_main.run in
     assert (code_of_response response = 400)
   in
   let test4 () =
     (* Test a valid call, check the returned value *)
-    let (i, j) = (1, 2) in
-    let (_meth, _uri, service_result) =
+    let i, j = (1, 2) in
+    let _meth, _uri, service_result =
       C.call_service media_types add_service ((), i) () j |> Lwt_main.run
     in
-    assert (service_result <> `Ok (Some 0));
+    assert (service_result <> `Ok (Some 0)) ;
     assert (service_result = `Ok (Some (i + j)))
   in
   let idx = ref 0 in
   List.iter
     (function
       | test ->
-          test ();
-          Printf.printf "test%d: ✔️\n" !idx;
+          test () ;
+          Printf.printf "test%d: ✔️\n" !idx ;
           idx := !idx + 1)
     [test0; test1; test2; test3; test4]

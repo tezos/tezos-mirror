@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = {allowed_headers: string list; allowed_origins: string list}
+type t = {allowed_headers : string list; allowed_origins : string list}
 
 let default = {allowed_headers = []; allowed_origins = []}
 
@@ -74,4 +74,4 @@ let check_host headers cors =
   | Some host -> (
       match find_matching_origin cors.allowed_origins host with
       | None -> false
-      | Some _ -> true )
+      | Some _ -> true)

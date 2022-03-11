@@ -94,7 +94,7 @@ module Make (Encoding : Resto.ENCODING) (Call : CALL) = struct
   type logger = (module LOGGER)
 
   let null_logger =
-    ( module struct
+    (module struct
       type request = unit
 
       let log_empty_request _ = Lwt.return_unit
@@ -102,10 +102,10 @@ module Make (Encoding : Resto.ENCODING) (Call : CALL) = struct
       let log_request ?media:_ _ _ _ = Lwt.return_unit
 
       let log_response _ ?media:_ _ _ _ = Lwt.return_unit
-    end : LOGGER )
+    end : LOGGER)
 
   let timings_logger ~gettimeofday ppf =
-    ( module struct
+    (module struct
       type request = string * float
 
       let log_empty_request uri =
@@ -116,9 +116,9 @@ module Make (Encoding : Resto.ENCODING) (Call : CALL) = struct
 
       let log_response (uri, tzero) ?media:_ _enc _code _body =
         let time = gettimeofday () -. tzero in
-        Format.fprintf ppf "Request to %s succeeded in %gs@." uri time;
+        Format.fprintf ppf "Request to %s succeeded in %gs@." uri time ;
         Lwt.return_unit
-    end : LOGGER )
+    end : LOGGER)
 
   let faked_media =
     {
@@ -133,7 +133,7 @@ module Make (Encoding : Resto.ENCODING) (Call : CALL) = struct
     }
 
   let full_logger ppf =
-    ( module struct
+    (module struct
       let cpt = ref 0
 
       type request = int * string
@@ -141,21 +141,21 @@ module Make (Encoding : Resto.ENCODING) (Call : CALL) = struct
       let log_empty_request uri =
         let id = !cpt in
         let uri = Uri.to_string uri in
-        incr cpt;
-        Format.fprintf ppf ">>>>%d: %s@." id uri;
+        incr cpt ;
+        Format.fprintf ppf ">>>>%d: %s@." id uri ;
         Lwt.return (id, uri)
 
       let log_request ?(media = faked_media) enc uri body =
         let id = !cpt in
         let uri = Uri.to_string uri in
-        incr cpt;
+        incr cpt ;
         Format.fprintf
           ppf
           "@[<v 2>>>>>%d: %s@,%a@]@."
           id
           uri
           (media.pp enc)
-          body;
+          body ;
         Lwt.return (id, uri)
 
       let log_response (id, _uri) ?(media = faked_media) enc code body =
@@ -166,28 +166,32 @@ module Make (Encoding : Resto.ENCODING) (Call : CALL) = struct
           id
           (Cohttp.Code.string_of_status code)
           (media.pp enc)
-          body;
+          body ;
         Lwt.return_unit
-    end : LOGGER )
+    end : LOGGER)
 
   let find_media received media_types =
     match received with
     | Some received -> Media_type.find_media received media_types
-    | None -> ( match media_types with [] -> None | m :: _ -> Some m )
+    | None -> ( match media_types with [] -> None | m :: _ -> Some m)
 
   type log = {
-    log:
-      'a. ?media:Media_type.t -> 'a Encoding.t -> Cohttp.Code.status_code ->
-      string Lwt.t Lazy.t -> unit Lwt.t;
+    log :
+      'a.
+      ?media:Media_type.t ->
+      'a Encoding.t ->
+      Cohttp.Code.status_code ->
+      string Lwt.t Lazy.t ->
+      unit Lwt.t;
   }
 
   let generic_call meth ?(headers = []) ?accept ?body ?media uri :
       (content, content) generic_rest_result Lwt.t =
     let host =
       match (Uri.host uri, Uri.port uri) with
-      | (None, _) -> None
-      | (Some host, None) -> Some host
-      | (Some host, Some port) -> Some (host ^ ":" ^ string_of_int port)
+      | None, _ -> None
+      | Some host, None -> Some host
+      | Some host, Some port -> Some (host ^ ":" ^ string_of_int port)
     in
     let init_headers =
       match host with
@@ -209,11 +213,11 @@ module Make (Encoding : Resto.ENCODING) (Call : CALL) = struct
         init_headers
         headers
     in
-    let (body, headers) =
+    let body, headers =
       match (body, media) with
-      | (None, _) -> (Cohttp_lwt.Body.empty, headers)
-      | (Some body, None) -> (body, headers)
-      | (Some body, Some media) ->
+      | None, _ -> (Cohttp_lwt.Body.empty, headers)
+      | Some body, None -> (body, headers)
+      | Some body, Some media ->
           (body, Header.add headers "content-type" (Media_type.name media))
     in
     let headers =
@@ -233,7 +237,7 @@ module Make (Encoding : Resto.ENCODING) (Call : CALL) = struct
           | Some s -> (
               match Resto.Utils.split_path s with
               | [x; y] -> Some (x, y)
-              | _ -> None )
+              | _ -> None)
           (* ignored invalid *)
         in
         let media =
@@ -299,7 +303,7 @@ module Make (Encoding : Resto.ENCODING) (Call : CALL) = struct
           match media.Media_type.destruct error body with
           | Ok body -> Lwt.return (f (Some body))
           | Error msg ->
-              Lwt.return (`Unexpected_error_content ((body, media), msg)) )
+              Lwt.return (`Unexpected_error_content ((body, media), msg)))
 
   let prepare (type i) media_types ?(logger = null_logger) ?base
       (service : (_, _, _, _, i, _, _) Service.t) params query body =
@@ -312,7 +316,7 @@ module Make (Encoding : Resto.ENCODING) (Call : CALL) = struct
     let {Service.meth; uri; input} =
       Service.forge_request ?base service params query
     in
-    ( match input with
+    (match input with
     | Service.No_input ->
         Logger.log_empty_request uri >>= fun log_request ->
         Lwt.return (None, None, log_request)
@@ -320,7 +324,7 @@ module Make (Encoding : Resto.ENCODING) (Call : CALL) = struct
         let body = media.Media_type.construct input body in
         Logger.log_request ~media input uri body >>= fun log_request ->
         Lwt.return
-          (Some (Cohttp_lwt.Body.of_string body), Some media, log_request) )
+          (Some (Cohttp_lwt.Body.of_string body), Some media, log_request))
     >>= fun (body, media, log_request) ->
     let log = {log = (fun ?media -> Logger.log_response log_request ?media)} in
     Lwt.return (log, meth, uri, body, media)
@@ -344,7 +348,7 @@ module Make (Encoding : Resto.ENCODING) (Call : CALL) = struct
              match media.destruct output body with
              | Ok body -> Lwt.return (`Ok (Some body))
              | Error msg ->
-                 Lwt.return (`Unexpected_content ((body, media), msg)) ) )
+                 Lwt.return (`Unexpected_content ((body, media), msg))))
      | `Conflict body ->
          handle_error log service body `Conflict (fun v -> `Conflict v)
      | `Error body ->
@@ -370,7 +374,7 @@ module Make (Encoding : Resto.ENCODING) (Call : CALL) = struct
     (generic_call meth ?headers ~accept:media_types ?body ?media uri
      >>= function
      | `Ok None ->
-         on_close ();
+         on_close () ;
          log.log Encoding.untyped `No_content (lazy (Lwt.return ""))
          >>= fun () -> Lwt.return (`Ok None)
      | `Ok (Some (body, media_name, media)) -> (
@@ -380,36 +384,36 @@ module Make (Encoding : Resto.ENCODING) (Call : CALL) = struct
              let stream = Cohttp_lwt.Body.to_stream body in
              Lwt_stream.get stream >>= function
              | None ->
-                 on_close ();
+                 on_close () ;
                  Lwt.return (`Ok None)
              | Some chunk ->
                  let buffer = Buffer.create 2048 in
                  let output = Service.output_encoding service in
                  let rec loop = function
                    | None ->
-                       on_close ();
+                       on_close () ;
                        Lwt.return_unit
                    | Some chunk -> (
-                       Buffer.add_string buffer chunk;
+                       Buffer.add_string buffer chunk ;
                        let data = Buffer.contents buffer in
                        log.log ~media output `OK (lazy (Lwt.return chunk))
                        >>= fun () ->
                        match media.destruct output data with
                        | Ok body ->
-                           Buffer.reset buffer;
-                           on_chunk body;
+                           Buffer.reset buffer ;
+                           on_chunk body ;
                            Lwt_stream.get stream >>= loop
-                       | Error _msg -> Lwt_stream.get stream >>= loop )
+                       | Error _msg -> Lwt_stream.get stream >>= loop)
                  in
-                 ignore (loop (Some chunk) : unit Lwt.t);
+                 ignore (loop (Some chunk) : unit Lwt.t) ;
                  Lwt.return
                    (`Ok
                      (Some
                         (fun () ->
                           ignore
-                            ( Lwt_stream.junk_while (fun _ -> true) stream
-                              : unit Lwt.t );
-                          ()))) ) )
+                            (Lwt_stream.junk_while (fun _ -> true) stream
+                              : unit Lwt.t) ;
+                          ())))))
      | `Conflict body ->
          handle_error log service body `Conflict (fun v -> `Conflict v)
      | `Error body ->

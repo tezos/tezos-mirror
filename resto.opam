@@ -20,5 +20,5 @@ depends: [
   "ezjsonm" {with-test}
   "lwt" {with-test}
   "base-unix"{with-test}
-  "ocamlformat" { = "0.15.0" & dev }
+  "ocamlformat" { = "0.20.1" & with-doc } # not technically a doc dep; modify when with-dev becomes available
 ]

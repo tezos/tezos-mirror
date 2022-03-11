@@ -54,7 +54,7 @@ struct
       (Request.request describe_service ((), ["foo"; "3"]) {recurse = true} ()
        >>= function
        | `Ok dir ->
-           Format.printf "@[<v>%a@]@." Resto.Description.pp_print_directory dir;
+           Format.printf "@[<v>%a@]@." Resto.Description.pp_print_directory dir ;
            Lwt.return_unit
        | _ -> assert false)
 
@@ -67,7 +67,7 @@ struct
          ()
        >>= function
        | `Ok dir ->
-           Format.printf "@[<v>%a@]@." Resto.Description.pp_print_directory dir;
+           Format.printf "@[<v>%a@]@." Resto.Description.pp_print_directory dir ;
            Lwt.return_unit
        | _ -> assert false)
 
@@ -80,7 +80,7 @@ struct
          ()
        >>= function
        | `Ok dir ->
-           Format.printf "@[<v>%a@]@." Resto.Description.pp_print_directory dir;
+           Format.printf "@[<v>%a@]@." Resto.Description.pp_print_directory dir ;
            Lwt.return_unit
        | _ -> assert false)
 
@@ -89,7 +89,7 @@ struct
       (Request.request describe_service ((), []) {recurse = true} ()
        >>= function
        | `Ok dir ->
-           Format.printf "@[<v>%a@]@." Resto.Description.pp_print_directory dir;
+           Format.printf "@[<v>%a@]@." Resto.Description.pp_print_directory dir ;
            Lwt.return_unit
        | _ -> assert false)
 
@@ -97,11 +97,11 @@ struct
     let test service args arg expected =
       Lwt_main.run (Request.request service args () arg) = `Ok expected
     in
-    assert (test repeat_service ((), 3) (`A []) (`A (repeat 3 (`A []))));
-    assert (test add_service ((), 2) 3 5);
-    assert (test alternate_add_service (((), 1), 2.5) () 3.5);
-    assert (test real_minus_service1 (((), 2.5), 1) () 1.5);
-    assert (test alternate_add_service' (((), 1), 2.) () 3);
+    assert (test repeat_service ((), 3) (`A []) (`A (repeat 3 (`A [])))) ;
+    assert (test add_service ((), 2) 3 5) ;
+    assert (test alternate_add_service (((), 1), 2.5) () 3.5) ;
+    assert (test real_minus_service1 (((), 2.5), 1) () 1.5) ;
+    assert (test alternate_add_service' (((), 1), 2.) () 3) ;
     ()
 end
 
@@ -126,7 +126,7 @@ module Faked = Test (struct
     let {Service.meth; uri; input} =
       Service.forge_request service params query
     in
-    Format.eprintf "\nREQUEST: %a@." Uri.pp_hum uri;
+    Format.eprintf "\nREQUEST: %a@." Uri.pp_hum uri ;
     let path = split_path (Uri.path uri) in
     let query =
       List.map (fun (n, vs) -> (n, String.concat "," vs)) (Uri.query uri)
@@ -139,17 +139,17 @@ module Faked = Test (struct
     lookup dir () meth path >>= function
     | Ok (Service s) -> (
         let query = Resto.Query.parse s.types.query query in
-        ( match s.types.input with
+        (match s.types.input with
         | Service.No_input -> s.handler query ()
         | Service.Input input ->
-            s.handler query @@ Json_encoding.destruct input json )
+            s.handler query @@ Json_encoding.destruct input json)
         >>= function
         | `Ok res ->
             let json = Json_encoding.construct s.types.output res in
             Lwt.return
               (`Ok
                 (Json_encoding.destruct (Service.output_encoding service) json))
-        | _ -> failwith "Unexpected lwt result (1)" )
+        | _ -> failwith "Unexpected lwt result (1)")
     | _ -> failwith "Unexpected lwt result (2)"
 end)
 

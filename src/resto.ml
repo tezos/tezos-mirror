@@ -111,13 +111,13 @@ module Internal = struct
      fun (module TyA) (module TyB) -> TyB.eq TyA.witness
   end
 
-  type descr = {name: string; descr: string option}
+  type descr = {name : string; descr : string option}
 
   type 'a arg = {
-    id: 'a Ty.id;
-    destruct: string -> ('a, string) result;
-    construct: 'a -> string;
-    descr: descr;
+    id : 'a Ty.id;
+    destruct : string -> ('a, string) result;
+    construct : 'a -> string;
+    descr : descr;
   }
 
   let from_arg x = x
@@ -175,31 +175,31 @@ module Internal = struct
 
   and ('a, 'b) query_field =
     | Single : {
-        name: string;
-        description: string option;
-        ty: 'b arg;
-        default: 'b;
-        get: 'a -> 'b;
+        name : string;
+        description : string option;
+        ty : 'b arg;
+        default : 'b;
+        get : 'a -> 'b;
       }
         -> ('a, 'b) query_field
     | Opt : {
-        name: string;
-        description: string option;
-        ty: 'b arg;
-        get: 'a -> 'b option;
+        name : string;
+        description : string option;
+        ty : 'b arg;
+        get : 'a -> 'b option;
       }
         -> ('a, 'b option) query_field
     | Flag : {
-        name: string;
-        description: string option;
-        get: 'a -> bool;
+        name : string;
+        description : string option;
+        get : 'a -> bool;
       }
         -> ('a, bool) query_field
     | Multi : {
-        name: string;
-        description: string option;
-        ty: 'b arg;
-        get: 'a -> 'b list;
+        name : string;
+        description : string option;
+        ty : 'b arg;
+        get : 'a -> 'b list;
       }
         -> ('a, 'b list) query_field
 
@@ -235,7 +235,7 @@ end
 open Internal
 
 module Arg = struct
-  type descr = Internal.descr = {name: string; descr: string option}
+  type descr = Internal.descr = {name : string; descr : string option}
 
   type 'a t = 'a Internal.arg
 
@@ -372,12 +372,12 @@ module Query = struct
       type a b c d.
       (a, b, c -> d) open_query -> (a, c) query_field -> (a, b, d) open_query =
    fun r f fs ->
-    let (c, fs) = r (F1 (f, fs)) in
+    let c, fs = r (F1 (f, fs)) in
     (c, fs)
 
   let seal : type a b. (a, b, a) open_query -> a t =
    fun r ->
-    let (c, fs) = r F0 in
+    let c, fs = r F0 in
     Fields (fs, c)
 
   let ( |+ ) = app
@@ -407,27 +407,27 @@ module Query = struct
             let Eq = Ty.eq field.ty.id field'.ty.id in
             let v = match v with None -> field.default | Some v -> v in
             rebuild map fs (f v)
-        | Parsed _ -> assert false )
+        | Parsed _ -> assert false)
     | F1 (Opt field, fs) -> (
         match StringMap.find field.name map with
         | Parsed (Opt field', v) ->
             let Eq = Ty.eq field.ty.id field'.ty.id in
             let v = match v with None -> None | Some v -> v in
             rebuild map fs (f v)
-        | Parsed _ -> assert false )
+        | Parsed _ -> assert false)
     | F1 (Flag field, fs) -> (
         match StringMap.find field.name map with
         | Parsed (Flag _, v) ->
             let v = match v with None -> false | Some v -> v in
             rebuild map fs (f v)
-        | Parsed _ -> assert false )
+        | Parsed _ -> assert false)
     | F1 (Multi field, fs) -> (
         match StringMap.find field.name map with
         | Parsed (Multi field', v) ->
             let Eq = Ty.eq field.ty.id field'.ty.id in
             let v = match v with None -> [] | Some v -> v in
             rebuild map fs (f v)
-        | Parsed _ -> assert false )
+        | Parsed _ -> assert false)
 
   exception Invalid of string
 
@@ -462,8 +462,7 @@ module Query = struct
                       name
                       value
                       error
-                | Ok v -> StringMap.add name (Parsed (Single f, Some v)) fields
-                )
+                | Ok v -> StringMap.add name (Parsed (Single f, Some v)) fields)
             | Parsed (Opt f, None) -> (
                 match f.ty.destruct value with
                 | Error error ->
@@ -473,7 +472,7 @@ module Query = struct
                       value
                       error
                 | Ok v ->
-                    StringMap.add name (Parsed (Opt f, Some (Some v))) fields )
+                    StringMap.add name (Parsed (Opt f, Some (Some v))) fields)
             | Parsed (Flag f, None) -> (
                 match bool_of_string value with
                 | Ok v -> StringMap.add name (Parsed (Flag f, Some v)) fields
@@ -482,7 +481,7 @@ module Query = struct
                       "Failed to parse argument '%s' (%S): %s"
                       name
                       value
-                      error )
+                      error)
             | Parsed (Multi f, previous) -> (
                 match f.ty.destruct value with
                 | Error error ->
@@ -495,7 +494,7 @@ module Query = struct
                     let v =
                       match previous with None -> [v] | Some l -> v :: l
                     in
-                    StringMap.add name (Parsed (Multi f, Some v)) fields ))
+                    StringMap.add name (Parsed (Multi f, Some v)) fields))
           fields
           query
       in
@@ -503,7 +502,7 @@ module Query = struct
 end
 
 module Description = struct
-  type request = {recurse: bool}
+  type request = {recurse : bool}
 
   let request_query =
     let open Query in
@@ -520,13 +519,13 @@ module Description = struct
   [@@@ocaml.warning "-30"]
 
   type 'schema service = {
-    description: string option;
-    path: path_item list;
-    meth: meth;
-    query: query_item list;
-    input: 'schema Lazy.t option;
-    output: 'schema Lazy.t;
-    error: 'schema Lazy.t;
+    description : string option;
+    path : path_item list;
+    meth : meth;
+    query : query_item list;
+    input : 'schema Lazy.t option;
+    output : 'schema Lazy.t;
+    error : 'schema Lazy.t;
   }
 
   and path_item =
@@ -534,7 +533,11 @@ module Description = struct
     | PDynamic of Arg.descr
     | PDynamicTail of Arg.descr
 
-  and query_item = {name: string; description: string option; kind: query_kind}
+  and query_item = {
+    name : string;
+    description : string option;
+    kind : query_kind;
+  }
 
   type 'schema directory =
     | Empty
@@ -542,8 +545,8 @@ module Description = struct
     | Dynamic of string option
 
   and 'schema static_directory = {
-    services: 'schema service MethMap.t;
-    subdirs: 'schema static_subdirectories option;
+    services : 'schema service MethMap.t;
+    subdirs : 'schema static_subdirectories option;
   }
 
   and 'schema static_subdirectories =
@@ -625,10 +628,10 @@ module MakeService (Encoding : ENCODING) = struct
     include Internal
 
     type ('query, 'input, 'output, 'error) types = {
-      query: 'query query;
-      input: 'input input;
-      output: 'output Encoding.t;
-      error: 'error Encoding.t;
+      query : 'query query;
+      input : 'input input;
+      output : 'output Encoding.t;
+      error : 'error Encoding.t;
     }
 
     and _ input =
@@ -636,10 +639,10 @@ module MakeService (Encoding : ENCODING) = struct
       | Input : 'input Encoding.t -> 'input input
 
     type (+'meth, 'prefix, 'params, 'query, 'input, 'output, 'error) iservice = {
-      description: string option;
-      meth: 'meth;
-      path: ('prefix, 'params) path;
-      types: ('query, 'input, 'output, 'error) types;
+      description : string option;
+      meth : 'meth;
+      path : ('prefix, 'params) path;
+      types : ('query, 'input, 'output, 'error) types;
     }
       constraint 'meth = [< meth]
 
@@ -744,7 +747,7 @@ module MakeService (Encoding : ENCODING) = struct
       ~error
       Path.(path /:* Arg.string)
 
-  type 'input request = {meth: meth; uri: Uri.t; input: 'input input}
+  type 'input request = {meth : meth; uri : Uri.t; input : 'input input}
 
   let forge_request_args : type pr p. (pr, p) path -> p -> string list =
    fun path args ->
@@ -752,11 +755,11 @@ module MakeService (Encoding : ENCODING) = struct
         type k. (pr, k) path -> k -> string list -> string list =
      fun path args acc ->
       match (path, args) with
-      | (Root, _) -> acc
-      | (Static (path, name), args) -> forge_request_args path args (name :: acc)
-      | (Dynamic (path, arg), (args, x)) ->
+      | Root, _ -> acc
+      | Static (path, name), args -> forge_request_args path args (name :: acc)
+      | Dynamic (path, arg), (args, x) ->
           forge_request_args path args (arg.construct x :: acc)
-      | (DynamicTail (path, arg), (args, xs)) ->
+      | DynamicTail (path, arg), (args, xs) ->
           forge_request_args
             path
             args
@@ -773,11 +776,11 @@ module MakeService (Encoding : ENCODING) = struct
       | F1 (Opt {name; ty; get; _}, fields) -> (
           match get q with
           | None -> loop fields
-          | Some v -> (name, ty.construct v) :: loop fields )
+          | Some v -> (name, ty.construct v) :: loop fields)
       | F1 (Flag {name; get; _}, fields) -> (
           match get q with
           | false -> loop fields
-          | true -> (name, "true") :: loop fields )
+          | true -> (name, "true") :: loop fields)
       | F1 (Multi {name; ty; get; _}, fields) -> (
           match get q with
           | [] -> loop fields
@@ -785,7 +788,7 @@ module MakeService (Encoding : ENCODING) = struct
               List.fold_right
                 (fun v acc -> (name, ty.construct v) :: acc)
                 l
-                (loop fields) )
+                (loop fields))
     in
     loop fields
 
@@ -801,12 +804,12 @@ module MakeService (Encoding : ENCODING) = struct
     {meth = s.meth; uri; input = s.types.input}
 
   let forge_partial_request =
-    ( forge_partial_request
+    (forge_partial_request
       : (meth, _, _, _, _, _, _) service -> _
-      :> ([< meth], _, _, _, _, _, _) service -> _ )
+      :> ([< meth], _, _, _, _, _, _) service -> _)
 
   let forge_request =
-    ( forge_partial_request
+    (forge_partial_request
       : (meth, _, _, _, _, _, _) service -> _
-      :> ([< meth], unit, _, _, _, _, _) service -> _ )
+      :> ([< meth], unit, _, _, _, _, _) service -> _)
 end

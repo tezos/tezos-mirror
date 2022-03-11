@@ -28,12 +28,12 @@ module Make (Encoding : Resto.ENCODING) = struct
   open Cohttp
 
   type t = {
-    name: Cohttp.Accept.media_range;
-    q: int option;
-    pp: 'a. 'a Encoding.t -> Format.formatter -> string -> unit;
-    construct: 'a. 'a Encoding.t -> 'a -> string;
-    construct_seq: 'a. 'a Encoding.t -> 'a -> (Bytes.t * int * int) Seq.t;
-    destruct: 'a. 'a Encoding.t -> string -> ('a, string) result;
+    name : Cohttp.Accept.media_range;
+    q : int option;
+    pp : 'a. 'a Encoding.t -> Format.formatter -> string -> unit;
+    construct : 'a. 'a Encoding.t -> 'a -> string;
+    construct_seq : 'a. 'a Encoding.t -> 'a -> (Bytes.t * int * int) Seq.t;
+    destruct : 'a. 'a Encoding.t -> string -> ('a, string) result;
   }
 
   let name_of_media_type = function
@@ -73,7 +73,7 @@ module Make (Encoding : Resto.ENCODING) = struct
         match range with
         | AnyMedia -> true
         | AnyMediaSubtype type_' -> type_' = type_
-        | MediaType (type_', subtype') -> type_' = type_ && subtype' = subtype )
+        | MediaType (type_', subtype') -> type_' = type_ && subtype' = subtype)
 
   let resolve_accept_header provided header =
     let ranges = Accept.(media_ranges header |> qsort) in
@@ -83,7 +83,7 @@ module Make (Encoding : Resto.ENCODING) = struct
           try
             let media = List.find (media_match r) provided in
             Some (name_of_media_type media.name, media)
-          with Not_found -> loop rs )
+          with Not_found -> loop rs)
     in
     loop ranges
 

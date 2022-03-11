@@ -32,15 +32,15 @@ module Make (Encoding : Resto.ENCODING) (Log : Server.LOGGING) = struct
   module Server = Server.Make_selfserver (Encoding) (Log)
 
   type self_server = {
-    root: unit Directory.directory;
-    cors: Cors.t;
-    medias: Server.Media.medias;
-    acl: Acl.t;
-    agent: string;
+    root : unit Directory.directory;
+    cors : Cors.t;
+    medias : Server.Media.medias;
+    acl : Acl.t;
+    agent : string;
   }
 
   let create (server : self_server) =
-    ( module struct
+    (module struct
       let ( >>=? ) = Lwt_result.( >>= )
 
       let ( >>? ) v f =
@@ -57,13 +57,11 @@ module Make (Encoding : Resto.ENCODING) (Log : Server.LOGGING) = struct
         >>? fun input_media_type ->
         Server.Media.output_content_media_type server.medias ~headers
         >>? fun (_output_content_type, output_media_type) ->
-        ( match
-            Resto.Query.parse
-              s.types.query
-              (List.map
-                 (fun (k, l) -> (k, String.concat "," l))
-                 (Uri.query uri))
-          with
+        (match
+           Resto.Query.parse
+             s.types.query
+             (List.map (fun (k, l) -> (k, String.concat "," l)) (Uri.query uri))
+         with
         | exception Resto.Query.Invalid s ->
             Lwt.return_error (`Cannot_parse_query s)
         | query -> (
@@ -79,7 +77,7 @@ module Make (Encoding : Resto.ENCODING) (Log : Server.LOGGING) = struct
                   >>= fun body ->
                   match input_media_type.destruct input body with
                   | Error s -> Lwt.return_error (`Cannot_parse_body s)
-                  | Ok body -> s.handler query body >>= Lwt.return_ok ) ) )
+                  | Ok body -> s.handler query body >>= Lwt.return_ok)))
         >>= function
         | Ok answer -> (
             let output = output_media_type.construct s.types.output in
@@ -117,7 +115,7 @@ module Make (Encoding : Resto.ENCODING) (Log : Server.LOGGING) = struct
                      "local"
                      ~headers
                      error
-                     a )
+                     a)
         | Error err ->
             Lwt.return_ok
             @@ Server.Handlers.handle_error
@@ -128,13 +126,13 @@ module Make (Encoding : Resto.ENCODING) (Log : Server.LOGGING) = struct
       let call ?headers ?body (meth : Cohttp.Code.meth) uri =
         let path = uri |> Uri.path |> Resto.Utils.decode_split_path in
         let headers = Option.value headers ~default:(Cohttp.Header.init ()) in
-        ( match meth with
+        (match meth with
         | #Resto.meth when Server.Handlers.invalid_cors server.cors headers ->
             Lwt.return_ok (Server.Handlers.invalid_cors_response server.agent)
         | #Resto.meth as meth -> call ~headers ?body meth uri path
         | `OPTIONS ->
             Server.Handlers.handle_options server.root server.cors headers path
-        | _ -> Lwt.return_error `Not_implemented )
+        | _ -> Lwt.return_error `Not_implemented)
         >>= function
         | Ok a -> Lwt.return a
         | Error err ->
@@ -143,7 +141,7 @@ module Make (Encoding : Resto.ENCODING) (Log : Server.LOGGING) = struct
                  (Cohttp.Header.init ())
                  server.medias
                  err
-    end : Client.CALL )
+    end : Client.CALL)
 
   let launch ?(cors = Cors.default) ?(agent = Server.Agent.default_agent)
       ?(acl = Acl.Allow_all {except = []}) ~media_types root =
