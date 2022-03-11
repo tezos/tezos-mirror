@@ -25,10 +25,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Constant = struct
-  let tx_rollup_node = "./tezos-tx-rollup-node-alpha"
-end
-
 module Parameters = struct
   type persistent_state = {
     tezos_node : Node.t;

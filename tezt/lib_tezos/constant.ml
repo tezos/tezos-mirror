@@ -40,6 +40,8 @@ let sc_rollup_node = "./tezos-sc-rollup-node-alpha"
 
 let sc_rollup_client = "./tezos-sc-rollup-client-alpha"
 
+let tx_rollup_node = "./tezos-tx-rollup-node-alpha"
+
 (** Key pair used to activate a protocol from genesis with [--network sandbox].
     The public key is hard-coded in the node. *)
 let activator : Account.key =
