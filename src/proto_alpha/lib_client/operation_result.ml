@@ -250,6 +250,18 @@ let pp_manager_operation_content (type kind) source internal pp_result ppf
         source
         pp_result
         result
+  | Tx_rollup_withdraw {tx_rollup; _} ->
+      Format.fprintf
+        ppf
+        "@[<v 2>%s:%a@,From: %a%a@]"
+        (if internal then "Internal tx rollup withdraw"
+        else "Tx rollup withdraw")
+        Tx_rollup.pp
+        tx_rollup
+        Contract.pp
+        source
+        pp_result
+        result
   | Sc_rollup_originate {kind; boot_sector} ->
       let (module R : Sc_rollups.PVM.S) = Sc_rollups.of_kind kind in
       Format.fprintf
@@ -563,6 +575,9 @@ let pp_manager_operation_contents_and_result ppf
       balance_updates ;
     Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas
   in
+  let pp_tx_rollup_withdraw_result (Tx_rollup_withdraw_result {consumed_gas}) =
+    Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas
+  in
   let pp_sc_rollup_originate_result
       (Sc_rollup_originate_result
         {address; consumed_gas; size; balance_updates}) =
@@ -719,6 +734,17 @@ let pp_manager_operation_contents_and_result ppf
           "@[<v 0>This tx rollup rejection operation was BACKTRACKED, its \
            expected effects (as follow) were NOT applied.@]" ;
         pp_tx_rollup_rejection_result op
+    | Applied (Tx_rollup_withdraw_result _ as op) ->
+        Format.fprintf
+          ppf
+          "This tx rollup withdraw operation was successfully applied" ;
+        pp_tx_rollup_withdraw_result op
+    | Backtracked ((Tx_rollup_withdraw_result _ as op), _err) ->
+        Format.fprintf
+          ppf
+          "@[<v 0>This tx rollup withdraw rollup operation was BACKTRACKED, \
+           its expected effects (as follow) were NOT applied.@]" ;
+        pp_tx_rollup_withdraw_result op
     | Applied (Sc_rollup_originate_result _ as op) ->
         Format.fprintf
           ppf

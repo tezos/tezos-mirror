@@ -25,6 +25,40 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Message_result_hash = struct
+  let message_result_hash =
+    Tx_rollup_prefixes.message_result_hash.b58check_prefix
+
+  module H =
+    Blake2B.Make
+      (Base58)
+      (struct
+        let name = "Message_result_hash"
+
+        let title = "A message result"
+
+        let b58check_prefix = message_result_hash
+
+        let size = Some Tx_rollup_prefixes.message_result_hash.hash_size
+      end)
+
+  include H
+  include Path_encoding.Make_hex (H)
+
+  let () =
+    Tx_rollup_prefixes.(check_encoding message_result_hash b58check_encoding)
+end
+
+let batch_commitment ctxt_root withdraw_merkle_root =
+  let withdraw_merkle_root_bytes =
+    Data_encoding.Binary.to_bytes_exn
+      Tx_rollup_withdraw_repr.withdrawals_merkle_root_encoding
+      withdraw_merkle_root
+  in
+  (* TODO/TORU: this needs to change with we use irmin *)
+  let ctxt_root_bytes = ctxt_root in
+  Message_result_hash.hash_bytes [ctxt_root_bytes; withdraw_merkle_root_bytes]
+
 module Commitment_hash = struct
   let commitment_hash = Tx_rollup_prefixes.commitment_hash.b58check_prefix
 
@@ -61,36 +95,9 @@ module Commitment_hash = struct
       ()
 end
 
-type batch_commitment = {
-  (* TODO: add effects and replace bytes with Irmin:
-     https://gitlab.com/tezos/tezos/-/issues/2444
-  *)
-  root : bytes;
-}
-
-module Batch = struct
-  type t = batch_commitment
-
-  let encoding =
-    Data_encoding.(
-      conv (fun {root} -> root) (fun root -> {root}) (obj1 (req "root" bytes)))
-
-  let pp : Format.formatter -> t -> unit =
-   fun fmt {root} -> Hex.pp fmt (Hex.of_bytes root)
-
-  include Compare.Make (struct
-    type nonrec t = t
-
-    let compare {root = root1} {root = root2} = Bytes.compare root1 root2
-  end)
-end
-
-let batch_commitment_equal : batch_commitment -> batch_commitment -> bool =
-  Batch.equal
-
 type t = {
   level : Tx_rollup_level_repr.t;
-  batches : batch_commitment list;
+  batches : Message_result_hash.t list;
   predecessor : Commitment_hash.t option;
   inbox_hash : Tx_rollup_inbox_repr.hash;
 }
@@ -100,7 +107,7 @@ let compare_or cmp c1 c2 f = match cmp c1 c2 with 0 -> f () | diff -> diff
 include Compare.Make (struct
   type nonrec t = t
 
-  module Compare_root_list = Compare.List (Batch)
+  module Compare_root_list = Compare.List (Message_result_hash)
 
   let compare r1 r2 =
     compare_or Tx_rollup_level_repr.compare r1.level r2.level (fun () ->
@@ -120,7 +127,7 @@ let pp : Format.formatter -> t -> unit =
     "commitment %a : batches = %a predecessor %a for inbox %a"
     Tx_rollup_level_repr.pp
     t.level
-    (Format.pp_print_list Batch.pp)
+    (Format.pp_print_list Message_result_hash.pp)
     t.batches
     (Format.pp_print_option Commitment_hash.pp)
     t.predecessor
@@ -139,13 +146,25 @@ let encoding =
       {level; batches; predecessor; inbox_hash})
     (obj4
        (req "level" Tx_rollup_level_repr.encoding)
-       (req "batches" (list Batch.encoding))
+       (req "batches" (list Message_result_hash.encoding))
        (req "predecessor" (option Commitment_hash.encoding))
        (req "inbox_hash" Tx_rollup_inbox_repr.hash_encoding))
 
 let hash c =
   let bytes = Data_encoding.Binary.to_bytes_exn encoding c in
   Commitment_hash.hash_bytes [bytes]
+
+let check_batch_commitment :
+    t ->
+    context_hash:bytes ->
+    Tx_rollup_withdraw_repr.withdrawals_merkle_root ->
+    message_index:int ->
+    bool =
+ fun {batches; _} ~context_hash withdraw_merkle_root ~message_index ->
+  let computed = batch_commitment context_hash withdraw_merkle_root in
+  match List.nth batches message_index with
+  | Some expected -> Message_result_hash.(computed = expected)
+  | None -> false
 
 module Index = struct
   type t = Commitment_hash.t

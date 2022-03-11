@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,34 +23,65 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = {
-  b58check_prefix : string;
-  prefix : string;
-  hash_size : int;
-  b58check_size : int;
-}
+(** Testing
+    -------
+    Component:    Protocol Library
+    Invocation:   dune exec src/proto_alpha/lib_protocol/test/pbt/test_tx_rollup_l2_withdraw_storage.exe
+    Subject:      Tx rollup l2 withdraw storage
+*)
 
-(** See {!Tx_rollup_repr}. *)
-val rollup_address : t
+open Lib_test.Qcheck2_helpers
 
-(** See {!Tx_rollup_l2_address}. *)
-val l2_address : t
+open Protocol.Tx_rollup_withdraw_repr.Withdrawal_accounting
 
-(** See {!Tx_rollup_inbox_repr}. *)
-val inbox_hash : t
+let gen_ofs = QCheck2.Gen.int_bound (64 * 10)
 
-(** See {!Tx_rollup_message_repr}. *)
-val message_hash : t
+let gen_storage =
+  let open QCheck2.Gen in
+  let* bool_vector = list bool in
+  match
+    List.fold_left_i_e
+      (fun i storage v -> if v then set storage i else ok storage)
+      empty
+      bool_vector
+  with
+  | Ok v -> return v
+  | Error e ->
+      Alcotest.failf
+        "An unxpected error %a occurred when generating Withdrawal_accounting.t"
+        Protocol.Environment.Error_monad.pp_trace
+        e
 
-(** See {!Tx_rollup_commitment_repr}. *)
-val commitment_hash : t
+let test_get_set (c, ofs) =
+  List.for_all
+    (fun ofs' ->
+      let res =
+        let open Tzresult_syntax in
+        let* c' = set c ofs in
+        let* v = get c ofs' in
+        let* v' = get c' ofs' in
+        return (if ofs = ofs' then v' = true else v = v')
+      in
+      match res with
+      | Error e ->
+          Alcotest.failf
+            "Unexpected error: %a"
+            Protocol.Environment.Error_monad.pp_trace
+            e
+      | Ok res -> res)
+    (0 -- 63)
 
-(** See {!Tx_rollup_commitment_repr}. *)
-val message_result_hash : t
-
-(** See {!Tx_rollup_withdraw_repr}. *)
-val withdraw_list_hash : t
-
-(** [check_encoding spec encoding] checks that [encoding] satisfies
-    [spec]. Raises an exception otherwise. *)
-val check_encoding : t -> 'a Base58.encoding -> unit
+let () =
+  Alcotest.run
+    "bits"
+    [
+      ( "quantity",
+        qcheck_wrap
+          [
+            QCheck2.Test.make
+              ~count:10000
+              ~name:"get set"
+              QCheck2.Gen.(pair gen_storage gen_ofs)
+              test_get_set;
+          ] );
+    ]

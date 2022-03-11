@@ -34,7 +34,7 @@ This sequence of operations was run:
 
 ./tezos-client --wait none submit tx rollup commitment 0 '[TX_ROLLUP_INBOX_HASH]'  726f6f74 to '[TX_ROLLUP_HASH]' from '[PUBLIC_KEY_HASH]'
 Node is bootstrapped.
-Estimated gas: 3280.860 units (will add 100 for safety)
+Estimated gas: 3280.956 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -45,19 +45,19 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.000632
+    Fee to the baker: ꜩ0.000656
     Expected counter: 3
     Gas limit: 3381
     Storage limit: 0 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.000632
-      payload fees(the block proposer) ....... +ꜩ0.000632
-    Tx rollup commitment:[TX_ROLLUP_HASH], commitment 0 : batches = 726f6f74 predecessor  for inbox [TX_ROLLUP_INBOX_HASH]
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000656
+      payload fees(the block proposer) ....... +ꜩ0.000656
+    Tx rollup commitment:[TX_ROLLUP_HASH], commitment 0 : batches = [TX_ROLLUP_MESSAGE_RESULT_HASH] predecessor  for inbox [TX_ROLLUP_INBOX_HASH]
       From: [PUBLIC_KEY_HASH]
       This tx rollup commit operation was successfully applied
       Balance updates:
         
-      Consumed gas: 3280.860
+      Consumed gas: 3280.956
 
 
 ./tezos-client --wait none submit tx rollup finalize commitment to '[TX_ROLLUP_HASH]' from '[PUBLIC_KEY_HASH]'

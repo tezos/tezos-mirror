@@ -61,6 +61,13 @@ type error +=
       length : int;
     }
   | Wrong_message_hash
+  | No_finalized_commitment_for_level of {
+      level : Tx_rollup_level_repr.t;
+      window : (Tx_rollup_level_repr.t * Tx_rollup_level_repr.t) option;
+    }
+  | Withdraw_invalid_path
+  | Withdraw_already_consumed
+  | Commitment_bond_negative of int
 
 let () =
   let open Data_encoding in
@@ -373,4 +380,84 @@ let () =
        stored one"
     unit
     (function Wrong_message_hash -> Some () | _ -> None)
-    (fun () -> Wrong_message_hash)
+    (fun () -> Wrong_message_hash) ;
+  (* No_finalized_commitment_for_level *)
+  register_error_kind
+    `Temporary
+    ~id:"operation.tx_rollup_no_finalized_commitment_for_level"
+    ~title:"Operation is about a commitment that is not yet finalized"
+    ~description:"This operation must be about a finalized commitment"
+    ~pp:(fun ppf (level, window) ->
+      match window with
+      | Some (first, last) ->
+          Format.fprintf
+            ppf
+            "This operation is only allowed on finalized and existing \
+             commitments, but its level %a is not in the existing and \
+             finalized window of commitments: [%a; %a]."
+            Tx_rollup_level_repr.pp
+            level
+            Tx_rollup_level_repr.pp
+            first
+            Tx_rollup_level_repr.pp
+            last
+      | None ->
+          Format.fprintf
+            ppf
+            "This operation was about level %a but no finalized commitment \
+             exists yet."
+            Tx_rollup_level_repr.pp
+            level)
+    Data_encoding.(
+      obj2
+        (req "received" Tx_rollup_level_repr.encoding)
+        (req
+           "commitment_head_level"
+           (option
+              (tup2 Tx_rollup_level_repr.encoding Tx_rollup_level_repr.encoding))))
+    (function
+      | No_finalized_commitment_for_level {level; window} -> Some (level, window)
+      | _ -> None)
+    (fun (level, window) -> No_finalized_commitment_for_level {level; window}) ;
+  register_error_kind
+    `Branch
+    ~id:"tx_rollup_withdraw_invalid_path"
+    ~title:"The validation path submitted for a withdrawal is invalid"
+    ~description:
+      "The validation path submitted for a withdrawal is not valid for the \
+       given withdrawal and message index"
+    empty
+    (function Withdraw_invalid_path -> Some () | _ -> None)
+    (fun () -> Withdraw_invalid_path) ;
+  register_error_kind
+    `Temporary
+    ~id:"operation.withdraw_already_consumed"
+    ~title:"withdraw already consumed"
+    ~description:"The submitted withdraw has already been consumed"
+    ~pp:(fun ppf () ->
+      Format.fprintf
+        ppf
+        "The submitted withdraw exists but it has already been consumed \
+         earlier.")
+    Data_encoding.unit
+    (function Withdraw_already_consumed -> Some () | _ -> None)
+    (fun () -> Withdraw_already_consumed) ;
+  register_error_kind
+    `Permanent
+    ~id:"tx_rollup_commitment_bond_negative"
+    ~title:
+      "The number of commitments associated with an implicit account is \
+       negative"
+    ~description:
+      "A negative number of commitment is associated with an implicit account \
+       and its associated bound. This error is internal and should never \
+       happen."
+    ~pp:(fun ppf count ->
+      Format.fprintf
+        ppf
+        "The number of commitments %d associated with this implicit account is \
+         negative"
+        count)
+    (obj1 (req "count" Data_encoding.int31))
+    (function Commitment_bond_negative count -> Some count | _ -> None)
+    (fun count -> Commitment_bond_negative count)

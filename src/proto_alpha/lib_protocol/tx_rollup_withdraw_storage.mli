@@ -1,7 +1,9 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
+(* Copyright (c) 2022 Marigold <contact@marigold.dev>                        *)
 (* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 Oxhead Alpha <info@oxhead-alpha.com>                   *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,34 +25,37 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = {
-  b58check_prefix : string;
-  prefix : string;
-  hash_size : int;
-  b58check_size : int;
-}
+(** [add ctxt tx_rollup lvl message_index withdraw_index] adds
+    [withdraw_index] to the list of already consumed withdrawawals for
+    [tx_rollup] at [lvl] for the message_result at [message_index]. *)
+val add :
+  Raw_context.t ->
+  Tx_rollup_repr.t ->
+  Tx_rollup_level_repr.t ->
+  message_index:int ->
+  withdraw_index:int ->
+  Raw_context.t tzresult Lwt.t
 
-(** See {!Tx_rollup_repr}. *)
-val rollup_address : t
+(** [mem ctxt tx_rollup lvl message_index withdraw_index] checks if
+    [withdraw_index] has already been consumed for [tx_rollup] at [lvl] for the
+    message_result at [message_index]. This function consumes gas
+    and so returns a new context. *)
+val mem :
+  Raw_context.t ->
+  Tx_rollup_repr.t ->
+  Tx_rollup_level_repr.t ->
+  message_index:int ->
+  withdraw_index:int ->
+  (bool * Raw_context.t) tzresult Lwt.t
 
-(** See {!Tx_rollup_l2_address}. *)
-val l2_address : t
-
-(** See {!Tx_rollup_inbox_repr}. *)
-val inbox_hash : t
-
-(** See {!Tx_rollup_message_repr}. *)
-val message_hash : t
-
-(** See {!Tx_rollup_commitment_repr}. *)
-val commitment_hash : t
-
-(** See {!Tx_rollup_commitment_repr}. *)
-val message_result_hash : t
-
-(** See {!Tx_rollup_withdraw_repr}. *)
-val withdraw_list_hash : t
-
-(** [check_encoding spec encoding] checks that [encoding] satisfies
-    [spec]. Raises an exception otherwise. *)
-val check_encoding : t -> 'a Base58.encoding -> unit
+(** [remove ctxt tx_rollup lvl] removes all withdrawal accounting for
+    [tx_rollup] at [lvl]. This must not be called before the
+    corresponding commitment is deleted. Otherwise, it would be
+    possible to retrieve the same withdrawal multiple times. This
+    function consumes gas and so returns a new context.  *)
+val remove :
+  Raw_context.t ->
+  Tx_rollup_repr.t ->
+  Tx_rollup_level_repr.t ->
+  inbox_length:int32 ->
+  Raw_context.t tzresult Lwt.t

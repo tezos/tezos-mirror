@@ -1248,6 +1248,116 @@ let apply_manager_operation_content :
         ~payer
         ~dst_rollup:dst
         ~since:before_operation
+  | Tx_rollup_withdraw
+      (* FIXME/TORU: #2488 The ticket accounting for the withdraw is not done here *)
+      {
+        tx_rollup;
+        level;
+        context_hash;
+        message_index;
+        withdraw_path;
+        contents;
+        ty;
+        ticketer;
+        amount;
+        destination;
+        entrypoint;
+      } ->
+      (* Ticket parsing and hashing *)
+      Script.force_decode_in_context ~consume_deserialization_gas ctxt ty
+      >>?= fun (ty, ctxt) ->
+      Script.force_decode_in_context ~consume_deserialization_gas ctxt contents
+      >>?= fun (contents, ctxt) ->
+      Script_ir_translator.unparse_data
+        ctxt
+        Optimized
+        Script_typed_ir.address_t
+        {destination = Contract ticketer; entrypoint = Entrypoint.default}
+      >>=? fun (ticketer_node, ctxt) ->
+      Tx_rollup.hash_ticket
+        ctxt
+        tx_rollup
+        ~contents:(Micheline.root contents)
+        ~ticketer:(Micheline.root @@ Micheline.strip_locations ticketer_node)
+        ~ty:(Micheline.root ty)
+      >>?= fun (ticket_hash, ctxt) ->
+      (* Checking the operation is non-internal *)
+      Option.value_e
+        ~error:
+          (Error_monad.trace_of_error
+             Tx_rollup_operation_with_non_implicit_contract)
+        (Contract.is_implicit source)
+      >>?= fun source_pkh ->
+      (* Computing the withdrawal hash *)
+      let withdrawal =
+        Tx_rollup_withdraw.{claimer = source_pkh; ticket_hash; amount}
+      in
+      let (computed_list_hash, withdraw_index) =
+        Tx_rollup_withdraw.check_path withdraw_path withdrawal
+      in
+      Tx_rollup_commitment.get_finalized ctxt tx_rollup level
+      >>=? fun (ctxt, commitment) ->
+      fail_unless
+        (Tx_rollup_commitment.check_batch_commitment
+           commitment.commitment
+           ~context_hash
+           computed_list_hash
+           ~message_index)
+        Tx_rollup_errors.Withdraw_invalid_path
+      >>=? fun () ->
+      Tx_rollup_withdraw.mem ctxt tx_rollup level ~message_index ~withdraw_index
+      >>=? fun (already_consumed, ctxt) ->
+      fail_when already_consumed Tx_rollup_errors.Withdraw_already_consumed
+      >>=? fun () ->
+      Tx_rollup_withdraw.add ctxt tx_rollup level ~message_index ~withdraw_index
+      >>=? fun ctxt ->
+      (* FIXME/TORU: #2488 The ticket accounting for the withdraw should be done here.
+         Before calling the next function we needs to make sure that
+         this ticket is owns by the tx_rollup *)
+      (* Now reconstruct the ticket sent as the parameter
+          destination. *)
+      ( Script_ir_translator.parse_comparable_ty ctxt (Micheline.root ty)
+      >>?= fun (Ex_comparable_ty ty, ctxt) ->
+        Script_ir_translator.parse_comparable_data
+          ctxt
+          ty
+          (Micheline.root contents)
+        >>=? fun (contents, ctxt) ->
+        let amount =
+          Option.value
+            ~default:Script_int.zero_n
+            Script_int.(is_nat @@ of_int64 @@ Tx_rollup_l2_qty.to_int64 amount)
+        in
+        let ticket = Script_typed_ir.{ticketer; contents; amount} in
+        Script_typed_ir.ticket_t Micheline.dummy_location ty >>?= fun ty ->
+        return (ticket, ty, ctxt) >>=? fun (ticket, ticket_ty, ctxt) ->
+        Script_ir_translator.unparse_data ctxt Optimized ticket_ty ticket
+        >|=? fun (parameters, ctxt) ->
+        (Script.lazy_expr (Micheline.strip_locations parameters), ctxt) )
+      >>=? fun (parameters, ctxt) ->
+      (* FIXME/TORU: #2488 the returned op will fail when ticket hardening is
+         merged, it must be commented or fixed *)
+      let op =
+        Internal_operation
+          {
+            source;
+            (* TODO is 0 correct ? *)
+            nonce = 0;
+            operation =
+              Transaction
+                {
+                  amount = Tez.zero;
+                  parameters;
+                  destination = Contract destination;
+                  entrypoint;
+                };
+          }
+      in
+      let result =
+        Tx_rollup_withdraw_result
+          {consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt}
+      in
+      return (ctxt, result, [op])
   | Origination {delegate; script; preorigination; credit} ->
       Script.force_decode_in_context
         ~consume_deserialization_gas
@@ -1342,7 +1452,6 @@ let apply_manager_operation_content :
       in
       return (ctxt, result, [])
   | Tx_rollup_submit_batch {tx_rollup; content; burn_limit} ->
-      assert_tx_rollup_feature_enabled ctxt >>=? fun () ->
       let (message, message_size) = Tx_rollup_message.make_batch content in
       Tx_rollup_state.get ctxt tx_rollup >>=? fun (ctxt, state) ->
       Tx_rollup_state.burn_cost ~limit:burn_limit state message_size
@@ -1631,9 +1740,10 @@ let precheck_manager_contents (type kind) ctxt (op : kind Kind.manager contents)
       assert_tx_rollup_feature_enabled ctxt >>=? fun () ->
       Tx_rollup_state.get ctxt tx_rollup >>=? fun (ctxt, state) ->
       Tx_rollup_commitment.check_commitment_level state commitment
-      >|=? fun () -> ctxt
+      >>?= fun () -> return ctxt
   | Tx_rollup_return_bond _ | Tx_rollup_finalize_commitment _
-  | Tx_rollup_remove_commitment _ | Tx_rollup_rejection _ ->
+  | Tx_rollup_remove_commitment _ | Tx_rollup_rejection _ | Tx_rollup_withdraw _
+    ->
       assert_tx_rollup_feature_enabled ctxt >|=? fun () -> ctxt
   | Sc_rollup_originate _ | Sc_rollup_add_messages _ | Sc_rollup_cement _ ->
       assert_sc_rollup_feature_enabled ctxt >|=? fun () -> ctxt)
@@ -1742,7 +1852,8 @@ let burn_storage_fees :
           Michelson’s big map). *)
   | Tx_rollup_submit_batch_result _ | Tx_rollup_commit_result _
   | Tx_rollup_return_bond_result _ | Tx_rollup_finalize_commitment_result _
-  | Tx_rollup_remove_commitment_result _ | Tx_rollup_rejection_result _ ->
+  | Tx_rollup_remove_commitment_result _ | Tx_rollup_rejection_result _
+  | Tx_rollup_withdraw_result _ ->
       return (ctxt, storage_limit, smopr)
   | Sc_rollup_originate_result payload ->
       Fees.burn_sc_rollup_origination_fees

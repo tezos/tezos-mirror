@@ -1412,7 +1412,7 @@ module Tx_rollup = struct
         let encoding = Tx_rollup_inbox_repr.metadata_encoding
       end)
 
-  module Message_index = struct
+  module Int32_index = struct
     type t = int32
 
     let compare = Compare.Int32.compare
@@ -1430,6 +1430,15 @@ module Tx_rollup = struct
       | [i] -> Int32.of_string_opt i
   end
 
+  module Consumed_withdraw =
+    Make_indexed_carbonated_data_storage
+      (Make_subcontext (Registered) (Level_tx_rollup_context.Raw_context)
+         (struct
+           let name = ["withdraw"]
+         end))
+         (Make_index (Int32_index))
+         (Tx_rollup_withdraw_repr.Withdrawal_accounting)
+
   module Message_indexed_context =
     Make_subcontext (Registered) (Level_tx_rollup_context.Raw_context)
       (struct
@@ -1439,7 +1448,7 @@ module Tx_rollup = struct
   module Inbox_contents =
     Make_indexed_carbonated_data_storage
       (Message_indexed_context)
-      (Make_index (Message_index))
+      (Make_index (Int32_index))
       (struct
         type t = Tx_rollup_message_repr.hash
 

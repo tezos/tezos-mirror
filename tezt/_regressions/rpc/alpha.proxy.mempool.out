@@ -672,6 +672,10 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                         "title": "An Ed25519 public key hash (Base58Check-encoded)",
                         "$ref": "#/definitions/unistring"
                       },
+                      "Message_result_hash": {
+                        "title": "A message result (Base58Check-encoded)",
+                        "$ref": "#/definitions/unistring"
+                      },
                       "Operation_hash": {
                         "title": "A Tezos operation ID (Base58Check-encoded)",
                         "$ref": "#/definitions/unistring"
@@ -702,6 +706,10 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       "Tx_rollup_l2_address": {
                         "title": "The hash of a BLS public key used to identify a L2 ticket holders (Base58Check-encoded)",
+                        "$ref": "#/definitions/unistring"
+                      },
+                      "Withdraw_list_hash": {
+                        "title": "A hash of withdraw's list (Base58Check-encoded)",
                         "$ref": "#/definitions/unistring"
                       },
                       "alpha.block_header.alpha.full_header": {
@@ -777,6 +785,11 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                           "level"
                         ],
                         "additionalProperties": false
+                      },
+                      "alpha.contract_id": {
+                        "title": "A contract handle",
+                        "description": "A contract notation as given to an RPC or inside scripts. Can be a base58 implicit contract hash or a base58 originated contract hash.",
+                        "$ref": "#/definitions/unistring"
                       },
                       "alpha.entrypoint": {
                         "title": "entrypoint",
@@ -1946,17 +1959,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                   "batches": {
                                     "type": "array",
                                     "items": {
-                                      "type": "object",
-                                      "properties": {
-                                        "root": {
-                                          "type": "string",
-                                          "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
-                                        }
-                                      },
-                                      "required": [
-                                        "root"
-                                      ],
-                                      "additionalProperties": false
+                                      "$ref": "#/definitions/Message_result_hash"
                                     }
                                   },
                                   "predecessor": {
@@ -2292,6 +2295,356 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                               "message",
                               "level",
                               "rollup",
+                              "storage_limit",
+                              "gas_limit",
+                              "counter",
+                              "fee",
+                              "source",
+                              "kind"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "title": "Tx_rollup_withdraw",
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "tx_rollup_withdraw"
+                                ]
+                              },
+                              "source": {
+                                "$ref": "#/definitions/Signature.Public_key_hash"
+                              },
+                              "fee": {
+                                "$ref": "#/definitions/alpha.mutez"
+                              },
+                              "counter": {
+                                "$ref": "#/definitions/positive_bignum"
+                              },
+                              "gas_limit": {
+                                "$ref": "#/definitions/positive_bignum"
+                              },
+                              "storage_limit": {
+                                "$ref": "#/definitions/positive_bignum"
+                              },
+                              "tx_rollup": {
+                                "$ref": "#/definitions/alpha.tx_rollup_id"
+                              },
+                              "level": {
+                                "type": "integer",
+                                "minimum": -2147483648,
+                                "maximum": 2147483647
+                              },
+                              "context_hash": {
+                                "type": "string",
+                                "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                              },
+                              "message_index": {
+                                "type": "integer",
+                                "minimum": -1073741824,
+                                "maximum": 1073741823
+                              },
+                              "withdraw_path": {
+                                "oneOf": [
+                                  {
+                                    "title": "Left",
+                                    "type": "object",
+                                    "properties": {
+                                      "path": {
+                                        "$ref": "#/definitions/path"
+                                      },
+                                      "right": {
+                                        "$ref": "#/definitions/Withdraw_list_hash"
+                                      }
+                                    },
+                                    "required": [
+                                      "right",
+                                      "path"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "title": "Right",
+                                    "type": "object",
+                                    "properties": {
+                                      "left": {
+                                        "$ref": "#/definitions/Withdraw_list_hash"
+                                      },
+                                      "path": {
+                                        "$ref": "#/definitions/path"
+                                      }
+                                    },
+                                    "required": [
+                                      "path",
+                                      "left"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "title": "Op"
+                                  }
+                                ]
+                              },
+                              "ticket_contents": {
+                                "oneOf": [
+                                  {
+                                    "title": "Int",
+                                    "type": "object",
+                                    "properties": {
+                                      "int": {
+                                        "$ref": "#/definitions/bignum"
+                                      }
+                                    },
+                                    "required": [
+                                      "int"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "title": "String",
+                                    "type": "object",
+                                    "properties": {
+                                      "string": {
+                                        "$ref": "#/definitions/unistring"
+                                      }
+                                    },
+                                    "required": [
+                                      "string"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "title": "Bytes",
+                                    "type": "object",
+                                    "properties": {
+                                      "bytes": {
+                                        "type": "string",
+                                        "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                                      }
+                                    },
+                                    "required": [
+                                      "bytes"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "title": "Sequence",
+                                    "type": "array",
+                                    "items": {
+                                      "$ref": "#/definitions/micheline.alpha.michelson_v1.expression"
+                                    }
+                                  },
+                                  {
+                                    "title": "Prim__generic",
+                                    "description": "Generic primitive (any number of args with or without annotations)",
+                                    "type": "object",
+                                    "properties": {
+                                      "prim": {
+                                        "$ref": "#/definitions/alpha.michelson.v1.primitives"
+                                      },
+                                      "args": {
+                                        "type": "array",
+                                        "items": {
+                                          "$ref": "#/definitions/micheline.alpha.michelson_v1.expression"
+                                        }
+                                      },
+                                      "annots": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string"
+                                        }
+                                      }
+                                    },
+                                    "required": [
+                                      "prim"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                ]
+                              },
+                              "ticket_ty": {
+                                "oneOf": [
+                                  {
+                                    "title": "Int",
+                                    "type": "object",
+                                    "properties": {
+                                      "int": {
+                                        "$ref": "#/definitions/bignum"
+                                      }
+                                    },
+                                    "required": [
+                                      "int"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "title": "String",
+                                    "type": "object",
+                                    "properties": {
+                                      "string": {
+                                        "$ref": "#/definitions/unistring"
+                                      }
+                                    },
+                                    "required": [
+                                      "string"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "title": "Bytes",
+                                    "type": "object",
+                                    "properties": {
+                                      "bytes": {
+                                        "type": "string",
+                                        "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                                      }
+                                    },
+                                    "required": [
+                                      "bytes"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "title": "Sequence",
+                                    "type": "array",
+                                    "items": {
+                                      "$ref": "#/definitions/micheline.alpha.michelson_v1.expression"
+                                    }
+                                  },
+                                  {
+                                    "title": "Prim__generic",
+                                    "description": "Generic primitive (any number of args with or without annotations)",
+                                    "type": "object",
+                                    "properties": {
+                                      "prim": {
+                                        "$ref": "#/definitions/alpha.michelson.v1.primitives"
+                                      },
+                                      "args": {
+                                        "type": "array",
+                                        "items": {
+                                          "$ref": "#/definitions/micheline.alpha.michelson_v1.expression"
+                                        }
+                                      },
+                                      "annots": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string"
+                                        }
+                                      }
+                                    },
+                                    "required": [
+                                      "prim"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                ]
+                              },
+                              "ticket_ticketer": {
+                                "$ref": "#/definitions/alpha.contract_id"
+                              },
+                              "ticket_amount": {
+                                "oneOf": [
+                                  {
+                                    "title": "small",
+                                    "description": "An int64 which fits within a uint8",
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "$ref": "#/definitions/unistring"
+                                      },
+                                      "value": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 255
+                                      }
+                                    },
+                                    "required": [
+                                      "value",
+                                      "kind"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "title": "medium",
+                                    "description": "An int64 which fits within a uint16",
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "$ref": "#/definitions/unistring"
+                                      },
+                                      "value": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 65535
+                                      }
+                                    },
+                                    "required": [
+                                      "value",
+                                      "kind"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "title": "biggish",
+                                    "description": "An int64 which fits within a uint32",
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "$ref": "#/definitions/unistring"
+                                      },
+                                      "value": {
+                                        "type": "integer",
+                                        "minimum": -2147483648,
+                                        "maximum": 2147483647
+                                      }
+                                    },
+                                    "required": [
+                                      "value",
+                                      "kind"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "title": "bigger",
+                                    "description": "An int64 which doesn't fit within a uint32",
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "$ref": "#/definitions/unistring"
+                                      },
+                                      "value": {
+                                        "$ref": "#/definitions/int64"
+                                      }
+                                    },
+                                    "required": [
+                                      "value",
+                                      "kind"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                ]
+                              },
+                              "destination": {
+                                "$ref": "#/definitions/alpha.contract_id"
+                              },
+                              "entrypoint": {
+                                "$ref": "#/definitions/unistring"
+                              }
+                            },
+                            "required": [
+                              "entrypoint",
+                              "destination",
+                              "ticket_amount",
+                              "ticket_ticketer",
+                              "ticket_ty",
+                              "ticket_contents",
+                              "withdraw_path",
+                              "message_index",
+                              "context_hash",
+                              "level",
+                              "tx_rollup",
                               "storage_limit",
                               "gas_limit",
                               "counter",
@@ -2732,6 +3085,47 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                           }
                         ]
                       },
+                      "path": {
+                        "oneOf": [
+                          {
+                            "title": "Left",
+                            "type": "object",
+                            "properties": {
+                              "path": {
+                                "$ref": "#/definitions/path"
+                              },
+                              "right": {
+                                "$ref": "#/definitions/Withdraw_list_hash"
+                              }
+                            },
+                            "required": [
+                              "right",
+                              "path"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "title": "Right",
+                            "type": "object",
+                            "properties": {
+                              "left": {
+                                "$ref": "#/definitions/Withdraw_list_hash"
+                              },
+                              "path": {
+                                "$ref": "#/definitions/path"
+                              }
+                            },
+                            "required": [
+                              "path",
+                              "left"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "title": "Op"
+                          }
+                        ]
+                      },
                       "positive_bignum": {
                         "title": "Positive big number",
                         "description": "Decimal representation of a positive big number",
@@ -2803,229 +3197,12 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                     "fields": [
                       {
                         "description": {
-                          "title": "X_1"
+                          "title": "X_0"
                         },
                         "encoding": {
                           "fields": [
                             {
-                              "kind": "dyn",
-                              "num_fields": 1,
-                              "size": "Uint30"
-                            },
-                            {
-                              "layout": {
-                                "kind": "String"
-                              },
-                              "kind": "anon",
-                              "data_kind": {
-                                "kind": "Variable"
-                              }
-                            }
-                          ]
-                        }
-                      },
-                      {
-                        "description": {
-                          "title": "X_2"
-                        },
-                        "encoding": {
-                          "tag_size": "Uint16",
-                          "kind": {
-                            "size": 2,
-                            "kind": "Float"
-                          },
-                          "cases": [
-                            {
-                              "tag": 0,
-                              "fields": [
-                                {
-                                  "name": "Tag",
-                                  "layout": {
-                                    "size": "Uint16",
-                                    "kind": "Int"
-                                  },
-                                  "data_kind": {
-                                    "size": 2,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "layout": {
-                                    "kind": "Zero_width"
-                                  },
-                                  "kind": "anon",
-                                  "data_kind": {
-                                    "size": 0,
-                                    "kind": "Float"
-                                  }
-                                }
-                              ],
-                              "name": "Example_arith smart contract rollup kind"
-                            }
-                          ]
-                        }
-                      },
-                      {
-                        "description": {
-                          "title": "X_4"
-                        },
-                        "encoding": {
-                          "tag_size": "Uint8",
-                          "kind": {
-                            "kind": "Dynamic"
-                          },
-                          "cases": [
-                            {
-                              "tag": 0,
-                              "fields": [
-                                {
-                                  "name": "Tag",
-                                  "layout": {
-                                    "size": "Uint8",
-                                    "kind": "Int"
-                                  },
-                                  "data_kind": {
-                                    "size": 1,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "layout": {
-                                    "size": "Uint8",
-                                    "kind": "Int"
-                                  },
-                                  "kind": "anon",
-                                  "data_kind": {
-                                    "size": 1,
-                                    "kind": "Float"
-                                  }
-                                }
-                              ],
-                              "name": "case 0"
-                            },
-                            {
-                              "tag": 1,
-                              "fields": [
-                                {
-                                  "name": "Tag",
-                                  "layout": {
-                                    "size": "Uint8",
-                                    "kind": "Int"
-                                  },
-                                  "data_kind": {
-                                    "size": 1,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "layout": {
-                                    "size": "Uint16",
-                                    "kind": "Int"
-                                  },
-                                  "kind": "anon",
-                                  "data_kind": {
-                                    "size": 2,
-                                    "kind": "Float"
-                                  }
-                                }
-                              ],
-                              "name": "case 1"
-                            },
-                            {
-                              "tag": 2,
-                              "fields": [
-                                {
-                                  "name": "Tag",
-                                  "layout": {
-                                    "size": "Uint8",
-                                    "kind": "Int"
-                                  },
-                                  "data_kind": {
-                                    "size": 1,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "layout": {
-                                    "size": "Int32",
-                                    "kind": "Int"
-                                  },
-                                  "kind": "anon",
-                                  "data_kind": {
-                                    "size": 4,
-                                    "kind": "Float"
-                                  }
-                                }
-                              ],
-                              "name": "case 2"
-                            },
-                            {
-                              "tag": 3,
-                              "fields": [
-                                {
-                                  "name": "Tag",
-                                  "layout": {
-                                    "size": "Uint8",
-                                    "kind": "Int"
-                                  },
-                                  "data_kind": {
-                                    "size": 1,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "layout": {
-                                    "size": "Int64",
-                                    "kind": "Int"
-                                  },
-                                  "kind": "anon",
-                                  "data_kind": {
-                                    "size": 8,
-                                    "kind": "Float"
-                                  }
-                                }
-                              ],
-                              "name": "case 3"
-                            }
-                          ]
-                        }
-                      },
-                      {
-                        "description": {
-                          "title": "X_3"
-                        },
-                        "encoding": {
-                          "fields": [
-                            {
-                              "name": "sender",
-                              "layout": {
-                                "name": "public_key_hash",
-                                "kind": "Ref"
-                              },
-                              "data_kind": {
-                                "size": 21,
-                                "kind": "Float"
-                              },
-                              "kind": "named"
-                            },
-                            {
-                              "name": "destination",
-                              "layout": {
-                                "kind": "Bytes"
-                              },
-                              "data_kind": {
-                                "size": 20,
-                                "kind": "Float"
-                              },
-                              "kind": "named"
-                            },
-                            {
-                              "name": "ticket_hash",
+                              "name": "hash",
                               "layout": {
                                 "kind": "Bytes"
                               },
@@ -3036,814 +3213,10 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                               "kind": "named"
                             },
                             {
-                              "name": "amount",
-                              "layout": {
-                                "name": "X_4",
-                                "kind": "Ref"
-                              },
-                              "data_kind": {
-                                "kind": "Dynamic"
-                              },
-                              "kind": "named"
-                            }
-                          ]
-                        }
-                      },
-                      {
-                        "description": {
-                          "title": "X_5"
-                        },
-                        "encoding": {
-                          "tag_size": "Uint8",
-                          "kind": {
-                            "kind": "Dynamic"
-                          },
-                          "cases": [
-                            {
-                              "tag": 0,
-                              "fields": [
-                                {
-                                  "name": "Tag",
-                                  "layout": {
-                                    "size": "Uint8",
-                                    "kind": "Int"
-                                  },
-                                  "data_kind": {
-                                    "size": 1,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "kind": "dyn",
-                                  "num_fields": 1,
-                                  "size": "Uint30"
-                                },
-                                {
-                                  "name": "batch",
-                                  "layout": {
-                                    "kind": "String"
-                                  },
-                                  "data_kind": {
-                                    "kind": "Variable"
-                                  },
-                                  "kind": "named"
-                                }
-                              ],
-                              "name": "Batch"
-                            },
-                            {
-                              "tag": 1,
-                              "fields": [
-                                {
-                                  "name": "Tag",
-                                  "layout": {
-                                    "size": "Uint8",
-                                    "kind": "Int"
-                                  },
-                                  "data_kind": {
-                                    "size": 1,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "name": "deposit",
-                                  "layout": {
-                                    "name": "X_3",
-                                    "kind": "Ref"
-                                  },
-                                  "data_kind": {
-                                    "kind": "Dynamic"
-                                  },
-                                  "kind": "named"
-                                }
-                              ],
-                              "name": "Deposit"
-                            }
-                          ]
-                        }
-                      },
-                      {
-                        "description": {
-                          "title": "X_8"
-                        },
-                        "encoding": {
-                          "tag_size": "Uint8",
-                          "kind": {
-                            "kind": "Dynamic"
-                          },
-                          "cases": [
-                            {
-                              "tag": 0,
-                              "fields": [
-                                {
-                                  "name": "Tag",
-                                  "layout": {
-                                    "size": "Uint8",
-                                    "kind": "Int"
-                                  },
-                                  "data_kind": {
-                                    "size": 1,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "layout": {
-                                    "kind": "Zero_width"
-                                  },
-                                  "kind": "anon",
-                                  "data_kind": {
-                                    "size": 0,
-                                    "kind": "Float"
-                                  }
-                                }
-                              ],
-                              "name": "None"
-                            },
-                            {
-                              "tag": 1,
-                              "fields": [
-                                {
-                                  "name": "Tag",
-                                  "layout": {
-                                    "size": "Uint8",
-                                    "kind": "Int"
-                                  },
-                                  "data_kind": {
-                                    "size": 1,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "name": "Commitment_hash",
-                                  "layout": {
-                                    "kind": "Bytes"
-                                  },
-                                  "data_kind": {
-                                    "size": 32,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                }
-                              ],
-                              "name": "Some"
-                            }
-                          ]
-                        }
-                      },
-                      {
-                        "description": {
-                          "title": "X_6"
-                        },
-                        "encoding": {
-                          "fields": [
-                            {
-                              "name": "level",
-                              "layout": {
-                                "size": "Int32",
-                                "kind": "Int"
-                              },
-                              "data_kind": {
-                                "size": 4,
-                                "kind": "Float"
-                              },
-                              "kind": "named"
-                            },
-                            {
                               "kind": "dyn",
                               "num_fields": 1,
                               "size": "Uint30"
                             },
-                            {
-                              "name": "batches",
-                              "layout": {
-                                "layout": {
-                                  "name": "fitness.elem",
-                                  "kind": "Ref"
-                                },
-                                "kind": "Seq"
-                              },
-                              "data_kind": {
-                                "kind": "Variable"
-                              },
-                              "kind": "named"
-                            },
-                            {
-                              "name": "predecessor",
-                              "layout": {
-                                "name": "X_8",
-                                "kind": "Ref"
-                              },
-                              "data_kind": {
-                                "kind": "Dynamic"
-                              },
-                              "kind": "named"
-                            },
-                            {
-                              "name": "inbox_hash",
-                              "layout": {
-                                "kind": "Bytes"
-                              },
-                              "data_kind": {
-                                "size": 32,
-                                "kind": "Float"
-                              },
-                              "kind": "named"
-                            }
-                          ]
-                        }
-                      },
-                      {
-                        "description": {
-                          "title": "alpha.scripted.contracts"
-                        },
-                        "encoding": {
-                          "fields": [
-                            {
-                              "kind": "dyn",
-                              "num_fields": 1,
-                              "size": "Uint30"
-                            },
-                            {
-                              "name": "code",
-                              "layout": {
-                                "kind": "Bytes"
-                              },
-                              "data_kind": {
-                                "kind": "Variable"
-                              },
-                              "kind": "named"
-                            },
-                            {
-                              "kind": "dyn",
-                              "num_fields": 1,
-                              "size": "Uint30"
-                            },
-                            {
-                              "name": "storage",
-                              "layout": {
-                                "kind": "Bytes"
-                              },
-                              "data_kind": {
-                                "kind": "Variable"
-                              },
-                              "kind": "named"
-                            }
-                          ]
-                        }
-                      },
-                      {
-                        "description": {
-                          "title": "alpha.transaction_destination"
-                        },
-                        "encoding": {
-                          "tag_size": "Uint8",
-                          "kind": {
-                            "size": 22,
-                            "kind": "Float"
-                          },
-                          "cases": [
-                            {
-                              "tag": 0,
-                              "fields": [
-                                {
-                                  "name": "Tag",
-                                  "layout": {
-                                    "size": "Uint8",
-                                    "kind": "Int"
-                                  },
-                                  "data_kind": {
-                                    "size": 1,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "name": "Signature.Public_key_hash",
-                                  "layout": {
-                                    "name": "public_key_hash",
-                                    "kind": "Ref"
-                                  },
-                                  "data_kind": {
-                                    "size": 21,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                }
-                              ],
-                              "name": "Implicit"
-                            },
-                            {
-                              "tag": 1,
-                              "fields": [
-                                {
-                                  "name": "Tag",
-                                  "layout": {
-                                    "size": "Uint8",
-                                    "kind": "Int"
-                                  },
-                                  "data_kind": {
-                                    "size": 1,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "name": "Contract_hash",
-                                  "layout": {
-                                    "kind": "Bytes"
-                                  },
-                                  "data_kind": {
-                                    "size": 20,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "name": "padding",
-                                  "layout": {
-                                    "kind": "Padding"
-                                  },
-                                  "data_kind": {
-                                    "size": 1,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                }
-                              ],
-                              "name": "Originated"
-                            },
-                            {
-                              "tag": 2,
-                              "fields": [
-                                {
-                                  "name": "Tag",
-                                  "layout": {
-                                    "size": "Uint8",
-                                    "kind": "Int"
-                                  },
-                                  "data_kind": {
-                                    "size": 1,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "name": "Rollup_hash",
-                                  "layout": {
-                                    "kind": "Bytes"
-                                  },
-                                  "data_kind": {
-                                    "size": 20,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "name": "padding",
-                                  "layout": {
-                                    "kind": "Padding"
-                                  },
-                                  "data_kind": {
-                                    "size": 1,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                }
-                              ],
-                              "name": "Tx_rollup"
-                            }
-                          ]
-                        }
-                      },
-                      {
-                        "description": {
-                          "title": "alpha.entrypoint"
-                        },
-                        "encoding": {
-                          "tag_size": "Uint8",
-                          "kind": {
-                            "kind": "Dynamic"
-                          },
-                          "cases": [
-                            {
-                              "tag": 0,
-                              "fields": [
-                                {
-                                  "name": "Tag",
-                                  "layout": {
-                                    "size": "Uint8",
-                                    "kind": "Int"
-                                  },
-                                  "data_kind": {
-                                    "size": 1,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "layout": {
-                                    "kind": "Zero_width"
-                                  },
-                                  "kind": "anon",
-                                  "data_kind": {
-                                    "size": 0,
-                                    "kind": "Float"
-                                  }
-                                }
-                              ],
-                              "name": "default"
-                            },
-                            {
-                              "tag": 1,
-                              "fields": [
-                                {
-                                  "name": "Tag",
-                                  "layout": {
-                                    "size": "Uint8",
-                                    "kind": "Int"
-                                  },
-                                  "data_kind": {
-                                    "size": 1,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "layout": {
-                                    "kind": "Zero_width"
-                                  },
-                                  "kind": "anon",
-                                  "data_kind": {
-                                    "size": 0,
-                                    "kind": "Float"
-                                  }
-                                }
-                              ],
-                              "name": "root"
-                            },
-                            {
-                              "tag": 2,
-                              "fields": [
-                                {
-                                  "name": "Tag",
-                                  "layout": {
-                                    "size": "Uint8",
-                                    "kind": "Int"
-                                  },
-                                  "data_kind": {
-                                    "size": 1,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "layout": {
-                                    "kind": "Zero_width"
-                                  },
-                                  "kind": "anon",
-                                  "data_kind": {
-                                    "size": 0,
-                                    "kind": "Float"
-                                  }
-                                }
-                              ],
-                              "name": "do"
-                            },
-                            {
-                              "tag": 3,
-                              "fields": [
-                                {
-                                  "name": "Tag",
-                                  "layout": {
-                                    "size": "Uint8",
-                                    "kind": "Int"
-                                  },
-                                  "data_kind": {
-                                    "size": 1,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "layout": {
-                                    "kind": "Zero_width"
-                                  },
-                                  "kind": "anon",
-                                  "data_kind": {
-                                    "size": 0,
-                                    "kind": "Float"
-                                  }
-                                }
-                              ],
-                              "name": "set_delegate"
-                            },
-                            {
-                              "tag": 4,
-                              "fields": [
-                                {
-                                  "name": "Tag",
-                                  "layout": {
-                                    "size": "Uint8",
-                                    "kind": "Int"
-                                  },
-                                  "data_kind": {
-                                    "size": 1,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "layout": {
-                                    "kind": "Zero_width"
-                                  },
-                                  "kind": "anon",
-                                  "data_kind": {
-                                    "size": 0,
-                                    "kind": "Float"
-                                  }
-                                }
-                              ],
-                              "name": "remove_delegate"
-                            },
-                            {
-                              "tag": 255,
-                              "fields": [
-                                {
-                                  "name": "Tag",
-                                  "layout": {
-                                    "size": "Uint8",
-                                    "kind": "Int"
-                                  },
-                                  "data_kind": {
-                                    "size": 1,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "kind": "dyn",
-                                  "num_fields": 1,
-                                  "size": "Uint8"
-                                },
-                                {
-                                  "layout": {
-                                    "kind": "String"
-                                  },
-                                  "kind": "anon",
-                                  "data_kind": {
-                                    "kind": "Variable"
-                                  }
-                                }
-                              ],
-                              "name": "named"
-                            }
-                          ]
-                        }
-                      },
-                      {
-                        "description": {
-                          "title": "X_9"
-                        },
-                        "encoding": {
-                          "fields": [
-                            {
-                              "name": "entrypoint",
-                              "layout": {
-                                "name": "alpha.entrypoint",
-                                "kind": "Ref"
-                              },
-                              "data_kind": {
-                                "kind": "Dynamic"
-                              },
-                              "kind": "named"
-                            },
-                            {
-                              "kind": "dyn",
-                              "num_fields": 1,
-                              "size": "Uint30"
-                            },
-                            {
-                              "name": "value",
-                              "layout": {
-                                "kind": "Bytes"
-                              },
-                              "data_kind": {
-                                "kind": "Variable"
-                              },
-                              "kind": "named"
-                            }
-                          ]
-                        }
-                      },
-                      {
-                        "description": {
-                          "title": "N.t",
-                          "description": "A variable-length sequence of bytes encoding a Zarith natural number. Each byte has a running unary size bit: the most significant bit of each byte indicates whether this is the last byte in the sequence (0) or whether the sequence continues (1). Size bits ignored, the data is the binary representation of the number in little-endian order."
-                        },
-                        "encoding": {
-                          "fields": [
-                            {
-                              "name": "N.t",
-                              "layout": {
-                                "kind": "Bytes"
-                              },
-                              "data_kind": {
-                                "kind": "Dynamic"
-                              },
-                              "kind": "named"
-                            }
-                          ]
-                        }
-                      },
-                      {
-                        "description": {
-                          "title": "public_key"
-                        },
-                        "encoding": {
-                          "tag_size": "Uint8",
-                          "kind": {
-                            "kind": "Dynamic"
-                          },
-                          "cases": [
-                            {
-                              "tag": 0,
-                              "fields": [
-                                {
-                                  "name": "Tag",
-                                  "layout": {
-                                    "size": "Uint8",
-                                    "kind": "Int"
-                                  },
-                                  "data_kind": {
-                                    "size": 1,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "name": "Ed25519.Public_key",
-                                  "layout": {
-                                    "kind": "Bytes"
-                                  },
-                                  "data_kind": {
-                                    "size": 32,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                }
-                              ],
-                              "name": "Ed25519"
-                            },
-                            {
-                              "tag": 1,
-                              "fields": [
-                                {
-                                  "name": "Tag",
-                                  "layout": {
-                                    "size": "Uint8",
-                                    "kind": "Int"
-                                  },
-                                  "data_kind": {
-                                    "size": 1,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "name": "Secp256k1.Public_key",
-                                  "layout": {
-                                    "kind": "Bytes"
-                                  },
-                                  "data_kind": {
-                                    "size": 33,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                }
-                              ],
-                              "name": "Secp256k1"
-                            },
-                            {
-                              "tag": 2,
-                              "fields": [
-                                {
-                                  "name": "Tag",
-                                  "layout": {
-                                    "size": "Uint8",
-                                    "kind": "Int"
-                                  },
-                                  "data_kind": {
-                                    "size": 1,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "name": "P256.Public_key",
-                                  "layout": {
-                                    "kind": "Bytes"
-                                  },
-                                  "data_kind": {
-                                    "size": 33,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                }
-                              ],
-                              "name": "P256"
-                            }
-                          ]
-                        }
-                      },
-                      {
-                        "description": {
-                          "title": "alpha.inlined.preendorsement.contents"
-                        },
-                        "encoding": {
-                          "tag_size": "Uint8",
-                          "kind": {
-                            "size": 43,
-                            "kind": "Float"
-                          },
-                          "cases": [
-                            {
-                              "tag": 20,
-                              "fields": [
-                                {
-                                  "name": "Tag",
-                                  "layout": {
-                                    "size": "Uint8",
-                                    "kind": "Int"
-                                  },
-                                  "data_kind": {
-                                    "size": 1,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "name": "slot",
-                                  "layout": {
-                                    "size": "Uint16",
-                                    "kind": "Int"
-                                  },
-                                  "data_kind": {
-                                    "size": 2,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "name": "level",
-                                  "layout": {
-                                    "size": "Int32",
-                                    "kind": "Int"
-                                  },
-                                  "data_kind": {
-                                    "size": 4,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "name": "round",
-                                  "layout": {
-                                    "size": "Int32",
-                                    "kind": "Int"
-                                  },
-                                  "data_kind": {
-                                    "size": 4,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "name": "block_payload_hash",
-                                  "layout": {
-                                    "kind": "Bytes"
-                                  },
-                                  "data_kind": {
-                                    "size": 32,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                }
-                              ],
-                              "name": "Preendorsement"
-                            }
-                          ]
-                        }
-                      },
-                      {
-                        "description": {
-                          "title": "alpha.inlined.preendorsement"
-                        },
-                        "encoding": {
-                          "fields": [
                             {
                               "name": "branch",
                               "layout": {
@@ -3856,319 +3229,21 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                               "kind": "named"
                             },
                             {
-                              "name": "operations",
-                              "layout": {
-                                "name": "alpha.inlined.preendorsement.contents",
-                                "kind": "Ref"
-                              },
-                              "data_kind": {
-                                "size": 43,
-                                "kind": "Float"
-                              },
-                              "kind": "named"
-                            },
-                            {
-                              "name": "signature",
-                              "layout": {
-                                "kind": "Bytes"
-                              },
-                              "data_kind": {
-                                "kind": "Variable"
-                              },
-                              "kind": "named"
-                            }
-                          ]
-                        }
-                      },
-                      {
-                        "description": {
-                          "title": "public_key_hash"
-                        },
-                        "encoding": {
-                          "tag_size": "Uint8",
-                          "kind": {
-                            "size": 21,
-                            "kind": "Float"
-                          },
-                          "cases": [
-                            {
-                              "tag": 0,
-                              "fields": [
-                                {
-                                  "name": "Tag",
-                                  "layout": {
-                                    "size": "Uint8",
-                                    "kind": "Int"
-                                  },
-                                  "data_kind": {
-                                    "size": 1,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "name": "Ed25519.Public_key_hash",
-                                  "layout": {
-                                    "kind": "Bytes"
-                                  },
-                                  "data_kind": {
-                                    "size": 20,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                }
-                              ],
-                              "name": "Ed25519"
-                            },
-                            {
-                              "tag": 1,
-                              "fields": [
-                                {
-                                  "name": "Tag",
-                                  "layout": {
-                                    "size": "Uint8",
-                                    "kind": "Int"
-                                  },
-                                  "data_kind": {
-                                    "size": 1,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "name": "Secp256k1.Public_key_hash",
-                                  "layout": {
-                                    "kind": "Bytes"
-                                  },
-                                  "data_kind": {
-                                    "size": 20,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                }
-                              ],
-                              "name": "Secp256k1"
-                            },
-                            {
-                              "tag": 2,
-                              "fields": [
-                                {
-                                  "name": "Tag",
-                                  "layout": {
-                                    "size": "Uint8",
-                                    "kind": "Int"
-                                  },
-                                  "data_kind": {
-                                    "size": 1,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "name": "P256.Public_key_hash",
-                                  "layout": {
-                                    "kind": "Bytes"
-                                  },
-                                  "data_kind": {
-                                    "size": 20,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                }
-                              ],
-                              "name": "P256"
-                            }
-                          ]
-                        }
-                      },
-                      {
-                        "description": {
-                          "title": "fitness.elem"
-                        },
-                        "encoding": {
-                          "fields": [
-                            {
                               "kind": "dyn",
-                              "num_fields": 1,
+                              "num_fields": 2,
                               "size": "Uint30"
                             },
                             {
-                              "layout": {
-                                "kind": "Bytes"
-                              },
-                              "kind": "anon",
-                              "data_kind": {
-                                "kind": "Variable"
-                              }
-                            }
-                          ]
-                        }
-                      },
-                      {
-                        "description": {
-                          "title": "alpha.block_header.alpha.full_header"
-                        },
-                        "encoding": {
-                          "fields": [
-                            {
-                              "name": "level",
-                              "layout": {
-                                "size": "Int32",
-                                "kind": "Int"
-                              },
-                              "data_kind": {
-                                "size": 4,
-                                "kind": "Float"
-                              },
-                              "kind": "named"
-                            },
-                            {
-                              "name": "proto",
-                              "layout": {
-                                "size": "Uint8",
-                                "kind": "Int"
-                              },
-                              "data_kind": {
-                                "size": 1,
-                                "kind": "Float"
-                              },
-                              "kind": "named"
-                            },
-                            {
-                              "name": "predecessor",
-                              "layout": {
-                                "kind": "Bytes"
-                              },
-                              "data_kind": {
-                                "size": 32,
-                                "kind": "Float"
-                              },
-                              "kind": "named"
-                            },
-                            {
-                              "name": "timestamp",
-                              "layout": {
-                                "size": "Int64",
-                                "kind": "Int"
-                              },
-                              "data_kind": {
-                                "size": 8,
-                                "kind": "Float"
-                              },
-                              "kind": "named"
-                            },
-                            {
-                              "name": "validation_pass",
-                              "layout": {
-                                "size": "Uint8",
-                                "kind": "Int"
-                              },
-                              "data_kind": {
-                                "size": 1,
-                                "kind": "Float"
-                              },
-                              "kind": "named"
-                            },
-                            {
-                              "name": "operations_hash",
-                              "layout": {
-                                "kind": "Bytes"
-                              },
-                              "data_kind": {
-                                "size": 32,
-                                "kind": "Float"
-                              },
-                              "kind": "named"
-                            },
-                            {
-                              "kind": "dyn",
-                              "name": "fitness",
-                              "num_fields": 1,
-                              "size": "Uint30"
-                            },
-                            {
-                              "name": "fitness",
+                              "name": "contents",
                               "layout": {
                                 "layout": {
-                                  "name": "fitness.elem",
+                                  "name": "alpha.operation.alpha.contents",
                                   "kind": "Ref"
                                 },
                                 "kind": "Seq"
                               },
                               "data_kind": {
                                 "kind": "Variable"
-                              },
-                              "kind": "named"
-                            },
-                            {
-                              "name": "context",
-                              "layout": {
-                                "kind": "Bytes"
-                              },
-                              "data_kind": {
-                                "size": 32,
-                                "kind": "Float"
-                              },
-                              "kind": "named"
-                            },
-                            {
-                              "name": "payload_hash",
-                              "layout": {
-                                "kind": "Bytes"
-                              },
-                              "data_kind": {
-                                "size": 32,
-                                "kind": "Float"
-                              },
-                              "kind": "named"
-                            },
-                            {
-                              "name": "payload_round",
-                              "layout": {
-                                "size": "Int32",
-                                "kind": "Int"
-                              },
-                              "data_kind": {
-                                "size": 4,
-                                "kind": "Float"
-                              },
-                              "kind": "named"
-                            },
-                            {
-                              "name": "proof_of_work_nonce",
-                              "layout": {
-                                "kind": "Bytes"
-                              },
-                              "data_kind": {
-                                "size": 8,
-                                "kind": "Float"
-                              },
-                              "kind": "named"
-                            },
-                            {
-                              "kind": "option_indicator",
-                              "name": "seed_nonce_hash"
-                            },
-                            {
-                              "name": "seed_nonce_hash",
-                              "layout": {
-                                "kind": "Bytes"
-                              },
-                              "data_kind": {
-                                "size": 32,
-                                "kind": "Float"
-                              },
-                              "kind": "named"
-                            },
-                            {
-                              "name": "liquidity_baking_toggle_vote",
-                              "layout": {
-                                "size": "Int8",
-                                "kind": "Int"
-                              },
-                              "data_kind": {
-                                "size": 1,
-                                "kind": "Float"
                               },
                               "kind": "named"
                             },
@@ -4182,122 +3257,17 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 "kind": "Float"
                               },
                               "kind": "named"
-                            }
-                          ]
-                        }
-                      },
-                      {
-                        "description": {
-                          "title": "alpha.inlined.endorsement_mempool.contents"
-                        },
-                        "encoding": {
-                          "tag_size": "Uint8",
-                          "kind": {
-                            "size": 43,
-                            "kind": "Float"
-                          },
-                          "cases": [
-                            {
-                              "tag": 21,
-                              "fields": [
-                                {
-                                  "name": "Tag",
-                                  "layout": {
-                                    "size": "Uint8",
-                                    "kind": "Int"
-                                  },
-                                  "data_kind": {
-                                    "size": 1,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "name": "slot",
-                                  "layout": {
-                                    "size": "Uint16",
-                                    "kind": "Int"
-                                  },
-                                  "data_kind": {
-                                    "size": 2,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "name": "level",
-                                  "layout": {
-                                    "size": "Int32",
-                                    "kind": "Int"
-                                  },
-                                  "data_kind": {
-                                    "size": 4,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "name": "round",
-                                  "layout": {
-                                    "size": "Int32",
-                                    "kind": "Int"
-                                  },
-                                  "data_kind": {
-                                    "size": 4,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "name": "block_payload_hash",
-                                  "layout": {
-                                    "kind": "Bytes"
-                                  },
-                                  "data_kind": {
-                                    "size": 32,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                }
-                              ],
-                              "name": "Endorsement"
-                            }
-                          ]
-                        }
-                      },
-                      {
-                        "description": {
-                          "title": "alpha.inlined.endorsement"
-                        },
-                        "encoding": {
-                          "fields": [
-                            {
-                              "name": "branch",
-                              "layout": {
-                                "kind": "Bytes"
-                              },
-                              "data_kind": {
-                                "size": 32,
-                                "kind": "Float"
-                              },
-                              "kind": "named"
                             },
                             {
-                              "name": "operations",
-                              "layout": {
-                                "name": "alpha.inlined.endorsement_mempool.contents",
-                                "kind": "Ref"
-                              },
-                              "data_kind": {
-                                "size": 43,
-                                "kind": "Float"
-                              },
-                              "kind": "named"
+                              "kind": "dyn",
+                              "name": "error_opt",
+                              "num_fields": 1,
+                              "size": "Uint30"
                             },
                             {
-                              "name": "signature",
+                              "name": "error",
                               "layout": {
-                                "kind": "Bytes"
+                                "kind": "String"
                               },
                               "data_kind": {
                                 "kind": "Variable"
@@ -5022,7 +3992,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 {
                                   "name": "parameters",
                                   "layout": {
-                                    "name": "X_9",
+                                    "name": "X_12",
                                     "kind": "Ref"
                                   },
                                   "data_kind": {
@@ -5687,7 +4657,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 {
                                   "name": "commitment",
                                   "layout": {
-                                    "name": "X_6",
+                                    "name": "X_10",
                                     "kind": "Ref"
                                   },
                                   "data_kind": {
@@ -6050,7 +5020,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 {
                                   "name": "message",
                                   "layout": {
-                                    "name": "X_5",
+                                    "name": "X_9",
                                     "kind": "Ref"
                                   },
                                   "data_kind": {
@@ -6082,6 +5052,222 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 }
                               ],
                               "name": "Tx_rollup_rejection"
+                            },
+                            {
+                              "tag": 157,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "source",
+                                  "layout": {
+                                    "name": "public_key_hash",
+                                    "kind": "Ref"
+                                  },
+                                  "data_kind": {
+                                    "size": 21,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "fee",
+                                  "layout": {
+                                    "name": "N.t",
+                                    "kind": "Ref"
+                                  },
+                                  "data_kind": {
+                                    "kind": "Dynamic"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "counter",
+                                  "layout": {
+                                    "name": "N.t",
+                                    "kind": "Ref"
+                                  },
+                                  "data_kind": {
+                                    "kind": "Dynamic"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "gas_limit",
+                                  "layout": {
+                                    "name": "N.t",
+                                    "kind": "Ref"
+                                  },
+                                  "data_kind": {
+                                    "kind": "Dynamic"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "storage_limit",
+                                  "layout": {
+                                    "name": "N.t",
+                                    "kind": "Ref"
+                                  },
+                                  "data_kind": {
+                                    "kind": "Dynamic"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "tx_rollup",
+                                  "layout": {
+                                    "kind": "Bytes"
+                                  },
+                                  "data_kind": {
+                                    "size": 20,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "level",
+                                  "layout": {
+                                    "size": "Int32",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 4,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "kind": "dyn",
+                                  "num_fields": 1,
+                                  "size": "Uint30"
+                                },
+                                {
+                                  "name": "context_hash",
+                                  "layout": {
+                                    "kind": "Bytes"
+                                  },
+                                  "data_kind": {
+                                    "kind": "Variable"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "message_index",
+                                  "layout": {
+                                    "min": -1073741824,
+                                    "max": 1073741823,
+                                    "kind": "RangedInt"
+                                  },
+                                  "data_kind": {
+                                    "size": 4,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "withdraw_path",
+                                  "layout": {
+                                    "name": "path",
+                                    "kind": "Ref"
+                                  },
+                                  "data_kind": {
+                                    "kind": "Dynamic"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "kind": "dyn",
+                                  "num_fields": 1,
+                                  "size": "Uint30"
+                                },
+                                {
+                                  "name": "ticket_contents",
+                                  "layout": {
+                                    "kind": "Bytes"
+                                  },
+                                  "data_kind": {
+                                    "kind": "Variable"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "kind": "dyn",
+                                  "num_fields": 1,
+                                  "size": "Uint30"
+                                },
+                                {
+                                  "name": "ticket_ty",
+                                  "layout": {
+                                    "kind": "Bytes"
+                                  },
+                                  "data_kind": {
+                                    "kind": "Variable"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "ticket_ticketer",
+                                  "layout": {
+                                    "name": "alpha.contract_id",
+                                    "kind": "Ref"
+                                  },
+                                  "data_kind": {
+                                    "size": 22,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "ticket_amount",
+                                  "layout": {
+                                    "name": "X_8",
+                                    "kind": "Ref"
+                                  },
+                                  "data_kind": {
+                                    "kind": "Dynamic"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "destination",
+                                  "layout": {
+                                    "name": "alpha.contract_id",
+                                    "kind": "Ref"
+                                  },
+                                  "data_kind": {
+                                    "size": 22,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "kind": "dyn",
+                                  "num_fields": 1,
+                                  "size": "Uint30"
+                                },
+                                {
+                                  "name": "entrypoint",
+                                  "layout": {
+                                    "kind": "String"
+                                  },
+                                  "data_kind": {
+                                    "kind": "Variable"
+                                  },
+                                  "kind": "named"
+                                }
+                              ],
+                              "name": "Tx_rollup_withdraw"
                             },
                             {
                               "tag": 200,
@@ -6399,26 +5585,10 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "X_0"
+                          "title": "alpha.inlined.endorsement"
                         },
                         "encoding": {
                           "fields": [
-                            {
-                              "name": "hash",
-                              "layout": {
-                                "kind": "Bytes"
-                              },
-                              "data_kind": {
-                                "size": 32,
-                                "kind": "Float"
-                              },
-                              "kind": "named"
-                            },
-                            {
-                              "kind": "dyn",
-                              "num_fields": 1,
-                              "size": "Uint30"
-                            },
                             {
                               "name": "branch",
                               "layout": {
@@ -6431,21 +5601,274 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                               "kind": "named"
                             },
                             {
+                              "name": "operations",
+                              "layout": {
+                                "name": "alpha.inlined.endorsement_mempool.contents",
+                                "kind": "Ref"
+                              },
+                              "data_kind": {
+                                "size": 43,
+                                "kind": "Float"
+                              },
+                              "kind": "named"
+                            },
+                            {
+                              "name": "signature",
+                              "layout": {
+                                "kind": "Bytes"
+                              },
+                              "data_kind": {
+                                "kind": "Variable"
+                              },
+                              "kind": "named"
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "description": {
+                          "title": "alpha.inlined.endorsement_mempool.contents"
+                        },
+                        "encoding": {
+                          "tag_size": "Uint8",
+                          "kind": {
+                            "size": 43,
+                            "kind": "Float"
+                          },
+                          "cases": [
+                            {
+                              "tag": 21,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "slot",
+                                  "layout": {
+                                    "size": "Uint16",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 2,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "level",
+                                  "layout": {
+                                    "size": "Int32",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 4,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "round",
+                                  "layout": {
+                                    "size": "Int32",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 4,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "block_payload_hash",
+                                  "layout": {
+                                    "kind": "Bytes"
+                                  },
+                                  "data_kind": {
+                                    "size": 32,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                }
+                              ],
+                              "name": "Endorsement"
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "description": {
+                          "title": "alpha.block_header.alpha.full_header"
+                        },
+                        "encoding": {
+                          "fields": [
+                            {
+                              "name": "level",
+                              "layout": {
+                                "size": "Int32",
+                                "kind": "Int"
+                              },
+                              "data_kind": {
+                                "size": 4,
+                                "kind": "Float"
+                              },
+                              "kind": "named"
+                            },
+                            {
+                              "name": "proto",
+                              "layout": {
+                                "size": "Uint8",
+                                "kind": "Int"
+                              },
+                              "data_kind": {
+                                "size": 1,
+                                "kind": "Float"
+                              },
+                              "kind": "named"
+                            },
+                            {
+                              "name": "predecessor",
+                              "layout": {
+                                "kind": "Bytes"
+                              },
+                              "data_kind": {
+                                "size": 32,
+                                "kind": "Float"
+                              },
+                              "kind": "named"
+                            },
+                            {
+                              "name": "timestamp",
+                              "layout": {
+                                "size": "Int64",
+                                "kind": "Int"
+                              },
+                              "data_kind": {
+                                "size": 8,
+                                "kind": "Float"
+                              },
+                              "kind": "named"
+                            },
+                            {
+                              "name": "validation_pass",
+                              "layout": {
+                                "size": "Uint8",
+                                "kind": "Int"
+                              },
+                              "data_kind": {
+                                "size": 1,
+                                "kind": "Float"
+                              },
+                              "kind": "named"
+                            },
+                            {
+                              "name": "operations_hash",
+                              "layout": {
+                                "kind": "Bytes"
+                              },
+                              "data_kind": {
+                                "size": 32,
+                                "kind": "Float"
+                              },
+                              "kind": "named"
+                            },
+                            {
                               "kind": "dyn",
-                              "num_fields": 2,
+                              "name": "fitness",
+                              "num_fields": 1,
                               "size": "Uint30"
                             },
                             {
-                              "name": "contents",
+                              "name": "fitness",
                               "layout": {
                                 "layout": {
-                                  "name": "alpha.operation.alpha.contents",
+                                  "name": "fitness.elem",
                                   "kind": "Ref"
                                 },
                                 "kind": "Seq"
                               },
                               "data_kind": {
                                 "kind": "Variable"
+                              },
+                              "kind": "named"
+                            },
+                            {
+                              "name": "context",
+                              "layout": {
+                                "kind": "Bytes"
+                              },
+                              "data_kind": {
+                                "size": 32,
+                                "kind": "Float"
+                              },
+                              "kind": "named"
+                            },
+                            {
+                              "name": "payload_hash",
+                              "layout": {
+                                "kind": "Bytes"
+                              },
+                              "data_kind": {
+                                "size": 32,
+                                "kind": "Float"
+                              },
+                              "kind": "named"
+                            },
+                            {
+                              "name": "payload_round",
+                              "layout": {
+                                "size": "Int32",
+                                "kind": "Int"
+                              },
+                              "data_kind": {
+                                "size": 4,
+                                "kind": "Float"
+                              },
+                              "kind": "named"
+                            },
+                            {
+                              "name": "proof_of_work_nonce",
+                              "layout": {
+                                "kind": "Bytes"
+                              },
+                              "data_kind": {
+                                "size": 8,
+                                "kind": "Float"
+                              },
+                              "kind": "named"
+                            },
+                            {
+                              "kind": "option_indicator",
+                              "name": "seed_nonce_hash"
+                            },
+                            {
+                              "name": "seed_nonce_hash",
+                              "layout": {
+                                "kind": "Bytes"
+                              },
+                              "data_kind": {
+                                "size": 32,
+                                "kind": "Float"
+                              },
+                              "kind": "named"
+                            },
+                            {
+                              "name": "liquidity_baking_toggle_vote",
+                              "layout": {
+                                "size": "Int8",
+                                "kind": "Int"
+                              },
+                              "data_kind": {
+                                "size": 1,
+                                "kind": "Float"
                               },
                               "kind": "named"
                             },
@@ -6459,22 +5882,1413 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 "kind": "Float"
                               },
                               "kind": "named"
-                            },
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "description": {
+                          "title": "fitness.elem"
+                        },
+                        "encoding": {
+                          "fields": [
                             {
                               "kind": "dyn",
-                              "name": "error_opt",
                               "num_fields": 1,
                               "size": "Uint30"
                             },
                             {
-                              "name": "error",
                               "layout": {
-                                "kind": "String"
+                                "kind": "Bytes"
+                              },
+                              "kind": "anon",
+                              "data_kind": {
+                                "kind": "Variable"
+                              }
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "description": {
+                          "title": "public_key_hash"
+                        },
+                        "encoding": {
+                          "tag_size": "Uint8",
+                          "kind": {
+                            "size": 21,
+                            "kind": "Float"
+                          },
+                          "cases": [
+                            {
+                              "tag": 0,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "Ed25519.Public_key_hash",
+                                  "layout": {
+                                    "kind": "Bytes"
+                                  },
+                                  "data_kind": {
+                                    "size": 20,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                }
+                              ],
+                              "name": "Ed25519"
+                            },
+                            {
+                              "tag": 1,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "Secp256k1.Public_key_hash",
+                                  "layout": {
+                                    "kind": "Bytes"
+                                  },
+                                  "data_kind": {
+                                    "size": 20,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                }
+                              ],
+                              "name": "Secp256k1"
+                            },
+                            {
+                              "tag": 2,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "P256.Public_key_hash",
+                                  "layout": {
+                                    "kind": "Bytes"
+                                  },
+                                  "data_kind": {
+                                    "size": 20,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                }
+                              ],
+                              "name": "P256"
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "description": {
+                          "title": "alpha.inlined.preendorsement"
+                        },
+                        "encoding": {
+                          "fields": [
+                            {
+                              "name": "branch",
+                              "layout": {
+                                "kind": "Bytes"
+                              },
+                              "data_kind": {
+                                "size": 32,
+                                "kind": "Float"
+                              },
+                              "kind": "named"
+                            },
+                            {
+                              "name": "operations",
+                              "layout": {
+                                "name": "alpha.inlined.preendorsement.contents",
+                                "kind": "Ref"
+                              },
+                              "data_kind": {
+                                "size": 43,
+                                "kind": "Float"
+                              },
+                              "kind": "named"
+                            },
+                            {
+                              "name": "signature",
+                              "layout": {
+                                "kind": "Bytes"
                               },
                               "data_kind": {
                                 "kind": "Variable"
                               },
                               "kind": "named"
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "description": {
+                          "title": "alpha.inlined.preendorsement.contents"
+                        },
+                        "encoding": {
+                          "tag_size": "Uint8",
+                          "kind": {
+                            "size": 43,
+                            "kind": "Float"
+                          },
+                          "cases": [
+                            {
+                              "tag": 20,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "slot",
+                                  "layout": {
+                                    "size": "Uint16",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 2,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "level",
+                                  "layout": {
+                                    "size": "Int32",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 4,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "round",
+                                  "layout": {
+                                    "size": "Int32",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 4,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "block_payload_hash",
+                                  "layout": {
+                                    "kind": "Bytes"
+                                  },
+                                  "data_kind": {
+                                    "size": 32,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                }
+                              ],
+                              "name": "Preendorsement"
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "description": {
+                          "title": "public_key"
+                        },
+                        "encoding": {
+                          "tag_size": "Uint8",
+                          "kind": {
+                            "kind": "Dynamic"
+                          },
+                          "cases": [
+                            {
+                              "tag": 0,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "Ed25519.Public_key",
+                                  "layout": {
+                                    "kind": "Bytes"
+                                  },
+                                  "data_kind": {
+                                    "size": 32,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                }
+                              ],
+                              "name": "Ed25519"
+                            },
+                            {
+                              "tag": 1,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "Secp256k1.Public_key",
+                                  "layout": {
+                                    "kind": "Bytes"
+                                  },
+                                  "data_kind": {
+                                    "size": 33,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                }
+                              ],
+                              "name": "Secp256k1"
+                            },
+                            {
+                              "tag": 2,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "P256.Public_key",
+                                  "layout": {
+                                    "kind": "Bytes"
+                                  },
+                                  "data_kind": {
+                                    "size": 33,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                }
+                              ],
+                              "name": "P256"
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "description": {
+                          "title": "N.t",
+                          "description": "A variable-length sequence of bytes encoding a Zarith natural number. Each byte has a running unary size bit: the most significant bit of each byte indicates whether this is the last byte in the sequence (0) or whether the sequence continues (1). Size bits ignored, the data is the binary representation of the number in little-endian order."
+                        },
+                        "encoding": {
+                          "fields": [
+                            {
+                              "name": "N.t",
+                              "layout": {
+                                "kind": "Bytes"
+                              },
+                              "data_kind": {
+                                "kind": "Dynamic"
+                              },
+                              "kind": "named"
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "description": {
+                          "title": "X_12"
+                        },
+                        "encoding": {
+                          "fields": [
+                            {
+                              "name": "entrypoint",
+                              "layout": {
+                                "name": "alpha.entrypoint",
+                                "kind": "Ref"
+                              },
+                              "data_kind": {
+                                "kind": "Dynamic"
+                              },
+                              "kind": "named"
+                            },
+                            {
+                              "kind": "dyn",
+                              "num_fields": 1,
+                              "size": "Uint30"
+                            },
+                            {
+                              "name": "value",
+                              "layout": {
+                                "kind": "Bytes"
+                              },
+                              "data_kind": {
+                                "kind": "Variable"
+                              },
+                              "kind": "named"
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "description": {
+                          "title": "alpha.entrypoint"
+                        },
+                        "encoding": {
+                          "tag_size": "Uint8",
+                          "kind": {
+                            "kind": "Dynamic"
+                          },
+                          "cases": [
+                            {
+                              "tag": 0,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "layout": {
+                                    "kind": "Zero_width"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "size": 0,
+                                    "kind": "Float"
+                                  }
+                                }
+                              ],
+                              "name": "default"
+                            },
+                            {
+                              "tag": 1,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "layout": {
+                                    "kind": "Zero_width"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "size": 0,
+                                    "kind": "Float"
+                                  }
+                                }
+                              ],
+                              "name": "root"
+                            },
+                            {
+                              "tag": 2,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "layout": {
+                                    "kind": "Zero_width"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "size": 0,
+                                    "kind": "Float"
+                                  }
+                                }
+                              ],
+                              "name": "do"
+                            },
+                            {
+                              "tag": 3,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "layout": {
+                                    "kind": "Zero_width"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "size": 0,
+                                    "kind": "Float"
+                                  }
+                                }
+                              ],
+                              "name": "set_delegate"
+                            },
+                            {
+                              "tag": 4,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "layout": {
+                                    "kind": "Zero_width"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "size": 0,
+                                    "kind": "Float"
+                                  }
+                                }
+                              ],
+                              "name": "remove_delegate"
+                            },
+                            {
+                              "tag": 255,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "kind": "dyn",
+                                  "num_fields": 1,
+                                  "size": "Uint8"
+                                },
+                                {
+                                  "layout": {
+                                    "kind": "String"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "kind": "Variable"
+                                  }
+                                }
+                              ],
+                              "name": "named"
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "description": {
+                          "title": "alpha.transaction_destination"
+                        },
+                        "encoding": {
+                          "tag_size": "Uint8",
+                          "kind": {
+                            "size": 22,
+                            "kind": "Float"
+                          },
+                          "cases": [
+                            {
+                              "tag": 0,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "Signature.Public_key_hash",
+                                  "layout": {
+                                    "name": "public_key_hash",
+                                    "kind": "Ref"
+                                  },
+                                  "data_kind": {
+                                    "size": 21,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                }
+                              ],
+                              "name": "Implicit"
+                            },
+                            {
+                              "tag": 1,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "Contract_hash",
+                                  "layout": {
+                                    "kind": "Bytes"
+                                  },
+                                  "data_kind": {
+                                    "size": 20,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "padding",
+                                  "layout": {
+                                    "kind": "Padding"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                }
+                              ],
+                              "name": "Originated"
+                            },
+                            {
+                              "tag": 2,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "Rollup_hash",
+                                  "layout": {
+                                    "kind": "Bytes"
+                                  },
+                                  "data_kind": {
+                                    "size": 20,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "padding",
+                                  "layout": {
+                                    "kind": "Padding"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                }
+                              ],
+                              "name": "Tx_rollup"
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "description": {
+                          "title": "alpha.scripted.contracts"
+                        },
+                        "encoding": {
+                          "fields": [
+                            {
+                              "kind": "dyn",
+                              "num_fields": 1,
+                              "size": "Uint30"
+                            },
+                            {
+                              "name": "code",
+                              "layout": {
+                                "kind": "Bytes"
+                              },
+                              "data_kind": {
+                                "kind": "Variable"
+                              },
+                              "kind": "named"
+                            },
+                            {
+                              "kind": "dyn",
+                              "num_fields": 1,
+                              "size": "Uint30"
+                            },
+                            {
+                              "name": "storage",
+                              "layout": {
+                                "kind": "Bytes"
+                              },
+                              "data_kind": {
+                                "kind": "Variable"
+                              },
+                              "kind": "named"
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "description": {
+                          "title": "X_10"
+                        },
+                        "encoding": {
+                          "fields": [
+                            {
+                              "name": "level",
+                              "layout": {
+                                "size": "Int32",
+                                "kind": "Int"
+                              },
+                              "data_kind": {
+                                "size": 4,
+                                "kind": "Float"
+                              },
+                              "kind": "named"
+                            },
+                            {
+                              "kind": "dyn",
+                              "num_fields": 1,
+                              "size": "Uint30"
+                            },
+                            {
+                              "name": "batches",
+                              "layout": {
+                                "layout": {
+                                  "kind": "Bytes"
+                                },
+                                "kind": "Seq"
+                              },
+                              "data_kind": {
+                                "kind": "Variable"
+                              },
+                              "kind": "named"
+                            },
+                            {
+                              "name": "predecessor",
+                              "layout": {
+                                "name": "X_11",
+                                "kind": "Ref"
+                              },
+                              "data_kind": {
+                                "kind": "Dynamic"
+                              },
+                              "kind": "named"
+                            },
+                            {
+                              "name": "inbox_hash",
+                              "layout": {
+                                "kind": "Bytes"
+                              },
+                              "data_kind": {
+                                "size": 32,
+                                "kind": "Float"
+                              },
+                              "kind": "named"
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "description": {
+                          "title": "X_11"
+                        },
+                        "encoding": {
+                          "tag_size": "Uint8",
+                          "kind": {
+                            "kind": "Dynamic"
+                          },
+                          "cases": [
+                            {
+                              "tag": 0,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "layout": {
+                                    "kind": "Zero_width"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "size": 0,
+                                    "kind": "Float"
+                                  }
+                                }
+                              ],
+                              "name": "None"
+                            },
+                            {
+                              "tag": 1,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "Commitment_hash",
+                                  "layout": {
+                                    "kind": "Bytes"
+                                  },
+                                  "data_kind": {
+                                    "size": 32,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                }
+                              ],
+                              "name": "Some"
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "description": {
+                          "title": "X_9"
+                        },
+                        "encoding": {
+                          "tag_size": "Uint8",
+                          "kind": {
+                            "kind": "Dynamic"
+                          },
+                          "cases": [
+                            {
+                              "tag": 0,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "kind": "dyn",
+                                  "num_fields": 1,
+                                  "size": "Uint30"
+                                },
+                                {
+                                  "name": "batch",
+                                  "layout": {
+                                    "kind": "String"
+                                  },
+                                  "data_kind": {
+                                    "kind": "Variable"
+                                  },
+                                  "kind": "named"
+                                }
+                              ],
+                              "name": "Batch"
+                            },
+                            {
+                              "tag": 1,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "deposit",
+                                  "layout": {
+                                    "name": "X_7",
+                                    "kind": "Ref"
+                                  },
+                                  "data_kind": {
+                                    "kind": "Dynamic"
+                                  },
+                                  "kind": "named"
+                                }
+                              ],
+                              "name": "Deposit"
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "description": {
+                          "title": "X_7"
+                        },
+                        "encoding": {
+                          "fields": [
+                            {
+                              "name": "sender",
+                              "layout": {
+                                "name": "public_key_hash",
+                                "kind": "Ref"
+                              },
+                              "data_kind": {
+                                "size": 21,
+                                "kind": "Float"
+                              },
+                              "kind": "named"
+                            },
+                            {
+                              "name": "destination",
+                              "layout": {
+                                "kind": "Bytes"
+                              },
+                              "data_kind": {
+                                "size": 20,
+                                "kind": "Float"
+                              },
+                              "kind": "named"
+                            },
+                            {
+                              "name": "ticket_hash",
+                              "layout": {
+                                "kind": "Bytes"
+                              },
+                              "data_kind": {
+                                "size": 32,
+                                "kind": "Float"
+                              },
+                              "kind": "named"
+                            },
+                            {
+                              "name": "amount",
+                              "layout": {
+                                "name": "X_8",
+                                "kind": "Ref"
+                              },
+                              "data_kind": {
+                                "kind": "Dynamic"
+                              },
+                              "kind": "named"
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "description": {
+                          "title": "X_8"
+                        },
+                        "encoding": {
+                          "tag_size": "Uint8",
+                          "kind": {
+                            "kind": "Dynamic"
+                          },
+                          "cases": [
+                            {
+                              "tag": 0,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  }
+                                }
+                              ],
+                              "name": "case 0"
+                            },
+                            {
+                              "tag": 1,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "layout": {
+                                    "size": "Uint16",
+                                    "kind": "Int"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "size": 2,
+                                    "kind": "Float"
+                                  }
+                                }
+                              ],
+                              "name": "case 1"
+                            },
+                            {
+                              "tag": 2,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "layout": {
+                                    "size": "Int32",
+                                    "kind": "Int"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "size": 4,
+                                    "kind": "Float"
+                                  }
+                                }
+                              ],
+                              "name": "case 2"
+                            },
+                            {
+                              "tag": 3,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "layout": {
+                                    "size": "Int64",
+                                    "kind": "Int"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "size": 8,
+                                    "kind": "Float"
+                                  }
+                                }
+                              ],
+                              "name": "case 3"
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "description": {
+                          "title": "alpha.contract_id"
+                        },
+                        "encoding": {
+                          "tag_size": "Uint8",
+                          "kind": {
+                            "size": 22,
+                            "kind": "Float"
+                          },
+                          "cases": [
+                            {
+                              "tag": 0,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "Signature.Public_key_hash",
+                                  "layout": {
+                                    "name": "public_key_hash",
+                                    "kind": "Ref"
+                                  },
+                                  "data_kind": {
+                                    "size": 21,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                }
+                              ],
+                              "name": "Implicit"
+                            },
+                            {
+                              "tag": 1,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "Contract_hash",
+                                  "layout": {
+                                    "kind": "Bytes"
+                                  },
+                                  "data_kind": {
+                                    "size": 20,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "padding",
+                                  "layout": {
+                                    "kind": "Padding"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                }
+                              ],
+                              "name": "Originated"
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "description": {
+                          "title": "path"
+                        },
+                        "encoding": {
+                          "tag_size": "Uint8",
+                          "kind": {
+                            "kind": "Dynamic"
+                          },
+                          "cases": [
+                            {
+                              "tag": 0,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "layout": {
+                                    "kind": "Zero_width"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "size": 0,
+                                    "kind": "Float"
+                                  }
+                                }
+                              ],
+                              "name": "Op"
+                            },
+                            {
+                              "tag": 15,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "left",
+                                  "layout": {
+                                    "kind": "Bytes"
+                                  },
+                                  "data_kind": {
+                                    "size": 32,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "path",
+                                  "layout": {
+                                    "name": "path",
+                                    "kind": "Ref"
+                                  },
+                                  "data_kind": {
+                                    "kind": "Dynamic"
+                                  },
+                                  "kind": "named"
+                                }
+                              ],
+                              "name": "Right"
+                            },
+                            {
+                              "tag": 240,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "path",
+                                  "layout": {
+                                    "name": "path",
+                                    "kind": "Ref"
+                                  },
+                                  "data_kind": {
+                                    "kind": "Dynamic"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "right",
+                                  "layout": {
+                                    "kind": "Bytes"
+                                  },
+                                  "data_kind": {
+                                    "size": 32,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                }
+                              ],
+                              "name": "Left"
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "description": {
+                          "title": "X_2"
+                        },
+                        "encoding": {
+                          "tag_size": "Uint16",
+                          "kind": {
+                            "size": 2,
+                            "kind": "Float"
+                          },
+                          "cases": [
+                            {
+                              "tag": 0,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint16",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 2,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "layout": {
+                                    "kind": "Zero_width"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "size": 0,
+                                    "kind": "Float"
+                                  }
+                                }
+                              ],
+                              "name": "Example_arith smart contract rollup kind"
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "description": {
+                          "title": "X_1"
+                        },
+                        "encoding": {
+                          "fields": [
+                            {
+                              "kind": "dyn",
+                              "num_fields": 1,
+                              "size": "Uint30"
+                            },
+                            {
+                              "layout": {
+                                "kind": "String"
+                              },
+                              "kind": "anon",
+                              "data_kind": {
+                                "kind": "Variable"
+                              }
                             }
                           ]
                         }
@@ -7103,6 +7917,10 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                         "title": "An Ed25519 public key hash (Base58Check-encoded)",
                         "$ref": "#/definitions/unistring"
                       },
+                      "Message_result_hash": {
+                        "title": "A message result (Base58Check-encoded)",
+                        "$ref": "#/definitions/unistring"
+                      },
                       "Operation_hash": {
                         "title": "A Tezos operation ID (Base58Check-encoded)",
                         "$ref": "#/definitions/unistring"
@@ -7133,6 +7951,10 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       "Tx_rollup_l2_address": {
                         "title": "The hash of a BLS public key used to identify a L2 ticket holders (Base58Check-encoded)",
+                        "$ref": "#/definitions/unistring"
+                      },
+                      "Withdraw_list_hash": {
+                        "title": "A hash of withdraw's list (Base58Check-encoded)",
                         "$ref": "#/definitions/unistring"
                       },
                       "alpha.block_header.alpha.full_header": {
@@ -7208,6 +8030,11 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                           "level"
                         ],
                         "additionalProperties": false
+                      },
+                      "alpha.contract_id": {
+                        "title": "A contract handle",
+                        "description": "A contract notation as given to an RPC or inside scripts. Can be a base58 implicit contract hash or a base58 originated contract hash.",
+                        "$ref": "#/definitions/unistring"
                       },
                       "alpha.entrypoint": {
                         "title": "entrypoint",
@@ -8377,17 +9204,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                   "batches": {
                                     "type": "array",
                                     "items": {
-                                      "type": "object",
-                                      "properties": {
-                                        "root": {
-                                          "type": "string",
-                                          "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
-                                        }
-                                      },
-                                      "required": [
-                                        "root"
-                                      ],
-                                      "additionalProperties": false
+                                      "$ref": "#/definitions/Message_result_hash"
                                     }
                                   },
                                   "predecessor": {
@@ -8723,6 +9540,356 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                               "message",
                               "level",
                               "rollup",
+                              "storage_limit",
+                              "gas_limit",
+                              "counter",
+                              "fee",
+                              "source",
+                              "kind"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "title": "Tx_rollup_withdraw",
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "tx_rollup_withdraw"
+                                ]
+                              },
+                              "source": {
+                                "$ref": "#/definitions/Signature.Public_key_hash"
+                              },
+                              "fee": {
+                                "$ref": "#/definitions/alpha.mutez"
+                              },
+                              "counter": {
+                                "$ref": "#/definitions/positive_bignum"
+                              },
+                              "gas_limit": {
+                                "$ref": "#/definitions/positive_bignum"
+                              },
+                              "storage_limit": {
+                                "$ref": "#/definitions/positive_bignum"
+                              },
+                              "tx_rollup": {
+                                "$ref": "#/definitions/alpha.tx_rollup_id"
+                              },
+                              "level": {
+                                "type": "integer",
+                                "minimum": -2147483648,
+                                "maximum": 2147483647
+                              },
+                              "context_hash": {
+                                "type": "string",
+                                "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                              },
+                              "message_index": {
+                                "type": "integer",
+                                "minimum": -1073741824,
+                                "maximum": 1073741823
+                              },
+                              "withdraw_path": {
+                                "oneOf": [
+                                  {
+                                    "title": "Left",
+                                    "type": "object",
+                                    "properties": {
+                                      "path": {
+                                        "$ref": "#/definitions/path"
+                                      },
+                                      "right": {
+                                        "$ref": "#/definitions/Withdraw_list_hash"
+                                      }
+                                    },
+                                    "required": [
+                                      "right",
+                                      "path"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "title": "Right",
+                                    "type": "object",
+                                    "properties": {
+                                      "left": {
+                                        "$ref": "#/definitions/Withdraw_list_hash"
+                                      },
+                                      "path": {
+                                        "$ref": "#/definitions/path"
+                                      }
+                                    },
+                                    "required": [
+                                      "path",
+                                      "left"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "title": "Op"
+                                  }
+                                ]
+                              },
+                              "ticket_contents": {
+                                "oneOf": [
+                                  {
+                                    "title": "Int",
+                                    "type": "object",
+                                    "properties": {
+                                      "int": {
+                                        "$ref": "#/definitions/bignum"
+                                      }
+                                    },
+                                    "required": [
+                                      "int"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "title": "String",
+                                    "type": "object",
+                                    "properties": {
+                                      "string": {
+                                        "$ref": "#/definitions/unistring"
+                                      }
+                                    },
+                                    "required": [
+                                      "string"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "title": "Bytes",
+                                    "type": "object",
+                                    "properties": {
+                                      "bytes": {
+                                        "type": "string",
+                                        "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                                      }
+                                    },
+                                    "required": [
+                                      "bytes"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "title": "Sequence",
+                                    "type": "array",
+                                    "items": {
+                                      "$ref": "#/definitions/micheline.alpha.michelson_v1.expression"
+                                    }
+                                  },
+                                  {
+                                    "title": "Prim__generic",
+                                    "description": "Generic primitive (any number of args with or without annotations)",
+                                    "type": "object",
+                                    "properties": {
+                                      "prim": {
+                                        "$ref": "#/definitions/alpha.michelson.v1.primitives"
+                                      },
+                                      "args": {
+                                        "type": "array",
+                                        "items": {
+                                          "$ref": "#/definitions/micheline.alpha.michelson_v1.expression"
+                                        }
+                                      },
+                                      "annots": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string"
+                                        }
+                                      }
+                                    },
+                                    "required": [
+                                      "prim"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                ]
+                              },
+                              "ticket_ty": {
+                                "oneOf": [
+                                  {
+                                    "title": "Int",
+                                    "type": "object",
+                                    "properties": {
+                                      "int": {
+                                        "$ref": "#/definitions/bignum"
+                                      }
+                                    },
+                                    "required": [
+                                      "int"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "title": "String",
+                                    "type": "object",
+                                    "properties": {
+                                      "string": {
+                                        "$ref": "#/definitions/unistring"
+                                      }
+                                    },
+                                    "required": [
+                                      "string"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "title": "Bytes",
+                                    "type": "object",
+                                    "properties": {
+                                      "bytes": {
+                                        "type": "string",
+                                        "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                                      }
+                                    },
+                                    "required": [
+                                      "bytes"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "title": "Sequence",
+                                    "type": "array",
+                                    "items": {
+                                      "$ref": "#/definitions/micheline.alpha.michelson_v1.expression"
+                                    }
+                                  },
+                                  {
+                                    "title": "Prim__generic",
+                                    "description": "Generic primitive (any number of args with or without annotations)",
+                                    "type": "object",
+                                    "properties": {
+                                      "prim": {
+                                        "$ref": "#/definitions/alpha.michelson.v1.primitives"
+                                      },
+                                      "args": {
+                                        "type": "array",
+                                        "items": {
+                                          "$ref": "#/definitions/micheline.alpha.michelson_v1.expression"
+                                        }
+                                      },
+                                      "annots": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string"
+                                        }
+                                      }
+                                    },
+                                    "required": [
+                                      "prim"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                ]
+                              },
+                              "ticket_ticketer": {
+                                "$ref": "#/definitions/alpha.contract_id"
+                              },
+                              "ticket_amount": {
+                                "oneOf": [
+                                  {
+                                    "title": "small",
+                                    "description": "An int64 which fits within a uint8",
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "$ref": "#/definitions/unistring"
+                                      },
+                                      "value": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 255
+                                      }
+                                    },
+                                    "required": [
+                                      "value",
+                                      "kind"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "title": "medium",
+                                    "description": "An int64 which fits within a uint16",
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "$ref": "#/definitions/unistring"
+                                      },
+                                      "value": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 65535
+                                      }
+                                    },
+                                    "required": [
+                                      "value",
+                                      "kind"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "title": "biggish",
+                                    "description": "An int64 which fits within a uint32",
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "$ref": "#/definitions/unistring"
+                                      },
+                                      "value": {
+                                        "type": "integer",
+                                        "minimum": -2147483648,
+                                        "maximum": 2147483647
+                                      }
+                                    },
+                                    "required": [
+                                      "value",
+                                      "kind"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "title": "bigger",
+                                    "description": "An int64 which doesn't fit within a uint32",
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "$ref": "#/definitions/unistring"
+                                      },
+                                      "value": {
+                                        "$ref": "#/definitions/int64"
+                                      }
+                                    },
+                                    "required": [
+                                      "value",
+                                      "kind"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                ]
+                              },
+                              "destination": {
+                                "$ref": "#/definitions/alpha.contract_id"
+                              },
+                              "entrypoint": {
+                                "$ref": "#/definitions/unistring"
+                              }
+                            },
+                            "required": [
+                              "entrypoint",
+                              "destination",
+                              "ticket_amount",
+                              "ticket_ticketer",
+                              "ticket_ty",
+                              "ticket_contents",
+                              "withdraw_path",
+                              "message_index",
+                              "context_hash",
+                              "level",
+                              "tx_rollup",
                               "storage_limit",
                               "gas_limit",
                               "counter",
@@ -9193,6 +10360,47 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                           "protocol"
                         ],
                         "additionalProperties": false
+                      },
+                      "path": {
+                        "oneOf": [
+                          {
+                            "title": "Left",
+                            "type": "object",
+                            "properties": {
+                              "path": {
+                                "$ref": "#/definitions/path"
+                              },
+                              "right": {
+                                "$ref": "#/definitions/Withdraw_list_hash"
+                              }
+                            },
+                            "required": [
+                              "right",
+                              "path"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "title": "Right",
+                            "type": "object",
+                            "properties": {
+                              "left": {
+                                "$ref": "#/definitions/Withdraw_list_hash"
+                              },
+                              "path": {
+                                "$ref": "#/definitions/path"
+                              }
+                            },
+                            "required": [
+                              "path",
+                              "left"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "title": "Op"
+                          }
+                        ]
                       },
                       "positive_bignum": {
                         "title": "Positive big number",

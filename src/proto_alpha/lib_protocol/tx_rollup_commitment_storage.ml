@@ -30,9 +30,6 @@ let just_ctxt (ctxt, _, _) = ctxt
 open Tx_rollup_commitment_repr
 open Tx_rollup_errors_repr
 
-(* This indicates a programming error. *)
-type error += (*`Temporary*) Commitment_bond_negative of int
-
 let adjust_unfinalized_commitments_count ctxt tx_rollup pkh
     ~(dir : [`Incr | `Decr]) =
   let delta = match dir with `Incr -> 1 | `Decr -> -1 in
@@ -85,21 +82,45 @@ let get :
  fun ctxt tx_rollup level ->
   find ctxt tx_rollup level >>=? fun (ctxt, commitment) ->
   match commitment with
+  (* TODO: why not use directly `.get` and get the default error for a missing key ? *)
   | None -> fail @@ Tx_rollup_errors_repr.Commitment_does_not_exist level
   | Some commitment -> return (ctxt, commitment)
 
-(* TODO: Lwt.t is only useful for [fail_when] *)
+let get_finalized :
+    Raw_context.t ->
+    Tx_rollup_repr.t ->
+    Tx_rollup_level_repr.t ->
+    (Raw_context.t * Tx_rollup_commitment_repr.Submitted_commitment.t) tzresult
+    Lwt.t =
+ fun ctxt tx_rollup level ->
+  Tx_rollup_state_storage.assert_exist ctxt tx_rollup >>=? fun ctxt ->
+  Storage.Tx_rollup.State.get ctxt tx_rollup >>=? fun (ctxt, state) ->
+  Tx_rollup_state_repr.finalized_commitments_range state >>?= fun window ->
+  (match window with
+  | Some (first, last) ->
+      error_unless
+        Tx_rollup_level_repr.(first <= level && level <= last)
+        (Tx_rollup_errors_repr.No_finalized_commitment_for_level {level; window})
+  | None ->
+      error
+        (Tx_rollup_errors_repr.No_finalized_commitment_for_level {level; window}))
+  >>?= fun () ->
+  Storage.Tx_rollup.Commitment.find ctxt (level, tx_rollup)
+  >>=? fun (ctxt, commitment) ->
+  match commitment with
+  | None -> fail @@ Tx_rollup_errors_repr.Commitment_does_not_exist level
+  | Some commitment -> return (ctxt, commitment)
+
 let check_commitment_level state commitment =
-  Tx_rollup_state_repr.next_commitment_level state >>?= fun expected_level ->
-  fail_when
+  Tx_rollup_state_repr.next_commitment_level state >>? fun expected_level ->
+  error_when
     Tx_rollup_level_repr.(commitment.level < expected_level)
     (Level_already_has_commitment commitment.level)
-  >>=? fun () ->
-  fail_when
+  >>? fun () ->
+  error_when
     Tx_rollup_level_repr.(expected_level < commitment.level)
     (Commitment_too_early
        {provided = commitment.level; expected = expected_level})
-  >>=? fun () -> return_unit
 
 (** [check_commitment_predecessor ctxt tx_rollup state commitment]
     will raise an error if the [predecessor] field of [commitment] is
@@ -138,7 +159,7 @@ let add_commitment ctxt tx_rollup state pkh commitment =
     Too_many_finalized_commitments
   >>=? fun () ->
   (* Check the commitment has the correct values *)
-  check_commitment_level state commitment >>=? fun () ->
+  check_commitment_level state commitment >>?= fun () ->
   check_commitment_predecessor ctxt state commitment >>=? fun ctxt ->
   check_commitment_batches_and_inbox_hash ctxt tx_rollup commitment
   >>=? fun ctxt ->
@@ -241,6 +262,12 @@ let remove_commitment ctxt rollup state =
       (* We remove the commitment *)
       Storage.Tx_rollup.Commitment.remove ctxt (tail, rollup)
       >>=? fun (ctxt, _freed_size, _existed) ->
+      let inbox_length =
+        (* safe because inbox cannot be more than int32 *)
+        Int32.of_int @@ List.length commitment.commitment.batches
+      in
+      Tx_rollup_withdraw_storage.remove ctxt rollup tail ~inbox_length
+      >>=? fun ctxt ->
       (* We update the state *)
       Tx_rollup_state_repr.record_commitment_deletion
         state

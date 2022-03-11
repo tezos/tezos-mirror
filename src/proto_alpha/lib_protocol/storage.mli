@@ -602,6 +602,16 @@ module Tx_rollup : sig
        and type key = Tx_rollup_repr.t
        and type value = Tx_rollup_inbox_repr.metadata
 
+  (** A carbonated storage of the set of withdrawals consumed
+      of those potentially associated to each message
+      of an inbox. The key is the message number, which is
+      sequentially assigned from 0. *)
+  module Consumed_withdraw :
+    Non_iterable_indexed_carbonated_data_storage
+      with type t := (Raw_context.t * Tx_rollup_level_repr.t) * Tx_rollup_repr.t
+       and type key = int32
+       and type value = Tx_rollup_withdraw_repr.Withdrawal_accounting.t
+
   (** A carbonated storage to store the hashes of the messages
       appended in an inbox. The key is the batch number, which is
       sequentially assigned from 0.

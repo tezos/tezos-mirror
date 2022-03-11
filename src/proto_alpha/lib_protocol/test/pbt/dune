@@ -7,6 +7,7 @@
         test_script_comparison
         test_tez_repr
         test_tx_rollup_l2_encoding
+        test_tx_rollup_l2_withdraw_storage
         test_carbonated_map)
  (libraries tezos-base
             tezos-micheline

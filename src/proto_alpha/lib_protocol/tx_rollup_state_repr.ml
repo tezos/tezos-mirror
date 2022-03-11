@@ -463,6 +463,23 @@ let burn_cost ~limit state size =
       error (Submit_batch_burn_excedeed {burn; limit})
   | _ -> ok burn
 
+let finalized_commitments_range state =
+  if Compare.Int.(0 < finalized_commitments_count state) then
+    match (state.commitment_tail_level, state.oldest_inbox_level) with
+    | (Some commitment_tail, Some oldest_inbox) -> (
+        match Tx_rollup_level_repr.pred oldest_inbox with
+        | Some res -> ok (Some (commitment_tail, res))
+        | None ->
+            error
+              (Internal_error
+                 "oldest inbox has no predecessor, but commitments have been \
+                  finalized"))
+    | (_, _) ->
+        error
+          (Internal_error
+             "unreachable code per definition of [finalized_commitments_count]")
+  else ok None
+
 module Internal_for_tests = struct
   let make :
       ?burn_per_byte:Tez_repr.t ->

@@ -80,12 +80,6 @@ type indexes = {
 }
 
 module Message_result : sig
-  type withdrawal = {
-    destination : Signature.Public_key_hash.t;
-    ticket_hash : Ticket_hash.t;
-    amount : Tx_rollup_l2_qty.t;
-  }
-
   (** A transaction inside a batch can either be a success or a failure.
 
       In the case of a failure, we store the operation's index which failed
@@ -120,7 +114,7 @@ module Message_result : sig
   (* In addition to [message_result] the result contains the list of
      withdrawals that result from failing deposits and layer2-to-layer1
      transfers. *)
-  type t = message_result * withdrawal list
+  type t = message_result * Tx_rollup_withdraw.withdrawal list
 
   val encoding : t Data_encoding.t
 end
@@ -155,7 +149,7 @@ module Make (Context : CONTEXT) : sig
     val apply_batch :
       ctxt ->
       (Indexable.unknown, Indexable.unknown) t ->
-      (ctxt * Message_result.Batch_V1.t * Message_result.withdrawal list) m
+      (ctxt * Message_result.Batch_V1.t * Tx_rollup_withdraw.withdrawal list) m
 
     (** [check_signature ctxt batch] asserts that [batch] is correctly signed.
 
@@ -202,7 +196,10 @@ module Make (Context : CONTEXT) : sig
   val apply_deposit :
     ctxt ->
     Tx_rollup_message.deposit ->
-    (ctxt * Message_result.deposit_result * Message_result.withdrawal option) m
+    (ctxt
+    * Message_result.deposit_result
+    * Tx_rollup_withdraw.withdrawal option)
+    m
 
   (** [apply_message ctxt message] interpets the [message] in the [ctxt].
 

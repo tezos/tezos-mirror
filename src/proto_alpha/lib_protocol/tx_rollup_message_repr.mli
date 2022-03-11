@@ -59,6 +59,8 @@ type t = Batch of string | Deposit of deposit
     inbox by [msg]. *)
 val size : t -> int
 
+val deposit_encoding : deposit Data_encoding.t
+
 val encoding : t Data_encoding.t
 
 val pp : Format.formatter -> t -> unit

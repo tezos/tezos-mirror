@@ -31,7 +31,7 @@
 (** [check_commitment_level state commitment] fails if [commitment]
     does not target the expected level. *)
 val check_commitment_level :
-  Tx_rollup_state_repr.t -> Tx_rollup_commitment_repr.t -> unit tzresult Lwt.t
+  Tx_rollup_state_repr.t -> Tx_rollup_commitment_repr.t -> unit tzresult
 (* FIXME: move in Tx_rollup_commitment_repr *)
 
 (** [add_commitment context tx_rollup contract commitment] adds a
@@ -81,6 +81,17 @@ val find :
     for a level, if any exists.  If the rollup does not exist,
     the error [Tx_rollup_does_not_exist] is returned. *)
 val get :
+  Raw_context.t ->
+  Tx_rollup_repr.t ->
+  Tx_rollup_level_repr.t ->
+  (Raw_context.t * Tx_rollup_commitment_repr.Submitted_commitment.t) tzresult
+  Lwt.t
+
+(** [get_finalized context tx_rollup level] returns the
+    commitment for a level, if any exists and is finalized. If the rollup does not
+    exist, the error [Tx_rollup_does_not_exist] is returned. If the commitment
+    is not finalized the error [Tx_rollup_commitment_not_final] is returned *)
+val get_finalized :
   Raw_context.t ->
   Tx_rollup_repr.t ->
   Tx_rollup_level_repr.t ->

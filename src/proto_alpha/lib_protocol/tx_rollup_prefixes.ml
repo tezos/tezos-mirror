@@ -70,5 +70,21 @@ let commitment_hash =
     b58check_size = 53;
   }
 
+let message_result_hash =
+  {
+    b58check_prefix = "\018\007\206\087";
+    prefix = "txmr";
+    hash_size = 32;
+    b58check_size = 54;
+  }
+
+let withdraw_list_hash =
+  {
+    b58check_prefix = "\079\150\072";
+    prefix = "txw";
+    hash_size = 32;
+    b58check_size = 53;
+  }
+
 let check_encoding {prefix; b58check_size; _} encoding =
   Base58.check_encoded_prefix encoding prefix b58check_size

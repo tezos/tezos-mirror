@@ -182,24 +182,6 @@ let encoding_indexes : indexes Data_encoding.t =
              Tx_rollup_l2_context_sig.Ticket_indexable.index_encoding))
 
 module Message_result = struct
-  type withdrawal = {
-    destination : Signature.Public_key_hash.t;
-    ticket_hash : Ticket_hash.t;
-    amount : Tx_rollup_l2_qty.t;
-  }
-
-  let withdrawal_encoding : withdrawal Data_encoding.t =
-    let open Data_encoding in
-    conv
-      (fun {destination; ticket_hash; amount} ->
-        (destination, ticket_hash, amount))
-      (fun (destination, ticket_hash, amount) ->
-        {destination; ticket_hash; amount})
-      (obj3
-         (req "destination" Signature.Public_key_hash.encoding)
-         (req "ticket_hash" Ticket_hash.encoding)
-         (req "amount" Tx_rollup_l2_qty.encoding))
-
   type transaction_result =
     | Transaction_success
     | Transaction_failure of {index : int; reason : error}
@@ -303,10 +285,11 @@ module Message_result = struct
            (fun result -> Batch_V1_result result));
       ]
 
-  type t = message_result * withdrawal list
+  type t = message_result * Tx_rollup_withdraw.t list
 
   let encoding =
-    Data_encoding.(tup2 message_result_encoding (list withdrawal_encoding))
+    Data_encoding.(
+      tup2 message_result_encoding (list Tx_rollup_withdraw.encoding))
 end
 
 module Make (Context : CONTEXT) = struct
@@ -587,7 +570,7 @@ module Make (Context : CONTEXT) = struct
         indexes ->
         Signer_indexable.index ->
         'content operation_content ->
-        (ctxt * indexes * withdrawal option) m =
+        (ctxt * indexes * Tx_rollup_withdraw.withdrawal option) m =
      fun ctxt indexes source_idx {destination; ticket_hash; qty} ->
       match destination with
       | Layer1 l1_dest ->
@@ -609,7 +592,9 @@ module Make (Context : CONTEXT) = struct
           (* spend the ticket -- this is responsible for checking that
              the source has the required balance *)
           let* ctxt = Ticket_ledger.spend ctxt tidx source_idx qty in
-          let withdrawal = {destination = l1_dest; ticket_hash; amount = qty} in
+          let withdrawal =
+            Tx_rollup_withdraw.{claimer = l1_dest; ticket_hash; amount = qty}
+          in
           return (ctxt, indexes, Some withdrawal)
       | Layer2 l2_dest ->
           let* (ctxt, created_addr, dest_idx) = address_index ctxt l2_dest in
@@ -642,7 +627,7 @@ module Make (Context : CONTEXT) = struct
         ctxt ->
         indexes ->
         (Indexable.index_only, Indexable.unknown) operation ->
-        (ctxt * indexes * withdrawal list) m =
+        (ctxt * indexes * Tx_rollup_withdraw.withdrawal list) m =
      fun ctxt indexes {signer; counter; contents} ->
       (* Before applying any operation, we check the counter *)
       let* () = check_counter ctxt signer counter in
@@ -668,7 +653,11 @@ module Make (Context : CONTEXT) = struct
         ctxt ->
         indexes ->
         (Indexable.index_only, Indexable.unknown) transaction ->
-        (ctxt * indexes * transaction_result * withdrawal list) m =
+        (ctxt
+        * indexes
+        * transaction_result
+        * Tx_rollup_withdraw.withdrawal list)
+        m =
      fun initial_ctxt initial_indexes transaction ->
       let rec fold (ctxt, prev_indexes, withdrawals) index ops =
         match ops with
@@ -712,7 +701,8 @@ module Make (Context : CONTEXT) = struct
     let apply_batch :
         ctxt ->
         (Indexable.unknown, Indexable.unknown) t ->
-        (ctxt * Message_result.Batch_V1.t * withdrawal list) m =
+        (ctxt * Message_result.Batch_V1.t * Tx_rollup_withdraw.withdrawal list)
+        m =
      fun ctxt batch ->
       let* (ctxt, indexes, batch) = check_signature ctxt batch in
       let {contents; _} = batch in
@@ -741,7 +731,7 @@ module Make (Context : CONTEXT) = struct
   let apply_deposit :
       ctxt ->
       Tx_rollup_message.deposit ->
-      (ctxt * deposit_result * withdrawal option) m =
+      (ctxt * deposit_result * Tx_rollup_withdraw.withdrawal option) m =
    fun initial_ctxt Tx_rollup_message.{sender; destination; ticket_hash; amount} ->
     let apply_deposit () =
       let* (ctxt, created_addr, aidx) =
@@ -763,7 +753,9 @@ module Make (Context : CONTEXT) = struct
         (* Should there be an error during the deposit, then return
            the full [amount] to [sender] in the form of a
            withdrawal. *)
-        let withdrawal = {destination = sender; ticket_hash; amount} in
+        let withdrawal =
+          Tx_rollup_withdraw.{claimer = sender; ticket_hash; amount}
+        in
         return (initial_ctxt, Deposit_failure reason, Some withdrawal))
 
   let apply_message : ctxt -> Tx_rollup_message.t -> (ctxt * Message_result.t) m
