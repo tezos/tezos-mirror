@@ -196,6 +196,14 @@ Breaking Changes
   the proportion Off/(On + Off) of toggle votes the following formula
   can be used: liquidity_baking_toggle_ema / 2,000,000,000.
 
+- Receipts and balance updates may now refer to a new type of account
+  with the kind ``"freezer"`` and the category ``"bonds"``.
+  Bonds are like deposits.
+  However, they can be associated to implicit or originated accounts,
+  unlike deposits that only apply to implicit accounts that are also
+  delegates (see :doc:`../jakarta/token_management`).
+  (MR :gl:`!4437`)
+
 Bug Fixes
 ---------
 
