@@ -69,7 +69,7 @@ let make_client_bake_for () =
 
 (* A helper to register a RPC test environment with a node and a client for the
    given protocol version. *)
-let check_rpc ~group_name ~protocols ~test_mode_tag
+let check_rpc ~protocols ~test_mode_tag
     ~(rpcs :
        (string
        * (?endpoint:Client.endpoint -> Client.t -> unit Lwt.t)
@@ -87,14 +87,10 @@ let check_rpc ~group_name ~protocols ~test_mode_tag
     (fun (sub_group, rpc, parameter_overrides, node_parameters) ->
       Protocol.register_regression_test
         ~__FILE__
-        ~title:
-          (sf
-             "%s (mode %s) RPC regression tests: %s"
-             group_name
-             title_tag
-             sub_group)
-        ~tags:["rpc"; group_name; sub_group]
-        ~output_file:("rpc" // sf "%s.%s.%s" group_name title_tag sub_group)
+        ~title:(sf "(mode %s) RPC regression tests: %s" title_tag sub_group)
+        ~tags:["rpc"; sub_group]
+        ~output_file:(fun p ->
+          "rpc" // sf "%s.%s.%s" (Protocol.tag p) title_tag sub_group)
         (fun protocol ->
           (* Initialize a node with alpha protocol and data to be used for RPC calls.
              The log of the node is not captured in the regression output. *)
@@ -1038,7 +1034,6 @@ let register () =
   let alpha_overrides = Some alpha_consensus_threshold in
   let register_alpha test_mode_tag =
     check_rpc
-      ~group_name:"alpha"
       ~protocols:[Protocol.Alpha]
       ~test_mode_tag
       ~rpcs:
@@ -1071,7 +1066,6 @@ let register () =
   in
   let register_current_mainnet test_mode_tag =
     check_rpc
-      ~group_name:"hangzhou"
       ~protocols:[Hangzhou]
       ~test_mode_tag
       ~rpcs:

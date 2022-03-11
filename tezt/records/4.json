@@ -1,15 +1,14 @@
 [
   {
-    "file": "basic.ml",
-    "title": "Alpha: node initialization (full mode)",
+    "file": "global_constants.ml",
+    "title": "Alpha: Global constants are expanded on entrypoints RPC",
     "tags": [
       "alpha",
-      "basic",
-      "node",
-      "full"
+      "global_constant",
+      "rpc"
     ],
     "successful_runs": {
-      "total_time": "8862378",
+      "total_time": "6915343",
       "count": "1"
     },
     "failed_runs": {
@@ -19,7 +18,7 @@
   },
   {
     "file": "bootstrap.ml",
-    "title": "Alpha: node synchronization (archive / full)",
+    "title": "Alpha: node synchronization (full / archive)",
     "tags": [
       "alpha",
       "bootstrap",
@@ -27,11 +26,33 @@
       "sync",
       "activate",
       "bake",
-      "primary_archive",
+      "primary_full",
+      "secondary_archive"
+    ],
+    "successful_runs": {
+      "total_time": "20858680",
+      "count": "1"
+    },
+    "failed_runs": {
+      "total_time": "0",
+      "count": "0"
+    }
+  },
+  {
+    "file": "bootstrap.ml",
+    "title": "Alpha: node synchronization (full / full)",
+    "tags": [
+      "alpha",
+      "bootstrap",
+      "node",
+      "sync",
+      "activate",
+      "bake",
+      "primary_full",
       "secondary_full"
     ],
     "successful_runs": {
-      "total_time": "19910274",
+      "total_time": "20816355",
       "count": "1"
     },
     "failed_runs": {
@@ -40,60 +61,17 @@
     }
   },
   {
-    "file": "bootstrap.ml",
-    "title": "Alpha: node synchronization (archive / rolling)",
+    "file": "hash_data.ml",
+    "title": "Alpha: hash data ... of type ... (bad)",
     "tags": [
+      "regression",
       "alpha",
-      "bootstrap",
-      "node",
-      "sync",
-      "activate",
-      "bake",
-      "primary_archive",
-      "secondary_rolling"
+      "hash",
+      "data",
+      "mockup"
     ],
     "successful_runs": {
-      "total_time": "19945251",
-      "count": "1"
-    },
-    "failed_runs": {
-      "total_time": "0",
-      "count": "0"
-    }
-  },
-  {
-    "file": "bootstrap.ml",
-    "title": "Alpha: node synchronization (rolling_0 / rolling_0)",
-    "tags": [
-      "alpha",
-      "bootstrap",
-      "node",
-      "sync",
-      "activate",
-      "bake",
-      "primary_rolling_0",
-      "secondary_rolling_0"
-    ],
-    "successful_runs": {
-      "total_time": "20328696",
-      "count": "1"
-    },
-    "failed_runs": {
-      "total_time": "0",
-      "count": "0"
-    }
-  },
-  {
-    "file": "normalize.ml",
-    "title": "Alpha: normalize data (mockup)",
-    "tags": [
-      "alpha",
-      "mockup",
-      "normalize",
-      "data"
-    ],
-    "successful_runs": {
-      "total_time": "1532874",
+      "total_time": "2714632",
       "count": "1"
     },
     "failed_runs": {
@@ -111,44 +89,7 @@
       "transfer"
     ],
     "successful_runs": {
-      "total_time": "7001456",
-      "count": "1"
-    },
-    "failed_runs": {
-      "total_time": "0",
-      "count": "0"
-    }
-  },
-  {
-    "file": "mockup.ml",
-    "title": "Granada: (Mockup) Transfer same participants (asynchronous)",
-    "tags": [
-      "granada",
-      "mockup",
-      "client",
-      "transfer",
-      "asynchronous"
-    ],
-    "successful_runs": {
-      "total_time": "1871212",
-      "count": "1"
-    },
-    "failed_runs": {
-      "total_time": "0",
-      "count": "0"
-    }
-  },
-  {
-    "file": "mockup.ml",
-    "title": "Alpha: (Mockup) Transfer",
-    "tags": [
-      "alpha",
-      "mockup",
-      "client",
-      "transfer"
-    ],
-    "successful_runs": {
-      "total_time": "2296355",
+      "total_time": "7017032",
       "count": "1"
     },
     "failed_runs": {
@@ -168,7 +109,7 @@
       "asynchronous"
     ],
     "successful_runs": {
-      "total_time": "1295742",
+      "total_time": "1284419",
       "count": "1"
     },
     "failed_runs": {
@@ -178,16 +119,17 @@
   },
   {
     "file": "mockup.ml",
-    "title": "Hangzhou: (Mockup) Multi transfer/multi baking (asynchronous)",
+    "title": "Ithaca: (Mockup) Transfer (empty, asynchronous)",
     "tags": [
-      "hangzhou",
+      "ithaca",
       "mockup",
       "client",
-      "transfer",
+      "empty",
+      "bake_for",
       "asynchronous"
     ],
     "successful_runs": {
-      "total_time": "28611262",
+      "total_time": "799395",
       "count": "1"
     },
     "failed_runs": {
@@ -197,50 +139,15 @@
   },
   {
     "file": "mockup.ml",
-    "title": "Alpha: (Mockup) Register Global Constant success",
-    "tags": [
-      "alpha",
-      "mockup",
-      "client",
-      "global_constant"
-    ],
-    "successful_runs": {
-      "total_time": "778220",
-      "count": "1"
-    },
-    "failed_runs": {
-      "total_time": "0",
-      "count": "0"
-    }
-  },
-  {
-    "file": "mockup.ml",
-    "title": "Alpha: (Mockup) Calling a contract with a global constant failure",
-    "tags": [
-      "alpha",
-      "mockup",
-      "client",
-      "global_constant"
-    ],
-    "successful_runs": {
-      "total_time": "749672",
-      "count": "1"
-    },
-    "failed_runs": {
-      "total_time": "0",
-      "count": "0"
-    }
-  },
-  {
-    "file": "proxy.ml",
-    "title": "Hangzhou: (Proxy) Bake",
+    "title": "Hangzhou: (Mockup) RPC header/shell",
     "tags": [
       "hangzhou",
-      "proxy",
-      "bake"
+      "mockup",
+      "client",
+      "rpc"
     ],
     "successful_runs": {
-      "total_time": "9474021",
+      "total_time": "1110580",
       "count": "1"
     },
     "failed_runs": {
@@ -250,25 +157,7 @@
   },
   {
     "file": "proxy.ml",
-    "title": "Granada: (Proxy) (/chains/main/blocks/head/votes/successor_period) No useless RPC call",
-    "tags": [
-      "granada",
-      "proxy",
-      "rpc",
-      "get"
-    ],
-    "successful_runs": {
-      "total_time": "5812080",
-      "count": "1"
-    },
-    "failed_runs": {
-      "total_time": "0",
-      "count": "0"
-    }
-  },
-  {
-    "file": "proxy.ml",
-    "title": "Alpha: (Proxy) (/chains/main/blocks/head/helpers/baking_rights) Cache at most once",
+    "title": "Alpha: (Proxy) (/chains/main/blocks/head/votes/current_period) No useless RPC call",
     "tags": [
       "alpha",
       "proxy",
@@ -276,7 +165,7 @@
       "get"
     ],
     "successful_runs": {
-      "total_time": "5579595",
+      "total_time": "5702328",
       "count": "1"
     },
     "failed_runs": {
@@ -286,7 +175,43 @@
   },
   {
     "file": "proxy.ml",
-    "title": "Hangzhou: (Proxy) (/chains/main/blocks/head/context/constants) Cache at most once",
+    "title": "Alpha: (Proxy) (/chains/main/blocks/head/votes/successor_period) No useless RPC call",
+    "tags": [
+      "alpha",
+      "proxy",
+      "rpc",
+      "get"
+    ],
+    "successful_runs": {
+      "total_time": "5722638",
+      "count": "1"
+    },
+    "failed_runs": {
+      "total_time": "0",
+      "count": "0"
+    }
+  },
+  {
+    "file": "proxy.ml",
+    "title": "Ithaca: (Proxy) (/chains/main/blocks/head/votes/total_voting_power) No useless RPC call",
+    "tags": [
+      "ithaca",
+      "proxy",
+      "rpc",
+      "get"
+    ],
+    "successful_runs": {
+      "total_time": "5697471",
+      "count": "1"
+    },
+    "failed_runs": {
+      "total_time": "0",
+      "count": "0"
+    }
+  },
+  {
+    "file": "proxy.ml",
+    "title": "Hangzhou: (Proxy) (/chains/main/blocks/head/votes/current_period) No useless RPC call",
     "tags": [
       "hangzhou",
       "proxy",
@@ -294,7 +219,43 @@
       "get"
     ],
     "successful_runs": {
-      "total_time": "5773166",
+      "total_time": "5867646",
+      "count": "1"
+    },
+    "failed_runs": {
+      "total_time": "0",
+      "count": "0"
+    }
+  },
+  {
+    "file": "proxy.ml",
+    "title": "Hangzhou: (Proxy) (/chains/main/blocks/head/votes/current_proposal) No useless RPC call",
+    "tags": [
+      "hangzhou",
+      "proxy",
+      "rpc",
+      "get"
+    ],
+    "successful_runs": {
+      "total_time": "5851942",
+      "count": "1"
+    },
+    "failed_runs": {
+      "total_time": "0",
+      "count": "0"
+    }
+  },
+  {
+    "file": "proxy.ml",
+    "title": "Hangzhou: (Proxy) (/chains/main/blocks/head/helpers/baking_rights) Cache at most once",
+    "tags": [
+      "hangzhou",
+      "proxy",
+      "rpc",
+      "get"
+    ],
+    "successful_runs": {
+      "total_time": "5879613",
       "count": "1"
     },
     "failed_runs": {
@@ -312,7 +273,7 @@
       "get"
     ],
     "successful_runs": {
-      "total_time": "5814143",
+      "total_time": "5904789",
       "count": "1"
     },
     "failed_runs": {
@@ -322,7 +283,25 @@
   },
   {
     "file": "proxy.ml",
-    "title": "Hangzhou: (Proxy) (/chains/main/blocks/head/context/delegates) Cache at most once",
+    "title": "Ithaca: (Proxy) (/chains/main/blocks/head/context/nonces/3) Cache at most once",
+    "tags": [
+      "ithaca",
+      "proxy",
+      "rpc",
+      "get"
+    ],
+    "successful_runs": {
+      "total_time": "5662347",
+      "count": "1"
+    },
+    "failed_runs": {
+      "total_time": "0",
+      "count": "0"
+    }
+  },
+  {
+    "file": "proxy.ml",
+    "title": "Hangzhou: (Proxy) (/chains/main/blocks/head/helpers/endorsing_rights) Cache at most once",
     "tags": [
       "hangzhou",
       "proxy",
@@ -330,7 +309,7 @@
       "get"
     ],
     "successful_runs": {
-      "total_time": "5746291",
+      "total_time": "5816301",
       "count": "1"
     },
     "failed_runs": {
@@ -340,69 +319,15 @@
   },
   {
     "file": "proxy.ml",
-    "title": "Alpha: (Proxy) (/chains/main/blocks/head/context/nonces/3) Cache at most once",
+    "title": "Ithaca: (Proxy) (/chains/main/blocks/head/helpers/levels_in_current_cycle) Cache at most once",
     "tags": [
-      "alpha",
+      "ithaca",
       "proxy",
       "rpc",
       "get"
     ],
     "successful_runs": {
-      "total_time": "5619158",
-      "count": "1"
-    },
-    "failed_runs": {
-      "total_time": "0",
-      "count": "0"
-    }
-  },
-  {
-    "file": "proxy.ml",
-    "title": "Hangzhou: (Proxy) (/chains/main/blocks/head/context/nonces/3) Cache at most once",
-    "tags": [
-      "hangzhou",
-      "proxy",
-      "rpc",
-      "get"
-    ],
-    "successful_runs": {
-      "total_time": "5742653",
-      "count": "1"
-    },
-    "failed_runs": {
-      "total_time": "0",
-      "count": "0"
-    }
-  },
-  {
-    "file": "proxy.ml",
-    "title": "Granada: (Proxy) (/chains/main/blocks/head/helpers/endorsing_rights) Cache at most once",
-    "tags": [
-      "granada",
-      "proxy",
-      "rpc",
-      "get"
-    ],
-    "successful_runs": {
-      "total_time": "5888202",
-      "count": "1"
-    },
-    "failed_runs": {
-      "total_time": "0",
-      "count": "0"
-    }
-  },
-  {
-    "file": "proxy.ml",
-    "title": "Alpha: (Proxy) (/chains/main/blocks/head/votes/current_period) Cache at most once",
-    "tags": [
-      "alpha",
-      "proxy",
-      "rpc",
-      "get"
-    ],
-    "successful_runs": {
-      "total_time": "5603345",
+      "total_time": "5677664",
       "count": "1"
     },
     "failed_runs": {
@@ -420,7 +345,7 @@
       "get"
     ],
     "successful_runs": {
-      "total_time": "5698441",
+      "total_time": "5835989",
       "count": "1"
     },
     "failed_runs": {
@@ -430,52 +355,15 @@
   },
   {
     "file": "proxy.ml",
-    "title": "Alpha: (Proxy) (/chains/main/blocks/head/votes/ballots) Cache at most once",
+    "title": "Ithaca: (Proxy) (/chains/main/blocks/head/votes/current_quorum) Cache at most once",
     "tags": [
-      "alpha",
+      "ithaca",
       "proxy",
       "rpc",
       "get"
     ],
     "successful_runs": {
-      "total_time": "5528337",
-      "count": "1"
-    },
-    "failed_runs": {
-      "total_time": "0",
-      "count": "0"
-    }
-  },
-  {
-    "file": "proxy.ml",
-    "title": "Granada: (Proxy) (/chains/main/blocks/head/votes/proposals) Cache at most once",
-    "tags": [
-      "granada",
-      "proxy",
-      "rpc",
-      "get"
-    ],
-    "successful_runs": {
-      "total_time": "5783801",
-      "count": "1"
-    },
-    "failed_runs": {
-      "total_time": "0",
-      "count": "0"
-    }
-  },
-  {
-    "file": "proxy.ml",
-    "title": "Hangzhou: (Proxy) RPC get's location",
-    "tags": [
-      "hangzhou",
-      "proxy",
-      "location",
-      "rpc",
-      "get"
-    ],
-    "successful_runs": {
-      "total_time": "6405042",
+      "total_time": "5668079",
       "count": "1"
     },
     "failed_runs": {
@@ -493,7 +381,25 @@
       "get"
     ],
     "successful_runs": {
-      "total_time": "15690337",
+      "total_time": "15952628",
+      "count": "1"
+    },
+    "failed_runs": {
+      "total_time": "0",
+      "count": "0"
+    }
+  },
+  {
+    "file": "protocol_limits.ml",
+    "title": "Alpha: protocol limits",
+    "tags": [
+      "alpha",
+      "mockup",
+      "protocol",
+      "limits"
+    ],
+    "successful_runs": {
+      "total_time": "2334521",
       "count": "1"
     },
     "failed_runs": {
@@ -503,31 +409,14 @@
   },
   {
     "file": "protocol_migration.ml",
-    "title": "protocol migration at level 8",
+    "title": "protocol migration at level 13",
     "tags": [
       "protocol",
       "migration",
       "sandbox"
     ],
     "successful_runs": {
-      "total_time": "7678429",
-      "count": "1"
-    },
-    "failed_runs": {
-      "total_time": "0",
-      "count": "0"
-    }
-  },
-  {
-    "file": "protocol_migration.ml",
-    "title": "protocol migration at level 12",
-    "tags": [
-      "protocol",
-      "migration",
-      "sandbox"
-    ],
-    "successful_runs": {
-      "total_time": "7702049",
+      "total_time": "7699117",
       "count": "1"
     },
     "failed_runs": {
@@ -537,15 +426,69 @@
   },
   {
     "file": "mempool.ml",
-    "title": "Alpha: Manager_restriction_flush",
+    "title": "Ithaca: ban_operation_branch_delayed_reevaluated",
+    "tags": [
+      "ithaca",
+      "mempool",
+      "ban",
+      "branch_delayed"
+    ],
+    "successful_runs": {
+      "total_time": "9869247",
+      "count": "1"
+    },
+    "failed_runs": {
+      "total_time": "0",
+      "count": "0"
+    }
+  },
+  {
+    "file": "mempool.ml",
+    "title": "Alpha: ban_operation_branch_delayed_reevaluated",
+    "tags": [
+      "alpha",
+      "mempool",
+      "ban",
+      "branch_delayed"
+    ],
+    "successful_runs": {
+      "total_time": "9996238",
+      "count": "1"
+    },
+    "failed_runs": {
+      "total_time": "0",
+      "count": "0"
+    }
+  },
+  {
+    "file": "mempool.ml",
+    "title": "Ithaca: Manager_restriction_inject_1M",
+    "tags": [
+      "ithaca",
+      "mempool",
+      "manager_restriction",
+      "inject"
+    ],
+    "successful_runs": {
+      "total_time": "8283850",
+      "count": "1"
+    },
+    "failed_runs": {
+      "total_time": "0",
+      "count": "0"
+    }
+  },
+  {
+    "file": "mempool.ml",
+    "title": "Alpha: Manager_restriction_inject_1M",
     "tags": [
       "alpha",
       "mempool",
       "manager_restriction",
-      "flush"
+      "inject"
     ],
     "successful_runs": {
-      "total_time": "10808369",
+      "total_time": "8344086",
       "count": "1"
     },
     "failed_runs": {
@@ -554,16 +497,18 @@
     }
   },
   {
-    "file": "stresstest_command.ml",
-    "title": "Alpha: stresstest applied",
+    "file": "mempool.ml",
+    "title": "Ithaca: Test prefiltered limits of mempool after a remove/replace",
     "tags": [
-      "alpha",
-      "client",
-      "stresstest",
-      "applied"
+      "ithaca",
+      "mempool",
+      "gc",
+      "limit",
+      "replace",
+      "remove"
     ],
     "successful_runs": {
-      "total_time": "11597951",
+      "total_time": "14272522",
       "count": "1"
     },
     "failed_runs": {
@@ -572,17 +517,32 @@
     }
   },
   {
-    "file": "stresstest_command.ml",
-    "title": "Alpha: stresstest applied 1op",
+    "file": "mempool.ml",
+    "title": "Alpha: Fetch failed operation",
     "tags": [
       "alpha",
-      "client",
-      "stresstest",
-      "stresstest_1op",
-      "applied"
+      "fetch",
+      "mempool"
     ],
     "successful_runs": {
-      "total_time": "16270532",
+      "total_time": "10435259",
+      "count": "1"
+    },
+    "failed_runs": {
+      "total_time": "0",
+      "count": "0"
+    }
+  },
+  {
+    "file": "mempool.ml",
+    "title": "Alpha: mempool ban operation and check applied",
+    "tags": [
+      "alpha",
+      "mempool",
+      "node"
+    ],
+    "successful_runs": {
+      "total_time": "8946290",
       "count": "1"
     },
     "failed_runs": {
@@ -592,51 +552,14 @@
   },
   {
     "file": "encoding.ml",
-    "title": "Alpha: alpha encoding regression test: block_header.unsigned",
-    "tags": [
-      "regression",
-      "alpha",
-      "encoding",
-      "alpha"
-    ],
-    "successful_runs": {
-      "total_time": "634340",
-      "count": "1"
-    },
-    "failed_runs": {
-      "total_time": "0",
-      "count": "0"
-    }
-  },
-  {
-    "file": "encoding.ml",
-    "title": "Alpha: alpha encoding regression test: operation.internal",
-    "tags": [
-      "regression",
-      "alpha",
-      "encoding",
-      "alpha"
-    ],
-    "successful_runs": {
-      "total_time": "3839288",
-      "count": "1"
-    },
-    "failed_runs": {
-      "total_time": "0",
-      "count": "0"
-    }
-  },
-  {
-    "file": "encoding.ml",
-    "title": "Hangzhou: hangzhou encoding regression test: delegate.frozen_balance_by_cycles",
+    "title": "Hangzhou: encoding regression test: delegate.frozen_balance_by_cycles",
     "tags": [
       "regression",
       "hangzhou",
-      "encoding",
-      "hangzhou"
+      "encoding"
     ],
     "successful_runs": {
-      "total_time": "649899",
+      "total_time": "616778",
       "count": "1"
     },
     "failed_runs": {
@@ -646,15 +569,48 @@
   },
   {
     "file": "encoding.ml",
-    "title": "Hangzhou: hangzhou encoding regression test: raw_level",
+    "title": "Alpha: encoding regression test: gas.cost",
+    "tags": [
+      "regression",
+      "alpha",
+      "encoding"
+    ],
+    "successful_runs": {
+      "total_time": "1219072",
+      "count": "1"
+    },
+    "failed_runs": {
+      "total_time": "0",
+      "count": "0"
+    }
+  },
+  {
+    "file": "encoding.ml",
+    "title": "Ithaca: encoding regression test: gas.cost",
+    "tags": [
+      "regression",
+      "ithaca",
+      "encoding"
+    ],
+    "successful_runs": {
+      "total_time": "1214353",
+      "count": "1"
+    },
+    "failed_runs": {
+      "total_time": "0",
+      "count": "0"
+    }
+  },
+  {
+    "file": "encoding.ml",
+    "title": "Hangzhou: encoding regression test: operation.unsigned",
     "tags": [
       "regression",
       "hangzhou",
-      "encoding",
-      "hangzhou"
+      "encoding"
     ],
     "successful_runs": {
-      "total_time": "1299891",
+      "total_time": "8687714",
       "count": "1"
     },
     "failed_runs": {
@@ -664,15 +620,14 @@
   },
   {
     "file": "encoding.ml",
-    "title": "Granada: granada encoding regression test: gas.cost",
+    "title": "Alpha: encoding regression test: seed",
     "tags": [
       "regression",
-      "granada",
-      "encoding",
-      "granada"
+      "alpha",
+      "encoding"
     ],
     "successful_runs": {
-      "total_time": "1280741",
+      "total_time": "621381",
       "count": "1"
     },
     "failed_runs": {
@@ -682,15 +637,48 @@
   },
   {
     "file": "encoding.ml",
-    "title": "Granada: granada encoding regression test: operation.raw",
+    "title": "Ithaca: encoding regression test: seed",
     "tags": [
       "regression",
-      "granada",
-      "encoding",
-      "granada"
+      "ithaca",
+      "encoding"
     ],
     "successful_runs": {
-      "total_time": "636124",
+      "total_time": "619935",
+      "count": "1"
+    },
+    "failed_runs": {
+      "total_time": "0",
+      "count": "0"
+    }
+  },
+  {
+    "file": "encoding.ml",
+    "title": "Hangzhou: encoding regression test: vote.listings",
+    "tags": [
+      "regression",
+      "hangzhou",
+      "encoding"
+    ],
+    "successful_runs": {
+      "total_time": "621080",
+      "count": "1"
+    },
+    "failed_runs": {
+      "total_time": "0",
+      "count": "0"
+    }
+  },
+  {
+    "file": "precheck.ml",
+    "title": "Ithaca: precheck block",
+    "tags": [
+      "ithaca",
+      "node",
+      "precheck"
+    ],
+    "successful_runs": {
+      "total_time": "13704106",
       "count": "1"
     },
     "failed_runs": {
@@ -707,7 +695,7 @@
       "precheck"
     ],
     "successful_runs": {
-      "total_time": "13663151",
+      "total_time": "23766855",
       "count": "1"
     },
     "failed_runs": {
@@ -716,33 +704,50 @@
     }
   },
   {
-    "file": "proxy.ml",
-    "title": "light supported protocols are the same as the mockup protocols",
+    "file": "precheck.ml",
+    "title": "Ithaca: forge fake block",
+    "tags": [
+      "ithaca",
+      "precheck",
+      "fake_block",
+      "propagation"
+    ],
+    "successful_runs": {
+      "total_time": "18094472",
+      "count": "1"
+    },
+    "failed_runs": {
+      "total_time": "0",
+      "count": "0"
+    }
+  },
+  {
+    "file": "tenderbake.ml",
+    "title": "Alpha: Tenderbake transfer - baking 2",
+    "tags": [
+      "alpha",
+      "baking",
+      "tenderbake"
+    ],
+    "successful_runs": {
+      "total_time": "9001982",
+      "count": "1"
+    },
+    "failed_runs": {
+      "total_time": "0",
+      "count": "0"
+    }
+  },
+  {
+    "file": "light.ml",
+    "title": "mode light endpoint not in sources",
     "tags": [
       "client",
       "light",
-      "list",
-      "protocols"
+      "cli"
     ],
     "successful_runs": {
-      "total_time": "723618",
-      "count": "1"
-    },
-    "failed_runs": {
-      "total_time": "0",
-      "count": "0"
-    }
-  },
-  {
-    "file": "cli_tezos.ml",
-    "title": "CLI above connections cap",
-    "tags": [
-      "cli",
-      "connections",
-      "bad"
-    ],
-    "successful_runs": {
-      "total_time": "570683",
+      "total_time": "383152",
       "count": "1"
     },
     "failed_runs": {
@@ -752,16 +757,15 @@
   },
   {
     "file": "RPC_test.ml",
-    "title": "Alpha: alpha (mode light) RPC regression tests: delegates",
+    "title": "Alpha: (mode client) RPC regression tests: delegates",
     "tags": [
       "regression",
       "alpha",
       "rpc",
-      "alpha",
       "delegates"
     ],
     "successful_runs": {
-      "total_time": "12506874",
+      "total_time": "12487365",
       "count": "1"
     },
     "failed_runs": {
@@ -771,16 +775,15 @@
   },
   {
     "file": "RPC_test.ml",
-    "title": "Granada: granada (mode proxy) RPC regression tests: mempool",
+    "title": "Hangzhou: (mode client) RPC regression tests: others",
     "tags": [
       "regression",
-      "granada",
+      "hangzhou",
       "rpc",
-      "granada",
-      "mempool"
+      "others"
     ],
     "successful_runs": {
-      "total_time": "25003152",
+      "total_time": "6969690",
       "count": "1"
     },
     "failed_runs": {
@@ -790,16 +793,15 @@
   },
   {
     "file": "RPC_test.ml",
-    "title": "Alpha: alpha (mode proxy_server) RPC regression tests: votes",
+    "title": "Alpha: (mode light) RPC regression tests: votes",
     "tags": [
       "regression",
       "alpha",
       "rpc",
-      "alpha",
       "votes"
     ],
     "successful_runs": {
-      "total_time": "15397825",
+      "total_time": "16083034",
       "count": "1"
     },
     "failed_runs": {
@@ -809,14 +811,52 @@
   },
   {
     "file": "RPC_test.ml",
-    "title": "Test RPC client binary mode @ 127.0.0.1",
+    "title": "Hangzhou: (mode proxy) RPC regression tests: others",
     "tags": [
+      "regression",
+      "hangzhou",
       "rpc",
-      "client",
-      "binary"
+      "others"
     ],
     "successful_runs": {
-      "total_time": "4070477",
+      "total_time": "6982567",
+      "count": "1"
+    },
+    "failed_runs": {
+      "total_time": "0",
+      "count": "0"
+    }
+  },
+  {
+    "file": "RPC_test.ml",
+    "title": "Alpha: (mode proxy_server) RPC regression tests: others",
+    "tags": [
+      "regression",
+      "alpha",
+      "rpc",
+      "others"
+    ],
+    "successful_runs": {
+      "total_time": "7483978",
+      "count": "1"
+    },
+    "failed_runs": {
+      "total_time": "0",
+      "count": "0"
+    }
+  },
+  {
+    "file": "manager_operations.ml",
+    "title": "Ithaca: Contract's body illtyped 2",
+    "tags": [
+      "ithaca",
+      "precheck",
+      "illtyped",
+      "origination",
+      "typing"
+    ],
+    "successful_runs": {
+      "total_time": "18652333",
       "count": "1"
     },
     "failed_runs": {
@@ -833,7 +873,7 @@
       "revelation"
     ],
     "successful_runs": {
-      "total_time": "36238537",
+      "total_time": "35018815",
       "count": "1"
     },
     "failed_runs": {
@@ -843,14 +883,123 @@
   },
   {
     "file": "manager_operations.ml",
-    "title": "Granada: Two reveals in a batch. Second key is wrong",
+    "title": "Hangzhou: Two reveals in a batch. First key is wrong",
     "tags": [
-      "granada",
+      "hangzhou",
       "reveal",
-      "revelation"
+      "revelation",
+      "batch"
     ],
     "successful_runs": {
-      "total_time": "18301505",
+      "total_time": "74263900",
+      "count": "1"
+    },
+    "failed_runs": {
+      "total_time": "0",
+      "count": "0"
+    }
+  },
+  {
+    "file": "manager_operations.ml",
+    "title": "Alpha: Simple transfer not enough balance to pay fees",
+    "tags": [
+      "alpha",
+      "transaction",
+      "transfer"
+    ],
+    "successful_runs": {
+      "total_time": "28447897",
+      "count": "1"
+    },
+    "failed_runs": {
+      "total_time": "0",
+      "count": "0"
+    }
+  },
+  {
+    "file": "manager_operations.ml",
+    "title": "Hangzhou: Simple transfer counter in the past",
+    "tags": [
+      "hangzhou",
+      "transaction",
+      "transfer"
+    ],
+    "successful_runs": {
+      "total_time": "21375296",
+      "count": "1"
+    },
+    "failed_runs": {
+      "total_time": "0",
+      "count": "0"
+    }
+  },
+  {
+    "file": "manager_operations.ml",
+    "title": "Ithaca: Simple transfer with not enough fees to cover gas",
+    "tags": [
+      "ithaca",
+      "transaction",
+      "transfer"
+    ],
+    "successful_runs": {
+      "total_time": "23059983",
+      "count": "1"
+    },
+    "failed_runs": {
+      "total_time": "0",
+      "count": "0"
+    }
+  },
+  {
+    "file": "manager_operations.ml",
+    "title": "Hangzhou: Test successive injections with same manager (no operation precheck)",
+    "tags": [
+      "hangzhou",
+      "transaction",
+      "transfer",
+      "counters",
+      "no_operation_precheck"
+    ],
+    "successful_runs": {
+      "total_time": "24837438",
+      "count": "1"
+    },
+    "failed_runs": {
+      "total_time": "0",
+      "count": "0"
+    }
+  },
+  {
+    "file": "manager_operations.ml",
+    "title": "Alpha: Test batch with wrong counters (+1, +2, +4)",
+    "tags": [
+      "alpha",
+      "transaction",
+      "transfer",
+      "counters",
+      "batch"
+    ],
+    "successful_runs": {
+      "total_time": "32007671",
+      "count": "1"
+    },
+    "failed_runs": {
+      "total_time": "0",
+      "count": "0"
+    }
+  },
+  {
+    "file": "manager_operations.ml",
+    "title": "Hangzhou: Smart contract call with illtyped argument",
+    "tags": [
+      "hangzhou",
+      "simple_contract_calls",
+      "smart",
+      "contract",
+      "call"
+    ],
+    "successful_runs": {
+      "total_time": "17641773",
       "count": "1"
     },
     "failed_runs": {
@@ -869,7 +1018,113 @@
       "call"
     ],
     "successful_runs": {
-      "total_time": "17911761",
+      "total_time": "17736510",
+      "count": "1"
+    },
+    "failed_runs": {
+      "total_time": "0",
+      "count": "0"
+    }
+  },
+  {
+    "file": "replace_by_fees.ml",
+    "title": "Alpha: Second op's fees are above replacement fees threshold by 1 mutez",
+    "tags": [
+      "alpha",
+      "replace",
+      "fee",
+      "manager"
+    ],
+    "successful_runs": {
+      "total_time": "16683937",
+      "count": "1"
+    },
+    "failed_runs": {
+      "total_time": "0",
+      "count": "0"
+    }
+  },
+  {
+    "file": "replace_by_fees.ml",
+    "title": "Ithaca: Replace a replacement op with enough fees",
+    "tags": [
+      "ithaca",
+      "replace",
+      "fee",
+      "manager"
+    ],
+    "successful_runs": {
+      "total_time": "19952982",
+      "count": "1"
+    },
+    "failed_runs": {
+      "total_time": "0",
+      "count": "0"
+    }
+  },
+  {
+    "file": "replace_by_fees.ml",
+    "title": "Ithaca: Second op's fees are equal to replacement fees. But gas increased",
+    "tags": [
+      "ithaca",
+      "replace",
+      "fee",
+      "manager"
+    ],
+    "successful_runs": {
+      "total_time": "11592633",
+      "count": "1"
+    },
+    "failed_runs": {
+      "total_time": "0",
+      "count": "0"
+    }
+  },
+  {
+    "file": "replace_by_fees.ml",
+    "title": "Ithaca: Gas limit doubled in batch. More fees needed",
+    "tags": [
+      "ithaca",
+      "replace",
+      "fee",
+      "manager"
+    ],
+    "successful_runs": {
+      "total_time": "16152271",
+      "count": "1"
+    },
+    "failed_runs": {
+      "total_time": "0",
+      "count": "0"
+    }
+  },
+  {
+    "file": "sc_rollup.ml",
+    "title": "Alpha: origination of a SCORU executes without error",
+    "tags": [
+      "regression",
+      "alpha",
+      "sc_rollup"
+    ],
+    "successful_runs": {
+      "total_time": "5635967",
+      "count": "1"
+    },
+    "failed_runs": {
+      "total_time": "0",
+      "count": "0"
+    }
+  },
+  {
+    "file": "sc_rollup.ml",
+    "title": "Alpha: configuration of a smart contract optimistic rollup node",
+    "tags": [
+      "regression",
+      "alpha",
+      "sc_rollup"
+    ],
+    "successful_runs": {
+      "total_time": "5813556",
       "count": "1"
     },
     "failed_runs": {

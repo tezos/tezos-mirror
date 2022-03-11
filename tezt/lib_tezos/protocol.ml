@@ -197,5 +197,9 @@ let register_regression_test ~__FILE__ ~title ~tags ?supports ~output_file body
     protocols =
   iter_on_supported_protocols ~title ~protocols ?supports @@ fun protocol ->
   let (title, tags) = add_to_test_parameters protocol title tags in
-  Regression.register ~__FILE__ ~title ~tags ~output_file (fun () ->
-      body protocol)
+  Regression.register
+    ~__FILE__
+    ~title
+    ~tags
+    ~output_file:(output_file protocol)
+    (fun () -> body protocol)
