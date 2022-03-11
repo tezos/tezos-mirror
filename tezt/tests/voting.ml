@@ -293,23 +293,22 @@ let test_voting ~from_protocol ~(to_protocol : target_protocol) ~loser_protocols
      of blocks for all protocols, and we do not need to handle
      different cases when checking levels and periods in tests. *)
   let parameters =
-    match from_protocol with
-    | Alpha ->
-        [
-          (["blocks_per_cycle"], Some "4");
-          (["cycles_per_voting_period"], Some "1");
-        ]
-    | _ ->
-        (* Note: the test fails with [blocks_per_voting_period] < [blocks_per_cycle]
-           when migrating to protocol Alpha, as this will cause the migration to
-           set [cycles_per_voting_period] = 0. The test also fails when
-           [blocks_per_voting_period] % [blocks_per_cycle] <> 0, as the starting
-           position of a period will change when migrating a protocol to Alpha.
-        *)
-        [
-          (["blocks_per_cycle"], Some "4");
-          (["blocks_per_voting_period"], Some "4");
-        ]
+    if Protocol.number from_protocol >= 013 then
+      [
+        (["blocks_per_cycle"], Some "4");
+        (["cycles_per_voting_period"], Some "1");
+      ]
+    else
+      (* Note: the test fails with [blocks_per_voting_period] < [blocks_per_cycle]
+         when migrating to protocol Alpha, as this will cause the migration to
+         set [cycles_per_voting_period] = 0. The test also fails when
+         [blocks_per_voting_period] % [blocks_per_cycle] <> 0, as the starting
+         position of a period will change when migrating a protocol to Alpha.
+      *)
+      [
+        (["blocks_per_cycle"], Some "4");
+        (["blocks_per_voting_period"], Some "4");
+      ]
   in
   let* parameter_file =
     Protocol.write_parameter_file ~base:(Right (from_protocol, None)) parameters
