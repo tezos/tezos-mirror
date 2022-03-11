@@ -243,9 +243,8 @@ let tickets_of_origination ctxt ~preorigination script =
    originations and transactions. We will likely also need to support rollups.
  *)
 let tickets_of_operation ctxt
-    (Internal_operation {source = _; operation; nonce = _}) =
+    (Script_typed_ir.Internal_operation {source = _; operation; nonce = _}) =
   match operation with
-  | Reveal _ -> return (None, ctxt)
   | Transaction
       {
         amount = _;
@@ -263,23 +262,6 @@ let tickets_of_operation ctxt
   | Origination {delegate = _; script; credit = _; preorigination} ->
       tickets_of_origination ctxt ~preorigination script
   | Delegation _ -> return (None, ctxt)
-  | Register_global_constant _ -> return (None, ctxt)
-  | Set_deposits_limit _ -> return (None, ctxt)
-  | Tx_rollup_origination -> return (None, ctxt)
-  | Tx_rollup_submit_batch _ -> return (None, ctxt)
-  | Tx_rollup_commit _ -> return (None, ctxt)
-  | Tx_rollup_return_bond _ -> return (None, ctxt)
-  | Tx_rollup_finalize_commitment _ -> return (None, ctxt)
-  | Tx_rollup_remove_commitment _ -> return (None, ctxt)
-  | Tx_rollup_rejection _ -> return (None, ctxt)
-  (* TODO: #2488
-         The ticket accounting for the recipient of rollup transactions
-         is currently done in the apply function, but should rather be
-         done in this module. *)
-  | Tx_rollup_withdraw _ -> return (None, ctxt)
-  | Sc_rollup_originate _ -> return (None, ctxt)
-  | Sc_rollup_add_messages _ -> return (None, ctxt)
-  | Sc_rollup_cement _ -> return (None, ctxt)
 
 let add_transfer_to_token_map ctxt token_map {destination; tickets} =
   List.fold_left_es

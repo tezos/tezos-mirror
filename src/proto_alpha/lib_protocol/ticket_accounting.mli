@@ -59,5 +59,5 @@ val update_ticket_balances :
   Alpha_context.context ->
   self:Alpha_context.Contract.t ->
   ticket_diffs:Z.t Ticket_token_map.t ->
-  Alpha_context.packed_internal_operation list ->
+  Script_typed_ir.packed_internal_operation list ->
   (Z.t * Alpha_context.t) tzresult Lwt.t

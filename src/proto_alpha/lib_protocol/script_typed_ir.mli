@@ -78,11 +78,6 @@ type ('a, 'b) pair = 'a * 'b
 
 type ('a, 'b) union = L of 'a | R of 'b
 
-type operation = {
-  piop : packed_internal_operation;
-  lazy_storage_diff : Lazy_storage.diffs option;
-}
-
 module Script_chain_id : sig
   (** [t] is made algebraic in order to distinguish it from the other type
       parameters of [Script_typed_ir.ty]. *)
@@ -1490,6 +1485,38 @@ and ('input, 'output) view_signature =
       output_ty : 'output ty;
     }
       -> ('input, 'output) view_signature
+
+and 'kind manager_operation =
+  | Transaction :
+      Alpha_context.transaction
+      -> Kind.transaction manager_operation
+  | Origination :
+      Alpha_context.origination
+      -> Kind.origination manager_operation
+  | Delegation :
+      Signature.Public_key_hash.t option
+      -> Kind.delegation manager_operation
+
+and 'kind internal_operation = {
+  source : Contract.contract;
+  operation : 'kind manager_operation;
+  nonce : int;
+}
+
+and packed_internal_operation =
+  | Internal_operation : 'kind internal_operation -> packed_internal_operation
+[@@ocaml.unboxed]
+
+and operation = {
+  piop : packed_internal_operation;
+  lazy_storage_diff : Lazy_storage.diffs option;
+}
+
+type packed_manager_operation =
+  | Manager : 'kind manager_operation -> packed_manager_operation
+[@@ocaml.unboxed]
+
+val manager_kind : 'kind manager_operation -> 'kind Kind.manager
 
 val kinfo_of_kinstr : ('a, 's, 'b, 'f) kinstr -> ('a, 's) kinfo
 

@@ -230,7 +230,7 @@ let origination_operation block ~src ~baker ~script ~storage ~forges_tickets =
     Incremental.begin_construction ~policy:Block.(By_account baker) block
   in
   let operation =
-    Internal_operation
+    Script_typed_ir.Internal_operation
       {
         source = src;
         operation =
@@ -246,57 +246,9 @@ let origination_operation block ~src ~baker ~script ~storage ~forges_tickets =
   in
   return (orig_contract, operation, incr)
 
-let register_global_constant_operation ~src =
-  Internal_operation
-    {
-      source = src;
-      operation =
-        Register_global_constant
-          {value = Script.lazy_expr @@ Expr.from_string "1"};
-      nonce = 1;
-    }
-
-let reveal_operation ~src pk =
-  Internal_operation {source = src; operation = Reveal pk; nonce = 1}
-
 let delegation_operation ~src =
-  Internal_operation {source = src; operation = Delegation None; nonce = 1}
-
-let set_deposits_limit_operation ~src =
-  Internal_operation
-    {source = src; operation = Set_deposits_limit None; nonce = 1}
-
-let sc_rollup_origination_operation ~src =
-  let rollup = Sc_rollup.Address.hash_string ["Dummy"] in
-  Internal_operation
-    {
-      source = src;
-      operation = Sc_rollup_add_messages {rollup; messages = []};
-      nonce = 1;
-    }
-
-let sc_rollup_add_message ~src =
-  Internal_operation
-    {
-      source = src;
-      operation =
-        Sc_rollup_originate
-          {
-            kind = Sc_rollup.Kind.Example_arith;
-            boot_sector = Sc_rollup.PVM.boot_sector_of_string "Dummy";
-          };
-      nonce = 1;
-    }
-
-let sc_rollup_cement ~src =
-  let rollup = Sc_rollup.Address.hash_string ["Dummy"] in
-  let commitment = Sc_rollup.Commitment_hash.hash_string ["Dummy"] in
-  Internal_operation
-    {source = src; operation = Sc_rollup_cement {rollup; commitment}; nonce = 1}
-
-let tx_rollup_originate_operation ~src =
-  Internal_operation
-    {source = src; operation = Tx_rollup_origination; nonce = 1}
+  Script_typed_ir.Internal_operation
+    {source = src; operation = Delegation None; nonce = 1}
 
 let originate block ~src ~baker ~script ~storage ~forges_tickets =
   let* (orig_contract, _script, block) =
@@ -308,7 +260,7 @@ let originate block ~src ~baker ~script ~storage ~forges_tickets =
   return (orig_contract, incr)
 
 let transfer_operation ~src ~destination ~parameters =
-  Internal_operation
+  Script_typed_ir.Internal_operation
     {
       source = src;
       operation =
@@ -354,22 +306,7 @@ let ticket_big_map_script =
 let test_non_ticket_operations () =
   let* (_baker, src, block) = init () in
   let* incr = Incremental.begin_construction block in
-  let pub_key =
-    Signature.Public_key.of_b58check_exn
-      "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
-  in
-  let operations =
-    [
-      register_global_constant_operation ~src;
-      reveal_operation ~src pub_key;
-      delegation_operation ~src;
-      set_deposits_limit_operation ~src;
-      tx_rollup_originate_operation ~src;
-      sc_rollup_add_message ~src;
-      sc_rollup_cement ~src;
-      sc_rollup_origination_operation ~src;
-    ]
-  in
+  let operations = [delegation_operation ~src] in
   let* (ticket_diffs, ctxt) = ticket_diffs_of_operations incr operations in
   assert_equal_ticket_token_diffs ctxt ~loc:__LOC__ ticket_diffs ~expected:[]
 

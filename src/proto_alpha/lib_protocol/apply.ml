@@ -1080,6 +1080,11 @@ let apply_origination ~consume_deserialization_gas ~ctxt ~script ~internal
   Script.force_decode_in_context
     ~consume_deserialization_gas
     ctxt
+    script.Script.storage
+  >>?= fun (_unparsed_storage, ctxt) ->
+  Script.force_decode_in_context
+    ~consume_deserialization_gas
+    ctxt
     script.Script.code
   >>?= fun (unparsed_code, ctxt) ->
   Script_ir_translator.parse_script
@@ -1177,29 +1182,8 @@ let apply_origination ~consume_deserialization_gas ~ctxt ~script ~internal
 
 *)
 
-let apply_manager_operation_content :
-    type kind.
-    Alpha_context.t ->
-    Script_ir_translator.unparsing_mode ->
-    payer:public_key_hash ->
-    source:Contract.t ->
-    chain_id:Chain_id.t ->
-    internal:bool ->
-    gas_consumed_in_precheck:Gas.cost option ->
-    kind manager_operation ->
-    (context
-    * kind successful_manager_operation_result
-    * packed_internal_operation list)
-    tzresult
-    Lwt.t =
- fun ctxt
-     mode
-     ~payer
-     ~source
-     ~chain_id
-     ~internal
-     ~gas_consumed_in_precheck
-     operation ->
+let prepare_apply_manager_operation_content ~ctxt ~source
+    ~gas_consumed_in_precheck =
   let before_operation =
     (* This context is not used for backtracking. Only to compute
          gas consumption and originations for the operation result. *)
@@ -1214,6 +1198,108 @@ let apply_manager_operation_content :
   let consume_deserialization_gas = Script.When_needed in
   (* [note]: deserialization gas has already been accounted for in the gas
      consumed by the precheck and the lazy_exprs have been forced. *)
+  return (ctxt, before_operation, consume_deserialization_gas)
+
+let apply_internal_manager_operation_content :
+    type kind.
+    Alpha_context.t ->
+    Script_ir_translator.unparsing_mode ->
+    payer:public_key_hash ->
+    source:Contract.t ->
+    chain_id:Chain_id.t ->
+    internal:bool ->
+    gas_consumed_in_precheck:Gas.cost option ->
+    kind Script_typed_ir.manager_operation ->
+    (context
+    * kind successful_manager_operation_result
+    * Script_typed_ir.packed_internal_operation list)
+    tzresult
+    Lwt.t =
+ fun ctxt
+     mode
+     ~payer
+     ~source
+     ~chain_id
+     ~internal
+     ~gas_consumed_in_precheck
+     operation ->
+  prepare_apply_manager_operation_content
+    ~ctxt
+    ~source
+    ~gas_consumed_in_precheck
+  >>=? fun (ctxt, before_operation, consume_deserialization_gas) ->
+  match operation with
+  | Transaction
+      {amount; parameters; destination = Contract contract; entrypoint} ->
+      apply_transaction
+        ~consume_deserialization_gas
+        ~ctxt
+        ~parameters
+        ~source
+        ~contract
+        ~amount
+        ~entrypoint
+        ~before_operation
+        ~payer
+        ~chain_id
+        ~mode
+        ~internal
+      >|=? fun (ctxt, manager_result, operations) ->
+      ( ctxt,
+        (manager_result : kind successful_manager_operation_result),
+        operations )
+  | Transaction {amount; parameters; destination = Tx_rollup dst; entrypoint} ->
+      apply_transaction_to_rollup
+        ~consume_deserialization_gas
+        ~ctxt
+        ~parameters
+        ~amount
+        ~entrypoint
+        ~payer
+        ~dst_rollup:dst
+        ~since:before_operation
+  | Origination {delegate; script; preorigination; credit} ->
+      apply_origination
+        ~consume_deserialization_gas
+        ~ctxt
+        ~script
+        ~internal
+        ~preorigination
+        ~delegate
+        ~source
+        ~credit
+        ~before_operation
+  | Delegation delegate ->
+      apply_delegation ~ctxt ~source ~delegate ~since:before_operation
+
+let apply_external_manager_operation_content :
+    type kind.
+    Alpha_context.t ->
+    Script_ir_translator.unparsing_mode ->
+    payer:public_key_hash ->
+    source:Contract.t ->
+    chain_id:Chain_id.t ->
+    internal:bool ->
+    gas_consumed_in_precheck:Gas.cost option ->
+    kind Alpha_context.manager_operation ->
+    (context
+    * kind successful_manager_operation_result
+    * Script_typed_ir.packed_internal_operation list)
+    tzresult
+    Lwt.t =
+ fun ctxt
+     mode
+     ~payer
+     ~source
+     ~chain_id
+     ~internal
+     ~gas_consumed_in_precheck
+     operation ->
+  prepare_apply_manager_operation_content
+    ~ctxt
+    ~source
+    ~gas_consumed_in_precheck
+  >>=? fun (ctxt, before_operation, consume_deserialization_gas) ->
   match operation with
   | Reveal _ ->
       return
@@ -1338,7 +1424,7 @@ let apply_manager_operation_content :
       (* FIXME/TORU: #2488 the returned op will fail when ticket hardening is
          merged, it must be commented or fixed *)
       let op =
-        Internal_operation
+        Script_typed_ir.Internal_operation
           {
             source;
             (* TODO is 0 correct ? *)
@@ -1359,11 +1445,6 @@ let apply_manager_operation_content :
       in
       return (ctxt, result, [op])
   | Origination {delegate; script; preorigination; credit} ->
-      Script.force_decode_in_context
-        ~consume_deserialization_gas
-        ctxt
-        script.Script.storage
-      >>?= fun (_unparsed_storage, ctxt) ->
       apply_origination
         ~consume_deserialization_gas
         ~ctxt
@@ -1452,6 +1533,7 @@ let apply_manager_operation_content :
       in
       return (ctxt, result, [])
   | Tx_rollup_submit_batch {tx_rollup; content; burn_limit} ->
+      assert_tx_rollup_feature_enabled ctxt >>=? fun () ->
       let (message, message_size) = Tx_rollup_message.make_batch content in
       Tx_rollup_state.get ctxt tx_rollup >>=? fun (ctxt, state) ->
       Tx_rollup_state.burn_cost ~limit:burn_limit state message_size
@@ -1607,13 +1689,14 @@ let apply_internal_manager_operations ctxt mode ~payer ~chain_id ops =
   let[@coq_struct "ctxt"] rec apply ctxt applied worklist =
     match worklist with
     | [] -> Lwt.return (Success ctxt, List.rev applied)
-    | Internal_operation ({source; operation; nonce} as op) :: rest -> (
+    | Script_typed_ir.Internal_operation ({source; operation; nonce} as op)
+      :: rest -> (
         let op_res = Apply_results.contents_of_internal_operation op in
         (if internal_nonce_already_recorded ctxt nonce then
          fail (Internal_operation_replay (Internal_contents op_res))
         else
           let ctxt = record_internal_nonce ctxt nonce in
-          apply_manager_operation_content
+          apply_internal_manager_operation_content
             ctxt
             mode
             ~source
@@ -1627,14 +1710,14 @@ let apply_internal_manager_operations ctxt mode ~payer ~chain_id ops =
             let result =
               pack_internal_manager_operation_result
                 op
-                (Failed (manager_kind op.operation, errors))
+                (Failed (Script_typed_ir.manager_kind op.operation, errors))
             in
             let skipped =
               List.rev_map
-                (fun (Internal_operation op) ->
+                (fun (Script_typed_ir.Internal_operation op) ->
                   pack_internal_manager_operation_result
                     op
-                    (Skipped (manager_kind op.operation)))
+                    (Skipped (Script_typed_ir.manager_kind op.operation)))
                 rest
             in
             Lwt.return (Failure, List.rev (skipped @ result :: applied))
@@ -1888,7 +1971,7 @@ let apply_manager_contents (type kind) ctxt mode chain_id
   let ctxt = Gas.set_limit ctxt gas_limit in
   let payer = source in
   let source = Contract.implicit_contract source in
-  apply_manager_operation_content
+  apply_external_manager_operation_content
     ctxt
     mode
     ~source

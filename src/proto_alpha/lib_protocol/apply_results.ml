@@ -68,28 +68,26 @@ type packed_internal_contents =
   | Internal_contents : 'kind internal_contents -> packed_internal_contents
 
 let manager_operation_of_internal_operation (type kind)
-    (operation : kind internal_manager_operation) : kind manager_operation =
+    (operation : kind internal_manager_operation) :
+    kind Alpha_context.manager_operation =
   match operation with
   | Transaction transaction -> Transaction transaction
   | Origination origination -> Origination origination
   | Delegation delegate -> Delegation delegate
 
 let contents_of_internal_operation (type kind)
-    ({source; operation; nonce} : kind internal_operation) :
+    ({source; operation; nonce} : kind Script_typed_ir.internal_operation) :
     kind internal_contents =
   let operation : kind internal_manager_operation =
     match operation with
     | Transaction transaction -> Transaction transaction
     | Origination origination -> Origination origination
     | Delegation delegate -> Delegation delegate
-    (* This function will be used on internal operations only.
-       TODO (MR comment !4291): the branch will be removed when internal
-       operations are strictly defined. *)
-    | _ -> assert false
   in
   {source; operation; nonce}
 
-let contents_of_packed_internal_operation (Internal_operation op) =
+let contents_of_packed_internal_operation
+    (Script_typed_ir.Internal_operation op) =
   Internal_contents (contents_of_internal_operation op)
 
 let contents_of_packed_internal_operations =
@@ -247,7 +245,7 @@ type packed_internal_manager_operation_result =
       -> packed_internal_manager_operation_result
 
 let pack_internal_manager_operation_result (type kind)
-    (internal_op : kind internal_operation)
+    (internal_op : kind Script_typed_ir.internal_operation)
     (manager_op : kind manager_operation_result) =
   let internal_op = contents_of_internal_operation internal_op in
   Internal_manager_operation_result (internal_op, manager_op)

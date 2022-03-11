@@ -378,12 +378,6 @@ let manager_kind : type kind. kind manager_operation -> kind Kind.manager =
   | Sc_rollup_add_messages _ -> Kind.Sc_rollup_add_messages_manager_kind
   | Sc_rollup_cement _ -> Kind.Sc_rollup_cement_manager_kind
 
-type 'kind internal_operation = {
-  source : Contract_repr.contract;
-  operation : 'kind manager_operation;
-  nonce : int;
-}
-
 type packed_manager_operation =
   | Manager : 'kind manager_operation -> packed_manager_operation
 
@@ -402,9 +396,6 @@ type packed_operation = {
 
 let pack ({shell; protocol_data} : _ operation) : packed_operation =
   {shell; protocol_data = Operation_data protocol_data}
-
-type packed_internal_operation =
-  | Internal_operation : 'kind internal_operation -> packed_internal_operation
 
 let rec contents_list_to_list : type a. a contents_list -> _ = function
   | Single o -> [Contents o]
@@ -883,38 +874,6 @@ module Encoding = struct
           inj =
             (fun (rollup, commitment) -> Sc_rollup_cement {rollup; commitment});
         }
-
-    let encoding =
-      let make (MCase {tag; name; encoding; select; proj; inj}) =
-        case
-          (Tag tag)
-          name
-          encoding
-          (fun o ->
-            match select o with None -> None | Some o -> Some (proj o))
-          (fun x -> Manager (inj x))
-      in
-      union
-        ~tag_size:`Uint8
-        [
-          make reveal_case;
-          make transaction_case;
-          make origination_case;
-          make delegation_case;
-          make register_global_constant_case;
-          make set_deposits_limit_case;
-          make tx_rollup_origination_case;
-          make tx_rollup_submit_batch_case;
-          make tx_rollup_commit_case;
-          make tx_rollup_return_bond_case;
-          make tx_rollup_finalize_commitment_case;
-          make tx_rollup_remove_commitment_case;
-          make tx_rollup_rejection_case;
-          make tx_rollup_withdraw_case;
-          make sc_rollup_originate_case;
-          make sc_rollup_add_messages_case;
-          make sc_rollup_cement_case;
-        ]
   end
 
   type 'b case =
@@ -1337,17 +1296,6 @@ module Encoding = struct
     @@ merge_objs
          Operation.shell_header_encoding
          (obj1 (req "contents" contents_list_encoding))
-
-  let internal_operation_encoding =
-    def "operation.alpha.internal_operation"
-    @@ conv
-         (fun (Internal_operation {source; operation; nonce}) ->
-           ((source, nonce), Manager operation))
-         (fun ((source, nonce), Manager operation) ->
-           Internal_operation {source; operation; nonce})
-         (merge_objs
-            (obj2 (req "source" Contract_repr.encoding) (req "nonce" uint16))
-            Manager_operations.encoding)
 end
 
 let encoding = Encoding.operation_encoding
@@ -1359,8 +1307,6 @@ let contents_list_encoding = Encoding.contents_list_encoding
 let protocol_data_encoding = Encoding.protocol_data_encoding
 
 let unsigned_operation_encoding = Encoding.unsigned_operation_encoding
-
-let internal_operation_encoding = Encoding.internal_operation_encoding
 
 let raw ({shell; protocol_data} : _ operation) =
   let proto =

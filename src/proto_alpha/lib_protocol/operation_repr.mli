@@ -431,12 +431,6 @@ and _ manager_operation =
     its manager is checked and incremented. *)
 and counter = Z.t
 
-type 'kind internal_operation = {
-  source : Contract_repr.contract;
-  operation : 'kind manager_operation;
-  nonce : int;
-}
-
 type packed_manager_operation =
   | Manager : 'kind manager_operation -> packed_manager_operation
 
@@ -458,9 +452,6 @@ type packed_operation = {
 }
 
 val pack : 'kind operation -> packed_operation
-
-type packed_internal_operation =
-  | Internal_operation : 'kind internal_operation -> packed_internal_operation
 
 val manager_kind : 'kind manager_operation -> 'kind Kind.manager
 
@@ -491,8 +482,6 @@ type error += Invalid_signature (* `Permanent *)
 
 val check_signature :
   Signature.Public_key.t -> Chain_id.t -> _ operation -> unit tzresult
-
-val internal_operation_encoding : packed_internal_operation Data_encoding.t
 
 type ('a, 'b) eq = Eq : ('a, 'a) eq
 
