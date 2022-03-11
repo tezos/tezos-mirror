@@ -2,8 +2,6 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
-(* Copyright (c) 2022 Marigold, <contact@marigold.dev>                       *)
-(* Copyright (c) 2022 Oxhead Alpha <info@oxhead-alpha.com>                   *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,7 +22,9 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
-open Tezos_rpc_http_server
 
-(** Starts the RPC server of the tx_rollup_node. *)
-val start : Configuration.t -> State.t -> RPC_server.server tzresult Lwt.t
+(** [all ()] is the list of commands recognized by the transaction
+   rollup client. These commands may depend on the client
+   configuration. *)
+
+val all : unit -> Configuration.tx_client_context Clic.command list

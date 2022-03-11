@@ -12,7 +12,6 @@ depends: [
   "tezos-base"
   "tezos-protocol-alpha"
   "tezos-client-alpha"
-  "tezos-client-base"
   "tezos-client-base-unix"
   "tezos-tx-rollup-alpha"
 ]
@@ -20,4 +19,4 @@ build: [
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Tezos/Protocol: Transaction Rollup node binary"
+synopsis: "Tezos/Protocol: `tezos-tx-rollup-client-alpha` client binary"

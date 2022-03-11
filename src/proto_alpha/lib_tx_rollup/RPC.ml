@@ -54,6 +54,42 @@ let context_of_id state context_id =
   | #block_id as block_id -> context_of_block_id state block_id
   | `Context c -> Lwt.return_some c
 
+let construct_block_id = function
+  | `Head -> "head"
+  | `L2_block h -> L2block.Hash.to_b58check h
+  | `Tezos_block h -> Block_hash.to_b58check h
+  | `Level l -> L2block.level_to_string l
+
+let destruct_block_id h =
+  match h with
+  | "head" -> Ok `Head
+  | "genesis" -> Ok (`Level L2block.Genesis)
+  | _ -> (
+      match Int32.of_string_opt h with
+      | Some l -> (
+          match Alpha_context.Tx_rollup_level.of_int32 l with
+          | Error _ -> Error "Invalid rollup level"
+          | Ok l -> Ok (`Level (L2block.Rollup_level l)))
+      | None -> (
+          match Block_hash.of_b58check_opt h with
+          | Some b -> Ok (`Tezos_block b)
+          | None -> (
+              match L2block.Hash.of_b58check_opt h with
+              | Some b -> Ok (`L2_block b)
+              | None -> Error "Cannot parse block id")))
+
+let construct_context_id = function
+  | #block_id as id -> construct_block_id id
+  | `Context h -> Tx_rollup_l2_context_hash.to_b58check h
+
+let destruct_context_id h =
+  match destruct_block_id h with
+  | Ok b -> Ok b
+  | Error _ -> (
+      match Tx_rollup_l2_context_hash.of_b58check_opt h with
+      | Some c -> Ok (`Context c)
+      | None -> Error "Cannot parse block or context hash")
+
 module Arg = struct
   let indexable ~kind ~construct ~destruct =
     let construct i =
@@ -93,42 +129,6 @@ module Arg = struct
       ~construct:Ticket_hash.to_b58check
       ~destruct:Ticket_hash.of_b58check_opt
 
-  let construct_block_id = function
-    | `Head -> "head"
-    | `L2_block h -> L2block.Hash.to_b58check h
-    | `Tezos_block h -> Block_hash.to_b58check h
-    | `Level l -> L2block.level_to_string l
-
-  let destruct_block_id h =
-    match h with
-    | "head" -> Ok `Head
-    | "genesis" -> Ok (`Level L2block.Genesis)
-    | _ -> (
-        match Int32.of_string_opt h with
-        | Some l -> (
-            match Alpha_context.Tx_rollup_level.of_int32 l with
-            | Error _ -> Error "Invalid rollup level"
-            | Ok l -> Ok (`Level (L2block.Rollup_level l)))
-        | None -> (
-            match Block_hash.of_b58check_opt h with
-            | Some b -> Ok (`Tezos_block b)
-            | None -> (
-                match L2block.Hash.of_b58check_opt h with
-                | Some b -> Ok (`L2_block b)
-                | None -> Error "Cannot parse block id")))
-
-  let construct_context_id = function
-    | #block_id as id -> construct_block_id id
-    | `Context h -> Tx_rollup_l2_context_hash.to_b58check h
-
-  let destruct_context_id h =
-    match destruct_block_id h with
-    | Ok b -> Ok b
-    | Error _ -> (
-        match Tx_rollup_l2_context_hash.of_b58check_opt h with
-        | Some c -> Ok (`Context c)
-        | None -> Error "Cannot parse block or context hash")
-
   let block_id : block_id RPC_arg.t =
     RPC_arg.make
       ~descr:"An L2 block identifier."
@@ -160,13 +160,23 @@ end
 module Block = struct
   open Lwt_result_syntax
 
-  let path = RPC_path.(open_root)
+  let path : (unit * block_id) RPC_path.context = RPC_path.(open_root)
+
+  let prefix = RPC_path.(open_root / "block" /: Arg.block_id)
 
   let directory : (State.t * block_id) RPC_directory.t ref =
     ref RPC_directory.empty
 
   let register service f =
     directory := RPC_directory.register !directory service f
+
+  let register0 service f = register (RPC_service.subst0 service) f
+
+  let register1 service f = register (RPC_service.subst1 service) f
+
+  let export_service s =
+    let p = RPC_path.prefix prefix path in
+    RPC_service.prefix p s
 
   let block =
     RPC_service.get_service
@@ -211,19 +221,19 @@ module Block = struct
       RPC_path.(path / "proof" / "message" /: RPC_arg.int)
 
   let () =
-    register block @@ fun (state, block_id) () () ->
+    register0 block @@ fun (state, block_id) () () ->
     let*! block = block_of_id state block_id in
     return block
 
   let () =
-    register header @@ fun (state, block_id) () () ->
+    register0 header @@ fun (state, block_id) () () ->
     let*! block = block_of_id state block_id in
     match block with
     | None -> return None
     | Some block -> return (Some (block.hash, block.header))
 
   let () =
-    register inbox @@ fun (state, block_id) () () ->
+    register0 inbox @@ fun (state, block_id) () () ->
     let*! block = block_of_id state block_id in
     match block with
     | None -> return None
@@ -235,7 +245,7 @@ module Block = struct
         | _ -> return (Some block.inbox))
 
   let () =
-    register proof @@ fun ((state, block_id), message_pos) () () ->
+    register1 proof @@ fun ((state, block_id), message_pos) () () ->
     let*! block = block_of_id state block_id in
     match block with
     | None -> return_none
@@ -314,12 +324,24 @@ end
 module Context_RPC = struct
   open Lwt_result_syntax
 
-  let path = RPC_path.open_root
+  let path : (unit * context_id) RPC_path.context = RPC_path.open_root
+
+  let prefix = RPC_path.(open_root / "context" /: Arg.context_id)
 
   let directory : Context.t RPC_directory.t ref = ref RPC_directory.empty
 
   let register service f =
     directory := RPC_directory.register !directory service f
+
+  let register0 service f = register (RPC_service.subst0 service) f
+
+  let register1 service f = register (RPC_service.subst1 service) f
+
+  let register2 service f = register (RPC_service.subst2 service) f
+
+  let export_service s =
+    let p = RPC_path.prefix prefix path in
+    RPC_service.prefix p s
 
   type address_metadata = {
     index : Tx_rollup_l2_context_sig.address_index;
@@ -448,7 +470,7 @@ module Context_RPC = struct
       Context.Ticket_index.count
 
   let () =
-    register balance @@ fun ((c, ticket), address) () () ->
+    register2 balance @@ fun ((c, ticket), address) () () ->
     let* ticket_id = get_ticket_index c ticket in
     let* address_id = get_address_index c address in
     match (ticket_id, address_id) with
@@ -456,21 +478,22 @@ module Context_RPC = struct
     | (Some ticket_id, Some address_id) ->
         Context.Ticket_ledger.get c ticket_id address_id
 
-  let () = register tickets_count @@ fun c () () -> Context.Ticket_index.count c
+  let () =
+    register0 tickets_count @@ fun c () () -> Context.Ticket_index.count c
 
   let () =
-    register addresses_count @@ fun c () () -> Context.Address_index.count c
+    register0 addresses_count @@ fun c () () -> Context.Address_index.count c
 
   let () =
-    register ticket_index @@ fun (c, ticket) () () ->
+    register1 ticket_index @@ fun (c, ticket) () () ->
     get_ticket_index ~check_index:true c ticket
 
   let () =
-    register address_index @@ fun (c, address) () () ->
+    register1 address_index @@ fun (c, address) () () ->
     get_address_index ~check_index:true c address
 
   let () =
-    register address_metadata @@ fun (c, address) () () ->
+    register1 address_metadata @@ fun (c, address) () () ->
     let* address_index = get_address_index c address in
     match address_index with
     | None -> return None
@@ -482,7 +505,7 @@ module Context_RPC = struct
             return (Some {index = address_index; counter; public_key}))
 
   let () =
-    register address_counter @@ fun (c, address) () () ->
+    register1 address_counter @@ fun (c, address) () () ->
     let* address_index = get_address_index c address in
     match address_index with
     | None -> return 0L
@@ -493,7 +516,7 @@ module Context_RPC = struct
         | Some {counter; _} -> return counter)
 
   let () =
-    register address_public_key @@ fun (c, address) () () ->
+    register1 address_public_key @@ fun (c, address) () () ->
     let* address_index = get_address_index c address in
     match address_index with
     | None -> return None
@@ -512,7 +535,7 @@ module Context_RPC = struct
              match context_hash with
              | None ->
                  Stdlib.failwith @@ "Unknown context id "
-                 ^ Arg.construct_context_id context_id
+                 ^ construct_context_id context_id
              | Some ch -> ch
            in
            Context.checkout_exn state.State.context_index context_hash)
@@ -520,12 +543,20 @@ module Context_RPC = struct
 end
 
 module Injection = struct
-  let path = RPC_path.(open_root / "queue")
+  let path : unit RPC_path.context = RPC_path.(open_root / "queue")
+
+  let prefix = RPC_path.(open_root)
 
   let directory : Batcher.t RPC_directory.t ref = ref RPC_directory.empty
 
   let register service f =
     directory := RPC_directory.register !directory service f
+
+  let register0 service f = register (RPC_service.subst0 service) f
+
+  let register1 service f = register (RPC_service.subst1 service) f
+
+  let export_service s = RPC_service.prefix prefix s
 
   let build_directory state =
     match state.State.batcher with
@@ -565,18 +596,18 @@ module Injection = struct
       path
 
   let () =
-    register inject_transaction (fun batcher q transaction ->
+    register0 inject_transaction (fun batcher q transaction ->
         Batcher.register_transaction
           ~eager_batch:q#eager_batch
           batcher
           transaction)
 
   let () =
-    register get_transaction (fun (batcher, tr_hash) () () ->
+    register1 get_transaction (fun (batcher, tr_hash) () () ->
         return @@ Batcher.find_transaction batcher tr_hash)
 
   let () =
-    register get_queue (fun batcher () () ->
+    register0 get_queue (fun batcher () () ->
         return @@ Batcher.get_queue batcher)
 end
 
@@ -607,3 +638,62 @@ let start configuration state =
       let*! () = Event.(emit rpc_server_is_ready) rpc_addr in
       return rpc_server)
     fail_with_exn
+
+let balance ctxt (block : block_id) ticket tz4 =
+  let ticket = Indexable.from_value ticket in
+  let tz4 = Indexable.from_value tz4 in
+  let block =
+    match destruct_context_id (construct_context_id block) with
+    | Ok v -> v
+    | _ -> assert false
+  in
+  RPC_context.make_call3
+    Context_RPC.(export_service balance)
+    ctxt
+    block
+    ticket
+    tz4
+    ()
+    ()
+
+let counter ctxt (block : block_id) tz4 =
+  let block =
+    match destruct_context_id (construct_context_id block) with
+    | Ok v -> v
+    | _ -> assert false
+  in
+  let tz4 = Indexable.from_value tz4 in
+  RPC_context.make_call2
+    Context_RPC.(export_service address_counter)
+    ctxt
+    block
+    tz4
+    ()
+    ()
+
+let inbox ctxt block =
+  RPC_context.make_call1 Block.(export_service inbox) ctxt block () ()
+
+let block ctxt block =
+  RPC_context.make_call1 Block.(export_service block) ctxt block () ()
+
+let get_queue ctxt =
+  RPC_context.make_call Injection.(export_service get_queue) ctxt () () ()
+
+let get_transaction ctxt hash =
+  RPC_context.make_call1
+    Injection.(export_service get_transaction)
+    ctxt
+    hash
+    ()
+    ()
+
+let inject_transaction ctxt ?(eager_batch = false) transaction =
+  RPC_context.make_call
+    Injection.(export_service inject_transaction)
+    ctxt
+    ()
+    (object
+       method eager_batch = eager_batch
+    end)
+    transaction
