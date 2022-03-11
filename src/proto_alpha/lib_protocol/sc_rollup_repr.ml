@@ -306,4 +306,9 @@ module Kind = struct
         (fun () -> Example_arith))
 
   let encoding = Data_encoding.union ~tag_size:`Uint16 [example_arith_case]
+
+  let equal x y = match (x, y) with (Example_arith, Example_arith) -> true
+
+  let pp fmt kind =
+    match kind with Example_arith -> Format.fprintf fmt "Example_arith"
 end

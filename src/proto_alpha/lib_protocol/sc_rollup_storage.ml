@@ -241,13 +241,6 @@ let originate ctxt ~kind ~boot_sector =
 
 let kind ctxt address = Storage.Sc_rollup.PVM_kind.find ctxt address
 
-let add_messages ctxt rollup messages =
-  Storage.Sc_rollup.Inbox.get ctxt rollup >>=? fun (ctxt, inbox) ->
-  let {Level_repr.level; _} = Raw_context.current_level ctxt in
-  let inbox = Sc_rollup_inbox.add_messages messages level inbox in
-  Storage.Sc_rollup.Inbox.update ctxt rollup inbox >>=? fun (ctxt, size) ->
-  return (inbox, Z.of_int size, ctxt)
-
 (** Try to consume n messages. *)
 let consume_n_messages ctxt rollup n =
   let open Lwt_tzresult_syntax in
@@ -256,13 +249,8 @@ let consume_n_messages ctxt rollup n =
   | None -> return ctxt
   | Some inbox ->
       let* (ctxt, size) = Storage.Sc_rollup.Inbox.update ctxt rollup inbox in
-      assert (Compare.Int.(size < 0)) ;
+      assert (Compare.Int.(size <= 0)) ;
       return ctxt
-
-let inbox ctxt rollup =
-  let open Lwt_tzresult_syntax in
-  let* (ctxt, res) = Storage.Sc_rollup.Inbox.get ctxt rollup in
-  return (res, ctxt)
 
 let last_cemented_commitment ctxt rollup =
   let open Lwt_tzresult_syntax in
@@ -271,16 +259,46 @@ let last_cemented_commitment ctxt rollup =
   | None -> fail (Sc_rollup_does_not_exist rollup)
   | Some lcc -> return (lcc, ctxt)
 
-let get_commitment ctxt rollup commitment =
+let inbox ctxt rollup =
+  let open Lwt_tzresult_syntax in
+  let* (ctxt, res) = Storage.Sc_rollup.Inbox.find ctxt rollup in
+  match res with
+  | None -> fail (Sc_rollup_does_not_exist rollup)
+  | Some inbox -> return (inbox, ctxt)
+
+let add_messages ctxt rollup messages =
+  let open Lwt_tzresult_syntax in
+  let* (ctxt, res) = Storage.Sc_rollup.Inbox.find ctxt rollup in
+  match res with
+  | None -> fail (Sc_rollup_does_not_exist rollup)
+  | Some inbox ->
+      let {Level_repr.level; _} = Raw_context.current_level ctxt in
+      let inbox = Sc_rollup_inbox.add_messages messages level inbox in
+      let* (ctxt, size) = Storage.Sc_rollup.Inbox.update ctxt rollup inbox in
+      return (inbox, Z.of_int size, ctxt)
+
+(* This function is called in other functions in the module only after they have
+   checked for the existence of the rollup, and therefore it is not necessary
+   for it to check for the existence of the rollup again. It is not directly
+   exposed by the module. Instead, a different public function [get_commitment]
+   is provided, which checks for the existence of [rollup] before calling
+   [get_commitment_internal]. *)
+let get_commitment_internal ctxt rollup commitment =
   let open Lwt_tzresult_syntax in
   let* (ctxt, res) = Store.Commitments.find (ctxt, rollup) commitment in
   match res with
   | None -> fail (Sc_rollup_unknown_commitment commitment)
   | Some commitment -> return (commitment, ctxt)
 
+let get_commitment ctxt rollup commitment =
+  let open Lwt_tzresult_syntax in
+  (* Assert that a last cemented commitment exists. *)
+  let* (_lcc, ctxt) = last_cemented_commitment ctxt rollup in
+  get_commitment_internal ctxt rollup commitment
+
 let get_predecessor ctxt rollup node =
   let open Lwt_tzresult_syntax in
-  let* (commitment, ctxt) = get_commitment ctxt rollup node in
+  let* (commitment, ctxt) = get_commitment_internal ctxt rollup node in
   return (commitment.predecessor, ctxt)
 
 let find_staker ctxt rollup staker =
@@ -410,7 +428,7 @@ let assert_commitment_not_too_far_ahead ctxt rollup lcc commitment =
       let* level = Store.Initial_level.get ctxt rollup in
       return (ctxt, level)
     else
-      let* (lcc, ctxt) = get_commitment ctxt rollup lcc in
+      let* (lcc, ctxt) = get_commitment_internal ctxt rollup lcc in
       return (ctxt, Commitment.(lcc.inbox_level))
   in
   let max_level = Commitment.(commitment.inbox_level) in
@@ -428,7 +446,9 @@ let assert_commitment_frequency ctxt rollup commitment check =
       let* level = Store.Initial_level.get ctxt rollup in
       return (ctxt, level)
     else
-      let* (pred, ctxt) = get_commitment ctxt rollup commitment.predecessor in
+      let* (pred, ctxt) =
+        get_commitment_internal ctxt rollup commitment.predecessor
+      in
       return (ctxt, Commitment.(pred.inbox_level))
   in
   if
@@ -525,12 +545,16 @@ let cement_commitment ctxt rollup new_lcc =
   let refutation_deadline_blocks =
     Constants_storage.sc_rollup_challenge_window_in_blocks ctxt
   in
-  (* get is safe, as Staker_count is initialized on origination *)
+  (* Calling [last_final_commitment] first to trigger failure in case of
+     non-existing rollup. *)
+  let* (old_lcc, ctxt) = last_cemented_commitment ctxt rollup in
+  (* Get is safe, as [Stakers_size] is initialized on origination. *)
   let* (ctxt, total_staker_count) = Store.Staker_count.get ctxt rollup in
   if Compare.Int32.(total_staker_count <= 0l) then fail Sc_rollup_no_stakers
   else
-    let* (old_lcc, ctxt) = last_cemented_commitment ctxt rollup in
-    let* (new_lcc_commitment, ctxt) = get_commitment ctxt rollup new_lcc in
+    let* (new_lcc_commitment, ctxt) =
+      get_commitment_internal ctxt rollup new_lcc
+    in
     let* (ctxt, new_lcc_added) =
       Store.Commitment_added.get (ctxt, rollup) new_lcc
     in
