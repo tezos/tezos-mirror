@@ -1536,7 +1536,6 @@ let apply_external_manager_operation_content :
       in
       return (ctxt, result, [])
   | Tx_rollup_submit_batch {tx_rollup; content; burn_limit} ->
-      assert_tx_rollup_feature_enabled ctxt >>=? fun () ->
       let (message, message_size) = Tx_rollup_message.make_batch content in
       Tx_rollup_state.get ctxt tx_rollup >>=? fun (ctxt, state) ->
       Tx_rollup_state.burn_cost ~limit:burn_limit state message_size
