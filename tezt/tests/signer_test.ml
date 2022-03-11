@@ -25,41 +25,43 @@
 
 (* Testing
    -------
-   Component:    Baker
-   Invocation:   dune exec tezt/tests/main.exe -- --file baker_test.ml
-   Subject:      Run the baker while performing a lot of transfers
+   Component:    Signer
+   Invocation:   dune exec tezt/tests/main.exe -- --file signer_test.ml
+   Subject:      Run the baker and signer while performing transfers
 *)
 
-let baker_test ~title ~tags =
+(* same as `baker_test`, `baker_test.ml` but using the signer *)
+let signer_simple_test ~title ~tags ~keys =
   Protocol.register_test ~__FILE__ ~title ~tags @@ fun protocol ->
+  (* init the signer and import all the bootstrap_keys *)
+  let* signer = Signer.init ~keys () in
   let* (node, client) =
-    Client.init_with_protocol `Client ~protocol ~timestamp_delay:0.0 ()
+    Client.init_with_protocol
+      ~keys:[Constant.activator]
+      `Client
+      ~protocol
+      ~timestamp_delay:0.0
+      ()
+  in
+  let* _ =
+    (* tell the baker to ask the signer for the bootstrap keys *)
+    let uri = Signer.uri signer in
+    Lwt_list.iter_s
+      (fun account -> Client.import_signer_key client account uri)
+      keys
   in
   let level_2_promise = Node.wait_for_level node 2 in
   let level_3_promise = Node.wait_for_level node 3 in
-  let* baker = Baker.init ~protocol node client in
-  Log.info "Wait for new head." ;
-  Baker.log_events baker ;
+  let* _baker = Baker.init ~protocol node client in
   let* _ = level_2_promise in
   Log.info "New head arrive level 2" ;
   let* _ = level_3_promise in
   Log.info "New head arrive level 3" ;
   Lwt.return_unit
 
-let baker_stresstest =
-  Protocol.register_test
-    ~__FILE__
-    ~title:"baker stresstest"
-    ~tags:["node"; "baker"]
-  @@ fun protocol ->
-  let* (node, client) =
-    Client.init_with_protocol `Client ~protocol () ~timestamp_delay:0.0
-  in
-  let* _ = Baker.init ~protocol node client in
-  (* Use a large tps, to have failing operations too *)
-  let* () = Client.stresstest ~tps:25 ~transfers:100 client in
-  Lwt.return_unit
-
 let register ~protocols =
-  let () = baker_test ~title:"baker test" ~tags:["node"; "baker"] protocols in
-  baker_stresstest protocols
+  signer_simple_test
+    ~title:"signer test"
+    ~tags:["node"; "baker"; "signer"]
+    ~keys:Constant.bootstrap_keys
+    protocols

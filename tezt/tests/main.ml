@@ -46,6 +46,7 @@ let () =
   (* Tests that are relatively protocol-agnostic.
      We can run them on all protocols, or only one if the CI would be too slow. *)
   Baker_test.register ~protocols:[Alpha] ;
+  Signer_test.register ~protocols:[Alpha] ;
   Basic.register ~protocols:[Alpha] ;
   Client_config.register ~protocols:[Alpha] ;
   Global_constants.register ~protocols:[Alpha] ;
