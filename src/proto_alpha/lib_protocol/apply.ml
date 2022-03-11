@@ -940,29 +940,17 @@ let apply_transaction_to_smart_contract ~ctxt ~source ~contract ~amount
       level;
     }
   in
-  (match parameter with
-  | Untyped_arg parameter ->
-      Script_interpreter.execute
-        ctxt
-        ~cached_script:(Some script_ir)
-        mode
-        step_constants
-        ~script
-        ~parameter
-        ~entrypoint
-        ~internal
-  | Typed_arg (location, parameter_ty, parameter) ->
-      Script_interpreter.execute_with_typed_parameter
-        ctxt
-        ~cached_script:(Some script_ir)
-        mode
-        step_constants
-        ~script
-        ~location
-        ~parameter_ty
-        ~parameter
-        ~entrypoint
-        ~internal)
+  let execute =
+    match parameter with
+    | Untyped_arg parameter -> Script_interpreter.execute ~parameter
+    | Typed_arg (location, parameter_ty, parameter) ->
+        Script_interpreter.execute_with_typed_parameter
+          ~location
+          ~parameter_ty
+          ~parameter
+  in
+  let cached_script = Some script_ir in
+  execute ctxt ~cached_script mode step_constants ~script ~entrypoint ~internal
   >>=? fun ( {
                script = updated_cached_script;
                code_size = updated_size;
