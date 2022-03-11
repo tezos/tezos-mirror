@@ -163,7 +163,7 @@ let test_inclusion_proof_verification (list_of_payloads, n) =
   | Some proof ->
       let old_inbox' = Stdlib.List.nth inboxes (Random.int (1 + n)) in
       fail_unless
-        (old_inbox = old_inbox'
+        (equal old_inbox old_inbox'
         || not (verify_inclusion_proof proof old_inbox' inbox))
         (err
            "Verification should rule out a valid proof which is not about the \

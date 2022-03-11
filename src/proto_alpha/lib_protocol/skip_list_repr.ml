@@ -26,6 +26,13 @@
 module type S = sig
   type ('content, 'ptr) cell
 
+  val equal :
+    ('content -> 'content -> bool) ->
+    ('ptr -> 'ptr -> bool) ->
+    ('content, 'ptr) cell ->
+    ('content, 'ptr) cell ->
+    bool
+
   val encoding :
     'ptr Data_encoding.t ->
     'content Data_encoding.t ->
@@ -101,6 +108,24 @@ end) : S = struct
     back_pointers : 'ptr option FallbackArray.t;
     index : int;
   }
+
+  let equal equal_content equal_ptr cell1 cell2 =
+    let equal_back_pointers b1 b2 =
+      let open FallbackArray in
+      Compare.Int.(length b1 = length b2)
+      &&
+      let i = ref 0 in
+      let equal = ref true in
+      while Compare.Int.(!i < length b1) && !equal do
+        equal := Option.equal equal_ptr (get b1 !i) (get b2 !i) ;
+        incr i
+      done ;
+      !equal
+    in
+    let {content; back_pointers; index} = cell1 in
+    equal_content content cell2.content
+    && equal_back_pointers back_pointers cell2.back_pointers
+    && Compare.Int.equal index cell2.index
 
   let index cell = cell.index
 

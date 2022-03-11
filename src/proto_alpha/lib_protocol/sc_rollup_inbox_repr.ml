@@ -99,6 +99,8 @@ type history_proof_hash = Context.Proof.hash
 
 type history_proof = (proof_hash, history_proof_hash) Skip_list.cell
 
+let equal_history_proof = Skip_list.equal Context_hash.equal Context_hash.equal
+
 let history_proof_encoding =
   Skip_list.encoding Context_hash.encoding Context_hash.encoding
 
@@ -146,9 +148,30 @@ type t = {
   level : Raw_level_repr.t;
   nb_available_messages : int64;
   message_counter : Z.t;
-  current_messages_hash : Context.Proof.hash;
+  current_messages_hash : unit -> Context.Proof.hash;
   old_levels_messages : history_proof;
 }
+
+let equal inbox1 inbox2 =
+  (* To be robust to addition of fields in [t]. *)
+  let {
+    rollup;
+    level;
+    nb_available_messages;
+    message_counter;
+    current_messages_hash;
+    old_levels_messages;
+  } =
+    inbox1
+  in
+  Sc_rollup_repr.Address.equal rollup inbox2.rollup
+  && Raw_level_repr.equal level inbox2.level
+  && Compare.Int64.(equal nb_available_messages inbox2.nb_available_messages)
+  && Z.equal message_counter inbox2.message_counter
+  && Context_hash.equal
+       (current_messages_hash ())
+       (inbox2.current_messages_hash ())
+  && equal_history_proof old_levels_messages inbox2.old_levels_messages
 
 let pp fmt inbox =
   Format.fprintf
@@ -166,7 +189,7 @@ let pp fmt inbox =
     Raw_level_repr.pp
     inbox.level
     Context_hash.pp
-    inbox.current_messages_hash
+    (inbox.current_messages_hash ())
     (Int64.to_string inbox.nb_available_messages)
     Z.pp_print
     inbox.message_counter
@@ -193,7 +216,7 @@ let encoding =
           message_counter,
           nb_available_messages,
           level,
-          current_messages_hash,
+          current_messages_hash (),
           old_levels_messages ))
       (fun ( rollup,
              message_counter,
@@ -206,7 +229,7 @@ let encoding =
           message_counter;
           nb_available_messages;
           level;
-          current_messages_hash;
+          current_messages_hash = (fun () -> current_messages_hash);
           old_levels_messages;
         })
       (obj6
@@ -227,7 +250,7 @@ let empty rollup level =
     level;
     message_counter = Z.zero;
     nb_available_messages = 0L;
-    current_messages_hash = no_messages_hash;
+    current_messages_hash = (fun () -> no_messages_hash);
     old_levels_messages = Skip_list.genesis no_messages_hash;
   }
 
@@ -399,10 +422,13 @@ module MakeHashingScheme
       let prev_cell_ptr = hash_old_levels_messages prev_cell in
       let history = remember prev_cell_ptr prev_cell history in
       let old_levels_messages =
-        Skip_list.next ~prev_cell ~prev_cell_ptr inbox.current_messages_hash
+        Skip_list.next
+          ~prev_cell
+          ~prev_cell_ptr
+          (inbox.current_messages_hash ())
       in
       let level = Raw_level_repr.succ inbox.level in
-      let current_messages_hash = no_messages_hash in
+      let current_messages_hash () = no_messages_hash in
       let inbox =
         {
           rollup = inbox.rollup;
@@ -432,7 +458,7 @@ module MakeHashingScheme
         (messages, inbox)
         payloads
       >>=? fun (messages, inbox) ->
-      let current_messages_hash =
+      let current_messages_hash () =
         if Tree.is_empty messages then no_messages_hash else Tree.hash messages
       in
       return (messages, history, {inbox with current_messages_hash})

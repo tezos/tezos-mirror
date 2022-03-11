@@ -127,6 +127,8 @@ type t
 
 val pp : Format.formatter -> t -> unit
 
+val equal : t -> t -> bool
+
 val encoding : t Data_encoding.t
 
 (** [empty level] is an inbox started at some given [level] with no

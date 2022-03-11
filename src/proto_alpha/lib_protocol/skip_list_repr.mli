@@ -51,6 +51,13 @@ module type S = sig
      pointers of type ['ptr]. *)
   type ('content, 'ptr) cell
 
+  val equal :
+    ('content -> 'content -> bool) ->
+    ('ptr -> 'ptr -> bool) ->
+    ('content, 'ptr) cell ->
+    ('content, 'ptr) cell ->
+    bool
+
   val encoding :
     'ptr Data_encoding.t ->
     'content Data_encoding.t ->
