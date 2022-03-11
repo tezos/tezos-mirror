@@ -240,6 +240,8 @@ EXCLUDE_PROTO_LIBS_DIR := $(addprefix --exclude-file ,${PROTO_LIBS_DIR})
 lint-ometrics:
 	@echo "Running ometrics analysis in your changes."
 	@ometrics check ${EXCLUDE_NONPROTO_LIBS_DIR} ${EXCLUDE_PROTO_LIBS_DIR} \
+        --exclude-file "src/proto_alpha/lib_protocol/alpha_context.mli" \
+        --exclude-file "src/proto_alpha/lib_protocol/alpha_context.ml" \
         --exclude-entry-re "pp\|pp_.+" \
         --exclude-entry-re "encoding\|encoding_.+\|.+_encoding" \
         --exclude-entry-re "compare\|compare_.+\|.+_compare"
@@ -250,6 +252,8 @@ lint-ometrics-gitlab:
 	@mkdir -p _reports
 	@ometrics check-clone ${OMETRICS_GIT} --branch ${OMETRICS_BRANCH} \
         ${EXCLUDE_NONPROTO_LIBS_DIR} ${EXCLUDE_PROTO_LIBS_DIR} \
+        --exclude-file "src/proto_alpha/lib_protocol/alpha_context.mli" \
+        --exclude-file "src/proto_alpha/lib_protocol/alpha_context.ml" \
         --exclude-entry-re "pp\|pp_.+" \
         --exclude-entry-re "encoding\|encoding_.+\|.+_encoding" \
         --exclude-entry-re "compare\|compare_.+\|.+_compare" \
