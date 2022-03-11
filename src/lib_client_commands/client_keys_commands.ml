@@ -155,6 +155,7 @@ let gen_keys_containing ?(encrypted = false) ?(prefix = false) ?(force = false)
                     cctxt
                     ~force
                     (public_key_hash, pk_uri, sk_uri)
+                    ~public_key
                     name
                 in
                 return hash

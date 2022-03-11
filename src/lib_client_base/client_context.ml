@@ -86,6 +86,8 @@ class type wallet =
     method write :
       string -> 'a -> 'a Data_encoding.encoding -> unit tzresult Lwt.t
 
+    method last_modification_time : string -> float option tzresult Lwt.t
+
     method get_base_dir : string
   end
 
@@ -200,6 +202,9 @@ class proxy_context (obj : full) =
     method write : type a.
         string -> a -> a Data_encoding.encoding -> unit tzresult Lwt.t =
       obj#write
+
+    method last_modification_time : string -> float option tzresult Lwt.t =
+      obj#last_modification_time
 
     method prompt : type a. (a, string tzresult) lwt_format -> a = obj#prompt
 

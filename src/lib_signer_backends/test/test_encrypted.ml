@@ -103,6 +103,9 @@ let fake_ctx () : Client_context.io_wallet =
           'a Data_encoding.t ->
           unit Tezos_base__TzPervasives.tzresult Lwt.t =
       fun _ _ _ -> return ()
+
+    method last_modification_time : string -> float option tzresult Lwt.t =
+      fun _ -> return_none
   end
 
 let make_sk_uris =

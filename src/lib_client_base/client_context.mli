@@ -103,6 +103,11 @@ class type wallet =
     method write :
       string -> 'a -> 'a Data_encoding.encoding -> unit tzresult Lwt.t
 
+    (** [last_modification_time alias] returns {Some} of the last modification
+        time of the file corresponding to the [alias], if the file exists;
+        otherwise [None]. *)
+    method last_modification_time : string -> float option tzresult Lwt.t
+
     (** Current base directory. Stores the information of keys (public
         key hashes, public keys, secret keys) and watermarks. *)
     method get_base_dir : string
