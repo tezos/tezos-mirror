@@ -222,8 +222,8 @@ module Command_line = struct
 
   let pp_parameter ppf = function
     | Any -> Format.fprintf ppf "any"
-    | Binary -> Format.fprintf ppf "json"
-    | Json -> Format.fprintf ppf "any"
+    | Binary -> Format.fprintf ppf "binary"
+    | Json -> Format.fprintf ppf "json"
 
   let encoding =
     Data_encoding.string_enum [("json", Json); ("binary", Binary); ("any", Any)]

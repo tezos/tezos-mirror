@@ -361,6 +361,36 @@ let test_matching_with_name_resolving =
           to_test ;
         return_unit))
 
+let test_media_type_pp_parse =
+  let open Tezos_rpc_http.Media_type.Command_line in
+  let inputs = [Any; Json; Binary] in
+  let to_string = function
+    | Any -> "Any"
+    | Json -> "Json"
+    | Binary -> "Binary"
+  in
+  Alcotest.test_case "Media_type.Command_line.pp/parse" `Quick (fun () ->
+      List.iter
+        (fun m ->
+          let s = Format.asprintf "%a" pp_parameter m in
+          let mm = parse_cli_parameter s in
+          match mm with
+          | None ->
+              Format.kasprintf
+                Stdlib.failwith
+                "No parsing back for %s (%s)"
+                (to_string m)
+                s
+          | Some mm when m <> mm ->
+              Format.kasprintf
+                Stdlib.failwith
+                "No round trip for %s (%s) (%s)"
+                (to_string m)
+                s
+                (to_string mm)
+          | Some mm -> assert (m = mm))
+        inputs)
+
 let () =
   let open Qcheck_helpers in
   Alcotest.run
@@ -373,4 +403,5 @@ let () =
       ("find_policy_matching_rules", [test_finding_policy]);
       ("ensure_unsafe_rpcs_blocked", [ensure_unsafe_rpcs_blocked]);
       ("test_matching_with_name_resolving", [test_matching_with_name_resolving]);
+      ("test_media_type_pp_parse", [test_media_type_pp_parse]);
     ]
