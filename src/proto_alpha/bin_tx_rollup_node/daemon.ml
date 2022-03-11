@@ -240,18 +240,10 @@ let extract_messages_from_block block_info rollup_id =
 let create_genesis_block state tezos_block =
   let open Lwt_result_syntax in
   let ctxt = Context.empty state.State.context_index in
-  let*! context_hash = Context.commit ctxt in
-  let header : L2block.header =
-    {
-      level = Genesis;
-      tezos_block;
-      predecessor = L2block.genesis_hash state.rollup;
-      (* Genesis block is its own predecessor *)
-      context = context_hash;
-    }
+  let genesis_block =
+    L2block.genesis_block state.context_index state.rollup tezos_block
   in
-  let inbox : Inbox.t = {contents = []; cumulated_size = 0} in
-  let genesis_block = L2block.{header; inbox} in
+  let*! _ctxt_hash = Context.commit ctxt in
   let+ _block_hash = State.save_block state genesis_block in
   (genesis_block, ctxt)
 

@@ -253,9 +253,9 @@ end)
 module L2_head = Make_ref (struct
   let location = ["tx_rollup"; "head"]
 
-  type value = L2block.header
+  type value = L2block.hash
 
-  let value_encoding = L2block.header_encoding
+  let value_encoding = L2block.Hash.encoding
 end)
 
 module Tezos_blocks = Make_map (struct

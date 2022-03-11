@@ -81,9 +81,9 @@ end
    run). *)
 module Rollup_origination : REF with type value = Block_hash.t * int32
 
-(** A persistent reference cell that stores the header of the head of the
+(** A persistent reference cell that stores the hash of the head of the
     rollup. *)
-module L2_head : REF with type value = L2block.header
+module L2_head : REF with type value = L2block.hash
 
 (** {2 Maps} *)
 

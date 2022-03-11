@@ -35,6 +35,7 @@ type rollup_origination = {block_hash : Block_hash.t; block_level : int32}
 type t = {
   store : Stores.t;
   context_index : Context.index;
+  mutable head : L2block.t;
   rollup : Tx_rollup.t;
   rollup_origination : rollup_origination;
   parameters : Protocol.Tx_rollup_l2_apply.parameters;
@@ -54,7 +55,11 @@ let rollup_operation_index = 3
 
 let no_reorg = {ancestor = None; old_chain = []; new_chain = []}
 
-let get_head state = Stores.L2_head.find state.store
+let get_head state = state.head
+
+let set_head state block =
+  state.head <- block ;
+  Stores.L2_head.set state.store (L2block.hash_header block.header)
 
 let save_tezos_l2_block_hash state block info =
   Stores.Tezos_blocks.add state.store block info
@@ -70,12 +75,15 @@ let get_inbox state hash = Stores.Inboxes.find state.store hash
 
 let save_inbox state hash inbox = Stores.Inboxes.add state.store hash inbox
 
-let get_block state hash =
+let get_block_store store hash =
   let open Lwt_syntax in
-  let* header = get_header state hash and* inbox = get_inbox state hash in
+  let* header = Stores.L2_blocks.find store hash
+  and* inbox = Stores.Inboxes.find store hash in
   match (header, inbox) with
   | (None, _) | (_, None) -> return None
   | (Some header, Some inbox) -> return (Some L2block.{header; inbox})
+
+let get_block state hash = get_block_store state.store hash
 
 let get_tezos_l2_block state block =
   let open Lwt_syntax in
@@ -89,12 +97,19 @@ let get_level state level = Stores.Rollup_levels.find state.store level
 let save_level state level hash =
   Stores.Rollup_levels.add state.store level hash
 
-let get_level_l2_block state level =
+let get_level_l2_block_header state level =
   let open Lwt_syntax in
   let* l2_hash = get_level state level in
   match l2_hash with
   | None -> return None
   | Some l2_hash -> get_header state l2_hash
+
+let get_level_l2_block state level =
+  let open Lwt_syntax in
+  let* l2_hash = get_level state level in
+  match l2_hash with
+  | None -> return None
+  | Some l2_hash -> get_block state l2_hash
 
 let save_block state L2block.{header; inbox} =
   let open Lwt_result_syntax in
@@ -317,6 +332,19 @@ let init_context ~data_dir =
   let*! index = Context.init (Node_data.context_dir data_dir) in
   return index
 
+let init_head store context_index rollup rollup_origination =
+  let open Lwt_syntax in
+  let* hash = Stores.L2_head.find store in
+  let+ head =
+    match hash with
+    | None -> return_none
+    | Some hash -> get_block_store store hash
+  in
+  match head with
+  | Some head -> head
+  | None ->
+      L2block.genesis_block context_index rollup rollup_origination.block_hash
+
 let init_parameters cctxt =
   let open Lwt_result_syntax in
   let* {parametric; _} =
@@ -334,6 +362,7 @@ let init cctxt ~data_dir ?rollup_genesis ~operator rollup =
   let context_index = init_context ~data_dir in
   let* (store, rollup_origination) = store_orig in
   let* context_index = context_index in
+  let*! head = init_head store context_index rollup rollup_origination in
   let* parameters = init_parameters cctxt in
   let* batcher_state =
     Batcher.init cctxt ~rollup ~signer:operator context_index parameters
@@ -343,6 +372,7 @@ let init cctxt ~data_dir ?rollup_genesis ~operator rollup =
     {
       store;
       context_index;
+      head;
       rollup;
       rollup_origination;
       parameters;

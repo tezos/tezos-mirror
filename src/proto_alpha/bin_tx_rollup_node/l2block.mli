@@ -56,6 +56,9 @@ type header = {
     actual messages.  *)
 type t = {header : header; inbox : Inbox.t}
 
+(** Build the genesis block  *)
+val genesis_block : Context.index -> Tx_rollup.t -> Block_hash.t -> t
+
 (**  {2 Encoding} *)
 
 val level_encoding : level Data_encoding.t
@@ -67,9 +70,6 @@ val header_encoding : header Data_encoding.t
 val encoding : t Data_encoding.t
 
 (**  {2 Hashing} *)
-
-(** A predefined hash for the Genesis L2 block for a given rollup address *)
-val genesis_hash : Tx_rollup.t -> hash
 
 (** Returns the hash of an L2 block header *)
 val hash_header : header -> hash

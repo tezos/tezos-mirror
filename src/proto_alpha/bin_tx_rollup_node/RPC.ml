@@ -179,58 +179,49 @@ module Block = struct
       ~output:Data_encoding.(option Inbox.encoding)
       RPC_path.(path / "inbox")
 
+  let block_header_of_id state block_id =
+    let open Lwt_syntax in
+    match block_id with
+    | `L2_block b -> State.get_header state b
+    | `Tezos_block b ->
+        let+ b = State.get_tezos_l2_block state b in
+        Option.map (fun b -> b.L2block.header) b
+    | `Head -> return_some (State.get_head state).header
+    | `Level l -> State.get_level_l2_block_header state l
+
   let block_of_id state block_id =
     let open Lwt_syntax in
     match block_id with
-    | `L2_block b -> Lwt.return (Some b)
-    | `Tezos_block b -> State.get_tezos_l2_block_hash state b
-    | `Head ->
-        let+ head = State.get_head state in
-        Option.map L2block.hash_header head
-    | `Level l -> State.get_level state l
+    | `L2_block b -> State.get_block state b
+    | `Tezos_block b -> State.get_tezos_l2_block state b
+    | `Head -> return_some (State.get_head state)
+    | `Level l -> State.get_level_l2_block state l
 
   let () =
     register block @@ fun (state, block_id) () () ->
-    let*! hash = block_of_id state block_id in
-    match hash with
+    let*! block = block_of_id state block_id in
+    match block with
     | None -> return None
-    | Some hash -> (
-        let*! block = State.get_block state hash in
-        match block with
-        | None -> return None
-        | Some block -> return (Some (L2block.hash_header block.header, block)))
+    | Some block -> return (Some (L2block.hash_header block.header, block))
 
   let () =
     register header @@ fun (state, block_id) () () ->
-    let*! header =
-      match block_id with
-      | `Head -> State.get_head state
-      | `L2_block b -> State.get_header state b
-      | _ -> (
-          let*! hash = block_of_id state block_id in
-          match hash with
-          | None -> Lwt.return None
-          | Some hash -> State.get_header state hash)
-    in
+    let*! header = block_header_of_id state block_id in
     match header with
     | None -> return None
     | Some header -> return (Some (L2block.hash_header header, header))
 
   let () =
     register inbox @@ fun (state, block_id) () () ->
-    let*! hash = block_of_id state block_id in
-    match hash with
+    let*! block = block_of_id state block_id in
+    match block with
     | None -> return None
-    | Some hash -> (
-        let*! block = State.get_block state hash in
-        match block with
-        | None -> return None
-        | Some block -> (
-            match block_id with
-            | `Tezos_block b when Block_hash.(block.header.tezos_block <> b) ->
-                (* Tezos block has no l2 inbox *)
-                return None
-            | _ -> return (Some block.inbox)))
+    | Some block -> (
+        match block_id with
+        | `Tezos_block b when Block_hash.(block.header.tezos_block <> b) ->
+            (* Tezos block has no l2 inbox *)
+            return None
+        | _ -> return (Some block.inbox))
 
   let build_directory state =
     !directory
@@ -432,16 +423,7 @@ module Context_RPC = struct
 
   let context_of_block_id state block_id =
     let open Lwt_syntax in
-    let*! header =
-      match block_id with
-      | `Head -> State.get_head state
-      | `L2_block b -> State.get_header state b
-      | _ -> (
-          let*! hash = Block.block_of_id state block_id in
-          match hash with
-          | None -> Lwt.return None
-          | Some hash -> State.get_header state hash)
-    in
+    let*! header = Block.block_header_of_id state block_id in
     match header with
     | None -> Stdlib.failwith "Unknown block id"
     | Some b -> return b.context

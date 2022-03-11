@@ -40,6 +40,7 @@ type rollup_origination = {block_hash : Block_hash.t; block_level : int32}
 type t = {
   store : Stores.t;
   context_index : Context.index;
+  mutable head : L2block.t;
   rollup : Tx_rollup.t;
   rollup_origination : rollup_origination;
   parameters : Protocol.Tx_rollup_l2_apply.parameters;
@@ -77,7 +78,7 @@ val init :
 
 (** Retrieve the current head of the rollup. Note that the current head can go
     in the past or change in case of reorganisations at the L1 layer.  *)
-val get_head : t -> L2block.header option Lwt.t
+val get_head : t -> L2block.t
 
 (** Retrieve an L2 block by its hash *)
 val get_block : t -> L2block.hash -> L2block.t option Lwt.t
@@ -103,7 +104,11 @@ val get_tezos_l2_block_hash : t -> Block_hash.t -> L2block.hash option Lwt.t
 val get_tezos_l2_block : t -> Block_hash.t -> L2block.t option Lwt.t
 
 (** Same as {!get_level} but retrieves the associated header at the same time. *)
-val get_level_l2_block : t -> L2block.level -> L2block.header option Lwt.t
+val get_level_l2_block_header :
+  t -> L2block.level -> L2block.header option Lwt.t
+
+(** Same as {!get_level} but retrieves the associated L2 block at the same time. *)
+val get_level_l2_block : t -> L2block.level -> L2block.t option Lwt.t
 
 (** Returns [true] if the Tezos block was already processed by the rollup node. *)
 val tezos_block_already_processed : t -> Block_hash.t -> bool Lwt.t

@@ -122,3 +122,18 @@ let hash_header h =
       h.predecessor
   | Rollup_level _ ->
       Hash.hash_bytes [Data_encoding.Binary.to_bytes_exn header_encoding h]
+
+let genesis_block index rollup tezos_block =
+  let ctxt = Context.empty index in
+  let context_hash = Context.hash ctxt in
+  let header =
+    {
+      level = Genesis;
+      tezos_block;
+      predecessor = genesis_hash rollup;
+      (* Genesis block is its own predecessor *)
+      context = context_hash;
+    }
+  in
+  let inbox : Inbox.t = {contents = []; cumulated_size = 0} in
+  {header; inbox}
