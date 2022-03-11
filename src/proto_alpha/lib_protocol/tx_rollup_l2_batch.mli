@@ -68,14 +68,23 @@ open Tx_rollup_l2_context_sig
    implementation of their encodings have been carefully crafted in
    order to allow for compact batches. *)
 
+(** Represents the [signer] of an layer-2 operation. This is either a
+    BLS public key or a layer-2 address index, whose metadata in turn
+    contains a corresponding BLS public. key *)
+type signer =
+  | Bls_pk of Bls_signature.pk  (** A signer identified by a BLS public key. *)
+  | L2_addr of Tx_rollup_l2_address.t
+      (** A signer identified by a layer-2 address. Each such adress
+          is in turn identified with a BLS public key. *)
+
 module Signer_indexable : sig
-  type nonrec 'state t = ('state, Bls_signature.pk) Indexable.t
+  type nonrec 'state t = ('state, signer) Indexable.t
 
-  type nonrec index = Bls_signature.pk Indexable.index
+  type nonrec index = signer Indexable.index
 
-  type nonrec value = Bls_signature.pk Indexable.value
+  type nonrec value = signer Indexable.value
 
-  type either = Bls_signature.pk Indexable.either
+  type either = signer Indexable.either
 
   val encoding : either Data_encoding.t
 

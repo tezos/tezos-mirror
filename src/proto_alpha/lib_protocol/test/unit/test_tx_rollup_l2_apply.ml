@@ -270,6 +270,10 @@ let transfer ?counter ~signer ~dest ~ticket qty =
   in
   operation_content ?counter ~signer content
 
+let signer_pk x = Tx_rollup_l2_batch.Bls_pk x
+
+let signer_addr x = Tx_rollup_l2_batch.L2_addr x
+
 let withdraw ?counter ~signer ~dest ~ticket qty =
   let qty = Tx_rollup_l2_qty.of_int64_exn qty in
   let content = Withdraw {destination = dest; ticket_hash = ticket; qty} in
@@ -449,16 +453,37 @@ let test_indexes_creation () =
   (* We create a transaction for each transfer, it makes the test of each
      transaction result easier. *)
   let transaction1 =
-    [transfer ~counter:1L ~signer:pk1 ~dest:addr2 ~ticket:ticket1 10L]
+    [
+      transfer
+        ~counter:1L
+        ~signer:(signer_pk pk1)
+        ~dest:addr2
+        ~ticket:ticket1
+        10L;
+    ]
   in
   let signature1 = sign_transaction [sk1] transaction1 in
   let transaction2 =
-    [transfer ~counter:2L ~signer:pk1 ~dest:addr3 ~ticket:ticket1 20L]
+    [
+      transfer
+        ~counter:2L
+        ~signer:(signer_pk pk1)
+        ~dest:addr3
+        ~ticket:ticket1
+        20L;
+    ]
   in
   let signature2 = sign_transaction [sk1] transaction2 in
 
   let transaction3 =
-    [transfer ~counter:3L ~signer:pk1 ~dest:addr4 ~ticket:ticket1 30L]
+    [
+      transfer
+        ~counter:3L
+        ~signer:(signer_pk pk1)
+        ~dest:addr4
+        ~ticket:ticket1
+        30L;
+    ]
   in
   let signature3 = sign_transaction [sk1] transaction3 in
   let batch =
@@ -502,12 +527,21 @@ let test_indexes_creation_bad () =
   let transaction1 =
     (* This transaction will fail because the number of tickets required is
        more than its own. *)
-    [transfer ~counter:1L ~signer:pk1 ~dest:addr2 ~ticket:ticket1 10000L]
+    [
+      transfer
+        ~counter:1L
+        ~signer:(signer_pk pk1)
+        ~dest:addr2
+        ~ticket:ticket1
+        10000L;
+    ]
   in
   let signature1 = sign_transaction [sk1] transaction1 in
   let transaction2 =
     (* This is ok *)
-    [transfer ~counter:2L ~signer:pk1 ~dest:addr3 ~ticket:ticket1 1L]
+    [
+      transfer ~counter:2L ~signer:(signer_pk pk1) ~dest:addr3 ~ticket:ticket1 1L;
+    ]
   in
   let signature2 = sign_transaction [sk1] transaction2 in
 
@@ -556,7 +590,10 @@ let test_simple_l2_transaction () =
      [addr1] -> [addr2] & [addr2] -> [addr1]. *)
   let transaction =
     transfers
-      [(pk1, addr2, ticket1, 10L, None); (pk2, addr1, ticket2, 20L, None)]
+      [
+        (signer_pk pk1, addr2, ticket1, 10L, None);
+        (signer_pk pk2, addr1, ticket2, 20L, None);
+      ]
   in
   let batch = create_batch_v1 [transaction] [[sk1; sk2]] in
 
@@ -615,6 +652,70 @@ let test_simple_l2_transaction () =
   | (Transaction_success, _) -> fail_msg "Did not expect any withdrawals"
   | (Transaction_failure _, _) -> fail_msg "The transaction should be a success"
 
+(** Test that a signer can be layer2 address. *)
+let test_l2_transaction_l2_addr_signer_good () =
+  let open Context_l2 in
+  let open Syntax in
+  let* (ctxt, _tidxs, accounts) =
+    with_initial_setup [] [[(ticket1, 10L)]; []]
+  in
+  let (sk1, pk1, addr1, idx1, _pkh1) = nth_exn accounts 0 in
+  let (_sk2, _pk2, addr2, _idx2, _pkh2) = nth_exn accounts 1 in
+  let* ctxt = Address_metadata.init_with_public_key ctxt idx1 pk1 in
+  let transfer =
+    [transfer ~signer:(signer_addr addr1) ~dest:addr2 ~ticket:ticket1 10L]
+  in
+  let signature = sign_transaction [sk1] transfer in
+  let batch = batch signature [transfer] in
+  let* (_ctxt, Batch_result {results; indexes = _}, _withdrawals) =
+    Batch_V1.apply_batch ctxt batch
+  in
+  let status = nth_exn results 0 in
+  match status with
+  | (_, Transaction_success) -> return_unit
+  | (_, Transaction_failure _) -> fail_msg "The transaction should be a success"
+
+(** Test that signing with a layer2 address needs a proper context. *)
+let test_l2_transaction_l2_addr_signer_bad () =
+  let open Context_l2 in
+  let open Syntax in
+  let ctxt = empty_context in
+  let (sk1, pk1, addr1) = gen_l2_address () in
+  let (_sk2, _pk2, addr2) = gen_l2_address () in
+  (* The address has no index in the context *)
+  let transfer =
+    [transfer ~signer:(signer_addr addr1) ~dest:addr2 ~ticket:ticket1 10L]
+  in
+  let signature = sign_transaction [sk1] transfer in
+  let batch = batch signature [transfer] in
+  let* () =
+    expect_error
+      ~msg_if_valid:"The check should fail with an unknown address"
+      (Batch_V1.apply_batch ctxt batch)
+      (Tx_rollup_l2_apply.Unknown_address addr1)
+  in
+  (* Now we add the index but the metadata is still missing *)
+  let* (ctxt, _, idx1) = Address_index.get_or_associate_index ctxt addr1 in
+  let* () =
+    expect_error
+      ~msg_if_valid:"The check should fail with unknown metadata"
+      (Batch_V1.apply_batch ctxt batch)
+      (Tx_rollup_l2_apply.Unallocated_metadata 0l)
+  in
+  (* Finally we add the metadata and the test pass *)
+  let* ctxt = Address_metadata.init_with_public_key ctxt idx1 pk1 in
+  let* (ctxt, _, tidx) = Ticket_index.get_or_associate_index ctxt ticket1 in
+  let* ctxt =
+    Ticket_ledger.credit ctxt tidx idx1 (Tx_rollup_l2_qty.of_int64_exn 100L)
+  in
+  let* (_ctxt, Batch_result {results; indexes = _}, _withdrawals) =
+    Batch_V1.apply_batch ctxt batch
+  in
+  let status = nth_exn results 0 in
+  match status with
+  | (_, Transaction_success) -> return_unit
+  | (_, Transaction_failure _) -> fail_msg "The transaction should succeed"
+
 (** The test consists of [pk1] sending [ticket1] to [pkh2].
     This results in a withdrawal. *)
 let test_simple_l1_transaction () =
@@ -630,7 +731,9 @@ let test_simple_l1_transaction () =
 
   (* Then, we build a transaction with:
      [addr1] -> [pkh2] *)
-  let withdraw = withdraw ~signer:pk1 ~dest:pkh2 ~ticket:ticket1 10L in
+  let withdraw =
+    withdraw ~signer:(signer_pk pk1) ~dest:pkh2 ~ticket:ticket1 10L
+  in
   let transaction = [withdraw] in
   let batch = create_batch_v1 [transaction] [[sk1]] in
 
@@ -679,7 +782,9 @@ let test_l1_transaction_inexistant_ticket () =
   let (_sk2, _pk2, _addr2, _idx2, pkh2) = nth_exn accounts 1 in
 
   (* We build an invalid transaction with: [addr1] -> [pkh2] *)
-  let withdraw = withdraw ~signer:pk1 ~dest:pkh2 ~ticket:ticket1 10L in
+  let withdraw =
+    withdraw ~signer:(signer_pk pk1) ~dest:pkh2 ~ticket:ticket1 10L
+  in
   let transaction = [withdraw] in
   let batch = create_batch_v1 [transaction] [[sk1]] in
 
@@ -717,7 +822,9 @@ let test_l1_transaction_inexistant_signer () =
 
   (* Then, we build an invalid transaction with:
      [pk_unknown] -> [pkh2] *)
-  let withdraw = withdraw ~signer:pk_unknown ~dest:pkh2 ~ticket:ticket1 10L in
+  let withdraw =
+    withdraw ~signer:(signer_pk pk_unknown) ~dest:pkh2 ~ticket:ticket1 10L
+  in
   let transaction = [withdraw] in
   let batch = create_batch_v1 [transaction] [[sk_unknown]] in
 
@@ -757,7 +864,9 @@ let test_l1_transaction_overdraft () =
   let tidx2 = nth_exn tidxs 1 in
 
   (* Then, we build an transaction with: [addr1] -> [pkh2] where addr1 attempts to spend too much*)
-  let withdraw = withdraw ~signer:pk1 ~dest:pkh2 ~ticket:ticket1 30L in
+  let withdraw =
+    withdraw ~signer:(signer_pk pk1) ~dest:pkh2 ~ticket:ticket1 30L
+  in
   let transaction = [withdraw] in
   let batch = create_batch_v1 [transaction] [[sk1]] in
 
@@ -841,7 +950,9 @@ let test_l1_transaction_zero () =
   let tidx2 = nth_exn tidxs 1 in
 
   (* Then, we build an transaction with: [addr1] -> [pkh2] with amount 0 *)
-  let withdraw = withdraw ~signer:pk1 ~dest:pkh2 ~ticket:ticket1 0L in
+  let withdraw =
+    withdraw ~signer:(signer_pk pk1) ~dest:pkh2 ~ticket:ticket1 0L
+  in
   let transaction = [withdraw] in
   let batch = create_batch_v1 [transaction] [[sk1]] in
 
@@ -919,7 +1030,9 @@ let test_l1_transaction_partial () =
   let tidx2 = nth_exn tidxs 1 in
 
   (* Then, we build an transaction with: [addr1] -> [pkh2] , addr1 spending the ticket partially *)
-  let withdraw = withdraw ~signer:pk1 ~dest:pkh2 ~ticket:ticket1 5L in
+  let withdraw =
+    withdraw ~signer:(signer_pk pk1) ~dest:pkh2 ~ticket:ticket1 5L
+  in
   let transaction = [withdraw] in
   let batch = create_batch_v1 [transaction] [[sk1]] in
 
@@ -1012,7 +1125,7 @@ let test_transaction_with_unknown_indexable () =
 
   let transfer1 : (Indexable.unknown, Indexable.unknown) operation =
     {
-      signer = from_value pk1;
+      signer = from_value (signer_pk pk1);
       counter = 1L;
       contents =
         [
@@ -1131,7 +1244,10 @@ let test_invalid_transaction () =
      [addr1] -> [addr2] & [addr2] -> [addr1]. *)
   let transaction =
     transfers
-      [(pk1, addr2, ticket1, 10L, None); (pk2, addr1, ticket2, 20L, None)]
+      [
+        (signer_pk pk1, addr2, ticket1, 10L, None);
+        (signer_pk pk2, addr1, ticket2, 20L, None);
+      ]
   in
   let batch = create_batch_v1 [transaction] [[sk1; sk2]] in
 
@@ -1179,7 +1295,9 @@ let test_invalid_counter () =
   let (sk1, pk1, addr1, _idx1, _) = nth_exn accounts 0 in
 
   let counter = 10L in
-  let transaction = transfers [(pk1, addr2, ticket1, 10L, Some counter)] in
+  let transaction =
+    transfers [(signer_pk pk1, addr2, ticket1, 10L, Some counter)]
+  in
   let batch = create_batch_v1 [transaction] [[sk1]] in
 
   let* (_ctxt, Batch_result {results; _}, _withdrawals) =
@@ -1209,11 +1327,11 @@ let test_update_counter () =
   let transactions =
     transfers
       [
-        (pk1, addr2, ticket1, 10L, Some 1L);
-        (pk1, addr2, ticket1, 20L, Some 2L);
-        (pk1, addr2, ticket1, 30L, Some 3L);
-        (pk1, addr2, ticket1, 40L, Some 4L);
-        (pk1, addr2, ticket1, 50L, Some 5L);
+        (signer_pk pk1, addr2, ticket1, 10L, Some 1L);
+        (signer_pk pk1, addr2, ticket1, 20L, Some 2L);
+        (signer_pk pk1, addr2, ticket1, 30L, Some 3L);
+        (signer_pk pk1, addr2, ticket1, 40L, Some 4L);
+        (signer_pk pk1, addr2, ticket1, 50L, Some 5L);
       ]
     |> List.map (fun x -> [x])
   in
@@ -1255,7 +1373,10 @@ let test_pre_apply_batch () =
 
   let transaction =
     transfers
-      [(pk1, addr2, ticket1, 10L, None); (pk2, addr1, ticket2, 20L, None)]
+      [
+        (signer_pk pk1, addr2, ticket1, 10L, None);
+        (signer_pk pk2, addr1, ticket2, 20L, None);
+      ]
   in
   let batch1 = create_batch_v1 [transaction] [[sk1; sk2]] in
   let* (ctxt, _indexes, _) = Batch_V1.check_signature ctxt batch1 in
@@ -1305,7 +1426,10 @@ let test_apply_message_batch () =
      [addr1] -> [addr2] & [addr2] -> [addr1]. *)
   let transaction =
     transfers
-      [(pk1, addr2, ticket1, 10L, None); (pk2, addr1, ticket2, 20L, None)]
+      [
+        (signer_pk pk1, addr2, ticket1, 10L, None);
+        (signer_pk pk2, addr1, ticket2, 20L, None);
+      ]
   in
   let batch = create_batch_v1 [transaction] [[sk1; sk2]] in
   let (msg, _) =
@@ -1346,10 +1470,38 @@ let test_apply_message_batch_withdrawals () =
   *)
   let transactions =
     [
-      [transfer ~signer:pk1 ~dest:addr2 ~ticket:ticket1 ~counter:1L 5L];
-      [withdraw ~signer:pk1 ~dest:pkh2 ~ticket:ticket1 ~counter:2L 5L];
-      [transfer ~signer:pk2 ~dest:addr1 ~ticket:ticket2 ~counter:1L 10L];
-      [withdraw ~signer:pk2 ~dest:pkh1 ~ticket:ticket2 ~counter:2L 10L];
+      [
+        transfer
+          ~signer:(signer_pk pk1)
+          ~dest:addr2
+          ~ticket:ticket1
+          ~counter:1L
+          5L;
+      ];
+      [
+        withdraw
+          ~signer:(signer_pk pk1)
+          ~dest:pkh2
+          ~ticket:ticket1
+          ~counter:2L
+          5L;
+      ];
+      [
+        transfer
+          ~signer:(signer_pk pk2)
+          ~dest:addr1
+          ~ticket:ticket2
+          ~counter:1L
+          10L;
+      ];
+      [
+        withdraw
+          ~signer:(signer_pk pk2)
+          ~dest:pkh1
+          ~ticket:ticket2
+          ~counter:2L
+          10L;
+      ];
     ]
   in
   let batch = create_batch_v1 transactions [[sk1]; [sk1]; [sk2]; [sk2]] in
@@ -1497,6 +1649,10 @@ let tests =
       ("test simple l1 transaction: zero", test_l1_transaction_zero);
       ("test simple l1 transaction: partial", test_l1_transaction_partial);
       ("test simple l2 transaction", test_simple_l2_transaction);
+      ( "test l2 transaction with l2 addr: good",
+        test_l2_transaction_l2_addr_signer_good );
+      ( "test l2 transaction with l2 addr: bad",
+        test_l2_transaction_l2_addr_signer_bad );
       ( "test simple transaction with indexes and values",
         test_transaction_with_unknown_indexable );
       ("invalid transaction", test_invalid_transaction);

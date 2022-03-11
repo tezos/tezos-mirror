@@ -42,6 +42,7 @@ type error +=
   | Invalid_batch_encoding
   | Unexpectedly_indexed_ticket
   | Missing_ticket of Ticket_hash.t
+  | Unknown_address of Tx_rollup_l2_address.t
 
 let () =
   let open Data_encoding in
@@ -131,7 +132,17 @@ let () =
       "A withdrawal must reference a ticket that already exists in the rollup."
     (obj1 (req "ticket_hash" Ticket_hash.encoding))
     (function Missing_ticket ticket_hash -> Some ticket_hash | _ -> None)
-    (function ticket_hash -> Missing_ticket ticket_hash)
+    (function ticket_hash -> Missing_ticket ticket_hash) ;
+  (* Unknown address *)
+  register_error_kind
+    `Temporary
+    ~id:"tx_rollup_unknown_address"
+    ~title:"Attempted to sign a transfer with an unknown address"
+    ~description:
+      "The address must exist in the context when signing a transfer with it."
+    (obj1 (req "address" Tx_rollup_l2_address.encoding))
+    (function Unknown_address addr -> Some addr | _ -> None)
+    (function addr -> Unknown_address addr)
 
 module Address_indexes = Map.Make (Tx_rollup_l2_address)
 module Ticket_indexes = Map.Make (Ticket_hash)
@@ -433,15 +444,15 @@ module Make (Context : CONTEXT) = struct
      fun ctxt indexes op ->
       let* (ctxt, indexes, pk, idx) =
         match Indexable.destruct op.signer with
-        | Left pk_index ->
+        | Left signer_index ->
             (* Get the public key from the index. *)
-            let address_index = address_of_signer_index pk_index in
+            let address_index = address_of_signer_index signer_index in
             let* metadata = get_metadata ctxt address_index in
             let pk = metadata.public_key in
             return (ctxt, indexes, pk, address_index)
-        | Right pk -> (
+        | Right (Bls_pk signer_pk) -> (
             (* Initialize the ctxt with public_key if it's necessary. *)
-            let addr = Tx_rollup_l2_address.of_bls_pk pk in
+            let addr = Tx_rollup_l2_address.of_bls_pk signer_pk in
             let* (ctxt, created, idx) =
               Address_index.get_or_associate_index ctxt addr
             in
@@ -462,15 +473,28 @@ module Make (Context : CONTEXT) = struct
                       (* If the metadata exists, then the public key necessarily
                          exists, we do not need to change the context. *)
                       return ctxt
-                  | None -> Address_metadata.init_with_public_key ctxt idx pk
+                  | None ->
+                      Address_metadata.init_with_public_key ctxt idx signer_pk
                 in
-                return (ctxt, indexes, pk, idx)
+                return (ctxt, indexes, signer_pk, idx)
             | `Created ->
                 (* If the index is created however, we need to add to indexes and
                    initiliaze the metadata. *)
                 let indexes = add_addr_to_indexes indexes addr idx in
-                let* ctxt = Address_metadata.init_with_public_key ctxt idx pk in
-                return (ctxt, indexes, pk, idx))
+                let* ctxt =
+                  Address_metadata.init_with_public_key ctxt idx signer_pk
+                in
+                return (ctxt, indexes, signer_pk, idx))
+        | Right (L2_addr signer_addr) -> (
+            (* In order to get the public key associated to [signer_addr], there
+               needs to be both an index associated to it, and a metadata for this
+               index. *)
+            let* idx = Address_index.get ctxt signer_addr in
+            match idx with
+            | None -> fail (Unknown_address signer_addr)
+            | Some idx ->
+                let* metadata = get_metadata ctxt idx in
+                return (ctxt, indexes, metadata.public_key, idx))
       in
       let op : (Indexable.index_only, 'content) operation =
         {op with signer = signer_of_address_index idx}

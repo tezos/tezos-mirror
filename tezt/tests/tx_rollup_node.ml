@@ -566,7 +566,7 @@ let test_l2_to_l2_transaction =
       let tx =
         craft_tx
           ~counter:1L
-          ~signer:bls_pk_1
+          ~signer:(Bls_pk bls_pk_1)
           ~dest:bls_pkh_2_str
           ~ticket:ticket_id
           1L

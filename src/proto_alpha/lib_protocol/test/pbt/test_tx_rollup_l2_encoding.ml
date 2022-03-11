@@ -49,21 +49,22 @@ let bls_pk_gen =
   let secret_key = Bls12_381.Signature.generate_sk seed in
   Bls12_381.Signature.MinPk.derive_pk secret_key
 
+let l2_address_gen =
+  let open QCheck2.Gen in
+  Protocol.Tx_rollup_l2_address.of_bls_pk <$> bls_pk_gen
+
 let signer_gen : Signer_indexable.either QCheck2.Gen.t =
   let open QCheck2.Gen in
   frequency
     [
-      (1, (fun pk -> from_value pk) <$> bls_pk_gen);
-      (9, (fun x -> from_index_exn x) <$> ui32);
+      (1, (fun pk -> from_value (Bls_pk pk)) <$> bls_pk_gen);
+      (5, (fun addr -> from_value (L2_addr addr)) <$> l2_address_gen);
+      (4, (fun x -> from_index_exn x) <$> ui32);
     ]
 
 let signer_index_gen : Signer_indexable.index QCheck2.Gen.t =
   let open QCheck2.Gen in
   (fun x -> Protocol.Indexable.index_exn x) <$> ui32
-
-let l2_address_gen =
-  let open QCheck2.Gen in
-  Protocol.Tx_rollup_l2_address.of_bls_pk <$> bls_pk_gen
 
 let idx_l2_address_idx_gen =
   let open QCheck2.Gen in

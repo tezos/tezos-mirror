@@ -29,7 +29,7 @@ open Tx_rollup_l2_context_sig
 
 let tag_size = `Uint8
 
-let signer_encoding =
+let bls_pk_encoding =
   let open Data_encoding in
   conv_with_guard
     Bls_signature.pk_to_bytes
@@ -39,15 +39,42 @@ let signer_encoding =
       | None -> Error "not a BLS public key")
     (Fixed.bytes Bls_signature.pk_size_in_bytes)
 
-module Signer_indexable = Indexable.Make (struct
-  type t = Bls_signature.pk
+type signer = Bls_pk of Bls_signature.pk | L2_addr of Tx_rollup_l2_address.t
 
-  let pp fmt _ = Format.pp_print_string fmt "<bls_signature>"
+module Signer_indexable = Indexable.Make (struct
+  type t = signer
+
+  let pp fmt = function
+    | Bls_pk _ -> Format.pp_print_string fmt "<bls_signature>"
+    | L2_addr addr -> Tx_rollup_l2_address.pp fmt addr
 
   let compare x y =
-    Bytes.compare (Bls_signature.pk_to_bytes x) (Bls_signature.pk_to_bytes y)
+    match (x, y) with
+    | (Bls_pk pk1, Bls_pk pk2) ->
+        Bytes.compare
+          (Bls_signature.pk_to_bytes pk1)
+          (Bls_signature.pk_to_bytes pk2)
+    | (L2_addr addr1, L2_addr addr2) -> Tx_rollup_l2_address.compare addr1 addr2
+    | (L2_addr _, Bls_pk _) -> -1
+    | (Bls_pk _, L2_addr _) -> 1
 
-  let encoding = signer_encoding
+  let encoding =
+    let open Data_encoding in
+    union
+      [
+        case
+          ~title:"bls_pk"
+          (Tag 0)
+          bls_pk_encoding
+          (function Bls_pk pk -> Some pk | _ -> None)
+          (fun pk -> Bls_pk pk);
+        case
+          ~title:"l2_addr"
+          (Tag 1)
+          Tx_rollup_l2_address.encoding
+          (function L2_addr addr -> Some addr | _ -> None)
+          (fun addr -> L2_addr addr);
+      ]
 end)
 
 module V1 = struct
