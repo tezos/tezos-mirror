@@ -1,4 +1,4 @@
-rpc/alpha.proxy_server.votes.out
+rpc/alpha.proxy_server_rpc.votes.out
 
 ./tezos-client rpc get /chains/main/blocks/head/votes/ballot_list
 []

@@ -70,6 +70,7 @@ let create ?runner ?name ?rpc_port ?(args = []) node =
   let user_arguments =
     List.map
       (function
+        | Data_dir -> ["--data-dir"; Node.data_dir node]
         | Symbolic_block_caching_time s ->
             ["--sym-block-caching-time"; Int.to_string s])
       args

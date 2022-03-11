@@ -107,7 +107,7 @@ let big_map_get ?(big_map_size = 10) ?nb_gets ~protocol mode () =
   let* (endpoint : Client.endpoint option) =
     match mode with
     | `Node -> return None
-    | `Proxy_server ->
+    | (`Proxy_server_rpc | `Proxy_server_data_dir) as proxy_server_mode ->
         (* When checking the split_key heuristic with {!heuristic_event_handler},
            we don't want data to be discarded. Hence we keep data for
            60 seconds. Any duration longer than the test duration is fine. As
@@ -117,6 +117,10 @@ let big_map_get ?(big_map_size = 10) ?nb_gets ~protocol mode () =
         let sym_block_caching_time = 6 * approximate_test_duration in
         let args =
           Proxy_server.[Symbolic_block_caching_time sym_block_caching_time]
+          @
+          match proxy_server_mode with
+          | `Proxy_server_rpc -> []
+          | `Proxy_server_data_dir -> Proxy_server.[Data_dir]
         in
         let* () = Client.bake_for client in
         (* We want Debug level events, for [heuristic_event_handler]
@@ -202,7 +206,10 @@ let test_equivalence =
 let register ~protocols =
   let register mode =
     let mode_tag =
-      match mode with `Node -> "node" | `Proxy_server -> "proxy_server"
+      match mode with
+      | `Node -> "node"
+      | `Proxy_server_rpc -> "proxy_server"
+      | `Proxy_server_data_dir -> "proxy_server_data_dir"
     in
     Protocol.register_test
       ~__FILE__
@@ -212,5 +219,6 @@ let register ~protocols =
       protocols
   in
   register `Node ;
-  register `Proxy_server ;
+  register `Proxy_server_data_dir ;
+  register `Proxy_server_rpc ;
   test_equivalence protocols

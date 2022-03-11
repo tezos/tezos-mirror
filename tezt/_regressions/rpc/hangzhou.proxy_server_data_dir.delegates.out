@@ -1,4 +1,4 @@
-rpc/hangzhou.proxy_server.delegates.out
+rpc/hangzhou.proxy_server_data_dir.delegates.out
 
 ./tezos-client rpc get /chains/main/blocks/head/context/contracts
 [ "[CONTRACT_HASH]",
