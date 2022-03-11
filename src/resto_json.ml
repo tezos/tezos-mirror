@@ -232,7 +232,7 @@ module Ezjsonm = struct
 
   let construct enc v = Json_encoding.construct enc v
 
-  let destruct = Json_encoding.destruct
+  let destruct enc v = Json_encoding.destruct enc v
 end
 
 module Bson = struct
@@ -242,5 +242,5 @@ module Bson = struct
 
   let construct enc v = Json_encoding.construct enc v
 
-  let destruct = Json_encoding.destruct
+  let destruct enc v = Json_encoding.destruct enc v
 end
