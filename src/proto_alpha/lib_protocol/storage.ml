@@ -349,6 +349,30 @@ module Contract = struct
         let name = ["frozen_deposits_limit"]
       end)
       (Tez_repr)
+
+  module Bond_id_index =
+    Make_indexed_subcontext
+      (Make_subcontext (Registered) (Indexed_context.Raw_context)
+         (struct
+           let name = ["bond_id_index"]
+         end))
+         (Make_index (Bond_id_repr.Index))
+
+  module Frozen_bonds =
+    Bond_id_index.Make_carbonated_map
+      (struct
+        let name = ["frozen_bonds"]
+      end)
+      (Tez_repr)
+
+  let fold_bond_ids = Bond_id_index.fold_keys
+
+  module Total_frozen_bonds =
+    Indexed_context.Make_map
+      (struct
+        let name = ["total_frozen_bonds"]
+      end)
+      (Tez_repr)
 end
 
 module type NEXT = sig

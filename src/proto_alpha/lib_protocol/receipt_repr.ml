@@ -43,6 +43,7 @@ type balance =
   | Invoice
   | Initial_commitments
   | Minted
+  | Frozen_bonds of Contract_repr.t * Bond_id_repr.t
 
 let balance_encoding =
   let open Data_encoding in
@@ -201,6 +202,16 @@ let balance_encoding =
               (req "category" (constant "minted")))
            (function Minted -> Some ((), ()) | _ -> None)
            (fun ((), ()) -> Minted);
+         case
+           (Tag 21)
+           ~title:"Frozen_bonds"
+           (obj4
+              (req "kind" (constant "freezer"))
+              (req "category" (constant "tx_rollup_bonds"))
+              (req "contract" Contract_repr.encoding)
+              (req "bond_id" Bond_id_repr.encoding))
+           (function Frozen_bonds (c, r) -> Some ((), (), c, r) | _ -> None)
+           (fun ((), (), c, r) -> Frozen_bonds (c, r));
        ]
 
 let is_not_zero c = not (Compare.Int.equal c 0)
@@ -219,6 +230,9 @@ let compare_balance ba bb =
         if is_not_zero c then c else Compare.Bool.compare ra rb
   | (Commitments bpkha, Commitments bpkhb) ->
       Blinded_public_key_hash.compare bpkha bpkhb
+  | (Frozen_bonds (ca, ra), Frozen_bonds (cb, rb)) ->
+      let c = Contract_repr.compare ca cb in
+      if is_not_zero c then c else Bond_id_repr.compare ra rb
   | (_, _) ->
       let index b =
         match b with
@@ -240,6 +254,7 @@ let compare_balance ba bb =
         | Invoice -> 15
         | Initial_commitments -> 16
         | Minted -> 17
+        | Frozen_bonds _ -> 18
         (* don't forget to add parameterized cases in the first part of the function *)
       in
       Compare.Int.compare (index ba) (index bb)

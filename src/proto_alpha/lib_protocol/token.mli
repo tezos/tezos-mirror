@@ -41,12 +41,14 @@
     to/from [`Delegate_balance d] will not update [d]'s stake, while transferring
     to/from [`Contract (Contract_repr.implicit_contract d)] will update [d]'s
     stake. *)
+
 type container =
   [ `Contract of Contract_repr.t
   | `Collected_commitments of Blinded_public_key_hash.t
   | `Delegate_balance of Signature.Public_key_hash.t
   | `Frozen_deposits of Signature.Public_key_hash.t
-  | `Block_fees ]
+  | `Block_fees
+  | `Frozen_bonds of Contract_repr.t * Bond_id_repr.t ]
 
 (** [infinite_source] defines types of tokens provides which are considered to be
  ** of infinite capacity. *)
@@ -76,19 +78,23 @@ type infinite_sink =
     containers are considered to have infinite capacity. *)
 type sink = [infinite_sink | container]
 
-(** [allocated ctxt container] returns true if [balance ctxt container] is
-    guaranteed not to fail, and returns false when [balance ctxt container] may
-    fail. *)
-val allocated : Raw_context.t -> container -> bool tzresult Lwt.t
+(** [allocated ctxt container] returns a new context because of possible access
+    to carbonated data, and a boolean that is [true] when
+    [balance ctxt container] is guaranteed not to fail, and [false] when
+    [balance ctxt container] may fail. *)
+val allocated :
+  Raw_context.t -> container -> (Raw_context.t * bool) tzresult Lwt.t
 
-(** [balance ctxt container] returns the balance associated to the token holder,
-    may fail if [allocated ctxt container] returns [false].
+(** [balance ctxt container] returns a new context because of an access to
+    carbonated data, and the balance associated to the token holder.
+    This function may fail if [allocated ctxt container] returns [false].
     Returns an error with the message "get_balance" if [container] refers to an
     originated contract that is not allocated.
     Returns a {!Storage_Error Missing_key} error if [container] is of the form
     [`Delegate_balance pkh], where [pkh] refers to an implicit contract that is
     not allocated. *)
-val balance : Raw_context.t -> container -> Tez_repr.t tzresult Lwt.t
+val balance :
+  Raw_context.t -> container -> (Raw_context.t * Tez_repr.t) tzresult Lwt.t
 
 (** [transfer_n ?origin ctxt sources dest] transfers [amount] Tez from [src] to
     [dest] for each [(src, amount)] pair in [sources], and returns a new

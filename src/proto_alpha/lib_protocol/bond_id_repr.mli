@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,39 +23,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let find = Storage.Contract.Delegate.find
+(** This module defines identifiers for frozen bonds. *)
 
-(* A delegate is registered if its "implicit account" delegates to itself. *)
-let registered c delegate =
-  Storage.Contract.Delegate.find c (Contract_repr.implicit_contract delegate)
-  >|=? function
-  | Some current_delegate ->
-      Signature.Public_key_hash.equal delegate current_delegate
-  | None -> false
+type t = Tx_rollup_bond_id of Tx_rollup_repr.t
 
-let init ctxt contract delegate =
-  Storage.Contract.Delegate.init ctxt contract delegate >>=? fun ctxt ->
-  let delegate_contract = Contract_repr.implicit_contract delegate in
-  Storage.Contract.Delegated.add (ctxt, delegate_contract) contract >|= ok
+val pp : Format.formatter -> t -> unit
 
-let unlink ctxt contract =
-  Storage.Contract.Delegate.find ctxt contract >>=? function
-  | None -> return ctxt
-  | Some delegate ->
-      let delegate_contract = Contract_repr.implicit_contract delegate in
-      Storage.Contract.Delegated.remove (ctxt, delegate_contract) contract
-      >|= ok
+val encoding : t Data_encoding.t
 
-let delete ctxt contract =
-  unlink ctxt contract >>=? fun ctxt ->
-  Storage.Contract.Delegate.remove ctxt contract >|= ok
+include Compare.S with type t := t
 
-let set ctxt contract delegate =
-  unlink ctxt contract >>=? fun ctxt ->
-  Storage.Contract.Delegate.add ctxt contract delegate >>= fun ctxt ->
-  let delegate_contract = Contract_repr.implicit_contract delegate in
-  Storage.Contract.Delegated.add (ctxt, delegate_contract) contract >|= ok
-
-let delegated_contracts ctxt delegate =
-  let contract = Contract_repr.implicit_contract delegate in
-  Storage.Contract.Delegated.elements (ctxt, contract)
+module Index : Storage_description.INDEX with type t = t

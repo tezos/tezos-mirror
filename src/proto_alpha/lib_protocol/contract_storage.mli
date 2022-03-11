@@ -68,8 +68,9 @@ val check_counter_increment :
 val increment_counter :
   Raw_context.t -> Signature.Public_key_hash.t -> Raw_context.t tzresult Lwt.t
 
-(** [get_balance c contract] returns the balance of [contract] given raw
-    context [c]. *)
+(** [get_balance ctxt contract] returns the balance of spendable tez owned by
+    [contract] given raw context [ctxt]. This does not include the contract's
+    frozen balances. *)
 val get_balance : Raw_context.t -> Contract_repr.t -> Tez_repr.t tzresult Lwt.t
 
 val get_balance_carbonated :
@@ -177,3 +178,91 @@ val increase_balance_only_call_from_token :
     break important invariants. Consider calling [spend] instead. *)
 val decrease_balance_only_call_from_token :
   Raw_context.t -> Contract_repr.t -> Tez_repr.t -> Raw_context.t tzresult Lwt.t
+
+(** [get_balance_and_frozen_bonds ctxt contract] returns the sum of the
+    (spendable) balance and the frozen bonds associated to [contract]. *)
+val get_balance_and_frozen_bonds :
+  Raw_context.t -> Contract_repr.t -> Tez_repr.t tzresult Lwt.t
+
+(** This error is raised when [spend_bond_only_call_from_token] is called with
+    an amount that is not equal to the deposit associated to the given contract
+    and bond id. *)
+type error +=
+  | (* `Permanent *)
+      Frozen_bonds_must_be_spent_at_once of
+      Contract_repr.t * Bond_id_repr.t
+
+(** [bond_allocated ctxt contract bond_id] returns a new context because of an
+    access to carbonated data, and [true] if there is a bond associated to
+    [contract] and [bond_id], or [false] otherwise. *)
+val bond_allocated :
+  Raw_context.t ->
+  Contract_repr.t ->
+  Bond_id_repr.t ->
+  (Raw_context.t * bool) tzresult Lwt.t
+
+(** [find_bond ctxt contract bond_id] returns a new context because of an access
+    to carbonated data, and the bond associated to [(contract, bond_id)] if
+    there is one, or [None] otherwise. *)
+val find_bond :
+  Raw_context.t ->
+  Contract_repr.t ->
+  Bond_id_repr.t ->
+  (Raw_context.t * Tez_repr.t option) tzresult Lwt.t
+
+(** [spend_bond ctxt contract bond_id amount] withdraws the given [amount] from
+    the value of the bond associated to [contract] and [bond_id].
+
+    The argument [amount] is required to be strictly positive.
+
+    @raise a [Storage_Error Missing_key] error when there is no bond associated
+    to [contract] and [bond_id].
+
+    @raise a [Frozen_bonds_must_be_spent_at_once (contract, bond_id)]
+    error when the amount is different from the bond associated to [contract]
+    and [bond_id]. *)
+val spend_bond_only_call_from_token :
+  Raw_context.t ->
+  Contract_repr.t ->
+  Bond_id_repr.t ->
+  Tez_repr.t ->
+  Raw_context.t tzresult Lwt.t
+
+(** [credit_bond ctxt contract bond_id amount] adds the given [amount] to the
+    bond associated to [contract] and [bond_id]. If no bond exists, one whose
+    value is [amount] is created.
+
+    The argument [amount] is required to be strictly positive.
+
+    @raise a [Addition_overflow] error when
+    [(find ctxt contract bond_id) + amount > Int64.max_int]. *)
+val credit_bond_only_call_from_token :
+  Raw_context.t ->
+  Contract_repr.t ->
+  Bond_id_repr.t ->
+  Tez_repr.t ->
+  Raw_context.t tzresult Lwt.t
+
+(** [has_frozen_bonds ctxt contract] returns [true] if there are frozen bonds
+    associated to [contract], and returns [false] otherwise. *)
+val has_frozen_bonds : Raw_context.t -> Contract_repr.t -> bool tzresult Lwt.t
+
+(** [get_frozen_bonds ctxt contract] returns the total amount of bonds associated
+    to [contract]. *)
+val get_frozen_bonds :
+  Raw_context.t -> Contract_repr.t -> Tez_repr.t tzresult Lwt.t
+
+(** [fold_on_bond_ids ctxt contract order init f] folds [f] on all bond
+    identifiers associated to [contract]. *)
+val fold_on_bond_ids :
+  Raw_context.t ->
+  Contract_repr.t ->
+  order:[`Sorted | `Undefined] ->
+  init:'a ->
+  f:(Bond_id_repr.t -> 'a -> 'a Lwt.t) ->
+  'a Lwt.t
+
+(** [ensure_deallocated_if_empty ctxt contract] de-allocates [contract] if its
+    full balance is zero, and it does not delegate. *)
+val ensure_deallocated_if_empty :
+  Raw_context.t -> Contract_repr.t -> Raw_context.t tzresult Lwt.t

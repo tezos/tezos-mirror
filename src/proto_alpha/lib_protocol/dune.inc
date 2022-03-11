@@ -82,6 +82,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    tx_rollup_commitment_repr.mli tx_rollup_commitment_repr.ml
    tx_rollup_errors_repr.ml
    tx_rollup_state_repr.mli tx_rollup_state_repr.ml
+   bond_id_repr.mli bond_id_repr.ml
    vote_repr.mli vote_repr.ml
    liquidity_baking_repr.mli liquidity_baking_repr.ml
    block_header_repr.mli block_header_repr.ml
@@ -114,8 +115,8 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    commitment_storage.mli commitment_storage.ml
    voting_period_storage.mli voting_period_storage.ml
    cache_repr.mli cache_repr.ml
-   stake_storage.mli stake_storage.ml
    contract_delegate_storage.mli contract_delegate_storage.ml
+   stake_storage.mli stake_storage.ml
    contract_storage.mli contract_storage.ml
    token.mli token.ml
    delegate_storage.mli delegate_storage.ml
@@ -254,6 +255,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    tx_rollup_commitment_repr.mli tx_rollup_commitment_repr.ml
    tx_rollup_errors_repr.ml
    tx_rollup_state_repr.mli tx_rollup_state_repr.ml
+   bond_id_repr.mli bond_id_repr.ml
    vote_repr.mli vote_repr.ml
    liquidity_baking_repr.mli liquidity_baking_repr.ml
    block_header_repr.mli block_header_repr.ml
@@ -286,8 +288,8 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    commitment_storage.mli commitment_storage.ml
    voting_period_storage.mli voting_period_storage.ml
    cache_repr.mli cache_repr.ml
-   stake_storage.mli stake_storage.ml
    contract_delegate_storage.mli contract_delegate_storage.ml
+   stake_storage.mli stake_storage.ml
    contract_storage.mli contract_storage.ml
    token.mli token.ml
    delegate_storage.mli delegate_storage.ml
@@ -426,6 +428,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    tx_rollup_commitment_repr.mli tx_rollup_commitment_repr.ml
    tx_rollup_errors_repr.ml
    tx_rollup_state_repr.mli tx_rollup_state_repr.ml
+   bond_id_repr.mli bond_id_repr.ml
    vote_repr.mli vote_repr.ml
    liquidity_baking_repr.mli liquidity_baking_repr.ml
    block_header_repr.mli block_header_repr.ml
@@ -458,8 +461,8 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    commitment_storage.mli commitment_storage.ml
    voting_period_storage.mli voting_period_storage.ml
    cache_repr.mli cache_repr.ml
-   stake_storage.mli stake_storage.ml
    contract_delegate_storage.mli contract_delegate_storage.ml
+   stake_storage.mli stake_storage.ml
    contract_storage.mli contract_storage.ml
    token.mli token.ml
    delegate_storage.mli delegate_storage.ml
@@ -620,6 +623,7 @@ include Tezos_raw_protocol_alpha.Main
    Tx_rollup_commitment_repr
    Tx_rollup_errors_repr
    Tx_rollup_state_repr
+   Bond_id_repr
    Vote_repr
    Liquidity_baking_repr
    Block_header_repr
@@ -652,8 +656,8 @@ include Tezos_raw_protocol_alpha.Main
    Commitment_storage
    Voting_period_storage
    Cache_repr
-   Stake_storage
    Contract_delegate_storage
+   Stake_storage
    Contract_storage
    Token
    Delegate_storage
@@ -833,6 +837,7 @@ include Tezos_raw_protocol_alpha.Main
    tx_rollup_commitment_repr.mli tx_rollup_commitment_repr.ml
    tx_rollup_errors_repr.ml
    tx_rollup_state_repr.mli tx_rollup_state_repr.ml
+   bond_id_repr.mli bond_id_repr.ml
    vote_repr.mli vote_repr.ml
    liquidity_baking_repr.mli liquidity_baking_repr.ml
    block_header_repr.mli block_header_repr.ml
@@ -865,8 +870,8 @@ include Tezos_raw_protocol_alpha.Main
    commitment_storage.mli commitment_storage.ml
    voting_period_storage.mli voting_period_storage.ml
    cache_repr.mli cache_repr.ml
-   stake_storage.mli stake_storage.ml
    contract_delegate_storage.mli contract_delegate_storage.ml
+   stake_storage.mli stake_storage.ml
    contract_storage.mli contract_storage.ml
    token.mli token.ml
    delegate_storage.mli delegate_storage.ml

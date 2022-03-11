@@ -86,6 +86,13 @@ let test_encodings () =
   test_encodings (Commitments Blinded_public_key_hash.zero) >>=? fun () ->
   test_encodings Bootstrap >>=? fun () ->
   test_encodings Invoice >>=? fun () ->
-  test_encodings Initial_commitments >>=? fun () -> test_encodings Minted
+  test_encodings Initial_commitments >>=? fun () ->
+  test_encodings Minted >>=? fun () ->
+  let nonce =
+    Origination_nonce.Internal_for_tests.initial Operation_hash.zero
+  in
+  let tx_rollup = Tx_rollup.Internal_for_tests.originated_tx_rollup nonce in
+  let bond_id = Bond_id.Tx_rollup_bond_id tx_rollup in
+  test_encodings (Frozen_bonds (Contract.implicit_contract pkh, bond_id))
 
 let tests = Tztest.[tztest "receipt - encoding" `Quick test_encodings]

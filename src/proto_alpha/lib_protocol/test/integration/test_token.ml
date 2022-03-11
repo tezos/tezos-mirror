@@ -52,6 +52,10 @@ let random_amount () =
   | None -> assert false
   | Some x -> x
 
+let nonce = Origination_nonce.Internal_for_tests.initial Operation_hash.zero
+
+let mk_rollup () = Tx_rollup.Internal_for_tests.originated_tx_rollup nonce
+
 (** Check balances for a simple transfer from [bootstrap] to new [Implicit]. *)
 let test_simple_balances () =
   Random.init 0 ;
@@ -61,10 +65,10 @@ let test_simple_balances () =
   let dest = `Contract (Contract.implicit_contract pkh) in
   let amount = Tez.one in
   wrap (Token.transfer ctxt src dest amount) >>=? fun (ctxt', _) ->
-  wrap (Token.balance ctxt src) >>=? fun bal_src ->
-  wrap (Token.balance ctxt' src) >>=? fun bal_src' ->
-  wrap (Token.balance ctxt dest) >>=? fun bal_dest ->
-  wrap (Token.balance ctxt' dest) >>=? fun bal_dest' ->
+  wrap (Token.balance ctxt src) >>=? fun (ctxt, bal_src) ->
+  wrap (Token.balance ctxt' src) >>=? fun (ctxt', bal_src') ->
+  wrap (Token.balance ctxt dest) >>=? fun (_, bal_dest) ->
+  wrap (Token.balance ctxt' dest) >>=? fun (_, bal_dest') ->
   bal_src' +? amount >>?= fun add_bal_src'_amount ->
   bal_dest +? amount >>?= fun add_bal_dest_amount ->
   Assert.equal_tez ~loc:__LOC__ bal_src add_bal_src'_amount >>=? fun () ->
@@ -102,15 +106,15 @@ let test_simple_balance_updates () =
   return_unit
 
 let test_allocated_and_deallocated ctxt dest initial_status status_when_empty =
-  wrap (Token.allocated ctxt dest) >>=? fun allocated ->
+  wrap (Token.allocated ctxt dest) >>=? fun (ctxt, allocated) ->
   Assert.equal_bool ~loc:__LOC__ allocated initial_status >>=? fun () ->
   let amount = Tez.one in
   wrap (Token.transfer ctxt `Minted dest amount) >>=? fun (ctxt', _) ->
-  wrap (Token.allocated ctxt' dest) >>=? fun allocated ->
+  wrap (Token.allocated ctxt' dest) >>=? fun (ctxt', allocated) ->
   Assert.equal_bool ~loc:__LOC__ allocated true >>=? fun () ->
-  wrap (Token.balance ctxt' dest) >>=? fun bal_dest' ->
+  wrap (Token.balance ctxt' dest) >>=? fun (ctxt', bal_dest') ->
   wrap (Token.transfer ctxt' dest `Burned bal_dest') >>=? fun (ctxt', _) ->
-  wrap (Token.allocated ctxt' dest) >>=? fun allocated ->
+  wrap (Token.allocated ctxt' dest) >>=? fun (_, allocated) ->
   Assert.equal_bool ~loc:__LOC__ allocated status_when_empty >>=? fun () ->
   return_unit
 
@@ -133,25 +137,36 @@ let test_allocated () =
   let dest = `Frozen_deposits pkh in
   test_allocated_and_still_allocated_when_empty ctxt dest false >>=? fun _ ->
   let dest = `Block_fees in
-  test_allocated_and_still_allocated_when_empty ctxt dest true
+  test_allocated_and_still_allocated_when_empty ctxt dest true >>=? fun _ ->
+  let dest =
+    let bond_id = Bond_id.Tx_rollup_bond_id (mk_rollup ()) in
+    `Frozen_bonds (Contract.implicit_contract pkh, bond_id)
+  in
+  test_allocated_and_deallocated_when_empty ctxt dest
 
 let check_sink_balances ctxt ctxt' dest amount =
-  wrap (Token.balance ctxt dest) >>=? fun bal_dest ->
-  wrap (Token.balance ctxt' dest) >>=? fun bal_dest' ->
+  wrap (Token.balance ctxt dest) >>=? fun (_, bal_dest) ->
+  wrap (Token.balance ctxt' dest) >>=? fun (_, bal_dest') ->
   bal_dest +? amount >>?= fun add_bal_dest_amount ->
   Assert.equal_tez ~loc:__LOC__ bal_dest' add_bal_dest_amount
 
+(* Accounts of the form (`DelegateBalance pkh) are not allocated when they
+   receive funds for the first time. To force allocation, we transfer to
+   (`Contract pkh) instead. *)
+let force_allocation_if_need_be ctxt account =
+  match account with
+  | `Delegate_balance pkh ->
+      let account = `Contract (Contract.implicit_contract pkh) in
+      wrap (Token.transfer ctxt `Minted account Tez.one_mutez) >|=? fst
+  | _ -> return ctxt
+
 let test_transferring_to_sink ctxt sink amount expected_bupds =
-  (* Transferring zero must not return balance updates. *)
-  (match sink with
-  | `Contract _ | `Delegate_balance _ ->
-      return_unit (* Transaction of 0tz is forbidden. *)
-  | _ ->
-      wrap (Token.transfer ctxt `Minted sink Tez.zero)
-      >>=? fun (ctxt', bupds) ->
-      check_sink_balances ctxt ctxt' sink Tez.zero >>=? fun _ ->
-      Assert.equal_bool ~loc:__LOC__ (bupds = []) true)
+  (* Transferring zero must be a noop, and must not return balance updates. *)
+  wrap (Token.transfer ctxt `Minted sink Tez.zero) >>=? fun (ctxt', bupds) ->
+  Assert.equal_bool ~loc:__LOC__ (ctxt == ctxt' && bupds = []) true
   >>=? fun _ ->
+  (* Force the allocation of [dest] if need be. *)
+  force_allocation_if_need_be ctxt sink >>=? fun ctxt ->
   (* Test transferring a non null amount. *)
   wrap (Token.transfer ctxt `Minted sink amount) >>=? fun (ctxt', bupds) ->
   check_sink_balances ctxt ctxt' sink amount >>=? fun _ ->
@@ -160,7 +175,11 @@ let test_transferring_to_sink ctxt sink amount expected_bupds =
   in
   Alcotest.(
     check bool "Balance updates do not match." (bupds = expected_bupds) true) ;
-  return_unit
+  (* Test transferring to go beyond capacity. *)
+  wrap (Token.balance ctxt' sink) >>=? fun (ctxt', bal) ->
+  let amount = Tez.of_mutez_exn Int64.max_int -! bal +! Tez.one_mutez in
+  wrap (Token.transfer ctxt' `Minted sink amount) >>= fun res ->
+  Assert.proto_error_with_info ~loc:__LOC__ res "Overflowing tez addition"
 
 let test_transferring_to_contract ctxt =
   let (pkh, _pk, _sk) = Signature.generate_key () in
@@ -184,11 +203,6 @@ let test_transferring_to_collected_commitments ctxt =
 let test_transferring_to_delegate_balance ctxt =
   let (pkh, _pk, _sk) = Signature.generate_key () in
   let dest = Contract.implicit_contract pkh in
-  (* First we need to force the allocation of [dest]. *)
-  wrap (Token.transfer ctxt `Minted (`Contract dest) Tez.one)
-  >>=? fun (ctxt, _) ->
-  wrap (Token.allocated ctxt (`Delegate_balance pkh)) >>=? fun allocated ->
-  Assert.equal_bool ~loc:__LOC__ allocated true >>=? fun () ->
   let amount = random_amount () in
   test_transferring_to_sink
     ctxt
@@ -253,6 +267,18 @@ let test_transferring_to_burned ctxt =
       ])
     true
 
+let test_transferring_to_frozen_bonds ctxt =
+  let (pkh, _pk, _sk) = Signature.generate_key () in
+  let contract = Contract.implicit_contract pkh in
+  let tx_rollup = mk_rollup () in
+  let bond_id = Bond_id.Tx_rollup_bond_id tx_rollup in
+  let amount = random_amount () in
+  test_transferring_to_sink
+    ctxt
+    (`Frozen_bonds (contract, bond_id))
+    amount
+    [(Frozen_bonds (contract, bond_id), Credited amount, Block_application)]
+
 let test_transferring_to_sink () =
   Random.init 0 ;
   create_context () >>=? fun (ctxt, _) ->
@@ -261,11 +287,12 @@ let test_transferring_to_sink () =
   test_transferring_to_delegate_balance ctxt >>=? fun _ ->
   test_transferring_to_frozen_deposits ctxt >>=? fun _ ->
   test_transferring_to_collected_fees ctxt >>=? fun _ ->
-  test_transferring_to_burned ctxt
+  test_transferring_to_burned ctxt >>=? fun _ ->
+  test_transferring_to_frozen_bonds ctxt
 
 let check_src_balances ctxt ctxt' src amount =
-  wrap (Token.balance ctxt src) >>=? fun bal_src ->
-  wrap (Token.balance ctxt' src) >>=? fun bal_src' ->
+  wrap (Token.balance ctxt src) >>=? fun (_, bal_src) ->
+  wrap (Token.balance ctxt' src) >>=? fun (_, bal_src') ->
   bal_src' +? amount >>?= fun add_bal_src'_amount ->
   Assert.equal_tez ~loc:__LOC__ bal_src add_bal_src'_amount
 
@@ -283,24 +310,62 @@ let test_transferring_from_unbounded_source ctxt src expected_bupds =
   Assert.equal_bool ~loc:__LOC__ (bupds = expected_bupds) true >>=? fun () ->
   return_unit
 
+(* Returns the balance of [account] if [account] is allocated, and returns
+   [Tez.zero] otherwise. *)
+let balance_no_fail ctxt account =
+  wrap (Token.allocated ctxt account) >>=? fun (ctxt, allocated) ->
+  if allocated then wrap (Token.balance ctxt account)
+  else return (ctxt, Tez.zero)
+
 let test_transferring_from_bounded_source ctxt src amount expected_bupds =
-  (* Transferring zero must not return balance updates. *)
-  (match src with
-  | `Contract _ | `Delegate_balance _ ->
-      return_unit (* Transaction of 0tz is forbidden. *)
-  | _ ->
-      wrap (Token.transfer ctxt src `Burned Tez.zero) >>=? fun (ctxt', bupds) ->
-      check_src_balances ctxt ctxt' src Tez.zero >>=? fun _ ->
-      Assert.equal_bool ~loc:__LOC__ (bupds = []) true)
+  balance_no_fail ctxt src >>=? fun (ctxt, balance) ->
+  Assert.equal_tez ~loc:__LOC__ balance Tez.zero >>=? fun () ->
+  (* Test transferring from an empty account. *)
+  wrap (Token.transfer ctxt src `Burned Tez.one) >>= fun res ->
+  let error_title =
+    match src with
+    | `Contract _ -> "Balance too low"
+    | `Delegate_balance _ | `Frozen_deposits _ | `Frozen_bonds _ ->
+        "Storage error (fatal internal error)"
+    | _ -> "Underflowing tez subtraction"
+  in
+  Assert.proto_error_with_info ~loc:__LOC__ res error_title >>=? fun () ->
+  (* Transferring zero must be a noop, and must not return balance updates. *)
+  wrap (Token.transfer ctxt src `Burned Tez.zero) >>=? fun (ctxt', bupds) ->
+  Assert.equal_bool ~loc:__LOC__ (ctxt == ctxt' && bupds = []) true
   >>=? fun _ ->
-  (* Test transferring a non null amount. *)
+  (* Force the allocation of [dest] if need be. *)
+  force_allocation_if_need_be ctxt src >>=? fun ctxt ->
+  (* Test transferring everything. *)
   wrap (Token.transfer ctxt `Minted src amount) >>=? fun (ctxt, _) ->
   wrap (Token.transfer ctxt src `Burned amount) >>=? fun (ctxt', bupds) ->
   check_src_balances ctxt ctxt' src amount >>=? fun _ ->
   let expected_bupds =
     expected_bupds @ Receipt.[(Burned, Credited amount, Block_application)]
   in
-  Assert.equal_bool ~loc:__LOC__ (bupds = expected_bupds) true
+  Assert.equal_bool ~loc:__LOC__ (bupds = expected_bupds) true >>=? fun () ->
+  (* Test transferring a smaller amount. *)
+  wrap (Token.transfer ctxt `Minted src amount) >>=? fun (ctxt, _) ->
+  (match src with
+  | `Frozen_bonds _ ->
+      wrap (Token.transfer ctxt src `Burned amount) >>= fun res ->
+      let error_title = "Partial spending of frozen bonds" in
+      Assert.proto_error_with_info ~loc:__LOC__ res error_title
+  | _ ->
+      wrap (Token.transfer ctxt src `Burned amount) >>=? fun (ctxt', bupds) ->
+      check_src_balances ctxt ctxt' src amount >>=? fun _ ->
+      Assert.equal_bool ~loc:__LOC__ (bupds = expected_bupds) true)
+  >>=? fun () ->
+  (* Test transferring more than available. *)
+  wrap (Token.balance ctxt src) >>=? fun (ctxt, balance) ->
+  wrap (Token.transfer ctxt src `Burned (balance +! Tez.one)) >>= fun res ->
+  let error_title =
+    match src with
+    | `Contract _ -> "Balance too low"
+    | `Frozen_bonds _ -> "Partial spending of frozen bonds"
+    | _ -> "Underflowing tez subtraction"
+  in
+  Assert.proto_error_with_info ~loc:__LOC__ res error_title
 
 let test_transferring_from_contract ctxt =
   let (pkh, _pk, _sk) = Signature.generate_key () in
@@ -325,9 +390,6 @@ let test_transferring_from_delegate_balance ctxt =
   let (pkh, _pk, _sk) = Signature.generate_key () in
   let amount = random_amount () in
   let src = Contract.implicit_contract pkh in
-  (* First we need to force the allocation of [dest]. *)
-  wrap (Token.transfer ctxt `Minted (`Contract src) Tez.one)
-  >>=? fun (ctxt, _) ->
   test_transferring_from_bounded_source
     ctxt
     (`Delegate_balance pkh)
@@ -350,6 +412,18 @@ let test_transferring_from_collected_fees ctxt =
     `Block_fees
     amount
     [(Block_fees, Debited amount, Block_application)]
+
+let test_transferring_from_frozen_bonds ctxt =
+  let (pkh, _pk, _sk) = Signature.generate_key () in
+  let contract = Contract.implicit_contract pkh in
+  let tx_rollup = mk_rollup () in
+  let bond_id = Bond_id.Tx_rollup_bond_id tx_rollup in
+  let amount = random_amount () in
+  test_transferring_from_bounded_source
+    ctxt
+    (`Frozen_bonds (contract, bond_id))
+    amount
+    [(Frozen_bonds (contract, bond_id), Debited amount, Block_application)]
 
 let test_transferring_from_source () =
   Random.init 0 ;
@@ -393,7 +467,8 @@ let test_transferring_from_source () =
   test_transferring_from_collected_commitments ctxt >>=? fun _ ->
   test_transferring_from_delegate_balance ctxt >>=? fun _ ->
   test_transferring_from_frozen_deposits ctxt >>=? fun _ ->
-  test_transferring_from_collected_fees ctxt
+  test_transferring_from_collected_fees ctxt >>=? fun _ ->
+  test_transferring_from_frozen_bonds ctxt
 
 let cast_to_container_type x =
   match x with
@@ -404,6 +479,7 @@ let cast_to_container_type x =
   | `Collected_commitments _ as x -> Some x
   | `Delegate_balance _ as x -> Some x
   | `Block_fees as x -> Some x
+  | `Frozen_bonds _ as x -> Some x
 
 (** Generates all combinations of constructors. *)
 let build_test_cases () =
@@ -437,6 +513,12 @@ let build_test_cases () =
   >>=? fun ctxt ->
   wrap (Delegate.set ctxt (Contract.implicit_contract user1) (Some baker2))
   >>=? fun ctxt ->
+  let tx_rollup1 = mk_rollup () in
+  let bond_id1 = Bond_id.Tx_rollup_bond_id tx_rollup1 in
+  let tx_rollup2 = mk_rollup () in
+  let bond_id2 = Bond_id.Tx_rollup_bond_id tx_rollup2 in
+  let user1ic = Contract.implicit_contract user1 in
+  let baker2ic = Contract.implicit_contract baker2 in
   let src_list =
     [
       (`Invoice, random_amount ());
@@ -452,6 +534,8 @@ let build_test_cases () =
       (user2c, random_amount ());
       (baker1c, random_amount ());
       (baker2c, random_amount ());
+      (`Frozen_bonds (user1ic, bond_id1), random_amount ());
+      (`Frozen_bonds (baker2ic, bond_id2), random_amount ());
     ]
   in
   let dest_list =
@@ -464,6 +548,8 @@ let build_test_cases () =
       user2c;
       baker1c;
       baker2c;
+      `Frozen_bonds (user1ic, bond_id1);
+      `Frozen_bonds (baker2ic, bond_id2);
       `Burned;
     ]
   in
@@ -492,8 +578,8 @@ let rec check_balances ctxt ctxt' src dest amount =
       check_balances ctxt ctxt' contract contract amount
   | (Some src, Some dest) when src = dest ->
       (* src and dest are the same contract *)
-      wrap (Token.balance ctxt dest) >>=? fun bal_dest ->
-      wrap (Token.balance ctxt' dest) >>=? fun bal_dest' ->
+      wrap (Token.balance ctxt dest) >>=? fun (_, bal_dest) ->
+      wrap (Token.balance ctxt' dest) >>=? fun (_, bal_dest') ->
       Assert.equal_tez ~loc:__LOC__ bal_dest bal_dest'
   | (Some src, None) -> check_src_balances ctxt ctxt' src amount
   | (None, Some dest) -> check_sink_balances ctxt ctxt' dest amount
@@ -547,8 +633,8 @@ let coalesce_balance_updates bu1 bu2 =
 let check_balances_are_consistent ctxt1 ctxt2 elt =
   match elt with
   | #Token.container as elt ->
-      Token.balance ctxt1 elt >>=? fun elt_bal1 ->
-      Token.balance ctxt2 elt >>=? fun elt_bal2 ->
+      Token.balance ctxt1 elt >>=? fun (_, elt_bal1) ->
+      Token.balance ctxt2 elt >>=? fun (_, elt_bal2) ->
       assert (elt_bal1 = elt_bal2) ;
       return_unit
   | `Invoice | `Bootstrap | `Initial_commitments | `Minted

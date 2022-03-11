@@ -207,7 +207,8 @@ module S = struct
     RPC_service.get_service
       ~description:
         "Returns the full balance (in mutez) of a given delegate, including \
-         the frozen deposits. It does not include its delegated balance."
+         the frozen deposits and the frozen bonds. It does not include its \
+         delegated balance."
       ~query:RPC_query.empty
       ~output:Tez.encoding
       RPC_path.(path / "full_balance")
@@ -236,8 +237,8 @@ module S = struct
       ~description:
         "Returns the total amount of tokens (in mutez) delegated to a given \
          delegate. This includes the balances of all the contracts that \
-         delegate to it, but also the balance of the delegate itself and its \
-         frozen deposits."
+         delegate to it, but also the balance of the delegate itself, its \
+         frozen deposits, and its frozen bonds."
       ~query:RPC_query.empty
       ~output:Tez.encoding
       RPC_path.(path / "staking_balance")

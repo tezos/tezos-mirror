@@ -59,10 +59,28 @@ module S = struct
 
   let balance =
     RPC_service.get_service
-      ~description:"Access the balance of a contract."
+      ~description:
+        "Access the spendable balance of a contract, excluding frozen bonds."
       ~query:RPC_query.empty
       ~output:Tez.encoding
       RPC_path.(custom_root /: Contract.rpc_arg / "balance")
+
+  let frozen_bonds =
+    RPC_service.get_service
+      ~description:"Access the frozen bonds of a contract."
+      ~query:RPC_query.empty
+      ~output:Tez.encoding
+      RPC_path.(custom_root /: Contract.rpc_arg / "frozen_bonds")
+
+  let balance_and_frozen_bonds =
+    RPC_service.get_service
+      ~description:
+        "Access the sum of the spendable balance and frozen bonds of a \
+         contract. This sum is part of the contract's stake, and it is exactly \
+         the contract's stake if the contract is not a delegate."
+      ~query:RPC_query.empty
+      ~output:Tez.encoding
+      RPC_path.(custom_root /: Contract.rpc_arg / "balance_and_frozen_bonds")
 
   let manager_key =
     RPC_service.get_service
@@ -320,6 +338,11 @@ let[@coq_axiom_with_reason "gadt"] register () =
         >|=? fun (_ctxt, rev_values) -> List.rev rev_values
   in
   register_field ~chunked:false S.balance Contract.get_balance ;
+  register_field ~chunked:false S.frozen_bonds Contract.get_frozen_bonds ;
+  register_field
+    ~chunked:false
+    S.balance_and_frozen_bonds
+    Contract.get_balance_and_frozen_bonds ;
   opt_register1 ~chunked:false S.manager_key (fun ctxt contract () () ->
       match Contract.is_implicit contract with
       | None -> return_none
@@ -473,6 +496,12 @@ let info ctxt block contract =
 
 let balance ctxt block contract =
   RPC_context.make_call1 S.balance ctxt block contract () ()
+
+let frozen_bonds ctxt block contract =
+  RPC_context.make_call1 S.frozen_bonds ctxt block contract () ()
+
+let balance_and_frozen_bonds ctxt block contract =
+  RPC_context.make_call1 S.balance_and_frozen_bonds ctxt block contract () ()
 
 let manager_key ctxt block mgr =
   RPC_context.make_call1
