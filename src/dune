@@ -1,18 +1,4 @@
 (library
- (name ezresto)
- (public_name ezresto)
- (modules ezResto)
- (libraries resto-json resto uri)
- (wrapped false))
-
-(library
- (name ezresto_directory)
- (public_name ezresto-directory)
- (modules ezResto_directory)
- (libraries ezresto resto-directory resto lwt)
- (wrapped false))
-
-(library
  (name resto)
  (public_name resto)
  (modules resto)

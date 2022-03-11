@@ -26,8 +26,23 @@
 
 open Resto
 
+(** Directories are sets of services. They are used to spin up servers (see
+    [Server]) that reply to requests for all their registered services. *)
+
 module Answer : sig
-  (** Return type for service handler *)
+  (** Return type for service handler
+
+      Note about the three distinct [200]-code constructors:
+      - [`Ok] is for RPCs that return a value that the server should encode as
+        one blob of data. This should be the most common answer for successful
+        returns of simple, reasonably-sized values.
+      - [`OkChunk] is for RPCs that return a value that the server should encode
+        as chunks: multiple blobs, the concatenation of which represents the
+        data. This should be reserved for values that can be fairly large
+        (typically over 4Kb, but this threshold may vary depending on your
+        setup). Data is then transferred using chunked transfer encoding.
+      - [`OkStream] is for RPCs that return a stream of values, not all of which
+        are determined at the time of call. *)
   type ('o, 'e) t =
     [ `Ok of 'o (* 200 *)
     | `OkChunk of 'o (* 200 *)
@@ -53,12 +68,18 @@ module Make (Encoding : ENCODING) : sig
     include Resto.MakeService (Encoding)
   end
 
-  (** Possible error while registring services. *)
-  type step =
-    | Static of string
-    | Dynamic of Arg.descr
-    | DynamicTail of Arg.descr
+  (** The different chunks of a path
 
+      E.g., [/archive/<year>/<months>/] has a [Static "archive"] step followed
+      by a [Dynamic _] step followed by a [Dynamic _] step. Each [Dynamic _]
+      step has an {!Resto.Arg} payload describing the chunk. *)
+  type step =
+    | Static of string (** A literal chunk *)
+    | Dynamic of Arg.descr (** A chunk which describes a argument to a service *)
+    | DynamicTail of Arg.descr (** The remainder of the chunks are to be
+                                   interpreted as a list of arguments *)
+
+  (** Possible error while registring services. *)
   type conflict =
     | CService of meth
     | CDir
@@ -91,7 +112,12 @@ module Make (Encoding : ENCODING) : sig
     | `Method_not_allowed of meth list (* 405 *)
     | `Cannot_parse_path of string list * Arg.descr * string (* 400 *) ]
 
-  (** Resolve a service. *)
+  (** [lookup d m p] is [Ok (Service _)] if there is a service [s] registered in
+      [d] and both the method of [s] is [m] and the path of [s] matches [p]. It is
+      [Error _] otherwise.
+
+      If it is [Ok (Service _)] then the returned value corresponds to the
+      registered service. *)
   val lookup :
     'prefix directory ->
     'prefix ->
@@ -99,6 +125,9 @@ module Make (Encoding : ENCODING) : sig
     string list ->
     (registered_service, [> lookup_error]) result Lwt.t
 
+  (** [allowed_methods d p] is the set of methods [m] such that [lookup d m p] is
+      [Ok _]. In other words, it is the set of methods [m] such that a service has
+      been registered in [d] for a path that matches [p]. *)
   val allowed_methods :
     'prefix directory ->
     'prefix ->
@@ -118,13 +147,24 @@ module Make (Encoding : ENCODING) : sig
 
   val map : ('a -> 'b Lwt.t) -> 'b directory -> 'a directory
 
+  (** [prefix p d] is a directory of services which includes a service registered
+      on the path [p / q] for each service registered on the path [q] in [d].
+
+      @raise [Invalid_argument] if [p] is a dynamic path. *)
   val prefix : ('pr, 'p) Path.path -> 'p directory -> 'pr directory
 
+  (** [merge d1 d2] is a directory which includes all the services of [d1] and
+      [d2].
+
+      @raise [Conflict] if one or more service from [d1] conflicts with one or
+      more service from [d2]. *)
   val merge : 'a directory -> 'a directory -> 'a directory
 
   exception Conflict of step list * conflict
 
-  (** Registring handler in service tree. *)
+  (** [register d s h] is a directory that contains all the services registered
+      in [d] plus the service [s]. Requests to the service [s] are handled by the
+      handler [h]. *)
   val register :
     'prefix directory ->
     ('meth, 'prefix, 'params, 'query, 'input, 'output, 'error) Service.t ->

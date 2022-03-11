@@ -1,14 +1,4 @@
 (executable
- (name ezResto_test)
- (modules ezDirectory ezResto_test ezServices)
- (libraries ezresto-directory lwt lwt.unix))
-
-(alias
- (name runtest_ezresto)
- (action
-  (run %{exe:ezResto_test.exe})))
-
-(executable
  (name acl_unit_test)
  (modules acl_unit_test)
  (libraries resto-acl)
@@ -71,7 +61,6 @@
  (name runtest)
  (deps
   (alias runtest_resto)
-  (alias runtest_ezresto)
   (alias runtest_acl_unit_test)
   (alias runtest_acl_integration_test)
   (alias runtest_self_serving_client)

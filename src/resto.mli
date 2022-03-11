@@ -29,6 +29,46 @@ module Utils : sig
   val decode_split_path : string -> string list
 end
 
+(** {1 Resto}
+
+    Resto is a library for defining, serving, and querying a REST directory of
+    RPC services.
+
+    {2 Overview of Resto}
+
+    Resto is a library for describing *services*. A service is the entry-point
+    in an API: a URI/URL with some path parameters (some of the slash-separated
+    segments are actually decoded as parameters), some additional query
+    parameters (the part that looks like [?utm_parameter=from_email] in the
+    links of marketing emails) and other attributes depending on the method of
+    the service.
+
+    For example, you can use Resto to describe the directory of services that,
+    as a whole, forms the API for a web-service. You can then use one of the
+    other resto packages to implement a server that answers requests made to
+    this API. Alternatively, you can use one of the other resto packages to make
+    your program query such an API.
+
+    {2 Intended use of Resto}
+
+    The intended use of [Resto] is as follows:
+    - Define arguments, paths, query fields, and queries as required by the API
+      you describe.
+    - Define services using the previously defined arguments, paths, query
+      fields and queries.
+    - Use {!Resto_directory} to register those services.
+
+    If you are writing a server, you can then:
+    - Use [Resto_cohttp_server.]{!Server} to spin up a server that answers
+      requests to these services.
+
+    Alternatively, if you are writing a client, you can then:
+    - Use [Resto_cohttp_client.]{!Client} to make requests to these services.
+
+    And of course you can do both if you are writing both the server and the
+    client. *)
+
+(** The different methods that a service can be used by a service. *)
 type meth = [`GET | `POST | `DELETE | `PUT | `PATCH]
 
 val string_of_meth : [< meth] -> string
@@ -48,9 +88,9 @@ module StringMap : Map.S with type key = string
      | Some Eq -> (* values are equal *) ..] *)
 type (_, _) eq = Eq : ('a, 'a) eq
 
-(** Typed path argument. *)
+(** Arguments are documented serializers-deserializers for parameters. *)
 module Arg : sig
-  (** An argument to a service. *)
+  (** The type of an argument. *)
   type 'a t
 
   type 'a arg = 'a t
@@ -58,7 +98,7 @@ module Arg : sig
   (** [make ?descr ~name ~destruct ~construct ()] is an argument. The values of
       [descr] and [name] are used for documentation purpose only. The values of
       [destruct] and [construct] are used for conversion from/to [string]s. Note
-      that it is expected that [destruct] and [construct] roundtrip (modulo the
+      that it is expected that [destruct] and [construct] round-trip (modulo the
       [result] error wrapping). *)
   val make :
     ?descr:string ->
@@ -125,10 +165,24 @@ module Arg : sig
   val eq : 'a arg -> 'b arg -> ('a, 'b) eq option
 end
 
-(** Parametrized path to services. *)
+(** Paths describe URIs/URLs: segments separated by slashes (/).
+
+    Note that paths can be static (i.e., all the segments of the path are
+    determined in advance) or dynamic (i.e., some segments of the path are
+    actually arguments for the service -- e.g., paths can have the form
+    [/user/<user-name>] where [<user-name>] is a string encoding of a user
+    identifier). *)
 module Path : sig
-  (** The type of a path. Here "path" is to be taken in the sense of a
-      slash-separated sequence of segments of a URI/URL. *)
+  (** The type for service's paths
+
+      A [(p, a) path] is a path in which some segments encode a value of type
+      [a].
+
+      Typically a [(_, unit) path] is a static path. Also typically, a dynamic
+      path has type [(_, ((unit * a) * b) * ..) path] where different segments
+      encode the different components of the tuple ([a], [b], etc.). For example
+      the path [/entries-by-date/<year>/<month>/<day>] may be described as a
+      [(_, ((unit * int) * int) * int) path]. *)
   type ('prefix, 'params) t
 
   type ('prefix, 'params) path = ('prefix, 'params) t
@@ -248,15 +302,30 @@ module Description : sig
     unit
 end
 
+(** Query parameters are the key-value pairs that appear as
+    [?key0=value0&key1=value1&..] at the end of the path in URIs/URLs. *)
 module Query : sig
+  (** A type for representing query parameters. *)
   type 'a t
 
   type 'a query = 'a t
 
+  (** [empty] is for services that expects no query parameters. *)
   val empty : unit query
 
+  (** The type for key-value pairs that constitute a query. The first type
+      parameter is for whole-query store and the second is for the type of value
+      carried by the field. *)
   type ('a, 'b) field
 
+  (** [field ?descr key arg default get] is a field for the query parameters,
+      i.e., it describes one key-value pair.
+
+      The key is given by [key] and the value is parsed as specified in [arg]
+      or, if absent from the URI suffix, [default].
+
+      Finally, [get] is for retrieving the value from the whole-query store.
+      More on the whole-query store below. *)
   val field :
     ?descr:string -> string -> 'a Arg.t -> 'a -> ('b -> 'a) -> ('b, 'a) field
 
@@ -276,6 +345,23 @@ module Query : sig
     ('b -> 'a list) ->
     ('b, 'a list) field
 
+  (** Queries are constructed by adding fields to an open query and sealing it
+      into a query. This is done using the functions below. Typically, it is
+      done as follow:
+      [query c |+ field1 |+ field2 |> seal]
+
+      As the types require, you must provide the correct argument to the
+      successive building steps. Here is an example:
+      [
+         query (fun timeout shade -> (timeout, shade))
+         |+ field "timeout" Arg.float 10. (fun (timeout, _) -> timeout)
+         |+ field "shade" Arg.string "fuchsia" (fun (_, shade) -> shade)
+         |> seal
+      ]
+
+      The initial [query] function takes a whole-query store builder (a function
+      that assemble all the fields into a single store of values), and each
+      field takes a function to recover the value from the whole-query store. *)
   type ('a, 'b, 'c) open_query
 
   val query : 'b -> ('a, 'b, 'b) open_query
@@ -285,11 +371,13 @@ module Query : sig
 
   val seal : ('a, 'b, 'a) open_query -> 'a t
 
+  (**/**)
   type untyped = (string * string) list
 
   exception Invalid of string
 
   val parse : 'a query -> untyped -> 'a
+  (**/**)
 end
 
 (**/**)
@@ -398,8 +486,8 @@ module type ENCODING = sig
   val description_answer_encoding : schema Description.directory t
 end
 
+(** Services. *)
 module MakeService (Encoding : ENCODING) : sig
-  (** Services. *)
   type (+'meth, 'prefix, 'params, 'query, 'input, 'output, 'error) t
     constraint 'meth = [< meth]
 
@@ -429,6 +517,14 @@ module MakeService (Encoding : ENCODING) : sig
     ('meth, 'prefix, 'params, 'query, 'input, 'output, 'error) service ->
     'error Encoding.t
 
+  (** [get_service ?description ~query ~output ~error path] is a [GET] service
+      that is intended to seat at the URI described by [path] and receive the
+      additional parameters described by [query]. The value [output] (resp.
+      [error]) describe the representation of the successful (resp. failed)
+      returned value for the service.
+
+      Note that, whilst [get_service] declares a service, the resulting service is
+      not registered yet. This is handled in [Resto_directory]. *)
   val get_service :
     ?description:string ->
     query:'query Query.t ->
@@ -436,6 +532,14 @@ module MakeService (Encoding : ENCODING) : sig
     error:'error Encoding.t ->
     ('prefix, 'params) Path.t ->
     ([`GET], 'prefix, 'params, 'query, unit, 'output, 'error) service
+
+  (** {!post_service}, {!delete_service}, {!put_service}, and {!patch_service} are
+      similar to {!get_service} but for the other HTTP methods.
+
+      Note that some of these functions take an additional [input] argument. This
+      is only for the services with methods that expect additional parameters. It
+      is used internally to encode/decode additional parameters passed in a
+      dedicated payload rather than in the path/query parameters. *)
 
   val post_service :
     ?description:string ->
