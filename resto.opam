@@ -21,4 +21,5 @@ depends: [
   "lwt" {with-test}
   "base-unix"{with-test}
   "ocamlformat" { = "0.20.1" & with-doc } # not technically a doc dep; modify when with-dev becomes available
+  "odoc" { with-doc }
 ]
