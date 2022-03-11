@@ -146,4 +146,8 @@ module Kind : sig
   type t = Example_arith
 
   val encoding : t Data_encoding.t
+
+  val equal : t -> t -> bool
+
+  val pp : Format.formatter -> t -> unit
 end
