@@ -509,7 +509,12 @@ module type S = sig
   type ('proof, 'result) verifier :=
     'proof ->
     (tree -> (tree * 'result) Lwt.t) ->
-    (tree * 'result, [`Msg of string]) result Lwt.t
+    ( tree * 'result,
+      [ `Proof_mismatch of string
+      | `Stream_too_long of string
+      | `Stream_too_short of string ] )
+    result
+    Lwt.t
 
   (** The type for tree proofs.
 

@@ -85,7 +85,12 @@ module Make_proof (DB : DB) (Store_conf : Tezos_context_encoding.Context.Conf) :
   type ('proof, 'result) verifier :=
     'proof ->
     (DB.tree -> (DB.tree * 'result) Lwt.t) ->
-    (DB.tree * 'result, [`Msg of string]) result Lwt.t
+    ( DB.tree * 'result,
+      [ `Proof_mismatch of string
+      | `Stream_too_long of string
+      | `Stream_too_short of string ] )
+    result
+    Lwt.t
 
   val produce_tree_proof : (tree_proof, 'a) producer
 
