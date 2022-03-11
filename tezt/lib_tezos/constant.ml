@@ -115,3 +115,12 @@ let max_op_ttl = 120
 (** A valid base58 encoded layer-2 address to be used to test
     transaction rollups. *)
 let tx_rollup_l2_address = "tz4MSfZsn6kMDczShy8PMeB628TNukn9hi2K"
+
+let tx_rollup_empty_l2_context =
+  "CoVdWnWTqvYLikKj8koW6zpxCvK6FzZiD31YWEpD1UNAjWn7vhch"
+
+let tx_rollup_empty_withdraw_list =
+  "txw1qi5zqv2cizWX3XYSGtj5aDpdft5V4er7SK44TNpW5usEi5im7"
+
+let tx_rollup_initial_message_result =
+  "txmr2RQL6pMQMkjZwL28kEeyAGpmaorNx2nT6G9JpQj81ER4XqDpD7"

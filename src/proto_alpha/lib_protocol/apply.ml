@@ -1382,16 +1382,15 @@ let apply_external_manager_operation_content :
       let withdrawal =
         Tx_rollup_withdraw.{claimer = source_pkh; ticket_hash; amount}
       in
-      let (computed_list_hash, withdraw_index) =
+      let (withdrawals_merkle_root, withdraw_index) =
         Tx_rollup_withdraw.check_path withdraw_path withdrawal
       in
       Tx_rollup_commitment.get_finalized ctxt tx_rollup level
       >>=? fun (ctxt, commitment) ->
       fail_unless
-        (Tx_rollup_commitment.check_batch_commitment
+        (Tx_rollup_commitment.check_message_result
            commitment.commitment
-           ~context_hash
-           computed_list_hash
+           {context_hash; withdrawals_merkle_root}
            ~message_index)
         Tx_rollup_errors.Withdraw_invalid_path
       >>=? fun () ->
@@ -1643,9 +1642,39 @@ let apply_external_manager_operation_content :
           }
       in
       return (ctxt, result, [])
-  | Tx_rollup_rejection {proof; tx_rollup; level; message; message_position} ->
+  | Tx_rollup_rejection
+      {
+        proof;
+        tx_rollup;
+        level;
+        message;
+        previous_message_result;
+        message_position;
+      } ->
       Tx_rollup_state.get ctxt tx_rollup >>=? fun (ctxt, state) ->
-      (* TODO/TORU: Check the proof *)
+      (* Check [level] *)
+      Tx_rollup_state.check_level_can_be_rejected state level >>?= fun () ->
+      (* Check [previous_message_result] *)
+      Tx_rollup_commitment.get_before_and_after_results
+        ctxt
+        tx_rollup
+        level
+        state
+        ~message_position
+      >>=? fun (ctxt, agreed_hash, rejected) ->
+      let computed =
+        Tx_rollup_commitment.hash_message_result previous_message_result
+      in
+      fail_unless
+        Tx_rollup_message_result_hash.(agreed_hash = computed)
+        (Tx_rollup_errors.Wrong_rejection_hashes
+           {
+             expected = agreed_hash;
+             provided = previous_message_result;
+             computed;
+           })
+      (* Check [message] *)
+      >>=? fun () ->
       Tx_rollup_inbox.check_message_hash
         ctxt
         level
@@ -1653,7 +1682,14 @@ let apply_external_manager_operation_content :
         ~position:message_position
         message
       >>=? fun ctxt ->
-      fail_unless proof Tx_rollup_errors.Invalid_proof >>=? fun () ->
+      (* Check [proof] *)
+      Tx_rollup_l2_verifier.verify_proof
+        message
+        proof
+        ~agreed:previous_message_result
+        ~rejected
+      >>= fun verified ->
+      fail_unless verified Tx_rollup_errors.Invalid_proof >>=? fun () ->
       (* Proof is correct, removing *)
       Tx_rollup_commitment.reject_commitment ctxt tx_rollup state level
       >>=? fun (ctxt, state) ->

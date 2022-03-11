@@ -108,6 +108,7 @@ val mk_rejection :
   level:int ->
   message:[`Batch of string] ->
   message_position:int ->
+  previous_message_result:string * string ->
   Client.t ->
   manager_operation_content Lwt.t
 
@@ -359,7 +360,7 @@ val inject_transfers :
   [`OpHash of string] list Lwt.t
 
 (** [inject_rejection] is a high-level wrapper around the tx_rollup
-   rejection operation (see {!mk_transfer}). *)
+   rejection operation (see {!mk_rejection}). *)
 val inject_rejection :
   ?protocol:Protocol.t ->
   ?async:bool ->
@@ -377,5 +378,6 @@ val inject_rejection :
   level:int ->
   message:[`Batch of string] ->
   message_position:int ->
+  previous_message_result:string * string ->
   Client.t ->
   [> `OpHash of string] Lwt.t

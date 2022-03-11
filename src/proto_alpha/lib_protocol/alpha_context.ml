@@ -238,6 +238,8 @@ end
 
 module Tx_rollup_level = Tx_rollup_level_repr
 module Tx_rollup_commitment_hash = Tx_rollup_commitment_repr.Commitment_hash
+module Tx_rollup_message_result_hash =
+  Tx_rollup_commitment_repr.Message_result_hash
 
 module Tx_rollup = struct
   include Tx_rollup_repr

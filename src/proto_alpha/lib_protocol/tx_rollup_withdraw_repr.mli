@@ -50,11 +50,14 @@ type withdrawals_merkle_root
 
 val withdrawals_merkle_root_encoding : withdrawals_merkle_root Data_encoding.t
 
+val withdrawals_merkle_root_of_b58check_opt :
+  string -> withdrawals_merkle_root option
+
 (** A [merkle_tree_path] is the minimal information needed to
    recompute a [withdrawals_merkle_root] without having all
    withdrawals.
 
-    Internally [merkle_tree_path] is the merkle tree path of sub-tree
+   Internally [merkle_tree_path] is the merkle tree path of sub-tree
    hash of a [withdrawals_merkle_root] *)
 type merkle_tree_path
 
@@ -64,6 +67,11 @@ val merkle_tree_path_encoding : merkle_tree_path Data_encoding.t
    a full binary tree and returns the [withdrawals_merkle_root] of
    that tree.  *)
 val merkelize_list : t list -> withdrawals_merkle_root
+
+val empty_withdrawals_merkle_root : withdrawals_merkle_root
+
+val pp_withdrawals_merkle_root :
+  Format.formatter -> withdrawals_merkle_root -> unit
 
 (** [compute_path withdrawal_list index] computes the
    [merkle_tree_path] in the tree given by [merkelize_list

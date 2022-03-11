@@ -2148,6 +2148,8 @@ module Tx_rollup_commitment_hash : sig
   include S.HASH
 end
 
+module Tx_rollup_message_result_hash : S.HASH
+
 (** This module re-exports definitions from {!Tx_rollup_state_repr}
     and {!Tx_rollup_state_storage}. *)
 module Tx_rollup_state : sig
@@ -2171,11 +2173,17 @@ module Tx_rollup_state : sig
 
   val head_level : t -> (Tx_rollup_level.t * Raw_level.t) option
 
+  val check_level_can_be_rejected : t -> Tx_rollup_level.t -> unit tzresult
+
+  val last_removed_commitment_hashes :
+    t -> (Tx_rollup_message_result_hash.t * Tx_rollup_commitment_hash.t) option
+
   module Internal_for_tests : sig
     val make :
       ?burn_per_byte:Tez.t ->
       ?inbox_ema:int ->
-      ?last_removed_commitment_hash:Tx_rollup_commitment_hash.t ->
+      ?last_removed_commitment_hashes:
+        Tx_rollup_message_result_hash.t * Tx_rollup_commitment_hash.t ->
       ?commitment_tail_level:Tx_rollup_level.t ->
       ?oldest_inbox_level:Tx_rollup_level.t ->
       ?commitment_head_level:Tx_rollup_level.t * Tx_rollup_commitment_hash.t ->
@@ -2206,9 +2214,17 @@ module Tx_rollup_withdraw : sig
 
   type merkle_tree_path
 
+  val withdrawals_merkle_root_of_b58check_opt :
+    string -> withdrawals_merkle_root option
+
   val merkle_tree_path_encoding : merkle_tree_path Data_encoding.t
 
   val merkelize_list : t list -> withdrawals_merkle_root
+
+  val empty_withdrawals_merkle_root : withdrawals_merkle_root
+
+  val pp_withdrawals_merkle_root :
+    Format.formatter -> withdrawals_merkle_root -> unit
 
   val compute_path : t list -> int -> merkle_tree_path
 
@@ -2361,14 +2377,21 @@ end
 
 (** This simply re-exports [Tx_rollup_commitment_repr] *)
 module Tx_rollup_commitment : sig
-  module Message_result_hash : S.HASH
+  type message_result = {
+    context_hash : Context_hash.t;
+    withdrawals_merkle_root : Tx_rollup_withdraw.withdrawals_merkle_root;
+  }
 
-  val batch_commitment :
-    bytes -> Tx_rollup_withdraw.withdrawals_merkle_root -> Message_result_hash.t
+  val hash_message_result : message_result -> Tx_rollup_message_result_hash.t
+
+  val pp_message_result_hash :
+    Format.formatter -> Tx_rollup_message_result_hash.t -> unit
+
+  val empty_l2_context_hash : Context_hash.t
 
   type t = {
     level : Tx_rollup_level.t;
-    batches : Message_result_hash.t list;
+    messages : Tx_rollup_message_result_hash.t list;
     predecessor : Tx_rollup_commitment_hash.t option;
     inbox_hash : Tx_rollup_inbox.hash;
   }
@@ -2393,12 +2416,7 @@ module Tx_rollup_commitment : sig
 
   val hash : t -> Tx_rollup_commitment_hash.t
 
-  val check_batch_commitment :
-    t ->
-    context_hash:bytes ->
-    Tx_rollup_withdraw.withdrawals_merkle_root ->
-    message_index:int ->
-    bool
+  val check_message_result : t -> message_result -> message_index:int -> bool
 
   val add_commitment :
     context ->
@@ -2421,6 +2439,18 @@ module Tx_rollup_commitment : sig
     Tx_rollup.t ->
     Tx_rollup_level.t ->
     (context * Submitted_commitment.t) tzresult Lwt.t
+
+  val get_before_and_after_results :
+    context ->
+    Tx_rollup.t ->
+    Tx_rollup_level.t ->
+    message_position:int ->
+    Tx_rollup_state.t ->
+    (context
+    * Tx_rollup_message_result_hash.t
+    * Tx_rollup_message_result_hash.t)
+    tzresult
+    Lwt.t
 
   val get_finalized :
     context ->
@@ -2497,7 +2527,7 @@ module Tx_rollup_errors : sig
     | Invalid_proof
     | Internal_error of string
     | Wrong_message_position of {
-        level : Tx_rollup_level_repr.t;
+        level : Tx_rollup_level.t;
         position : int;
         length : int;
       }
@@ -2508,6 +2538,15 @@ module Tx_rollup_errors : sig
       }
     | Withdraw_invalid_path
     | Withdraw_already_consumed
+    | Cannot_reject_level of {
+        provided : Tx_rollup_level.t;
+        accepted_range : (Tx_rollup_level.t * Tx_rollup_level.t) option;
+      }
+    | Wrong_rejection_hashes of {
+        provided : Tx_rollup_commitment.message_result;
+        computed : Tx_rollup_message_result_hash.t;
+        expected : Tx_rollup_message_result_hash.t;
+      }
 end
 
 (** This simply re-exports {!Destination_repr}. *)
@@ -2767,13 +2806,14 @@ and _ manager_operation =
       level : Tx_rollup_level.t;
       message : Tx_rollup_message.t;
       message_position : int;
-      proof : (* FIXME/TORU *) bool;
+      previous_message_result : Tx_rollup_commitment.message_result;
+      proof : Tx_rollup_l2_proof.t;
     }
       -> Kind.tx_rollup_rejection manager_operation
   | Tx_rollup_withdraw : {
       tx_rollup : Tx_rollup.t;
       level : Tx_rollup_level.t;
-      context_hash : bytes;
+      context_hash : Context_hash.t;
       message_index : int;
       withdraw_path : Tx_rollup_withdraw.merkle_tree_path;
       contents : Script.lazy_expr;

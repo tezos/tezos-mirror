@@ -74,10 +74,16 @@ let withdrawals_merkle_root_encoding = Withdraw_list_hash.encoding
 
 type merkle_tree_path = Withdraw_list_hash.path
 
+let withdrawals_merkle_root_of_b58check_opt = Withdraw_list_hash.of_b58check_opt
+
 let merkle_tree_path_encoding = Withdraw_list_hash.path_encoding
 
 let merkelize_list : t list -> withdrawals_merkle_root =
   Withdraw_list_hash.compute
+
+let empty_withdrawals_merkle_root = merkelize_list []
+
+let pp_withdrawals_merkle_root = Withdraw_list_hash.pp
 
 let compute_path : t list -> int -> merkle_tree_path =
   Withdraw_list_hash.compute_path

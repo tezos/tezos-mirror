@@ -1258,10 +1258,7 @@ module Tx_rollup = struct
             inbox_hash;
             predecessor;
           ]
-        @ [
-            String.concat "!"
-            @@ List.map (fun root -> Hex.show @@ Hex.of_string root) roots;
-          ]
+        @ [String.concat "!" roots]
         @ ["to"; rollup; "from"; src]
         @ Option.fold
             ~none:[]
@@ -1318,7 +1315,8 @@ module Tx_rollup = struct
     {value = process; run = parse}
 
   let submit_rejection ?(wait = "none") ?burn_cap ?storage_limit ?hooks ~level
-      ~message ~position ~proof ~rollup ~src client =
+      ~message ~position ~proof ~context_hash ~withdraw_list_hash ~rollup ~src
+      client =
     let process =
       spawn_command
         ?hooks
@@ -1329,6 +1327,8 @@ module Tx_rollup = struct
         @ ["message"; message]
         @ ["at"; "position"; string_of_int position]
         @ ["with"; "proof"; string_of_bool proof]
+        @ ["with"; "agreed"; "context"; "hash"; context_hash]
+        @ ["and"; "withdraw"; "list"; withdraw_list_hash]
         @ ["to"; rollup] @ ["from"; src]
         @ Option.fold
             ~none:[]

@@ -46,6 +46,7 @@
         "Indexable",
         "Entrypoint_repr",
         "Tx_rollup_level_repr",
+        "Tx_rollup_l2_proof",
         "Tx_rollup_l2_address",
         "Tx_rollup_l2_qty",
         "Tx_rollup_l2_context_hash",
@@ -128,6 +129,7 @@
         "Tx_rollup_l2_context",
         "Tx_rollup_l2_batch",
         "Tx_rollup_l2_apply",
+        "Tx_rollup_l2_verifier",
 
         "Local_gas_counter",
         "Script_tc_errors",

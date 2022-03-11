@@ -71,6 +71,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    indexable.mli indexable.ml
    entrypoint_repr.mli entrypoint_repr.ml
    tx_rollup_level_repr.mli tx_rollup_level_repr.ml
+   tx_rollup_l2_proof.mli tx_rollup_l2_proof.ml
    tx_rollup_l2_address.mli tx_rollup_l2_address.ml
    tx_rollup_l2_qty.mli tx_rollup_l2_qty.ml
    tx_rollup_l2_context_hash.mli tx_rollup_l2_context_hash.ml
@@ -145,6 +146,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    tx_rollup_l2_context.ml
    tx_rollup_l2_batch.mli tx_rollup_l2_batch.ml
    tx_rollup_l2_apply.mli tx_rollup_l2_apply.ml
+   tx_rollup_l2_verifier.mli tx_rollup_l2_verifier.ml
    local_gas_counter.mli local_gas_counter.ml
    script_tc_errors.ml
    gas_monad.mli gas_monad.ml
@@ -241,6 +243,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    indexable.mli indexable.ml
    entrypoint_repr.mli entrypoint_repr.ml
    tx_rollup_level_repr.mli tx_rollup_level_repr.ml
+   tx_rollup_l2_proof.mli tx_rollup_l2_proof.ml
    tx_rollup_l2_address.mli tx_rollup_l2_address.ml
    tx_rollup_l2_qty.mli tx_rollup_l2_qty.ml
    tx_rollup_l2_context_hash.mli tx_rollup_l2_context_hash.ml
@@ -315,6 +318,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    tx_rollup_l2_context.ml
    tx_rollup_l2_batch.mli tx_rollup_l2_batch.ml
    tx_rollup_l2_apply.mli tx_rollup_l2_apply.ml
+   tx_rollup_l2_verifier.mli tx_rollup_l2_verifier.ml
    local_gas_counter.mli local_gas_counter.ml
    script_tc_errors.ml
    gas_monad.mli gas_monad.ml
@@ -411,6 +415,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    indexable.mli indexable.ml
    entrypoint_repr.mli entrypoint_repr.ml
    tx_rollup_level_repr.mli tx_rollup_level_repr.ml
+   tx_rollup_l2_proof.mli tx_rollup_l2_proof.ml
    tx_rollup_l2_address.mli tx_rollup_l2_address.ml
    tx_rollup_l2_qty.mli tx_rollup_l2_qty.ml
    tx_rollup_l2_context_hash.mli tx_rollup_l2_context_hash.ml
@@ -485,6 +490,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    tx_rollup_l2_context.ml
    tx_rollup_l2_batch.mli tx_rollup_l2_batch.ml
    tx_rollup_l2_apply.mli tx_rollup_l2_apply.ml
+   tx_rollup_l2_verifier.mli tx_rollup_l2_verifier.ml
    local_gas_counter.mli local_gas_counter.ml
    script_tc_errors.ml
    gas_monad.mli gas_monad.ml
@@ -603,6 +609,7 @@ include Tezos_raw_protocol_alpha.Main
    Indexable
    Entrypoint_repr
    Tx_rollup_level_repr
+   Tx_rollup_l2_proof
    Tx_rollup_l2_address
    Tx_rollup_l2_qty
    Tx_rollup_l2_context_hash
@@ -677,6 +684,7 @@ include Tezos_raw_protocol_alpha.Main
    Tx_rollup_l2_context
    Tx_rollup_l2_batch
    Tx_rollup_l2_apply
+   Tx_rollup_l2_verifier
    Local_gas_counter
    Script_tc_errors
    Gas_monad
@@ -814,6 +822,7 @@ include Tezos_raw_protocol_alpha.Main
    indexable.mli indexable.ml
    entrypoint_repr.mli entrypoint_repr.ml
    tx_rollup_level_repr.mli tx_rollup_level_repr.ml
+   tx_rollup_l2_proof.mli tx_rollup_l2_proof.ml
    tx_rollup_l2_address.mli tx_rollup_l2_address.ml
    tx_rollup_l2_qty.mli tx_rollup_l2_qty.ml
    tx_rollup_l2_context_hash.mli tx_rollup_l2_context_hash.ml
@@ -888,6 +897,7 @@ include Tezos_raw_protocol_alpha.Main
    tx_rollup_l2_context.ml
    tx_rollup_l2_batch.mli tx_rollup_l2_batch.ml
    tx_rollup_l2_apply.mli tx_rollup_l2_apply.ml
+   tx_rollup_l2_verifier.mli tx_rollup_l2_verifier.ml
    local_gas_counter.mli local_gas_counter.ml
    script_tc_errors.ml
    gas_monad.mli gas_monad.ml

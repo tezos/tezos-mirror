@@ -49,15 +49,31 @@ module Message_result_hash = struct
     Tx_rollup_prefixes.(check_encoding message_result_hash b58check_encoding)
 end
 
-let batch_commitment ctxt_root withdraw_merkle_root =
-  let withdraw_merkle_root_bytes =
-    Data_encoding.Binary.to_bytes_exn
-      Tx_rollup_withdraw_repr.withdrawals_merkle_root_encoding
-      withdraw_merkle_root
+type message_result = {
+  context_hash : Context_hash.t;
+  withdrawals_merkle_root : Tx_rollup_withdraw_repr.withdrawals_merkle_root;
+}
+
+let message_result_encoding =
+  let open Data_encoding in
+  conv
+    (fun {context_hash; withdrawals_merkle_root} ->
+      (context_hash, withdrawals_merkle_root))
+    (fun (context_hash, withdrawals_merkle_root) ->
+      {context_hash; withdrawals_merkle_root})
+    (obj2
+       (req "context_hash" Context_hash.encoding)
+       (req
+          "withdrawals_merkle_root"
+          Tx_rollup_withdraw_repr.withdrawals_merkle_root_encoding))
+
+let hash_message_result result =
+  let bytes =
+    Data_encoding.Binary.to_bytes_exn message_result_encoding result
   in
-  (* TODO/TORU: this needs to change with we use irmin *)
-  let ctxt_root_bytes = ctxt_root in
-  Message_result_hash.hash_bytes [ctxt_root_bytes; withdraw_merkle_root_bytes]
+  Message_result_hash.hash_bytes [bytes]
+
+let pp_message_result_hash = Message_result_hash.pp
 
 module Commitment_hash = struct
   let commitment_hash = Tx_rollup_prefixes.commitment_hash.b58check_prefix
@@ -97,7 +113,7 @@ end
 
 type t = {
   level : Tx_rollup_level_repr.t;
-  batches : Message_result_hash.t list;
+  messages : Message_result_hash.t list;
   predecessor : Commitment_hash.t option;
   inbox_hash : Tx_rollup_inbox_repr.hash;
 }
@@ -111,7 +127,7 @@ include Compare.Make (struct
 
   let compare r1 r2 =
     compare_or Tx_rollup_level_repr.compare r1.level r2.level (fun () ->
-        compare_or Compare_root_list.compare r1.batches r2.batches (fun () ->
+        compare_or Compare_root_list.compare r1.messages r2.messages (fun () ->
             compare_or
               (Option.compare Commitment_hash.compare)
               r1.predecessor
@@ -124,15 +140,28 @@ let pp : Format.formatter -> t -> unit =
  fun fmt t ->
   Format.fprintf
     fmt
-    "commitment %a : batches = %a predecessor %a for inbox %a"
+    "commitment %a : messages = %a predecessor %a for inbox %a"
     Tx_rollup_level_repr.pp
     t.level
     (Format.pp_print_list Message_result_hash.pp)
-    t.batches
+    t.messages
     (Format.pp_print_option Commitment_hash.pp)
     t.predecessor
     Tx_rollup_inbox_repr.pp_hash
     t.inbox_hash
+
+(* FIXME/TORU: We need a test that checks that. *)
+let empty_l2_context_hash =
+  Context_hash.of_b58check_exn
+    "CoVdWnWTqvYLikKj8koW6zpxCvK6FzZiD31YWEpD1UNAjWn7vhch"
+
+let initial_message_result_hash =
+  hash_message_result
+    {
+      context_hash = empty_l2_context_hash;
+      withdrawals_merkle_root =
+        Tx_rollup_withdraw_repr.empty_withdrawals_merkle_root;
+    }
 
 (* FIXME/TORU: https://gitlab.com/tezos/tezos/-/issues/2470
 
@@ -140,10 +169,10 @@ let pp : Format.formatter -> t -> unit =
 let encoding =
   let open Data_encoding in
   conv
-    (fun {level; batches; predecessor; inbox_hash} ->
-      (level, batches, predecessor, inbox_hash))
-    (fun (level, batches, predecessor, inbox_hash) ->
-      {level; batches; predecessor; inbox_hash})
+    (fun {level; messages; predecessor; inbox_hash} ->
+      (level, messages, predecessor, inbox_hash))
+    (fun (level, messages, predecessor, inbox_hash) ->
+      {level; messages; predecessor; inbox_hash})
     (obj4
        (req "level" Tx_rollup_level_repr.encoding)
        (req "batches" (list Message_result_hash.encoding))
@@ -154,15 +183,10 @@ let hash c =
   let bytes = Data_encoding.Binary.to_bytes_exn encoding c in
   Commitment_hash.hash_bytes [bytes]
 
-let check_batch_commitment :
-    t ->
-    context_hash:bytes ->
-    Tx_rollup_withdraw_repr.withdrawals_merkle_root ->
-    message_index:int ->
-    bool =
- fun {batches; _} ~context_hash withdraw_merkle_root ~message_index ->
-  let computed = batch_commitment context_hash withdraw_merkle_root in
-  match List.nth batches message_index with
+let check_message_result : t -> message_result -> message_index:int -> bool =
+ fun {messages; _} result ~message_index ->
+  let computed = hash_message_result result in
+  match List.nth messages message_index with
   | Some expected -> Message_result_hash.(computed = expected)
   | None -> false
 

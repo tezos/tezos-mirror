@@ -50,6 +50,7 @@ type manager_op_kind =
       level : int;
       message : [`Batch of string];
       message_position : int;
+      previous_message_result : string * string;
     }
 
 (* This is the manager operations' content type *)
@@ -130,9 +131,17 @@ let mk_reveal ~source ?counter ?(fee = 1_000) ?(gas_limit = 1040)
 
 let mk_rejection ~source ?counter ?(fee = 1_000_000) ?(gas_limit = 1_000_000)
     ?(storage_limit = 0) ~tx_rollup ~proof ~level ~message ~message_position
-    client =
+    ~previous_message_result client =
   mk_manager_op ~source ?counter ~fee ~gas_limit ~storage_limit client
-  @@ Rejection {tx_rollup; proof; level; message; message_position}
+  @@ Rejection
+       {
+         tx_rollup;
+         proof;
+         level;
+         message;
+         message_position;
+         previous_message_result;
+       }
 
 let mk_origination ~source ?counter ?(fee = 1_000_000) ?(gas_limit = 100_000)
     ?(storage_limit = 10_000) ~code ~init_storage ?(init_balance = 0) client =
@@ -146,7 +155,8 @@ let manager_op_content_to_json_string
   let mk_jsonm ?(amount = `Null) ?(destination = `Null) ?(parameter = `Null)
       ?(public_key = `Null) ?(balance = `Null) ?(script = `Null)
       ?(proof = `Null) ?(rollup = `Null) ?(message = `Null)
-      ?(message_position = `Null) ?(level = `Null) kind =
+      ?(message_position = `Null) ?(level = `Null)
+      ?(previous_message_result = `Null) kind =
     let filter = List.filter (fun (_k, v) -> v <> `Null) in
     return
     @@ `O
@@ -172,6 +182,7 @@ let manager_op_content_to_json_string
               ("rollup", rollup);
               ("message", message);
               ("message_position", message_position);
+              ("previous_message_result", previous_message_result);
               ("level", level);
             ])
   in
@@ -197,7 +208,15 @@ let manager_op_content_to_json_string
       let* storage = data_to_json client storage in
       let script : Ezjsonm.value = `O [("code", code); ("storage", storage)] in
       mk_jsonm ~balance:(jz_string_of_int balance) ~script "origination"
-  | Rejection {proof; tx_rollup; level; message; message_position} ->
+  | Rejection
+      {
+        proof;
+        tx_rollup;
+        level;
+        message;
+        message_position;
+        previous_message_result;
+      } ->
       let rollup = `String tx_rollup in
       let proof = `Bool proof in
       let level = `Float (float_of_int level) in
@@ -205,12 +224,20 @@ let manager_op_content_to_json_string
         match message with `Batch str -> `O [("batch", `String str)]
       in
       let message_position = `String (string_of_int message_position) in
+      let previous_message_result =
+        `O
+          [
+            ("context_hash", `String (fst previous_message_result));
+            ("withdrawals_merkle_root", `String (snd previous_message_result));
+          ]
+      in
       mk_jsonm
         ~rollup
         ~proof
         ~level
         ~message
         ~message_position
+        ~previous_message_result
         "tx_rollup_rejection"
 
 (* construct a JSON operations with contents and branch *)
@@ -346,7 +373,7 @@ let inject_transfer ?protocol ?async ?force ?wait_for_injection ?branch ~source
 
 let inject_rejection ?protocol ?async ?force ?wait_for_injection ?branch ~source
     ?(signer = source) ?counter ?fee ?gas_limit ?storage_limit ~tx_rollup ~proof
-    ~level ~message ~message_position client =
+    ~level ~message ~message_position ~previous_message_result client =
   let* op =
     mk_rejection
       ~source
@@ -359,6 +386,7 @@ let inject_rejection ?protocol ?async ?force ?wait_for_injection ?branch ~source
       ~level
       ~message
       ~message_position
+      ~previous_message_result
       client
   in
   forge_and_inject_operation

@@ -68,6 +68,15 @@ type error +=
   | Withdraw_invalid_path
   | Withdraw_already_consumed
   | Commitment_bond_negative of int
+  | Cannot_reject_level of {
+      provided : Tx_rollup_level_repr.t;
+      accepted_range : (Tx_rollup_level_repr.t * Tx_rollup_level_repr.t) option;
+    }
+  | Wrong_rejection_hashes of {
+      provided : Tx_rollup_commitment_repr.message_result;
+      computed : Tx_rollup_commitment_repr.Message_result_hash.t;
+      expected : Tx_rollup_commitment_repr.Message_result_hash.t;
+    }
 
 let () =
   let open Data_encoding in
@@ -419,6 +428,7 @@ let () =
       | No_finalized_commitment_for_level {level; window} -> Some (level, window)
       | _ -> None)
     (fun (level, window) -> No_finalized_commitment_for_level {level; window}) ;
+  (* Withdraw_invalid_proof *)
   register_error_kind
     `Branch
     ~id:"tx_rollup_withdraw_invalid_path"
@@ -460,4 +470,44 @@ let () =
         count)
     (obj1 (req "count" Data_encoding.int31))
     (function Commitment_bond_negative count -> Some count | _ -> None)
-    (fun count -> Commitment_bond_negative count)
+    (fun count -> Commitment_bond_negative count) ;
+  (* Cannot_reject_level *)
+  register_error_kind
+    `Temporary
+    ~id:"tx_rollup_cannot_reject_level"
+    ~title:"Cannot reject a commitment at the requested level"
+    ~description:"Cannot reject a commitment at the requested level"
+    (obj2
+       (req "provided" Tx_rollup_level_repr.encoding)
+       (req
+          "accepted_range"
+          (option
+             (obj2
+                (req "min" Tx_rollup_level_repr.encoding)
+                (req "max" Tx_rollup_level_repr.encoding)))))
+    (function
+      | Cannot_reject_level {provided; accepted_range} ->
+          Some (provided, accepted_range)
+      | _ -> None)
+    (fun (provided, accepted_range) ->
+      Cannot_reject_level {provided; accepted_range}) ;
+  (* Wrong_rejection_hashes *)
+  register_error_kind
+    `Temporary
+    ~id:"tx_rollup_wrong_rejection_hashes"
+    ~title:
+      "The message result hash recomputed from the rejection argument is \
+       invalid"
+    ~description:
+      "The message result hash recomputed from the rejection argument is \
+       invalid"
+    (obj3
+       (req "provided" Tx_rollup_commitment_repr.message_result_encoding)
+       (req "computed" Tx_rollup_commitment_repr.Message_result_hash.encoding)
+       (req "expected" Tx_rollup_commitment_repr.Message_result_hash.encoding))
+    (function
+      | Wrong_rejection_hashes {provided; computed; expected} ->
+          Some (provided, computed, expected)
+      | _ -> None)
+    (fun (provided, computed, expected) ->
+      Wrong_rejection_hashes {provided; computed; expected})
