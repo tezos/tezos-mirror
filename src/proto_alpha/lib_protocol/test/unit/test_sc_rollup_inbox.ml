@@ -54,9 +54,8 @@ let test_empty () =
     (err "An empty inbox should have no available message.")
 
 let setup_inbox_with_messages list_of_payloads f =
-  let open Tezos_protocol_environment_alpha.Environment in
   create_context () >>=? fun ctxt ->
-  let empty_messages = Context.Tree.empty ctxt in
+  let empty_messages = Environment.Context.Tree.empty ctxt in
   let inbox = empty rollup level in
   let history = history_at_genesis ~bound:10000L in
   let rec aux level history inbox inboxes messages = function
