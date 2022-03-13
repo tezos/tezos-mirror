@@ -284,7 +284,7 @@ let assert_inbox_size_ok ctxt next_size =
 
 let add_messages ctxt rollup messages =
   let open Raw_context in
-  Storage.Sc_rollup.Inbox.get ctxt rollup >>=? fun (ctxt, inbox) ->
+  inbox ctxt rollup >>=? fun (inbox, ctxt) ->
   let next_size =
     Z.add
       (Sc_rollup_inbox_repr.number_of_available_messages inbox)
