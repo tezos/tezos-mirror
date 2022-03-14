@@ -43,6 +43,7 @@ type error +=
   | Unexpectedly_indexed_ticket
   | Missing_ticket of Ticket_hash.t
   | Unknown_address of Tx_rollup_l2_address.t
+  | Invalid_self_transfer
 
 let () =
   let open Data_encoding in
@@ -142,7 +143,16 @@ let () =
       "The address must exist in the context when signing a transfer with it."
     (obj1 (req "address" Tx_rollup_l2_address.encoding))
     (function Unknown_address addr -> Some addr | _ -> None)
-    (function addr -> Unknown_address addr)
+    (function addr -> Unknown_address addr) ;
+  (* Invalid self transfer *)
+  register_error_kind
+    `Temporary
+    ~id:"tx_rollup_invalid_self_transfer"
+    ~title:"Attempted to transfer ticket to self"
+    ~description:"The index for the destination is the same as the sender"
+    empty
+    (function Invalid_self_transfer -> Some () | _ -> None)
+    (function () -> Invalid_self_transfer)
 
 module Address_indexes = Map.Make (Tx_rollup_l2_address)
 module Ticket_indexes = Map.Make (Ticket_hash)
@@ -408,6 +418,11 @@ module Make (Context : CONTEXT) = struct
   (** [transfers ctxt source_idx destination_idx tidx amount] transfers [amount]
       from [source_idx] to [destination_idx] of [tidx]. *)
   let transfer ctxt source_idx destination_idx tidx amount =
+    let* () =
+      fail_unless
+        Compare.Int.(Indexable.compare_indexes source_idx destination_idx <> 0)
+        Invalid_self_transfer
+    in
     let* ctxt = Ticket_ledger.spend ctxt tidx source_idx amount in
     Ticket_ledger.credit ctxt tidx destination_idx amount
 

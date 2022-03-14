@@ -1634,6 +1634,29 @@ let test_apply_message_deposit () =
       return_unit
   | _ -> fail_msg "Invalid apply message result"
 
+let test_transfer_to_self () =
+  let open Context_l2.Syntax in
+  let* (ctxt, _, accounts) = with_initial_setup [ticket1] [[(ticket1, 10L)]] in
+
+  let (sk1, pk1, addr1, _idx1, _) = nth_exn accounts 0 in
+  let transaction =
+    [transfer ~signer:(signer_pk pk1) ~dest:addr1 ~ticket:ticket1 1L]
+  in
+  let batch = create_batch_v1 [transaction] [[sk1]] in
+
+  let* (_ctxt, Batch_result {results; _}, _withdrawals) =
+    Batch_V1.apply_batch ctxt batch
+  in
+
+  let status = nth_exn results 0 in
+
+  match status with
+  | ( _,
+      Transaction_failure
+        {index = 0; reason = Tx_rollup_l2_apply.Invalid_self_transfer} ) ->
+      return_unit
+  | (_, _) -> fail_msg "The transaction should faild with [Invalid_destination]"
+
 let tests =
   wrap_tztest_tests
     [
@@ -1665,4 +1688,5 @@ let tests =
       ( "apply batch from message with withdrawals",
         test_apply_message_batch_withdrawals );
       ("apply deposit from message", test_apply_message_deposit);
+      ("test transfer to self fail", test_transfer_to_self);
     ]

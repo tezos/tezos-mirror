@@ -148,7 +148,10 @@ let compare :
   | ((Hidden_value _ | Value _), (Hidden_index _ | Index _)) -> 1
 
 let compare_values c : 'a value -> 'a value -> int =
- fun x y -> match (x, y) with (Value x, Value y) -> c x y
+ fun (Value x) (Value y) -> c x y
+
+let compare_indexes : 'a index -> 'a index -> int =
+ fun (Index x) (Index y) -> Compare.Int32.compare x y
 
 module type VALUE = sig
   type t
@@ -189,6 +192,8 @@ module Make (V : VALUE) = struct
   let pp : Format.formatter -> 'state t -> unit = fun fmt x -> pp V.pp fmt x
 
   let compare_values = compare_values V.compare
+
+  let compare_indexes = compare_indexes
 
   let compare : 'state t -> 'state' t -> int = fun x y -> compare V.compare x y
 end
