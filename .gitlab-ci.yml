@@ -3,8 +3,6 @@ include: 'https://gitlab.com/nomadic-labs/gitlab-ocaml-ci-example/-/raw/main/.gi
 .build-matrix:
   parallel:
     matrix:
-    - OCAML_COMPILER: "4.08.1"
-    - OCAML_COMPILER: "4.09.1"
     - OCAML_COMPILER: "4.10.2"
     - OCAML_COMPILER: "4.11.2"
     - OCAML_COMPILER: "4.12.1"
