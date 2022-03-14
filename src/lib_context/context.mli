@@ -172,6 +172,12 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) : sig
   val dump_context :
     index -> Context_hash.t -> fd:Lwt_unix.file_descr -> int tzresult Lwt.t
 
+  (** Rebuild a context from a given snapshot.
+
+      NOTE: the indexing strategy used by the [index] must be [`Always] (in
+      order to recover direct internal pointers between store objects during
+      the import). This limitation is likely to be removed in a future version
+      of [lib_context]. *)
   val restore_context :
     index ->
     expected_context_hash:Context_hash.t ->
