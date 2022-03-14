@@ -478,8 +478,8 @@ module Make (Context : CONTEXT) = struct
                 in
                 return (ctxt, indexes, signer_pk, idx)
             | `Created ->
-                (* If the index is created however, we need to add to indexes and
-                   initiliaze the metadata. *)
+                (* If the index is created, we need to add to indexes and
+                   initialize the metadata. *)
                 let indexes = add_addr_to_indexes indexes addr idx in
                 let* ctxt =
                   Address_metadata.init_with_public_key ctxt idx signer_pk
