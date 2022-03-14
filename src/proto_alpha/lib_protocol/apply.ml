@@ -1366,13 +1366,16 @@ let apply_external_manager_operation_content :
       >>=? fun (already_consumed, ctxt) ->
       fail_when already_consumed Tx_rollup_errors.Withdraw_already_consumed
       >>=? fun () ->
+      Tx_rollup_state.get ctxt tx_rollup >>=? fun (ctxt, state) ->
       Tx_rollup_withdraw.add
         ctxt
+        state
         tx_rollup
         level
         ~message_index
         ~withdraw_position
-      >>=? fun ctxt ->
+      >>=? fun (ctxt, state, withdraw_paid_storage_size_diff) ->
+      Tx_rollup_state.update ctxt tx_rollup state >>=? fun ctxt ->
       (* Now reconstruct the ticket sent as the parameter
           destination. *)
       Option.value_e
@@ -1423,27 +1426,28 @@ let apply_external_manager_operation_content :
         ctxt
         tx_rollup_ticket_hash
         ~delta:(Z.neg @@ Tx_rollup_l2_qty.to_z amount)
-      >>=? fun (_tx_ticket_hash_storage_diff, ctxt) ->
+      >>=? fun (tx_ticket_hash_storage_diff, ctxt) ->
       Ticket_balance.adjust_balance
         ctxt
         destination_ticket_hash
         ~delta:(Tx_rollup_l2_qty.to_z amount)
-      >>=? fun (_dest_ticket_hash_storage_diff, ctxt) ->
+      >>=? fun (dest_ticket_hash_storage_diff, ctxt) ->
+      let delta =
+        Z.add tx_ticket_hash_storage_diff dest_ticket_hash_storage_diff
+      in
+      Tx_rollup_state.get ctxt tx_rollup >>=? fun (ctxt, state) ->
+      Tx_rollup_state.adjust_storage_allocation state ~delta
+      >>?= fun (state, ticket_paid_storage_size_diff) ->
+      let paid_storage_size_diff =
+        Z.add ticket_paid_storage_size_diff withdraw_paid_storage_size_diff
+      in
+      Tx_rollup_state.update ctxt tx_rollup state >>=? fun ctxt ->
       let result =
         Tx_rollup_withdraw_result
           {
             balance_updates = [];
             consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
-            paid_storage_size_diff =
-              (* TODO/TORU: #2339
-
-                 We set [paid_storage_size_diff] to zero for now, it should be something like
-
-                   Z.add _tx_ticket_hash_storage_diff _dest_ticket_hash_storage_diff
-
-                 with the fix of #2339.
-              *)
-              Z.zero;
+            paid_storage_size_diff;
           }
       in
       return (ctxt, result, [op])

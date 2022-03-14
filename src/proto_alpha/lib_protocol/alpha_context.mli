@@ -1647,11 +1647,12 @@ module Tx_rollup_withdraw : sig
 
   val add :
     context ->
+    Tx_rollup_state.t ->
     Tx_rollup.t ->
     Tx_rollup_level.t ->
     message_index:int ->
     withdraw_position:int ->
-    context tzresult Lwt.t
+    (context * Tx_rollup_state.t * Z.t) tzresult Lwt.t
 
   val mem :
     context ->

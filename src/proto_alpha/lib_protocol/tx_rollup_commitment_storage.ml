@@ -304,8 +304,8 @@ let remove_commitment ctxt rollup state =
         (* safe because inbox cannot be more than int32 *)
         Int32.of_int @@ List.length commitment.commitment.messages
       in
-      Tx_rollup_withdraw_storage.remove ctxt rollup tail ~inbox_length
-      >>=? fun ctxt ->
+      Tx_rollup_withdraw_storage.remove ctxt state rollup tail ~inbox_length
+      >>=? fun (ctxt, state) ->
       (* We update the state *)
       (match List.last_opt commitment.commitment.messages with
       | Some hash -> ok hash
