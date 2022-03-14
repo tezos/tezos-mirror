@@ -366,6 +366,7 @@ let pp_document ppf descriptions version =
     descriptions
 
 let make_index node required_version =
+  let open Lwt_syntax in
   let shell_dir = Node.build_rpc_directory node in
   let protocol_dirs =
     List.map
@@ -402,10 +403,10 @@ let make_index node required_version =
            version = required_version)
          dirs
   in
-  RPC_directory.describe_directory ~recurse:true ~arg:() dir >>= fun dir ->
+  let* dir = RPC_directory.describe_directory ~recurse:true ~arg:() dir in
   let ppf = Format.std_formatter in
   pp_document ppf [(name, intro, path, dir)] required_version ;
-  return ()
+  return_ok ()
 
 let make_default_acl _node =
   let addr_of_string addr = P2p_point.Id.{addr; port = None; peer_id = None} in

@@ -26,9 +26,10 @@ the following OCaml function inside the module ``lib_my_module``:
 .. code-block:: OCaml
 
     let my_function () =
+      let open Lwt_syntax in
       let a = f () in
       let b = g () in
-      h () >>= fun c ->
+      let* c = h () in
       foo a b c
 
 Suppose also that module ``lib_my_module`` contains the following dune file:
@@ -48,7 +49,7 @@ adding the following OCaml attributes:
     let my_function () =
       let a = f () [@time.duration f_time] in
       let b = g () [@time.duration g_time] in
-      h () >>= fun c ->
+      let* c = h () in
       foo a b c [@time.flush]
 
 ``[@time.duration]`` will be used to measure the time of ``f ()`` and ``g ()``
@@ -68,9 +69,9 @@ When the preprocessing will occur, the code will be transformed as follows:
         ("g_time", [])
         (fun () -> g ())
       in
-      h () >>= fun c ->
-      foo a b c >>= fun __flush__id__0 ->
-      Tezos_time_measurement_runtime.Default.Time_measurement.flush () >|= fun () ->
+      let* c = h () in
+      let* __flush__id__0 = foo a b c in
+      let+ () = Tezos_time_measurement_runtime.Default.Time_measurement.flush () in
       __flush__id__0
 
 Woah! What a mess... Let's see what this means.
