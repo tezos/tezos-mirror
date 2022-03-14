@@ -26,6 +26,8 @@
 
 (** Command-line interface. *)
 
+open Base
+
 (** Log levels for standard output.
 
     The list below is sorted from the most quiet level to the most verbose level.
@@ -99,6 +101,7 @@ type options = {
   mutable junit : string option;
   mutable skip : int;
   mutable only : int option;
+  mutable test_args : string String_map.t;
 }
 
 (** Values for command-line options. *)
@@ -119,3 +122,38 @@ val options : options
     So if you call [init] several times with the same [--log-file] argument,
     all logs between the calls to [init] are lost in this file. *)
 val init : ?args:string list -> unit -> unit
+
+(** Get the value for a parameter specified with [--test-arg].
+
+    Usage: [get parse parameter]
+
+    If [--test-arg parameter=value] was specified on the command-line,
+    this calls [parse] on [value]. If [parse] returns [None], this fails.
+    If [parse] returns [Some x], this returns [x].
+
+    If no value for [parameter] was specified on the command-line,
+    this returns [default] if [default] was specified. Else, this fails.
+
+    It is recommended to make it so that specifying parameters with [--test-arg]
+    is not mandatory for everyday use. This means it is recommended to always
+    give default values, and that those default values should be suitable
+    for typical test runs. For parameters that can take a small number of values,
+    it is usually better to register multiple tests, one for each possible value,
+    and to use tags to select from the command-line.
+
+    @raise Failure if [parse] returns [None] or if [parameter] was not
+    specified on the command-line using [--test-arg] and no [default]
+    value was provided. *)
+val get : ?default:'a -> (string -> 'a option) -> string -> 'a
+
+(** Same as [get bool_of_string_opt]. *)
+val get_bool : ?default:bool -> string -> bool
+
+(** Same as [get int_of_string_opt]. *)
+val get_int : ?default:int -> string -> int
+
+(** Same as [get float_of_string_opt]. *)
+val get_float : ?default:float -> string -> float
+
+(** Same as [get (fun x -> Some x)]. *)
+val get_string : ?default:string -> string -> string
