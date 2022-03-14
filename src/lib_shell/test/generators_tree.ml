@@ -305,7 +305,7 @@ let block_gen ?proto_gen () : Block.t QCheck2.Gen.t =
    optional generator for protocol bytes of operations. *)
 let unique_block_gen ?(list_gen = QCheck2.Gen.small_list) ?proto_gen () :
     Block.Set.t QCheck2.Gen.t =
-  QCheck2.Gen.(list_gen (block_gen ?proto_gen ()) >|= Block.Set.of_list)
+  QCheck2.Gen.(map Block.Set.of_list @@ list_gen (block_gen ?proto_gen ()))
 
 (* A generator of sets of {!Block.t} where all elements are guaranteed
    to be different and returned sets are guaranteed to be non empty. *)
@@ -352,7 +352,7 @@ let tree_gen ?blocks () =
     | None ->
         (* no blocks received: generate them, use the [nonempty] flavor
            of the generator, to guarantee [blocks <> []] below. *)
-        unique_nonempty_block_gen >|= Block.set_to_list
+        map Block.set_to_list @@ unique_nonempty_block_gen
     | Some [] ->
         QCheck2.Test.fail_report
           "tree_gen should not be called with an empty list of blocks"
@@ -373,10 +373,8 @@ let tree_gen ?blocks () =
           | None -> ret (Tree.Leaf x)
           | Some sub -> ret (Tree.Node1 (x, sub))
         else
-          let* (left, right) =
-            QCheck2.Gen.int_bound (List.length xs - 1) >|= fun n ->
-            List.split_n n xs
-          in
+          let* n = QCheck2.Gen.int_bound (List.length xs - 1) in
+          let (left, right) = List.split_n n xs in
           let* left = go left and* right = go right in
           match (left, right) with
           | (None, None) -> ret (Tree.Leaf x)
@@ -385,7 +383,7 @@ let tree_gen ?blocks () =
   in
   (* The assertion cannot break, because we made sure that [blocks] is
      not empty. *)
-  go blocks >|= Option.value_f ~default:(fun () -> assert false)
+  map (WithExceptions.Option.get ~loc:__LOC__) (go blocks)
 
 (** A generator for passing the last argument of
       [Prevalidator.handle_live_operations] *)

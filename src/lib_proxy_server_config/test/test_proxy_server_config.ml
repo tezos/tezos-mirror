@@ -36,7 +36,7 @@ open Lib_test
 open Tezos_proxy_server_config
 
 (** Lift an arbitrary of ['a] to ['a option] by always creating [Some] values *)
-let to_some gen = QCheck.Gen.(gen >|= Option.some)
+let to_some gen = QCheck.Gen.(map Option.some gen)
 
 (** A generator that generates valid values for the [rpc_addr] field *)
 let rpc_addr_gen =
@@ -55,12 +55,16 @@ let rpc_addr_gen =
 let path_gen =
   let open QCheck.Gen in
   (* Generate something that looks like a Unix path *)
-  list_size (1 -- 8) (string_size ~gen:(char_range 'a' 'z') (1 -- 8))
-  >|= fun s -> "/" ^ String.concat "/" s
+  let+ s =
+    list_size (1 -- 8) (string_size ~gen:(char_range 'a' 'z') (1 -- 8))
+  in
+  "/" ^ String.concat "/" s
 
 (** A generator that generates valid values for the [rpc_tls] field *)
 let rpc_tls_gen =
-  QCheck.Gen.(pair path_gen path_gen >|= fun (cert, key) -> cert ^ "," ^ key)
+  QCheck.Gen.(
+    let+ (cert, key) = pair path_gen path_gen in
+    cert ^ "," ^ key)
 
 (** A generator that generates valid values for the
     [sym_block_caching_time] field *)
@@ -77,13 +81,13 @@ let proxy_server_config_arb endpoint_gen rpc_addr_gen rpc_tls_gen
     sym_block_caching_time_gen data_dir_gen =
   let gen =
     QCheck.Gen.(
-      quad
-        endpoint_gen
-        rpc_addr_gen
-        rpc_tls_gen
-        (pair sym_block_caching_time_gen data_dir_gen)
-      >|= fun (endpoint, rpc_addr, rpc_tls, (sym_block_caching_time, data_dir))
-        ->
+      let+ (endpoint, rpc_addr, rpc_tls, (sym_block_caching_time, data_dir)) =
+        quad
+          endpoint_gen
+          rpc_addr_gen
+          rpc_tls_gen
+          (pair sym_block_caching_time_gen data_dir_gen)
+      in
       Proxy_server_config.make
         ~endpoint
         ~rpc_addr

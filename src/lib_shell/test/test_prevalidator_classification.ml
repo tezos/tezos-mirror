@@ -128,7 +128,7 @@ module Extra_generators = struct
       obtained by having applied all previous events to [t_initial]. *)
   let t_with_event_sequence_gen =
     let open QCheck2.Gen in
-    Generators.t_gen () >>= fun t ->
+    let* t = Generators.t_gen () in
     let t_initial = Internal_for_tests.copy t in
     let rec loop acc_gen n =
       if n <= 0 then acc_gen

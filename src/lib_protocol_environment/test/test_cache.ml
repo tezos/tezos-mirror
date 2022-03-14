@@ -81,10 +81,11 @@ let number_of_keys cache =
 
 let gen_entries ?(high_init_entries = high_init_entries) ncaches =
   QCheck.Gen.(
-    list_size
-      (int_range low_init_entries high_init_entries)
-      (pair (int_bound (ncaches - 1)) (pair string_printable small_int))
-    >>= fun entries ->
+    let* entries =
+      list_size
+        (int_range low_init_entries high_init_entries)
+        (pair (int_bound (ncaches - 1)) (pair string_printable small_int))
+    in
     List.sort_uniq
       (fun (n1, (k1, _)) (n2, (k2, _)) ->
         let c = compare n1 n2 in
@@ -104,13 +105,13 @@ let insert_entries cache entries =
 let gen_cache ?(high_init_entries = high_init_entries) () =
   QCheck.(
     Gen.(
-      int_range 1 3 >>= fun ncaches ->
+      let* ncaches = int_range 1 3 in
       let layout = generate ~n:ncaches (int_range low_size high_size) in
       let cache = from_layout layout in
-      int_range 0 100 >>= fun k ->
+      let* k = int_range 0 100 in
       if k = 0 then return (layout, [], cache)
       else
-        gen_entries ~high_init_entries ncaches >>= fun entries ->
+        let* entries = gen_entries ~high_init_entries ncaches in
         let cache = insert_entries cache entries in
         return (layout, entries, cache)))
 
@@ -200,11 +201,11 @@ let check_from_layout_with_negative_size =
     ~name:"from_layout fails on negative sizes"
     QCheck.Gen.(
       QCheck.make
-        ( int_range 1 10 >>= fun n ->
-          list_repeat n small_int >>= fun layout ->
-          int_range 0 (List.length layout - 1) >>= fun idx ->
-          int_range (-100) (-1) >>= fun neg_size ->
-          return (layout, idx, neg_size) ))
+        (let* n = int_range 1 10 in
+         let* layout = list_repeat n small_int in
+         let* idx = int_range 0 (List.length layout - 1) in
+         let* neg_size = int_range (-100) (-1) in
+         return (layout, idx, neg_size)))
     (fun (layout, idx, neg_size) ->
       let layout =
         List.mapi (fun i x -> if i = idx then neg_size else x) layout
@@ -531,8 +532,8 @@ let check_after_sync_cache_nonce_are_set =
     QCheck.(
       make
         Gen.(
-          gen_cache () >>= fun (_, entries, cache) ->
-          gen_entries (number_of_caches cache) >>= fun fresh_entries ->
+          let* (_, entries, cache) = gen_cache () in
+          let* fresh_entries = gen_entries (number_of_caches cache) in
           return (entries, cache, fresh_entries)))
     after_sync_cache_nonce_are_set
 
