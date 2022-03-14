@@ -309,6 +309,9 @@ build-tps-deps:
 build-tps: lift-protocol-limits-patch build build-tezt
 	@dune build ./src/bin_tps_evaluation
 	@cp -f ./_build/install/default/bin/tezos-tps-evaluation .
+	@cp -f ./src/bin_tps_evaluation/tezos-tps-evaluation-benchmark-tps .
+	@cp -f ./src/bin_tps_evaluation/tezos-tps-evaluation-estimate-average-block .
+	@cp -f ./src/bin_tps_evaluation/tezos-tps-evaluation-gas-tps .
 
 .PHONY: docker-image-build
 docker-image-build:

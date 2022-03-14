@@ -243,108 +243,45 @@ let regression_handling defacto_tps_of_injection empirical_tps
   in
   save_and_check "empirical_tps" @@ fun () -> empirical_tps
 
-module Term = struct
-  let accounts_total_arg =
-    let open Cmdliner in
-    let doc = "The number of bootstrap accounts to use in the benchmark" in
-    let docv = "ACCOUNTS_TOTAL" in
-    Arg.(value & opt int 5 & info ["accounts-total"] ~docv ~doc)
-
-  let blocks_total_arg =
-    let open Cmdliner in
-    let doc = "The number of blocks to bake during the benchmark" in
-    let docv = "BLOCKS_TOTAL" in
-    Arg.(value & opt int 10 & info ["blocks-total"] ~docv ~doc)
-
-  let average_block_path_arg =
-    let open Cmdliner in
-    let doc = "Path to the file with description of the average block" in
-    let docv = "AVERAGE_BLOCK_PATH" in
-    Arg.(value & opt (some string) None & info ["average-block"] ~docv ~doc)
-
-  let lift_protocol_limits_arg =
-    let open Cmdliner in
-    let doc =
-      "Remove any protocol settings that may limit the maximum achievable TPS"
-    in
-    let docv = "LIFT_PROTOCOL_LIMITS" in
-    Arg.(value (flag & info ["lift-protocol-limits"] ~docv ~doc))
-
-  let tps_of_injection_arg =
-    let open Cmdliner in
-    let doc = "The injection TPS value that we should use" in
-    let docv = "TPS_OF_INJECTION" in
-    Arg.(value & opt (some int) None & info ["tps-of-injection"] ~docv ~doc)
-
-  let tezt_args =
-    let open Cmdliner in
-    let doc =
-      "Extra arguments after -- to be passed directly to Tezt. Contains `-i` \
-       by default to display info log level."
-    in
-    let docv = "TEZT_ARGS" in
-    Arg.(value & pos_all string [] & info [] ~docv ~doc)
-
-  let previous_count_arg =
-    let open Cmdliner in
-    let doc =
-      "The number of previously recorded samples that must be compared to the \
-       result of this benchmark"
-    in
-    let docv = "PREVIOUS_SAMPLE_COUNT" in
-    Arg.(
-      value & opt int 10 & info ["regression-previous-sample-count"] ~docv ~doc)
-
-  let term =
-    let process accounts_total blocks_total average_block_path
-        lift_protocol_limits provided_tps_of_injection tezt_args previous_count
-        =
-      (try Cli.init ~args:("-i" :: tezt_args) ()
-       with Arg.Help help_str ->
-         Format.eprintf "%s@." help_str ;
-         exit 0) ;
-      Long_test.init () ;
-      let executors = Long_test.[x86_executor1] in
-      Long_test.register
-        ~__FILE__
-        ~title:"tezos_tps_benchmark"
-        ~tags:[]
-        ~timeout:(Long_test.Minutes 60)
-        ~executors
-        (fun () ->
-          let* (defacto_tps_of_injection, empirical_tps) =
-            run_benchmark
-              ~lift_protocol_limits
-              ~provided_tps_of_injection
-              ~accounts_total
-              ~blocks_total
-              ~average_block_path
-              ()
-          in
-          regression_handling
-            defacto_tps_of_injection
-            empirical_tps
-            lift_protocol_limits
-            ~previous_count) ;
-      Test.run () ;
-      `Ok ()
-    in
-    let open Cmdliner.Term in
-    ret
-      (const process $ accounts_total_arg $ blocks_total_arg
-     $ average_block_path_arg $ lift_protocol_limits_arg $ tps_of_injection_arg
-     $ tezt_args $ previous_count_arg)
-end
-
-module Manpage = struct
-  let command_description =
-    "Run the benchmark and print out the results on stdout"
-
-  let description = [`S "DESCRIPTION"; `P command_description]
-
-  let man = description
-
-  let info = Cmdliner.Term.info ~doc:command_description ~man "benchmark-tps"
-end
-
-let cmd = (Term.term, Manpage.info)
+let register () =
+  Long_test.register
+    ~__FILE__
+    ~title:"tezos_tps_benchmark"
+    ~tags:["tezos_tps_benchmark"]
+    ~timeout:(Long_test.Minutes 60)
+    ~executors:Long_test.[x86_executor1]
+    (fun () ->
+      let lift_protocol_limits =
+        Cli.get_bool ~default:false "lift-protocol-limits"
+      in
+      let provided_tps_of_injection =
+        Cli.get
+          ~default:None
+          (fun s ->
+            match int_of_string_opt s with
+            | None -> None
+            | Some x -> Some (Some x))
+          "provided_tps_of_injection"
+      in
+      let accounts_total = Cli.get_int ~default:5 "accounts-total" in
+      let blocks_total = Cli.get_int ~default:10 "blocks-total" in
+      let average_block_path =
+        Cli.get ~default:None (fun s -> Some (Some s)) "average-block"
+      in
+      let previous_count =
+        Cli.get_int ~default:10 "regression-previous-sample-count"
+      in
+      let* (defacto_tps_of_injection, empirical_tps) =
+        run_benchmark
+          ~lift_protocol_limits
+          ~provided_tps_of_injection
+          ~accounts_total
+          ~blocks_total
+          ~average_block_path
+          ()
+      in
+      regression_handling
+        defacto_tps_of_injection
+        empirical_tps
+        lift_protocol_limits
+        ~previous_count)

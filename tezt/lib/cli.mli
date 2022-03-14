@@ -24,7 +24,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Command-line interface. *)
+(** Command-line interface.
+
+    When this module is loaded, it parses command line options
+    unconditionally as a side-effect.
+*)
 
 open Base
 
@@ -106,22 +110,6 @@ type options = {
 
 (** Values for command-line options. *)
 val options : options
-
-(** Read command-line options to initialize [options].
-
-    By default arguments are read from [Sys.argv], but you can specify [args]
-    to override this behavior. Note that [args] must not contain the executable
-    name ([Sys.argv.(0)]), only actual arguments.
-
-    If you do not call [init], [options] will contain only default values.
-
-    [init] exits the program on failure to parse the arguments (with code 2) or
-    when either [-help] or [--help] is present (with code 0).
-
-    Warning: if [--log-file] is specified, the file is truncated.
-    So if you call [init] several times with the same [--log-file] argument,
-    all logs between the calls to [init] are lost in this file. *)
-val init : ?args:string list -> unit -> unit
 
 (** Get the value for a parameter specified with [--test-arg].
 

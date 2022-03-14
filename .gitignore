@@ -29,6 +29,7 @@ __pycache__
 /tezos-codec
 /tezos-snoop
 /tezos-tps-evaluation
+/tezos-tps-evaluation-*
 /tezos-sc-rollup-node-*
 /tezos-sc-rollup-client-*
 

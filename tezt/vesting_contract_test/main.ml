@@ -54,7 +54,6 @@ let tests =
 
 let () =
   (* Register your tests here. *)
-  Cli.init () ;
   List.iter
     (fun (test, title, user_count) ->
       Test.register

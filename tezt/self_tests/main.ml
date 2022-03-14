@@ -26,7 +26,6 @@
 (* Tests that test Tezt itself. *)
 
 let () =
-  Cli.init () ;
   Test_check.register () ;
   Test_daemon.register () ;
   Test_retry.register () ;

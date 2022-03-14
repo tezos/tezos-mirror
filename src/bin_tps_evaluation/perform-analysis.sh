@@ -25,7 +25,7 @@ declare -r RESULT_FILE="$START_DATE-to-$END_DATE.json"
 
 docker run -d --name tezos_history_analysis -p 5432:5432 -e POSTGRES_HOST_AUTH_METHOD=trust -e POSTGRES_USER=tezos postgres:14-alpine
 bunzip2 -c "$DATABASE_DUMP_FILE" | docker exec -i tezos_history_analysis psql -U tezos -a tezos
-../../tezos-tps-evaluation estimate-average-block -c postgresql://tezos:tezos@localhost:5432 --start "$START_DATE" --end "$END_DATE" > "$RESULT_FILE"
+../../tezos-tps-evaluation-estimate-average-block -a connection-string=postgresql://tezos:tezos@localhost:5432 -a start-date="$START_DATE" -a end-date="$END_DATE" > "$RESULT_FILE"
 cp "$RESULT_FILE" "average-block.json"
 docker stop tezos_history_analysis
 docker rm tezos_history_analysis

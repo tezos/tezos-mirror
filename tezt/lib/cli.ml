@@ -453,6 +453,8 @@ let init ?args () =
       Printf.printf "%s" msg ;
       exit 0
 
+let () = init ()
+
 let get ?default parse parameter =
   match String_map.find_opt parameter options.test_args with
   | Some value -> (
@@ -475,4 +477,4 @@ let get_int ?default parameter = get ?default int_of_string_opt parameter
 
 let get_float ?default parameter = get ?default float_of_string_opt parameter
 
-let get_string ?default parameter = get ?default (fun x -> Some x) parameter
+let get_string ?default parameter = get ?default Option.some parameter
