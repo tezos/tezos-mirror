@@ -104,6 +104,8 @@ val tx_rollup_max_messages_per_inbox : Raw_context.t -> int
 
 val tx_rollup_max_finalized_levels : Raw_context.t -> int
 
+val tx_rollup_cost_per_byte_ema_factor : Raw_context.t -> int
+
 val ratio_of_frozen_deposits_slashed_per_double_endorsement :
   Raw_context.t -> Constants_repr.ratio
 

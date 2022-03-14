@@ -801,6 +801,7 @@ module Constants : sig
     tx_rollup_max_unfinalized_levels : int;
     tx_rollup_max_messages_per_inbox : int;
     tx_rollup_max_finalized_levels : int;
+    tx_rollup_cost_per_byte_ema_factor : int;
     sc_rollup_enable : bool;
     sc_rollup_origination_size : int;
     sc_rollup_challenge_window_in_blocks : int;
@@ -1616,7 +1617,8 @@ module Tx_rollup_state : sig
       unit ->
       t
 
-    val update_burn_per_byte : t -> final_size:int -> hard_limit:int -> t
+    val update_burn_per_byte :
+      t -> elapsed:int -> factor:int -> final_size:int -> hard_limit:int -> t
 
     val get_inbox_ema : t -> int
   end

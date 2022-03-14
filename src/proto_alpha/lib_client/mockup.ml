@@ -82,6 +82,7 @@ module Protocol_constants_overrides = struct
     tx_rollup_withdraw_period : int option;
     tx_rollup_max_messages_per_inbox : int option;
     tx_rollup_max_finalized_levels : int option;
+    tx_rollup_cost_per_byte_ema_factor : int option;
     sc_rollup_enable : bool option;
     sc_rollup_origination_size : int option;
     sc_rollup_challenge_window_in_blocks : int option;
@@ -134,16 +135,17 @@ module Protocol_constants_overrides = struct
                 ( ( c.cache_script_size,
                     c.cache_stake_distribution_cycles,
                     c.cache_sampler_state_cycles ),
-                  ( ( c.tx_rollup_enable,
-                      c.tx_rollup_origination_size,
-                      c.tx_rollup_hard_size_limit_per_inbox,
-                      c.tx_rollup_hard_size_limit_per_message,
-                      c.tx_rollup_commitment_bond,
-                      c.tx_rollup_finality_period,
-                      c.tx_rollup_max_unfinalized_levels,
-                      c.tx_rollup_withdraw_period,
-                      c.tx_rollup_max_messages_per_inbox,
-                      c.tx_rollup_max_finalized_levels ),
+                  ( ( ( c.tx_rollup_enable,
+                        c.tx_rollup_origination_size,
+                        c.tx_rollup_hard_size_limit_per_inbox,
+                        c.tx_rollup_hard_size_limit_per_message,
+                        c.tx_rollup_commitment_bond,
+                        c.tx_rollup_finality_period,
+                        c.tx_rollup_max_unfinalized_levels,
+                        c.tx_rollup_withdraw_period,
+                        c.tx_rollup_max_messages_per_inbox ),
+                      ( c.tx_rollup_max_finalized_levels,
+                        c.tx_rollup_cost_per_byte_ema_factor ) ),
                     ( c.sc_rollup_enable,
                       c.sc_rollup_origination_size,
                       c.sc_rollup_challenge_window_in_blocks ) ) ) ) ) ) ))
@@ -185,16 +187,17 @@ module Protocol_constants_overrides = struct
                    ( ( cache_script_size,
                        cache_stake_distribution_cycles,
                        cache_sampler_state_cycles ),
-                     ( ( tx_rollup_enable,
-                         tx_rollup_origination_size,
-                         tx_rollup_hard_size_limit_per_inbox,
-                         tx_rollup_hard_size_limit_per_message,
-                         tx_rollup_commitment_bond,
-                         tx_rollup_finality_period,
-                         tx_rollup_max_unfinalized_levels,
-                         tx_rollup_withdraw_period,
-                         tx_rollup_max_messages_per_inbox,
-                         tx_rollup_max_finalized_levels ),
+                     ( ( ( tx_rollup_enable,
+                           tx_rollup_origination_size,
+                           tx_rollup_hard_size_limit_per_inbox,
+                           tx_rollup_hard_size_limit_per_message,
+                           tx_rollup_commitment_bond,
+                           tx_rollup_finality_period,
+                           tx_rollup_max_unfinalized_levels,
+                           tx_rollup_withdraw_period,
+                           tx_rollup_max_messages_per_inbox ),
+                         ( tx_rollup_max_finalized_levels,
+                           tx_rollup_cost_per_byte_ema_factor ) ),
                        ( sc_rollup_enable,
                          sc_rollup_origination_size,
                          sc_rollup_challenge_window_in_blocks ) ) ) ) ) ) ) ->
@@ -244,6 +247,7 @@ module Protocol_constants_overrides = struct
           tx_rollup_withdraw_period;
           tx_rollup_max_messages_per_inbox;
           tx_rollup_max_finalized_levels;
+          tx_rollup_cost_per_byte_ema_factor;
           sc_rollup_enable;
           sc_rollup_origination_size;
           sc_rollup_challenge_window_in_blocks;
@@ -304,17 +308,22 @@ module Protocol_constants_overrides = struct
                         (opt "cache_stake_distribution_cycles" int8)
                         (opt "cache_sampler_state_cycles" int8))
                      (merge_objs
-                        (obj10
-                           (opt "tx_rollup_enable" Data_encoding.bool)
-                           (opt "tx_rollup_origination_size" int31)
-                           (opt "tx_rollup_hard_size_limit_per_inbox" int31)
-                           (opt "tx_rollup_hard_size_limit_per_message" int31)
-                           (opt "tx_rollup_commitment_bond" Tez.encoding)
-                           (opt "tx_rollup_finality_period" int31)
-                           (opt "tx_rollup_max_unfinalized_levels" int31)
-                           (opt "tx_rollup_withdraw_period" int31)
-                           (opt "tx_rollup_max_messages_per_inbox" int31)
-                           (opt "tx_rollup_max_finalized_levels" int31))
+                        (merge_objs
+                           (obj9
+                              (opt "tx_rollup_enable" Data_encoding.bool)
+                              (opt "tx_rollup_origination_size" int31)
+                              (opt "tx_rollup_hard_size_limit_per_inbox" int31)
+                              (opt
+                                 "tx_rollup_hard_size_limit_per_message"
+                                 int31)
+                              (opt "tx_rollup_commitment_bond" Tez.encoding)
+                              (opt "tx_rollup_finality_period" int31)
+                              (opt "tx_rollup_max_unfinalized_levels" int31)
+                              (opt "tx_rollup_withdraw_period" int31)
+                              (opt "tx_rollup_max_messages_per_inbox" int31))
+                           (obj2
+                              (opt "tx_rollup_max_finalized_levels" int31)
+                              (opt "tx_rollup_cost_per_byte_ema_factor" int31)))
                         (obj3
                            (opt "sc_rollup_enable" bool)
                            (opt "sc_rollup_origination_size" int31)
@@ -396,6 +405,8 @@ module Protocol_constants_overrides = struct
           Some parametric.tx_rollup_max_messages_per_inbox;
         tx_rollup_max_finalized_levels =
           Some parametric.tx_rollup_max_finalized_levels;
+        tx_rollup_cost_per_byte_ema_factor =
+          Some parametric.tx_rollup_cost_per_byte_ema_factor;
         sc_rollup_enable = Some parametric.sc_rollup_enable;
         sc_rollup_origination_size = Some parametric.sc_rollup_origination_size;
         sc_rollup_challenge_window_in_blocks =
@@ -455,6 +466,7 @@ module Protocol_constants_overrides = struct
       tx_rollup_withdraw_period = None;
       tx_rollup_max_messages_per_inbox = None;
       tx_rollup_max_finalized_levels = None;
+      tx_rollup_cost_per_byte_ema_factor = None;
       sc_rollup_enable = None;
       sc_rollup_origination_size = None;
       sc_rollup_challenge_window_in_blocks = None;
@@ -726,6 +738,12 @@ module Protocol_constants_overrides = struct
             override_value = o.tx_rollup_commitment_bond;
             pp = Tez.pp;
           };
+        O
+          {
+            name = "tx_rollup_cost_per_byte_ema_factor";
+            override_value = o.tx_rollup_cost_per_byte_ema_factor;
+            pp = pp_print_int;
+          };
       ]
     in
     let fields_with_override =
@@ -894,6 +912,10 @@ module Protocol_constants_overrides = struct
            Option.value
              ~default:c.tx_rollup_max_finalized_levels
              o.tx_rollup_max_finalized_levels;
+         tx_rollup_cost_per_byte_ema_factor =
+           Option.value
+             ~default:c.tx_rollup_cost_per_byte_ema_factor
+             o.tx_rollup_cost_per_byte_ema_factor;
          sc_rollup_enable =
            Option.value ~default:c.sc_rollup_enable o.sc_rollup_enable;
          sc_rollup_origination_size =
