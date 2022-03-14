@@ -342,25 +342,25 @@ The bonus per additional endorsement slot is in turn ``bonus /
 ``CONSENSUS_COMMITTEE_SIZE / 3`` validator slots corresponding to the
 additional endorsements included in a block). The rewards per
 endorsement slot are ``endorsing_rewards / CONSENSUS_COMMITTEE_SIZE``.
-Assuming ``CONSENSUS_COMMITTEE_SIZE = 8000``, we obtain a bonus per slot of
-``10 / (8000 / 3) = 0.00375`` tez and an endorsing
-rewards per slot of ``20 / 8000 = 0.0025`` tez.
+Assuming ``CONSENSUS_COMMITTEE_SIZE = 7000``, we obtain a bonus per slot of
+``10 / (7000 / 3) = 0.004286`` tez and an endorsing
+rewards per slot of ``20 / 7000 = 0.002857`` tez.
 
 Let's take an example. Say a block has round 1, is proposed by
 delegate B, and contains the payload from round 0 produced by delegate
-A. Also, B includes endorsements with endorsing power ``6000``. Then A receives
+A. Also, B includes endorsements with endorsing power ``5251``. Then A receives
 the fees and 10 tez (the ``BAKING_REWARD_FIXED_PORTION``) as a reward for
-producing the block's payload. For simpler calculations, let's assume
-``CONSENSUS_COMMITTEE_SIZE = 8000``. Concerning the bonus, the minimum required validator slots is ``5334``, and there are ``2666 = 8000 - 5334`` additional validator slots.
-Therefore B receives the bonus ``(6000 - 5334) * 0.00375 = 2.4975`` tez. (Note
-that B only included endorsements corresponding to 666 additional validator slots, about a quarter of the
-maximum 2666 extra endorsements it could have theoretically included.) Finally, consider some
+producing the block's payload. Concerning the bonus, given that
+``CONSENSUS_COMMITTEE_SIZE = 7000``, the minimum required validator slots is ``4667``, and there are ``2333 = 7000 - 4667`` additional validator slots.
+Therefore B receives the bonus ``(5251 - 4667) * 0.004286 = 2.503`` tez. (Note
+that B only included endorsements corresponding to 584 = 5251 - 4667 additional validator slots, about a quarter of the
+maximum 2333 extra endorsements it could have theoretically included.) Finally, consider some
 delegate C, whose active stake at some cycle is 5% of the total stake. Note that
-his expected number of validator slots for that cycle is ``5/100 * 8192 * 8000 =
-3,276,800`` slots. Assume also that the endorsing power of C's endorsements
+his expected number of validator slots for that cycle is ``5/100 * 8192 * 7000 =
+2,867,200`` slots. Assume also that the endorsing power of C's endorsements
 included during that cycle has been ``3,123,456`` slots. Given that this number is
-bigger than the minimum required (``3,276,800 * 2 / 3``), it receives an endorsing
-reward of ``3,276,800 * 0.0025 = 8192`` tez for that cycle.
+bigger than the minimum required (``2,867,200 * 2 / 3``), it receives an endorsing
+reward of ``2,867,200 * 0.002857 = 8191.59`` tez for that cycle.
 
 .. _slashing_ithaca:
 
@@ -403,7 +403,7 @@ Consensus related protocol parameters
    * - ``CONSENSUS_COMMITTEE_SIZE``
      - 7000
    * - ``CONSENSUS_THRESHOLD``
-     - ``ceil(2 * CONSENSUS_COMMITTEE_SIZE / 3)``
+     - ``ceil(2 * CONSENSUS_COMMITTEE_SIZE / 3)`` = 4667
    * - ``MINIMAL_BLOCK_DELAY``
      - 30s
    * - ``DELAY_INCREMENT_PER_ROUND``
