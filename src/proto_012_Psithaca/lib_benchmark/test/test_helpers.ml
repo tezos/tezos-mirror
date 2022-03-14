@@ -23,8 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Tezos_error_monad.Error_monad
-
 let rng_state = Random.State.make [|42; 987897; 54120|]
 
 let print_script_expr fmtr (expr : Protocol.Script_repr.expr) =

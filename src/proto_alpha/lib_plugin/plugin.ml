@@ -2413,7 +2413,7 @@ module RPC = struct
           Contract.get_script ctxt contract >>=? fun (ctxt, script_opt) ->
           Option.fold
             ~some:ok
-            ~none:(Error_monad.error View_helpers.Viewed_contract_has_no_script)
+            ~none:(error View_helpers.Viewed_contract_has_no_script)
             script_opt
           >>?= fun script ->
           Script_repr.(force_decode script.code) >>?= fun decoded_script ->

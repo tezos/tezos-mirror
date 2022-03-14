@@ -570,7 +570,6 @@ module Merge_types : Benchmark.S = struct
     [("size_translator_model", size_model); ("codegen", codegen_model)]
 
   let merge_type_benchmark rng_state nodes (ty : Script_ir_translator.ex_ty) =
-    let open Error_monad in
     Lwt_main.run
       ( Execution_context.make ~rng_state >>=? fun (ctxt, _) ->
         let ctxt = Gas_helpers.set_limit ctxt in
@@ -681,7 +680,6 @@ module Parse_type_benchmark : Benchmark.S = struct
   let info = "Benchmarking parse_ty"
 
   let make_bench rng_state config () =
-    let open Error_monad in
     ( Lwt_main.run (Execution_context.make ~rng_state) >>? fun (ctxt, _) ->
       let ctxt = Gas_helpers.set_limit ctxt in
       let depth = Random.State.int rng_state config.max_size in
@@ -729,7 +727,6 @@ module Unparse_type_benchmark : Benchmark.S = struct
   let info = "Benchmarking unparse_ty"
 
   let make_bench rng_state config () =
-    let open Error_monad in
     ( Lwt_main.run (Execution_context.make ~rng_state) >>? fun (ctxt, _) ->
       let ctxt = Gas_helpers.set_limit ctxt in
       let depth = Random.State.int rng_state config.max_size in
