@@ -24,7 +24,9 @@
   tezos-rpc
   tezos-rpc-http
   tezos-rpc-http-client-unix
-  tezos-rpc-http-server)
+  tezos-rpc-http-server
+  tezos-store
+  index)
  (flags
   (:standard
    -open Tezos_base.TzPervasives

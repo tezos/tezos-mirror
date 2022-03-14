@@ -25,283 +25,456 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* TODO/TORU: https://gitlab.com/tezos/tezos/-/issues/2589
-   Don't use Irmin for store but rather https://github.com/mirage/index *)
+type error += Cannot_encode_block of L2block.hash
 
-module Conf = struct
-  let entries = 32
+let () =
+  register_error_kind
+    ~id:"tx_rollup.node.cannot_encode_block"
+    ~title:"An L2 block cannot be encoded"
+    ~description:"An L2 block cannot be encoded to be stored on disk."
+    ~pp:(fun ppf b ->
+      Format.fprintf
+        ppf
+        "The L2 block %a cannot be encoded to be stored on disk."
+        L2block.Hash.pp
+        b)
+    `Permanent
+    Data_encoding.(obj1 (req "block" L2block.Hash.encoding))
+    (function Cannot_encode_block b -> Some b | _ -> None)
+    (fun b -> Cannot_encode_block b)
 
-  let stable_hash = 256
+type error += Cannot_encode_data of string
 
-  let inode_child_order = `Seeded_hash
+let () =
+  register_error_kind
+    ~id:"tx_rollup.node.cannot_encode_data"
+    ~title:"Data cannot be encoded"
+    ~description:"Data cannot be encoded to be stored on disk."
+    ~pp:(fun ppf name ->
+      Format.fprintf ppf "Data %s cannot be encoded to be stored on disk." name)
+    `Permanent
+    Data_encoding.(obj1 (req "name" string))
+    (function Cannot_encode_data n -> Some n | _ -> None)
+    (fun n -> Cannot_encode_data n)
 
-  let contents_length_header = Some `Varint
+type error += Cannot_write_file of string
+
+let () =
+  register_error_kind
+    ~id:"tx_rollup.node.cannot_write_file"
+    ~title:"File cannot be written"
+    ~description:"File cannot be written to disk."
+    ~pp:(fun ppf name ->
+      Format.fprintf ppf "File %s cannot be written to disk." name)
+    `Permanent
+    Data_encoding.(obj1 (req "name" string))
+    (function Cannot_write_file n -> Some n | _ -> None)
+    (fun n -> Cannot_write_file n)
+
+(* Helper functions to copy byte sequences or integers in [src] to another byte
+   sequence [dst] at offset [offset], with named arguments to avoid
+   confusion. These functions return the offset in the destination at which to
+   copy the more data. *)
+
+let blit ~src ~dst offset =
+  let len = Bytes.length src in
+  Bytes.blit src 0 dst offset len ;
+  offset + len
+
+let bytes_set_int64 ~src ~dst offset =
+  Bytes.set_int64_be dst offset src ;
+  offset + 8
+
+let bytes_set_int32 ~src ~dst offset =
+  Bytes.set_int32_be dst offset src ;
+  offset + 4
+
+let bytes_set_int8 ~src ~dst offset =
+  Bytes.set_int8 dst offset src ;
+  offset + 1
+
+(* Helper functions to read data (strings with a decoding function, or integers)
+   from a binary string. These functions return, as the second component, the
+   offset in the string at which to read more data. *)
+
+let read_str str ~offset ~len decode =
+  let s = String.sub str offset len in
+  (decode s, offset + len)
+
+let read_int64 str offset =
+  let i = TzEndian.get_int64_string str offset in
+  (i, offset + 8)
+
+let read_int32 str offset =
+  let i = TzEndian.get_int32_string str offset in
+  (i, offset + 4)
+
+let read_int8 str offset =
+  let i = TzEndian.get_int8_string str offset in
+  (i, offset + 1)
+
+module L2_block_key = struct
+  include L2block.Hash
+
+  (* [hash] in Blake2B.Make is {!Stdlib.Hashtbl.hash} which is 30 bits *)
+  let hash_size = 30 (* in bits *)
+
+  let t =
+    let open Repr in
+    map
+      (bytes_of (`Fixed hash_size))
+      (fun b -> of_bytes_exn b)
+      (fun bh -> to_bytes bh)
+
+  let encode bh = to_string bh
+
+  let encoded_size = size (* in bytes *)
+
+  let decode str off =
+    let str = String.sub str off encoded_size in
+    of_string_exn str
 end
 
-module Kv = struct
-  open Irmin_pack_unix.KV (Conf)
+module L2_level_key = struct
+  type t = L2block.level
 
-  include Make (Irmin.Contents.String)
+  let to_int32 = function
+    | L2block.Genesis -> -1l
+    | Rollup_level l -> Protocol.Alpha_context.Tx_rollup_level.to_int32 l
+
+  let of_int32 l =
+    if l < 0l then L2block.Genesis
+    else
+      let l =
+        WithExceptions.Result.get_ok ~loc:__LOC__
+        @@ Protocol.Alpha_context.Tx_rollup_level.of_int32 l
+      in
+      Rollup_level l
+
+  let t =
+    let open Repr in
+    map int32 of_int32 to_int32
+
+  let equal x y = Compare.Int32.equal (to_int32 x) (to_int32 y)
+
+  let hash = Stdlib.Hashtbl.hash
+
+  (* {!Stdlib.Hashtbl.hash} is 30 bits as per {!Index__.Data.Key} *)
+  let hash_size = 30 (* in bits *)
+
+  let encoded_size = 4 (* in bytes *)
+
+  let encode l =
+    let b = Bytes.create encoded_size in
+    TzEndian.set_int32 b 0 (to_int32 l) ;
+    Bytes.unsafe_to_string b
+
+  let decode str i = TzEndian.get_int32_string str i |> of_int32
 end
 
-type t = Kv.t
+module L2_block_info = struct
+  type t = {
+    offset : int;
+    (* subset of L2 block header for efficiency *)
+    (* TODO decide if we want more or less *)
+    predecessor : L2block.hash;
+    context : Protocol.Tx_rollup_l2_context_hash.t;
+  }
 
-let make_info message =
-  let date = Unix.gettimeofday () |> Int64.of_float in
-  Kv.Info.v ~author:"tx-rollup-node" date ~message
+  let encoded_size =
+    8 (* offset *) + L2block.Hash.size + Protocol.Tx_rollup_l2_context_hash.size
 
-let load data_dir =
-  let open Lwt_syntax in
-  let* repository = Kv.Repo.v (Irmin_pack.config data_dir) in
-  let* branch = Kv.main repository in
-  let* () = Event.(emit irmin_store_loaded) data_dir in
-  return_ok branch
+  let l2_context_hash_repr =
+    let open Repr in
+    map
+      (bytes_of (`Fixed 31))
+      (fun c -> Protocol.Tx_rollup_l2_context_hash.of_bytes_exn c)
+      (fun ch -> Protocol.Tx_rollup_l2_context_hash.to_bytes ch)
 
-let close data_dir =
-  let open Lwt_syntax in
-  let* repository = Kv.Repo.v (Irmin_pack.config data_dir) in
-  let* () = Kv.Repo.close repository in
-  return_unit
+  let t =
+    let open Repr in
+    map
+      (triple int L2_block_key.t l2_context_hash_repr)
+      (fun (offset, predecessor, context) -> {offset; predecessor; context})
+      (fun {offset; predecessor; context} -> (offset, predecessor, context))
 
-module type REF_CONF = sig
-  val location : string list
-
-  type value
-
-  val value_encoding : value Data_encoding.t
-end
-
-module type MAP_CONF = sig
-  include REF_CONF
-
-  type key
-
-  val key_to_string : key -> string
-end
-
-module type REF = sig
-  type nonrec t = t
-
-  type value
-
-  val find : t -> value option Lwt.t
-
-  val get : t -> value tzresult Lwt.t
-
-  val set : t -> value -> unit tzresult Lwt.t
-end
-
-module type MAP = sig
-  type nonrec t = t
-
-  type key
-
-  type value
-
-  val mem : t -> key -> bool Lwt.t
-
-  val find : t -> key -> value option Lwt.t
-
-  val get : t -> key -> value tzresult Lwt.t
-
-  val add : t -> key -> value -> unit tzresult Lwt.t
-
-  val remove : t -> key -> unit tzresult Lwt.t
-end
-
-module Make_map (M : MAP_CONF) = struct
-  type t = Kv.t
-
-  type key = M.key
-
-  type value = M.value
-
-  let mk key =
-    let loc = Kv.Path.v M.location in
-    Kv.Path.rcons loc @@ M.key_to_string key
-
-  let render_key key =
-    Format.sprintf "%s/%s" (String.concat "/" M.location) (M.key_to_string key)
-
-  let mem store key =
-    let key = mk key in
-    Kv.mem store key
-
-  let encode key value =
-    value
-    |> Data_encoding.Binary.to_string M.value_encoding
-    |> Result.fold ~ok:return ~error:(fun _ ->
-           let json = Data_encoding.Json.construct M.value_encoding value in
-           fail @@ Error.Tx_rollup_unable_to_encode_storable_value (key, json))
-
-  let decode key value =
-    value
-    |> Data_encoding.Binary.of_string M.value_encoding
-    |> Result.fold ~ok:return ~error:(fun _ ->
-           fail @@ Error.Tx_rollup_unable_to_decode_stored_value (key, value))
-
-  let find store raw_key =
-    let open Lwt_syntax in
-    let key = mk raw_key in
-    let* binaries = Kv.find store key in
-    let+ value =
-      match binaries with
-      | None -> Lwt.return None
-      | Some x -> (
-          let+ k = decode (render_key raw_key) x in
-          match k with Ok x -> Some x | _ -> None)
+  let encode v =
+    let dst = Bytes.create encoded_size in
+    let offset = bytes_set_int64 ~src:(Int64.of_int v.offset) ~dst 0 in
+    let pred_bytes = L2block.Hash.to_bytes v.predecessor in
+    let offset = blit ~src:pred_bytes ~dst offset in
+    let _ =
+      blit
+        ~src:(Protocol.Tx_rollup_l2_context_hash.to_bytes v.context)
+        ~dst
+        offset
     in
-    value
+    Bytes.unsafe_to_string dst
 
-  let get store raw_key =
-    let open Lwt_syntax in
-    let key = mk raw_key in
-    let* binaries = Kv.get store key in
-    decode (render_key raw_key) binaries
-
-  let set rendered_key store key value =
-    let open Lwt_tzresult_syntax in
-    let info () = make_info rendered_key in
-    let*! r = Kv.set ~info store key value in
-    match r with
-    | Error _ -> fail @@ Error.Tx_rollup_irmin_error "cannot store value"
-    | Ok () -> return_unit
-
-  let add store raw_key value =
-    let open Lwt_result_syntax in
-    let key = mk raw_key in
-    let rendered_key = render_key raw_key in
-    let* value = encode rendered_key value in
-    set rendered_key store key value
-
-  let remove store raw_key =
-    let open Lwt_tzresult_syntax in
-    let key = mk raw_key in
-    let rendered_key = render_key raw_key in
-    let info () = make_info rendered_key in
-    let*! r = Kv.remove ~info store key in
-    match r with
-    | Error _ -> fail @@ Error.Tx_rollup_irmin_error "cannot remove value"
-    | Ok () -> return_unit
-end
-
-module Make_ref (R : REF_CONF) = struct
-  type t = Kv.t
-
-  type value = R.value
-
-  let key = Kv.Path.v R.location
-
-  let rendered_key = String.concat "/" R.location
-
-  let decode value =
-    value
-    |> Data_encoding.Binary.of_string R.value_encoding
-    |> Result.fold ~ok:return ~error:(fun _ ->
-           fail
-           @@ Error.Tx_rollup_unable_to_decode_stored_value (rendered_key, value))
-
-  let encode value =
-    value
-    |> Data_encoding.Binary.to_string R.value_encoding
-    |> Result.fold ~ok:return ~error:(fun _ ->
-           let json = Data_encoding.Json.construct R.value_encoding value in
-           fail
-           @@ Error.Tx_rollup_unable_to_encode_storable_value
-                (rendered_key, json))
-
-  let get store =
-    let open Lwt_syntax in
-    let* binaries = Kv.get store key in
-    decode binaries
-
-  let find store =
-    let open Lwt_syntax in
-    let* binaries = Kv.find store key in
-    let+ value =
-      match binaries with
-      | None -> Lwt.return None
-      | Some x -> (
-          let+ k = decode x in
-          match k with Ok x -> Some x | _ -> None)
+  let decode str offset =
+    let (file_offset, offset) = read_int64 str offset in
+    let (predecessor, offset) =
+      read_str str ~offset ~len:L2block.Hash.size L2block.Hash.of_string_exn
     in
-    value
-
-  let set_aux store value =
-    let open Lwt_tzresult_syntax in
-    let info () = make_info rendered_key in
-    let*! r = Kv.set ~info store key value in
-    match r with
-    | Error _ -> fail @@ Error.Tx_rollup_irmin_error "cannot store value"
-    | Ok () -> return_unit
-
-  let set store value =
-    let open Lwt_result_syntax in
-    let* value = encode value in
-    set_aux store value
+    let (context, _) =
+      read_str
+        str
+        ~offset
+        ~len:Protocol.Tx_rollup_l2_context_hash.size
+        (fun s ->
+          Bytes.unsafe_of_string s
+          |> Protocol.Tx_rollup_l2_context_hash.of_bytes_exn)
+    in
+    {offset = Int64.to_int file_offset; predecessor; context}
 end
 
-module Rollup_origination = Make_ref (struct
-  let location = ["tx_rollup"; "origination"]
+module L2block_index =
+  Index_unix.Make (L2block_key) (L2block_info) (Index.Cache.Unbounded)
+module Level_index =
+  Index_unix.Make (L2level_key) (L2block_key) (Index.Cache.Unbounded)
+module Tezos_block_index =
+  Index_unix.Make (Tezos_store.Block_key) (L2block_key) (Index.Cache.Unbounded)
 
-  type value = Block_hash.t * int32
+module L2_blocks_file = struct
+  let encoding = Data_encoding.dynamic_size ~kind:`Uint30 L2block.encoding
 
-  let value_encoding =
-    Data_encoding.tup2 Block_hash.encoding Data_encoding.int32
-end)
+  let pread_block_exn fd ~file_offset =
+    let open Lwt_syntax in
+    (* Read length *)
+    let length_bytes = Bytes.create 4 in
+    let* () =
+      Lwt_utils_unix.read_bytes ~file_offset ~pos:0 ~len:4 fd length_bytes
+    in
+    let block_length_int32 = Bytes.get_int32_be length_bytes 0 in
+    let block_length = Int32.to_int block_length_int32 in
+    let block_bytes = Bytes.extend length_bytes 0 block_length in
+    let* () =
+      Lwt_utils_unix.read_bytes
+        ~file_offset:(file_offset + 4)
+        ~pos:4
+        ~len:block_length
+        fd
+        block_bytes
+    in
+    Lwt.return
+      (Data_encoding.Binary.of_bytes_exn encoding block_bytes, 4 + block_length)
 
-module L2_head = Make_ref (struct
-  let location = ["tx_rollup"; "head"]
+  let pread_block fd ~file_offset =
+    Option.catch_s (fun () -> pread_block_exn fd ~file_offset)
+end
 
-  type value = L2block.hash
+module L2_block_store = struct
+  open L2_block_info
 
-  let value_encoding = L2block.Hash.encoding
-end)
+  type t = {
+    index : L2_block_index.t;
+    fd : Lwt_unix.file_descr;
+    scheduler : Lwt_idle_waiter.t;
+  }
 
-module Tezos_blocks = Make_map (struct
-  let location = ["tezos"; "blocks"]
+  (* The log_size corresponds to the maximum size of the memory zone
+     allocated in memory before flushing it onto the disk. It is
+     basically a cache which is use for the index. The cache size is
+     `log_size * log_entry` where a `log_entry` is roughly 56 bytes. *)
+  let blocks_log_size = 10_000
 
-  type key = Block_hash.t
+  let mem store hash =
+    Lwt_idle_waiter.task store.scheduler @@ fun () ->
+    Lwt.return (L2_block_index.mem store.index hash)
 
-  type value = L2block.hash
+  let predecessor store hash =
+    Lwt_idle_waiter.task store.scheduler @@ fun () ->
+    try
+      let {predecessor; _} = L2_block_index.find store.index hash in
+      Lwt.return_some predecessor
+    with Not_found -> Lwt.return_none
 
-  let key_to_string = Block_hash.to_string
+  let context store hash =
+    Lwt_idle_waiter.task store.scheduler @@ fun () ->
+    try
+      let {context; _} = L2_block_index.find store.index hash in
+      Lwt.return_some context
+    with Not_found -> Lwt.return_none
 
-  let value_encoding = L2block.Hash.encoding
-end)
+  let read_block store hash =
+    let open Lwt_syntax in
+    Lwt_idle_waiter.task store.scheduler @@ fun () ->
+    Option.catch_os @@ fun () ->
+    let {offset; _} = L2block_index.find store.index hash in
+    let* o = L2Blocks_file.pread_block store.fd ~file_offset:offset in
+    match o with
+    | Some (block, _) -> Lwt.return_some block
+    | None -> Lwt.return_none
 
-module Inboxes = Make_map (struct
-  let location = ["tx_rollup"; "inboxes"]
+  let locked_write_block store ~offset ~block =
+    let open Lwt_tzresult_syntax in
+    let* block_bytes =
+      match Data_encoding.Binary.to_bytes_opt L2_blocks_file.encoding block with
+      | None -> fail (Cannot_encode_block hash)
+      | Some bytes -> return bytes
+    in
+    let block_length = Bytes.length block_bytes in
+    let*! () =
+      Lwt_utils_unix.write_bytes ~pos:0 ~len:block_length store.fd block_bytes
+    in
+    L2_block_index.replace
+      store.index
+      (L2block.hash_header block.header)
+      {
+        offset;
+        predecessor = block.header.predecessor;
+        context = block.header.context;
+      } ;
+    return block_length
 
-  type key = L2block.hash
+  let append_block ?(flush = true) store (block : L2block.t) =
+    let open Lwt_syntax in
+    Lwt_idle_waiter.force_idle store.scheduler @@ fun () ->
+    let* offset = Lwt_unix.lseek store.fd 0 Unix.SEEK_END in
+    let* _written_len = locked_write_block store ~offset ~block in
+    if flush then L2block_index.flush store.index ;
+    Lwt.return_unit
 
-  type value = Inbox.t
+  let init ~data_dir ~readonly =
+    let open Lwt_syntax in
+    let (flag, perms) =
+      if readonly then (Unix.O_RDONLY, 0o444) else (Unix.O_RDWR, 0o644)
+    in
+    let* fd =
+      Lwt_unix.openfile
+        (Node_data.l2blocks_data data_dir)
+        [Unix.O_CREAT; O_CLOEXEC; flag]
+        perms
+    in
+    let index =
+      L2_block_index.v
+        ~log_size:blocks_log_size
+        ~readonly
+        (Node_data.l2blocks_index data_dir)
+    in
+    let scheduler = Lwt_idle_waiter.create () in
+    Lwt.return {index; fd; scheduler}
 
-  let key_to_string = L2block.Hash.to_b58check
+  let close store =
+    let open Lwt_syntax in
+    Lwt_idle_waiter.force_idle store.scheduler @@ fun () ->
+    (try L2_block_index.close store.index with Index.Closed -> ()) ;
+    let* _ignore = Lwt_utils_unix.safe_close store.fd in
+    Lwt.return_unit
+end
 
-  let value_encoding = Inbox.encoding
-end)
+module Tezos_block_store = struct
+  type t = {index : Tezos_block_index.t; scheduler : Lwt_idle_waiter.t}
 
-module L2_blocks = Make_map (struct
-  let location = ["tx_rollup"; "blocks"]
+  let log_size = 10_000
 
-  type key = L2block.hash
+  let mem store hash =
+    Lwt_idle_waiter.task store.scheduler @@ fun () ->
+    Lwt.return (Tezos_block_index.mem store.index hash)
 
-  type value = L2block.header
+  let find store hash =
+    let open Lwt_syntax in
+    Lwt_idle_waiter.task store.scheduler @@ fun () ->
+    Option.catch_os @@ fun () ->
+    let b = Tezos_block_index.find store.index hash in
+    return_some b
 
-  let key_to_string = L2block.Hash.to_b58check
+  let add ?(flush = true) store tezos_block l2_block =
+    Lwt_idle_waiter.force_idle store.scheduler @@ fun () ->
+    Tezos_block_index.replace store.index tezos_block l2_block ;
+    if flush then Tezos_block_index.flush store.index ;
+    Lwt.return_unit
 
-  let value_encoding = L2block.header_encoding
-end)
+  let init ~data_dir ~readonly =
+    let index =
+      Tezos_block_index.v
+        ~log_size
+        ~readonly
+        (Node_data.tezos_blocks_index data_dir)
+    in
+    let scheduler = Lwt_idle_waiter.create () in
+    Lwt.return {index; scheduler}
 
-module Rollup_levels = Make_map (struct
-  let location = ["tx_rollup"; "levels"]
+  let close store =
+    Lwt_idle_waiter.force_idle store.scheduler @@ fun () ->
+    (try Tezos_block_index.close store.index with Index.Closed -> ()) ;
+    Lwt.return_unit
+end
 
-  type key = L2block.level
+module Level_store = struct
+  type t = {index : Level_index.t; scheduler : Lwt_idle_waiter.t}
 
-  type value = L2block.hash
+  let log_size = 10_000
 
-  let key_to_string = L2block.level_to_string
+  let mem store hash =
+    Lwt_idle_waiter.task store.scheduler @@ fun () ->
+    Lwt.return (Level_index.mem store.index hash)
 
-  let value_encoding = L2block.Hash.encoding
-end)
+  let find store hash =
+    Lwt_idle_waiter.task store.scheduler @@ fun () ->
+    Option.catch_os @@ fun () ->
+    let b = Level_index.find store.index hash in
+    Lwt.return_some b
+
+  let add ?(flush = true) store level l2_block =
+    Lwt_idle_waiter.force_idle store.scheduler @@ fun () ->
+    Level_index.replace store.index level l2_block ;
+    if flush then Level_index.flush store.index ;
+    Lwt.return_unit
+
+  let init ~data_dir ~readonly =
+    let index =
+      Level_index.v ~log_size ~readonly (Node_data.levels_index data_dir)
+    in
+    let scheduler = Lwt_idle_waiter.create () in
+    Lwt.return {index; scheduler}
+
+  let close store =
+    Lwt_idle_waiter.force_idle store.scheduler @@ fun () ->
+    (try Level_index.close store.index with Index.Closed -> ()) ;
+    Lwt.return_unit
+end
+
+module Head_store = struct
+  type t = {file : string}
+
+  let read store =
+    let open Lwt_syntax in
+    let* exists = Lwt_unix.file_exists store.file in
+    match exists with
+    | false -> return_none
+    | true ->
+        Lwt_io.with_file
+          ~flags:[Unix.O_RDONLY; O_CLOEXEC]
+          ~mode:Input
+          store.file
+        @@ fun channel ->
+        let+ bytes = Lwt_io.read channel in
+        Data_encoding.Binary.of_bytes_opt
+          L2block.encoding
+          (Bytes.unsafe_of_string bytes)
+
+  let write store x =
+    let open Lwt_tzresult_syntax in
+    let*! res =
+      Lwt_utils_unix.with_atomic_open_out ~overwrite:true store.file
+      @@ fun fd ->
+      let+ block_bytes =
+        match Data_encoding.Binary.to_bytes_opt L2block.encoding block with
+        | None -> failwith "Cannot encode block" (* TODO proper error *)
+        | Some bytes -> return bytes
+      in
+      let*! () = Lwt_utils_unix.write_bytes fd block_bytes in
+      return_unit
+    in
+    match res with
+    | Ok res -> Lwt.return res
+    | Error _ ->
+        (* TODO proper error *)
+        failwith "Cannot write head file"
+
+  let init ~data_dir =
+    let open Lwt_syntax in
+    let* () = Node_data.mk_store_dir data_dir in
+    Lwt.return {file = Node_data.head_file data_dir}
+end
