@@ -328,3 +328,19 @@ let () =
     Data_encoding.(obj1 (req "context" Operation_hash.encoding))
     (function Tx_rollup_no_operation_metadata o -> Some o | _ -> None)
     (fun o -> Tx_rollup_no_operation_metadata o)
+
+type error += Tx_rollup_mismatch
+
+let () =
+  register_error_kind
+    ~id:"tx_rollup.node.different_disk_stored_rollup"
+    ~title:"Rollup on disk is different from the one provided"
+    ~description:"Rollup on disk is different from the provided rollup"
+    ~pp:(fun ppf () ->
+      Format.fprintf
+        ppf
+        "Rollup origination on disk is different from the provided rollup")
+    `Permanent
+    Data_encoding.unit
+    (function Tx_rollup_mismatch -> Some () | _ -> None)
+    (fun () -> Tx_rollup_mismatch)

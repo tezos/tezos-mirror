@@ -284,20 +284,18 @@ let init_rollup_origination cctxt stores ?rollup_genesis rollup =
   let*! origination_info =
     Stores.Rollup_origination_store.read stores.Stores.rollup_origination
   in
-  let store_rollup_origination =
-    Option.map
-      (fun (block_hash, block_level) -> {block_hash; block_level})
-      origination_info
-  in
   let* rollup_origination =
-    match (store_rollup_origination, rollup_genesis) with
+    match (origination_info, rollup_genesis) with
     | (None, None) ->
         fail
           [
             Error
             .Tx_rollup_no_rollup_origination_on_disk_and_no_rollup_genesis_given;
           ]
-    | (Some {block_hash; _}, Some genesis)
+    | (Some (stored_rollup, _, _), __) when Tx_rollup.(stored_rollup <> rollup)
+      ->
+        fail [Error.Tx_rollup_mismatch]
+    | (Some (_, block_hash, _), Some genesis)
       when Block_hash.(block_hash <> genesis) ->
         fail
           [
@@ -308,7 +306,7 @@ let init_rollup_origination cctxt stores ?rollup_genesis rollup =
                 given_rollup_genesis = genesis;
               };
           ]
-    | (Some rollup_orig, _) -> return rollup_orig
+    | (Some (_, block_hash, block_level), _) -> return {block_hash; block_level}
     | (None, Some rollup_genesis) ->
         let block = `Hash (rollup_genesis, 0) in
         let* block_info =
@@ -324,7 +322,7 @@ let init_rollup_origination cctxt stores ?rollup_genesis rollup =
         let* () =
           Stores.Rollup_origination_store.write
             stores.rollup_origination
-            (rollup_orig.block_hash, rollup_orig.block_level)
+            (rollup, rollup_orig.block_hash, rollup_orig.block_level)
         in
         return rollup_orig
   in

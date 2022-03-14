@@ -492,11 +492,15 @@ module Head_store = Make_singleton (struct
 end)
 
 module Rollup_origination_store = Make_singleton (struct
-  type t = Block_hash.t * int32
+  type t = Protocol.Alpha_context.Tx_rollup.t * Block_hash.t * int32
 
   let name = "rollup_origination"
 
-  let encoding = Data_encoding.tup2 Block_hash.encoding Data_encoding.int32
+  let encoding =
+    Data_encoding.tup3
+      Protocol.Alpha_context.Tx_rollup.encoding
+      Block_hash.encoding
+      Data_encoding.int32
 end)
 
 type t = {

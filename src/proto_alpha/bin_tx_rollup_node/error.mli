@@ -85,3 +85,6 @@ type error +=
 
 (** Error when operation metadata is not available. *)
 type error += Tx_rollup_no_operation_metadata of Operation_hash.t
+
+(** Error when rollup stored on disk is different from the expected one. *)
+type error += Tx_rollup_mismatch

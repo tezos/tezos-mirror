@@ -125,10 +125,15 @@ module Rollup_origination_store : sig
 
   (** Reads the current rollup origination information from disk. Returns [None]
       if the file does not exist or if it is corrupted. *)
-  val read : t -> (Block_hash.t * int32) option Lwt.t
+  val read :
+    t ->
+    (Protocol.Alpha_context.Tx_rollup.t * Block_hash.t * int32) option Lwt.t
 
   (** Write the rollup origination information to disk. *)
-  val write : t -> Block_hash.t * int32 -> unit tzresult Lwt.t
+  val write :
+    t ->
+    Protocol.Alpha_context.Tx_rollup.t * Block_hash.t * int32 ->
+    unit tzresult Lwt.t
 end
 
 (** The type of all stores of the Tx rollup node. *)
