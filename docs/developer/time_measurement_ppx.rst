@@ -70,9 +70,12 @@ When the preprocessing will occur, the code will be transformed as follows:
         (fun () -> g ())
       in
       let* c = h () in
-      let* __flush__id__0 = foo a b c in
-      let+ () = Tezos_time_measurement_runtime.Default.Time_measurement.flush () in
-      __flush__id__0
+      Lwt.bind
+        (foo a b c)
+        (fun __flush__id__0 ->
+          Lwt.map
+            (fun () -> __flush__id__0)
+            (Tezos_time_measurement_runtime.Default.Time_measurement.flush ()))
 
 Woah! What a mess... Let's see what this means.
 
