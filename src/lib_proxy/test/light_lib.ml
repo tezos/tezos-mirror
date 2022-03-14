@@ -116,7 +116,9 @@ let rec irmin_tree_to_simple_tree tree =
         let* pairs = Store.Tree.list tree [] in
         let+ l =
           List.map_s
-            (fun (k, i) -> irmin_tree_to_simple_tree i >|= fun st -> (k, st))
+            (fun (k, i) ->
+              let+ st = irmin_tree_to_simple_tree i in
+              (k, st))
             pairs
         in
         sdir_of_list l
