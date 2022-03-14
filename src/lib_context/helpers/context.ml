@@ -360,9 +360,29 @@ struct
     let+ (p, r) = Store.Tree.produce_proof repo key f in
     (Proof.to_tree p, r)
 
+  (* This is temporary until the release of irmin.3.2.0, see
+     https://github.com/mirage/irmin/issues/1790. *)
+  let specialise_error = function
+    | Ok r -> Lwt.return_ok r
+    | Error (`Msg error) ->
+        if
+          String.equal
+            error
+            "Bad_stream verify_stream: did not consume the full stream"
+        then Lwt.return_error (`Stream_too_long error)
+        else
+          let x = String.split ' ' error in
+          if
+            List.exists (String.equal "empty") x
+            && List.exists (String.equal "Bad_stream") x
+          then Lwt.return_error (`Stream_too_short error)
+          else Lwt.return_error (`Proof_mismatch error)
+
   let verify_tree_proof proof f =
+    let open Lwt_syntax in
     let proof = Proof.of_tree proof in
-    Store.Tree.verify_proof proof f
+    let* result = Store.Tree.verify_proof proof f in
+    specialise_error result
 
   let produce_stream_proof repo key f =
     let open Lwt_syntax in
@@ -373,8 +393,10 @@ struct
     (Proof.to_stream p, r)
 
   let verify_stream_proof proof f =
+    let open Lwt_syntax in
     let proof = Proof.of_stream proof in
-    Store.Tree.verify_stream proof f
+    let* result = Store.Tree.verify_stream proof f in
+    specialise_error result
 end
 
 type error += Unsupported_context_hash_version of Context_hash.Version.t

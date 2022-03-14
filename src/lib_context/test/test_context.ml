@@ -591,6 +591,85 @@ let test_to_memory_tree {idx; block2; _} : unit Lwt.t =
   let () = Assert.equal_bool true (Option.is_none tree) in
   return_unit
 
+let tree_of_list ls {idx; _} =
+  let ctxt = Context.empty idx in
+  let tree = Tree.empty ctxt in
+  Lwt_list.fold_left_s (fun tree (k, v) -> Tree.add tree k v) tree ls
+
+let hash_of_contents tree key =
+  let* tree = Tree.find_tree tree key in
+  match tree with
+  | None -> Assert.fail_msg "contents not found in tree"
+  | Some t -> Lwt.return (Tree.hash t)
+
+let test_proof_exn ctxt =
+  let open Lwt_syntax in
+  let open Context.Proof in
+  let bytes s = Bytes.of_string s in
+  let x = bytes "x" in
+  let y = bytes "y" in
+  let* tree = tree_of_list [(["bx"], x); (["by"], y)] ctxt in
+  let hash = Tree.hash tree in
+  let* hx = hash_of_contents tree ["bx"] in
+  let* hy = hash_of_contents tree ["by"] in
+  let stream_elt1 : Stream.elt = Value y in
+  let stream_elt2 : Stream.elt = Value x in
+  let stream_elt3 : Stream.elt = Node [("bx", `Value hx); ("by", `Value hy)] in
+  let stream_all =
+    {
+      version = 1;
+      before = `Node hash;
+      after = `Node hash;
+      state = List.to_seq [stream_elt3; stream_elt2; stream_elt1];
+    }
+  in
+  let stream_short =
+    {
+      version = 1;
+      before = `Node hash;
+      after = `Node hash;
+      state = List.to_seq [stream_elt3; stream_elt2];
+    }
+  in
+  let f_all t =
+    let* _ = Context.Tree.find t ["bx"] in
+    let+ _ = Context.Tree.find t ["by"] in
+    (t, ())
+  in
+  let f_short t =
+    let+ _ = Context.Tree.find t ["bx"] in
+    (t, ())
+  in
+  (* Test the Stream_too_long error. *)
+  let* r = Context.verify_stream_proof stream_all f_short in
+  let* () =
+    match r with
+    | Error (`Stream_too_long _) -> Lwt.return_unit
+    | _ -> Assert.fail_msg "expected Stream_too_long error"
+  in
+  (* Test the Stream_too_short error. *)
+  let* r = Context.verify_stream_proof stream_short f_all in
+  let* () =
+    match r with
+    | Error (`Stream_too_short _) -> Lwt.return_unit
+    | _ -> Assert.fail_msg "expected Stream_too_short error"
+  in
+  (* Test the correct usecase. *)
+  let* r = Context.verify_stream_proof stream_all f_all in
+  let* () =
+    match r with
+    | Ok (_, ()) -> return_unit
+    | Error e -> (
+        match e with
+        | `Proof_mismatch str ->
+            Assert.fail_msg "unexpected Proof_mismatch error: %s" str
+        | `Stream_too_long str ->
+            Assert.fail_msg "unexpected Stream_too_long error: %s" str
+        | `Stream_too_short str ->
+            Assert.fail_msg "unexpected Stream_too_short error: %s" str)
+  in
+  return_unit
+
 (******************************************************************************)
 
 let tests : (string * (t -> unit Lwt.t)) list =
@@ -611,6 +690,7 @@ let tests : (string * (t -> unit Lwt.t)) list =
     ("get_hash_version", test_get_version_hash);
     ("set_hash_version_tzresult", test_set_version_hash_tzresult);
     ("to_memory_tree", test_to_memory_tree);
+    ("proof exn", test_proof_exn);
   ]
 
 let tests =
