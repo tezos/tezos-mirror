@@ -355,6 +355,9 @@ let pp_balance_updates ppf = function
                     contract
                     Bond_id.pp
                     bond_id
+              | Tx_rollup_rejection_rewards -> "tx rollup rejection rewards"
+              | Tx_rollup_rejection_punishments ->
+                  "tx rollup rejection punishments"
             in
             let balance =
               match origin with

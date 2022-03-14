@@ -1870,7 +1870,7 @@ module Tx_rollup_commitment : sig
   val get_before_and_after_results :
     context ->
     Tx_rollup.t ->
-    Tx_rollup_level.t ->
+    Submitted_commitment.t ->
     message_position:int ->
     Tx_rollup_state.t ->
     (context
@@ -1914,6 +1914,12 @@ module Tx_rollup_commitment : sig
     Tx_rollup.t ->
     Signature.public_key_hash ->
     context tzresult Lwt.t
+
+  val slash_bond :
+    context ->
+    Tx_rollup.t ->
+    Signature.public_key_hash ->
+    (context * bool) tzresult Lwt.t
 
   val reject_commitment :
     context ->
@@ -2145,6 +2151,8 @@ module Receipt : sig
     | Initial_commitments
     | Minted
     | Frozen_bonds of Contract.t * Bond_id.t
+    | Tx_rollup_rejection_punishments
+    | Tx_rollup_rejection_rewards
 
   val compare_balance : balance -> balance -> int
 
@@ -3276,6 +3284,7 @@ module Token : sig
     | `Baking_bonuses
     | `Minted
     | `Liquidity_baking_subsidies
+    | `Tx_rollup_rejection_rewards
     | container ]
 
   type sink =
@@ -3283,6 +3292,7 @@ module Token : sig
     | `Double_signing_punishments
     | `Lost_endorsing_rewards of Signature.Public_key_hash.t * bool * bool
     | `Burned
+    | `Tx_rollup_rejection_punishments
     | container ]
 
   val allocated : context -> container -> (context * bool) tzresult Lwt.t

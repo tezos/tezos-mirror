@@ -94,5 +94,8 @@ let test_encodings () =
   let tx_rollup = Tx_rollup.Internal_for_tests.originated_tx_rollup nonce in
   let bond_id = Bond_id.Tx_rollup_bond_id tx_rollup in
   test_encodings (Frozen_bonds (Contract.implicit_contract pkh, bond_id))
+  >>=? fun () ->
+  test_encodings Tx_rollup_rejection_punishments >>=? fun () ->
+  test_encodings Tx_rollup_rejection_rewards
 
 let tests = Tztest.[tztest "receipt - encoding" `Quick test_encodings]

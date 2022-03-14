@@ -57,6 +57,16 @@ let remove_bond :
       Storage.Tx_rollup.Commitment_bond.remove ctxt bond_key >|=? just_ctxt
   | Some _ -> fail (Bond_in_use contract)
 
+let slash_bond ctxt tx_rollup contract =
+  let bond_key = (tx_rollup, contract) in
+  Storage.Tx_rollup.Commitment_bond.find ctxt bond_key
+  >>=? fun (ctxt, bond_counter) ->
+  match bond_counter with
+  | None -> return (ctxt, false)
+  | Some c ->
+      Storage.Tx_rollup.Commitment_bond.remove ctxt bond_key
+      >|=? fun (ctxt, _, _) -> (ctxt, Compare.Int.(0 < c))
+
 let find :
     Raw_context.t ->
     Tx_rollup_repr.t ->
@@ -282,7 +292,8 @@ let remove_commitment ctxt rollup state =
       >>?= fun state -> return (ctxt, state, tail)
   | None -> fail No_commitment_to_remove
 
-let get_nth_commitment level commitment message_position =
+let get_nth_commitment commitment message_position =
+  let level = commitment.level in
   Option.value_e
     ~error:
       (Error_monad.trace_of_error
@@ -294,11 +305,11 @@ let get_nth_commitment level commitment message_position =
             }))
     (List.nth_opt commitment.messages message_position)
 
-let get_before_and_after_results ctxt tx_rollup level ~message_position state =
-  Storage.Tx_rollup.Commitment.get ctxt (level, tx_rollup)
-  >>=? fun (ctxt, submitted_commitment) ->
+let get_before_and_after_results ctxt tx_rollup
+    (submitted_commitment : Submitted_commitment.t) ~message_position state =
   let commitment = submitted_commitment.commitment in
-  get_nth_commitment level commitment message_position >>?= fun after_hash ->
+  get_nth_commitment commitment message_position >>?= fun after_hash ->
+  let level = commitment.level in
   if Compare.Int.(message_position = 0) then
     match Tx_rollup_level_repr.pred level with
     | None ->
@@ -347,8 +358,8 @@ let get_before_and_after_results ctxt tx_rollup level ~message_position state =
     Storage.Tx_rollup.Commitment.get ctxt (level, tx_rollup)
     >>=? fun (ctxt, submitted_commitment) ->
     let commitment = submitted_commitment.commitment in
-    get_nth_commitment level commitment (message_position - 1)
-    >>?= fun before_hash -> return (ctxt, before_hash, after_hash)
+    get_nth_commitment commitment (message_position - 1) >>?= fun before_hash ->
+    return (ctxt, before_hash, after_hash)
 
 let reject_commitment ctxt rollup state level =
   match

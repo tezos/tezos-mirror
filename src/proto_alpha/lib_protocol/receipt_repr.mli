@@ -45,6 +45,8 @@ type balance =
   | Initial_commitments
   | Minted
   | Frozen_bonds of Contract_repr.t * Bond_id_repr.t
+  | Tx_rollup_rejection_punishments
+  | Tx_rollup_rejection_rewards
 
 (** Compares two balances. *)
 val compare_balance : balance -> balance -> int

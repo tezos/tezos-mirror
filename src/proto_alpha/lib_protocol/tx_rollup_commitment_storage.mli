@@ -57,14 +57,24 @@ val add_commitment :
   Tx_rollup_commitment_repr.t ->
   (Raw_context.t * Tx_rollup_state_repr.t) tzresult Lwt.t
 
-(** [remove_bond context tx_rollup contract] removes the bond for an
-    implicit contract.  This will fail if either the bond does not exist,
-    or the bond is currently in-use. *)
+(** [remove_bond context tx_rollup contract] removes the bond counter
+    for an implicit contract.  This will fail if either the bond does
+    not exist, or the bond is currently in-use ({i i.e.}, the counter
+    is strictly positive). *)
 val remove_bond :
   Raw_context.t ->
   Tx_rollup_repr.t ->
   Signature.public_key_hash ->
   Raw_context.t tzresult Lwt.t
+
+(** [slash_bond ctxt tx_rollup contract] removes the bond counter for
+    an implicit contract if it exists. Besides, it returns a boolean
+    to determine if this counter was strictly superior to 0. *)
+val slash_bond :
+  Raw_context.t ->
+  Tx_rollup_repr.t ->
+  Signature.public_key_hash ->
+  (Raw_context.t * bool) tzresult Lwt.t
 
 (** [find context tx_rollup level] returns the commitment
     for a level, if any exists.  If the rollup does not exist,
@@ -155,15 +165,13 @@ val reject_commitment :
   Tx_rollup_level_repr.t ->
   (Raw_context.t * Tx_rollup_state_repr.t) tzresult Lwt.t
 
-(** [get_before_and_after_results tx_rollup level ~message_position
-    state] returns the before and after roots for a given
-    [message_position], from the commitment on [tx_rollup] at [level].
-    If there is no commitment at [level], [Storage_error.Missing_key]
-    is returned. *)
+(** [get_before_and_after_results tx_rollup commitment
+    ~message_position state] returns the before and after roots for a
+    given [message_position], from [commitment] on [tx_rollup]. *)
 val get_before_and_after_results :
   Raw_context.t ->
   Tx_rollup_repr.t ->
-  Tx_rollup_level_repr.t ->
+  Tx_rollup_commitment_repr.Submitted_commitment.t ->
   message_position:int ->
   Tx_rollup_state_repr.t ->
   (Raw_context.t
