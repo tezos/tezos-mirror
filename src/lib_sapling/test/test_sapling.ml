@@ -303,6 +303,7 @@ let test_full_transaction () =
   ()
 
 let test_forge () =
+  let open Lwt_result_syntax in
   let module Core = Core.Client in
   let key = "SaplingForTezosV1" in
   let sk1 = List.nth Keys.xsks 0 in
@@ -316,7 +317,7 @@ let test_forge () =
   let t1 =
     Forge.forge_transaction [] [output] sk1 key ~bound_data:"pkh" state
   in
-  Example.Validator.verify_update t1 state key >>=? fun (_, state) ->
+  let* (_, state) = Example.Validator.verify_update t1 state key in
   let forge_input_opt = Forge.Input.get state 0L vk1 in
   let (_msg, forge_input) = Stdlib.Option.get @@ forge_input_opt in
   let forge_output = Forge.make_output addr2 10L Bytes.empty in
@@ -329,7 +330,8 @@ let test_forge () =
       ~bound_data:""
       state
   in
-  Example.Validator.verify_update transaction state key >>= function
+  let*! r = Example.Validator.verify_update transaction state key in
+  match r with
   | Error l ->
       pp_print_trace Format.err_formatter l ;
       assert false
@@ -346,7 +348,8 @@ let test_forge () =
           ~bound_data:""
           state
       in
-      Example.Validator.verify_update transaction state key >>= function
+      let*! r = Example.Validator.verify_update transaction state key in
+      match r with
       | Ok _ -> assert false
       | Error l ->
           assert (
@@ -356,6 +359,7 @@ let test_forge () =
           return_unit)
 
 let test_simple_client () =
+  let open Lwt_result_syntax in
   let open Example.Client in
   (*String that has to be equal to the one of the smart contract/verify_update*)
   let key = "SaplingForTezosV1" in
@@ -366,7 +370,7 @@ let test_simple_client () =
   let addr_b = new_address wb in
   (*a gives 2 to b and 1 (of change) to himself with 3 transparent money*)
   let (t1, wa) = pay wa addr_b 2L ~memo:"t1" 3L state key in
-  Example.Validator.verify_update t1 state key >>=? fun (balance, state) ->
+  let* (balance, state) = Example.Validator.verify_update t1 state key in
   assert (balance = -3L) ;
   let wb = scan wb state in
   assert (wb.balance = 2L) ;
@@ -375,7 +379,7 @@ let test_simple_client () =
   let addr_a = new_address wa in
   (* b gives 1 to a and 1 (of change) to himself with 2 transparent money*)
   let (t2, wb) = pay wb addr_a 1L ~memo:"t2" 2L state key in
-  Example.Validator.verify_update t2 state key >>=? fun (balance, state) ->
+  let* (balance, state) = Example.Validator.verify_update t2 state key in
   assert (balance = -2L) ;
   (* before scanning b still has 2*)
   assert (wb.balance = 2L) ;
@@ -386,7 +390,7 @@ let test_simple_client () =
   (*  b gives 1 to a with shielded money *)
   let addr_a = new_address wa in
   let (t3, wb) = pay wb addr_a 1L ~memo:"t3" 0L state key in
-  Example.Validator.verify_update t3 state key >>=? fun (balance, state) ->
+  let* (balance, state) = Example.Validator.verify_update t3 state key in
   assert (balance = 0L) ;
   let wb = scan wb state in
   assert (wb.balance = 2L) ;
@@ -396,7 +400,7 @@ let test_simple_client () =
   let addr_a = new_address wa in
   let (t4, wa) = pay wa addr_a 0L ~memo:"t4" Int64.minus_one state key in
   assert (wa.balance = 2L) ;
-  Example.Validator.verify_update t4 state key >>=? fun (balance, state) ->
+  let* (balance, state) = Example.Validator.verify_update t4 state key in
   assert (balance = 1L) ;
   let l_a =
     scan_ovk
@@ -420,6 +424,7 @@ let test_simple_client () =
 
 (* We sign and verify with two different strings and check that it fails *)
 let test_replay () =
+  let open Lwt_result_syntax in
   let open Example.Client in
   let right_string = "SaplingForTezosV1" in
   let wrong_string = "SaplingForTezosVaezf1" in
@@ -427,15 +432,15 @@ let test_replay () =
   let state = Storage.empty ~memo_size:2 in
   let addr = new_address wa in
   let (t1, _) = pay wa addr 2L ~memo:"t1" 3L state right_string in
-  Example.Validator.verify_update t1 state wrong_string >>= function
-  | Error _ -> return_unit
-  | _ -> assert false
+  let*! r = Example.Validator.verify_update t1 state wrong_string in
+  match r with Error _ -> return_unit | _ -> assert false
 
 (* A transaction is signed using "right" as bound_data and a different
    one with bound_data "wrong" and the same original signature is
    passed to verify_update. Verify_update should verify the signature
    and reject the modified transaction. *)
 let test_wrong_bound_data () =
+  let open Lwt_result_syntax in
   let open Example.Client in
   let key = "SaplingForTezosV1" in
   let wa = new_wallet (List.nth Keys.xsks 0) in
@@ -443,7 +448,8 @@ let test_wrong_bound_data () =
   let addr = new_address wa in
   let (t1, _) = pay wa addr 2L ~memo:"t1" ~bound_data:"right" 3L state key in
   let t1_wrong = {t1 with bound_data = "wrong"} in
-  Example.Validator.verify_update t1_wrong state key >>= function
+  let*! r = Example.Validator.verify_update t1_wrong state key in
+  match r with
   | Error [Example.Validator.Binding_sig_incorrect _] -> return_unit
   | _ -> assert false
 
