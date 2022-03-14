@@ -101,10 +101,16 @@ type t = {
   block3b : Context_hash.t;
 }
 
-let wrap_context_init f _ () =
+type init_config = {indexing_strategy : [`Always | `Minimal]}
+
+let wrap_context_init config f _ () =
   Lwt_utils_unix.with_tempdir "tezos_test_" (fun base_dir ->
       let root = base_dir // "context" in
-      let* idx = Context.init root in
+      let* idx =
+        match config with
+        | None -> Context.init root
+        | Some {indexing_strategy} -> Context.init ~indexing_strategy root
+      in
       let*!! genesis =
         Context.commit_genesis
           idx
@@ -515,7 +521,9 @@ let test_dump {idx; block3b; _} =
             (fun () -> Lwt_unix.close context_fd)
         in
         let root = base_dir2 // "context" in
-        let*! idx2 = Context.init ?patch_context:None root in
+        let*! idx2 =
+          Context.init ~indexing_strategy:`Always ?patch_context:None root
+        in
         let*! context_fd =
           Lwt_unix.openfile dumpfile Lwt_unix.[O_RDONLY] 0o444
         in
@@ -672,28 +680,33 @@ let test_proof_exn ctxt =
 
 (******************************************************************************)
 
-let tests : (string * (t -> unit Lwt.t)) list =
+let tests : (string * (t -> unit Lwt.t) * init_config option) list =
+  let test ?config name f = (name, f, config) in
   [
-    ("is_empty", test_is_empty);
-    ("simple", test_simple);
-    ("list", test_list);
-    ("continuation", test_continuation);
-    ("fork", test_fork);
-    ("replay", test_replay);
-    ("fold_keys_sorted", test_fold_keys_sorted);
-    ("fold_keys_undefined", test_fold_keys_undefined);
-    ("fold", test_fold);
-    ("trees", test_trees);
-    ("raw", test_raw);
-    ("dump", test_dump);
-    ("encoding", test_encoding);
-    ("get_hash_version", test_get_version_hash);
-    ("set_hash_version_tzresult", test_set_version_hash_tzresult);
-    ("to_memory_tree", test_to_memory_tree);
-    ("proof exn", test_proof_exn);
+    test "is_empty" test_is_empty;
+    test "simple" test_simple;
+    test "list" test_list;
+    test "continuation" test_continuation;
+    test "fork" test_fork;
+    test "replay" test_replay;
+    test "fold_keys_sorted" test_fold_keys_sorted;
+    test "fold_keys_undefined" test_fold_keys_undefined;
+    test "fold" test_fold;
+    test "trees" test_trees;
+    test "raw" test_raw;
+    (* NOTE: importing the context from a snapshot requires using an [`Always]
+       indexing strategy. See the docs for [Context.restore_context] for more
+       details. *)
+    test ~config:{indexing_strategy = `Always} "dump" test_dump;
+    test "encoding" test_encoding;
+    test "get_hash_version" test_get_version_hash;
+    test "set_hash_version_tzresult" test_set_version_hash_tzresult;
+    test "to_memory_tree" test_to_memory_tree;
+    test "proof exn" test_proof_exn;
   ]
 
 let tests =
   List.map
-    (fun (s, f) -> Alcotest_lwt.test_case s `Quick (wrap_context_init f))
+    (fun (s, f, config) ->
+      Alcotest_lwt.test_case s `Quick (wrap_context_init config f))
     tests

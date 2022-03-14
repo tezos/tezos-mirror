@@ -601,9 +601,13 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
 
   (*-- Initialisation ----------------------------------------------------------*)
 
-  let init ?patch_context ?(readonly = false) root =
+  let init ?patch_context ?(readonly = false) ?(indexing_strategy = `Minimal)
+      root =
     let open Lwt_syntax in
-    let indexing_strategy = Irmin_pack.Pack_store.Indexing_strategy.minimal in
+    let indexing_strategy =
+      let module I = Irmin_pack.Pack_store.Indexing_strategy in
+      match indexing_strategy with `Minimal -> I.minimal | `Always -> I.always
+    in
     let+ repo =
       Store.Repo.v
         (Irmin_pack.config

@@ -3544,7 +3544,11 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
         user_expected_block
     in
     let*! context_index =
-      Context.init ~readonly:false ?patch_context dst_context_dir
+      Context.init
+        ~readonly:false
+        ~indexing_strategy:`Always
+        ?patch_context
+        dst_context_dir
     in
     (* Restore context *)
     let* (block_data, genesis_context_hash, block_validation_result) =
