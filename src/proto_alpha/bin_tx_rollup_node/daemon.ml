@@ -238,11 +238,9 @@ let create_genesis_block state tezos_block =
   let open Lwt_result_syntax in
   let ctxt = Context.empty state.State.context_index in
   let*! context_hash = Context.commit ctxt in
-  let inbox_hash = Tx_rollup_inbox.hash_inbox [] in
   let header : L2block.header =
     {
       level = Genesis;
-      inbox_hash;
       tezos_block;
       predecessor = L2block.genesis_hash state.rollup;
       (* Genesis block is its own predecessor *)
@@ -276,7 +274,6 @@ let process_messages_and_inboxes (state : State.t)
       return (predecessor, predecessor_context)
   | Some inbox ->
       let*! context_hash = Context.commit context in
-      let inbox_hash = Inbox.hash_contents inbox.contents in
       let level =
         match predecessor.level with
         | Genesis -> L2block.Rollup_level Tx_rollup_level.root
@@ -285,7 +282,6 @@ let process_messages_and_inboxes (state : State.t)
       let header : L2block.header =
         {
           level;
-          inbox_hash;
           tezos_block = current_hash;
           predecessor = L2block.hash_header predecessor;
           context = context_hash;

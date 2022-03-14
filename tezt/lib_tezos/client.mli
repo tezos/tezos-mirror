@@ -904,6 +904,7 @@ module Tx_rollup : sig
     ?wait:string ->
     ?burn_cap:Tez.t ->
     ?storage_limit:int ->
+    ?hooks:Process.hooks ->
     src:string ->
     t ->
     string Process.runnable
@@ -929,7 +930,7 @@ module Tx_rollup : sig
     level:int ->
     roots:string list ->
     predecessor:string option ->
-    inbox_hash:string ->
+    inbox_merkle_root:string ->
     rollup:string ->
     src:string ->
     t ->
@@ -969,6 +970,7 @@ module Tx_rollup : sig
     level:int ->
     message:string ->
     position:int ->
+    path:string ->
     proof:bool ->
     context_hash:string ->
     withdraw_list_hash:string ->

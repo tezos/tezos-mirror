@@ -147,15 +147,15 @@ let check_commitment_predecessor ctxt state commitment =
   | (None, None) -> return ctxt
   | (provided, expected) -> fail (Wrong_predecessor_hash {provided; expected})
 
-let check_commitment_batches_and_inbox_hash ctxt tx_rollup commitment =
-  Tx_rollup_inbox_storage.get_metadata ctxt commitment.level tx_rollup
-  >>=? fun (ctxt, {inbox_length; hash; _}) ->
+let check_commitment_batches_and_merkle_root ctxt tx_rollup commitment =
+  Tx_rollup_inbox_storage.get ctxt commitment.level tx_rollup
+  >>=? fun (ctxt, {inbox_length; merkle_root; _}) ->
   fail_unless
-    Compare.List_length_with.(commitment.messages = Int32.to_int inbox_length)
+    Compare.List_length_with.(commitment.messages = inbox_length)
     Wrong_batch_count
   >>=? fun () ->
   fail_unless
-    (Tx_rollup_inbox_repr.equal_hash commitment.inbox_hash hash)
+    Tx_rollup_inbox_repr.Merkle.(commitment.inbox_merkle_root = merkle_root)
     Wrong_inbox_hash
   >>=? fun () -> return ctxt
 
@@ -171,7 +171,7 @@ let add_commitment ctxt tx_rollup state pkh commitment =
   (* Check the commitment has the correct values *)
   check_commitment_level state commitment >>?= fun () ->
   check_commitment_predecessor ctxt state commitment >>=? fun ctxt ->
-  check_commitment_batches_and_inbox_hash ctxt tx_rollup commitment
+  check_commitment_batches_and_merkle_root ctxt tx_rollup commitment
   >>=? fun ctxt ->
   (* Everything has been sorted out, let’s update the storage *)
   let current_level = (Raw_context.current_level ctxt).level in

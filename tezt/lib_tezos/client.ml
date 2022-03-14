@@ -1185,9 +1185,10 @@ let sign_block client block_hex ~delegate =
 
 module Tx_rollup = struct
   let originate ?(wait = "none") ?(burn_cap = Tez.of_int 9_999_999)
-      ?(storage_limit = 60_000) ~src client =
+      ?(storage_limit = 60_000) ?hooks ~src client =
     let process =
       spawn_command
+        ?hooks
         client
         [
           "--wait";
@@ -1242,7 +1243,7 @@ module Tx_rollup = struct
     {value = process; run = parse}
 
   let submit_commitment ?(wait = "none") ?burn_cap ?storage_limit ?hooks ~level
-      ~roots ~predecessor ~inbox_hash ~rollup ~src client =
+      ~roots ~predecessor ~inbox_merkle_root ~rollup ~src client =
     let process =
       let predecessor = Option.value ~default:"" predecessor in
       spawn_command
@@ -1255,7 +1256,7 @@ module Tx_rollup = struct
             "rollup";
             "commitment";
             Int.to_string level;
-            inbox_hash;
+            inbox_merkle_root;
             predecessor;
           ]
         @ [String.concat "!" roots]
@@ -1315,8 +1316,8 @@ module Tx_rollup = struct
     {value = process; run = parse}
 
   let submit_rejection ?(wait = "none") ?burn_cap ?storage_limit ?hooks ~level
-      ~message ~position ~proof ~context_hash ~withdraw_list_hash ~rollup ~src
-      client =
+      ~message ~position ~path ~proof ~context_hash ~withdraw_list_hash ~rollup
+      ~src client =
     let process =
       spawn_command
         ?hooks
@@ -1326,6 +1327,7 @@ module Tx_rollup = struct
         @ ["at"; "level"; string_of_int level]
         @ ["message"; message]
         @ ["at"; "position"; string_of_int position]
+        @ ["and"; "path"; path]
         @ ["with"; "proof"; string_of_bool proof]
         @ ["with"; "agreed"; "context"; "hash"; context_hash]
         @ ["and"; "withdraw"; "list"; withdraw_list_hash]

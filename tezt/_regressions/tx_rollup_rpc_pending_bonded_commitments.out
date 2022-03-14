@@ -1,8 +1,37 @@
 tezt/_regressions/tx_rollup_rpc_pending_bonded_commitments.out
 
+./tezos-client --wait none originate tx rollup from '[PUBLIC_KEY_HASH]' --burn-cap 9999999 --storage-limit 60000
+Node is bootstrapped.
+Estimated gas: 1410.040 units (will add 100 for safety)
+Operation successfully injected in the node.
+Operation hash is '[OPERATION_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  tezos-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.000378
+    Expected counter: 1
+    Gas limit: 1511
+    Storage limit: 60000 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000378
+      payload fees(the block proposer) ....... +ꜩ0.000378
+    Tx rollup origination:
+      From: [PUBLIC_KEY_HASH]
+      This tx rollup origination operation was successfully applied
+      Balance updates:
+        [PUBLIC_KEY_HASH] ... -ꜩ15
+        storage fees ........................... +ꜩ15
+      Consumed gas: 1410.040
+      Originated tx rollup: [TX_ROLLUP_HASH]
+
+
 ./tezos-client --wait none submit tx rollup batch 626c6f62 to '[TX_ROLLUP_HASH]' from '[PUBLIC_KEY_HASH]'
 Node is bootstrapped.
-Estimated gas: 2257.424 units (will add 100 for safety)
+Estimated gas: 2021.296 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -13,18 +42,18 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.000489
+    Fee to the baker: ꜩ0.000466
     Expected counter: 2
-    Gas limit: 2358
+    Gas limit: 2122
     Storage limit: 0 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.000489
-      payload fees(the block proposer) ....... +ꜩ0.000489
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000466
+      payload fees(the block proposer) ....... +ꜩ0.000466
     Tx rollup transaction:[TX_ROLLUP_HASH], 4 bytes, From: [PUBLIC_KEY_HASH]
       This tx rollup submit operation was successfully applied
       Balance updates:
         
-      Consumed gas: 2257.424
+      Consumed gas: 2021.296
 
 
 ./tezos-client --wait none submit tx rollup commitment 0 '[TX_ROLLUP_INBOX_HASH]'  '[TX_ROLLUP_MESSAGE_RESULT_HASH]' to '[TX_ROLLUP_HASH]' from '[PUBLIC_KEY_HASH]'
@@ -47,7 +76,7 @@ This sequence of operations was run:
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000697
       payload fees(the block proposer) ....... +ꜩ0.000697
-    Tx rollup commitment:[TX_ROLLUP_HASH], commitment 0 : messages = [TX_ROLLUP_MESSAGE_RESULT_HASH] predecessor  for inbox [TX_ROLLUP_INBOX_HASH]
+    Tx rollup commitment:[TX_ROLLUP_HASH], commitment 0 : messages = [TX_ROLLUP_MESSAGE_RESULT_HASH] predecessor  for inbox with merkle root [TX_ROLLUP_INBOX_HASH]
       From: [PUBLIC_KEY_HASH]
       This tx rollup commit operation was successfully applied
       Balance updates:

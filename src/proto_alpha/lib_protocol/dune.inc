@@ -40,6 +40,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    block_payload_hash.mli block_payload_hash.ml
    origination_nonce.mli origination_nonce.ml
    tx_rollup_prefixes.mli tx_rollup_prefixes.ml
+   merkle_list.mli merkle_list.ml
    slot_repr.mli slot_repr.ml
    tez_repr.mli tez_repr.ml
    period_repr.mli period_repr.ml
@@ -195,7 +196,6 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    voting_services.mli voting_services.ml
    tx_rollup_services.mli tx_rollup_services.ml
    alpha_services.mli alpha_services.ml
-   merkle_list.mli merkle_list.ml
    main.mli main.ml
    (:src_dir TEZOS_PROTOCOL))
  (action
@@ -217,6 +217,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    block_payload_hash.mli block_payload_hash.ml
    origination_nonce.mli origination_nonce.ml
    tx_rollup_prefixes.mli tx_rollup_prefixes.ml
+   merkle_list.mli merkle_list.ml
    slot_repr.mli slot_repr.ml
    tez_repr.mli tez_repr.ml
    period_repr.mli period_repr.ml
@@ -372,7 +373,6 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    voting_services.mli voting_services.ml
    tx_rollup_services.mli tx_rollup_services.ml
    alpha_services.mli alpha_services.ml
-   merkle_list.mli merkle_list.ml
    main.mli main.ml
    (:src_dir TEZOS_PROTOCOL))
  (action (with-stdout-to %{targets}
@@ -394,6 +394,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    block_payload_hash.mli block_payload_hash.ml
    origination_nonce.mli origination_nonce.ml
    tx_rollup_prefixes.mli tx_rollup_prefixes.ml
+   merkle_list.mli merkle_list.ml
    slot_repr.mli slot_repr.ml
    tez_repr.mli tez_repr.ml
    period_repr.mli period_repr.ml
@@ -549,7 +550,6 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    voting_services.mli voting_services.ml
    tx_rollup_services.mli tx_rollup_services.ml
    alpha_services.mli alpha_services.ml
-   merkle_list.mli merkle_list.ml
    main.mli main.ml)
  (action
   (write-file %{targets}
@@ -593,6 +593,7 @@ include Tezos_raw_protocol_alpha.Main
    Block_payload_hash
    Origination_nonce
    Tx_rollup_prefixes
+   Merkle_list
    Slot_repr
    Tez_repr
    Period_repr
@@ -748,7 +749,6 @@ include Tezos_raw_protocol_alpha.Main
    Voting_services
    Tx_rollup_services
    Alpha_services
-   Merkle_list
    Main))
 
 (install
@@ -811,6 +811,7 @@ include Tezos_raw_protocol_alpha.Main
    block_payload_hash.mli block_payload_hash.ml
    origination_nonce.mli origination_nonce.ml
    tx_rollup_prefixes.mli tx_rollup_prefixes.ml
+   merkle_list.mli merkle_list.ml
    slot_repr.mli slot_repr.ml
    tez_repr.mli tez_repr.ml
    period_repr.mli period_repr.ml
@@ -966,7 +967,6 @@ include Tezos_raw_protocol_alpha.Main
    voting_services.mli voting_services.ml
    tx_rollup_services.mli tx_rollup_services.ml
    alpha_services.mli alpha_services.ml
-   merkle_list.mli merkle_list.ml
    main.mli main.ml
   (:src_dir TEZOS_PROTOCOL))
  (action (run %{bin:tezos-protocol-compiler} -no-hash-check .)))

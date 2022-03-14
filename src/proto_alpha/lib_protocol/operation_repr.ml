@@ -321,6 +321,7 @@ and _ manager_operation =
       level : Tx_rollup_level_repr.t;
       message : Tx_rollup_message_repr.t;
       message_position : int;
+      message_path : Tx_rollup_inbox_repr.Merkle.path;
       previous_message_result : Tx_rollup_commitment_repr.message_result;
       proof : Tx_rollup_l2_proof.t;
     }
@@ -713,11 +714,12 @@ module Encoding = struct
           tag = tx_rollup_operation_rejection_tag;
           name = "tx_rollup_rejection";
           encoding =
-            obj6
+            obj7
               (req "rollup" Tx_rollup_repr.encoding)
               (req "level" Tx_rollup_level_repr.encoding)
               (req "message" Tx_rollup_message_repr.encoding)
               (req "message_position" n)
+              (req "message_path" Tx_rollup_inbox_repr.Merkle.path_encoding)
               (req
                  "previous_message_result"
                  Tx_rollup_commitment_repr.message_result_encoding)
@@ -733,6 +735,7 @@ module Encoding = struct
                   level;
                   message;
                   message_position;
+                  message_path;
                   previous_message_result;
                   proof;
                 } ->
@@ -740,6 +743,7 @@ module Encoding = struct
                   level,
                   message,
                   Z.of_int message_position,
+                  message_path,
                   previous_message_result,
                   proof ));
           inj =
@@ -747,6 +751,7 @@ module Encoding = struct
                    level,
                    message,
                    message_position,
+                   message_path,
                    previous_message_result,
                    proof ) ->
               Tx_rollup_rejection
@@ -755,6 +760,7 @@ module Encoding = struct
                   level;
                   message;
                   message_position = Z.to_int message_position;
+                  message_path;
                   previous_message_result;
                   proof;
                 });

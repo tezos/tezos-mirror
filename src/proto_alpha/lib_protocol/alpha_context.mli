@@ -1725,37 +1725,25 @@ end
 (** This module re-exports definitions from {!Tx_rollup_inbox_repr} and
     {!Tx_rollup_inbox_storage}. *)
 module Tx_rollup_inbox : sig
-  type hash
+  module Merkle : sig
+    type root
 
-  type t = {
-    contents : Tx_rollup_message.hash list;
-    cumulated_size : int;
-    hash : hash;
-  }
+    type path
 
-  val compare_hash : hash -> hash -> int
+    val path_encoding : path Data_encoding.t
 
-  val equal_hash : hash -> hash -> bool
+    val root_encoding : root Data_encoding.t
 
-  val pp_hash : Format.formatter -> hash -> unit
+    val root_of_b58check_opt : string -> root option
 
-  val hash_of_bytes_exn : bytes -> hash
+    val compute_path : Tx_rollup_message.hash list -> int -> path tzresult
 
-  val hash_of_bytes_opt : bytes -> hash option
+    val merklize_list : Tx_rollup_message.hash list -> root
+  end
 
-  val hash_of_b58check_exn : string -> hash
+  type t = {inbox_length : int; cumulated_size : int; merkle_root : Merkle.root}
 
-  val hash_of_b58check_opt : string -> hash option
-
-  val hash_encoding : hash Data_encoding.t
-
-  val hash_to_bytes : hash -> bytes
-
-  val hash_to_b58check : hash -> string
-
-  val extend_hash : hash -> Tx_rollup_message.hash -> hash
-
-  val hash_inbox : Tx_rollup_message.t list -> hash
+  val ( = ) : t -> t -> bool
 
   val pp : Format.formatter -> t -> unit
 
@@ -1767,12 +1755,6 @@ module Tx_rollup_inbox : sig
     Tx_rollup_state.t ->
     Tx_rollup_message.t ->
     (context * Tx_rollup_state.t) tzresult Lwt.t
-
-  val message_hashes :
-    context ->
-    Tx_rollup_level.t ->
-    Tx_rollup.t ->
-    (context * Tx_rollup_message.hash list) tzresult Lwt.t
 
   val size :
     context ->
@@ -1795,17 +1777,8 @@ module Tx_rollup_inbox : sig
     Tx_rollup.t ->
     position:int ->
     Tx_rollup_message.t ->
+    Merkle.path ->
     context tzresult Lwt.t
-
-  module Internal_for_tests : sig
-    type metadata = {inbox_length : int32; cumulated_size : int; hash : hash}
-
-    val get_metadata :
-      context ->
-      Tx_rollup_level.t ->
-      Tx_rollup.t ->
-      (context * metadata) tzresult Lwt.t
-  end
 end
 
 (** This simply re-exports [Tx_rollup_commitment_repr] *)
@@ -1826,7 +1799,7 @@ module Tx_rollup_commitment : sig
     level : Tx_rollup_level.t;
     messages : Tx_rollup_message_result_hash.t list;
     predecessor : Tx_rollup_commitment_hash.t option;
-    inbox_hash : Tx_rollup_inbox.hash;
+    inbox_merkle_root : Tx_rollup_inbox.Merkle.root;
   }
 
   include Compare.S with type t := t
@@ -1970,7 +1943,7 @@ module Tx_rollup_errors : sig
         position : int;
         length : int;
       }
-    | Wrong_message_hash
+    | Wrong_message_path of {expected : Tx_rollup_inbox.Merkle.root}
     | No_finalized_commitment_for_level of {
         level : Tx_rollup_level.t;
         window : (Tx_rollup_level.t * Tx_rollup_level.t) option;
@@ -2860,6 +2833,7 @@ and _ manager_operation =
       level : Tx_rollup_level.t;
       message : Tx_rollup_message.t;
       message_position : int;
+      message_path : Tx_rollup_inbox.Merkle.path;
       previous_message_result : Tx_rollup_commitment.message_result;
       proof : Tx_rollup_l2_proof.t;
     }

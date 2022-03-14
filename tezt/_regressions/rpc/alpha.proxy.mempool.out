@@ -672,6 +672,10 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                         "title": "An Ed25519 public key hash (Base58Check-encoded)",
                         "$ref": "#/definitions/unistring"
                       },
+                      "Inbox_list_hash": {
+                        "title": "A merkle root hash for inboxes (Base58Check-encoded)",
+                        "$ref": "#/definitions/unistring"
+                      },
                       "Message_result_hash": {
                         "title": "A message result (Base58Check-encoded)",
                         "$ref": "#/definitions/unistring"
@@ -698,10 +702,6 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       "Signature.Public_key_hash": {
                         "title": "A Ed25519, Secp256k1, or P256 public key hash (Base58Check-encoded)",
-                        "$ref": "#/definitions/unistring"
-                      },
-                      "Tx_rollup_inbox_hash": {
-                        "title": "The hash of a transaction rollup inbox (Base58Check-encoded)",
                         "$ref": "#/definitions/unistring"
                       },
                       "Tx_rollup_l2_address": {
@@ -1974,12 +1974,12 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                       }
                                     ]
                                   },
-                                  "inbox_hash": {
-                                    "$ref": "#/definitions/Tx_rollup_inbox_hash"
+                                  "inbox_merkle_root": {
+                                    "$ref": "#/definitions/Inbox_list_hash"
                                   }
                                 },
                                 "required": [
-                                  "inbox_hash",
+                                  "inbox_merkle_root",
                                   "predecessor",
                                   "batches",
                                   "level"
@@ -2285,6 +2285,12 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                               "message_position": {
                                 "$ref": "#/definitions/positive_bignum"
                               },
+                              "message_path": {
+                                "type": "array",
+                                "items": {
+                                  "$ref": "#/definitions/Inbox_list_hash"
+                                }
+                              },
                               "previous_message_result": {
                                 "type": "object",
                                 "properties": {
@@ -2308,6 +2314,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                             "required": [
                               "proof",
                               "previous_message_result",
+                              "message_path",
                               "message_position",
                               "message",
                               "level",
@@ -5056,6 +5063,24 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                   "kind": "named"
                                 },
                                 {
+                                  "kind": "dyn",
+                                  "num_fields": 1,
+                                  "size": "Uint30"
+                                },
+                                {
+                                  "name": "message_path",
+                                  "layout": {
+                                    "layout": {
+                                      "kind": "Bytes"
+                                    },
+                                    "kind": "Seq"
+                                  },
+                                  "data_kind": {
+                                    "kind": "Variable"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
                                   "name": "previous_message_result",
                                   "layout": {
                                     "name": "X_10",
@@ -6706,7 +6731,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                               "kind": "named"
                             },
                             {
-                              "name": "inbox_hash",
+                              "name": "inbox_merkle_root",
                               "layout": {
                                 "kind": "Bytes"
                               },
@@ -7972,6 +7997,10 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                         "title": "An Ed25519 public key hash (Base58Check-encoded)",
                         "$ref": "#/definitions/unistring"
                       },
+                      "Inbox_list_hash": {
+                        "title": "A merkle root hash for inboxes (Base58Check-encoded)",
+                        "$ref": "#/definitions/unistring"
+                      },
                       "Message_result_hash": {
                         "title": "A message result (Base58Check-encoded)",
                         "$ref": "#/definitions/unistring"
@@ -7998,10 +8027,6 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       "Signature.Public_key_hash": {
                         "title": "A Ed25519, Secp256k1, or P256 public key hash (Base58Check-encoded)",
-                        "$ref": "#/definitions/unistring"
-                      },
-                      "Tx_rollup_inbox_hash": {
-                        "title": "The hash of a transaction rollup inbox (Base58Check-encoded)",
                         "$ref": "#/definitions/unistring"
                       },
                       "Tx_rollup_l2_address": {
@@ -9274,12 +9299,12 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                       }
                                     ]
                                   },
-                                  "inbox_hash": {
-                                    "$ref": "#/definitions/Tx_rollup_inbox_hash"
+                                  "inbox_merkle_root": {
+                                    "$ref": "#/definitions/Inbox_list_hash"
                                   }
                                 },
                                 "required": [
-                                  "inbox_hash",
+                                  "inbox_merkle_root",
                                   "predecessor",
                                   "batches",
                                   "level"
@@ -9585,6 +9610,12 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                               "message_position": {
                                 "$ref": "#/definitions/positive_bignum"
                               },
+                              "message_path": {
+                                "type": "array",
+                                "items": {
+                                  "$ref": "#/definitions/Inbox_list_hash"
+                                }
+                              },
                               "previous_message_result": {
                                 "type": "object",
                                 "properties": {
@@ -9608,6 +9639,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                             "required": [
                               "proof",
                               "previous_message_result",
+                              "message_path",
                               "message_position",
                               "message",
                               "level",

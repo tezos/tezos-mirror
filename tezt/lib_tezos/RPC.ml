@@ -580,6 +580,61 @@ module Tx_rollup = struct
       sub_path ~chain ~block ~rollup ["pending_bonded_commitments"; pkh]
     in
     Client.Spawn.rpc ?endpoint ?hooks GET path client
+
+  module Forge = struct
+    module Inbox = struct
+      let message_hash ?endpoint ?hooks ?(chain = "main") ?(block = "head")
+          ~data client =
+        let path =
+          [
+            "chains";
+            chain;
+            "blocks";
+            block;
+            "helpers";
+            "forge";
+            "tx_rollup";
+            "inbox";
+            "message_hash";
+          ]
+        in
+        Client.Spawn.rpc ?endpoint ?hooks ~data POST path client
+
+      let merkle_tree_hash ?endpoint ?hooks ?(chain = "main") ?(block = "head")
+          ~data client =
+        let path =
+          [
+            "chains";
+            chain;
+            "blocks";
+            block;
+            "helpers";
+            "forge";
+            "tx_rollup";
+            "inbox";
+            "merkle_tree_hash";
+          ]
+        in
+        Client.Spawn.rpc ?endpoint ?hooks ~data POST path client
+
+      let merkle_tree_path ?endpoint ?hooks ?(chain = "main") ?(block = "head")
+          ~data client =
+        let path =
+          [
+            "chains";
+            chain;
+            "blocks";
+            block;
+            "helpers";
+            "forge";
+            "tx_rollup";
+            "inbox";
+            "merkle_tree_path";
+          ]
+        in
+        Client.Spawn.rpc ?endpoint ?hooks ~data POST path client
+    end
+  end
 end
 
 module Sc_rollup = struct

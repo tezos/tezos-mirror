@@ -485,7 +485,7 @@ val submit_tx_rollup_commitment :
   src_sk:Client_keys.sk_uri ->
   fee_parameter:Injection.fee_parameter ->
   level:int32 ->
-  inbox_hash:string ->
+  inbox_merkle_root:string ->
   batches:string ->
   predecessor:string option ->
   tx_rollup:Tx_rollup.t ->
@@ -565,6 +565,7 @@ val submit_tx_rollup_rejection :
   tx_rollup:Tx_rollup.t ->
   message:string ->
   message_position:int ->
+  message_path:string ->
   context_hash:string ->
   withdrawals_merkle_root:string ->
   proof:bool ->

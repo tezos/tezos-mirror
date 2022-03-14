@@ -60,7 +60,7 @@ type error +=
       position : int;
       length : int;
     }
-  | Wrong_message_hash
+  | Wrong_message_path of {expected : Tx_rollup_inbox_repr.Merkle.root}
   | No_finalized_commitment_for_level of {
       level : Tx_rollup_level_repr.t;
       window : (Tx_rollup_level_repr.t * Tx_rollup_level_repr.t) option;
@@ -384,13 +384,14 @@ let () =
   register_error_kind
     `Branch
     ~id:"tx_rollup_wrong_message_hash"
-    ~title:"Wrong message hash in rejection."
+    ~title:"Wrong message path in rejection."
     ~description:
-      "This rejection has sent a message with a hash that doesn't match the \
-       stored one"
-    unit
-    (function Wrong_message_hash -> Some () | _ -> None)
-    (fun () -> Wrong_message_hash) ;
+      "This rejection has sent a message  and a path that does not fit the \
+       current merkle root hash in the corresponding inbox"
+    (obj1
+       (req "expected_merkle_root" Tx_rollup_inbox_repr.Merkle.root_encoding))
+    (function Wrong_message_path {expected} -> Some expected | _ -> None)
+    (fun expected -> Wrong_message_path {expected}) ;
   (* No_finalized_commitment_for_level *)
   register_error_kind
     `Temporary

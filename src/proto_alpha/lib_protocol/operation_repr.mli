@@ -366,6 +366,7 @@ and _ manager_operation =
       level : Tx_rollup_level_repr.t;
       message : Tx_rollup_message_repr.t;
       message_position : int;
+      message_path : Tx_rollup_inbox_repr.Merkle.path;
       previous_message_result : Tx_rollup_commitment_repr.message_result;
       proof : Tx_rollup_l2_proof.t;
     }

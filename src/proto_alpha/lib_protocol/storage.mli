@@ -615,14 +615,13 @@ module Tx_rollup : sig
        and type value = Tx_rollup_state_repr.t
        and type t := Raw_context.t
 
-  (** Each inbox has a set of metadata attached to it. See
-      {!Tx_rollup_inbox_repr.metadata} for a description of the actual
-      content. *)
-  module Inbox_metadata :
+  (** The representation of an inbox. See {!Tx_rollup_inbox_repr.t}
+     for a description of the actual content. *)
+  module Inbox :
     Non_iterable_indexed_carbonated_data_storage
       with type t := Raw_context.t * Tx_rollup_level_repr.t
        and type key = Tx_rollup_repr.t
-       and type value = Tx_rollup_inbox_repr.metadata
+       and type value = Tx_rollup_inbox_repr.t
 
   (** A carbonated storage of the set of withdrawals consumed
       of those potentially associated to each message
@@ -634,40 +633,7 @@ module Tx_rollup : sig
        and type key = int32
        and type value = Tx_rollup_withdraw_repr.Withdrawal_accounting.t
 
-  (** A carbonated storage to store the hashes of the messages
-      appended in an inbox. The key is the batch number, which is
-      sequentially assigned from 0.
-
-      The actual content is already stored in the block (as part of
-      the operations), so by only storing the hashes we avoid
-      unnecessary storage duplication. *)
-  module Inbox_contents : sig
-    include
-      Non_iterable_indexed_carbonated_data_storage
-        with type t :=
-              (Raw_context.t * Tx_rollup_level_repr.t) * Tx_rollup_repr.t
-         and type key = int32
-         and type value = Tx_rollup_message_repr.hash
-
-    (** [list_values ?offset ?length ((ctxt, tx_level), rollup)]
-        returns the list of message hashes of the inbox of [rollup] at
-        [tx_level].
-
-        [length] and [offset] can be used to retrieve a subset of the
-        result. [length] is the maximum number of elements to fetch. A
-        negative [length] produces an empty list of results. [offset]
-        is the number of elements to ignore. If [offset] is negative,
-        then it is treated as if it were equal to [0].
-
-        {b: Note:} This is the same HACK as [Big_map.Contents]. **)
-    val list_values :
-      ?offset:int ->
-      ?length:int ->
-      (Raw_context.t * Tx_rollup_level_repr.t) * Tx_rollup_repr.t ->
-      (Raw_context.t * Tx_rollup_message_repr.hash list) tzresult Lwt.t
-  end
-
-  (* A rollup can have at most one commitment per rollup level. Some
+  (** A rollup can have at most one commitment per rollup level. Some
      metadata are saved in addition to the commitment itself. See
      {!Tx_rollup_commitment_repr.Submitted_commitment.t} for the exact
      content. *)
@@ -677,13 +643,12 @@ module Tx_rollup : sig
        and type value = Tx_rollup_commitment_repr.Submitted_commitment.t
        and type t := Raw_context.t
 
-  (* This stores information about which contracts have bonds
+  (** This stores information about which contracts have bonds
      for each rollup, and how many commitments those bonds
      stake. *)
   module Commitment_bond :
     Non_iterable_indexed_carbonated_data_storage
       with type key = Tx_rollup_repr.t * Signature.public_key_hash
-      (* The value here is the number of unfinalized commitments *)
        and type value = int
        and type t := Raw_context.t
 end

@@ -168,20 +168,8 @@ module Block = struct
     RPC_service.get_service
       ~description:"Get the tx-rollup-node inbox for a given block"
       ~query:RPC_query.empty
-      ~output:
-        Data_encoding.(
-          option
-          @@ merge_objs
-               (obj1 (req "hash" Alpha_context.Tx_rollup_inbox.hash_encoding))
-               Inbox.encoding)
+      ~output:Data_encoding.(option Inbox.encoding)
       RPC_path.(path / "inbox")
-
-  let proto_inbox =
-    RPC_service.get_service
-      ~description:"Get the tx-rollup-node \"protocol\" inbox for a given block"
-      ~query:RPC_query.empty
-      ~output:(Data_encoding.option Alpha_context.Tx_rollup_inbox.encoding)
-      RPC_path.(path / "proto_inbox")
 
   let block_of_id state block_id =
     let open Lwt_syntax in
@@ -234,26 +222,7 @@ module Block = struct
             | `Tezos_block b when Block_hash.(block.header.tezos_block <> b) ->
                 (* Tezos block has no l2 inbox *)
                 return None
-            | _ ->
-                return
-                  (Some (Inbox.hash_contents block.inbox.contents, block.inbox))
-            ))
-
-  let () =
-    register proto_inbox @@ fun (state, block_id) () () ->
-    let*! hash = block_of_id state block_id in
-    match hash with
-    | None -> return None
-    | Some hash -> (
-        let*! block = State.get_block state hash in
-        match block with
-        | None -> return None
-        | Some block -> (
-            match block_id with
-            | `Tezos_block b when Block_hash.(block.header.tezos_block <> b) ->
-                (* Tezos block has no l2 inbox *)
-                return None
-            | _ -> return (Some (Inbox.to_protocol_inbox block.inbox))))
+            | _ -> return (Some block.inbox)))
 
   let build_directory state =
     !directory

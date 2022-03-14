@@ -82,7 +82,7 @@ type t = {
   level : Tx_rollup_level_repr.t;
   messages : Message_result_hash.t list;
   predecessor : Commitment_hash.t option;
-  inbox_hash : Tx_rollup_inbox_repr.hash;
+  inbox_merkle_root : Tx_rollup_inbox_repr.Merkle.root;
 }
 
 include Compare.S with type t := t

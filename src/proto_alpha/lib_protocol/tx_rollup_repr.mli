@@ -95,3 +95,5 @@ type deposit_parameters = {
 }
 
 module Set : Set.S with type elt = tx_rollup
+
+module Map : Map.S with type key = tx_rollup

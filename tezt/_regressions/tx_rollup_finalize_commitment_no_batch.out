@@ -1,5 +1,34 @@
 tezt/_regressions/tx_rollup_finalize_commitment_no_batch.out
 
+./tezos-client --wait none originate tx rollup from '[PUBLIC_KEY_HASH]' --burn-cap 9999999 --storage-limit 60000
+Node is bootstrapped.
+Estimated gas: 1410.040 units (will add 100 for safety)
+Operation successfully injected in the node.
+Operation hash is '[OPERATION_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  tezos-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.000378
+    Expected counter: 1
+    Gas limit: 1511
+    Storage limit: 60000 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000378
+      payload fees(the block proposer) ....... +ꜩ0.000378
+    Tx rollup origination:
+      From: [PUBLIC_KEY_HASH]
+      This tx rollup origination operation was successfully applied
+      Balance updates:
+        [PUBLIC_KEY_HASH] ... -ꜩ15
+        storage fees ........................... +ꜩ15
+      Consumed gas: 1410.040
+      Originated tx rollup: [TX_ROLLUP_HASH]
+
+
 ./tezos-client --wait none submit tx rollup finalize commitment to '[TX_ROLLUP_HASH]' from '[PUBLIC_KEY_HASH]'
 Node is bootstrapped.
 This simulation failed:

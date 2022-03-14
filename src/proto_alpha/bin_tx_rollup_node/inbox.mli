@@ -31,9 +31,6 @@
 open Protocol
 open Alpha_context
 
-(** Alias for type of inbox hashes *)
-type hash = Tx_rollup_inbox.hash
-
 (** Result of application of an inbox message *)
 type message_result =
   | Interpreted of Tx_rollup_l2_apply.Message_result.t
@@ -53,15 +50,8 @@ type message = {
     hashed messages. *)
 type t = {contents : message list; cumulated_size : int}
 
-(** [to_protocol_inbox node_inbox] will hash the contents of [node_inbox] to
-    produces an [Tx_rollup_inbox.t]. *)
-val to_protocol_inbox : t -> Tx_rollup_inbox.t
-
 (** Encoding for inbox messages *)
 val message_encoding : message Data_encoding.t
 
 (** Encoding for inboxes *)
 val encoding : t Data_encoding.t
-
-(** Hash contents of inbox. This gives the inbox hash. *)
-val hash_contents : message list -> hash

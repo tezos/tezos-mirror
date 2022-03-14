@@ -28,8 +28,6 @@
 open Protocol
 open Alpha_context
 
-type hash = Tx_rollup_inbox.hash
-
 type message_result =
   | Interpreted of Tx_rollup_l2_apply.Message_result.t
   | Discarded of tztrace
@@ -79,19 +77,3 @@ let encoding =
     (obj2
        (req "contents" @@ list message_encoding)
        (req "cumulated_size" int31))
-
-let to_protocol_contents contents =
-  List.map
-    (fun {message; _} -> Tx_rollup_message.hash_uncarbonated message)
-    contents
-
-let hash_contents contents =
-  Tx_rollup_inbox.hash_inbox @@ List.map (fun {message; _} -> message) contents
-
-let to_protocol_inbox {contents; cumulated_size} =
-  Tx_rollup_inbox.
-    {
-      contents = to_protocol_contents contents;
-      cumulated_size;
-      hash = hash_contents contents;
-    }

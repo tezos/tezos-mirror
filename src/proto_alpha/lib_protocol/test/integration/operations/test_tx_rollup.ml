@@ -146,25 +146,6 @@ let inbox_burn state size =
     the inbox. *)
 let burn_per_byte state = inbox_burn state 1
 
-(** [check_batch_in_inbox inbox n expected] checks that the [n]th
-    element of [inbox] is a batch equal to [expected]. *)
-let check_batch_in_inbox :
-    t -> Tx_rollup_inbox.t -> int -> string -> unit tzresult Lwt.t =
- fun ctxt inbox n expected ->
-  let (expected_batch, _) = Tx_rollup_message.make_batch expected in
-  Environment.wrap_tzresult (Tx_rollup_message.hash ctxt expected_batch)
-  >>?= fun (_ctxt, expected_hash) ->
-  match List.nth inbox.contents n with
-  | Some content ->
-      Alcotest.(
-        check
-          message_hash_testable
-          "Expected batch with a different content"
-          content
-          expected_hash) ;
-      return_unit
-  | _ -> Alcotest.fail "Selected message in the inbox is not a batch"
-
 (** [context_init n] initializes a context with no consensus rewards
     to not interfere with balances prediction. It returns the created
     context and [n] contracts. *)
@@ -243,8 +224,7 @@ let public_key_hash_testable =
 
 let raw_level_testable = Alcotest.testable Raw_level.pp Raw_level.( = )
 
-let inbox_hash_testable =
-  Alcotest.testable Tx_rollup_inbox.pp_hash Tx_rollup_inbox.equal_hash
+let inbox_testable = Alcotest.testable Tx_rollup_inbox.pp Tx_rollup_inbox.( = )
 
 let rng_state = Random.State.make_self_init ()
 
@@ -312,16 +292,10 @@ let merkle_root_empty_withdraw_list = Tx_rollup_withdraw.merkelize_list []
    is expensive *)
 let make_commitment_for_batch i level tx_rollup withdraw_list =
   let ctxt = Incremental.alpha_ctxt i in
-  wrap
-    (Alpha_context.Tx_rollup_inbox.Internal_for_tests.get_metadata
-       ctxt
-       level
-       tx_rollup)
+  wrap (Alpha_context.Tx_rollup_inbox.get ctxt level tx_rollup)
   >>=? fun (ctxt, metadata) ->
-  List.init
-    ~when_negative_length:[]
-    (Int32.to_int metadata.inbox_length)
-    (fun _ -> Tx_rollup_commitment.empty_l2_context_hash)
+  List.init ~when_negative_length:[] metadata.inbox_length (fun _ ->
+      Tx_rollup_commitment.empty_l2_context_hash)
   >>?= fun batches_result ->
   let messages =
     List.mapi
@@ -344,8 +318,9 @@ let make_commitment_for_batch i level tx_rollup withdraw_list =
       | (_, Some {commitment; _}) -> Some (Tx_rollup_commitment.hash commitment)
       ))
   >>=? fun predecessor ->
+  let inbox_merkle_root = metadata.merkle_root in
   let commitment : Tx_rollup_commitment.t =
-    {level; messages; predecessor; inbox_hash = metadata.hash}
+    {level; messages; predecessor; inbox_merkle_root}
   in
   return (commitment, batches_result)
 
@@ -544,16 +519,20 @@ let test_add_batch () =
   let contents = String.make contents_size 'c' in
   init_originate_and_submit ~batch:contents ()
   >>=? fun ((contract, balance), state, tx_rollup, b) ->
-  Context.Tx_rollup.inbox (B b) tx_rollup Tx_rollup_level.root
-  >>=? fun {contents; cumulated_size; hash} ->
-  let length = List.length contents in
-  let expected_hash =
-    Tx_rollup_inbox.hash_of_b58check_exn
-      "txi369dxdaFA9LzUXUcY4MHafPDizuLnrHXuQzRXQyrPGFdMu3Eq3"
+  Context.Tx_rollup.inbox (B b) tx_rollup Tx_rollup_level.root >>=? fun inbox ->
+  let contents_hash =
+    Tx_rollup_message.(make_batch contents |> fst |> hash_uncarbonated)
   in
-  Alcotest.(check int "Expect an inbox with a single item" 1 length) ;
-  Alcotest.(check int "Expect cumulated size" contents_size cumulated_size) ;
-  Alcotest.(check inbox_hash_testable "Expect hash" expected_hash hash) ;
+  let merkle_root = Tx_rollup_inbox.Merkle.merklize_list [contents_hash] in
+  let expected_inbox =
+    Tx_rollup_inbox.
+      {inbox_length = 1; cumulated_size = contents_size; merkle_root}
+  in
+  Alcotest.check
+    inbox_testable
+    "Expected inbox is not the computed one"
+    expected_inbox
+    inbox ;
   inbox_burn state contents_size >>?= fun cost ->
   Assert.balance_was_debited ~loc:__LOC__ (B b) contract balance cost
 
@@ -604,22 +583,28 @@ let test_add_two_batches () =
      its successor. *)
   Context.Tx_rollup.inbox (B b) tx_rollup Tx_rollup_level.(succ root)
   >>=? fun inbox ->
-  let length = List.length inbox.contents in
-  let expected_cumulated_size = contents_size1 + contents_size2 in
-
-  Alcotest.(check int "Expect an inbox with two items" 2 length) ;
+  Incremental.begin_construction b >>=? fun _incr ->
+  let contents1_hash =
+    Tx_rollup_message.hash_uncarbonated
+      (Tx_rollup_message.make_batch contents1 |> fst)
+  in
+  let contents2_hash =
+    Tx_rollup_message.hash_uncarbonated
+      (Tx_rollup_message.make_batch contents2 |> fst)
+  in
+  let merkle_root =
+    Tx_rollup_inbox.Merkle.merklize_list [contents1_hash; contents2_hash]
+  in
+  let expected_inbox =
+    Tx_rollup_inbox.{inbox_length = 2; cumulated_size = 5 + 6; merkle_root}
+  in
   Alcotest.(
     check
-      int
-      "Expect cumulated size"
-      expected_cumulated_size
-      inbox.cumulated_size) ;
-
-  Incremental.begin_construction b >>=? fun incr ->
-  let ctxt = Incremental.alpha_ctxt incr in
-  check_batch_in_inbox ctxt inbox 0 contents1 >>=? fun () ->
-  check_batch_in_inbox ctxt inbox 1 contents2 >>=? fun () ->
-  inbox_burn state expected_cumulated_size >>?= fun cost ->
+      inbox_testable
+      "The expected inbox is not the computed one"
+      inbox
+      expected_inbox) ;
+  inbox_burn state expected_inbox.cumulated_size >>?= fun cost ->
   Assert.balance_was_debited ~loc:__LOC__ (B b) contract balance cost
 
 (** Try to add a batch too large in an inbox. *)
@@ -746,7 +731,6 @@ let test_inbox_count_too_big () =
     tickets to a transaction rollup. *)
 let test_valid_deposit () =
   let (_, _, pkh) = gen_l2_account () in
-
   context_init1 () >>=? fun (b, account) ->
   originate b account >>=? fun (b, tx_rollup) ->
   Contract_helpers.originate_contract
@@ -768,22 +752,30 @@ let test_valid_deposit () =
     ~parameters
   >>=? fun operation ->
   Block.bake ~operation b >>=? fun b ->
-  Incremental.begin_construction b >|=? Incremental.alpha_ctxt >>=? fun ctxt ->
-  Context.Tx_rollup.inbox (B b) tx_rollup Tx_rollup_level.root >>=? function
-  | {contents = [hash]; _} ->
-      let ticket_hash = make_unit_ticket_key ~ticketer:contract tx_rollup in
-      let (message, _size) =
-        Tx_rollup_message.make_deposit
-          (is_implicit_exn account)
-          (Tx_rollup_l2_address.Indexable.value pkh)
-          ticket_hash
-          (Tx_rollup_l2_qty.of_int64_exn 10L)
-      in
-      Environment.wrap_tzresult (Tx_rollup_message.hash ctxt message)
-      >>?= fun (_ctxt, expected) ->
-      Alcotest.(check message_hash_testable "deposit" hash expected) ;
-      return_unit
-  | _ -> Alcotest.fail "The inbox has not the expected shape"
+  Incremental.begin_construction b >|=? Incremental.alpha_ctxt >>=? fun _ctxt ->
+  Context.Tx_rollup.inbox (B b) tx_rollup Tx_rollup_level.root >>=? fun inbox ->
+  let ticket_hash = make_unit_ticket_key ~ticketer:contract tx_rollup in
+  let (message, cumulated_size) =
+    Tx_rollup_message.make_deposit
+      (is_implicit_exn account)
+      (Tx_rollup_l2_address.Indexable.value pkh)
+      ticket_hash
+      (Tx_rollup_l2_qty.of_int64_exn 10L)
+  in
+  let merkle_root =
+    Tx_rollup_inbox.Merkle.merklize_list
+      [Tx_rollup_message.hash_uncarbonated message]
+  in
+  let expected_inbox =
+    Tx_rollup_inbox.{inbox_length = 1; cumulated_size; merkle_root}
+  in
+  Alcotest.(
+    check
+      inbox_testable
+      "Expected inbox different from the computed one"
+      inbox
+      expected_inbox) ;
+  return_unit
 
 (** [test_valid_deposit_inexistant_rollup] checks that the Michelson
     interpreter checks the existence of a transaction rollup prior to
@@ -1531,6 +1523,12 @@ module Rejection = struct
     >>=? fun (i, contract1, tx_rollup, level, message) ->
     let proof = true in
     let (message, _size) = Tx_rollup_message.make_batch message in
+    let message_hash = Tx_rollup_message.hash_uncarbonated message in
+    let message_path =
+      match Tx_rollup_inbox.Merkle.(compute_path [message_hash] 0) with
+      | Error _ -> assert false
+      | Ok path -> path
+    in
     Op.tx_rollup_reject
       (I i)
       contract1
@@ -1538,6 +1536,7 @@ module Rejection = struct
       level
       message
       ~message_position:0
+      ~message_path
       ~proof
       ~previous_message_result:
         {
@@ -1558,6 +1557,12 @@ module Rejection = struct
     >>=? fun (i, contract1, tx_rollup, level, message) ->
     let proof = false in
     let (message, _size) = Tx_rollup_message.make_batch message in
+    let message_hash = Tx_rollup_message.hash_uncarbonated message in
+    let message_path =
+      match Tx_rollup_inbox.Merkle.(compute_path [message_hash] 0) with
+      | Error _ -> assert false
+      | Ok path -> path
+    in
     Op.tx_rollup_reject
       (I i)
       contract1
@@ -1565,6 +1570,7 @@ module Rejection = struct
       level
       message
       ~message_position:0
+      ~message_path
       ~proof
       ~previous_message_result:
         {
@@ -1598,6 +1604,12 @@ module Rejection = struct
           Tx_rollup_withdraw.empty_withdrawals_merkle_root;
       }
     in
+    let message_hash = Tx_rollup_message.hash_uncarbonated message in
+    let message_path =
+      match Tx_rollup_inbox.Merkle.(compute_path [message_hash] 0) with
+      | Error _ -> assert false
+      | Ok path -> path
+    in
     Op.tx_rollup_reject
       (I i)
       contract1
@@ -1605,6 +1617,7 @@ module Rejection = struct
       level
       message
       ~message_position:0
+      ~message_path
       ~proof
       ~previous_message_result
     >>=? fun op ->
@@ -1644,6 +1657,12 @@ module Rejection = struct
     let level = Tx_rollup_level.root in
     let proof = true in
     let (message, _size) = Tx_rollup_message.make_batch message in
+    let message_hash = Tx_rollup_message.hash_uncarbonated message in
+    let message_path =
+      match Tx_rollup_inbox.Merkle.(compute_path [message_hash] 0) with
+      | Error _ -> assert false
+      | Ok path -> path
+    in
     Op.tx_rollup_reject
       (I i)
       contract1
@@ -1651,6 +1670,7 @@ module Rejection = struct
       level
       message
       ~message_position:0
+      ~message_path
       ~proof
       ~previous_message_result:
         {
@@ -1691,6 +1711,12 @@ module Rejection = struct
     Incremental.add_operation i op >>=? fun i ->
     let proof = true in
     let (message, _size) = Tx_rollup_message.make_batch message in
+    let message_hash = Tx_rollup_message.hash_uncarbonated message in
+    let message_path =
+      match Tx_rollup_inbox.Merkle.(compute_path [message_hash] 0) with
+      | Error _ -> assert false
+      | Ok path -> path
+    in
     Op.tx_rollup_reject
       (I i)
       contract1
@@ -1698,6 +1724,7 @@ module Rejection = struct
       level
       message
       ~message_position:0
+      ~message_path
       ~proof
       ~previous_message_result:
         {
@@ -1725,6 +1752,12 @@ module Rejection = struct
     >>=? fun (i, contract1, tx_rollup, level, _message) ->
     let proof = true in
     let (message, _size) = Tx_rollup_message.make_batch "wrong message" in
+    let message_hash = Tx_rollup_message.hash_uncarbonated message in
+    let message_path =
+      match Tx_rollup_inbox.Merkle.(compute_path [message_hash] 0) with
+      | Error _ -> assert false
+      | Ok path -> path
+    in
     Op.tx_rollup_reject
       (I i)
       contract1
@@ -1732,6 +1765,7 @@ module Rejection = struct
       level
       message
       ~message_position:0
+      ~message_path
       ~proof
       ~previous_message_result:
         {
@@ -1740,13 +1774,15 @@ module Rejection = struct
             Tx_rollup_withdraw.empty_withdrawals_merkle_root;
         }
     >>=? fun op ->
-    Incremental.add_operation
-      i
-      op
-      ~expect_failure:(check_proto_error Tx_rollup_errors.Wrong_message_hash)
+    let expected =
+      Tx_rollup_inbox.Merkle.root_of_b58check_opt
+        "txi1pvHiq799LSL2SXnRipQoCmSHnJ3SYH6SqjvJEQEKyfCLj3hCh"
+      |> Option.value_f ~default:(fun () -> assert false)
+    in
+    let error = Tx_rollup_errors.Wrong_message_path {expected} in
+    Incremental.add_operation i op ~expect_failure:(check_proto_error error)
     >>=? fun i ->
     ignore i ;
-
     return ()
 
   (** [test_wrong_message_position] tests that rejection successfully fails
@@ -1756,6 +1792,12 @@ module Rejection = struct
     >>=? fun (i, contract1, tx_rollup, level, message) ->
     let proof = true in
     let (message, _size) = Tx_rollup_message.make_batch message in
+    let message_hash = Tx_rollup_message.hash_uncarbonated message in
+    let message_path =
+      match Tx_rollup_inbox.Merkle.(compute_path [message_hash] 0) with
+      | Error _ -> assert false
+      | Ok path -> path
+    in
     Op.tx_rollup_reject
       (I i)
       contract1
@@ -1763,6 +1805,7 @@ module Rejection = struct
       level
       message
       ~message_position:1
+      ~message_path
       ~proof
       ~previous_message_result:
         {
