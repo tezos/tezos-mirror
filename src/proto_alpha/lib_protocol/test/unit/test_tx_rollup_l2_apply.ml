@@ -931,11 +931,7 @@ let test_l1_transaction_overdraft () =
      in
      return_unit)
 
-(** Test that withdrawals with quantity zero are possible.
-
-    TODO: https://gitlab.com/tezos/tezos/-/issues/2593
-    Should they be possible?
- *)
+(** Test that withdrawals with quantity zero are not possible. *)
 let test_l1_transaction_zero () =
   let open Context_l2.Syntax in
   let initial_balances = [[(ticket1, 10L)]; [(ticket2, 20L)]] in
@@ -965,11 +961,15 @@ let test_l1_transaction_zero () =
     check
       (list eq_withdrawal)
       "Resulting withdrawal from L2->L1 transfer"
-      withdrawals
-      [{claimer = pkh2; ticket_hash = ticket1; amount = Tx_rollup_l2_qty.zero}]) ;
+      []
+      withdrawals) ;
 
   match results with
-  | [([_], Transaction_success)] ->
+  | [
+   ( [_],
+     Transaction_failure
+       {index = 0; reason = Tx_rollup_l2_apply.Invalid_zero_transfer} );
+  ] ->
       let* () =
         check_balance
           ctxt
@@ -1012,7 +1012,7 @@ let test_l1_transaction_zero () =
           0L
       in
       return_unit
-  | _ -> fail_msg "Zero-transactions should be successful"
+  | _ -> fail_msg "Zero-transactions should be a failure"
 
 (** Test partial L2 to L1 transaction. Ensure that a withdrawal is emitted
     for the transferred amount and that the remainder is in the sender's

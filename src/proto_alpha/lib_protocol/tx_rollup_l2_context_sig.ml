@@ -211,6 +211,9 @@ module type CONTEXT = sig
 
     (** [fail_unless cond err] raises [err] iff [cond] is [false]. *)
     val fail_unless : bool -> error -> unit m
+
+    (** [fail_when cond err] raises [err] iff [cond] is [true]. *)
+    val fail_when : bool -> error -> unit m
   end
 
   (** [bls_aggregate_verify] allows to verify the aggregated signature

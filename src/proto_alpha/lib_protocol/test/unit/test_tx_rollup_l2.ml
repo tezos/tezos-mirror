@@ -425,17 +425,6 @@ module Test_Ticket_ledger = struct
 
     return_unit
 
-  (** Test that crediting a non strictly positive quantity fails. *)
-  let test_credit_invalid_quantity () =
-    let* (ctxt, idx1) = context_with_one_addr in
-    let* () =
-      expect_error
-        (credit ctxt ticket_idx1 idx1 Tx_rollup_l2_qty.zero)
-        Invalid_quantity
-    in
-
-    return_unit
-
   (** Test that an index can be credited ticket indexes even if its not associated
       to an address. *)
   let test_credit_unknown_index () =
@@ -504,7 +493,6 @@ module Test_Ticket_ledger = struct
       [
         ("test credit", test_credit);
         ("test credit too much", test_credit_too_much);
-        ("test credit invalid quantity", test_credit_invalid_quantity);
         ("test credit unknown index", test_credit_unknown_index);
         ("test spend", test_spend_valid);
         ("test spend without required balance", test_spend_without_balance);

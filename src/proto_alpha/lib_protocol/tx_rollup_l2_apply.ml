@@ -44,6 +44,7 @@ type error +=
   | Missing_ticket of Ticket_hash.t
   | Unknown_address of Tx_rollup_l2_address.t
   | Invalid_self_transfer
+  | Invalid_zero_transfer
 
 let () =
   let open Data_encoding in
@@ -152,7 +153,16 @@ let () =
     ~description:"The index for the destination is the same as the sender"
     empty
     (function Invalid_self_transfer -> Some () | _ -> None)
-    (function () -> Invalid_self_transfer)
+    (function () -> Invalid_self_transfer) ;
+  (* Invalid zero transfer *)
+  register_error_kind
+    `Permanent
+    ~id:"tx_rollup_invalid_zero_transfer"
+    ~title:"Attempted to transfer zero ticket"
+    ~description:"A transfer's amount must be greater than zero."
+    empty
+    (function Invalid_zero_transfer -> Some () | _ -> None)
+    (function () -> Invalid_zero_transfer)
 
 module Address_indexes = Map.Make (Tx_rollup_l2_address)
 module Ticket_indexes = Map.Make (Ticket_hash)
@@ -397,6 +407,9 @@ module Make (Context : CONTEXT) = struct
       ticket_indexes = add_to_ticket_indexes indexes.ticket_indexes ticket;
     }
 
+  let assert_non_zero_quantity qty =
+    fail_when Tx_rollup_l2_qty.(qty = zero) Invalid_zero_transfer
+
   (** {2. Counter } *)
 
   (** [get_metadata ctxt idx] returns the metadata associated to [idx] in
@@ -423,6 +436,7 @@ module Make (Context : CONTEXT) = struct
         Compare.Int.(Indexable.compare_indexes source_idx destination_idx <> 0)
         Invalid_self_transfer
     in
+    let* () = assert_non_zero_quantity amount in
     let* ctxt = Ticket_ledger.spend ctxt tidx source_idx amount in
     Ticket_ledger.credit ctxt tidx destination_idx amount
 
@@ -619,8 +633,10 @@ module Make (Context : CONTEXT) = struct
             Option.value_e ~error:(Missing_ticket ticket_hash) tidx_opt
           in
           let source_idx = address_of_signer_index source_idx in
+
           (* spend the ticket -- this is responsible for checking that
              the source has the required balance *)
+          let* () = assert_non_zero_quantity amount in
           let* ctxt = Ticket_ledger.spend ctxt tidx source_idx amount in
           let withdrawal = Tx_rollup_withdraw.{claimer; ticket_hash; amount} in
           return (ctxt, indexes, Some withdrawal)

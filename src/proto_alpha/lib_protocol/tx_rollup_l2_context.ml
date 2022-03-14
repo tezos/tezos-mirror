@@ -368,7 +368,6 @@ struct
 
     let credit ctxt tidx aidx qty =
       let open Syntax in
-      let* () = fail_when Tx_rollup_l2_qty.(qty = zero) Invalid_quantity in
       let* balance = get ctxt tidx aidx in
       match Tx_rollup_l2_qty.add balance qty with
       | None -> fail Balance_overflow
