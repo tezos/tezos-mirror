@@ -33,7 +33,7 @@ open Common
 type rollup_origination = {block_hash : Block_hash.t; block_level : int32}
 
 type t = {
-  store : Stores.t;
+  stores : Stores.t;
   context_index : Context.index;
   mutable head : L2block.t;
   rollup : Tx_rollup.t;
@@ -59,31 +59,31 @@ let get_head state = state.head
 
 let set_head state block =
   state.head <- block ;
-  Stores.L2_head.set state.store (L2block.hash_header block.header)
+  Stores.Head_store.write state.stores.head (L2block.hash_header block.header)
 
 let save_tezos_l2_block_hash state block info =
-  Stores.Tezos_blocks.add state.store block info
+  Stores.Tezos_block_store.add state.stores.tezos_blocks block info
 
 let get_tezos_l2_block_hash state block =
-  Stores.Tezos_blocks.find state.store block
+  Stores.Tezos_block_store.find state.stores.tezos_blocks block
 
-let get_header state hash = Stores.L2_blocks.find state.store hash
+let get_block_store stores hash =
+  Stores.L2_block_store.read_block stores.Stores.blocks hash
 
-let save_header state hash header = Stores.L2_blocks.add state.store hash header
+let get_block state hash = get_block_store state.stores hash
 
-let get_inbox state hash = Stores.Inboxes.find state.store hash
-
-let save_inbox state hash inbox = Stores.Inboxes.add state.store hash inbox
-
-let get_block_store store hash =
+let get_header state hash =
   let open Lwt_syntax in
-  let* header = Stores.L2_blocks.find store hash
-  and* inbox = Stores.Inboxes.find store hash in
-  match (header, inbox) with
-  | (None, _) | (_, None) -> return None
-  | (Some header, Some inbox) -> return (Some L2block.{header; inbox})
+  let+ block = get_block state hash in
+  Option.map (fun b -> b.L2block.header) block
 
-let get_block state hash = get_block_store state.store hash
+let save_block state block =
+  Stores.L2_block_store.append_block state.stores.blocks block
+
+let get_inbox state hash =
+  let open Lwt_syntax in
+  let+ block = get_block state hash in
+  Option.map (fun b -> b.L2block.inbox) block
 
 let get_tezos_l2_block state block =
   let open Lwt_syntax in
@@ -92,10 +92,10 @@ let get_tezos_l2_block state block =
   | None -> return None
   | Some l2_hash -> get_block state l2_hash
 
-let get_level state level = Stores.Rollup_levels.find state.store level
+let get_level state level = Stores.Level_store.find state.stores.levels level
 
 let save_level state level hash =
-  Stores.Rollup_levels.add state.store level hash
+  Stores.Level_store.add state.stores.levels level hash
 
 let get_level_l2_block_header state level =
   let open Lwt_syntax in
@@ -111,17 +111,15 @@ let get_level_l2_block state level =
   | None -> return None
   | Some l2_hash -> get_block state l2_hash
 
-let save_block state L2block.{header; inbox} =
-  let open Lwt_result_syntax in
-  let hash = L2block.hash_header header in
+let save_block state (block : L2block.t) =
+  let open Lwt_syntax in
+  let hash = L2block.hash_header block.header in
   let+ () =
     join
       [
-        save_level state header.level hash;
-        save_header state hash header;
-        save_inbox state hash inbox;
+        save_level state block.header.level hash;
+        save_block state block;
       ]
-    |> lwt_map_error (function [] -> [] | trace :: _ -> trace)
   in
   hash
 
@@ -200,13 +198,13 @@ let rollup_reorg state ~old_head ~new_head =
 
 let patch_l2_levels state (reorg : (L2block.t * L2block.hash) reorg) =
   let open Lwt_result_syntax in
-  let* () =
-    List.iter_es
+  let*! () =
+    List.iter_s
       (fun (old_, _) ->
-        Stores.Rollup_levels.remove state.store old_.L2block.header.level)
+        Stores.Level_store.remove state.stores.levels old_.L2block.header.level)
       reorg.old_chain
   in
-  List.iter_es
+  List.iter_s
     (fun (new_, new_hash) ->
       save_level state new_.L2block.header.level new_hash)
     reorg.new_chain
@@ -216,24 +214,28 @@ let set_head state head context =
   (match state.batcher_state with
   | None -> ()
   | Some batcher_state -> Batcher.update_incr_context batcher_state context) ;
-  let*! old_header = Stores.L2_head.find state.store in
-  let* () = Stores.L2_head.set state.store head.L2block.header in
+  state.head <- head ;
+  let*! old_head = Stores.Head_store.read state.stores.head in
+  let* () =
+    Stores.Head_store.write
+      state.stores.head
+      (L2block.hash_header head.L2block.header)
+  in
   let hash = L2block.hash_header head.header in
   let*! l2_reorg =
-    match old_header with
+    match old_head with
     | None -> Lwt.return no_reorg
-    | Some old_header -> (
-        let old_hash = L2block.hash_header old_header in
-        let*! old_head = get_block state old_hash in
+    | Some old_head_hash -> (
+        let*! old_head = get_block state old_head_hash in
         match old_head with
         | None -> Lwt.return no_reorg
         | Some old_head ->
             rollup_reorg
               state
-              ~old_head:(old_head, old_hash)
+              ~old_head:(old_head, old_head_hash)
               ~new_head:(head, hash))
   in
-  let* () = patch_l2_levels state l2_reorg in
+  let*! () = patch_l2_levels state l2_reorg in
   return l2_reorg
 
 let tezos_block_already_processed state hash =
@@ -277,10 +279,11 @@ let check_origination_in_block_info rollup block_info =
   | Some _ -> return_unit
   | None -> fail @@ Error.Tx_rollup_not_originated_in_the_given_block rollup
 
-let init_store cctxt ~data_dir ?rollup_genesis rollup =
+let init_rollup_origination cctxt stores ?rollup_genesis rollup =
   let open Lwt_result_syntax in
-  let* store = Stores.load (Node_data.store_dir data_dir) in
-  let*! origination_info = Stores.Rollup_origination.find store in
+  let*! origination_info =
+    Stores.Rollup_origination_store.read stores.Stores.rollup_origination
+  in
   let store_rollup_origination =
     Option.map
       (fun (block_hash, block_level) -> {block_hash; block_level})
@@ -319,26 +322,26 @@ let init_store cctxt ~data_dir ?rollup_genesis rollup =
           }
         in
         let* () =
-          Stores.Rollup_origination.set
-            store
+          Stores.Rollup_origination_store.write
+            stores.rollup_origination
             (rollup_orig.block_hash, rollup_orig.block_level)
         in
         return rollup_orig
   in
-  return (store, rollup_origination)
+  return rollup_origination
 
 let init_context ~data_dir =
   let open Lwt_result_syntax in
   let*! index = Context.init (Node_data.context_dir data_dir) in
   return index
 
-let init_head store context_index rollup rollup_origination =
+let init_head (stores : Stores.t) context_index rollup rollup_origination =
   let open Lwt_syntax in
-  let* hash = Stores.L2_head.find store in
+  let* hash = Stores.Head_store.read stores.head in
   let+ head =
     match hash with
     | None -> return_none
-    | Some hash -> get_block_store store hash
+    | Some hash -> get_block_store stores hash
   in
   match head with
   | Some head -> head
@@ -356,13 +359,16 @@ let init_parameters cctxt =
         parametric.tx_rollup_max_withdrawals_per_batch;
     }
 
-let init cctxt ~data_dir ?rollup_genesis ~operator rollup =
+let init cctxt ~data_dir ?(readonly = false) ?rollup_genesis ~operator rollup =
   let open Lwt_result_syntax in
-  let store_orig = init_store cctxt ~data_dir ?rollup_genesis rollup in
-  let context_index = init_context ~data_dir in
-  let* (store, rollup_origination) = store_orig in
-  let* context_index = context_index in
-  let*! head = init_head store context_index rollup rollup_origination in
+  let*! stores = Stores.init ~data_dir ~readonly in
+  let* (rollup_origination, context_index) =
+    both
+      (init_rollup_origination cctxt stores ?rollup_genesis rollup)
+      (init_context ~data_dir)
+    |> lwt_map_error (function [] -> [] | trace :: _ -> trace)
+  in
+  let*! head = init_head stores context_index rollup rollup_info in
   let* parameters = init_parameters cctxt in
   let* batcher_state =
     Batcher.init cctxt ~rollup ~signer:operator context_index parameters
@@ -370,7 +376,7 @@ let init cctxt ~data_dir ?rollup_genesis ~operator rollup =
   let* operator = get_signer cctxt operator in
   return
     {
-      store;
+      stores;
       context_index;
       head;
       rollup;

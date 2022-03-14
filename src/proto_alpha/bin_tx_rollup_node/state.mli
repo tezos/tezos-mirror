@@ -37,8 +37,8 @@ type rollup_origination = {block_hash : Block_hash.t; block_level : int32}
 (* TODO/TORU: have different operators (for commitments, rejections, batches,
    etc.) and have multiple injection keys (except for commitments). *)
 
-type t = {
-  store : Stores.t;
+type t = private {
+  stores : Stores.t;
   context_index : Context.index;
   mutable head : L2block.t;
   rollup : Tx_rollup.t;
@@ -69,6 +69,7 @@ type 'block reorg = {
 val init :
   #Protocol_client_context.full ->
   data_dir:string ->
+  ?readonly:bool ->
   ?rollup_genesis:Block_hash.t ->
   operator:string option ->
   Tx_rollup.t ->
@@ -125,21 +126,14 @@ val set_head :
     - Make the level point to this block
     - Associate this L2 block with the corresponding Tezos block
  *)
-val save_block : t -> L2block.t -> (L2block.hash, tztrace) result Lwt.t
+val save_block : t -> L2block.t -> L2block.hash Lwt.t
 
 (** Make a level point to a given L2 block. If the level already points to a
     block, it is changed. *)
-val save_level : t -> L2block.level -> L2block.hash -> unit tzresult Lwt.t
-
-(** Save an inbox to disk *)
-val save_inbox : t -> L2block.hash -> Inbox.t -> unit tzresult Lwt.t
-
-(** Save an L2 block header to disk *)
-val save_header : t -> L2block.hash -> L2block.header -> unit tzresult Lwt.t
+val save_level : t -> L2block.level -> L2block.hash -> unit Lwt.t
 
 (** Associate an L2 block to a Tezos block *)
-val save_tezos_l2_block_hash :
-  t -> Block_hash.t -> L2block.hash -> unit tzresult Lwt.t
+val save_tezos_l2_block_hash : t -> Block_hash.t -> L2block.hash -> unit Lwt.t
 
 (** {2 Misc}  *)
 

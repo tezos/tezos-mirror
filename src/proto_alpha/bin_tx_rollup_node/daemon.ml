@@ -238,12 +238,12 @@ let extract_messages_from_block block_info rollup_id =
       (List.rev rev_messages, cumulated_size)
 
 let create_genesis_block state tezos_block =
-  let open Lwt_result_syntax in
+  let open Lwt_syntax in
   let ctxt = Context.empty state.State.context_index in
   let genesis_block =
     L2block.genesis_block state.context_index state.rollup tezos_block
   in
-  let*! _ctxt_hash = Context.commit ctxt in
+  let* _ctxt_hash = Context.commit ctxt in
   let+ _block_hash = State.save_block state genesis_block in
   (genesis_block, ctxt)
 
@@ -283,7 +283,7 @@ let process_messages_and_inboxes (state : State.t) ~(predecessor : L2block.t)
         }
       in
       let block = L2block.{header; inbox} in
-      let* hash = State.save_block state block in
+      let*! hash = State.save_block state block in
       let*! () =
         Event.(emit rollup_block) (header.level, hash, header.tezos_block)
       in
@@ -295,10 +295,10 @@ let rec process_block cctxt state current_hash rollup_id :
   if Block_hash.equal state.State.rollup_origination.block_hash current_hash
   then
     (* This is the rollup origination block, create L2 genesis block *)
-    let+ (genesis_block, genesis_ctxt) =
+    let*! (genesis_block, genesis_ctxt) =
       create_genesis_block state current_hash
     in
-    (genesis_block, Some genesis_ctxt)
+    return (genesis_block, Some genesis_ctxt)
   else
     let*! l2_block = State.get_tezos_l2_block state current_hash in
     match l2_block with
@@ -362,9 +362,9 @@ let process_head cctxt state current_hash rollup_id =
   maybe_batch_and_inject state ;
   res
 
-let main_exit_callback state data_dir exit_status =
+let main_exit_callback state exit_status =
   let open Lwt_syntax in
-  let* () = Stores.close data_dir in
+  let* () = Stores.close state.State.stores in
   let* () = Context.close state.State.context_index in
   let* () = Event.(emit node_is_shutting_down) exit_status in
   Tezos_base_unix.Internal_event_unix.close ()
@@ -398,9 +398,7 @@ let run configuration cctxt =
   let* _rpc_server = RPC.start configuration state in
   let _ =
     (* Register cleaner callback *)
-    Lwt_exit.register_clean_up_callback
-      ~loc:__LOC__
-      (main_exit_callback state data_dir)
+    Lwt_exit.register_clean_up_callback ~loc:__LOC__ (main_exit_callback state)
   in
   let*! () = Event.(emit node_is_ready) () in
   let rec loop () =
