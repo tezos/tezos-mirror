@@ -72,7 +72,7 @@ let init_validator
         Node.default_chain_validator_limits
         ~start_testchain:false
     in
-    Lwt.return (ok (block_validator, validator, Store.main_chain_store store))
+    Lwt.return_ok (block_validator, validator, Store.main_chain_store store)
   in
   match r with
   | Ok (block_validator, validator, chain) ->

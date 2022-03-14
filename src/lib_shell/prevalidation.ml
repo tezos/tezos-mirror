@@ -104,9 +104,10 @@ end
 (** Doesn't depend on heavy [Registered_protocol.T] for testability. *)
 let safe_binary_of_bytes (encoding : 'a Data_encoding.t) (bytes : bytes) :
     'a tzresult =
+  let open Tzresult_syntax in
   match Data_encoding.Binary.of_bytes_opt encoding bytes with
-  | None -> error Parse_error
-  | Some protocol_data -> ok protocol_data
+  | None -> fail Parse_error
+  | Some protocol_data -> return protocol_data
 
 module MakeAbstract
     (Chain_store : CHAIN_STORE)

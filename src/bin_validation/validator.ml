@@ -439,7 +439,7 @@ let run input output =
               External_validation.send
                 output
                 (Error_monad.result_encoding Data_encoding.empty)
-                (error
+                (Tzresult_syntax.fail
                    (Block_validator_errors.Failed_to_checkout_context
                       context_hash))
         in

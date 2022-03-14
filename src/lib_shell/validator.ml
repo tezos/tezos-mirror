@@ -88,9 +88,10 @@ let activate v ~start_prevalidator ~validator_process chain_store =
         v.chain_validator_limits
 
 let get {active_chains; _} chain_id =
+  let open Tzresult_syntax in
   match Chain_id.Table.find active_chains chain_id with
-  | Some nv -> Ok nv
-  | None -> error (Validation_errors.Inactive_chain chain_id)
+  | Some nv -> return nv
+  | None -> fail (Validation_errors.Inactive_chain chain_id)
 
 let get_active_chains {active_chains; _} =
   let l = Chain_id.Table.fold (fun c _ acc -> c :: acc) active_chains [] in

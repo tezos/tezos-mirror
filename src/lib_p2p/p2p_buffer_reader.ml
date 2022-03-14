@@ -131,7 +131,7 @@ let read_from readable {pos = offset; length_to_copy; buf} data =
            ~into:buf
            ~offset) ;
       Ok read_len
-  | Error _ -> error P2p_errors.Connection_closed
+  | Error _ -> Tzresult_syntax.fail P2p_errors.Connection_closed
 
 let read ?canceler readable buffer =
   let open Lwt_syntax in
