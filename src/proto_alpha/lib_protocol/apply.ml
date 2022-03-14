@@ -1603,19 +1603,14 @@ let apply_external_manager_operation_content :
           Tx_rollup_state.get ctxt tx_rollup >>=? fun (ctxt, state) ->
           ( Tx_rollup_commitment.has_bond ctxt tx_rollup key
           >>=? fun (ctxt, pending) ->
-            let _ = pending in
-            (* TODO/TORU: https://gitlab.com/tezos/tezos/-/merge_requests/4437
-               let bond_id = Bond_id.Tx_rollup_bond_id tx_rollup in
-               match pending with
-               | 0 ->
-                   Token.transfer
-                     ctxt
-                     (`Contract source)
-                     (`Frozen_bonds (source, bond_id))
-                     (Constants.tx_rollup_commitment_bond ctxt)
-               | _ -> return (ctxt, []) )
-            *)
-            return (ctxt, []) )
+            if not pending then
+              let bond_id = Bond_id.Tx_rollup_bond_id tx_rollup in
+              Token.transfer
+                ctxt
+                (`Contract source)
+                (`Frozen_bonds (source, bond_id))
+                (Constants.tx_rollup_commitment_bond ctxt)
+            else return (ctxt, []) )
           >>=? fun (ctxt, balance_updates) ->
           Tx_rollup_commitment.add_commitment
             ctxt
@@ -1638,19 +1633,20 @@ let apply_external_manager_operation_content :
       | None -> fail Tx_rollup_operation_with_non_implicit_contract
       | Some key ->
           Tx_rollup_commitment.remove_bond ctxt tx_rollup key >>=? fun ctxt ->
-          (* TODO/TORU: This depends on https://gitlab.com/tezos/tezos/-/merge_requests/4437
-             let bond_id = Rollup_bond_id.Tx_rollup_bond_id tx_rollup in
-             Token.transfer
-               ctxt
-               (`Frozen_rollup_bonds (source, bond_id))
-               (`Contract source)
-               (Constants.tx_rollup_commitment_bond ctxt))
-          *)
+          let bond_id = Bond_id.Tx_rollup_bond_id tx_rollup in
+          Token.balance ctxt (`Frozen_bonds (source, bond_id))
+          >>=? fun (ctxt, bond) ->
+          Token.transfer
+            ctxt
+            (`Frozen_bonds (source, bond_id))
+            (`Contract source)
+            bond
+          >>=? fun (ctxt, balance_updates) ->
           let result =
             Tx_rollup_return_bond_result
               {
                 consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
-                balance_updates = [];
+                balance_updates;
               }
           in
           return (ctxt, result, []))
