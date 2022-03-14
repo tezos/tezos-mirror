@@ -7,6 +7,7 @@
             tezos-base-test-helpers
             tezos-011-PtHangz2-test-helpers)
  (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
                    -open Tezos_protocol_011_PtHangz2
                    -open Tezos_011_PtHangz2_test_helpers
                    -open Tezos_base_test_helpers)))

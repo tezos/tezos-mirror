@@ -9,6 +9,7 @@
             tezos-base-test-helpers
             tezos-012-Psithaca-test-helpers)
  (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
                    -open Tezos_client_012_Psithaca
                    -open Tezos_protocol_012_Psithaca
                    -open Tezos_protocol_012_Psithaca_parameters
