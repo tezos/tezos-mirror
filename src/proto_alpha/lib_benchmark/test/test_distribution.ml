@@ -78,11 +78,11 @@ let rec tnames_of_type :
       tnames_of_type dom (tnames_of_type range (`TLambda :: acc))
   | Script_typed_ir.Option_t (ty, _, _) -> tnames_of_type ty (`TOption :: acc)
   | Script_typed_ir.List_t (ty, _) -> tnames_of_type ty (`TList :: acc)
-  | Script_typed_ir.Set_t (ty, _) -> tnames_of_comparable_type ty (`TSet :: acc)
+  | Script_typed_ir.Set_t (ty, _) -> tnames_of_type ty (`TSet :: acc)
   | Script_typed_ir.Map_t (kty, vty, _) ->
-      tnames_of_comparable_type kty (tnames_of_type vty (`TMap :: acc))
+      tnames_of_type kty (tnames_of_type vty (`TMap :: acc))
   | Script_typed_ir.Big_map_t (kty, vty, _) ->
-      tnames_of_comparable_type kty (tnames_of_type vty (`TBig_map :: acc))
+      tnames_of_type kty (tnames_of_type vty (`TBig_map :: acc))
   | Script_typed_ir.Contract_t (ty, _) -> tnames_of_type ty (`TContract :: acc)
   | Script_typed_ir.Sapling_transaction_t _ -> `TSapling_transaction :: acc
   | Script_typed_ir.Sapling_transaction_deprecated_t _ ->
@@ -94,41 +94,9 @@ let rec tnames_of_type :
   | Script_typed_ir.Bls12_381_g1_t -> `TBls12_381_g1 :: acc
   | Script_typed_ir.Bls12_381_g2_t -> `TBls12_381_g2 :: acc
   | Script_typed_ir.Bls12_381_fr_t -> `TBls12_381_fr :: acc
-  | Script_typed_ir.Ticket_t (ty, _) ->
-      tnames_of_comparable_type ty (`TTicket :: acc)
+  | Script_typed_ir.Ticket_t (ty, _) -> tnames_of_type ty (`TTicket :: acc)
   | Script_typed_ir.Chest_key_t -> assert false
   | Script_typed_ir.Chest_t -> assert false
-
-and tnames_of_comparable_type :
-    type a. a Script_typed_ir.comparable_ty -> type_name list -> type_name list
-    =
- fun t acc ->
-  match t with
-  | Script_typed_ir.Unit_t -> `TUnit :: acc
-  | Script_typed_ir.Never_t -> assert false
-  | Script_typed_ir.Int_t -> `TInt :: acc
-  | Script_typed_ir.Nat_t -> `TNat :: acc
-  | Script_typed_ir.Signature_t -> `TSignature :: acc
-  | Script_typed_ir.String_t -> `TString :: acc
-  | Script_typed_ir.Bytes_t -> `TBytes :: acc
-  | Script_typed_ir.Mutez_t -> `TMutez :: acc
-  | Script_typed_ir.Bool_t -> `TBool :: acc
-  | Script_typed_ir.Key_hash_t -> `TKey_hash :: acc
-  | Script_typed_ir.Key_t -> `TKey :: acc
-  | Script_typed_ir.Timestamp_t -> `TTimestamp :: acc
-  | Script_typed_ir.Chain_id_t -> `TChain_id :: acc
-  | Script_typed_ir.Address_t -> `TAddress :: acc
-  | Script_typed_ir.Tx_rollup_l2_address_t -> `TTx_rollup_l2_address :: acc
-  | Script_typed_ir.Pair_t (lty, rty, _, YesYes) ->
-      tnames_of_comparable_type
-        lty
-        (tnames_of_comparable_type rty (`TPair :: acc))
-  | Script_typed_ir.Union_t (lty, rty, _, YesYes) ->
-      tnames_of_comparable_type
-        lty
-        (tnames_of_comparable_type rty (`TUnion :: acc))
-  | Script_typed_ir.Option_t (ty, _, Yes) ->
-      tnames_of_comparable_type ty (`TOption :: acc)
 
 module Crypto_samplers = Crypto_samplers.Make_finite_key_pool (struct
   let algo = `Default
