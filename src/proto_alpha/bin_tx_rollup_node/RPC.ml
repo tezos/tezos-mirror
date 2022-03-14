@@ -421,23 +421,42 @@ module Context_RPC = struct
         | None -> return None
         | Some {public_key; _} -> return (Some public_key))
 
+  let context_of_l2_block state b =
+    Stores.L2_block_store.context state.State.stores.blocks b
+
   let context_of_block_id state block_id =
     let open Lwt_syntax in
-    let*! header = Block.block_header_of_id state block_id in
-    match header with
-    | None -> Stdlib.failwith "Unknown block id"
-    | Some b -> return b.context
+    match block_id with
+    | `L2_block b -> context_of_l2_block state b
+    | `Tezos_block b -> (
+        let* b = State.get_tezos_l2_block_hash state b in
+        match b with
+        | None -> return_none
+        | Some b -> context_of_l2_block state b)
+    | `Head -> return_some (State.get_head state).header.context
+    | `Level l -> (
+        let* b = State.get_level state l in
+        match b with
+        | None -> return_none
+        | Some b -> context_of_l2_block state b)
 
   let context_of_id state context_id =
     match context_id with
     | #block_id as block_id -> context_of_block_id state block_id
-    | `Context c -> Lwt.return c
+    | `Context c -> Lwt.return_some c
 
   let build_directory state =
     !directory
     |> RPC_directory.map (fun ((), context_id) ->
            let open Lwt_syntax in
            let* context_hash = context_of_id state context_id in
+           let context_hash =
+             match context_hash with
+             | None ->
+                 Stdlib.failwith @@ "Unknown context id "
+                 ^ Arg.construct_context_id context_id
+             | Some ch -> ch
+           in
            Context.checkout_exn state.State.context_index context_hash)
     |> RPC_directory.prefix RPC_path.(open_root / "context" /: Arg.context_id)
 end
