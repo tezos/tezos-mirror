@@ -46,7 +46,7 @@ let err x = Exn (Script_cache_test_error x)
    model. It has been computed by a manual run of the test.
 
 *)
-let liquidity_baking_contract_size = 266738
+let liquidity_baking_contract_size = 267304
 
 let liquidity_baking_contract =
   Contract.of_b58check "KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5" |> function
@@ -120,7 +120,7 @@ let add_some_contracts k src block baker =
    model. It has been computed by a manual run of the test.
 
 *)
-let int_store_contract_size = 891
+let int_store_contract_size = 916
 
 (*
 
