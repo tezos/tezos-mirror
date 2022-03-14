@@ -4,5 +4,5 @@ Run a test that should fail:
   Starting test: Failing test
   [error] Always failing test
   [FAILURE] (1/1, 1 failed) Failing test
-  Try again with: ./main.exe --verbose --file test_retry.ml --test 'Failing test'
+  Try again with: ./main.exe --verbose --file test_retry.ml --title 'Failing test'
   [1]

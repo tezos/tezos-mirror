@@ -26,14 +26,14 @@
 open Alpha_context
 
 type ticket_transfer = {
-  destination : Contract.t;
+  destination : Destination.t;
   tickets : Ticket_scanner.ex_ticket list;
 }
 
 type ticket_token_diff = {
   ticket_token : Ticket_token.ex_token;
   total_amount : Script_int.n Script_int.num;
-  destinations : (Contract.t * Script_int.n Script_int.num) list;
+  destinations : (Destination.t * Script_int.n Script_int.num) list;
 }
 
 type error += Failed_to_get_script of Contract.t | Contract_not_originated
@@ -65,12 +65,17 @@ let () =
     (function Contract_not_originated -> Some () | _ -> None)
     (fun () -> Contract_not_originated)
 
-(** A carbonated map where the keys are contracts. *)
-module Contract_map = Carbonated_map.Make (struct
-  type t = Contract.t
+(** A carbonated map where the keys are destination (contract or tx_rollup). *)
+module Destination_map = Carbonated_map.Make (struct
+  type t = Destination.t
 
-  let compare = Contract.compare
+  let compare = Destination.compare
 
+  (* TODO: #2667
+     Change cost-function to one for comparing destinations.
+     Not expected to have any performance impact but we should update for
+     completeness.
+  *)
   let compare_cost _ = Ticket_costs.Constants.cost_compare_key_contract
 end)
 
@@ -94,7 +99,7 @@ module Ticket_token_map = struct
   (** Adds a ticket-token with a destination and an amount to the map.
       The layout of the map parameter is as described above. Its type is:
 
-       (n num Contract_map.t) Ticket_token_map.t
+       (n num Destination_map.t) Ticket_token_map.t
 
       As explained above, the inner map expresses a list of destination
       contracts and outgoing amount pairs.
@@ -111,7 +116,7 @@ module Ticket_token_map = struct
         match old_val with
         | None ->
             (* Create a new map with a single contract-and amount pair. *)
-            let map = Contract_map.singleton destination amount in
+            let map = Destination_map.singleton destination amount in
             ok (Some map, ctxt)
         | Some destination_map ->
             (* Update the inner contract map *)
@@ -125,7 +130,7 @@ module Ticket_token_map = struct
                   (Some (Script_int.add_n prev_amount amount), ctxt)
               | None -> ok (Some amount, ctxt)
             in
-            Contract_map.update ctxt destination update destination_map
+            Destination_map.update ctxt destination update destination_map
             >|? fun (destination_map, ctxt) -> (Some destination_map, ctxt))
       map
 end
@@ -210,13 +215,14 @@ let tickets_of_transaction ctxt ~destination ~entrypoint ~location
         ctxt
         has_tickets
         parameters
-      >>=? fun (tickets, ctxt) -> return (Some {destination; tickets}, ctxt)
+      >>=? fun (tickets, ctxt) ->
+      return (Some {destination = Contract destination; tickets}, ctxt)
 
 (** Extract tickets of an origination operation by scanning the storage. *)
 let tickets_of_origination ctxt ~preorigination script =
   match preorigination with
   | None -> fail Contract_not_originated
-  | Some destination ->
+  | Some contract ->
       (* TODO: #2351
          Avoid having to parse the script here.
          We're not able to rely on caching due to issues with lazy storage.
@@ -248,13 +254,9 @@ let tickets_of_origination ctxt ~preorigination script =
         ~include_lazy:true
         has_tickets
         storage
-      >|=? fun (tickets, ctxt) -> (Some {tickets; destination}, ctxt)
+      >|=? fun (tickets, ctxt) ->
+      (Some {tickets; destination = Destination.Contract contract}, ctxt)
 
-(* TODO: #2352
-   Extend operations scanning to support rollup-operations once ready.
-   Currently the only two operations that may involve ticket transfers are
-   originations and transactions. We will likely also need to support rollups.
- *)
 let tickets_of_operation ctxt
     (Script_typed_ir.Internal_operation {source = _; operation; nonce = _}) =
   match operation with
@@ -278,12 +280,30 @@ let tickets_of_operation ctxt
         ~location
         ~parameters_ty
         ~parameters
-  | Transaction {transaction = {destination = Destination.Tx_rollup _; _}; _} ->
-      (* TODO: #2488
-         The ticket accounting for the recipient of rollup transactions
-         is currently done in the apply function, but should rather be
-         done in this module. *)
-      return (None, ctxt)
+  | Transaction
+      {
+        transaction =
+          {
+            destination = Destination.Tx_rollup tx_rollup_dest;
+            parameters = _;
+            entrypoint;
+            amount = _;
+          };
+        location = _;
+        parameters_ty;
+        parameters;
+      } ->
+      if Entrypoint.(entrypoint = Tx_rollup.deposit_entrypoint) then
+        Tx_rollup_parameters.get_deposit_parameters parameters_ty parameters
+        >>?= fun {ex_ticket; l2_destination = _} ->
+        return
+          ( Some
+              {
+                destination = Destination.Tx_rollup tx_rollup_dest;
+                tickets = [ex_ticket];
+              },
+            ctxt )
+      else return (None, ctxt)
   | Origination {delegate = _; script; credit = _; preorigination} ->
       tickets_of_origination ctxt ~preorigination script
   | Delegation _ -> return (None, ctxt)
@@ -317,7 +337,7 @@ let ticket_diffs_of_operations ctxt operations =
     (fun ctxt acc ticket_token destination_map ->
       (* Calculate the total amount of outgoing units for the current
          ticket-token. *)
-      Contract_map.fold
+      Destination_map.fold
         ctxt
         (fun ctxt total_amount _destination amount ->
           Gas.consume ctxt (Ticket_costs.add_int_cost total_amount amount)
@@ -325,7 +345,8 @@ let ticket_diffs_of_operations ctxt operations =
         Script_int.zero_n
         destination_map
       >>? fun (total_amount, ctxt) ->
-      Contract_map.to_list ctxt destination_map >|? fun (destinations, ctxt) ->
+      Destination_map.to_list ctxt destination_map
+      >|? fun (destinations, ctxt) ->
       ({ticket_token; total_amount; destinations} :: acc, ctxt))
     []
     token_map

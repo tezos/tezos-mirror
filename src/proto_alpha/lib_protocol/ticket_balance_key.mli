@@ -23,15 +23,17 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Alpha_context
+
 (** This module exposes a function for generating a ticket-balance key-hash
     given an owner and a ticket-token. The key-hash is used for populating the
     global ticket-balance table that tracks ownership of tickets for different tokens.
  *)
 
-(** [ticket_balance_key ctxt ~owner ex_token] returns the [key_hash] of the
+(** [of_ex_token ctxt ~owner ex_token] returns the [key_hash] of the
     given [owner] and [ex_token]. *)
-val ticket_balance_key :
-  Alpha_context.context ->
-  owner:Alpha_context.Contract.t ->
+val of_ex_token :
+  context ->
+  owner:Destination.t ->
   Ticket_token.ex_token ->
-  (Alpha_context.Ticket_hash.t * Alpha_context.context) tzresult Lwt.t
+  (Ticket_hash.t * context) tzresult Lwt.t

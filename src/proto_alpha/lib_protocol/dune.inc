@@ -176,6 +176,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    ticket_balance_key.mli ticket_balance_key.ml
    ticket_lazy_storage_diff.mli ticket_lazy_storage_diff.ml
    ticket_balance_migration_for_j.mli ticket_balance_migration_for_j.ml
+   tx_rollup_parameters.mli tx_rollup_parameters.ml
    ticket_token_map.mli ticket_token_map.ml
    ticket_operations_diff.mli ticket_operations_diff.ml
    ticket_accounting.mli ticket_accounting.ml
@@ -353,6 +354,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    ticket_balance_key.mli ticket_balance_key.ml
    ticket_lazy_storage_diff.mli ticket_lazy_storage_diff.ml
    ticket_balance_migration_for_j.mli ticket_balance_migration_for_j.ml
+   tx_rollup_parameters.mli tx_rollup_parameters.ml
    ticket_token_map.mli ticket_token_map.ml
    ticket_operations_diff.mli ticket_operations_diff.ml
    ticket_accounting.mli ticket_accounting.ml
@@ -530,6 +532,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    ticket_balance_key.mli ticket_balance_key.ml
    ticket_lazy_storage_diff.mli ticket_lazy_storage_diff.ml
    ticket_balance_migration_for_j.mli ticket_balance_migration_for_j.ml
+   tx_rollup_parameters.mli tx_rollup_parameters.ml
    ticket_token_map.mli ticket_token_map.ml
    ticket_operations_diff.mli ticket_operations_diff.ml
    ticket_accounting.mli ticket_accounting.ml
@@ -729,6 +732,7 @@ include Tezos_raw_protocol_alpha.Main
    Ticket_balance_key
    Ticket_lazy_storage_diff
    Ticket_balance_migration_for_j
+   Tx_rollup_parameters
    Ticket_token_map
    Ticket_operations_diff
    Ticket_accounting
@@ -947,6 +951,7 @@ include Tezos_raw_protocol_alpha.Main
    ticket_balance_key.mli ticket_balance_key.ml
    ticket_lazy_storage_diff.mli ticket_lazy_storage_diff.ml
    ticket_balance_migration_for_j.mli ticket_balance_migration_for_j.ml
+   tx_rollup_parameters.mli tx_rollup_parameters.ml
    ticket_token_map.mli ticket_token_map.ml
    ticket_operations_diff.mli ticket_operations_diff.ml
    ticket_accounting.mli ticket_accounting.ml

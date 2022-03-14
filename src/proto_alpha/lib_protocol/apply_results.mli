@@ -241,7 +241,9 @@ and _ successful_manager_operation_result =
     }
       -> Kind.tx_rollup_rejection successful_manager_operation_result
   | Tx_rollup_withdraw_result : {
+      balance_updates : Receipt.balance_updates;
       consumed_gas : Gas.Arith.fp;
+      paid_storage_size_diff : Z.t;
     }
       -> Kind.tx_rollup_withdraw successful_manager_operation_result
   | Sc_rollup_originate_result : {

@@ -428,12 +428,6 @@ val parse_contract_for_script :
   entrypoint:Entrypoint.t ->
   (context * 'a Script_typed_ir.typed_contract option) tzresult Lwt.t
 
-(** [parse_tx_rollup_deposit_parameters ctxt expr] extracts from
-    [expr] the parameters of the [deposit] entrypoint of transaction
-    rollups. *)
-val parse_tx_rollup_deposit_parameters :
-  context -> Script.expr -> (Tx_rollup.deposit_parameters * context) tzresult
-
 (** ['a ex_ty_cstr] is like [ex_ty], but also adds to the existential a function
     used to reconstruct a value of type ['a] from the internal type of the
     existential. Typically, it will be used to go from the type of an
