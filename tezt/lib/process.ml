@@ -457,9 +457,9 @@ let check ?(expect_failure = false) process =
              reason = Some reason;
            })
 
-let run ?log_status_on_exit ?name ?color ?env ?expect_failure command arguments
-    =
-  spawn ?log_status_on_exit ?name ?color ?env command arguments
+let run ?log_status_on_exit ?name ?color ?env ?hooks ?expect_failure command
+    arguments =
+  spawn ?log_status_on_exit ?name ?color ?env ?hooks command arguments
   |> check ?expect_failure
 
 let clean_up () =
@@ -492,14 +492,18 @@ let check_and_read_stdout = check_and_read ~channel_getter:stdout
 
 let check_and_read_stderr = check_and_read ~channel_getter:stderr
 
-let run_and_read_stdout ?log_status_on_exit ?name ?color ?env ?expect_failure
-    command arguments =
-  let process = spawn ?log_status_on_exit ?name ?color ?env command arguments in
+let run_and_read_stdout ?log_status_on_exit ?name ?color ?env ?hooks
+    ?expect_failure command arguments =
+  let process =
+    spawn ?log_status_on_exit ?name ?color ?env ?hooks command arguments
+  in
   check_and_read_stdout ?expect_failure process
 
-let run_and_read_stderr ?log_status_on_exit ?name ?color ?env ?expect_failure
-    command arguments =
-  let process = spawn ?log_status_on_exit ?name ?color ?env command arguments in
+let run_and_read_stderr ?log_status_on_exit ?name ?color ?env ?hooks
+    ?expect_failure command arguments =
+  let process =
+    spawn ?log_status_on_exit ?name ?color ?env ?hooks command arguments
+  in
   check_and_read_stdout ?expect_failure process
 
 let check_error ?exit_code ?msg process =

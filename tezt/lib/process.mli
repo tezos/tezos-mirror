@@ -149,6 +149,7 @@ val run :
   ?name:string ->
   ?color:Log.Color.t ->
   ?env:string Base.String_map.t ->
+  ?hooks:hooks ->
   ?expect_failure:bool ->
   string ->
   string list ->
@@ -178,6 +179,7 @@ val run_and_read_stdout :
   ?name:string ->
   ?color:Log.Color.t ->
   ?env:string Base.String_map.t ->
+  ?hooks:hooks ->
   ?expect_failure:bool ->
   string ->
   string list ->
@@ -192,6 +194,7 @@ val run_and_read_stderr :
   ?name:string ->
   ?color:Log.Color.t ->
   ?env:string Base.String_map.t ->
+  ?hooks:hooks ->
   ?expect_failure:bool ->
   string ->
   string list ->
