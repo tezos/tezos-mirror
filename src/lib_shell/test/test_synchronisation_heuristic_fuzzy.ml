@@ -87,7 +87,8 @@ module Reference : S = struct
     else
       let candidates =
         replace_or_add (ts, peer) state.candidates
-        |> List.take_n ~compare state.threshold
+        |> List.sort compare |> List.rev
+        |> List.rev_take_n state.threshold
       in
       state.candidates <- candidates
 

@@ -537,7 +537,9 @@ let test_full_2_merge block_store =
       (List.rev (List.concat cycles))
     (* hack: invert the reading order to clear the cache *)
   in
-  let expected_preserved_blocks = List.concat (List.sub (List.rev cycles) 3) in
+  let expected_preserved_blocks =
+    List.concat (List.take_n 3 (List.rev cycles))
+  in
   (* Last 3 cycles should have metadata *)
   let* () =
     assert_presence_in_block_store
@@ -546,7 +548,7 @@ let test_full_2_merge block_store =
       expected_preserved_blocks
   in
   let expected_pruned_blocks =
-    List.sub cycles (List.length cycles - 3) |> List.concat
+    List.take_n (List.length cycles - 3) cycles |> List.concat
   in
   (* First 7 cycles shouldn't have metadata *)
   let* () =
@@ -626,7 +628,9 @@ let test_rolling_2_merge block_store =
       (Rolling (Some {offset = 2}))
       10
   in
-  let expected_preserved_blocks = List.concat (List.sub (List.rev cycles) 3) in
+  let expected_preserved_blocks =
+    List.concat (List.take_n 3 (List.rev cycles))
+  in
   (* Last 3 cycles should have metadata *)
   let* () =
     assert_presence_in_block_store
@@ -635,7 +639,7 @@ let test_rolling_2_merge block_store =
       expected_preserved_blocks
   in
   let expected_pruned_blocks =
-    List.sub cycles (List.length cycles - 3) |> List.concat
+    List.take_n (List.length cycles - 3) cycles |> List.concat
   in
   (* First 7 cycles shouldn't have metadata *)
   let* () = assert_absence_in_block_store block_store expected_pruned_blocks in
