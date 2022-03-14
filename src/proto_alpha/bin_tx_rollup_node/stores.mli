@@ -101,6 +101,9 @@ module Level_store : sig
   val add : ?flush:bool -> t -> L2block.level -> L2block.hash -> unit Lwt.t
 end
 
+(** {2 Singleton stores}  *)
+
+(** A store composed of a single file on disk to store the current head *)
 module Head_store : sig
   (** The type of store for the head. *)
   type t
@@ -112,3 +115,36 @@ module Head_store : sig
   (** Write the head block hash to disk. *)
   val write : t -> L2block.hash -> unit tzresult Lwt.t
 end
+
+(** A store composed of a single file on disk to store the rollup origination
+    information. This is used to guarantee consistency between several runs of
+    the Tx rollup node. *)
+module Rollup_origination_store : sig
+  (** The type of store for the rollup origination information. *)
+  type t
+
+  (** Reads the current rollup origination information from disk. Returns [None]
+      if the file does not exist or if it is corrupted. *)
+  val read : t -> (Block_hash.t * int32) option Lwt.t
+
+  (** Write the rollup origination information to disk. *)
+  val write : t -> Block_hash.t * int32 -> unit tzresult Lwt.t
+end
+
+(** The type of all stores of the Tx rollup node. *)
+type t = {
+  blocks : L2_block_store.t;
+  tezos_blocks : Tezos_block_store.t;
+  levels : Level_store.t;
+  head : Head_store.t;
+  rollup_origination : Rollup_origination_store.t;
+}
+
+(** [init ~data_dir ~readonly] creates or loads existing all the stores in
+    the directory [data_dir]. If [readonly] (defaults to [false]) is set, the
+    stores can only be read. *)
+val init : data_dir:string -> readonly:bool -> t Lwt.t
+
+(** [close store] closes all the stores by closing the indexes and the
+    associated opened file descriptors. *)
+val close : t -> unit Lwt.t

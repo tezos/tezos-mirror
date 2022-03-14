@@ -435,7 +435,14 @@ module Level_store = struct
     Lwt.return_unit
 end
 
-module Head_store = struct
+module Make_singleton (S : sig
+  type t
+
+  val name : string
+
+  val encoding : t Data_encoding.t
+end) =
+struct
   type t = {file : string}
 
   let read store =
@@ -451,7 +458,7 @@ module Head_store = struct
         @@ fun channel ->
         let+ bytes = Lwt_io.read channel in
         Data_encoding.Binary.of_bytes_opt
-          L2block.encoding
+          S.encoding
           (Bytes.unsafe_of_string bytes)
 
   let write store x =
@@ -459,9 +466,9 @@ module Head_store = struct
     let*! res =
       Lwt_utils_unix.with_atomic_open_out ~overwrite:true store.file
       @@ fun fd ->
-      let+ block_bytes =
-        match Data_encoding.Binary.to_bytes_opt L2block.encoding block with
-        | None -> failwith "Cannot encode block" (* TODO proper error *)
+      let* block_bytes =
+        match Data_encoding.Binary.to_bytes_opt S.encoding x with
+        | None -> fail (Cannot_encode_data S.name)
         | Some bytes -> return bytes
       in
       let*! () = Lwt_utils_unix.write_bytes fd block_bytes in
@@ -469,12 +476,50 @@ module Head_store = struct
     in
     match res with
     | Ok res -> Lwt.return res
-    | Error _ ->
-        (* TODO proper error *)
-        failwith "Cannot write head file"
+    | Error _ -> fail (Cannot_write_file S.name)
 
   let init ~data_dir =
-    let open Lwt_syntax in
-    let* () = Node_data.mk_store_dir data_dir in
-    Lwt.return {file = Node_data.head_file data_dir}
+    let file = Filename.Infix.(Node_data.store_dir data_dir // S.name) in
+    Lwt.return {file}
 end
+
+module Head_store = Make_singleton (struct
+  type t = L2block.hash
+
+  let name = "head"
+
+  let encoding = L2block.Hash.encoding
+end)
+
+module Rollup_origination_store = Make_singleton (struct
+  type t = Block_hash.t * int32
+
+  let name = "rollup_origination"
+
+  let encoding = Data_encoding.tup2 Block_hash.encoding Data_encoding.int32
+end)
+
+type t = {
+  blocks : L2_block_store.t;
+  tezos_blocks : Tezos_block_store.t;
+  levels : Level_store.t;
+  head : Head_store.t;
+  rollup_origination : Rollup_origination_store.t;
+}
+
+let init ~data_dir ~readonly =
+  let open Lwt_syntax in
+  let* () = Node_data.mk_store_dir data_dir in
+  let* blocks = L2_block_store.init ~data_dir ~readonly
+  and* tezos_blocks = Tezos_block_store.init ~data_dir ~readonly
+  and* levels = Level_store.init ~data_dir ~readonly
+  and* head = Head_store.init ~data_dir
+  and* rollup_origination = Rollup_origination_store.init ~data_dir in
+  return {blocks; tezos_blocks; levels; head; rollup_origination}
+
+let close stores =
+  let open Lwt_syntax in
+  let* () = L2_block_store.close stores.blocks
+  and* () = Tezos_block_store.close stores.tezos_blocks
+  and* () = Level_store.close stores.levels in
+  return_unit
