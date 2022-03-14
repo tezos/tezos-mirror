@@ -583,18 +583,12 @@ let cement_commitment ctxt rollup new_lcc =
            can safely deallocate the old LCC.
         *)
         let* ctxt = deallocate ctxt rollup old_lcc in
-        let* ctxt =
-          consume_n_messages
-            ctxt
-            rollup
-            (Int32.to_int
-            @@ Sc_rollup_repr.Number_of_messages.to_int32
-                 new_lcc_commitment.number_of_messages)
-        in
-        let* (ctxt, _size) =
-          Store.Commitments.remove_existing (ctxt, rollup) new_lcc
-        in
-        return ctxt
+        consume_n_messages
+          ctxt
+          rollup
+          (Int32.to_int
+          @@ Sc_rollup_repr.Number_of_messages.to_int32
+               new_lcc_commitment.number_of_messages)
 
 type conflict_point = Commitment_hash.t * Commitment_hash.t
 
