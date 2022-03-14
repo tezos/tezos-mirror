@@ -552,9 +552,8 @@ module Consensus = struct
     let module Consensus = Tezos_proxy.Light_consensus.Make (Light_proto) in
     let printer = mock_printer () in
     let repo = Lwt_main.run (Store.Tree.make_repo ()) in
-    let* tree =
-      Internal.Merkle.merkle_tree_to_irmin_tree repo mtree >|= get_ok
-    in
+    let* tree_r = Internal.Merkle.merkle_tree_to_irmin_tree repo mtree in
+    let tree = get_ok tree_r in
     let input : Tezos_proxy.Light_consensus.input =
       {
         printer = (printer :> Tezos_client_base.Client_context.printer);

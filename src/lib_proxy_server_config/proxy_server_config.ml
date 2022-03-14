@@ -177,21 +177,24 @@ let to_runtime
     (runtime, string) result =
   (* Validating sym_block_caching_time is required if it was specified
      on the command line. In this case it wasn't validated yet. *)
+  let open Result_syntax in
   match
     (endpoint, rpc_addr, sym_block_caching_time_error sym_block_caching_time)
   with
   | (None, _, _) ->
-      Error
+      fail
         {|Endpoint not specified: pass argument --endpoint or specify "endpoint" field in CONFIG file|}
   | (_, None, _) ->
-      Error
+      fail
         {|RPC address not specified: pass argument --rpc-addr or specify "rpc_addr" field in CONFIG file|}
-  | (_, _, Some err) -> Error err
+  | (_, _, Some err) -> fail err
   | (Some endpoint, Some rpc_addr, None) ->
-      address_and_port_for_runtime rpc_addr
-      >>? fun (rpc_server_address, rpc_server_port) ->
-      Option.map tls_for_runtime rpc_tls |> opt_res_to_res_opt
-      >>? fun rpc_server_tls ->
+      let* (rpc_server_address, rpc_server_port) =
+        address_and_port_for_runtime rpc_addr
+      in
+      let* rpc_server_tls =
+        Option.map tls_for_runtime rpc_tls |> opt_res_to_res_opt
+      in
       Ok
         {
           endpoint;
