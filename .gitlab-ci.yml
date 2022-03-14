@@ -55,17 +55,17 @@ include:
 
 # Actual jobs are defined in these included files
 
-  - .gitlab/ci/packaging.yml
-  - .gitlab/ci/sanity.yml
-  - .gitlab/ci/build.yml
-  - .gitlab/ci/test/templates.yml
-  - .gitlab/ci/test/lints.yml
-  - .gitlab/ci/test/unit.yml
-  - .gitlab/ci/test/integration.yml
-  - .gitlab/ci/test/liquidity-baking-scripts-integrity.yml
-  - .gitlab/ci/test/tezt.yml
-  - .gitlab/ci/doc.yml
-  - .gitlab/ci/doc/test-scripts.yml
-  - .gitlab/ci/build_release.yml
+#  - .gitlab/ci/packaging.yml
+#  - .gitlab/ci/sanity.yml
+#  - .gitlab/ci/build.yml
+#  - .gitlab/ci/test/templates.yml
+#  - .gitlab/ci/test/lints.yml
+#  - .gitlab/ci/test/unit.yml
+#  - .gitlab/ci/test/integration.yml
+#  - .gitlab/ci/test/liquidity-baking-scripts-integrity.yml
+#  - .gitlab/ci/test/tezt.yml
+#  - .gitlab/ci/doc.yml
+#  - .gitlab/ci/doc/test-scripts.yml
+#  - .gitlab/ci/build_release.yml
   - .gitlab/ci/publish_release.yml
-  - .gitlab/ci/test_coverage.yml
+#  - .gitlab/ci/test_coverage.yml

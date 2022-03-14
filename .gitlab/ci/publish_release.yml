@@ -1,37 +1,52 @@
 ---
-gitlab:release:
-  extends:
-    - .rules_template__release_tag
-  image: registry.gitlab.com/gitlab-org/release-cli:v0.11.0
-  stage: publish_release
-  dependencies:
-    - build:static-x86_64-linux-binaries
-    - build:static-arm64-linux-binaries
-    - docker:merge_manifests
-  script:
-    - apk --no-cache --virtual add jq curl git
-    # we run the smoketest only for x86_64 since this job is executed on x86_64
-    - ./scripts/ci/static_smoke_test.sh x86_64 version
-    # create a GitLab generic package
-    - ./scripts/ci/create_gitlab_package.sh
-    # create a GitLab release
-    - ./scripts/ci/create_gitlab_release.sh
+#gitlab:release:
+#  extends:
+#    - .rules_template__release_tag
+#  # Mirror of registry.gitlab.com/nomadic-labs/iac/docker/tezos-ci:v1.3.0
+#  image: "${AWS_ECR}/tezos-ci:v1.3.0"
+#  stage: publish_release
+#  dependencies:
+#    - build:static-x86_64-linux-binaries
+#    - build:static-arm64-linux-binaries
+#    - docker:merge_manifests
+#  script:
+#    # we run the smoketest only for x86_64 since this job is executed on x86_64
+#    - ./scripts/ci/static_smoke_test.sh x86_64 version
+#    # create a GitLab generic package
+#    - ./scripts/ci/create_gitlab_package.sh
+#    # create a GitLab release
+#    - ./scripts/ci/create_gitlab_release.sh
 
 # Note: here we rely on $IMAGE_ARCH_PREFIX to be empty.
 # Otherwise, $DOCKER_IMAGE_TAG would contain $IMAGE_ARCH_PREFIX too.
 # $IMAGE_ARCH_PREFIX is only used when building Docker images,
 # here we handle all architectures so there is no such variable.
-docker:merge_manifests:
-  extends:
-    - .rules_template__master_and_releases
-    - .image_template__latest # Docker-in-Docker (dind)
-    - .docker_registry_auth # Sets up a before_script
+#docker:merge_manifests:
+#  extends:
+#    - .rules_template__master_and_releases
+#    - .image_template__latest # Docker-in-Docker (dind)
+#    - .docker_registry_auth # Sets up a before_script
+#  stage: publish_release
+#  script:
+#    - apk add git
+#    # Environment variables from before_script
+#    - . ./scripts/ci/docker.env
+#    - ./scripts/ci/docker_merge_manifests.sh
+#  needs:
+#    - docker:build_amd64
+#    - docker:build_arm64
+
+# To debug job directly inside GitLab executor
+debug:
   stage: publish_release
+  extends:
+    - .rules_template__release_tag
+  # Mirror of registry.gitlab.com/nomadic-labs/iac/docker/tezos-ci:v1.3.0
+  image: "${AWS_ECR}/tezos-ci:v1.3.0"
+  # image: registry.gitlab.com/gitlab-org/release-cli:v0.11.0
+  variables:
+    # GIT_STRATEGY: "clone"
+    # GIT_DEPTH: 10
+    # GIT_FETCH_EXTRA_FLAGS: "--tags"
   script:
-    - apk add git
-    # Environment variables from before_script
-    - . ./scripts/ci/docker.env
-    - ./scripts/ci/docker_merge_manifests.sh
-  needs:
-    - docker:build_amd64
-    - docker:build_arm64
+    - ./scripts/ci/debug.sh
