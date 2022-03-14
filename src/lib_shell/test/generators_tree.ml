@@ -56,14 +56,6 @@ module List_extra = struct
         match take_until_if_found ~pred rest_l with
         | None -> None
         | Some tail -> Some (fst :: tail))
-
-  (** [split_n l n] returns two lists, the first one containing the first
-      [n] elements of [l] and the second one containing the remaining elements.
-      For example:
-      [split_n [] _] is [([], [])]
-      [split_n ["a"] 1] is [(["a"], [])]
-      [split_n ["a"; "b"; "c"] 1] is [(["a"], ["b"; "c"])] *)
-  let split_n l n = (List.take_n n l, List.drop_n n l)
 end
 
 module Tree = struct
@@ -382,7 +374,8 @@ let tree_gen ?blocks () =
           | Some sub -> ret (Tree.Node1 (x, sub))
         else
           let* (left, right) =
-            QCheck2.Gen.int_bound (List.length xs - 1) >|= List_extra.split_n xs
+            QCheck2.Gen.int_bound (List.length xs - 1) >|= fun n ->
+            List.split_n n xs
           in
           let* left = go left and* right = go right in
           match (left, right) with
@@ -532,4 +525,4 @@ let split_in_two (l : 'a list) : ('a list * 'a list) QCheck2.Gen.t =
   let open QCheck2.Gen in
   let length = List.length l in
   let+ i = 0 -- length in
-  List_extra.split_n l i
+  List.split_n i l
