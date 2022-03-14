@@ -33,6 +33,9 @@
 open TzCore
 
 let splitted_error_encoding =
+  (* As documented in [Sig.Core.error_encoding], this use of [error_encoding]
+     suffers from significant drawbacks. Specifically, The json-encoding via
+     [splitted] is not updated when new errors are registered. *)
   Data_encoding.splitted ~json:error_encoding ~binary:error_encoding
 
 type error += Foo
@@ -40,6 +43,8 @@ type error += Foo
 let msg error = Obj.Extension_constructor.(name @@ of_val error)
 
 let test_unregistered_binary () =
+  (* The error was declared but not registered so we expect all encoding
+     attempts to fail. *)
   let e = Foo in
   let blob = Data_encoding.Binary.to_string_exn error_encoding e in
   let ee = Data_encoding.Binary.of_string_exn error_encoding blob in
@@ -50,6 +55,8 @@ let test_unregistered_binary () =
   ()
 
 let test_unregistered_json () =
+  (* The error was declared but not registered so we expect all encoding
+     attempts to fail. *)
   let e = Foo in
   let json = Data_encoding.Json.construct error_encoding e in
   let ee = Data_encoding.Json.destruct error_encoding json in
@@ -60,6 +67,7 @@ let test_unregistered_json () =
   ()
 
 let test_registered () =
+  (* We register the error. *)
   register_error_kind
     `Permanent
     ~id:"test.Foo"
@@ -68,6 +76,7 @@ let test_registered () =
     Data_encoding.(obj1 (req "test-foo" Data_encoding.unit))
     (function Foo -> Some () | _ -> None)
     (fun () -> Foo) ;
+  (* We check that binary encoding works fine. *)
   let e = Foo in
   let blob = Data_encoding.Binary.to_string_exn error_encoding e in
   let ee = Data_encoding.Binary.of_string_exn error_encoding blob in
@@ -81,6 +90,8 @@ let test_registered () =
   let json = Data_encoding.Json.construct error_encoding e in
   let ee = Data_encoding.Json.destruct error_encoding json in
   assert (ee = Foo) ;
+  (* and now JSON with splitted. This fail as per the documentation of
+     [error_encoding] (see [sig.ml]). *)
   let sjson = Data_encoding.Json.construct splitted_error_encoding e in
   let see = Data_encoding.Json.destruct error_encoding sjson in
   (match see with Unregistered_error _ -> () | _ -> assert false) ;
