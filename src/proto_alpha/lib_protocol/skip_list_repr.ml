@@ -97,10 +97,10 @@ end) : S = struct
        also ask the client to provide the index of the cell to be
        built, which can be error-prone.
 
-     - The back pointers of a node are entirely determined by the
-       back pointers of its predecessor (except for the genesis
-       node) and a pointer to this predecessor. This locality makes
-       the insertion of new node very efficient in practice.
+     - The back pointers of a node are chosen from the back pointers of
+       its predecessor (except for the genesis node) and a pointer to this
+       predecessor. This locality makes the insertion of new nodes very
+       efficient in practice.
 
   *)
   type ('content, 'ptr) cell = {
@@ -113,14 +113,12 @@ end) : S = struct
     let equal_back_pointers b1 b2 =
       let open FallbackArray in
       Compare.Int.(length b1 = length b2)
-      &&
-      let i = ref 0 in
-      let equal = ref true in
-      while Compare.Int.(!i < length b1) && !equal do
-        equal := Option.equal equal_ptr (get b1 !i) (get b2 !i) ;
-        incr i
-      done ;
-      !equal
+      && fst
+         @@ fold
+              (fun (equal, i) h1 ->
+                (equal && Option.equal equal_ptr h1 (get b2 i), i + 1))
+              b1
+              (true, 0)
     in
     let {content; back_pointers; index} = cell1 in
     equal_content content cell2.content

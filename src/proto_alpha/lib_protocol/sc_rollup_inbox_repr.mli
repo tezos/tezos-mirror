@@ -203,6 +203,16 @@ module type MerkelizedOperations = sig
     messages ->
     (messages * history * t) tzresult Lwt.t
 
+  (** [add_messages_no_history inbox level payloads messages] behaves
+      a [add_messages] except that it does not remember the inbox
+      history. *)
+  val add_messages_no_history :
+    t ->
+    Raw_level_repr.t ->
+    string list ->
+    message ->
+    (message * t, error trace) result Lwt.t
+
   (** [get_message messages idx] returns [Some message] if the
      sequence of [messages] has a more than [idx] messages and
      [message] is at position [idx] in this sequence.
@@ -224,7 +234,7 @@ module type MerkelizedOperations = sig
      levels messages of [B]. The current messages of [A] and [B]
      are not considered.
 
-     The size of this proof is O(log_basis (L' - L')). *)
+     The size of this proof is O(log_basis (L' - L)). *)
   type inclusion_proof
 
   val pp_inclusion_proof : Format.formatter -> inclusion_proof -> unit
@@ -243,21 +253,40 @@ module type MerkelizedOperations = sig
   val verify_inclusion_proof : inclusion_proof -> t -> t -> bool
 end
 
+module type TREE = sig
+  type t
+
+  type tree
+
+  type key = string list
+
+  type value = bytes
+
+  val find : tree -> key -> value option Lwt.t
+
+  val find_tree : tree -> key -> tree option Lwt.t
+
+  val add : tree -> key -> value -> tree Lwt.t
+
+  val is_empty : tree -> bool
+
+  val hash : tree -> Context_hash.t
+end
+
 (**
 
    This validation is based on a standardized Merkelization
    scheme. The definition of this scheme is independent from the exact
-   data model of the context but it depends the [Tree] arity and
+   data model of the context but it depends on the [Tree] arity and
    internal hashing scheme.
 
    We provide a functor that takes a {!Context.TREE} module from any
    context, checks that the assumptions made about tree's arity and
-   hashing scheme is valid, and returns a standard compliant
+   hashing scheme are valid, and returns a standard compliant
    implementation of the {!MerkelizedOperations}.
 
 *)
-module MakeHashingScheme
-    (Tree : Context.TREE with type key = string list and type value = bytes) :
+module MakeHashingScheme (Tree : TREE) :
   MerkelizedOperations with type tree = Tree.tree
 
 include MerkelizedOperations with type tree = Context.tree

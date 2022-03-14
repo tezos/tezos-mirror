@@ -92,9 +92,6 @@ struct
 
   let rec nlist basis n = if n = 0 then zero else succ (nlist basis (n - 1))
 
-  let rec range start stop =
-    if start = stop then [] else start :: range (start + 1) stop
-
   let check_path i j =
     let l = nlist basis i in
     if i <= j then return ()

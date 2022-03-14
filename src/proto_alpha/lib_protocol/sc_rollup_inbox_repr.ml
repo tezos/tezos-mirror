@@ -27,8 +27,8 @@
 
    A Merkelized inbox represents a list of available messages. This
    list is decomposed into sublist of messages, one for each Tezos
-   level greater than the level of the Last Finalized Commitment
-   (LFC).
+   level greater than the level of the Last Cemented Commitment
+   (LCC).
 
    This module is designed to:
 
@@ -56,7 +56,7 @@
    hashes of the head of H, and the root hash of C.
 
    The rollup node needs to maintain a full representation for C and a
-   partial representation for H back to the level of the LFC.
+   partial representation for H back to the level of the LCC.
 
 *)
 type error += Invalid_level_add_messages of Raw_level_repr.t
@@ -128,7 +128,8 @@ let pp_history_proof fmt cell =
    - [rollup] : the address of the rollup ;
    - [level] : the inbox level ;
    - [message_counter] : the number of messages in the [level]'s inbox ;
-   - [nb_available_messages] : the number of messages that have not been consumed by a commitment finalization ;
+   - [nb_available_messages] :
+     the number of messages that have not been consumed by a commitment cementing ;
    - [current_messages_hash] : the root hash of [current_messages] ;
    - [old_levels_messages] : a witness of the inbox history.
 
@@ -148,6 +149,7 @@ type t = {
   level : Raw_level_repr.t;
   nb_available_messages : int64;
   message_counter : Z.t;
+  (* Lazy to avoid hashing O(n^2) time in [add_messages] *)
   current_messages_hash : unit -> Context.Proof.hash;
   old_levels_messages : history_proof;
 }
@@ -288,6 +290,13 @@ module type MerkelizedOperations = sig
     messages ->
     (messages * history * t) tzresult Lwt.t
 
+  val add_messages_no_history :
+    t ->
+    Raw_level_repr.t ->
+    string list ->
+    messages ->
+    (messages * t) tzresult Lwt.t
+
   val get_message : messages -> Z.t -> message option Lwt.t
 
   val get_message_payload : messages -> Z.t -> string option Lwt.t
@@ -303,8 +312,27 @@ module type MerkelizedOperations = sig
   val verify_inclusion_proof : inclusion_proof -> t -> t -> bool
 end
 
-module MakeHashingScheme
-    (Tree : Context.TREE with type key = string list and type value = bytes) :
+module type TREE = sig
+  type t
+
+  type tree
+
+  type key = string list
+
+  type value = bytes
+
+  val find : tree -> key -> value option Lwt.t
+
+  val find_tree : tree -> key -> tree option Lwt.t
+
+  val add : tree -> key -> value -> tree Lwt.t
+
+  val is_empty : tree -> bool
+
+  val hash : tree -> Context_hash.t
+end
+
+module MakeHashingScheme (Tree : TREE) :
   MerkelizedOperations with type tree = Tree.tree = struct
   module Tree = Tree
 
@@ -389,6 +417,11 @@ module MakeHashingScheme
       counter = 0L;
     }
 
+  (** [remember ptr cell history] extends [history] with a new
+      mapping from [ptr] to [cell]. If [history] is full, the
+      oldest mapping is removed. If the history bound is less
+      or equal to zero, then this function returns [history]
+      untouched. *)
   let remember ptr cell history =
     if Compare.Int64.(history.bound <= 0L) then history
     else
@@ -462,6 +495,11 @@ module MakeHashingScheme
         if Tree.is_empty messages then no_messages_hash else Tree.hash messages
       in
       return (messages, history, {inbox with current_messages_hash})
+
+  let add_messages_no_history inbox level payloads messages =
+    let history = history_at_genesis ~bound:0L in
+    add_messages history inbox level payloads messages
+    >>=? fun (messages, _, inbox) -> return (messages, inbox)
 
   (* An [inclusion_proof] is a path in the Merkelized skip list
      showing that a given inbox history is a prefix of another one.
