@@ -70,6 +70,14 @@ module type S = sig
   (** A commitment hash characterized the contents of the state. *)
   type hash = State_hash.t
 
+  (** [proof_start_state proof] returns the initial state hash of the
+     [proof] execution step. *)
+  val proof_start_state : proof -> hash
+
+  (** [proof_stop_state proof] returns the final state hash of the
+     [proof] execution step. *)
+  val proof_stop_state : proof -> hash
+
   (** [state_hash state] returns a compressed representation of [state]. *)
   val state_hash : state -> hash Lwt.t
 

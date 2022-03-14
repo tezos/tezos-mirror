@@ -95,6 +95,10 @@ module Make (Context : P) : S with type context = Context.Tree.t = struct
 
   let proof_encoding = Context.proof_encoding
 
+  let proof_start_state = Context.proof_start_state
+
+  let proof_stop_state = Context.proof_stop_state
+
   let name = "arith"
 
   let parse_boot_sector s = Some (PVM.boot_sector_of_string s)
