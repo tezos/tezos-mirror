@@ -141,6 +141,10 @@ val get : ('conn, 'peer_meta, 'conn_meta) Info.t -> ('conn, 'conn_meta) state
 
 val is_disconnected : ('conn, 'peer_meta, 'conn_meta) Info.t -> bool
 
+val is_accepted : ('conn, 'peer_meta, 'conn_meta) Info.t -> bool
+
+val is_running : ('conn, 'peer_meta, 'conn_meta) Info.t -> bool
+
 val set_accepted :
   timestamp:Time.System.t ->
   ('conn, 'peer_meta, 'conn_meta) Info.t ->

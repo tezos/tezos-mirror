@@ -135,7 +135,11 @@ end
 
 val get : 'conn Info.t -> 'conn t
 
+val is_running : 'conn Info.t -> bool
+
 val is_disconnected : 'conn Info.t -> bool
+
+val is_accepted : 'conn Info.t -> bool
 
 val set_requested :
   timestamp:Time.System.t -> 'conn Info.t -> Lwt_canceler.t -> unit
