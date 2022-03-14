@@ -1137,7 +1137,7 @@ let create_merging_thread block_store ~history_mode ~old_ro_store ~old_rw_store
               if offset > 0 then
                 (* Only cement <offset> cycles *)
                 let cycles_interval_to_cement =
-                  List.remove
+                  List.drop_n
                     (List.length cycles_interval_to_cement - offset)
                     cycles_interval_to_cement
                 in

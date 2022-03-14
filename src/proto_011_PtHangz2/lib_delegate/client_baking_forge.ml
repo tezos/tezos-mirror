@@ -496,7 +496,7 @@ let sort_manager_operations ~max_size ~hard_gas_limit_per_block ~minimal_fees
 let retain_operations_up_to_quota operations quota =
   let {Tezos_protocol_environment.max_op; max_size} = quota in
   let operations =
-    match max_op with Some n -> List.sub operations n | None -> operations
+    match max_op with Some n -> List.take_n n operations | None -> operations
   in
   let exception Full of packed_operation list in
   let operations =
@@ -985,10 +985,10 @@ let forge_block cctxt ?force ?(best_effort = true) ?(sort = best_effort)
   (* Ensure that we retain operations up to the quota *)
   let quota : Environment.Updater.quota list = Main.validation_passes in
   let endorsements =
-    List.sub
+    List.take_n
+      constants.parametric.endorsers_per_block
       (WithExceptions.Option.get ~loc:__LOC__
       @@ List.nth operations endorsements_index)
-      constants.parametric.endorsers_per_block
   in
   let votes =
     retain_operations_up_to_quota

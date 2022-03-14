@@ -220,7 +220,7 @@ let random_connections ~rng pool n =
   let candidates =
     P2p_pool.Connection.fold pool ~init:[] ~f |> List.shuffle ~rng
   in
-  TzList.rev_sub candidates n
+  TzList.rev_take_n n candidates
 
 (** Maintenance step.
     1. trigger greylist gc

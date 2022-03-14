@@ -152,7 +152,7 @@ let blocks_from_current_cycle {cctxt; chain; _} block ?(offset = 0l) () =
       >>=? fun blocks ->
       let head = Stdlib.List.hd blocks in
       let blocks =
-        List.remove (length - Int32.to_int (Raw_level.diff last first)) head
+        List.drop_n (length - Int32.to_int (Raw_level.diff last first)) head
       in
       if Int32.equal level (Raw_level.to_int32 last) then
         return (hash :: blocks)

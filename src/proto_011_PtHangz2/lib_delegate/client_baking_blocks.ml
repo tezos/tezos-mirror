@@ -197,7 +197,7 @@ let blocks_from_current_cycle cctxt ?(chain = `Main) block ?(offset = 0l) () =
       | [] -> return_nil
       | hd :: _ ->
           let blocks =
-            List.remove (length - Int32.to_int (Raw_level.diff last first)) hd
+            List.drop_n (length - Int32.to_int (Raw_level.diff last first)) hd
           in
           if Int32.equal level (Raw_level.to_int32 last) then
             return (hash :: blocks)

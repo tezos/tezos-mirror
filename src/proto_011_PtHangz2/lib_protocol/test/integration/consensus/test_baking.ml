@@ -114,7 +114,7 @@ let test_rewards_retrieval () =
   List.iter_es
     (fun (priority, endorsing_power) ->
       (* bake block at given priority and with given endorsing_power *)
-      let real_endorsers = List.sub endorsers endorsing_power in
+      let real_endorsers = List.take_n endorsing_power endorsers in
       List.map_ep
         (fun endorser ->
           Op.endorsement_with_slot

@@ -24,27 +24,28 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [remove nb list] remove the first [nb] elements from the list [list]. *)
-val remove : int -> 'a list -> 'a list
+(** [repeat n x] is [List.of_array (Array.make n x)] but more efficient.
 
-(** [repeat n x] is a list of [n] [x]'s *)
+    If [n < 0] it is the empty list [[]]. *)
 val repeat : int -> 'a -> 'a list
 
-(** [take_n n l] returns the [n] first elements of [l]. When [compare]
-    is provided, it returns the [n] greatest element of [l]. *)
-val take_n : ?compare:('a -> 'a -> int) -> int -> 'a list -> 'a list
+(** [take_n n l] returns the [n] first elements of [l].
 
-(** [drop_n n l] returns the suffix of [l] after the first [n] elements,
-    or [] if [n > length l]. *)
+    If [n < 0] it is the empty list [[]].
+    If [n > List.length l] it is the list [l] in its entirety. *)
+val take_n : int -> 'a list -> 'a list
+
+(** [rev_take_n n l] is [List.rev (take_n n l)] but more efficient. *)
+val rev_take_n : int -> 'a list -> 'a list
+
+(** [drop_n n l] returns the suffix of [l] after the first [n] elements.
+
+    If [n < 0] it is the list [l] in its entirety.
+    If [n > List.length l] it is the empty list [[]]. *)
 val drop_n : int -> 'a list -> 'a list
 
-(** [split_n n l] is a pair of lists [(j, k)] where [j] contains the [n] first
-    elements of [l] and [k] the remainder elements. If [l] has less than or
-    exactly [n] elements, [j] is [l] and [k] is [[]]. *)
+(** [split_n n l] is [(take_n n l, drop_n n l)] but more efficient. *)
 val split_n : int -> 'a list -> 'a list * 'a list
 
-(** [rev_sub l n] is [List.rev l] capped to max [n] elements *)
-val rev_sub : 'a list -> int -> 'a list
-
-(** [sub l n] is [l] capped to max [n] elements *)
-val sub : 'a list -> int -> 'a list
+(** [rev_split_n n l] is [(rev_take_n n l, drop_n n l)] but more efficient. *)
+val rev_split_n : int -> 'a list -> 'a list * 'a list
