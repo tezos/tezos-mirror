@@ -55,6 +55,16 @@ let new_sc_rollup ctxt =
   in
   (rollup, ctxt)
 
+(** Originate a rollup with one staker and make a deposit to the initial LCC *)
+let originate_rollup_and_deposit_with_one_staker () =
+  let* ctxt = new_context () in
+  let* (rollup, ctxt) = lift @@ new_sc_rollup ctxt in
+  let staker =
+    Sc_rollup_repr.Staker.of_b58check_exn "tz1SdKt9kjPp1HRQFkBmXtBhgMfvdgFhSjmG"
+  in
+  let+ ctxt = lift @@ Sc_rollup_storage.deposit_stake ctxt rollup staker in
+  (ctxt, rollup, staker)
+
 (** Originate a rollup with two stakers and make a deposit to the initial LCC *)
 let originate_rollup_and_deposit_with_two_stakers () =
   let* ctxt = new_context () in
@@ -301,6 +311,67 @@ let test_cement () =
      in
      let* ctxt = Sc_rollup_storage.cement_commitment ctxt rollup c1 in
      assert_true ctxt
+
+(* Create and cement three commitments:
+
+   [c3 -> c2 -> c1 -> Commitment_hash.zero]
+
+   This is useful to catch potential issues with de-allocation of [c2],
+   as we deallocate the old LCC when a new LCC is cemented.
+ *)
+let test_cement_three_commitments () =
+  let* (ctxt, rollup, staker) =
+    originate_rollup_and_deposit_with_one_staker ()
+  in
+  let challenge_window =
+    Constants_storage.sc_rollup_challenge_window_in_blocks ctxt
+  in
+  lift
+  @@
+  let commitment =
+    Sc_rollup_repr.Commitment.
+      {
+        predecessor = Sc_rollup_repr.Commitment_hash.zero;
+        inbox_level = Raw_level_repr.of_int32_exn 21l;
+        number_of_messages = number_of_messages_exn 3l;
+        number_of_ticks = number_of_ticks_exn 1232909l;
+        compressed_state = Sc_rollup_repr.State_hash.zero;
+      }
+  in
+  let* (c1, ctxt) =
+    Sc_rollup_storage.refine_stake ctxt rollup staker commitment
+  in
+  let commitment =
+    Sc_rollup_repr.Commitment.
+      {
+        predecessor = c1;
+        inbox_level = Raw_level_repr.of_int32_exn 41l;
+        number_of_messages = number_of_messages_exn 3l;
+        number_of_ticks = number_of_ticks_exn 1232909l;
+        compressed_state = Sc_rollup_repr.State_hash.zero;
+      }
+  in
+  let* (c2, ctxt) =
+    Sc_rollup_storage.refine_stake ctxt rollup staker commitment
+  in
+  let commitment =
+    Sc_rollup_repr.Commitment.
+      {
+        predecessor = c2;
+        inbox_level = Raw_level_repr.of_int32_exn 61l;
+        number_of_messages = number_of_messages_exn 3l;
+        number_of_ticks = number_of_ticks_exn 1232909l;
+        compressed_state = Sc_rollup_repr.State_hash.zero;
+      }
+  in
+  let* (c3, ctxt) =
+    Sc_rollup_storage.refine_stake ctxt rollup staker commitment
+  in
+  let ctxt = Raw_context.Internal_for_tests.add_level ctxt challenge_window in
+  let* ctxt = Sc_rollup_storage.cement_commitment ctxt rollup c1 in
+  let* ctxt = Sc_rollup_storage.cement_commitment ctxt rollup c2 in
+  let* ctxt = Sc_rollup_storage.cement_commitment ctxt rollup c3 in
+  assert_true ctxt
 
 let test_cement_then_remove () =
   let* ctxt = new_context () in
@@ -1364,6 +1435,10 @@ let tests =
       `Quick
       test_initial_state_is_pre_boot;
     Tztest.tztest "cement" `Quick test_cement;
+    Tztest.tztest
+      "cement three commitments"
+      `Quick
+      test_cement_three_commitments;
     Tztest.tztest "cannot unstake staker at LCC" `Quick test_cement_then_remove;
     Tztest.tztest
       "cement consumes available messages"
