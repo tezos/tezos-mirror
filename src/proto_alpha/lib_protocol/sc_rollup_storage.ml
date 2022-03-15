@@ -603,7 +603,7 @@ type conflict_point = Commitment_hash.t * Commitment_hash.t
 let goto_inbox_level ctxt rollup inbox_level commit =
   let open Lwt_tzresult_syntax in
   let rec go ctxt commit =
-    let* (info, ctxt) = get_commitment ctxt rollup commit in
+    let* (info, ctxt) = get_commitment_internal ctxt rollup commit in
     if Raw_level_repr.(info.Commitment.inbox_level <= inbox_level) then (
       (* Assert that we're exactly at that level. If this isn't the case, we're most likely in a
          situation where inbox levels are inconsistent. *)
@@ -615,11 +615,23 @@ let goto_inbox_level ctxt rollup inbox_level commit =
 
 let get_conflict_point ctxt rollup staker1 staker2 =
   let open Lwt_tzresult_syntax in
+  (* Ensure the LCC is set. *)
+  let* (lcc, ctxt) = last_cemented_commitment ctxt rollup in
   (* Find out on which commitments the competitors are staked. *)
   let* (commit1, ctxt) = find_staker ctxt rollup staker1 in
   let* (commit2, ctxt) = find_staker ctxt rollup staker2 in
-  let* (commit1_info, ctxt) = get_commitment ctxt rollup commit1 in
-  let* (commit2_info, ctxt) = get_commitment ctxt rollup commit2 in
+  let* () =
+    fail_when
+      Commitment_hash.(
+        (* If PVM is in pre-boot state, there might be stakes on the zero commitment. *)
+        commit1 = zero || commit2 = zero
+        (* If either commit is the LCC, that also means there can't be a conflict. *)
+        || commit1 = lcc
+        || commit2 = lcc)
+      Sc_rollup_no_conflict
+  in
+  let* (commit1_info, ctxt) = get_commitment_internal ctxt rollup commit1 in
+  let* (commit2_info, ctxt) = get_commitment_internal ctxt rollup commit2 in
   (* Make sure that both commits are at the same inbox level. In case they are not move the commit
      that is farther ahead to the exact inbox level of the other.
 
@@ -646,8 +658,8 @@ let get_conflict_point ctxt rollup staker1 staker2 =
          enough to land at the other commit. *)
       fail Sc_rollup_no_conflict
     else
-      let* (commit1_info, ctxt) = get_commitment ctxt rollup commit1 in
-      let* (commit2_info, ctxt) = get_commitment ctxt rollup commit2 in
+      let* (commit1_info, ctxt) = get_commitment_internal ctxt rollup commit1 in
+      let* (commit2_info, ctxt) = get_commitment_internal ctxt rollup commit2 in
       assert (
         Raw_level_repr.(commit1_info.inbox_level = commit2_info.inbox_level)) ;
       if Commitment_hash.(commit1_info.predecessor = commit2_info.predecessor)
