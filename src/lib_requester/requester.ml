@@ -515,6 +515,7 @@ module Make
       (fun key -> Timeout key)
 
   let read s k =
+    let open Lwt_tzresult_syntax in
     match Memory_table.find s.memory k with
     | None -> trace (Missing_data k) @@ Disk_table.read s.disk k
     | Some (Found v) -> return v
