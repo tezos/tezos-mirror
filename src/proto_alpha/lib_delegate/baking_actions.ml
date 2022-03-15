@@ -30,7 +30,7 @@ module Events = Baking_events.Actions
 
 module Operations_source = struct
   type error +=
-    | Failed_mempool_fetch of {
+    | Failed_operations_fetch of {
         path : string;
         reason : string;
         details : Data_encoding.json option;
@@ -39,28 +39,27 @@ module Operations_source = struct
   let operations_encoding =
     Data_encoding.(list (dynamic_size Operation.encoding))
 
-  let retrieve mempool =
-    match mempool with
+  let retrieve = function
     | None -> Lwt.return_none
-    | Some mempool -> (
+    | Some operations -> (
         let fail reason details =
           let path =
-            match mempool with
+            match operations with
             | Baking_configuration.Operations_source.Local {filename} ->
                 filename
             | Baking_configuration.Operations_source.Remote {uri; _} ->
                 Uri.to_string uri
           in
-          fail (Failed_mempool_fetch {path; reason; details})
+          fail (Failed_operations_fetch {path; reason; details})
         in
-        let decode_mempool json =
+        let decode_operations json =
           protect
             ~on_error:(fun _ ->
-              fail "cannot decode the received JSON into mempool" (Some json))
+              fail "cannot decode the received JSON into operations" (Some json))
             (fun () ->
               return (Data_encoding.Json.destruct operations_encoding json))
         in
-        match mempool with
+        match operations with
         | Baking_configuration.Operations_source.Local {filename} ->
             if Sys.file_exists filename then
               Tezos_stdlib_unix.Lwt_utils_unix.Json.read_file filename
@@ -69,13 +68,13 @@ module Operations_source = struct
                   Events.(emit invalid_json_file filename) >>= fun () ->
                   Lwt.return_none
               | Ok json -> (
-                  decode_mempool json >>= function
-                  | Ok mempool -> Lwt.return_some mempool
+                  decode_operations json >>= function
+                  | Ok operations -> Lwt.return_some operations
                   | Error errs ->
-                      Events.(emit cannot_fetch_mempool errs) >>= fun () ->
+                      Events.(emit cannot_fetch_operations errs) >>= fun () ->
                       Lwt.return_none)
             else
-              Events.(emit no_mempool_found_in_file filename) >>= fun () ->
+              Events.(emit no_operations_found_in_file filename) >>= fun () ->
               Lwt.return_none
         | Baking_configuration.Operations_source.Remote {uri; http_headers} -> (
             ( ((with_timeout
@@ -98,11 +97,11 @@ module Operations_source = struct
                | `Not_found json -> fail "not found" json
                | `Forbidden json -> fail "forbidden" json
                | `Conflict json -> fail "conflict" json)
-            >>=? fun json -> decode_mempool json )
+            >>=? fun json -> decode_operations json )
             >>= function
-            | Ok mempool -> Lwt.return_some mempool
+            | Ok operations -> Lwt.return_some operations
             | Error errs ->
-                Events.(emit cannot_fetch_mempool errs) >>= fun () ->
+                Events.(emit cannot_fetch_operations errs) >>= fun () ->
                 Lwt.return_none))
 end
 

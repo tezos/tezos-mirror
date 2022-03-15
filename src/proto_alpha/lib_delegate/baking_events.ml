@@ -640,20 +640,20 @@ module Actions = struct
       ~msg:"{filename} is not a valid JSON file"
       ("filename", Data_encoding.string)
 
-  let no_mempool_found_in_file =
+  let no_operations_found_in_file =
     declare_1
       ~section
-      ~name:"no_mempool_found_in_file"
+      ~name:"no_operations_found_in_file"
       ~level:Warning
-      ~msg:"no mempool found in file {filename}"
+      ~msg:"no operations found in file {filename}"
       ("filename", Data_encoding.string)
 
-  let cannot_fetch_mempool =
+  let cannot_fetch_operations =
     declare_1
       ~section
-      ~name:"cannot_fetch_mempool"
+      ~name:"cannot_fetch_operations"
       ~level:Error
-      ~msg:"cannot fetch mempool: {errs}"
+      ~msg:"cannot fetch operations: {errs}"
       ("errs", Error_monad.(TzTrace.encoding error_encoding))
 
   let vote_for_liquidity_baking_toggle =
