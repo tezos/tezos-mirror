@@ -84,6 +84,7 @@ let info_of_peer_info pool i =
     }
 
 let build_rpc_directory net =
+  let open Lwt_tzresult_syntax in
   let dir = RPC_directory.empty in
   (* Network : Global *)
   (* DEPRECATED: use [version] from "lib_shell_services/version_services"

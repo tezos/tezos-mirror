@@ -288,7 +288,7 @@ module Scheduler (IO : IO) = struct
         in_param;
         out_param;
         current_pop = Lwt.fail Not_found (* dummy *);
-        current_push = return_unit;
+        current_push = Lwt_tzresult_syntax.return_unit;
         counter = Moving_average.create st.ma_state ~init:0 ~alpha;
         quota = 0;
       }
@@ -416,8 +416,11 @@ module WriteIO = struct
 
   (* [push] bytes in the network. *)
   let push fd buf =
+    let open Lwt_tzresult_syntax in
     Lwt.catch
-      (fun () -> Lwt_result.ok @@ P2p_fd.write fd buf)
+      (fun () ->
+        let*! () = P2p_fd.write fd buf in
+        return_unit)
       (function
         | Unix.Unix_error (Unix.ECONNRESET, _, _)
         | Unix.Unix_error (Unix.EPIPE, _, _)

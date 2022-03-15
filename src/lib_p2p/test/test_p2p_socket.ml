@@ -39,6 +39,7 @@ include Internal_event.Legacy_logging.Make (struct
 end)
 
 let tzassert b pos =
+  let open Lwt_tzresult_syntax in
   let p (file, lnum, cnum, _) = (file, lnum, cnum) in
   if b then return_unit else fail_with_exn (Assert_failure (p pos))
 
