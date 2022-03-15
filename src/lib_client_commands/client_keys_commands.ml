@@ -321,6 +321,94 @@ let aggregate_fail_if_already_registered cctxt force pk_uri name =
             --force"
            name)
 
+module Bls_commands = struct
+  open Lwt_result_syntax
+
+  let generate_keys ~force name (cctxt : #Client_context.io_wallet) =
+    let* name = Aggregate_alias.Secret_key.of_fresh cctxt force name in
+    let mnemonic = Mnemonic.new_random in
+    let*! () =
+      cctxt#message
+        "It is important to save this mnemonic in a secure place:@\n\
+         @\n\
+         %a@\n\
+         @\n\
+         The mnemonic can be used to recover your spending key.@."
+        Mnemonic.words_pp
+        (Bip39.to_words mnemonic)
+    in
+    let seed = Mnemonic.to_32_bytes mnemonic in
+    let (pkh, pk, sk) = Aggregate_signature.generate_key ~seed () in
+    let*? pk_uri = Tezos_signer_backends.Unencrypted.Aggregate.make_pk pk in
+    let*? sk_uri = Tezos_signer_backends.Unencrypted.Aggregate.make_sk sk in
+    register_aggregate_key
+      cctxt
+      ~force
+      (pkh, pk_uri, sk_uri)
+      ~public_key:pk
+      name
+
+  let list_keys (cctxt : #Client_context.io_wallet) =
+    let* aggregate_keys_list = list_aggregate_keys cctxt in
+    List.iter_es
+      (fun (name, pkh, pk, sk) ->
+        let* pkh_str = Aggregate_alias.Public_key_hash.to_source pkh in
+        let*! () =
+          match (pk, sk) with
+          | (None, None) -> cctxt#message "%s: %s" name pkh_str
+          | (_, Some uri) ->
+              let scheme =
+                Option.value ~default:"aggregate_unencrypted"
+                @@ Uri.scheme (uri : aggregate_sk_uri :> Uri.t)
+              in
+              cctxt#message "%s: %s (%s sk known)" name pkh_str scheme
+          | (Some _, _) -> cctxt#message "%s: %s (pk known)" name pkh_str
+        in
+        return_unit)
+      aggregate_keys_list
+
+  let show_address name (cctxt : #Client_context.io_wallet) =
+    let* keys_opt = alias_aggregate_keys cctxt name in
+    match keys_opt with
+    | None ->
+        let*! () = cctxt#error "No keys found for address" in
+        return_unit
+    | Some (pkh, pk, skloc) -> (
+        let*! () =
+          cctxt#message "Hash: %a" Aggregate_signature.Public_key_hash.pp pkh
+        in
+        match pk with
+        | None -> return_unit
+        | Some pk ->
+            let*! () =
+              cctxt#message
+                "Public Key: %a"
+                Aggregate_signature.Public_key.pp
+                pk
+            in
+            Option.iter_es
+              (fun skloc ->
+                let* skloc = Aggregate_alias.Secret_key.to_source skloc in
+                let*! () = cctxt#message "Secret Key: %s" skloc in
+                return_unit)
+              skloc)
+
+  let import_secret_key ~force name sk_uri (cctxt : #Client_context.io_wallet) =
+    let* name = Aggregate_alias.Secret_key.of_fresh cctxt false name in
+    let* pk_uri = aggregate_neuterize sk_uri in
+    let* () = aggregate_fail_if_already_registered cctxt force pk_uri name in
+    let* (pkh, public_key) =
+      import_aggregate_secret_key ~io:(cctxt :> Client_context.io_wallet) pk_uri
+    in
+    let*! () =
+      cctxt#message
+        "Bls address added: %a"
+        Aggregate_signature.Public_key_hash.pp
+        pkh
+    in
+    register_aggregate_key cctxt (pkh, pk_uri, sk_uri) ?public_key name
+end
+
 let commands network : Client_context.full Clic.command list =
   let open Lwt_result_syntax in
   let open Clic in
@@ -848,56 +936,13 @@ let commands network : Client_context.full Clic.command list =
         (args1 (Aggregate_alias.Secret_key.force_switch ()))
         (prefixes ["bls"; "gen"; "keys"]
         @@ Aggregate_alias.Secret_key.fresh_alias_param @@ stop)
-        (fun force name (cctxt : #Client_context.full) ->
-          let* name = Aggregate_alias.Secret_key.of_fresh cctxt force name in
-          let mnemonic = Mnemonic.new_random in
-          let*! () =
-            cctxt#message
-              "It is important to save this mnemonic in a secure place:@\n\
-               @\n\
-               %a@\n\
-               @\n\
-               The mnemonic can be used to recover your spending key.@."
-              Mnemonic.words_pp
-              (Bip39.to_words mnemonic)
-          in
-          let seed = Mnemonic.to_32_bytes mnemonic in
-          let (pkh, pk, sk) = Aggregate_signature.generate_key ~seed () in
-          let*? pk_uri =
-            Tezos_signer_backends.Unencrypted.Aggregate.make_pk pk
-          in
-          let*? sk_uri =
-            Tezos_signer_backends.Unencrypted.Aggregate.make_sk sk
-          in
-          register_aggregate_key
-            cctxt
-            ~force
-            (pkh, pk_uri, sk_uri)
-            ~public_key:pk
-            name);
+        (fun force name cctxt -> Bls_commands.generate_keys ~force name cctxt);
       command
         ~group
         ~desc:"List BlS keys."
         no_options
         (prefixes ["bls"; "list"; "keys"] @@ stop)
-        (fun () (cctxt : #Client_context.full) ->
-          let* aggregate_keys_list = list_aggregate_keys cctxt in
-          List.iter_es
-            (fun (name, pkh, pk, sk) ->
-              let* pkh_str = Aggregate_alias.Public_key_hash.to_source pkh in
-              let*! () =
-                match (pk, sk) with
-                | (None, None) -> cctxt#message "%s: %s" name pkh_str
-                | (_, Some uri) ->
-                    let scheme =
-                      Option.value ~default:"aggregate_unencrypted"
-                      @@ Uri.scheme (uri : aggregate_sk_uri :> Uri.t)
-                    in
-                    cctxt#message "%s: %s (%s sk known)" name pkh_str scheme
-                | (Some _, _) -> cctxt#message "%s: %s (pk known)" name pkh_str
-              in
-              return_unit)
-            aggregate_keys_list);
+        (fun () cctxt -> Bls_commands.list_keys cctxt);
       command
         ~group
         ~desc:"Show the keys associated with an rollup account."
@@ -905,33 +950,7 @@ let commands network : Client_context.full Clic.command list =
         (prefixes ["bls"; "show"; "address"]
         @@ Aggregate_alias.Public_key_hash.alias_param @@ stop)
         (fun () (name, _pkh) (cctxt : #Client_context.full) ->
-          let* keys_opt = alias_aggregate_keys cctxt name in
-          match keys_opt with
-          | None ->
-              let*! () = cctxt#error "No keys found for address" in
-              return_unit
-          | Some (pkh, pk, skloc) -> (
-              let*! () =
-                cctxt#message
-                  "Hash: %a"
-                  Aggregate_signature.Public_key_hash.pp
-                  pkh
-              in
-              match pk with
-              | None -> return_unit
-              | Some pk -> (
-                  let*! () =
-                    cctxt#message
-                      "Public Key: %a"
-                      Aggregate_signature.Public_key.pp
-                      pk
-                  in
-                  match skloc with
-                  | None -> return_unit
-                  | Some skloc ->
-                      let* skloc = Aggregate_alias.Secret_key.to_source skloc in
-                      let*! () = cctxt#message "Secret Key: %s" skloc in
-                      return_unit)));
+          Bls_commands.show_address name cctxt);
       command
         ~group
         ~desc:"Add a secret key to the wallet."
@@ -939,22 +958,6 @@ let commands network : Client_context.full Clic.command list =
         (prefixes ["bls"; "import"; "secret"; "key"]
         @@ Aggregate_alias.Secret_key.fresh_alias_param
         @@ aggregate_sk_uri_param @@ stop)
-        (fun force name sk_uri (cctxt : #Client_context.full) ->
-          let* name = Aggregate_alias.Secret_key.of_fresh cctxt false name in
-          let* pk_uri = aggregate_neuterize sk_uri in
-          let* () =
-            aggregate_fail_if_already_registered cctxt force pk_uri name
-          in
-          let* (pkh, public_key) =
-            import_aggregate_secret_key
-              ~io:(cctxt :> Client_context.io_wallet)
-              pk_uri
-          in
-          let*! () =
-            cctxt#message
-              "Bls address added: %a"
-              Aggregate_signature.Public_key_hash.pp
-              pkh
-          in
-          register_aggregate_key cctxt (pkh, pk_uri, sk_uri) ?public_key name);
+        (fun force name sk_uri cctxt ->
+          Bls_commands.import_secret_key ~force name sk_uri cctxt);
     ]

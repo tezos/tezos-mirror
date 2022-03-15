@@ -23,5 +23,33 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** BLS commands are used by rollup clients to handle their keys directly. *)
+module Bls_commands : sig
+  (** [generate_keys ~force alias cctxt] generates a BLS based pair of keys with
+      a fresh mnemonic with [alias] as alias. If [force] is [true], it will
+      replace the alias if it already exists. *)
+  val generate_keys :
+    force:bool ->
+    Client_keys.Aggregate_alias.Secret_key.fresh_param ->
+    #Client_context.io_wallet ->
+    unit tzresult Lwt.t
+
+  (** [list_keys cctxt] lists the BLS keys known by the wallet. *)
+  val list_keys : #Client_context.io_wallet -> unit tzresult Lwt.t
+
+  (** [show_address alias] shows the address corresponding to given [alias]. *)
+  val show_address : string -> #Client_context.io_wallet -> unit tzresult Lwt.t
+
+  (** [import_secret_key ~force alias uri cctxt] imports a secret key from [uri]
+      as [alias] in the wallet. If [force] is [true], it will replace the alias
+      if it already exists. *)
+  val import_secret_key :
+    force:bool ->
+    Client_keys.Aggregate_alias.Secret_key.fresh_param ->
+    Client_keys.aggregate_sk_uri ->
+    #Client_context.io_wallet ->
+    unit tzresult Lwt.t
+end
+
 val commands :
   [`Mainnet | `Testnet] option -> Client_context.full Clic.command list
