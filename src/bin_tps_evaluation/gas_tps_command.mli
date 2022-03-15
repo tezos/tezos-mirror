@@ -23,5 +23,5 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Cmdliner's command definition for the "gas TPS" command. *)
-val cmd : unit Cmdliner.Term.t * Cmdliner.Term.info
+(** Register gas estimation of TPS as a Tezt long test. *)
+val register : unit -> unit

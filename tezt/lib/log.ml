@@ -66,6 +66,7 @@ let channel =
     junit = _;
     skip = _;
     only = _;
+    test_args = _;
   } =
     Cli.options
   in

@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+
+./tezos-tps-evaluation -i tezos_tps_estimate_average_block "$@"

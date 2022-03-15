@@ -3318,7 +3318,6 @@ let _tezos_tps_evaluation =
         caqti;
         caqti_driver_postgresql;
         caqti_lwt;
-        cmdliner;
         data_encoding;
         lwt;
         ppx_blob;

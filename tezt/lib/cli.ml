@@ -63,6 +63,7 @@ type options = {
   mutable junit : string option;
   mutable skip : int;
   mutable only : int option;
+  mutable test_args : string String_map.t;
 }
 
 let options =
@@ -97,6 +98,7 @@ let options =
     junit = None;
     skip = 0;
     only = None;
+    test_args = String_map.empty;
   }
 
 let () = at_exit @@ fun () -> Option.iter close_out options.log_file
@@ -166,6 +168,20 @@ let init ?args () =
   let set_only value =
     if value <= 0 then raise (Arg.Bad "--only must be at least one") ;
     options.only <- Some value
+  in
+  let add_test_arg value =
+    let len = String.length value in
+    let rec find_equal i =
+      if i >= len then None
+      else if value.[i] = '=' then Some i
+      else find_equal (i + 1)
+    in
+    let (parameter, value) =
+      match find_equal 0 with
+      | None -> (value, "true")
+      | Some i -> (String.sub value 0 i, String.sub value (i + 1) (len - i - 1))
+    in
+    options.test_args <- String_map.add parameter value options.test_args
   in
   let spec =
     Arg.align
@@ -375,6 +391,14 @@ let init ?args () =
           Arg.Int set_only,
           "<COUNT> Only run the first COUNT tests. This filter is applied \
            after --job and --skip." );
+        ( "--test-arg",
+          Arg.String add_test_arg,
+          "<PARAMETER>=<VALUE> Pass a generic argument to tests. Tests can get \
+           this argument with Cli.get. --test-arg <PARAMETER> is a short-hand \
+           for: --test-arg <PARAMETER>=true" );
+        ( "-a",
+          Arg.String add_test_arg,
+          "<PARAMETER>=<VALUE> Same as --test-arg." );
       ]
   in
   let usage =
@@ -428,3 +452,29 @@ let init ?args () =
   | Arg.Help msg ->
       Printf.printf "%s" msg ;
       exit 0
+
+let () = init ()
+
+let get ?default parse parameter =
+  match String_map.find_opt parameter options.test_args with
+  | Some value -> (
+      match parse value with
+      | None -> failwith (sf "invalid value for -a %s: %s" parameter value)
+      | Some value -> value)
+  | None -> (
+      match default with
+      | None ->
+          failwith
+            (sf
+               "missing test argument %s, please specify it with: -a %s=<VALUE>"
+               parameter
+               parameter)
+      | Some default -> default)
+
+let get_bool ?default parameter = get ?default bool_of_string_opt parameter
+
+let get_int ?default parameter = get ?default int_of_string_opt parameter
+
+let get_float ?default parameter = get ?default float_of_string_opt parameter
+
+let get_string ?default parameter = get ?default Option.some parameter

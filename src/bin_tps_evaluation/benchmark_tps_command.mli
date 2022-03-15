@@ -23,5 +23,5 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Cmdliner's command definition for the "benchmark TPS" command. *)
-val cmd : unit Cmdliner.Term.t * Cmdliner.Term.info
+(** Register the TPS benchmark as a Tezt long test. *)
+val register : unit -> unit

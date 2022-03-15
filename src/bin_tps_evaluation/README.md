@@ -74,7 +74,7 @@ It is possible to get an estimation of the maximal possible TPS by using the
 protocol parameters.
 
 ```
-./tezos-tps-evaluation gas-tps --average-block=src/bin_tps_evaluation/average-block.json
+./tezos-tps-evaluation-gas-tps -a average-block=src/bin_tps_evaluation/average-block.json
 [14:26:25.243] Starting test: tezos_tps_gas
 [14:26:27.956] Reading description of the average block from src/bin_tps_evaluation/average-block.json
 [14:26:28.061] Originating smart contracts
@@ -87,8 +87,9 @@ protocol parameters.
 This estimation is obtained by dividing the hard gas limit per block by the
 average transaction cost.
 
-The `gas-tps` command will also register its result in a database if
-`tezt_config.json` exists (see [these instructions][long-tezts-locally]).
+The `tezos-tps-evaluation-gas-tps` command will also register its result in
+a database if `tezt_config.json` exists (see [these
+instructions][long-tezts-locally]).
 
 ## Running the TPS benchmark
 
@@ -99,36 +100,23 @@ reached and after that it will run the stress test client command.
 
 The TPS parameter that is passed to the stress test command (we call this
 **target TPS of injection**) depends on the presence of the
-`--lift-protocol-limits` flag:
+`-a lift-protocol-limits` flag:
 
-* If `--lift-protocol-limits` is passed, an arbitrary big value is passed,
+* If `-a lift-protocol-limits` is passed, an arbitrary big value is passed,
   so that stress test will inject as fast as possible.
-* If no `--lift-protocol-limits` is passed, TPS computed from gas (see the
+* If no `-a lift-protocol-limits` is passed, TPS computed from gas (see the
   previous section for details) will be used as the target TPS of injection.
 
 By default 10 blocks will be produced, but this can be changed by supplying
-the `--blocks-total` command line option. The total number of applied
+the `-a blocks-total` command line option. The total number of applied
 operations will be divided by the total time spent producing the blocks and
 the resulting value will be presented as the **empirical TPS**. The
 benchmark is also capable of calculating **de facto TPS of injection** which
 is useful in judging the results.
 
-It is possible to pass command line arguments to the underlying Tezt
-framework. To accomplish that pass arguments after the double dash
-delimiter. For example:
-
-```bash
-./tezos-tps-evaluation benchmark-tps -- --help
-```
-
-will print command line options that the Tezt framework accepts. `-- -v` can
-be helpful for obtaining a detailed log.
-
-Consult `./tezos-tps-evaluation benchmark-tps --help` to see all accepted
-command line options.
-
-The `benchmark-tps` command will also register its result in a database if
-`tezt_config.json` exists (see [these instructions][long-tezts-locally]).
+The `tezos-tps-evaluation-benchmark-tps` command will also register its
+result in a database if `tezt_config.json` exists (see [these
+instructions][long-tezts-locally]).
 
 ### Making sense of the results
 
@@ -138,7 +126,7 @@ to catch TPS regressions, but not to find where exactly the bottlenecks are.
 
 The empirical TPS is significantly affected by the hardware on which the
 benchmark is run and other factors, such as the amount of logging that is
-performed. For example, passing `-- -v` is likely to result in much lower
+performed. For example, passing `-v` is likely to result in much lower
 empirical TPS values.
 
 The empirical TPS should normally be very close to the de facto TPS of
@@ -173,7 +161,7 @@ trustworthy:
 ### Example usage
 
 ```
-./tezos-tps-evaluation benchmark-tps --average-block=src/bin_tps_evaluation/average_block.json --lift-protocol-limits
+./tezos-tps-evaluation-benchmark-tps -a average-block=src/bin_tps_evaluation/average_block.json -a lift-protocol-limits
 [12:20:57.387] Tezos TPS benchmark
 [12:20:57.387] Protocol: Alpha
 [12:20:57.387] Total number of accounts to use: 5

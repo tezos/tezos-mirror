@@ -42,7 +42,6 @@ let migrate_to = Protocol.Alpha
    Each module defines tests which are thematically related,
    as functions to be called here. *)
 let () =
-  Cli.init () ;
   (* Tests that are relatively protocol-agnostic.
      We can run them on all protocols, or only one if the CI would be too slow. *)
   Baker_test.register ~protocols:[Alpha] ;

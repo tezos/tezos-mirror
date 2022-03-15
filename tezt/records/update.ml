@@ -81,7 +81,6 @@ let fetch_pipeline_records () =
   Lwt_list.iter_p fetch_record records
 
 let () =
-  Cli.init () ;
   (* Register a test to benefit from error handling of Test.run,
      as well as [Background.start] etc. *)
   ( Test.register ~__FILE__ ~title:"update records" ~tags:["update"] @@ fun () ->

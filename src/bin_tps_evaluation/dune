@@ -11,7 +11,6 @@
   caqti
   caqti-driver-postgresql
   caqti-lwt
-  cmdliner
   data-encoding
   lwt
   ppx_blob
