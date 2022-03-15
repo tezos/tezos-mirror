@@ -49,6 +49,7 @@ module High_watermark = struct
   let get_level_and_round_for_tenderbake_block bytes =
     (* <watermark(1)><chain_id(4)><level(4)><proto_level(1)><predecessor(32)><timestamp(8)><validation_passes(1)><oph(32)><FITNESS>... *)
     (* FITNESS=<len(4)><version(1)><len(4)><level(4)><len(4)><locked_round(0 OR 4)><len(4)><predecessor_round(4)><len(4)><round(4)> *)
+    let open Lwt_tzresult_syntax in
     try
       let level = Bytes.get_int32_be bytes (1 + 4) in
       let fitness_offset = 1 + 4 + 4 + 1 + 32 + 8 + 1 + 32 in
@@ -66,6 +67,7 @@ module High_watermark = struct
 
   let get_level_and_round_for_tenderbake_endorsement bytes =
     (* <watermark(1)><chain_id(4)><branch(32)><kind(1)><slot(2)><level(4)><round(4)>... *)
+    let open Lwt_tzresult_syntax in
     try
       let level_offset = 1 + 4 + 32 + 1 + 2 in
       let level = Bytes.get_int32_be bytes level_offset in
@@ -80,6 +82,7 @@ module High_watermark = struct
   let check_mark name
       (previous_level, previous_round_opt, previous_hash, previous_signature_opt)
       level round_opt hash =
+    let open Lwt_tzresult_syntax in
     let round = Option.value ~default:0l round_opt in
     match (previous_round_opt, previous_signature_opt) with
     | (None, None) ->
@@ -221,12 +224,13 @@ module Authorized_key = Client_aliases.Alias (struct
 
   let name = "authorized_key"
 
-  let to_source s = return (to_b58check s)
+  let to_source s = Lwt.return_ok (to_b58check s)
 
   let of_source t = Lwt.return (of_b58check t)
 end)
 
 let check_magic_byte magic_bytes data =
+  let open Lwt_tzresult_syntax in
   match magic_bytes with
   | None -> return_unit
   | Some magic_bytes ->

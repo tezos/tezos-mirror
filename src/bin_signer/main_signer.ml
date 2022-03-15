@@ -94,7 +94,7 @@ let pidfile_arg =
     ~short:'P'
     ~long:"pidfile"
     ~placeholder:"filename"
-    (parameter (fun _ s -> return s))
+    (parameter (fun _ s -> Lwt.return_ok s))
 
 let may_setup_pidfile pidfile_opt f =
   match pidfile_opt with
@@ -307,7 +307,7 @@ let home = try Sys.getenv "HOME" with Not_found -> "/root"
 let default_base_dir = Filename.concat home ".tezos-signer"
 
 let string_parameter () : (string, _) parameter =
-  parameter (fun _ x -> return x)
+  parameter (fun _ x -> Lwt.return_ok x)
 
 let base_dir_arg () =
   arg
@@ -383,4 +383,4 @@ end
 let () =
   Client_main_run.run
     (module Signer_config)
-    ~select_commands:(fun _ _ -> return_nil)
+    ~select_commands:(fun _ _ -> Lwt_tzresult_syntax.return_nil)
