@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestSelfAddressTransfer::test_send_self_address
 
 Node is bootstrapped.
-Estimated gas: 5195.305 units (will add 100 for safety)
+Estimated gas: 5195.785 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[BLOCK_HASH]'
@@ -27,7 +27,7 @@ This sequence of operations was run:
       This transaction was successfully applied
       Updated storage: Unit
       Storage size: 82 bytes
-      Consumed gas: 3990.539
+      Consumed gas: 3991.559
     Internal operations:
       Transaction:
         Amount: ꜩ0
@@ -37,6 +37,6 @@ This sequence of operations was run:
         This transaction was successfully applied
         Updated storage: Unit
         Storage size: 83 bytes
-        Consumed gas: 1204.766
+        Consumed gas: 1204.226
 
 Injected block at minimal timestamp
