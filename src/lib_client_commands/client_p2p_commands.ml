@@ -38,7 +38,7 @@ let addr_parameter =
     ~name:"address"
     ~desc:"<IPv4>:PORT or <IPV6>:PORT address (PORT defaults to 9732)."
     (parameter (fun _ x ->
-         return (P2p_point.Id.of_string_exn ~default_port:9732 x)))
+         Lwt.return_ok (P2p_point.Id.of_string_exn ~default_port:9732 x)))
 
 let p2p_peer_id_param ~name ~desc t =
   Clic.param

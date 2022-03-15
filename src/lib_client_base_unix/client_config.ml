@@ -324,10 +324,11 @@ let default_cli_args =
 open Clic
 
 let string_parameter () : (string, #Client_context.full) parameter =
-  parameter (fun _ x -> return x)
+  parameter (fun _ x -> Lwt.return_ok x)
 
 let media_type_parameter () :
     (Media_type.Command_line.t, #Client_context.full) parameter =
+  let open Lwt_tzresult_syntax in
   parameter (fun _ x ->
       match Media_type.Command_line.parse_cli_parameter x with
       | Some v -> return v
@@ -377,18 +378,21 @@ let sources_parameter () =
 
 let chain_parameter () =
   parameter (fun _ chain ->
+      let open Lwt_tzresult_syntax in
       match Chain_services.parse_chain chain with
       | Error _ -> fail (Invalid_chain_argument chain)
       | Ok chain -> return chain)
 
 let block_parameter () =
   parameter (fun _ block ->
+      let open Lwt_tzresult_syntax in
       match Block_services.parse_block block with
       | Error _ -> fail (Invalid_block_argument block)
       | Ok block -> return block)
 
 let wait_parameter () =
   parameter (fun _ wait ->
+      let open Lwt_tzresult_syntax in
       match wait with
       | "no" | "none" -> return_none
       | _ -> (
@@ -398,6 +402,7 @@ let wait_parameter () =
 
 let protocol_parameter () =
   parameter (fun _ arg ->
+      let open Lwt_tzresult_syntax in
       match
         Seq.filter
           (fun (hash, _commands) ->
@@ -499,8 +504,10 @@ let port_arg () =
     ~placeholder:"number"
     ~doc:"[DEPRECATED: use --endpoint instead] RPC port of the node"
     (parameter (fun _ x ->
-         try return (int_of_string x)
-         with Failure _ -> fail (Invalid_port_arg x)))
+         let open Lwt_tzresult_syntax in
+         match int_of_string_opt x with
+         | Some i -> return i
+         | None -> fail (Invalid_port_arg x)))
 
 let tls_confdesc = "-S/--tls ('tls' in config file)"
 
@@ -585,7 +592,7 @@ let client_mode_arg () =
     ~doc:"how to interact with the node"
     ~default:(client_mode_to_string `Mode_client)
     (parameter
-       ~autocomplete:(fun _ -> return mode_strings)
+       ~autocomplete:(fun _ -> Lwt.return_ok mode_strings)
        (fun _ param -> Lwt.return (parse_client_mode param)))
 
 let read_config_file config_file =
@@ -622,7 +629,7 @@ let fail_on_non_mockup_dir (cctxt : #Client_context.full) =
          /some/dir create mockup` where `/some/dir` is **fresh** and **empty** \
          and redo this operation, specifying `--base-dir /some/dir` this time."
         base_dir
-  | Base_dir_is_mockup -> Error_monad.return_unit
+  | Base_dir_is_mockup -> return_unit
 
 let default_config_file_name = "config"
 
@@ -804,19 +811,19 @@ let commands config_file cfg (client_mode : client_mode)
             ~placeholder:"path"
             ~doc:"path at which to create the file"
             ~default:(cfg.base_dir // default_config_file_name)
-            (parameter (fun _ctx str -> return str)))
+            (parameter (fun _ctx str -> Lwt.return_ok str)))
          (default_arg
             ~long:mockup_bootstrap_accounts
             ~placeholder:"path"
             ~doc:"path at which to create the file"
             ~default:((cfg.base_dir // mockup_bootstrap_accounts) ^ ".json")
-            (parameter (fun _ctx str -> return str)))
+            (parameter (fun _ctx str -> Lwt.return_ok str)))
          (default_arg
             ~long:mockup_protocol_constants
             ~placeholder:"path"
             ~doc:"path at which to create the file"
             ~default:((cfg.base_dir // mockup_protocol_constants) ^ ".json")
-            (parameter (fun _ctx str -> return str))))
+            (parameter (fun _ctx str -> Lwt.return_ok str))))
       (fixed ["config"; "init"])
       (fun (config_file, bootstrap_accounts_file, protocol_constants_file) cctxt ->
         match client_mode with
@@ -963,6 +970,7 @@ let build_endpoint addr port tls =
   |> updatecomp Uri.with_scheme scheme
 
 let light_mode_checks mode endpoint sources =
+  let open Lwt_tzresult_syntax in
   match (mode, sources) with
   | (`Mode_client, None) | (`Mode_mockup, None) | (`Mode_proxy, None) ->
       (* No --mode light, no --sources; good *)

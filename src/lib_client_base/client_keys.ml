@@ -57,7 +57,7 @@ module Public_key_hash = struct
 
     let of_source s = Lwt.return (Signature.Public_key_hash.of_b58check s)
 
-    let to_source p = return (Signature.Public_key_hash.to_b58check p)
+    let to_source p = Lwt.return_ok (Signature.Public_key_hash.to_b58check p)
 
     let name = "public key hash"
   end)
@@ -164,7 +164,7 @@ module Secret_key = Client_aliases.Alias (struct
 
   let of_source s = Lwt.return (make_sk_uri @@ Uri.of_string s)
 
-  let to_source t = return (Uri.to_string t)
+  let to_source t = Lwt.return_ok (Uri.to_string t)
 
   let encoding = uri_encoding
 end)
@@ -187,7 +187,7 @@ module Public_key = Client_aliases.Alias (struct
     let*? pk_uri = make_pk_uri @@ Uri.of_string s in
     return (pk_uri, None)
 
-  let to_source (t, _) = return (Uri.to_string t)
+  let to_source (t, _) = Lwt.return_ok (Uri.to_string t)
 
   let encoding =
     let open Data_encoding in
@@ -247,6 +247,7 @@ module Sapling_key = Client_aliases.Alias (struct
          (req "address_index" S.Viewing_key.index_encoding))
 
   let of_source s =
+    let open Lwt_tzresult_syntax in
     let open Data_encoding in
     match Json.from_string s with
     | Error _ -> failwith "corrupted wallet"
@@ -254,7 +255,7 @@ module Sapling_key = Client_aliases.Alias (struct
 
   let to_source k =
     let open Data_encoding in
-    return @@ Json.to_string (Json.construct encoding k)
+    Lwt.return_ok @@ Json.to_string (Json.construct encoding k)
 end)
 
 module PVSS_public_key = Client_aliases.Alias (struct
@@ -264,7 +265,7 @@ module PVSS_public_key = Client_aliases.Alias (struct
 
   let of_source s = Lwt.return (Pvss_secp256k1.Public_key.of_b58check s)
 
-  let to_source t = return (Pvss_secp256k1.Public_key.to_b58check t)
+  let to_source t = Lwt.return_ok (Pvss_secp256k1.Public_key.to_b58check t)
 end)
 
 module PVSS_secret_key = Client_aliases.Alias (struct
@@ -278,7 +279,7 @@ module PVSS_secret_key = Client_aliases.Alias (struct
 
   let of_source s = Lwt.return (make_pvss_sk_uri @@ Uri.of_string s)
 
-  let to_source t = return (Uri.to_string t)
+  let to_source t = Lwt.return_ok (Uri.to_string t)
 end)
 
 module type SIGNER = sig
@@ -321,6 +322,7 @@ let register_signer signer =
   String.Hashtbl.replace signers_table Signer.scheme signer
 
 let find_signer_for_key ~scheme =
+  let open Lwt_tzresult_syntax in
   match String.Hashtbl.find signers_table scheme with
   | None -> fail (Unregistered_key_scheme scheme)
   | Some signer -> return signer

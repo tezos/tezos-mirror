@@ -352,7 +352,11 @@ module Alias (Entity : Entity) = struct
 
   let fresh_alias_param ?(name = "new")
       ?(desc = "new " ^ Entity.name ^ " alias") next =
-    param ~name ~desc (parameter (fun (_ : < .. >) s -> return @@ Fresh s)) next
+    param
+      ~name
+      ~desc
+      (parameter (fun (_ : < .. >) s -> Lwt.return_ok (Fresh s)))
+      next
 
   let parse_source_string cctxt s =
     let open Lwt_tzresult_syntax in
