@@ -269,9 +269,9 @@ module Shuffle = struct
       ~pp_sep:(fun ppf () -> Format.fprintf ppf "; ")
       Format.pp_print_int
 
-  let list_size = QCheck.Gen.int_range 2 1000
+  let list_size = QCheck.Gen.int_range 2 50
 
-  let count = 1000
+  let count = 50
 
   let test_shuffle_preserves_values =
     QCheck.Test.make
