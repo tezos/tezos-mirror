@@ -450,9 +450,10 @@ module Bounded = struct
       discarded_operations_rev := oph :: !discarded_operations_rev
     in
     let parameters = Classification.{map_size_limit; on_discarded_operation} in
+    let* size = 0 -- map_size_limit in
     let* inputs =
-      list_size
-        (0 -- map_size_limit)
+      list_repeat
+        size
         Generators.(pair classification_gen (operation_with_hash_gen ()))
     in
     let t = Classification.create parameters in

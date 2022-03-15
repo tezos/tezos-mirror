@@ -341,7 +341,7 @@ module Recyle_operations = struct
     let parameters : Classification.parameters =
       {map_size_limit; on_discarded_operation = Fun.const ()}
     in
-    let* classes = list_size (pure length) Generators.classification_gen in
+    let* classes = list_repeat length Generators.classification_gen in
     assert (List.length classes == length) ;
     let t = Prevalidator_classification.create parameters in
     List.iter

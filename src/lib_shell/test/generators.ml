@@ -218,11 +218,10 @@ let parameters_gen : parameters QCheck2.Gen.t =
 let t_gen ?(can_be_full = true) () : unit t QCheck2.Gen.t =
   let open QCheck2.Gen in
   let* parameters = parameters_gen in
+  let limit = parameters.map_size_limit - if can_be_full then 0 else 1 in
+  let* size = 0 -- limit in
   let+ inputs =
-    let limit = parameters.map_size_limit - if can_be_full then 0 else 1 in
-    list_size
-      (0 -- limit)
-      (pair classification_gen (operation_with_hash_gen ()))
+    list_repeat size (pair classification_gen (operation_with_hash_gen ()))
   in
   let t = Prevalidator_classification.create parameters in
   List.iter

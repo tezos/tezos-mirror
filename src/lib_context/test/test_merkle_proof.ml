@@ -77,7 +77,9 @@ module Proof32 (Encoding : Tezos_context_sigs.Context.PROOF_ENCODING) = struct
 
     let inode_extender gen_a =
       let* length = int_range 1 10 in
-      let* segment = list_size (map succ (int_bound 5)) (int_bound 4) in
+      let* size = int_bound 5 in
+      let size = size + 1 in
+      let* segment = list_repeat size (int_bound 4) in
       let+ proof = gen_a in
       {length; segment; proof}
 
@@ -92,11 +94,9 @@ module Proof32 (Encoding : Tezos_context_sigs.Context.PROOF_ENCODING) = struct
             let+ hash = hash in
             Blinded_inode hash
         | 1 ->
-            let+ xs =
-              list_size
-                (map succ (int_bound 3))
-                (pair step (tree (depth - 1, width)))
-            in
+            let* size = int_bound 3 in
+            let size = size + 1 in
+            let+ xs = list_repeat size (pair step (tree (depth - 1, width))) in
             Inode_values xs
         | 2 ->
             let+ i = inode width (inode_tree (depth - 1, width / 2)) in
@@ -130,10 +130,9 @@ module Proof32 (Encoding : Tezos_context_sigs.Context.PROOF_ENCODING) = struct
             let+ h = hash in
             Blinded_value h
         | 2 ->
-            let+ xs =
-              list_size (map succ (int_bound 4))
-              @@ pair step (tree (depth - 1, width))
-            in
+            let* size = int_bound 4 in
+            let size = size + 1 in
+            let+ xs = list_repeat size @@ pair step (tree (depth - 1, width)) in
             (Node xs : tree)
         | 3 ->
             let+ h = hash in
@@ -167,9 +166,9 @@ module Proof32 (Encoding : Tezos_context_sigs.Context.PROOF_ENCODING) = struct
             let+ v = value in
             Value v
         | 1 ->
-            let+ sks =
-              list_size (map succ (int_bound 4)) @@ pair step kinded_hash
-            in
+            let* size = int_bound 4 in
+            let size = size + 1 in
+            let+ sks = list_repeat size @@ pair step kinded_hash in
             Node sks
         | 2 ->
             let max_indices = 5 in
@@ -181,7 +180,9 @@ module Proof32 (Encoding : Tezos_context_sigs.Context.PROOF_ENCODING) = struct
         | _ -> assert false
 
       let t : Stream.t Gen.t =
-        let+ xs = list_size (map succ (int_bound 10)) elt in
+        let* size = int_bound 10 in
+        let size = size + 1 in
+        let+ xs = list_repeat size elt in
         List.to_seq xs
     end
 
@@ -308,7 +309,9 @@ module Proof2 (Encoding : Tezos_context_sigs.Context.PROOF_ENCODING) = struct
 
     let inode_extender gen_a =
       let* length = int_range 1 10 in
-      let* segment = list_size (map succ (int_bound 5)) (int_bound 1) in
+      let* size = int_bound 5 in
+      let size = size + 1 in
+      let* segment = list_repeat size (int_bound 1) in
       let+ proof = gen_a in
       {length; segment; proof}
 
@@ -323,11 +326,9 @@ module Proof2 (Encoding : Tezos_context_sigs.Context.PROOF_ENCODING) = struct
             let+ hash = hash in
             Blinded_inode hash
         | 1 ->
-            let+ xs =
-              list_size
-                (map succ (int_bound 3))
-                (pair step (tree (depth - 1, width)))
-            in
+            let* size = int_bound 3 in
+            let size = size + 1 in
+            let+ xs = list_repeat size (pair step (tree (depth - 1, width))) in
             Inode_values xs
         | 2 ->
             let+ i = inode width (inode_tree (depth - 1, width / 2)) in
@@ -361,10 +362,9 @@ module Proof2 (Encoding : Tezos_context_sigs.Context.PROOF_ENCODING) = struct
             let+ h = hash in
             Blinded_value h
         | 2 ->
-            let+ xs =
-              list_size (map succ (int_bound 4))
-              @@ pair step (tree (depth - 1, width))
-            in
+            let* size = int_bound 4 in
+            let size = size + 1 in
+            let+ xs = list_repeat size @@ pair step (tree (depth - 1, width)) in
             (Node xs : tree)
         | 3 ->
             let+ h = hash in
@@ -398,9 +398,9 @@ module Proof2 (Encoding : Tezos_context_sigs.Context.PROOF_ENCODING) = struct
             let+ v = value in
             Value v
         | 1 ->
-            let+ sks =
-              list_size (map succ (int_bound 4)) @@ pair step kinded_hash
-            in
+            let* size = int_bound 4 in
+            let size = size + 1 in
+            let+ sks = list_repeat size @@ pair step kinded_hash in
             Node sks
         | 2 ->
             let max_indices = 5 in
@@ -412,7 +412,9 @@ module Proof2 (Encoding : Tezos_context_sigs.Context.PROOF_ENCODING) = struct
         | _ -> assert false
 
       let t : Stream.t Gen.t =
-        let+ xs = list_size (map succ (int_bound 10)) elt in
+        let* size = int_bound 10 in
+        let size = size + 1 in
+        let+ xs = list_repeat size elt in
         List.to_seq xs
     end
 

@@ -185,7 +185,7 @@ let sublist : 'a list -> 'a list QCheck.Gen.t =
 let holey (l : 'a list) : 'a list QCheck.Gen.t =
   let open QCheck.Gen in
   (* Generate as many Booleans as there are elements in [l] *)
-  let+ bools = list_size (return (List.length l)) bool in
+  let+ bools = list_repeat (List.length l) bool in
   let rev_result =
     List.fold_left
       (fun acc (elem, pick) -> if pick then elem :: acc else acc)
