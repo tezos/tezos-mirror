@@ -185,20 +185,17 @@ let multisig_script_string =
   \                  DIP { SWAP ; CAR } ; SWAP ; PAIR ; SWAP }} ;\n\
   \    PAIR }\n"
 
-open Tezos_error_monad.Error_monad
 open Tezos_client_alpha
 
 (* Client_proto_context.originate expects the contract script as a Script.expr *)
 let multisig_script : Script_repr.expr =
-  let result =
+  match
     Tezos_micheline.Micheline_parser.no_parsing_error
     @@ Michelson_v1_parser.parse_toplevel
          ?check:(Some true)
          multisig_script_string
-    >>? fun parsing_result -> ok parsing_result.Michelson_v1_parser.expanded
-  in
-  match result with
-  | Ok script -> script
+  with
+  | Ok parsing_result -> parsing_result.Michelson_v1_parser.expanded
   | Error _err -> Stdlib.failwith "Error while parsing script"
 
 let original_script_oracle =
