@@ -695,6 +695,7 @@ let load_cache_correctly_restores_cache_in_memory builder mode
   Context.Cache.Internal_for_tests.same_cache_domains ctxt0 ctxt1
 
 let load_cache_correctly_restores_cache_in_memory_normal_case =
+  let open Lwt_result_syntax in
   let builder entries key =
     let value = Stdlib.List.assoc key entries in
     return (Int value)

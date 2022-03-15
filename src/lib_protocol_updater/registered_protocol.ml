@@ -203,6 +203,7 @@ let () =
     (fun hash -> Unregistered_protocol hash)
 
 let get_result hash =
+  let open Lwt_tzresult_syntax in
   match get hash with
   | Some hash -> return hash
   | None -> fail (Unregistered_protocol hash)
