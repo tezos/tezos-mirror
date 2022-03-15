@@ -88,9 +88,9 @@ let () =
     (fun () -> Canceled)
 
 let protect_no_canceler ?on_error t =
-  let open Lwt_syntax in
+  let open Lwt_tzresult_syntax in
   let res = Lwt.catch t (fun exn -> fail (Exn exn)) in
-  let* r = res in
+  let*! r = res in
   match r with
   | Ok _ -> res
   | Error trace -> (
