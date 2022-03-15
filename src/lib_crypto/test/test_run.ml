@@ -31,4 +31,5 @@ runtest
     (module Test_signature);
     (module Test_timelock);
     (module Test_context_hash);
+    (module Test_bls12_381);
   ]
