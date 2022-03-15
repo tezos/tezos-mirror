@@ -1940,6 +1940,31 @@ let complete_next_tree cctxt =
   | TStop command -> return (list_command_args command)
   | TEmpty -> return_nil
 
+let rec args_starting_from_suffix original_suffix ind matched_args = function
+  | ((s :: s_rest as suffix), a :: a_rest) ->
+      if s = a then
+        args_starting_from_suffix
+          original_suffix
+          ind
+          (matched_args @ [a])
+          (s_rest, a_rest)
+      else if matched_args = [] then
+        (* Suffix not found on args head, check the rest of the args *)
+        args_starting_from_suffix
+          original_suffix
+          (ind - 1)
+          matched_args
+          (suffix, a_rest)
+      else
+        (* After there is a suffix match, the rest of the suffix has
+           to be matched in the following args, unless it's empty. *)
+        None
+  | (unmatched_suffix, args)
+  (* Partial or full suffix match found *)
+    when Compare.List_lengths.(unmatched_suffix < original_suffix) ->
+      Some (matched_args @ args, ind)
+  | _ -> None
+
 let complete_tree cctxt tree index args =
   let rec help tree args ind =
     if ind = 0 then complete_next_tree cctxt tree
@@ -1947,30 +1972,7 @@ let complete_tree cctxt tree index args =
       match (tree, args) with
       | (TSeq _, _) -> complete_next_tree cctxt tree
       | ((TNonTerminalSeq {tree; suffix; _} as this_tree), _ :: _tl) -> (
-          let rec args_starting_from_suffix ind matched_args = function
-            | ((s :: s_rest as suffix), a :: a_rest) ->
-                if s = a then
-                  args_starting_from_suffix
-                    ind
-                    (matched_args @ [a])
-                    (s_rest, a_rest)
-                else if matched_args = [] then
-                  (* Suffix not found on args head, check the rest of the args *)
-                  args_starting_from_suffix
-                    (ind - 1)
-                    matched_args
-                    (suffix, a_rest)
-                else
-                  (* After there is a suffix match, the rest of the suffix has
-                     to be matched in the following args, unless it's empty. *)
-                  None
-            | (unmatched_suffix, args)
-            (* Partial or full suffix match found *)
-              when Compare.List_lengths.(unmatched_suffix < suffix) ->
-                Some (matched_args @ args, ind)
-            | _ -> None
-          in
-          match args_starting_from_suffix ind [] (suffix, args) with
+          match args_starting_from_suffix suffix ind [] (suffix, args) with
           | Some (args, ind) -> help tree args ind
           | _ -> complete_next_tree cctxt this_tree)
       | (TPrefix {prefix; _}, hd :: tl) -> (
