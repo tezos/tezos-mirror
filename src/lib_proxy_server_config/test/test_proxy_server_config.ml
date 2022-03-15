@@ -58,7 +58,7 @@ let path_gen =
   let+ s =
     list_size (1 -- 8) (string_size ~gen:(char_range 'a' 'z') (1 -- 8))
   in
-  "/" ^ String.concat "/" s
+  String.concat "/" ("" :: s)
 
 (** A generator that generates valid values for the [rpc_tls] field *)
 let rpc_tls_gen =
@@ -81,13 +81,11 @@ let proxy_server_config_arb endpoint_gen rpc_addr_gen rpc_tls_gen
     sym_block_caching_time_gen data_dir_gen =
   let gen =
     QCheck.Gen.(
-      let+ (endpoint, rpc_addr, rpc_tls, (sym_block_caching_time, data_dir)) =
-        quad
-          endpoint_gen
-          rpc_addr_gen
-          rpc_tls_gen
-          (pair sym_block_caching_time_gen data_dir_gen)
-      in
+      let* endpoint = endpoint_gen in
+      let* rpc_addr = rpc_addr_gen in
+      let* rpc_tls = rpc_tls_gen in
+      let* sym_block_caching_time = sym_block_caching_time_gen in
+      let+ data_dir = data_dir_gen in
       Proxy_server_config.make
         ~endpoint
         ~rpc_addr

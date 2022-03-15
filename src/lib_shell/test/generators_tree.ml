@@ -352,7 +352,7 @@ let tree_gen ?blocks () =
     | None ->
         (* no blocks received: generate them, use the [nonempty] flavor
            of the generator, to guarantee [blocks <> []] below. *)
-        map Block.set_to_list @@ unique_nonempty_block_gen
+        map Block.set_to_list unique_nonempty_block_gen
     | Some [] ->
         QCheck2.Test.fail_report
           "tree_gen should not be called with an empty list of blocks"

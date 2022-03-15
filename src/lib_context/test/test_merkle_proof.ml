@@ -148,8 +148,7 @@ module Proof32 (Encoding : Tezos_context_sigs.Context.PROOF_ENCODING) = struct
 
     let kinded_hash =
       let* h = hash in
-      let+ b = bool in
-      match b with true -> `Value h | false -> `Node h
+      oneofl [`Value h; `Node h]
 
     let tree_proof =
       let* version = int_bound 3 in
@@ -380,8 +379,7 @@ module Proof2 (Encoding : Tezos_context_sigs.Context.PROOF_ENCODING) = struct
 
     let kinded_hash =
       let* h = hash in
-      let+ b = bool in
-      match b with true -> `Value h | false -> `Node h
+      oneofl [`Value h; `Node h]
 
     let tree_proof =
       let* version = int_bound 3 in
