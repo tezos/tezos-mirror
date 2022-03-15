@@ -213,14 +213,13 @@ let invalid_pow =
          "p2p.expected-proof-of-work")
     ("proof-of-work", Data_encoding.float)
 
-let validate_expected_pow (config : Node_config_file.t) : t tzresult Lwt.t =
-  let t =
-    unless
-      (0. <= config.p2p.expected_pow && config.p2p.expected_pow <= 256.)
-      ~event:invalid_pow
-      ~payload:config.p2p.expected_pow
-  in
-  return t
+let validate_expected_pow (config : Node_config_file.t) : t =
+  unless
+    (0. <= config.p2p.expected_pow && config.p2p.expected_pow <= 256.)
+    ~event:invalid_pow
+    ~payload:config.p2p.expected_pow
+
+let validate_expected_pow config = return (validate_expected_pow config)
 
 (* Validate addresses. *)
 
@@ -440,7 +439,8 @@ let validate_connections (config : Node_config_file.t) =
             (limits.max_connections > target_known_points)
             ~event:target_number_of_known_points_lower_than_maximum_conn
             ~payload:(target_known_points, limits.max_connections))
-  |> return
+
+let validate_connections config = return (validate_connections config)
 
 (* Main validation passes. *)
 
