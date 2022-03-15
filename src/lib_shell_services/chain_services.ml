@@ -218,7 +218,7 @@ let make_call1 s ctxt chain a q p =
 let chain_id ctxt =
   let f = make_call0 S.chain_id ctxt in
   fun ?(chain = `Main) () ->
-    match chain with `Hash h -> return h | _ -> f chain () ()
+    match chain with `Hash h -> Lwt.return_ok h | _ -> f chain () ()
 
 let checkpoint ctxt ?(chain = `Main) () =
   make_call0 S.checkpoint ctxt chain () ()

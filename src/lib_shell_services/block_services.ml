@@ -1346,7 +1346,9 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
   let hash ctxt =
     let f = make_call0 S.hash ctxt in
     fun ?(chain = `Main) ?(block = `Head 0) () ->
-      match block with `Hash (h, 0) -> return h | _ -> f chain block () ()
+      match block with
+      | `Hash (h, 0) -> Lwt.return_ok h
+      | _ -> f chain block () ()
 
   let header ctxt =
     let f = make_call0 S.header ctxt in
