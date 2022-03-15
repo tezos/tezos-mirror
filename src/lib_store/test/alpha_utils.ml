@@ -89,6 +89,7 @@ module Account = struct
   let activator_account = new_account ()
 
   let find pkh =
+    let open Lwt_tzresult_syntax in
     match Signature.Public_key_hash.Table.find known_accounts pkh with
     | Some v -> return v
     | None -> failwith "Missing account: %a" Signature.Public_key_hash.pp pkh

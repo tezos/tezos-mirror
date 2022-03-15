@@ -1012,6 +1012,7 @@ let move_all_floating_stores block_store ~new_ro_store =
       return_unit)
 
 let check_store_consistency block_store ~cementing_highwatermark =
+  let open Lwt_tzresult_syntax in
   match
     Cemented_block_store.get_highest_cemented_level block_store.cemented_store
   with

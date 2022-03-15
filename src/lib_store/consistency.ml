@@ -47,6 +47,7 @@ open Store_errors
    the cementing_highwatermark is consistent with the cemented
    store. *)
 let check_cementing_highwatermark ~cementing_highwatermark block_store =
+  let open Lwt_tzresult_syntax in
   let cemented_store = Block_store.cemented_block_store block_store in
   let highest_cemented_level =
     Cemented_block_store.get_highest_cemented_level cemented_store
@@ -376,7 +377,8 @@ let lowest_metadata_entry metadata_file =
     | [] ->
         (* A metadata file is never empty *)
         assert false
-    | {Zip.filename; _} :: _ -> return_some (Int32.of_string filename)
+    | {Zip.filename; _} :: _ ->
+        Lwt_tzresult_syntax.return_some (Int32.of_string filename)
   with exn -> Lwt.fail exn
 
 (* Returns the lowest block level, from the cemented store, which is

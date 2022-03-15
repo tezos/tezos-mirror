@@ -684,6 +684,7 @@ let reconstruct_floating chain_store context_index ~user_activated_upgrades
 
 (* Only Full modes with any offset can be reconstructed *)
 let check_history_mode_compatibility chain_store savepoint genesis_block =
+  let open Lwt_tzresult_syntax in
   match Store.Chain.history_mode chain_store with
   | History_mode.(Full _) ->
       fail_when

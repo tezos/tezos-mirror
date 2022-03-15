@@ -518,6 +518,7 @@ let read_block_metadata cemented_store block_level =
   read_block_metadata cemented_store block_level
 
 let get_cemented_block_by_hash ~read_metadata (cemented_store : t) hash =
+  let open Lwt_tzresult_syntax in
   match get_cemented_block_level cemented_store hash with
   | None -> return_none
   | Some level ->
