@@ -397,7 +397,7 @@ let run configuration cctxt =
     configuration
   in
   let* state = State.init cctxt ~data_dir ~operator ?rollup_genesis rollup_id in
-  let* _rpc_server = RPC.start configuration state in
+  let* _rpc_server = RPC.start cctxt configuration state in
   let _ =
     (* Register cleaner callback *)
     Lwt_exit.register_clean_up_callback

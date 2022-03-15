@@ -27,4 +27,8 @@
 open Tezos_rpc_http_server
 
 (** Starts the RPC server of the tx_rollup_node. *)
-val start : Configuration.t -> State.t -> RPC_server.server tzresult Lwt.t
+val start :
+  Protocol_client_context.full ->
+  Configuration.t ->
+  State.t ->
+  RPC_server.server tzresult Lwt.t

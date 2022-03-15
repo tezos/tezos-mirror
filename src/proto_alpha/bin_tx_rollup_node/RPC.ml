@@ -463,21 +463,33 @@ end
 module Injection = struct
   let path = RPC_path.(open_root / "queue")
 
-  let directory : Batcher.state RPC_directory.t ref = ref RPC_directory.empty
+  let directory :
+      (Protocol_client_context.full * Batcher.state) RPC_directory.t ref =
+    ref RPC_directory.empty
 
   let register service f =
     directory := RPC_directory.register !directory service f
 
-  let build_directory state =
+  let build_directory cctxt state =
     match state.State.batcher_state with
     | None -> RPC_directory.empty
     | Some batcher_state ->
-        !directory |> RPC_directory.map (fun () -> Lwt.return batcher_state)
+        !directory
+        |> RPC_directory.map (fun () -> Lwt.return (cctxt, batcher_state))
+
+  let inject_query =
+    let open RPC_query in
+    query (fun eager_batch ->
+        object
+          method eager_batch = eager_batch
+        end)
+    |+ flag "eager_batch" (fun t -> t#eager_batch)
+    |> seal
 
   let inject_transaction =
     RPC_service.post_service
-      ~description:"Inject an L2 tranasction in the queue of the rollup node."
-      ~query:RPC_query.empty
+      ~description:"Inject an L2 transaction in the queue of the rollup node."
+      ~query:inject_query
       ~input:L2_transaction.encoding
       ~output:L2_transaction.Hash.encoding
       RPC_path.(path / "injection" / "transaction")
@@ -497,36 +509,41 @@ module Injection = struct
       path
 
   let () =
-    register inject_transaction (fun state () transaction ->
-        Batcher.register_transaction state transaction)
+    register inject_transaction (fun (cctxt, state) q transaction ->
+        Batcher.register_transaction
+          ~eager_batch:q#eager_batch
+          cctxt
+          state
+          transaction)
 
   let () =
-    register get_transaction (fun (state, tr_hash) () () ->
+    register get_transaction (fun ((_, state), tr_hash) () () ->
         return @@ Batcher.find_transaction state tr_hash)
 
   let () =
-    register get_queue (fun state () () -> return @@ Batcher.get_queue state)
+    register get_queue (fun (_, state) () () ->
+        return @@ Batcher.get_queue state)
 end
 
-let register state =
+let register cctxt state =
   List.fold_left
     (fun dir f -> RPC_directory.merge dir (f state))
     RPC_directory.empty
     [
       Block.build_directory;
       Context_RPC.build_directory;
-      Injection.build_directory;
+      Injection.build_directory cctxt;
     ]
 
 let launch ~host ~acl ~node ~dir () =
   RPC_server.launch ~media_types:Media_type.all_media_types ~host ~acl node dir
 
-let start configuration state =
+let start cctxt configuration state =
   let open Lwt_result_syntax in
   let Configuration.{rpc_addr; _} = configuration in
   let (host, rpc_port) = rpc_addr in
   let host = P2p_addr.to_string host in
-  let dir = register state in
+  let dir = register cctxt state in
   let node = `TCP (`Port rpc_port) in
   let acl = RPC_server.Acl.allow_all in
   Lwt.catch

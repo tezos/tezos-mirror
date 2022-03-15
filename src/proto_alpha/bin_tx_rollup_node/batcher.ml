@@ -56,37 +56,6 @@ let find_transaction state tr_hash =
 
 let get_queue state = Tx_queue.elements state.transactions
 
-let register_transaction ?(apply = true) state (tr : L2_transaction.t) =
-  let open Lwt_result_syntax in
-  Lwt_mutex.with_lock state.lock @@ fun () ->
-  let batch =
-    Tx_rollup_l2_batch.V1.
-      {contents = [tr.transaction]; aggregated_signature = tr.signature}
-  in
-  let context = state.incr_context in
-  let prev_context = context in
-  let+ (context, result) =
-    if apply then
-      let+ (context, result, _) =
-        L2_apply.Batch_V1.apply_batch context state.parameters batch
-      in
-      let result =
-        match result with
-        | Tx_rollup_l2_apply.Message_result.Batch_V1.Batch_result
-            {results = [(_tr, r)]; _} ->
-            Some r
-        | _ -> None
-      in
-      (context, result)
-    else return (context, None)
-  in
-  L2_transaction.Hash_queue.add tr ?result state.transactions ;
-  if prev_context == context then
-    (* Only update internal context if it was not changed due to a head block
-       change in the meantime. *)
-    state.incr_context <- context ;
-  L2_transaction.hash tr
-
 let inject_operations (type kind) (cctxt : Protocol_client_context.full) state
     (operations : kind manager_operation list) =
   let open Lwt_result_syntax in
@@ -166,11 +135,16 @@ let get_batches state =
   let+ batches = loop [] transactions in
   (batches, transactions)
 
-let batch_and_inject cctxt state =
+let batch_and_inject ?(at_least_one_full_batch = false) cctxt state =
   let open Lwt_result_syntax in
   let*? (batches, to_remove) = get_batches state in
   match batches with
   | [] -> return_none
+  | Tx_rollup_l2_batch.(V1 {V1.contents; _}) :: _
+    when at_least_one_full_batch
+         && List.compare_length_with contents max_batch_transactions < 0 ->
+      (* The first batch is not full, and we requested it to be *)
+      return_none
   | _ ->
       let+ oph = inject_batches cctxt state batches in
       List.iter
@@ -178,10 +152,10 @@ let batch_and_inject cctxt state =
         to_remove ;
       Some oph
 
-let async_batch_and_inject cctxt state =
+let async_batch_and_inject ?at_least_one_full_batch cctxt state =
   Lwt.async @@ fun () ->
   let open Lwt_syntax in
-  let* _ = batch_and_inject cctxt state in
+  let* _ = batch_and_inject ?at_least_one_full_batch cctxt state in
   return_unit
 
 let init cctxt ~rollup ~signer index parameters =
@@ -198,3 +172,39 @@ let init cctxt ~rollup ~signer index parameters =
         lock = Lwt_mutex.create ();
       })
     signer
+
+let register_transaction ?(eager_batch = false) ?(apply = true) cctxt state
+    (tr : L2_transaction.t) =
+  let open Lwt_result_syntax in
+  Lwt_mutex.with_lock state.lock @@ fun () ->
+  let batch =
+    Tx_rollup_l2_batch.V1.
+      {contents = [tr.transaction]; aggregated_signature = tr.signature}
+  in
+  let context = state.incr_context in
+  let prev_context = context in
+  let+ (context, result) =
+    if apply then
+      let+ (context, result, _) =
+        L2_apply.Batch_V1.apply_batch context state.parameters batch
+      in
+      let result =
+        match result with
+        | Tx_rollup_l2_apply.Message_result.Batch_V1.Batch_result
+            {results = [(_tr, r)]; _} ->
+            Some r
+        | _ -> None
+      in
+      context
+    else return context
+  in
+  L2_transaction.Hash_queue.add tr ?result state.transactions ;
+  if prev_context == context then
+    (* Only update internal context if it was not changed due to a head block
+       change in the meantime. *)
+    state.incr_context <- context ;
+  if eager_batch then
+    (* TODO/TORU: find better solution as this reduces throughput when we have a
+       single key to sign/inject. *)
+    async_batch_and_inject ~at_least_one_full_batch:true cctxt state ;
+  L2_transaction.hash tr
