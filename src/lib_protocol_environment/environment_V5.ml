@@ -53,6 +53,7 @@ module type V5 = sig
        and type Context.cache_value = Environment_context.Context.cache_value
        and type Context_hash.t = Context_hash.t
        and type Context_hash.Version.t = Context_hash.Version.t
+       and type Context.config = Tezos_context_sigs.Config.t
        and module Context.Proof = Environment_context.Context.Proof
        and type Protocol_hash.t = Protocol_hash.t
        and type Time.t = Time.Protocol.t
