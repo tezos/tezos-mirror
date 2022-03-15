@@ -219,7 +219,7 @@ let validate_expected_pow (config : Node_config_file.t) : t =
     ~event:invalid_pow
     ~payload:config.p2p.expected_pow
 
-let validate_expected_pow config = return (validate_expected_pow config)
+let validate_expected_pow config = Lwt.return_ok (validate_expected_pow config)
 
 (* Validate addresses. *)
 
@@ -440,7 +440,7 @@ let validate_connections (config : Node_config_file.t) =
             ~event:target_number_of_known_points_lower_than_maximum_conn
             ~payload:(target_known_points, limits.max_connections))
 
-let validate_connections config = return (validate_connections config)
+let validate_connections config = Lwt.return_ok (validate_connections config)
 
 (* Main validation passes. *)
 

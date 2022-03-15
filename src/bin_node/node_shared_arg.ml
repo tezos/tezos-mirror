@@ -620,6 +620,7 @@ module Term = struct
 end
 
 let read_config_file args =
+  let open Lwt_tzresult_syntax in
   if Sys.file_exists args.config_file then
     Node_config_file.read args.config_file
   else return Node_config_file.default_config

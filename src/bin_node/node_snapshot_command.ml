@@ -113,7 +113,9 @@ end
 module Term = struct
   type subcommand = Export | Import | Info
 
-  let check_snapshot_path = function
+  let check_snapshot_path =
+    let open Lwt_tzresult_syntax in
+    function
     | None -> fail Missing_file_argument
     | Some path ->
         if Sys.file_exists path then return path
