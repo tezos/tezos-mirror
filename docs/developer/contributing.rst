@@ -441,10 +441,29 @@ Merge Request "Draft" Mode
 A merge request that is not yet ready for review should be marked
 as `draft <https://docs.gitlab.com/ee/user/project/merge_requests/drafts.html>`_
 by prefixing its title with ``Draft:``.
-On ``tezos/tezos`` draft merge requests are ignored by reviewers.
+On ``tezos/tezos`` draft merge requests that are assigned to their owners
+are ignored by reviewers.
 Marking merge requests as draft hence helps lower
 the number of merge requests that require attention from the
 :doc:`Octez merge team<merge_team>`.
+
+Merge Request's owner
+~~~~~~~~~~~~~~~~~~~~~
+
+Usually the person who has created a Merge Request is also responsible for
+pushing it forward: finding reviewers, addressing their comments and so on.
+Occasionally though it happens that the author has to move to more pressing
+tasks and hands his MR over to another person to finish. This is a problem,
+because an MR assigned to its author has sort of a special status – it
+informs everyone that the branch is likely to change at any moment. When an
+MR is handed over, we lose that important information.
+
+For this reason, when take-over happens, it's useful to make that explicit.
+The person taking over should put a comment informing about this so that
+everyone knows that the person attending to the MR changes. Also the
+description should be updated to reflect that information. It is suggested to
+prefix the description with a line specifying the MR's owner if that's
+different to the author indicated by GitLab.
 
 .. _adding_new_dependencies:
 
