@@ -143,7 +143,7 @@ module Benchmark_cmd = struct
     in
     commandline_outcome_ref :=
       Some (Benchmark {bench_name; bench_opts = options}) ;
-    return ()
+    Lwt.return_ok ()
 
   module Options = struct
     (* Argument --flush-cache mb
@@ -172,10 +172,10 @@ module Benchmark_cmd = struct
     let determinizer_arg =
       let determinizer_arg_param =
         Clic.parameter
-          ~autocomplete:(fun () -> return ["mean"; "percentile@[0-100]"])
+          ~autocomplete:(fun () -> Lwt.return_ok ["mean"; "percentile@[0-100]"])
           (fun (_ : unit) parsed ->
             match parsed with
-            | "mean" -> return Mean
+            | "mean" -> Lwt.return_ok Mean
             | s -> (
                 let error () =
                   Printf.eprintf "Wrong determinizer specification.\n" ;
@@ -186,7 +186,8 @@ module Benchmark_cmd = struct
                     let i =
                       Option.value_f (int_of_string_opt i) ~default:error
                     in
-                    if i < 1 || i > 100 then error () else return (Percentile i)
+                    if i < 1 || i > 100 then error ()
+                    else Lwt.return_ok (Percentile i)
                 | _ -> error ()))
       in
       Clic.arg
@@ -233,7 +234,7 @@ module Benchmark_cmd = struct
        Parameter: filename of the file where to write the csv data. *)
     let dump_csv_arg =
       let dump_csv_arg_param =
-        Clic.parameter (fun (_ : unit) parsed -> return parsed)
+        Clic.parameter (fun (_ : unit) parsed -> Lwt.return_ok parsed)
       in
       Clic.arg
         ~doc:"Dumps raw benchmark results to CSV"
@@ -271,7 +272,7 @@ module Benchmark_cmd = struct
 
     let config_dir_arg =
       let config_dir_arg_param =
-        Clic.parameter (fun (_ : unit) parsed -> return parsed)
+        Clic.parameter (fun (_ : unit) parsed -> Lwt.return_ok parsed)
       in
       Clic.arg
         ~doc:
@@ -307,8 +308,8 @@ module Benchmark_cmd = struct
                (fun (module Bench : Benchmark.S) -> Bench.name)
                (Registration.all_benchmarks ())
            in
-           return res)
-         (fun _ str -> return str))
+           Lwt.return_ok res)
+         (fun _ str -> Lwt.return_ok str))
 
   let params =
     Clic.(
@@ -403,7 +404,7 @@ module Infer_cmd = struct
     in
     commandline_outcome_ref :=
       Some (Infer {model_name; workload_data; solver; infer_opts = options}) ;
-    return ()
+    Lwt.return_ok ()
 
   module Options = struct
     (* Boolean argument --print-problem *)
@@ -452,7 +453,7 @@ module Infer_cmd = struct
 
     let dump_csv_arg =
       let dump_csv_arg_param =
-        Clic.parameter (fun (_ : unit) parsed -> return parsed)
+        Clic.parameter (fun (_ : unit) parsed -> Lwt.return_ok parsed)
       in
       Clic.arg
         ~doc:"Dumps solution of inference to a CSV file"
@@ -462,7 +463,7 @@ module Infer_cmd = struct
 
     let report_arg =
       let dump_report_param =
-        Clic.parameter (fun (_ : unit) parsed -> return parsed)
+        Clic.parameter (fun (_ : unit) parsed -> Lwt.return_ok parsed)
       in
       Clic.arg
         ~doc:"Produces a detailed report"
@@ -474,7 +475,7 @@ module Infer_cmd = struct
       let override_file_param =
         Clic.parameter (fun (_ : unit) parsed ->
             let files = String.split ',' parsed in
-            return files)
+            Lwt.return_ok files)
       in
       Clic.arg
         ~doc:"Specify CSV file containing overrided variables for inference"
@@ -484,7 +485,7 @@ module Infer_cmd = struct
 
     let save_solution_arg =
       let override_file_param =
-        Clic.parameter (fun (_ : unit) parsed -> return parsed)
+        Clic.parameter (fun (_ : unit) parsed -> Lwt.return_ok parsed)
       in
       Clic.arg
         ~doc:
@@ -496,7 +497,7 @@ module Infer_cmd = struct
 
     let dot_file_arg =
       let override_file_param =
-        Clic.parameter (fun (_ : unit) parsed -> return parsed)
+        Clic.parameter (fun (_ : unit) parsed -> Lwt.return_ok parsed)
       in
       Clic.arg
         ~doc:
@@ -526,16 +527,17 @@ module Infer_cmd = struct
       ~name:"MODEL-NAME"
       ~desc:"Name of the model for which to infer parameter"
       (Clic.parameter
-         ~autocomplete:(fun _ -> return (Registration.all_model_names ()))
-         (fun _ str -> return str))
+         ~autocomplete:(fun _ ->
+           Lwt.return_ok (Registration.all_model_names ()))
+         (fun _ str -> Lwt.return_ok str))
 
   let regression_param =
     Clic.param
       ~name:"REGRESSION-METHOD"
       ~desc:"Regression method used"
       (Clic.parameter
-         ~autocomplete:(fun _ -> return ["lasso"; "ridge"; "nnls"])
-         (fun _ str -> return str))
+         ~autocomplete:(fun _ -> Lwt.return_ok ["lasso"; "ridge"; "nnls"])
+         (fun _ str -> Lwt.return_ok str))
 
   let params =
     Clic.(
@@ -576,7 +578,7 @@ module Cull_outliers_cmd = struct
     in
     commandline_outcome_ref :=
       Some (Cull_outliers {workload_data; nsigmas; save_file}) ;
-    return ()
+    Lwt.return_ok ()
 
   let options = Clic.no_options
 
@@ -645,7 +647,7 @@ module Codegen_cmd = struct
     in
     commandline_outcome_ref :=
       Some (Codegen {solution; model_name; codegen_options}) ;
-    return ()
+    Lwt.return_ok ()
 
   let options =
     Clic.args1
@@ -653,7 +655,7 @@ module Codegen_cmd = struct
          ~doc:"Apply fixed-point transform to the model"
          ~long:"fixed-point"
          ~placeholder:"json-config-file"
-         (Clic.parameter (fun () filename -> return filename)))
+         (Clic.parameter (fun () filename -> Lwt.return_ok filename)))
 
   let model_param =
     Clic.param
@@ -666,8 +668,8 @@ module Codegen_cmd = struct
                (fun (name, _) -> name)
                (Registration.all_registered_models ())
            in
-           return res)
-         (fun _ str -> return str))
+           Lwt.return_ok res)
+         (fun _ str -> Lwt.return_ok str))
 
   let params =
     Clic.(
@@ -702,7 +704,7 @@ module Codegen_all_cmd = struct
     in
     commandline_outcome_ref :=
       Some (Codegen_all {solution; matching; codegen_options}) ;
-    return ()
+    Lwt.return_ok ()
 
   let params =
     Clic.(
@@ -733,8 +735,8 @@ module List_cmd = struct
       ~name:"TAG"
       ~desc:"Tag of a benchmark"
       (Clic.parameter
-         ~autocomplete:(fun _ -> return (Registration.all_tags ()))
-         (fun _ s -> return s))
+         ~autocomplete:(fun _ -> Lwt.return_ok (Registration.all_tags ()))
+         (fun _ s -> Lwt.return_ok s))
 
   let params_all_bench = Clic.fixed ["list"; "all"; "benchmarks"]
 
@@ -765,7 +767,7 @@ module List_cmd = struct
         (fun (module Bench : Benchmark.S) ->
           Format.fprintf Format.std_formatter "%s: %s\n" Bench.name Bench.info)
         bench_list ;
-    return_unit
+    Lwt_tzresult_syntax.return_unit
 
   let handler_all_bench show_tags () =
     base_handler_bench (Registration.all_benchmarks ()) show_tags
@@ -776,7 +778,7 @@ module List_cmd = struct
     List.iter
       (fun tag -> Format.fprintf Format.std_formatter "%s\n" tag)
       (Registration.all_tags ()) ;
-    return_unit
+    Lwt_tzresult_syntax.return_unit
 
   let params_bench_tags_any =
     Clic.(
