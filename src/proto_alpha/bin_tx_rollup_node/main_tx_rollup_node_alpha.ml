@@ -119,9 +119,7 @@ let group =
       title = "Commands related to the transaction rollup node";
     }
 
-let to_tzresult msg = function
-  | Some x -> Error_monad.return x
-  | None -> Error_monad.failwith msg
+let to_tzresult msg = function Some x -> return x | None -> failwith msg
 
 let configuration_init_command =
   let open Clic in

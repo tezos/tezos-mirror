@@ -368,7 +368,7 @@ let rec connect ~delay cctxt =
   let open Lwt_syntax in
   let* res = Monitor_services.heads cctxt cctxt#chain in
   match res with
-  | Ok (stream, stopper) -> Error_monad.return (stream, stopper)
+  | Ok (stream, stopper) -> return_ok (stream, stopper)
   | Error _ ->
       let* () = Event.(emit cannot_connect) delay in
       let* () = Lwt_unix.sleep delay in
