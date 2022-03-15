@@ -250,7 +250,7 @@ module Sink_implementation : Internal_event.SINK with type t = t = struct
     let t =
       {path = Uri.path uri; lwt_bad_citizen_hack = ref []; event_filter}
     in
-    return t
+    Lwt.return_ok t
 
   let output_json ~pp file_path event_json =
     let open Lwt_syntax in
@@ -261,7 +261,7 @@ module Sink_implementation : Internal_event.SINK with type t = t = struct
         in
         let* ru = Lwt_utils_unix.Json.write_file file_path event_json in
         match ru with
-        | Ok () -> Error_monad.return_unit
+        | Ok () -> return_ok_unit
         | Error el ->
             failwith
               "ERROR while Handling %a,@ cannot write JSON to %s:@ %a\n%!"
@@ -469,7 +469,7 @@ module Query = struct
       | `Warning e -> fprintf fmt "@[Warning:@ %a@]" warning e
 
     let make_return m ((prev : item list), value) warning =
-      return (m warning :: prev, value)
+      Lwt.return_ok (m warning :: prev, value)
 
     let return_with_warning v e = make_return (fun e -> `Warning e) v e
 
@@ -479,6 +479,7 @@ module Query = struct
   open Report
 
   let fold_event_kind_directory ~time_query path ~init ~f =
+    let open Lwt_result_syntax in
     fold_directory path ~init:(return init) ~f:(fun previous -> function
       | `Directory "." | `Directory ".." -> return previous
       | `Directory date when Time_constraint.check_date time_query date ->
