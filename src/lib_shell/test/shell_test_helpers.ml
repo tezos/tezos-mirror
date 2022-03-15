@@ -104,4 +104,4 @@ let init_mock_p2p chain_name =
   in
   let message_cfg = Distributed_db_message.cfg chain_name in
   let c_meta = {disable_mempool = true; private_node = true} in
-  return (P2p.faked_network message_cfg peer_metadata_cfg c_meta)
+  Lwt.return_ok (P2p.faked_network message_cfg peer_metadata_cfg c_meta)

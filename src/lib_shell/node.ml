@@ -368,5 +368,5 @@ let build_rpc_directory node =
        node.store) ;
   merge (Version_directory.rpc_directory node.p2p) ;
   register0 RPC_service.error_service (fun () () ->
-      return (Data_encoding.Json.schema Error_monad.error_encoding)) ;
+      Lwt.return_ok (Data_encoding.Json.schema Error_monad.error_encoding)) ;
   !dir

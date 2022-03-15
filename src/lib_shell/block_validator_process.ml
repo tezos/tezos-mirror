@@ -328,7 +328,7 @@ module Internal_validator_process = struct
     let* context = Store.Block.context validator.chain_store forking_block in
     Block_validation.init_test_chain context forked_header
 
-  let reconfigure_event_logging _ _ = return_unit
+  let reconfigure_event_logging _ _ = Lwt_tzresult_syntax.return_unit
 end
 
 (** Block validation using an external process *)

@@ -58,6 +58,7 @@ let read_partial_context =
                 | Some v -> raw_context_insert (k, Key v) acc)
 
 let build_raw_header_rpc_directory (module Proto : Block_services.PROTO) =
+  let open Lwt_tzresult_syntax in
   let dir :
       (Store.chain_store * Block_hash.t * Block_header.t) RPC_directory.t ref =
     ref RPC_directory.empty
