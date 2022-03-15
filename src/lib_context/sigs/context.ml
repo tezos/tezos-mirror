@@ -355,7 +355,7 @@ module Proof_types = struct
 
         The sequance [e_1 ... e_n] proves that the [e_1], ..., [e_n] are
         read in the store in sequence. *)
-    type t = elt Seq.t
+    type t = unit -> elt Seq.node
   end
 
   type stream = Stream.t
