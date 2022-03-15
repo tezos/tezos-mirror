@@ -467,11 +467,12 @@ let wait_all_results (processes : ('a, 'b, 'c) t list) =
   let terminations = List.map (fun p -> p.termination) processes in
   let* o = loop terminations in
   match o with
-  | None ->
+  | None -> (
       let* () = lwt_log_info "All done!" in
-      let* terminated = Error_monad.Lwt_syntax.all terminations in
-      return_ok
-      @@ List.map (function Ok a -> a | Error _ -> assert false) terminated
+      let* terminated = all terminations in
+      match List.partition_result terminated with
+      | (_, _ :: _) -> assert false
+      | (terminated, []) -> return_ok terminated)
   | Some (_err, remaining) ->
       let* () = lwt_log_error "Early error! Canceling remaining process." in
       List.iter Lwt.cancel remaining ;
