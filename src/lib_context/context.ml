@@ -311,6 +311,7 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
   let get_hash_version _c = Context_hash.Version.of_int 0
 
   let set_hash_version c v =
+    let open Lwt_tzresult_syntax in
     if Context_hash.Version.(of_int 0 = v) then return c
     else fail (Tezos_context_helpers.Context.Unsupported_context_hash_version v)
 

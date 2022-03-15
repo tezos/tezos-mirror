@@ -323,7 +323,7 @@ module Make (I : Dump_interface) = struct
         notify ())
 
   let dump_context_fd idx context_hash ~context_fd =
-    let open Lwt_syntax in
+    let open Lwt_tzresult_syntax in
     (* Dumping *)
     let buf = Buffer.create 1_000_000 in
     let written = ref 0 in
@@ -338,7 +338,7 @@ module Make (I : Dump_interface) = struct
     in
     Lwt.catch
       (fun () ->
-        let* o = I.checkout idx context_hash in
+        let*! o = I.checkout idx context_hash in
         match o with
         | None ->
             (* FIXME: dirty *)
@@ -356,14 +356,14 @@ module Make (I : Dump_interface) = struct
                   else Format.asprintf "%dKiB" (!written / 1_024)))
               (fun notify ->
                 set_root buf ;
-                let* elements =
+                let*! elements =
                   I.context_tree ctxt |> serialize_tree ~notify ~maybe_flush buf
                 in
                 let parents = I.context_parents ctxt in
                 set_eoc buf (I.context_info ctxt) parents ;
                 set_end buf ;
-                let* () = flush () in
-                return_ok elements))
+                let*! () = flush () in
+                return elements))
       (function
         | Unix.Unix_error (e, _, _) ->
             fail @@ System_write_error (Unix.error_message e)
