@@ -33,7 +33,7 @@ let list_proxy_command_handler _ _ =
   List.iter (fun (module Proxy : Registration.Proxy_sig) ->
       Format.printf "%a@." Protocol_hash.pp Proxy.protocol_hash)
   @@ Registration.get_all_registered () ;
-  return ()
+  Lwt_result_syntax.return_unit
 
 let list_env_command (flag : string) : _ Clic.command =
   let open Clic in

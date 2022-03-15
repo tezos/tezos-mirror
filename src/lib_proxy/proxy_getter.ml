@@ -230,6 +230,7 @@ module Make (C : Proxy.CORE) (X : Proxy_proto.PROTO_RPC) : M = struct
   (** Handles the application of [X.split_key] to optimize queries. *)
   let do_rpc (pgi : Proxy.proxy_getter_input) (kind : kind)
       (requested_key : Local.key) : unit tzresult Lwt.t =
+    let open Lwt_tzresult_syntax in
     let (key_to_get, split) =
       match kind with
       | Mem ->
@@ -256,13 +257,12 @@ module Make (C : Proxy.CORE) (X : Proxy_proto.PROTO_RPC) : M = struct
        and hence 'key' here differs from the key received as parameter) *)
     if split && is_all key_to_get then return_unit
     else
-      let open Lwt_syntax in
-      let* () =
+      let*! () =
         if split then
           Events.(emit split_key_triggers (key_to_get, requested_key))
         else Lwt.return_unit
       in
-      let* r = C.do_rpc pgi key_to_get in
+      let*! r = C.do_rpc pgi key_to_get in
       match r with
       | Ok _ -> remember_request ()
       | Error _ when X.failure_is_permanent requested_key -> remember_request ()

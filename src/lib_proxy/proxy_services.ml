@@ -127,7 +127,9 @@ let to_client_server_mode = function
   | Proxy_server _ -> Proxy.Server
 
 module BlockToHashServer : BLOCK_TO_HASH = struct
-  let hash_of_block __ _ = function
+  let hash_of_block __ _ =
+    let open Lwt_result_syntax in
+    function
     | `Hash (h, 0) -> return_some h
     | `Alias (_, _) | `Genesis | `Head _ | `Level _ | `Hash (_, _) ->
         return_none
