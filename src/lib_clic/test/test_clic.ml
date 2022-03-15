@@ -37,6 +37,7 @@ open Tezos_error_monad.Error_monad
 (* definitions *)
 
 let keywords words =
+  let open Lwt_tzresult_syntax in
   let words = List.map (fun (w, v) -> (String.lowercase_ascii w, v)) words in
   let matcher _ w =
     let w = String.lowercase_ascii w in
@@ -274,7 +275,7 @@ let string_param ~autocomplete next =
     param
       ~name:"string"
       ~desc:"string"
-      (parameter ~autocomplete (fun _ s -> return s))
+      (parameter ~autocomplete (fun _ s -> Lwt.return_ok s))
       next)
 
 let int_param ~autocomplete next =
@@ -282,7 +283,7 @@ let int_param ~autocomplete next =
     param
       ~name:"int"
       ~desc:"int"
-      (parameter ~autocomplete (fun _ s -> return @@ int_of_string s))
+      (parameter ~autocomplete (fun _ s -> Lwt.return_ok @@ int_of_string s))
       next)
 
 let test_autocompletion_case ~commands ~args ~expected () =
@@ -319,6 +320,7 @@ let test_autocompletion_case ~commands ~args ~expected () =
     and [non_terminal_seq].
 *)
 let test_parameters_autocompletion =
+  let open Lwt_tzresult_syntax in
   let param_commands =
     Clic.
       [
