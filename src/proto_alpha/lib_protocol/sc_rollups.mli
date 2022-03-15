@@ -27,7 +27,7 @@
 open Alpha_context.Sc_rollup
 
 module PVM : sig
-  type boot_sector = Alpha_context.Sc_rollup.PVM.boot_sector
+  type boot_sector = string
 
   module type S = sig
     val name : string

@@ -33,5 +33,5 @@ type origination_result = {address : Sc_rollup.Address.t; size : Z.t}
 val originate :
   context ->
   kind:Sc_rollup.Kind.t ->
-  boot_sector:Sc_rollup.PVM.boot_sector ->
+  boot_sector:string ->
   (origination_result * context) tzresult Lwt.t

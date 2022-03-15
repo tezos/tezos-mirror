@@ -227,9 +227,7 @@ let originate ctxt ~kind ~boot_sector =
   let addresses_size = 2 * Sc_rollup_repr.Address.size in
   let stored_kind_size = 2 (* because tag_size of kind encoding is 16bits. *) in
   let boot_sector_size =
-    Data_encoding.Binary.length
-      Sc_rollup_repr.PVM.boot_sector_encoding
-      boot_sector
+    Data_encoding.Binary.length Data_encoding.string boot_sector
   in
   let origination_size = Constants_storage.sc_rollup_origination_size ctxt in
   let size =

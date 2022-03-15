@@ -341,7 +341,7 @@ and _ manager_operation =
       -> Kind.tx_rollup_withdraw manager_operation
   | Sc_rollup_originate : {
       kind : Sc_rollup_repr.Kind.t;
-      boot_sector : Sc_rollup_repr.PVM.boot_sector;
+      boot_sector : string;
     }
       -> Kind.sc_rollup_originate manager_operation
   | Sc_rollup_add_messages : {
@@ -847,7 +847,7 @@ module Encoding = struct
           encoding =
             obj2
               (req "kind" Sc_rollup_repr.Kind.encoding)
-              (req "boot_sector" Sc_rollup_repr.PVM.boot_sector_encoding);
+              (req "boot_sector" Data_encoding.string);
           select =
             (function
             | Manager (Sc_rollup_originate _ as op) -> Some op | _ -> None);

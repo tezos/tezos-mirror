@@ -2419,16 +2419,6 @@ module Sc_rollup : sig
     module Map : Map.S with type key = t
   end
 
-  module PVM : sig
-    type boot_sector
-
-    val boot_sector_encoding : boot_sector Data_encoding.t
-
-    val boot_sector_of_string : string -> boot_sector
-
-    val boot_sector_to_string : boot_sector -> string
-  end
-
   module Address : S.HASH
 
   type t = Address.t
@@ -2467,7 +2457,7 @@ module Sc_rollup : sig
   val originate :
     context ->
     kind:Kind.t ->
-    boot_sector:PVM.boot_sector ->
+    boot_sector:string ->
     (t * Z.t * context) tzresult Lwt.t
 
   val kind : context -> t -> Kind.t option tzresult Lwt.t
@@ -2884,7 +2874,7 @@ and _ manager_operation =
       -> Kind.tx_rollup_withdraw manager_operation
   | Sc_rollup_originate : {
       kind : Sc_rollup.Kind.t;
-      boot_sector : Sc_rollup.PVM.boot_sector;
+      boot_sector : string;
     }
       -> Kind.sc_rollup_originate manager_operation
   | Sc_rollup_add_messages : {

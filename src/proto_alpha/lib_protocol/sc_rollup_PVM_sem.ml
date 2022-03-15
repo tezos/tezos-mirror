@@ -84,7 +84,7 @@ module type S = sig
   (** [initial_state context] is the state of the PVM before booting. It must
       be such that [state_hash state = Commitment_hash.zero]. Any [context]
       should be enough to create an initial state. *)
-  val initial_state : context -> PVM.boot_sector -> state Lwt.t
+  val initial_state : context -> string -> state Lwt.t
 
   (** [is_input_state state] returns [Some (level, counter)] if [state] is
       waiting for the input message that comes next to the message numbered

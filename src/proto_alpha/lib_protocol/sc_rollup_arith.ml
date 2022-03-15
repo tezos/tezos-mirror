@@ -55,9 +55,9 @@ module type S = sig
 
   val name : string
 
-  val parse_boot_sector : string -> Sc_rollup.PVM.boot_sector option
+  val parse_boot_sector : string -> string option
 
-  val pp_boot_sector : Format.formatter -> Sc_rollup.PVM.boot_sector -> unit
+  val pp_boot_sector : Format.formatter -> string -> unit
 
   val pp : state -> (Format.formatter -> unit -> unit) Lwt.t
 
@@ -101,10 +101,9 @@ module Make (Context : P) : S with type context = Context.Tree.t = struct
 
   let name = "arith"
 
-  let parse_boot_sector s = Some (PVM.boot_sector_of_string s)
+  let parse_boot_sector s = Some s
 
-  let pp_boot_sector fmt s =
-    Format.fprintf fmt "%s" (PVM.boot_sector_to_string s)
+  let pp_boot_sector fmt s = Format.fprintf fmt "%s" s
 
   type tree = Tree.tree
 
@@ -382,15 +381,15 @@ module Make (Context : P) : S with type context = Context.Tree.t = struct
     end)
 
     module Boot_sector = MakeVar (struct
-      type t = PVM.boot_sector
+      type t = string
 
       let name = "boot_sector"
 
-      let initial = PVM.boot_sector_of_string ""
+      let initial = ""
 
-      let encoding = PVM.boot_sector_encoding
+      let encoding = Data_encoding.string
 
-      let pp fmt s = Format.fprintf fmt "%s" (PVM.boot_sector_to_string s)
+      let pp fmt s = Format.fprintf fmt "%s" s
     end)
 
     module Status = MakeVar (struct
@@ -639,7 +638,7 @@ module Make (Context : P) : S with type context = Context.Tree.t = struct
   let set_input_monadic {inbox_level; message_counter; payload} =
     let open Monad.Syntax in
     let* boot_sector = Boot_sector.get in
-    let msg = PVM.boot_sector_to_string boot_sector ^ payload in
+    let msg = boot_sector ^ payload in
     let* last_level = CurrentLevel.get in
     let* last_counter = MessageCounter.get in
     let update =

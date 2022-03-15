@@ -151,7 +151,7 @@ type error +=
 val originate :
   Raw_context.t ->
   kind:Sc_rollup_repr.Kind.t ->
-  boot_sector:Sc_rollup_repr.PVM.boot_sector ->
+  boot_sector:string ->
   (Sc_rollup_repr.Address.t * Z.t * Raw_context.t) tzresult Lwt.t
 
 (** [kind context address] returns [Some kind] iff [address] is an
@@ -228,7 +228,7 @@ val withdraw_stake :
     commitments and {i staking on existing commitments}.  The storage of
     commitments is content-addressable to minimize storage duplication.
 
-    Subsequent calls to [refine_stake] and [cement_commitment] must use 
+    Subsequent calls to [refine_stake] and [cement_commitment] must use
     a [context] with greater level, or behavior is undefined.
 
     The first time a commitment hash is staked on, it is assigned a deadline,
@@ -277,7 +277,7 @@ val last_cemented_commitment :
 (** [cement_commitment context rollup commitment] cements the given
     commitment.
 
-    Subsequent calls to [refine_stake] and [cement_commitment] must use 
+    Subsequent calls to [refine_stake] and [cement_commitment] must use
     a [context] with greater level, or behavior is undefined.
 
     For cementing to succeed, the following must hold:

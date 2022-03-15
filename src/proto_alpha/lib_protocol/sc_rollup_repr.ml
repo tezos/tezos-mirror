@@ -24,16 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module PVM = struct
-  type boot_sector = string
-
-  let boot_sector_encoding = Data_encoding.string
-
-  let boot_sector_of_string s = s
-
-  let boot_sector_to_string s = s
-end
-
 module Address = struct
   let prefix = "scr1"
 
