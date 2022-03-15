@@ -1,88 +1,98 @@
 (library
  (name tezos_baking_011_PtHangz2)
- (instrumentation (backend bisect_ppx))
  (public_name tezos-baking-011-PtHangz2)
- (libraries tezos-base
-            tezos-version
-            tezos-protocol-011-PtHangz2
-            tezos-protocol-environment
-            tezos-shell-context
-            tezos-shell-services
-            tezos-client-base
-            tezos-client-011-PtHangz2
-            tezos-client-commands
-            tezos-stdlib
-            tezos-stdlib-unix
-            tezos-context
-            tezos-rpc-http
-            tezos-rpc-http-client-unix
-            tezos-rpc
-            lwt-canceler
-            lwt-exit)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  tezos-version
+  tezos-protocol-011-PtHangz2
+  tezos-protocol-plugin-011-PtHangz2
+  tezos-protocol-environment
+  tezos-shell-services
+  tezos-client-base
+  tezos-client-011-PtHangz2
+  tezos-client-commands
+  tezos-stdlib
+  tezos-stdlib-unix
+  tezos-shell-context
+  tezos-context
+  tezos-rpc-http-client-unix
+  tezos-rpc
+  tezos-rpc-http
+  lwt-canceler
+  lwt-exit)
  (library_flags (:standard -linkall))
- (modules (:standard \
-                     delegate_commands
-                     delegate_commands_registration))
- (flags (:standard -open Tezos_base__TzPervasives
-                   -open Tezos_protocol_011_PtHangz2
-                   -open Tezos_protocol_plugin_011_PtHangz2
-                   -open Tezos_shell_services
-                   -open Tezos_client_base
-                   -open Tezos_client_011_PtHangz2
-                   -open Tezos_client_commands
-                   -open Tezos_stdlib
-                   -open Tezos_stdlib_unix
-                   -open Tezos_shell_context
-                   -open Tezos_context
-                   -open Tezos_rpc
-                   -open Tezos_rpc_http)))
+ (flags
+  (:standard
+   -open Tezos_base.TzPervasives
+   -open Tezos_protocol_011_PtHangz2
+   -open Tezos_protocol_plugin_011_PtHangz2
+   -open Tezos_shell_services
+   -open Tezos_client_base
+   -open Tezos_client_011_PtHangz2
+   -open Tezos_client_commands
+   -open Tezos_stdlib
+   -open Tezos_stdlib_unix
+   -open Tezos_shell_context
+   -open Tezos_context
+   -open Tezos_rpc
+   -open Tezos_rpc_http))
+ (modules (:standard \ Delegate_commands Delegate_commands_registration)))
 
 (library
  (name tezos_baking_011_PtHangz2_commands)
- (instrumentation (backend bisect_ppx))
  (public_name tezos-baking-011-PtHangz2-commands)
- (libraries tezos-base
-            tezos-protocol-011-PtHangz2
-            tezos-protocol-environment
-            tezos-shell-services
-            tezos-client-base
-            tezos-client-011-PtHangz2
-            tezos-client-commands
-            tezos-baking-011-PtHangz2)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  tezos-protocol-011-PtHangz2
+  tezos-stdlib-unix
+  tezos-protocol-environment
+  tezos-shell-services
+  tezos-client-base
+  tezos-client-011-PtHangz2
+  tezos-client-commands
+  tezos-baking-011-PtHangz2
+  tezos-rpc)
  (library_flags (:standard -linkall))
- (modules delegate_commands)
- (flags (:standard -open Tezos_base__TzPervasives
-                   -open Tezos_protocol_011_PtHangz2
-                   -open Tezos_stdlib_unix
-                   -open Tezos_shell_services
-                   -open Tezos_client_base
-                   -open Tezos_client_011_PtHangz2
-                   -open Tezos_client_commands
-                   -open Tezos_baking_011_PtHangz2
-                   -open Tezos_rpc)))
+ (flags
+  (:standard
+   -open Tezos_base.TzPervasives
+   -open Tezos_protocol_011_PtHangz2
+   -open Tezos_stdlib_unix
+   -open Tezos_shell_services
+   -open Tezos_client_base
+   -open Tezos_client_011_PtHangz2
+   -open Tezos_client_commands
+   -open Tezos_baking_011_PtHangz2
+   -open Tezos_rpc))
+ (modules Delegate_commands))
 
 (library
  (name tezos_baking_011_PtHangz2_commands_registration)
- (instrumentation (backend bisect_ppx))
  (public_name tezos-baking-011-PtHangz2-commands.registration)
- (libraries tezos-base
-            tezos-protocol-011-PtHangz2
-            tezos-protocol-environment
-            tezos-shell-services
-            tezos-client-base
-            tezos-client-011-PtHangz2
-            tezos-client-commands
-            tezos-baking-011-PtHangz2
-            tezos-baking-011-PtHangz2-commands
-            tezos-rpc)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  tezos-protocol-011-PtHangz2
+  tezos-protocol-environment
+  tezos-shell-services
+  tezos-client-base
+  tezos-client-011-PtHangz2
+  tezos-client-commands
+  tezos-baking-011-PtHangz2
+  tezos-baking-011-PtHangz2-commands
+  tezos-rpc)
  (library_flags (:standard -linkall))
- (modules delegate_commands_registration)
- (flags (:standard -open Tezos_base__TzPervasives
-                   -open Tezos_protocol_011_PtHangz2
-                   -open Tezos_shell_services
-                   -open Tezos_client_base
-                   -open Tezos_client_011_PtHangz2
-                   -open Tezos_client_commands
-                   -open Tezos_baking_011_PtHangz2
-                   -open Tezos_baking_011_PtHangz2_commands
-                   -open Tezos_rpc)))
+ (flags
+  (:standard
+   -open Tezos_base.TzPervasives
+   -open Tezos_protocol_011_PtHangz2
+   -open Tezos_shell_services
+   -open Tezos_client_base
+   -open Tezos_client_011_PtHangz2
+   -open Tezos_client_commands
+   -open Tezos_baking_011_PtHangz2
+   -open Tezos_baking_011_PtHangz2_commands
+   -open Tezos_rpc))
+ (modules Delegate_commands_registration))
