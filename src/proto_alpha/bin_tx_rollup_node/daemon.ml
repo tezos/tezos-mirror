@@ -43,7 +43,7 @@ let interp_messages ctxt parameters messages cumulated_size =
   let+ (ctxt, _ctxt_hash, rev_contents) =
     List.fold_left_s
       (fun (ctxt, ctxt_hash, acc) message ->
-        let+ apply_res = Apply.apply_message ctxt parameters message in
+        let+ apply_res = L2_apply.apply_message ctxt parameters message in
         let (ctxt, ctxt_hash, result) =
           match apply_res with
           | Ok (ctxt, result) ->

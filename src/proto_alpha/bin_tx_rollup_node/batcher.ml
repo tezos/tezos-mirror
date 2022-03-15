@@ -23,8 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module L2_apply = Apply (* TODO rename *)
-
 open Protocol
 open Alpha_context
 open Common
