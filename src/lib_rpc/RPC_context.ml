@@ -113,19 +113,19 @@ let not_found s p q =
   let {RPC_service.meth; uri; _} =
     RPC_service.forge_partial_request s ~base p q
   in
-  fail (Not_found {meth; uri})
+  Lwt_tzresult_syntax.fail (Not_found {meth; uri})
 
 let gone s p q =
   let {RPC_service.meth; uri; _} =
     RPC_service.forge_partial_request s ~base p q
   in
-  fail (Gone {meth; uri})
+  Lwt_tzresult_syntax.fail (Gone {meth; uri})
 
 let error_with s p q =
   let {RPC_service.meth; uri; _} =
     RPC_service.forge_partial_request s ~base p q
   in
-  fail (Generic_error {meth; uri})
+  Lwt_tzresult_syntax.fail (Generic_error {meth; uri})
 
 class ['pr] of_directory (dir : 'pr RPC_directory.t) =
   object

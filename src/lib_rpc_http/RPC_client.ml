@@ -133,7 +133,8 @@ module Make (Client : Resto_cohttp_client.Client.CALL) = struct
 
   let request_failed meth uri error =
     let meth = (meth : [< RPC_service.meth] :> RPC_service.meth) in
-    fail (RPC_client_errors.Request_failed {meth; uri; error})
+    Lwt_tzresult_syntax.fail
+      (RPC_client_errors.Request_failed {meth; uri; error})
 
   let generic_call ?headers ?accept ?body ?media meth uri :
       (content, content) RPC_context.rest_result Lwt.t =
@@ -271,7 +272,7 @@ module Make (Client : Resto_cohttp_client.Client.CALL) = struct
 
   let post_process_json_response ~body meth uri =
     match Data_encoding.Json.from_string body with
-    | Ok json -> return json
+    | Ok json -> Lwt.return_ok json
     | Error msg ->
         request_failed
           meth
@@ -294,7 +295,7 @@ module Make (Client : Resto_cohttp_client.Client.CALL) = struct
           (Unexpected_content
              {content = body; media_type = Media_type.(name bson); error})
     | bson ->
-        return
+        Lwt.return_ok
           (Json_repr.convert
              (module Json_repr_bson.Repr)
              (module Json_repr.Ezjsonm)
