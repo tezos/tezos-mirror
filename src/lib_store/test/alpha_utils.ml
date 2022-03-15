@@ -89,12 +89,9 @@ module Account = struct
   let activator_account = new_account ()
 
   let find pkh =
-    try
-      return
-        (Signature.Public_key_hash.Table.find known_accounts pkh
-        |> WithExceptions.Option.to_exn ~none:Not_found)
-    with Not_found ->
-      failwith "Missing account: %a" Signature.Public_key_hash.pp pkh
+    match Signature.Public_key_hash.Table.find known_accounts pkh with
+    | Some v -> return v
+    | None -> failwith "Missing account: %a" Signature.Public_key_hash.pp pkh
 
   let find_alternate pkh =
     let exception Found of t in
