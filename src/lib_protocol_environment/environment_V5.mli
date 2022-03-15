@@ -32,7 +32,13 @@ module type V5 = sig
     Tezos_protocol_environment_sigs.V5.T
       with type Format.formatter = Format.formatter
        and type 'a Seq.node = 'a Seq.node
-       and type 'a Seq.t = 'a Seq.t
+       and type 'a Seq.t = unit -> 'a Seq.node
+      (* This ['a Seq.t = unit -> 'a Seq.node] cannot be replaced by the
+         simpler ['a Seq.t = 'a Seq.t] (which one could think is equivalent)
+         because this makes [Seq.t] abstract in the protocol environment.
+         Specifically, with the [= 'a Seq.t] constraints sequences can be
+         passed to [fold], [iter] and other such functions, but they cannot
+         be traversed manually. *)
        and type 'a Data_encoding.t = 'a Data_encoding.t
        and type 'a Data_encoding.Compact.t = 'a Data_encoding.Compact.t
        and type 'a Data_encoding.lazy_t = 'a Data_encoding.lazy_t
