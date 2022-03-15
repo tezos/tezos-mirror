@@ -812,7 +812,7 @@ module Make_s
                 op
             in
             List.iter (handle_classification ~notifier shell) to_handle ;
-            ok (new_filter_state, new_validation_state, new_mempool, limit - 1)))
+            Ok (new_filter_state, new_validation_state, new_mempool, limit - 1)))
         shell.pending
         ( filter_state,
           state,
@@ -949,11 +949,11 @@ module Make_s
       else
         match Prevalidation_t.parse oph op with
         | Error _ ->
-            let+ () = Event.(emit unparsable_operation) oph in
+            let* () = Event.(emit unparsable_operation) oph in
             Prevalidator_classification.add_unparsable
               oph
               pv.shell.classification ;
-            ok ()
+            return_ok_unit
         | Ok parsed_op -> (
             let* v =
               pre_filter

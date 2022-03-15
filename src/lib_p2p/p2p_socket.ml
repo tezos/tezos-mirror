@@ -560,8 +560,10 @@ module Writer = struct
 
   let encode_message st msg =
     match Data_encoding.Binary.to_bytes st.encoding msg with
-    | Error we -> error (Tezos_base.Data_encoding_wrapper.Encoding_error we)
-    | Ok bytes -> ok (Utils.cut st.binary_chunks_size bytes)
+    | Error we ->
+        Tzresult_syntax.fail
+          (Tezos_base.Data_encoding_wrapper.Encoding_error we)
+    | Ok bytes -> Ok (Utils.cut st.binary_chunks_size bytes)
 
   let rec worker_loop st =
     let open Lwt_syntax in
@@ -584,7 +586,10 @@ module Writer = struct
             worker_loop st
         | Error err -> (
             Option.iter
-              (fun u -> Lwt.wakeup_later u (error P2p_errors.Connection_closed))
+              (fun u ->
+                Lwt.wakeup_later
+                  u
+                  (Tzresult_syntax.fail P2p_errors.Connection_closed))
               wakener ;
             match err with
             | (Canceled | Exn Lwt_pipe.Closed) :: _ ->
@@ -791,7 +796,8 @@ let read {reader; _} =
 
 let read_now {reader; _} =
   try Lwt_pipe.Maybe_bounded.pop_now reader.messages
-  with Lwt_pipe.Closed -> Some (error P2p_errors.Connection_closed)
+  with Lwt_pipe.Closed ->
+    Some (Tzresult_syntax.fail P2p_errors.Connection_closed)
 
 let stat {conn = {scheduled_conn; _}; _} = P2p_io_scheduler.stat scheduled_conn
 

@@ -58,14 +58,16 @@ let rec worker_loop bv =
           | None ->
               Lwt.wakeup_later
                 wakener
-                (error (Invalid_protocol {hash; error = Dynlinking_failed}))) ;
+                (Tzresult_syntax.fail
+                   (Invalid_protocol {hash; error = Dynlinking_failed}))) ;
           return_unit)
         else (
           (* no need to tag 'invalid' protocol on disk, the economic protocol
              prevents us from being spammed with protocol validation. *)
           Lwt.wakeup_later
             wakener
-            (error (Invalid_protocol {hash; error = Compilation_failed})) ;
+            (Tzresult_syntax.fail
+               (Invalid_protocol {hash; error = Compilation_failed})) ;
           return_unit)
   in
   match r with

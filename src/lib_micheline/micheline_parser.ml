@@ -758,7 +758,7 @@ let print_location ppf loc =
       loc.stop.column
 
 let no_parsing_error (ast, errors) =
-  match errors with [] -> ok ast | errors -> Error errors
+  match errors with [] -> Ok ast | errors -> Error errors
 
 let () =
   register_error_kind

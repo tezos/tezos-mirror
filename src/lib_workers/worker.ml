@@ -426,7 +426,9 @@ struct
     let wakeup = function
       | (_, Message (_, Some u)) ->
           let name = Format.asprintf "%a" Name.pp w.name in
-          Lwt.wakeup_later u (error (Closed {base = base_name; name}))
+          Lwt.wakeup_later
+            u
+            (Tzresult_syntax.fail (Closed {base = base_name; name}))
       | (_, Message (_, None)) -> ()
     in
     let close_queue message_queue =

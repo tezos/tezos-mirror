@@ -47,7 +47,7 @@ let test_safe_decode () =
     check
       bool
       "A broken encoding should return None"
-      (actual = error Validation_errors.Parse_error)
+      (actual = Tzresult_syntax.fail Validation_errors.Parse_error)
       true)
 
 open Tezos_requester

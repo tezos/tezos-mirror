@@ -532,7 +532,7 @@ module Make
             if data.waiters = 0 then (
               Memory_table.remove s.memory k ;
               Scheduler.notify_cancellation s.scheduler k ;
-              Lwt.wakeup_later w (error (Canceled k)))) ;
+              Lwt.wakeup_later w (Tzresult_syntax.fail (Canceled k)))) ;
     match timeout with
     | None -> t
     | Some delay ->
@@ -631,7 +631,7 @@ module Make
     | Some (Pending {wakener = w; _}) ->
         Scheduler.notify_cancellation s.scheduler k ;
         Memory_table.remove s.memory k ;
-        Lwt.wakeup_later w (error (Canceled k))
+        Lwt.wakeup_later w (Tzresult_syntax.fail (Canceled k))
     | Some (Found _) -> Memory_table.remove s.memory k
 
   let watch s = Lwt_watcher.create_stream s.input

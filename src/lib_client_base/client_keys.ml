@@ -87,10 +87,11 @@ module Pk_uri_hashtbl = Hashtbl.Make (struct
 end)
 
 let make_pk_uri (x : Uri.t) : pk_uri tzresult =
+  let open Tzresult_syntax in
   match Uri.scheme x with
   | None ->
-      error (Exn (Failure "Error while parsing URI: PK_URI needs a scheme"))
-  | Some _ -> ok x
+      fail (Exn (Failure "Error while parsing URI: PK_URI needs a scheme"))
+  | Some _ -> return x
 
 type sk_uri = Uri.t
 
@@ -101,25 +102,28 @@ module CompareUri = Compare.Make (struct
 end)
 
 let make_sk_uri (x : Uri.t) : sk_uri tzresult =
+  let open Tzresult_syntax in
   match Uri.scheme x with
   | None ->
-      error (Exn (Failure "Error while parsing URI: SK_URI needs a scheme"))
-  | Some _ -> ok x
+      fail (Exn (Failure "Error while parsing URI: SK_URI needs a scheme"))
+  | Some _ -> return x
 
 type sapling_uri = Uri.t
 
 let make_sapling_uri (x : Uri.t) : sapling_uri tzresult =
+  let open Tzresult_syntax in
   match Uri.scheme x with
-  | None -> error (Exn (Failure "SAPLING_URI needs a scheme"))
-  | Some _ -> ok x
+  | None -> fail (Exn (Failure "SAPLING_URI needs a scheme"))
+  | Some _ -> return x
 
 type pvss_sk_uri = Uri.t
 
 let make_pvss_sk_uri (x : Uri.t) : pvss_sk_uri tzresult =
+  let open Tzresult_syntax in
   match Uri.scheme x with
   | None ->
-      error (Exn (Failure "Error while parsing URI: PVSS_URI needs a scheme"))
-  | Some _ -> ok x
+      fail (Exn (Failure "Error while parsing URI: PVSS_URI needs a scheme"))
+  | Some _ -> return x
 
 let pk_uri_parameter () =
   Clic.parameter (fun _ s -> Lwt.return @@ make_pk_uri (Uri.of_string s))

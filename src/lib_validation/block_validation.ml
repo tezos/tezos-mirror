@@ -94,9 +94,10 @@ type result = {
 type apply_result = {result : result; cache : Environment_context.Context.cache}
 
 let check_proto_environment_version_increasing block_hash before after =
-  if Protocol.compare_version before after <= 0 then Result.return_unit
+  let open Tzresult_syntax in
+  if Protocol.compare_version before after <= 0 then return_unit
   else
-    error
+    fail
       (invalid_block
          block_hash
          (Invalid_protocol_environment_transition (before, after)))
@@ -656,9 +657,10 @@ module Make (Proto : Registered_protocol.T) = struct
   (** Doesn't depend on heavy [Registered_protocol.T] for testability. *)
   let safe_binary_of_bytes (encoding : 'a Data_encoding.t) (bytes : bytes) :
       'a tzresult =
+    let open Tzresult_syntax in
     match Data_encoding.Binary.of_bytes_opt encoding bytes with
-    | None -> error Parse_error
-    | Some protocol_data -> ok protocol_data
+    | None -> fail Parse_error
+    | Some protocol_data -> return protocol_data
 
   let parse_unsafe (proto : bytes) : Proto.operation_data tzresult =
     safe_binary_of_bytes Proto.operation_data_encoding proto
@@ -1021,9 +1023,10 @@ module Make (Proto : Registered_protocol.T) = struct
 end
 
 let assert_no_duplicate_operations block_hash live_operations operations =
+  let open Tzresult_syntax in
   let exception Duplicate of block_error in
   try
-    ok
+    return
       (List.fold_left
          (List.fold_left (fun live_operations op ->
               let oph = Operation.hash op in
@@ -1032,12 +1035,13 @@ let assert_no_duplicate_operations block_hash live_operations operations =
               else Operation_hash.Set.add oph live_operations))
          live_operations
          operations)
-  with Duplicate err -> error (invalid_block block_hash err)
+  with Duplicate err -> fail (invalid_block block_hash err)
 
 let assert_operation_liveness block_hash live_blocks operations =
+  let open Tzresult_syntax in
   let exception Outdated of block_error in
   try
-    ok
+    return
       (List.iter
          (List.iter (fun op ->
               if not (Block_hash.Set.mem op.Operation.shell.branch live_blocks)
@@ -1051,7 +1055,7 @@ let assert_operation_liveness block_hash live_blocks operations =
                 in
                 raise (Outdated error)))
          operations)
-  with Outdated err -> error (invalid_block block_hash err)
+  with Outdated err -> fail (invalid_block block_hash err)
 
 (* Maybe this function should be moved somewhere else since it used
    once by [Block_validator_process] *)
