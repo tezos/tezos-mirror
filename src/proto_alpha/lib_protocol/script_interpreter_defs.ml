@@ -500,11 +500,12 @@ let apply ctxt gas capture_ty capture lam =
       let (gas, ctxt) = local_gas_counter_and_outdated_context ctxt in
       return (lam', ctxt, gas)
 
-(* [transfer (ctxt, sc) gas tez tp p destination entrypoint]
+(* [transfer (ctxt, sc) gas tez parameters_ty parameters destination entrypoint]
    creates an operation that transfers an amount of [tez] to
    a contract determined by [(destination, entrypoint)]
-   instantiated with argument [p] of type [tp]. *)
-let transfer (ctxt, sc) gas amount tp p destination entrypoint =
+   instantiated with argument [parameters] of type [parameters_ty]. *)
+let transfer (ctxt, sc) gas amount location parameters_ty parameters destination
+    entrypoint =
   (* [craft_transfer_parameters ctxt tp p] reorganizes, if need be, the
      parameters submitted by the interpreter to prepare them for the
      [Transaction] operation. *)
@@ -548,28 +549,32 @@ let transfer (ctxt, sc) gas amount tp p destination entrypoint =
   in
 
   let ctxt = update_context gas ctxt in
-  collect_lazy_storage ctxt tp p >>?= fun (to_duplicate, ctxt) ->
+  collect_lazy_storage ctxt parameters_ty parameters
+  >>?= fun (to_duplicate, ctxt) ->
   let to_update = no_lazy_storage_id in
   extract_lazy_storage_diff
     ctxt
     Optimized
-    tp
-    p
+    parameters_ty
+    parameters
     ~to_duplicate
     ~to_update
     ~temporary:true
-  >>=? fun (p, lazy_storage_diff, ctxt) ->
-  unparse_data ctxt Optimized tp p >>=? fun (p, ctxt) ->
-  Gas.consume ctxt (Script.strip_locations_cost p) >>?= fun ctxt ->
-  craft_transfer_parameters ctxt tp p destination >>?= fun (p, ctxt) ->
+  >>=? fun (parameters, lazy_storage_diff, ctxt) ->
+  unparse_data ctxt Optimized parameters_ty parameters
+  >>=? fun (unparsed_parameters, ctxt) ->
+  Gas.consume ctxt (Script.strip_locations_cost unparsed_parameters)
+  >>?= fun ctxt ->
+  craft_transfer_parameters ctxt parameters_ty unparsed_parameters destination
+  >>?= fun (unparsed_parameters, ctxt) ->
+  let transaction =
+    let parameters =
+      Script.lazy_expr (Micheline.strip_locations unparsed_parameters)
+    in
+    {amount; destination; entrypoint; parameters}
+  in
   let operation =
-    Transaction
-      {
-        amount;
-        destination;
-        entrypoint;
-        parameters = Script.lazy_expr (Micheline.strip_locations p);
-      }
+    Transaction {transaction; location; parameters_ty; parameters}
   in
   fresh_internal_nonce ctxt >>?= fun (ctxt, nonce) ->
   let iop = {source = sc.self; operation; nonce} in

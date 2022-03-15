@@ -149,14 +149,28 @@ let parse_and_cache_script ctxt ~destination ~get_non_cached_script =
       Script_cache.insert ctxt destination (script, ex_script) size
       >>?= fun ctxt -> return (ex_script, ctxt)
 
-let tickets_of_transaction ctxt ~destination ~parameters ~entrypoint =
+let cast_transaction_parameter (type a b) ctxt location
+    (entry_arg_ty : a Script_typed_ir.ty) (parameters_ty : b Script_typed_ir.ty)
+    (parameters : b) : (a * context) tzresult Lwt.t =
+  Gas_monad.run
+    ctxt
+    (Script_ir_translator.ty_eq
+       ~error_details:Informative
+       location
+       entry_arg_ty
+       parameters_ty)
+  >>?= fun (res, ctxt) ->
+  res >>?= fun Script_ir_translator.Eq -> return ((parameters : a), ctxt)
+
+let tickets_of_transaction ctxt ~destination ~entrypoint ~location
+    ~parameters_ty ~parameters =
   match Contract.is_implicit destination with
   | Some _ -> return (None, ctxt)
   | None ->
-      (* TODO: #2351
+      (* TODO: #2653
          Avoid having to load the script from the cache.
-         After internal operations are in place we should be able to use the
-         typed script directly.
+         This is currently in place to avoid regressions for type-checking
+         errors. We should be able to remove it.
       *)
       parse_and_cache_script
         ctxt
@@ -181,22 +195,20 @@ let tickets_of_transaction ctxt ~destination ~parameters ~entrypoint =
       res >>?= fun (Ex_ty_cstr (entry_arg_ty, _f)) ->
       Ticket_scanner.type_has_tickets ctxt entry_arg_ty
       >>?= fun (has_tickets, ctxt) ->
-      (* Load the tickets from the parameters. *)
-      (* TODO: #2350
-         Avoid having to decode and parse the [parameters] node.
-         After internal operations are in place we should be able to use the
-         typed script directly.
-      *)
-      Script.force_decode_in_context
+      (* Check that the parameter's type matches that of the entry-point, and
+         cast the parameter if this is the case. *)
+      cast_transaction_parameter
         ctxt
-        ~consume_deserialization_gas:When_needed
+        location
+        entry_arg_ty
+        parameters_ty
         parameters
-      >>?= fun (expr, ctxt) ->
-      Ticket_scanner.tickets_of_node
+      >>=? fun (parameters, ctxt) ->
+      Ticket_scanner.tickets_of_value
         ~include_lazy:true
         ctxt
         has_tickets
-        (Micheline.root expr)
+        parameters
       >>=? fun (tickets, ctxt) -> return (Some {destination; tickets}, ctxt)
 
 (** Extract tickets of an origination operation by scanning the storage. *)
@@ -247,13 +259,25 @@ let tickets_of_operation ctxt
   match operation with
   | Transaction
       {
-        amount = _;
+        transaction =
+          {
+            amount = _;
+            parameters = _;
+            entrypoint;
+            destination = Destination.Contract destination;
+          };
+        location;
+        parameters_ty;
         parameters;
-        entrypoint;
-        destination = Destination.Contract destination;
       } ->
-      tickets_of_transaction ctxt ~destination ~parameters ~entrypoint
-  | Transaction {destination = Destination.Tx_rollup _; _} ->
+      tickets_of_transaction
+        ctxt
+        ~destination
+        ~entrypoint
+        ~location
+        ~parameters_ty
+        ~parameters
+  | Transaction {transaction = {destination = Destination.Tx_rollup _; _}; _} ->
       (* TODO: #2488
          The ticket accounting for the recipient of rollup transactions
          is currently done in the apply function, but should rather be

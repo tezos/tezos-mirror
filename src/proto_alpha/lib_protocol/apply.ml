@@ -876,16 +876,28 @@ let apply_delegation ~ctxt ~source ~delegate ~since =
   Delegate.set ctxt source delegate >|=? fun ctxt ->
   (ctxt, Delegation_result {consumed_gas = Gas.consumed ~since ~until:ctxt}, [])
 
+type execution_arg =
+  | Typed_arg : Script.location * 'a Script_typed_ir.ty * 'a -> execution_arg
+  | Untyped_arg : Script.expr -> execution_arg
+
 let apply_transaction_to_implicit ~ctxt ~contract ~parameter ~entrypoint
     ~before_operation ~balance_updates ~allocated_destination_contract =
+  let is_unit =
+    match parameter with
+    | Typed_arg (_, Unit_t, ()) -> true
+    | Typed_arg _ -> false
+    | Untyped_arg parameter -> (
+        match Micheline.root parameter with
+        | Prim (_, Michelson_v1_primitives.D_Unit, [], _) -> true
+        | _ -> false)
+  in
   ( (if Entrypoint.is_default entrypoint then Result.return_unit
     else error (Script_tc_errors.No_such_entrypoint entrypoint))
   >>? fun () ->
-    match Micheline.root parameter with
-    | Prim (_, Michelson_v1_primitives.D_Unit, [], _) ->
-        (* Allow [Unit] parameter to non-scripted contracts. *)
-        ok ctxt
-    | _ -> error (Script_interpreter.Bad_contract_parameter contract) )
+    if is_unit then
+      (* Only allow [Unit] parameter to implicit accounts. *)
+      ok ctxt
+    else error (Script_interpreter.Bad_contract_parameter contract) )
   >|? fun ctxt ->
   let result =
     Transaction_result
@@ -928,17 +940,26 @@ let apply_transaction_to_smart_contract ~ctxt ~source ~contract ~amount
       level;
     }
   in
-  Script_interpreter.execute
-    ctxt
-    ~cached_script:(Some script_ir)
-    mode
-    step_constants
-    ~script
-    ~parameter
-    ~entrypoint
-    ~internal
-  >>=? fun ( {ctxt; storage; lazy_storage_diff; operations; ticket_diffs},
-             (updated_cached_script, updated_size) ) ->
+  let execute =
+    match parameter with
+    | Untyped_arg parameter -> Script_interpreter.execute ~parameter
+    | Typed_arg (location, parameter_ty, parameter) ->
+        Script_interpreter.execute_with_typed_parameter
+          ~location
+          ~parameter_ty
+          ~parameter
+  in
+  let cached_script = Some script_ir in
+  execute ctxt ~cached_script mode step_constants ~script ~entrypoint ~internal
+  >>=? fun ( {
+               script = updated_cached_script;
+               code_size = updated_size;
+               storage;
+               lazy_storage_diff;
+               operations;
+               ticket_diffs;
+             },
+             ctxt ) ->
   update_script_storage_and_ticket_balances
     ctxt
     ~self:contract
@@ -974,11 +995,8 @@ let apply_transaction_to_smart_contract ~ctxt ~source ~contract ~amount
       in
       (ctxt, result, operations) )
 
-let apply_transaction ~consume_deserialization_gas ~ctxt ~parameters ~source
-    ~contract ~amount ~entrypoint ~before_operation ~payer ~chain_id ~mode
-    ~internal =
-  Script.force_decode_in_context ~consume_deserialization_gas ctxt parameters
-  >>?= fun (parameter, ctxt) ->
+let apply_transaction ~ctxt ~parameter ~source ~contract ~amount ~entrypoint
+    ~before_operation ~payer ~chain_id ~mode ~internal =
   (match Contract.is_implicit contract with
   | None ->
       (if Tez.(amount = zero) then
@@ -1234,11 +1252,16 @@ let apply_internal_manager_operation_content :
   >>=? fun (ctxt, before_operation, consume_deserialization_gas) ->
   match operation with
   | Transaction
-      {amount; parameters; destination = Contract contract; entrypoint} ->
+      {
+        transaction =
+          {amount; parameters = _; destination = Contract contract; entrypoint};
+        location;
+        parameters_ty;
+        parameters = typed_parameters;
+      } ->
       apply_transaction
-        ~consume_deserialization_gas
         ~ctxt
-        ~parameters
+        ~parameter:(Typed_arg (location, parameters_ty, typed_parameters))
         ~source
         ~contract
         ~amount
@@ -1252,7 +1275,14 @@ let apply_internal_manager_operation_content :
       ( ctxt,
         (manager_result : kind successful_manager_operation_result),
         operations )
-  | Transaction {amount; parameters; destination = Tx_rollup dst; entrypoint} ->
+  | Transaction
+      {
+        transaction =
+          {amount; parameters; destination = Tx_rollup dst; entrypoint};
+        location = _;
+        parameters_ty = _;
+        parameters = _;
+      } ->
       apply_transaction_to_rollup
         ~consume_deserialization_gas
         ~ctxt
@@ -1315,10 +1345,14 @@ let apply_external_manager_operation_content :
           [] )
   | Transaction
       {amount; parameters; destination = Contract contract; entrypoint} ->
-      apply_transaction
+      Script.force_decode_in_context
         ~consume_deserialization_gas
+        ctxt
+        parameters
+      >>?= fun (parameters, ctxt) ->
+      apply_transaction
         ~ctxt
-        ~parameters
+        ~parameter:(Untyped_arg parameters)
         ~source
         ~contract
         ~amount
@@ -1405,25 +1439,26 @@ let apply_external_manager_operation_content :
          this ticket is owns by the tx_rollup *)
       (* Now reconstruct the ticket sent as the parameter
           destination. *)
-      ( Script_ir_translator.parse_comparable_ty ctxt (Micheline.root ty)
+      Script_ir_translator.parse_comparable_ty ctxt (Micheline.root ty)
       >>?= fun (Ex_comparable_ty ty, ctxt) ->
-        Script_ir_translator.parse_comparable_data
-          ctxt
-          ty
-          (Micheline.root contents)
-        >>=? fun (contents, ctxt) ->
-        let amount =
-          Option.value
-            ~default:Script_int.zero_n
-            Script_int.(is_nat @@ of_int64 @@ Tx_rollup_l2_qty.to_int64 amount)
-        in
-        let ticket = Script_typed_ir.{ticketer; contents; amount} in
-        Script_typed_ir.ticket_t Micheline.dummy_location ty >>?= fun ty ->
-        return (ticket, ty, ctxt) >>=? fun (ticket, ticket_ty, ctxt) ->
-        Script_ir_translator.unparse_data ctxt Optimized ticket_ty ticket
-        >|=? fun (parameters, ctxt) ->
-        (Script.lazy_expr (Micheline.strip_locations parameters), ctxt) )
+      Script_ir_translator.parse_comparable_data
+        ctxt
+        ty
+        (Micheline.root contents)
+      >>=? fun (contents, ctxt) ->
+      let amount =
+        Option.value
+          ~default:Script_int.zero_n
+          Script_int.(is_nat @@ of_int64 @@ Tx_rollup_l2_qty.to_int64 amount)
+      in
+      let ticket = Script_typed_ir.{ticketer; contents; amount} in
+      Script_typed_ir.ticket_t Micheline.dummy_location ty >>?= fun ty ->
+      return (ticket, ty, ctxt) >>=? fun (ticket, ticket_ty, ctxt) ->
+      Script_ir_translator.unparse_data ctxt Optimized ticket_ty ticket
       >>=? fun (parameters, ctxt) ->
+      let parameters =
+        Script.lazy_expr (Micheline.strip_locations parameters)
+      in
       (* FIXME/TORU: #2488 the returned op will fail when ticket hardening is
          merged, it must be commented or fixed *)
       let op =
@@ -1435,10 +1470,16 @@ let apply_external_manager_operation_content :
             operation =
               Transaction
                 {
-                  amount = Tez.zero;
-                  parameters;
-                  destination = Contract destination;
-                  entrypoint;
+                  transaction =
+                    {
+                      amount = Tez.zero;
+                      parameters;
+                      destination = Contract destination;
+                      entrypoint;
+                    };
+                  location = Micheline.location ticketer_node;
+                  parameters_ty = ticket_ty;
+                  parameters = ticket;
                 };
           }
       in
@@ -3037,13 +3078,14 @@ let apply_liquidity_baking_subsidy ctxt ~toggle_vote =
              ~entrypoint:Entrypoint.default
              ~internal:false
            >>=? fun ( {
-                        ctxt;
+                        script = updated_cached_script;
+                        code_size = updated_size;
                         storage;
                         lazy_storage_diff;
                         operations;
                         ticket_diffs;
                       },
-                      (updated_cached_script, updated_size) ) ->
+                      ctxt ) ->
            match operations with
            | _ :: _ ->
                (* No internal operations are expected here. Something bad may be happening. *)

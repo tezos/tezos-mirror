@@ -1009,11 +1009,19 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
               let accu = maybe_contract in
               (step [@ocaml.tailcall]) (ctxt, sc) gas k ks accu stack
           | None -> (step [@ocaml.tailcall]) (ctxt, sc) gas k ks None stack)
-      | ITransfer_tokens (_, k) ->
+      | ITransfer_tokens (kinfo, k) ->
           let p = accu in
           let (amount, (Typed_contract {arg_ty; address}, stack)) = stack in
           let {destination; entrypoint} = address in
-          transfer (ctxt, sc) gas amount arg_ty p destination entrypoint
+          transfer
+            (ctxt, sc)
+            gas
+            amount
+            kinfo.iloc
+            arg_ty
+            p
+            destination
+            entrypoint
           >>=? fun (accu, ctxt, gas) ->
           (step [@ocaml.tailcall]) (ctxt, sc) gas k ks accu stack
       | IImplicit_account (_, k) ->
@@ -1704,17 +1712,41 @@ let step logger ctxt step_constants descr stack =
    ====================
 
 *)
-let execute logger ctxt mode step_constants ~entrypoint ~internal
-    unparsed_script cached_script arg :
-    (Script.expr
-    * packed_internal_operation list
-    * context
-    * Lazy_storage.diffs option
-    * ex_script
-    * int
-    * Z.t Ticket_token_map.t)
-    tzresult
-    Lwt.t =
+type execution_arg =
+  | Typed_arg : Script.location * 'a Script_typed_ir.ty * 'a -> execution_arg
+  | Untyped_arg : Script.expr -> execution_arg
+
+let lift_execution_arg (type a) ctxt ~internal (entrypoint_ty : a ty)
+    (box : a -> 'b) arg : ('b * context) tzresult Lwt.t =
+  (match arg with
+  | Untyped_arg arg ->
+      let arg = Micheline.root arg in
+      parse_data ctxt ~legacy:false ~allow_forged:internal entrypoint_ty arg
+  | Typed_arg (location, parsed_arg_ty, parsed_arg) ->
+      Gas_monad.run
+        ctxt
+        (Script_ir_translator.ty_eq
+           ~error_details:Informative
+           location
+           entrypoint_ty
+           parsed_arg_ty)
+      >>?= fun (res, ctxt) ->
+      res >>?= fun Eq ->
+      let parsed_arg : a = parsed_arg in
+      return (parsed_arg, ctxt))
+  >>=? fun (entrypoint_arg, ctxt) -> return (box entrypoint_arg, ctxt)
+
+type execution_result = {
+  script : Script_ir_translator.ex_script;
+  code_size : int;
+  storage : Script.expr;
+  lazy_storage_diff : Lazy_storage.diffs option;
+  operations : packed_internal_operation list;
+  ticket_diffs : Z.t Ticket_token_map.t;
+}
+
+let execute_any_arg logger ctxt mode step_constants ~entrypoint ~internal
+    unparsed_script cached_script arg =
   (match cached_script with
   | None ->
       parse_script
@@ -1742,9 +1774,8 @@ let execute logger ctxt mode step_constants ~entrypoint ~internal
   >>?= fun (Ex_ty_cstr (entrypoint_ty, box)) ->
   trace
     (Bad_contract_parameter step_constants.self)
-    (parse_data ctxt ~legacy:false ~allow_forged:internal entrypoint_ty arg)
+    (lift_execution_arg ctxt ~internal entrypoint_ty box arg)
   >>=? fun (arg, ctxt) ->
-  let arg = box arg in
   Script_ir_translator.collect_lazy_storage ctxt arg_type arg
   >>?= fun (to_duplicate, ctxt) ->
   Script_ir_translator.collect_lazy_storage ctxt storage_type old_storage
@@ -1772,7 +1803,7 @@ let execute logger ctxt mode step_constants ~entrypoint ~internal
     )
   >>=? fun (unparsed_storage, ctxt) ->
   let op_to_couple op = (op.piop, op.lazy_storage_diff) in
-  let (op_elems, op_diffs) =
+  let (operations, op_diffs) =
     ops.elements |> List.map op_to_couple |> List.split
   in
   let lazy_storage_diff_all =
@@ -1808,25 +1839,19 @@ let execute logger ctxt mode step_constants ~entrypoint ~internal
   let (size, cost) = Script_ir_translator.script_size script in
   Gas.consume ctxt cost >>?= fun ctxt ->
   return
-    ( unparsed_storage,
-      op_elems,
-      ctxt,
-      lazy_storage_diff_all,
-      script,
-      size,
-      ticket_diffs )
+    ( {
+        script;
+        code_size = size;
+        storage = unparsed_storage;
+        lazy_storage_diff = lazy_storage_diff_all;
+        operations;
+        ticket_diffs;
+      },
+      ctxt )
 
-type execution_result = {
-  ctxt : context;
-  storage : Script.expr;
-  lazy_storage_diff : Lazy_storage.diffs option;
-  operations : packed_internal_operation list;
-  ticket_diffs : Z.t Ticket_token_map.t;
-}
-
-let execute ?logger ctxt ~cached_script mode step_constants ~script ~entrypoint
-    ~parameter ~internal =
-  execute
+let execute_with_typed_parameter ?logger ctxt ~cached_script mode step_constants
+    ~script ~entrypoint ~parameter_ty ~location ~parameter ~internal =
+  execute_any_arg
     logger
     ctxt
     mode
@@ -1835,16 +1860,20 @@ let execute ?logger ctxt ~cached_script mode step_constants ~script ~entrypoint
     ~internal
     script
     cached_script
-    (Micheline.root parameter)
-  >|=? fun ( storage,
-             operations,
-             ctxt,
-             lazy_storage_diff,
-             ex_script,
-             approx_size,
-             ticket_diffs ) ->
-  ( {ctxt; storage; lazy_storage_diff; operations; ticket_diffs},
-    (ex_script, approx_size) )
+    (Typed_arg (location, parameter_ty, parameter))
+
+let execute ?logger ctxt ~cached_script mode step_constants ~script ~entrypoint
+    ~parameter ~internal =
+  execute_any_arg
+    logger
+    ctxt
+    mode
+    step_constants
+    ~entrypoint
+    ~internal
+    script
+    cached_script
+    (Untyped_arg parameter)
 
 (*
 

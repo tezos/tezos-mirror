@@ -1487,8 +1487,17 @@ and ('input, 'output) view_signature =
       -> ('input, 'output) view_signature
 
 and 'kind manager_operation =
-  | Transaction :
-      Alpha_context.transaction
+  | Transaction : {
+      (* The [transaction.parameters] field may seem useless since we have
+         access to a typed version of the field (with [parameters_ty] and
+         [parameters]), but we keep it so that we do not have to unparse the
+         typed version in order to produce the receipt
+         ([Apply_results.internal_manager_operation]). *)
+      transaction : Alpha_context.transaction;
+      location : Script.location;
+      parameters_ty : 'a ty;
+      parameters : 'a;
+    }
       -> Kind.transaction manager_operation
   | Origination :
       Alpha_context.origination
