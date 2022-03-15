@@ -102,6 +102,7 @@ let pp_round_opt fmt = function
 (** Wrappers around Ledger APDUs. *)
 module Ledger_commands = struct
   let wrap_ledger_cmd f =
+    let open Lwt_tzresult_syntax in
     let buf = Buffer.create 100 in
     let pp =
       Format.make_formatter
@@ -492,12 +493,14 @@ module Ledger_uri = struct
             path)
 
   let if_matches (meta_uri : t) ledger_id cont =
+    let open Lwt_tzresult_syntax in
     match meta_uri with
     | `Ledger l -> if Ledger_id.equal l ledger_id then cont () else return_none
     | `Ledger_account {Ledger_account.ledger; _} ->
         if Ledger_id.equal ledger ledger_id then cont () else return_none
 
   let full_account (ledger_uri : t) =
+    let open Lwt_tzresult_syntax in
     match ledger_uri with
     | `Ledger_account acc -> return acc
     | `Ledger ledger_id ->
@@ -767,7 +770,7 @@ module Signer_implementation : Client_keys.SIGNER = struct
     let* nonce = deterministic_nonce sk msg in
     return (Blake2B.to_bytes (Blake2B.hash_bytes [nonce]))
 
-  let supports_deterministic_nonces _ = return_true
+  let supports_deterministic_nonces _ = Lwt_tzresult_syntax.return_true
 end
 
 (* The Ledger uses a special value 0x00000000 for the “any” chain-id: *)

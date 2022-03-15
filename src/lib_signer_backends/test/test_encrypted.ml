@@ -61,7 +61,7 @@ let fake_ctx () : Client_context.io_wallet =
 
     method prompt : type a. (a, string tzresult) Client_context.lwt_format -> a
         =
-      Format.kasprintf (fun _ -> return "")
+      Format.kasprintf (fun _ -> Lwt.return_ok "")
 
     method prompt_password : type a.
         (a, Bytes.t tzresult) Client_context.lwt_format -> a =
@@ -70,12 +70,12 @@ let fake_ctx () : Client_context.io_wallet =
           match distributed with
           | false ->
               distributed <- true ;
-              return
+              Lwt.return_ok
                 (WithExceptions.Option.get ~loc:__LOC__ @@ List.nth passwords 0)
           | true ->
               i <- (if i = nb_passwds - 1 then 0 else succ i) ;
               distributed <- false ;
-              return
+              Lwt.return_ok
                 (WithExceptions.Option.get ~loc:__LOC__ @@ List.nth passwords i))
 
     method multiple_password_retries = true
@@ -88,11 +88,11 @@ let fake_ctx () : Client_context.io_wallet =
           default:'a ->
           'a Data_encoding.t ->
           'a Tezos_base__TzPervasives.tzresult Lwt.t =
-      fun _ ~default _ -> return default
+      fun _ ~default _ -> Lwt.return_ok default
 
     method load_passwords = None
 
-    method read_file _ = return ""
+    method read_file _ = Lwt.return_ok ""
 
     method with_lock : 'a. (unit -> 'a Lwt.t) -> 'a Lwt.t = fun f -> f ()
 
@@ -102,10 +102,10 @@ let fake_ctx () : Client_context.io_wallet =
           'a ->
           'a Data_encoding.t ->
           unit Tezos_base__TzPervasives.tzresult Lwt.t =
-      fun _ _ _ -> return ()
+      fun _ _ _ -> Lwt.return_ok ()
 
     method last_modification_time : string -> float option tzresult Lwt.t =
-      fun _ -> return_none
+      fun _ -> Lwt_tzresult_syntax.return_none
   end
 
 let make_sk_uris =

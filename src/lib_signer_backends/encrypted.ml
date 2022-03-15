@@ -71,6 +71,7 @@ module Raw = struct
     Bytes.cat salt (Crypto_box.Secretbox.secretbox key msg nonce)
 
   let decrypt algo ~password ~encrypted_sk =
+    let open Lwt_tzresult_syntax in
     let salt = Bytes.sub encrypted_sk 0 salt_len in
     let encrypted_sk = Bytes.sub encrypted_sk salt_len encrypted_size in
     let key = Crypto_box.Secretbox.unsafe_of_bytes (pbkdf ~salt ~password) in
@@ -425,7 +426,7 @@ struct
     let* sk = decrypt C.cctxt sk_uri in
     return (Signature.deterministic_nonce_hash sk buf)
 
-  let supports_deterministic_nonces _ = return_true
+  let supports_deterministic_nonces _ = Lwt_tzresult_syntax.return_true
 end
 
 let encrypt_pvss_key cctxt sk =

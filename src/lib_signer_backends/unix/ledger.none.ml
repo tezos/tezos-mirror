@@ -52,21 +52,23 @@ module Signer_implementation : Client_keys.SIGNER = struct
     "In order to communicate with a Ledger Nano, recompile with \
      ledgerwallet-tezos library installed"
 
-  let neuterize _sk = fail NoLedgerSupport
+  let neuterize _sk = Lwt_tzresult_syntax.fail NoLedgerSupport
 
-  let public_key _sk_uri = fail NoLedgerSupport
+  let public_key _sk_uri = Lwt_tzresult_syntax.fail NoLedgerSupport
 
-  let public_key_hash _sk_uri = fail NoLedgerSupport
+  let public_key_hash _sk_uri = Lwt_tzresult_syntax.fail NoLedgerSupport
 
-  let import_secret_key ~io:_ _pk_uri = fail NoLedgerSupport
+  let import_secret_key ~io:_ _pk_uri = Lwt_tzresult_syntax.fail NoLedgerSupport
 
-  let sign ?watermark:_k _sk_uri _msg = fail NoLedgerSupport
+  let sign ?watermark:_k _sk_uri _msg = Lwt_tzresult_syntax.fail NoLedgerSupport
 
-  let deterministic_nonce _sk_uri _msg = fail NoLedgerSupport
+  let deterministic_nonce _sk_uri _msg =
+    Lwt_tzresult_syntax.fail NoLedgerSupport
 
-  let deterministic_nonce_hash _sk_uri _msg = fail NoLedgerSupport
+  let deterministic_nonce_hash _sk_uri _msg =
+    Lwt_tzresult_syntax.fail NoLedgerSupport
 
-  let supports_deterministic_nonces _ = return_false
+  let supports_deterministic_nonces _ = Lwt_tzresult_syntax.return_false
 end
 
 let commands () = []
