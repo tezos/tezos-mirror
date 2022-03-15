@@ -227,7 +227,7 @@ module Block = struct
     |> RPC_directory.prefix RPC_path.(open_root / "block" /: Arg.block_id)
 end
 
-module Context = struct
+module Context_RPC = struct
   open Lwt_tzresult_syntax
 
   let path = RPC_path.open_root
@@ -449,11 +449,42 @@ module Context = struct
     |> RPC_directory.prefix RPC_path.(open_root / "context" /: Arg.context_id)
 end
 
+module Injection = struct
+  let path = RPC_path.(open_root / "injection")
+
+  let directory : Batcher.state RPC_directory.t ref = ref RPC_directory.empty
+
+  let register service f =
+    directory := RPC_directory.register !directory service f
+
+  let build_directory state =
+    match state.State.batcher_state with
+    | None -> RPC_directory.empty
+    | Some batcher_state ->
+        !directory |> RPC_directory.map (fun () -> Lwt.return batcher_state)
+
+  let transaction =
+    RPC_service.post_service
+      ~description:"Inject an L2 tranasction in the queue of the rollup node."
+      ~query:RPC_query.empty
+      ~input:L2_transaction.encoding
+      ~output:Data_encoding.unit
+      RPC_path.(path / "transaction")
+
+  let () =
+    register transaction (fun state () transaction ->
+        Batcher.register_transaction state transaction)
+end
+
 let register state =
   List.fold_left
     (fun dir f -> RPC_directory.merge dir (f state))
     RPC_directory.empty
-    [Block.build_directory; Context.build_directory]
+    [
+      Block.build_directory;
+      Context_RPC.build_directory;
+      Injection.build_directory;
+    ]
 
 let launch ~host ~acl ~node ~dir () =
   RPC_server.launch ~media_types:Media_type.all_media_types ~host ~acl node dir
