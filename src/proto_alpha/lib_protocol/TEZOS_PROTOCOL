@@ -183,6 +183,8 @@
         "Tx_rollup_services",
         "Alpha_services",
 
+        "Merkle_list",
+
         "Main"
     ]
 }
