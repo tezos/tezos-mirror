@@ -60,8 +60,7 @@ let do_compile hash p =
   | Ok () -> (
       let compiler_command =
         ( Sys.executable_name,
-          Array.of_list
-            [compiler_name; "-register"; "-o"; plugin_file; source_dir] )
+          [|compiler_name; "-register"; "-o"; plugin_file; source_dir|] )
       in
       let fd = Unix.(openfile log_file [O_WRONLY; O_CREAT; O_TRUNC] 0o644) in
       let* s =
