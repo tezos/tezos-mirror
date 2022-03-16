@@ -57,8 +57,8 @@ let date =
 
 let parse_version s = Tezos_version_parser.version_tag (Lexing.from_string s)
 
-(* This string is substituted by git export-subst. *)
-let raw_current_version = "$Format:%(describe)$"
+(* The $Format string is substituted by git with attributes and export-subst *)
+let raw_current_version = "$Format:%(describe:tags)$"
 
 (* Deduce the version either from the a git tag ( in a specific format )
    or from two env variables set by opam, OPAM_PACKAGE_VERSION or in the
@@ -83,7 +83,7 @@ let git_describe =
   let s =
     (* here we use the same trick as in src/lib_version/current_git_info.ml
      * so we concatenate the two strings to avoid the subsitution *)
-    if String.equal raw_current_version ("$Format" ^ ":%(describe)$") then
+    if String.equal raw_current_version ("$Format" ^ ":%(describe:tags)$") then
       query ~env:"GIT_VERSION" ~default:"dev" "git describe --tags"
     else raw_current_version
   in
