@@ -1049,7 +1049,7 @@ module Interpreter_tests = struct
      let open Script_typed_ir in
      let state_ty = sapling_state_t ~memo_size in
      pair_t (-1) state_ty state_ty)
-    >>??= fun tytype ->
+    >>??= fun (Ty_ex_c tytype) ->
     Script_ir_translator.parse_storage
       ctx_without_gas
       ~legacy:true

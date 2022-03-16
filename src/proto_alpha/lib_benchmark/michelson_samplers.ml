@@ -382,7 +382,7 @@ end)
             let* (Ex_ty right) = m_type ~size:rsize in
             match pair_t (-1) left right with
             | Error _ -> assert false
-            | Ok res_ty -> return @@ Ex_ty res_ty)
+            | Ok (Ty_ex_c res_ty) -> return @@ Ex_ty res_ty)
         | `TLambda -> (
             let* (lsize, rsize) = pick_split (size - 1) in
             let* (Ex_ty domain) = m_type ~size:lsize in
@@ -396,7 +396,7 @@ end)
             let* (Ex_ty right) = m_type ~size:rsize in
             match union_t (-1) left right with
             | Error _ -> assert false
-            | Ok res_ty -> return @@ Ex_ty res_ty)
+            | Ok (Ty_ex_c res_ty) -> return @@ Ex_ty res_ty)
         | `TOption -> (
             let* (Ex_ty t) = m_type ~size:(size - 1) in
             match option_t (-1) t with
@@ -556,18 +556,18 @@ end)
         | Bool_t -> Base_samplers.uniform_bool
         | Address_t -> address
         | Tx_rollup_l2_address_t -> tx_rollup_l2_address
-        | Pair_t (left_t, right_t, _) ->
+        | Pair_t (left_t, right_t, _, _) ->
             M.(
               let* left_v = value left_t in
               let* right_v = value right_t in
               return (left_v, right_v))
-        | Union_t (left_t, right_t, _) ->
+        | Union_t (left_t, right_t, _, _) ->
             fun rng_state ->
               if Base_samplers.uniform_bool rng_state then
                 L (value left_t rng_state)
               else R (value right_t rng_state)
         | Lambda_t (arg_ty, ret_ty, _) -> generate_lambda arg_ty ret_ty
-        | Option_t (ty, _) ->
+        | Option_t (ty, _, _) ->
             fun rng_state ->
               if Base_samplers.uniform_bool rng_state then None
               else Some (value ty rng_state)

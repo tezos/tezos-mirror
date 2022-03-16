@@ -785,7 +785,7 @@ let test_diffs_args_storage_and_lazy_diffs () =
   let*? int_ticket_big_map_ty =
     big_map_type ~key_type:int_key ~value_type:ticket_string_type
   in
-  let*? list_big_map_pair_type =
+  let*? (Ty_ex_c list_big_map_pair_type) =
     Environment.wrap_tzresult
     @@ pair_t (-1) ticket_string_list_type int_ticket_big_map_ty
   in

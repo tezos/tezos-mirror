@@ -2043,12 +2043,12 @@ module RPC = struct
         | Contract_t (ut, _meta) ->
             let t = unparse_ty ~loc ut in
             return (T_contract, [t], [])
-        | Pair_t (utl, utr, _meta) ->
+        | Pair_t (utl, utr, _meta, _) ->
             let annot = [] in
             let tl = unparse_ty ~loc utl in
             let tr = unparse_ty ~loc utr in
             return (T_pair, [tl; tr], annot)
-        | Union_t (utl, utr, _meta) ->
+        | Union_t (utl, utr, _meta, _) ->
             let annot = [] in
             let tl = unparse_ty ~loc utl in
             let tr = unparse_ty ~loc utr in
@@ -2057,7 +2057,7 @@ module RPC = struct
             let ta = unparse_ty ~loc uta in
             let tr = unparse_ty ~loc utr in
             return (T_lambda, [ta; tr], [])
-        | Option_t (ut, _meta) ->
+        | Option_t (ut, _meta, _) ->
             let annot = [] in
             let ut = unparse_ty ~loc ut in
             return (T_option, [ut], annot)

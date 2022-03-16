@@ -188,8 +188,10 @@ let rec dummy_type_generator ~rng_state size =
   if size <= 1 then ticket_or_int
   else
     match (ticket_or_int, dummy_type_generator ~rng_state (size - 3)) with
-    | (Ex_ty l, Ex_ty r) ->
-        Ex_ty (match pair_t (-1) l r with Error _ -> assert false | Ok t -> t)
+    | (Ex_ty l, Ex_ty r) -> (
+        match pair_t (-1) l r with
+        | Error _ -> assert false
+        | Ok (Ty_ex_c t) -> Ex_ty t)
 
 (** A benchmark for {!Ticket_costs.Constants.cost_has_tickets_of_ty}. *)
 module Has_tickets_type_benchmark : Benchmark.S = struct

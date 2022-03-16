@@ -90,13 +90,14 @@ let ty_traverse_f =
     | Bls12_381_fr_t -> ret_succ_adding accu base_basic
     | Chest_key_t -> ret_succ_adding accu base_basic
     | Chest_t -> ret_succ_adding accu base_basic
-    | Pair_t (_ty1, _ty2, a) ->
-        ret_succ_adding accu @@ (base_compound a +! (word_size *? 2))
-    | Union_t (_ty1, _ty2, a) ->
-        ret_succ_adding accu @@ (base_compound a +! (word_size *? 2))
+    | Pair_t (_ty1, _ty2, a, _) ->
+        ret_succ_adding accu @@ (base_compound a +! (word_size *? 3))
+    | Union_t (_ty1, _ty2, a, _) ->
+        ret_succ_adding accu @@ (base_compound a +! (word_size *? 3))
     | Lambda_t (_ty1, _ty2, a) ->
         ret_succ_adding accu @@ (base_compound a +! (word_size *? 2))
-    | Option_t (_ty, a) -> ret_succ_adding accu @@ (base_compound a +! word_size)
+    | Option_t (_ty, a, _) ->
+        ret_succ_adding accu @@ (base_compound a +! (word_size *? 2))
     | List_t (_ty, a) -> ret_succ_adding accu @@ (base_compound a +! word_size)
     | Set_t (_cty, a) -> ret_succ_adding accu @@ (base_compound a +! word_size)
     | Map_t (_cty, _ty, a) ->
@@ -285,11 +286,11 @@ let rec value_size :
     | Tx_rollup_l2_address_t ->
         ret_succ_adding accu (tx_rollup_l2_address_size x)
     | Bool_t -> ret_succ accu
-    | Pair_t (_, _, _) -> ret_succ_adding accu h2w
-    | Union_t (_, _, _) -> ret_succ_adding accu h1w
+    | Pair_t (_, _, _, _) -> ret_succ_adding accu h2w
+    | Union_t (_, _, _, _) -> ret_succ_adding accu h1w
     | Lambda_t (_, _, _) ->
         (lambda_size [@ocaml.tailcall]) ~count_lambda_nodes (ret_succ accu) x
-    | Option_t (_, _) -> ret_succ_adding accu (option_size (fun _ -> !!0) x)
+    | Option_t (_, _, _) -> ret_succ_adding accu (option_size (fun _ -> !!0) x)
     | List_t (_, _) -> ret_succ_adding accu (h2w +! (h2w *? x.length))
     | Set_t (_, _) ->
         let module M = (val Script_set.get x) in
@@ -433,11 +434,8 @@ and kinstr_size :
     | ISwap (kinfo, _) -> ret_succ_adding accu (base kinfo)
     | IConst (kinfo, x, k) ->
         let accu = ret_succ_adding accu (base kinfo +! word_size) in
-        (value_size [@ocaml.tailcall])
-          ~count_lambda_nodes
-          accu
-          (L (stack_top_ty (kinfo_of_kinstr k).kstack_ty))
-          x
+        let (Ty_ex_c top_ty) = stack_top_ty (kinfo_of_kinstr k).kstack_ty in
+        (value_size [@ocaml.tailcall]) ~count_lambda_nodes accu (L top_ty) x
     | ICons_pair (kinfo, _) -> ret_succ_adding accu (base kinfo)
     | ICar (kinfo, _) -> ret_succ_adding accu (base kinfo)
     | ICdr (kinfo, _) -> ret_succ_adding accu (base kinfo)

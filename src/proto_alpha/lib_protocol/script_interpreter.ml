@@ -1084,7 +1084,8 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
                               kinstr;
                             },
                             _script_view ) -> (
-                          pair_t kloc input_ty storage_type >>?= fun pair_ty ->
+                          pair_t kloc input_ty storage_type
+                          >>?= fun (Ty_ex_c pair_ty) ->
                           let io_ty =
                             let open Gas_monad.Syntax in
                             let* out_eq =

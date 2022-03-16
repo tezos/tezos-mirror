@@ -469,7 +469,7 @@ let apply ctxt gas capture_ty capture lam =
   let loc = Micheline.dummy_location in
   unparse_ty ~loc ctxt capture_ty >>?= fun (ty_expr, ctxt) ->
   match full_arg_ty with
-  | Pair_t (capture_ty, arg_ty, _) ->
+  | Pair_t (capture_ty, arg_ty, _, _) ->
       let arg_stack_ty = Item_t (arg_ty, Bot_t) in
       let full_descr =
         {
@@ -532,7 +532,7 @@ let transfer (ctxt, sc) gas amount location parameters_ty parameters destination
     | Tx_rollup _ -> (
         let open Micheline in
         match tp with
-        | Pair_t (Ticket_t (tp, _), _, _) ->
+        | Pair_t (Ticket_t (tp, _), _, _, _) ->
             Script_ir_translator.unparse_comparable_ty
               ~loc:dummy_location
               ctxt

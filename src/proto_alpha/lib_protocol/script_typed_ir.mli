@@ -1327,6 +1327,8 @@ and logger = {
           produced. *)
 }
 
+and to_be_replaced = unit
+
 (* ---- Auxiliary types -----------------------------------------------------*)
 and 'ty ty =
   | Unit_t : unit ty
@@ -1342,12 +1344,16 @@ and 'ty ty =
   | Address_t : address ty
   | Tx_rollup_l2_address_t : tx_rollup_l2_address ty
   | Bool_t : bool ty
-  | Pair_t : 'a ty * 'b ty * ('a, 'b) pair ty_metadata -> ('a, 'b) pair ty
-  | Union_t : 'a ty * 'b ty * ('a, 'b) union ty_metadata -> ('a, 'b) union ty
+  | Pair_t :
+      'a ty * 'b ty * ('a, 'b) pair ty_metadata * to_be_replaced
+      -> ('a, 'b) pair ty
+  | Union_t :
+      'a ty * 'b ty * ('a, 'b) union ty_metadata * to_be_replaced
+      -> ('a, 'b) union ty
   | Lambda_t :
       'arg ty * 'ret ty * ('arg, 'ret) lambda ty_metadata
       -> ('arg, 'ret) lambda ty
-  | Option_t : 'v ty * 'v option ty_metadata -> 'v option ty
+  | Option_t : 'v ty * 'v option ty_metadata * to_be_replaced -> 'v option ty
   | List_t : 'v ty * 'v boxed_list ty_metadata -> 'v boxed_list ty
   | Set_t : 'v comparable_ty * 'v set ty_metadata -> 'v set ty
   | Map_t :
@@ -1540,6 +1546,8 @@ val ty_size : 'a ty -> 'a Type_size.t
 
 val comparable_ty_size : 'a comparable_ty -> 'a Type_size.t
 
+type 'v ty_ex_c = Ty_ex_c : 'v ty -> 'v ty_ex_c [@@ocaml.unboxed]
+
 val unit_key : unit comparable_ty
 
 val never_key : never comparable_ty
@@ -1618,9 +1626,10 @@ val tx_rollup_l2_address_t : tx_rollup_l2_address ty
 
 val bool_t : bool ty
 
-val pair_t : Script.location -> 'a ty -> 'b ty -> ('a, 'b) pair ty tzresult
+val pair_t : Script.location -> 'a ty -> 'b ty -> ('a, 'b) pair ty_ex_c tzresult
 
-val union_t : Script.location -> 'a ty -> 'b ty -> ('a, 'b) union ty tzresult
+val union_t :
+  Script.location -> 'a ty -> 'b ty -> ('a, 'b) union ty_ex_c tzresult
 
 val union_bytes_bool_t : (Bytes.t, bool) union ty
 
@@ -1736,4 +1745,4 @@ type 'a value_traverse = {
 val value_traverse :
   ('t ty, 't comparable_ty) union -> 't -> 'r -> 'r value_traverse -> 'r
 
-val stack_top_ty : ('a, 'b * 's) stack_ty -> 'a ty
+val stack_top_ty : ('a, 'b * 's) stack_ty -> 'a ty_ex_c

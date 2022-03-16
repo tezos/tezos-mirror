@@ -163,13 +163,13 @@ module Ticket_inspection = struct
     | Address_t -> (k [@ocaml.tailcall]) False_ht
     | Tx_rollup_l2_address_t -> (k [@ocaml.tailcall]) False_ht
     | Bool_t -> (k [@ocaml.tailcall]) False_ht
-    | Pair_t (ty1, ty2, _) ->
+    | Pair_t (ty1, ty2, _, _) ->
         (has_tickets_of_pair [@ocaml.tailcall])
           ty1
           ty2
           ~pair:(fun ht1 ht2 -> Pair_ht (ht1, ht2))
           k
-    | Union_t (ty1, ty2, _) ->
+    | Union_t (ty1, ty2, _, _) ->
         (has_tickets_of_pair [@ocaml.tailcall])
           ty1
           ty2
@@ -179,7 +179,7 @@ module Ticket_inspection = struct
         (* As of H, closures cannot contain tickets because APPLY requires
            a packable type and tickets are not packable. *)
         (k [@ocaml.tailcall]) False_ht
-    | Option_t (ty, _) ->
+    | Option_t (ty, _, _) ->
         (has_tickets_of_ty [@ocaml.tailcall]) ty (fun ht ->
             let opt_hty = map_has_tickets (fun ht -> Option_ht ht) ht in
             (k [@ocaml.tailcall]) opt_hty)
@@ -322,7 +322,7 @@ module Ticket_collection = struct
     consume_gas_steps ctxt ~num_steps:1 >>?= fun ctxt ->
     match (hty, ty) with
     | (False_ht, _) -> (k [@ocaml.tailcall]) ctxt acc
-    | (Pair_ht (hty1, hty2), Pair_t (ty1, ty2, _)) ->
+    | (Pair_ht (hty1, hty2), Pair_t (ty1, ty2, _, _)) ->
         let (l, r) = x in
         (tickets_of_value [@ocaml.tailcall])
           ~include_lazy
@@ -340,7 +340,7 @@ module Ticket_collection = struct
               r
               acc
               k)
-    | (Union_ht (htyl, htyr), Union_t (tyl, tyr, _)) -> (
+    | (Union_ht (htyl, htyr), Union_t (tyl, tyr, _, _)) -> (
         match x with
         | L v ->
             (tickets_of_value [@ocaml.tailcall])
@@ -360,7 +360,7 @@ module Ticket_collection = struct
               v
               acc
               k)
-    | (Option_ht el_hty, Option_t (el_ty, _)) -> (
+    | (Option_ht el_hty, Option_t (el_ty, _, _)) -> (
         match x with
         | Some x ->
             (tickets_of_value [@ocaml.tailcall])
