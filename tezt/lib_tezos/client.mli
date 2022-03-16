@@ -479,15 +479,6 @@ val spawn_show_address : alias:string -> t -> Process.t
     The default value for [alias] is a fresh alias of the form [tezt_<n>]. *)
 val gen_keys : ?alias:string -> t -> string Lwt.t
 
-(** Run [tezos-client bls gen keys] and return the key alias.
-
-    The default value for [alias] is a fresh alias of the form [tezt_<n>]. *)
-val bls_gen_keys : ?alias:string -> t -> string Lwt.t
-
-(** Run [tezos-client bls show address <alias> --show-secret] and
-    parse the output into an [Account.key]. *)
-val bls_show_address : alias:string -> t -> Account.key Lwt.t
-
 (** A helper to run [tezos-client gen keys] followed by
     [tezos-client show address] to get the generated key. *)
 val gen_and_show_keys : ?alias:string -> t -> Account.key Lwt.t

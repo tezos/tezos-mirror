@@ -624,56 +624,6 @@ let gen_keys ?alias client =
   let* () = Process.check p in
   return alias
 
-let spawn_bls_gen_keys =
-  let id = ref 0 in
-  fun ?alias client ->
-    let alias =
-      match alias with
-      | None ->
-          incr id ;
-          sf "tezt_%d" !id
-      | Some alias -> alias
-    in
-    (spawn_command client ["bls"; "gen"; "keys"; alias], alias)
-
-let bls_gen_keys ?alias client =
-  let (p, alias) = spawn_bls_gen_keys ?alias client in
-  let* () = Process.check p in
-  return alias
-
-let spawn_bls_show_address ~alias client =
-  spawn_command client ["bls"; "show"; "address"; alias]
-
-let bls_show_address ~alias client =
-  let extract_key (client_output : string) : Account.key =
-    let public_key_hash =
-      (* group of letters and digits after "Hash: "
-         e.g. "ta16aKTrTWiK1TRfKs4SbG8V3WWJCyjGsLm5" *)
-      client_output =~* rex "Hash: ?(\\w*)" |> mandatory "public key hash"
-    in
-    let public_key =
-      (* group of letters and digits after "Public Key: "
-         e.g. "BLpk1xn3cBTrYSVsneqdASwY91UEnWFfGtdtkWZwqckVbw4dLsDui5L4tucwork2nU6TcebtsAHj"
-      *)
-      client_output =~* rex "Public Key: ?(\\w*)" |> mandatory "public key"
-    in
-    let sk =
-      (* group of letters and digits after "Secret Key:
-         aggregate_unencrypted:"
-         e.g. "BLsk2CVe1n76DKmopRiFQEkiqSfCzX5RAXb4hh1jF9WB93T3DNggw3"
-         Note: The tests only use unencrypted keys for the moment. If
-         this changes, please update secret key parsing. *)
-      client_output
-      =~* rex "Secret Key: aggregate_unencrypted:?(\\w*)"
-      |> mandatory "secret key"
-    in
-    {alias; public_key_hash; public_key; secret_key = Unencrypted sk}
-  in
-  let* output =
-    spawn_bls_show_address ~alias client |> Process.check_and_read_stdout
-  in
-  return @@ extract_key output
-
 let spawn_show_address ~alias client =
   spawn_command client ["show"; "address"; alias; "--show-secret"]
 
