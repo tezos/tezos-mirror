@@ -141,9 +141,9 @@ module Handle_operations = struct
       let* (tree, pair_blocks_opt, old_mempool) =
         Generators_tree.tree_gen ?blocks:None ()
       in
-      let* live_blocks =
-        sublist (Tree.values tree)
-        >|= List.map (fun (blk : Block.t) -> blk.hash)
+      let* live_blocks = sublist (Tree.values tree) in
+      let live_blocks =
+        List.map (fun (blk : Block.t) -> blk.hash) live_blocks
       in
       return
         (tree, pair_blocks_opt, old_mempool, Block_hash.Set.of_list live_blocks)
@@ -365,9 +365,8 @@ module Recyle_operations = struct
       to test the typical use case. *)
   let gen =
     let open QCheck2.Gen in
-    let* blocks =
-      Generators_tree.unique_nonempty_block_gen >|= Block.set_to_list
-    in
+    let* blocks = Generators_tree.unique_nonempty_block_gen in
+    let blocks = Block.set_to_list blocks in
     assert (blocks <> []) ;
     let to_ops (blk : Block.t) = List.concat blk.operations in
     let oph_op_list_to_map l = List.to_seq l |> Op_map.of_seq in
@@ -376,7 +375,6 @@ module Recyle_operations = struct
       |> List.map (fun op -> (op.Prevalidation.hash, op))
       |> oph_op_list_to_map
     in
-    let both f (a, b) = (f a, f b) in
     let blocks_hashes = List.map Block.to_hash blocks in
     let block_hash_t =
       (* For classification and pending, put 50% of them in live_blocks.
@@ -388,12 +386,18 @@ module Recyle_operations = struct
       (* For classification and pending, we want operations that are NOT in
          the blocks already. Hence: *)
       Generators.op_map_gen ~block_hash_t ()
-      >|= Op_map.filter (fun oph _ -> not (Op_map.mem oph blocks_ops))
+    in
+    let classification_pendings_ops =
+      Op_map.filter
+        (fun oph _ -> not (Op_map.mem oph blocks_ops))
+        classification_pendings_ops
     in
     let* (classification_ops, pending_ops) =
       Op_map.bindings classification_pendings_ops
-      |> Generators_tree.split_in_two >|= both oph_op_list_to_map
+      |> Generators_tree.split_in_two
     in
+    let classification_ops = oph_op_list_to_map classification_ops in
+    let pending_ops = oph_op_list_to_map pending_ops in
     let* (tree, from_to, _) = Generators_tree.tree_gen ~blocks () in
     let+ classification = classification_of_ops_gen classification_ops in
     (tree, from_to, classification, pending_ops)

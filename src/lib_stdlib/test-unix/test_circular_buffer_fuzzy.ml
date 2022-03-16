@@ -126,13 +126,13 @@ let rec ops_gen acc i =
     let open QCheck in
     let open Gen in
     ops_gen
-      ( acc >>= fun (nb_writes, ops) ->
-        let gen = if nb_writes > 0 then op else write_op in
-        map
-          (fun op ->
-            let delta = match op with Write _ -> 1 | Read _ -> -1 in
-            (nb_writes + delta, op :: ops))
-          gen )
+      (let* (nb_writes, ops) = acc in
+       let gen = if nb_writes > 0 then op else write_op in
+       map
+         (fun op ->
+           let delta = match op with Write _ -> 1 | Read _ -> -1 in
+           (nb_writes + delta, op :: ops))
+         gen)
       (i - 1)
 
 (* Scenarios start with a write operation. *)
@@ -147,7 +147,9 @@ let values =
      - quick execution
   *)
   let size_gen = Gen.int_range 0 1000 in
-  Gen.(size_gen >>= ops_gen)
+  Gen.(
+    let* size = size_gen in
+    ops_gen size)
 
 let values = QCheck.make ~print:(Format.asprintf "%a" pp) values
 

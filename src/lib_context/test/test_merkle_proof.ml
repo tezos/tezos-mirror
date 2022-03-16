@@ -62,9 +62,10 @@ module Proof32 (Encoding : Tezos_context_sigs.Context.PROOF_ENCODING) = struct
 
     let inode width gen_a =
       let* length = int_range 1 1000_000 in
+      let* n = int_bound (min 32 (max 5 width) - 1) in
+      let n = n + 1 in
+      let* indices = comb n (Stdlib.List.init 32 (fun x -> x)) in
       let+ proofs =
-        let* n = int_bound (min 32 (max 5 width) - 1) >|= ( + ) 1 in
-        let* indices = comb n (Stdlib.List.init 32 (fun x -> x)) in
         flatten_l
         @@ List.map
              (fun i ->
@@ -76,7 +77,7 @@ module Proof32 (Encoding : Tezos_context_sigs.Context.PROOF_ENCODING) = struct
 
     let inode_extender gen_a =
       let* length = int_range 1 10 in
-      let* segment = list_size (int_bound 5 >|= ( + ) 1) (int_bound 4) in
+      let* segment = list_size (map succ (int_bound 5)) (int_bound 4) in
       let+ proof = gen_a in
       {length; segment; proof}
 
@@ -85,14 +86,15 @@ module Proof32 (Encoding : Tezos_context_sigs.Context.PROOF_ENCODING) = struct
         let+ hash = hash in
         Blinded_inode hash
       else
-        int_bound 3 >>= function
+        let* i = int_bound 3 in
+        match i with
         | 0 ->
             let+ hash = hash in
             Blinded_inode hash
         | 1 ->
             let+ xs =
               list_size
-                (int_bound 3 >|= ( + ) 1)
+                (map succ (int_bound 3))
                 (pair step (tree (depth - 1, width)))
             in
             Inode_values xs
@@ -106,7 +108,8 @@ module Proof32 (Encoding : Tezos_context_sigs.Context.PROOF_ENCODING) = struct
 
     and tree (depth, width) : tree t =
       if depth <= 0 then
-        int_bound 2 >>= function
+        let* i = int_bound 2 in
+        match i with
         | 0 ->
             let+ v = value in
             (Value v : tree)
@@ -118,7 +121,8 @@ module Proof32 (Encoding : Tezos_context_sigs.Context.PROOF_ENCODING) = struct
             Blinded_node h
         | _ -> assert false
       else
-        int_bound 5 >>= function
+        let* i = int_bound 5 in
+        match i with
         | 0 ->
             let+ v = value in
             (Value v : tree)
@@ -127,7 +131,7 @@ module Proof32 (Encoding : Tezos_context_sigs.Context.PROOF_ENCODING) = struct
             Blinded_value h
         | 2 ->
             let+ xs =
-              list_size (int_bound 4 >|= ( + ) 1)
+              list_size (map succ (int_bound 4))
               @@ pair step (tree (depth - 1, width))
             in
             (Node xs : tree)
@@ -144,7 +148,7 @@ module Proof32 (Encoding : Tezos_context_sigs.Context.PROOF_ENCODING) = struct
 
     let kinded_hash =
       let* h = hash in
-      bool >|= function true -> `Value h | false -> `Node h
+      oneofl [`Value h; `Node h]
 
     let tree_proof =
       let* version = int_bound 3 in
@@ -157,13 +161,14 @@ module Proof32 (Encoding : Tezos_context_sigs.Context.PROOF_ENCODING) = struct
       open Stream
 
       let elt =
-        int_bound 3 >>= function
+        let* i = int_bound 3 in
+        match i with
         | 0 ->
             let+ v = value in
             Value v
         | 1 ->
             let+ sks =
-              list_size (int_bound 4 >|= ( + ) 1) @@ pair step kinded_hash
+              list_size (map succ (int_bound 4)) @@ pair step kinded_hash
             in
             Node sks
         | 2 ->
@@ -176,7 +181,7 @@ module Proof32 (Encoding : Tezos_context_sigs.Context.PROOF_ENCODING) = struct
         | _ -> assert false
 
       let t : Stream.t Gen.t =
-        let+ xs = list_size (int_bound 10 >|= ( + ) 1) elt in
+        let+ xs = list_size (map succ (int_bound 10)) elt in
         List.to_seq xs
     end
 
@@ -288,9 +293,10 @@ module Proof2 (Encoding : Tezos_context_sigs.Context.PROOF_ENCODING) = struct
 
     let inode _width gen_a =
       let* length = int_range 1 1000_000 in
+      let* n = int_bound 1 in
+      let n = n + 1 in
+      let* indices = comb n [0; 1] in
       let+ proofs =
-        let* n = int_bound 1 >|= ( + ) 1 in
-        let* indices = comb n [0; 1] in
         flatten_l
         @@ List.map
              (fun i ->
@@ -302,7 +308,7 @@ module Proof2 (Encoding : Tezos_context_sigs.Context.PROOF_ENCODING) = struct
 
     let inode_extender gen_a =
       let* length = int_range 1 10 in
-      let* segment = list_size (int_bound 5 >|= ( + ) 1) (int_bound 1) in
+      let* segment = list_size (map succ (int_bound 5)) (int_bound 1) in
       let+ proof = gen_a in
       {length; segment; proof}
 
@@ -311,14 +317,15 @@ module Proof2 (Encoding : Tezos_context_sigs.Context.PROOF_ENCODING) = struct
         let+ hash = hash in
         Blinded_inode hash
       else
-        int_bound 3 >>= function
+        let* i = int_bound 3 in
+        match i with
         | 0 ->
             let+ hash = hash in
             Blinded_inode hash
         | 1 ->
             let+ xs =
               list_size
-                (int_bound 3 >|= ( + ) 1)
+                (map succ (int_bound 3))
                 (pair step (tree (depth - 1, width)))
             in
             Inode_values xs
@@ -332,7 +339,8 @@ module Proof2 (Encoding : Tezos_context_sigs.Context.PROOF_ENCODING) = struct
 
     and tree (depth, width) : tree t =
       if depth <= 0 then
-        int_bound 2 >>= function
+        let* i = int_bound 2 in
+        match i with
         | 0 ->
             let+ v = value in
             (Value v : tree)
@@ -344,7 +352,8 @@ module Proof2 (Encoding : Tezos_context_sigs.Context.PROOF_ENCODING) = struct
             Blinded_node h
         | _ -> assert false
       else
-        int_bound 5 >>= function
+        let* i = int_bound 5 in
+        match i with
         | 0 ->
             let+ v = value in
             (Value v : tree)
@@ -353,7 +362,7 @@ module Proof2 (Encoding : Tezos_context_sigs.Context.PROOF_ENCODING) = struct
             Blinded_value h
         | 2 ->
             let+ xs =
-              list_size (int_bound 4 >|= ( + ) 1)
+              list_size (map succ (int_bound 4))
               @@ pair step (tree (depth - 1, width))
             in
             (Node xs : tree)
@@ -370,7 +379,7 @@ module Proof2 (Encoding : Tezos_context_sigs.Context.PROOF_ENCODING) = struct
 
     let kinded_hash =
       let* h = hash in
-      bool >|= function true -> `Value h | false -> `Node h
+      oneofl [`Value h; `Node h]
 
     let tree_proof =
       let* version = int_bound 3 in
@@ -383,13 +392,14 @@ module Proof2 (Encoding : Tezos_context_sigs.Context.PROOF_ENCODING) = struct
       open Stream
 
       let elt =
-        int_bound 3 >>= function
+        let* i = int_bound 3 in
+        match i with
         | 0 ->
             let+ v = value in
             Value v
         | 1 ->
             let+ sks =
-              list_size (int_bound 4 >|= ( + ) 1) @@ pair step kinded_hash
+              list_size (map succ (int_bound 4)) @@ pair step kinded_hash
             in
             Node sks
         | 2 ->
@@ -402,7 +412,7 @@ module Proof2 (Encoding : Tezos_context_sigs.Context.PROOF_ENCODING) = struct
         | _ -> assert false
 
       let t : Stream.t Gen.t =
-        let+ xs = list_size (int_bound 10 >|= ( + ) 1) elt in
+        let+ xs = list_size (map succ (int_bound 10)) elt in
         List.to_seq xs
     end
 

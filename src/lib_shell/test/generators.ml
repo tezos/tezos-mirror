@@ -61,8 +61,9 @@ let operation_gen ?(proto_gen = operation_proto_gen) ?block_hash_t () :
     Operation.t QCheck2.Gen.t =
   let open QCheck2.Gen in
   let prod_block_hash_gen = Option.value ~default:block_hash_gen block_hash_t in
-  let+ branch = prod_block_hash_gen
-  and+ proto = proto_gen >|= Bytes.of_string in
+  let* branch = prod_block_hash_gen in
+  let+ proto = proto_gen in
+  let proto = Bytes.of_string proto in
   Operation.{shell = {branch}; proto}
 
 (** Like {!operation_gen} with a hash. *)
@@ -277,4 +278,5 @@ let with_t_operation_gen : unit t -> unit Prevalidation.operation QCheck2.Gen.t
 let t_with_operation_gen ?can_be_full () :
     (unit t * unit Prevalidation.operation) QCheck2.Gen.t =
   let open QCheck2.Gen in
-  t_gen ?can_be_full () >>= fun t -> pair (return t) (with_t_operation_gen t)
+  let* t = t_gen ?can_be_full () in
+  pair (return t) (with_t_operation_gen t)
