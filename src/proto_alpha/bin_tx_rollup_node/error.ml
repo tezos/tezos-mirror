@@ -344,3 +344,21 @@ let () =
     Data_encoding.unit
     (function Tx_rollup_mismatch -> Some () | _ -> None)
     (fun () -> Tx_rollup_mismatch)
+
+type error += Tx_rollup_cannot_fetch_tezos_block of Block_hash.t
+
+let () =
+  register_error_kind
+    ~id:"tx_rollup.node.cannot_fetch_tezos_block"
+    ~title:"A Tezos block cannot be fetched"
+    ~description:"A Tezos block cannot be fetched."
+    ~pp:(fun ppf b ->
+      Format.fprintf
+        ppf
+        "The Tezos block %a cannot be fetched from the node."
+        Block_hash.pp
+        b)
+    `Permanent
+    Data_encoding.(obj1 (req "block" Block_hash.encoding))
+    (function Tx_rollup_cannot_fetch_tezos_block b -> Some b | _ -> None)
+    (fun b -> Tx_rollup_cannot_fetch_tezos_block b)

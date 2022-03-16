@@ -30,6 +30,12 @@ open Protocol.Apply_results
 open Protocol_client_context
 open Common
 
+module Tezos_blocks_cache =
+  Ringo_lwt.Functors.Make_opt
+    ((val Ringo.(
+            map_maker ~replacement:LRU ~overflow:Strong ~accounting:Precise))
+       (Block_hash))
+
 type rollup_origination = {block_hash : Block_hash.t; block_level : int32}
 
 type t = {
@@ -38,6 +44,7 @@ type t = {
   mutable head : L2block.t;
   rollup : Tx_rollup.t;
   rollup_origination : rollup_origination;
+  tezos_blocks_cache : Alpha_block_services.block_info Tezos_blocks_cache.t;
   parameters : Protocol.Tx_rollup_l2_apply.parameters;
   operator : signer option;
   batcher_state : Batcher.state option;
@@ -435,6 +442,7 @@ let init cctxt ~data_dir ?(readonly = false) ?rollup_genesis ~operator rollup =
     Batcher.init cctxt ~rollup ~signer:operator context_index parameters
   in
   let* operator = get_signer cctxt operator in
+  let tezos_blocks_cache = Tezos_blocks_cache.create 128 in
   return
     {
       stores;
@@ -442,6 +450,7 @@ let init cctxt ~data_dir ?(readonly = false) ?rollup_genesis ~operator rollup =
       head;
       rollup;
       rollup_origination;
+      tezos_blocks_cache;
       parameters;
       operator;
       batcher_state;

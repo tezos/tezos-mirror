@@ -289,6 +289,26 @@ let process_messages_and_inboxes (state : State.t) ~(predecessor : L2block.t)
       in
       return (block, context)
 
+let get_tezos_block cctxt state hash =
+  let open Lwt_syntax in
+  let fetch hash =
+    let+ block =
+      Alpha_block_services.info
+        cctxt
+        ~chain:cctxt#chain
+        ~block:(`Hash (hash, 0))
+        ()
+    in
+    Result.to_option block
+  in
+  let+ block =
+    State.Tezos_blocks_cache.find_or_replace
+      state.State.tezos_blocks_cache
+      hash
+      fetch
+  in
+  Result.of_option ~error:[Tx_rollup_cannot_fetch_tezos_block hash] block
+
 let rec process_block cctxt state current_hash rollup_id :
     (L2block.t * Context.context option, tztrace) result Lwt.t =
   let open Lwt_result_syntax in
@@ -309,13 +329,7 @@ let rec process_block cctxt state current_hash rollup_id :
         let* _l2_reorg = State.set_head state l2_block context in
         return (l2_block, Some context)
     | None ->
-        let* block_info =
-          Alpha_block_services.info
-            cctxt
-            ~chain:cctxt#chain
-            ~block:(`Hash (current_hash, 0))
-            ()
-        in
+        let* block_info = get_tezos_block cctxt state current_hash in
         let predecessor_hash = block_info.header.shell.predecessor in
         let block_level = block_info.header.shell.level in
         let* () =

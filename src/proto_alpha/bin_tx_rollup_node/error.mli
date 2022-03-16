@@ -88,3 +88,6 @@ type error += Tx_rollup_no_operation_metadata of Operation_hash.t
 
 (** Error when rollup stored on disk is different from the expected one. *)
 type error += Tx_rollup_mismatch
+
+(** Error when Tezos block cannot be fetched. *)
+type error += Tx_rollup_cannot_fetch_tezos_block of Block_hash.t

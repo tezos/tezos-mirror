@@ -25,11 +25,15 @@
 (*                                                                           *)
 (*****************************************************************************)
 open Protocol.Alpha_context
+open Protocol_client_context
 open Common
 
 (** The RPC server and the Daemon main loop are sharing a variable of the
     type stored in the Irmin store. The [State] module allows access to this stored
     data. *)
+
+module Tezos_blocks_cache :
+  Ringo_lwt.Sigs.CACHE_MAP_OPT with type key = Block_hash.t
 
 (** The origination block and level of the rollup is kept in the state. *)
 type rollup_origination = {block_hash : Block_hash.t; block_level : int32}
@@ -43,6 +47,7 @@ type t = private {
   mutable head : L2block.t;
   rollup : Tx_rollup.t;
   rollup_origination : rollup_origination;
+  tezos_blocks_cache : Alpha_block_services.block_info Tezos_blocks_cache.t;
   parameters : Protocol.Tx_rollup_l2_apply.parameters;
   operator : signer option;
   batcher_state : Batcher.state option;
