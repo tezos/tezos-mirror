@@ -393,7 +393,7 @@ include Tezos_raw_protocol_008_PtEdoTez.Main
  (public_name tezos-protocol-008-PtEdoTez)
  (libraries
       tezos-protocol-environment
-      tezos-protocol-environment-sigs
+      tezos-protocol-environment.sigs
       tezos_raw_protocol_008_PtEdoTez)
  (flags -w "+a-4-6-7-9-16-29-40..42-44-45-48-60-67-68"
         -warn-error "-A"
@@ -408,7 +408,7 @@ include Tezos_raw_protocol_008_PtEdoTez.Main
  (public_name tezos-protocol-functor-008-PtEdoTez)
  (libraries
       tezos-protocol-environment
-      tezos-protocol-environment-sigs
+      tezos-protocol-environment.sigs
       tezos-protocol-008-PtEdoTez.raw)
  (flags -w "+a-4-6-7-9-16-29-40..42-44-45-48-60-67-68"
         -warn-error "-A"

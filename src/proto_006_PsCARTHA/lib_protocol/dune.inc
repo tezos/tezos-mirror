@@ -365,7 +365,7 @@ include Tezos_raw_protocol_006_PsCARTHA.Main
  (public_name tezos-protocol-006-PsCARTHA)
  (libraries
       tezos-protocol-environment
-      tezos-protocol-environment-sigs
+      tezos-protocol-environment.sigs
       tezos_raw_protocol_006_PsCARTHA)
  (flags -w "+a-4-6-7-9-16-29-40..42-44-45-48-60-67-68"
         -warn-error "-A"
@@ -380,7 +380,7 @@ include Tezos_raw_protocol_006_PsCARTHA.Main
  (public_name tezos-protocol-functor-006-PsCARTHA)
  (libraries
       tezos-protocol-environment
-      tezos-protocol-environment-sigs
+      tezos-protocol-environment.sigs
       tezos-protocol-006-PsCARTHA.raw)
  (flags -w "+a-4-6-7-9-16-29-40..42-44-45-48-60-67-68"
         -warn-error "-A"

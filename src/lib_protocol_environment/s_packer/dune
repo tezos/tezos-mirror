@@ -1,16 +1,10 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(library
- (name tezos_protocol_environment_packer)
- (public_name tezos-protocol-environment-packer)
- (instrumentation (backend bisect_ppx))
- (modules))
-
 (executable
  (name s_packer))
 
 (install
- (package tezos-protocol-environment-packer)
+ (package tezos-protocol-environment)
  (section libexec)
  (files (s_packer.exe as s_packer)))

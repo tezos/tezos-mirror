@@ -68,4 +68,4 @@
    v2/equality_witness.mli
  )
  (action (with-stdout-to %{targets} (chdir %{workspace_root}}
-          (run %{libexec:tezos-protocol-environment-packer:s_packer} "sigs" %{deps})))))
+          (run %{libexec:tezos-protocol-environment:s_packer} "sigs" %{deps})))))
