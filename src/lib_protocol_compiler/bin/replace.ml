@@ -127,22 +127,24 @@ let read_proto destination final_protocol_file =
     else Filename.dirname destination
   in
   Lwt_main.run
-    ( Lwt_utils_unix.read_file final_protocol_file >>= fun final_protocol ->
-      let final_protocol =
-        List.map Protocol_hash.of_b58check_exn
-        @@ String.split_on_char '\n' final_protocol
-      in
-      Tezos_base_unix.Protocol_files.read_dir source_dir >|= function
-      | Ok (None, proto) -> (Protocol.hash proto, proto, false)
-      | Ok (Some hash, proto) ->
-          (hash, proto, List.mem ~equal:Protocol_hash.equal hash final_protocol)
-      | Error err ->
-          Format.kasprintf
-            Stdlib.failwith
-            "Failed to read TEZOS_PROTOCOL in %s:@ %a"
-            source_dir
-            pp_print_trace
-            err )
+    (let open Lwt_syntax in
+    let* final_protocol = Lwt_utils_unix.read_file final_protocol_file in
+    let final_protocol =
+      List.map Protocol_hash.of_b58check_exn
+      @@ String.split_on_char '\n' final_protocol
+    in
+    let+ r = Tezos_base_unix.Protocol_files.read_dir source_dir in
+    match r with
+    | Ok (None, proto) -> (Protocol.hash proto, proto, false)
+    | Ok (Some hash, proto) ->
+        (hash, proto, List.mem ~equal:Protocol_hash.equal hash final_protocol)
+    | Error err ->
+        Format.kasprintf
+          Stdlib.failwith
+          "Failed to read TEZOS_PROTOCOL in %s:@ %a"
+          source_dir
+          pp_print_trace
+          err)
 
 let main () =
   let template = Sys.argv.(1) in
