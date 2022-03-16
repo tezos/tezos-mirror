@@ -80,36 +80,40 @@ let log_regression_diff diff =
 
 let all_output_files = ref String_set.empty
 
+let output_file_extension = "out"
+
 let full_output_file output_file =
-  (Cli.options.regression_dir // output_file) ^ ".out"
+  (Cli.options.regression_dir // output_file) ^ "." ^ output_file_extension
 
 let register ~__FILE__ ~title ~tags ~output_file f =
   let tags = "regression" :: tags in
   all_output_files := String_set.add output_file !all_output_files ;
   Test.register ~__FILE__ ~title ~tags (fun () ->
-      (* We cannot compute [stored_output_file] before [Test.register]
+      (* We cannot compute [stored_full_output_file] before [Test.register]
          because [Cli.init] must have been called. *)
-      let stored_output_file = full_output_file output_file in
+      let stored_full_output_file = full_output_file output_file in
       (* when the stored output doesn't already exists, must reset regressions *)
       if
-        not (Sys.file_exists stored_output_file || Cli.options.reset_regressions)
+        not
+          (Sys.file_exists stored_full_output_file
+          || Cli.options.reset_regressions)
       then
         Test.fail
           "Regression output file not found: %s. To generate it, use: \
            --reset-regressions --title %s"
-          (Log.quote_shell stored_output_file)
+          (Log.quote_shell stored_full_output_file)
           (Log.quote_shell title) ;
-      let capture_f ~output_file =
-        run_and_capture_output ~output_file @@ fun () ->
-        capture stored_output_file ;
+      let capture_f ~full_output_file =
+        run_and_capture_output ~output_file:full_output_file @@ fun () ->
+        capture (output_file ^ "." ^ output_file_extension) ;
         f ()
       in
       if Cli.options.reset_regressions then
-        capture_f ~output_file:stored_output_file
+        capture_f ~full_output_file:stored_full_output_file
       else
         (* store the current run into a temp file *)
-        let temp_output_file = Temp.file output_file in
-        let* () = capture_f ~output_file:temp_output_file in
+        let temp_full_output_file = Temp.file output_file in
+        let* () = capture_f ~full_output_file:temp_full_output_file in
         (* compare the captured output with the stored output *)
         let diff_process =
           Process.spawn
@@ -122,8 +126,8 @@ let register ~__FILE__ ~title ~tags ~output_file f =
               "stored";
               "--label";
               "actual";
-              stored_output_file;
-              temp_output_file;
+              stored_full_output_file;
+              temp_full_output_file;
             ]
         in
         let* status = Process.wait diff_process in
@@ -145,7 +149,7 @@ let register ~__FILE__ ~title ~tags ~output_file f =
             Test.fail
               "Regression output file contains differences: %s. To accept the \
                differences, use: --reset-regressions --title %s"
-              (Log.quote_shell stored_output_file)
+              (Log.quote_shell stored_full_output_file)
               (Log.quote_shell title))
 
 let check_unknown_output_files () =
