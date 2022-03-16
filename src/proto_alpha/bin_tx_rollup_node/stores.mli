@@ -145,10 +145,11 @@ type t = {
   rollup_origination : Rollup_origination_store.t;
 }
 
-(** [init ~data_dir ~readonly] creates or loads existing all the stores in
-    the directory [data_dir]. If [readonly] (defaults to [false]) is set, the
-    stores can only be read. *)
-val init : data_dir:string -> readonly:bool -> t Lwt.t
+(** [init ~data_dir ~readonly ~blocks_cache_size] creates or loads existing
+    stores located in the directory [data_dir]. If [readonly] (defaults to
+    [false]) is set, the stores can only be read. An LRU cache of size
+    [blocks_cache_size] is used for reading L2 blocks. *)
+val init : data_dir:string -> readonly:bool -> blocks_cache_size:int -> t Lwt.t
 
 (** [close store] closes all the stores by closing the indexes and the
     associated opened file descriptors. *)

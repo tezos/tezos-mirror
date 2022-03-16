@@ -266,10 +266,17 @@ end
 module L2_block_store = struct
   open L2_block_info
 
+  module Cache =
+    Ringo_lwt.Functors.Make_opt
+      ((val Ringo.(
+              map_maker ~replacement:LRU ~overflow:Strong ~accounting:Precise))
+         (L2block.Hash))
+
   type t = {
     index : L2_block_index.t;
     fd : Lwt_unix.file_descr;
     scheduler : Lwt_idle_waiter.t;
+    cache : L2block.t Cache.t;
   }
 
   (* The log_size corresponds to the maximum size of the memory zone
@@ -300,13 +307,16 @@ module L2_block_store = struct
     let open Lwt_syntax in
     Lwt_idle_waiter.task store.scheduler @@ fun () ->
     Option.catch_os @@ fun () ->
-    let {offset; _} = L2block_index.find store.index hash in
-    let* o = L2Blocks_file.pread_block store.fd ~file_offset:offset in
-    match o with
-    | Some (block, _) -> Lwt.return_some block
-    | None -> Lwt.return_none
+    let read_from_disk hash =
+      let {offset; _} = L2_block_index.find store.index hash in
+      let* o = L2_blocks_file.pread_block store.fd ~file_offset:offset in
+      match o with
+      | Some (block, _) -> Lwt.return_some block
+      | None -> Lwt.return_none
+    in
+    Cache.find_or_replace store.cache hash read_from_disk
 
-  let locked_write_block store ~offset ~block =
+  let locked_write_block store ~offset ~block ~hash =
     let open Lwt_tzresult_syntax in
     let* block_bytes =
       match Data_encoding.Binary.to_bytes_opt L2_blocks_file.encoding block with
@@ -319,7 +329,7 @@ module L2_block_store = struct
     in
     L2_block_index.replace
       store.index
-      (L2block.hash_header block.header)
+      hash
       {
         offset;
         predecessor = block.header.predecessor;
@@ -330,12 +340,14 @@ module L2_block_store = struct
   let append_block ?(flush = true) store (block : L2block.t) =
     let open Lwt_syntax in
     Lwt_idle_waiter.force_idle store.scheduler @@ fun () ->
+    let hash = L2block.hash_header block.header in
+    Cache.replace store.cache hash (return_some block) ;
     let* offset = Lwt_unix.lseek store.fd 0 Unix.SEEK_END in
-    let* _written_len = locked_write_block store ~offset ~block in
-    if flush then L2block_index.flush store.index ;
+    let* _written_len = locked_write_block store ~offset ~block ~hash in
+    if flush then L2_block_index.flush store.index ;
     Lwt.return_unit
 
-  let init ~data_dir ~readonly =
+  let init ~data_dir ~readonly ~cache_size =
     let open Lwt_syntax in
     let (flag, perms) =
       if readonly then (Unix.O_RDONLY, 0o444) else (Unix.O_RDWR, 0o644)
@@ -353,7 +365,8 @@ module L2_block_store = struct
         (Node_data.l2blocks_index data_dir)
     in
     let scheduler = Lwt_idle_waiter.create () in
-    Lwt.return {index; fd; scheduler}
+    let cache = Cache.create cache_size in
+    Lwt.return {index; fd; scheduler; cache}
 
   let close store =
     let open Lwt_syntax in
@@ -511,10 +524,11 @@ type t = {
   rollup_origination : Rollup_origination_store.t;
 }
 
-let init ~data_dir ~readonly =
+let init ~data_dir ~readonly ~blocks_cache_size =
   let open Lwt_syntax in
   let* () = Node_data.mk_store_dir data_dir in
-  let* blocks = L2_block_store.init ~data_dir ~readonly
+  let* blocks =
+    L2_block_store.init ~data_dir ~readonly ~cache_size:blocks_cache_size
   and* tezos_blocks = Tezos_block_store.init ~data_dir ~readonly
   and* levels = Level_store.init ~data_dir ~readonly
   and* head = Head_store.init ~data_dir

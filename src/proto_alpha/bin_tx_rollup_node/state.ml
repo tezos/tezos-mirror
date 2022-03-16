@@ -359,7 +359,8 @@ let init_parameters cctxt =
 
 let init cctxt ~data_dir ?(readonly = false) ?rollup_genesis ~operator rollup =
   let open Lwt_result_syntax in
-  let*! stores = Stores.init ~data_dir ~readonly in
+  (* TODO/TORU make blocks_cache_size configurable *)
+  let*! stores = Stores.init ~data_dir ~readonly ~blocks_cache_size:1024 in
   let* (rollup_origination, context_index) =
     both
       (init_rollup_origination cctxt stores ?rollup_genesis rollup)
