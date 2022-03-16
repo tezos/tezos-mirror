@@ -28,7 +28,7 @@
 type error +=
   | Tx_rollup_already_exists of Tx_rollup_repr.t
   | Tx_rollup_does_not_exist of Tx_rollup_repr.t
-  | Submit_batch_burn_excedeed of {burn : Tez_repr.t; limit : Tez_repr.t}
+  | Submit_batch_burn_exceeded of {burn : Tez_repr.t; limit : Tez_repr.t}
   | Inbox_does_not_exist of Tx_rollup_repr.t * Tx_rollup_level_repr.t
   | Inbox_size_would_exceed_limit of Tx_rollup_repr.t
   | Inbox_count_would_exceed_limit of Tx_rollup_repr.t
@@ -77,14 +77,15 @@ type error +=
       computed : Tx_rollup_commitment_repr.Message_result_hash.t;
       expected : Tx_rollup_commitment_repr.Message_result_hash.t;
     }
+  | Ticket_content_size_limit_exceeded of {content_size : int; limit : int}
 
 let () =
   let open Data_encoding in
-  (* Tx_rollup_submit_batch_burn_excedeed *)
+  (* Tx_rollup_submit_batch_burn_exceeded *)
   register_error_kind
     `Temporary
-    ~id:"operation.tx_rollup_submit_batch_burn_excedeed"
-    ~title:"Submit batch excedeed burn limit"
+    ~id:"operation.tx_rollup_submit_batch_burn_exceeded"
+    ~title:"Submit batch exceeded burn limit"
     ~description:
       "The submit batch would exceed the burn limit, we withdraw the submit."
     ~pp:(fun ppf (burn, limit) ->
@@ -99,9 +100,9 @@ let () =
     Data_encoding.(
       obj2 (req "burn" Tez_repr.encoding) (req "limit" Tez_repr.encoding))
     (function
-      | Submit_batch_burn_excedeed {burn; limit} -> Some (burn, limit)
+      | Submit_batch_burn_exceeded {burn; limit} -> Some (burn, limit)
       | _ -> None)
-    (fun (burn, limit) -> Submit_batch_burn_excedeed {burn; limit}) ;
+    (fun (burn, limit) -> Submit_batch_burn_exceeded {burn; limit}) ;
   (* Tx_rollup_inbox_does_not_exist *)
   register_error_kind
     `Temporary

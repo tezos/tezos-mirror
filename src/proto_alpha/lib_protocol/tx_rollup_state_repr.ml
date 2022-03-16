@@ -491,7 +491,7 @@ let burn_cost ~limit state size =
   Tez_repr.(state.burn_per_byte *? Int64.of_int size) >>? fun burn ->
   match limit with
   | Some limit when Tez_repr.(limit >= burn) ->
-      error (Submit_batch_burn_excedeed {burn; limit})
+      error (Submit_batch_burn_exceeded {burn; limit})
   | _ -> ok burn
 
 let finalized_commitments_range state =
