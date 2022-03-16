@@ -276,8 +276,7 @@ Because computations done by the proxy server are protocol dependent, the proxy 
 does not support all protocols. However, it is expected than, at any
 given time, the proxy server supports ``Alpha`` and the three protocols
 before that. In doubt, execute
-``find src -name "proxy.ml" | grep 'proto_' | grep -v genesis`` at Tezos'
-root to find the supported protocols.
+``tezos-client list proxy protocols`` to see the supported protocols.
 
 Deployment
 ~~~~~~~~~~
