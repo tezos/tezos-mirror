@@ -37,3 +37,6 @@ v0.5:
 
 v0.5.1:  
 - fix bug wherein infinite recursion protection prevented some legitimate uses
+
+v0.5.2:  
+- make compact encoding's JSON encoding less opinionated
