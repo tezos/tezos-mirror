@@ -70,3 +70,9 @@ val run : t -> unit Lwt.t
 
 (** See [Daemon.Make.terminate]. *)
 val terminate : ?kill:bool -> t -> unit Lwt.t
+
+(** Get the RPC host given as [--rpc-addr] to a node. *)
+val rpc_host : t -> string
+
+(** Get the RPC port given as [--rpc-port] to a node. *)
+val rpc_port : t -> int
