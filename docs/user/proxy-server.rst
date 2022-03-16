@@ -203,10 +203,9 @@ What the proxy server serves
 The proxy server serves a subset of what a node serves. The proxy server
 serves the protocol-specific RPCs, which are listed
 `here <https://tezos.gitlab.io/alpha/rpc.html#protocol-alpha>`_ for protocol Alpha.
-The proxy server's purpose is to serve only ``GET`` requests, as it's
-a readonly frontend for the underlying node. Non-``GET`` requests (such as ``POST`` ones)
-will be forwarded to the node backing the proxy server, hence it is better
-to send these requests directly to the node.
+The proxy server's purpose is to serve only readonly requests (``GET`` requests, as well
+as a subset of the ``POST`` requests), as it's a readonly frontend for the underlying node.
+Requests that are not readonly should be sent to the node.
 
 Because computations done by the proxy server are protocol dependent, the proxy server
 does not support all protocols. However, it is expected than, at any
