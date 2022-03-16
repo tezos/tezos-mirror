@@ -1,4 +1,4 @@
-tezt/_regressions/encoding/hangzhou.period.out
+encoding/hangzhou.period.out
 
 ./tezos-codec encode 011-PtHangz2.period from '"2789"'
 0000000000000ae5

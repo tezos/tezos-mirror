@@ -1,4 +1,4 @@
-tezt/_regressions/rpc/hangzhou.client.delegates.out
+rpc/hangzhou.client.delegates.out
 
 ./tezos-client rpc get /chains/main/blocks/head/context/contracts
 [ "[CONTRACT_HASH]",

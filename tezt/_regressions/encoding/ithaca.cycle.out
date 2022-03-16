@@ -1,4 +1,4 @@
-tezt/_regressions/encoding/ithaca.cycle.out
+encoding/ithaca.cycle.out
 
 ./tezos-codec encode 012-Psithaca.cycle from 2147483647
 7fffffff

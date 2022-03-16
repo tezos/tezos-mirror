@@ -1,4 +1,4 @@
-tezt/_regressions/rpc/binary_rpc.out
+rpc/binary_rpc.out
 
 ./tezos-client --media-type json rpc get /chains/main/blocks/head/header/shell
 { "level": 0, "proto": 0,

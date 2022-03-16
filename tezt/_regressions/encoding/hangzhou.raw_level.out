@@ -1,4 +1,4 @@
-tezt/_regressions/encoding/hangzhou.raw_level.out
+encoding/hangzhou.raw_level.out
 
 ./tezos-codec encode 011-PtHangz2.raw_level from 2147483647
 7fffffff

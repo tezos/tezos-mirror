@@ -1,4 +1,4 @@
-tezt/_regressions/encoding/hangzhou.gas.cost.out
+encoding/hangzhou.gas.cost.out
 
 ./tezos-codec encode 011-PtHangz2.gas.cost from '"8920392083423078"'
 a6fd9d9694c3d81f

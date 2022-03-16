@@ -1,4 +1,4 @@
-tezt/_regressions/rpc/alpha.proxy.votes.out
+rpc/alpha.proxy.votes.out
 
 ./tezos-client --mode proxy rpc get /chains/main/blocks/head/votes/ballot_list
 []

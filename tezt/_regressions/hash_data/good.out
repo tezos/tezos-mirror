@@ -1,4 +1,4 @@
-tezt/_regressions/hash_data/good.out
+hash_data/good.out
 
 ./tezos-client --mode mockup hash data -92233720368547758089223372036854775807 of type int
 Raw packed data: 0x0500ffffffffffffffffff8180c09e91c191c79502

@@ -1,4 +1,4 @@
-tezt/_regressions/encoding/ithaca.gas.out
+encoding/ithaca.gas.out
 
 ./tezos-codec encode 012-Psithaca.gas from '"1238"'
 009613

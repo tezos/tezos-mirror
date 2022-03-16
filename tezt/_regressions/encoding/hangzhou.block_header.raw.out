@@ -1,4 +1,4 @@
-tezt/_regressions/encoding/hangzhou.block_header.raw.out
+encoding/hangzhou.block_header.raw.out
 
 ./tezos-codec encode 011-PtHangz2.block_header.raw from '{
   "level": 1331,

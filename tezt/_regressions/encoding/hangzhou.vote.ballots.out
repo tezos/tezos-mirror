@@ -1,4 +1,4 @@
-tezt/_regressions/encoding/hangzhou.vote.ballots.out
+encoding/hangzhou.vote.ballots.out
 
 ./tezos-codec encode 011-PtHangz2.vote.ballots from '{
   "yay": 2147483647,

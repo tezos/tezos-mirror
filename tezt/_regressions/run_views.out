@@ -1,4 +1,4 @@
-tezt/_regressions/run_views.out
+run_views.out
 
 ./tezos-client --mode mockup --base-dir '<masked>' --wait none originate contract register_calls transferring 0 from bootstrap1 running '
 parameter unit;

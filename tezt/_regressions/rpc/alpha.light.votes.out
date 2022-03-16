@@ -1,4 +1,4 @@
-tezt/_regressions/rpc/alpha.light.votes.out
+rpc/alpha.light.votes.out
 
 ./tezos-client --mode light rpc get /chains/main/blocks/head/votes/ballot_list
 []

@@ -1,4 +1,4 @@
-tezt/_regressions/sc_rollup_list.out
+sc_rollup_list.out
 
 ./tezos-client --wait none originate sc rollup from '[PUBLIC_KEY_HASH]' of kind arith booting with  --burn-cap 9999999
 Node is bootstrapped.

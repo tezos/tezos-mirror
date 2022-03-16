@@ -1,4 +1,4 @@
-tezt/_regressions/deposits_limit/set_desposits_limit.out
+deposits_limit/set_desposits_limit.out
 Node is bootstrapped.
 Estimated gas: 1000 units (will add 0 for safety)
 Estimated storage: no bytes added

@@ -1,4 +1,4 @@
-tezt/_regressions/encoding/alpha.operation.out
+encoding/alpha.operation.out
 
 ./tezos-codec encode alpha.operation from '{
   "branch": "BKpbfCvh777DQHnXjU2sqHvVUNZ7dBAdqEfKkdw8EGSkD9LSYXb",

@@ -1,4 +1,4 @@
-tezt/_regressions/encoding/ithaca.level.out
+encoding/ithaca.level.out
 
 ./tezos-codec encode 012-Psithaca.level from '{
   "level": 1331,
