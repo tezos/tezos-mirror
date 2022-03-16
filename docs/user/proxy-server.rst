@@ -19,6 +19,18 @@ and ``--rpc-addr``:
   ``/chains/<chain_id>/blocks/<block_id>/context/raw/bytes``).
 * ``--rpc-addr`` specifies the URL that the proxy server should serve.
 
+Another important argument is ``--data-dir``:
+
+* ``--data-dir`` specifies the directory of the node from
+  which to obtain data. This argument can only be used when the proxy server
+  has actual access to the specified data directory.
+  In this case, this option will reduce the number of RPC calls to the
+  node, thereby reducing its IO consumption.
+
+The full list of arguments is detailed :ref:`below <additional_arguments>`.
+
+.. _sandbox_example:
+
 Example with the sandbox
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -43,6 +55,9 @@ In a terminal, start a sandboxed node:
 ::
 
     $ ./src/bin_node/tezos-sandboxed-node.sh 1 --connections 1
+      April 21 11:05:32.789 - node.config.validation: the node configuration has been successfully validated.
+      Created /tmp/tezos-node.Uzq5aGAN/config.json for network: sandbox.
+      ...
 
 Leave that terminal running. In a second terminal, prepare the appropriate
 environment for using a proxy server:
@@ -161,6 +176,45 @@ The proxy server is reusing the data it obtained for ``<head>`` from
 the first request, because less than ``time_between_block`` (``15`` seconds)
 have passed.
 
+Reducing RPC calls: ``--data-dir``
+""""""""""""""""""""""""""""""""""
+
+To make the proxy server read the node's data-dir instead of doing
+``/chains/<main>/blocks/<head>/context/raw/bytes`` RPC calls, kill
+the proxy server you have launched :ref:`above <sandbox_example>`),
+and restart it as follows:
+
+::
+
+    $ ./tezos-proxy-server --endpoint http://127.0.0.1:18731 --rpc-addr http://127.0.0.1:18732 --data-dir /tmp/tezos-node.Uzq5aGAN
+      protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
+      Apr 21 11:09:22.092 - proxy_server_run: starting proxy RPC server on 127.0.0.1:18732
+
+The value of the ``--data-dir`` argument was obtained by looking at the
+output of the terminal where ``tezos-node`` was launched
+(see :ref:`above <sandbox_example>`).
+
+Now, in the fourth terminal (the client's terminal), redo the request
+to retrieve contracts:
+
+::
+
+    $ ./tezos-client --endpoint http://127.0.0.1:18732 rpc get /chains/main/blocks/head/context/contracts
+      # ... same output as above ...
+
+Now the output in the proxy server terminal should be:
+
+::
+
+    Apr 21 11:22:44.359 - alpha.proxy_rpc: chains/<main>/blocks/<head>/header
+    Apr 21 11:22:44.360 - alpha.proxy_rpc: proxy cache created for chain main and block head
+    Apr 21 11:22:59.362 - proxy_services: clearing data for chain main and block head
+
+There are far fewer ``alpha.proxy_rpc`` lines! That is because the proxy
+server obtained its data by reading the node's data-dir, instead of performing RPC calls.
+
+.. _additional_arguments:
+
 Additional arguments
 ~~~~~~~~~~~~~~~~~~~~
 
@@ -174,6 +228,17 @@ Here is the list of possible arguments:
   This file can specify all command line arguments except ``-l``/``--log-requests``.
   If an argument if specified both in the configuration file and on the command line,
   the command line takes precedence.
+* ``-d`` and ``--data-dir`` specify the path of the data directory of
+  the node. If specified, the proxy server obtains data by reading the disk
+  instead of performing the ``/chains/<chain_id>/blocks/<block_id>/context/raw/bytes``
+  RPC. If possible (i.e. if the proxy server can access the node's
+  disk), this option should be used, because it reduces IO consumption
+  of the node.
+
+  Note that this argument doesn't make ``--endpoint`` optional, because the
+  proxy server still needs to do RPC calls to obtain block headers. Further
+  work removing all RPC calls is described in issue
+  `2502 <https://gitlab.com/tezos/tezos/-/issues/2502>`_.
 * ``-E`` and ``--endpoint`` specify the URL of the RPC server of the node
   to do requests to obtain data (RPCs of the form
   ``/chains/<chain_id>/blocks/<block_id>/context/raw/bytes``).
