@@ -1,8 +1,8 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(test
- (name test_registration)
+(tests
+ (names test_registration test_splitted_error_encoding)
  (package tezos-error-monad)
  (modes native js)
  (libraries
@@ -16,3 +16,8 @@
  (alias runtest_js)
  (package tezos-error-monad)
  (action (run node %{dep:./test_registration.bc.js})))
+
+(rule
+ (alias runtest_js)
+ (package tezos-error-monad)
+ (action (run node %{dep:./test_splitted_error_encoding.bc.js})))

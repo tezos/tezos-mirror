@@ -49,6 +49,40 @@ module type CORE = sig
 
   val string_of_category : error_category -> string
 
+  (** The encoding for errors.
+
+      Note that this encoding has a few peculiarities, some of which may impact
+      your code. These peculiarities are due to the type [error] being an
+      extensible variant.
+
+      Because the [error] type is an extensible variant, you must register an
+      encoding for each error constructor you add to [error]. This is done via
+      {!register_error_kind}.
+
+      Because the [error] type is an extensible variant, with dynamically
+      registered errors (see peculiarity above), there are no tags
+      associated with each error. This does not affect the JSON encoding, but it
+      does impose restrictions on the binary encoding. The chosen workaround is
+      to encode errors as JSON and to encode the JSON to binary form. As a
+      result, errors can be somewhat large in binary: they include field names
+      and such.
+
+      Because the [error] type is an extensible variant, with dynamically
+      registered errors (see peculiarity above), the encoding must be recomputed
+      when a new error is registered. This is achieved by the means of a
+      {!Data_encoding.delayed} combinator: the encoding is recomputed on-demand.
+      There is a caching mechanism so that, in the case where no new errors have
+      been registered since the last use, the last result is used.
+
+      This last peculiarity imposes a limit on the use of [error_encoding]
+      itself. Specifically, it is invalid to use [error_encoding] inside the
+      [~json] argument of a {!Data_encoding.splitted}. This is because
+      [splitted] evaluates the [delayed] combinator once-and-for-all to produce
+      a json encoding. (Note that the following
+      data-encoding combinators use [splitted] internally:
+      {!Data_encoding.Compact.make}, {!Data_encoding.assoc}, and
+      {!Data_encoding.lazy_encoding}. As a result, it is invalid to use
+      [error_encoding] within the arguments of these combinators as well.) *)
   val error_encoding : error Data_encoding.t
 
   val pp : Format.formatter -> error -> unit

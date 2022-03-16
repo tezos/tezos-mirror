@@ -625,8 +625,8 @@ let _tezos_hacl_tests_1 =
     ~js_compatible:true
 
 let _tezos_error_monad_tests =
-  test
-    "test_registration"
+  tests
+    ["test_registration"; "test_splitted_error_encoding"]
     ~path:"src/lib_error_monad/test"
     ~opam:"src/lib_error_monad/tezos-error-monad"
     ~modes:[Native; JS]
