@@ -93,3 +93,26 @@ module Bootstrap : sig
   (** The default bootstrap keys. *)
   val keys : key array
 end
+
+(** [parse_client_output ~alias ~client_output] extracts keys from clients output that
+    yields result of the form
+{v
+      Hash: tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx
+      Public Key: edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav
+      Secret Key: unencrypted:edsk3gUfUPyBSfrS9CCgmCiQsTCHGkviBDusMxDJstFtojtc1zcpsh
+v}
+    and returns the corresponding key.
+*)
+val parse_client_output : alias:string -> client_output:string -> key
+
+(** [parse_client_output_aggregate ~alias ~client_output] extracts keys from
+    clients output that yields result of the form
+{v
+      Hash: tz4EECtMxAuJ9UDLaiMZH7G1GCFYUWsj8HZn
+      Public Key: BLpk1yUiLJ7RezbyViD5ZvWTfQndM3TRRYmvYWkUfH2EJqsLFnzzvpJss6pbuz3U1DDMpk8v16nV
+      Secret Key: aggregate_unencrypted:BLsk1hKAHyGqY9qRbgoSVnjiSmDWpKGjFF3WNQ7BaiaMUA6RMA6Pfq
+v}
+    and returns the corresponding key.
+*)
+val parse_client_output_aggregate :
+  alias:string -> client_output:string -> aggregate_key

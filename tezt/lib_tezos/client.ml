@@ -628,32 +628,10 @@ let spawn_show_address ~alias client =
   spawn_command client ["show"; "address"; alias; "--show-secret"]
 
 let show_address ~alias client =
-  let extract_key (client_output : string) : Account.key =
-    let public_key_hash =
-      (* group of letters and digits after "Hash: "
-         e.g. "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" *)
-      client_output =~* rex "Hash: ?(\\w*)" |> mandatory "public key hash"
-    in
-    let public_key =
-      (* group of letters and digits after "Public Key: "
-         e.g. "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav" *)
-      client_output =~* rex "Public Key: ?(\\w*)" |> mandatory "public key"
-    in
-    let sk =
-      (* group of letters and digits after "Secret Key: unencrypted:"
-         e.g. "edsk3gUfUPyBSfrS9CCgmCiQsTCHGkviBDusMxDJstFtojtc1zcpsh"
-         Note: The tests only use unencrypted keys for the moment. If
-         this changes, please update secret key parsing. *)
-      client_output
-      =~* rex "Secret Key: unencrypted:?(\\w*)"
-      |> mandatory "secret key"
-    in
-    {alias; public_key_hash; public_key; secret_key = Unencrypted sk}
-  in
-  let* output =
+  let* client_output =
     spawn_show_address ~alias client |> Process.check_and_read_stdout
   in
-  return @@ extract_key output
+  return @@ Account.parse_client_output ~alias ~client_output
 
 let gen_and_show_keys ?alias client =
   let* alias = gen_keys ?alias client in
