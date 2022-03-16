@@ -20,7 +20,7 @@ release-on-gitlab:
 docker:merge_manifests:
   extends:
     - .rules_template__master_and_releases
-    - .image_template__latest # Docker-in-Docker (dind)
+    - .image_template__docker
     - .docker_registry_auth # Sets up a before_script
   stage: publish_release
   # this job does not need artifacts from previous jobs.

@@ -2,7 +2,7 @@
 .build_docker_release_template:
   extends:
     - .default_settings_template
-    - .image_template__latest # Docker-in-Docker (dind)
+    - .image_template__docker
     - .docker_registry_auth # Sets up a before_script
   variables:
     IMAGE_ARCH_PREFIX: ""
