@@ -145,16 +145,14 @@ Validator selection: staking balance, active stake, and frozen deposits
 
 Validator selection is based on the stake, as in Emmy*, with the exception that
 it is based on the delegate's *active stake* instead of its *staking
-balance* (or rather the corresponding rolls.
-**NB**: rolls do not play a
-role anymore, except for establishing a minimum required staking
-balance). Let us first (re)define these and related concepts.
+balance*. Let us first (re)define these and related concepts.
 
 - The *(maximal) staking balance* of a delegate is its full balance (i.e. all the tokens owned by the delegate) plus the
   balances of all accounts that have delegated to it.
+  It must be at least ``TOKENS_PER_ROLL`` tez, otherwise the delegate cannot be selected as a validator.
 - The *active stake* of a delegate is the amount of tez with which
   it participates in consensus. It is at most its
-  staking balance. It must be at least ``TOKEN_PER_ROLL`` tez. We explain below how it is computed.
+  staking balance. We explain below how it is computed.
 - The *frozen deposit* represents a percentage ``FROZEN_DEPOSIT_PERCENTAGE``
   of the maximum active stake during the last ``PRESERVED_CYCLES + MAX_SLASHING_PERIOD``. This amount
   represents the delegate's skin in the game: in the case that the
