@@ -96,7 +96,7 @@ let register ~__FILE__ ~title ~tags ~output_file f =
       then
         Test.fail
           "Regression output file not found: %s. To generate it, use: \
-           --reset-regressions --test %s"
+           --reset-regressions --title %s"
           (Log.quote_shell stored_output_file)
           (Log.quote_shell title) ;
       let capture_f ~output_file =
@@ -144,7 +144,7 @@ let register ~__FILE__ ~title ~tags ~output_file f =
             log_regression_diff diff ;
             Test.fail
               "Regression output file contains differences: %s. To accept the \
-               differences, use: --reset-regressions --test %s"
+               differences, use: --reset-regressions --title %s"
               (Log.quote_shell stored_output_file)
               (Log.quote_shell title))
 
