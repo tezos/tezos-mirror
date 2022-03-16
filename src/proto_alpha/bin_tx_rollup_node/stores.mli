@@ -68,18 +68,24 @@ module Tezos_block_store : sig
   (** The type of store for Tezos block hashes *)
   type t
 
+  type info = {
+    l2_block : L2block.hash;
+    level : int32;
+    predecessor : Block_hash.t;
+  }
+
   (** Returns [true] if the Tezos block hash has a L2 block hash associated in
       the store. *)
   val mem : t -> Block_hash.t -> bool Lwt.t
 
   (** Returns the L2 block hash associated to a Tezos block hash in the store,
       or [None] otherwise. *)
-  val find : t -> Block_hash.t -> L2block.hash option Lwt.t
+  val find : t -> Block_hash.t -> info option Lwt.t
 
   (** Add an association from a Tezos block hash to an L2 block hash in the
       store. If [flush] (default to [true]) is set, the index is written on disk
       right away. *)
-  val add : ?flush:bool -> t -> Block_hash.t -> L2block.hash -> unit Lwt.t
+  val add : ?flush:bool -> t -> Block_hash.t -> info -> unit Lwt.t
 end
 
 (** An index store to map L2 block level to L2 block hashes. It is composed

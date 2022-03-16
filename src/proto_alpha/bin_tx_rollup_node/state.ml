@@ -61,11 +61,16 @@ let set_head state block =
   state.head <- block ;
   Stores.Head_store.write state.stores.head (L2block.hash_header block.header)
 
-let save_tezos_l2_block_hash state block info =
-  Stores.Tezos_block_store.add state.stores.tezos_blocks block info
+let save_tezos_block_info state block l2_block ~level ~predecessor =
+  Stores.Tezos_block_store.add
+    state.stores.tezos_blocks
+    block
+    {Stores.Tezos_block_store.l2_block; level; predecessor}
 
 let get_tezos_l2_block_hash state block =
-  Stores.Tezos_block_store.find state.stores.tezos_blocks block
+  let open Lwt_syntax in
+  let+ info = Stores.Tezos_block_store.find state.stores.tezos_blocks block in
+  Option.map (fun i -> i.Stores.Tezos_block_store.l2_block) info
 
 let get_block_store stores hash =
   Stores.L2_block_store.read_block stores.Stores.blocks hash
@@ -115,11 +120,7 @@ let save_block state (block : L2block.t) =
   let open Lwt_syntax in
   let hash = L2block.hash_header block.header in
   let+ () =
-    join
-      [
-        save_level state block.header.level hash;
-        save_block state block;
-      ]
+    join [save_level state block.header.level hash; save_block state block]
   in
   hash
 

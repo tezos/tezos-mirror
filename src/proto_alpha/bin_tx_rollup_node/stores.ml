@@ -228,12 +228,43 @@ module L2_block_info = struct
     {offset = Int64.to_int file_offset; predecessor; context}
 end
 
+module Tezos_block_info = struct
+  type t = {l2_block : L2block.hash; level : int32; predecessor : Block_hash.t}
+
+  let t =
+    let open Repr in
+    map
+      (triple L2_block_key.t int32 Tezos_store.Block_key.t)
+      (fun (l2_block, level, predecessor) -> {l2_block; level; predecessor})
+      (fun {l2_block; level; predecessor} -> (l2_block, level, predecessor))
+
+  let encoded_size = L2block.Hash.size + 4 (* level *) + Block_hash.size
+
+  let encode v =
+    let dst = Bytes.create encoded_size in
+    let offset = blit ~src:(L2block.Hash.to_bytes v.l2_block) ~dst 0 in
+    let offset = bytes_set_int32 ~dst ~src:v.level offset in
+    let _ = blit ~src:(Block_hash.to_bytes v.predecessor) ~dst offset in
+    Bytes.unsafe_to_string dst
+
+  let decode str offset =
+    let (l2_block, offset) =
+      read_str str ~offset ~len:L2block.Hash.size L2block.Hash.of_string_exn
+    in
+    let (level, offset) = read_int32 str offset in
+    let (predecessor, _) =
+      read_str str ~offset ~len:Block_hash.size Block_hash.of_string_exn
+    in
+    {l2_block; level; predecessor}
+end
+
 module L2block_index =
   Index_unix.Make (L2block_key) (L2block_info) (Index.Cache.Unbounded)
 module Level_index =
   Index_unix.Make (L2level_key) (L2block_key) (Index.Cache.Unbounded)
 module Tezos_block_index =
-  Index_unix.Make (Tezos_store.Block_key) (L2block_key) (Index.Cache.Unbounded)
+  Index_unix.Make (Tezos_store.Block_key) (Tezos_block_info)
+    (Index.Cache.Unbounded)
 
 module L2_blocks_file = struct
   let encoding = Data_encoding.dynamic_size ~kind:`Uint30 L2block.encoding
@@ -379,6 +410,12 @@ end
 module Tezos_block_store = struct
   type t = {index : Tezos_block_index.t; scheduler : Lwt_idle_waiter.t}
 
+  type info = Tezos_block_info.t = {
+    l2_block : L2block.hash;
+    level : int32;
+    predecessor : Block_hash.t;
+  }
+
   let log_size = 10_000
 
   let mem store hash =
@@ -389,12 +426,12 @@ module Tezos_block_store = struct
     let open Lwt_syntax in
     Lwt_idle_waiter.task store.scheduler @@ fun () ->
     Option.catch_os @@ fun () ->
-    let b = Tezos_block_index.find store.index hash in
-    return_some b
+    let info = Tezos_block_index.find store.index hash in
+    return_some info
 
-  let add ?(flush = true) store tezos_block l2_block =
+  let add ?(flush = true) store tezos_block info =
     Lwt_idle_waiter.force_idle store.scheduler @@ fun () ->
-    Tezos_block_index.replace store.index tezos_block l2_block ;
+    Tezos_block_index.replace store.index tezos_block info ;
     if flush then Tezos_block_index.flush store.index ;
     Lwt.return_unit
 

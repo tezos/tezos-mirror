@@ -339,11 +339,13 @@ let rec process_block cctxt state current_hash rollup_id :
             block_info
             rollup_id
         in
-        let* () =
-          State.save_tezos_l2_block_hash
+        let*! () =
+          State.save_tezos_block_info
             state
             current_hash
             (L2block.hash_header l2_block.header)
+            ~level:block_info.header.shell.level
+            ~predecessor:block_info.header.shell.predecessor
         in
         let* _l2_reorg = State.set_head state l2_block context in
         let*! () = Event.(emit new_tezos_head) current_hash in

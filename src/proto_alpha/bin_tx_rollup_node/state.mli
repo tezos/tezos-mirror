@@ -124,7 +124,6 @@ val set_head :
 (** Save an L2 block to disk:
     - Save both the header and the inbox
     - Make the level point to this block
-    - Associate this L2 block with the corresponding Tezos block
  *)
 val save_block : t -> L2block.t -> L2block.hash Lwt.t
 
@@ -132,8 +131,15 @@ val save_block : t -> L2block.t -> L2block.hash Lwt.t
     block, it is changed. *)
 val save_level : t -> L2block.level -> L2block.hash -> unit Lwt.t
 
-(** Associate an L2 block to a Tezos block *)
-val save_tezos_l2_block_hash : t -> Block_hash.t -> L2block.hash -> unit Lwt.t
+(** Associate an L2 block to a Tezos block, and register its level and
+    predecessor as well. *)
+val save_tezos_block_info :
+  t ->
+  Block_hash.t ->
+  L2block.hash ->
+  level:int32 ->
+  predecessor:Block_hash.t ->
+  unit Lwt.t
 
 (** {2 Misc}  *)
 
