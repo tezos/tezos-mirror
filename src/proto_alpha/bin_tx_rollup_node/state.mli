@@ -47,6 +47,18 @@ type t = {
   batcher_state : Batcher.state option;
 }
 
+(** Type of chain reorganizations. *)
+type 'block reorg = {
+  ancestor : 'block option;
+      (** The common ancestor of the two chains. Can be None if the chains have no
+          common ancestor, in which case all the blocks are changed *)
+  old_chain : 'block list;
+      (** The blocks that were in the old chain and which are not in the new one. *)
+  new_chain : 'block list;
+      (** The blocks that are now in the new chain. The length of [old_chain] and
+      [new_chain] may be different. *)
+}
+
 (** [init cctxt ~data_dir ~rollup_genesis ~operator rollup] creates a new state
     for the rollup node with a new store and context.  If the [rollup_genesis]
     block hash is provided, checks that the rollup [rollup_id] is created inside
@@ -87,8 +99,8 @@ val get_header : t -> L2block.hash -> L2block.header option Lwt.t
     which the rollup was when the Tezos node was at block [h]. *)
 val get_tezos_l2_block_hash : t -> Block_hash.t -> L2block.hash option Lwt.t
 
-(** Same as {!get_tezos_block} but retrieves the associated header at the same time. *)
-val get_tezos_l2_block : t -> Block_hash.t -> L2block.header option Lwt.t
+(** Same as {!get_tezos_block} but retrieves the associated L2 block at the same time. *)
+val get_tezos_l2_block : t -> Block_hash.t -> L2block.t option Lwt.t
 
 (** Same as {!get_level} but retrieves the associated header at the same time. *)
 val get_level_l2_block : t -> L2block.level -> L2block.header option Lwt.t
@@ -98,8 +110,10 @@ val tezos_block_already_processed : t -> Block_hash.t -> bool Lwt.t
 
 (** {2 Saving the state to disk}  *)
 
-(** Set the current head of the rollup with it's context. *)
-val set_head : t -> L2block.header -> Context.t -> unit tzresult Lwt.t
+(** Set the current head of the rollup with its context and return the blocks
+    (hashes) that were reorganized. *)
+val set_head :
+  t -> L2block.t -> Context.t -> (L2block.t * L2block.hash) reorg tzresult Lwt.t
 
 (** Save an L2 block to disk:
     - Save both the header and the inbox

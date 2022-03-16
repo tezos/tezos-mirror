@@ -105,6 +105,8 @@ module type MAP = sig
   val get : t -> key -> value tzresult Lwt.t
 
   val add : t -> key -> value -> unit tzresult Lwt.t
+
+  val remove : t -> key -> unit tzresult Lwt.t
 end
 
 module Make_map (M : MAP_CONF) = struct
@@ -171,6 +173,16 @@ module Make_map (M : MAP_CONF) = struct
     let rendered_key = render_key raw_key in
     let* value = encode rendered_key value in
     set rendered_key store key value
+
+  let remove store raw_key =
+    let open Lwt_tzresult_syntax in
+    let key = mk raw_key in
+    let rendered_key = render_key raw_key in
+    let info () = make_info rendered_key in
+    let*! r = Kv.remove ~info store key in
+    match r with
+    | Error _ -> fail @@ Error.Tx_rollup_irmin_error "cannot remove value"
+    | Ok () -> return_unit
 end
 
 module Make_ref (R : REF_CONF) = struct

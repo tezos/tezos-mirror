@@ -255,8 +255,8 @@ let create_genesis_block state tezos_block =
   let+ _block_hash = State.save_block state genesis_block in
   (genesis_block, ctxt)
 
-let process_messages_and_inboxes (state : State.t)
-    ~(predecessor : L2block.header) ?predecessor_context block_info rollup_id =
+let process_messages_and_inboxes (state : State.t) ~(predecessor : L2block.t)
+    ?predecessor_context block_info rollup_id =
   let open Lwt_result_syntax in
   let current_hash = block_info.Alpha_block_services.hash in
   let*? (messages, cumulated_size) =
@@ -265,7 +265,7 @@ let process_messages_and_inboxes (state : State.t)
   let*! () = Event.(emit messages_application) (List.length messages) in
   let* predecessor_context =
     match predecessor_context with
-    | None -> checkout_context state predecessor.context
+    | None -> checkout_context state predecessor.header.context
     | Some context -> return context
   in
   let*! (context, inbox) =
@@ -278,7 +278,7 @@ let process_messages_and_inboxes (state : State.t)
   | Some inbox ->
       let*! context_hash = Context.commit context in
       let level =
-        match predecessor.level with
+        match predecessor.header.level with
         | Genesis -> L2block.Rollup_level Tx_rollup_level.root
         | Rollup_level l -> Rollup_level (Tx_rollup_level.succ l)
       in
@@ -286,7 +286,7 @@ let process_messages_and_inboxes (state : State.t)
         {
           level;
           tezos_block = current_hash;
-          predecessor = L2block.hash_header predecessor;
+          predecessor = L2block.hash_header predecessor.header;
           context = context_hash;
         }
       in
@@ -295,10 +295,10 @@ let process_messages_and_inboxes (state : State.t)
       let*! () =
         Event.(emit rollup_block) (header.level, hash, header.tezos_block)
       in
-      return (block.header, context)
+      return (block, context)
 
 let rec process_block cctxt state current_hash rollup_id :
-    (L2block.header * Context.context option, tztrace) result Lwt.t =
+    (L2block.t * Context.context option, tztrace) result Lwt.t =
   let open Lwt_result_syntax in
   if Block_hash.equal state.State.rollup_origination.block_hash current_hash
   then
@@ -306,16 +306,16 @@ let rec process_block cctxt state current_hash rollup_id :
     let+ (genesis_block, genesis_ctxt) =
       create_genesis_block state current_hash
     in
-    (genesis_block.header, Some genesis_ctxt)
+    (genesis_block, Some genesis_ctxt)
   else
-    let*! l2_header = State.get_tezos_l2_block state current_hash in
-    match l2_header with
-    | Some l2_header ->
+    let*! l2_block = State.get_tezos_l2_block state current_hash in
+    match l2_block with
+    | Some l2_block ->
         (* Already processed *)
         let*! () = Event.(emit block_already_processed) current_hash in
-        let* context = checkout_context state l2_header.context in
-        let* () = State.set_head state l2_header context in
-        return (l2_header, None)
+        let* context = checkout_context state l2_block.header.context in
+        let* _l2_reorg = State.set_head state l2_block context in
+        return (l2_block, None)
     | None ->
         let* block_info =
           Alpha_block_services.info
@@ -339,7 +339,7 @@ let rec process_block cctxt state current_hash rollup_id :
         let*! () =
           Event.(emit processing_block) (current_hash, predecessor_hash)
         in
-        let* (l2_header, context) =
+        let* (l2_block, context) =
           process_messages_and_inboxes
             state
             ~predecessor:l2_predecessor_header
@@ -347,10 +347,10 @@ let rec process_block cctxt state current_hash rollup_id :
             block_info
             rollup_id
         in
-        let* () = State.set_head state l2_header context in
+        let* _l2_reorg = State.set_head state l2_block context in
         let*! () = Event.(emit new_tezos_head) current_hash in
         let*! () = Event.(emit block_processed) (current_hash, block_level) in
-        return (l2_header, Some context)
+        return (l2_block, Some context)
 
 let maybe_batch_and_inject cctxt state =
   match state.State.batcher_state with
