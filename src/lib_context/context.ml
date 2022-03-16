@@ -125,6 +125,45 @@ let lru_size = ref 5_000
    will have to be garbage collected later on to save space. *)
 let auto_flush = ref 10_000
 
+module Indexing_strategy : sig
+  (* Determines the policy used to determine whether to add new
+     objects to Irmin's index whenever they are exported to the
+     data file. *)
+  type t :=
+    [ `Minimal  (** only newly-exported commit objects are added to the index *)
+    | `Always  (** all newly-exported objects are added to the index *) ]
+
+  val parse : string -> (t, string) result
+
+  val set : t -> unit
+
+  val get : unit -> t
+
+  type irmin_t := Irmin_pack.Pack_store.Indexing_strategy.t
+
+  val to_irmin : t -> irmin_t
+end = struct
+  module I = Irmin_pack.Pack_store.Indexing_strategy
+
+  let singleton = ref `Minimal
+
+  let set x = singleton := x
+
+  let get () = !singleton
+
+  let parse = function
+    | "always" -> Ok `Always
+    | "minimal" -> Ok `Minimal
+    | x ->
+        Error
+          (Fmt.str
+             "Unable to parse indexing strategy '%s'. Expected one of { \
+              'always', 'minimal' }."
+             x)
+
+  let to_irmin = function `Always -> I.always | `Minimal -> I.minimal
+end
+
 let () =
   let verbose_info () =
     Logs.set_level (Some Logs.Info) ;
@@ -137,6 +176,14 @@ let () =
   let index_log_size n = index_log_size := int_of_string n in
   let auto_flush n = auto_flush := int_of_string n in
   let lru_size n = lru_size := int_of_string n in
+  let indexing_strategy x =
+    match Indexing_strategy.parse x with
+    | Ok x -> Indexing_strategy.set x
+    | Error msg ->
+        Fmt.failwith
+          "Invalid value for TEZOS_CONTEXT environment variable: %s"
+          msg
+  in
   match Unix.getenv "TEZOS_CONTEXT" with
   | exception Not_found -> ()
   | v ->
@@ -150,6 +197,7 @@ let () =
               | ["index-log-size"; n] -> index_log_size n
               | ["auto-flush"; n] -> auto_flush n
               | ["lru-size"; n] -> lru_size n
+              | ["indexing-strategy"; x] -> indexing_strategy x
               | _ -> ()))
         args
 
@@ -601,12 +649,17 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
 
   (*-- Initialisation ----------------------------------------------------------*)
 
-  let init ?patch_context ?(readonly = false) root =
+  let init ?patch_context ?(readonly = false) ?indexing_strategy root =
     let open Lwt_syntax in
     let+ repo =
+      let indexing_strategy =
+        Option.value indexing_strategy ~default:(Indexing_strategy.get ())
+        |> Indexing_strategy.to_irmin
+      in
       Store.Repo.v
         (Irmin_pack.config
            ~readonly
+           ~indexing_strategy
            ~index_log_size:!index_log_size
            ~lru_size:!lru_size
            root)

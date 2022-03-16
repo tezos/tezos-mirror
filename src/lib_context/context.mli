@@ -50,10 +50,18 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) : sig
 
   val index : context -> index
 
-  (** Open or initialize a versioned store at a given path. *)
+  (** Open or initialize a versioned store at a given path. 
+
+      @param indexing_strategy determines whether newly-exported objects by
+      this store handle should also be added to the store's index. [`Minimal]
+      (the default) only adds objects to the index when they are {i commits},
+      whereas [`Always] indexes every object type. The indexing strategy used
+      for existing stores can be changed without issue (as only {i
+      newly}-exported objects are impacted). *)
   val init :
     ?patch_context:(context -> context tzresult Lwt.t) ->
     ?readonly:bool ->
+    ?indexing_strategy:[`Always | `Minimal] ->
     string ->
     index Lwt.t
 
@@ -164,6 +172,12 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) : sig
   val dump_context :
     index -> Context_hash.t -> fd:Lwt_unix.file_descr -> int tzresult Lwt.t
 
+  (** Rebuild a context from a given snapshot.
+
+      NOTE: the indexing strategy used by the [index] must be [`Always] (in
+      order to recover direct internal pointers between store objects during
+      the import). This limitation is likely to be removed in a future version
+      of [lib_context]. *)
   val restore_context :
     index ->
     expected_context_hash:Context_hash.t ->
