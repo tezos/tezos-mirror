@@ -1,5 +1,4 @@
 #!/bin/sh
-set -x
 
 ## Sourceable file with common variables for other scripts related to release
 

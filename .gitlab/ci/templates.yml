@@ -12,6 +12,9 @@ variables:
   TEZOS_DEFAULT_BRANCH: "master"
   TEZOS_DEFAULT_NAMESPACE: "tezos"
 
+  # AWS private Docker Registry, mirror for some public images hosted registry.gitlab.com
+  AWS_ECR: "609325257694.dkr.ecr.us-east-1.amazonaws.com"
+
 # Basic, specialised, minimal, orthogonal templates
 
 # Some settings we want by default on all jobs

@@ -30,6 +30,7 @@
    the string was substituted. Thanks to this, we know whether we should get the
    hash from Generated_git_info (not available in archives) or not. *)
 
+(* The $Format string is substituted by git with attributes and export-subst *)
 let raw_commit_hash = "$Format:%H$"
 
 let commit_hash =
@@ -41,6 +42,7 @@ let abbreviated_commit_hash =
   if String.length commit_hash >= 8 then String.sub commit_hash 0 8
   else commit_hash
 
+(* The $Format string is substituted by git with attributes and export-subst *)
 let raw_committer_date = "$Format:%ci$"
 
 let committer_date =

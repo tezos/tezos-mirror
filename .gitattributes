@@ -1,12 +1,12 @@
 _coverage_output export-ignore
-.gitignore	export-ignore
-.gitattributes	export-ignore
-.gitlab-ci.yml	export-ignore
+.gitignore export-ignore
+.gitattributes export-ignore
+.gitlab-ci.yml export-ignore
 .github export-ignore
 .gitlab export-ignore
-devtools	export-ignore
+devtools export-ignore
 # these folders have symlinks which are problematic on Windows
 docs/active export-ignore
 
-src/lib_version/current_git_info.ml	export-subst
 src/lib_version/exe/get_git_info.ml export-subst
+src/lib_version/current_git_info.ml export-subst

@@ -2,14 +2,14 @@
 gitlab:release:
   extends:
     - .rules_template__release_tag
-  image: registry.gitlab.com/gitlab-org/release-cli:v0.11.0
+  # Mirror of registry.gitlab.com/nomadic-labs/iac/docker/tezos-ci:v1.0.0
+  image: "${AWS_ECR}/tezos-ci:v1.0.0"
   stage: publish_release
   dependencies:
     - build:static-x86_64-linux-binaries
     - build:static-arm64-linux-binaries
     - docker:merge_manifests
   script:
-    - apk --no-cache --virtual add jq curl git
     # we run the smoketest only for x86_64 since this job is executed on x86_64
     - ./scripts/ci/static_smoke_test.sh x86_64 version
     # create a GitLab generic package
