@@ -98,6 +98,10 @@ api/errors.rst: $(DOCERRORDIR)/error_doc.ml
 	@cd .. && dune build docs/$(DOCERRORDIR)/error_doc.exe
 	../_build/default/docs/$(DOCERRORDIR)/error_doc.exe > api/errors.rst
 
+developer/metrics.csv:
+	make -C ../ tezos-node
+	../tezos-node dump-metrics > developer/metrics.csv
+
 $(DOCGENDIR)/rpc_doc.exe:
 	@cd .. && dune build docs/$(DOCGENDIR)/rpc_doc.exe
 
@@ -122,7 +126,7 @@ install-dependencies:
 
 # Catch-all target: route all unknown targets to Sphinx using the new
 # "make mode" option.  $(O) is meant as a shortcut for $(SPHINXOPTS).
-html: Makefile api/errors.rst rpc p2p install-dependencies
+html: Makefile api/errors.rst developer/metrics.csv rpc p2p install-dependencies
 	(echo ':orphan:'; echo ''; cat ../CHANGES.rst) > CHANGES-dev.rst
 	@$(SPHINXBUILD) -b html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS)
 	@ln -s active "$(BUILDDIR)/hangzhou" || true
@@ -168,5 +172,5 @@ lint: pylint pycodestyle lint_black
 
 clean:
 	@-rm -Rf "$(BUILDDIR)"
-	@-rm -Rf api/errors.rst active/rpc.rst hangzhou/rpc.rst ithaca/rpc.rst alpha/rpc.rst shell/rpc.rst shell/p2p_api.rst user/default-acl.json CHANGES-dev.rst
+	@-rm -Rf api/errors.rst developer/metrics.csv active/rpc.rst hangzhou/rpc.rst ithaca/rpc.rst alpha/rpc.rst shell/rpc.rst shell/p2p_api.rst user/default-acl.json CHANGES-dev.rst
 	@-rm -Rf api/tezos-*.html api/tezos-*.txt active/tezos-*.html hangzhou/tezos-*.html ithaca/tezos-*.html alpha/tezos-*.html

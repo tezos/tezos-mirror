@@ -101,6 +101,67 @@ let info =
   let version = Tezos_version.Bin_version.version_string in
   Cmdliner.Term.info ~doc:"The Tezos node" ~man ~version "tezos-node"
 
+module Node_metrics_command = struct
+  let dump_metrics () =
+    let open Prometheus in
+    let metric_type_to_string = function
+      | Counter -> "Counter"
+      | Gauge -> "Gauge"
+      | Summary -> "Summary"
+      | Histogram -> "Histogram"
+    in
+    let pp_label_names fmt =
+      Format.pp_print_list
+        ~pp_sep:(fun fmt () -> Format.fprintf fmt ";")
+        (fun fmt v -> Format.fprintf fmt "%a" LabelName.pp v)
+        fmt
+    in
+    Format.printf "@[<v>Name,Type,Description,Labels" ;
+    List.iter
+      (fun (v, _) ->
+        Format.printf
+          "@,@[%a@],%s,\"%s\",%a"
+          MetricName.pp
+          v.MetricInfo.name
+          (metric_type_to_string v.MetricInfo.metric_type)
+          v.MetricInfo.help
+          pp_label_names
+          v.MetricInfo.label_names)
+      (Prometheus.MetricFamilyMap.to_list
+         Prometheus.CollectorRegistry.(collect default)) ;
+    Format.printf "@]@."
+
+  module Term = struct
+    let process _ = `Ok (dump_metrics ())
+
+    let docs = "METRICS OPTIONS"
+
+    let dump_metrics =
+      let doc = "Show available openmetrics in csv format." in
+      Cmdliner.Arg.(value & flag & info ~docs ~doc ["dump-metrics"])
+
+    let term = Cmdliner.Term.(ret (const process $ dump_metrics))
+  end
+
+  module Manpage = struct
+    let command_description =
+      "The $(b,dump-metrics) command is meant to dump openmetrics that are \
+       collected by the Tezos node on console."
+
+    let description = [`S "DESCRIPTION"; `P command_description]
+
+    let man = description
+
+    let info =
+      Cmdliner.Term.info
+        ~doc:"Show all the openmetrics collected by the Tezos node"
+        ~man
+        "dump-metrics"
+  end
+
+  let cmd = (Term.term, Manpage.info)
+end
+
 let commands =
   [
     Node_run_command.cmd;
@@ -111,6 +172,7 @@ let commands =
     Node_snapshot_command.cmd;
     Node_reconstruct_command.cmd;
     Node_storage_command.cmd;
+    Node_metrics_command.cmd;
   ]
 
 (* This call is not strictly necessary as the parameters are initialized
