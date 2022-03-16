@@ -33,7 +33,14 @@ type key = {
   secret_key : secret_key;
 }
 
-let sign_bytes ~watermark ~signer (message : Bytes.t) =
+type aggregate_key = {
+  aggregate_alias : string;
+  aggregate_public_key_hash : string;
+  aggregate_public_key : string;
+  aggregate_secret_key : secret_key;
+}
+
+let sign_bytes ~watermark ~(signer : key) (message : Bytes.t) =
   let (Unencrypted b58_secret_key) = signer.secret_key in
   let secret_key =
     Tezos_crypto.Signature.Secret_key.of_b58check_exn b58_secret_key
