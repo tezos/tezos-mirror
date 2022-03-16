@@ -48,7 +48,7 @@ let update_contract_tickets ctxt contract =
         ~allow_forged_in_storage:true
         script
       >>=? fun (ex_script, ctxt) ->
-      let (Ex_script {storage_type; storage; _}) = ex_script in
+      let (Ex_script (Script {storage_type; storage; _})) = ex_script in
       Ticket_scanner.type_has_tickets ctxt storage_type
       >>?= fun (has_tickets, ctxt) ->
       Ticket_scanner.tickets_of_value

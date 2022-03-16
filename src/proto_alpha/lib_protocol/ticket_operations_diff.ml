@@ -187,8 +187,9 @@ let tickets_of_transaction ctxt ~destination ~entrypoint ~location
           match script_opt with
           | None -> fail (Failed_to_get_script destination)
           | Some script -> return (script, ctxt))
-      >>=? fun (Script_ir_translator.Ex_script {arg_type; entrypoints; _}, ctxt)
-        ->
+      >>=? fun ( Script_ir_translator.Ex_script
+                   (Script {arg_type; entrypoints; _}),
+                 ctxt ) ->
       (* Find the entrypoint type for the given entrypoint. *)
       Gas_monad.run
         ctxt
@@ -235,15 +236,16 @@ let tickets_of_origination ctxt ~preorigination script =
         ~allow_forged_in_storage:true
         script
       >>=? fun ( Script_ir_translator.Ex_script
-                   {
-                     storage;
-                     storage_type;
-                     code = _;
-                     arg_type = _;
-                     views = _;
-                     entrypoints = _;
-                     code_size = _;
-                   },
+                   (Script
+                     {
+                       storage;
+                       storage_type;
+                       code = _;
+                       arg_type = _;
+                       views = _;
+                       entrypoints = _;
+                       code_size = _;
+                     }),
                  ctxt ) ->
       (* Extract any tickets from the storage. Note that if the type of the
          contract storage does not contain tickets, storage is not scanned. *)

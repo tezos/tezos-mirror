@@ -1055,8 +1055,8 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
                     ~allow_forged_in_storage:true
                     ctxt
                     script
-                  >>=? fun (Ex_script {storage; storage_type; views; _}, ctxt)
-                    ->
+                  >>=? fun ( Ex_script (Script {storage; storage_type; views; _}),
+                             ctxt ) ->
                   Gas.consume ctxt (Interp_costs.view_get name views)
                   >>?= fun ctxt ->
                   match Script_map.get name views with
@@ -1759,15 +1759,16 @@ let execute_any_arg logger ctxt mode step_constants ~entrypoint ~internal
         ~allow_forged_in_storage:true
   | Some ex_script -> return (ex_script, ctxt))
   >>=? fun ( Ex_script
-               {
-                 code_size;
-                 code;
-                 arg_type;
-                 storage = old_storage;
-                 storage_type;
-                 entrypoints;
-                 views;
-               },
+               (Script
+                 {
+                   code_size;
+                   code;
+                   arg_type;
+                   storage = old_storage;
+                   storage_type;
+                   entrypoints;
+                   views;
+                 }),
              ctxt ) ->
   Gas_monad.run
     ctxt
@@ -1819,7 +1820,8 @@ let execute_any_arg logger ctxt mode step_constants ~entrypoint ~internal
   in
   let script =
     Ex_script
-      {code_size; code; arg_type; storage; storage_type; entrypoints; views}
+      (Script
+         {code_size; code; arg_type; storage; storage_type; entrypoints; views})
   in
   Ticket_scanner.type_has_tickets ctxt arg_type
   >>?= fun (arg_type_has_tickets, ctxt) ->

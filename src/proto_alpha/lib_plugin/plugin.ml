@@ -2537,15 +2537,16 @@ module RPC = struct
           >>=? fun (storage, _) ->
           let script =
             Script_ir_translator.Ex_script
-              {
-                code;
-                arg_type;
-                storage_type;
-                views;
-                entrypoints;
-                code_size;
-                storage;
-              }
+              (Script
+                 {
+                   code;
+                   arg_type;
+                   storage_type;
+                   views;
+                   entrypoints;
+                   code_size;
+                   storage;
+                 })
           in
           let (size, cost) = Script_ir_translator.script_size script in
           Gas.consume ctxt cost >>?= fun _ctxt -> return @@ size) ;

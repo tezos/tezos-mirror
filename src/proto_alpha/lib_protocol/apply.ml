@@ -1157,7 +1157,7 @@ let apply_origination ~consume_deserialization_gas ~ctxt ~script ~internal
     ~legacy:false
     ~allow_forged_in_storage:internal
     script
-  >>=? fun (Ex_script parsed_script, ctxt) ->
+  >>=? fun (Ex_script (Script parsed_script), ctxt) ->
   let views_result =
     Script_ir_translator.typecheck_views
       ctxt

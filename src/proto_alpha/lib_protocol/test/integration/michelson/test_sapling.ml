@@ -951,7 +951,7 @@ module Interpreter_tests = struct
         ~allow_forged_in_storage:true
         script
       >>= wrap
-      >>=? fun (Ex_script script, ctxt) ->
+      >>=? fun (Ex_script (Script script), ctxt) ->
       Script_ir_translator.get_single_sapling_state
         ctxt
         script.storage_type
