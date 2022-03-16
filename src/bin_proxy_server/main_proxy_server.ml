@@ -68,7 +68,7 @@ let data_dir : string option Term.t =
      reducing the node's IO)."
   in
   let docv = "DATA_DIR" in
-  Arg.(value & opt (some string) None & info ["data-dir"] ~docv ~doc)
+  Arg.(value & opt (some string) None & info ["d"; "data-dir"] ~docv ~doc)
 
 let sym_block_caching_time : int option Term.t =
   let doc =
