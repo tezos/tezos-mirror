@@ -1139,8 +1139,9 @@ let run () =
                       test.session_successful_runs + single_seconds time)
               | Failed _ ->
                   Log.report
-                    "Try again with: %s --verbose --title %s"
+                    "Try again with: %s --verbose --file %s --title %s"
                     Sys.argv.(0)
+                    (Log.quote_shell test.file)
                     (Log.quote_shell test.title) ;
                   test.session_failed_runs <-
                     Summed_durations.(
