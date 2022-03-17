@@ -425,17 +425,6 @@ module Test_Ticket_ledger = struct
 
     return_unit
 
-  (** Test that crediting a non strictly positive quantity fails. *)
-  let test_credit_invalid_quantity () =
-    let* (ctxt, idx1) = context_with_one_addr in
-    let* () =
-      expect_error
-        (credit ctxt ticket_idx1 idx1 Tx_rollup_l2_qty.zero)
-        Invalid_quantity
-    in
-
-    return_unit
-
   (** Test that an index can be credited ticket indexes even if its not associated
       to an address. *)
   let test_credit_unknown_index () =
@@ -504,7 +493,6 @@ module Test_Ticket_ledger = struct
       [
         ("test credit", test_credit);
         ("test credit too much", test_credit_too_much);
-        ("test credit invalid quantity", test_credit_invalid_quantity);
         ("test credit unknown index", test_credit_unknown_index);
         ("test spend", test_spend_valid);
         ("test spend without required balance", test_spend_without_balance);
@@ -542,37 +530,42 @@ module Test_batch_encodings = struct
   let decode_transaction buffer =
     Binary.of_bytes_exn transaction_encoding buffer
 
-  let destination_pp fmt =
-    let open Protocol.Tx_rollup_l2_batch in
-    function
-    | Layer1 pkh -> Signature.Public_key_hash.pp fmt pkh
-    | Layer2 l2 -> Tx_rollup_l2_address.Indexable.pp fmt l2
-
   let operation_content_pp fmt = function
-    | {destination; ticket_hash; qty} ->
+    | Transfer {destination; ticket_hash; qty} ->
         Format.fprintf
           fmt
-          "@[<hov 2>Operation:@ destination=%a,@ ticket_hash=%a,@ qty:%a@]"
-          destination_pp
+          "@[<hov 2>Transfer:@ destination=%a,@ ticket_hash=%a,@ qty:%a@]"
+          Tx_rollup_l2_address.Indexable.pp
           destination
           Tx_rollup_l2_context_sig.Ticket_indexable.pp
           ticket_hash
           Tx_rollup_l2_qty.pp
           qty
+    | Withdraw {destination; ticket_hash; qty} ->
+        Format.fprintf
+          fmt
+          "@[<hov 2>Withdraw:@ destination=%a,@ ticket_hash=%a,@ qty:%a@]"
+          Signature.Public_key_hash.pp
+          destination
+          Alpha_context.Ticket_hash.pp
+          ticket_hash
+          Tx_rollup_l2_qty.pp
+          qty
 
-  let test_l2_operation_size () =
-    (* Assert the smallest operation_content size is 4 *)
+  let test_l2_transaction_size () =
+    (* Assert the smallest operation_content size is 5 *)
     let opc =
-      {
-        destination = Layer2 (Indexable.from_index_exn 0l);
-        ticket_hash = Indexable.from_index_exn 1l;
-        qty = Tx_rollup_l2_qty.of_int64_exn 12L;
-      }
+      Transfer
+        {
+          destination = Indexable.from_index_exn 0l;
+          ticket_hash = Indexable.from_index_exn 1l;
+          qty = Tx_rollup_l2_qty.of_int64_exn 12L;
+        }
     in
     let buffer = encode_content opc in
     let opc' = decode_content buffer in
 
-    Alcotest.(check int "smallest transfer content" 4 (Bytes.length buffer)) ;
+    Alcotest.(check int "smallest operation content" 4 (Bytes.length buffer)) ;
     assert (opc = opc') ;
 
     (* Assert the smallest operation size is 7 *)
@@ -582,7 +575,7 @@ module Test_batch_encodings = struct
     let buffer = encode_operation op in
     let op' = decode_operation buffer in
 
-    Alcotest.(check int "smallest transfer" 7 (Bytes.length buffer)) ;
+    Alcotest.(check int "smallest operation" 7 (Bytes.length buffer)) ;
     assert (op = op') ;
 
     (* Assert the smallest transaction size is 8 *)
@@ -595,66 +588,12 @@ module Test_batch_encodings = struct
 
     return_unit
 
-  let test_l2_operation_encode_guard () =
-    let invalid_indexed_l2_to_l1_op =
-      {
-        destination = Layer1 Signature.Public_key_hash.zero;
-        ticket_hash = Indexable.from_index_exn 1l;
-        qty = Tx_rollup_l2_qty.of_int64_exn 12L;
-      }
-    in
-    try
-      let buffer = encode_content invalid_indexed_l2_to_l1_op in
-      Alcotest.failf
-        "Expected encoding of layer2-to-layer1 operation_content with indexed \
-         ticket to fail. Binary output: %s"
-        Hex.(of_bytes buffer |> show)
-    with
-    | Data_encoding.Binary.Write_error (Exception_raised_in_user_function _) ->
-        return_unit
-    | Data_encoding.Binary.Write_error e ->
-        Alcotest.failf
-          "Got unexpected exception Write_error: %a"
-          Binary.pp_write_error
-          e
-    | e -> Alcotest.failf "Got unexpected exception: %s" (Printexc.to_string e)
-
-  let test_l2_operation_decode_guard () =
-    let invalid_indexed_l2_to_l1_op_serialized =
-      Hex.(
-        `Hex "00000000000000000000000000000000000000000000010c" |> to_bytes
-        |> Stdlib.Option.get)
-    in
-    try
-      let invalid_indexed_l2_to_l1_op =
-        decode_content invalid_indexed_l2_to_l1_op_serialized
-      in
-      Alcotest.failf
-        "Expected decoding of layer2-to-layer1 operation_content with indexed \
-         ticket to fail. Got operation: %a"
-        operation_content_pp
-        invalid_indexed_l2_to_l1_op
-    with
-    | Data_encoding.Binary.Read_error (Exception_raised_in_user_function _) ->
-        return_unit
-    | Data_encoding.Binary.Read_error e ->
-        Alcotest.failf
-          "Got unexpected exception Read_error: %a"
-          Binary.pp_read_error
-          e
-    | e -> Alcotest.failf "Got unexpected exception: %s" (Printexc.to_string e)
-
   let tests =
     [
-      tztest "test layer-2 operation encoding size" `Quick test_l2_operation_size;
       tztest
-        "test layer-2 operation encoding guard"
+        "test layer-2 transaction encoding size"
         `Quick
-        test_l2_operation_encode_guard;
-      tztest
-        "test layer-2 operation decoding guard"
-        `Quick
-        test_l2_operation_decode_guard;
+        test_l2_transaction_size;
     ]
 end
 

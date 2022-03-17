@@ -61,6 +61,9 @@ type error +=
   | Invalid_batch_encoding
   | Unexpectedly_indexed_ticket
   | Missing_ticket of Ticket_hash.t
+  | Unknown_address of Tx_rollup_l2_address.t
+  | Invalid_self_transfer
+  | Invalid_zero_transfer
 
 module Address_indexes : Map.S with type key = Tx_rollup_l2_address.t
 

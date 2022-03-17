@@ -423,13 +423,15 @@ let craft_tx ~counter ~signer ~dest ~ticket qty =
   let open Tezos_protocol_alpha.Protocol in
   let qty = Tx_rollup_l2_qty.of_int64_exn qty in
   let l2_addr = Tx_rollup_l2_address.of_b58check_exn dest in
-  let destination = Tx_rollup_l2_batch.Layer2 (Indexable.from_value l2_addr) in
+  let destination = Indexable.from_value l2_addr in
   let ticket_hash =
     Indexable.from_value
       (Tezos_protocol_alpha.Protocol.Alpha_context.Ticket_hash.of_b58check_exn
          ticket)
   in
-  let content = Tx_rollup_l2_batch.V1.{destination; ticket_hash; qty} in
+  let content =
+    Tx_rollup_l2_batch.V1.Transfer {destination; ticket_hash; qty}
+  in
   let signer = Indexable.from_value signer in
   Tx_rollup_l2_batch.V1.{signer; counter; contents = [content]}
 
@@ -564,7 +566,7 @@ let test_l2_to_l2_transaction =
       let tx =
         craft_tx
           ~counter:1L
-          ~signer:bls_pk_1
+          ~signer:(Bls_pk bls_pk_1)
           ~dest:bls_pkh_2_str
           ~ticket:ticket_id
           1L

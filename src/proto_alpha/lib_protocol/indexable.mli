@@ -147,6 +147,11 @@ val compare : ('a -> 'a -> int) -> ('state, 'a) t -> ('state', 'a) t -> int
     are indeed both values. *)
 val compare_values : ('a -> 'a -> int) -> 'a value -> 'a value -> int
 
+(** [compare_indexes x y] compares the indexes [x] and [y], and relies
+    on the type system of OCaml to ensure that [x] and [y] are indeed
+    both indexes. *)
+val compare_indexes : 'a index -> 'a index -> int
+
 module type VALUE = sig
   type t
 
@@ -183,6 +188,8 @@ module Make (V : VALUE) : sig
   val compare : 'state t -> 'state' t -> int
 
   val compare_values : value -> value -> int
+
+  val compare_indexes : index -> index -> int
 
   val pp : Format.formatter -> 'state t -> unit
 end

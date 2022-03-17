@@ -42,6 +42,9 @@ type error +=
   | Invalid_batch_encoding
   | Unexpectedly_indexed_ticket
   | Missing_ticket of Ticket_hash.t
+  | Unknown_address of Tx_rollup_l2_address.t
+  | Invalid_self_transfer
+  | Invalid_zero_transfer
 
 let () =
   let open Data_encoding in
@@ -131,7 +134,35 @@ let () =
       "A withdrawal must reference a ticket that already exists in the rollup."
     (obj1 (req "ticket_hash" Ticket_hash.encoding))
     (function Missing_ticket ticket_hash -> Some ticket_hash | _ -> None)
-    (function ticket_hash -> Missing_ticket ticket_hash)
+    (function ticket_hash -> Missing_ticket ticket_hash) ;
+  (* Unknown address *)
+  register_error_kind
+    `Temporary
+    ~id:"tx_rollup_unknown_address"
+    ~title:"Attempted to sign a transfer with an unknown address"
+    ~description:
+      "The address must exist in the context when signing a transfer with it."
+    (obj1 (req "address" Tx_rollup_l2_address.encoding))
+    (function Unknown_address addr -> Some addr | _ -> None)
+    (function addr -> Unknown_address addr) ;
+  (* Invalid self transfer *)
+  register_error_kind
+    `Temporary
+    ~id:"tx_rollup_invalid_self_transfer"
+    ~title:"Attempted to transfer ticket to self"
+    ~description:"The index for the destination is the same as the sender"
+    empty
+    (function Invalid_self_transfer -> Some () | _ -> None)
+    (function () -> Invalid_self_transfer) ;
+  (* Invalid zero transfer *)
+  register_error_kind
+    `Permanent
+    ~id:"tx_rollup_invalid_zero_transfer"
+    ~title:"Attempted to transfer zero ticket"
+    ~description:"A transfer's amount must be greater than zero."
+    empty
+    (function Invalid_zero_transfer -> Some () | _ -> None)
+    (function () -> Invalid_zero_transfer)
 
 module Address_indexes = Map.Make (Tx_rollup_l2_address)
 module Ticket_indexes = Map.Make (Ticket_hash)
@@ -376,6 +407,9 @@ module Make (Context : CONTEXT) = struct
       ticket_indexes = add_to_ticket_indexes indexes.ticket_indexes ticket;
     }
 
+  let assert_non_zero_quantity qty =
+    fail_when Tx_rollup_l2_qty.(qty = zero) Invalid_zero_transfer
+
   (** {2. Counter } *)
 
   (** [get_metadata ctxt idx] returns the metadata associated to [idx] in
@@ -397,6 +431,12 @@ module Make (Context : CONTEXT) = struct
   (** [transfers ctxt source_idx destination_idx tidx amount] transfers [amount]
       from [source_idx] to [destination_idx] of [tidx]. *)
   let transfer ctxt source_idx destination_idx tidx amount =
+    let* () =
+      fail_unless
+        Compare.Int.(Indexable.compare_indexes source_idx destination_idx <> 0)
+        Invalid_self_transfer
+    in
+    let* () = assert_non_zero_quantity amount in
     let* ctxt = Ticket_ledger.spend ctxt tidx source_idx amount in
     Ticket_ledger.credit ctxt tidx destination_idx amount
 
@@ -433,15 +473,15 @@ module Make (Context : CONTEXT) = struct
      fun ctxt indexes op ->
       let* (ctxt, indexes, pk, idx) =
         match Indexable.destruct op.signer with
-        | Left pk_index ->
+        | Left signer_index ->
             (* Get the public key from the index. *)
-            let address_index = address_of_signer_index pk_index in
+            let address_index = address_of_signer_index signer_index in
             let* metadata = get_metadata ctxt address_index in
             let pk = metadata.public_key in
             return (ctxt, indexes, pk, address_index)
-        | Right pk -> (
+        | Right (Bls_pk signer_pk) -> (
             (* Initialize the ctxt with public_key if it's necessary. *)
-            let addr = Tx_rollup_l2_address.of_bls_pk pk in
+            let addr = Tx_rollup_l2_address.of_bls_pk signer_pk in
             let* (ctxt, created, idx) =
               Address_index.get_or_associate_index ctxt addr
             in
@@ -462,15 +502,28 @@ module Make (Context : CONTEXT) = struct
                       (* If the metadata exists, then the public key necessarily
                          exists, we do not need to change the context. *)
                       return ctxt
-                  | None -> Address_metadata.init_with_public_key ctxt idx pk
+                  | None ->
+                      Address_metadata.init_with_public_key ctxt idx signer_pk
                 in
-                return (ctxt, indexes, pk, idx)
+                return (ctxt, indexes, signer_pk, idx)
             | `Created ->
-                (* If the index is created however, we need to add to indexes and
-                   initiliaze the metadata. *)
+                (* If the index is created, we need to add to indexes and
+                   initialize the metadata. *)
                 let indexes = add_addr_to_indexes indexes addr idx in
-                let* ctxt = Address_metadata.init_with_public_key ctxt idx pk in
-                return (ctxt, indexes, pk, idx))
+                let* ctxt =
+                  Address_metadata.init_with_public_key ctxt idx signer_pk
+                in
+                return (ctxt, indexes, signer_pk, idx))
+        | Right (L2_addr signer_addr) -> (
+            (* In order to get the public key associated to [signer_addr], there
+               needs to be both an index associated to it, and a metadata for this
+               index. *)
+            let* idx = Address_index.get ctxt signer_addr in
+            match idx with
+            | None -> fail (Unknown_address signer_addr)
+            | Some idx ->
+                let* metadata = get_metadata ctxt idx in
+                return (ctxt, indexes, metadata.public_key, idx))
       in
       let op : (Indexable.index_only, 'content) operation =
         {op with signer = signer_of_address_index idx}
@@ -561,9 +614,6 @@ module Make (Context : CONTEXT) = struct
 
         {ul {li The destination address index.}
             {li The ticket exchanged index.}}
-
-        If the transfer is layer2-to-layer1, then it also returns
-        the resulting withdrawal.
     *)
     let apply_operation_content :
         ctxt ->
@@ -571,33 +621,29 @@ module Make (Context : CONTEXT) = struct
         Signer_indexable.index ->
         'content operation_content ->
         (ctxt * indexes * Tx_rollup_withdraw.withdrawal option) m =
-     fun ctxt indexes source_idx {destination; ticket_hash; qty} ->
-      match destination with
-      | Layer1 l1_dest ->
-          (* To withdraw, the ticket must be given in the form of a
-             value. Furthermore, the ticket must already exist in the
+     fun ctxt indexes source_idx op_content ->
+      match op_content with
+      | Withdraw {destination = claimer; ticket_hash; qty = amount} ->
+          (* To withdraw, the ticket must already exist in the
              rollup and be indexed (the ticket must have already been
              assigned an index in the content: otherwise the ticket has
-             not been seen before and we can't withdraw from
-             it). Therefore, we do not create any new associations in
-             the ticket index. *)
-          let*? ticket_hash =
-            Indexable.is_value_e ~error:Unexpectedly_indexed_ticket ticket_hash
-          in
+             not been seen before and we can't withdraw from it). *)
           let* tidx_opt = Ticket_index.get ctxt ticket_hash in
           let*? tidx =
             Option.value_e ~error:(Missing_ticket ticket_hash) tidx_opt
           in
           let source_idx = address_of_signer_index source_idx in
+
           (* spend the ticket -- this is responsible for checking that
              the source has the required balance *)
-          let* ctxt = Ticket_ledger.spend ctxt tidx source_idx qty in
-          let withdrawal =
-            Tx_rollup_withdraw.{claimer = l1_dest; ticket_hash; amount = qty}
-          in
+          let* () = assert_non_zero_quantity amount in
+          let* ctxt = Ticket_ledger.spend ctxt tidx source_idx amount in
+          let withdrawal = Tx_rollup_withdraw.{claimer; ticket_hash; amount} in
           return (ctxt, indexes, Some withdrawal)
-      | Layer2 l2_dest ->
-          let* (ctxt, created_addr, dest_idx) = address_index ctxt l2_dest in
+      | Transfer {destination; ticket_hash; qty} ->
+          let* (ctxt, created_addr, dest_idx) =
+            address_index ctxt destination
+          in
           let* (ctxt, created_ticket, tidx) = ticket_index ctxt ticket_hash in
           let source_idx = address_of_signer_index source_idx in
           let* ctxt = transfer ctxt source_idx dest_idx tidx qty in

@@ -68,14 +68,23 @@ open Tx_rollup_l2_context_sig
    implementation of their encodings have been carefully crafted in
    order to allow for compact batches. *)
 
+(** Represents the [signer] of an layer-2 operation. This is either a
+    BLS public key or a layer-2 address index, whose metadata in turn
+    contains a corresponding BLS public. key *)
+type signer =
+  | Bls_pk of Bls_signature.pk  (** A signer identified by a BLS public key. *)
+  | L2_addr of Tx_rollup_l2_address.t
+      (** A signer identified by a layer-2 address. Each such adress
+          is in turn identified with a BLS public key. *)
+
 module Signer_indexable : sig
-  type nonrec 'state t = ('state, Bls_signature.pk) Indexable.t
+  type nonrec 'state t = ('state, signer) Indexable.t
 
-  type nonrec index = Bls_signature.pk Indexable.index
+  type nonrec index = signer Indexable.index
 
-  type nonrec value = Bls_signature.pk Indexable.value
+  type nonrec value = signer Indexable.value
 
-  type either = Bls_signature.pk Indexable.either
+  type either = signer Indexable.either
 
   val encoding : either Data_encoding.t
 
@@ -86,21 +95,28 @@ end
 
 (** {1 Layer-2 Batches Definitions} *)
 
-type 'status destination =
-  | Layer1 of Signature.Public_key_hash.t
-  | Layer2 of 'status Tx_rollup_l2_address.Indexable.t
-
-val compact_destination : Indexable.unknown destination Data_encoding.Compact.t
-
 (** The operations are versioned, to let the possibility to propose
     new features in future iterations of the protocol. *)
 
 module V1 : sig
-  type 'status operation_content = {
-    destination : 'status destination;
-    ticket_hash : 'status Ticket_indexable.t;
-    qty : Tx_rollup_l2_qty.t;
-  }
+  type 'status operation_content =
+    | Withdraw of {
+        destination : Signature.Public_key_hash.t;
+        ticket_hash : Alpha_context.Ticket_hash.t;
+        qty : Tx_rollup_l2_qty.t;
+      }
+        (** A [Withdraw] removes [qty] of the tickets represented by
+            [ticket_hash] from the operation's signer in layer-2, and
+            permits [destination] to retrieve those tickets in layer-1
+            through a [Tx_rollup_withdraw] operation. *)
+    | Transfer of {
+        destination : 'status Tx_rollup_l2_address.Indexable.t;
+        ticket_hash : 'status Ticket_indexable.t;
+        qty : Tx_rollup_l2_qty.t;
+      }
+        (** A [Transfer] moves [qty] of the tickets represented by
+            [ticket_hash] from the operation's signer in layer-2 to
+            [destination] in layer-2. *)
 
   type ('signer, 'content) operation = {
     signer : 'signer Signer_indexable.t;
