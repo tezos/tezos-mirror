@@ -393,24 +393,29 @@ let read_block_metadata ?location cemented_store block_level =
       let*! b = Lwt_unix.file_exists metadata_file in
       match b with
       | false -> return_none
-      | true -> (
-          match Zip.open_in metadata_file with
-          | exception _ -> return_none
-          | in_file ->
-              Lwt.catch
+      | true ->
+          Lwt.catch
+            (fun () ->
+              let*! in_file = Lwt_preemptive.detach Zip.open_in metadata_file in
+              Lwt.finalize
                 (fun () ->
-                  let entry =
-                    Zip.find_entry in_file (Int32.to_string block_level)
+                  let*! entry =
+                    Lwt_preemptive.detach
+                      (fun () ->
+                        Zip.find_entry in_file (Int32.to_string block_level))
+                      ()
                   in
-                  let metadata = Zip.read_entry in_file entry in
-                  Zip.close_in in_file ;
+                  let*! metadata =
+                    Lwt_preemptive.detach
+                      (fun () -> Zip.read_entry in_file entry)
+                      ()
+                  in
                   return_some
                     (Data_encoding.Binary.of_string_exn
                        Block_repr.metadata_encoding
                        metadata))
-                (fun _ ->
-                  Zip.close_in in_file ;
-                  return_none)))
+                (fun () -> Lwt_preemptive.detach Zip.close_in in_file))
+            (fun _ -> return_none))
 
 let cement_blocks_metadata cemented_store blocks =
   let open Lwt_tzresult_syntax in
@@ -437,37 +442,40 @@ let cement_blocks_metadata cemented_store blocks =
         Naming.cemented_blocks_tmp_metadata_file cemented_metadata_dir file
         |> Naming.file_path
       in
-      if List.exists (fun block -> Block_repr.metadata block <> None) blocks
-      then (
-        let out_file = Zip.open_out tmp_metadata_file_path in
-        let*! () =
-          List.iter_s
-            (fun block ->
-              let level = Block_repr.level block in
-              match Block_repr.metadata block with
-              | Some metadata ->
-                  let metadata =
-                    Data_encoding.Binary.to_string_exn
-                      Block_repr.metadata_encoding
-                      metadata
-                  in
-                  Zip.add_entry
-                    ~level:default_compression_level
-                    metadata
-                    out_file
-                    (Int32.to_string level) ;
-                  Lwt.pause ()
-              | None -> Lwt.return_unit)
-            blocks
-        in
-        Zip.close_out out_file ;
-        let metadata_file_path =
-          Naming.cemented_blocks_metadata_file cemented_metadata_dir file
-          |> Naming.file_path
-        in
-        let*! () = Lwt_unix.rename tmp_metadata_file_path metadata_file_path in
-        return_unit)
-      else return_unit
+      let*! out_file =
+        Lwt_preemptive.detach Zip.open_out tmp_metadata_file_path
+      in
+      let*! () =
+        Lwt.finalize
+          (fun () ->
+            List.iter_s
+              (fun block ->
+                let level = Block_repr.level block in
+                match Block_repr.metadata block with
+                | Some metadata ->
+                    let metadata =
+                      Data_encoding.Binary.to_string_exn
+                        Block_repr.metadata_encoding
+                        metadata
+                    in
+                    Lwt_preemptive.detach
+                      (fun () ->
+                        Zip.add_entry
+                          ~level:default_compression_level
+                          metadata
+                          out_file
+                          (Int32.to_string level))
+                      ()
+                | None -> Lwt.return_unit)
+              blocks)
+          (fun () -> Lwt_preemptive.detach Zip.close_out out_file)
+      in
+      let metadata_file_path =
+        Naming.cemented_blocks_metadata_file cemented_metadata_dir file
+        |> Naming.file_path
+      in
+      let*! () = Lwt_unix.rename tmp_metadata_file_path metadata_file_path in
+      return_unit
 
 let read_block fd block_number =
   let open Lwt_syntax in
