@@ -14,7 +14,7 @@ depends: [
   "tezos-lwt-result-stdlib"
   "tezos-event-logging"
   "tezos-stdlib"
-  "data-encoding" { >= "0.5.1" & < "0.6" }
+  "data-encoding" { >= "0.5.3" & < "0.6" }
   "lwt" { >= "5.4.0" }
   "ipaddr" { >= "5.0.0" & < "6.0.0" }
   "re" { >= "1.7.2" }

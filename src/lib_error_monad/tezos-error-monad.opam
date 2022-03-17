@@ -11,7 +11,7 @@ depends: [
   "dune" { >= "2.9" }
   "ocaml" { >= "4.07" }
   "tezos-stdlib"
-  "data-encoding" { >= "0.5.1" & < "0.6" }
+  "data-encoding" { >= "0.5.3" & < "0.6" }
   "lwt-canceler" { >= "0.3" & < "0.4" }
   "lwt" { >= "5.4.0" }
   "tezos-lwt-result-stdlib"
