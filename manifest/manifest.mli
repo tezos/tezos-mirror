@@ -547,6 +547,8 @@ val pps : ?args:string list -> target -> preprocessor
 
     - [synopsis]: short description for the [.opam] file.
 
+    - [description]: long description for the [.opam] file.
+
     - [warnings]: the argument passed to the -w flag when building.
 
     - [wrapped]: if [false], add the [(wrapped false)] stanza in the [dune] file.
@@ -588,6 +590,7 @@ type 'a maker =
   ?static:bool ->
   ?static_cclibs:string list ->
   ?synopsis:string ->
+  ?description:string ->
   ?time_measurement_ppx:bool ->
   ?warnings:string ->
   ?wrapped:bool ->
