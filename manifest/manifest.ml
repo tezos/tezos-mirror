@@ -1142,9 +1142,10 @@ module Target = struct
       ?modules ?(modules_without_implementation = []) ?(npm_deps = []) ?ocaml
       ?opam ?(opam_with_test = Always) ?(preprocess = [])
       ?(preprocessor_deps = []) ?(private_modules = []) ?(opam_only_deps = [])
-      ?release ?static ?synopsis ?description ?(time_measurement_ppx = false)
-      ?(virtual_modules = []) ?default_implementation ?(cram = false) ?license
-      ?(extra_authors = []) ~path names =
+      ?(release = false) ?static ?synopsis ?description
+      ?(time_measurement_ppx = false) ?(virtual_modules = [])
+      ?default_implementation ?(cram = false) ?license ?(extra_authors = [])
+      ~path names =
     let conflicts = List.filter_map Fun.id conflicts in
     let deps = List.filter_map Fun.id deps in
     let opam_only_deps = List.filter_map Fun.id opam_only_deps in
@@ -1342,11 +1343,6 @@ module Target = struct
                 public_name
                 (String.concat ", " privates))
       | _ -> ()
-    in
-    let release =
-      match release with
-      | Some release -> release
-      | None -> ( match kind with Public_executable _ -> true | _ -> false)
     in
     let static =
       match (static, kind) with
@@ -2388,6 +2384,23 @@ let generate_package_json_file () =
        pp_dep)
     (List.sort compare !l)
 
+let generate_binaries_for_release () =
+  write "binaries-for-release" @@ fun fmt ->
+  !Target.registered
+  |> List.iter (fun (internal : Target.internal) ->
+         if internal.release then
+           match internal.kind with
+           | Public_library _ | Private_library _ | Private_executable _
+           | Test_executable _ ->
+               error
+                 "Target %s is marked with ~release:true but is not a public \
+                  executable.\n"
+                 (Target.name_for_errors (Internal internal))
+           | Public_executable ne_list ->
+               Ne_list.to_list ne_list
+               |> List.iter (fun (full_name : Target.full_name) ->
+                      Format.fprintf fmt "%s@." full_name.public_name))
+
 let generate_static_packages () =
   write "static-packages" @@ fun fmt ->
   Target.iter_internal_by_opam (fun package internals ->
@@ -2852,6 +2865,7 @@ let generate ~make_tezt_exe =
     generate_package_json_file () ;
     generate_static_packages () ;
     generate_opam_ci () ;
+    generate_binaries_for_release () ;
     Option.iter (generate_opam_files_for_release packages_dir) release
   with exn ->
     Printexc.print_backtrace stderr ;
