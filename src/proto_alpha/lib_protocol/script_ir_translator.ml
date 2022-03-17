@@ -2933,6 +2933,10 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
         script_instr
         stack_ty
   in
+  let bad_stack_error ctxt loc prim relevant_stack_portion =
+    let whole_stack = serialize_stack_for_error ctxt stack_ty in
+    error (Bad_stack (loc, prim, relevant_stack_portion, whole_stack))
+  in
   match (script_instr, stack_ty) with
   (* stack ops *)
   | Prim (loc, I_DROP, [], annot), Item_t (_, rest) ->
@@ -2976,44 +2980,35 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       >>?= fun ctxt ->
       let dup = {apply = (fun kinfo k -> IDup (kinfo, k))} in
       typed ctxt loc dup (Item_t (v, stack))
-  | Prim (loc, I_DUP, [n], v_annot), stack_ty -> (
-      let bad_stack_error () =
-        let whole_stack = serialize_stack_for_error ctxt stack_ty in
-        error (Bad_stack (loc, I_DUP, 1, whole_stack))
+  | Prim (loc, I_DUP, [n], v_annot), (Item_t _ as stack_ty) ->
+      check_var_annot loc v_annot >>?= fun () ->
+      let rec make_proof_argument :
+          type a b s.
+          int -> (a, b * s) stack_ty -> (a, b, s) dup_n_proof_argument tzresult
+          =
+       fun n (stack_ty : (a, b * s) stack_ty) ->
+        match (n, stack_ty) with
+        | 1, Item_t (hd_ty, _) -> ok @@ Dup_n_proof_argument (Dup_n_zero, hd_ty)
+        | n, Item_t (_, (Item_t (_, _) as tl_ty)) ->
+            make_proof_argument (n - 1) tl_ty
+            >|? fun (Dup_n_proof_argument (dup_n_witness, b_ty)) ->
+            Dup_n_proof_argument (Dup_n_succ dup_n_witness, b_ty)
+        | _ -> bad_stack_error ctxt loc I_DUP 1
       in
-      match stack_ty with
-      | Bot_t -> Lwt.return @@ bad_stack_error ()
-      | Item_t _ as stack_ty ->
-          check_var_annot loc v_annot >>?= fun () ->
-          let rec make_proof_argument :
-              type a b s.
-              int ->
-              (a, b * s) stack_ty ->
-              (a, b, s) dup_n_proof_argument tzresult =
-           fun n (stack_ty : (a, b * s) stack_ty) ->
-            match (n, stack_ty) with
-            | 1, Item_t (hd_ty, _) ->
-                ok @@ Dup_n_proof_argument (Dup_n_zero, hd_ty)
-            | n, Item_t (_, (Item_t (_, _) as tl_ty)) ->
-                make_proof_argument (n - 1) tl_ty
-                >|? fun (Dup_n_proof_argument (dup_n_witness, b_ty)) ->
-                Dup_n_proof_argument (Dup_n_succ dup_n_witness, b_ty)
-            | _ -> bad_stack_error ()
-          in
-          parse_uint10 n >>?= fun n ->
-          Gas.consume ctxt (Typecheck_costs.proof_argument n) >>?= fun ctxt ->
-          error_unless (Compare.Int.( > ) n 0) (Dup_n_bad_argument loc)
-          >>?= fun () ->
-          record_trace (Dup_n_bad_stack loc) (make_proof_argument n stack_ty)
-          >>?= fun (Dup_n_proof_argument (witness, after_ty)) ->
-          record_trace_eval
-            (fun () ->
-              let t = serialize_ty_for_error after_ty in
-              Non_dupable_type (loc, t))
-            (check_dupable_ty ctxt loc after_ty)
-          >>?= fun ctxt ->
-          let dupn = {apply = (fun kinfo k -> IDup_n (kinfo, n, witness, k))} in
-          typed ctxt loc dupn (Item_t (after_ty, stack_ty)))
+      parse_uint10 n >>?= fun n ->
+      Gas.consume ctxt (Typecheck_costs.proof_argument n) >>?= fun ctxt ->
+      error_unless (Compare.Int.( > ) n 0) (Dup_n_bad_argument loc)
+      >>?= fun () ->
+      record_trace (Dup_n_bad_stack loc) (make_proof_argument n stack_ty)
+      >>?= fun (Dup_n_proof_argument (witness, after_ty)) ->
+      record_trace_eval
+        (fun () ->
+          let t = serialize_ty_for_error after_ty in
+          Non_dupable_type (loc, t))
+        (check_dupable_ty ctxt loc after_ty)
+      >>?= fun ctxt ->
+      let dupn = {apply = (fun kinfo k -> IDup_n (kinfo, n, witness, k))} in
+      typed ctxt loc dupn (Item_t (after_ty, stack_ty))
   | Prim (loc, I_DIG, [n], result_annot), stack ->
       let rec make_proof_argument :
           type a s. int -> (a, s) stack_ty -> (a, s) dig_proof_argument tzresult
@@ -3159,75 +3154,55 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       let stack_ty = Item_t (ty, rest) in
       let cons_pair = {apply = (fun kinfo k -> ICons_pair (kinfo, k))} in
       typed ctxt loc cons_pair stack_ty
-  | Prim (loc, I_PAIR, [n], annot), stack_ty -> (
-      let bad_stack_error () =
-        let whole_stack = serialize_stack_for_error ctxt stack_ty in
-        error (Bad_stack (loc, I_PAIR, 1, whole_stack))
+  | Prim (loc, I_PAIR, [n], annot), (Item_t _ as stack_ty) ->
+      check_var_annot loc annot >>?= fun () ->
+      let rec make_proof_argument :
+          type a b s.
+          int -> (a, b * s) stack_ty -> (a, b, s) comb_proof_argument tzresult =
+       fun n stack_ty ->
+        match (n, stack_ty) with
+        | 1, Item_t _ -> ok (Comb_proof_argument (Comb_one, stack_ty))
+        | n, Item_t (a_ty, (Item_t _ as tl_ty)) ->
+            make_proof_argument (n - 1) tl_ty
+            >>? fun (Comb_proof_argument (comb_witness, Item_t (b_ty, tl_ty')))
+              ->
+            pair_t loc a_ty b_ty >|? fun (Ty_ex_c pair_t) ->
+            Comb_proof_argument (Comb_succ comb_witness, Item_t (pair_t, tl_ty'))
+        | _ -> bad_stack_error ctxt loc I_PAIR 1
       in
-      match stack_ty with
-      | Bot_t -> Lwt.return @@ bad_stack_error ()
-      | Item_t _ ->
-          check_var_annot loc annot >>?= fun () ->
-          let rec make_proof_argument :
-              type a b s.
-              int ->
-              (a, b * s) stack_ty ->
-              (a, b, s) comb_proof_argument tzresult =
-           fun n stack_ty ->
-            match (n, stack_ty) with
-            | 1, Item_t _ -> ok (Comb_proof_argument (Comb_one, stack_ty))
-            | n, Item_t (a_ty, (Item_t _ as tl_ty)) ->
-                make_proof_argument (n - 1) tl_ty
-                >>? fun (Comb_proof_argument
-                          (comb_witness, Item_t (b_ty, tl_ty'))) ->
-                pair_t loc a_ty b_ty >|? fun (Ty_ex_c pair_t) ->
-                Comb_proof_argument
-                  (Comb_succ comb_witness, Item_t (pair_t, tl_ty'))
-            | _ -> bad_stack_error ()
-          in
-          parse_uint10 n >>?= fun n ->
-          Gas.consume ctxt (Typecheck_costs.proof_argument n) >>?= fun ctxt ->
-          error_unless (Compare.Int.( > ) n 1) (Pair_bad_argument loc)
-          >>?= fun () ->
-          make_proof_argument n stack_ty
-          >>?= fun (Comb_proof_argument (witness, after_ty)) ->
-          let comb = {apply = (fun kinfo k -> IComb (kinfo, n, witness, k))} in
-          typed ctxt loc comb after_ty)
-  | Prim (loc, I_UNPAIR, [n], annot), stack_ty -> (
-      let bad_stack_error () =
-        let whole_stack = serialize_stack_for_error ctxt stack_ty in
-        error (Bad_stack (loc, I_UNPAIR, 1, whole_stack))
+      parse_uint10 n >>?= fun n ->
+      Gas.consume ctxt (Typecheck_costs.proof_argument n) >>?= fun ctxt ->
+      error_unless (Compare.Int.( > ) n 1) (Pair_bad_argument loc)
+      >>?= fun () ->
+      make_proof_argument n stack_ty
+      >>?= fun (Comb_proof_argument (witness, after_ty)) ->
+      let comb = {apply = (fun kinfo k -> IComb (kinfo, n, witness, k))} in
+      typed ctxt loc comb after_ty
+  | Prim (loc, I_UNPAIR, [n], annot), (Item_t _ as stack_ty) ->
+      error_unexpected_annot loc annot >>?= fun () ->
+      let rec make_proof_argument :
+          type a b s.
+          int -> (a, b * s) stack_ty -> (a, b, s) uncomb_proof_argument tzresult
+          =
+       fun n stack_ty ->
+        match (n, stack_ty) with
+        | 1, (Item_t _ as stack) ->
+            ok @@ Uncomb_proof_argument (Uncomb_one, stack)
+        | n, Item_t (Pair_t (a_ty, b_ty, _, _), tl_ty) ->
+            make_proof_argument (n - 1) (Item_t (b_ty, tl_ty))
+            >|? fun (Uncomb_proof_argument (uncomb_witness, after_ty)) ->
+            Uncomb_proof_argument
+              (Uncomb_succ uncomb_witness, Item_t (a_ty, after_ty))
+        | _ -> bad_stack_error ctxt loc I_UNPAIR 1
       in
-      match stack_ty with
-      | Bot_t -> Lwt.return @@ bad_stack_error ()
-      | Item_t _ ->
-          error_unexpected_annot loc annot >>?= fun () ->
-          let rec make_proof_argument :
-              type a b s.
-              int ->
-              (a, b * s) stack_ty ->
-              (a, b, s) uncomb_proof_argument tzresult =
-           fun n stack_ty ->
-            match (n, stack_ty) with
-            | 1, (Item_t _ as stack) ->
-                ok @@ Uncomb_proof_argument (Uncomb_one, stack)
-            | n, Item_t (Pair_t (a_ty, b_ty, _, _), tl_ty) ->
-                make_proof_argument (n - 1) (Item_t (b_ty, tl_ty))
-                >|? fun (Uncomb_proof_argument (uncomb_witness, after_ty)) ->
-                Uncomb_proof_argument
-                  (Uncomb_succ uncomb_witness, Item_t (a_ty, after_ty))
-            | _ -> bad_stack_error ()
-          in
-          parse_uint10 n >>?= fun n ->
-          Gas.consume ctxt (Typecheck_costs.proof_argument n) >>?= fun ctxt ->
-          error_unless (Compare.Int.( > ) n 1) (Unpair_bad_argument loc)
-          >>?= fun () ->
-          make_proof_argument n stack_ty
-          >>?= fun (Uncomb_proof_argument (witness, after_ty)) ->
-          let uncomb =
-            {apply = (fun kinfo k -> IUncomb (kinfo, n, witness, k))}
-          in
-          typed ctxt loc uncomb after_ty)
+      parse_uint10 n >>?= fun n ->
+      Gas.consume ctxt (Typecheck_costs.proof_argument n) >>?= fun ctxt ->
+      error_unless (Compare.Int.( > ) n 1) (Unpair_bad_argument loc)
+      >>?= fun () ->
+      make_proof_argument n stack_ty
+      >>?= fun (Uncomb_proof_argument (witness, after_ty)) ->
+      let uncomb = {apply = (fun kinfo k -> IUncomb (kinfo, n, witness, k))} in
+      typed ctxt loc uncomb after_ty
   | Prim (loc, I_GET, [n], annot), Item_t (comb_ty, rest_ty) -> (
       check_var_annot loc annot >>?= fun () ->
       parse_uint11 n >>?= fun n ->
