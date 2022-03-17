@@ -360,9 +360,12 @@ let maybe_batch_and_inject state =
 let process_head cctxt state current_hash rollup_id =
   let open Lwt_result_syntax in
   let*! () = Event.(emit new_block) current_hash in
-  let+ res = process_block cctxt state current_hash rollup_id in
+  let* res = process_block cctxt state current_hash rollup_id in
+  let* _l1_reorg = State.set_tezos_head state current_hash in
   maybe_batch_and_inject state ;
-  res
+  (* TODO/TORU: handle new head and reorgs w.r.t. injected operations by the
+     rollup node, like commitments and rejections. *)
+  return res
 
 let main_exit_callback state exit_status =
   let open Lwt_syntax in

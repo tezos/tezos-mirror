@@ -121,6 +121,9 @@ val tezos_block_already_processed : t -> Block_hash.t -> bool Lwt.t
 val set_head :
   t -> L2block.t -> Context.t -> (L2block.t * L2block.hash) reorg tzresult Lwt.t
 
+(** Set the Tezos head. Returns the reorganization of L1 blocks (if any). *)
+val set_tezos_head : t -> Block_hash.t -> Block_hash.t reorg tzresult Lwt.t
+
 (** Save an L2 block to disk:
     - Save both the header and the inbox
     - Make the level point to this block

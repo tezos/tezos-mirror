@@ -541,6 +541,14 @@ module Head_store = Make_singleton (struct
   let encoding = L2block.Hash.encoding
 end)
 
+module Tezos_head_store = Make_singleton (struct
+  type t = Block_hash.t
+
+  let name = "tezos_head"
+
+  let encoding = Block_hash.encoding
+end)
+
 module Rollup_origination_store = Make_singleton (struct
   type t = Protocol.Alpha_context.Tx_rollup.t * Block_hash.t * int32
 
@@ -558,6 +566,7 @@ type t = {
   tezos_blocks : Tezos_block_store.t;
   levels : Level_store.t;
   head : Head_store.t;
+  tezos_head : Tezos_head_store.t;
   rollup_origination : Rollup_origination_store.t;
 }
 
@@ -569,8 +578,9 @@ let init ~data_dir ~readonly ~blocks_cache_size =
   and* tezos_blocks = Tezos_block_store.init ~data_dir ~readonly
   and* levels = Level_store.init ~data_dir ~readonly
   and* head = Head_store.init ~data_dir
+  and* tezos_head = Tezos_head_store.init ~data_dir
   and* rollup_origination = Rollup_origination_store.init ~data_dir in
-  return {blocks; tezos_blocks; levels; head; rollup_origination}
+  return {blocks; tezos_blocks; levels; head; tezos_head; rollup_origination}
 
 let close stores =
   let open Lwt_syntax in

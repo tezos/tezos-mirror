@@ -122,6 +122,19 @@ module Head_store : sig
   val write : t -> L2block.hash -> unit tzresult Lwt.t
 end
 
+(** A store composed of a single file on disk to store the current Tezos head *)
+module Tezos_head_store : sig
+  (** The type of store for the Tezos head. *)
+  type t
+
+  (** Reads the current tezos head block hash from the disk. Returns [None] if the
+      file does not exist or if it is corrupted. *)
+  val read : t -> Block_hash.t option Lwt.t
+
+  (** Write the tezos head block hash to disk. *)
+  val write : t -> Block_hash.t -> unit tzresult Lwt.t
+end
+
 (** A store composed of a single file on disk to store the rollup origination
     information. This is used to guarantee consistency between several runs of
     the Tx rollup node. *)
@@ -148,6 +161,7 @@ type t = {
   tezos_blocks : Tezos_block_store.t;
   levels : Level_store.t;
   head : Head_store.t;
+  tezos_head : Tezos_head_store.t;
   rollup_origination : Rollup_origination_store.t;
 }
 
