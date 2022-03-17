@@ -62,7 +62,8 @@ type infinite_source =
   | `Baking_rewards
   | `Baking_bonuses
   | `Minted
-  | `Liquidity_baking_subsidies ]
+  | `Liquidity_baking_subsidies
+  | `Tx_rollup_rejection_rewards ]
 
 (** [source] is the type of token providers. Token providers that are not
     containers are considered to have infinite capacity. *)
@@ -72,6 +73,7 @@ type infinite_sink =
   [ `Storage_fees
   | `Double_signing_punishments
   | `Lost_endorsing_rewards of Signature.Public_key_hash.t * bool * bool
+  | `Tx_rollup_rejection_punishments
   | `Burned ]
 
 (** [sink] is the type of token receivers. Token receivers that are not

@@ -1603,19 +1603,14 @@ let apply_external_manager_operation_content :
           Tx_rollup_state.get ctxt tx_rollup >>=? fun (ctxt, state) ->
           ( Tx_rollup_commitment.has_bond ctxt tx_rollup key
           >>=? fun (ctxt, pending) ->
-            let _ = pending in
-            (* TODO/TORU: https://gitlab.com/tezos/tezos/-/merge_requests/4437
-               let bond_id = Bond_id.Tx_rollup_bond_id tx_rollup in
-               match pending with
-               | 0 ->
-                   Token.transfer
-                     ctxt
-                     (`Contract source)
-                     (`Frozen_bonds (source, bond_id))
-                     (Constants.tx_rollup_commitment_bond ctxt)
-               | _ -> return (ctxt, []) )
-            *)
-            return (ctxt, []) )
+            if not pending then
+              let bond_id = Bond_id.Tx_rollup_bond_id tx_rollup in
+              Token.transfer
+                ctxt
+                (`Contract source)
+                (`Frozen_bonds (source, bond_id))
+                (Constants.tx_rollup_commitment_bond ctxt)
+            else return (ctxt, []) )
           >>=? fun (ctxt, balance_updates) ->
           Tx_rollup_commitment.add_commitment
             ctxt
@@ -1638,19 +1633,20 @@ let apply_external_manager_operation_content :
       | None -> fail Tx_rollup_operation_with_non_implicit_contract
       | Some key ->
           Tx_rollup_commitment.remove_bond ctxt tx_rollup key >>=? fun ctxt ->
-          (* TODO/TORU: This depends on https://gitlab.com/tezos/tezos/-/merge_requests/4437
-             let bond_id = Rollup_bond_id.Tx_rollup_bond_id tx_rollup in
-             Token.transfer
-               ctxt
-               (`Frozen_rollup_bonds (source, bond_id))
-               (`Contract source)
-               (Constants.tx_rollup_commitment_bond ctxt))
-          *)
+          let bond_id = Bond_id.Tx_rollup_bond_id tx_rollup in
+          Token.balance ctxt (`Frozen_bonds (source, bond_id))
+          >>=? fun (ctxt, bond) ->
+          Token.transfer
+            ctxt
+            (`Frozen_bonds (source, bond_id))
+            (`Contract source)
+            bond
+          >>=? fun (ctxt, balance_updates) ->
           let result =
             Tx_rollup_return_bond_result
               {
                 consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
-                balance_updates = [];
+                balance_updates;
               }
           in
           return (ctxt, result, []))
@@ -1695,10 +1691,12 @@ let apply_external_manager_operation_content :
       (* Check [level] *)
       Tx_rollup_state.check_level_can_be_rejected state level >>?= fun () ->
       (* Check [previous_message_result] *)
+      Tx_rollup_commitment.get ctxt tx_rollup level
+      >>=? fun (ctxt, commitment) ->
       Tx_rollup_commitment.get_before_and_after_results
         ctxt
         tx_rollup
-        level
+        commitment
         state
         ~message_position
       >>=? fun (ctxt, agreed_hash, rejected) ->
@@ -1733,12 +1731,37 @@ let apply_external_manager_operation_content :
       (* Proof is correct, removing *)
       Tx_rollup_commitment.reject_commitment ctxt tx_rollup state level
       >>=? fun (ctxt, state) ->
+      (* Bond slashing, and removing *)
+      Tx_rollup_commitment.slash_bond ctxt tx_rollup commitment.committer
+      >>=? fun (ctxt, slashed) ->
+      (if slashed then
+       let source = Contract.implicit_contract commitment.committer in
+       let bid = Bond_id.Tx_rollup_bond_id tx_rollup in
+       Token.balance ctxt (`Frozen_bonds (source, bid)) >>=? fun (ctxt, burn) ->
+       Tez.(burn /? 2L) >>?= fun reward ->
+       let accuser = Contract.implicit_contract payer in
+       Token.transfer
+         ctxt
+         (`Frozen_bonds (source, bid))
+         `Tx_rollup_rejection_punishments
+         burn
+       >>=? fun (ctxt, burn_update) ->
+       Token.transfer
+         ctxt
+         `Tx_rollup_rejection_rewards
+         (`Contract accuser)
+         reward
+       >>=? fun (ctxt, reward_update) ->
+       return (ctxt, burn_update @ reward_update)
+      else return (ctxt, []))
+      >>=? fun (ctxt, balance_updates) ->
+      (* Update state and conclude *)
       Tx_rollup_state.update ctxt tx_rollup state >>=? fun ctxt ->
       let result =
         Tx_rollup_rejection_result
           {
             consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
-            balance_updates = [];
+            balance_updates;
           }
       in
       return (ctxt, result, [])

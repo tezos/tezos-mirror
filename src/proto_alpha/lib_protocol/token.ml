@@ -41,7 +41,8 @@ type infinite_source =
   | `Baking_rewards
   | `Baking_bonuses
   | `Minted
-  | `Liquidity_baking_subsidies ]
+  | `Liquidity_baking_subsidies
+  | `Tx_rollup_rejection_rewards ]
 
 type source = [infinite_source | container]
 
@@ -49,6 +50,7 @@ type infinite_sink =
   [ `Storage_fees
   | `Double_signing_punishments
   | `Lost_endorsing_rewards of Signature.Public_key_hash.t * bool * bool
+  | `Tx_rollup_rejection_punishments
   | `Burned ]
 
 type sink = [infinite_sink | container]
@@ -109,6 +111,7 @@ let credit ctxt dest amount origin =
         | `Storage_fees -> Storage_fees
         | `Double_signing_punishments -> Double_signing_punishments
         | `Lost_endorsing_rewards (d, p, r) -> Lost_endorsing_rewards (d, p, r)
+        | `Tx_rollup_rejection_punishments -> Tx_rollup_rejection_punishments
         | `Burned -> Burned
       in
       return (ctxt, sink)
@@ -168,6 +171,7 @@ let spend ctxt src amount origin =
         | `Endorsing_rewards -> Endorsing_rewards
         | `Baking_rewards -> Baking_rewards
         | `Baking_bonuses -> Baking_bonuses
+        | `Tx_rollup_rejection_rewards -> Tx_rollup_rejection_rewards
       in
       return (ctxt, src)
   | #container as container -> (

@@ -954,7 +954,7 @@ let test_commitment_duplication () =
   context_init2 () >>=? fun (b, contract1, contract2) ->
   let pkh1 = is_implicit_exn contract1 in
   originate b contract1 >>=? fun (b, tx_rollup) ->
-  Context.Contract.balance (B b) contract1 >>=? fun _balance ->
+  Context.Contract.balance (B b) contract1 >>=? fun balance ->
   Context.Contract.balance (B b) contract2 >>=? fun balance2 ->
   (* In order to have a permissible commitment, we need a transaction. *)
   let contents = "batch" in
@@ -989,10 +989,9 @@ let test_commitment_duplication () =
   let submitted_level = (Level.current (Incremental.alpha_ctxt i)).level in
   Op.tx_rollup_commit (I i) contract1 tx_rollup commitment >>=? fun op ->
   Incremental.add_operation i op >>=? fun i ->
-  (* TODO/TORU: https://gitlab.com/tezos/tezos/-/merge_requests/4437 *)
-  (* let cost = Tez.of_mutez_exn 10_000_000_000L in *)
-  (* Assert.balance_was_debited ~loc:__LOC__ (I i) contract1 balance cost *)
-  (* >>=? fun () -> *)
+  let cost = Constants.tx_rollup_commitment_bond (Incremental.alpha_ctxt i) in
+  Assert.balance_was_debited ~loc:__LOC__ (I i) contract1 balance cost
+  >>=? fun () ->
   (* Successfully fail to submit a duplicate commitment *)
   Op.tx_rollup_commit (I i) contract2 tx_rollup commitment >>=? fun op ->
   (Incremental.add_operation i op >>= function
@@ -1161,10 +1160,12 @@ let test_bond_finalization () =
   context_init1 () >>=? fun (b, contract1) ->
   let pkh1 = is_implicit_exn contract1 in
   originate b contract1 >>=? fun (b, tx_rollup) ->
+  Context.Contract.balance (B b) contract1 >>=? fun balance ->
   (* Transactions in block 2, 3, 4 *)
   make_transactions_in tx_rollup contract1 [2; 3; 4] b >>=? fun b ->
   (* Let’s try to remove the bond *)
   Incremental.begin_construction b >>=? fun i ->
+  let bond = Constants.tx_rollup_commitment_bond (Incremental.alpha_ctxt i) in
   Op.tx_rollup_return_bond (I i) contract1 tx_rollup >>=? fun op ->
   Incremental.add_operation
     i
@@ -1188,20 +1189,27 @@ let test_bond_finalization () =
        | _ -> false)
   >>=? fun i ->
   Incremental.finalize_block i >>=? fun b ->
+  Assert.balance_was_debited ~loc:__LOC__ (B b) contract1 balance bond
+  >>=? fun () ->
   (* Finalize the commitment of level 0. *)
-  Op.tx_rollup_finalize (B b) contract1 tx_rollup >>=? fun operation ->
-  Block.bake b ~operation >>=? fun b ->
+  Incremental.begin_construction b >>=? fun i ->
+  Op.tx_rollup_finalize (I i) contract1 tx_rollup >>=? fun operation ->
+  Incremental.add_operation i operation >>=? fun i ->
+  Incremental.finalize_block i >>=? fun b ->
   (* Bake enough block, and remove the commitment of level 0. *)
   Block.bake b ~operations:[] >>=? fun b ->
-  Op.tx_rollup_remove_commitment (B b) contract1 tx_rollup >>=? fun operation ->
-  Block.bake b ~operation >>=? fun b ->
+  Incremental.begin_construction b >>=? fun i ->
+  Op.tx_rollup_remove_commitment (I i) contract1 tx_rollup >>=? fun operation ->
+  Incremental.add_operation i operation >>=? fun i ->
+  Incremental.finalize_block i >>=? fun b ->
   (* Try to return the bond *)
+  Context.Contract.balance (B b) contract1 >>=? fun balance ->
   Incremental.begin_construction b >>=? fun i ->
   Op.tx_rollup_return_bond (I i) contract1 tx_rollup >>=? fun op ->
-  Incremental.add_operation i op >>=? fun _ ->
-  (* TODO/TORU: https://gitlab.com/tezos/tezos/-/merge_requests/4437
-     Once stakable bonds are merged, check the balances. *)
-  return ()
+  Incremental.add_operation i op >>=? fun i ->
+  Incremental.finalize_block i >>=? fun b ->
+  (* Check the balance*)
+  Assert.balance_was_credited ~loc:__LOC__ (B b) contract1 balance bond
 
 (** [test_too_many_commitments] tests that you can't submit new
       commitments if there are too many finalized commitments. *)
