@@ -50,6 +50,14 @@ open Alpha_context
 
 open Sc_rollup
 
+(** An input to a PVM is the [message_counter] element of an inbox at
+    a given [inbox_level] and contains a given [payload]. *)
+type input = {
+  inbox_level : Raw_level.t;
+  message_counter : Z.t;
+  payload : string;
+}
+
 module type S = sig
   (**
 
@@ -90,12 +98,6 @@ module type S = sig
       waiting for the input message that comes next to the message numbered
       [counter] in the inbox of a given [level]. *)
   val is_input_state : state -> (Raw_level.t * Z.t) option Lwt.t
-
-  type input = {
-    inbox_level : Raw_level.t;
-    message_counter : Z.t;
-    payload : string;
-  }
 
   (** [set_input level n msg state] sets [msg] in [state] as
      the next message to be processed. This input message is assumed

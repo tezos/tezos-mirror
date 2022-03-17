@@ -61,6 +61,7 @@ let test_boot () =
   | _ -> failwith "After booting, the machine must be waiting for input."
 
 let test_input_message () =
+  let open Sc_rollup_PVM_sem in
   boot "" @@ fun state ->
   let input =
     {
@@ -91,6 +92,7 @@ let go ~max_steps target_status state =
   aux 0 state
 
 let test_parsing_message ~valid (source, expected_code) =
+  let open Sc_rollup_PVM_sem in
   boot "" @@ fun state ->
   let input =
     {inbox_level = Raw_level.root; message_counter = Z.zero; payload = source}
@@ -150,6 +152,7 @@ let test_parsing_messages () =
     syntactically_invalid_messages
 
 let test_evaluation_message ~valid (boot_sector, source, expected_stack) =
+  let open Sc_rollup_PVM_sem in
   boot boot_sector @@ fun state ->
   let input =
     {inbox_level = Raw_level.root; message_counter = Z.zero; payload = source}
