@@ -46,7 +46,7 @@ val max_operation_data_length : int
     number by finding the largest possible contract in terms of
     number of nodes. The number of nodes is constrained by the
     current "max_operation_data_length" (32768) to be ~10,000 (
-    see "largest_flat_contract.tz" in the tezt suite for the largest
+    see "large_flat_contract.tz" in the tezt suite for the largest
     contract with constants that can be originated). As a first
     approximation, we set the node size limit to 5 times this amount. *)
 val max_micheline_node_count : int
@@ -65,6 +65,11 @@ val max_micheline_bytes_limit : int
     in [Script_ir_translator]. *)
 val max_allowed_global_constant_depth : int
 
+(** A global size limit on the size of Michelson types.
+
+    The size of a type is the number of nodes in its AST
+    representation. See [Script_typed_ir.TYPE_SIZE].
+ *)
 val michelson_maximum_type_size : int
 
 type fixed

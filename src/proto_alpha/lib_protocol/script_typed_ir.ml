@@ -226,6 +226,11 @@ module type TYPE_SIZE = sig
 
      It allows keeping type metadata and types non-private.
 
+     The size of a type is the number of nodes in its AST
+     representation. In other words, the size of a type is 1 plus the size of
+     its arguments. For instance, the size of [Unit] is 1 and the size of
+     [Pair ty1 ty2] is [1] plus the size of [ty1] and [ty2].
+
      This module is here because we want three levels of visibility over this
      code:
      - inside this submodule, we have [type 'a t = int]
