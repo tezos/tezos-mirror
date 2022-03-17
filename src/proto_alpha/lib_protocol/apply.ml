@@ -1050,9 +1050,7 @@ let apply_transaction ~ctxt ~parameter ~source ~contract ~amount ~entrypoint
         ~allocated_destination_contract
 
 let ex_ticket_size :
-    Alpha_context.t ->
-    Ticket_scanner.ex_ticket ->
-    (Alpha_context.t * int) tzresult Lwt.t =
+    context -> Ticket_scanner.ex_ticket -> (context * int) tzresult Lwt.t =
  fun ctxt (Ex_ticket (ty, ticket)) ->
   (* type *)
   Script_typed_ir.ticket_t Micheline.dummy_location ty >>?= fun ty ->
@@ -1086,9 +1084,7 @@ let apply_transaction_to_tx_rollup ~ctxt ~parameters_ty ~parameters ~amount
     Tx_rollup_parameters.get_deposit_parameters parameters_ty parameters
     >>?= fun {ex_ticket; l2_destination} ->
     ex_ticket_size ctxt ex_ticket >>=? fun (ctxt, ticket_size) ->
-    let limit =
-      Alpha_context.Constants.tx_rollup_max_ticket_payload_size ctxt
-    in
+    let limit = Constants.tx_rollup_max_ticket_payload_size ctxt in
     fail_when
       Compare.Int.(ticket_size > limit)
       (Tx_rollup_errors_repr.Ticket_payload_size_limit_exceeded
@@ -1262,7 +1258,7 @@ let prepare_apply_manager_operation_content ~ctxt ~source
 
 let apply_internal_manager_operation_content :
     type kind.
-    Alpha_context.t ->
+    context ->
     Script_ir_translator.unparsing_mode ->
     payer:public_key_hash ->
     source:Contract.t ->
@@ -1352,14 +1348,14 @@ let apply_internal_manager_operation_content :
 
 let apply_external_manager_operation_content :
     type kind.
-    Alpha_context.t ->
+    context ->
     Script_ir_translator.unparsing_mode ->
     payer:public_key_hash ->
     source:Contract.t ->
     chain_id:Chain_id.t ->
     internal:bool ->
     gas_consumed_in_precheck:Gas.cost option ->
-    kind Alpha_context.manager_operation ->
+    kind manager_operation ->
     (context
     * kind successful_manager_operation_result
     * Script_typed_ir.packed_internal_operation list)
@@ -1992,12 +1988,10 @@ let precheck_manager_contents (type kind) ctxt (op : kind Kind.manager contents)
       assert_tx_rollup_feature_enabled ctxt >|=? fun () -> ctxt
   | Tx_rollup_submit_batch {content; _} ->
       assert_tx_rollup_feature_enabled ctxt >>=? fun () ->
-      let size_limit =
-        Alpha_context.Constants.tx_rollup_hard_size_limit_per_message ctxt
-      in
+      let size_limit = Constants.tx_rollup_hard_size_limit_per_message ctxt in
       let (_message, message_size) = Tx_rollup_message.make_batch content in
       Tx_rollup_gas.message_hash_cost message_size >>?= fun cost ->
-      Alpha_context.Gas.consume ctxt cost >>?= fun ctxt ->
+      Gas.consume ctxt cost >>?= fun ctxt ->
       fail_unless
         Compare.Int.(message_size <= size_limit)
         Tx_rollup_errors.Message_size_exceeds_limit
@@ -2297,7 +2291,7 @@ let check_counters_consistency contents_list =
 let precheck_manager_contents_list ctxt contents_list ~mempool_mode =
   let rec rec_precheck_manager_contents_list :
       type kind.
-      Alpha_context.t ->
+      context ->
       kind Kind.manager contents_list ->
       (context * kind Kind.manager prechecked_contents_list) tzresult Lwt.t =
    fun ctxt contents_list ->
@@ -2361,7 +2355,7 @@ let check_manager_signature ctxt chain_id (op : _ Kind.manager contents_list)
 
 let rec apply_manager_contents_list_rec :
     type kind.
-    Alpha_context.t ->
+    context ->
     Script_ir_translator.unparsing_mode ->
     payload_producer:public_key_hash ->
     Chain_id.t ->
@@ -2517,12 +2511,11 @@ type 'consensus_op_kind expected_consensus_content = {
    when we check a preendorsement if the [preendorsement_quorum_round]
    was not set. *)
 let compute_expected_consensus_content (type consensus_op_kind)
-    ~(current_level : Level.t) ~(proposal_level : Level.t)
-    (ctxt : Alpha_context.t) (application_mode : apply_mode)
+    ~(current_level : Level.t) ~(proposal_level : Level.t) (ctxt : context)
+    (application_mode : apply_mode)
     (operation_kind : consensus_op_kind consensus_operation_type)
     (operation_round : Round.t) (operation_level : Raw_level.t) :
-    (Alpha_context.t * consensus_op_kind expected_consensus_content) tzresult
-    Lwt.t =
+    (context * consensus_op_kind expected_consensus_content) tzresult Lwt.t =
   match operation_kind with
   | Endorsement -> (
       match Consensus.endorsement_branch ctxt with
@@ -2774,7 +2767,8 @@ let punish_delegate ctxt delegate level mistake mk_result ~payload_producer =
 let punish_double_endorsement_or_preendorsement (type kind) ctxt ~chain_id
     ~preendorsement ~(op1 : kind Kind.consensus Operation.t)
     ~(op2 : kind Kind.consensus Operation.t) ~payload_producer :
-    (t * kind Kind.double_consensus_operation_evidence contents_result_list)
+    (context
+    * kind Kind.double_consensus_operation_evidence contents_result_list)
     tzresult
     Lwt.t =
   let mk_result (balance_updates : Receipt.balance_updates) :
@@ -3374,15 +3368,14 @@ type finalize_application_mode =
     }
   | Finalize_application of Fitness.t
 
-let compute_payload_hash (ctxt : Alpha_context.t) ~(predecessor : Block_hash.t)
+let compute_payload_hash (ctxt : context) ~(predecessor : Block_hash.t)
     ~(payload_round : Round.t) : Block_payload_hash.t =
   let non_consensus_operations = non_consensus_operations ctxt in
   let operations_hash = Operation_list_hash.compute non_consensus_operations in
   Block_payload.hash ~predecessor payload_round operations_hash
 
 let are_endorsements_required ctxt ~level =
-  Alpha_context.First_level_of_tenderbake.get ctxt
-  >|=? fun first_Tenderbake_level ->
+  First_level_of_tenderbake.get ctxt >|=? fun first_Tenderbake_level ->
   (* NB: the first level is the level of the migration block. This
      block was proposed by an Emmy* baker. There are no
      endorsements for this block. Therefore the block at the next
@@ -3470,7 +3463,7 @@ let finalize_application ctxt (mode : finalize_application_mode) protocol_data
     ~payload_producer ~block_producer liquidity_baking_toggle_ema
     implicit_operations_results ~round ~predecessor ~migration_balance_updates =
   (* Then we finalize the consensus. *)
-  let level = Alpha_context.Level.current ctxt in
+  let level = Level.current ctxt in
   let block_endorsing_power = Consensus.current_endorsement_power ctxt in
   let consensus_threshold = Constants.consensus_threshold ctxt in
   are_endorsements_required ctxt ~level:level.level
