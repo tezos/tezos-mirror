@@ -74,6 +74,8 @@ type error += Tx_rollup_bad_deposit_parameter of Script.location * Script.expr
 
 type error += Tx_rollup_invalid_ticket_amount of Z.t
 
+type error += Tx_rollup_addresses_disabled of Script.location
+
 (* Instruction typing errors *)
 type error += Fail_not_in_tail_position of Script.location
 

@@ -55,6 +55,11 @@ let check_proto_error_f f t =
     equals [e]. *)
 let check_proto_error e t = check_proto_error_f (( = ) e) t
 
+let is_implicit_exn x =
+  match Alpha_context.Contract.is_implicit x with
+  | Some x -> x
+  | None -> raise (Invalid_argument "is_implicit_exn")
+
 (** [test_disable_feature_flag] try to originate a tx rollup with the feature
     flag is deactivated and check it fails *)
 let test_disable_feature_flag () =
@@ -69,6 +74,60 @@ let test_disable_feature_flag () =
     i
     op
   >>=? fun _i -> return_unit
+
+(** [parsing_tests] try originating contracts using the
+    type [tx_rollup_l2_address], test that it only works
+    when rollups are enabled.
+ *)
+let parsing_tests =
+  let test_origination ~tx_rollup_enable script_path initial_storage =
+    Context.init1 ~tx_rollup_enable () >>=? fun (b, contract) ->
+    Contract_helpers.originate_contract
+      script_path
+      initial_storage
+      contract
+      b
+      (is_implicit_exn contract)
+    >>= fun res ->
+    if not tx_rollup_enable then
+      Assert.error ~loc:__LOC__ res (function
+          | Environment.Ecoproto_error
+              (Script_tc_errors.Tx_rollup_addresses_disabled _) ->
+              true
+          | _ -> false)
+    else
+      match res with
+      | Ok _ -> return_unit
+      | Error err ->
+          Alcotest.fail
+            (Format.asprintf
+               "Unexpected failure when parsing %s: %a"
+               script_path
+               pp_print_trace
+               err)
+  in
+  List.concat_map
+    (fun (description, path) ->
+      [
+        Tztest.tztest
+          (Format.asprintf
+             "Originating `%s` succeeds w/ tx rollups enabled"
+             description)
+          `Quick
+          (fun () -> test_origination ~tx_rollup_enable:true path "Unit");
+        Tztest.tztest
+          (Format.asprintf
+             "Originating `%s` fails w/ tx rollups disabled"
+             description)
+          `Quick
+          (fun () -> test_origination ~tx_rollup_enable:false path "Unit");
+      ])
+    [
+      ("deposit", "contracts/tx_rollup_deposit.tz");
+      ("type", "contracts/tx_rollup_parse_type.tz");
+      ("comparable_type", "contracts/tx_rollup_parse_comparable_type.tz");
+      ("data", "contracts/tx_rollup_parse_data.tz");
+    ]
 
 let message_hash_testable : Tx_rollup_message.hash Alcotest.testable =
   Alcotest.testable Tx_rollup_message.pp_hash ( = )
@@ -181,11 +240,6 @@ let gen_l2_account () =
   let secret_key = Bls12_381.Signature.generate_sk seed in
   let public_key = Bls12_381.Signature.MinPk.derive_pk secret_key in
   (secret_key, public_key, Tx_rollup_l2_address.of_bls_pk public_key)
-
-let is_implicit_exn x =
-  match Alpha_context.Contract.is_implicit x with
-  | Some x -> x
-  | None -> raise (Invalid_argument "is_implicit_exn")
 
 (** [make_ticket_key ty contents ticketer tx_rollup] computes the ticket hash
     of the ticket containing [contents] of type [ty], crafted by [ticketer] and
@@ -2526,4 +2580,4 @@ let tests =
       test_too_many_commitments;
     Tztest.tztest "Test bond finalization" `Quick test_bond_finalization;
   ]
-  @ Withdraw.tests @ Rejection.tests
+  @ Withdraw.tests @ Rejection.tests @ parsing_tests
