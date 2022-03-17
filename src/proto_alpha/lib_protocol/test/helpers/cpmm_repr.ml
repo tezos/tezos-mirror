@@ -304,7 +304,7 @@ module Parameter = struct
             int ~loc maxTokensDeposited;
             timestamp ~loc deadline;
           ]
-    | Default () -> unit ~loc
+    | Default () -> unit ~loc ()
     | RemoveLiquidity
         {to_; lqtBurned; minXtzWithdrawn; minTokensWithdrawn; deadline} ->
         comb
