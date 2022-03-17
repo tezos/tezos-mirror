@@ -38,6 +38,7 @@ type t = private {
   context_index : Context.index;
   rollup : Tx_rollup.t;
   rollup_origination : rollup_origination;
+  parameters : Protocol.Tx_rollup_l2_apply.parameters;
 }
 
 (** [init ~data_dir ~context ~rollup_genesis rollup] creates a new state for the

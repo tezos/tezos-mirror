@@ -419,6 +419,14 @@ let test_returned_deposit () =
   | (Deposit_success _result, _) ->
       fail_msg "Did not expect overflowing deposit to be succesful"
 
+let apply_l2_parameters : Protocol.Tx_rollup_l2_apply.parameters =
+  {maximum_withdraws_per_message = 5}
+
+let apply_l2_batch ctxt batch =
+  Batch_V1.apply_batch ctxt apply_l2_parameters batch
+
+let apply_l2_message ctxt msg = apply_message ctxt apply_l2_parameters msg
+
 (** Test that all values used in a transaction creates indexes and they are
     packed in the final indexes. *)
 let test_indexes_creation () =
@@ -493,7 +501,7 @@ let test_indexes_creation () =
   in
 
   let* (_ctxt, Batch_result {indexes; _}, _withdrawals) =
-    Batch_V1.apply_batch ctxt batch
+    apply_l2_batch ctxt batch
   in
 
   let* () =
@@ -550,7 +558,7 @@ let test_indexes_creation_bad () =
   in
 
   let* (ctxt, Batch_result {results; indexes}, _withdrawals) =
-    Batch_V1.apply_batch ctxt batch
+    apply_l2_batch ctxt batch
   in
 
   (* Only the indexes from the second transaction should exist, the first
@@ -598,7 +606,7 @@ let test_simple_l2_transaction () =
   let batch = create_batch_v1 [transaction] [[sk1; sk2]] in
 
   let* (ctxt, Batch_result {results; _}, _withdrawals) =
-    Batch_V1.apply_batch ctxt batch
+    apply_l2_batch ctxt batch
   in
 
   let status = nth_exn results 0 |> snd in
@@ -668,7 +676,7 @@ let test_l2_transaction_l2_addr_signer_good () =
   let signature = sign_transaction [sk1] transfer in
   let batch = batch signature [transfer] in
   let* (_ctxt, Batch_result {results; indexes = _}, _withdrawals) =
-    Batch_V1.apply_batch ctxt batch
+    apply_l2_batch ctxt batch
   in
   let status = nth_exn results 0 in
   match status with
@@ -691,7 +699,7 @@ let test_l2_transaction_l2_addr_signer_bad () =
   let* () =
     expect_error
       ~msg_if_valid:"The check should fail with an unknown address"
-      (Batch_V1.apply_batch ctxt batch)
+      (apply_l2_batch ctxt batch)
       (Tx_rollup_l2_apply.Unknown_address addr1)
   in
   (* Now we add the index but the metadata is still missing *)
@@ -699,7 +707,7 @@ let test_l2_transaction_l2_addr_signer_bad () =
   let* () =
     expect_error
       ~msg_if_valid:"The check should fail with unknown metadata"
-      (Batch_V1.apply_batch ctxt batch)
+      (apply_l2_batch ctxt batch)
       (Tx_rollup_l2_apply.Unallocated_metadata 0l)
   in
   (* Finally we add the metadata and the test pass *)
@@ -709,7 +717,7 @@ let test_l2_transaction_l2_addr_signer_bad () =
     Ticket_ledger.credit ctxt tidx idx1 (Tx_rollup_l2_qty.of_int64_exn 100L)
   in
   let* (_ctxt, Batch_result {results; indexes = _}, _withdrawals) =
-    Batch_V1.apply_batch ctxt batch
+    apply_l2_batch ctxt batch
   in
   let status = nth_exn results 0 in
   match status with
@@ -738,7 +746,7 @@ let test_simple_l1_transaction () =
   let batch = create_batch_v1 [transaction] [[sk1]] in
 
   let* (ctxt, Batch_result {results; _}, withdrawals) =
-    Batch_V1.apply_batch ctxt batch
+    apply_l2_batch ctxt batch
   in
 
   let status = nth_exn results 0 |> snd in
@@ -789,7 +797,7 @@ let test_l1_transaction_inexistant_ticket () =
   let batch = create_batch_v1 [transaction] [[sk1]] in
 
   let* (_ctxt, Batch_result {results; _}, withdrawals) =
-    Batch_V1.apply_batch ctxt batch
+    apply_l2_batch ctxt batch
   in
 
   (* Expect no withdrawals *)
@@ -829,7 +837,7 @@ let test_l1_transaction_inexistant_signer () =
   let batch = create_batch_v1 [transaction] [[sk_unknown]] in
 
   let* (_ctxt, Batch_result {results; _}, withdrawals) =
-    Batch_V1.apply_batch ctxt batch
+    apply_l2_batch ctxt batch
   in
 
   (* Expect no withdrawals *)
@@ -871,7 +879,7 @@ let test_l1_transaction_overdraft () =
   let batch = create_batch_v1 [transaction] [[sk1]] in
 
   let* (ctxt, Batch_result {results; _}, withdrawals) =
-    Batch_V1.apply_batch ctxt batch
+    apply_l2_batch ctxt batch
   in
 
   (* Expect no withdrawals *)
@@ -953,7 +961,7 @@ let test_l1_transaction_zero () =
   let batch = create_batch_v1 [transaction] [[sk1]] in
 
   let* (ctxt, Batch_result {results; _}, withdrawals) =
-    Batch_V1.apply_batch ctxt batch
+    apply_l2_batch ctxt batch
   in
 
   (* Expect one zero-withdrawal *)
@@ -1037,7 +1045,7 @@ let test_l1_transaction_partial () =
   let batch = create_batch_v1 [transaction] [[sk1]] in
 
   let* (ctxt, Batch_result {results; _}, withdrawals) =
-    Batch_V1.apply_batch ctxt batch
+    apply_l2_batch ctxt batch
   in
 
   (* Expect one partial withdrawal *)
@@ -1171,7 +1179,7 @@ let test_transaction_with_unknown_indexable () =
   let batch = batch signatures [transaction] in
 
   let* (ctxt, Batch_result {results; _}, withdrawals) =
-    Batch_V1.apply_batch ctxt batch
+    apply_l2_batch ctxt batch
   in
 
   let status = nth_exn results 0 |> snd in
@@ -1252,7 +1260,7 @@ let test_invalid_transaction () =
   let batch = create_batch_v1 [transaction] [[sk1; sk2]] in
 
   let* (ctxt, Batch_result {results; _}, _withdrawals) =
-    Batch_V1.apply_batch ctxt batch
+    apply_l2_batch ctxt batch
   in
 
   let status = nth_exn results 0 |> snd in
@@ -1301,7 +1309,7 @@ let test_invalid_counter () =
   let batch = create_batch_v1 [transaction] [[sk1]] in
 
   let* (_ctxt, Batch_result {results; _}, _withdrawals) =
-    Batch_V1.apply_batch ctxt batch
+    apply_l2_batch ctxt batch
   in
 
   let status = nth_exn results 0 |> snd in
@@ -1341,7 +1349,7 @@ let test_update_counter () =
   in
 
   let* (ctxt, Batch_result {results; _}, withdrawals) =
-    Batch_V1.apply_batch ctxt batch
+    apply_l2_batch ctxt batch
   in
 
   let status = nth_exn results 0 |> snd in
@@ -1439,7 +1447,7 @@ let test_apply_message_batch () =
          (V1 batch))
   in
 
-  let* (_ctxt, result) = apply_message ctxt msg in
+  let* (_ctxt, result) = apply_l2_message ctxt msg in
 
   match result with
   | (Message_result.Batch_V1_result _, []) ->
@@ -1512,7 +1520,7 @@ let test_apply_message_batch_withdrawals () =
          (V1 batch))
   in
 
-  let* (ctxt, result) = apply_message ctxt msg in
+  let* (ctxt, result) = apply_l2_message ctxt msg in
 
   match result with
   | ( Message_result.Batch_V1_result
@@ -1625,7 +1633,7 @@ let test_apply_message_deposit () =
       (Tx_rollup_l2_qty.of_int64_exn amount)
   in
 
-  let* (_ctxt, result) = apply_message ctxt msg in
+  let* (_ctxt, result) = apply_l2_message ctxt msg in
 
   match result with
   | (Message_result.Deposit_result _, []) ->
@@ -1637,7 +1645,6 @@ let test_apply_message_deposit () =
 let test_transfer_to_self () =
   let open Context_l2.Syntax in
   let* (ctxt, _, accounts) = with_initial_setup [ticket1] [[(ticket1, 10L)]] in
-
   let (sk1, pk1, addr1, _idx1, _) = nth_exn accounts 0 in
   let transaction =
     [transfer ~signer:(signer_pk pk1) ~dest:addr1 ~ticket:ticket1 1L]
@@ -1645,7 +1652,7 @@ let test_transfer_to_self () =
   let batch = create_batch_v1 [transaction] [[sk1]] in
 
   let* (_ctxt, Batch_result {results; _}, _withdrawals) =
-    Batch_V1.apply_batch ctxt batch
+    apply_l2_batch ctxt batch
   in
 
   let status = nth_exn results 0 in

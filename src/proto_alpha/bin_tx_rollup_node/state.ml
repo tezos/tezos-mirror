@@ -37,6 +37,7 @@ type t = {
   context_index : Context.index;
   rollup : Tx_rollup.t;
   rollup_origination : rollup_origination;
+  parameters : Protocol.Tx_rollup_l2_apply.parameters;
 }
 
 (* Stands for the manager operation pass, in which the rollup transactions are
@@ -198,10 +199,22 @@ let init_context ~data_dir =
   let*! index = Context.init (Node_data.context_dir data_dir) in
   return index
 
+let init_parameters cctxt =
+  let open Lwt_result_syntax in
+  let* {parametric; _} =
+    Protocol.Constants_services.all cctxt (cctxt#chain, cctxt#block)
+  in
+  return
+    {
+      Protocol.Tx_rollup_l2_apply.tx_rollup_max_withdrawals_per_batch =
+        parametric.tx_rollup_max_withdrawals_per_batch;
+    }
+
 let init ~data_dir ~context ?rollup_genesis rollup =
   let open Lwt_result_syntax in
   let store_orig = init_store ~data_dir ~context ?rollup_genesis rollup in
   let context_index = init_context ~data_dir in
   let* (store, rollup_origination) = store_orig in
   let* context_index = context_index in
-  return {store; context_index; rollup; rollup_origination}
+  let* parameters = init_parameters context in
+  return {store; context_index; rollup; rollup_origination; parameters}

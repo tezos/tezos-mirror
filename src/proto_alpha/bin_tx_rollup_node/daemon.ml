@@ -38,12 +38,12 @@ let checkout_context (state : State.t) ctxt_hash =
   let+ context = Context.checkout state.context_index ctxt_hash in
   Option.to_result ~none:[Tx_rollup_cannot_checkout_context ctxt_hash] context
 
-let interp_messages ctxt messages cumulated_size =
+let interp_messages ctxt parameters messages cumulated_size =
   let open Lwt_syntax in
   let+ (ctxt, _ctxt_hash, rev_contents) =
     List.fold_left_s
       (fun (ctxt, ctxt_hash, acc) message ->
-        let+ apply_res = Apply.apply_message ctxt message in
+        let+ apply_res = Apply.apply_message ctxt parameters message in
         let (ctxt, ctxt_hash, result) =
           match apply_res with
           | Ok (ctxt, result) ->
@@ -268,7 +268,7 @@ let process_messages_and_inboxes (state : State.t)
     | Some context -> return context
   in
   let*! (context, inbox) =
-    interp_messages predecessor_context messages cumulated_size
+    interp_messages predecessor_context state.parameters messages cumulated_size
   in
   match inbox with
   | None ->

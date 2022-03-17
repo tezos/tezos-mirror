@@ -162,6 +162,10 @@ let tx_rollup_hard_size_limit_per_message c =
   let constants = Raw_context.constants c in
   constants.tx_rollup_hard_size_limit_per_message
 
+let tx_rollup_max_withdrawals_per_batch c =
+  let constants = Raw_context.constants c in
+  constants.tx_rollup_max_withdrawals_per_batch
+
 let tx_rollup_commitment_bond c =
   let constants = Raw_context.constants c in
   constants.tx_rollup_commitment_bond
