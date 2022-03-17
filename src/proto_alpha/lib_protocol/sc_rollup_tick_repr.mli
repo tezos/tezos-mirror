@@ -1,7 +1,8 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,50 +24,32 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Alpha_context.Sc_rollup
+(** This module defines [Tick.t], an execution step counter for
+    smart-contract rollups. *)
 
-module PVM = struct
-  type boot_sector = string
+(** A tick is a counter for the execution step of a smart-contract rollup. *)
+type t
 
-  module type S = sig
-    val name : string
+(** The initial tick. *)
+val initial : t
 
-    val parse_boot_sector : string -> boot_sector option
+(** [next tick] returns the counter successor of [tick]. No overflow can happen. *)
+val next : t -> t
 
-    val pp_boot_sector : Format.formatter -> boot_sector -> unit
+(** [distance t1 t2] is the absolute value of the difference between [t1] and [t2]. *)
+val distance : t -> t -> Z.t
 
-    include Sc_rollup_PVM_sem.S
-  end
+(** [of_int x] returns [Some tick] for the rollup [x]-th execution
+    step if [x] is non-negative. Returns [None] otherwise. *)
+val of_int : int -> t option
 
-  type t = (module S)
-end
+(** [to_int tick] converts the [tick] into an integer. *)
+val to_int : t -> int option
 
-let all = [Kind.Example_arith]
+val encoding : t Data_encoding.t
 
-let kind_of_string = function "arith" -> Some Kind.Example_arith | _ -> None
+val pp : Format.formatter -> t -> unit
 
-let example_arith_pvm = (module Sc_rollup_arith.ProtocolImplementation : PVM.S)
+include Compare.S with type t := t
 
-let of_kind = function Kind.Example_arith -> example_arith_pvm
-
-let kind_of (module M : PVM.S) =
-  match kind_of_string M.name with
-  | Some k -> k
-  | None ->
-      failwith
-        (Format.sprintf "The module named %s is not in Sc_rollups.all." M.name)
-
-let from ~name = Option.map of_kind (kind_of_string name)
-
-let all_names =
-  List.map
-    (fun k ->
-      let (module M : PVM.S) = of_kind k in
-      M.name)
-    all
-
-let string_of_kind k =
-  let (module M) = of_kind k in
-  M.name
-
-let pp fmt k = Format.fprintf fmt "%s" (string_of_kind k)
+module Map : Map.S with type key = t

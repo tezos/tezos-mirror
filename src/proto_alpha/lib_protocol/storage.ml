@@ -1549,9 +1549,9 @@ module Sc_rollup = struct
         let name = ["boot_sector"]
       end)
       (struct
-        type t = Sc_rollup_repr.PVM.boot_sector
+        type t = string
 
-        let encoding = Sc_rollup_repr.PVM.boot_sector_encoding
+        let encoding = Data_encoding.string
       end)
 
   module Initial_level =

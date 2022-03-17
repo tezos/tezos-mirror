@@ -2396,10 +2396,27 @@ end
 
 (** See {!Sc_rollup_storage} and {!Sc_rollup_repr}. *)
 module Sc_rollup : sig
-  module PVM : sig
-    type boot_sector
+  (** See {!Sc_rollup_tick_repr}. *)
+  module Tick : sig
+    type t
 
-    val boot_sector_of_string : string -> boot_sector
+    val initial : t
+
+    val next : t -> t
+
+    val distance : t -> t -> Z.t
+
+    val of_int : int -> t option
+
+    val to_int : t -> int option
+
+    val encoding : t Data_encoding.t
+
+    val pp : Format.formatter -> t -> unit
+
+    include Compare.S with type t := t
+
+    module Map : Map.S with type key = t
   end
 
   module Address : S.HASH
@@ -2440,7 +2457,7 @@ module Sc_rollup : sig
   val originate :
     context ->
     kind:Kind.t ->
-    boot_sector:PVM.boot_sector ->
+    boot_sector:string ->
     (t * Z.t * context) tzresult Lwt.t
 
   val kind : context -> t -> Kind.t option tzresult Lwt.t
@@ -2857,7 +2874,7 @@ and _ manager_operation =
       -> Kind.tx_rollup_withdraw manager_operation
   | Sc_rollup_originate : {
       kind : Sc_rollup.Kind.t;
-      boot_sector : Sc_rollup.PVM.boot_sector;
+      boot_sector : string;
     }
       -> Kind.sc_rollup_originate manager_operation
   | Sc_rollup_add_messages : {

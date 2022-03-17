@@ -589,7 +589,7 @@ val sc_rollup_originate :
   ?counter:counter ->
   source:public_key_hash ->
   kind:Sc_rollup.Kind.t ->
-  boot_sector:Sc_rollup.PVM.boot_sector ->
+  boot_sector:string ->
   src_pk:public_key ->
   src_sk:Client_keys.sk_uri ->
   fee_parameter:Injection.fee_parameter ->

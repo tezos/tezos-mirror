@@ -39,14 +39,6 @@
    as well as the potentially-disputed operations.
 
 *)
-module PVM : sig
-  (** A PVM instance can be initialized by setting a boot sector. *)
-  type boot_sector
-
-  val boot_sector_encoding : boot_sector Data_encoding.t
-
-  val boot_sector_of_string : string -> boot_sector
-end
 
 (** A smart-contract rollup has an address starting with "scr1". *)
 module Address : sig

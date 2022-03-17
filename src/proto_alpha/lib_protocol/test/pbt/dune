@@ -8,6 +8,7 @@
         test_tez_repr
         test_tx_rollup_l2_encoding
         test_tx_rollup_l2_withdraw_storage
+        test_sc_rollup_tick_repr
         test_carbonated_map)
  (libraries tezos-base
             tezos-micheline

@@ -49,7 +49,7 @@ let test_disable_feature_flag () =
   in
   Incremental.begin_construction b >>=? fun i ->
   let kind = Sc_rollup.Kind.Example_arith in
-  let boot_sector = Sc_rollup.PVM.boot_sector_of_string "" in
+  let boot_sector = "" in
   Op.sc_rollup_origination (I i) contract kind boot_sector >>=? fun op ->
   let expect_failure = function
     | Environment.Ecoproto_error (Apply.Sc_rollup_feature_disabled as e) :: _ ->

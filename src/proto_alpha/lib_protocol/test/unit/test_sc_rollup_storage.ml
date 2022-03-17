@@ -48,10 +48,7 @@ let new_context () =
 
 let new_sc_rollup ctxt =
   let+ (rollup, _size, ctxt) =
-    Sc_rollup_storage.originate
-      ctxt
-      ~kind:Example_arith
-      ~boot_sector:(Sc_rollup_repr.PVM.boot_sector_of_string "")
+    Sc_rollup_storage.originate ctxt ~kind:Example_arith ~boot_sector:""
   in
   (rollup, ctxt)
 

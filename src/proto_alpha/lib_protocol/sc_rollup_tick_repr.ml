@@ -1,7 +1,8 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,50 +24,32 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Alpha_context.Sc_rollup
+include Z
 
-module PVM = struct
-  type boot_sector = string
+let initial = zero
 
-  module type S = sig
-    val name : string
+let next = succ
 
-    val parse_boot_sector : string -> boot_sector option
+let pp = pp_print
 
-    val pp_boot_sector : Format.formatter -> boot_sector -> unit
+let encoding = Data_encoding.n
 
-    include Sc_rollup_PVM_sem.S
-  end
+let distance tick1 tick2 = Z.abs (Z.sub tick1 tick2)
 
-  type t = (module S)
-end
+let of_int x = if Compare.Int.(x < 0) then None else Some (Z.of_int x)
 
-let all = [Kind.Example_arith]
+let to_int x = if Z.fits_int x then Some (Z.to_int x) else None
 
-let kind_of_string = function "arith" -> Some Kind.Example_arith | _ -> None
+let ( <= ) = leq
 
-let example_arith_pvm = (module Sc_rollup_arith.ProtocolImplementation : PVM.S)
+let ( < ) = lt
 
-let of_kind = function Kind.Example_arith -> example_arith_pvm
+let ( >= ) = geq
 
-let kind_of (module M : PVM.S) =
-  match kind_of_string M.name with
-  | Some k -> k
-  | None ->
-      failwith
-        (Format.sprintf "The module named %s is not in Sc_rollups.all." M.name)
+let ( > ) = gt
 
-let from ~name = Option.map of_kind (kind_of_string name)
+let ( = ) = equal
 
-let all_names =
-  List.map
-    (fun k ->
-      let (module M : PVM.S) = of_kind k in
-      M.name)
-    all
+let ( <> ) x y = not (x = y)
 
-let string_of_kind k =
-  let (module M) = of_kind k in
-  M.name
-
-let pp fmt k = Format.fprintf fmt "%s" (string_of_kind k)
+module Map = Map.Make (Z)

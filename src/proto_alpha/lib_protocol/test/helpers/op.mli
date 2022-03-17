@@ -249,7 +249,7 @@ val sc_rollup_origination :
   Context.t ->
   Contract.t ->
   Sc_rollup.Kind.t ->
-  Sc_rollup.PVM.boot_sector ->
+  string ->
   packed_operation tzresult Lwt.t
 
 (** [tx_rollup_commit ctxt source tx_rollup commitment] Commits to a tx
