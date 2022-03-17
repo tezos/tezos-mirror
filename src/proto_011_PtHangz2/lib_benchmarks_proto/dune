@@ -1,32 +1,39 @@
 (library
  (name tezos_benchmarks_proto_011_PtHangz2)
- (instrumentation (backend bisect_ppx))
  (public_name tezos-benchmarks-proto-011-PtHangz2)
+ (instrumentation (backend bisect_ppx))
  (libraries
   str
+  tezos-stdlib
   tezos-base
-  tezos-protocol-011-PtHangz2
+  tezos-error-monad
   tezos-protocol-011-PtHangz2-parameters
   tezos-benchmark
   tezos-benchmark-011-PtHangz2
+  tezos-benchmark-type-inference-011-PtHangz2
+  tezos-protocol-011-PtHangz2
+  tezos-protocol-011-PtHangz2.raw
+  tezos-crypto
   tezos-shell-benchmarks
   tezos-micheline
   tezos-011-PtHangz2-test-helpers
   tezos-sapling
   tezos-client-011-PtHangz2
-)
+  tezos-tooling
+  tezos-protocol-environment)
  (library_flags (:standard -linkall))
- (flags (:standard -open Tezos_stdlib
-                   -open Tezos_base
-                   -open Tezos_base__TzPervasives
-                   -open Tezos_error_monad
-                   -open Tezos_benchmark
-                   -open Tezos_benchmark_011_PtHangz2
-                   -open Tezos_benchmark_type_inference_011_PtHangz2
-                   -open Tezos_protocol_011_PtHangz2
-                   -open Tezos_raw_protocol_011_PtHangz2
-                   -open Tezos_client_011_PtHangz2
-                   -open Tezos_crypto
-                   -open Tezos_micheline
-                   -open Tezos_011_PtHangz2_test_helpers
-                   -open Tezos_client_011_PtHangz2)))
+ (flags
+  (:standard
+   -open Tezos_stdlib
+   -open Tezos_base
+   -open Tezos_base.TzPervasives
+   -open Tezos_error_monad
+   -open Tezos_benchmark
+   -open Tezos_benchmark_011_PtHangz2
+   -open Tezos_benchmark_type_inference_011_PtHangz2
+   -open Tezos_protocol_011_PtHangz2
+   -open Tezos_raw_protocol_011_PtHangz2
+   -open Tezos_crypto
+   -open Tezos_micheline
+   -open Tezos_011_PtHangz2_test_helpers
+   -open Tezos_client_011_PtHangz2)))
