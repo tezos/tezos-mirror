@@ -66,7 +66,7 @@ val update_burn_per_byte :
 (** [burn_cost ~limit state size] computes the burn to be paid to submit
     [size] bytes in the inbox of the transactional rollup.
 
-    Returns [Tx_rollup_submit_batch_burn_excedeed] if the (computed) burn
+    Returns [Tx_rollup_submit_batch_burn_exceeded] if the (computed) burn
     exceeds [limit].
 *)
 val burn_cost : limit:Tez_repr.t option -> t -> int -> Tez_repr.t tzresult

@@ -1927,7 +1927,7 @@ module Tx_rollup_errors : sig
   type error +=
     | Tx_rollup_already_exists of Tx_rollup.t
     | Tx_rollup_does_not_exist of Tx_rollup.t
-    | Submit_batch_burn_excedeed of {burn : Tez.t; limit : Tez.t}
+    | Submit_batch_burn_exceeded of {burn : Tez.t; limit : Tez.t}
     | Inbox_does_not_exist of Tx_rollup.t * Tx_rollup_level.t
     | Inbox_size_would_exceed_limit of Tx_rollup.t
     | Inbox_count_would_exceed_limit of Tx_rollup.t

@@ -503,7 +503,7 @@ let test_add_batch_with_limit () =
     op
     ~expect_failure:
       (check_proto_error_f (function
-          | Tx_rollup_errors.Submit_batch_burn_excedeed _ -> true
+          | Tx_rollup_errors.Submit_batch_burn_exceeded _ -> true
           | _ -> false))
   >>=? fun _ -> return_unit
 
