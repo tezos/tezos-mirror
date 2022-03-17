@@ -406,15 +406,15 @@ let kinstr_split :
             (fun (Item_t (b, s)) -> map_t loc kty b >|? fun m -> Item_t (m, s));
           reconstruct = (fun body k -> IMap_map (kinfo, key_ty, body, k));
         }
-  | IMap_iter (kinfo, pair_ty, body, k), Item_t (_, stack) ->
+  | IMap_iter (kinfo, kvty, body, k), Item_t (_, stack) ->
       ok
       @@ Ex_split_loop_may_fail
            {
-             body_init_stack = Item_t (pair_ty, stack);
+             body_init_stack = Item_t (kvty, stack);
              body;
              cont_init_stack = stack;
              continuation = k;
-             reconstruct = (fun body k -> IMap_iter (kinfo, pair_ty, body, k));
+             reconstruct = (fun body k -> IMap_iter (kinfo, kvty, body, k));
            }
   | IMap_mem (kinfo, k), Item_t (_, Item_t (_, s)) ->
       let s = Item_t (bool_t, s) in
