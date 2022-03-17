@@ -145,8 +145,7 @@ let peano_shape_proof =
   fun k -> scale *? k
 
 let stack_prefix_preservation_witness_size =
-  let kinfo_size = h2w in
-  let scale = header_size +! (h2w +! kinfo_size) in
+  let scale = h3w in
   fun k -> scale *? k
 
 let comb_gadt_witness_size = peano_shape_proof
@@ -349,7 +348,7 @@ and kinstr_size :
     | IDup (_, _) -> ret_succ_adding accu base
     | ISwap (_, _) -> ret_succ_adding accu base
     | IConst (_, ty, x, _) ->
-        let accu = ret_succ_adding accu (base +! word_size) in
+        let accu = ret_succ_adding accu (base +! (word_size *? 2)) in
         (value_size [@ocaml.tailcall])
           ~count_lambda_nodes
           (accu ++ ty_size ty)
@@ -360,30 +359,37 @@ and kinstr_size :
     | ICdr (_, _) -> ret_succ_adding accu base
     | IUnpair (_, _) -> ret_succ_adding accu base
     | ICons_some (_, _) -> ret_succ_adding accu base
-    | ICons_none (_, ty, _) -> ret_succ_adding (accu ++ ty_size ty) base
+    | ICons_none (_, ty, _) ->
+        ret_succ_adding (accu ++ ty_size ty) (base +! word_size)
     | IIf_none _ -> ret_succ_adding accu base
     | IOpt_map _ -> ret_succ_adding accu base
-    | ICons_left (_, ty, _) -> ret_succ_adding (accu ++ ty_size ty) base
-    | ICons_right (_, ty, _) -> ret_succ_adding (accu ++ ty_size ty) base
+    | ICons_left (_, ty, _) ->
+        ret_succ_adding (accu ++ ty_size ty) (base +! word_size)
+    | ICons_right (_, ty, _) ->
+        ret_succ_adding (accu ++ ty_size ty) (base +! word_size)
     | IIf_left _ -> ret_succ_adding accu base
     | ICons_list (_, _) -> ret_succ_adding accu base
-    | INil (_, ty, _) -> ret_succ_adding (accu ++ ty_size ty) base
+    | INil (_, ty, _) -> ret_succ_adding (accu ++ ty_size ty) (base +! word_size)
     | IIf_cons _ -> ret_succ_adding accu base
     | IList_map (_, _, _) -> ret_succ_adding accu base
-    | IList_iter (_, ty, _, _) -> ret_succ_adding (accu ++ ty_size ty) base
+    | IList_iter (_, ty, _, _) ->
+        ret_succ_adding (accu ++ ty_size ty) (base +! (word_size *? 2))
     | IList_size (_, _) -> ret_succ_adding accu base
     | IEmpty_set (_, cty, _) ->
         ret_succ_adding (accu ++ ty_size cty) (base +! word_size)
-    | ISet_iter (_, ty, _, _) -> ret_succ_adding (accu ++ ty_size ty) base
+    | ISet_iter (_, ty, _, _) ->
+        ret_succ_adding (accu ++ ty_size ty) (base +! (word_size *? 2))
     | ISet_mem (_, _) -> ret_succ_adding accu base
     | ISet_update (_, _) -> ret_succ_adding accu base
     | ISet_size (_, _) -> ret_succ_adding accu base
     | IEmpty_map (_, cty, vty, _) ->
-        ret_succ_adding (accu ++ ty_size cty ++ ty_size vty) (base +! word_size)
+        ret_succ_adding
+          (accu ++ ty_size cty ++ ty_size vty)
+          (base +! (word_size *? 2))
     | IMap_map (_, ty, _, _) ->
-        ret_succ_adding (accu ++ ty_size ty) (base +! word_size)
-    | IMap_iter (_, Pair_t (kty, pty, _, _), _, _) ->
-        ret_succ_adding (accu ++ ty_size kty ++ ty_size pty) (base +! word_size)
+        ret_succ_adding (accu ++ ty_size ty) (base +! (word_size *? 2))
+    | IMap_iter (_, kvty, _, _) ->
+        ret_succ_adding (accu ++ ty_size kvty) (base +! (word_size *? 2))
     | IMap_mem (_, _) -> ret_succ_adding accu base
     | IMap_get (_, _) -> ret_succ_adding accu base
     | IMap_update (_, _) -> ret_succ_adding accu base
@@ -439,7 +445,7 @@ and kinstr_size :
     | IXor_nat (_, _) -> ret_succ_adding accu base
     | INot_int (_, _) -> ret_succ_adding accu base
     | IIf _ -> ret_succ_adding accu base
-    | ILoop (_, _, _) -> ret_succ_adding accu base
+    | ILoop (_, _, _) -> ret_succ_adding accu (base +! word_size)
     | ILoop_left (_, _, _) -> ret_succ_adding accu (base +! word_size)
     | IDip (_, _, _) -> ret_succ_adding accu (base +! word_size)
     | IExec (_, _) -> ret_succ_adding accu base
@@ -448,8 +454,7 @@ and kinstr_size :
     | ILambda (_, lambda, _) ->
         let accu = ret_succ_adding accu (base +! word_size) in
         (lambda_size [@ocaml.tailcall]) ~count_lambda_nodes accu lambda
-    | IFailwith (_, _, ty) ->
-        ret_succ_adding (accu ++ ty_size ty) (base +! word_size)
+    | IFailwith (_, _, ty) -> ret_succ_adding (accu ++ ty_size ty) base
     | ICompare (_, cty, _) ->
         ret_succ_adding (accu ++ ty_size cty) (base +! word_size)
     | IEq (_, _) -> ret_succ_adding accu base
@@ -514,7 +519,7 @@ and kinstr_size :
           accu
           (base +! (word_size *? 2) +! stack_prefix_preservation_witness_size n)
     | IChainId (_, _) -> ret_succ_adding accu base
-    | INever _ -> ret_succ_adding accu kinfo_size
+    | INever _ -> ret_succ_adding accu h1w
     | IVoting_power (_, _) -> ret_succ_adding accu base
     | ITotal_voting_power (_, _) -> ret_succ_adding accu base
     | IKeccak (_, _) -> ret_succ_adding accu base
@@ -552,8 +557,10 @@ and kinstr_size :
         ret_succ_adding
           accu
           (base +! (word_size *? 2) +! dup_n_gadt_witness_size n)
-    | ITicket (_, cty, _) -> ret_succ_adding (accu ++ ty_size cty) base
-    | IRead_ticket (_, ty, _) -> ret_succ_adding (accu ++ ty_size ty) base
+    | ITicket (_, cty, _) ->
+        ret_succ_adding (accu ++ ty_size cty) (base +! word_size)
+    | IRead_ticket (_, ty, _) ->
+        ret_succ_adding (accu ++ ty_size ty) (base +! word_size)
     | ISplit_ticket (_, _) -> ret_succ_adding accu base
     | IJoin_tickets (_, cty, _) ->
         ret_succ_adding (accu ++ ty_size cty) (base +! word_size)
