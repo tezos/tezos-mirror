@@ -198,7 +198,7 @@ let chest_key_size _ =
   let proof_size = 256 in
   h2w +? (unlocked_value_size + proof_size)
 
-let kinfo_size {iloc = _} = h2w
+let kinfo_size = !!0
 
 (* The following mutually recursive functions are mostly
    tail-recursive and the only recursive call that is not a tailcall
@@ -340,239 +340,225 @@ and kinstr_size :
     (a, s, r, f) kinstr ->
     nodes_and_size =
  fun ~count_lambda_nodes accu t ->
-  let base kinfo = h2w +! kinfo_size kinfo in
+  let base = h2w +! kinfo_size in
   let apply :
       type a s r f. nodes_and_size -> (a, s, r, f) kinstr -> nodes_and_size =
    fun accu t ->
     match t with
-    | IDrop (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | IDup (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | ISwap (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | IConst (kinfo, ty, x, _) ->
-        let accu = ret_succ_adding accu (base kinfo +! word_size) in
+    | IDrop (_, _) -> ret_succ_adding accu base
+    | IDup (_, _) -> ret_succ_adding accu base
+    | ISwap (_, _) -> ret_succ_adding accu base
+    | IConst (_, ty, x, _) ->
+        let accu = ret_succ_adding accu (base +! word_size) in
         (value_size [@ocaml.tailcall])
           ~count_lambda_nodes
           (accu ++ ty_size ty)
           ty
           x
-    | ICons_pair (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | ICar (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | ICdr (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | IUnpair (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | ICons_some (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | ICons_none (kinfo, ty, _) ->
-        ret_succ_adding (accu ++ ty_size ty) (base kinfo)
-    | IIf_none {kinfo; _} -> ret_succ_adding accu (base kinfo)
-    | IOpt_map {kinfo; _} -> ret_succ_adding accu (base kinfo)
-    | ICons_left (kinfo, ty, _) ->
-        ret_succ_adding (accu ++ ty_size ty) (base kinfo)
-    | ICons_right (kinfo, ty, _) ->
-        ret_succ_adding (accu ++ ty_size ty) (base kinfo)
-    | IIf_left {kinfo; _} -> ret_succ_adding accu (base kinfo)
-    | ICons_list (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | INil (kinfo, ty, _) -> ret_succ_adding (accu ++ ty_size ty) (base kinfo)
-    | IIf_cons {kinfo; _} -> ret_succ_adding accu (base kinfo)
-    | IList_map (kinfo, _, _) -> ret_succ_adding accu (base kinfo)
-    | IList_iter (kinfo, ty, _, _) ->
-        ret_succ_adding (accu ++ ty_size ty) (base kinfo)
-    | IList_size (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | IEmpty_set (kinfo, cty, _) ->
-        ret_succ_adding (accu ++ ty_size cty) (base kinfo +! word_size)
-    | ISet_iter (kinfo, ty, _, _) ->
-        ret_succ_adding (accu ++ ty_size ty) (base kinfo)
-    | ISet_mem (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | ISet_update (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | ISet_size (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | IEmpty_map (kinfo, cty, vty, _) ->
-        ret_succ_adding
-          (accu ++ ty_size cty ++ ty_size vty)
-          (base kinfo +! word_size)
-    | IMap_map (kinfo, ty, _, _) ->
-        ret_succ_adding (accu ++ ty_size ty) (base kinfo +! word_size)
-    | IMap_iter (kinfo, pty, _, _) ->
-        ret_succ_adding (accu ++ ty_size pty) (base kinfo +! word_size)
-    | IMap_mem (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | IMap_get (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | IMap_update (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | IMap_get_and_update (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | IMap_size (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | IEmpty_big_map (kinfo, cty, ty, _) ->
+    | ICons_pair (_, _) -> ret_succ_adding accu base
+    | ICar (_, _) -> ret_succ_adding accu base
+    | ICdr (_, _) -> ret_succ_adding accu base
+    | IUnpair (_, _) -> ret_succ_adding accu base
+    | ICons_some (_, _) -> ret_succ_adding accu base
+    | ICons_none (_, ty, _) -> ret_succ_adding (accu ++ ty_size ty) base
+    | IIf_none _ -> ret_succ_adding accu base
+    | IOpt_map _ -> ret_succ_adding accu base
+    | ICons_left (_, ty, _) -> ret_succ_adding (accu ++ ty_size ty) base
+    | ICons_right (_, ty, _) -> ret_succ_adding (accu ++ ty_size ty) base
+    | IIf_left _ -> ret_succ_adding accu base
+    | ICons_list (_, _) -> ret_succ_adding accu base
+    | INil (_, ty, _) -> ret_succ_adding (accu ++ ty_size ty) base
+    | IIf_cons _ -> ret_succ_adding accu base
+    | IList_map (_, _, _) -> ret_succ_adding accu base
+    | IList_iter (_, ty, _, _) -> ret_succ_adding (accu ++ ty_size ty) base
+    | IList_size (_, _) -> ret_succ_adding accu base
+    | IEmpty_set (_, cty, _) ->
+        ret_succ_adding (accu ++ ty_size cty) (base +! word_size)
+    | ISet_iter (_, ty, _, _) -> ret_succ_adding (accu ++ ty_size ty) base
+    | ISet_mem (_, _) -> ret_succ_adding accu base
+    | ISet_update (_, _) -> ret_succ_adding accu base
+    | ISet_size (_, _) -> ret_succ_adding accu base
+    | IEmpty_map (_, cty, vty, _) ->
+        ret_succ_adding (accu ++ ty_size cty ++ ty_size vty) (base +! word_size)
+    | IMap_map (_, ty, _, _) ->
+        ret_succ_adding (accu ++ ty_size ty) (base +! word_size)
+    | IMap_iter (_, Pair_t (kty, pty, _, _), _, _) ->
+        ret_succ_adding (accu ++ ty_size kty ++ ty_size pty) (base +! word_size)
+    | IMap_mem (_, _) -> ret_succ_adding accu base
+    | IMap_get (_, _) -> ret_succ_adding accu base
+    | IMap_update (_, _) -> ret_succ_adding accu base
+    | IMap_get_and_update (_, _) -> ret_succ_adding accu base
+    | IMap_size (_, _) -> ret_succ_adding accu base
+    | IEmpty_big_map (_, cty, ty, _) ->
         ret_succ_adding
           (accu ++ ty_size cty ++ ty_size ty)
-          (base kinfo +! (word_size *? 2))
-    | IBig_map_mem (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | IBig_map_get (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | IBig_map_update (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | IBig_map_get_and_update (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | IConcat_string (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | IConcat_string_pair (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | ISlice_string (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | IString_size (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | IConcat_bytes (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | IConcat_bytes_pair (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | ISlice_bytes (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | IBytes_size (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | IAdd_seconds_to_timestamp (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | IAdd_timestamp_to_seconds (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | ISub_timestamp_seconds (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | IDiff_timestamps (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | IAdd_tez (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | ISub_tez (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | ISub_tez_legacy (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | IMul_teznat (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | IMul_nattez (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | IEdiv_teznat (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | IEdiv_tez (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | IOr (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | IAnd (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | IXor (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | INot (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | IIs_nat (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | INeg (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | IAbs_int (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | IInt_nat (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | IAdd_int (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | IAdd_nat (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | ISub_int (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | IMul_int (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | IMul_nat (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | IEdiv_int (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | IEdiv_nat (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | ILsl_nat (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | ILsr_nat (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | IOr_nat (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | IAnd_nat (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | IAnd_int_nat (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | IXor_nat (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | INot_int (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | IIf {kinfo; _} -> ret_succ_adding accu (base kinfo)
-    | ILoop (kinfo, _, _) -> ret_succ_adding accu (base kinfo)
-    | ILoop_left (kinfo, _, _) -> ret_succ_adding accu (base kinfo +! word_size)
-    | IDip (kinfo, _, _) -> ret_succ_adding accu (base kinfo +! word_size)
-    | IExec (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | IApply (kinfo, ty, _) ->
-        ret_succ_adding (accu ++ ty_size ty) (base kinfo +! word_size)
-    | ILambda (kinfo, lambda, _) ->
-        let accu = ret_succ_adding accu (base kinfo +! word_size) in
+          (base +! (word_size *? 2))
+    | IBig_map_mem (_, _) -> ret_succ_adding accu base
+    | IBig_map_get (_, _) -> ret_succ_adding accu base
+    | IBig_map_update (_, _) -> ret_succ_adding accu base
+    | IBig_map_get_and_update (_, _) -> ret_succ_adding accu base
+    | IConcat_string (_, _) -> ret_succ_adding accu base
+    | IConcat_string_pair (_, _) -> ret_succ_adding accu base
+    | ISlice_string (_, _) -> ret_succ_adding accu base
+    | IString_size (_, _) -> ret_succ_adding accu base
+    | IConcat_bytes (_, _) -> ret_succ_adding accu base
+    | IConcat_bytes_pair (_, _) -> ret_succ_adding accu base
+    | ISlice_bytes (_, _) -> ret_succ_adding accu base
+    | IBytes_size (_, _) -> ret_succ_adding accu base
+    | IAdd_seconds_to_timestamp (_, _) -> ret_succ_adding accu base
+    | IAdd_timestamp_to_seconds (_, _) -> ret_succ_adding accu base
+    | ISub_timestamp_seconds (_, _) -> ret_succ_adding accu base
+    | IDiff_timestamps (_, _) -> ret_succ_adding accu base
+    | IAdd_tez (_, _) -> ret_succ_adding accu base
+    | ISub_tez (_, _) -> ret_succ_adding accu base
+    | ISub_tez_legacy (_, _) -> ret_succ_adding accu base
+    | IMul_teznat (_, _) -> ret_succ_adding accu base
+    | IMul_nattez (_, _) -> ret_succ_adding accu base
+    | IEdiv_teznat (_, _) -> ret_succ_adding accu base
+    | IEdiv_tez (_, _) -> ret_succ_adding accu base
+    | IOr (_, _) -> ret_succ_adding accu base
+    | IAnd (_, _) -> ret_succ_adding accu base
+    | IXor (_, _) -> ret_succ_adding accu base
+    | INot (_, _) -> ret_succ_adding accu base
+    | IIs_nat (_, _) -> ret_succ_adding accu base
+    | INeg (_, _) -> ret_succ_adding accu base
+    | IAbs_int (_, _) -> ret_succ_adding accu base
+    | IInt_nat (_, _) -> ret_succ_adding accu base
+    | IAdd_int (_, _) -> ret_succ_adding accu base
+    | IAdd_nat (_, _) -> ret_succ_adding accu base
+    | ISub_int (_, _) -> ret_succ_adding accu base
+    | IMul_int (_, _) -> ret_succ_adding accu base
+    | IMul_nat (_, _) -> ret_succ_adding accu base
+    | IEdiv_int (_, _) -> ret_succ_adding accu base
+    | IEdiv_nat (_, _) -> ret_succ_adding accu base
+    | ILsl_nat (_, _) -> ret_succ_adding accu base
+    | ILsr_nat (_, _) -> ret_succ_adding accu base
+    | IOr_nat (_, _) -> ret_succ_adding accu base
+    | IAnd_nat (_, _) -> ret_succ_adding accu base
+    | IAnd_int_nat (_, _) -> ret_succ_adding accu base
+    | IXor_nat (_, _) -> ret_succ_adding accu base
+    | INot_int (_, _) -> ret_succ_adding accu base
+    | IIf _ -> ret_succ_adding accu base
+    | ILoop (_, _, _) -> ret_succ_adding accu base
+    | ILoop_left (_, _, _) -> ret_succ_adding accu (base +! word_size)
+    | IDip (_, _, _) -> ret_succ_adding accu (base +! word_size)
+    | IExec (_, _) -> ret_succ_adding accu base
+    | IApply (_, ty, _) ->
+        ret_succ_adding (accu ++ ty_size ty) (base +! word_size)
+    | ILambda (_, lambda, _) ->
+        let accu = ret_succ_adding accu (base +! word_size) in
         (lambda_size [@ocaml.tailcall]) ~count_lambda_nodes accu lambda
-    | IFailwith (kinfo, _, ty) ->
-        ret_succ_adding (accu ++ ty_size ty) (base kinfo +! word_size)
-    | ICompare (kinfo, cty, _) ->
-        ret_succ_adding (accu ++ ty_size cty) (base kinfo +! word_size)
-    | IEq (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | INeq (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | ILt (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | IGt (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | ILe (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | IGe (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | IAddress (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | IContract (kinfo, ty, s, _) ->
+    | IFailwith (_, _, ty) ->
+        ret_succ_adding (accu ++ ty_size ty) (base +! word_size)
+    | ICompare (_, cty, _) ->
+        ret_succ_adding (accu ++ ty_size cty) (base +! word_size)
+    | IEq (_, _) -> ret_succ_adding accu base
+    | INeq (_, _) -> ret_succ_adding accu base
+    | ILt (_, _) -> ret_succ_adding accu base
+    | IGt (_, _) -> ret_succ_adding accu base
+    | ILe (_, _) -> ret_succ_adding accu base
+    | IGe (_, _) -> ret_succ_adding accu base
+    | IAddress (_, _) -> ret_succ_adding accu base
+    | IContract (_, ty, s, _) ->
         ret_succ_adding
           (accu ++ ty_size ty)
-          (base kinfo +! Entrypoint.in_memory_size s +! (word_size *? 2))
-    | IView (kinfo, s, _) ->
-        ret_succ_adding (accu ++ view_signature_size s) (base kinfo +! word_size)
-    | ITransfer_tokens (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | IImplicit_account (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | ICreate_contract {kinfo; storage_type; code; k = _} ->
+          (base +! Entrypoint.in_memory_size s +! (word_size *? 2))
+    | IView (_, s, _) ->
+        ret_succ_adding (accu ++ view_signature_size s) (base +! word_size)
+    | ITransfer_tokens (_, _) -> ret_succ_adding accu base
+    | IImplicit_account (_, _) -> ret_succ_adding accu base
+    | ICreate_contract {loc = _; storage_type; code; k = _} ->
         ret_succ_adding
           (accu ++ ty_size storage_type ++ expr_size code)
-          (base kinfo +! (word_size *? 2))
-    | ISet_delegate (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | INow (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | IMin_block_time (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | IBalance (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | ILevel (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | ICheck_signature (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | IHash_key (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | IPack (kinfo, ty, _) ->
-        ret_succ_adding (accu ++ ty_size ty) (base kinfo +! word_size)
-    | IUnpack (kinfo, ty, _) ->
-        ret_succ_adding (accu ++ ty_size ty) (base kinfo +! word_size)
-    | IBlake2b (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | ISha256 (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | ISha512 (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | ISource (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | ISender (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | ISelf (kinfo, ty, s, _) ->
+          (word_size *? 2)
+    | ISet_delegate (_, _) -> ret_succ_adding accu base
+    | INow (_, _) -> ret_succ_adding accu base
+    | IMin_block_time (_, _) -> ret_succ_adding accu base
+    | IBalance (_, _) -> ret_succ_adding accu base
+    | ILevel (_, _) -> ret_succ_adding accu base
+    | ICheck_signature (_, _) -> ret_succ_adding accu base
+    | IHash_key (_, _) -> ret_succ_adding accu base
+    | IPack (_, ty, _) ->
+        ret_succ_adding (accu ++ ty_size ty) (base +! word_size)
+    | IUnpack (_, ty, _) ->
+        ret_succ_adding (accu ++ ty_size ty) (base +! word_size)
+    | IBlake2b (_, _) -> ret_succ_adding accu base
+    | ISha256 (_, _) -> ret_succ_adding accu base
+    | ISha512 (_, _) -> ret_succ_adding accu base
+    | ISource (_, _) -> ret_succ_adding accu base
+    | ISender (_, _) -> ret_succ_adding accu base
+    | ISelf (_, ty, s, _) ->
         ret_succ_adding
           (accu ++ ty_size ty)
-          (base kinfo +! (word_size *? 2) +! Entrypoint.in_memory_size s)
-    | ISelf_address (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | IAmount (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | ISapling_empty_state (kinfo, _m, _) ->
-        ret_succ_adding accu (base kinfo +! word_size +! sapling_memo_size_size)
-    | ISapling_verify_update (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | ISapling_verify_update_deprecated (kinfo, _) ->
-        ret_succ_adding accu (base kinfo)
-    | IDig (kinfo, n, _, _) ->
+          (base +! (word_size *? 2) +! Entrypoint.in_memory_size s)
+    | ISelf_address (_, _) -> ret_succ_adding accu base
+    | IAmount (_, _) -> ret_succ_adding accu base
+    | ISapling_empty_state (_, _m, _) ->
+        ret_succ_adding accu (base +! word_size +! sapling_memo_size_size)
+    | ISapling_verify_update (_, _) -> ret_succ_adding accu base
+    | ISapling_verify_update_deprecated (_, _) -> ret_succ_adding accu base
+    | IDig (_, n, _, _) ->
         ret_succ_adding
           accu
-          (base kinfo +! (word_size *? 2)
-          +! stack_prefix_preservation_witness_size n)
-    | IDug (kinfo, n, _, _) ->
+          (base +! (word_size *? 2) +! stack_prefix_preservation_witness_size n)
+    | IDug (_, n, _, _) ->
         ret_succ_adding
           accu
-          (base kinfo +! (word_size *? 2)
-          +! stack_prefix_preservation_witness_size n)
-    | IDipn (kinfo, n, _, _, _) ->
+          (base +! (word_size *? 2) +! stack_prefix_preservation_witness_size n)
+    | IDipn (_, n, _, _, _) ->
         ret_succ_adding
           accu
-          (base kinfo +! (word_size *? 2)
-          +! stack_prefix_preservation_witness_size n)
-    | IDropn (kinfo, n, _, _) ->
+          (base +! (word_size *? 2) +! stack_prefix_preservation_witness_size n)
+    | IDropn (_, n, _, _) ->
         ret_succ_adding
           accu
-          (base kinfo +! (word_size *? 2)
-          +! stack_prefix_preservation_witness_size n)
-    | IChainId (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | INever kinfo -> ret_succ_adding accu (kinfo_size kinfo)
-    | IVoting_power (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | ITotal_voting_power (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | IKeccak (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | ISha3 (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | IAdd_bls12_381_g1 (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | IAdd_bls12_381_g2 (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | IAdd_bls12_381_fr (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | IMul_bls12_381_g1 (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | IMul_bls12_381_g2 (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | IMul_bls12_381_fr (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | IMul_bls12_381_z_fr (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | IMul_bls12_381_fr_z (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | IInt_bls12_381_fr (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | INeg_bls12_381_g1 (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | INeg_bls12_381_g2 (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | INeg_bls12_381_fr (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | IPairing_check_bls12_381 (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | IComb (kinfo, n, _, _) ->
+          (base +! (word_size *? 2) +! stack_prefix_preservation_witness_size n)
+    | IChainId (_, _) -> ret_succ_adding accu base
+    | INever _ -> ret_succ_adding accu kinfo_size
+    | IVoting_power (_, _) -> ret_succ_adding accu base
+    | ITotal_voting_power (_, _) -> ret_succ_adding accu base
+    | IKeccak (_, _) -> ret_succ_adding accu base
+    | ISha3 (_, _) -> ret_succ_adding accu base
+    | IAdd_bls12_381_g1 (_, _) -> ret_succ_adding accu base
+    | IAdd_bls12_381_g2 (_, _) -> ret_succ_adding accu base
+    | IAdd_bls12_381_fr (_, _) -> ret_succ_adding accu base
+    | IMul_bls12_381_g1 (_, _) -> ret_succ_adding accu base
+    | IMul_bls12_381_g2 (_, _) -> ret_succ_adding accu base
+    | IMul_bls12_381_fr (_, _) -> ret_succ_adding accu base
+    | IMul_bls12_381_z_fr (_, _) -> ret_succ_adding accu base
+    | IMul_bls12_381_fr_z (_, _) -> ret_succ_adding accu base
+    | IInt_bls12_381_fr (_, _) -> ret_succ_adding accu base
+    | INeg_bls12_381_g1 (_, _) -> ret_succ_adding accu base
+    | INeg_bls12_381_g2 (_, _) -> ret_succ_adding accu base
+    | INeg_bls12_381_fr (_, _) -> ret_succ_adding accu base
+    | IPairing_check_bls12_381 (_, _) -> ret_succ_adding accu base
+    | IComb (_, n, _, _) ->
         ret_succ_adding
           accu
-          (base kinfo +! (word_size *? 2) +! comb_gadt_witness_size n)
-    | IUncomb (kinfo, n, _, _) ->
+          (base +! (word_size *? 2) +! comb_gadt_witness_size n)
+    | IUncomb (_, n, _, _) ->
         ret_succ_adding
           accu
-          (base kinfo +! (word_size *? 2) +! uncomb_gadt_witness_size n)
-    | IComb_get (kinfo, n, _, _) ->
+          (base +! (word_size *? 2) +! uncomb_gadt_witness_size n)
+    | IComb_get (_, n, _, _) ->
         ret_succ_adding
           accu
-          (base kinfo +! (word_size *? 2) +! comb_get_gadt_witness_size n)
-    | IComb_set (kinfo, n, _, _) ->
+          (base +! (word_size *? 2) +! comb_get_gadt_witness_size n)
+    | IComb_set (_, n, _, _) ->
         ret_succ_adding
           accu
-          (base kinfo +! (word_size *? 2) +! comb_set_gadt_witness_size n)
-    | IDup_n (kinfo, n, _, _) ->
+          (base +! (word_size *? 2) +! comb_set_gadt_witness_size n)
+    | IDup_n (_, n, _, _) ->
         ret_succ_adding
           accu
-          (base kinfo +! (word_size *? 2) +! dup_n_gadt_witness_size n)
-    | ITicket (kinfo, cty, _) ->
-        ret_succ_adding (accu ++ ty_size cty) (base kinfo)
-    | IRead_ticket (kinfo, ty, _) ->
-        ret_succ_adding (accu ++ ty_size ty) (base kinfo)
-    | ISplit_ticket (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | IJoin_tickets (kinfo, cty, _) ->
-        ret_succ_adding (accu ++ ty_size cty) (base kinfo +! word_size)
-    | IOpen_chest (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | IHalt kinfo -> ret_succ_adding accu (h1w +! kinfo_size kinfo)
+          (base +! (word_size *? 2) +! dup_n_gadt_witness_size n)
+    | ITicket (_, cty, _) -> ret_succ_adding (accu ++ ty_size cty) base
+    | IRead_ticket (_, ty, _) -> ret_succ_adding (accu ++ ty_size ty) base
+    | ISplit_ticket (_, _) -> ret_succ_adding accu base
+    | IJoin_tickets (_, cty, _) ->
+        ret_succ_adding (accu ++ ty_size cty) (base +! word_size)
+    | IOpen_chest (_, _) -> ret_succ_adding accu base
+    | IHalt _ -> ret_succ_adding accu (h1w +! kinfo_size)
     | ILog _ ->
         (* This instruction is ignored because it is only used for testing. *)
         accu
