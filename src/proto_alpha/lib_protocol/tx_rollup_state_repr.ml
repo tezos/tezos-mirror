@@ -27,6 +27,94 @@
 
 open Tx_rollup_errors_repr
 
+type range =
+  | Interval of {
+      oldest : Tx_rollup_level_repr.t;
+      newest : Tx_rollup_level_repr.t;
+    }
+  | Empty of {next : Tx_rollup_level_repr.t}
+
+let range_newest = function Interval {newest; _} -> Some newest | _ -> None
+
+let range_oldest = function Interval {oldest; _} -> Some oldest | _ -> None
+
+let extend = function
+  | Empty {next} -> (Interval {oldest = next; newest = next}, next)
+  | Interval {oldest; newest} ->
+      let newest = Tx_rollup_level_repr.succ newest in
+      (Interval {oldest; newest}, newest)
+
+let shrink = function
+  | Empty _ -> error (Internal_error "cannot shrink range")
+  | Interval {oldest; newest} when Tx_rollup_level_repr.(oldest < newest) ->
+      ok (Interval {oldest = Tx_rollup_level_repr.succ oldest; newest})
+  | Interval {newest; oldest = _} ->
+      ok (Empty {next = Tx_rollup_level_repr.succ newest})
+
+let belongs_to range level =
+  match range with
+  | Empty _ -> false
+  | Interval {oldest; newest} ->
+      Tx_rollup_level_repr.(oldest <= level && level <= newest)
+
+let right_cut range level =
+  match Tx_rollup_level_repr.pred level with
+  | None -> ok (Empty {next = Tx_rollup_level_repr.root})
+  | Some predecessor -> (
+      match range with
+      | Interval {oldest; newest = _} when belongs_to range level ->
+          if Tx_rollup_level_repr.(oldest <= predecessor) then
+            ok (Interval {oldest; newest = predecessor})
+          else ok (Empty {next = level})
+      | _ -> error (Internal_error "cannot cut range"))
+
+let left_extend range level =
+  match range with
+  | Interval {oldest = _; newest} -> ok (Interval {oldest = level; newest})
+  | Empty {next} ->
+      let newest =
+        Option.value ~default:level (Tx_rollup_level_repr.pred next)
+      in
+      ok (Interval {oldest = level; newest})
+
+let range_count = function
+  | Empty _ -> 0
+  | Interval {oldest; newest} ->
+      Int32.(succ @@ Tx_rollup_level_repr.diff newest oldest |> to_int)
+
+let range_encoding : range Data_encoding.t =
+  Data_encoding.(
+    union
+      [
+        case
+          (Tag 0)
+          ~title:"empty"
+          (obj1 (req "next" Tx_rollup_level_repr.encoding))
+          (function Empty {next} -> Some next | _ -> None)
+          (fun next -> Empty {next});
+        case
+          (Tag 1)
+          ~title:"interval"
+          (obj2
+             (req "newest" Tx_rollup_level_repr.encoding)
+             (req "oldest" Tx_rollup_level_repr.encoding))
+          (function
+            | Interval {newest; oldest} -> Some (newest, oldest) | _ -> None)
+          (fun (newest, oldest) -> Interval {newest; oldest});
+      ])
+
+let pp_range fmt = function
+  | Empty {next} -> Format.(fprintf fmt "next: %a" Tx_rollup_level_repr.pp next)
+  | Interval {oldest; newest} ->
+      Format.(
+        fprintf
+          fmt
+          "oldest: %a newest: %a"
+          Tx_rollup_level_repr.pp
+          oldest
+          Tx_rollup_level_repr.pp
+          newest)
+
 (** The state of a transaction rollup is composed of [burn_per_byte]
     and [inbox_ema] fields. [initial_state] introduces their initial
     values. Both values are updated by [update_burn_per_byte] as the
@@ -46,16 +134,16 @@ open Tx_rollup_errors_repr
    The state of the transaction rollup also keeps track of four pointers
    to four different rollup levels.
 
-    - The [commitment_tail_level] is the level of the oldest
+    - The [commitment_oldest_level] is the level of the oldest
       finalized commitment still stored in the layer-1 storage.
 
-    - The [commitment_head_level] is the level of the most recent
+    - The [commitment_newest_level] is the level of the most recent
       unfinalized commitment in the layer-1 storage.
 
     - The [oldest_inbox_level] is the level of the oldest inbox still stored
       in the layer-1 storage.
 
-    - The [head_level] is the level of the most recent inbox in the
+    - The [newest_level] is the level of the most recent inbox in the
       layer-1 storage.
 *)
 type t = {
@@ -63,12 +151,11 @@ type t = {
     (Tx_rollup_commitment_repr.Message_result_hash.t
     * Tx_rollup_commitment_repr.Commitment_hash.t)
     option;
-  commitment_tail_level : Tx_rollup_level_repr.t option;
-  oldest_inbox_level : Tx_rollup_level_repr.t option;
-  commitment_head_level :
-    (Tx_rollup_level_repr.t * Tx_rollup_commitment_repr.Commitment_hash.t)
-    option;
-  head_level : (Tx_rollup_level_repr.t * Raw_level_repr.t) option;
+  finalized_commitments : range;
+  unfinalized_commitments : range;
+  uncommitted_inboxes : range;
+  commitment_newest_hash : Tx_rollup_commitment_repr.Commitment_hash.t option;
+  tezos_head_level : Raw_level_repr.t option;
   burn_per_byte : Tez_repr.t;
   inbox_ema : int;
 }
@@ -83,73 +170,49 @@ type t = {
    yet. Because inboxes and commitments can be removed from the layer-1
    context under certain circumstances, they can be reset to [None].
 
-   Given [CT] the commitment tail, [OI] the oldest inbox, [CH] the
-   commitment head, and [H] the head, a typical rollup state is
+   The state allows us to keep track of three intervals: the finalized
+   commitments (whose inboxes have been removed from the layer-1
+   storage), the unfinalized commitments (whose inboxes are still in
+   the layer-1 storage), and uncommitted inboxes (that is, inboxes
+   which are still waiting for a commitment).
 
      finalized     uncommitted
        ^^^^^^        ^^^^^^^^
-      CT           CH
        [------------]            commitments
              [--------------]    inboxes
-            OI              H
              ^^^^^^^^
             unfinalized
 
-   Note that the oldest inbox level is not always lesser than the
-   commitment head. If the commitment head is equal to [None], it
-   means all the inboxes currently stored in layer-1 are “uncommitted”,
-   that is, no commitments have been submitted for them.
-
-   In such a case, the rollup state is analoguous to
+    Note that this layout is not the only one that we can witness in
+    the layer-1 storage, even if it is the more common. It is possible
+    for instance that there is no unfinalized commitments at a given
+    time.
 
      finalized
        ^^^^^^
-      CT
-       [-----[                   commitments
+       [----]                    commitments
              [--------------]    inboxes
-            OI              H
              ^^^^^^^^^^^^^^^^
                 uncommitted
 
-   Similarly, it is possible to see the oldest inbox level and head level
-   set to [None]. For instance, when each commitment in the
-   layer-1 storage has been properly finalized. In this case, the
-   layout will be
+     Or that we have no more inboxes, but only finalized commitments.
 
      finalized
        ^^^^^^
       CT
-       [-----[              commitments
-             [              inboxes
-
-
-   When a pointer is reset to [None], its next value will be decided
-   by its previous value. For instance, when the oldest inbox level is
-   set from [Some l] to [None], its next value is the successor level
-   of [l].
-
-   To implement this behavior, this module relies on four fields and
-   four functions which share the same name. Once set to a given
-   value, the fields are never set back to [None]. It is the purpose
-   of the functions to determine if a value is correct, or kept in
-   memory for future use, and only the functions are exposed to other
-   modules.
-
-   Let’s take the [oldest_inbox_level], for instance. It is supposed
-   to be [None] iff there is no “uncommitted” inbox in the context,
-   and we can retreive the number of uncommitted inbox by computing
-   the difference between the fields [head_level] and
-   [oldest_inbox_level].
+       [-----]              commitments
+                            inboxes
 
  *)
 
 let initial_state =
   {
     last_removed_commitment_hashes = None;
-    commitment_tail_level = None;
-    oldest_inbox_level = None;
-    commitment_head_level = None;
-    head_level = None;
+    finalized_commitments = Empty {next = Tx_rollup_level_repr.root};
+    unfinalized_commitments = Empty {next = Tx_rollup_level_repr.root};
+    uncommitted_inboxes = Empty {next = Tx_rollup_level_repr.root};
+    commitment_newest_hash = None;
+    tezos_head_level = None;
     burn_per_byte = Tez_repr.zero;
     inbox_ema = 0;
   }
@@ -159,37 +222,41 @@ let encoding : t Data_encoding.t =
   conv
     (fun {
            last_removed_commitment_hashes;
-           commitment_tail_level;
-           oldest_inbox_level;
-           commitment_head_level;
-           head_level;
+           finalized_commitments;
+           unfinalized_commitments;
+           uncommitted_inboxes;
+           commitment_newest_hash;
+           tezos_head_level;
            burn_per_byte;
            inbox_ema;
          } ->
       ( last_removed_commitment_hashes,
-        commitment_tail_level,
-        oldest_inbox_level,
-        commitment_head_level,
-        head_level,
+        finalized_commitments,
+        unfinalized_commitments,
+        uncommitted_inboxes,
+        commitment_newest_hash,
+        tezos_head_level,
         burn_per_byte,
         inbox_ema ))
     (fun ( last_removed_commitment_hashes,
-           commitment_tail_level,
-           oldest_inbox_level,
-           commitment_head_level,
-           head_level,
+           finalized_commitments,
+           unfinalized_commitments,
+           uncommitted_inboxes,
+           commitment_newest_hash,
+           tezos_head_level,
            burn_per_byte,
            inbox_ema ) ->
       {
         last_removed_commitment_hashes;
-        commitment_tail_level;
-        oldest_inbox_level;
-        commitment_head_level;
-        head_level;
+        finalized_commitments;
+        unfinalized_commitments;
+        uncommitted_inboxes;
+        commitment_newest_hash;
+        tezos_head_level;
         burn_per_byte;
         inbox_ema;
       })
-    (obj7
+    (obj8
        (req
           "last_removed_commitment_hashes"
           (option
@@ -200,64 +267,47 @@ let encoding : t Data_encoding.t =
                (req
                   "commitment_hash"
                   Tx_rollup_commitment_repr.Commitment_hash.encoding)))
-       (req "commitment_tail_level" (option Tx_rollup_level_repr.encoding))
-       (req "oldest_inbox_level" (option Tx_rollup_level_repr.encoding))
+       (req "finalized_commitments" range_encoding)
+       (req "unfinalized_commitments" range_encoding)
+       (req "uncommitted_inboxes" range_encoding)
        (req
-          "commitment_head_level"
-          (option
-             (obj2
-                (req "level" Tx_rollup_level_repr.encoding)
-                (req "hash" Tx_rollup_commitment_repr.Commitment_hash.encoding))))
-       (req
-          "head_level"
-          (option
-             (obj2
-                (req "level" Tx_rollup_level_repr.encoding)
-                (req "tezos_level" Raw_level_repr.encoding))))
+          "commitment_newest_hash"
+          (option Tx_rollup_commitment_repr.Commitment_hash.encoding))
+       (req "tezos_head_level" (option Raw_level_repr.encoding))
        (req "burn_per_byte" Tez_repr.encoding)
        (req "inbox_ema" int31))
 
 let pp fmt
     {
       last_removed_commitment_hashes;
-      commitment_tail_level;
-      oldest_inbox_level;
-      commitment_head_level;
-      head_level;
+      finalized_commitments;
+      unfinalized_commitments;
+      uncommitted_inboxes;
+      commitment_newest_hash;
+      tezos_head_level;
       burn_per_byte;
       inbox_ema;
     } =
   Format.(
     fprintf
       fmt
-      "oldest_inbox_level: %a cost_per_byte: %a inbox_ema: %d head inbox: %a \
-       commitment tail: %a commitment head: %a last_removed_commitment_hashes: \
-       %a"
-      (Format.pp_print_option Tx_rollup_level_repr.pp)
-      oldest_inbox_level
+      "cost_per_byte: %a inbox_ema: %d finalized_commitments: %a \
+       unfinalized_commitments: %a uncommitted_inboxes: %a \
+       commitment_newest_hash: %a tezos_head_level: %a \
+       last_removed_commitment_hashes: %a"
       Tez_repr.pp
       burn_per_byte
       inbox_ema
-      (pp_print_option (fun fmt (tx_lvl, tezos_lvl) ->
-           fprintf
-             fmt
-             "(rollup level: %a, tezos level: %a)"
-             Tx_rollup_level_repr.pp
-             tx_lvl
-             Raw_level_repr.pp
-             tezos_lvl))
-      head_level
-      (Format.pp_print_option Tx_rollup_level_repr.pp)
-      commitment_tail_level
-      (pp_print_option (fun fmt (tx_lvl, tezos_lvl) ->
-           fprintf
-             fmt
-             "(rollup level: %a, commitment: %a)"
-             Tx_rollup_level_repr.pp
-             tx_lvl
-             Tx_rollup_commitment_repr.Commitment_hash.pp
-             tezos_lvl))
-      commitment_head_level
+      pp_range
+      finalized_commitments
+      pp_range
+      unfinalized_commitments
+      pp_range
+      uncommitted_inboxes
+      (pp_print_option Tx_rollup_commitment_repr.Commitment_hash.pp)
+      commitment_newest_hash
+      (pp_print_option Raw_level_repr.pp)
+      tezos_head_level
       (pp_print_option (fun fmt (m, c) ->
            fprintf
              fmt
@@ -332,114 +382,67 @@ let rec update_burn_per_byte :
     let elapsed = elapsed - 1 in
     update_burn_per_byte state' ~elapsed ~factor ~final_size ~hard_limit
 
-let inboxes_count {head_level; oldest_inbox_level; _} =
-  match (oldest_inbox_level, head_level) with
-  | (Some oldest_level, Some (newest_level, _)) ->
-      let delta =
-        (* [Int32.succ] because the range is inclusive, i.e., [l; l]
-           has one inbox at level [l]. *)
-        Int32.succ @@ Tx_rollup_level_repr.diff newest_level oldest_level
-      in
-      Compare.Int32.max 0l delta |> Int32.to_int
-  | _ -> 0
+let inboxes_count {unfinalized_commitments; uncommitted_inboxes; _} =
+  range_count unfinalized_commitments + range_count uncommitted_inboxes
 
-let committed_inboxes_count {oldest_inbox_level; commitment_head_level; _} =
-  match (oldest_inbox_level, commitment_head_level) with
-  | (Some oldest_level, Some (newest_level, _)) ->
-      let delta =
-        (* [Int32.succ] because the range is inclusive, i.e., [l; l]
-           has one committed inbox at level [l]. *)
-        Int32.succ @@ Tx_rollup_level_repr.diff newest_level oldest_level
-      in
-      Compare.Int32.max 0l delta |> Int32.to_int
-  | _ -> 0
+let uncommitted_inboxes_count {uncommitted_inboxes; _} =
+  range_count uncommitted_inboxes
 
-let uncommitted_inboxes_count {head_level; commitment_head_level; _} =
-  match (commitment_head_level, head_level) with
-  | (Some (oldest_level, _), Some (newest_level, _)) ->
-      let delta =
-        (* No [Int32.succ] because the range is not inclusive. More
-           precisely, the [commitment_head_level] has one commitment,
-           and therefore is not part of the count. *)
-        Tx_rollup_level_repr.diff newest_level oldest_level
-      in
-      Compare.Int32.max 0l delta |> Int32.to_int
-  | _ -> 0
-
-let finalized_commitments_count {commitment_tail_level; oldest_inbox_level; _} =
-  match (commitment_tail_level, oldest_inbox_level) with
-  | (Some oldest_level, Some newest_level) ->
-      let delta =
-        (* No [Int32.succ] because the range is not inclusive. More
-           precisely, the [oldest_inbox_level] has not yet been
-           finalized. *)
-        Tx_rollup_level_repr.diff newest_level oldest_level
-      in
-      Compare.Int32.max 0l delta |> Int32.to_int
-  | _ -> 0
-
-let commitment_head_level state =
-  if Compare.Int.(committed_inboxes_count state = 0) then None
-  else Option.map fst state.commitment_head_level
-
-let commitment_tail_level state =
-  if Compare.Int.(finalized_commitments_count state = 0) then None
-  else state.commitment_tail_level
-
-let head_level state =
-  if Compare.Int.(inboxes_count state = 0) then None else state.head_level
-
-let oldest_inbox_level state =
-  if Compare.Int.(inboxes_count state = 0) then None
-  else state.oldest_inbox_level
-
-let next_commitment_level state =
-  match (commitment_head_level state, oldest_inbox_level state) with
-  | (Some commitment_head, Some _) ->
-      ok (Tx_rollup_level_repr.succ commitment_head)
-  | (None, Some oldest_inbox) -> ok oldest_inbox
-  | (_, _) -> error No_uncommitted_inbox
-
-let next_commitment_predecessor state =
-  Option.map snd state.commitment_head_level
+let finalized_commitments_count {finalized_commitments; _} =
+  range_count finalized_commitments
 
 let record_inbox_creation t level =
-  (match t.head_level with
-  | Some (tx_lvl, tezos_lvl) ->
-      (if Raw_level_repr.(level <= tezos_lvl) then
-       error (Internal_error "Trying to create an inbox in the past")
-      else ok ())
-      >>? fun () -> ok (Tx_rollup_level_repr.succ tx_lvl)
-  | None -> ok Tx_rollup_level_repr.root)
-  >>? fun tx_level ->
-  let oldest_inbox_level =
-    Some (Option.value ~default:tx_level t.oldest_inbox_level)
-  in
-  ok ({t with head_level = Some (tx_level, level); oldest_inbox_level}, tx_level)
+  (match t.tezos_head_level with
+  | Some tezos_lvl ->
+      error_when
+        Raw_level_repr.(level <= tezos_lvl)
+        (Internal_error "Trying to create an inbox in the past")
+  | None -> ok ())
+  >>? fun () ->
+  let (uncommitted_inboxes, new_level) = extend t.uncommitted_inboxes in
+  ok ({t with tezos_head_level = Some level; uncommitted_inboxes}, new_level)
+
+let next_commitment_predecessor state = state.commitment_newest_hash
+
+let finalized_commitment_oldest_level state =
+  range_oldest state.finalized_commitments
+
+let next_commitment_level state =
+  match range_oldest state.uncommitted_inboxes with
+  | Some level -> ok level
+  | None -> error No_uncommitted_inbox
+
+let next_commitment_to_finalize state =
+  range_oldest state.unfinalized_commitments
+
+let next_commitment_to_remove state = range_oldest state.finalized_commitments
 
 let record_inbox_deletion state candidate =
-  match state.oldest_inbox_level with
-  | Some level
-    when Compare.Int.(0 < inboxes_count state)
-         && Tx_rollup_level_repr.(candidate = level) ->
-      let oldest_inbox_level = Some (Tx_rollup_level_repr.succ level) in
-      ok {state with oldest_inbox_level}
+  match range_oldest state.unfinalized_commitments with
+  | Some level when Tx_rollup_level_repr.(candidate = level) ->
+      shrink state.unfinalized_commitments >>? fun unfinalized_commitments ->
+      let (finalized_commitments, _) = extend state.finalized_commitments in
+      ok {state with unfinalized_commitments; finalized_commitments}
   | _ -> error (Internal_error "Trying to delete the wrong inbox")
 
 let record_commitment_creation state level hash =
-  let commitment_tail_level =
-    Some (Option.value ~default:level state.commitment_tail_level)
-  in
-  let state = {state with commitment_tail_level} in
-  match (commitment_head_level state, oldest_inbox_level state) with
-  | (Some commitment_head, Some _)
-    when Tx_rollup_level_repr.(level = succ commitment_head) ->
-      ok {state with commitment_head_level = Some (level, hash)}
-  | (None, Some oldest) when Tx_rollup_level_repr.(level = oldest) ->
-      ok {state with commitment_head_level = Some (level, hash)}
-  | _ ->
-      error
-        (Internal_error "Trying to create a commitment at an incorrect level")
+  match range_oldest state.uncommitted_inboxes with
+  | Some oldest ->
+      error_unless
+        Tx_rollup_level_repr.(level = oldest)
+        (Internal_error "Trying to create the wrong commitment")
+      >>? fun () ->
+      shrink state.uncommitted_inboxes >>? fun uncommitted_inboxes ->
+      let (unfinalized_commitments, _) = extend state.unfinalized_commitments in
+      ok
+        {
+          state with
+          uncommitted_inboxes;
+          unfinalized_commitments;
+          commitment_newest_hash = Some hash;
+        }
+  | None ->
+      error (Internal_error "Cannot create a commitment due to lack of inbox")
 
 let record_commitment_rejection state level predecessor_hash =
   let unwrap_option msg = function
@@ -450,39 +453,49 @@ let record_commitment_rejection state level predecessor_hash =
     | None -> ok ()
     | Some _ -> error (Internal_error msg)
   in
-  match (oldest_inbox_level state, commitment_head_level state) with
-  | (Some inbox_tail, Some commitment_head)
-    when Tx_rollup_level_repr.(inbox_tail <= level && level <= commitment_head)
-    -> (
-      match (commitment_tail_level state, Tx_rollup_level_repr.pred level) with
-      | (Some commitment_tail, Some pred_level)
-        when Tx_rollup_level_repr.(commitment_tail <= pred_level) ->
-          unwrap_option "Missing predecessor commitment" predecessor_hash
-          >>? fun pred_hash ->
-          ok {state with commitment_head_level = Some (pred_level, pred_hash)}
-      | (None, Some pred_level) ->
-          check_none "Unexpected predecessor hash" predecessor_hash
-          >>? fun () ->
-          unwrap_option
-            "Missing commitment hash"
-            state.last_removed_commitment_hashes
-          >>? fun (_, pred_hash) ->
-          ok {state with commitment_head_level = Some (pred_level, pred_hash)}
-      | (None, None) ->
-          check_none
-            "Unexpected last removed commitment"
-            state.last_removed_commitment_hashes
-          >>? fun () -> ok {state with commitment_head_level = None}
-      | _ -> error (Internal_error "Machine state inconsistency"))
-  | _ -> error (Internal_error "No commitment to reject")
-
-let record_commitment_deletion state level hash message_hash =
-  match commitment_tail_level state with
-  | Some tail when Tx_rollup_level_repr.(level = tail) ->
+  left_extend state.uncommitted_inboxes level >>? fun uncommitted_inboxes ->
+  let state = {state with uncommitted_inboxes} in
+  right_cut state.unfinalized_commitments level
+  >>? fun unfinalized_commitments ->
+  match Tx_rollup_level_repr.pred level with
+  | Some pred_level
+    when belongs_to state.unfinalized_commitments pred_level
+         || belongs_to state.finalized_commitments pred_level ->
+      (* Case 1. Predecessor level of the rejected commitments has a commitment in the storage *)
+      unwrap_option "Missing predecessor commitment" predecessor_hash
+      >>? fun predecessor_hash ->
       ok
         {
           state with
-          commitment_tail_level = Some (Tx_rollup_level_repr.succ tail);
+          unfinalized_commitments;
+          commitment_newest_hash = Some predecessor_hash;
+        }
+  | Some _ ->
+      (* Case 2. Predecessor level of the rejected commitments has its
+         commitment removed from the storage *)
+      check_none "Unexpected predecessor hash" predecessor_hash >>? fun () ->
+      unwrap_option
+        "Missing commitment hash"
+        state.last_removed_commitment_hashes
+      >>? fun (_, pred_hash) ->
+      ok
+        {
+          state with
+          unfinalized_commitments;
+          commitment_newest_hash = Some pred_hash;
+        }
+  | None ->
+      (* Case 3. The rejected commitment is the commitment of the root level *)
+      ok {state with unfinalized_commitments; commitment_newest_hash = None}
+
+let record_commitment_deletion state level hash message_hash =
+  match range_oldest state.finalized_commitments with
+  | Some oldest when Tx_rollup_level_repr.(level = oldest) ->
+      shrink state.finalized_commitments >>? fun finalized_commitments ->
+      ok
+        {
+          state with
+          finalized_commitments;
           last_removed_commitment_hashes = Some (message_hash, hash);
         }
   | _ -> error (Internal_error "Trying to remove an incorrect commitment")
@@ -495,32 +508,32 @@ let burn_cost ~limit state size =
   | _ -> ok burn
 
 let finalized_commitments_range state =
-  if Compare.Int.(0 < finalized_commitments_count state) then
-    match (state.commitment_tail_level, state.oldest_inbox_level) with
-    | (Some commitment_tail, Some oldest_inbox) -> (
-        match Tx_rollup_level_repr.pred oldest_inbox with
-        | Some res -> ok (Some (commitment_tail, res))
-        | None ->
-            error
-              (Internal_error
-                 "oldest inbox has no predecessor, but commitments have been \
-                  finalized"))
-    | (_, _) ->
-        error
-          (Internal_error
-             "unreachable code per definition of [finalized_commitments_count]")
-  else ok None
+  match
+    ( range_oldest state.finalized_commitments,
+      range_newest state.finalized_commitments )
+  with
+  | (Some oldest, Some newest) -> Some (oldest, newest)
+  | _ -> None
 
 let check_level_can_be_rejected state level =
-  match (oldest_inbox_level state, commitment_head_level state) with
+  match
+    ( range_oldest state.unfinalized_commitments,
+      range_newest state.unfinalized_commitments )
+  with
   | (Some oldest, Some newest) ->
       error_unless Tx_rollup_level_repr.(oldest <= level && level <= newest)
       @@ Cannot_reject_level
            {provided = level; accepted_range = Some (oldest, newest)}
-  | (_, _) ->
-      error @@ Cannot_reject_level {provided = level; accepted_range = None}
+  | _ -> error @@ Cannot_reject_level {provided = level; accepted_range = None}
 
 let last_removed_commitment_hashes state = state.last_removed_commitment_hashes
+
+let head_levels state =
+  match (state.uncommitted_inboxes, state.tezos_head_level) with
+  | (Empty {next = l}, Some tz_level) ->
+      Option.map (fun l -> (l, tz_level)) (Tx_rollup_level_repr.pred l)
+  | (Interval {newest; _}, Some tz_level) -> Some (newest, tz_level)
+  | _ -> None
 
 module Internal_for_tests = struct
   let make :
@@ -529,29 +542,42 @@ module Internal_for_tests = struct
       ?last_removed_commitment_hashes:
         Tx_rollup_commitment_repr.Message_result_hash.t
         * Tx_rollup_commitment_repr.Commitment_hash.t ->
-      ?commitment_tail_level:Tx_rollup_level_repr.t ->
-      ?oldest_inbox_level:Tx_rollup_level_repr.t ->
-      ?commitment_head_level:
-        Tx_rollup_level_repr.t * Tx_rollup_commitment_repr.Commitment_hash.t ->
-      ?head_level:Tx_rollup_level_repr.t * Raw_level_repr.t ->
+      ?finalized_commitments:Tx_rollup_level_repr.t * Tx_rollup_level_repr.t ->
+      ?unfinalized_commitments:Tx_rollup_level_repr.t * Tx_rollup_level_repr.t ->
+      ?uncommitted_inboxes:Tx_rollup_level_repr.t * Tx_rollup_level_repr.t ->
+      ?commitment_newest_hash:Tx_rollup_commitment_repr.Commitment_hash.t ->
+      ?tezos_head_level:Raw_level_repr.t ->
       unit ->
       t =
    fun ?(burn_per_byte = Tez_repr.zero)
        ?(inbox_ema = 0)
        ?last_removed_commitment_hashes
-       ?commitment_tail_level
-       ?oldest_inbox_level
-       ?commitment_head_level
-       ?head_level
+       ?finalized_commitments
+       ?unfinalized_commitments
+       ?uncommitted_inboxes
+       ?commitment_newest_hash
+       ?tezos_head_level
        () ->
+    let to_range = function
+      | Some (oldest, newest) ->
+          assert (Tx_rollup_level_repr.(oldest <= newest)) ;
+          Interval {oldest; newest}
+      | _ -> Empty {next = Tx_rollup_level_repr.root}
+    in
+
+    let unfinalized_commitments = to_range unfinalized_commitments in
+    let finalized_commitments = to_range finalized_commitments in
+    let uncommitted_inboxes = to_range uncommitted_inboxes in
+
     {
       last_removed_commitment_hashes;
       burn_per_byte;
       inbox_ema;
-      commitment_tail_level;
-      oldest_inbox_level;
-      commitment_head_level;
-      head_level;
+      finalized_commitments;
+      unfinalized_commitments;
+      uncommitted_inboxes;
+      commitment_newest_hash;
+      tezos_head_level;
     }
 
   let get_inbox_ema : t -> int = fun {inbox_ema; _} -> inbox_ema

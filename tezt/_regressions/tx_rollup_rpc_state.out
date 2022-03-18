@@ -2,7 +2,7 @@ tezt/_regressions/tx_rollup_rpc_state.out
 
 ./tezos-client --wait none originate tx rollup from '[PUBLIC_KEY_HASH]' --burn-cap 9999999 --storage-limit 60000
 Node is bootstrapped.
-Estimated gas: 1410.040 units (will add 100 for safety)
+Estimated gas: 1410.092 units (will add 100 for safety)
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
 NOT waiting for the operation to be included.
@@ -25,11 +25,13 @@ This sequence of operations was run:
       Balance updates:
         [PUBLIC_KEY_HASH] ... -ꜩ15
         storage fees ........................... +ꜩ15
-      Consumed gas: 1410.040
+      Consumed gas: 1410.092
       Originated tx rollup: [TX_ROLLUP_HASH]
 
 
 ./tezos-client rpc get '/chains/main/blocks/head/context/tx_rollup/[TX_ROLLUP_HASH]/state'
-{ "last_removed_commitment_hashes": null, "commitment_tail_level": null,
-  "oldest_inbox_level": null, "commitment_head_level": null,
-  "head_level": null, "burn_per_byte": "0", "inbox_ema": 0 }
+{ "last_removed_commitment_hashes": null,
+  "finalized_commitments": { "next": 0 },
+  "unfinalized_commitments": { "next": 0 },
+  "uncommitted_inboxes": { "next": 0 }, "commitment_newest_hash": null,
+  "tezos_head_level": null, "burn_per_byte": "0", "inbox_ema": 0 }

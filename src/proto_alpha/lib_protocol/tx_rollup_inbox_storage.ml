@@ -84,8 +84,8 @@ let prepare_inbox :
       <= Tx_rollup_state_repr.inboxes_count state)
     Too_many_inboxes
   >>=? fun () ->
-  let current_level = Tx_rollup_state_repr.head_level state in
-  match current_level with
+  let current_levels = Tx_rollup_state_repr.head_levels state in
+  match current_levels with
   | Some (_, tezos_lvl) when Raw_level_repr.(level < tezos_lvl) ->
       fail (Internal_error "Trying to write into an inbox from the past")
   | Some (tx_lvl, tezos_lvl) when Raw_level_repr.(tezos_lvl = level) ->
@@ -97,7 +97,7 @@ let prepare_inbox :
         Option.fold
           ~none:None
           ~some:(fun (tx_level, _) -> Tx_rollup_level_repr.pred tx_level)
-          current_level
+          current_levels
       in
       (match pred_level with
       | None -> return (ctxt, state)
@@ -110,7 +110,7 @@ let prepare_inbox :
             Constants_storage.tx_rollup_cost_per_byte_ema_factor ctxt
           in
           let elapsed =
-            match current_level with
+            match current_levels with
             | None -> 0
             | Some (_, tezos_level) ->
                 let diff = Raw_level_repr.diff level tezos_level in

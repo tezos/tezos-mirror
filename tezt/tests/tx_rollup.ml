@@ -605,9 +605,11 @@ let test_submit_batches_in_several_blocks =
   let expected_state =
     Rollup.
       {
-        oldest_inbox_level = None;
-        head_level = None;
-        commitment_head_level = None;
+        finalized_commitments = Empty 0;
+        unfinalized_commitments = Empty 0;
+        uncommitted_inboxes = Empty 0;
+        tezos_head_level = None;
+        commitment_head_hash = None;
         burn_per_byte = 0;
         inbox_ema = 0;
       }
@@ -945,10 +947,9 @@ let test_rollup_wrong_rejection =
   Check.(error_id = "proto.alpha.tx_rollup_invalid_proof")
     Check.string
     ~error_msg:"Expected error id: %R. Got %L" ;
-  match state.commitment_head_level with
-  | Some (0, _) -> unit
-  | None | Some _ ->
-      Test.fail "Wrong rollup state: Expected commitment head at level 0"
+  match state.unfinalized_commitments with
+  | Interval (0, _) -> unit
+  | _ -> Test.fail "Wrong rollup state: Expected commitment head at level 0"
 
 let register ~protocols =
   Regressions.register protocols ;

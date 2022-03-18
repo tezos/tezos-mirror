@@ -71,20 +71,6 @@ val update_burn_per_byte :
 *)
 val burn_cost : limit:Tez_repr.t option -> t -> int -> Tez_repr.t tzresult
 
-(** [head_level state] returns the rollup level of the most recent
-    inbox —if it exists— long with the Tezos level at which this inbox
-    was created. *)
-val head_level : t -> (Tx_rollup_level_repr.t * Raw_level_repr.t) option
-
-(** [commitment_head_level state] returns the rollup level of the most
-    recent unfinalized commitment, if it exists. *)
-val commitment_head_level : t -> Tx_rollup_level_repr.t option
-
-(** [commitment_tail_level state] returns the rollup level of the
-    oldest finalized commitment still in the layer-1 context, if it
-    exists. *)
-val commitment_tail_level : t -> Tx_rollup_level_repr.t option
-
 (** [uncommitted_inboxes_count state] returns the number of inboxes
     the rollup current has in the storage which did not receive a
     commitment yet. *)
@@ -98,9 +84,17 @@ val finalized_commitments_count : t -> int
     current has in the storage. *)
 val inboxes_count : t -> int
 
-(** [oldest_inbox_level state] returns the level of the oldest inbox
-    of a rollup that is still in the layer-1 context, if it exists. *)
-val oldest_inbox_level : t -> Tx_rollup_level_repr.t option
+(** [next_commitment_to_finalize state] returns the rollup level of
+    the next commitment to be finalized. *)
+val next_commitment_to_finalize : t -> Tx_rollup_level_repr.t option
+
+(** [next_commitment_to_remove state] returns the rollup level of the
+    next commitment to be removed from the layer-1 context. *)
+val next_commitment_to_remove : t -> Tx_rollup_level_repr.t option
+
+(** [finalized_commitment_oldest_level state] returns the rollup level
+    of the oldest finalized commitment. *)
+val finalized_commitment_oldest_level : t -> Tx_rollup_level_repr.t option
 
 (** [next_commitment_level state] returns the expected level of the
     next valid commitment.
@@ -178,10 +172,10 @@ val record_commitment_deletion :
 (** [finalized_commitments_range state] returns the window of finalized
     commitments that have not yet been cleaned out
 
-    This function returns an [Internal_error] if the state is inconsistent, 
+    This function returns an [Internal_error] if the state is inconsistent,
     which should not be possible. *)
 val finalized_commitments_range :
-  t -> (Tx_rollup_level_repr.t * Tx_rollup_level_repr.t) option tzresult
+  t -> (Tx_rollup_level_repr.t * Tx_rollup_level_repr.t) option
 
 (** [check_level_can_be_rejected state level] raises
     [Cannot_reject_level] iff there does not exist a commitment at
@@ -197,6 +191,11 @@ val last_removed_commitment_hashes :
   * Tx_rollup_commitment_repr.Commitment_hash.t)
   option
 
+(** [head_levels state] returns the level of the last inbox which has
+    been created in the layer-1 context, along with the Tezos level at
+    which said inbox has been created. *)
+val head_levels : t -> (Tx_rollup_level_repr.t * Raw_level_repr.t) option
+
 module Internal_for_tests : sig
   (** [make] returns a state for tests *)
   val make :
@@ -205,11 +204,11 @@ module Internal_for_tests : sig
     ?last_removed_commitment_hashes:
       Tx_rollup_commitment_repr.Message_result_hash.t
       * Tx_rollup_commitment_repr.Commitment_hash.t ->
-    ?commitment_tail_level:Tx_rollup_level_repr.t ->
-    ?oldest_inbox_level:Tx_rollup_level_repr.t ->
-    ?commitment_head_level:
-      Tx_rollup_level_repr.t * Tx_rollup_commitment_repr.Commitment_hash.t ->
-    ?head_level:Tx_rollup_level_repr.t * Raw_level_repr.t ->
+    ?finalized_commitments:Tx_rollup_level_repr.t * Tx_rollup_level_repr.t ->
+    ?unfinalized_commitments:Tx_rollup_level_repr.t * Tx_rollup_level_repr.t ->
+    ?uncommitted_inboxes:Tx_rollup_level_repr.t * Tx_rollup_level_repr.t ->
+    ?commitment_newest_hash:Tx_rollup_commitment_repr.Commitment_hash.t ->
+    ?tezos_head_level:Raw_level_repr.t ->
     unit ->
     t
 

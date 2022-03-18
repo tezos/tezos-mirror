@@ -24,10 +24,26 @@
 (*****************************************************************************)
 
 module Tx_rollup = struct
+  type range = Empty of int | Interval of int * int
+
+  let pp_range fmt = function
+    | Empty x -> Format.fprintf fmt "next: %d" x
+    | Interval (t, h) -> Format.fprintf fmt "oldest: %d newest: %d" t h
+
+  let range_of_json json =
+    if JSON.(json |-> "newest" |> is_null) then
+      Empty JSON.(json |-> "next" |> as_int)
+    else
+      let tail = JSON.(json |-> "oldest" |> as_int) in
+      let head = JSON.(json |-> "newest" |> as_int) in
+      Interval (tail, head)
+
   type state = {
-    oldest_inbox_level : int option;
-    head_level : (int * int) option;
-    commitment_head_level : (int * string) option;
+    finalized_commitments : range;
+    unfinalized_commitments : range;
+    uncommitted_inboxes : range;
+    tezos_head_level : int option;
+    commitment_head_hash : string option;
     burn_per_byte : int;
     inbox_ema : int;
   }
@@ -36,29 +52,27 @@ module Tx_rollup = struct
 
   let get_state ?hooks ~rollup client =
     let parse json =
-      let oldest_inbox_level =
-        JSON.(json |-> "oldest_inbox_level" |> as_opt |> Option.map as_int)
+      let finalized_commitments =
+        JSON.(json |-> "finalized_commitments" |> range_of_json)
       in
-      let head_level =
-        JSON.(
-          match json |-> "head_level" |> as_opt with
-          | None -> None
-          | Some json ->
-              Some (json |-> "level" |> as_int, json |-> "tezos_level" |> as_int))
+      let unfinalized_commitments =
+        JSON.(json |-> "unfinalized_commitments" |> range_of_json)
       in
-      let commitment_head_level =
-        JSON.(
-          match json |-> "commitment_head_level" |> as_opt with
-          | None -> None
-          | Some json ->
-              Some (json |-> "level" |> as_int, json |-> "hash" |> as_string))
+      let uncommitted_inboxes =
+        JSON.(json |-> "uncommitted_inboxes" |> range_of_json)
+      in
+      let tezos_head_level = JSON.(json |-> "tezos_head_level" |> as_int_opt) in
+      let commitment_head_hash =
+        JSON.(json |-> "commitment_head_hash" |> as_string_opt)
       in
       let burn_per_byte = JSON.(json |-> "burn_per_byte" |> as_int) in
       let inbox_ema = JSON.(json |-> "inbox_ema" |> as_int) in
       {
-        oldest_inbox_level;
-        commitment_head_level;
-        head_level;
+        finalized_commitments;
+        unfinalized_commitments;
+        uncommitted_inboxes;
+        tezos_head_level;
+        commitment_head_hash;
         burn_per_byte;
         inbox_ema;
       }
@@ -140,27 +154,26 @@ module Tx_rollup = struct
       }
 
   module Check = struct
+    let range : range Check.typ = Check.equalable pp_range ( = )
+
     let state : state Check.typ =
       let open Check in
       convert
         (fun {
-               head_level;
-               commitment_head_level;
-               oldest_inbox_level;
+               finalized_commitments;
+               unfinalized_commitments;
+               uncommitted_inboxes;
+               tezos_head_level;
+               commitment_head_hash;
                burn_per_byte;
                inbox_ema;
              } ->
-          ( head_level,
-            commitment_head_level,
-            oldest_inbox_level,
-            burn_per_byte,
-            inbox_ema ))
-        (tuple5
-           (option (tuple2 int int))
-           (option (tuple2 int string))
-           (option int)
-           int
-           int)
+          ( finalized_commitments,
+            unfinalized_commitments,
+            uncommitted_inboxes,
+            tezos_head_level,
+            (commitment_head_hash, burn_per_byte, inbox_ema) ))
+        (tuple5 range range range (option int) (tuple3 (option string) int int))
 
     let inbox : inbox Check.typ =
       let open Check in

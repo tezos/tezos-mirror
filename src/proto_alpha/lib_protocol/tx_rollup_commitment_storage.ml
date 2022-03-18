@@ -105,7 +105,7 @@ let get_finalized :
  fun ctxt tx_rollup level ->
   Tx_rollup_state_storage.assert_exist ctxt tx_rollup >>=? fun ctxt ->
   Storage.Tx_rollup.State.get ctxt tx_rollup >>=? fun (ctxt, state) ->
-  Tx_rollup_state_repr.finalized_commitments_range state >>?= fun window ->
+  let window = Tx_rollup_state_repr.finalized_commitments_range state in
   (match window with
   | Some (first, last) ->
       error_unless
@@ -214,10 +214,8 @@ let has_bond :
   >|=? fun (ctxt, pending) -> (ctxt, Option.is_some pending)
 
 let finalize_commitment ctxt rollup state =
-  match
-    Tx_rollup_state_repr.(oldest_inbox_level state, commitment_head_level state)
-  with
-  | (Some oldest_inbox_level, Some _) ->
+  match Tx_rollup_state_repr.next_commitment_to_finalize state with
+  | Some oldest_inbox_level ->
       (* Since the commitment head is not null, we know the oldest
          inbox has a commitment. *)
       get ctxt rollup oldest_inbox_level >>=? fun (ctxt, commitment) ->
@@ -248,10 +246,10 @@ let finalize_commitment ctxt rollup state =
       (* We update the state *)
       Tx_rollup_state_repr.record_inbox_deletion state oldest_inbox_level
       >>?= fun state -> return (ctxt, state, oldest_inbox_level)
-  | _ -> fail No_commitment_to_finalize
+  | None -> fail No_commitment_to_finalize
 
 let remove_commitment ctxt rollup state =
-  match Tx_rollup_state_repr.commitment_tail_level state with
+  match Tx_rollup_state_repr.next_commitment_to_remove state with
   | Some tail ->
       (* We check the commitment is old enough *)
       get ctxt rollup tail >>=? fun (ctxt, commitment) ->
@@ -320,33 +318,33 @@ let get_before_and_after_results ctxt tx_rollup
     | Some pred_level -> (
         Storage.Tx_rollup.Commitment.find ctxt (pred_level, tx_rollup)
         >>=? function
-        | (ctxt, None) ->
+        | (ctxt, None) -> (
             (* In this case, the predecessor commitment is not stored.  We need to
                check a bunch of things to ensure that the last removed commitment
                is a valid predecessor.
             *)
-            if Option.is_none (Tx_rollup_state_repr.commitment_tail_level state)
-            then
-              match
-                Tx_rollup_state_repr.last_removed_commitment_hashes state
-              with
-              | None -> fail (Internal_error "Missing last removed commitment")
-              | Some (message_commitment, commitment_hash) ->
-                  Option.value_e
-                    ~error:
-                      (Error_monad.trace_of_error
-                         (Internal_error
-                            "Non-initial commitment has empty predecessor"))
-                    commitment.predecessor
-                  >>?= fun predecessor_commitment_hash ->
-                  fail_unless
-                    (Commitment_hash.( = )
-                       predecessor_commitment_hash
-                       commitment_hash)
-                    (Internal_error
-                       "Last removed commitment has wrong predecessor hash")
-                  >>=? fun () -> return (ctxt, message_commitment, after_hash)
-            else fail (Internal_error "Missing commitment predecessor")
+            fail_unless
+              (Option.is_none
+                 (Tx_rollup_state_repr.finalized_commitment_oldest_level state))
+              (Internal_error "Missing commitment predecessor")
+            >>=? fun () ->
+            match Tx_rollup_state_repr.last_removed_commitment_hashes state with
+            | None -> fail (Internal_error "Missing last removed commitment")
+            | Some (message_commitment, commitment_hash) ->
+                Option.value_e
+                  ~error:
+                    (Error_monad.trace_of_error
+                       (Internal_error
+                          "Non-initial commitment has empty predecessor"))
+                  commitment.predecessor
+                >>?= fun predecessor_commitment_hash ->
+                fail_unless
+                  (Commitment_hash.( = )
+                     predecessor_commitment_hash
+                     commitment_hash)
+                  (Internal_error
+                     "Last removed commitment has wrong predecessor hash")
+                >>=? fun () -> return (ctxt, message_commitment, after_hash))
         | (ctxt, Some {commitment = {messages; _}; _}) ->
             Option.value_e
               ~error:
@@ -362,28 +360,20 @@ let get_before_and_after_results ctxt tx_rollup
     return (ctxt, before_hash, after_hash)
 
 let reject_commitment ctxt rollup state level =
-  match
-    Tx_rollup_state_repr.(oldest_inbox_level state, commitment_head_level state)
-  with
-  | (Some inbox_tail, Some commitment_head) ->
-      fail_unless
-        Tx_rollup_level_repr.(inbox_tail <= level && level <= commitment_head)
-        Invalid_rejection_level_argument
-      >>=? fun () ->
-      (* Fetching the next predecessor hash to be used *)
-      (match Tx_rollup_level_repr.pred level with
-      | Some pred_level ->
-          find ctxt rollup pred_level >>=? fun (ctxt, pred_commitment) ->
-          let pred_hash =
-            Option.map
-              (fun (x : Submitted_commitment.t) ->
-                Tx_rollup_commitment_repr.hash x.commitment)
-              pred_commitment
-          in
-          return (ctxt, pred_hash)
-      | None -> return (ctxt, None))
-      (* We record in the state *)
-      >>=? fun (ctxt, pred_hash) ->
-      Tx_rollup_state_repr.record_commitment_rejection state level pred_hash
-      >>?= fun state -> return (ctxt, state)
-  | _ -> fail Invalid_rejection_level_argument
+  Tx_rollup_state_repr.check_level_can_be_rejected state level >>?= fun () ->
+  (* Fetching the next predecessor hash to be used *)
+  (match Tx_rollup_level_repr.pred level with
+  | Some pred_level ->
+      find ctxt rollup pred_level >>=? fun (ctxt, pred_commitment) ->
+      let pred_hash =
+        Option.map
+          (fun (x : Submitted_commitment.t) ->
+            Tx_rollup_commitment_repr.hash x.commitment)
+          pred_commitment
+      in
+      return (ctxt, pred_hash)
+  | None -> return (ctxt, None))
+  (* We record in the state *)
+  >>=? fun (ctxt, pred_hash) ->
+  Tx_rollup_state_repr.record_commitment_rejection state level pred_hash
+  >>?= fun state -> return (ctxt, state)

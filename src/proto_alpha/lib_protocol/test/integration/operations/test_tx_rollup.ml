@@ -135,6 +135,9 @@ let message_hash_testable : Tx_rollup_message.hash Alcotest.testable =
 let sint_testable : _ Saturation_repr.t Alcotest.testable =
   Alcotest.testable Saturation_repr.pp ( = )
 
+let tx_rollup_state_testable : Tx_rollup_state.t Alcotest.testable =
+  Alcotest.testable Tx_rollup_state.pp ( = )
+
 let wrap m = m >|= Environment.wrap_tzresult
 
 (** [inbox_burn state size] computes the burn (per byte of message)
@@ -1267,10 +1270,7 @@ let test_commitment_duplication () =
    | Ok _ -> failwith "an error was expected"
    | Error e ->
        check_proto_error_f
-         (function
-           | Tx_rollup_errors.Level_already_has_commitment level1 ->
-               Tx_rollup_level.root = level1
-           | _ -> false)
+         (function Tx_rollup_errors.No_uncommitted_inbox -> true | _ -> false)
          e)
   >>=? fun _ ->
   (* No charge. *)
@@ -1879,6 +1879,124 @@ module Rejection = struct
         test_wrong_message_position;
     ]
 end
+
+(** [test_state] tests some edge cases in state management around
+    rejecting commitments. *)
+let test_state () =
+  context_init1 () >>=? fun (b, account1) ->
+  originate b account1 >>=? fun (b, tx_rollup) ->
+  let pkh = is_implicit_exn account1 in
+  Incremental.begin_construction b >>=? fun i ->
+  let ctxt = Incremental.alpha_ctxt i in
+  let (message, _) = Tx_rollup_message.make_batch "bogus" in
+  let state = Tx_rollup_state.initial_state in
+  wrap (Tx_rollup_inbox.append_message ctxt tx_rollup state message)
+  >>=? fun (ctxt, state) ->
+  let append_inbox i ctxt state =
+    let i = Incremental.set_alpha_ctxt i ctxt in
+    (* need to increment state so that the second message goes into a new inbox *)
+    Incremental.finalize_block i >>=? fun b ->
+    Incremental.begin_construction b >>=? fun i ->
+    let ctxt = Incremental.alpha_ctxt i in
+    wrap (Tx_rollup_inbox.append_message ctxt tx_rollup state message)
+    >|=? fun (ctxt, state) -> (i, ctxt, state)
+  in
+  append_inbox i ctxt state >>=? fun (i, ctxt, state) ->
+  append_inbox i ctxt state >>=? fun (i, ctxt, state) ->
+  let level0 = Tx_rollup_level.root in
+  let inbox_hash = Tx_rollup_inbox.hash_inbox [message] in
+  let add_commitment ctxt state level predecessor =
+    let commitment =
+      Tx_rollup_commitment.
+        {
+          level;
+          messages = [Tx_rollup_message_result_hash.zero];
+          predecessor;
+          inbox_hash;
+        }
+    in
+    wrap
+      (Tx_rollup_commitment.add_commitment ctxt tx_rollup state pkh commitment)
+    >|=? fun (ctxt, state) -> (ctxt, state, commitment)
+  in
+  let state_before = state in
+  (* Create and reject a commitment at level 0 *)
+  add_commitment ctxt state Tx_rollup_level.root None
+  >>=? fun (ctxt, state, _) ->
+  wrap (Tx_rollup_commitment.reject_commitment ctxt tx_rollup state level0)
+  >>=? fun (ctxt, state) ->
+  Alcotest.(
+    check
+      tx_rollup_state_testable
+      "state unchanged by commit/reject at root"
+      state_before
+      state) ;
+  (* Create a commitment at level 0; create and reject a commitment at level 1 *)
+  add_commitment ctxt state Tx_rollup_level.root None
+  >>=? fun (ctxt, state, commitment0) ->
+  let level1 = Tx_rollup_level.succ level0 in
+  let commitment0_hash = Tx_rollup_commitment.hash commitment0 in
+  let state_before_reject_1 = state in
+  add_commitment ctxt state level1 (Some commitment0_hash)
+  >>=? fun (ctxt, state, _) ->
+  wrap (Tx_rollup_commitment.reject_commitment ctxt tx_rollup state level1)
+  >>=? fun (ctxt, state) ->
+  Alcotest.(
+    check
+      tx_rollup_state_testable
+      "state unchanged by commit/reject at l1"
+      state_before_reject_1
+      state) ;
+  wrap
+    (Tx_rollup_commitment.reject_commitment
+       ctxt
+       tx_rollup
+       state
+       Tx_rollup_level.root)
+  >>=? fun (ctxt, state) ->
+  Alcotest.(
+    check
+      tx_rollup_state_testable
+      "state unchanged from initial after rejecting all commitments"
+      state_before
+      state) ;
+  (* Now let's try commitments and rejections when there exist some finalized commits. *)
+  add_commitment ctxt state level0 None >>=? fun (ctxt, state, commitment0) ->
+  let commitment0_hash = Tx_rollup_commitment.hash commitment0 in
+  wrap
+    (Lwt.return
+    @@ Tx_rollup_state.Internal_for_tests.record_inbox_deletion state level0)
+  >>=? fun state ->
+  let state_before = state in
+  add_commitment ctxt state level1 (Some commitment0_hash)
+  >>=? fun (ctxt, state, _commitment1) ->
+  wrap (Tx_rollup_commitment.reject_commitment ctxt tx_rollup state level1)
+  >>=? fun (ctxt, state) ->
+  Alcotest.(
+    check
+      tx_rollup_state_testable
+      "state unchanged after add/reject with one final commitment"
+      state_before
+      state) ;
+  (* Add two commitments and reject the first *)
+  add_commitment ctxt state level1 (Some commitment0_hash)
+  >>=? fun (ctxt, state, commitment1) ->
+  let commitment1_hash = Tx_rollup_commitment.hash commitment1 in
+  let level2 = Tx_rollup_level.succ level1 in
+  add_commitment ctxt state level2 (Some commitment1_hash)
+  >>=? fun (ctxt, state, _commitment2) ->
+  wrap (Tx_rollup_commitment.reject_commitment ctxt tx_rollup state level1)
+  >>=? fun (ctxt, state) ->
+  Alcotest.(
+    check
+      tx_rollup_state_testable
+      "state unchanged after add/reject with one final commitment"
+      state_before
+      state) ;
+  ignore state ;
+  ignore ctxt ;
+  ignore i ;
+  return ()
 
 module Withdraw = struct
   module Nat_ticket = struct
@@ -3115,5 +3233,6 @@ let tests =
       `Quick
       test_too_many_commitments;
     Tztest.tztest "Test bond finalization" `Quick test_bond_finalization;
+    Tztest.tztest "Test state" `Quick test_state;
   ]
   @ Withdraw.tests @ Rejection.tests @ parsing_tests
