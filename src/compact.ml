@@ -156,6 +156,14 @@ let make : type a. ?tag_size:[`Uint0 | `Uint8 | `Uint16] -> a t -> a Encoding.t
                    (fun x -> x))
                C.layouts)
 
+let splitted : type a. json:a Encoding.t -> compact:a t -> a t =
+ fun ~json ~compact:(module C : S with type input = a) ->
+  (module struct
+    include C
+
+    let json_encoding = json
+  end)
+
 (* ---- Combinators --------------------------------------------------------- *)
 
 module List_syntax = struct
@@ -411,6 +419,8 @@ let payload : type a. a Encoding.t -> a t =
 
 let unit = payload Encoding.unit
 
+let null = payload Encoding.null
+
 let conv : type a b. ?json:a Encoding.t -> (a -> b) -> (b -> a) -> b t -> a t =
  fun ?json f g (module B : S with type input = b) ->
   (module struct
@@ -440,7 +450,7 @@ let option compact =
     [
       case
         ~title:"none"
-        unit
+        null
         (function None -> Some () | _ -> None)
         (fun () -> None);
       case ~title:"some" compact (fun x -> x) (fun x -> Some x);
@@ -1582,61 +1592,75 @@ let int32_cases =
         i);
   ]
 
-let int32 = union ~union_tag_bits:2 ~cases_tag_bits:0 int32_cases
+let int32 =
+  splitted
+    ~json:Encoding.int32
+    ~compact:(union ~union_tag_bits:2 ~cases_tag_bits:0 int32_cases)
 
 let int64 =
-  union
-    ~union_tag_bits:2
-    ~cases_tag_bits:0
-    [
-      case
-        ~title:"small"
-        ~description:"An int64 which fits within a uint8"
-        (payload Encoding.uint8)
-        (fun i ->
-          if 0L <= i && i <= max_uint8_L then Some (Int64.to_int i) else None)
-        (fun i -> Int64.of_int i);
-      case
-        ~title:"medium"
-        ~description:"An int64 which fits within a uint16"
-        (payload Encoding.uint16)
-        (fun i ->
-          if max_uint8_L < i && i <= max_uint16_L then Some (Int64.to_int i)
-          else None)
-        (fun i ->
-          if i <= max_uint8 then
-            raise
-              (Binary_error_types.Read_error
-                 (Invalid_int {min = max_uint8 + 1; v = i; max = max_uint16})) ;
-          Int64.of_int i);
-      case
-        ~title:"biggish"
-        ~description:"An int64 which fits within a uint32"
-        (payload Encoding.int32)
-        (fun i ->
-          if max_uint16_L < i && i <= max_uint32_L then Some (Int64.to_int32 i)
-          else None)
-        (fun x ->
-          let r = Int64.(logand 0xFFFF_FFFFL (of_int32 x)) in
-          if r <= max_uint16_L then
-            raise
-              (Binary_error_types.Read_error
-                 (Invalid_int
-                    {min = max_uint16 + 1; v = Int32.to_int x; max = max_uint32})) ;
-          r);
-      case
-        ~title:"bigger"
-        ~description:"An int64 which doesn't fit within a uint32"
-        (payload Encoding.int64)
-        (fun i -> if max_uint32_L < i || i < 0L then Some i else None)
-        (fun i ->
-          if 0L <= i && i <= max_uint32_L then
-            raise
-              (Binary_error_types.Read_error
-                 (Invalid_int
-                    {min = max_uint32 + 1; v = Int64.to_int i; max = 0})) ;
-          i);
-    ]
+  splitted
+    ~json:Encoding.int64
+    ~compact:
+      (union
+         ~union_tag_bits:2
+         ~cases_tag_bits:0
+         [
+           case
+             ~title:"small"
+             ~description:"An int64 which fits within a uint8"
+             (payload Encoding.uint8)
+             (fun i ->
+               if 0L <= i && i <= max_uint8_L then Some (Int64.to_int i)
+               else None)
+             (fun i -> Int64.of_int i);
+           case
+             ~title:"medium"
+             ~description:"An int64 which fits within a uint16"
+             (payload Encoding.uint16)
+             (fun i ->
+               if max_uint8_L < i && i <= max_uint16_L then
+                 Some (Int64.to_int i)
+               else None)
+             (fun i ->
+               if i <= max_uint8 then
+                 raise
+                   (Binary_error_types.Read_error
+                      (Invalid_int
+                         {min = max_uint8 + 1; v = i; max = max_uint16})) ;
+               Int64.of_int i);
+           case
+             ~title:"biggish"
+             ~description:"An int64 which fits within a uint32"
+             (payload Encoding.int32)
+             (fun i ->
+               if max_uint16_L < i && i <= max_uint32_L then
+                 Some (Int64.to_int32 i)
+               else None)
+             (fun x ->
+               let r = Int64.(logand 0xFFFF_FFFFL (of_int32 x)) in
+               if r <= max_uint16_L then
+                 raise
+                   (Binary_error_types.Read_error
+                      (Invalid_int
+                         {
+                           min = max_uint16 + 1;
+                           v = Int32.to_int x;
+                           max = max_uint32;
+                         })) ;
+               r);
+           case
+             ~title:"bigger"
+             ~description:"An int64 which doesn't fit within a uint32"
+             (payload Encoding.int64)
+             (fun i -> if max_uint32_L < i || i < 0L then Some i else None)
+             (fun i ->
+               if 0L <= i && i <= max_uint32_L then
+                 raise
+                   (Binary_error_types.Read_error
+                      (Invalid_int
+                         {min = max_uint32 + 1; v = Int64.to_int i; max = 0})) ;
+               i);
+         ])
 
 module Compact_list = struct
   type layout = Small_list of int | Big_list

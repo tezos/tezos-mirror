@@ -39,6 +39,8 @@ val refute : void -> 'a
 
 val unit : unit t
 
+val null : unit t
+
 val bool : bool t
 
 val payload : 'a Encoding.t -> 'a t
@@ -216,6 +218,8 @@ val or_int32 :
   ?alt_description:string ->
   'a Encoding.t ->
   (int32, 'a) Either.t t
+
+val splitted : json:'a Encoding.t -> compact:'a t -> 'a t
 
 module Custom : sig
   type tag = int
