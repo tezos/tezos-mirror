@@ -372,6 +372,7 @@ module Validator = struct
   let verify_update (transaction : Core.UTXO.transaction)
       (state : Storage.state) (key : string) :
       (Int64.t * Storage.state) tzresult Lwt.t =
+    let open Lwt_tzresult_syntax in
     (* Check the transaction *)
     (* Check the memo_size*)
     let coherence_of_memo_size =
@@ -394,38 +395,43 @@ module Validator = struct
       not (Storage.mem_root state transaction.root)
     then fail (Too_old_root transaction.root)
     else
-      Core.Verification.with_verification_ctx (fun ctx ->
-          (* Check all the output ZK proofs *)
-          List.iter_es
-            (fun output ->
-              fail_unless
-                (Core.Verification.check_output ctx output)
-                (Output_incorrect output))
-            transaction.outputs
-          >>=? fun () ->
-          (* Check all the input Zk proofs and signatures *)
-          List.iter_es
-            (fun input ->
-              if Core.Verification.check_spend ctx input transaction.root key
-              then return_unit
-              else fail (Input_incorrect input))
-            transaction.inputs
-          >>=? fun () ->
-          (* Check the signature and balance of the whole transaction *)
-          fail_unless
-            (Core.Verification.final_check ctx transaction key)
-            (Binding_sig_incorrect transaction.binding_sig))
-      >>=? fun () ->
+      let* () =
+        Core.Verification.with_verification_ctx (fun ctx ->
+            (* Check all the output ZK proofs *)
+            let* () =
+              List.iter_es
+                (fun output ->
+                  fail_unless
+                    (Core.Verification.check_output ctx output)
+                    (Output_incorrect output))
+                transaction.outputs
+            in
+            (* Check all the input Zk proofs and signatures *)
+            let* () =
+              List.iter_es
+                (fun input ->
+                  if
+                    Core.Verification.check_spend ctx input transaction.root key
+                  then return_unit
+                  else fail (Input_incorrect input))
+                transaction.inputs
+            in
+            (* Check the signature and balance of the whole transaction *)
+            fail_unless
+              (Core.Verification.final_check ctx transaction key)
+              (Binding_sig_incorrect transaction.binding_sig))
+      in
       (* Check that each nullifier is not already present in the state and add it.
              Important to avoid spending the same input twice in a transaction. *)
-      List.fold_left_es
-        (fun state input ->
-          if Storage.mem_nullifier state Core.UTXO.(input.nf) then
-            fail (Input_spent input)
-          else return (Storage.add_nullifier state Core.UTXO.(input.nf)))
-        state
-        transaction.inputs
-      >>=? fun state ->
+      let* state =
+        List.fold_left_es
+          (fun state input ->
+            if Storage.mem_nullifier state Core.UTXO.(input.nf) then
+              fail (Input_spent input)
+            else return (Storage.add_nullifier state Core.UTXO.(input.nf)))
+          state
+          transaction.inputs
+      in
       (* Add the commitments to the state *)
       let state =
         let open Core.UTXO in
