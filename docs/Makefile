@@ -1,5 +1,7 @@
 # You can set these variables from the command line.
-SPHINXOPTS    = -j auto -aE -n -W --keep-going
+# FIXME: https://gitlab.com/tezos/tezos/-/issues/2680
+# The [-W] flag is temporary disabled
+SPHINXOPTS    = -j auto -aE -n --keep-going
 SPHINXBUILD   = poetry run sphinx-build
 SPHINXPROJ    = Tezos
 SOURCEDIR     = .
