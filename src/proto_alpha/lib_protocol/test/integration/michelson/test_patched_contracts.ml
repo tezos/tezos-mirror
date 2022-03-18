@@ -33,132 +33,182 @@
 
 open Tezos_micheline
 open Protocol
-open Legacy_script_patches_for_J
+
+module type LEGACY_SCRIPT_PATCHES = sig
+  type t
+
+  val script_hash : t -> Script_expr_hash.t
+
+  val code : t -> Michelson_v1_primitives.prim Micheline.canonical
+
+  val patches : t list
+end
+
+module type LEGACY_PATCH_TESTS = sig
+  type t
+
+  val tests : t -> unit Alcotest_lwt.test_case list
+end
 
 let script_hash_testable =
   Alcotest.testable Script_expr_hash.pp Script_expr_hash.equal
 
-let patched_contracts =
-  [
-    exprtgpMFzTtyg1STJqANLQsjsMXmkf8UuJTuczQh8GPtqfw18x6Lc;
-    exprucjN3PgUnqQHFXQmemT44DjkacU35NrSSKyz18JSSjJB9vtUEw;
-    expruqNpURkmjQk5RGHjLrnS1U3DZnEsQCvQQNLSpN1powRmJeQgoJ;
-    expruwujdJkc5y4iPzr83Sd3KrJhzxSUb67JdCZmXNKiTTNvEkMrRU;
-    expruZKjVy3JbWcJmjtnvMGvRamkDhMgM3urGGdne3pkN9VKgK7VnD;
-    exprv98vtze1uwbDXdpb27R8RQabWZMZDXGNAwaAZwCg6WSvXu8fw3;
-    expru1ukk6ZqdA32rFYFG7j1eGjfsatbdUZWz8Mi1kXWZYRZm4FZVe;
-    exprubv5oQmAUP8BwktmDgMWqTizYDJVhzHhJESGZhJ2GkHESZ1VWg;
-  ]
+(** This functor provides testing for legacy script patches. Patches to
+    be tested should be placed in a module conformal to the signature
+    [LEGACY_SCRIPT_PATCHES]. It should contain a list of patches and for
+    each patch it has to provide a hash of the patched contract and the
+    new code (as Micheline).
 
-let readable_micheline m =
-  let open Micheline in
-  map_node (fun _ -> ()) Michelson_v1_primitives.string_of_prim (root m)
+    Additionally for each patch 3 files need to be placed in
+    [patched_contracts] subdirectory:
+    * script_hash.original.tz – containing the original version of the
+      script;
+    * script_hash.patched.tz - containing the patched version;
+    * script_hash.diff - containing the diff between the two.
 
-let contract_path ?(ext = "patched.tz") hash =
-  Filename.concat "patched_contracts"
-  @@ Format.asprintf "%a.%s" Script_expr_hash.pp hash ext
+    These files are there so that reviewers of the migration can easily
+    see what changes are made to each contract and these tests make sure
+    that the patched code supplied in file is identical to the one
+    included in the migration; and that the diff is correct. *)
+module Legacy_patch_test (Patches : LEGACY_SCRIPT_PATCHES) :
+  LEGACY_PATCH_TESTS with type t = Patches.t = struct
+  open Lwt_result_syntax
 
-let read_file ?ext hash =
-  let filename = contract_path ?ext hash in
-  Lwt_io.(with_file ~mode:Input filename read)
+  type t = Patches.t
 
-(* Test that the hashes of the scripts in ./patched_contract/<hash>.original.tz
-   match hashes of the contracts being updated by the migration. *)
-let test_original_contract {legacy_script_hash; _} () =
-  let open Lwt_result_syntax in
-  let*! code = read_file ~ext:"original.tz" legacy_script_hash in
-  let michelson = Michelson_v1_parser.parse_toplevel ~check:true code in
-  let*? prog = Micheline_parser.no_parsing_error michelson in
-  let bytes =
-    Data_encoding.Binary.to_bytes_exn
-      Alpha_context.Script.expr_encoding
-      prog.expanded
-  in
-  Alcotest.check
-    script_hash_testable
-    "Expr hash doesn't match"
-    legacy_script_hash
-    (Script_expr_hash.hash_bytes [bytes]) ;
-  return ()
+  let readable_micheline m =
+    let open Micheline in
+    map_node (fun _ -> ()) Michelson_v1_primitives.string_of_prim (root m)
 
-(* Test that the binary-encoded versions of the patched contracts used during the
-   migration correspond to the content of the `./patched_contracts/<hash>.tz`
-   files *)
-let test_patched_contract {legacy_script_hash; patched_code} () =
-  let open Lwt_result_syntax in
-  let*! expected_michelson = read_file legacy_script_hash in
-  let*? program =
-    Micheline_parser.no_parsing_error
-    @@ Michelson_v1_parser.parse_toplevel ~check:true expected_michelson
-  in
-  match
-    Micheline_diff.diff
-      ~prev:(readable_micheline patched_code)
-      ~current:(readable_micheline program.expanded)
-      ()
-  with
-  | Some diff ->
-      let msg =
-        Format.asprintf
-          "Patched code for %a different than expected!\n%a"
-          Script_expr_hash.pp
-          legacy_script_hash
-          Micheline_printer.print_expr
-          diff
-      in
-      Alcotest.fail msg
-  | None -> return ()
+  let contract_path ?(ext = "patched.tz") hash =
+    Filename.concat "patched_contracts"
+    @@ Format.asprintf "%a.%s" Script_expr_hash.pp hash ext
 
-(* Test that the diff files `./patched_contracts/<hash>.diff`
-   are the results of the `diff` command on the corresponding
-   original and patched files *)
-let verify_diff {legacy_script_hash; _} () =
-  let open Lwt_result_syntax in
-  let*! expected_diff = read_file ~ext:"diff" legacy_script_hash in
-  let original_code = contract_path ~ext:"original.tz" legacy_script_hash in
-  (* The other test asserts that this is indeed the patched code. *)
-  let current_code = contract_path ~ext:"patched.tz" legacy_script_hash in
-  let diff_cmd =
-    ( "",
-      [|
-        "diff";
-        "-u";
-        "--label";
-        original_code;
-        "--label";
-        current_code;
-        original_code;
-        current_code;
-      |] )
-  in
-  let*! actual_diff = Lwt_process.pread diff_cmd in
-  Alcotest.(check string) "same diff" expected_diff actual_diff ;
-  return ()
+  let read_file ?ext hash =
+    let filename = contract_path ?ext hash in
+    Lwt_io.(with_file ~mode:Input filename read)
+
+  (* Test that the hashes of the scripts in ./patched_contract/<hash>.original.tz
+     match hashes of the contracts being updated by the migration. *)
+  let test_original_contract legacy_script_hash () =
+    let*! code = read_file ~ext:"original.tz" legacy_script_hash in
+    let michelson = Michelson_v1_parser.parse_toplevel ~check:true code in
+    let*? prog = Micheline_parser.no_parsing_error michelson in
+    let bytes =
+      Data_encoding.Binary.to_bytes_exn
+        Alpha_context.Script.expr_encoding
+        prog.expanded
+    in
+    Alcotest.check
+      script_hash_testable
+      "Expr hash doesn't match"
+      legacy_script_hash
+      (Script_expr_hash.hash_bytes [bytes]) ;
+    return ()
+
+  (* Test that the binary-encoded versions of the patched contracts used during the
+     migration correspond to the content of the `./patched_contracts/<hash>.tz`
+     files *)
+  let test_patched_contract patch () =
+    let*! expected_michelson = read_file @@ Patches.script_hash patch in
+    let*? program =
+      Micheline_parser.no_parsing_error
+      @@ Michelson_v1_parser.parse_toplevel ~check:true expected_michelson
+    in
+    match
+      Micheline_diff.diff
+        ~prev:(readable_micheline @@ Patches.code patch)
+        ~current:(readable_micheline program.expanded)
+        ()
+    with
+    | Some diff ->
+        let msg =
+          Format.asprintf
+            "Patched code for %a different than expected!\n%a"
+            Script_expr_hash.pp
+            (Patches.script_hash patch)
+            Micheline_printer.print_expr
+            diff
+        in
+        Alcotest.fail msg
+    | None -> return ()
+
+  (* Test that the diff files `./patched_contracts/<hash>.diff`
+     are the results of the `diff` command on the corresponding
+     original and patched files *)
+  let verify_diff legacy_script_hash () =
+    let*! expected_diff = read_file ~ext:"diff" legacy_script_hash in
+    let original_code = contract_path ~ext:"original.tz" legacy_script_hash in
+    (* The other test asserts that this is indeed the patched code. *)
+    let current_code = contract_path ~ext:"patched.tz" legacy_script_hash in
+    let diff_cmd =
+      ( "",
+        [|
+          "diff";
+          "-u";
+          "--label";
+          original_code;
+          "--label";
+          current_code;
+          original_code;
+          current_code;
+        |] )
+    in
+    let*! actual_diff = Lwt_process.pread diff_cmd in
+    Alcotest.(check string) "same diff" expected_diff actual_diff ;
+    return ()
+
+  let typecheck_patched_script code () =
+    (* Number 3 below controls how many accounts should be
+       created. This number shouldn't be too small or the context
+       won't have enough tokens to form a roll. *)
+    let* (block, _) = Context.init 3 in
+    let* inc = Incremental.begin_construction block in
+    let ctxt = Incremental.alpha_ctxt inc in
+    let* _ =
+      Lwt.map Environment.wrap_tzresult
+      @@ Script_ir_translator.parse_code
+           ~legacy:false
+           ~code:(Script_repr.lazy_expr code)
+           ctxt
+    in
+    return ()
+
+  let tests (patch : Patches.t) =
+    let script_hash = Patches.script_hash patch in
+    [
+      Tztest.tztest
+        (Format.asprintf
+           "check original contract hash %a"
+           Script_expr_hash.pp
+           script_hash)
+        `Quick
+        (test_original_contract script_hash);
+      Tztest.tztest
+        (Format.asprintf
+           "check patched contract %a"
+           Script_expr_hash.pp
+           script_hash)
+        `Quick
+        (test_patched_contract patch);
+      Tztest.tztest
+        (Format.asprintf "verify patch for %a" Script_expr_hash.pp script_hash)
+        `Quick
+        (verify_diff script_hash);
+      Tztest.tztest
+        (Format.asprintf "type check %a" Script_expr_hash.pp script_hash)
+        `Quick
+        (typecheck_patched_script @@ Patches.code patch);
+    ]
+end
+
+(* List modules containing patched scripts here: *)
+let test_modules : (module LEGACY_SCRIPT_PATCHES) list =
+  [(module Legacy_script_patches_for_J)]
 
 let tests =
   List.concat_map
-    (fun patch ->
-      [
-        Tztest.tztest
-          (Format.asprintf
-             "check original contract hash %a"
-             Script_expr_hash.pp
-             patch.legacy_script_hash)
-          `Quick
-          (test_original_contract patch);
-        Tztest.tztest
-          (Format.asprintf
-             "check patched contract %a"
-             Script_expr_hash.pp
-             patch.legacy_script_hash)
-          `Quick
-          (test_patched_contract patch);
-        Tztest.tztest
-          (Format.asprintf
-             "verify patch for %a"
-             Script_expr_hash.pp
-             patch.legacy_script_hash)
-          `Quick
-          (verify_diff patch);
-      ])
-    patched_contracts
+    (fun (module Patches : LEGACY_SCRIPT_PATCHES) ->
+      let module Test = Legacy_patch_test (Patches) in
+      List.concat_map Test.tests Patches.patches)
+    test_modules

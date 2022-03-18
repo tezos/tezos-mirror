@@ -18,7 +18,17 @@
                            PUSH mutez 0 ;
                            DIG 3 ;
                            SELF ;
-@@ -744,7 +744,7 @@
+@@ -720,7 +720,8 @@
+                      DIP 3 { DUP } ;
+                      DIG 3 ;
+                      SWAP ;
+-                     SUB ;
++                     SUB_MUTEZ ;
++                     IF_NONE { PUSH string "negative mutez!"; FAILWITH } {} ;
+                      DIP { DUP ; CDR } ;
+                      DIP { DUP ; DIP { CAR } ; CDR } ;
+                      DIP { DUP ; DIP { CAR } ; CDR } ;
+@@ -744,7 +745,7 @@
                       CDR ;
                       CAR ;
                       CONTRACT unit ;
@@ -27,7 +37,7 @@
                       DIG 3 ;
                       UNIT ;
                       TRANSFER_TOKENS ;
-@@ -755,7 +755,7 @@
+@@ -755,7 +756,7 @@
                             CAR ;
                             CDR ;
                             CONTRACT %transfer (pair address (pair address nat)) ;
@@ -36,7 +46,7 @@
                             PUSH mutez 0 ;
                             DIG 3 ;
                             DIG 4 ;
-@@ -909,7 +909,7 @@
+@@ -909,7 +910,7 @@
                           CAR ;
                           CDR ;
                           CONTRACT %transfer (pair address (pair address nat)) ;
@@ -45,7 +55,17 @@
                           PUSH mutez 0 ;
                           DIG 3 ;
                           DIG 5 ;
-@@ -1074,7 +1074,7 @@
+@@ -1040,7 +1041,8 @@
+                          DUP ;
+                          DIP { DIP { DUP ; CDR ; CDR ; CDR ; CDR } ;
+                                SWAP ;
+-                               SUB ;
++                               SUB_MUTEZ ;
++                               IF_NONE { PUSH string "negative mutez!"; FAILWITH } {} ;
+                                DIP { DUP ; CDR } ;
+                                DIP { DUP ; DIP { CAR } ; CDR } ;
+                                DIP { DUP ; DIP { CAR } ; CDR } ;
+@@ -1074,7 +1076,7 @@
                                 CAR ;
                                 CDR ;
                                 CONTRACT %transfer (pair address (pair address nat)) ;
@@ -54,7 +74,17 @@
                                 PUSH mutez 0 ;
                                 DIG 3 ;
                                 SELF ;
-@@ -1240,7 +1240,7 @@
+@@ -1217,7 +1219,8 @@
+                      DIP 2 { DUP } ;
+                      DIG 2 ;
+                      SWAP ;
+-                     SUB ;
++                     SUB_MUTEZ ;
++                     IF_NONE { PUSH string "negative mutez!"; FAILWITH } {} ;
+                      DIP { DUP ; CDR } ;
+                      DIP { DUP ; DIP { CAR } ; CDR } ;
+                      DIP { DUP ; DIP { CAR } ; CDR } ;
+@@ -1240,7 +1243,7 @@
                       CAR ;
                       CAR ;
                       CONTRACT %xtzToToken (pair address (pair nat timestamp)) ;
@@ -63,7 +93,7 @@
                       DIG 2 ;
                       DIP 3 { DUP } ;
                       DIG 3 ;
-@@ -1260,7 +1260,7 @@
+@@ -1260,7 +1263,7 @@
                       CAR ;
                       CDR ;
                       CONTRACT %transfer (pair address (pair address nat)) ;
@@ -72,7 +102,7 @@
                       PUSH mutez 0 ;
                       DIG 3 ;
                       SELF ;
-@@ -1313,7 +1313,7 @@
+@@ -1313,7 +1316,7 @@
                           CAR ;
                           CDR ;
                           CONTRACT %getBalance (pair address (contract nat)) ;
