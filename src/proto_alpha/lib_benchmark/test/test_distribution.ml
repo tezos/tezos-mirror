@@ -55,7 +55,7 @@ module Type_name_multiset =
   Basic_structures.Basic_impl.Free_module.Float_valued.Make_with_map (Type_name)
 
 let rec tnames_of_type :
-    type a. a Script_typed_ir.ty -> type_name list -> type_name list =
+    type a ac. (a, ac) Script_typed_ir.ty -> type_name list -> type_name list =
  fun t acc ->
   match t with
   | Script_typed_ir.Unit_t -> `TUnit :: acc
@@ -120,15 +120,15 @@ and tnames_of_comparable_type :
   | Script_typed_ir.Chain_id_key -> `TChain_id :: acc
   | Script_typed_ir.Address_key -> `TAddress :: acc
   | Script_typed_ir.Tx_rollup_l2_address_key -> `TTx_rollup_l2_address :: acc
-  | Script_typed_ir.Pair_key (lty, rty, _) ->
+  | Script_typed_ir.Pair_key (lty, rty, _, YesYes) ->
       tnames_of_comparable_type
         lty
         (tnames_of_comparable_type rty (`TPair :: acc))
-  | Script_typed_ir.Union_key (lty, rty, _) ->
+  | Script_typed_ir.Union_key (lty, rty, _, YesYes) ->
       tnames_of_comparable_type
         lty
         (tnames_of_comparable_type rty (`TUnion :: acc))
-  | Script_typed_ir.Option_key (ty, _) ->
+  | Script_typed_ir.Option_key (ty, _, Yes) ->
       tnames_of_comparable_type ty (`TOption :: acc)
 
 module Crypto_samplers = Crypto_samplers.Make_finite_key_pool (struct

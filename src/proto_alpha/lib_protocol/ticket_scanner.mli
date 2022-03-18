@@ -46,7 +46,7 @@ type 'a has_tickets
  *)
 val type_has_tickets :
   Alpha_context.context ->
-  'a Script_typed_ir.ty ->
+  ('a, _) Script_typed_ir.ty ->
   ('a has_tickets * Alpha_context.context) tzresult
 
 (** [tickets_of_value ctxt ~include_lazy ht value] extracts all tickets from

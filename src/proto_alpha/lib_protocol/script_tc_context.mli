@@ -48,8 +48,8 @@ type in_lambda = bool
     instructions for example). *)
 type callsite =
   | Toplevel : {
-      storage_type : 'sto ty;
-      param_type : 'param ty;
+      storage_type : ('sto, _) ty;
+      param_type : ('param, _) ty;
       entrypoints : 'param Script_typed_ir.entrypoints;
     }
       -> callsite
@@ -61,8 +61,8 @@ type t = {callsite : callsite; in_lambda : in_lambda}
 val init : callsite -> t
 
 val toplevel :
-  storage_type:'sto ty ->
-  param_type:'param ty ->
+  storage_type:('sto, _) ty ->
+  param_type:('param, _) ty ->
   entrypoints:'param Script_typed_ir.entrypoints ->
   t
 

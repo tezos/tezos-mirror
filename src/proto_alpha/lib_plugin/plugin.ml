@@ -2001,15 +2001,15 @@ module RPC = struct
         | Address_key -> Prim (loc, T_address, [], [])
         | Tx_rollup_l2_address_key -> Prim (loc, T_tx_rollup_l2_address, [], [])
         | Chain_id_key -> Prim (loc, T_chain_id, [], [])
-        | Pair_key (l, r, _meta) ->
+        | Pair_key (l, r, _meta, YesYes) ->
             let tl = unparse_comparable_ty ~loc l in
             let tr = unparse_comparable_ty ~loc r in
             Prim (loc, T_pair, [tl; tr], [])
-        | Union_key (l, r, _meta) ->
+        | Union_key (l, r, _meta, YesYes) ->
             let tl = unparse_comparable_ty ~loc l in
             let tr = unparse_comparable_ty ~loc r in
             Prim (loc, T_or, [tl; tr], [])
-        | Option_key (t, _meta) ->
+        | Option_key (t, _meta, Yes) ->
             Prim (loc, T_option, [unparse_comparable_ty ~loc t], [])
 
       let unparse_memo_size ~loc memo_size =
@@ -2017,7 +2017,8 @@ module RPC = struct
         Int (loc, z)
 
       let rec unparse_ty :
-          type a loc. loc:loc -> a ty -> (loc, Script.prim) Micheline.node =
+          type a ac loc.
+          loc:loc -> (a, ac) ty -> (loc, Script.prim) Micheline.node =
        fun ~loc ty ->
         let return (name, args, annot) = Prim (loc, name, args, annot) in
         match ty with

@@ -159,7 +159,7 @@ module Printers = struct
         Format.eprintf "@[Error: %a@]" pp_print_trace errs ;
         exit 1
 
-  let string_of_value : type a. a Script_typed_ir.ty -> a -> string =
+  let string_of_value : type a ac. (a, ac) Script_typed_ir.ty -> a -> string =
    fun ty v ->
     string_of_something @@ fun ctxt ->
     Script_ir_translator.(
@@ -284,7 +284,7 @@ module Tests = struct
       ~expected_ratios:(1., 0.05)
 
   let contains_exceptions ty =
-    let apply : type a. bool -> a Script_typed_ir.ty -> bool =
+    let apply : type a ac. bool -> (a, ac) Script_typed_ir.ty -> bool =
      fun accu -> function
       (* Boxed sets and maps point to a shared first class module.
          This is an overapproximation that we want to ignore in

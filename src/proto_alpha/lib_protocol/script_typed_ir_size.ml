@@ -60,13 +60,13 @@ let ty_traverse_f =
     | Bool_key -> ret_succ_adding accu base_basic
     | Chain_id_key -> ret_succ_adding accu base_basic
     | Never_key -> ret_succ_adding accu base_basic
-    | Pair_key (_ty1, _ty2, a) ->
+    | Pair_key (_ty1, _ty2, a, YesYes) ->
+        ret_succ_adding accu @@ (base_compound a +! (word_size *? 3))
+    | Union_key (_ty1, _ty2, a, YesYes) ->
+        ret_succ_adding accu @@ (base_compound a +! (word_size *? 3))
+    | Option_key (_ty, a, Yes) ->
         ret_succ_adding accu @@ (base_compound a +! (word_size *? 2))
-    | Union_key (_ty1, _ty2, a) ->
-        ret_succ_adding accu @@ (base_compound a +! (word_size *? 2))
-    | Option_key (_ty, a) ->
-        ret_succ_adding accu @@ (base_compound a +! word_size)
-  and apply : type a. nodes_and_size -> a ty -> nodes_and_size =
+  and apply : type a ac. nodes_and_size -> (a, ac) ty -> nodes_and_size =
    fun accu ty ->
     match ty with
     | Unit_t -> ret_succ_adding accu base_basic
@@ -123,7 +123,7 @@ let ty_traverse_f =
 let comparable_ty_size : type a. a comparable_ty -> nodes_and_size =
  fun cty -> comparable_ty_traverse cty zero ty_traverse_f
 
-let ty_size : type a. a ty -> nodes_and_size =
+let ty_size : type a ac. (a, ac) ty -> nodes_and_size =
  fun ty -> ty_traverse ty zero ty_traverse_f
 
 let stack_ty_size s =
@@ -262,14 +262,14 @@ let kinfo_size {iloc = _; kstack_ty = _} = h2w
    cannot be nested. (See [big_map_size].) For this reason, these
    functions should not trigger stack overflows. *)
 let rec value_size :
-    type a.
+    type a ac.
     count_lambda_nodes:bool ->
     nodes_and_size ->
-    (a ty, a comparable_ty) union ->
+    ((a, ac) ty, a comparable_ty) union ->
     a ->
     nodes_and_size =
  fun ~count_lambda_nodes accu ty x ->
-  let apply : type a. nodes_and_size -> a ty -> a -> nodes_and_size =
+  let apply : type a ac. nodes_and_size -> (a, ac) ty -> a -> nodes_and_size =
    fun accu ty x ->
     match ty with
     | Unit_t -> ret_succ accu
@@ -344,9 +344,10 @@ let rec value_size :
     | Tx_rollup_l2_address_key ->
         ret_succ_adding accu (tx_rollup_l2_address_size x)
     | Bool_key -> ret_succ accu
-    | Pair_key (_, _, _) -> ret_succ_adding accu h2w
-    | Union_key (_, _, _) -> ret_succ_adding accu h1w
-    | Option_key (_, _) -> ret_succ_adding accu (option_size (fun _ -> !!0) x)
+    | Pair_key (_, _, _, YesYes) -> ret_succ_adding accu h2w
+    | Union_key (_, _, _, YesYes) -> ret_succ_adding accu h1w
+    | Option_key (_, _, Yes) ->
+        ret_succ_adding accu (option_size (fun _ -> !!0) x)
     | Chain_id_key -> ret_succ_adding accu chain_id_size
     | Never_key -> ( match x with _ -> .)
   in
@@ -354,11 +355,11 @@ let rec value_size :
  [@@coq_axiom_with_reason "unreachable expressions '.' not handled for now"]
 
 and big_map_size :
-    type a b.
+    type a b bc.
     count_lambda_nodes:bool ->
     nodes_and_size ->
     a comparable_ty ->
-    b ty ->
+    (b, bc) ty ->
     (a, b) big_map ->
     nodes_and_size =
  fun ~count_lambda_nodes accu cty ty' (Big_map {id; diff; key_type; value_type}) ->

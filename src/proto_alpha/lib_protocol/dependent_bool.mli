@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Trili Tech, <contact@trili.tech>                       *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -20,25 +20,46 @@
 (* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
 (* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
 (* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
 
-(** Update a big map. See [Script_typed_ir.big_map_get_and_update] for details. *)
-val update :
-  'key ->
-  'value option ->
-  ('key, 'value) Protocol.Script_typed_ir.big_map ->
-  Protocol.Alpha_context.t ->
-  (('key, 'value) Protocol.Script_typed_ir.big_map * Protocol.Alpha_context.t)
-  Protocol.Environment.Error_monad.tzresult
-  Lwt.t
+(** Dependent booleans *)
 
-(** Convert a list to a [Script_big_map]. If the list contains duplicate keys,
-    the first occurence is used.
-  *)
-val of_list :
-  'key Protocol.Script_typed_ir.comparable_ty ->
-  ('value, _) Protocol.Script_typed_ir.ty ->
-  ('key * 'value) list ->
-  Protocol.Alpha_context.t ->
-  (('key, 'value) Protocol.Script_typed_ir.big_map * Protocol.Alpha_context.t)
-  Protocol.Environment.Error_monad.tzresult
-  Lwt.t
+type no = private DNo
+
+type yes = private DYes
+
+(** 
+    ['b dbool] is a boolean whose value depends on its type parameter ['b].
+    [yes dbool] can only be [Yes]. [no dbool] can only be [No].
+*)
+type _ dbool = No : no dbool | Yes : yes dbool
+
+(** 
+    [('a, 'b, 'r) dand] is a witness of the logical conjunction of dependent
+    booleans. ['r] is the result of ['a] and ['b].
+*)
+type ('a, 'b, 'r) dand =
+  | NoNo : (no, no, no) dand
+  | NoYes : (no, yes, no) dand
+  | YesNo : (yes, no, no) dand
+  | YesYes : (yes, yes, yes) dand
+
+type ('a, 'b) ex_dand = Ex_dand : ('a, 'b, _) dand -> ('a, 'b) ex_dand
+[@@unboxed]
+
+(** Logical conjunction of dependent booleans. *)
+val dand : 'a dbool -> 'b dbool -> ('a, 'b) ex_dand
+
+(** Result of the logical conjunction of dependent booleans. *)
+val dbool_of_dand : ('a, 'b, 'r) dand -> 'r dbool
+
+(** Type equality witness. *)
+type (_, _) eq = Eq : ('a, 'a) eq
+
+(**
+    [merge_dand] proves that the type [dand] represents a function, i.e. that
+    there is a unique ['r] such that [('a, 'b, 'r) dand] is inhabited for a
+    given ['a] and a given ['b].
+*)
+val merge_dand : ('a, 'b, 'c1) dand -> ('a, 'b, 'c2) dand -> ('c1, 'c2) eq

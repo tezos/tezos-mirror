@@ -137,6 +137,7 @@
         "Script_tc_errors",
         "Gas_monad",
         "Script_ir_annot",
+        "Dependent_bool",
         "Script_typed_ir",
         "Script_comparable",
         "Gas_comparable_input_size",

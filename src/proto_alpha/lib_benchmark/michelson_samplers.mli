@@ -79,7 +79,7 @@ module type S = sig
       supported types as listed at the beginning of this file. *)
   module rec Random_value : sig
     (** Sample a value given its type. *)
-    val value : 'a Script_typed_ir.ty -> 'a sampler
+    val value : ('a, _) Script_typed_ir.ty -> 'a sampler
 
     (** Sample a comparable value given its type. *)
     val comparable : 'a Script_typed_ir.comparable_ty -> 'a sampler

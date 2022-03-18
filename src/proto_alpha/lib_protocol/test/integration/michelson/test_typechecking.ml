@@ -160,7 +160,8 @@ let location = function
   | Seq (loc, _) ->
       loc
 
-let test_parse_ty (type exp) ctxt node (expected : exp Script_typed_ir.ty) =
+let test_parse_ty (type exp expc) ctxt node
+    (expected : (exp, expc) Script_typed_ir.ty) =
   let legacy = false in
   let allow_lazy_storage = true in
   let allow_operation = true in
@@ -454,11 +455,27 @@ let test_parse_comb_data () =
     Big_map
       {id = Some big_map_id; diff; key_type = nat_key_ty; value_type = nat_ty}
   in
+  let ty_equal :
+      type a ac1 ac2.
+      (a, ac1) Script_typed_ir.ty -> (a, ac2) Script_typed_ir.ty -> bool =
+   fun ty1 ty2 ->
+    match Script_typed_ir.(is_comparable ty1, is_comparable ty2) with
+    | (Yes, Yes) -> ty1 = ty2
+    | (No, No) -> ty1 = ty2
+    | (Yes, No) -> assert false
+    | (No, Yes) -> assert false
+   (*
+      These last two cases can't happen because the comparable character of a
+      type is a function of its concrete type.
+      It is possible to write a function that proves it but it is not needed
+      in the protocol for the moment.
+   *)
+  in
   let equal (nat1, Big_map big_map1) (nat2, Big_map big_map2) =
     (* Custom equal needed because big maps contain boxed maps containing functional values *)
     nat1 = nat2 && big_map1.id = big_map2.id
     && big_map1.key_type = big_map2.key_type
-    && big_map1.value_type = big_map2.value_type
+    && ty_equal big_map1.value_type big_map2.value_type
     && big_map1.diff.size = big_map2.diff.size
     && Big_map_overlay.bindings big_map1.diff.map
        = Big_map_overlay.bindings big_map2.diff.map

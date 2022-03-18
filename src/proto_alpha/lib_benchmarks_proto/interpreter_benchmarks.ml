@@ -43,7 +43,7 @@ type ex_stack_and_continuation =
       -> ex_stack_and_continuation
 
 type ex_value =
-  | Ex_value : {value : 'a; ty : 'a Script_typed_ir.ty} -> ex_value
+  | Ex_value : {value : 'a; ty : ('a, _) Script_typed_ir.ty} -> ex_value
 
 (* ------------------------------------------------------------------------- *)
 
