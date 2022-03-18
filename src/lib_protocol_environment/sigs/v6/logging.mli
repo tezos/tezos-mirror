@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,22 +23,22 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = {expected_env : env_version; components : component list}
+(** Logging levels.  See [docs/developer/guidelines.rst] for their meaning *)
+type level = Debug | Info | Notice | Warning | Error | Fatal
 
-(** An OCaml source component of a protocol implementation. *)
-and component = {
-  (* The OCaml module name. *)
-  name : string;
-  (* The OCaml interface source code *)
-  interface : string option;
-  (* The OCaml source code *)
-  implementation : string;
-}
+(** Logs a message. It is the shell's responsibility to manage the actual
+    logging.
 
-and env_version = V0 | V1 | V2 | V3 | V4 | V5 | V6
+    Even though logging may involve system calls, formatting, or other work, the
+    shell guarantees that calling this function doesn't transfer control over
+    another promise. Consequently, the performance of this function can be
+    considered predictable from the point of view of gas-consumption.
 
-val component_encoding : component Data_encoding.t
+    Note that the function call has predictable performance, but that it is the
+    caller's responsibility to ensure that argument evaluation has predictable
+    performance too. E.g., [log Notice "%s" (Format.asprint …)] may spend time
+    formatting the argument string. *)
+val log : level -> ('a, Format.formatter, unit, unit) format4 -> 'a
 
-val env_version_encoding : env_version Data_encoding.t
-
-include S.HASHABLE with type t := t and type hash := Protocol_hash.t
+(** Same as [log] but more efficient with a simpler interface. *)
+val log_string : level -> string -> unit

@@ -23,22 +23,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = {expected_env : env_version; components : component list}
+val blake2b : bytes -> bytes
 
-(** An OCaml source component of a protocol implementation. *)
-and component = {
-  (* The OCaml module name. *)
-  name : string;
-  (* The OCaml interface source code *)
-  interface : string option;
-  (* The OCaml source code *)
-  implementation : string;
-}
+val sha256 : bytes -> bytes
 
-and env_version = V0 | V1 | V2 | V3 | V4 | V5 | V6
+val sha512 : bytes -> bytes
 
-val component_encoding : component Data_encoding.t
+val keccak256 : bytes -> bytes
 
-val env_version_encoding : env_version Data_encoding.t
+val sha3_256 : bytes -> bytes
 
-include S.HASHABLE with type t := t and type hash := Protocol_hash.t
+val sha3_512 : bytes -> bytes

@@ -23,22 +23,37 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = {expected_env : env_version; components : component list}
+type 'a encoding
 
-(** An OCaml source component of a protocol implementation. *)
-and component = {
-  (* The OCaml module name. *)
-  name : string;
-  (* The OCaml interface source code *)
-  interface : string option;
-  (* The OCaml source code *)
-  implementation : string;
-}
+(** Decoder for a given kind of data. It returns [None] when
+    the decoded data does not start with the expected prefix. *)
+val simple_decode : 'a encoding -> string -> 'a option
 
-and env_version = V0 | V1 | V2 | V3 | V4 | V5 | V6
+(** Encoder for a given kind of data. *)
+val simple_encode : 'a encoding -> 'a -> string
 
-val component_encoding : component Data_encoding.t
+(** An extensible sum-type for decoded data: one case per known
+    "prefix". See for instance [Hash.Block_hash.Hash] or
+    [Environment.Ed25519.Public_key_hash]. *)
+type data = ..
 
-val env_version_encoding : env_version Data_encoding.t
+(** Register a new encoding. The function might raise [Invalid_arg] if
+    the provided [prefix] overlaps with a previously registered
+    prefix. The [to_raw] and [of_raw] are the ad-hoc
+    serialisation/deserialisation for the data. The [wrap] should wrap
+    the deserialised value into the extensible sum-type [data] (see
+    the generic function [decode]). *)
+val register_encoding :
+  prefix:string ->
+  length:int ->
+  to_raw:('a -> string) ->
+  of_raw:(string -> 'a option) ->
+  wrap:('a -> data) ->
+  'a encoding
 
-include S.HASHABLE with type t := t and type hash := Protocol_hash.t
+(** Checks that an encoding has a certain prefix and length. *)
+val check_encoded_prefix : 'a encoding -> string -> int -> unit
+
+(** Generic decoder. It returns [None] when the decoded data does
+    not start with a registered prefix. *)
+val decode : string -> data option

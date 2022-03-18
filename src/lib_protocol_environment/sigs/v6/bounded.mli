@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,22 +23,48 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = {expected_env : env_version; components : component list}
+(** This module implements bounded (or refined) versions of data types. *)
 
-(** An OCaml source component of a protocol implementation. *)
-and component = {
-  (* The OCaml module name. *)
-  name : string;
-  (* The OCaml interface source code *)
-  interface : string option;
-  (* The OCaml source code *)
-  implementation : string;
-}
+(** Bounded [int32]. *)
+module Int32 : sig
+  (** Bounds.
 
-and env_version = V0 | V1 | V2 | V3 | V4 | V5 | V6
+      Formally each [B : BOUND] represents the interval of all integers
+      between [B.min_int] and [B.max_int]. This is a closed interval, e.g.
+      the endpoints are included.
 
-val component_encoding : component Data_encoding.t
+      Intervals can be empty, for example [struct let min_int = 1; let max_int
+      0 end] is empty.
+   *)
+  module type BOUNDS = sig
+    val min_int : int32
 
-val env_version_encoding : env_version Data_encoding.t
+    val max_int : int32
+  end
 
-include S.HASHABLE with type t := t and type hash := Protocol_hash.t
+  module type S = sig
+    type t
+
+    include BOUNDS
+
+    include Compare.S with type t := t
+
+    val encoding : t Data_encoding.t
+
+    val to_int32 : t -> int32
+
+    val of_int32 : int32 -> t option
+  end
+
+  (** Produce a module [_ : S] of bounded integers.
+
+      If the given interval is empty, [S.t] is the empty type, and [of_int32]
+      returns [Error] for all inputs.
+
+      {4 Encoding}
+      [(Make B).encoding] is based on the underlying [int32] encoding. This
+      allow future compatiblity with larger bounds, at the price of addding 1-3
+      redundant bytes to each message.
+   *)
+  module Make (_ : BOUNDS) : S
+end

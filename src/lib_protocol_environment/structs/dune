@@ -11,7 +11,7 @@
   tezos-lwt-result-stdlib
   data-encoding
   bls12-381)
- (modules V0 V1 V2 V3 V4 V5))
+ (modules V0 V1 V2 V3 V4 V5 V6))
 
 (include v0.dune.inc)
 
@@ -24,3 +24,5 @@
 (include v4.dune.inc)
 
 (include v5.dune.inc)
+
+(include v6.dune.inc)

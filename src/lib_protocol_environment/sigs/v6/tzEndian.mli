@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,22 +23,38 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = {expected_env : env_version; components : component list}
+val get_int32 : bytes -> int -> int32
 
-(** An OCaml source component of a protocol implementation. *)
-and component = {
-  (* The OCaml module name. *)
-  name : string;
-  (* The OCaml interface source code *)
-  interface : string option;
-  (* The OCaml source code *)
-  implementation : string;
-}
+val get_int32_string : string -> int -> int32
 
-and env_version = V0 | V1 | V2 | V3 | V4 | V5 | V6
+val set_int32 : bytes -> int -> int32 -> unit
 
-val component_encoding : component Data_encoding.t
+val set_int8 : bytes -> int -> int -> unit
 
-val env_version_encoding : env_version Data_encoding.t
+val get_int8 : bytes -> int -> int
 
-include S.HASHABLE with type t := t and type hash := Protocol_hash.t
+val get_int8_string : string -> int -> int
+
+val set_int16 : bytes -> int -> int -> unit
+
+val get_int16 : bytes -> int -> int
+
+val get_int16_string : string -> int -> int
+
+val set_int64 : bytes -> int -> int64 -> unit
+
+val get_int64 : bytes -> int -> int64
+
+val get_int64_string : string -> int -> int64
+
+val get_uint8 : bytes -> int -> int
+
+val get_uint8_string : string -> int -> int
+
+val set_uint8 : bytes -> int -> int -> unit
+
+val get_uint16 : bytes -> int -> int
+
+val get_uint16_string : string -> int -> int
+
+val set_uint16 : bytes -> int -> int -> unit

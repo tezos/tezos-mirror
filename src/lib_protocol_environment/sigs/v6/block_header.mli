@@ -23,22 +23,29 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = {expected_env : env_version; components : component list}
-
-(** An OCaml source component of a protocol implementation. *)
-and component = {
-  (* The OCaml module name. *)
-  name : string;
-  (* The OCaml interface source code *)
-  interface : string option;
-  (* The OCaml source code *)
-  implementation : string;
+type shell_header = {
+  level : Int32.t;  (** Height of the block, from the genesis block. *)
+  proto_level : int;
+      (** Number (uint8) of protocol changes since genesis modulo 256. *)
+  predecessor : Block_hash.t;  (** Hash of the preceding block. *)
+  timestamp : Time.t;
+      (** Timestamp at which the block is claimed to have been created. *)
+  validation_passes : int;
+      (** Number (uint8) of validation passes (also number of lists of operations). *)
+  operations_hash : Operation_list_list_hash.t;
+      (** Hash of the list of lists (actually root hashes of merkle trees)
+          of operations included in the block. There is one list of
+          operations per validation pass. *)
+  fitness : Bytes.t list;
+      (** A sequence of sequences of unsigned bytes, ordered by length and
+          then lexicographically. It represents the claimed fitness of the
+          chain ending in this block. *)
+  context : Context_hash.t;
+      (** Hash of the state of the context after application of this block. *)
 }
 
-and env_version = V0 | V1 | V2 | V3 | V4 | V5 | V6
+val shell_header_encoding : shell_header Data_encoding.t
 
-val component_encoding : component Data_encoding.t
+type t = {shell : shell_header; protocol_data : bytes}
 
-val env_version_encoding : env_version Data_encoding.t
-
-include S.HASHABLE with type t := t and type hash := Protocol_hash.t
+include S.HASHABLE with type t := t and type hash := Block_hash.t

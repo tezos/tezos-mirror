@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2021 Nomadic Labs. <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,22 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = {expected_env : env_version; components : component list}
+(** Assuming [x >= 0], [numbits x] is the number of bits needed to
+    represent [x]. This is also the unique [k] such that
+    [2^{k - 1} <= x < 2^k] if [x > 0] and [0] otherwise.
 
-(** An OCaml source component of a protocol implementation. *)
-and component = {
-  (* The OCaml module name. *)
-  name : string;
-  (* The OCaml interface source code *)
-  interface : string option;
-  (* The OCaml source code *)
-  implementation : string;
-}
-
-and env_version = V0 | V1 | V2 | V3 | V4 | V5 | V6
-
-val component_encoding : component Data_encoding.t
-
-val env_version_encoding : env_version Data_encoding.t
-
-include S.HASHABLE with type t := t and type hash := Protocol_hash.t
+    The behaviour is unspecified if [x < 0].*)
+val numbits : int -> int

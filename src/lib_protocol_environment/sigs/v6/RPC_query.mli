@@ -23,22 +23,44 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = {expected_env : env_version; components : component list}
+type 'a t
 
-(** An OCaml source component of a protocol implementation. *)
-and component = {
-  (* The OCaml module name. *)
-  name : string;
-  (* The OCaml interface source code *)
-  interface : string option;
-  (* The OCaml source code *)
-  implementation : string;
-}
+type 'a query = 'a t
 
-and env_version = V0 | V1 | V2 | V3 | V4 | V5 | V6
+val empty : unit query
 
-val component_encoding : component Data_encoding.t
+type ('a, 'b) field
 
-val env_version_encoding : env_version Data_encoding.t
+val field :
+  ?descr:string -> string -> 'a RPC_arg.t -> 'a -> ('b -> 'a) -> ('b, 'a) field
 
-include S.HASHABLE with type t := t and type hash := Protocol_hash.t
+val opt_field :
+  ?descr:string ->
+  string ->
+  'a RPC_arg.t ->
+  ('b -> 'a option) ->
+  ('b, 'a option) field
+
+val flag : ?descr:string -> string -> ('b -> bool) -> ('b, bool) field
+
+val multi_field :
+  ?descr:string ->
+  string ->
+  'a RPC_arg.t ->
+  ('b -> 'a list) ->
+  ('b, 'a list) field
+
+type ('a, 'b, 'c) open_query
+
+val query : 'b -> ('a, 'b, 'b) open_query
+
+val ( |+ ) :
+  ('a, 'b, 'c -> 'd) open_query -> ('a, 'c) field -> ('a, 'b, 'd) open_query
+
+val seal : ('a, 'b, 'a) open_query -> 'a t
+
+type untyped = (string * string) list
+
+exception Invalid of string
+
+val parse : 'a query -> untyped -> 'a

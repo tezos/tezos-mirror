@@ -23,22 +23,32 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = {expected_env : env_version; components : component list}
+type annot = string list
 
-(** An OCaml source component of a protocol implementation. *)
-and component = {
-  (* The OCaml module name. *)
-  name : string;
-  (* The OCaml interface source code *)
-  interface : string option;
-  (* The OCaml source code *)
-  implementation : string;
-}
+type ('l, 'p) node =
+  | Int of 'l * Z.t
+  | String of 'l * string
+  | Bytes of 'l * bytes
+  | Prim of 'l * 'p * ('l, 'p) node list * annot
+  | Seq of 'l * ('l, 'p) node list
 
-and env_version = V0 | V1 | V2 | V3 | V4 | V5 | V6
+type 'p canonical
 
-val component_encoding : component Data_encoding.t
+type canonical_location
 
-val env_version_encoding : env_version Data_encoding.t
+val dummy_location : canonical_location
 
-include S.HASHABLE with type t := t and type hash := Protocol_hash.t
+val root : 'p canonical -> (canonical_location, 'p) node
+
+val canonical_location_encoding : canonical_location Data_encoding.encoding
+
+val canonical_encoding :
+  variant:string ->
+  'l Data_encoding.encoding ->
+  'l canonical Data_encoding.encoding
+
+val location : ('l, 'p) node -> 'l
+
+val annotations : ('l, 'p) node -> string list
+
+val strip_locations : (_, 'p) node -> 'p canonical
