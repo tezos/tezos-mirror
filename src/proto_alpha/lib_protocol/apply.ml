@@ -921,8 +921,8 @@ let apply_transaction_to_smart_contract ~ctxt ~source ~contract ~amount
     ~entrypoint ~before_operation ~payer ~chain_id ~mode ~internal ~script_ir
     ~script ~parameter ~cache_key ~balance_updates
     ~allocated_destination_contract =
-  (* Token.transfer which is being called above already loads this
-     value into the Irmin cache, so no need to burn gas for it. *)
+  (* Token.transfer which is being called before already loads this value into
+     the Irmin cache, so no need to burn gas for it. *)
   Contract.get_balance ctxt contract >>=? fun balance ->
   let now = Script_timestamp.now ctxt in
   let level =
