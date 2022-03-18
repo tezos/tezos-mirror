@@ -1,7 +1,7 @@
 (tests
  (names test test_generated test_legacy_compatibility test_json_stream
    test_json_stream_sizes test_classifiers test_sub_string
-   json_roundtrip_in_binary)
+   json_roundtrip_in_binary compact_is_same_as_vanilla_in_json)
  (modes native js)
  (js_of_ocaml)
  (libraries data_encoding zarith zarith_stubs_js alcotest crowbar))
