@@ -29,7 +29,7 @@
     Contains functors used by [Storage] to create the structure on
     disk.
 
-  @see [Make_subcontext]
+  See {!Make_subcontext}
  *)
 
 open Storage_sigs

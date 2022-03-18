@@ -202,7 +202,7 @@ module V1 : sig
       [destination], [tt] of [ticket_hash] and [qq] of [qty]. More
       precisely, for [destination],
 
-      {ul {li [000] means a value of type {!}, that is a layer-1 address.}
+      {ul {li [000] means a layer-1 address.}
           {li [100] means an index for a layer-2 address, fitting on 1 byte.}
           {li [101] means an index for a layer-2 address, fitting on 2 bytes.}
           {li [110] means an index for a layer-2 address, fitting on 4 bytes.}

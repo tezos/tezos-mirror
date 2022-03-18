@@ -141,13 +141,13 @@ module Make (Context : CONTEXT) : sig
     open Tx_rollup_l2_batch.V1
 
     (** [apply_batch ctxt parameters batch] interprets the batch
-        {Tx_rollup_l2_batch.V1.t}.
+        {!Tx_rollup_l2_batch.V1.t}.
 
         By construction, a failing transaction will not affect the [ctxt]
         and other transactions will still be interpreted.
         That is, this function can only fail because of internals errors.
         Otherwise, the errors that caused the transactions to fail can be
-        observed in the result (see {Message_result.Batch_V1.t}).
+        observed in the result (see {!Message_result.Batch_V1.t}).
 
         The counters are incremented when the operation is part of a transaction
         that is correctly signed and whose every operations have the expected
@@ -218,7 +218,7 @@ module Make (Context : CONTEXT) : sig
 
       That is,
 
-      {ul {li Deposit tickets if the message is a deposit. }}
+      {ul {li Deposit tickets if the message is a deposit. }
           {li Decodes the batch and interprets it for the
               correct batch version. }}
 

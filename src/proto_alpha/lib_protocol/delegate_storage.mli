@@ -204,7 +204,7 @@ val frozen_deposits :
     a given key, i.e. the sum of the spendable balance (given by [balance] or
     [Contract_storage.get_balance]) and of the frozen balance. The frozen
     balance is composed of all frozen bonds associated to the contract (given by
-    Contract_storage.get_frozen_bonds]) and of the frozen deposits (given by
+    [Contract_storage.get_frozen_bonds]) and of the frozen deposits (given by
     [frozen_deposits]).
 
     Only use this function for RPCs: this is expensive. *)
