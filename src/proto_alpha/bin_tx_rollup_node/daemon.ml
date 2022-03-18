@@ -315,7 +315,7 @@ let rec process_block cctxt state current_hash rollup_id :
         let*! () = Event.(emit block_already_processed) current_hash in
         let* context = checkout_context state l2_block.header.context in
         let* _l2_reorg = State.set_head state l2_block context in
-        return (l2_block, None)
+        return (l2_block, Some context)
     | None ->
         let* block_info =
           Alpha_block_services.info
@@ -346,6 +346,12 @@ let rec process_block cctxt state current_hash rollup_id :
             ?predecessor_context
             block_info
             rollup_id
+        in
+        let* () =
+          State.save_tezos_l2_block_hash
+            state
+            current_hash
+            (L2block.hash_header l2_block.header)
         in
         let* _l2_reorg = State.set_head state l2_block context in
         let*! () = Event.(emit new_tezos_head) current_hash in

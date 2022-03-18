@@ -102,7 +102,6 @@ let save_block state L2block.{header; inbox} =
   let+ () =
     join
       [
-        save_tezos_l2_block_hash state header.tezos_block hash;
         save_level state header.level hash;
         save_header state hash header;
         save_inbox state hash inbox;
