@@ -268,21 +268,30 @@ let init ?args () =
           Arg.String
             (fun file -> options.files_to_run <- file :: options.files_to_run),
           "<FILE> Same as --file." );
-        ( "--test",
+        ( "--title",
           Arg.String
             (fun title -> options.tests_to_run <- title :: options.tests_to_run),
           "<TITLE> Only run tests which are exactly entitled TITLE (see \
            SELECTING TESTS)." );
+        ( "--test",
+          Arg.String
+            (fun title -> options.tests_to_run <- title :: options.tests_to_run),
+          "<TITLE> Same as --title." );
         ( "-t",
           Arg.String
             (fun title -> options.tests_to_run <- title :: options.tests_to_run),
-          "<TITLE> Same as --test." );
-        ( "--not-test",
+          "<TITLE> Same as --title." );
+        ( "--not-title",
           Arg.String
             (fun title ->
               options.tests_not_to_run <- title :: options.tests_not_to_run),
           "<TITLE> Only run tests which are not exactly entitled TITLE (see \
            SELECTING TESTS)." );
+        ( "--not-test",
+          Arg.String
+            (fun title ->
+              options.tests_not_to_run <- title :: options.tests_not_to_run),
+          "<TITLE> Same as --not-title." );
         ( "--global-timeout",
           Arg.Float (fun delay -> options.global_timeout <- Some delay),
           "<SECONDS> Fail if the set of tests takes more than SECONDS to run."
@@ -416,7 +425,7 @@ let init ?args () =
        negate a tag, prefix it with a slash: /\n\n\
       \  The title of a test is given by the ~title argument of Test.run. It \
        is what is printed after [SUCCESS] (or [FAILURE] or [ABORTED]) in the \
-       reports. Use --test (respectively --not-test) to select (respectively \
+       reports. Use --title (respectively --not-title) to select (respectively \
        unselect) a test by its title on the command-line.\n\n\
       \  The file in which a test is implemented is specified by the ~__FILE__ \
        argument of Test.run. In other words, it is the name of the file in \
