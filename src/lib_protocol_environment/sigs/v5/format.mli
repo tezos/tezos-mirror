@@ -297,7 +297,7 @@ val pp_print_custom_break :
 
    The custom break is useful if you want to change which visible
    (non-whitespace) characters are printed in case of break or no break. For
-   example, when printing a list {[ [a; b; c] ]}, you might want to add a
+   example, when printing a list [ [a; b; c] ], you might want to add a
    trailing semicolon when it is printed vertically:
 
    {[
