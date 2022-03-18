@@ -1059,6 +1059,27 @@ let apply_transaction_to_rollup ~consume_deserialization_gas ~ctxt ~parameters
     >>?= fun (parameters, ctxt) ->
     Script_ir_translator.parse_tx_rollup_deposit_parameters ctxt parameters
     >>?= fun (Tx_rollup.{ticketer; contents; ty; amount; destination}, ctxt) ->
+    let (ty_nodes, ty_size) = Script_typed_ir_size.node_size ty in
+    let (content_nodes, content_size) =
+      Script_typed_ir_size.node_size contents
+    in
+    let content_size = Saturation_repr.to_int content_size in
+    let ty_size = Saturation_repr.to_int ty_size in
+    let limit =
+      Alpha_context.Constants.tx_rollup_max_ticket_payload_size ctxt
+    in
+    let content_size_cost =
+      Script_typed_ir_size_costs.nodes_cost ~nodes:content_nodes
+    in
+    let ty_size_cost = Script_typed_ir_size_costs.nodes_cost ~nodes:ty_nodes in
+    Gas.consume ctxt content_size_cost >>?= fun ctxt ->
+    Gas.consume ctxt ty_size_cost >>?= fun ctxt ->
+    let payload_size = ty_size + content_size in
+    fail_when
+      Compare.Int.(payload_size > limit)
+      (Tx_rollup_errors_repr.Ticket_payload_size_limit_exceeded
+         {payload_size; limit})
+    >>=? fun () ->
     Tx_rollup.hash_ticket ctxt dst_rollup ~contents ~ticketer ~ty
     >>?= fun (ticket_hash, ctxt) ->
     (* If the ticket deposit fails on L2 for some reason

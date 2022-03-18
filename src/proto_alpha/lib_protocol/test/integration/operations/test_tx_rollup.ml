@@ -132,6 +132,9 @@ let parsing_tests =
 let message_hash_testable : Tx_rollup_message.hash Alcotest.testable =
   Alcotest.testable Tx_rollup_message.pp_hash ( = )
 
+let sint_testable : _ Saturation_repr.t Alcotest.testable =
+  Alcotest.testable Saturation_repr.pp ( = )
+
 let wrap m = m >|= Environment.wrap_tzresult
 
 (** [inbox_burn state size] computes the burn (per byte of message)
@@ -165,7 +168,8 @@ let check_batch_in_inbox :
 (** [context_init n] initializes a context with no consensus rewards
     to not interfere with balances prediction. It returns the created
     context and [n] contracts. *)
-let context_init ?(tx_rollup_max_unfinalized_levels = 2100) n =
+let context_init ?(tx_rollup_max_unfinalized_levels = 2100)
+    ?(tx_rollup_max_ticket_payload_size = 10_240) n =
   Context.init_with_constants
     {
       Context.default_test_contants with
@@ -178,22 +182,33 @@ let context_init ?(tx_rollup_max_unfinalized_levels = 2100) n =
       endorsing_reward_per_slot = Tez.zero;
       baking_reward_bonus_per_slot = Tez.zero;
       baking_reward_fixed_portion = Tez.zero;
+      tx_rollup_max_ticket_payload_size;
     }
     n
 
 (** [context_init1] initializes a context with no consensus rewards
     to not interfere with balances prediction. It returns the created
     context and 1 contract. *)
-let context_init1 () =
-  context_init 1 >|=? function
+let context_init1 ?tx_rollup_max_unfinalized_levels
+    ?tx_rollup_max_ticket_payload_size () =
+  context_init
+    ?tx_rollup_max_unfinalized_levels
+    ?tx_rollup_max_ticket_payload_size
+    1
+  >|=? function
   | (b, contract_1 :: _) -> (b, contract_1)
   | (_, _) -> assert false
 
 (** [context_init2] initializes a context with no consensus rewards
     to not interfere with balances prediction. It returns the created
     context and 2 contracts. *)
-let context_init2 () =
-  context_init 2 >|=? function
+let context_init2 ?tx_rollup_max_unfinalized_levels
+    ?tx_rollup_max_ticket_payload_size () =
+  context_init
+    ?tx_rollup_max_unfinalized_levels
+    ?tx_rollup_max_ticket_payload_size
+    2
+  >|=? function
   | (b, contract_1 :: contract_2 :: _) -> (b, contract_1, contract_2)
   | (_, _) -> assert false
 
@@ -824,6 +839,190 @@ let test_invalid_deposit_not_ticket () =
           | Script_interpreter.Bad_contract_parameter _ -> true
           | _ -> false))
   >>=? fun _ -> return_unit
+
+let string_ticket_of_size expected_size =
+  if expected_size < 0 && expected_size mod 8 <> 0 then
+    Alcotest.fail
+      (Format.asprintf
+         "string_ticket_of_size: argument [expected_size] must be positive and \
+          a multiple of 8") ;
+  let ticket_contents_ty =
+    Tezos_micheline.Micheline.Prim (0, Michelson_v1_primitives.T_string, [], [])
+  in
+  let (_, ticket_contents_ty_size) =
+    Script_typed_ir_size.node_size ticket_contents_ty
+  in
+  Alcotest.(
+    check
+      (option sint_testable)
+      "Expected size of ticket_contents type"
+      (Saturation_repr.of_int_opt 40)
+      (Some ticket_contents_ty_size)) ;
+  let (_, empty_string_size) =
+    Script_typed_ir_size.node_size (Expr_common.string "")
+  in
+  let ticket_contents =
+    Expr_common.string
+      (String.make
+         (expected_size
+         - Saturation_repr.to_int ticket_contents_ty_size
+         - Saturation_repr.to_int empty_string_size)
+         'a')
+  in
+  let (_, ticket_contents_size) =
+    Script_typed_ir_size.node_size ticket_contents
+  in
+  Alcotest.(
+    check
+      (option sint_testable)
+      "Expected size of ticket_contents type + ticket_contents"
+      (Saturation_repr.of_int_opt expected_size)
+      (Some Saturation_repr.(add ticket_contents_ty_size ticket_contents_size))) ;
+  ticket_contents
+
+(** [test_invalid_deposit_too_big_ticket] tests that depositing a ticket that
+    has a content whose size exceeds [tx_rollup_max_ticket_payload_size] fails.*)
+let test_invalid_deposit_too_big_ticket () =
+  let (_, _, pkh) = gen_l2_account () in
+  context_init1 () >>=? fun (b, account) ->
+  Context.get_constants (B b) >>=? fun constant ->
+  let tx_rollup_max_ticket_payload_size =
+    constant.parametric.tx_rollup_max_ticket_payload_size
+  in
+  originate b account >>=? fun (b, tx_rollup) ->
+  Contract_helpers.originate_contract
+    "contracts/tx_rollup_deposit_string.tz"
+    "Unit"
+    account
+    b
+    (is_implicit_exn account)
+  >>=? fun (contract, b) ->
+  Incremental.begin_construction b >>=? fun i ->
+  let ticket_contents =
+    string_ticket_of_size (tx_rollup_max_ticket_payload_size + 8)
+  in
+  let parameters =
+    Expr_common.(
+      pair_n
+        [
+          string (Tx_rollup.to_b58check tx_rollup);
+          string (Tx_rollup_l2_address.to_b58check pkh);
+          ticket_contents;
+        ])
+    |> Tezos_micheline.Micheline.strip_locations |> Script.lazy_expr
+  in
+  let fee = Test_tez.of_int 10 in
+  Op.transaction
+    ~counter:(Z.of_int 2)
+    ~fee
+    (B b)
+    account
+    contract
+    Tez.zero
+    ~parameters
+  >>=? fun op ->
+  Incremental.add_operation
+    i
+    op
+    ~expect_failure:
+      (check_proto_error_f (function
+          | Tx_rollup_errors_repr.Ticket_payload_size_limit_exceeded _ -> true
+          | _ -> false))
+  >>=? fun _ -> return_unit
+
+(** [test_invalid_deposit_too_big_ticket_type] tests that depositing a
+    ticket that has a content and type whose summed size exceeds
+    [tx_rollup_max_ticket_payload_size] fails.*)
+let test_invalid_deposit_too_big_ticket_type () =
+  let (_, _, pkh) = gen_l2_account () in
+  context_init1 () >>=? fun (b, account) ->
+  Context.get_constants (B b) >>=? fun constant ->
+  let tx_rollup_max_ticket_payload_size =
+    constant.parametric.tx_rollup_max_ticket_payload_size
+  in
+  originate b account >>=? fun (b, tx_rollup) ->
+  Contract_helpers.originate_contract
+    "contracts/tx_rollup_deposit_pair_string.tz"
+    "Unit"
+    account
+    b
+    (is_implicit_exn account)
+  >>=? fun (contract, b) ->
+  Incremental.begin_construction b >>=? fun i ->
+  let ticket_contents =
+    string_ticket_of_size tx_rollup_max_ticket_payload_size
+  in
+  let parameters =
+    Expr_common.(
+      pair_n
+        [
+          string (Tx_rollup.to_b58check tx_rollup);
+          string (Tx_rollup_l2_address.to_b58check pkh);
+          ticket_contents;
+        ])
+    |> Tezos_micheline.Micheline.strip_locations |> Script.lazy_expr
+  in
+  let fee = Test_tez.of_int 10 in
+  Op.transaction
+    ~counter:(Z.of_int 2)
+    ~fee
+    (B b)
+    account
+    contract
+    Tez.zero
+    ~parameters
+  >>=? fun op ->
+  Incremental.add_operation
+    i
+    op
+    ~expect_failure:
+      (check_proto_error_f (function
+          | Tx_rollup_errors_repr.Ticket_payload_size_limit_exceeded _ -> true
+          | _ -> false))
+  >>=? fun _ -> return_unit
+
+(** [test_valid_deposit_big_ticket] tests that depositing a ticket whose size is exactly
+    [tx_rollup_max_ticket_payload_size] succeeds.*)
+let test_valid_deposit_big_ticket () =
+  let (_, _, pkh) = gen_l2_account () in
+  context_init1 () >>=? fun (b, account) ->
+  Context.get_constants (B b) >>=? fun constant ->
+  let tx_rollup_max_ticket_payload_size =
+    constant.parametric.tx_rollup_max_ticket_payload_size
+  in
+  originate b account >>=? fun (b, tx_rollup) ->
+  Contract_helpers.originate_contract
+    "contracts/tx_rollup_deposit_string.tz"
+    "Unit"
+    account
+    b
+    (is_implicit_exn account)
+  >>=? fun (contract, b) ->
+  Incremental.begin_construction b >>=? fun i ->
+  let ticket_contents =
+    string_ticket_of_size tx_rollup_max_ticket_payload_size
+  in
+  let parameters =
+    Expr_common.(
+      pair_n
+        [
+          string (Tx_rollup.to_b58check tx_rollup);
+          string (Tx_rollup_l2_address.to_b58check pkh);
+          ticket_contents;
+        ])
+    |> Tezos_micheline.Micheline.strip_locations |> Script.lazy_expr
+  in
+  let fee = Test_tez.of_int 10 in
+  Op.transaction
+    ~counter:(Z.of_int 2)
+    ~fee
+    (B b)
+    account
+    contract
+    Tez.zero
+    ~parameters
+  >>=? fun op ->
+  Incremental.add_operation i op >>=? fun _ -> return_unit
 
 (** [test_invalid_entrypoint] checks that a transaction to an invalid entrypoint
     of a transaction rollup fails. *)
@@ -2550,6 +2749,18 @@ let tests =
       "Test deposit with invalid parameter"
       `Quick
       test_invalid_deposit_not_ticket;
+    Tztest.tztest
+      "Test deposit with too big ticket"
+      `Quick
+      test_invalid_deposit_too_big_ticket;
+    Tztest.tztest
+      "Test deposit with too big ticket type"
+      `Quick
+      test_invalid_deposit_too_big_ticket_type;
+    Tztest.tztest
+      "Test valid deposit with big ticket"
+      `Quick
+      test_valid_deposit_big_ticket;
     Tztest.tztest
       "Test valid deposit to inexistant rollup"
       `Quick

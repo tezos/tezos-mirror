@@ -190,6 +190,10 @@ let tx_rollup_cost_per_byte_ema_factor c =
   let constants = Raw_context.constants c in
   constants.tx_rollup_cost_per_byte_ema_factor
 
+let tx_rollup_max_ticket_payload_size c =
+  let constants = Raw_context.constants c in
+  constants.tx_rollup_max_ticket_payload_size
+
 let ratio_of_frozen_deposits_slashed_per_double_endorsement c =
   let constants = Raw_context.constants c in
   constants.ratio_of_frozen_deposits_slashed_per_double_endorsement

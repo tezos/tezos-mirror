@@ -83,6 +83,7 @@ module Protocol_constants_overrides = struct
     tx_rollup_max_messages_per_inbox : int option;
     tx_rollup_max_finalized_levels : int option;
     tx_rollup_cost_per_byte_ema_factor : int option;
+    tx_rollup_max_ticket_payload_size : int option;
     sc_rollup_enable : bool option;
     sc_rollup_origination_size : int option;
     sc_rollup_challenge_window_in_blocks : int option;
@@ -145,7 +146,8 @@ module Protocol_constants_overrides = struct
                         c.tx_rollup_withdraw_period,
                         c.tx_rollup_max_messages_per_inbox ),
                       ( c.tx_rollup_max_finalized_levels,
-                        c.tx_rollup_cost_per_byte_ema_factor ) ),
+                        c.tx_rollup_cost_per_byte_ema_factor,
+                        c.tx_rollup_max_ticket_payload_size ) ),
                     ( c.sc_rollup_enable,
                       c.sc_rollup_origination_size,
                       c.sc_rollup_challenge_window_in_blocks ) ) ) ) ) ) ))
@@ -197,7 +199,8 @@ module Protocol_constants_overrides = struct
                            tx_rollup_withdraw_period,
                            tx_rollup_max_messages_per_inbox ),
                          ( tx_rollup_max_finalized_levels,
-                           tx_rollup_cost_per_byte_ema_factor ) ),
+                           tx_rollup_cost_per_byte_ema_factor,
+                           tx_rollup_max_ticket_payload_size ) ),
                        ( sc_rollup_enable,
                          sc_rollup_origination_size,
                          sc_rollup_challenge_window_in_blocks ) ) ) ) ) ) ) ->
@@ -248,6 +251,7 @@ module Protocol_constants_overrides = struct
           tx_rollup_max_messages_per_inbox;
           tx_rollup_max_finalized_levels;
           tx_rollup_cost_per_byte_ema_factor;
+          tx_rollup_max_ticket_payload_size;
           sc_rollup_enable;
           sc_rollup_origination_size;
           sc_rollup_challenge_window_in_blocks;
@@ -321,9 +325,10 @@ module Protocol_constants_overrides = struct
                               (opt "tx_rollup_max_unfinalized_levels" int31)
                               (opt "tx_rollup_withdraw_period" int31)
                               (opt "tx_rollup_max_messages_per_inbox" int31))
-                           (obj2
+                           (obj3
                               (opt "tx_rollup_max_finalized_levels" int31)
-                              (opt "tx_rollup_cost_per_byte_ema_factor" int31)))
+                              (opt "tx_rollup_cost_per_byte_ema_factor" int31)
+                              (opt "tx_rollup_max_ticket_payload_size" int31)))
                         (obj3
                            (opt "sc_rollup_enable" bool)
                            (opt "sc_rollup_origination_size" int31)
@@ -407,6 +412,8 @@ module Protocol_constants_overrides = struct
           Some parametric.tx_rollup_max_finalized_levels;
         tx_rollup_cost_per_byte_ema_factor =
           Some parametric.tx_rollup_cost_per_byte_ema_factor;
+        tx_rollup_max_ticket_payload_size =
+          Some parametric.tx_rollup_max_ticket_payload_size;
         sc_rollup_enable = Some parametric.sc_rollup_enable;
         sc_rollup_origination_size = Some parametric.sc_rollup_origination_size;
         sc_rollup_challenge_window_in_blocks =
@@ -467,6 +474,7 @@ module Protocol_constants_overrides = struct
       tx_rollup_max_messages_per_inbox = None;
       tx_rollup_max_finalized_levels = None;
       tx_rollup_cost_per_byte_ema_factor = None;
+      tx_rollup_max_ticket_payload_size = None;
       sc_rollup_enable = None;
       sc_rollup_origination_size = None;
       sc_rollup_challenge_window_in_blocks = None;
@@ -916,6 +924,10 @@ module Protocol_constants_overrides = struct
            Option.value
              ~default:c.tx_rollup_cost_per_byte_ema_factor
              o.tx_rollup_cost_per_byte_ema_factor;
+         tx_rollup_max_ticket_payload_size =
+           Option.value
+             ~default:c.tx_rollup_max_ticket_payload_size
+             o.tx_rollup_max_ticket_payload_size;
          sc_rollup_enable =
            Option.value ~default:c.sc_rollup_enable o.sc_rollup_enable;
          sc_rollup_origination_size =
