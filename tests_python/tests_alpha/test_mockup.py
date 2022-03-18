@@ -666,6 +666,7 @@ def _test_create_mockup_init_show_roundtrip(
                 "tx_rollup_max_messages_per_inbox": 1010,
                 "tx_rollup_max_finalized_levels": 60_100,
                 "tx_rollup_cost_per_byte_ema_factor": 321,
+                "tx_rollup_max_ticket_payload_size": 10_240,
                 "sc_rollup_enable": False,
                 "sc_rollup_origination_size": 6_314,
                 "sc_rollup_challenge_window_in_blocks": 20_160,

@@ -147,6 +147,8 @@ type parametric = {
   (* The number of blocks used to compute the ema factor determining
      the cost per byte for new messages in the inbox. *)
   tx_rollup_cost_per_byte_ema_factor : int;
+  (* maximum size, in bytes, of the contents given in deposited tickets. *)
+  tx_rollup_max_ticket_payload_size : int;
   sc_rollup_enable : bool;
   sc_rollup_origination_size : int;
   sc_rollup_challenge_window_in_blocks : int;

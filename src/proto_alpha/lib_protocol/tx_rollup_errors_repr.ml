@@ -77,7 +77,7 @@ type error +=
       computed : Tx_rollup_commitment_repr.Message_result_hash.t;
       expected : Tx_rollup_commitment_repr.Message_result_hash.t;
     }
-  | Ticket_content_size_limit_exceeded of {content_size : int; limit : int}
+  | Ticket_payload_size_limit_exceeded of {payload_size : int; limit : int}
 
 let () =
   let open Data_encoding in
@@ -511,4 +511,17 @@ let () =
           Some (provided, computed, expected)
       | _ -> None)
     (fun (provided, computed, expected) ->
-      Wrong_rejection_hashes {provided; computed; expected})
+      Wrong_rejection_hashes {provided; computed; expected}) ;
+  (* ticket_payload_size_limit_exceeded *)
+  register_error_kind
+    `Permanent
+    ~id:"tx_rollup_ticket_payload_size_limit_exceeded"
+    ~title:"The payload of the deposited ticket exceeded the size limit"
+    ~description:"The payload of the deposited ticket exceeded the size limit"
+    (obj2 (req "payload_size" int31) (req "limit" int31))
+    (function
+      | Ticket_payload_size_limit_exceeded {payload_size; limit} ->
+          Some (payload_size, limit)
+      | _ -> None)
+    (fun (payload_size, limit) ->
+      Ticket_payload_size_limit_exceeded {payload_size; limit})

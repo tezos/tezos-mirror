@@ -37,7 +37,8 @@ tezt/_regressions/rpc/alpha.proxy.others.out
   "tx_rollup_max_unfinalized_levels": 2100,
   "tx_rollup_max_messages_per_inbox": 1010,
   "tx_rollup_max_finalized_levels": 60100,
-  "tx_rollup_cost_per_byte_ema_factor": 120, "sc_rollup_enable": false,
+  "tx_rollup_cost_per_byte_ema_factor": 120,
+  "tx_rollup_max_ticket_payload_size": 10240, "sc_rollup_enable": false,
   "sc_rollup_origination_size": 6314,
   "sc_rollup_challenge_window_in_blocks": 20160 }
 protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
