@@ -728,7 +728,7 @@ module ConcreteBaseMachine :
 
   let fold_m = Environment.List.fold_left_es
 
-  let pure = Error_monad.return
+  let pure = return
 
   let get_xtz_balance contract blk =
     Context.Contract.balance (B blk) contract >>= fun x ->

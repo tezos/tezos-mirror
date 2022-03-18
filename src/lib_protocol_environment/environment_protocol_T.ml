@@ -92,7 +92,7 @@ module V0toV3
 
   let value_of_key ~chain_id:_ ~predecessor_context:_ ~predecessor_timestamp:_
       ~predecessor_level:_ ~predecessor_fitness:_ ~predecessor:_ ~timestamp:_ =
-    return (fun _ ->
+    Lwt.return_ok (fun _ ->
         Lwt.return
           (Error_monad.error_with
              "element_of_key called on environment protocol < V3"))

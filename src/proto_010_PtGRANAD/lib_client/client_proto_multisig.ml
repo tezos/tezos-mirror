@@ -674,7 +674,7 @@ let action_to_expr ~loc ~generic action =
 
 let action_of_expr_generic e =
   let fail () =
-    Error_monad.fail
+    fail
       (Action_deserialisation_error
          (Tezos_micheline.Micheline.strip_locations e))
   in
@@ -709,7 +709,7 @@ let action_of_expr_generic e =
 
 let action_of_expr_not_generic e =
   let fail () =
-    Error_monad.fail
+    fail
       (Action_deserialisation_error
          (Tezos_micheline.Micheline.strip_locations e))
   in
