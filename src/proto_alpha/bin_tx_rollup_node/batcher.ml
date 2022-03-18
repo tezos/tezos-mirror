@@ -29,6 +29,7 @@ open Common
 module Tx_queue = Hash_queue.Make (L2_transaction.Hash) (L2_transaction)
 
 type state = {
+  cctxt : Protocol_client_context.full;
   rollup : Tx_rollup.t;
   parameters : Protocol.Tx_rollup_l2_apply.parameters;
   signer : signer;
@@ -43,6 +44,19 @@ let max_batch_transactions = 10
 (* TODO/TORU Change me with bound on size and have a configuration option *)
 let max_number_of_batches = 10
 
+let batcher_context (cctxt : #Client_context.full) =
+  let log _channel msg = Logs_lwt.info (fun m -> m "%s" msg) in
+  object
+    inherit
+      Protocol_client_context.wrap_full
+        (new Client_context.proxy_context (cctxt :> Client_context.full))
+
+    inherit! Client_context.simple_printer log
+
+    method! exit code =
+      Format.ksprintf Stdlib.failwith "Batching client wants to exit %d" code
+  end
+
 let encode_batch batch =
   Data_encoding.Binary.to_string Tx_rollup_l2_batch.encoding batch
   |> Result.map_error (fun err -> [Data_encoding_wrapper.Encoding_error err])
@@ -54,7 +68,7 @@ let find_transaction state tr_hash =
 
 let get_queue state = Tx_queue.elements state.transactions
 
-let inject_operations (type kind) (cctxt : Protocol_client_context.full) state
+let inject_operations (type kind) state
     (operations : kind manager_operation list) =
   let open Lwt_result_syntax in
   let open Annotated_manager_operation in
@@ -79,8 +93,8 @@ let inject_operations (type kind) (cctxt : Protocol_client_context.full) state
   (* TODO maybe use something else (e.g. inject directly with correct limits) *)
   let+ (oph, _, _) =
     Injection.inject_manager_operation
-      cctxt
-      ~chain:cctxt#chain
+      state.cctxt
+      ~chain:state.cctxt#chain
       ~block:(`Head 0)
       ~source:state.signer.pkh
       ~src_pk:state.signer.pk
@@ -103,7 +117,7 @@ let inject_operations (type kind) (cctxt : Protocol_client_context.full) state
   in
   oph
 
-let inject_batches (cctxt : Protocol_client_context.full) state batches =
+let inject_batches state batches =
   let open Lwt_result_syntax in
   let*? operations =
     List.map_e
@@ -114,7 +128,7 @@ let inject_batches (cctxt : Protocol_client_context.full) state batches =
           {tx_rollup = state.rollup; content = batch_content; burn_limit = None})
       batches
   in
-  inject_operations cctxt state operations
+  inject_operations state operations
 
 let get_batches state =
   let open Result_syntax in
@@ -133,7 +147,7 @@ let get_batches state =
   let+ batches = loop [] transactions in
   (batches, transactions)
 
-let batch_and_inject ?(at_least_one_full_batch = false) cctxt state =
+let batch_and_inject ?(at_least_one_full_batch = false) state =
   let open Lwt_result_syntax in
   let*? (batches, to_remove) = get_batches state in
   match batches with
@@ -144,16 +158,17 @@ let batch_and_inject ?(at_least_one_full_batch = false) cctxt state =
       (* The first batch is not full, and we requested it to be *)
       return_none
   | _ ->
-      let+ oph = inject_batches cctxt state batches in
+      let+ oph = inject_batches state batches in
       List.iter
         (fun tr -> Tx_queue.remove state.transactions (L2_transaction.hash tr))
         to_remove ;
       Some oph
 
-let async_batch_and_inject ?at_least_one_full_batch cctxt state =
+let async_batch_and_inject ?at_least_one_full_batch state =
   Lwt.async @@ fun () ->
   let open Lwt_syntax in
-  let* _ = batch_and_inject ?at_least_one_full_batch cctxt state in
+  (* let* _ = Lwt_unix.sleep 2. in *)
+  let* _ = batch_and_inject ?at_least_one_full_batch state in
   return_unit
 
 let init cctxt ~rollup ~signer index parameters =
@@ -162,6 +177,7 @@ let init cctxt ~rollup ~signer index parameters =
   Option.map
     (fun signer ->
       {
+        cctxt = batcher_context cctxt;
         rollup;
         signer;
         parameters;
@@ -171,9 +187,9 @@ let init cctxt ~rollup ~signer index parameters =
       })
     signer
 
-let register_transaction ?(eager_batch = false) ?(apply = true) cctxt state
+let register_transaction ?(eager_batch = false) ?(apply = true) state
     (tr : L2_transaction.t) =
-  let open Lwt_result_syntax in
+  let open Lwt_tzresult_syntax in
   Lwt_mutex.with_lock state.lock @@ fun () ->
   let batch =
     Tx_rollup_l2_batch.V1.
@@ -183,26 +199,29 @@ let register_transaction ?(eager_batch = false) ?(apply = true) cctxt state
   let prev_context = context in
   let+ (context, result) =
     if apply then
-      let+ (context, result, _) =
+      let* (new_context, result, _) =
         L2_apply.Batch_V1.apply_batch context state.parameters batch
       in
-      let result =
+      let open Tx_rollup_l2_apply.Message_result in
+      let+ context =
         match result with
-        | Tx_rollup_l2_apply.Message_result.Batch_V1.Batch_result
-            {results = [(_tr, r)]; _} ->
-            Some r
-        | _ -> None
+        | Batch_V1.Batch_result {results = [(_tr, Transaction_success)]; _} ->
+            return new_context
+        | Batch_V1.Batch_result
+            {results = [(_tr, Transaction_failure {reason; _})]; _} ->
+            fail (Environment.wrap_tzerror reason)
+        | _ -> return context
       in
       context
     else return context
   in
   L2_transaction.Hash_queue.add tr ?result state.transactions ;
-  if prev_context == context then
+  if state.incr_context == prev_context then
     (* Only update internal context if it was not changed due to a head block
        change in the meantime. *)
     state.incr_context <- context ;
   if eager_batch then
     (* TODO/TORU: find better solution as this reduces throughput when we have a
        single key to sign/inject. *)
-    async_batch_and_inject ~at_least_one_full_batch:true cctxt state ;
+    async_batch_and_inject ~at_least_one_full_batch:true state ;
   L2_transaction.hash tr

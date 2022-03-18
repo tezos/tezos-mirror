@@ -32,7 +32,7 @@ type state
 
 (** Initialize the internal state of the batcher. *)
 val init :
-  #Client_context.wallet ->
+  #Client_context.full ->
   rollup:Tx_rollup.t ->
   signer:string option ->
   Context.index ->
@@ -61,7 +61,6 @@ val get_queue : state -> L2_transaction.t list
 val register_transaction :
   ?eager_batch:bool ->
   ?apply:bool ->
-  Protocol_client_context.full ->
   state ->
   L2_transaction.t ->
   L2_transaction.hash tzresult Lwt.t
@@ -73,11 +72,9 @@ val register_transaction :
     default [false]) and there isn't at least a full batch to inject. *)
 val batch_and_inject :
   ?at_least_one_full_batch:bool ->
-  Protocol_client_context.full ->
   state ->
   Operation_hash.t option tzresult Lwt.t
 
 (** Same as [batch_and_inject] but asynchronous. In particular, the potential
     failures are not reported here. *)
-val async_batch_and_inject :
-  ?at_least_one_full_batch:bool -> Protocol_client_context.full -> state -> unit
+val async_batch_and_inject : ?at_least_one_full_batch:bool -> state -> unit

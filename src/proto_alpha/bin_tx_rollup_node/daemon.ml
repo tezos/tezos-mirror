@@ -358,16 +358,16 @@ let rec process_block cctxt state current_hash rollup_id :
         let*! () = Event.(emit block_processed) (current_hash, block_level) in
         return (l2_block, Some context)
 
-let maybe_batch_and_inject cctxt state =
+let maybe_batch_and_inject state =
   match state.State.batcher_state with
   | None -> ()
-  | Some batcher_state -> Batcher.async_batch_and_inject cctxt batcher_state
+  | Some batcher_state -> Batcher.async_batch_and_inject batcher_state
 
 let process_head cctxt state current_hash rollup_id =
   let open Lwt_result_syntax in
   let*! () = Event.(emit new_block) current_hash in
   let+ res = process_block cctxt state current_hash rollup_id in
-  maybe_batch_and_inject cctxt state ;
+  maybe_batch_and_inject state ;
   res
 
 let main_exit_callback state data_dir exit_status =
@@ -403,7 +403,7 @@ let run configuration cctxt =
     configuration
   in
   let* state = State.init cctxt ~data_dir ~operator ?rollup_genesis rollup_id in
-  let* _rpc_server = RPC.start cctxt configuration state in
+  let* _rpc_server = RPC.start configuration state in
   let _ =
     (* Register cleaner callback *)
     Lwt_exit.register_clean_up_callback
