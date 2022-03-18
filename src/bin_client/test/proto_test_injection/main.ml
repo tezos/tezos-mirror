@@ -132,7 +132,7 @@ let finalize_block ctxt _block_header =
 
 let rpc_services = RPC_directory.empty
 
-let init ctxt block_header =
+let init _chain_id ctxt block_header =
   let fitness = block_header.Block_header.fitness in
   let message = None in
   return

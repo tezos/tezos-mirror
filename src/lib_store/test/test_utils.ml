@@ -168,6 +168,7 @@ let dummy_patch_context ctxt =
   let ctxt = Tezos_shell_context.Shell_context.wrap_disk_context ctxt in
   let*! res =
     Protocol.Main.init
+      Chain_id.zero
       ctxt
       {
         level = 0l;

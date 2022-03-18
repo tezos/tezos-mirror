@@ -254,15 +254,19 @@ module type PROTOCOL = sig
      by this protocol implementation. *)
   val rpc_services : rpc_context RPC_directory.t
 
-  (** [init ctxt hd] initializes the context, or upgrades the context
-     after a protocol amendment. This function receives as arguments
-     the context [ctxt] resulting from the application of the block
-     that triggered the amendment, as well as its header [hd]. This
-     function should fail if the "protocol stitching", i.e., the
-     transition from a valid previous protocol to the one being
-     activated, has not been implemented. *)
+  (** [init chain_id ctxt hd] initializes the context, or upgrades the
+     context after a protocol amendment. This function receives as
+     arguments the [chain_id] of the current chain and the context
+     [ctxt] resulting from the application of the block that triggered
+     the amendment, as well as its header [hd]. This function should
+     fail if the "protocol stitching", i.e., the transition from a
+     valid previous protocol to the one being activated, has not been
+     implemented. *)
   val init :
-    Context.t -> Block_header.shell_header -> validation_result tzresult Lwt.t
+    Chain_id.t ->
+    Context.t ->
+    Block_header.shell_header ->
+    validation_result tzresult Lwt.t
 
   (** [value_of_key chain_id predecessor_context
      predecessor_timestamp predecessor_level predecessor_fitness

@@ -442,7 +442,7 @@ let patch_context ctxt ~json =
   let* ctxt = Context.add ctxt ["version"] (Bytes.of_string "genesis") in
   let* ctxt = Context.add ctxt protocol_param_key proto_params in
   let ctxt = Shell_context.wrap_disk_context ctxt in
-  let* r = Main.init ctxt shell in
+  let* r = Main.init Chain_id.zero ctxt shell in
   match r with
   | Error e -> failwith "%a" Environment.Error_monad.pp_trace e
   | Ok {context; _} -> return_ok (Shell_context.unwrap_disk_context context)

@@ -832,7 +832,7 @@ struct
 
     let set_log_message_consumer _ = ()
 
-    include Environment_protocol_T.V0toV3 (LiftV0 (P))
+    include Environment_protocol_T.V0toV6 (LiftV0 (P))
   end)
 
   class ['chain, 'block] proto_rpc_context (t : Tezos_rpc.RPC_context.t)

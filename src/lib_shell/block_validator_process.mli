@@ -103,4 +103,5 @@ val precheck_block :
 val commit_genesis : t -> chain_id:Chain_id.t -> Context_hash.t tzresult Lwt.t
 
 (** [init_test_chain] must only be called on a forking block. *)
-val init_test_chain : t -> Store.Block.t -> Block_header.t tzresult Lwt.t
+val init_test_chain :
+  t -> Chain_id.t -> Store.Block.t -> Block_header.t tzresult Lwt.t

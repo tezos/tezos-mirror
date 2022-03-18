@@ -1024,7 +1024,7 @@ struct
 
     let environment_version = Protocol.V2
 
-    include Environment_protocol_T.V0toV3 (LiftV2 (P))
+    include Environment_protocol_T.V0toV6 (LiftV2 (P))
   end)
 
   class ['chain, 'block] proto_rpc_context (t : Tezos_rpc.RPC_context.t)

@@ -60,7 +60,7 @@ val check_proto_environment_version_increasing :
 
 (** [init_test_chain] must only be called on a forking block. *)
 val init_test_chain :
-  Context.t -> Block_header.t -> Block_header.t tzresult Lwt.t
+  Chain_id.t -> Context.t -> Block_header.t -> Block_header.t tzresult Lwt.t
 
 type operation_metadata = Metadata of Bytes.t | Too_large_metadata
 

@@ -1065,7 +1065,7 @@ struct
     let activate = Context.set_protocol
 
     module type PROTOCOL =
-      Environment_protocol_T_V3.T
+      Environment_protocol_T_V6.T
         with type context := Context.t
          and type cache_value := Environment_context.Context.cache_value
          and type cache_key := Environment_context.Context.cache_key
@@ -1231,9 +1231,9 @@ struct
       let+ r = finalize_block c shell_header in
       wrap_tzresult r
 
-    let init c bh =
+    let init chain_id c bh =
       let open Lwt_syntax in
-      let+ r = init c bh in
+      let+ r = init chain_id c bh in
       wrap_tzresult r
 
     let set_log_message_consumer f = Logging.logging_function := Some f

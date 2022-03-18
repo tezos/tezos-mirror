@@ -728,7 +728,7 @@ let relative_position_within_block op1 op2 =
   | Cons (Manager_operation op1, _), Cons (Manager_operation op2, _) ->
       Z.compare op1.counter op2.counter
 
-let init ctxt block_header =
+let init chain_id ctxt block_header =
   let level = block_header.Block_header.level in
   let timestamp = block_header.timestamp in
   let typecheck (ctxt : Alpha_context.context) (script : Alpha_context.Script.t)
@@ -773,7 +773,7 @@ let init ctxt block_header =
       ~round:Alpha_context.Round.zero
       ~predecessor_round:Alpha_context.Round.zero
   in
-  Alpha_context.prepare_first_block ~typecheck ~level ~timestamp ctxt
+  Alpha_context.prepare_first_block chain_id ~typecheck ~level ~timestamp ctxt
   >>=? fun ctxt ->
   let cache_nonce =
     cache_nonce_from_block_header

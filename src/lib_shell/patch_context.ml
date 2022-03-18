@@ -40,6 +40,7 @@ let patch_context (genesis : Genesis.t) key_json ctxt =
   let ctxt = Shell_context.wrap_disk_context ctxt in
   let* {context; _} =
     Proto.init
+      (Chain_id.of_block_hash genesis.block)
       ctxt
       {
         level = 0l;
