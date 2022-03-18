@@ -39,6 +39,8 @@ module type T = sig
       of an element in the Merkle list. *)
   type path
 
+  val pp_path : Format.formatter -> path -> unit
+
   (** The empty Merkle list *)
   val nil : t
 
