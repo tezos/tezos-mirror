@@ -1121,8 +1121,7 @@ module Registration_section = struct
           ~name:Interpreter_workload.N_IList_map
           ~stack:(Script_list.empty, ((), eos))
           ~stack_type:(list unit @$ unit @$ bot)
-          ~kinstr:
-            (IList_map (dummy_kinfo (), halt (), Some (list unit), halt ()))
+          ~kinstr:(IList_map (dummy_kinfo (), halt (), halt ()))
           ()
     end
 
@@ -1287,8 +1286,8 @@ module Registration_section = struct
     let map_map_code () =
       IMap_map
         ( dummy_kinfo (),
-          map int unit,
-          IFailwith (dummy_kinfo (), cpair int unit),
+          int,
+          IFailwith (dummy_kinfo (), 0, cpair int unit),
           halt () )
 
     let () =
@@ -1978,7 +1977,7 @@ module Registration_section = struct
         ~kinstr:
           (IIf
              {
-               loc = dummy_kinfo ();
+               kinfo = dummy_kinfo ();
                branch_if_true = halt ();
                branch_if_false = halt ();
                k = halt ();
@@ -2022,7 +2021,7 @@ module Registration_section = struct
       simple_benchmark
         ~name:Interpreter_workload.N_IDip
         ~stack_type:(unit @$ unit @$ bot)
-        ~kinstr:(IDip (dummy_kinfo (), halt (), Some unit, halt ()))
+        ~kinstr:(IDip (dummy_kinfo (), halt (), halt ()))
         ()
 
     let dummy_lambda =
