@@ -25,7 +25,7 @@
 
 open Protocol
 
-(** {2 {!Script_typed_ir_size}-related benchmarks} *)
+(** {2 [Script_typed_ir_size]-related benchmarks} *)
 
 (** Benchmarking {!Script_typed_ir_size.value_size}. *)
 

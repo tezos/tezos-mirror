@@ -345,7 +345,7 @@ module Mempool = struct
     match !removed_oph_source with
     | None ->
         (* Not present anywhere in the filter state, because of invariants.
-           @see {!state} *)
+           See {!state} *)
         filter_state
     | Some source ->
         let prechecked_operations_count =
@@ -573,7 +573,7 @@ module Mempool = struct
   (** Returns the weight and resources consumption of an operation. The weight
       corresponds to the one implemented by the baker, to decide which operations
       to put in a block first (the code is largely duplicated).
-      @see {!Tezos_baking_alpha.Operation_selection.weight_manager} *)
+      See {!Tezos_baking_alpha.Operation_selection.weight_manager} *)
   let weight_and_resources_manager_operation ~validation_state ?size ~fee ~gas
       op =
     let hard_gas_limit_per_block =
