@@ -105,6 +105,10 @@ module Level_store : sig
       store. If [flush] (default to [true]) is set, the index is written on disk
       right away. *)
   val add : ?flush:bool -> t -> L2block.level -> L2block.hash -> unit Lwt.t
+
+  (** Removes a level from the store. Does nothing if the level was not
+      registered. *)
+  val remove : ?flush:bool -> t -> L2block.level -> unit Lwt.t
 end
 
 (** {2 Singleton stores}  *)

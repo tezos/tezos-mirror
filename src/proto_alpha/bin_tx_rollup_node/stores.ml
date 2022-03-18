@@ -258,10 +258,50 @@ module Tezos_block_info = struct
     {l2_block; level; predecessor}
 end
 
-module L2block_index =
-  Index_unix.Make (L2block_key) (L2block_info) (Index.Cache.Unbounded)
+module L2_level_info = struct
+  (* The information associated to L2 levels in the index are optional L2 block
+     hashes.  When we "remove" a level from the store, we're not really removing
+     it from the index, but simply setting its association to [None] (encoded
+     with zero bytes here). This is needed in the case of L2 reorganizations
+     where the new chain is shorter than the old one (though this is unlikely to
+     happen in practice). When the new L2 chain progresses, the zero bytes will
+     be overwritten by actual L2 block hashes, so this index should only contain
+     levels mapped to [None] very temporarily. *)
+
+  type t = L2block.hash option
+
+  let t = Repr.option L2_block_key.t
+
+  let encoded_size = 1 + L2block.Hash.size
+
+  let encode bh =
+    let dst = Bytes.create encoded_size in
+    let (tag, l2_block_bytes) =
+      match bh with
+      | None -> (0, Bytes.make L2block.Hash.size '\000')
+      | Some l2_block -> (1, L2block.Hash.to_bytes l2_block)
+    in
+    let offset = bytes_set_int8 ~dst ~src:tag 0 in
+    let _ = blit ~src:l2_block_bytes ~dst offset in
+    Bytes.unsafe_to_string dst
+
+  let decode str offset =
+    let (tag, offset) = read_int8 str offset in
+    match tag with
+    | 0 -> None
+    | 1 ->
+        let (l2block_hash, _) =
+          read_str str ~offset ~len:L2block.Hash.size L2block.Hash.of_string_exn
+        in
+
+        Some l2block_hash
+    | _ -> assert false
+end
+
+module L2_block_index =
+  Index_unix.Make (L2_block_key) (L2_block_info) (Index.Cache.Unbounded)
 module Level_index =
-  Index_unix.Make (L2level_key) (L2block_key) (Index.Cache.Unbounded)
+  Index_unix.Make (L2_level_key) (L2_level_info) (Index.Cache.Unbounded)
 module Tezos_block_index =
   Index_unix.Make (Tezos_store.Block_key) (Tezos_block_info)
     (Index.Cache.Unbounded)
@@ -456,21 +496,31 @@ module Level_store = struct
 
   let log_size = 10_000
 
-  let mem store hash =
-    Lwt_idle_waiter.task store.scheduler @@ fun () ->
-    Lwt.return (Level_index.mem store.index hash)
-
   let find store hash =
     Lwt_idle_waiter.task store.scheduler @@ fun () ->
     Option.catch_os @@ fun () ->
     let b = Level_index.find store.index hash in
-    Lwt.return_some b
+    Lwt.return b
+
+  let mem store hash =
+    let open Lwt_syntax in
+    let+ b = find store hash in
+    Option.is_some b
 
   let add ?(flush = true) store level l2_block =
     Lwt_idle_waiter.force_idle store.scheduler @@ fun () ->
-    Level_index.replace store.index level l2_block ;
+    Level_index.replace store.index level (Some l2_block) ;
     if flush then Level_index.flush store.index ;
     Lwt.return_unit
+
+  let remove ?(flush = true) store level =
+    Lwt_idle_waiter.force_idle store.scheduler @@ fun () ->
+    let exists = Level_index.mem store.index level in
+    if not exists then Lwt.return_unit
+    else (
+      Level_index.replace store.index level None ;
+      if flush then Level_index.flush store.index ;
+      Lwt.return_unit)
 
   let init ~data_dir ~readonly =
     let index =
