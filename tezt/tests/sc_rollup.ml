@@ -73,7 +73,7 @@ let sc_rollup_node_rpc sc_node service =
         Printf.sprintf "%s/%s" (Sc_rollup_node.endpoint sc_node) service
       in
       let* response = curl ~url in
-      return (Some (response |> JSON.parse ~origin:service))
+      return (Some response)
 
 (*
 
