@@ -420,7 +420,7 @@ let test_returned_deposit () =
       fail_msg "Did not expect overflowing deposit to be succesful"
 
 let apply_l2_parameters : Protocol.Tx_rollup_l2_apply.parameters =
-  {maximum_withdraws_per_message = 5}
+  {tx_rollup_max_withdrawals_per_batch = 5}
 
 let apply_l2_batch ctxt batch =
   Batch_V1.apply_batch ctxt apply_l2_parameters batch
@@ -778,6 +778,71 @@ let test_simple_l1_transaction () =
       return_unit
   | (Transaction_success, _) -> fail_msg "Expected exactly one withdrawal"
   | (Transaction_failure _, _) -> fail_msg "The transaction should be a success"
+
+let rec repeat n f acc = if n <= 0 then acc else repeat (n - 1) f (f n acc)
+
+(** This function crafts a batch containing [nb_withdraws]. Then, it applies it
+    on an L2 context, and checks the status, depending on the value of
+    [should_succeed] *)
+let helper_test_withdrawal_limits_per_batch nb_withdraws ~should_succeed =
+  let open Context_l2.Syntax in
+  (* create sufficiently many accounts *)
+  let accounts = repeat nb_withdraws (fun _i l -> [(ticket1, 2L)] :: l) [] in
+  let* (ctxt, _tidxs, accounts) =
+    with_initial_setup [ticket1] ([] :: accounts)
+  in
+  (* destination of withdrawals *)
+  let (_skD, _pkD, _addrD, _idxD, pkhD) = nth_exn accounts 0 in
+  (* transfer 1 ticket from [nb_withdraws] accounts to the dest *)
+  let (transactions, sks) =
+    repeat
+      nb_withdraws
+      (fun i (transactions, sks) ->
+        let (sk, pk, _addr, _idx, _pkh) = nth_exn accounts i in
+        let withdraw =
+          withdraw ~signer:(signer_pk pk) ~dest:pkhD ~ticket:ticket1 1L
+        in
+        (withdraw :: transactions, sk :: sks))
+      ([], [])
+  in
+  let batch = create_batch_v1 [transactions] [sks] in
+  (* apply the batch, and handle the success and error cases *)
+  Irmin_storage.Syntax.catch
+    (apply_l2_batch ctxt batch)
+    (fun _success ->
+      if should_succeed then return_unit
+      else fail_msg "The transaction should fail")
+    (fun error ->
+      let expected_error = "Maximum tx-rollup withdraws per message exceeded" in
+      let ({title = error_title; _} as _error_info) =
+        Error_monad.find_info_of_error (Environment.wrap_tzerror error)
+      in
+      if should_succeed then
+        fail_msg
+          ("The transaction should be a success, but failed: " ^ error_title)
+      else if error_title <> expected_error then
+        fail_msg
+        @@ Format.sprintf
+             "Expected error %s but got %s"
+             expected_error
+             error_title
+      else return_unit)
+
+(* Three tests that use the helper above *)
+let nb_withdrawals_per_batch_below_limit () =
+  helper_test_withdrawal_limits_per_batch
+    (apply_l2_parameters.tx_rollup_max_withdrawals_per_batch - 1)
+    ~should_succeed:true
+
+let nb_withdrawals_per_batch_equals_limit () =
+  helper_test_withdrawal_limits_per_batch
+    apply_l2_parameters.tx_rollup_max_withdrawals_per_batch
+    ~should_succeed:true
+
+let nb_withdrawals_per_batch_above_limit () =
+  helper_test_withdrawal_limits_per_batch
+    (apply_l2_parameters.tx_rollup_max_withdrawals_per_batch + 1)
+    ~should_succeed:false
 
 (** Test that [Missing_ticket] is raised if a transfer is attempted to
     a ticket absent from the rollup. *)
@@ -1696,4 +1761,10 @@ let tests =
         test_apply_message_batch_withdrawals );
       ("apply deposit from message", test_apply_message_deposit);
       ("test transfer to self fail", test_transfer_to_self);
+      ( "nb withdrawals per batch below limit",
+        nb_withdrawals_per_batch_below_limit );
+      ( "nb withdrawals per batch equals limit",
+        nb_withdrawals_per_batch_equals_limit );
+      ( "nb withdrawals per batch above limit",
+        nb_withdrawals_per_batch_above_limit );
     ]
