@@ -72,8 +72,7 @@ type error +=
 
 (** Error issued when the Tx rollup node starts without a rollup origination
     stored on disk and when there is no given rollup genesis. *)
-type error +=
-  | Tx_rollup_no_rollup_origination_on_disk_and_no_rollup_genesis_given
+type error += Tx_rollup_no_rollup_info_on_disk_and_no_rollup_genesis_given
 
 (** Error issued when the Tx rollup node starts with a rollup origination stored on disk
     different from the given rollup genesis. *)

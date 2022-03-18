@@ -241,7 +241,10 @@ let create_genesis_block state tezos_block =
   let open Lwt_syntax in
   let ctxt = Context.empty state.State.context_index in
   let genesis_block =
-    L2block.genesis_block state.context_index state.rollup tezos_block
+    L2block.genesis_block
+      state.context_index
+      state.rollup_info.rollup_id
+      tezos_block
   in
   let* _ctxt_hash = Context.commit ctxt in
   let+ _block_hash = State.save_block state genesis_block in
@@ -312,7 +315,7 @@ let get_tezos_block cctxt state hash =
 let rec process_block cctxt state current_hash rollup_id :
     (L2block.t * Context.context option, tztrace) result Lwt.t =
   let open Lwt_result_syntax in
-  if Block_hash.equal state.State.rollup_origination.block_hash current_hash
+  if Block_hash.equal state.State.rollup_info.origination_block current_hash
   then
     (* This is the rollup origination block, create L2 genesis block *)
     let*! (genesis_block, genesis_ctxt) =
@@ -334,7 +337,7 @@ let rec process_block cctxt state current_hash rollup_id :
         let block_level = block_info.header.shell.level in
         let* () =
           fail_when
-            (block_level < state.State.rollup_origination.block_level)
+            (block_level < state.State.rollup_info.origination_level)
             Tx_rollup_originated_in_fork
         in
         (* Handle predecessor Tezos block first *)

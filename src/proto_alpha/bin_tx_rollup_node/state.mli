@@ -35,8 +35,12 @@ open Common
 module Tezos_blocks_cache :
   Ringo_lwt.Sigs.CACHE_MAP_OPT with type key = Block_hash.t
 
-(** The origination block and level of the rollup is kept in the state. *)
-type rollup_origination = {block_hash : Block_hash.t; block_level : int32}
+(** Information about the rollup that is kept in the state. *)
+type rollup_info = Stores.rollup_info = {
+  rollup_id : Tx_rollup.t;
+  origination_block : Block_hash.t;
+  origination_level : int32;
+}
 
 (* TODO/TORU: have different operators (for commitments, rejections, batches,
    etc.) and have multiple injection keys (except for commitments). *)
@@ -45,8 +49,7 @@ type t = private {
   stores : Stores.t;
   context_index : Context.index;
   mutable head : L2block.t;
-  rollup : Tx_rollup.t;
-  rollup_origination : rollup_origination;
+  rollup_info : rollup_info;
   tezos_blocks_cache : Alpha_block_services.block_info Tezos_blocks_cache.t;
   parameters : Protocol.Tx_rollup_l2_apply.parameters;
   operator : signer option;

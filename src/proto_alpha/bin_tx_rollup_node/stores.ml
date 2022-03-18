@@ -599,16 +599,28 @@ module Tezos_head_store = Make_singleton (struct
   let encoding = Block_hash.encoding
 end)
 
-module Rollup_origination_store = Make_singleton (struct
-  type t = Protocol.Alpha_context.Tx_rollup.t * Block_hash.t * int32
+type rollup_info = {
+  rollup_id : Protocol.Alpha_context.Tx_rollup.t;
+  origination_block : Block_hash.t;
+  origination_level : int32;
+}
 
-  let name = "rollup_origination"
+module Rollup_info_store = Make_singleton (struct
+  type t = rollup_info
+
+  let name = "rollup_info"
 
   let encoding =
-    Data_encoding.tup3
-      Protocol.Alpha_context.Tx_rollup.encoding
-      Block_hash.encoding
-      Data_encoding.int32
+    let open Data_encoding in
+    conv
+      (fun {rollup_id; origination_block; origination_level} ->
+        (rollup_id, origination_block, origination_level))
+      (fun (rollup_id, origination_block, origination_level) ->
+        {rollup_id; origination_block; origination_level})
+    @@ obj3
+         (req "rollup_id" Protocol.Alpha_context.Tx_rollup.encoding)
+         (req "origination_block" Block_hash.encoding)
+         (req "origination_level" int32)
 end)
 
 type t = {
@@ -617,7 +629,7 @@ type t = {
   levels : Level_store.t;
   head : Head_store.t;
   tezos_head : Tezos_head_store.t;
-  rollup_origination : Rollup_origination_store.t;
+  rollup_info : Rollup_info_store.t;
 }
 
 let init ~data_dir ~readonly ~blocks_cache_size =
@@ -629,8 +641,8 @@ let init ~data_dir ~readonly ~blocks_cache_size =
   and* levels = Level_store.init ~data_dir ~readonly
   and* head = Head_store.init ~data_dir
   and* tezos_head = Tezos_head_store.init ~data_dir
-  and* rollup_origination = Rollup_origination_store.init ~data_dir in
-  return {blocks; tezos_blocks; levels; head; tezos_head; rollup_origination}
+  and* rollup_info = Rollup_info_store.init ~data_dir in
+  return {blocks; tezos_blocks; levels; head; tezos_head; rollup_info}
 
 let close stores =
   let open Lwt_syntax in

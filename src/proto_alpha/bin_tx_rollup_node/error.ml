@@ -252,26 +252,23 @@ let () =
     (function Tx_rollup_cannot_checkout_context c -> Some c | _ -> None)
     (fun c -> Tx_rollup_cannot_checkout_context c)
 
-type error +=
-  | Tx_rollup_no_rollup_origination_on_disk_and_no_rollup_genesis_given
+type error += Tx_rollup_no_rollup_info_on_disk_and_no_rollup_genesis_given
 
 let () =
   let description =
-    "No rollup origination on disk and no rollup genesis provided"
+    "No rollup information on disk and no rollup genesis provided"
   in
   register_error_kind
-    ~id:"tx_rollup.node.no_rollup_origination_and_no_rollup_genesis_given"
-    ~title:"No rollup origination on disk and none provided"
+    ~id:"tx_rollup.node.no_rollup_info_and_no_rollup_genesis_given"
+    ~title:"No rollup information on disk and none provided"
     ~description
     ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
     `Permanent
     Data_encoding.empty
     (function
-      | Tx_rollup_no_rollup_origination_on_disk_and_no_rollup_genesis_given ->
-          Some ()
+      | Tx_rollup_no_rollup_info_on_disk_and_no_rollup_genesis_given -> Some ()
       | _ -> None)
-    (fun () ->
-      Tx_rollup_no_rollup_origination_on_disk_and_no_rollup_genesis_given)
+    (fun () -> Tx_rollup_no_rollup_info_on_disk_and_no_rollup_genesis_given)
 
 type error +=
   | Tx_rollup_different_disk_stored_origination_rollup_and_given_rollup_genesis of {

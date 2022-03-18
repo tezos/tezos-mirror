@@ -139,24 +139,26 @@ module Tezos_head_store : sig
   val write : t -> Block_hash.t -> unit tzresult Lwt.t
 end
 
-(** A store composed of a single file on disk to store the rollup origination
+(** Type for on disk information about a rollup *)
+type rollup_info = {
+  rollup_id : Protocol.Alpha_context.Tx_rollup.t;
+  origination_block : Block_hash.t;
+  origination_level : int32;
+}
+
+(** A store composed of a single file on disk to store the rollup
     information. This is used to guarantee consistency between several runs of
     the Tx rollup node. *)
-module Rollup_origination_store : sig
+module Rollup_info_store : sig
   (** The type of store for the rollup origination information. *)
   type t
 
-  (** Reads the current rollup origination information from disk. Returns [None]
+  (** Reads the current rollup information from disk. Returns [None]
       if the file does not exist or if it is corrupted. *)
-  val read :
-    t ->
-    (Protocol.Alpha_context.Tx_rollup.t * Block_hash.t * int32) option Lwt.t
+  val read : t -> rollup_info option Lwt.t
 
-  (** Write the rollup origination information to disk. *)
-  val write :
-    t ->
-    Protocol.Alpha_context.Tx_rollup.t * Block_hash.t * int32 ->
-    unit tzresult Lwt.t
+  (** Write the rollup information to disk. *)
+  val write : t -> rollup_info -> unit tzresult Lwt.t
 end
 
 (** The type of all stores of the Tx rollup node. *)
@@ -166,7 +168,7 @@ type t = {
   levels : Level_store.t;
   head : Head_store.t;
   tezos_head : Tezos_head_store.t;
-  rollup_origination : Rollup_origination_store.t;
+  rollup_info : Rollup_info_store.t;
 }
 
 (** [init ~data_dir ~readonly ~blocks_cache_size] creates or loads existing

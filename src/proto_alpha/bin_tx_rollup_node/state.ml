@@ -36,14 +36,17 @@ module Tezos_blocks_cache =
             map_maker ~replacement:LRU ~overflow:Strong ~accounting:Precise))
        (Block_hash))
 
-type rollup_origination = {block_hash : Block_hash.t; block_level : int32}
+type rollup_info = Stores.rollup_info = {
+  rollup_id : Tx_rollup.t;
+  origination_block : Block_hash.t;
+  origination_level : int32;
+}
 
 type t = {
   stores : Stores.t;
   context_index : Context.index;
   mutable head : L2block.t;
-  rollup : Tx_rollup.t;
-  rollup_origination : rollup_origination;
+  rollup_info : rollup_info;
   tezos_blocks_cache : Alpha_block_services.block_info Tezos_blocks_cache.t;
   parameters : Protocol.Tx_rollup_l2_apply.parameters;
   operator : signer option;
@@ -348,61 +351,54 @@ let check_origination_in_block_info rollup block_info =
   | Some _ -> return_unit
   | None -> fail @@ Error.Tx_rollup_not_originated_in_the_given_block rollup
 
-let init_rollup_origination cctxt stores ?rollup_genesis rollup =
+let init_rollup_info cctxt stores ?rollup_genesis rollup =
   let open Lwt_result_syntax in
-  let*! origination_info =
-    Stores.Rollup_origination_store.read stores.Stores.rollup_origination
-  in
-  let* rollup_origination =
-    match (origination_info, rollup_genesis) with
+  let*! rollup_info = Stores.Rollup_info_store.read stores.Stores.rollup_info in
+  let* rollup_info =
+    match (rollup_info, rollup_genesis) with
     | (None, None) ->
         fail
-          [
-            Error
-            .Tx_rollup_no_rollup_origination_on_disk_and_no_rollup_genesis_given;
-          ]
-    | (Some (stored_rollup, _, _), __) when Tx_rollup.(stored_rollup <> rollup)
-      ->
+          [Error.Tx_rollup_no_rollup_info_on_disk_and_no_rollup_genesis_given]
+    | (Some stored, __) when Tx_rollup.(stored.rollup_id <> rollup) ->
         fail [Error.Tx_rollup_mismatch]
-    | (Some (_, block_hash, _), Some genesis)
-      when Block_hash.(block_hash <> genesis) ->
+    | (Some stored, Some genesis)
+      when Block_hash.(stored.origination_block <> genesis) ->
         fail
           [
             Error
             .Tx_rollup_different_disk_stored_origination_rollup_and_given_rollup_genesis
               {
-                disk_rollup_origination = block_hash;
+                disk_rollup_origination = stored.origination_block;
                 given_rollup_genesis = genesis;
               };
           ]
-    | (Some (_, block_hash, block_level), _) -> return {block_hash; block_level}
+    | (Some stored, _) -> return stored
     | (None, Some rollup_genesis) ->
         let block = `Hash (rollup_genesis, 0) in
         let* block_info =
           Alpha_block_services.info cctxt ~chain:cctxt#chain ~block ()
         in
         let* () = check_origination_in_block_info rollup block_info in
-        let rollup_orig =
+        let rollup_info =
           {
-            block_hash = rollup_genesis;
-            block_level = block_info.header.shell.level;
+            rollup_id = rollup;
+            origination_block = rollup_genesis;
+            origination_level = block_info.header.shell.level;
           }
         in
         let* () =
-          Stores.Rollup_origination_store.write
-            stores.rollup_origination
-            (rollup, rollup_orig.block_hash, rollup_orig.block_level)
+          Stores.Rollup_info_store.write stores.rollup_info rollup_info
         in
-        return rollup_orig
+        return rollup_info
   in
-  return rollup_origination
+  return rollup_info
 
 let init_context ~data_dir =
   let open Lwt_result_syntax in
   let*! index = Context.init (Node_data.context_dir data_dir) in
   return index
 
-let init_head (stores : Stores.t) context_index rollup rollup_origination =
+let init_head (stores : Stores.t) context_index rollup rollup_info =
   let open Lwt_syntax in
   let* hash = Stores.Head_store.read stores.head in
   let+ head =
@@ -413,7 +409,7 @@ let init_head (stores : Stores.t) context_index rollup rollup_origination =
   match head with
   | Some head -> head
   | None ->
-      L2block.genesis_block context_index rollup rollup_origination.block_hash
+      L2block.genesis_block context_index rollup rollup_info.origination_block
 
 let init_parameters cctxt =
   let open Lwt_result_syntax in
@@ -430,9 +426,9 @@ let init cctxt ~data_dir ?(readonly = false) ?rollup_genesis ~operator rollup =
   let open Lwt_result_syntax in
   (* TODO/TORU make blocks_cache_size configurable *)
   let*! stores = Stores.init ~data_dir ~readonly ~blocks_cache_size:1024 in
-  let* (rollup_origination, context_index) =
+  let* (rollup_info, context_index) =
     both
-      (init_rollup_origination cctxt stores ?rollup_genesis rollup)
+      (init_rollup_info cctxt stores ?rollup_genesis rollup)
       (init_context ~data_dir)
     |> lwt_map_error (function [] -> [] | trace :: _ -> trace)
   in
@@ -448,8 +444,7 @@ let init cctxt ~data_dir ?(readonly = false) ?rollup_genesis ~operator rollup =
       stores;
       context_index;
       head;
-      rollup;
-      rollup_origination;
+      rollup_info;
       tezos_blocks_cache;
       parameters;
       operator;
