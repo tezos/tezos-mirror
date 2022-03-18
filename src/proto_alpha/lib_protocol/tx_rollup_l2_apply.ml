@@ -45,6 +45,7 @@ type error +=
   | Unknown_address of Tx_rollup_l2_address.t
   | Invalid_self_transfer
   | Invalid_zero_transfer
+  | Maximum_withdraws_per_message_exceeded of {current : int; maximum : int}
 
 let () =
   let open Data_encoding in
@@ -162,7 +163,21 @@ let () =
     ~description:"A transfer's amount must be greater than zero."
     empty
     (function Invalid_zero_transfer -> Some () | _ -> None)
-    (function () -> Invalid_zero_transfer)
+    (function () -> Invalid_zero_transfer) ;
+  (* Maximum_withdraws_per_message_exceeded *)
+  register_error_kind
+    `Permanent
+    ~id:"tx_rollup_maximum_withdraws_per_message_exceeded"
+    ~title:"Maximum tx-rollup withdraws per message exceeded"
+    ~description:
+      "The maximum number of withdraws allowed per tx-rollup message exceeded"
+    (obj2 (req "current" int31) (req "limit" int31))
+    (function
+      | Maximum_withdraws_per_message_exceeded {current; maximum} ->
+          Some (current, maximum)
+      | _ -> None)
+    (fun (current, maximum) ->
+      Maximum_withdraws_per_message_exceeded {current; maximum})
 
 module Address_indexes = Map.Make (Tx_rollup_l2_address)
 module Ticket_indexes = Map.Make (Ticket_hash)
@@ -322,6 +337,11 @@ module Message_result = struct
     Data_encoding.(
       tup2 message_result_encoding (list Tx_rollup_withdraw.encoding))
 end
+
+type parameters = {
+  (* Maximum number of allowed L2-to-L1 withdraws per batch *)
+  tx_rollup_max_withdrawals_per_batch : int;
+}
 
 module Make (Context : CONTEXT) = struct
   open Context
@@ -746,10 +766,11 @@ module Make (Context : CONTEXT) = struct
 
     let apply_batch :
         ctxt ->
+        parameters ->
         (Indexable.unknown, Indexable.unknown) t ->
         (ctxt * Message_result.Batch_V1.t * Tx_rollup_withdraw.withdrawal list)
         m =
-     fun ctxt batch ->
+     fun ctxt parameters batch ->
       let* (ctxt, indexes, batch) = check_signature ctxt batch in
       let {contents; _} = batch in
       let* (ctxt, indexes, rev_results, withdrawals) =
@@ -767,11 +788,17 @@ module Make (Context : CONTEXT) = struct
           (ctxt, indexes, [], [])
           contents
       in
-      let results = List.rev rev_results in
-      return
-        ( ctxt,
-          Message_result.Batch_V1.Batch_result {results; indexes},
-          withdrawals )
+      let limit = parameters.tx_rollup_max_withdrawals_per_batch in
+      if Compare.List_length_with.(withdrawals > limit) then
+        fail
+          (Maximum_withdraws_per_message_exceeded
+             {current = List.length withdrawals; maximum = limit})
+      else
+        let results = List.rev rev_results in
+        return
+          ( ctxt,
+            Message_result.Batch_V1.Batch_result {results; indexes},
+            withdrawals )
   end
 
   let apply_deposit :
@@ -804,9 +831,9 @@ module Make (Context : CONTEXT) = struct
         in
         return (initial_ctxt, Deposit_failure reason, Some withdrawal))
 
-  let apply_message : ctxt -> Tx_rollup_message.t -> (ctxt * Message_result.t) m
-      =
-   fun ctxt msg ->
+  let apply_message :
+      ctxt -> parameters -> Tx_rollup_message.t -> (ctxt * Message_result.t) m =
+   fun ctxt parameters msg ->
     let open Tx_rollup_message in
     match msg with
     | Deposit deposit ->
@@ -819,7 +846,7 @@ module Make (Context : CONTEXT) = struct
         match batch with
         | Some (V1 batch) ->
             let* (ctxt, result, withdrawals) =
-              Batch_V1.apply_batch ctxt batch
+              Batch_V1.apply_batch ctxt parameters batch
             in
             return (ctxt, (Batch_V1_result result, withdrawals))
         | None -> fail Invalid_batch_encoding)

@@ -64,6 +64,7 @@ type error +=
   | Unknown_address of Tx_rollup_l2_address.t
   | Invalid_self_transfer
   | Invalid_zero_transfer
+  | Maximum_withdraws_per_message_exceeded of {current : int; maximum : int}
 
 module Address_indexes : Map.S with type key = Tx_rollup_l2_address.t
 
@@ -122,6 +123,12 @@ module Message_result : sig
   val encoding : t Data_encoding.t
 end
 
+(** The record of parameters used during the application of messages. *)
+type parameters = {
+  (* Maximum number of allowed L2-to-L1 withdraws per batch *)
+  tx_rollup_max_withdrawals_per_batch : int;
+}
+
 module Make (Context : CONTEXT) : sig
   open Context
 
@@ -133,7 +140,8 @@ module Make (Context : CONTEXT) : sig
   module Batch_V1 : sig
     open Tx_rollup_l2_batch.V1
 
-    (** [apply_batch ctxt batch] interprets the batch {Tx_rollup_l2_batch.V1.t}.
+    (** [apply_batch ctxt parameters batch] interprets the batch
+        {Tx_rollup_l2_batch.V1.t}.
 
         By construction, a failing transaction will not affect the [ctxt]
         and other transactions will still be interpreted.
@@ -151,6 +159,7 @@ module Make (Context : CONTEXT) : sig
     *)
     val apply_batch :
       ctxt ->
+      parameters ->
       (Indexable.unknown, Indexable.unknown) t ->
       (ctxt * Message_result.Batch_V1.t * Tx_rollup_withdraw.withdrawal list) m
 
@@ -204,7 +213,8 @@ module Make (Context : CONTEXT) : sig
     * Tx_rollup_withdraw.withdrawal option)
     m
 
-  (** [apply_message ctxt message] interpets the [message] in the [ctxt].
+  (** [apply_message ctxt parameters message] interprets the [message] in the
+      [ctxt].
 
       That is,
 
@@ -221,7 +231,8 @@ module Make (Context : CONTEXT) : sig
       The list of withdrawals in the message result followed the ordering
       of the contents in the message.
   *)
-  val apply_message : ctxt -> Tx_rollup_message.t -> (ctxt * Message_result.t) m
+  val apply_message :
+    ctxt -> parameters -> Tx_rollup_message.t -> (ctxt * Message_result.t) m
 end
 
 module Internal_for_tests : sig

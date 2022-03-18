@@ -76,6 +76,7 @@ module Protocol_constants_overrides = struct
     tx_rollup_origination_size : int option;
     tx_rollup_hard_size_limit_per_inbox : int option;
     tx_rollup_hard_size_limit_per_message : int option;
+    tx_rollup_max_withdrawals_per_batch : int option;
     tx_rollup_commitment_bond : Tez.t option;
     tx_rollup_finality_period : int option;
     tx_rollup_max_unfinalized_levels : int option;
@@ -140,6 +141,7 @@ module Protocol_constants_overrides = struct
                         c.tx_rollup_origination_size,
                         c.tx_rollup_hard_size_limit_per_inbox,
                         c.tx_rollup_hard_size_limit_per_message,
+                        c.tx_rollup_max_withdrawals_per_batch,
                         c.tx_rollup_commitment_bond,
                         c.tx_rollup_finality_period,
                         c.tx_rollup_max_unfinalized_levels,
@@ -193,6 +195,7 @@ module Protocol_constants_overrides = struct
                            tx_rollup_origination_size,
                            tx_rollup_hard_size_limit_per_inbox,
                            tx_rollup_hard_size_limit_per_message,
+                           tx_rollup_max_withdrawals_per_batch,
                            tx_rollup_commitment_bond,
                            tx_rollup_finality_period,
                            tx_rollup_max_unfinalized_levels,
@@ -244,6 +247,7 @@ module Protocol_constants_overrides = struct
           tx_rollup_origination_size;
           tx_rollup_hard_size_limit_per_inbox;
           tx_rollup_hard_size_limit_per_message;
+          tx_rollup_max_withdrawals_per_batch;
           tx_rollup_commitment_bond;
           tx_rollup_finality_period;
           tx_rollup_max_unfinalized_levels;
@@ -313,13 +317,14 @@ module Protocol_constants_overrides = struct
                         (opt "cache_sampler_state_cycles" int8))
                      (merge_objs
                         (merge_objs
-                           (obj9
+                           (obj10
                               (opt "tx_rollup_enable" Data_encoding.bool)
                               (opt "tx_rollup_origination_size" int31)
                               (opt "tx_rollup_hard_size_limit_per_inbox" int31)
                               (opt
                                  "tx_rollup_hard_size_limit_per_message"
                                  int31)
+                              (opt "tx_rollup_max_withdrawals_per_batch" int31)
                               (opt "tx_rollup_commitment_bond" Tez.encoding)
                               (opt "tx_rollup_finality_period" int31)
                               (opt "tx_rollup_max_unfinalized_levels" int31)
@@ -401,6 +406,8 @@ module Protocol_constants_overrides = struct
           Some parametric.tx_rollup_hard_size_limit_per_inbox;
         tx_rollup_hard_size_limit_per_message =
           Some parametric.tx_rollup_hard_size_limit_per_message;
+        tx_rollup_max_withdrawals_per_batch =
+          Some parametric.tx_rollup_max_withdrawals_per_batch;
         tx_rollup_commitment_bond = Some parametric.tx_rollup_commitment_bond;
         tx_rollup_finality_period = Some parametric.tx_rollup_finality_period;
         tx_rollup_max_unfinalized_levels =
@@ -467,6 +474,7 @@ module Protocol_constants_overrides = struct
       tx_rollup_origination_size = None;
       tx_rollup_hard_size_limit_per_inbox = None;
       tx_rollup_hard_size_limit_per_message = None;
+      tx_rollup_max_withdrawals_per_batch = None;
       tx_rollup_commitment_bond = None;
       tx_rollup_finality_period = None;
       tx_rollup_max_unfinalized_levels = None;
@@ -896,6 +904,10 @@ module Protocol_constants_overrides = struct
            Option.value
              ~default:c.tx_rollup_hard_size_limit_per_message
              o.tx_rollup_hard_size_limit_per_message;
+         tx_rollup_max_withdrawals_per_batch =
+           Option.value
+             ~default:c.tx_rollup_max_withdrawals_per_batch
+             o.tx_rollup_max_withdrawals_per_batch;
          tx_rollup_commitment_bond =
            Option.value
              ~default:c.tx_rollup_commitment_bond

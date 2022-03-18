@@ -108,6 +108,10 @@ let constants_mainnet =
     (* Transaction rollup’s size limits are expressed in number of bytes *)
     tx_rollup_hard_size_limit_per_inbox = 100_000;
     tx_rollup_hard_size_limit_per_message = 5_000;
+    (* We limit the number of withdraws per message to avoid costly
+       allocations/iterations in the accounting mechanism used for each
+       withdraw claiming in L1 and cleaned when removing a commitment. *)
+    tx_rollup_max_withdrawals_per_batch = 255;
     tx_rollup_commitment_bond = Tez.of_mutez_exn 10_000_000_000L;
     tx_rollup_finality_period = 2_000;
     tx_rollup_max_unfinalized_levels = 2_100;

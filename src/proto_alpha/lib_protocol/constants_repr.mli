@@ -128,6 +128,8 @@ type parametric = {
   tx_rollup_hard_size_limit_per_inbox : int;
   (* the maximum amount of bytes one batch can allocate in an inbox *)
   tx_rollup_hard_size_limit_per_message : int;
+  (* the maximum number of allowed "L2-to-L1" withdraws per batch *)
+  tx_rollup_max_withdrawals_per_batch : int;
   (* the amount of tez to bond a tx rollup commitment *)
   tx_rollup_commitment_bond : Tez_repr.t;
   (* the number of blocks before a tx rollup block is final *)

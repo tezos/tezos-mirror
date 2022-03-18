@@ -92,6 +92,8 @@ val tx_rollup_hard_size_limit_per_inbox : Raw_context.t -> int
 
 val tx_rollup_hard_size_limit_per_message : Raw_context.t -> int
 
+val tx_rollup_max_withdrawals_per_batch : Raw_context.t -> int
+
 val tx_rollup_commitment_bond : Raw_context.t -> Tez_repr.t
 
 val tx_rollup_finality_period : Raw_context.t -> int
