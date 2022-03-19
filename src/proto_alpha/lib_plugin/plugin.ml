@@ -3024,6 +3024,45 @@ module RPC = struct
                    LB_pass))
           ~output:(obj1 (req "protocol_data" bytes))
           RPC_path.(path / "protocol_data")
+
+      module Tx_rollup = struct
+        open Data_encoding
+
+        let path = RPC_path.(path / "tx_rollup")
+
+        module Inbox = struct
+          let path = RPC_path.(path / "inbox")
+
+          let message_hash =
+            RPC_service.post_service
+              ~description:"Compute the hash of a message"
+              ~query:RPC_query.empty
+              ~input:(obj1 (req "message" Tx_rollup_message.encoding))
+              ~output:(obj1 (req "hash" Tx_rollup_message.hash_encoding))
+              RPC_path.(path / "message_hash")
+
+          let merkle_tree_hash =
+            RPC_service.post_service
+              ~description:"Compute the merkle tree hash of an inbox"
+              ~query:RPC_query.empty
+              ~input:
+                (obj1
+                   (req "message_hashes" (list Tx_rollup_message.hash_encoding)))
+              ~output:(obj1 (req "hash" Tx_rollup_inbox.Merkle.root_encoding))
+              RPC_path.(path / "merkle_tree_hash")
+
+          let merkle_tree_path =
+            RPC_service.post_service
+              ~description:"Compute a path of an inbox message in a merkle tree"
+              ~query:RPC_query.empty
+              ~input:
+                (obj2
+                   (req "message_hashes" (list Tx_rollup_message.hash_encoding))
+                   (req "position" int16))
+              ~output:(obj1 (req "path" Tx_rollup_inbox.Merkle.path_encoding))
+              RPC_path.(path / "merkle_tree_path")
+        end
+      end
     end
 
     let register () =
@@ -3055,7 +3094,22 @@ module RPC = struct
                  seed_nonce_hash;
                  proof_of_work_nonce;
                  liquidity_baking_toggle_vote;
-               }))
+               })) ;
+      Registration.register0_noctxt
+        ~chunked:true
+        S.Tx_rollup.Inbox.message_hash
+        (fun () message -> return (Tx_rollup_message.hash_uncarbonated message)) ;
+      Registration.register0_noctxt
+        ~chunked:true
+        S.Tx_rollup.Inbox.merkle_tree_hash
+        (fun () message_hashes ->
+          return (Tx_rollup_inbox.Merkle.merklize_list message_hashes)) ;
+      Registration.register0_noctxt
+        ~chunked:true
+        S.Tx_rollup.Inbox.merkle_tree_path
+        (fun () (message_hashes, position) ->
+          Lwt.return
+            (Tx_rollup_inbox.Merkle.compute_path message_hashes position))
 
     module Manager = struct
       let[@coq_axiom_with_reason "cast on e"] operations ctxt block ~branch

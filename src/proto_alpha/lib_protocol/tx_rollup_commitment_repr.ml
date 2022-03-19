@@ -115,7 +115,7 @@ type t = {
   level : Tx_rollup_level_repr.t;
   messages : Message_result_hash.t list;
   predecessor : Commitment_hash.t option;
-  inbox_hash : Tx_rollup_inbox_repr.hash;
+  inbox_merkle_root : Tx_rollup_inbox_repr.Merkle.root;
 }
 
 let compare_or cmp c1 c2 f = match cmp c1 c2 with 0 -> f () | diff -> diff
@@ -133,22 +133,24 @@ include Compare.Make (struct
               r1.predecessor
               r2.predecessor
               (fun () ->
-                Tx_rollup_inbox_repr.compare_hash r1.inbox_hash r2.inbox_hash)))
+                Tx_rollup_inbox_repr.Merkle.compare
+                  r1.inbox_merkle_root
+                  r2.inbox_merkle_root)))
 end)
 
 let pp : Format.formatter -> t -> unit =
  fun fmt t ->
   Format.fprintf
     fmt
-    "commitment %a : messages = %a predecessor %a for inbox %a"
+    "commitment %a : messages = %a predecessor %a for inbox with merkle root %a"
     Tx_rollup_level_repr.pp
     t.level
     (Format.pp_print_list Message_result_hash.pp)
     t.messages
     (Format.pp_print_option Commitment_hash.pp)
     t.predecessor
-    Tx_rollup_inbox_repr.pp_hash
-    t.inbox_hash
+    Tx_rollup_inbox_repr.Merkle.pp_root
+    t.inbox_merkle_root
 
 (* FIXME/TORU: We need a test that checks that. *)
 let empty_l2_context_hash =
@@ -169,15 +171,15 @@ let initial_message_result_hash =
 let encoding =
   let open Data_encoding in
   conv
-    (fun {level; messages; predecessor; inbox_hash} ->
-      (level, messages, predecessor, inbox_hash))
-    (fun (level, messages, predecessor, inbox_hash) ->
-      {level; messages; predecessor; inbox_hash})
+    (fun {level; messages; predecessor; inbox_merkle_root} ->
+      (level, messages, predecessor, inbox_merkle_root))
+    (fun (level, messages, predecessor, inbox_merkle_root) ->
+      {level; messages; predecessor; inbox_merkle_root})
     (obj4
        (req "level" Tx_rollup_level_repr.encoding)
        (req "batches" (list Message_result_hash.encoding))
        (req "predecessor" (option Commitment_hash.encoding))
-       (req "inbox_hash" Tx_rollup_inbox_repr.hash_encoding))
+       (req "inbox_merkle_root" Tx_rollup_inbox_repr.Merkle.root_encoding))
 
 let hash c =
   let bytes = Data_encoding.Binary.to_bytes_exn encoding c in

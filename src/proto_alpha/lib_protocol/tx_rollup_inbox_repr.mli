@@ -25,73 +25,54 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** The type of hashes used to identify an inbox based on its
-    contents. For an inbox containing the messages hashes [h1; h2;
-    .. ; hn], its hash is computed with [H(.. H(H(empty + h1) + h2)
-    .. + hn)] *)
-type hash
+module Merkle : sig
+  (** See {Merkle_List} for the documentation of those functions. *)
 
-val compare_hash : hash -> hash -> int
+  type tree
 
-val equal_hash : hash -> hash -> bool
+  type root
 
-val pp_hash : Format.formatter -> hash -> unit
+  type path
 
-val hash_of_bytes_exn : bytes -> hash
+  val empty : tree
 
-val hash_of_bytes_opt : bytes -> hash option
+  val root : tree -> root
 
-val hash_of_b58check_exn : string -> hash
+  val ( = ) : root -> root -> bool
 
-val hash_of_b58check_opt : string -> hash option
+  val compare : root -> root -> int
 
-val hash_encoding : hash Data_encoding.t
+  val root_encoding : root Data_encoding.t
 
-val hash_to_bytes : hash -> bytes
+  val root_of_b58check_opt : string -> root option
 
-val hash_to_b58check : hash -> string
+  val pp_root : Format.formatter -> root -> unit
 
-(** [extend_hash inbox_hash hash] computes [H(inbox_hash + hash)],
-    which is used to identify an inbox identified by [inbox_hash]
-    after appending a new message identified by [hash]. *)
-val extend_hash : hash -> Tx_rollup_message_repr.hash -> hash
+  val path_encoding : path Data_encoding.t
 
-(** [hash_inbox messages] hashes a list of messages, starting
-    from an empty inbox and recursively running extend_hash on
-    each. *)
-val hash_inbox : Tx_rollup_message_repr.t list -> hash
+  val add_message : tree -> Tx_rollup_message_repr.hash -> tree
 
-(** [hash_hashed_inbox messages] hashes a list of already-hashed
-    messages, starting from an empty inbox and recursively running
-    extend_hash on each. *)
-val hash_hashed_inbox : Tx_rollup_message_repr.hash list -> hash
+  val compute_path : Tx_rollup_message_repr.hash list -> int -> path tzresult
 
-(** An inbox gathers, for a given Tezos level, messages crafted by the
-    layer-1 for the layer-2 to interpret.
+  val check_path :
+    path -> int -> Tx_rollup_message_repr.hash -> root -> bool tzresult
 
-    The structure comprises two fields: (1) [contents] is the list of
-    message hashes, and (2) [cumulated_size] is the quantity of bytes
-    allocated by the related messages.
+  (** [merklize_list messages] construct a merkle root by build a
+     tree, appending the [messages] one by one in the same order of
+     the list and finally computing the root. *)
+  val merklize_list : Tx_rollup_message_repr.hash list -> root
+end
 
-    We recall that a transaction rollup can have up to one inbox per
-    Tezos level, starting from its origination. See
-    {!Storage.Tx_rollup} for more information. *)
-type t = {
-  contents : Tx_rollup_message_repr.hash list;
-  cumulated_size : int;
-  hash : hash;
-}
-
-val pp : Format.formatter -> t -> unit
-
-val encoding : t Data_encoding.t
-
-(** The metadata for an inbox stores the [cumulated_size] in bytes for
+(** The view of an inbox: stores the [cumulated_size] in bytes for
     the inbox, the [inbox_length] ({i i.e.}, the number of messages),
     and the cumulative [hash] of the inbox contents. For newly created
     inboxes, the [hash] is initialized as an array 32 null byte. *)
-type metadata = {inbox_length : int32; cumulated_size : int; hash : hash}
+type t = {inbox_length : int; cumulated_size : int; merkle_root : Merkle.root}
 
-val metadata_encoding : metadata Data_encoding.t
+val ( = ) : t -> t -> bool
 
-val empty_metadata : metadata
+val encoding : t Data_encoding.t
+
+val empty : t
+
+val pp : Format.formatter -> t -> unit

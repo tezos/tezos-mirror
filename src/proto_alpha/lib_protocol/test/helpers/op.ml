@@ -640,7 +640,8 @@ let tx_rollup_withdraw ?counter ?fee ?gas_limit ?storage_limit ctxt
 
 let tx_rollup_reject ?counter ?fee ?gas_limit ?storage_limit ctxt
     (source : Contract.t) (tx_rollup : Tx_rollup.t) (level : Tx_rollup_level.t)
-    (message : Tx_rollup_message.t) ~(message_position : int) ~(proof : bool)
+    (message : Tx_rollup_message.t) ~(message_position : int)
+    ~(message_path : Tx_rollup_inbox.Merkle.path) ~(proof : bool)
     ~(previous_message_result : Tx_rollup_commitment.message_result) =
   manager_operation
     ?counter
@@ -655,6 +656,7 @@ let tx_rollup_reject ?counter ?fee ?gas_limit ?storage_limit ctxt
          level;
          message;
          message_position;
+         message_path;
          proof;
          previous_message_result;
        })

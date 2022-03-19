@@ -900,6 +900,37 @@ module Tx_rollup : sig
     pkh:string ->
     Client.t ->
     JSON.t Process.runnable
+
+  module Forge : sig
+    module Inbox : sig
+      val message_hash :
+        ?endpoint:Client.endpoint ->
+        ?hooks:Process.hooks ->
+        ?chain:string ->
+        ?block:string ->
+        data:JSON.u ->
+        Client.t ->
+        JSON.t Process.runnable
+
+      val merkle_tree_hash :
+        ?endpoint:Client.endpoint ->
+        ?hooks:Process.hooks ->
+        ?chain:string ->
+        ?block:string ->
+        data:JSON.u ->
+        Client.t ->
+        JSON.t Process.runnable
+
+      val merkle_tree_path :
+        ?endpoint:Client.endpoint ->
+        ?hooks:Process.hooks ->
+        ?chain:string ->
+        ?block:string ->
+        data:JSON.u ->
+        Client.t ->
+        JSON.t Process.runnable
+    end
+  end
 end
 
 module Sc_rollup : sig

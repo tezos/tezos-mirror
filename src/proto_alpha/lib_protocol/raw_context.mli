@@ -356,3 +356,11 @@ module Consensus :
      and type 'a slot_map := 'a Slot_repr.Map.t
      and type slot_set := Slot_repr.Set.t
      and type round := Round_repr.t
+
+module Tx_rollup : sig
+  val add_message :
+    t ->
+    Tx_rollup_repr.t ->
+    Tx_rollup_message_repr.hash ->
+    t * Tx_rollup_inbox_repr.Merkle.root
+end

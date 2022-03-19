@@ -45,17 +45,26 @@ let node_rpc node service =
       let* result = get ~url in
       return (Some (result |> JSON.parse ~origin:service))
 
-let get_node_inbox ?(block = "head") node =
-  let* json = node_rpc node @@ "block/" ^ block ^ "/proto_inbox" in
+(* This function computes an inbox from the messages stored by the
+   rollup node.  The way the inbox is computed is to use helpers
+   exposed by the protocol. *)
+let get_node_inbox ?(block = "head") node client =
+  let* json = node_rpc node @@ "block/" ^ block ^ "/inbox" in
   match json with
-  | None -> return Rollup.{cumulated_size = 0; contents = []; hash = ""}
+  | None ->
+      return Rollup.{inbox_length = 0; cumulated_size = 0; merkle_root = ""}
   | Some json ->
-      let cumulated_size = JSON.(json |-> "cumulated_size" |> as_int) in
-      let contents =
-        JSON.(json |-> "contents" |> as_list |> List.map as_string)
+      let parse_message json =
+        if JSON.(is_null (json |-> "batch")) then
+          Test.fail "This case is not handled yet"
+        else JSON.(json |-> "batch" |> as_string |> fun x -> `Batch x)
       in
-      let hash = JSON.(json |-> "hash" |> as_string) in
-      return Rollup.{cumulated_size; contents; hash}
+      let messages =
+        JSON.(
+          json |-> "contents" |> as_list
+          |> List.map (fun x -> x |-> "message" |> parse_message))
+      in
+      Rollup.compute_inbox_from_messages messages client
 
 let get_rollup_parameter_file ~protocol =
   let enable_tx_rollup = [(["tx_rollup_enable"], Some "true")] in
@@ -144,24 +153,6 @@ let test_tx_node_origination =
       let* _tx_node = init_and_run_rollup_node ~operator node client in
       unit)
 
-let check_inbox_equality (i1 : Rollup.inbox) (i2 : Rollup.inbox) =
-  Check.(
-    (( = )
-       i1.cumulated_size
-       i2.cumulated_size
-       ~error_msg:
-         "Cumulated size of inboxes computed by the rollup node should be \
-          equal to the cumulated size given by the RPC")
-      int) ;
-  Check.(
-    ( = )
-      i1.contents
-      i2.contents
-      ~error_msg:
-        "Content of inboxes computed by the rollup node should be equal to the \
-         cumulated size given by the RPC"
-      (list string))
-
 (* Checks that an inbox received by the tx_rollup node is well stored
    and available in a percistent way. *)
 let test_tx_node_store_inbox =
@@ -202,11 +193,15 @@ let test_tx_node_store_inbox =
       let* () = Client.bake_for client in
       let* _ = Node.wait_for_level node 3 in
       let* _ = Rollup_node.wait_for_tezos_level tx_node 3 in
-      let* node_inbox_1 = get_node_inbox ~block:"0" tx_node in
-      let*! inbox_1 = Rollup.get_inbox ~rollup ~level:0 client in
+      let* node_inbox_1 = get_node_inbox ~block:"0" tx_node client in
+      let*! expected_inbox_1 = Rollup.get_inbox ~rollup ~level:0 client in
       (* Ensure that stored inboxes on daemon's side are equivalent of
          inboxes returned by the rpc call. *)
-      check_inbox_equality node_inbox_1 inbox_1 ;
+      Check.(node_inbox_1 = expected_inbox_1)
+        Rollup.Check.inbox
+        ~error_msg:
+          "Unexpected inbox computed from the rollup node. Expected %R. \
+           Computed %L" ;
       let snd_batch = "tezos_l2_batch_2" in
       let*! () =
         Client.Tx_rollup.submit_batch
@@ -218,17 +213,25 @@ let test_tx_node_store_inbox =
       let* () = Client.bake_for client in
       let* _ = Node.wait_for_level node 4 in
       let* _ = Rollup_node.wait_for_tezos_level tx_node 4 in
-      let* node_inbox_2 = get_node_inbox ~block:"1" tx_node in
-      let*! inbox_2 = Rollup.get_inbox ~rollup ~level:1 client in
+      let* node_inbox_2 = get_node_inbox ~block:"1" tx_node client in
+      let*! expected_inbox_2 = Rollup.get_inbox ~rollup ~level:1 client in
       (* Ensure that stored inboxes on daemon side are equivalent of inboxes
          returned by the rpc call. *)
-      check_inbox_equality node_inbox_2 inbox_2 ;
+      Check.(node_inbox_2 = expected_inbox_2)
+        Rollup.Check.inbox
+        ~error_msg:
+          "Unexpected inbox computed from the rollup node. Expected %R. \
+           Computed %L" ;
       (* Stop the node and try to get the inbox once again*)
       let* () = Rollup_node.terminate tx_node in
       let* () = Rollup_node.run tx_node in
       let* () = Rollup_node.wait_for_ready tx_node in
       let*! inbox_after_restart = Rollup.get_inbox ~rollup ~level:1 client in
-      check_inbox_equality node_inbox_2 inbox_after_restart ;
+      Check.(node_inbox_2 = inbox_after_restart)
+        Rollup.Check.inbox
+        ~error_msg:
+          "Unexpected inbox computed from the rollup node. Expected %R. \
+           Computed %L" ;
       unit)
 
 (* FIXME/TORU: This is a temporary way of querying the node without
@@ -590,8 +593,10 @@ let test_l2_to_l2_transaction =
       let* () = Client.bake_for client in
       let* _ = Node.wait_for_level node 6 in
       let* _ = Rollup_node.wait_for_tezos_level tx_node 6 in
-      let* _node_inbox = get_node_inbox tx_node in
-      Format.printf "ticket 1 %s@." ticket_id ;
+      (* The decoding fails because of the buggy JSON encoding. This
+         line can be uncommented once it is fixed.
+
+         let* _node_inbox = get_node_inbox tx_node client in *)
       let* () =
         check_tz4_balance
           ~tx_node

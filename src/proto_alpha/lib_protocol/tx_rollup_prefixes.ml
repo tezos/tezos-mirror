@@ -54,6 +54,8 @@ let inbox_hash =
     b58check_size = 53;
   }
 
+let inbox_list_hash = inbox_hash
+
 let message_hash =
   {
     b58check_prefix = "\079\149\030";

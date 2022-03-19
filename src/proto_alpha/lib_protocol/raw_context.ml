@@ -227,6 +227,8 @@ type back = {
     Cycle_repr.Map.t;
   stake_distribution_for_current_cycle :
     Tez_repr.t Signature.Public_key_hash.Map.t option;
+  tx_rollup_current_messages :
+    Tx_rollup_inbox_repr.Merkle.tree Tx_rollup_repr.Map.t;
 }
 
 (*
@@ -782,6 +784,7 @@ let prepare ~level ~predecessor_timestamp ~timestamp ctxt =
         non_consensus_operations_rev = [];
         sampler_state = Cycle_repr.Map.empty;
         stake_distribution_for_current_cycle = None;
+        tx_rollup_current_messages = Tx_rollup_repr.Map.empty;
       };
   }
 
@@ -1324,4 +1327,25 @@ module Consensus :
   let[@inline] set_grand_parent_branch ctxt branch =
     update_consensus_with ctxt (fun ctxt ->
         Raw_consensus.set_grand_parent_branch ctxt branch)
+end
+
+module Tx_rollup = struct
+  let add_message ctxt rollup message =
+    let root = ref Tx_rollup_inbox_repr.Merkle.(root empty) in
+    let updater element =
+      let tree =
+        Option.value element ~default:Tx_rollup_inbox_repr.Merkle.(empty)
+      in
+      let tree = Tx_rollup_inbox_repr.Merkle.add_message tree message in
+      root := Tx_rollup_inbox_repr.Merkle.root tree ;
+      Some tree
+    in
+    let map =
+      Tx_rollup_repr.Map.update
+        rollup
+        updater
+        ctxt.back.tx_rollup_current_messages
+    in
+    let back = {ctxt.back with tx_rollup_current_messages = map} in
+    ({ctxt with back}, !root)
 end

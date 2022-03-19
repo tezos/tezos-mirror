@@ -1709,6 +1709,7 @@ let apply_external_manager_operation_content :
         message;
         previous_message_result;
         message_position;
+        message_path;
       } ->
       Tx_rollup_state.get ctxt tx_rollup >>=? fun (ctxt, state) ->
       (* Check [level] *)
@@ -1742,6 +1743,7 @@ let apply_external_manager_operation_content :
         tx_rollup
         ~position:message_position
         message
+        message_path
       >>=? fun ctxt ->
       (* Check [proof] *)
       Tx_rollup_l2_verifier.verify_proof

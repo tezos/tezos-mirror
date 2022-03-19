@@ -32,7 +32,7 @@ module Tx_rollup : sig
     inbox_ema : int;
   }
 
-  type inbox = {cumulated_size : int; contents : string list; hash : string}
+  type inbox = {inbox_length : int; cumulated_size : int; merkle_root : string}
 
   val get_state :
     ?hooks:Process.hooks -> rollup:string -> Client.t -> state Process.runnable
@@ -59,6 +59,28 @@ module Tx_rollup : sig
     pkh:string ->
     Client.t ->
     JSON.t Process.runnable
+
+  val message_hash :
+    ?hooks:Process.hooks ->
+    message:[`Batch of string] ->
+    Client.t ->
+    [> `Hash of string] Process.runnable
+
+  val inbox_merkle_tree_hash :
+    ?hooks:Process.hooks ->
+    message_hashes:[`Hash of string] list ->
+    Client.t ->
+    [> `Hash of string] Process.runnable
+
+  val inbox_merkle_tree_path :
+    ?hooks:Process.hooks ->
+    message_hashes:[`Hash of string] list ->
+    position:int ->
+    Client.t ->
+    JSON.t Process.runnable
+
+  val compute_inbox_from_messages :
+    ?hooks:Process.hooks -> [`Batch of string] list -> Client.t -> inbox Lwt.t
 
   module Check : sig
     val state : state Check.typ

@@ -44,8 +44,6 @@ type level =
 (** Type of L2 block headers *)
 type header = {
   level : level;  (** The level of the L2 block *)
-  inbox_hash : Tx_rollup_inbox.hash;
-      (** The hash of the inbox's contents associated with this L2 block *)
   tezos_block : Block_hash.t;
       (** The Tezos block on which this L2 block in anchored, i.e. the Tezos block
       in which the inbox was sent *)

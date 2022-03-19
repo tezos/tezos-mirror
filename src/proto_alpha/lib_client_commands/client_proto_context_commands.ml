@@ -2271,10 +2271,8 @@ let commands_rw () =
            ~desc:"The level"
            Client_proto_args.int_parameter
       @@ Clic.param
-           ~name:"inbox_hash"
-           ~desc:
-             "the hash of the inbox to commit to, in b58check notation \
-              (starting with the prefix i)."
+           ~name:"inbox_merkle_root"
+           ~desc:"the inbox merkle root to commit to in b58check notation."
            Client_proto_args.string_parameter
       @@ Clic.param
            ~name:"predecessor"
@@ -2306,7 +2304,7 @@ let commands_rw () =
              fee_cap,
              burn_cap )
            level
-           inbox_hash
+           inbox_merkle_root
            predecessor
            batches
            tx_rollup
@@ -2349,7 +2347,7 @@ let commands_rw () =
               ~fee_parameter
               ~tx_rollup
               ~level
-              ~inbox_hash
+              ~inbox_merkle_root
               ~batches
               ~predecessor
               ()
@@ -2528,6 +2526,11 @@ let commands_rw () =
            ~name:"message_position"
            ~desc:"position of the message being rejected in the inbox"
            int_parameter
+      @@ prefix "and" @@ prefix "path"
+      @@ Clic.param
+           ~name:"message_path"
+           ~desc:"merkle path of the message being rejected in the inbox"
+           string_parameter
       @@ prefix "with" @@ prefix "proof" @@ tx_rollup_proof_param
       @@ prefixes ["with"; "agreed"; "context"; "hash"]
       @@ Clic.param
@@ -2559,6 +2562,7 @@ let commands_rw () =
            level
            message
            message_position
+           message_path
            proof
            context_hash
            withdrawals_merkle_root
@@ -2601,6 +2605,7 @@ let commands_rw () =
               ~level
               ~message
               ~message_position
+              ~message_path
               ~proof
               ~context_hash
               ~withdrawals_merkle_root

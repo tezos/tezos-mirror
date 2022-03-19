@@ -108,6 +108,7 @@ val mk_rejection :
   level:int ->
   message:[`Batch of string] ->
   message_position:int ->
+  message_path:string list ->
   previous_message_result:string * string ->
   Client.t ->
   manager_operation_content Lwt.t
@@ -378,6 +379,7 @@ val inject_rejection :
   level:int ->
   message:[`Batch of string] ->
   message_position:int ->
+  message_path:string list ->
   previous_message_result:string * string ->
   Client.t ->
   [> `OpHash of string] Lwt.t

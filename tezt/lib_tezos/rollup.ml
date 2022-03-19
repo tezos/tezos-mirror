@@ -32,7 +32,7 @@ module Tx_rollup = struct
     inbox_ema : int;
   }
 
-  type inbox = {cumulated_size : int; contents : string list; hash : string}
+  type inbox = {inbox_length : int; cumulated_size : int; merkle_root : string}
 
   let get_state ?hooks ~rollup client =
     let parse json =
@@ -68,12 +68,10 @@ module Tx_rollup = struct
 
   let get_inbox ?hooks ~rollup ~level client =
     let parse json =
+      let inbox_length = JSON.(json |-> "inbox_length" |> as_int) in
       let cumulated_size = JSON.(json |-> "cumulated_size" |> as_int) in
-      let contents =
-        JSON.(json |-> "contents" |> as_list |> List.map as_string)
-      in
-      let hash = JSON.(json |-> "hash" |> as_string) in
-      {cumulated_size; contents; hash}
+      let merkle_root = JSON.(json |-> "merkle_root" |> as_string) in
+      {inbox_length; cumulated_size; merkle_root}
     in
     let runnable = RPC.Tx_rollup.get_inbox ?hooks ~rollup ~level client in
     Process.runnable_map parse runnable
@@ -88,6 +86,58 @@ module Tx_rollup = struct
       ~rollup
       ~pkh
       client
+
+  let message_hash ?hooks ~message:(`Batch message) client =
+    let parse json = `Hash JSON.(json |-> "hash" |> as_string) in
+    let data : JSON.u = `O [("message", `O [("batch", `String message)])] in
+    let runnable = RPC.Tx_rollup.Forge.Inbox.message_hash ?hooks ~data client in
+    Process.runnable_map parse runnable
+
+  let inbox_merkle_tree_hash ?hooks ~message_hashes client =
+    let parse json = `Hash JSON.(json |-> "hash" |> as_string) in
+    let make_message (`Hash message) : JSON.u = `String message in
+    let data =
+      `O [("message_hashes", `A (List.map make_message message_hashes))]
+    in
+    let runnable =
+      RPC.Tx_rollup.Forge.Inbox.merkle_tree_hash ?hooks ~data client
+    in
+    Process.runnable_map parse runnable
+
+  let inbox_merkle_tree_path ?hooks ~message_hashes ~position client =
+    let parse json = JSON.(json |-> "path") in
+    let make_message (`Hash message) : JSON.u = `String message in
+    let data =
+      `O
+        [
+          ("message_hashes", `A (List.map make_message message_hashes));
+          ("position", `Float (float_of_int position));
+        ]
+    in
+    let runnable =
+      RPC.Tx_rollup.Forge.Inbox.merkle_tree_path ?hooks ~data client
+    in
+    Process.runnable_map parse runnable
+
+  let compute_inbox_from_messages ?hooks messages client =
+    let* message_hashes =
+      Lwt_list.map_p
+        (fun message ->
+          let*! message_hash = message_hash ?hooks ~message client in
+          return message_hash)
+        messages
+    in
+    let*! (`Hash merkle_root) =
+      inbox_merkle_tree_hash ?hooks ~message_hashes client
+    in
+    return
+      {
+        inbox_length = List.length messages;
+        cumulated_size =
+          List.map (fun (`Batch message) -> String.length message) messages
+          |> List.fold_left ( + ) 0;
+        merkle_root;
+      }
 
   module Check = struct
     let state : state Check.typ =
@@ -115,9 +165,9 @@ module Tx_rollup = struct
     let inbox : inbox Check.typ =
       let open Check in
       convert
-        (fun {cumulated_size; contents; hash} ->
-          (cumulated_size, contents, hash))
-        (tuple3 int (list string) string)
+        (fun {inbox_length; cumulated_size; merkle_root} ->
+          (inbox_length, cumulated_size, merkle_root))
+        (tuple3 int int string)
   end
 
   module Parameters = struct

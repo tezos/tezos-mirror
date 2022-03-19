@@ -1,0 +1,8 @@
+tezt/_regressions/tx_rollup_rpc_inbox_message_hash.out
+
+./tezos-client rpc post /chains/main/blocks/head/helpers/forge/tx_rollup/inbox/message_hash with '{
+  "message": {
+    "batch": "blob"
+  }
+}'
+{ "hash": "[TX_ROLLUP_MESSAGE_HASH]" }

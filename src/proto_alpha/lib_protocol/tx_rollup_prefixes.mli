@@ -51,6 +51,9 @@ val message_result_hash : t
 (** See {!Tx_rollup_withdraw_repr}. *)
 val withdraw_list_hash : t
 
+(** See {!Tx_rollup_inbox_repr.inbox_hash}. *)
+val inbox_list_hash : t
+
 (** [check_encoding spec encoding] checks that [encoding] satisfies
     [spec]. Raises an exception otherwise. *)
 val check_encoding : t -> 'a Base58.encoding -> unit

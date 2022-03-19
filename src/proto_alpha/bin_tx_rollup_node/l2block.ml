@@ -47,7 +47,6 @@ type level = Genesis | Rollup_level of Tx_rollup_level.t
 
 type header = {
   level : level;
-  inbox_hash : Tx_rollup_inbox.hash;
   tezos_block : Block_hash.t;
   predecessor : hash;
   context : Tx_rollup_l2_context_hash.t;
@@ -95,13 +94,12 @@ let level_to_string = function
 let header_encoding =
   let open Data_encoding in
   conv
-    (fun {level; inbox_hash; tezos_block; predecessor; context} ->
-      (level, inbox_hash, tezos_block, predecessor, context))
-    (fun (level, inbox_hash, tezos_block, predecessor, context) ->
-      {level; inbox_hash; tezos_block; predecessor; context})
-    (obj5
+    (fun {level; tezos_block; predecessor; context} ->
+      (level, tezos_block, predecessor, context))
+    (fun (level, tezos_block, predecessor, context) ->
+      {level; tezos_block; predecessor; context})
+    (obj4
        (req "level" level_encoding)
-       (req "inbox_hash" Tx_rollup_inbox.hash_encoding)
        (req "tezos_block" Block_hash.encoding)
        (req "predecessor" Hash.encoding)
        (req "context" Tx_rollup_l2_context_hash.encoding))

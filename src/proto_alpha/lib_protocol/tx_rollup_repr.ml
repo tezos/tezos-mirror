@@ -168,3 +168,9 @@ module Set = Set.Make (struct
 
   include Compare_impl
 end)
+
+module Map = Map.Make (struct
+  type t = tx_rollup
+
+  include Compare_impl
+end)

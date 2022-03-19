@@ -25,106 +25,101 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let hash_size = Tx_rollup_prefixes.inbox_hash.hash_size
+module El = struct
+  type t = Tx_rollup_message_repr.hash
 
-module Inbox_hash =
-  Blake2B.Make
-    (Base58)
-    (struct
-      let name = "Tx_rollup_inbox_hash"
+  let to_bytes =
+    Data_encoding.Binary.to_bytes_exn Tx_rollup_message_repr.hash_encoding
+end
 
-      let title = "The hash of a transaction rollup inbox"
+module Prefix = struct
+  let name = "Inbox_list_hash"
 
-      let b58check_prefix = Tx_rollup_prefixes.inbox_hash.b58check_prefix
+  let title = "A merkle root hash for inboxes"
 
-      let size = Some hash_size
-    end)
+  let b58check_prefix = Tx_rollup_prefixes.inbox_list_hash.b58check_prefix
 
-let () =
-  Tx_rollup_prefixes.(check_encoding inbox_hash Inbox_hash.b58check_encoding)
+  let size = Some Tx_rollup_prefixes.inbox_list_hash.hash_size
+end
 
-type hash = Inbox_hash.t
+module H = Blake2B.Make (Base58) (Prefix)
+module Merkle_list = Merkle_list.Make (El) (H)
 
-let compare_hash = Inbox_hash.compare
+module Merkle = struct
+  type tree = Merkle_list.t
 
-let equal_hash = Inbox_hash.equal
+  type root = Merkle_list.h
 
-let pp_hash = Inbox_hash.pp
+  type path = Merkle_list.path
 
-let hash_of_bytes_exn = Inbox_hash.of_bytes_exn
+  let empty = Merkle_list.nil
 
-let hash_of_bytes_opt = Inbox_hash.of_bytes_opt
+  let root = Merkle_list.root
 
-let hash_of_b58check_exn = Inbox_hash.of_b58check_exn
+  let ( = ) = H.( = )
 
-let hash_of_b58check_opt = Inbox_hash.of_b58check_opt
+  let compare = H.compare
 
-let hash_encoding = Inbox_hash.encoding
+  let root_encoding = H.encoding
 
-let hash_to_bytes = Inbox_hash.to_bytes
+  let root_of_b58check_opt = H.of_b58check_opt
 
-let hash_to_b58check = Inbox_hash.to_b58check
+  let pp_root = H.pp
 
-let extend_hash inbox_hash msg_hash =
-  let open Data_encoding.Binary in
-  let inbox_hash = to_bytes_exn hash_encoding inbox_hash in
-  let msg_hash = to_bytes_exn Tx_rollup_message_repr.hash_encoding msg_hash in
-  Inbox_hash.hash_bytes [inbox_hash; msg_hash]
+  let path_encoding = Merkle_list.path_encoding
 
-let hash_hashed_inbox message_hashes =
-  List.fold_left
-    extend_hash
-    (Inbox_hash.hash_bytes [Bytes.make hash_size @@ Char.chr 0])
-    message_hashes
+  let add_message = Merkle_list.snoc
 
-let hash_inbox messages =
-  let message_hashes =
-    List.map Tx_rollup_message_repr.hash_uncarbonated messages
-  in
-  hash_hashed_inbox message_hashes
+  let tree_of_messages = List.fold_left Merkle_list.snoc Merkle_list.nil
 
-type t = {
-  contents : Tx_rollup_message_repr.hash list;
-  cumulated_size : int;
-  hash : hash;
-}
+  let compute_path messages position =
+    let tree = tree_of_messages messages in
+    Merkle_list.compute_path tree position
 
-let pp fmt {contents; cumulated_size; hash} =
-  Format.fprintf
-    fmt
-    "tx rollup inbox: %d messages using %d bytes with hash %a"
-    (List.length contents)
-    cumulated_size
-    pp_hash
-    hash
+  let check_path = Merkle_list.check_path
+
+  let merklize_list messages =
+    let tree = tree_of_messages messages in
+    root tree
+end
+
+type t = {inbox_length : int; cumulated_size : int; merkle_root : Merkle.root}
+
+let ( = )
+    {
+      inbox_length = inbox_length_left;
+      cumulated_size = cumulated_size_left;
+      merkle_root = merkle_root_left;
+    }
+    {
+      inbox_length = inbox_length_right;
+      cumulated_size = cumulated_size_right;
+      merkle_root = merkle_root_right;
+    } =
+  Compare.Int.(inbox_length_left = inbox_length_right)
+  && Compare.Int.(cumulated_size_left = cumulated_size_right)
+  && Merkle.(merkle_root_left = merkle_root_right)
 
 let encoding =
   let open Data_encoding in
   conv
-    (fun {contents; cumulated_size; hash} -> (contents, cumulated_size, hash))
-    (fun (contents, cumulated_size, hash) -> {contents; cumulated_size; hash})
+    (fun {inbox_length; cumulated_size; merkle_root} ->
+      (inbox_length, cumulated_size, merkle_root))
+    (fun (inbox_length, cumulated_size, merkle_root) ->
+      {inbox_length; cumulated_size; merkle_root})
     (obj3
-       (req "contents" @@ list Tx_rollup_message_repr.hash_encoding)
+       (req "inbox_length" int31)
        (req "cumulated_size" int31)
-       (req "hash" hash_encoding))
+       (req "merkle_root" Merkle.root_encoding))
 
-type metadata = {inbox_length : int32; cumulated_size : int; hash : hash}
+let empty =
+  {inbox_length = 0; cumulated_size = 0; merkle_root = Merkle_list.empty}
 
-let metadata_encoding =
-  let open Data_encoding in
-  conv
-    (fun {inbox_length; cumulated_size; hash} ->
-      (inbox_length, cumulated_size, hash))
-    (fun (inbox_length, cumulated_size, hash) ->
-      {inbox_length; cumulated_size; hash})
-    (obj3
-       (req "inbox_length" int32)
-       (req "cumulated_size" int31)
-       (req "hash" hash_encoding))
-
-let empty_metadata =
-  {
-    inbox_length = 0l;
-    cumulated_size = 0;
-    hash = Inbox_hash.hash_bytes [Bytes.make hash_size @@ Char.chr 0];
-  }
+let pp fmt {inbox_length; cumulated_size; merkle_root} =
+  Format.fprintf
+    fmt
+    "Inbox with length %d, size %d and merkle root %a"
+    inbox_length
+    cumulated_size
+    Merkle.pp_root
+    merkle_root
