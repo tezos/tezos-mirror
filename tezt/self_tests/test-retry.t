@@ -5,7 +5,7 @@ Without --retry, we fail as usual.
   Starting test: Fail every other run test
   [error] Failing test on first try
   [FAILURE] (2/3, 1 failed) Fail every other run test
-  Try again with: ./main.exe --verbose --title 'Fail every other run test'
+  Try again with: ./main.exe --verbose --file test_retry.ml --title 'Fail every other run test'
   [1]
 
 With --keep-going but without --retry, we run all tests and fail as usual.
@@ -15,11 +15,11 @@ With --keep-going but without --retry, we run all tests and fail as usual.
   Starting test: Fail every other run test
   [error] Failing test on first try
   [FAILURE] (2/3, 1 failed) Fail every other run test
-  Try again with: ./main.exe --verbose --title 'Fail every other run test'
+  Try again with: ./main.exe --verbose --file test_retry.ml --title 'Fail every other run test'
   Starting test: Failing test
   [error] Always failing test
   [FAILURE] (3/3, 2 failed) Failing test
-  Try again with: ./main.exe --verbose --title 'Failing test'
+  Try again with: ./main.exe --verbose --file test_retry.ml --title 'Failing test'
   [1]
 
 If we set --retry, then the "fail once" test will eventually
@@ -37,7 +37,7 @@ succeed. However, the "fail always" test will fail the test suite.
   Starting test: Failing test
   [error] Always failing test
   [FAILURE] (3/3, 1 failed) Failing test
-  Try again with: ./main.exe --verbose --title 'Failing test'
+  Try again with: ./main.exe --verbose --file test_retry.ml --title 'Failing test'
   [1]
 
 
@@ -64,7 +64,7 @@ With --keep-going, we still fail:
   Starting test: Failing test
   [error] Always failing test
   [FAILURE] (3/3, 1 failed) Failing test
-  Try again with: ./main.exe --verbose --title 'Failing test'
+  Try again with: ./main.exe --verbose --file test_retry.ml --title 'Failing test'
   [1]
 
 Looping is handled:
@@ -81,7 +81,7 @@ Looping is handled:
   Starting test: Failing test
   [error] Always failing test
   [FAILURE] (3/3, 1 failed) (loop 1) Failing test
-  Try again with: ./main.exe --verbose --title 'Failing test'
+  Try again with: ./main.exe --verbose --file test_retry.ml --title 'Failing test'
   [SUCCESS] (1/3, 1 failed) (loop 2) Success
   Starting test: Fail every other run test
   [error] Failing test on first try
@@ -93,7 +93,7 @@ Looping is handled:
   Starting test: Failing test
   [error] Always failing test
   [FAILURE] (3/3, 2 failed) (loop 2) Failing test
-  Try again with: ./main.exe --verbose --title 'Failing test'
+  Try again with: ./main.exe --verbose --file test_retry.ml --title 'Failing test'
   [1]
 
 Retries work with `-j`, but we don't know the order of the output. So
