@@ -930,7 +930,11 @@ let test_update_ticket_self_diff () =
   in
   (* After update, we should have 10 added red tokens. *)
   let* (red_self_token_hash, ctxt) =
-    wrap @@ Ticket_balance_key.ticket_balance_key ctxt ~owner:self red_token
+    wrap
+    @@ Ticket_balance_key.of_ex_token
+         ctxt
+         ~owner:(Destination.Contract self)
+         red_token
   in
   assert_balance ~loc:__LOC__ ctxt red_self_token_hash (Some 10)
 
@@ -984,9 +988,9 @@ let test_update_self_ticket_transfer () =
   let* () =
     let* (red_receiver_token_hash, ctxt) =
       wrap
-      @@ Ticket_balance_key.ticket_balance_key
+      @@ Ticket_balance_key.of_ex_token
            ctxt
-           ~owner:ticket_receiver
+           ~owner:(Destination.Contract ticket_receiver)
            red_token
     in
     assert_balance ~loc:__LOC__ ctxt red_receiver_token_hash (Some 10)
@@ -1011,11 +1015,18 @@ let test_update_valid_transfer () =
   let ctxt = Incremental.alpha_ctxt incr in
   let* red_token = string_ticket_token ticketer "red" in
   let* (red_self_token_hash, ctxt) =
-    wrap @@ Ticket_balance_key.ticket_balance_key ctxt ~owner:self red_token
+    wrap
+    @@ Ticket_balance_key.of_ex_token
+         ctxt
+         ~owner:(Destination.Contract self)
+         red_token
   in
   let* (red_receiver_token_hash, ctxt) =
     wrap
-    @@ Ticket_balance_key.ticket_balance_key ctxt ~owner:destination red_token
+    @@ Ticket_balance_key.of_ex_token
+         ctxt
+         ~owner:(Destination.Contract destination)
+         red_token
   in
   (* Set up the balance so that the self contract owns one ticket. *)
   let* (_, ctxt) =
@@ -1066,7 +1077,11 @@ let test_update_transfer_tickets_to_self () =
   let ctxt = Incremental.alpha_ctxt incr in
   let* red_token = string_ticket_token ticketer "red" in
   let* (red_self_token_hash, ctxt) =
-    wrap @@ Ticket_balance_key.ticket_balance_key ctxt ~owner:self red_token
+    wrap
+    @@ Ticket_balance_key.of_ex_token
+         ctxt
+         ~owner:(Destination.Contract self)
+         red_token
   in
   (* Set up the balance so that the self contract owns ten tickets. *)
   let* (_, ctxt) =
@@ -1159,7 +1174,11 @@ let test_update_valid_origination () =
   let ctxt = Incremental.alpha_ctxt incr in
   let* red_token = string_ticket_token ticketer "red" in
   let* (red_self_token_hash, ctxt) =
-    wrap @@ Ticket_balance_key.ticket_balance_key ctxt ~owner:self red_token
+    wrap
+    @@ Ticket_balance_key.of_ex_token
+         ctxt
+         ~owner:(Destination.Contract self)
+         red_token
   in
   (* Set up the balance so that the self contract owns one ticket. *)
   let* (_, ctxt) =
@@ -1187,7 +1206,10 @@ let test_update_valid_origination () =
      from [self] to [destination]. *)
   let* (red_originated_token_hash, ctxt) =
     wrap
-    @@ Ticket_balance_key.ticket_balance_key ctxt ~owner:originated red_token
+    @@ Ticket_balance_key.of_ex_token
+         ctxt
+         ~owner:(Destination.Contract originated)
+         red_token
   in
   assert_balance ~loc:__LOC__ ctxt red_originated_token_hash (Some 1)
 
@@ -1209,7 +1231,10 @@ let test_update_self_origination () =
   let* red_token = string_ticket_token ticketer "red" in
   let* (red_originated_token_hash, ctxt) =
     wrap
-    @@ Ticket_balance_key.ticket_balance_key ctxt ~owner:originated red_token
+    @@ Ticket_balance_key.of_ex_token
+         ctxt
+         ~owner:(Destination.Contract originated)
+         red_token
   in
   let operation =
     origination_operation ~src:self ~orig_contract:originated ~script
@@ -1254,7 +1279,11 @@ let test_ticket_token_map_of_list_with_duplicates () =
   in
   (* After update, we should have 10 + 5 added red tokens. *)
   let* (red_self_token_hash, ctxt) =
-    wrap @@ Ticket_balance_key.ticket_balance_key ctxt ~owner:self red_token
+    wrap
+    @@ Ticket_balance_key.of_ex_token
+         ctxt
+         ~owner:(Destination.Contract self)
+         red_token
   in
   assert_balance ~loc:__LOC__ ctxt red_self_token_hash (Some 15)
 

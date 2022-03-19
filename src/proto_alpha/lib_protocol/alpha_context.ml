@@ -245,24 +245,7 @@ module Tx_rollup_message_result_hash =
 module Tx_rollup = struct
   include Tx_rollup_repr
   include Tx_rollup_storage
-
-  let hash_ticket ctxt tx_rollup ~contents ~ticketer ~ty =
-    let open Micheline in
-    let owner = String (dummy_location, to_b58check tx_rollup) in
-    Ticket_hash_builder.make ctxt ~ticketer ~ty ~contents ~owner
-
-  module Internal_for_tests = struct
-    include Tx_rollup_repr
-
-    let hash_ticket_uncarbonated tx_rollup ~contents ~ticketer ~ty =
-      let open Micheline in
-      let owner = String (dummy_location, to_b58check tx_rollup) in
-      Ticket_hash_builder.Internal_for_tests.make_uncarbonated
-        ~ticketer
-        ~ty
-        ~contents
-        ~owner
-  end
+  module Internal_for_tests = Tx_rollup_repr
 end
 
 module Tx_rollup_state = struct

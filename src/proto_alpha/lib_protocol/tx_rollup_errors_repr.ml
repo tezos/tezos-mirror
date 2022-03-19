@@ -78,6 +78,8 @@ type error +=
       expected : Tx_rollup_commitment_repr.Message_result_hash.t;
     }
   | Ticket_payload_size_limit_exceeded of {payload_size : int; limit : int}
+  | Deposit_wrong_ticketer of Tx_rollup_repr.t
+  | Wrong_deposit_parameters
 
 let () =
   let open Data_encoding in
@@ -525,4 +527,22 @@ let () =
           Some (payload_size, limit)
       | _ -> None)
     (fun (payload_size, limit) ->
-      Ticket_payload_size_limit_exceeded {payload_size; limit})
+      Ticket_payload_size_limit_exceeded {payload_size; limit}) ;
+  register_error_kind
+    `Permanent
+    ~id:"tx_rollup_deposit_wrong_ticketer"
+    ~title:
+      "The ticketer submitted in the ticket is a tx rollup instead of a \
+       contract."
+    ~description:
+      "The ticketer provided with the ticket on the deposit transaction is a \
+       tx_rollup which is not possible."
+    ~pp:(fun ppf tx_rollup ->
+      Format.fprintf
+        ppf
+        "A tx_rollup (%a) can't be the ticketer of a ticket"
+        Tx_rollup_repr.pp
+        tx_rollup)
+    (obj1 (req "tx_rollup" Tx_rollup_repr.encoding))
+    (function Deposit_wrong_ticketer tx_rollup -> Some tx_rollup | _ -> None)
+    (fun tx_rollup -> Deposit_wrong_ticketer tx_rollup)

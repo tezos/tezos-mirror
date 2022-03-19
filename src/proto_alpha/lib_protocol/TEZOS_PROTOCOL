@@ -161,6 +161,8 @@
         "Ticket_lazy_storage_diff",
         "Ticket_balance_migration_for_j",
 
+        "Tx_rollup_parameters",
+
         "Ticket_token_map",
         "Ticket_operations_diff",
         "Ticket_accounting",

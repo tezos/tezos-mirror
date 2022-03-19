@@ -585,8 +585,16 @@ let pp_manager_operation_contents_and_result ppf
       balance_updates ;
     Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas
   in
-  let pp_tx_rollup_withdraw_result (Tx_rollup_withdraw_result {consumed_gas}) =
-    Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas
+  let pp_tx_rollup_withdraw_result
+      (Tx_rollup_withdraw_result
+        {balance_updates; consumed_gas; paid_storage_size_diff}) =
+    if paid_storage_size_diff <> Z.zero then
+      Format.fprintf
+        ppf
+        "@,Paid storage size diff: %s bytes"
+        (Z.to_string paid_storage_size_diff) ;
+    Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas ;
+    pp_balance_updates_opt ppf balance_updates
   in
   let pp_sc_rollup_originate_result
       (Sc_rollup_originate_result

@@ -38,6 +38,8 @@ let of_int64_exn q =
 
 let to_int64 q = q
 
+let to_z = Z.of_int64
+
 let to_string q = Int64.to_string q
 
 let of_string q = Option.fold ~none:None ~some:of_int64 (Int64.of_string_opt q)

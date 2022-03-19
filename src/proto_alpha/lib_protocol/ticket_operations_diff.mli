@@ -36,7 +36,7 @@ type ticket_token_diff = private {
   ticket_token : Ticket_token.ex_token;
   total_amount : Alpha_context.Script_int.n Alpha_context.Script_int.num;
   destinations :
-    (Alpha_context.Contract.t
+    (Alpha_context.Destination.t
     * Alpha_context.Script_int.n Alpha_context.Script_int.num)
     list;
 }

@@ -1049,39 +1049,33 @@ let apply_transaction ~ctxt ~parameter ~source ~contract ~amount ~entrypoint
         ~balance_updates
         ~allocated_destination_contract
 
-let apply_transaction_to_rollup ~consume_deserialization_gas ~ctxt ~parameters
-    ~amount ~entrypoint ~payer ~dst_rollup ~since =
+let ex_ticket_size :
+    Alpha_context.t ->
+    Ticket_scanner.ex_ticket ->
+    (Alpha_context.t * int) tzresult Lwt.t =
+ fun ctxt (Ex_ticket (ty, ticket)) ->
+  (* type *)
+  Script_typed_ir.ticket_t Micheline.dummy_location ty >>?= fun ty ->
+  Script_ir_translator.unparse_ty ~loc:Micheline.dummy_location ctxt ty
+  >>?= fun (ty', ctxt) ->
+  let (ty_nodes, ty_size) = Script_typed_ir_size.node_size ty' in
+  let ty_size = Saturation_repr.to_int ty_size in
+  let ty_size_cost = Script_typed_ir_size_costs.nodes_cost ~nodes:ty_nodes in
+  Gas.consume ctxt ty_size_cost >>?= fun ctxt ->
+  (* contents *)
+  let (val_nodes, val_size) = Script_typed_ir_size.value_size ty ticket in
+  let val_size = Saturation_repr.to_int val_size in
+  let val_size_cost = Script_typed_ir_size_costs.nodes_cost ~nodes:val_nodes in
+  Gas.consume ctxt val_size_cost >>?= fun ctxt ->
+  (* gas *)
+  return (ctxt, ty_size + val_size)
+
+let apply_transaction_to_tx_rollup ~ctxt ~parameters_ty ~parameters ~amount
+    ~entrypoint ~payer ~dst_rollup ~since =
   assert_tx_rollup_feature_enabled ctxt >>=? fun () ->
   fail_unless Tez.(amount = zero) Tx_rollup_invalid_transaction_amount
   >>=? fun () ->
   if Entrypoint.(entrypoint = Tx_rollup.deposit_entrypoint) then
-    Script.force_decode_in_context ~consume_deserialization_gas ctxt parameters
-    >>?= fun (parameters, ctxt) ->
-    Script_ir_translator.parse_tx_rollup_deposit_parameters ctxt parameters
-    >>?= fun (Tx_rollup.{ticketer; contents; ty; amount; destination}, ctxt) ->
-    let (ty_nodes, ty_size) = Script_typed_ir_size.node_size ty in
-    let (content_nodes, content_size) =
-      Script_typed_ir_size.node_size contents
-    in
-    let content_size = Saturation_repr.to_int content_size in
-    let ty_size = Saturation_repr.to_int ty_size in
-    let limit =
-      Alpha_context.Constants.tx_rollup_max_ticket_payload_size ctxt
-    in
-    let content_size_cost =
-      Script_typed_ir_size_costs.nodes_cost ~nodes:content_nodes
-    in
-    let ty_size_cost = Script_typed_ir_size_costs.nodes_cost ~nodes:ty_nodes in
-    Gas.consume ctxt content_size_cost >>?= fun ctxt ->
-    Gas.consume ctxt ty_size_cost >>?= fun ctxt ->
-    let payload_size = ty_size + content_size in
-    fail_when
-      Compare.Int.(payload_size > limit)
-      (Tx_rollup_errors_repr.Ticket_payload_size_limit_exceeded
-         {payload_size; limit})
-    >>=? fun () ->
-    Tx_rollup.hash_ticket ctxt dst_rollup ~contents ~ticketer ~ty
-    >>?= fun (ticket_hash, ctxt) ->
     (* If the ticket deposit fails on L2 for some reason
        (e.g. [Balance_overflow] in the recipient), then it is
        returned to [payer]. As [payer] is implicit, it cannot own
@@ -1089,8 +1083,34 @@ let apply_transaction_to_rollup ~consume_deserialization_gas ~ctxt ~parameters
        returned using the L2 withdrawal mechanism: a failing
        deposit emits a withdrawal that can be executed by
        [payer]. *)
+    Tx_rollup_parameters.get_deposit_parameters parameters_ty parameters
+    >>?= fun {ex_ticket; l2_destination} ->
+    ex_ticket_size ctxt ex_ticket >>=? fun (ctxt, ticket_size) ->
+    let limit =
+      Alpha_context.Constants.tx_rollup_max_ticket_payload_size ctxt
+    in
+    fail_when
+      Compare.Int.(ticket_size > limit)
+      (Tx_rollup_errors_repr.Ticket_payload_size_limit_exceeded
+         {payload_size = ticket_size; limit})
+    >>=? fun () ->
+    let (ex_token, ticket_amount) =
+      Ticket_token.token_and_amount_of_ex_ticket ex_ticket
+    in
+    Ticket_balance_key.of_ex_token ctxt ~owner:(Tx_rollup dst_rollup) ex_token
+    >>=? fun (ticket_hash, ctxt) ->
+    Option.value_e
+      ~error:(Error_monad.trace_of_error Tx_rollup_invalid_transaction_amount)
+      (Option.bind
+         (Script_int.to_int64 ticket_amount)
+         Tx_rollup_l2_qty.of_int64)
+    >>?= fun ticket_amount ->
     let (deposit, message_size) =
-      Tx_rollup_message.make_deposit payer destination ticket_hash amount
+      Tx_rollup_message.make_deposit
+        payer
+        l2_destination
+        ticket_hash
+        ticket_amount
     in
     Tx_rollup_state.get ctxt dst_rollup >>=? fun (ctxt, state) ->
     Tx_rollup_state.burn_cost ~limit:None state message_size >>?= fun cost ->
@@ -1301,14 +1321,14 @@ let apply_internal_manager_operation_content :
   | Transaction
       {
         transaction =
-          {amount; parameters; destination = Tx_rollup dst; entrypoint};
+          {amount; destination = Tx_rollup dst; entrypoint; parameters = _};
         location = _;
-        parameters_ty = _;
-        parameters = _;
+        parameters_ty;
+        parameters;
       } ->
-      apply_transaction_to_rollup
-        ~consume_deserialization_gas
+      apply_transaction_to_tx_rollup
         ~ctxt
+        ~parameters_ty
         ~parameters
         ~amount
         ~entrypoint
@@ -1385,18 +1405,9 @@ let apply_external_manager_operation_content :
         ~chain_id
         ~mode
         ~internal
-  | Transaction {amount; parameters; destination = Tx_rollup dst; entrypoint} ->
-      apply_transaction_to_rollup
-        ~consume_deserialization_gas
-        ~ctxt
-        ~parameters
-        ~amount
-        ~entrypoint
-        ~payer
-        ~dst_rollup:dst
-        ~since:before_operation
+  | Transaction {destination = Tx_rollup _; _} ->
+      fail Tx_rollup_non_internal_transaction
   | Tx_rollup_withdraw
-      (* FIXME/TORU: #2488 The ticket accounting for the withdraw is not done here *)
       {
         tx_rollup;
         level;
@@ -1415,19 +1426,21 @@ let apply_external_manager_operation_content :
       >>?= fun (ty, ctxt) ->
       Script.force_decode_in_context ~consume_deserialization_gas ctxt contents
       >>?= fun (contents, ctxt) ->
-      Script_ir_translator.unparse_data
+      Script_ir_translator.parse_comparable_ty ctxt (Micheline.root ty)
+      >>?= fun (Ex_comparable_ty contents_type, ctxt) ->
+      Script_ir_translator.parse_comparable_data
         ctxt
-        Optimized
-        Script_typed_ir.address_t
-        {destination = Contract ticketer; entrypoint = Entrypoint.default}
-      >>=? fun (ticketer_node, ctxt) ->
-      Tx_rollup.hash_ticket
+        contents_type
+        (Micheline.root contents)
+      >>=? fun (contents, ctxt) ->
+      let ticket_token =
+        Ticket_token.Ex_token {ticketer; contents_type; contents}
+      in
+      Ticket_balance_key.of_ex_token
         ctxt
-        tx_rollup
-        ~contents:(Micheline.root contents)
-        ~ticketer:(Micheline.root @@ Micheline.strip_locations ticketer_node)
-        ~ty:(Micheline.root ty)
-      >>?= fun (ticket_hash, ctxt) ->
+        ~owner:(Tx_rollup tx_rollup)
+        ticket_token
+      >>=? fun (tx_rollup_ticket_hash, ctxt) ->
       (* Checking the operation is non-internal *)
       Option.value_e
         ~error:
@@ -1437,8 +1450,14 @@ let apply_external_manager_operation_content :
       >>?= fun source_pkh ->
       (* Computing the withdrawal hash *)
       let withdrawal =
-        Tx_rollup_withdraw.{claimer = source_pkh; ticket_hash; amount}
+        Tx_rollup_withdraw.
+          {claimer = source_pkh; ticket_hash = tx_rollup_ticket_hash; amount}
       in
+      (* TODO/TORU: #2340
+
+         We should perform gas accounting when checking the path, but
+         we'll rehaul this part when merkelizing withdrawal list.
+      *)
       let (withdrawals_merkle_root, withdraw_index) =
         Tx_rollup_withdraw.check_path withdraw_path withdrawal
       in
@@ -1457,38 +1476,28 @@ let apply_external_manager_operation_content :
       >>=? fun () ->
       Tx_rollup_withdraw.add ctxt tx_rollup level ~message_index ~withdraw_index
       >>=? fun ctxt ->
-      (* FIXME/TORU: #2488 The ticket accounting for the withdraw should be done here.
-         Before calling the next function we needs to make sure that
-         this ticket is owns by the tx_rollup *)
       (* Now reconstruct the ticket sent as the parameter
           destination. *)
-      Script_ir_translator.parse_comparable_ty ctxt (Micheline.root ty)
-      >>?= fun (Ex_comparable_ty ty, ctxt) ->
-      Script_ir_translator.parse_comparable_data
-        ctxt
-        ty
-        (Micheline.root contents)
-      >>=? fun (contents, ctxt) ->
-      let amount =
-        Option.value
-          ~default:Script_int.zero_n
-          Script_int.(is_nat @@ of_int64 @@ Tx_rollup_l2_qty.to_int64 amount)
-      in
-      let ticket = Script_typed_ir.{ticketer; contents; amount} in
-      Script_typed_ir.ticket_t Micheline.dummy_location ty >>?= fun ty ->
-      return (ticket, ty, ctxt) >>=? fun (ticket, ticket_ty, ctxt) ->
+      Option.value_e
+        ~error:
+          (Error_monad.trace_of_error
+         @@ Tx_rollup_errors.Internal_error
+              "withdraw amount is negative, this can't happens because it \
+               comes from a qty.")
+        Script_int.(is_nat @@ of_int64 @@ Tx_rollup_l2_qty.to_int64 amount)
+      >>?= fun amount_node ->
+      Script_typed_ir.ticket_t Micheline.dummy_location contents_type
+      >>?= fun ticket_ty ->
+      let ticket = Script_typed_ir.{ticketer; contents; amount = amount_node} in
       Script_ir_translator.unparse_data ctxt Optimized ticket_ty ticket
-      >>=? fun (parameters, ctxt) ->
+      >>=? fun (parameters_expr, ctxt) ->
       let parameters =
-        Script.lazy_expr (Micheline.strip_locations parameters)
+        Script.lazy_expr (Micheline.strip_locations parameters_expr)
       in
-      (* FIXME/TORU: #2488 the returned op will fail when ticket hardening is
-         merged, it must be commented or fixed *)
       let op =
         Script_typed_ir.Internal_operation
           {
             source;
-            (* TODO is 0 correct ? *)
             nonce = 0;
             operation =
               Transaction
@@ -1500,15 +1509,45 @@ let apply_external_manager_operation_content :
                       destination = Contract destination;
                       entrypoint;
                     };
-                  location = Micheline.location ticketer_node;
+                  location = Micheline.location parameters_expr;
                   parameters_ty = ticket_ty;
                   parameters = ticket;
                 };
           }
       in
+      (* remove tickets from the tx_rollup and add them to the destination
+         contract *)
+      Ticket_balance_key.of_ex_token
+        ctxt
+        ~owner:(Contract destination)
+        ticket_token
+      >>=? fun (destination_ticket_hash, ctxt) ->
+      Ticket_balance.adjust_balance
+        ctxt
+        tx_rollup_ticket_hash
+        ~delta:(Z.neg @@ Tx_rollup_l2_qty.to_z amount)
+      >>=? fun (_tx_ticket_hash_storage_diff, ctxt) ->
+      Ticket_balance.adjust_balance
+        ctxt
+        destination_ticket_hash
+        ~delta:(Tx_rollup_l2_qty.to_z amount)
+      >>=? fun (_dest_ticket_hash_storage_diff, ctxt) ->
       let result =
         Tx_rollup_withdraw_result
-          {consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt}
+          {
+            balance_updates = [];
+            consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
+            paid_storage_size_diff =
+              (* TODO/TORU: #2339
+
+                 We set [paid_storage_size_diff] to zero for now, it should be something like
+
+                   Z.add _tx_ticket_hash_storage_diff _dest_ticket_hash_storage_diff
+
+                 with the fix of #2339.
+              *)
+              Z.zero;
+          }
       in
       return (ctxt, result, [op])
   | Origination {delegate; script; preorigination; credit} ->
@@ -1966,7 +2005,7 @@ let precheck_manager_contents (type kind) ctxt (op : kind Kind.manager contents)
   (ctxt, {balance_updates; consumed_gas})
 
 (** [burn_storage_fees ctxt smopr storage_limit payer] burns the storage fees
-    associated to the transaction or origination result [smopr].
+    associated to an operation result [smopr].
     Returns an updated context, an updated storage limit with the space consumed
     by the operation subtracted, and [smopr] with the relevant balance updates
     included. *)
@@ -2063,9 +2102,17 @@ let burn_storage_fees :
           Michelson’s big map). *)
   | Tx_rollup_submit_batch_result _ | Tx_rollup_commit_result _
   | Tx_rollup_return_bond_result _ | Tx_rollup_finalize_commitment_result _
-  | Tx_rollup_remove_commitment_result _ | Tx_rollup_rejection_result _
-  | Tx_rollup_withdraw_result _ ->
+  | Tx_rollup_remove_commitment_result _ | Tx_rollup_rejection_result _ ->
       return (ctxt, storage_limit, smopr)
+  | Tx_rollup_withdraw_result payload ->
+      let consumed = payload.paid_storage_size_diff in
+      Fees.burn_storage_fees ctxt ~storage_limit ~payer consumed
+      >>=? fun (ctxt, storage_limit, storage_bus) ->
+      let balance_updates = payload.balance_updates @ storage_bus in
+      return
+        ( ctxt,
+          storage_limit,
+          Tx_rollup_withdraw_result {payload with balance_updates} )
   | Sc_rollup_originate_result payload ->
       Fees.burn_sc_rollup_origination_fees
         ctxt

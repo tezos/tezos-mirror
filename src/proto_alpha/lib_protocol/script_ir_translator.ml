@@ -2336,44 +2336,6 @@ let parse_tx_rollup_l2_address ctxt :
   | expr ->
       error @@ Invalid_kind (location expr, [String_kind; Bytes_kind], kind expr)
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/2035
-   Investigate if separating internal operations from manager
-   operations could make this shenanigan useless.  *)
-let parse_tx_rollup_deposit_parameters :
-    context -> Script.expr -> (Tx_rollup.deposit_parameters * context) tzresult
-    =
- fun ctxt parameters ->
-  (* /!\ This pattern matching needs to remain in sync with the
-     [Tx_rollup] case of [parse_contract] and [parse_contract_for_script]. *)
-  match root parameters with
-  | Seq
-      ( _,
-        [
-          Prim
-            ( _,
-              D_Pair,
-              [
-                Prim
-                  ( _,
-                    D_Pair,
-                    [ticketer; Prim (_, D_Pair, [contents; amount], _)],
-                    _ );
-                bls;
-              ],
-              _ );
-          ty;
-        ] ) ->
-      parse_tx_rollup_l2_address ctxt bls >>? fun (destination, ctxt) ->
-      (match amount with
-      | Int (_, v) when Compare.Z.(Z.zero < v && v <= Z.of_int64 Int64.max_int)
-        ->
-          ok @@ Tx_rollup_l2_qty.of_int64_exn (Z.to_int64 v)
-      | Int (_, v) -> error @@ Tx_rollup_invalid_ticket_amount v
-      | expr -> error @@ Invalid_kind (location expr, [Int_kind], kind expr))
-      >|? fun amount ->
-      (Tx_rollup.{ticketer; contents; ty; amount; destination}, ctxt)
-  | expr -> error @@ Invalid_kind (location expr, [Seq_kind], kind expr)
-
 let parse_never expr : (never * context) tzresult =
   error @@ Invalid_never_expr (location expr)
 

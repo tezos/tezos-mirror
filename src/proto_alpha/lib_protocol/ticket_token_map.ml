@@ -46,7 +46,10 @@ let key_of_ticket_token ctxt (Ticket_token.Ex_token {ticketer; _} as token) =
      for comparing tokens. Since an owner contract is required we use [ticketer]
      but any dummy value would work as long as it's consistent.
   *)
-  Ticket_balance_key.ticket_balance_key ctxt ~owner:ticketer token
+  Ticket_balance_key.of_ex_token
+    ctxt
+    ~owner:(Destination.Contract ticketer)
+    token
 
 let update ctxt key f m =
   key_of_ticket_token ctxt key >>=? fun (key_hash, ctxt) ->

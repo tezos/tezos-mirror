@@ -1,7 +1,9 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
+(* Copyright (c) 2022 Marigold <contact@marigold.dev>                        *)
 (* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 Oxhead Alpha <info@oxheadalpha.com>                    *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,60 +25,25 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** This module is an abstraction on top of int64 to build positive (or zero)
-    quantities within the int64 bounds. It comes with a compact encoding to be
-    used in the transaction rollup batches. *)
+(** A module for representing and extracting typed transactional rollup
+    parameters. *)
 
-(** Type of postive quantities. Quantities are bounded by {!Int64.max_int}. *)
-type t
+(** A type representing deposit parameters for transactional rollups. Deposit
+    parameters consist of a ticket of arbitrary content along with a
+    layer-2 destination address. *)
+type deposit_parameters = {
+  ex_ticket : Ticket_scanner.ex_ticket;
+  l2_destination : Script_typed_ir.tx_rollup_l2_address;
+}
 
-(** The zero quantity. *)
-val zero : t
+(** [get_deposit_parameters ty value] returns [ex_ticket] and a
+    [tx_rollup_l2_address] from a michelson typed value. if [ty] is not of a
+    pair of ticket and [tx_rollup_l2_address] then it fails with
+    [Tx_rollup_errors.Wrong_deposit_parameters].
 
-(** One quantity. *)
-val one : t
-
-(** Build a quantity from an int64. Returns [None] if the argument is negative. *)
-val of_int64 : int64 -> t option
-
-(** Build a quantity from an int64 and raise [Invalid_argument] on negative quantities. *)
-val of_int64_exn : int64 -> t
-
-(** Convert a quantity to [int64]. *)
-val to_int64 : t -> int64
-
-(** Convert a quantity to [z]. *)
-val to_z : t -> Z.t
-
-(** Returns a string representation of a quantity. *)
-val to_string : t -> string
-
-(** Parse a quantity from a string. Returns [None] if the string is not a valid
-   quantity representation. *)
-val of_string : string -> t option
-
-(** Pretty-printer for quantities. *)
-val pp : Format.formatter -> t -> unit
-
-(** Compact encoding for quantities *)
-val compact_encoding : t Data_encoding.Compact.t
-
-(** Encoding for quantities *)
-val encoding : t Data_encoding.t
-
-(** Substract two quantities. Returns [None] on subtraction underflow. *)
-val sub : t -> t -> t option
-
-(** Add two quantities. Returns [None] on addition overflow. *)
-val add : t -> t -> t option
-
-(** Return the [t] successor. Returns [None] on overflow. *)
-val succ : t -> t option
-
-(** Quantities substraction. *)
-val ( - ) : t -> t -> t option
-
-(** Quantities addition. *)
-val ( + ) : t -> t -> t option
-
-include Compare.S with type t := t
+    This function is intended to be used to enforce the type of the transaction
+    to a [tx_rollup%deposit]. It must be used both in [ticket_diffs_of_operations]
+    to account for the ticket deposited and in [apply] to retrieve the ticket
+    when applying the transaction to a tx_rollup. *)
+val get_deposit_parameters :
+  ('a, 'comparable) Script_typed_ir.ty -> 'a -> deposit_parameters tzresult

@@ -27,13 +27,12 @@
 open Alpha_context
 
 (* This function extracts nodes of:
-    - Ticketer
-    - Type of content
-    - Content
-    - Owner
-   to generate at ticket-balance key-hash.
-*)
-let ticket_balance_key ctxt ~owner
+   - Ticketer
+   - Type of content
+   - Content
+   - Owner
+       to generate at ticket-balance key-hash.*)
+let of_ex_token ctxt ~owner
     (Ticket_token.Ex_token {ticketer; contents_type; contents}) =
   let loc = Micheline.dummy_location in
   Script_ir_translator.unparse_comparable_ty ~loc ctxt contents_type
@@ -44,11 +43,17 @@ let ticket_balance_key ctxt ~owner
   Gas.consume ctxt (Script.strip_annotations_cost cont_ty_unstripped)
   >>?= fun ctxt ->
   let ty = Script.strip_annotations cont_ty_unstripped in
-  let ticketer = Destination.Contract ticketer in
+  Script_ir_translator.unparse_comparable_data
+    ~loc
+    ctxt
+    Script_ir_translator.Optimized_legacy
+    contents_type
+    contents
+  >>=? fun (contents, ctxt) ->
   let ticketer_address =
-    Script_typed_ir.{destination = ticketer; entrypoint = Entrypoint.default}
+    Script_typed_ir.
+      {destination = Contract ticketer; entrypoint = Entrypoint.default}
   in
-  let owner = Destination.Contract owner in
   let owner_address =
     Script_typed_ir.{destination = owner; entrypoint = Entrypoint.default}
   in
@@ -58,13 +63,6 @@ let ticket_balance_key ctxt ~owner
     Script_typed_ir.address_t
     ticketer_address
   >>=? fun (ticketer, ctxt) ->
-  Script_ir_translator.unparse_comparable_data
-    ~loc
-    ctxt
-    Script_ir_translator.Optimized_legacy
-    contents_type
-    contents
-  >>=? fun (contents, ctxt) ->
   Script_ir_translator.unparse_data
     ctxt
     Script_ir_translator.Optimized_legacy

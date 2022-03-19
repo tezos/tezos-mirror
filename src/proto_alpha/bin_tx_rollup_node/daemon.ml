@@ -85,14 +85,17 @@ let parse_tx_rollup_l2_address :
   | Int (loc, _) | Prim (loc, _, _, _) | Seq (loc, _) ->
       error (Error.Tx_rollup_invalid_l2_address loc)
 
-(* TODO/TORU: expose uncarbonated parse_tx_rollup_deposit_parameters in protocol *)
-let parse_tx_rollup_deposit_parameters :
-    Script.expr -> Tx_rollup.deposit_parameters tzresult =
+let parse_tx_rollup_amount_l2_destination_parameters :
+    Script.expr ->
+    (Protocol.Tx_rollup_l2_qty.t
+    * Protocol.Script_typed_ir.tx_rollup_l2_address)
+    tzresult =
  fun parameters ->
   let open Micheline in
   let open Protocol in
-  (* /!\ This pattern matching needs to remain in sync with the
-     Script_ir_translator.parse_tx_rollup_deposit_parameters. *)
+  (* /!\ This pattern matching needs to remain in sync with the deposit
+     parameters. See the transaction to Tx_rollup case in
+     Protocol.Apply.Apply.apply_internal_manager_operations *)
   match root parameters with
   | Seq
       ( _,
@@ -104,12 +107,12 @@ let parse_tx_rollup_deposit_parameters :
                 Prim
                   ( _,
                     D_Pair,
-                    [ticketer; Prim (_, D_Pair, [contents; amount], _)],
+                    [_ticketer; Prim (_, D_Pair, [_contents; amount], _)],
                     _ );
                 bls;
               ],
               _ );
-          ty;
+          _ty;
         ] ) ->
       parse_tx_rollup_l2_address bls >>? fun destination ->
       (match amount with
@@ -119,7 +122,7 @@ let parse_tx_rollup_deposit_parameters :
       | Int (_, invalid_amount) ->
           error (Error.Tx_rollup_invalid_ticket_amount invalid_amount)
       | _expr -> error Error.Tx_rollup_invalid_deposit)
-      >|? fun amount -> Tx_rollup.{ticketer; contents; ty; amount; destination}
+      >|? fun amount -> (amount, destination)
   | _expr -> error Error.Tx_rollup_invalid_deposit
 
 let extract_messages_from_block block_info rollup_id =
@@ -154,9 +157,9 @@ let extract_messages_from_block block_info rollup_id =
           (* Deposit message *)
           Option.bind (Data_encoding.force_decode parameters)
           @@ fun parameters ->
-          parse_tx_rollup_deposit_parameters parameters
+          parse_tx_rollup_amount_l2_destination_parameters parameters
           |> Result.to_option
-          |> Option.map @@ fun Tx_rollup.{amount; destination; _} ->
+          |> Option.map @@ fun (amount, destination) ->
              Tx_rollup_message.make_deposit
                source
                destination
