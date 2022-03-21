@@ -35,6 +35,8 @@ module Conf = struct
   let contents_length_header = Some `Varint
 
   let inode_child_order = `Seeded_hash
+
+  let forbid_empty_dir_persistence = true
 end
 
 module Hash : sig
@@ -53,6 +55,8 @@ end = struct
   type t = H.t
 
   let to_raw_string = H.to_raw_string
+
+  let unsafe_of_raw_string s = H.of_raw_string s
 
   let of_context_hash s = H.of_raw_string (Context_hash.to_string s)
 
@@ -74,6 +78,12 @@ end = struct
   let short_hash_string = Irmin.Type.(unstage (short_hash string))
 
   let short_hash ?seed t = short_hash_string ?seed (H.to_raw_string t)
+
+  let hash_size = H.digest_size
+
+  let short_hash_substring t ~off =
+    let str = Bigstringaf.substring t ~off ~len:hash_size in
+    short_hash_string str
 
   let t : t Irmin.Type.t =
     Irmin.Type.map
