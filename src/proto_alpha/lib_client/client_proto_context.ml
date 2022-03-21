@@ -360,13 +360,7 @@ let build_origination_operation ?fee ?gas_limit ?storage_limit ~initial_storage
   >>=? fun {Michelson_v1_parser.expanded = storage; _} ->
   let code = Script.lazy_expr code and storage = Script.lazy_expr storage in
   let origination =
-    Origination
-      {
-        delegate;
-        script = {code; storage};
-        credit = balance;
-        preorigination = None;
-      }
+    Origination {delegate; script = {code; storage}; credit = balance}
   in
   return
     (Injection.prepare_manager_operation

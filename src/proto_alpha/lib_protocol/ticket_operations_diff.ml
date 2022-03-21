@@ -187,8 +187,9 @@ let tickets_of_transaction ctxt ~destination ~entrypoint ~location
           match script_opt with
           | None -> fail (Failed_to_get_script destination)
           | Some script -> return (script, ctxt))
-      >>=? fun (Script_ir_translator.Ex_script {arg_type; entrypoints; _}, ctxt)
-        ->
+      >>=? fun ( Script_ir_translator.Ex_script
+                   (Script {arg_type; entrypoints; _}),
+                 ctxt ) ->
       (* Find the entrypoint type for the given entrypoint. *)
       Gas_monad.run
         ctxt
@@ -219,43 +220,24 @@ let tickets_of_transaction ctxt ~destination ~entrypoint ~location
       return (Some {destination = Contract destination; tickets}, ctxt)
 
 (** Extract tickets of an origination operation by scanning the storage. *)
-let tickets_of_origination ctxt ~preorigination script =
-  match preorigination with
-  | None -> fail Contract_not_originated
-  | Some contract ->
-      (* TODO: #2351
-         Avoid having to parse the script here.
-         We're not able to rely on caching due to issues with lazy storage.
-         After internal operations are in place we should be able to use the
-         typed script directly.
-      *)
-      Script_ir_translator.parse_script
-        ctxt
-        ~legacy:true
-        ~allow_forged_in_storage:true
-        script
-      >>=? fun ( Script_ir_translator.Ex_script
-                   {
-                     storage;
-                     storage_type;
-                     code = _;
-                     arg_type = _;
-                     views = _;
-                     entrypoints = _;
-                     code_size = _;
-                   },
-                 ctxt ) ->
-      (* Extract any tickets from the storage. Note that if the type of the
-         contract storage does not contain tickets, storage is not scanned. *)
-      Ticket_scanner.type_has_tickets ctxt storage_type
-      >>?= fun (has_tickets, ctxt) ->
-      Ticket_scanner.tickets_of_value
-        ctxt
-        ~include_lazy:true
-        has_tickets
-        storage
-      >|=? fun (tickets, ctxt) ->
-      (Some {tickets; destination = Destination.Contract contract}, ctxt)
+let tickets_of_origination ctxt ~preorigination
+    (Script_typed_ir.Script
+      {
+        storage_type;
+        storage;
+        code = _;
+        arg_type = _;
+        views = _;
+        entrypoints = _;
+        code_size = _;
+      }) =
+  (* Extract any tickets from the storage. Note that if the type of the contract
+     storage does not contain tickets, storage is not scanned. *)
+  Ticket_scanner.type_has_tickets ctxt storage_type
+  >>?= fun (has_tickets, ctxt) ->
+  Ticket_scanner.tickets_of_value ctxt ~include_lazy:true has_tickets storage
+  >|=? fun (tickets, ctxt) ->
+  (Some {tickets; destination = Destination.Contract preorigination}, ctxt)
 
 let tickets_of_operation ctxt
     (Script_typed_ir.Internal_operation {source = _; operation; nonce = _}) =
@@ -304,7 +286,12 @@ let tickets_of_operation ctxt
               },
             ctxt )
       else return (None, ctxt)
-  | Origination {delegate = _; script; credit = _; preorigination} ->
+  | Origination
+      {
+        origination = {delegate = _; script = _; credit = _};
+        preorigination;
+        script;
+      } ->
       tickets_of_origination ctxt ~preorigination script
   | Delegation _ -> return (None, ctxt)
 

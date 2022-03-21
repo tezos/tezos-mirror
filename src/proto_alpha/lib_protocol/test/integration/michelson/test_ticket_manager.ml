@@ -84,7 +84,8 @@ let ticket_balance_of_storage ctxt contract =
   match script with
   | None -> return ([], ctxt)
   | Some script ->
-      let* (Script_ir_translator.Ex_script {storage; storage_type; _}, ctxt) =
+      let* ( Script_ir_translator.Ex_script (Script {storage; storage_type; _}),
+             ctxt ) =
         wrap
           (Script_ir_translator.parse_script
              ctxt

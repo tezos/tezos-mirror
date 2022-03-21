@@ -58,8 +58,7 @@ let pp_manager_operation_content (type kind) source internal pp_result ppf
          expr) ;
       pp_result ppf result ;
       Format.fprintf ppf "@]"
-  | Origination {delegate; credit; script = {code; storage}; preorigination = _}
-    ->
+  | Origination {delegate; credit; script = {code; storage}} ->
       Format.fprintf
         ppf
         "@[<v 2>%s:@,From: %a@,Credit: %s%a"

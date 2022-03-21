@@ -921,8 +921,8 @@ let apply_transaction_to_smart_contract ~ctxt ~source ~contract ~amount
     ~entrypoint ~before_operation ~payer ~chain_id ~mode ~internal ~script_ir
     ~script ~parameter ~cache_key ~balance_updates
     ~allocated_destination_contract =
-  (* Token.transfer which is being called above already loads this
-     value into the Irmin cache, so no need to burn gas for it. *)
+  (* Token.transfer which is being called before already loads this value into
+     the Irmin cache, so no need to burn gas for it. *)
   Contract.get_balance ctxt contract >>=? fun balance ->
   let now = Script_timestamp.now ctxt in
   let level =
@@ -1140,8 +1140,8 @@ let apply_transaction_to_tx_rollup ~ctxt ~parameters_ty ~parameters ~amount
     return (ctxt, result, [])
   else fail (Script_tc_errors.No_such_entrypoint entrypoint)
 
-let apply_origination ~consume_deserialization_gas ~ctxt ~script ~internal
-    ~preorigination ~delegate ~source ~credit ~before_operation =
+let apply_origination ~consume_deserialization_gas ~ctxt ~parsed_script ~script
+    ~internal ~contract ~delegate ~source ~credit ~before_operation =
   Script.force_decode_in_context
     ~consume_deserialization_gas
     ctxt
@@ -1152,12 +1152,16 @@ let apply_origination ~consume_deserialization_gas ~ctxt ~script ~internal
     ctxt
     script.Script.code
   >>?= fun (unparsed_code, ctxt) ->
-  Script_ir_translator.parse_script
-    ctxt
-    ~legacy:false
-    ~allow_forged_in_storage:internal
-    script
-  >>=? fun (Ex_script parsed_script, ctxt) ->
+  (match parsed_script with
+  | None ->
+      Script_ir_translator.parse_script
+        ctxt
+        ~legacy:false
+        ~allow_forged_in_storage:internal
+        script
+  | Some parsed_script ->
+      return (Script_ir_translator.Ex_script parsed_script, ctxt))
+  >>=? fun (Ex_script (Script parsed_script), ctxt) ->
   let views_result =
     Script_ir_translator.typecheck_views
       ctxt
@@ -1199,15 +1203,6 @@ let apply_origination ~consume_deserialization_gas ~ctxt ~script ~internal
   Gas.consume ctxt (Script.strip_locations_cost code) >>?= fun ctxt ->
   let code = Script.lazy_expr (Micheline.strip_locations code) in
   let script = {Script.code; storage} in
-  (match preorigination with
-  | Some contract ->
-      assert internal ;
-      (* The preorigination field is only used to early return the address of
-         an originated contract in Michelson.
-         It cannot come from the outside. *)
-      ok (ctxt, contract)
-  | None -> Contract.fresh_contract_from_current_nonce ctxt)
-  >>?= fun (ctxt, contract) ->
   Contract.raw_originate
     ctxt
     ~prepaid_bootstrap_storage:false
@@ -1335,13 +1330,19 @@ let apply_internal_manager_operation_content :
         ~payer
         ~dst_rollup:dst
         ~since:before_operation
-  | Origination {delegate; script; preorigination; credit} ->
+  | Origination
+      {
+        origination = {delegate; script; credit};
+        preorigination = contract;
+        script = parsed_script;
+      } ->
       apply_origination
         ~consume_deserialization_gas
         ~ctxt
+        ~parsed_script:(Some parsed_script)
         ~script
         ~internal
-        ~preorigination
+        ~contract
         ~delegate
         ~source
         ~credit
@@ -1550,13 +1551,19 @@ let apply_external_manager_operation_content :
           }
       in
       return (ctxt, result, [op])
-  | Origination {delegate; script; preorigination; credit} ->
+  | Origination {delegate; script; credit} ->
+      (* The contract is only used to early return the address of an originated
+         contract in Michelson.
+         It cannot come from the outside. *)
+      Contract.fresh_contract_from_current_nonce ctxt
+      >>?= fun (ctxt, contract) ->
       apply_origination
         ~consume_deserialization_gas
         ~ctxt
+        ~parsed_script:None
         ~script
         ~internal
-        ~preorigination
+        ~contract
         ~delegate
         ~source
         ~credit

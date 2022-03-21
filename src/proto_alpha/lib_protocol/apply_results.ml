@@ -81,7 +81,7 @@ let contents_of_internal_operation (type kind)
   let operation : kind internal_manager_operation =
     match operation with
     | Transaction {transaction; _} -> Transaction transaction
-    | Origination origination -> Origination origination
+    | Origination {origination; _} -> Origination origination
     | Delegation delegate -> Delegation delegate
   in
   {source; operation; nonce}
@@ -926,22 +926,10 @@ module Internal_result = struct
           (function Manager (Origination _ as op) -> Some op | _ -> None);
         proj =
           (function
-          | Origination
-              {
-                credit;
-                delegate;
-                script;
-                preorigination =
-                  _
-                  (* the hash is only used internally
-                             when originating from smart
-                             contracts, don't serialize it *);
-                _;
-              } ->
-              (credit, delegate, script));
+          | Origination {credit; delegate; script} -> (credit, delegate, script));
         inj =
           (fun (credit, delegate, script) ->
-            Origination {credit; delegate; script; preorigination = None});
+            Origination {credit; delegate; script});
       }
 
   let[@coq_axiom_with_reason "gadt"] delegation_case =

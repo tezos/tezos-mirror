@@ -330,20 +330,31 @@ let originate_script block ~script ~storage ~src ~baker ~forges_tickets =
   in
   Incremental.finalize_block incr >|=? fun block -> (destination, script, block)
 
-let origination_operation ~src ~script ~orig_contract =
-  Internal_operation
-    {
-      source = src;
-      operation =
-        Origination
-          {
-            delegate = None;
-            script;
-            credit = Tez.one;
-            preorigination = Some orig_contract;
-          };
-      nonce = 1;
-    }
+let origination_operation ctxt ~src ~script ~orig_contract =
+  let open Lwt_tzresult_syntax in
+  let* (Script_ir_translator.Ex_script parsed_script, ctxt) =
+    wrap
+    @@ Script_ir_translator.parse_script
+         ctxt
+         ~legacy:true
+         ~allow_forged_in_storage:true
+         script
+  in
+  let operation =
+    Internal_operation
+      {
+        source = src;
+        operation =
+          Origination
+            {
+              origination = {delegate = None; script; credit = Tez.one};
+              preorigination = orig_contract;
+              script = parsed_script;
+            };
+        nonce = 1;
+      }
+  in
+  return (operation, ctxt)
 
 let originate block ~src ~baker ~script ~storage ~forges_tickets =
   let open Lwt_tzresult_syntax in
@@ -1140,8 +1151,8 @@ let test_update_invalid_origination () =
       ~forges_tickets:true
   in
   let ctxt = Incremental.alpha_ctxt incr in
-  let operation =
-    origination_operation ~src ~orig_contract:destination ~script
+  let* (operation, ctxt) =
+    origination_operation ctxt ~src ~orig_contract:destination ~script
   in
   assert_fail_with
     ~loc:__LOC__
@@ -1184,8 +1195,8 @@ let test_update_valid_origination () =
   let* (_, ctxt) =
     wrap @@ Ticket_balance.adjust_balance ctxt red_self_token_hash ~delta:Z.one
   in
-  let operation =
-    origination_operation ~src:self ~orig_contract:originated ~script
+  let* (operation, ctxt) =
+    origination_operation ctxt ~src:self ~orig_contract:originated ~script
   in
   let* (_, ctxt) =
     let* (ticket_diffs, ctxt) =
@@ -1236,8 +1247,8 @@ let test_update_self_origination () =
          ~owner:(Destination.Contract originated)
          red_token
   in
-  let operation =
-    origination_operation ~src:self ~orig_contract:originated ~script
+  let* (operation, ctxt) =
+    origination_operation ctxt ~src:self ~orig_contract:originated ~script
   in
   let* (_, ctxt) =
     wrap

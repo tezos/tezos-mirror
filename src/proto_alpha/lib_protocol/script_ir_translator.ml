@@ -1801,23 +1801,7 @@ type ('arg, 'storage) code =
     }
       -> ('arg, 'storage) code
 
-type ex_script =
-  | Ex_script : {
-      code :
-        (('arg, 'storage) pair, (operation boxed_list, 'storage) pair) lambda;
-      arg_type : ('arg, _) ty;
-      storage : 'storage;
-      storage_type : ('storage, _) ty;
-      views : view_map;
-      entrypoints : 'arg entrypoints;
-      code_size : Cache_memory_helpers.sint;
-          (* This is an over-approximation of the value size in memory, in
-             bytes, of the contract's static part, that is its source
-             code. This includes the code of the contract as well as the code
-             of the views. The storage size is not taken into account by this
-             field as it has a dynamic size. *)
-    }
-      -> ex_script
+type ex_script = Ex_script : ('a, 'c) Script_typed_ir.script -> ex_script
 
 type ex_code = Ex_code : ('a, 'c) code -> ex_code
 
@@ -5490,7 +5474,8 @@ let[@coq_axiom_with_reason "gadt"] parse_script :
     ~storage
   >|=? fun (storage, ctxt) ->
   ( Ex_script
-      {code_size; code; arg_type; storage; storage_type; views; entrypoints},
+      (Script
+         {code_size; code; arg_type; storage; storage_type; views; entrypoints}),
     ctxt )
 
 let typecheck_code :
@@ -5868,7 +5853,8 @@ and[@coq_axiom_with_reason "gadt"] unparse_code ctxt ~stack_depth mode code =
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/1688
    Refactor the sharing part of unparse_script and create_contract *)
 let unparse_script ctxt mode
-    (Ex_script {code; arg_type; storage; storage_type; entrypoints; views; _}) =
+    (Ex_script
+      (Script {code; arg_type; storage; storage_type; entrypoints; views; _})) =
   let (Lam (_, original_code)) = code in
   Gas.consume ctxt Unparse_costs.unparse_script >>?= fun ctxt ->
   unparse_code ctxt ~stack_depth:0 mode original_code >>=? fun (code, ctxt) ->
@@ -6467,15 +6453,16 @@ let[@coq_axiom_with_reason "gadt"] get_single_sapling_state ctxt ty x =
 *)
 let script_size
     (Ex_script
-      {
-        code_size;
-        code = _;
-        arg_type = _;
-        storage;
-        storage_type;
-        entrypoints = _;
-        views = _;
-      }) =
+      (Script
+        {
+          code_size;
+          code = _;
+          arg_type = _;
+          storage;
+          storage_type;
+          entrypoints = _;
+          views = _;
+        })) =
   let (nodes, storage_size) =
     Script_typed_ir_size.value_size storage_type storage
   in

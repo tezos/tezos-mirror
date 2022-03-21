@@ -591,7 +591,7 @@ let transfer (ctxt, sc) gas amount location parameters_ty parameters destination
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/1688
    Refactor the sharing part of unparse_script and create_contract *)
-let create_contract (ctxt, sc) gas storage_type param_type code views
+let create_contract (ctxt, sc) gas storage_type param_type lambda views
     entrypoints delegate credit init =
   let ctxt = update_context gas ctxt in
   let loc = Micheline.dummy_location in
@@ -612,7 +612,8 @@ let create_contract (ctxt, sc) gas storage_type param_type code views
         [] )
     :: views
   in
-  let views = Script_map.fold view views [] |> List.rev in
+  let view_list = Script_map.fold view views [] |> List.rev in
+  let (Lam (_, code)) = lambda in
   let code =
     strip_locations
       (Seq
@@ -622,7 +623,7 @@ let create_contract (ctxt, sc) gas storage_type param_type code views
              Prim (loc, K_storage, [unparsed_storage_type], []);
              Prim (loc, K_code, [code], []);
            ]
-           @ views ))
+           @ view_list ))
   in
   collect_lazy_storage ctxt storage_type init >>?= fun (to_duplicate, ctxt) ->
   let to_update = no_lazy_storage_id in
@@ -639,15 +640,29 @@ let create_contract (ctxt, sc) gas storage_type param_type code views
   Gas.consume ctxt (Script.strip_locations_cost storage) >>?= fun ctxt ->
   let storage = strip_locations storage in
   Contract.fresh_contract_from_current_nonce ctxt >>?= fun (ctxt, contract) ->
-  let operation =
-    Origination
+  let origination =
+    {
+      credit;
+      delegate;
+      script =
+        {code = Script.lazy_expr code; storage = Script.lazy_expr storage};
+    }
+  in
+  Script_ir_translator.code_size ctxt lambda views >>?= fun (code_size, ctxt) ->
+  let script =
+    Script
       {
-        credit;
-        delegate;
-        preorigination = Some contract;
-        script =
-          {code = Script.lazy_expr code; storage = Script.lazy_expr storage};
+        code = lambda;
+        arg_type = param_type;
+        storage = init;
+        storage_type;
+        views;
+        entrypoints;
+        code_size;
       }
+  in
+  let operation =
+    Origination {origination; preorigination = contract; script}
   in
   fresh_internal_nonce ctxt >>?= fun (ctxt, nonce) ->
   let piop = Internal_operation {source = sc.self; operation; nonce} in

@@ -335,6 +335,19 @@ and 'arg nested_entrypoints =
 (** [no_entrypoints] is [{name = None; nested = Entrypoints_None}] *)
 val no_entrypoints : _ entrypoints
 
+type ('arg, 'storage) script =
+  | Script : {
+      code :
+        (('arg, 'storage) pair, (operation boxed_list, 'storage) pair) lambda;
+      arg_type : ('arg, _) ty;
+      storage : 'storage;
+      storage_type : ('storage, _) ty;
+      views : view_map;
+      entrypoints : 'arg entrypoints;
+      code_size : Cache_memory_helpers.sint;
+    }
+      -> ('arg, 'storage) script
+
 (* ---- Instructions --------------------------------------------------------*)
 
 (*
@@ -436,7 +449,7 @@ val no_entrypoints : _ entrypoints
    [1]: http://www.complang.tuwien.ac.at/projects/interpreters.html
 
  *)
-type ('before_top, 'before, 'result_top, 'result) kinstr =
+and ('before_top, 'before, 'result_top, 'result) kinstr =
   (*
      Stack
      -----
@@ -1520,8 +1533,11 @@ and 'kind manager_operation =
       parameters : 'a;
     }
       -> Kind.transaction manager_operation
-  | Origination :
-      Alpha_context.origination
+  | Origination : {
+      origination : Alpha_context.origination;
+      preorigination : Contract.t;
+      script : ('arg, 'storage) script;
+    }
       -> Kind.origination manager_operation
   | Delegation :
       Signature.Public_key_hash.t option

@@ -324,7 +324,7 @@ let initial_alpha_context ?(commitments = []) constants
       ~legacy:true
       ~allow_forged_in_storage
       script
-    >>=? fun (Ex_script parsed_script, ctxt) ->
+    >>=? fun (Ex_script (Script parsed_script), ctxt) ->
     Script_ir_translator.extract_lazy_storage_diff
       ctxt
       Optimized

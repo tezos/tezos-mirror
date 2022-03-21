@@ -207,7 +207,6 @@ type origination = {
   delegate : Signature.Public_key_hash.t option;
   script : Script_repr.t;
   credit : Tez_repr.tez;
-  preorigination : Contract_repr.t option;
 }
 
 type 'kind operation = {
@@ -547,21 +546,11 @@ module Encoding = struct
             (function Manager (Origination _ as op) -> Some op | _ -> None);
           proj =
             (function
-            | Origination
-                {
-                  credit;
-                  delegate;
-                  script;
-                  preorigination =
-                    _
-                    (* the hash is only used internally
-                               when originating from smart
-                               contracts, don't serialize it *);
-                } ->
+            | Origination {credit; delegate; script} ->
                 (credit, delegate, script));
           inj =
             (fun (credit, delegate, script) ->
-              Origination {credit; delegate; script; preorigination = None});
+              Origination {credit; delegate; script});
         }
 
     let delegation_tag = 3

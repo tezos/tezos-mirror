@@ -231,6 +231,15 @@ let origination_operation block ~src ~baker ~script ~storage ~forges_tickets =
   let* incr =
     Incremental.begin_construction ~policy:Block.(By_account baker) block
   in
+  let ctxt = Incremental.alpha_ctxt incr in
+  let* (Script_ir_translator.Ex_script parsed_script, ctxt) =
+    wrap
+    @@ Script_ir_translator.parse_script
+         ctxt
+         ~legacy:true
+         ~allow_forged_in_storage:true
+         script
+  in
   let operation =
     Script_typed_ir.Internal_operation
       {
@@ -238,14 +247,14 @@ let origination_operation block ~src ~baker ~script ~storage ~forges_tickets =
         operation =
           Origination
             {
-              delegate = None;
-              script;
-              credit = Tez.one;
-              preorigination = Some orig_contract;
+              origination = {delegate = None; script; credit = Tez.one};
+              preorigination = orig_contract;
+              script = parsed_script;
             };
         nonce = 1;
       }
   in
+  let incr = Incremental.set_alpha_ctxt incr ctxt in
   return (orig_contract, operation, incr)
 
 let delegation_operation ~src =

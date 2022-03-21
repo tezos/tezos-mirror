@@ -2688,7 +2688,6 @@ type origination = {
   delegate : Signature.Public_key_hash.t option;
   script : Script.t;
   credit : Tez.tez;
-  preorigination : Contract.t option;
 }
 
 type 'kind operation = {

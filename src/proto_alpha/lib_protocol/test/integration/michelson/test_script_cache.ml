@@ -206,17 +206,17 @@ let test_update_modifies_cached_contract () =
   originate_contract "contracts/int-store.tz" "36" src block baker
   >>=? fun (addr, block) ->
   ( make_block block @! fun ctxt ->
-    find ctxt addr >>=? fun (ctxt, identifier, script, Ex_script ir) ->
+    find ctxt addr >>=? fun (ctxt, identifier, script, Ex_script (Script ir)) ->
     match ir.storage_type with
     | Int_t ->
         let storage' = Script_int.(add ir.storage (Script_int.of_int 1)) in
         let cached_contract' =
-          (script, Ex_script {ir with storage = storage'})
+          (script, Ex_script (Script {ir with storage = storage'}))
         in
         Script_cache.update ctxt identifier cached_contract' 1
         |> Environment.wrap_tzresult
         >>?= fun ctxt ->
-        find ctxt addr >>=? fun (_, _, _, Ex_script ir') ->
+        find ctxt addr >>=? fun (_, _, _, Ex_script (Script ir')) ->
         let storage = value_as_int ir'.storage_type ir'.storage in
         fail_unless
           (Script_int.compare storage storage' = 0)

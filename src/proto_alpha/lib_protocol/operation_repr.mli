@@ -188,7 +188,6 @@ type origination = {
   delegate : Signature.Public_key_hash.t option;
   script : Script_repr.t;
   credit : Tez_repr.tez;
-  preorigination : Contract_repr.t option;
 }
 
 (** An [operation] contains the operation header information in [shell]

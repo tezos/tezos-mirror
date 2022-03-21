@@ -243,7 +243,7 @@ module S = struct
             ~allow_forged_in_storage:true
             script
           >|= fun tzresult ->
-          tzresult >>? fun (Ex_script script, ctxt) ->
+          tzresult >>? fun (Ex_script (Script script), ctxt) ->
           Script_ir_translator.get_single_sapling_state
             ctxt
             script.storage_type
@@ -454,7 +454,7 @@ let[@coq_axiom_with_reason "gadt"] register () =
           let ctxt = Gas.set_unlimited ctxt in
           let open Script_ir_translator in
           parse_script ctxt ~legacy:true ~allow_forged_in_storage:true script
-          >>=? fun (Ex_script script, ctxt) ->
+          >>=? fun (Ex_script (Script script), ctxt) ->
           Script_ir_translator.collect_lazy_storage
             ctxt
             script.storage_type
