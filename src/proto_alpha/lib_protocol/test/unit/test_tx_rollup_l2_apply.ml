@@ -1383,7 +1383,7 @@ let test_invalid_counter () =
     expect_error_status
       ~msg:"the invalid counter must be detected"
       (Tx_rollup_l2_apply.Counter_mismatch
-         {account = addr1; expected = 0L; provided = counter})
+         {account = addr1; expected = 1L; provided = counter})
       status
       return_unit
   in
