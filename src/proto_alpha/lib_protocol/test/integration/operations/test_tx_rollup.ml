@@ -3709,6 +3709,204 @@ module Withdraw = struct
       operation
     >>=? fun _ -> return_unit
 
+  (** [test_multiple_withdrawals_same_batch] checks that multiple
+       withdrawals from the same batch are possible. *)
+  let test_multiple_withdrawals_same_batch () =
+    context_init1_withdraw ()
+    >>=? fun (account1, tx_rollup, deposit_contract, withdraw_contract, b) ->
+    Nat_ticket.withdrawal
+      (B b)
+      ~ticketer:deposit_contract
+      ~claimer:account1
+      ~amount:(Tx_rollup_l2_qty.of_int64_exn 1L)
+      tx_rollup
+    >>=? fun withdraw1 ->
+    Nat_ticket.withdrawal
+      (B b)
+      ~ticketer:deposit_contract
+      ~claimer:account1
+      ~amount:(Tx_rollup_l2_qty.of_int64_exn 2L)
+      tx_rollup
+    >>=? fun withdraw2 ->
+    let withdraws = [withdraw1; withdraw2] in
+    context_finalize_batch_with_withdrawals
+      ~account:account1
+      ~tx_rollup
+      ~withdrawals:[(0, withdraws)]
+      b
+    >>=? fun (_commitment, context_hash_list, b) ->
+    let entrypoint = Entrypoint.default in
+    let context_hash =
+      WithExceptions.Option.get ~loc:__LOC__ @@ List.nth context_hash_list 0
+    in
+    let withdraw_root = Tx_rollup_withdraw.Merkle.merklize_list withdraws in
+    (* Execute withdraw *)
+    let withdraw_op b withdraw_proof qty withdraw_position =
+      Op.tx_rollup_withdraw
+        (B b)
+        ~source:account1
+        tx_rollup
+        Tx_rollup_level.root
+        ~context_hash
+        ~contents:(Script.lazy_expr Nat_ticket.contents)
+        ~ty:(Script.lazy_expr Nat_ticket.ty)
+        ~ticketer:deposit_contract
+        qty
+        ~destination:withdraw_contract
+        ~message_index:0
+        ~withdraw_position
+        withdraw_root
+        withdraw_proof
+        entrypoint
+    in
+    let withdraw_proof =
+      match Tx_rollup_withdraw.Merkle.compute_path withdraws 0 with
+      | Ok x -> x
+      | Error _ -> assert false
+    in
+    withdraw_op b withdraw_proof (Tx_rollup_l2_qty.of_int64_exn 1L) 0
+    >>=? fun operation ->
+    Block.bake ~operation b >>=? fun b ->
+    (* Execute again *)
+    Incremental.begin_construction b >>=? fun i ->
+    withdraw_op b withdraw_proof (Tx_rollup_l2_qty.of_int64_exn 1L) 0
+    >>=? fun operation ->
+    Incremental.add_operation
+      ~expect_failure:
+        (check_proto_error Tx_rollup_errors.Withdraw_already_consumed)
+      i
+      operation
+    >>=? fun _ ->
+    let withdraw_proof =
+      match Tx_rollup_withdraw.Merkle.compute_path withdraws 1 with
+      | Ok x -> x
+      | Error _ -> assert false
+    in
+    (* Execute second withdraw *)
+    withdraw_op b withdraw_proof (Tx_rollup_l2_qty.of_int64_exn 2L) 1
+    >>=? fun operation ->
+    Incremental.add_operation i operation >>=? fun _i -> return_unit
+
+  (** [test_multiple_withdrawals_same_inbox] checks that multiple
+       withdrawals from the same inbox are possible. *)
+  let test_multiple_withdrawals_same_inbox () =
+    context_init1_withdraw ()
+    >>=? fun (account1, tx_rollup, deposit_contract, withdraw_contract, b) ->
+    Nat_ticket.withdrawal
+      (B b)
+      ~ticketer:deposit_contract
+      ~claimer:account1
+      ~amount:(Tx_rollup_l2_qty.of_int64_exn 1L)
+      tx_rollup
+    >>=? fun withdraw1 ->
+    Nat_ticket.withdrawal
+      (B b)
+      ~ticketer:deposit_contract
+      ~claimer:account1
+      ~amount:(Tx_rollup_l2_qty.of_int64_exn 2L)
+      tx_rollup
+    >>=? fun withdraw2 ->
+    Incremental.begin_construction b >>=? fun i ->
+    (* 2. Create a commitment *)
+    make_incomplete_commitment_for_batch i Tx_rollup_level.root tx_rollup []
+    >>=? fun (commitment, _) ->
+    Op.tx_rollup_commit (I i) account1 tx_rollup commitment
+    >>=? fun operation ->
+    Incremental.add_operation i operation >>=? fun i ->
+    (* 1. Submit two batches *)
+    Op.tx_rollup_submit_batch (I i) account1 tx_rollup "batch"
+    >>=? fun operation ->
+    Incremental.add_operation i operation >>=? fun i ->
+    Op.tx_rollup_submit_batch (I i) account1 tx_rollup "batch2"
+    >>=? fun operation ->
+    Incremental.add_operation i operation >>=? fun i ->
+    Incremental.finalize_block i >>=? fun b ->
+    Incremental.begin_construction b >>=? fun i ->
+    (* 2. Create a commitment *)
+    make_incomplete_commitment_for_batch
+      i
+      (tx_level 1l)
+      tx_rollup
+      [(0, [withdraw1]); (1, [withdraw2])]
+    >>=? fun (commitment, context_hash_list) ->
+    Op.tx_rollup_commit (I i) account1 tx_rollup commitment
+    >>=? fun operation ->
+    Incremental.add_operation i operation >>=? fun i ->
+    Incremental.finalize_block i >>=? fun b ->
+    (* 3. Finalize the commitments *)
+    Op.tx_rollup_finalize (B b) account1 tx_rollup >>=? fun operation ->
+    Block.bake ~operation b >>=? fun b ->
+    Op.tx_rollup_finalize (B b) account1 tx_rollup >>=? fun operation ->
+    Block.bake ~operation b >>=? fun b ->
+    let entrypoint = Entrypoint.default in
+    (* Execute withdraw *)
+    let withdraw_op b withdraw_root withdraw_proof qty message_index =
+      let context_hash =
+        WithExceptions.Option.get ~loc:__LOC__
+        @@ List.nth context_hash_list message_index
+      in
+      Op.tx_rollup_withdraw
+        (B b)
+        ~source:account1
+        tx_rollup
+        (tx_level 1l)
+        ~context_hash
+        ~contents:(Script.lazy_expr Nat_ticket.contents)
+        ~ty:(Script.lazy_expr Nat_ticket.ty)
+        ~ticketer:deposit_contract
+        qty
+        ~destination:withdraw_contract
+        ~withdraw_position:0
+        ~message_index
+        withdraw_root
+        withdraw_proof
+        entrypoint
+    in
+    let withdraw_root = Tx_rollup_withdraw.Merkle.merklize_list [withdraw1] in
+    let withdraw_proof =
+      match Tx_rollup_withdraw.Merkle.compute_path [withdraw1] 0 with
+      | Ok x -> x
+      | _ -> assert false
+    in
+    withdraw_op
+      b
+      withdraw_root
+      withdraw_proof
+      (Tx_rollup_l2_qty.of_int64_exn 1L)
+      0
+    >>=? fun operation ->
+    Block.bake ~operation b >>=? fun b ->
+    (* Execute again *)
+    Incremental.begin_construction b >>=? fun i ->
+    withdraw_op
+      b
+      withdraw_root
+      withdraw_proof
+      (Tx_rollup_l2_qty.of_int64_exn 1L)
+      0
+    >>=? fun operation ->
+    Incremental.add_operation
+      ~expect_failure:
+        (check_proto_error Tx_rollup_errors.Withdraw_already_consumed)
+      i
+      operation
+    >>=? fun _ ->
+    (* Execute second withdraw *)
+    let withdraw_root = Tx_rollup_withdraw.Merkle.merklize_list [withdraw2] in
+    let withdraw_proof =
+      match Tx_rollup_withdraw.Merkle.compute_path [withdraw2] 0 with
+      | Ok x -> x
+      | _ -> assert false
+    in
+    withdraw_op
+      b
+      withdraw_root
+      withdraw_proof
+      (Tx_rollup_l2_qty.of_int64_exn 2L)
+      1
+    >>=? fun operation ->
+    Incremental.add_operation i operation >>=? fun _i -> return_unit
+
   (** [test_invalid_withdraw_someone_elses] asserts that attempting to
      execute a withdrawal with an erroneous [recipient] creates an
      incorrect proof.  *)
@@ -4153,6 +4351,14 @@ module Withdraw = struct
         "Test withdraw twice"
         `Quick
         test_invalid_withdraw_already_consumed;
+      Tztest.tztest
+        "Test multiple withdrawals from the same batch"
+        `Quick
+        test_multiple_withdrawals_same_batch;
+      Tztest.tztest
+        "Test multiple withdrawals from the same inbox (but different batches)"
+        `Quick
+        test_multiple_withdrawals_same_inbox;
       Tztest.tztest
         "Test withdraw someone elses's withdraw"
         `Quick
