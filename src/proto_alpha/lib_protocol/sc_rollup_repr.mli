@@ -52,6 +52,10 @@ module Address : sig
   val encoded_size : int
 end
 
+module Internal_for_tests : sig
+  val originated_sc_rollup : Origination_nonce.t -> Address.t
+end
+
 module Commitment_hash : S.HASH
 
 module State_hash : S.HASH

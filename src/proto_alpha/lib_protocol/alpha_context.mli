@@ -2487,6 +2487,10 @@ module Sc_rollup : sig
   val list : context -> t list tzresult Lwt.t
 
   val initial_level : context -> t -> Raw_level_repr.t tzresult Lwt.t
+
+  module Internal_for_tests : sig
+    val originated_sc_rollup : Origination_nonce.Internal_for_tests.t -> t
+  end
 end
 
 module Block_payload : sig

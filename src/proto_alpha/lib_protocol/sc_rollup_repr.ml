@@ -72,6 +72,14 @@ module Address = struct
     | Some nonce -> ok @@ hash_bytes [nonce]
 end
 
+module Internal_for_tests = struct
+  let originated_sc_rollup nonce =
+    let data =
+      Data_encoding.Binary.to_bytes_exn Origination_nonce.encoding nonce
+    in
+    Address.hash_bytes [data]
+end
+
 (* 32 *)
 let commitment_hash_prefix = "\017\144\021\100" (* scc1(54) *)
 

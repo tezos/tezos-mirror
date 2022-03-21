@@ -538,20 +538,6 @@ let tx_rollup_submit_batch ?counter ?fee ?burn_limit ?gas_limit ?storage_limit
   Context.Contract.manager ctxt source >|=? fun account ->
   sign account.sk ctxt to_sign_op
 
-let sc_rollup_origination ?counter ?fee ?gas_limit ?storage_limit ctxt
-    (src : Contract.t) kind boot_sector =
-  manager_operation
-    ?counter
-    ?fee
-    ?gas_limit
-    ?storage_limit
-    ~source:src
-    ctxt
-    (Sc_rollup_originate {kind; boot_sector})
-  >>=? fun to_sign_op ->
-  Context.Contract.manager ctxt src >|=? fun account ->
-  sign account.sk ctxt to_sign_op
-
 let tx_rollup_commit ?counter ?fee ?gas_limit ?storage_limit ctxt
     (source : Contract.t) (tx_rollup : Tx_rollup.t)
     (commitment : Tx_rollup_commitment.t) =
@@ -665,4 +651,52 @@ let tx_rollup_reject ?counter ?fee ?gas_limit ?storage_limit ctxt
        })
   >>=? fun to_sign_op ->
   Context.Contract.manager ctxt source >|=? fun account ->
+  sign account.sk ctxt to_sign_op
+
+let originated_sc_rollup op =
+  let packed = Operation.hash_packed op in
+  let nonce = Origination_nonce.Internal_for_tests.initial packed in
+  Sc_rollup.Internal_for_tests.originated_sc_rollup nonce
+
+let sc_rollup_origination ?counter ?fee ?gas_limit ?storage_limit ctxt
+    (src : Contract.t) kind boot_sector =
+  manager_operation
+    ?counter
+    ?fee
+    ?gas_limit
+    ?storage_limit
+    ~source:src
+    ctxt
+    (Sc_rollup_originate {kind; boot_sector})
+  >>=? fun to_sign_op ->
+  Context.Contract.manager ctxt src >|=? fun account ->
+  let op = sign account.sk ctxt to_sign_op in
+  originated_sc_rollup op |> fun addr -> (op, addr)
+
+let sc_rollup_publish ?counter ?fee ?gas_limit ?storage_limit ctxt
+    (src : Contract.t) rollup commitment =
+  manager_operation
+    ?counter
+    ?fee
+    ?gas_limit
+    ?storage_limit
+    ~source:src
+    ctxt
+    (Sc_rollup_publish {rollup; commitment})
+  >>=? fun to_sign_op ->
+  Context.Contract.manager ctxt src >|=? fun account ->
+  sign account.sk ctxt to_sign_op
+
+let sc_rollup_cement ?counter ?fee ?gas_limit ?storage_limit ctxt
+    (src : Contract.t) rollup commitment =
+  manager_operation
+    ?counter
+    ?fee
+    ?gas_limit
+    ?storage_limit
+    ~source:src
+    ctxt
+    (Sc_rollup_cement {rollup; commitment})
+  >>=? fun to_sign_op ->
+  Context.Contract.manager ctxt src >|=? fun account ->
   sign account.sk ctxt to_sign_op
