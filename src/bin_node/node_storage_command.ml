@@ -57,9 +57,12 @@ module Term = struct
     | Head_commit
 
   let read_config_file config_file =
-    Option.filter Sys.file_exists config_file
-    |> Option.map Node_config_file.read
-    |> Option.value ~default:(return Node_config_file.default_config)
+    let open Lwt_tzresult_syntax in
+    let+ config =
+      Option.filter Sys.file_exists config_file
+      |> Option.map_es Node_config_file.read
+    in
+    Option.value ~default:Node_config_file.default_config config
 
   let ensure_context_dir context_dir =
     let open Lwt_tzresult_syntax in

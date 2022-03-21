@@ -99,6 +99,7 @@ let load_config_from_file (config_file : string) =
     and the command line, and translates the result to
     a value of type [Proxy_server_config.runtime]. *)
 let get_runtime config_from_file config_args =
+  let open Lwt_tzresult_syntax in
   let open Proxy_server_config in
   let config =
     match config_from_file with

@@ -106,18 +106,21 @@ let () =
     (fun (status, body) -> Network_http_error (status, body))
 
 let decode_net_config source json =
-  try
+  let open Tzresult_syntax in
+  match
     Data_encoding.Json.destruct
       Node_config_file.blockchain_network_encoding
       json
-    |> return
   with
-  | Json_encoding.Cannot_destruct (path, exn) ->
+  | net_cfg -> return net_cfg
+  | exception Json_encoding.Cannot_destruct (path, exn) ->
       let path = Json_query.json_pointer_of_path path in
       fail (Invalid_network_config (path, Printexc.to_string exn))
-  | ( Json_encoding.Unexpected _ | Json_encoding.No_case_matched _
-    | Json_encoding.Bad_array_size _ | Json_encoding.Missing_field _
-    | Json_encoding.Unexpected_field _ | Json_encoding.Bad_schema _ ) as exn ->
+  | exception
+      (( Json_encoding.Unexpected _ | Json_encoding.No_case_matched _
+       | Json_encoding.Bad_array_size _ | Json_encoding.Missing_field _
+       | Json_encoding.Unexpected_field _ | Json_encoding.Bad_schema _ ) as exn)
+    ->
       fail (Invalid_network_config (source, Printexc.to_string exn))
 
 let load_net_config =
@@ -136,10 +139,12 @@ let load_net_config =
         | #Cohttp.Code.status_code ->
             fail (Network_http_error (resp.status, body_str))
       in
-      decode_net_config (Uri.to_string uri) netconfig
+      let*? net_config = decode_net_config (Uri.to_string uri) netconfig in
+      return net_config
   | Filename filename ->
       let* netconfig = Lwt_utils_unix.Json.read_file filename in
-      decode_net_config filename netconfig
+      let*? net_config = decode_net_config filename netconfig in
+      return net_config
 
 let wrap data_dir config_file network connections max_download_speed
     max_upload_speed binary_chunks_size peer_table_size listen_addr
@@ -615,6 +620,7 @@ module Term = struct
 end
 
 let read_config_file args =
+  let open Lwt_tzresult_syntax in
   if Sys.file_exists args.config_file then
     Node_config_file.read args.config_file
   else return Node_config_file.default_config

@@ -62,7 +62,8 @@ let data_version = "0.0.7"
 let upgradable_data_version =
   [
     ( "0.0.6",
-      fun ~data_dir:_ _ ~chain_name:_ ~sandbox_parameters:_ -> return_unit );
+      fun ~data_dir:_ _ ~chain_name:_ ~sandbox_parameters:_ ->
+        Lwt_tzresult_syntax.return_unit );
   ]
 
 let version_encoding = Data_encoding.(obj1 (req "version" string))

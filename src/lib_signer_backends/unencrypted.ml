@@ -90,4 +90,4 @@ let deterministic_nonce_hash sk_uri buf =
   let* sk = secret_key sk_uri in
   return (Signature.deterministic_nonce_hash sk buf)
 
-let supports_deterministic_nonces _ = return_true
+let supports_deterministic_nonces _ = Lwt_tzresult_syntax.return_true
