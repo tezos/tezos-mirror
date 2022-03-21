@@ -43,53 +43,63 @@ let encoding : withdrawal Data_encoding.t =
        (req "ticket_hash" Ticket_hash_repr.encoding)
        (req "amount" Tx_rollup_l2_qty.encoding))
 
-module Withdraw_list_hash = struct
-  let withdraw_list_hash = Tx_rollup_prefixes.withdraw_list_hash.b58check_prefix
+module Withdrawal = struct
+  type nonrec t = t
 
-  include
-    Blake2B.Make_merkle_tree
-      (Base58)
-      (struct
-        let name = "Withdraw_list_hash"
-
-        let title = "A hash of withdraw's list"
-
-        let b58check_prefix = withdraw_list_hash
-
-        let size = Some Tx_rollup_prefixes.withdraw_list_hash.hash_size
-      end)
-      (struct
-        type t = withdrawal
-
-        let to_bytes = Data_encoding.Binary.to_bytes_exn encoding
-      end)
-
-  let () =
-    Tx_rollup_prefixes.(check_encoding withdraw_list_hash b58check_encoding)
+  let to_bytes = Data_encoding.Binary.to_bytes_exn encoding
 end
 
-type withdrawals_merkle_root = Withdraw_list_hash.t
+module Prefix = struct
+  let name = "Withdrawal_list_hash"
 
-let withdrawals_merkle_root_encoding = Withdraw_list_hash.encoding
+  let title = "A merkle root hash for withdrawals"
 
-type merkle_tree_path = Withdraw_list_hash.path
+  let b58check_prefix = Tx_rollup_prefixes.withdraw_list_hash.b58check_prefix
 
-let withdrawals_merkle_root_of_b58check_opt = Withdraw_list_hash.of_b58check_opt
+  let size = Some Tx_rollup_prefixes.withdraw_list_hash.hash_size
+end
 
-let merkle_tree_path_encoding = Withdraw_list_hash.path_encoding
+module H = Blake2B.Make (Base58) (Prefix)
 
-let merkelize_list : t list -> withdrawals_merkle_root =
-  Withdraw_list_hash.compute
+module Merkle = struct
+  module Merkle_list = Merkle_list.Make (Withdrawal) (H)
 
-let empty_withdrawals_merkle_root = merkelize_list []
+  type tree = Merkle_list.t
 
-let pp_withdrawals_merkle_root = Withdraw_list_hash.pp
+  type root = Merkle_list.h
 
-let compute_path : t list -> int -> merkle_tree_path =
-  Withdraw_list_hash.compute_path
+  type path = Merkle_list.path
 
-let check_path : merkle_tree_path -> t -> withdrawals_merkle_root * int =
-  Withdraw_list_hash.check_path
+  let nil = Merkle_list.nil
+
+  let empty = Merkle_list.empty
+
+  let root = Merkle_list.root
+
+  let ( = ) = H.( = )
+
+  let compare = H.compare
+
+  let root_encoding = H.encoding
+
+  let root_of_b58check_opt = H.of_b58check_opt
+
+  let pp_root = H.pp
+
+  let path_encoding = Merkle_list.path_encoding
+
+  let tree_of_messages = List.fold_left Merkle_list.snoc Merkle_list.nil
+
+  let check_path = Merkle_list.check_path
+
+  let compute_path messages position =
+    let tree = tree_of_messages messages in
+    Merkle_list.compute_path tree position
+
+  let merklize_list messages =
+    let tree = tree_of_messages messages in
+    root tree
+end
 
 type error += Negative_withdrawal_index of int | Too_big_withdrawal_index of int
 

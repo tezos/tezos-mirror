@@ -1309,7 +1309,9 @@ let apply_external_manager_operation_content :
         level;
         context_hash;
         message_index;
+        withdrawals_merkle_root;
         withdraw_path;
+        withdraw_index;
         contents;
         ty;
         ticketer;
@@ -1342,14 +1344,14 @@ let apply_external_manager_operation_content :
         Tx_rollup_withdraw.
           {claimer = source; ticket_hash = tx_rollup_ticket_hash; amount}
       in
-      (* TODO/TORU: #2340
-
-         We should perform gas accounting when checking the path, but
-         we'll rehaul this part when merkelizing withdrawal list.
-      *)
-      let (withdrawals_merkle_root, withdraw_index) =
-        Tx_rollup_withdraw.check_path withdraw_path withdrawal
-      in
+      Tx_rollup_withdraw.Merkle.check_path
+        withdraw_path
+        withdraw_index
+        withdrawal
+        withdrawals_merkle_root
+      >>?= fun is_path_correct ->
+      fail_unless is_path_correct Tx_rollup_errors.Withdraw_invalid_path
+      >>=? fun () ->
       Tx_rollup_commitment.get_finalized ctxt tx_rollup level
       >>=? fun (ctxt, commitment) ->
       fail_unless

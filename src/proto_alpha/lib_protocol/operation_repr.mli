@@ -388,9 +388,13 @@ and _ manager_operation =
           inbox from where this withdrawal was enabled. *)
       message_index : int;
           (** Index of the message in the inbox at [level] where this withdrawal was enabled. *)
-      withdraw_path : Tx_rollup_withdraw_repr.merkle_tree_path;
+      withdrawals_merkle_root : Tx_rollup_withdraw_repr.Merkle.root;
+          (** The root hash of the list of withdrawals.*)
+      withdraw_path : Tx_rollup_withdraw_repr.Merkle.path;
           (** The proof that this withdraw is indeed included in
               commitment for [tx_rollup] at [level] with [context_hash]. *)
+      withdraw_index : int;
+          (** Index of [withdrawal] in the message result of message at [message_index]. *)
       contents : Script_repr.lazy_expr;  (** Contents of the withdrawn ticket *)
       ty : Script_repr.lazy_expr;
           (** Type of the withdrawn ticket's contents *)

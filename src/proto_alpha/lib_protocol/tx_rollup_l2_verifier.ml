@@ -70,7 +70,7 @@ let hash_message_result after withdraw =
     withdrawals. *)
 let after_hash_when_proof_failed before =
   let open Alpha_context in
-  hash_message_result before Tx_rollup_withdraw.empty_withdrawals_merkle_root
+  hash_message_result before Tx_rollup_withdraw.Merkle.empty
 
 (** [compute_proof_after_hash ~max_proof_size agreed proof message] computes the
     after hash expected while verifying [proof] on [message] starting from
@@ -116,7 +116,7 @@ let compute_proof_after_hash ~max_proof_size parameters agreed proof message =
       return
         (hash_message_result
            tree_hash
-           (Alpha_context.Tx_rollup_withdraw.merkelize_list withdrawals))
+           (Alpha_context.Tx_rollup_withdraw.Merkle.merklize_list withdrawals))
   | Error _ ->
       (* Finally, the proof verification leads to an internal Irmin error *)
       fail Proof_failed_to_reject
