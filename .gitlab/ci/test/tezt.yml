@@ -49,6 +49,15 @@ tezt:build-long:
   script:
     - dune build @tezt/long_tests/check
 
+# Tests tezt itself
+tezt:self_tests:
+  extends:
+    - .build_template
+    - .rules_template__development
+  stage: test
+  script:
+    - dune runtest tezt/self_tests/
+
 # Note: if you reactivate this test and if you keep it manual, put it in the "manual" stage.
 #
 #tezt:manual:migration:
