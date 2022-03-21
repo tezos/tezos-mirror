@@ -79,10 +79,10 @@ module Protocol_constants_overrides = struct
     tx_rollup_max_withdrawals_per_batch : int option;
     tx_rollup_commitment_bond : Tez.t option;
     tx_rollup_finality_period : int option;
-    tx_rollup_max_unfinalized_levels : int option;
+    tx_rollup_max_inboxes_count : int option;
     tx_rollup_withdraw_period : int option;
     tx_rollup_max_messages_per_inbox : int option;
-    tx_rollup_max_finalized_levels : int option;
+    tx_rollup_max_commitments_count : int option;
     tx_rollup_cost_per_byte_ema_factor : int option;
     tx_rollup_max_ticket_payload_size : int option;
     tx_rollup_rejection_max_proof_size : int option;
@@ -145,10 +145,10 @@ module Protocol_constants_overrides = struct
                         c.tx_rollup_max_withdrawals_per_batch,
                         c.tx_rollup_commitment_bond,
                         c.tx_rollup_finality_period,
-                        c.tx_rollup_max_unfinalized_levels,
+                        c.tx_rollup_max_inboxes_count,
                         c.tx_rollup_withdraw_period,
                         c.tx_rollup_max_messages_per_inbox ),
-                      ( c.tx_rollup_max_finalized_levels,
+                      ( c.tx_rollup_max_commitments_count,
                         c.tx_rollup_cost_per_byte_ema_factor,
                         c.tx_rollup_max_ticket_payload_size,
                         c.tx_rollup_rejection_max_proof_size ) ),
@@ -200,10 +200,10 @@ module Protocol_constants_overrides = struct
                            tx_rollup_max_withdrawals_per_batch,
                            tx_rollup_commitment_bond,
                            tx_rollup_finality_period,
-                           tx_rollup_max_unfinalized_levels,
+                           tx_rollup_max_inboxes_count,
                            tx_rollup_withdraw_period,
                            tx_rollup_max_messages_per_inbox ),
-                         ( tx_rollup_max_finalized_levels,
+                         ( tx_rollup_max_commitments_count,
                            tx_rollup_cost_per_byte_ema_factor,
                            tx_rollup_max_ticket_payload_size,
                            tx_rollup_rejection_max_proof_size ) ),
@@ -253,10 +253,10 @@ module Protocol_constants_overrides = struct
           tx_rollup_max_withdrawals_per_batch;
           tx_rollup_commitment_bond;
           tx_rollup_finality_period;
-          tx_rollup_max_unfinalized_levels;
+          tx_rollup_max_inboxes_count;
           tx_rollup_withdraw_period;
           tx_rollup_max_messages_per_inbox;
-          tx_rollup_max_finalized_levels;
+          tx_rollup_max_commitments_count;
           tx_rollup_cost_per_byte_ema_factor;
           tx_rollup_max_ticket_payload_size;
           tx_rollup_rejection_max_proof_size;
@@ -331,11 +331,11 @@ module Protocol_constants_overrides = struct
                               (opt "tx_rollup_max_withdrawals_per_batch" int31)
                               (opt "tx_rollup_commitment_bond" Tez.encoding)
                               (opt "tx_rollup_finality_period" int31)
-                              (opt "tx_rollup_max_unfinalized_levels" int31)
+                              (opt "tx_rollup_max_inboxes_count" int31)
                               (opt "tx_rollup_withdraw_period" int31)
                               (opt "tx_rollup_max_messages_per_inbox" int31))
                            (obj4
-                              (opt "tx_rollup_max_finalized_levels" int31)
+                              (opt "tx_rollup_max_commitments_count" int31)
                               (opt "tx_rollup_cost_per_byte_ema_factor" int31)
                               (opt "tx_rollup_max_ticket_payload_size" int31)
                               (opt "tx_rollup_rejection_max_proof_size" int31)))
@@ -415,13 +415,13 @@ module Protocol_constants_overrides = struct
           Some parametric.tx_rollup_max_withdrawals_per_batch;
         tx_rollup_commitment_bond = Some parametric.tx_rollup_commitment_bond;
         tx_rollup_finality_period = Some parametric.tx_rollup_finality_period;
-        tx_rollup_max_unfinalized_levels =
-          Some parametric.tx_rollup_max_unfinalized_levels;
+        tx_rollup_max_inboxes_count =
+          Some parametric.tx_rollup_max_inboxes_count;
         tx_rollup_withdraw_period = Some parametric.tx_rollup_withdraw_period;
         tx_rollup_max_messages_per_inbox =
           Some parametric.tx_rollup_max_messages_per_inbox;
-        tx_rollup_max_finalized_levels =
-          Some parametric.tx_rollup_max_finalized_levels;
+        tx_rollup_max_commitments_count =
+          Some parametric.tx_rollup_max_commitments_count;
         tx_rollup_cost_per_byte_ema_factor =
           Some parametric.tx_rollup_cost_per_byte_ema_factor;
         tx_rollup_max_ticket_payload_size =
@@ -484,10 +484,10 @@ module Protocol_constants_overrides = struct
       tx_rollup_max_withdrawals_per_batch = None;
       tx_rollup_commitment_bond = None;
       tx_rollup_finality_period = None;
-      tx_rollup_max_unfinalized_levels = None;
+      tx_rollup_max_inboxes_count = None;
       tx_rollup_withdraw_period = None;
       tx_rollup_max_messages_per_inbox = None;
-      tx_rollup_max_finalized_levels = None;
+      tx_rollup_max_commitments_count = None;
       tx_rollup_cost_per_byte_ema_factor = None;
       tx_rollup_max_ticket_payload_size = None;
       tx_rollup_rejection_max_proof_size = None;
@@ -930,10 +930,10 @@ module Protocol_constants_overrides = struct
            Option.value
              ~default:c.tx_rollup_finality_period
              o.tx_rollup_finality_period;
-         tx_rollup_max_unfinalized_levels =
+         tx_rollup_max_inboxes_count =
            Option.value
-             ~default:c.tx_rollup_max_unfinalized_levels
-             o.tx_rollup_max_unfinalized_levels;
+             ~default:c.tx_rollup_max_inboxes_count
+             o.tx_rollup_max_inboxes_count;
          tx_rollup_withdraw_period =
            Option.value
              ~default:c.tx_rollup_withdraw_period
@@ -942,10 +942,10 @@ module Protocol_constants_overrides = struct
            Option.value
              ~default:c.tx_rollup_max_messages_per_inbox
              o.tx_rollup_max_messages_per_inbox;
-         tx_rollup_max_finalized_levels =
+         tx_rollup_max_commitments_count =
            Option.value
-             ~default:c.tx_rollup_max_finalized_levels
-             o.tx_rollup_max_finalized_levels;
+             ~default:c.tx_rollup_max_commitments_count
+             o.tx_rollup_max_commitments_count;
          tx_rollup_cost_per_byte_ema_factor =
            Option.value
              ~default:c.tx_rollup_cost_per_byte_ema_factor

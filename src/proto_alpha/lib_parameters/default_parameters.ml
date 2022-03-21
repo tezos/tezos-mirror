@@ -27,7 +27,7 @@
 
 open Protocol.Alpha_context
 
-let tx_rollup_withdraw_period = 60_000
+let tx_rollup_finality_period = 60_000
 
 let constants_mainnet =
   let consensus_committee_size = 7000 in
@@ -113,13 +113,13 @@ let constants_mainnet =
        withdraw claiming in L1 and cleaned when removing a commitment. *)
     tx_rollup_max_withdrawals_per_batch = 255;
     tx_rollup_commitment_bond = Tez.of_mutez_exn 10_000_000_000L;
-    tx_rollup_finality_period = 2_000;
-    tx_rollup_max_unfinalized_levels = 2_100;
+    tx_rollup_finality_period;
+    tx_rollup_max_inboxes_count = tx_rollup_finality_period + 100;
     (* [60_000] blocks is about two weeks. *)
-    tx_rollup_withdraw_period;
+    tx_rollup_withdraw_period = tx_rollup_finality_period;
     tx_rollup_max_messages_per_inbox = 1_010;
     (* Must be greater than the withdraw period. *)
-    tx_rollup_max_finalized_levels = tx_rollup_withdraw_period + 100;
+    tx_rollup_max_commitments_count = (2 * tx_rollup_finality_period) + 100;
     tx_rollup_cost_per_byte_ema_factor = 120;
     tx_rollup_max_ticket_payload_size = 10_240;
     (* Must be smaller than maximum limit of a manager operation

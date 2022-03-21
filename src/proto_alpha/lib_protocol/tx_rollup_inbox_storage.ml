@@ -80,7 +80,7 @@ let prepare_inbox :
   (* First, check if there are too many inboxes *)
   fail_when
     Compare.Int.(
-      Constants_storage.tx_rollup_max_unfinalized_levels ctxt
+      Constants_storage.tx_rollup_max_inboxes_count ctxt
       <= Tx_rollup_state_repr.inboxes_count state)
     Too_many_inboxes
   >>=? fun () ->

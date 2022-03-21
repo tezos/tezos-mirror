@@ -161,12 +161,12 @@ let check_commitment_batches_and_merkle_root ctxt tx_rollup commitment =
 
 let add_commitment ctxt tx_rollup state pkh commitment =
   let commitment_limit =
-    Constants_storage.tx_rollup_max_finalized_levels ctxt
+    Constants_storage.tx_rollup_max_commitments_count ctxt
   in
   fail_when
     Compare.Int.(
-      Tx_rollup_state_repr.finalized_commitments_count state >= commitment_limit)
-    Too_many_finalized_commitments
+      Tx_rollup_state_repr.commitments_count state >= commitment_limit)
+    Too_many_commitments
   >>=? fun () ->
   (* Check the commitment has the correct values *)
   check_commitment_level state commitment >>?= fun () ->

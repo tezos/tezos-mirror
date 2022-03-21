@@ -100,11 +100,11 @@ val tx_rollup_finality_period : Raw_context.t -> int
 
 val tx_rollup_withdraw_period : Raw_context.t -> int
 
-val tx_rollup_max_unfinalized_levels : Raw_context.t -> int
+val tx_rollup_max_inboxes_count : Raw_context.t -> int
 
 val tx_rollup_max_messages_per_inbox : Raw_context.t -> int
 
-val tx_rollup_max_finalized_levels : Raw_context.t -> int
+val tx_rollup_max_commitments_count : Raw_context.t -> int
 
 val tx_rollup_cost_per_byte_ema_factor : Raw_context.t -> int
 

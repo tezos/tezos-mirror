@@ -178,17 +178,17 @@ let tx_rollup_withdraw_period c =
   let constants = Raw_context.constants c in
   constants.tx_rollup_withdraw_period
 
-let tx_rollup_max_unfinalized_levels c =
+let tx_rollup_max_inboxes_count c =
   let constants = Raw_context.constants c in
-  constants.tx_rollup_max_unfinalized_levels
+  constants.tx_rollup_max_inboxes_count
 
 let tx_rollup_max_messages_per_inbox c =
   let constants = Raw_context.constants c in
   constants.tx_rollup_max_messages_per_inbox
 
-let tx_rollup_max_finalized_levels c =
+let tx_rollup_max_commitments_count c =
   let constants = Raw_context.constants c in
-  constants.tx_rollup_max_finalized_levels
+  constants.tx_rollup_max_commitments_count
 
 let tx_rollup_cost_per_byte_ema_factor c =
   let constants = Raw_context.constants c in

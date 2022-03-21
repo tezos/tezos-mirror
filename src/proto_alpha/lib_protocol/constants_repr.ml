@@ -167,9 +167,9 @@ type parametric = {
   tx_rollup_commitment_bond : Tez_repr.t;
   tx_rollup_finality_period : int;
   tx_rollup_withdraw_period : int;
-  tx_rollup_max_unfinalized_levels : int;
+  tx_rollup_max_inboxes_count : int;
   tx_rollup_max_messages_per_inbox : int;
-  tx_rollup_max_finalized_levels : int;
+  tx_rollup_max_commitments_count : int;
   tx_rollup_cost_per_byte_ema_factor : int;
   tx_rollup_max_ticket_payload_size : int;
   tx_rollup_rejection_max_proof_size : int;
@@ -226,9 +226,9 @@ let parametric_encoding =
                       c.tx_rollup_commitment_bond,
                       c.tx_rollup_finality_period,
                       c.tx_rollup_withdraw_period,
-                      c.tx_rollup_max_unfinalized_levels,
+                      c.tx_rollup_max_inboxes_count,
                       c.tx_rollup_max_messages_per_inbox ),
-                    ( c.tx_rollup_max_finalized_levels,
+                    ( c.tx_rollup_max_commitments_count,
                       c.tx_rollup_cost_per_byte_ema_factor,
                       c.tx_rollup_max_ticket_payload_size,
                       c.tx_rollup_rejection_max_proof_size ) ),
@@ -279,9 +279,9 @@ let parametric_encoding =
                          tx_rollup_commitment_bond,
                          tx_rollup_finality_period,
                          tx_rollup_withdraw_period,
-                         tx_rollup_max_unfinalized_levels,
+                         tx_rollup_max_inboxes_count,
                          tx_rollup_max_messages_per_inbox ),
-                       ( tx_rollup_max_finalized_levels,
+                       ( tx_rollup_max_commitments_count,
                          tx_rollup_cost_per_byte_ema_factor,
                          tx_rollup_max_ticket_payload_size,
                          tx_rollup_rejection_max_proof_size ) ),
@@ -333,9 +333,9 @@ let parametric_encoding =
         tx_rollup_commitment_bond;
         tx_rollup_finality_period;
         tx_rollup_withdraw_period;
-        tx_rollup_max_unfinalized_levels;
+        tx_rollup_max_inboxes_count;
         tx_rollup_max_messages_per_inbox;
-        tx_rollup_max_finalized_levels;
+        tx_rollup_max_commitments_count;
         tx_rollup_cost_per_byte_ema_factor;
         tx_rollup_max_ticket_payload_size;
         tx_rollup_rejection_max_proof_size;
@@ -406,10 +406,10 @@ let parametric_encoding =
                             (req "tx_rollup_commitment_bond" Tez_repr.encoding)
                             (req "tx_rollup_finality_period" int31)
                             (req "tx_rollup_withdraw_period" int31)
-                            (req "tx_rollup_max_unfinalized_levels" int31)
+                            (req "tx_rollup_max_inboxes_count" int31)
                             (req "tx_rollup_max_messages_per_inbox" int31))
                          (obj4
-                            (req "tx_rollup_max_finalized_levels" int31)
+                            (req "tx_rollup_max_commitments_count" int31)
                             (req "tx_rollup_cost_per_byte_ema_factor" int31)
                             (req "tx_rollup_max_ticket_payload_size" int31)
                             (req "tx_rollup_rejection_max_proof_size" int31)))
