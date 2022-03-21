@@ -803,9 +803,12 @@ let update_script_storage_and_ticket_balances ctxt ~self storage
   >>=? fun ctxt ->
   Ticket_accounting.update_ticket_balances ctxt ~self ~ticket_diffs operations
 
-let apply_delegation ~ctxt ~source ~delegate ~since =
+let apply_delegation ~ctxt ~source ~delegate ~before_operation =
   Delegate.set ctxt source delegate >|=? fun ctxt ->
-  (ctxt, Delegation_result {consumed_gas = Gas.consumed ~since ~until:ctxt}, [])
+  ( ctxt,
+    Delegation_result
+      {consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt},
+    [] )
 
 type execution_arg =
   | Typed_arg :
@@ -1267,7 +1270,7 @@ let apply_internal_manager_operation_content :
         ~credit
         ~before_operation
   | Delegation delegate ->
-      apply_delegation ~ctxt ~source ~delegate ~since:before_operation
+      apply_delegation ~ctxt ~source ~delegate ~before_operation
 
 let apply_external_manager_operation_content :
     type kind.
@@ -1473,11 +1476,7 @@ let apply_external_manager_operation_content :
         ~credit
         ~before_operation
   | Delegation delegate ->
-      apply_delegation
-        ~ctxt
-        ~source:source_contract
-        ~delegate
-        ~since:before_operation
+      apply_delegation ~ctxt ~source:source_contract ~delegate ~before_operation
   | Register_global_constant {value} ->
       (* Decode the value and consume gas appropriately *)
       Script.force_decode_in_context ~consume_deserialization_gas ctxt value
