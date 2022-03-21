@@ -138,7 +138,9 @@ let sint_testable : _ Saturation_repr.t Alcotest.testable =
 let tx_rollup_state_testable : Tx_rollup_state.t Alcotest.testable =
   Alcotest.testable Tx_rollup_state.pp ( = )
 
-let wrap m = m >|= Environment.wrap_tzresult
+let wrap = Environment.wrap_tzresult
+
+let wrap_lwt m = m >|= wrap
 
 (** [inbox_burn state size] computes the burn (per byte of message)
     one has to pay to submit a message to the current inbox. *)
@@ -264,9 +266,10 @@ let make_ticket_key ctxt ~ty ~contents ~ticketer tx_rollup =
   let ctxt = Incremental.alpha_ctxt incr in
   Environment.wrap_tzresult @@ Script_ir_translator.parse_comparable_ty ctxt ty
   >>?= fun (Ex_comparable_ty contents_type, ctxt) ->
-  wrap @@ Script_ir_translator.parse_comparable_data ctxt contents_type contents
+  wrap_lwt
+  @@ Script_ir_translator.parse_comparable_data ctxt contents_type contents
   >>=? fun (contents, ctxt) ->
-  wrap
+  wrap_lwt
   @@ Ticket_balance_key.of_ex_token
        ctxt
        ~owner:(Tx_rollup tx_rollup)
@@ -314,7 +317,7 @@ let merkle_root_empty_withdraw_list = Tx_rollup_withdraw.merkelize_list []
    withdraw_list as the construction is expensive *)
 let make_incomplete_commitment_for_batch i level tx_rollup withdraw_list =
   let ctxt = Incremental.alpha_ctxt i in
-  wrap (Alpha_context.Tx_rollup_inbox.get ctxt level tx_rollup)
+  wrap_lwt (Alpha_context.Tx_rollup_inbox.get ctxt level tx_rollup)
   >>=? fun (ctxt, metadata) ->
   List.init ~when_negative_length:[] metadata.inbox_length (fun _ ->
       Tx_rollup_commitment.empty_l2_context_hash)
@@ -334,7 +337,7 @@ let make_incomplete_commitment_for_batch i level tx_rollup withdraw_list =
   (match Tx_rollup_level.pred level with
   | None -> return_none
   | Some predecessor_level -> (
-      wrap (Tx_rollup_commitment.find ctxt tx_rollup predecessor_level)
+      wrap_lwt (Tx_rollup_commitment.find ctxt tx_rollup predecessor_level)
       >|=? function
       | (_, None) -> None
       | (_, Some {commitment; _}) -> Some (Tx_rollup_commitment.hash commitment)
@@ -348,7 +351,7 @@ let make_incomplete_commitment_for_batch i level tx_rollup withdraw_list =
 
 let check_bond ctxt tx_rollup contract count =
   let pkh = is_implicit_exn contract in
-  wrap (Tx_rollup_commitment.pending_bonded_commitments ctxt tx_rollup pkh)
+  wrap_lwt (Tx_rollup_commitment.pending_bonded_commitments ctxt tx_rollup pkh)
   >>=? fun (_, pending) ->
   Alcotest.(check int "Pending bonded commitment count correct" count pending) ;
   return ()
@@ -368,9 +371,9 @@ let assert_retired retired =
 let assert_ticket_balance ~loc block token owner expected =
   Incremental.begin_construction block >>=? fun incr ->
   let ctxt = Incremental.alpha_ctxt incr in
-  wrap @@ Ticket_balance_key.of_ex_token ctxt ~owner token
+  wrap_lwt @@ Ticket_balance_key.of_ex_token ctxt ~owner token
   >>=? fun (key_hash, ctxt) ->
-  wrap (Ticket_balance.get_balance ctxt key_hash) >>=? fun (balance, _) ->
+  wrap_lwt (Ticket_balance.get_balance ctxt key_hash) >>=? fun (balance, _) ->
   match (balance, expected) with
   | (Some b, Some e) -> Assert.equal_int ~loc (Z.to_int b) e
   | (Some b, None) ->
@@ -1213,7 +1216,7 @@ let test_finalization () =
      - The [update_burn_per_byte] is called only on a new inbox
 
      - The [update_burn_per_byte] needs the predecessor inbox, hence
-     it is not called on the first inbox *)
+       it is not called on the first inbox *)
   let expected_state = update_burn_per_byte_n_time (n - 2) state in
   burn_per_byte expected_state >>?= fun expected_burn_per_byte ->
   Context.Tx_rollup.state (B b) tx_rollup >>=? fun state ->
@@ -1292,7 +1295,7 @@ let test_commitment_duplication () =
   Assert.balance_was_debited ~loc:__LOC__ (I i) contract2 balance2 Tez.zero
   >>=? fun () ->
   let ctxt = Incremental.alpha_ctxt i in
-  wrap (Tx_rollup_commitment.find ctxt tx_rollup Tx_rollup_level.root)
+  wrap_lwt (Tx_rollup_commitment.find ctxt tx_rollup Tx_rollup_level.root)
   >>=? fun (_, commitment_opt) ->
   (match commitment_opt with
   | None -> raise (Invalid_argument "No commitment")
@@ -2646,7 +2649,7 @@ let test_state () =
   let message_hash = Tx_rollup_message.hash_uncarbonated message in
   let inbox_hash = Tx_rollup_inbox.Merkle.merklize_list [message_hash] in
   let state = Tx_rollup_state.initial_state in
-  wrap (Tx_rollup_inbox.append_message ctxt tx_rollup state message)
+  wrap_lwt (Tx_rollup_inbox.append_message ctxt tx_rollup state message)
   >>=? fun (ctxt, state) ->
   let append_inbox i ctxt state =
     let i = Incremental.set_alpha_ctxt i ctxt in
@@ -2654,7 +2657,7 @@ let test_state () =
     Incremental.finalize_block i >>=? fun b ->
     Incremental.begin_construction b >>=? fun i ->
     let ctxt = Incremental.alpha_ctxt i in
-    wrap (Tx_rollup_inbox.append_message ctxt tx_rollup state message)
+    wrap_lwt (Tx_rollup_inbox.append_message ctxt tx_rollup state message)
     >|=? fun (ctxt, state) -> (i, ctxt, state)
   in
   append_inbox i ctxt state >>=? fun (i, ctxt, state) ->
@@ -2670,7 +2673,7 @@ let test_state () =
           inbox_merkle_root = inbox_hash;
         }
     in
-    wrap
+    wrap_lwt
       (Tx_rollup_commitment.add_commitment ctxt tx_rollup state pkh commitment)
     >|=? fun (ctxt, state) -> (ctxt, state, commitment)
   in
@@ -2678,7 +2681,7 @@ let test_state () =
   (* Create and reject a commitment at level 0 *)
   add_commitment ctxt state Tx_rollup_level.root None
   >>=? fun (ctxt, state, _) ->
-  wrap (Tx_rollup_commitment.reject_commitment ctxt tx_rollup state level0)
+  wrap_lwt (Tx_rollup_commitment.reject_commitment ctxt tx_rollup state level0)
   >>=? fun (ctxt, state) ->
   Alcotest.(
     check
@@ -2694,7 +2697,7 @@ let test_state () =
   let state_before_reject_1 = state in
   add_commitment ctxt state level1 (Some commitment0_hash)
   >>=? fun (ctxt, state, _) ->
-  wrap (Tx_rollup_commitment.reject_commitment ctxt tx_rollup state level1)
+  wrap_lwt (Tx_rollup_commitment.reject_commitment ctxt tx_rollup state level1)
   >>=? fun (ctxt, state) ->
   Alcotest.(
     check
@@ -2702,7 +2705,7 @@ let test_state () =
       "state unchanged by commit/reject at l1"
       state_before_reject_1
       state) ;
-  wrap
+  wrap_lwt
     (Tx_rollup_commitment.reject_commitment
        ctxt
        tx_rollup
@@ -2718,14 +2721,12 @@ let test_state () =
   (* Now let's try commitments and rejections when there exist some finalized commits. *)
   add_commitment ctxt state level0 None >>=? fun (ctxt, state, commitment0) ->
   let commitment0_hash = Tx_rollup_commitment.hash commitment0 in
-  wrap
-    (Lwt.return
-    @@ Tx_rollup_state.Internal_for_tests.record_inbox_deletion state level0)
-  >>=? fun state ->
+  wrap (Tx_rollup_state.Internal_for_tests.record_inbox_deletion state level0)
+  >>?= fun state ->
   let state_before = state in
   add_commitment ctxt state level1 (Some commitment0_hash)
   >>=? fun (ctxt, state, _commitment1) ->
-  wrap (Tx_rollup_commitment.reject_commitment ctxt tx_rollup state level1)
+  wrap_lwt (Tx_rollup_commitment.reject_commitment ctxt tx_rollup state level1)
   >>=? fun (ctxt, state) ->
   Alcotest.(
     check
@@ -2740,7 +2741,7 @@ let test_state () =
   let level2 = Tx_rollup_level.succ level1 in
   add_commitment ctxt state level2 (Some commitment1_hash)
   >>=? fun (ctxt, state, _commitment2) ->
-  wrap (Tx_rollup_commitment.reject_commitment ctxt tx_rollup state level1)
+  wrap_lwt (Tx_rollup_commitment.reject_commitment ctxt tx_rollup state level1)
   >>=? fun (ctxt, state) ->
   Alcotest.(
     check
@@ -3045,7 +3046,7 @@ module Withdraw = struct
        expected *)
     Incremental.begin_construction block >>=? fun i ->
     let ctxt = Incremental.alpha_ctxt i in
-    wrap @@ Contract.get_storage ctxt withdraw_contract
+    wrap_lwt @@ Contract.get_storage ctxt withdraw_contract
     >>=? fun (_ctxt, found_storage) ->
     Format.printf
       "found_storage %s"
@@ -3114,7 +3115,7 @@ module Withdraw = struct
        expected *)
     Incremental.begin_construction block >>=? fun i ->
     let ctxt = Incremental.alpha_ctxt i in
-    wrap @@ Contract.get_storage ctxt withdraw_dropping_contract
+    wrap_lwt @@ Contract.get_storage ctxt withdraw_dropping_contract
     >>=? fun (_ctxt, found_storage) ->
     let expected_storage = "Unit" |> Expr.from_string |> Option.some in
     (if expected_storage = found_storage then return_unit
