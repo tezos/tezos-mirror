@@ -2,8 +2,8 @@
 gitlab:release:
   extends:
     - .rules_template__release_tag
-  # Mirror of registry.gitlab.com/nomadic-labs/iac/docker/tezos-ci:v1.0.0
-  image: "${AWS_ECR}/tezos-ci:v1.0.0"
+  # https://gitlab.com/tezos/docker-images/ci-release
+  image: "${CI_REGISTRY}/tezos/docker-images/ci-release:v1.0.0"
   stage: publish_release
   dependencies:
     - build:static-x86_64-linux-binaries
