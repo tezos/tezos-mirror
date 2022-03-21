@@ -156,13 +156,14 @@ let burn_per_byte state = inbox_burn state 1
     context and [n] contracts. *)
 let context_init ?(tx_rollup_max_inboxes_count = 2100)
     ?(tx_rollup_rejection_max_proof_size = 30_000)
-    ?(tx_rollup_max_ticket_payload_size = 10_240) n =
+    ?(tx_rollup_max_ticket_payload_size = 10_240)
+    ?(tx_rollup_finality_period = 1) n =
   Context.init_with_constants
     {
       Context.default_test_constants with
       consensus_threshold = 0;
       tx_rollup_enable = true;
-      tx_rollup_finality_period = 1;
+      tx_rollup_finality_period;
       tx_rollup_withdraw_period = 1;
       tx_rollup_max_commitments_count = 3;
       tx_rollup_rejection_max_proof_size;
@@ -178,11 +179,13 @@ let context_init ?(tx_rollup_max_inboxes_count = 2100)
     to not interfere with balances prediction. It returns the created
     context and 1 contract. *)
 let context_init1 ?tx_rollup_max_inboxes_count
-    ?tx_rollup_max_ticket_payload_size ?tx_rollup_rejection_max_proof_size () =
+    ?tx_rollup_max_ticket_payload_size ?tx_rollup_rejection_max_proof_size
+    ?tx_rollup_finality_period () =
   context_init
     ?tx_rollup_max_inboxes_count
     ?tx_rollup_max_ticket_payload_size
     ?tx_rollup_rejection_max_proof_size
+    ?tx_rollup_finality_period
     1
   >|=? function
   | (b, contract_1 :: _) -> (b, contract_1)
@@ -1499,6 +1502,52 @@ let test_bond_finalization () =
   Incremental.finalize_block i >>=? fun b ->
   (* Check the balance*)
   Assert.balance_was_credited ~loc:__LOC__ (B b) contract1 balance bond
+
+(** [test_finalization_edge_cases] tests finalization correctly fails
+    in various edge cases. *)
+let test_finalization_edge_cases () =
+  context_init1 ~tx_rollup_finality_period:2 () >>=? fun (b, contract1) ->
+  originate b contract1 >>=? fun (b, tx_rollup) ->
+  Incremental.begin_construction b >>=? fun i ->
+  Op.tx_rollup_finalize (I i) contract1 tx_rollup >>=? fun op ->
+  (* With no inbox and no commitment *)
+  Incremental.add_operation
+    i
+    op
+    ~expect_failure:
+      (check_proto_error @@ Tx_rollup_errors.No_commitment_to_finalize)
+  >>=? fun _i ->
+  let message = "bogus" in
+  Op.tx_rollup_submit_batch (B b) contract1 tx_rollup message >>=? fun op ->
+  Block.bake ~operation:op b >>=? fun b ->
+  Op.tx_rollup_submit_batch (B b) contract1 tx_rollup message >>=? fun op ->
+  Block.bake ~operation:op b >>=? fun b ->
+  Op.tx_rollup_finalize (B b) contract1 tx_rollup >>=? fun op ->
+  (* With an inbox, but no commitment *)
+  Incremental.begin_construction b >>=? fun i ->
+  Incremental.add_operation
+    i
+    op
+    ~expect_failure:
+      (check_proto_error @@ Tx_rollup_errors.No_commitment_to_finalize)
+  >>=? fun _i ->
+  make_incomplete_commitment_for_batch i (tx_level 0l) tx_rollup []
+  >>=? fun (commitment, _) ->
+  Op.tx_rollup_commit (I i) contract1 tx_rollup commitment >>=? fun op ->
+  (* With a commitment, but too soon after the commitment *)
+  Incremental.add_operation i op >>=? fun i ->
+  Incremental.finalize_block i >>=? fun b ->
+  Incremental.begin_construction b >>=? fun i ->
+  Op.tx_rollup_finalize (I i) contract1 tx_rollup >>=? fun op ->
+  Incremental.add_operation
+    i
+    op
+    ~expect_failure:
+      (check_proto_error @@ Tx_rollup_errors.No_commitment_to_finalize)
+  >>=? fun _i ->
+  Incremental.finalize_block i >>=? fun b ->
+  (* Now our finalization is valid *)
+  Block.bake ~operation:op b >>=? fun _block -> return_unit
 
 (** [test_too_many_commitments] tests that you can't submit new
       commitments if there are too many finalized commitments. *)
@@ -4151,6 +4200,10 @@ let tests =
       "Test too many finalized commitments"
       `Quick
       test_too_many_commitments;
+    Tztest.tztest
+      "Test finalization edge cases"
+      `Quick
+      test_finalization_edge_cases;
     Tztest.tztest "Test bond finalization" `Quick test_bond_finalization;
     Tztest.tztest "Test state" `Quick test_state;
   ]
