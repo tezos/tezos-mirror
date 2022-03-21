@@ -2234,14 +2234,14 @@ module Rejection = struct
       ~proof
       ~previous_message_result
     >>=? fun op ->
-    Incremental.add_operation i op >>= function
-    | Ok _ -> failwith "Expected error, but the operation succeeded"
-    | Error err ->
-        check_proto_error
-          (Tx_rollup_errors.Cannot_reject_level
-             {provided = level; accepted_range = None})
-          err
-        >>=? fun _ -> return_unit
+    Incremental.add_operation
+      i
+      op
+      ~expect_failure:
+        (check_proto_error
+           (Tx_rollup_errors.Cannot_reject_level
+              {provided = level; accepted_range = None}))
+    >>=? fun _ -> return_unit
 
   (** Test that rejection successfully fails when the rejected commitment is
       already final *)
