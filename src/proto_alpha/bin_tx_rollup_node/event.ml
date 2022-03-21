@@ -186,3 +186,48 @@ let new_tezos_head =
     ~msg:"a new tezos head ({tezos_head}) is stored"
     ~level:Notice
     ("tezos_head", Block_hash.encoding)
+
+module Batcher = struct
+  let section = section @ ["batcher"]
+
+  let queue =
+    declare_1
+      ~section
+      ~name:"queue"
+      ~msg:"adding {tr_hash} to queue"
+      ~level:Notice
+      ("tr_hash", L2_transaction.Hash.encoding)
+
+  let batch =
+    declare_2
+      ~section
+      ~name:"batch"
+      ~msg:"batching {nb_transactions} transactions into {nb_batches} batches"
+      ~level:Notice
+      ("nb_batches", Data_encoding.int31)
+      ("nb_transactions", Data_encoding.int31)
+
+  let no_full_batch =
+    declare_0
+      ~section
+      ~name:"no_full_batch"
+      ~msg:"No full batch to inject and we requested so"
+      ~level:Info
+      ()
+
+  let inject =
+    declare_0
+      ~section
+      ~name:"inject"
+      ~msg:"Injecting batches on Tezos node"
+      ~level:Info
+      ()
+
+  let injection_success =
+    declare_1
+      ~section
+      ~name:"injection_success"
+      ~msg:"batches were successfully injected in operation {oph}"
+      ~level:Notice
+      ("oph", Operation_hash.encoding)
+end

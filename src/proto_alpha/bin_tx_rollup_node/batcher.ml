@@ -150,19 +150,25 @@ let get_batches state =
 let batch_and_inject ?(at_least_one_full_batch = false) state =
   let open Lwt_result_syntax in
   let*? (batches, to_remove) = get_batches state in
+  let*! () =
+    Event.(emit Batcher.batch) (List.length batches, List.length to_remove)
+  in
   match batches with
   | [] -> return_none
   | Tx_rollup_l2_batch.(V1 {V1.contents; _}) :: _
     when at_least_one_full_batch
          && List.compare_length_with contents max_batch_transactions < 0 ->
       (* The first batch is not full, and we requested it to be *)
+      let*! () = Event.(emit Batcher.no_full_batch) () in
       return_none
   | _ ->
-      let+ oph = inject_batches state batches in
+      let*! () = Event.(emit Batcher.inject) () in
+      let* oph = inject_batches state batches in
+      let*! () = Event.(emit Batcher.injection_success) oph in
       List.iter
         (fun tr -> Tx_queue.remove state.transactions (L2_transaction.hash tr))
         to_remove ;
-      Some oph
+      return_some oph
 
 let async_batch_and_inject ?at_least_one_full_batch state =
   Lwt.async @@ fun () ->
@@ -197,7 +203,7 @@ let register_transaction ?(eager_batch = false) ?(apply = true) state
   in
   let context = state.incr_context in
   let prev_context = context in
-  let+ (context, result) =
+  let* context =
     if apply then
       let* (new_context, result, _) =
         L2_apply.Batch_V1.apply_batch context state.parameters batch
@@ -215,7 +221,9 @@ let register_transaction ?(eager_batch = false) ?(apply = true) state
       context
     else return context
   in
-  L2_transaction.Hash_queue.add tr ?result state.transactions ;
+  let tr_hash = L2_transaction.hash tr in
+  Tx_queue.replace state.transactions tr_hash tr ;
+  let*! () = Event.(emit Batcher.queue) tr_hash in
   if state.incr_context == prev_context then
     (* Only update internal context if it was not changed due to a head block
        change in the meantime. *)
@@ -224,4 +232,4 @@ let register_transaction ?(eager_batch = false) ?(apply = true) state
     (* TODO/TORU: find better solution as this reduces throughput when we have a
        single key to sign/inject. *)
     async_batch_and_inject ~at_least_one_full_batch:true state ;
-  L2_transaction.hash tr
+  return tr_hash
