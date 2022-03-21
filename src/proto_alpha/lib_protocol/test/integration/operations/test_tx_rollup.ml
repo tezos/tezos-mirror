@@ -4527,6 +4527,29 @@ module Withdraw = struct
       incr
       operation
     >>=? fun _i ->
+    (* 5. try with a hilariously-large message_index.  If permitted,
+         this could cause a stack overflow. *)
+    let wrong_message_index = 1_000_000_000 in
+    Op.tx_rollup_dispatch_tickets
+      (I incr)
+      ~source:account1
+      ~message_index:wrong_message_index
+      ~message_result_path:path2
+      tx_rollup
+      Tx_rollup_level.(succ root)
+      valid_context_hash
+      [ticket_info]
+    >>=? fun operation ->
+    Incremental.add_operation
+      ~expect_failure:
+        (check_proto_error_f @@ function
+         | Tx_rollup_errors.Wrong_rejection_hash
+             {provided = _; expected = `Valid_path (_, idx)} ->
+             Compare.Int.(idx = wrong_message_index)
+         | _ -> false)
+      incr
+      operation
+    >>=? fun _i ->
     (* valid reveal *)
     Op.tx_rollup_dispatch_tickets
       (I incr)
