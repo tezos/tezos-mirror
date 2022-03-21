@@ -218,6 +218,8 @@ module Raw_level : sig
   val to_int32 : raw_level -> int32
 
   val of_int32 : int32 -> raw_level tzresult
+
+  val of_int32_exn : int32 -> raw_level
 end
 
 module Cycle : sig

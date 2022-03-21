@@ -28,7 +28,7 @@
     Component:  Protocol Sc_rollup_storage
     Invocation: dune exec src/proto_alpha/lib_protocol/test/unit/main.exe \
       -- test "^\[Unit\] Sc_rollup_storage.ml$"
-    Subject:    Tests for the gas monad module
+    Subject:    Tests for the SCORU storage module
 *)
 
 open Protocol
@@ -277,6 +277,70 @@ let test_deposit_then_refine_bad_inbox () =
     ~loc:__LOC__
     (Sc_rollup_storage.refine_stake ctxt rollup staker commitment)
     "Attempted to commit to a bad inbox level."
+
+let test_publish () =
+  let* ctxt = new_context () in
+  lift
+  @@ let* (rollup, ctxt) = new_sc_rollup ctxt in
+     let staker =
+       Sc_rollup_repr.Staker.of_b58check_exn
+         "tz1SdKt9kjPp1HRQFkBmXtBhgMfvdgFhSjmG"
+     in
+     let commitment =
+       Sc_rollup_repr.Commitment.
+         {
+           predecessor = Sc_rollup_repr.Commitment_hash.zero;
+           inbox_level = Raw_level_repr.of_int32_exn 21l;
+           number_of_messages = number_of_messages_exn 5l;
+           number_of_ticks = number_of_ticks_exn 152231l;
+           compressed_state = Sc_rollup_repr.State_hash.zero;
+         }
+     in
+     let* (_node, ctxt) =
+       Sc_rollup_storage.publish_commitment ctxt rollup staker commitment
+     in
+     assert_true ctxt
+
+let test_deposit_then_publish () =
+  let* ctxt = new_context () in
+  lift
+  @@ let* (rollup, ctxt) = new_sc_rollup ctxt in
+     let staker =
+       Sc_rollup_repr.Staker.of_b58check_exn
+         "tz1SdKt9kjPp1HRQFkBmXtBhgMfvdgFhSjmG"
+     in
+     let* ctxt = Sc_rollup_storage.deposit_stake ctxt rollup staker in
+     let commitment =
+       Sc_rollup_repr.Commitment.
+         {
+           predecessor = Sc_rollup_repr.Commitment_hash.zero;
+           inbox_level = Raw_level_repr.of_int32_exn 21l;
+           number_of_messages = number_of_messages_exn 5l;
+           number_of_ticks = number_of_ticks_exn 152231l;
+           compressed_state = Sc_rollup_repr.State_hash.zero;
+         }
+     in
+     let* (_node, ctxt) =
+       Sc_rollup_storage.publish_commitment ctxt rollup staker commitment
+     in
+     assert_true ctxt
+
+let test_publish_missing_rollup () =
+  let staker =
+    Sc_rollup_repr.Staker.of_b58check_exn "tz1SdKt9kjPp1HRQFkBmXtBhgMfvdgFhSjmG"
+  in
+  let commitment =
+    Sc_rollup_repr.Commitment.
+      {
+        predecessor = Sc_rollup_repr.Commitment_hash.zero;
+        inbox_level = Raw_level_repr.of_int32_exn 21l;
+        number_of_messages = number_of_messages_exn 3l;
+        number_of_ticks = number_of_ticks_exn 1232909l;
+        compressed_state = Sc_rollup_repr.State_hash.zero;
+      }
+  in
+  assert_fails_with_missing_rollup ~loc:__LOC__ (fun ctxt rollup ->
+      Sc_rollup_storage.publish_commitment ctxt rollup staker commitment)
 
 let test_cement () =
   let* ctxt = new_context () in
@@ -1433,6 +1497,9 @@ let tests =
       `Quick
       test_deposit_then_refine_bad_inbox;
     Tztest.tztest "stake on existing node" `Quick test_stake_on_existing_node;
+    Tztest.tztest "publish commitment" `Quick test_publish;
+    Tztest.tztest "stake then publish" `Quick test_deposit_then_publish;
+    Tztest.tztest "publish with no rollup" `Quick test_publish_missing_rollup;
     Tztest.tztest
       "withdrawal from missing rollup fails"
       `Quick
