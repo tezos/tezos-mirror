@@ -13,8 +13,8 @@
   ringo-lwt
   tezos-base
   tezos-sapling
-  tezos-protocol-environment-sigs
-  tezos-protocol-environment-structs
+  tezos-protocol-environment.sigs
+  tezos-protocol-environment.structs
   tezos-micheline
   tezos-context.memory
   tezos-event-logging)

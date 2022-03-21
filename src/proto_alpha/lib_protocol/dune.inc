@@ -766,7 +766,7 @@ include Tezos_raw_protocol_alpha.Main
  (public_name tezos-protocol-alpha)
  (libraries
       tezos-protocol-environment
-      tezos-protocol-environment-sigs
+      tezos-protocol-environment.sigs
       tezos_raw_protocol_alpha)
  (flags -w "+a-4-40..42-44-45-48"
         -warn-error "+a"
@@ -781,7 +781,7 @@ include Tezos_raw_protocol_alpha.Main
  (public_name tezos-protocol-functor-alpha)
  (libraries
       tezos-protocol-environment
-      tezos-protocol-environment-sigs
+      tezos-protocol-environment.sigs
       tezos-protocol-alpha.raw)
  (flags -w "+a-4-40..42-44-45-48"
         -warn-error "+a"

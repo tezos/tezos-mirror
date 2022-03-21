@@ -90,7 +90,7 @@ include Tezos_raw_protocol_demo_noops.Main
  (public_name tezos-protocol-demo-noops)
  (libraries
       tezos-protocol-environment
-      tezos-protocol-environment-sigs
+      tezos-protocol-environment.sigs
       tezos_raw_protocol_demo_noops)
  (flags -w "+a-4-40..42-44-45-48"
         -warn-error "+a"
@@ -105,7 +105,7 @@ include Tezos_raw_protocol_demo_noops.Main
  (public_name tezos-protocol-functor-demo-noops)
  (libraries
       tezos-protocol-environment
-      tezos-protocol-environment-sigs
+      tezos-protocol-environment.sigs
       tezos-protocol-demo-noops.raw)
  (flags -w "+a-4-40..42-44-45-48"
         -warn-error "+a"

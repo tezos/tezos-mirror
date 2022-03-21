@@ -542,7 +542,7 @@ include Tezos_raw_protocol_012_Psithaca.Main
  (public_name tezos-protocol-012-Psithaca)
  (libraries
       tezos-protocol-environment
-      tezos-protocol-environment-sigs
+      tezos-protocol-environment.sigs
       tezos_raw_protocol_012_Psithaca)
  (flags -w "+a-4-40..42-44-45-48"
         -warn-error "+a"
@@ -557,7 +557,7 @@ include Tezos_raw_protocol_012_Psithaca.Main
  (public_name tezos-protocol-functor-012-Psithaca)
  (libraries
       tezos-protocol-environment
-      tezos-protocol-environment-sigs
+      tezos-protocol-environment.sigs
       tezos-protocol-012-Psithaca.raw)
  (flags -w "+a-4-40..42-44-45-48"
         -warn-error "+a"

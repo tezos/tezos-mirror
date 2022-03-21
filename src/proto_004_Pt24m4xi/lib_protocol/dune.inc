@@ -361,7 +361,7 @@ include Tezos_raw_protocol_004_Pt24m4xi.Main
  (public_name tezos-protocol-004-Pt24m4xi)
  (libraries
       tezos-protocol-environment
-      tezos-protocol-environment-sigs
+      tezos-protocol-environment.sigs
       tezos_raw_protocol_004_Pt24m4xi)
  (flags -w "+a-4-6-7-9-16-29-40..42-44-45-48-60-67-68"
         -warn-error "-A"
@@ -376,7 +376,7 @@ include Tezos_raw_protocol_004_Pt24m4xi.Main
  (public_name tezos-protocol-functor-004-Pt24m4xi)
  (libraries
       tezos-protocol-environment
-      tezos-protocol-environment-sigs
+      tezos-protocol-environment.sigs
       tezos-protocol-004-Pt24m4xi.raw)
  (flags -w "+a-4-6-7-9-16-29-40..42-44-45-48-60-67-68"
         -warn-error "-A"

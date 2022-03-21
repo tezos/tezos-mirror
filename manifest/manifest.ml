@@ -446,6 +446,7 @@ module Opam = struct
     build : build_instruction list;
     synopsis : string;
     url : url option;
+    description : string option;
   }
 
   let pp fmt
@@ -461,6 +462,7 @@ module Opam = struct
         build;
         synopsis;
         url;
+        description;
       } =
     let (depopts, depends) = List.partition (fun dep -> dep.optional) depends in
     let (depopts, conflicts) =
@@ -643,7 +645,8 @@ module Opam = struct
         conflicts ;
     pp_line "%a" (pp_list ~prefix:"build: " pp_build_instruction) build ;
     pp_line "synopsis: %a" pp_string synopsis ;
-    Option.iter pp_url url
+    Option.iter pp_url url ;
+    Option.iter (pp_line "description: %a" pp_string) description
 end
 
 (*****************************************************************************)
@@ -723,6 +726,7 @@ module Target = struct
     static : bool;
     static_cclibs : string list;
     synopsis : string option;
+    description : string option;
     warnings : string option;
     wrapped : bool;
     node_wrapper_flags : string list;
@@ -858,6 +862,7 @@ module Target = struct
     ?static:bool ->
     ?static_cclibs:string list ->
     ?synopsis:string ->
+    ?description:string ->
     ?time_measurement_ppx:bool ->
     ?warnings:string ->
     ?wrapped:bool ->
@@ -875,8 +880,8 @@ module Target = struct
       ?(nopervasives = false) ?(nostdlib = false) ?ocaml ?opam ?(opaque = false)
       ?(opens = []) ?(preprocess = []) ?(preprocessor_deps = [])
       ?(private_modules = []) ?(opam_only_deps = []) ?release ?static
-      ?static_cclibs ?synopsis ?(time_measurement_ppx = false) ?warnings
-      ?(wrapped = true) ?(cram = false) ?action ~path names =
+      ?static_cclibs ?synopsis ?description ?(time_measurement_ppx = false)
+      ?warnings ?(wrapped = true) ?(cram = false) ?action ~path names =
     let conflicts = List.filter_map Fun.id conflicts in
     let deps = List.filter_map Fun.id deps in
     let opam_only_deps = List.filter_map Fun.id opam_only_deps in
@@ -1055,6 +1060,7 @@ module Target = struct
         static;
         static_cclibs;
         synopsis;
+        description;
         node_wrapper_flags;
         warnings;
         wrapped;
@@ -1664,6 +1670,15 @@ let generate_opam ?release this_package (internals : Target.internal list) :
     String.concat " " @@ List.flatten @@ map internals
     @@ fun internal -> Option.to_list internal.synopsis
   in
+  let description =
+    let descriptions =
+      List.filter_map Fun.id @@ map internals
+      @@ fun internal -> internal.description
+    in
+    match descriptions with
+    | [] -> None
+    | descriptions -> Some (String.concat "\n\n" descriptions)
+  in
   let build =
     let build : Opam.build_instruction =
       {
@@ -1707,6 +1722,7 @@ let generate_opam ?release this_package (internals : Target.internal list) :
     build;
     synopsis;
     url = Option.map (fun {url; _} -> url) release;
+    description;
   }
 
 let generate_opam_files () =

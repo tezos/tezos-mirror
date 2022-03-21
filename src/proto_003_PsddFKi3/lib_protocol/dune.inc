@@ -361,7 +361,7 @@ include Tezos_raw_protocol_003_PsddFKi3.Main
  (public_name tezos-protocol-003-PsddFKi3)
  (libraries
       tezos-protocol-environment
-      tezos-protocol-environment-sigs
+      tezos-protocol-environment.sigs
       tezos_raw_protocol_003_PsddFKi3)
  (flags -w "+a-4-6-7-9-16-29-40..42-44-45-48-60-67-68"
         -warn-error "-A"
@@ -376,7 +376,7 @@ include Tezos_raw_protocol_003_PsddFKi3.Main
  (public_name tezos-protocol-functor-003-PsddFKi3)
  (libraries
       tezos-protocol-environment
-      tezos-protocol-environment-sigs
+      tezos-protocol-environment.sigs
       tezos-protocol-003-PsddFKi3.raw)
  (flags -w "+a-4-6-7-9-16-29-40..42-44-45-48-60-67-68"
         -warn-error "-A"

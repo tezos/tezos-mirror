@@ -1495,37 +1495,20 @@ let _tezos_sapling_ctypes_gen =
     ~modules:
       ["rustzcash_ctypes_gen"; "rustzcash_ctypes_bindings"; "gen_runtime_js"]
 
-let tezos_protocol_environment_packer =
-  public_lib
-    "tezos-protocol-environment-packer"
-    ~path:"src/lib_protocol_environment/s_packer"
-    ~opam:"src/lib_protocol_environment/tezos-protocol-environment-packer"
-    ~ocaml:V.(at_least "4.03")
-    ~synopsis:"Tezos: sigs/structs packer for economic protocol environment"
-    ~modules:[]
-
 let tezos_protocol_environment_sigs_stdlib_compat =
   public_lib
-    "tezos-protocol-environment-sigs.stdlib-compat"
-    ~internal_name:"tezos_protocol_environment_sigs_stdlib_compat"
+    "tezos-protocol-environment.sigs.stdlib-compat"
     ~path:"src/lib_protocol_environment/sigs/stdlib_compat"
-    ~opam:"src/lib_protocol_environment/tezos-protocol-environment-sigs"
+    ~opam:"src/lib_protocol_environment/tezos-protocol-environment"
     ~modules_without_implementation:["V_all"; "V2"; "V3"; "V4"]
 
 let tezos_protocol_environment_sigs =
   public_lib
-    "tezos-protocol-environment-sigs"
+    "tezos-protocol-environment.sigs"
     ~path:"src/lib_protocol_environment/sigs"
-    ~opam:"src/lib_protocol_environment/tezos-protocol-environment-sigs"
+    ~opam:"src/lib_protocol_environment/tezos-protocol-environment"
     ~ocaml:V.(at_least "4.12")
-    ~synopsis:"Tezos: restricted typing environment for the economic protocols"
     ~deps:[tezos_protocol_environment_sigs_stdlib_compat]
-    ~opam_only_deps:
-      [
-        (* Build dependency but not for the (library) itself,
-           it's from one of the .inc files. *)
-        tezos_protocol_environment_packer;
-      ]
     ~nopervasives:true
     ~nostdlib:true
     ~modules:["V0"; "V1"; "V2"; "V3"; "V4"; "V5"]
@@ -1542,10 +1525,9 @@ let tezos_protocol_environment_sigs =
 
 let tezos_protocol_environment_structs =
   public_lib
-    "tezos-protocol-environment-structs"
+    "tezos-protocol-environment.structs"
     ~path:"src/lib_protocol_environment/structs"
-    ~opam:"src/lib_protocol_environment/tezos-protocol-environment-structs"
-    ~synopsis:"Tezos: restricted typing environment for the economic protocols"
+    ~opam:"src/lib_protocol_environment/tezos-protocol-environment"
     ~deps:
       [
         tezos_stdlib;
@@ -1553,12 +1535,6 @@ let tezos_protocol_environment_structs =
         tezos_lwt_result_stdlib;
         data_encoding;
         bls12_381_legacy;
-      ]
-    ~opam_only_deps:
-      [
-        (* Build dependency but not for the (library) itself,
-           it's from one of the .inc files. *)
-        tezos_protocol_environment_packer;
       ]
     ~modules:["V0"; "V1"; "V2"; "V3"; "V4"; "V5"]
     ~dune:
@@ -1576,9 +1552,19 @@ let tezos_protocol_environment =
   public_lib
     "tezos-protocol-environment"
     ~path:"src/lib_protocol_environment"
-    ~synopsis:
-      "Tezos: custom economic-protocols environment implementation for \
-       `tezos-client` and testing"
+    ~synopsis:"Interface layer between the protocols and the shell"
+    ~description:
+      {|The protocol-environment is a two-sided component sitting between the shell and
+the protocols.
+
+On one side, it provides a restricted typing environment to compile the
+protocols against. This is a series of modules which replace the standard
+library of OCaml. These modules purposefully omit many functionalities, thus
+preventing the protocols from, say, directly writing to disk.
+
+On the other side, it provides the shell with specific call-sites in the
+protocols. These are the only entry-points into the otherwise black-box
+protocols.|}
     ~deps:
       [
         zarith;
@@ -1680,29 +1666,29 @@ let tezos_protocol_compiler_registerer =
                 S
                   "%{dep:.tezos_protocol_registerer.objs/byte/tezos_protocol_registerer__Registerer.cmi}";
                 S
-                  "%{lib:tezos-protocol-environment-sigs.stdlib-compat:tezos_protocol_environment_sigs_stdlib_compat.cmi}";
+                  "%{lib:tezos-protocol-environment.sigs.stdlib-compat:tezos_protocol_environment_sigs_stdlib_compat.cmi}";
                 S
-                  "%{lib:tezos-protocol-environment-sigs.stdlib-compat:tezos_protocol_environment_sigs_stdlib_compat__V_all.cmi}";
+                  "%{lib:tezos-protocol-environment.sigs.stdlib-compat:tezos_protocol_environment_sigs_stdlib_compat__V_all.cmi}";
                 S
-                  "%{lib:tezos-protocol-environment-sigs.stdlib-compat:tezos_protocol_environment_sigs_stdlib_compat__V2.cmi}";
+                  "%{lib:tezos-protocol-environment.sigs.stdlib-compat:tezos_protocol_environment_sigs_stdlib_compat__V2.cmi}";
                 S
-                  "%{lib:tezos-protocol-environment-sigs.stdlib-compat:tezos_protocol_environment_sigs_stdlib_compat__V3.cmi}";
+                  "%{lib:tezos-protocol-environment.sigs.stdlib-compat:tezos_protocol_environment_sigs_stdlib_compat__V3.cmi}";
                 S
-                  "%{lib:tezos-protocol-environment-sigs.stdlib-compat:tezos_protocol_environment_sigs_stdlib_compat__V4.cmi}";
+                  "%{lib:tezos-protocol-environment.sigs.stdlib-compat:tezos_protocol_environment_sigs_stdlib_compat__V4.cmi}";
                 S
-                  "%{lib:tezos-protocol-environment-sigs:tezos_protocol_environment_sigs.cmi}";
+                  "%{lib:tezos-protocol-environment.sigs:tezos_protocol_environment_sigs.cmi}";
                 S
-                  "%{lib:tezos-protocol-environment-sigs:tezos_protocol_environment_sigs__V0.cmi}";
+                  "%{lib:tezos-protocol-environment.sigs:tezos_protocol_environment_sigs__V0.cmi}";
                 S
-                  "%{lib:tezos-protocol-environment-sigs:tezos_protocol_environment_sigs__V1.cmi}";
+                  "%{lib:tezos-protocol-environment.sigs:tezos_protocol_environment_sigs__V1.cmi}";
                 S
-                  "%{lib:tezos-protocol-environment-sigs:tezos_protocol_environment_sigs__V2.cmi}";
+                  "%{lib:tezos-protocol-environment.sigs:tezos_protocol_environment_sigs__V2.cmi}";
                 S
-                  "%{lib:tezos-protocol-environment-sigs:tezos_protocol_environment_sigs__V3.cmi}";
+                  "%{lib:tezos-protocol-environment.sigs:tezos_protocol_environment_sigs__V3.cmi}";
                 S
-                  "%{lib:tezos-protocol-environment-sigs:tezos_protocol_environment_sigs__V4.cmi}";
+                  "%{lib:tezos-protocol-environment.sigs:tezos_protocol_environment_sigs__V4.cmi}";
                 S
-                  "%{lib:tezos-protocol-environment-sigs:tezos_protocol_environment_sigs__V5.cmi}";
+                  "%{lib:tezos-protocol-environment.sigs:tezos_protocol_environment_sigs__V5.cmi}";
               ];
         ]
 
@@ -3028,14 +3014,14 @@ let _s_packer =
   private_exe
     "s_packer"
     ~path:"src/lib_protocol_environment/s_packer"
-    ~opam:"src/lib_protocol_environment/tezos-protocol-environment-packer"
+    ~opam:"src/lib_protocol_environment/tezos-protocol-environment"
     ~bisect_ppx:false
     ~dune:
       Dune.
         [
           install
             [as_ "s_packer.exe" "s_packer"]
-            ~package:"tezos-protocol-environment-packer"
+            ~package:"tezos-protocol-environment"
             ~section:"libexec";
         ]
 
