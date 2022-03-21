@@ -38,6 +38,10 @@ module Tx_rollup : sig
 
   type inbox = {inbox_length : int; cumulated_size : int; merkle_root : string}
 
+  type message = [`Batch of Hex.t]
+
+  val make_batch : string -> message
+
   val get_state :
     ?hooks:Process.hooks -> rollup:string -> Client.t -> state Process.runnable
 
@@ -66,7 +70,7 @@ module Tx_rollup : sig
 
   val message_hash :
     ?hooks:Process.hooks ->
-    message:[`Batch of string] ->
+    message:message ->
     Client.t ->
     [> `Hash of string] Process.runnable
 
@@ -84,7 +88,7 @@ module Tx_rollup : sig
     JSON.t Process.runnable
 
   val compute_inbox_from_messages :
-    ?hooks:Process.hooks -> [`Batch of string] list -> Client.t -> inbox Lwt.t
+    ?hooks:Process.hooks -> message list -> Client.t -> inbox Lwt.t
 
   module Check : sig
     val state : state Check.typ
