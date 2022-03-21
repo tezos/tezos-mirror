@@ -41,7 +41,7 @@ module Message_result_hash : S.HASH
 
 type message_result = {
   context_hash : Context_hash.t;
-  withdrawals_merkle_root : Tx_rollup_withdraw_repr.withdrawals_merkle_root;
+  withdrawals_merkle_root : Tx_rollup_withdraw_repr.Merkle.root;
 }
 
 val message_result_encoding : message_result Data_encoding.t

@@ -687,8 +687,8 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                         "title": "The hash of a BLS public key used to identify a L2 ticket holders (Base58Check-encoded)",
                         "$ref": "#/definitions/unistring"
                       },
-                      "Withdraw_list_hash": {
-                        "title": "A hash of withdraw's list (Base58Check-encoded)",
+                      "Withdrawal_list_hash": {
+                        "title": "A merkle root hash for withdrawals (Base58Check-encoded)",
                         "$ref": "#/definitions/unistring"
                       },
                       "alpha.block_header.alpha.full_header": {
@@ -2277,7 +2277,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                     "$ref": "#/definitions/Context_hash"
                                   },
                                   "withdrawals_merkle_root": {
-                                    "$ref": "#/definitions/Withdraw_list_hash"
+                                    "$ref": "#/definitions/Withdrawal_list_hash"
                                   }
                                 },
                                 "required": [
@@ -3040,46 +3040,19 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 "minimum": -1073741824,
                                 "maximum": 1073741823
                               },
+                              "withdrawals_merkle_root": {
+                                "$ref": "#/definitions/Withdrawal_list_hash"
+                              },
                               "withdraw_path": {
-                                "oneOf": [
-                                  {
-                                    "title": "Left",
-                                    "type": "object",
-                                    "properties": {
-                                      "path": {
-                                        "$ref": "#/definitions/path"
-                                      },
-                                      "right": {
-                                        "$ref": "#/definitions/Withdraw_list_hash"
-                                      }
-                                    },
-                                    "required": [
-                                      "right",
-                                      "path"
-                                    ],
-                                    "additionalProperties": false
-                                  },
-                                  {
-                                    "title": "Right",
-                                    "type": "object",
-                                    "properties": {
-                                      "left": {
-                                        "$ref": "#/definitions/Withdraw_list_hash"
-                                      },
-                                      "path": {
-                                        "$ref": "#/definitions/path"
-                                      }
-                                    },
-                                    "required": [
-                                      "path",
-                                      "left"
-                                    ],
-                                    "additionalProperties": false
-                                  },
-                                  {
-                                    "title": "Op"
-                                  }
-                                ]
+                                "type": "array",
+                                "items": {
+                                  "$ref": "#/definitions/Withdrawal_list_hash"
+                                }
+                              },
+                              "withdraw_position": {
+                                "type": "integer",
+                                "minimum": -1073741824,
+                                "maximum": 1073741823
                               },
                               "ticket_contents": {
                                 "oneOf": [
@@ -3334,7 +3307,9 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                               "ticket_ticketer",
                               "ticket_ty",
                               "ticket_contents",
+                              "withdraw_position",
                               "withdraw_path",
+                              "withdrawals_merkle_root",
                               "message_index",
                               "context_hash",
                               "level",
@@ -3776,47 +3751,6 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                               "prim"
                             ],
                             "additionalProperties": false
-                          }
-                        ]
-                      },
-                      "path": {
-                        "oneOf": [
-                          {
-                            "title": "Left",
-                            "type": "object",
-                            "properties": {
-                              "path": {
-                                "$ref": "#/definitions/path"
-                              },
-                              "right": {
-                                "$ref": "#/definitions/Withdraw_list_hash"
-                              }
-                            },
-                            "required": [
-                              "right",
-                              "path"
-                            ],
-                            "additionalProperties": false
-                          },
-                          {
-                            "title": "Right",
-                            "type": "object",
-                            "properties": {
-                              "left": {
-                                "$ref": "#/definitions/Withdraw_list_hash"
-                              },
-                              "path": {
-                                "$ref": "#/definitions/path"
-                              }
-                            },
-                            "required": [
-                              "path",
-                              "left"
-                            ],
-                            "additionalProperties": false
-                          },
-                          {
-                            "title": "Op"
                           }
                         ]
                       },
@@ -4686,7 +4620,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 {
                                   "name": "parameters",
                                   "layout": {
-                                    "name": "X_138",
+                                    "name": "X_135",
                                     "kind": "Ref"
                                   },
                                   "data_kind": {
@@ -5351,7 +5285,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 {
                                   "name": "commitment",
                                   "layout": {
-                                    "name": "X_136",
+                                    "name": "X_133",
                                     "kind": "Ref"
                                   },
                                   "data_kind": {
@@ -5714,7 +5648,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 {
                                   "name": "message",
                                   "layout": {
-                                    "name": "X_9",
+                                    "name": "X_6",
                                     "kind": "Ref"
                                   },
                                   "data_kind": {
@@ -5754,7 +5688,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 {
                                   "name": "previous_message_result",
                                   "layout": {
-                                    "name": "X_10",
+                                    "name": "X_7",
                                     "kind": "Ref"
                                   },
                                   "data_kind": {
@@ -5766,7 +5700,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 {
                                   "name": "proof",
                                   "layout": {
-                                    "name": "X_135",
+                                    "name": "X_132",
                                     "kind": "Ref"
                                   },
                                   "data_kind": {
@@ -5896,13 +5830,44 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                   "kind": "named"
                                 },
                                 {
-                                  "name": "withdraw_path",
+                                  "name": "withdrawals_merkle_root",
                                   "layout": {
-                                    "name": "path",
-                                    "kind": "Ref"
+                                    "kind": "Bytes"
                                   },
                                   "data_kind": {
-                                    "kind": "Dynamic"
+                                    "size": 32,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "kind": "dyn",
+                                  "num_fields": 1,
+                                  "size": "Uint30"
+                                },
+                                {
+                                  "name": "withdraw_path",
+                                  "layout": {
+                                    "layout": {
+                                      "kind": "Bytes"
+                                    },
+                                    "kind": "Seq"
+                                  },
+                                  "data_kind": {
+                                    "kind": "Variable"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "withdraw_position",
+                                  "layout": {
+                                    "min": -1073741824,
+                                    "max": 1073741823,
+                                    "kind": "RangedInt"
+                                  },
+                                  "data_kind": {
+                                    "size": 4,
+                                    "kind": "Float"
                                   },
                                   "kind": "named"
                                 },
@@ -5951,7 +5916,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 {
                                   "name": "ticket_amount",
                                   "layout": {
-                                    "name": "X_8",
+                                    "name": "X_5",
                                     "kind": "Ref"
                                   },
                                   "data_kind": {
@@ -6973,7 +6938,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "X_138"
+                          "title": "X_135"
                         },
                         "encoding": {
                           "fields": [
@@ -7356,7 +7321,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "X_136"
+                          "title": "X_133"
                         },
                         "encoding": {
                           "fields": [
@@ -7393,7 +7358,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                             {
                               "name": "predecessor",
                               "layout": {
-                                "name": "X_137",
+                                "name": "X_134",
                                 "kind": "Ref"
                               },
                               "data_kind": {
@@ -7417,7 +7382,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "X_137"
+                          "title": "X_134"
                         },
                         "encoding": {
                           "tag_size": "Uint8",
@@ -7487,7 +7452,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "X_135"
+                          "title": "X_132"
                         },
                         "encoding": {
                           "tag_size": "Uint8",
@@ -7543,7 +7508,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 },
                                 {
                                   "layout": {
-                                    "name": "X_11",
+                                    "name": "X_8",
                                     "kind": "Ref"
                                   },
                                   "kind": "anon",
@@ -7602,7 +7567,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 },
                                 {
                                   "layout": {
-                                    "name": "X_11",
+                                    "name": "X_8",
                                     "kind": "Ref"
                                   },
                                   "kind": "anon",
@@ -7661,7 +7626,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 },
                                 {
                                   "layout": {
-                                    "name": "X_11",
+                                    "name": "X_8",
                                     "kind": "Ref"
                                   },
                                   "kind": "anon",
@@ -7720,7 +7685,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 },
                                 {
                                   "layout": {
-                                    "name": "X_11",
+                                    "name": "X_8",
                                     "kind": "Ref"
                                   },
                                   "kind": "anon",
@@ -7736,7 +7701,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "X_134"
+                          "title": "X_131"
                         },
                         "encoding": {
                           "tag_size": "Uint8",
@@ -7772,7 +7737,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 },
                                 {
                                   "layout": {
-                                    "name": "X_133",
+                                    "name": "X_130",
                                     "kind": "Ref"
                                   },
                                   "kind": "anon",
@@ -7812,7 +7777,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 },
                                 {
                                   "layout": {
-                                    "name": "X_133",
+                                    "name": "X_130",
                                     "kind": "Ref"
                                   },
                                   "kind": "anon",
@@ -7852,7 +7817,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 },
                                 {
                                   "layout": {
-                                    "name": "X_133",
+                                    "name": "X_130",
                                     "kind": "Ref"
                                   },
                                   "kind": "anon",
@@ -7892,7 +7857,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 },
                                 {
                                   "layout": {
-                                    "name": "X_133",
+                                    "name": "X_130",
                                     "kind": "Ref"
                                   },
                                   "kind": "anon",
@@ -7932,7 +7897,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 },
                                 {
                                   "layout": {
-                                    "name": "X_129",
+                                    "name": "X_126",
                                     "kind": "Ref"
                                   },
                                   "kind": "anon",
@@ -7972,7 +7937,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 },
                                 {
                                   "layout": {
-                                    "name": "X_129",
+                                    "name": "X_126",
                                     "kind": "Ref"
                                   },
                                   "kind": "anon",
@@ -8012,7 +7977,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 },
                                 {
                                   "layout": {
-                                    "name": "X_129",
+                                    "name": "X_126",
                                     "kind": "Ref"
                                   },
                                   "kind": "anon",
@@ -8052,7 +8017,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 },
                                 {
                                   "layout": {
-                                    "name": "X_129",
+                                    "name": "X_126",
                                     "kind": "Ref"
                                   },
                                   "kind": "anon",
@@ -8092,7 +8057,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 },
                                 {
                                   "layout": {
-                                    "name": "X_129",
+                                    "name": "X_126",
                                     "kind": "Ref"
                                   },
                                   "kind": "anon",
@@ -8132,7 +8097,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 },
                                 {
                                   "layout": {
-                                    "name": "X_129",
+                                    "name": "X_126",
                                     "kind": "Ref"
                                   },
                                   "kind": "anon",
@@ -8172,7 +8137,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 },
                                 {
                                   "layout": {
-                                    "name": "X_129",
+                                    "name": "X_126",
                                     "kind": "Ref"
                                   },
                                   "kind": "anon",
@@ -8212,7 +8177,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 },
                                 {
                                   "layout": {
-                                    "name": "X_129",
+                                    "name": "X_126",
                                     "kind": "Ref"
                                   },
                                   "kind": "anon",
@@ -8252,7 +8217,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 },
                                 {
                                   "layout": {
-                                    "name": "X_121",
+                                    "name": "X_118",
                                     "kind": "Ref"
                                   },
                                   "kind": "anon",
@@ -8292,7 +8257,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 },
                                 {
                                   "layout": {
-                                    "name": "X_121",
+                                    "name": "X_118",
                                     "kind": "Ref"
                                   },
                                   "kind": "anon",
@@ -8332,7 +8297,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 },
                                 {
                                   "layout": {
-                                    "name": "X_121",
+                                    "name": "X_118",
                                     "kind": "Ref"
                                   },
                                   "kind": "anon",
@@ -8372,7 +8337,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 },
                                 {
                                   "layout": {
-                                    "name": "X_121",
+                                    "name": "X_118",
                                     "kind": "Ref"
                                   },
                                   "kind": "anon",
@@ -8430,7 +8395,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 {
                                   "layout": {
                                     "layout": {
-                                      "name": "X_16",
+                                      "name": "X_13",
                                       "kind": "Ref"
                                     },
                                     "kind": "Seq",
@@ -8465,7 +8430,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 {
                                   "layout": {
                                     "layout": {
-                                      "name": "X_16",
+                                      "name": "X_13",
                                       "kind": "Ref"
                                     },
                                     "kind": "Seq",
@@ -8505,7 +8470,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 {
                                   "layout": {
                                     "layout": {
-                                      "name": "X_16",
+                                      "name": "X_13",
                                       "kind": "Ref"
                                     },
                                     "kind": "Seq"
@@ -8642,7 +8607,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 },
                                 {
                                   "layout": {
-                                    "name": "X_116",
+                                    "name": "X_113",
                                     "kind": "Ref"
                                   },
                                   "kind": "anon",
@@ -8691,7 +8656,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 },
                                 {
                                   "layout": {
-                                    "name": "X_116",
+                                    "name": "X_113",
                                     "kind": "Ref"
                                   },
                                   "kind": "anon",
@@ -8740,7 +8705,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 },
                                 {
                                   "layout": {
-                                    "name": "X_116",
+                                    "name": "X_113",
                                     "kind": "Ref"
                                   },
                                   "kind": "anon",
@@ -8789,7 +8754,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 },
                                 {
                                   "layout": {
-                                    "name": "X_116",
+                                    "name": "X_113",
                                     "kind": "Ref"
                                   },
                                   "kind": "anon",
@@ -8815,7 +8780,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "X_133"
+                          "title": "X_130"
                         },
                         "encoding": {
                           "fields": []
@@ -8823,7 +8788,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "X_129"
+                          "title": "X_126"
                         },
                         "encoding": {
                           "fields": [
@@ -8842,7 +8807,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "X_121"
+                          "title": "X_118"
                         },
                         "encoding": {
                           "fields": [
@@ -8871,7 +8836,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "X_117"
+                          "title": "X_114"
                         },
                         "encoding": {
                           "tag_size": "Uint8",
@@ -8943,7 +8908,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "X_116"
+                          "title": "X_113"
                         },
                         "encoding": {
                           "fields": [
@@ -8966,7 +8931,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "X_11"
+                          "title": "X_8"
                         },
                         "encoding": {
                           "fields": [
@@ -8978,7 +8943,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                             {
                               "layout": {
                                 "layout": {
-                                  "name": "X_134",
+                                  "name": "X_131",
                                   "kind": "Ref"
                                 },
                                 "kind": "Seq"
@@ -8993,13 +8958,13 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "X_16"
+                          "title": "X_13"
                         },
                         "encoding": {
                           "fields": [
                             {
                               "layout": {
-                                "name": "X_116",
+                                "name": "X_113",
                                 "kind": "Ref"
                               },
                               "kind": "anon",
@@ -9009,7 +8974,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                             },
                             {
                               "layout": {
-                                "name": "X_117",
+                                "name": "X_114",
                                 "kind": "Ref"
                               },
                               "kind": "anon",
@@ -9023,7 +8988,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "X_10"
+                          "title": "X_7"
                         },
                         "encoding": {
                           "fields": [
@@ -9054,7 +9019,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "X_9"
+                          "title": "X_6"
                         },
                         "encoding": {
                           "tag_size": "Uint8",
@@ -9113,7 +9078,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 {
                                   "name": "deposit",
                                   "layout": {
-                                    "name": "X_7",
+                                    "name": "X_4",
                                     "kind": "Ref"
                                   },
                                   "data_kind": {
@@ -9129,7 +9094,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "X_7"
+                          "title": "X_4"
                         },
                         "encoding": {
                           "fields": [
@@ -9170,7 +9135,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                             {
                               "name": "amount",
                               "layout": {
-                                "name": "X_8",
+                                "name": "X_5",
                                 "kind": "Ref"
                               },
                               "data_kind": {
@@ -9183,7 +9148,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "X_8"
+                          "title": "X_5"
                         },
                         "encoding": {
                           "tag_size": "Uint8",
@@ -9390,127 +9355,6 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 }
                               ],
                               "name": "Originated"
-                            }
-                          ]
-                        }
-                      },
-                      {
-                        "description": {
-                          "title": "path"
-                        },
-                        "encoding": {
-                          "tag_size": "Uint8",
-                          "kind": {
-                            "kind": "Dynamic"
-                          },
-                          "cases": [
-                            {
-                              "tag": 0,
-                              "fields": [
-                                {
-                                  "name": "Tag",
-                                  "layout": {
-                                    "size": "Uint8",
-                                    "kind": "Int"
-                                  },
-                                  "data_kind": {
-                                    "size": 1,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "layout": {
-                                    "kind": "Zero_width"
-                                  },
-                                  "kind": "anon",
-                                  "data_kind": {
-                                    "size": 0,
-                                    "kind": "Float"
-                                  }
-                                }
-                              ],
-                              "name": "Op"
-                            },
-                            {
-                              "tag": 15,
-                              "fields": [
-                                {
-                                  "name": "Tag",
-                                  "layout": {
-                                    "size": "Uint8",
-                                    "kind": "Int"
-                                  },
-                                  "data_kind": {
-                                    "size": 1,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "name": "left",
-                                  "layout": {
-                                    "kind": "Bytes"
-                                  },
-                                  "data_kind": {
-                                    "size": 32,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "name": "path",
-                                  "layout": {
-                                    "name": "path",
-                                    "kind": "Ref"
-                                  },
-                                  "data_kind": {
-                                    "kind": "Dynamic"
-                                  },
-                                  "kind": "named"
-                                }
-                              ],
-                              "name": "Right"
-                            },
-                            {
-                              "tag": 240,
-                              "fields": [
-                                {
-                                  "name": "Tag",
-                                  "layout": {
-                                    "size": "Uint8",
-                                    "kind": "Int"
-                                  },
-                                  "data_kind": {
-                                    "size": 1,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "name": "path",
-                                  "layout": {
-                                    "name": "path",
-                                    "kind": "Ref"
-                                  },
-                                  "data_kind": {
-                                    "kind": "Dynamic"
-                                  },
-                                  "kind": "named"
-                                },
-                                {
-                                  "name": "right",
-                                  "layout": {
-                                    "kind": "Bytes"
-                                  },
-                                  "data_kind": {
-                                    "size": 32,
-                                    "kind": "Float"
-                                  },
-                                  "kind": "named"
-                                }
-                              ],
-                              "name": "Left"
                             }
                           ]
                         }
@@ -10240,8 +10084,8 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                         "title": "The hash of a BLS public key used to identify a L2 ticket holders (Base58Check-encoded)",
                         "$ref": "#/definitions/unistring"
                       },
-                      "Withdraw_list_hash": {
-                        "title": "A hash of withdraw's list (Base58Check-encoded)",
+                      "Withdrawal_list_hash": {
+                        "title": "A merkle root hash for withdrawals (Base58Check-encoded)",
                         "$ref": "#/definitions/unistring"
                       },
                       "alpha.block_header.alpha.full_header": {
@@ -11830,7 +11674,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                     "$ref": "#/definitions/Context_hash"
                                   },
                                   "withdrawals_merkle_root": {
-                                    "$ref": "#/definitions/Withdraw_list_hash"
+                                    "$ref": "#/definitions/Withdrawal_list_hash"
                                   }
                                 },
                                 "required": [
@@ -12593,46 +12437,19 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 "minimum": -1073741824,
                                 "maximum": 1073741823
                               },
+                              "withdrawals_merkle_root": {
+                                "$ref": "#/definitions/Withdrawal_list_hash"
+                              },
                               "withdraw_path": {
-                                "oneOf": [
-                                  {
-                                    "title": "Left",
-                                    "type": "object",
-                                    "properties": {
-                                      "path": {
-                                        "$ref": "#/definitions/path"
-                                      },
-                                      "right": {
-                                        "$ref": "#/definitions/Withdraw_list_hash"
-                                      }
-                                    },
-                                    "required": [
-                                      "right",
-                                      "path"
-                                    ],
-                                    "additionalProperties": false
-                                  },
-                                  {
-                                    "title": "Right",
-                                    "type": "object",
-                                    "properties": {
-                                      "left": {
-                                        "$ref": "#/definitions/Withdraw_list_hash"
-                                      },
-                                      "path": {
-                                        "$ref": "#/definitions/path"
-                                      }
-                                    },
-                                    "required": [
-                                      "path",
-                                      "left"
-                                    ],
-                                    "additionalProperties": false
-                                  },
-                                  {
-                                    "title": "Op"
-                                  }
-                                ]
+                                "type": "array",
+                                "items": {
+                                  "$ref": "#/definitions/Withdrawal_list_hash"
+                                }
+                              },
+                              "withdraw_position": {
+                                "type": "integer",
+                                "minimum": -1073741824,
+                                "maximum": 1073741823
                               },
                               "ticket_contents": {
                                 "oneOf": [
@@ -12887,7 +12704,9 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                               "ticket_ticketer",
                               "ticket_ty",
                               "ticket_contents",
+                              "withdraw_position",
                               "withdraw_path",
+                              "withdrawals_merkle_root",
                               "message_index",
                               "context_hash",
                               "level",
@@ -13362,47 +13181,6 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                           "protocol"
                         ],
                         "additionalProperties": false
-                      },
-                      "path": {
-                        "oneOf": [
-                          {
-                            "title": "Left",
-                            "type": "object",
-                            "properties": {
-                              "path": {
-                                "$ref": "#/definitions/path"
-                              },
-                              "right": {
-                                "$ref": "#/definitions/Withdraw_list_hash"
-                              }
-                            },
-                            "required": [
-                              "right",
-                              "path"
-                            ],
-                            "additionalProperties": false
-                          },
-                          {
-                            "title": "Right",
-                            "type": "object",
-                            "properties": {
-                              "left": {
-                                "$ref": "#/definitions/Withdraw_list_hash"
-                              },
-                              "path": {
-                                "$ref": "#/definitions/path"
-                              }
-                            },
-                            "required": [
-                              "path",
-                              "left"
-                            ],
-                            "additionalProperties": false
-                          },
-                          {
-                            "title": "Op"
-                          }
-                        ]
                       },
                       "positive_bignum": {
                         "title": "Positive big number",

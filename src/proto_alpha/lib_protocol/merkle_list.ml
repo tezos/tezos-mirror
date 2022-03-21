@@ -45,6 +45,8 @@ module type T = sig
 
   type path
 
+  val pp_path : Format.formatter -> path -> unit
+
   val nil : t
 
   val empty : h
@@ -120,6 +122,14 @@ end)
   type t = {tree : tree; depth : int; next_pos : int}
 
   type path = h list
+
+  let pp_path ppf =
+    Format.fprintf
+      ppf
+      "%a"
+      (Format.pp_print_list
+         ~pp_sep:(fun fmt () -> Format.fprintf fmt ";@ ")
+         H.pp)
 
   let empty = H.zero
 

@@ -1614,34 +1614,32 @@ module Tx_rollup_withdraw : sig
 
   val encoding : t Data_encoding.t
 
-  type withdrawals_merkle_root
+  module Merkle : sig
+    type root
 
-  val withdrawals_merkle_root_encoding : withdrawals_merkle_root Data_encoding.t
+    type path
 
-  type merkle_tree_path
+    val empty : root
 
-  val withdrawals_merkle_root_of_b58check_opt :
-    string -> withdrawals_merkle_root option
+    val path_encoding : path Data_encoding.t
 
-  val merkle_tree_path_encoding : merkle_tree_path Data_encoding.t
+    val root_encoding : root Data_encoding.t
 
-  val merkelize_list : t list -> withdrawals_merkle_root
+    val root_of_b58check_opt : string -> root option
 
-  val empty_withdrawals_merkle_root : withdrawals_merkle_root
+    val compute_path : withdrawal list -> int -> path tzresult
 
-  val pp_withdrawals_merkle_root :
-    Format.formatter -> withdrawals_merkle_root -> unit
+    val check_path : path -> int -> withdrawal -> root -> bool tzresult
 
-  val compute_path : t list -> int -> merkle_tree_path
-
-  val check_path : merkle_tree_path -> t -> withdrawals_merkle_root * int
+    val merklize_list : withdrawal list -> root
+  end
 
   val add :
     context ->
     Tx_rollup.t ->
     Tx_rollup_level.t ->
     message_index:int ->
-    withdraw_index:int ->
+    withdraw_position:int ->
     context tzresult Lwt.t
 
   val mem :
@@ -1649,7 +1647,7 @@ module Tx_rollup_withdraw : sig
     Tx_rollup.t ->
     Tx_rollup_level.t ->
     message_index:int ->
-    withdraw_index:int ->
+    withdraw_position:int ->
     (bool * context) tzresult Lwt.t
 end
 
@@ -1758,7 +1756,7 @@ end
 module Tx_rollup_commitment : sig
   type message_result = {
     context_hash : Context_hash.t;
-    withdrawals_merkle_root : Tx_rollup_withdraw.withdrawals_merkle_root;
+    withdrawals_merkle_root : Tx_rollup_withdraw.Merkle.root;
   }
 
   val hash_message_result : message_result -> Tx_rollup_message_result_hash.t
@@ -2823,7 +2821,9 @@ and _ manager_operation =
       level : Tx_rollup_level.t;
       context_hash : Context_hash.t;
       message_index : int;
-      withdraw_path : Tx_rollup_withdraw.merkle_tree_path;
+      withdrawals_merkle_root : Tx_rollup_withdraw.Merkle.root;
+      withdraw_path : Tx_rollup_withdraw.Merkle.path;
+      withdraw_position : int;
       contents : Script.lazy_expr;
       ty : Script.lazy_expr;
       ticketer : Contract.t;

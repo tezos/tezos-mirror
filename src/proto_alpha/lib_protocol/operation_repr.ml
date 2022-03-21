@@ -330,7 +330,9 @@ and _ manager_operation =
       level : Tx_rollup_level_repr.t;
       context_hash : Context_hash.t;
       message_index : int;
-      withdraw_path : Tx_rollup_withdraw_repr.merkle_tree_path;
+      withdrawals_merkle_root : Tx_rollup_withdraw_repr.Merkle.root;
+      withdraw_path : Tx_rollup_withdraw_repr.Merkle.path;
+      withdraw_position : int;
       contents : Script_repr.lazy_expr;
       ty : Script_repr.lazy_expr;
       ticketer : Contract_repr.t;
@@ -768,14 +770,19 @@ module Encoding = struct
                  (req "context_hash" Context_hash.encoding)
                  (req "message_index" int31)
                  (req
+                    "withdrawals_merkle_root"
+                    Tx_rollup_withdraw_repr.Merkle.root_encoding)
+                 (req
                     "withdraw_path"
-                    Tx_rollup_withdraw_repr.merkle_tree_path_encoding)
+                    Tx_rollup_withdraw_repr.Merkle.path_encoding)
+                 (req "withdraw_position" int31)
                  (req "ticket_contents" Script_repr.lazy_expr_encoding)
                  (req "ticket_ty" Script_repr.lazy_expr_encoding)
-                 (req "ticket_ticketer" Contract_repr.encoding)
+                 (req "ticket_ticketer" Contract_repr.encoding))
+              (obj3
                  (req "ticket_amount" Tx_rollup_l2_qty.encoding)
-                 (req "destination" Contract_repr.encoding))
-              (obj1 (req "entrypoint" Entrypoint_repr.simple_encoding));
+                 (req "destination" Contract_repr.encoding)
+                 (req "entrypoint" Entrypoint_repr.simple_encoding));
           select =
             (function
             | Manager (Tx_rollup_withdraw _ as op) -> Some op | _ -> None);
@@ -787,7 +794,9 @@ module Encoding = struct
                   level;
                   context_hash;
                   message_index;
+                  withdrawals_merkle_root;
                   withdraw_path;
+                  withdraw_position;
                   contents;
                   ty;
                   ticketer;
@@ -799,32 +808,34 @@ module Encoding = struct
                     level,
                     context_hash,
                     message_index,
+                    withdrawals_merkle_root,
                     withdraw_path,
+                    withdraw_position,
                     contents,
                     ty,
-                    ticketer,
-                    amount,
-                    destination ),
-                  entrypoint ));
+                    ticketer ),
+                  (amount, destination, entrypoint) ));
           inj =
             (fun ( ( tx_rollup,
                      level,
                      context_hash,
                      message_index,
+                     withdrawals_merkle_root,
                      withdraw_path,
+                     withdraw_position,
                      contents,
                      ty,
-                     ticketer,
-                     amount,
-                     destination ),
-                   entrypoint ) ->
+                     ticketer ),
+                   (amount, destination, entrypoint) ) ->
               Tx_rollup_withdraw
                 {
                   tx_rollup;
                   level;
                   context_hash;
                   message_index;
+                  withdrawals_merkle_root;
                   withdraw_path;
+                  withdraw_position;
                   contents;
                   ty;
                   ticketer;

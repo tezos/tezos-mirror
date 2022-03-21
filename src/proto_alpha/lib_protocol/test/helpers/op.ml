@@ -612,7 +612,7 @@ let tx_rollup_remove_commitment ?counter ?fee ?gas_limit ?storage_limit ctxt
 let tx_rollup_withdraw ?counter ?fee ?gas_limit ?storage_limit ctxt
     ~(source : Contract.t) (tx_rollup : Tx_rollup.t) (level : Tx_rollup_level.t)
     ~context_hash ~message_index ~contents ~ty ~ticketer amount ~destination
-    withdraw_path entrypoint =
+    ~withdraw_position withdrawals_merkle_root withdraw_path entrypoint =
   manager_operation
     ?counter
     ?fee
@@ -626,7 +626,9 @@ let tx_rollup_withdraw ?counter ?fee ?gas_limit ?storage_limit ctxt
          level;
          context_hash;
          message_index;
+         withdrawals_merkle_root;
          withdraw_path;
+         withdraw_position;
          contents;
          ty;
          ticketer;

@@ -334,7 +334,9 @@ val tx_rollup_withdraw :
   ticketer:Contract.t ->
   Tx_rollup_l2_qty.t ->
   destination:Contract.t ->
-  Tx_rollup_withdraw.merkle_tree_path ->
+  withdraw_position:int ->
+  Tx_rollup_withdraw.Merkle.root ->
+  Tx_rollup_withdraw.Merkle.path ->
   Entrypoint_repr.t ->
   (packed_operation, tztrace) result Lwt.t
 

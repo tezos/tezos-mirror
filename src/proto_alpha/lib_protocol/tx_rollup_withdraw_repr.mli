@@ -39,50 +39,42 @@ type t = withdrawal
 
 val encoding : t Data_encoding.t
 
-(** A [withdrawals_merkle_root] is the hash of a list of withdrawals (as returned by
-    [Tx_rollup_l2_apply.apply_message]), stored in commitments and used
-    to validate the executions of withdrawals.
+module Merkle : sig
+  (** See {Merkle_List} for the documentation of those functions. *)
 
-    Internally [withdrawals_merkle_root] is the root element of
-    a merkle tree whose leaves are [withdrawal] hashes.
-*)
-type withdrawals_merkle_root
+  type tree
 
-val withdrawals_merkle_root_encoding : withdrawals_merkle_root Data_encoding.t
+  type root
 
-val withdrawals_merkle_root_of_b58check_opt :
-  string -> withdrawals_merkle_root option
+  type path
 
-(** A [merkle_tree_path] is the minimal information needed to
-   recompute a [withdrawals_merkle_root] without having all
-   withdrawals.
+  val nil : tree
 
-   Internally [merkle_tree_path] is the merkle tree path of sub-tree
-   hash of a [withdrawals_merkle_root] *)
-type merkle_tree_path
+  val empty : root
 
-val merkle_tree_path_encoding : merkle_tree_path Data_encoding.t
+  val root : tree -> root
 
-(** [merkelize_list withdrawal_list] merkelizes [withdrawal_list] into
-   a full binary tree and returns the [withdrawals_merkle_root] of
-   that tree.  *)
-val merkelize_list : t list -> withdrawals_merkle_root
+  val ( = ) : root -> root -> bool
 
-val empty_withdrawals_merkle_root : withdrawals_merkle_root
+  val compare : root -> root -> int
 
-val pp_withdrawals_merkle_root :
-  Format.formatter -> withdrawals_merkle_root -> unit
+  val root_encoding : root Data_encoding.t
 
-(** [compute_path withdrawal_list index] computes the
-   [merkle_tree_path] in the tree given by [merkelize_list
-   withdrawal_list] of the [index]th element of the
-   [withdrawal_list]. *)
-val compute_path : t list -> int -> merkle_tree_path
+  val root_of_b58check_opt : string -> root option
 
-(** [check_path merkle_tree_path withdrawal] returns the
-   [withdrawals_merkle_root] computed for [withdrawal] and the index
-   on the list. *)
-val check_path : merkle_tree_path -> t -> withdrawals_merkle_root * int
+  val pp_root : Format.formatter -> root -> unit
+
+  val path_encoding : path Data_encoding.t
+
+  val compute_path : withdrawal list -> int -> path tzresult
+
+  val check_path : path -> int -> withdrawal -> root -> bool tzresult
+
+  (** [merklize_list messages] construct a merkle root by build a
+      tree, appending the [messages] one by one in the same order of
+      the list and finally computing the root. *)
+  val merklize_list : withdrawal list -> root
+end
 
 (** [Withdrawal_accounting] provides an interface for the storage to
    account for which withdrawals (as identified by their index) have

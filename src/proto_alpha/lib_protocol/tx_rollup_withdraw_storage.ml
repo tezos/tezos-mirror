@@ -31,9 +31,9 @@ let add :
     Tx_rollup_repr.t ->
     Tx_rollup_level_repr.t ->
     message_index:int ->
-    withdraw_index:int ->
+    withdraw_position:int ->
     Raw_context.t tzresult Lwt.t =
- fun ctxt tx_rollup commitment_lvl ~message_index ~withdraw_index ->
+ fun ctxt tx_rollup commitment_lvl ~message_index ~withdraw_position ->
   Storage.Tx_rollup.Consumed_withdraw.find
     ((ctxt, commitment_lvl), tx_rollup)
     (* TODO/TORU: https://gitlab.com/tezos/tezos/-/issues/2627
@@ -43,7 +43,7 @@ let add :
   >>=? fun (ctxt, consumed_withdraw_opt) ->
   Withdrawal_accounting.set
     (Option.value ~default:Withdrawal_accounting.empty consumed_withdraw_opt)
-    withdraw_index
+    withdraw_position
   >>?= fun consumed_withdraw ->
   Storage.Tx_rollup.Consumed_withdraw.add
     ((ctxt, commitment_lvl), tx_rollup)
@@ -56,9 +56,9 @@ let mem :
     Tx_rollup_repr.t ->
     Tx_rollup_level_repr.t ->
     message_index:int ->
-    withdraw_index:int ->
+    withdraw_position:int ->
     (bool * Raw_context.t) tzresult Lwt.t =
- fun ctxt tx_rollup commitment_lvl ~message_index ~withdraw_index ->
+ fun ctxt tx_rollup commitment_lvl ~message_index ~withdraw_position ->
   Storage.Tx_rollup.Consumed_withdraw.find
     ((ctxt, commitment_lvl), tx_rollup)
     (* TODO/TORU: https://gitlab.com/tezos/tezos/-/issues/2627
@@ -67,7 +67,7 @@ let mem :
     (Int32.of_int message_index)
   >>=? fun (ctxt, consumed_withdraw_opt) ->
   Option.map_e
-    (fun s -> Withdrawal_accounting.get s withdraw_index)
+    (fun s -> Withdrawal_accounting.get s withdraw_position)
     consumed_withdraw_opt
   >>?= fun consumed_withdraw_opt ->
   let already_consumed = Option.value ~default:false consumed_withdraw_opt in

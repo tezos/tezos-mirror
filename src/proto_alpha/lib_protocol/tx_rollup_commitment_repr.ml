@@ -51,7 +51,7 @@ end
 
 type message_result = {
   context_hash : Context_hash.t;
-  withdrawals_merkle_root : Tx_rollup_withdraw_repr.withdrawals_merkle_root;
+  withdrawals_merkle_root : Tx_rollup_withdraw_repr.Merkle.root;
 }
 
 let message_result_encoding =
@@ -65,7 +65,7 @@ let message_result_encoding =
        (req "context_hash" Context_hash.encoding)
        (req
           "withdrawals_merkle_root"
-          Tx_rollup_withdraw_repr.withdrawals_merkle_root_encoding))
+          Tx_rollup_withdraw_repr.Merkle.root_encoding))
 
 let hash_message_result result =
   let bytes =
@@ -160,8 +160,7 @@ let initial_message_result_hash =
   hash_message_result
     {
       context_hash = empty_l2_context_hash;
-      withdrawals_merkle_root =
-        Tx_rollup_withdraw_repr.empty_withdrawals_merkle_root;
+      withdrawals_merkle_root = Tx_rollup_withdraw_repr.Merkle.empty;
     }
 
 (* FIXME/TORU: https://gitlab.com/tezos/tezos/-/issues/2470

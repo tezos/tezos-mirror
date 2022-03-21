@@ -120,10 +120,10 @@ let tx_rollup_empty_l2_context =
   "CoVu7Pqp1Gh3z33mink5T5Q2kAQKtnn3GHxVhyehdKZpQMBxFBGF"
 
 let tx_rollup_empty_withdraw_list =
-  "txw1qi5zqv2cizWX3XYSGtj5aDpdft5V4er7SK44TNpW5usEi5im7"
+  "txw1jPmDA4PYvXduFE2WQmfZKFQPnwgCSiNjb9SZPMm4hceZsBmvP"
 
 let tx_rollup_initial_message_result =
-  "txmr2RQL6pMQMkjZwL28kEeyAGpmaorNx2nT6G9JpQj81ER4XqDpD7"
+  "txmr2DouKqJu5o8KEVGe6gLoiw1J3krjsxhf6C2a1kDNTTr8BdKpf2"
 
 (** A valid rejection proof for the initial layer2 state. *)
 let tx_rollup_proof_initial_state =

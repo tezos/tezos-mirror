@@ -1002,8 +1002,7 @@ let submit_tx_rollup_rejection (cctxt : #full) ~chain ~block ?confirmations
       failwith "%s is not a valid notation for a context hash" context_hash)
   >>=? fun context_hash ->
   (match
-     Tx_rollup_withdraw.withdrawals_merkle_root_of_b58check_opt
-       withdrawals_merkle_root
+     Tx_rollup_withdraw.Merkle.root_of_b58check_opt withdrawals_merkle_root
    with
   | Some hash -> return hash
   | None ->

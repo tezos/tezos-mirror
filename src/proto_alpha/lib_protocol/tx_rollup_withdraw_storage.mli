@@ -25,19 +25,19 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [add ctxt tx_rollup lvl message_index withdraw_index] adds
-    [withdraw_index] to the list of already consumed withdrawawals for
+(** [add ctxt tx_rollup lvl message_index withdraw_position] adds
+    [withdraw_position] to the list of already consumed withdrawawals for
     [tx_rollup] at [lvl] for the message_result at [message_index]. *)
 val add :
   Raw_context.t ->
   Tx_rollup_repr.t ->
   Tx_rollup_level_repr.t ->
   message_index:int ->
-  withdraw_index:int ->
+  withdraw_position:int ->
   Raw_context.t tzresult Lwt.t
 
-(** [mem ctxt tx_rollup lvl message_index withdraw_index] checks if
-    [withdraw_index] has already been consumed for [tx_rollup] at [lvl] for the
+(** [mem ctxt tx_rollup lvl message_index withdraw_position] checks if
+    [withdraw_position] has already been consumed for [tx_rollup] at [lvl] for the
     message_result at [message_index]. This function consumes gas
     and so returns a new context. *)
 val mem :
@@ -45,7 +45,7 @@ val mem :
   Tx_rollup_repr.t ->
   Tx_rollup_level_repr.t ->
   message_index:int ->
-  withdraw_index:int ->
+  withdraw_position:int ->
   (bool * Raw_context.t) tzresult Lwt.t
 
 (** [remove ctxt tx_rollup lvl] removes all withdrawal accounting for
