@@ -317,9 +317,9 @@ let generate_bls_addr ?alias:_ _client =
     Bytes.init 32 (fun _ -> char_of_int @@ Random.State.int rng_state 255)
   in
   let sk = Bls12_381.Signature.generate_sk seed in
-  let pk = Bls12_381.Signature.MinPk.derive_pk sk in
+  let pk = Bls12_381.Signature.MinSig.derive_pk sk in
   let pkh =
-    Bls_public_key_hash.hash_bytes [Bls12_381.Signature.MinPk.pk_to_bytes pk]
+    Bls_public_key_hash.hash_bytes [Bls12_381.Signature.MinSig.pk_to_bytes pk]
   in
   Log.info
     "A new BLS key was generated: %s"
@@ -420,7 +420,7 @@ let sign_transaction sks txs =
       Tx_rollup_l2_batch.V1.transaction_encoding
       txs
   in
-  List.map (fun sk -> Bls12_381.Signature.MinPk.Aug.sign sk buf) sks
+  List.map (fun sk -> Bls12_381.Signature.MinSig.Aug.sign sk buf) sks
 
 let craft_tx ~counter ~signer ~dest ~ticket qty =
   let open Tezos_protocol_alpha.Protocol in
@@ -439,7 +439,7 @@ let craft_tx ~counter ~signer ~dest ~ticket qty =
   Tx_rollup_l2_batch.V1.{signer; counter; contents = [content]}
 
 let aggregate_signature_exn signatures =
-  match Bls12_381.Signature.MinPk.aggregate_signature_opt signatures with
+  match Bls12_381.Signature.MinSig.aggregate_signature_opt signatures with
   | Some res -> res
   | None -> invalid_arg "aggregate_signature_exn"
 

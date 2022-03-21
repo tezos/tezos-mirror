@@ -84,7 +84,7 @@ let expect_error_status ~msg error status cont =
 
 let aggregate_signature_exn : signature list -> signature =
  fun signatures ->
-  match Bls12_381.Signature.MinPk.aggregate_signature_opt signatures with
+  match Bls12_381.Signature.MinSig.aggregate_signature_opt signatures with
   | Some res -> res
   | None -> raise (Invalid_argument "aggregate_signature_exn")
 
