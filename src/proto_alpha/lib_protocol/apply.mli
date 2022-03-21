@@ -36,19 +36,14 @@
 open Alpha_context
 open Apply_results
 
-type error += Internal_operation_replay of packed_internal_contents
-
-type error += Gas_quota_exceeded_init_deserialize
-
-type error += Tx_rollup_feature_disabled
-
-type error += Tx_rollup_invalid_transaction_amount
-
-type error += Tx_rollup_non_internal_transaction
-
-type error += Sc_rollup_feature_disabled
-
-type error += Inconsistent_counters
+type error +=
+  | Internal_operation_replay of packed_internal_contents
+  | Gas_quota_exceeded_init_deserialize
+  | Tx_rollup_feature_disabled
+  | Tx_rollup_invalid_transaction_amount
+  | Tx_rollup_non_internal_transaction
+  | Sc_rollup_feature_disabled
+  | Inconsistent_counters
 
 val begin_partial_construction :
   context ->

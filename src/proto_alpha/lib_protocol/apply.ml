@@ -28,6 +28,22 @@
 
 open Alpha_context
 
+type denunciation_kind = Preendorsement | Endorsement | Block
+
+let denunciation_kind_encoding =
+  let open Data_encoding in
+  string_enum
+    [
+      ("preendorsement", Preendorsement);
+      ("endorsement", Endorsement);
+      ("block", Block);
+    ]
+
+let pp_denunciation_kind fmt : denunciation_kind -> unit = function
+  | Preendorsement -> Format.fprintf fmt "preendorsement"
+  | Endorsement -> Format.fprintf fmt "endorsement"
+  | Block -> Format.fprintf fmt "baking"
+
 type error +=
   | Not_enough_endorsements of {required : int; provided : int}
   | Wrong_consensus_operation_branch of Block_hash.t * Block_hash.t
@@ -83,6 +99,31 @@ type error +=
   | Tx_rollup_non_internal_transaction
   | Sc_rollup_feature_disabled
   | Inconsistent_counters
+  | Wrong_voting_period of {expected : int32; provided : int32}
+  | Internal_operation_replay of Apply_results.packed_internal_contents
+  | Invalid_denunciation of denunciation_kind
+  | Inconsistent_denunciation of {
+      kind : denunciation_kind;
+      delegate1 : Signature.Public_key_hash.t;
+      delegate2 : Signature.Public_key_hash.t;
+    }
+  | Unrequired_denunciation
+  | Too_early_denunciation of {
+      kind : denunciation_kind;
+      level : Raw_level.t;
+      current : Raw_level.t;
+    }
+  | Outdated_denunciation of {
+      kind : denunciation_kind;
+      level : Raw_level.t;
+      last_cycle : Cycle.t;
+    }
+  | Invalid_activation of {pkh : Ed25519.Public_key_hash.t}
+  | Multiple_revelation
+  | Gas_quota_exceeded_init_deserialize
+  | Inconsistent_sources
+  | Failing_noop_error
+  | Zero_frozen_deposits of Signature.Public_key_hash.t
 
 let () =
   register_error_kind
@@ -511,67 +552,7 @@ let () =
          successive.")
     Data_encoding.empty
     (function Inconsistent_counters -> Some () | _ -> None)
-    (fun () -> Inconsistent_counters)
-
-type error += Wrong_voting_period of {expected : int32; provided : int32}
-
-type error +=
-  | Internal_operation_replay of Apply_results.packed_internal_contents
-
-type denunciation_kind = Preendorsement | Endorsement | Block
-
-let denunciation_kind_encoding =
-  let open Data_encoding in
-  string_enum
-    [
-      ("preendorsement", Preendorsement);
-      ("endorsement", Endorsement);
-      ("block", Block);
-    ]
-
-let pp_denunciation_kind fmt : denunciation_kind -> unit = function
-  | Preendorsement -> Format.fprintf fmt "preendorsement"
-  | Endorsement -> Format.fprintf fmt "endorsement"
-  | Block -> Format.fprintf fmt "baking"
-
-type error += Invalid_denunciation of denunciation_kind
-
-type error +=
-  | Inconsistent_denunciation of {
-      kind : denunciation_kind;
-      delegate1 : Signature.Public_key_hash.t;
-      delegate2 : Signature.Public_key_hash.t;
-    }
-
-type error += Unrequired_denunciation
-
-type error +=
-  | Too_early_denunciation of {
-      kind : denunciation_kind;
-      level : Raw_level.t;
-      current : Raw_level.t;
-    }
-
-type error +=
-  | Outdated_denunciation of {
-      kind : denunciation_kind;
-      level : Raw_level.t;
-      last_cycle : Cycle.t;
-    }
-
-type error += Invalid_activation of {pkh : Ed25519.Public_key_hash.t}
-
-type error += Multiple_revelation
-
-type error += Gas_quota_exceeded_init_deserialize
-
-type error += Inconsistent_sources
-
-type error += Failing_noop_error
-
-type error += Zero_frozen_deposits of Signature.Public_key_hash.t
-
-let () =
+    (fun () -> Inconsistent_counters) ;
   register_error_kind
     `Temporary
     ~id:"operation.wrong_voting_period"
