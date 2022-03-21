@@ -84,7 +84,8 @@ module type S = sig
   val get_is_stuck : state -> string option Lwt.t
 end
 
-module Make (Context : P) : S with type context = Context.Tree.t = struct
+module Make (Context : P) :
+  S with type context = Context.Tree.t and type state = Context.tree = struct
   module Tree = Context.Tree
 
   type context = Context.Tree.t
