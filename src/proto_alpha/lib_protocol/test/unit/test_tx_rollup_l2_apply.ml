@@ -1707,6 +1707,21 @@ let test_apply_message_deposit () =
       return_unit
   | _ -> fail_msg "Invalid apply message result"
 
+(** Test an unparsable message. *)
+let test_apply_message_unparsable () =
+  let open Context_l2.Syntax in
+  let* (ctxt, _tidxs, _accounts) =
+    with_initial_setup [ticket1; ticket2] [[(ticket1, 10L)]; [(ticket2, 20L)]]
+  in
+  let (msg, _) =
+    Tx_rollup_message.make_batch
+      "Yo, let me bust the funky lyrics (You can't parse this)!"
+  in
+  apply_l2_message ctxt msg >>= fun result ->
+  match result with
+  | Error Invalid_batch_encoding -> return_unit
+  | _ -> fail_msg "Unexpected apply message result"
+
 let test_transfer_to_self () =
   let open Context_l2.Syntax in
   let* (ctxt, _, accounts) = with_initial_setup [ticket1] [[(ticket1, 10L)]] in
@@ -1760,6 +1775,7 @@ let tests =
       ( "apply batch from message with withdrawals",
         test_apply_message_batch_withdrawals );
       ("apply deposit from message", test_apply_message_deposit);
+      ("apply unparseable message", test_apply_message_unparsable);
       ("test transfer to self fail", test_transfer_to_self);
       ( "nb withdrawals per batch below limit",
         nb_withdrawals_per_batch_below_limit );
