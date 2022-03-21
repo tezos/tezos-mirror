@@ -37,23 +37,16 @@ open Alpha_context
 open Apply_results
 
 type error +=
-  | (* `Permanent *)
-      Internal_operation_replay of packed_internal_contents
-
-type error += (* Permanent *) Gas_quota_exceeded_init_deserialize
-
-type error += (* `Permanent *) Tx_rollup_feature_disabled
-
-type error += (* `Permanent *) Tx_rollup_invalid_transaction_amount
-
-type error += (* `Permanent *) Tx_rollup_non_internal_transaction
-
-type error += (* `Permanent *) Sc_rollup_feature_disabled
-
-type error += (* `Permanent *) Inconsistent_counters
+  | Internal_operation_replay of packed_internal_contents
+  | Gas_quota_exceeded_init_deserialize
+  | Tx_rollup_feature_disabled
+  | Tx_rollup_invalid_transaction_amount
+  | Tx_rollup_non_internal_transaction
+  | Sc_rollup_feature_disabled
+  | Inconsistent_counters
 
 val begin_partial_construction :
-  t ->
+  context ->
   predecessor_level:Level.t ->
   toggle_vote:Liquidity_baking_repr.liquidity_baking_toggle_vote ->
   (t
@@ -63,7 +56,7 @@ val begin_partial_construction :
   Lwt.t
 
 type 'a full_construction = {
-  ctxt : t;
+  ctxt : context;
   protocol_data : 'a;
   payload_producer : Signature.public_key_hash;
   block_producer : Signature.public_key_hash;
@@ -73,7 +66,7 @@ type 'a full_construction = {
 }
 
 val begin_full_construction :
-  t ->
+  context ->
   predecessor_timestamp:Time.t ->
   predecessor_level:Level.t ->
   predecessor_round:Round.t ->
@@ -82,7 +75,7 @@ val begin_full_construction :
   Block_header.contents full_construction tzresult Lwt.t
 
 val begin_application :
-  t ->
+  context ->
   Chain_id.t ->
   Block_header.t ->
   Fitness.t ->
@@ -120,14 +113,14 @@ type apply_mode =
     }
 
 val apply_operation :
-  t ->
+  context ->
   Chain_id.t ->
   apply_mode ->
   Script_ir_translator.unparsing_mode ->
   payload_producer:public_key_hash ->
   Operation_list_hash.elt ->
   'a operation ->
-  (t * 'a operation_metadata, error trace) result Lwt.t
+  (context * 'a operation_metadata, error trace) result Lwt.t
 
 type finalize_application_mode =
   | Finalize_full_construction of {
@@ -137,9 +130,9 @@ type finalize_application_mode =
   | Finalize_application of Fitness.t
 
 val finalize_application :
-  t ->
+  context ->
   finalize_application_mode ->
-  Alpha_context.Block_header.contents ->
+  Block_header.contents ->
   payload_producer:public_key_hash ->
   block_producer:public_key_hash ->
   Liquidity_baking.Toggle_EMA.t ->
@@ -147,25 +140,25 @@ val finalize_application :
   round:Round.t ->
   predecessor:Block_hash.t ->
   migration_balance_updates:Receipt.balance_updates ->
-  (t * Fitness.t * block_metadata, error trace) result Lwt.t
+  (context * Fitness.t * block_metadata, error trace) result Lwt.t
 
 val apply_manager_contents_list :
-  t ->
+  context ->
   Script_ir_translator.unparsing_mode ->
   payload_producer:public_key_hash ->
   Chain_id.t ->
   'a Kind.manager prechecked_contents_list ->
-  (t * 'a Kind.manager contents_result_list) Lwt.t
+  (context * 'a Kind.manager contents_result_list) Lwt.t
 
 val apply_contents_list :
-  t ->
+  context ->
   Chain_id.t ->
   apply_mode ->
   Script_ir_translator.unparsing_mode ->
   payload_producer:public_key_hash ->
   'kind operation ->
   'kind contents_list ->
-  (t * 'kind contents_result_list) tzresult Lwt.t
+  (context * 'kind contents_result_list) tzresult Lwt.t
 
 (** [precheck_manager_contents_list validation_state contents_list]
    Returns an updated context, and a list of prechecked contents
@@ -178,17 +171,19 @@ val apply_contents_list :
    of the batch is removed from the one of the block (when possible)
    before moving on. *)
 val precheck_manager_contents_list :
-  t ->
+  context ->
   'kind Kind.manager contents_list ->
   mempool_mode:bool ->
   (context * 'kind Kind.manager prechecked_contents_list) tzresult Lwt.t
 
 (** [value_of_key ctxt k] builds a value identified by key [k]
     so that it can be put into the cache. *)
-val value_of_key : t -> Context.Cache.key -> Context.Cache.value tzresult Lwt.t
+val value_of_key :
+  context -> Context.Cache.key -> Context.Cache.value tzresult Lwt.t
 
 (** Check if endorsements are required for a given level. *)
-val are_endorsements_required : t -> level:Raw_level.t -> bool tzresult Lwt.t
+val are_endorsements_required :
+  context -> level:Raw_level.t -> bool tzresult Lwt.t
 
 (** Check if a block's endorsing power is at least the minim required. *)
 val check_minimum_endorsements :
@@ -210,7 +205,7 @@ val check_minimum_endorsements :
     @return [Error Inconsistent_sources] if the operations in a batch are not
     from the same manager *)
 val check_manager_signature :
-  t ->
+  context ->
   Chain_id.t ->
   'a Kind.manager contents_list ->
   'b operation ->
