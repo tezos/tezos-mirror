@@ -2,13 +2,13 @@ tezt/_regressions/tx_rollup_rpc_inbox_merkle_tree_hash.out
 
 ./tezos-client rpc post /chains/main/blocks/head/helpers/forge/tx_rollup/inbox/message_hash with '{
   "message": {
-    "batch": "blob"
+    "batch": "626c6f62"
   }
 }'
 
 ./tezos-client rpc post /chains/main/blocks/head/helpers/forge/tx_rollup/inbox/message_hash with '{
   "message": {
-    "batch": "gloubiboulga"
+    "batch": "676c6f756269626f756c6761"
   }
 }'
 { "hash": "[TX_ROLLUP_MESSAGE_HASH]" }

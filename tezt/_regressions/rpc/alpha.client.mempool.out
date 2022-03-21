@@ -2138,7 +2138,8 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                     "type": "object",
                                     "properties": {
                                       "batch": {
-                                        "$ref": "#/definitions/unistring"
+                                        "type": "string",
+                                        "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
                                       }
                                     },
                                     "required": [
@@ -11783,7 +11784,8 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                     "type": "object",
                                     "properties": {
                                       "batch": {
-                                        "$ref": "#/definitions/unistring"
+                                        "type": "string",
+                                        "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
                                       }
                                     },
                                     "required": [
