@@ -59,8 +59,8 @@ let () =
        counter"
     (obj3
        (req "account" Tx_rollup_l2_address.encoding)
-       (req "requested" int64)
-       (req "actual" int64))
+       (req "expected" int64)
+       (req "provided" int64))
     (function
       | Counter_mismatch {account; expected; provided} ->
           Some (account, expected, provided)
@@ -683,7 +683,7 @@ module Make (Context : CONTEXT) = struct
         (Counter_mismatch
            {
              account = Tx_rollup_l2_address.of_bls_pk metadata.public_key;
-             expected = metadata.counter;
+             expected = Int64.succ metadata.counter;
              provided = counter;
            })
 
