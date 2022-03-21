@@ -259,6 +259,10 @@ module type CONTEXT = sig
       in future layer2 operations.
   *)
   module Address_index : sig
+    (** [init_counter ctxt] writes the default counter (i.e. [0L]) in
+        the context. *)
+    val init_counter : t -> t m
+
     (** [get ctxt addr] returns the index associated to [addr], if
         any. *)
     val get : t -> Tx_rollup_l2_address.t -> address_index option m
@@ -298,6 +302,10 @@ module type CONTEXT = sig
       in future layer2 operations.
   *)
   module Ticket_index : sig
+    (** [init_counter ctxt] writes the default counter (i.e. [0L]) in
+        the context. *)
+    val init_counter : t -> t m
+
     (** [get ctxt ticket] returns the index associated to [ticket], if
         any. *)
     val get : t -> Alpha_context.Ticket_hash.t -> ticket_index option m

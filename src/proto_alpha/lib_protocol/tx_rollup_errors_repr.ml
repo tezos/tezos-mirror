@@ -53,7 +53,6 @@ type error +=
       provided : Tx_rollup_commitment_repr.Commitment_hash.t option;
       expected : Tx_rollup_commitment_repr.Commitment_hash.t option;
     }
-  | Invalid_proof
   | Internal_error of string
   | Wrong_message_position of {
       level : Tx_rollup_level_repr.t;
@@ -80,6 +79,9 @@ type error +=
   | Ticket_payload_size_limit_exceeded of {payload_size : int; limit : int}
   | Deposit_wrong_ticketer of Tx_rollup_repr.t
   | Wrong_deposit_parameters
+  | Proof_failed_to_reject
+  | Proof_produced_rejected_state
+  | Proof_invalid_before of {agreed : Context_hash.t; provided : Context_hash.t}
 
 let () =
   let open Data_encoding in
@@ -168,15 +170,6 @@ let () =
     empty
     (function No_uncommitted_inbox -> Some () | _ -> None)
     (fun () -> No_uncommitted_inbox) ;
-  (* Invalid_proof *)
-  register_error_kind
-    `Temporary
-    ~id:"tx_rollup_invalid_proof"
-    ~title:"The proof submitted for a rejection is invalid"
-    ~description:"The proof submitted for a rejection is invalid"
-    empty
-    (function Invalid_proof -> Some () | _ -> None)
-    (fun () -> Invalid_proof) ;
   (* Tx_rollup_message_size_exceed_limit *)
   register_error_kind
     `Temporary
@@ -385,7 +378,7 @@ let () =
   (* Wrong_message_hash *)
   register_error_kind
     `Branch
-    ~id:"tx_rollup_wrong_message_hash"
+    ~id:"tx_rollup_wrong_message_path"
     ~title:"Wrong message path in rejection."
     ~description:
       "This rejection has sent a message  and a path that does not fit the \
@@ -545,4 +538,40 @@ let () =
         tx_rollup)
     (obj1 (req "tx_rollup" Tx_rollup_repr.encoding))
     (function Deposit_wrong_ticketer tx_rollup -> Some tx_rollup | _ -> None)
-    (fun tx_rollup -> Deposit_wrong_ticketer tx_rollup)
+    (fun tx_rollup -> Deposit_wrong_ticketer tx_rollup) ;
+  (* Proof_failed_to_reject *)
+  register_error_kind
+    `Temporary
+    ~id:"tx_rollup_proof_failed_to_reject"
+    ~title:"Proof failed to reject the commitment"
+    ~description:
+      "The proof verification failed and was unable to reject the commitment"
+    empty
+    (function Proof_failed_to_reject -> Some () | _ -> None)
+    (fun () -> Proof_failed_to_reject) ;
+  (* Proof_produced_rejected_state *)
+  register_error_kind
+    `Temporary
+    ~id:"tx_rollup_proof_produced_rejected_state"
+    ~title:"Proof produced the rejected state"
+    ~description:
+      "The proof submitted did not refute the rejected commitment. The proof \
+       produced the same committed state"
+    empty
+    (function Proof_produced_rejected_state -> Some () | _ -> None)
+    (fun () -> Proof_produced_rejected_state) ;
+  (* Proof_invalid_before *)
+  register_error_kind
+    `Temporary
+    ~id:"tx_rollup_proof_invalid_before"
+    ~title:"Proof started from an invalid hash"
+    ~description:
+      "The proof started from a hash which is not the one agreed on (i.e. in \
+       the previous commitment)"
+    (obj2
+       (req "agreed" Context_hash.encoding)
+       (req "provided" Context_hash.encoding))
+    (function
+      | Proof_invalid_before {agreed; provided} -> Some (agreed, provided)
+      | _ -> None)
+    (fun (agreed, provided) -> Proof_invalid_before {agreed; provided})

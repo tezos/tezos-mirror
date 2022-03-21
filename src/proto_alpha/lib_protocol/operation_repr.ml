@@ -712,7 +712,7 @@ module Encoding = struct
               (req
                  "previous_message_result"
                  Tx_rollup_commitment_repr.message_result_encoding)
-              (req "proof" bool);
+              (req "proof" Tx_rollup_l2_proof.encoding);
           select =
             (function
             | Manager (Tx_rollup_rejection _ as op) -> Some op | _ -> None);

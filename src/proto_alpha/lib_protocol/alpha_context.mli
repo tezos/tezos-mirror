@@ -804,6 +804,7 @@ module Constants : sig
     tx_rollup_max_finalized_levels : int;
     tx_rollup_cost_per_byte_ema_factor : int;
     tx_rollup_max_ticket_payload_size : int;
+    tx_rollup_rejection_max_proof_size : int;
     sc_rollup_enable : bool;
     sc_rollup_origination_size : int;
     sc_rollup_challenge_window_in_blocks : int;
@@ -909,6 +910,8 @@ module Constants : sig
   val tx_rollup_max_finalized_levels : context -> int
 
   val tx_rollup_max_ticket_payload_size : context -> int
+
+  val tx_rollup_rejection_max_proof_size : context -> int
 
   val sc_rollup_enable : context -> bool
 
@@ -1570,7 +1573,7 @@ module Tx_rollup_state : sig
 
   val assert_exist : context -> Tx_rollup.t -> context tzresult Lwt.t
 
-  val head_level : t -> (Tx_rollup_level.t * Raw_level.t) option
+  val head_levels : t -> (Tx_rollup_level.t * Raw_level.t) option
 
   val check_level_can_be_rejected : t -> Tx_rollup_level.t -> unit tzresult
 
@@ -1583,10 +1586,11 @@ module Tx_rollup_state : sig
       ?inbox_ema:int ->
       ?last_removed_commitment_hashes:
         Tx_rollup_message_result_hash.t * Tx_rollup_commitment_hash.t ->
-      ?commitment_tail_level:Tx_rollup_level.t ->
-      ?oldest_inbox_level:Tx_rollup_level.t ->
-      ?commitment_head_level:Tx_rollup_level.t * Tx_rollup_commitment_hash.t ->
-      ?head_level:Tx_rollup_level.t * Raw_level.t ->
+      ?finalized_commitments:Tx_rollup_level.t * Tx_rollup_level.t ->
+      ?unfinalized_commitments:Tx_rollup_level.t * Tx_rollup_level.t ->
+      ?uncommitted_inboxes:Tx_rollup_level.t * Tx_rollup_level.t ->
+      ?commitment_newest_hash:Tx_rollup_commitment_hash.t ->
+      ?tezos_head_level:Raw_level.t ->
       unit ->
       t
 
@@ -1594,6 +1598,8 @@ module Tx_rollup_state : sig
       t -> elapsed:int -> factor:int -> final_size:int -> hard_limit:int -> t
 
     val get_inbox_ema : t -> int
+
+    val record_inbox_deletion : t -> Tx_rollup_level.t -> t tzresult
   end
 end
 
@@ -1895,6 +1901,7 @@ module Tx_rollup_errors : sig
     | Wrong_inbox_hash
     | Bond_does_not_exist of Signature.public_key_hash
     | Bond_in_use of Signature.public_key_hash
+    | No_uncommitted_inbox
     | No_commitment_to_finalize
     | No_commitment_to_remove
     | Commitment_does_not_exist of Tx_rollup_level.t
@@ -1903,7 +1910,6 @@ module Tx_rollup_errors : sig
         expected : Tx_rollup_commitment_hash.t option;
       }
     | Invalid_rejection_level_argument
-    | Invalid_proof
     | Internal_error of string
     | Wrong_message_position of {
         level : Tx_rollup_level.t;
@@ -1928,6 +1934,12 @@ module Tx_rollup_errors : sig
       }
     | Deposit_wrong_ticketer of Tx_rollup.t
     | Wrong_deposit_parameters
+    | Proof_failed_to_reject
+    | Proof_produced_rejected_state
+    | Proof_invalid_before of {
+        agreed : Context_hash.t;
+        provided : Context_hash.t;
+      }
 end
 
 module Bond_id : sig

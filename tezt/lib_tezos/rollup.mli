@@ -24,10 +24,14 @@
 (*****************************************************************************)
 
 module Tx_rollup : sig
+  type range = Empty of int | Interval of int * int
+
   type state = {
-    oldest_inbox_level : int option;
-    head_level : (int * int) option;
-    commitment_head_level : (int * string) option;
+    finalized_commitments : range;
+    unfinalized_commitments : range;
+    uncommitted_inboxes : range;
+    tezos_head_level : int option;
+    commitment_head_hash : string option;
     burn_per_byte : int;
     inbox_ema : int;
   }

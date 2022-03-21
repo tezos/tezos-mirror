@@ -352,6 +352,6 @@ val tx_rollup_reject :
   Tx_rollup_message.t ->
   message_position:int ->
   message_path:Tx_rollup_inbox.Merkle.path ->
-  proof:bool ->
+  proof:Tx_rollup_l2_proof.t ->
   previous_message_result:Tx_rollup_commitment.message_result ->
   Operation.packed tzresult Lwt.t

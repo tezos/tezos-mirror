@@ -172,6 +172,7 @@ type parametric = {
   tx_rollup_max_finalized_levels : int;
   tx_rollup_cost_per_byte_ema_factor : int;
   tx_rollup_max_ticket_payload_size : int;
+  tx_rollup_rejection_max_proof_size : int;
   sc_rollup_enable : bool;
   sc_rollup_origination_size : int;
   sc_rollup_challenge_window_in_blocks : int;
@@ -229,7 +230,8 @@ let parametric_encoding =
                       c.tx_rollup_max_messages_per_inbox ),
                     ( c.tx_rollup_max_finalized_levels,
                       c.tx_rollup_cost_per_byte_ema_factor,
-                      c.tx_rollup_max_ticket_payload_size ) ),
+                      c.tx_rollup_max_ticket_payload_size,
+                      c.tx_rollup_rejection_max_proof_size ) ),
                   ( c.sc_rollup_enable,
                     c.sc_rollup_origination_size,
                     c.sc_rollup_challenge_window_in_blocks ) ) ) ) ) ) ))
@@ -281,7 +283,8 @@ let parametric_encoding =
                          tx_rollup_max_messages_per_inbox ),
                        ( tx_rollup_max_finalized_levels,
                          tx_rollup_cost_per_byte_ema_factor,
-                         tx_rollup_max_ticket_payload_size ) ),
+                         tx_rollup_max_ticket_payload_size,
+                         tx_rollup_rejection_max_proof_size ) ),
                      ( sc_rollup_enable,
                        sc_rollup_origination_size,
                        sc_rollup_challenge_window_in_blocks ) ) ) ) ) ) ) ->
@@ -335,6 +338,7 @@ let parametric_encoding =
         tx_rollup_max_finalized_levels;
         tx_rollup_cost_per_byte_ema_factor;
         tx_rollup_max_ticket_payload_size;
+        tx_rollup_rejection_max_proof_size;
         sc_rollup_enable;
         sc_rollup_origination_size;
         sc_rollup_challenge_window_in_blocks;
@@ -404,10 +408,11 @@ let parametric_encoding =
                             (req "tx_rollup_withdraw_period" int31)
                             (req "tx_rollup_max_unfinalized_levels" int31)
                             (req "tx_rollup_max_messages_per_inbox" int31))
-                         (obj3
+                         (obj4
                             (req "tx_rollup_max_finalized_levels" int31)
                             (req "tx_rollup_cost_per_byte_ema_factor" int31)
-                            (req "tx_rollup_max_ticket_payload_size" int31)))
+                            (req "tx_rollup_max_ticket_payload_size" int31)
+                            (req "tx_rollup_rejection_max_proof_size" int31)))
                       (obj3
                          (req "sc_rollup_enable" bool)
                          (req "sc_rollup_origination_size" int31)

@@ -971,7 +971,7 @@ module Tx_rollup : sig
     message:string ->
     position:int ->
     path:string ->
-    proof:bool ->
+    proof:string ->
     context_hash:string ->
     withdraw_list_hash:string ->
     rollup:string ->

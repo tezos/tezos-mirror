@@ -152,10 +152,9 @@ let pp : Format.formatter -> t -> unit =
     Tx_rollup_inbox_repr.Merkle.pp_root
     t.inbox_merkle_root
 
-(* FIXME/TORU: We need a test that checks that. *)
 let empty_l2_context_hash =
   Context_hash.of_b58check_exn
-    "CoVdWnWTqvYLikKj8koW6zpxCvK6FzZiD31YWEpD1UNAjWn7vhch"
+    "CoVu7Pqp1Gh3z33mink5T5Q2kAQKtnn3GHxVhyehdKZpQMBxFBGF"
 
 let initial_message_result_hash =
   hash_message_result

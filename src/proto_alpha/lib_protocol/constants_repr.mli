@@ -151,6 +151,9 @@ type parametric = {
   tx_rollup_cost_per_byte_ema_factor : int;
   (* maximum size, in bytes, of the contents given in deposited tickets. *)
   tx_rollup_max_ticket_payload_size : int;
+  (* The maximum size, in bytes, of a Merkle proof.  Operations which would
+     require proofs larger than this should be no-ops. *)
+  tx_rollup_rejection_max_proof_size : int;
   sc_rollup_enable : bool;
   sc_rollup_origination_size : int;
   sc_rollup_challenge_window_in_blocks : int;

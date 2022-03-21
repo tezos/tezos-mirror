@@ -24,6 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = bool
+type t = Context.Proof.stream Context.Proof.t
 
-let encoding = Data_encoding.bool
+let encoding = Context.Proof_encoding.V2.Tree2.stream_proof_encoding
