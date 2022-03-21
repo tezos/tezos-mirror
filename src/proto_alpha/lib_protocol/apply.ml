@@ -29,13 +29,9 @@
 open Alpha_context
 
 type error +=
-  | (* `Permanent *)
-      Not_enough_endorsements of {required : int; provided : int}
-  | (* `Temporary *)
-      Wrong_consensus_operation_branch of
-      Block_hash.t * Block_hash.t
-  | (* `Permanent *)
-      Invalid_double_baking_evidence of {
+  | Not_enough_endorsements of {required : int; provided : int}
+  | Wrong_consensus_operation_branch of Block_hash.t * Block_hash.t
+  | Invalid_double_baking_evidence of {
       hash1 : Block_hash.t;
       level1 : Raw_level.t;
       round1 : Round.t;
@@ -43,79 +39,52 @@ type error +=
       level2 : Raw_level.t;
       round2 : Round.t;
     }
-  | (* `Permanent *)
-      Wrong_level_for_consensus_operation of {
+  | Wrong_level_for_consensus_operation of {
       expected : Raw_level.t;
       provided : Raw_level.t;
     }
-  | (* `Permanent *)
-      Wrong_round_for_consensus_operation of {
+  | Wrong_round_for_consensus_operation of {
       expected : Round.t;
       provided : Round.t;
     }
-  | (* `Permanent *)
-      Preendorsement_round_too_high of {
-      block_round : Round.t;
-      provided : Round.t;
-    }
-  | (* `Permanent *)
-      Unexpected_endorsement_in_block
-  | (* `Permanent *)
-      Unexpected_preendorsement_in_block
-  | (* `Permanent *)
-      Wrong_payload_hash_for_consensus_operation of {
+  | Preendorsement_round_too_high of {block_round : Round.t; provided : Round.t}
+  | Unexpected_endorsement_in_block
+  | Unexpected_preendorsement_in_block
+  | Wrong_payload_hash_for_consensus_operation of {
       expected : Block_payload_hash.t;
       provided : Block_payload_hash.t;
     }
-  | (* `Permanent *) Wrong_slot_used_for_consensus_operation
-  | (* `Temporary *)
-      Consensus_operation_for_future_level of {
+  | Wrong_slot_used_for_consensus_operation
+  | Consensus_operation_for_future_level of {
       expected : Raw_level.t;
       provided : Raw_level.t;
     }
-  | (* `Temporary *)
-      Consensus_operation_for_future_round of {
+  | Consensus_operation_for_future_round of {
       expected : Round.t;
       provided : Round.t;
     }
-  | (* `Outdated *)
-      Consensus_operation_for_old_level of {
+  | Consensus_operation_for_old_level of {
       expected : Raw_level.t;
       provided : Raw_level.t;
     }
-  | (* `Branch *)
-      Consensus_operation_for_old_round of {
+  | Consensus_operation_for_old_round of {
       expected : Round.t;
       provided : Round.t;
     }
-  | (* `Branch *)
-      Consensus_operation_on_competing_proposal of {
+  | Consensus_operation_on_competing_proposal of {
       expected : Block_payload_hash.t;
       provided : Block_payload_hash.t;
     }
-  | (* `Permanent *)
-      Set_deposits_limit_on_originated_contract
-  | (* `Temporary *)
-      Set_deposits_limit_on_unregistered_delegate of
-      Signature.Public_key_hash.t
-  | (* `Permanent *)
-      Set_deposits_limit_too_high of {
-      limit : Tez.t;
-      max_limit : Tez.t;
-    }
-  | (* `Branch *) Empty_transaction of Contract.t
-  | (* `Permanent *)
-      Tx_rollup_feature_disabled
-  | (* `Permanent *)
-      Tx_rollup_invalid_transaction_amount
-  | (* `Permanent *)
-      Tx_rollup_non_internal_transaction
-  | (* `Permanent *)
-      Sc_rollup_feature_disabled
-  | (* `Permanent *)
-      Inconsistent_counters
-  | (* `Permanent *)
-      Tx_rollup_operation_with_non_implicit_contract
+  | Set_deposits_limit_on_originated_contract
+  | Set_deposits_limit_on_unregistered_delegate of Signature.Public_key_hash.t
+  | Set_deposits_limit_too_high of {limit : Tez.t; max_limit : Tez.t}
+  | Empty_transaction of Contract.t
+  | Tx_rollup_feature_disabled
+  | Tx_rollup_invalid_transaction_amount
+  | Tx_rollup_non_internal_transaction
+  | Sc_rollup_feature_disabled
+  | Inconsistent_counters
+  | Tx_rollup_operation_with_non_implicit_contract
 
 let () =
   register_error_kind
@@ -572,13 +541,10 @@ let () =
     (function Inconsistent_counters -> Some () | _ -> None)
     (fun () -> Inconsistent_counters)
 
-type error +=
-  | (* `Temporary *) Wrong_voting_period of {expected : int32; provided : int32}
+type error += Wrong_voting_period of {expected : int32; provided : int32}
 
 type error +=
-  | (* `Permanent *)
-      Internal_operation_replay of
-      Apply_results.packed_internal_contents
+  | Internal_operation_replay of Apply_results.packed_internal_contents
 
 type denunciation_kind = Preendorsement | Endorsement | Block
 
@@ -596,49 +562,42 @@ let pp_denunciation_kind fmt : denunciation_kind -> unit = function
   | Endorsement -> Format.fprintf fmt "endorsement"
   | Block -> Format.fprintf fmt "baking"
 
-type error += (* `Permanent *)
-              Invalid_denunciation of denunciation_kind
+type error += Invalid_denunciation of denunciation_kind
 
 type error +=
-  | (* `Permanent *)
-      Inconsistent_denunciation of {
+  | Inconsistent_denunciation of {
       kind : denunciation_kind;
       delegate1 : Signature.Public_key_hash.t;
       delegate2 : Signature.Public_key_hash.t;
     }
 
-type error += (* `Branch *) Unrequired_denunciation
+type error += Unrequired_denunciation
 
 type error +=
-  | (* `Temporary *)
-      Too_early_denunciation of {
+  | Too_early_denunciation of {
       kind : denunciation_kind;
       level : Raw_level.t;
       current : Raw_level.t;
     }
 
 type error +=
-  | (* `Permanent *)
-      Outdated_denunciation of {
+  | Outdated_denunciation of {
       kind : denunciation_kind;
       level : Raw_level.t;
       last_cycle : Cycle.t;
     }
 
-type error +=
-  | (* Permanent *) Invalid_activation of {pkh : Ed25519.Public_key_hash.t}
+type error += Invalid_activation of {pkh : Ed25519.Public_key_hash.t}
 
-type error += (* Permanent *) Multiple_revelation
+type error += Multiple_revelation
 
-type error += (* Permanent *) Gas_quota_exceeded_init_deserialize
+type error += Gas_quota_exceeded_init_deserialize
 
-type error += (* `Permanent *) Inconsistent_sources
+type error += Inconsistent_sources
 
-type error += (* `Permanent *) Failing_noop_error
+type error += Failing_noop_error
 
-type error +=
-  | (* `Permanent *)
-      Zero_frozen_deposits of Signature.Public_key_hash.t
+type error += Zero_frozen_deposits of Signature.Public_key_hash.t
 
 let () =
   register_error_kind

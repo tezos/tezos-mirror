@@ -36,21 +36,19 @@
 open Alpha_context
 open Apply_results
 
-type error +=
-  | (* `Permanent *)
-      Internal_operation_replay of packed_internal_contents
+type error += Internal_operation_replay of packed_internal_contents
 
-type error += (* Permanent *) Gas_quota_exceeded_init_deserialize
+type error += Gas_quota_exceeded_init_deserialize
 
-type error += (* `Permanent *) Tx_rollup_feature_disabled
+type error += Tx_rollup_feature_disabled
 
-type error += (* `Permanent *) Tx_rollup_invalid_transaction_amount
+type error += Tx_rollup_invalid_transaction_amount
 
-type error += (* `Permanent *) Tx_rollup_non_internal_transaction
+type error += Tx_rollup_non_internal_transaction
 
-type error += (* `Permanent *) Sc_rollup_feature_disabled
+type error += Sc_rollup_feature_disabled
 
-type error += (* `Permanent *) Inconsistent_counters
+type error += Inconsistent_counters
 
 val begin_partial_construction :
   context ->
