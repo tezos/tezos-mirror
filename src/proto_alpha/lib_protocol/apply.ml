@@ -1194,7 +1194,6 @@ let apply_internal_manager_operation_content :
     payer:public_key_hash ->
     source:Contract.t ->
     chain_id:Chain_id.t ->
-    internal:bool ->
     gas_consumed_in_precheck:Gas.cost option ->
     kind Script_typed_ir.manager_operation ->
     (context
@@ -1202,14 +1201,7 @@ let apply_internal_manager_operation_content :
     * Script_typed_ir.packed_internal_operation list)
     tzresult
     Lwt.t =
- fun ctxt
-     mode
-     ~payer
-     ~source
-     ~chain_id
-     ~internal
-     ~gas_consumed_in_precheck
-     operation ->
+ fun ctxt mode ~payer ~source ~chain_id ~gas_consumed_in_precheck operation ->
   prepare_apply_manager_operation_content
     ~ctxt
     ~source
@@ -1235,7 +1227,7 @@ let apply_internal_manager_operation_content :
         ~payer
         ~chain_id
         ~mode
-        ~internal
+        ~internal:true
       >|=? fun (ctxt, manager_result, operations) ->
       ( ctxt,
         (manager_result : kind successful_manager_operation_result),
@@ -1268,7 +1260,7 @@ let apply_internal_manager_operation_content :
         ~ctxt
         ~parsed_script:(Some parsed_script)
         ~script
-        ~internal
+        ~internal:true
         ~contract
         ~delegate
         ~source
@@ -1783,7 +1775,6 @@ let apply_internal_manager_operations ctxt mode ~payer ~chain_id ops =
             ~source
             ~payer
             ~chain_id
-            ~internal:true
             ~gas_consumed_in_precheck:None
             operation)
         >>= function
