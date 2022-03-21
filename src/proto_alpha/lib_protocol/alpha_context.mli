@@ -1639,7 +1639,7 @@ module Tx_rollup_withdraw : sig
     Tx_rollup.t ->
     Tx_rollup_level.t ->
     message_index:int ->
-    withdraw_index:int ->
+    withdraw_position:int ->
     context tzresult Lwt.t
 
   val mem :
@@ -1647,7 +1647,7 @@ module Tx_rollup_withdraw : sig
     Tx_rollup.t ->
     Tx_rollup_level.t ->
     message_index:int ->
-    withdraw_index:int ->
+    withdraw_position:int ->
     (bool * context) tzresult Lwt.t
 end
 
@@ -2823,7 +2823,7 @@ and _ manager_operation =
       message_index : int;
       withdrawals_merkle_root : Tx_rollup_withdraw.Merkle.root;
       withdraw_path : Tx_rollup_withdraw.Merkle.path;
-      withdraw_index : int;
+      withdraw_position : int;
       contents : Script.lazy_expr;
       ty : Script.lazy_expr;
       ticketer : Contract.t;

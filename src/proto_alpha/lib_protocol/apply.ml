@@ -1311,7 +1311,7 @@ let apply_external_manager_operation_content :
         message_index;
         withdrawals_merkle_root;
         withdraw_path;
-        withdraw_index;
+        withdraw_position;
         contents;
         ty;
         ticketer;
@@ -1346,7 +1346,7 @@ let apply_external_manager_operation_content :
       in
       Tx_rollup_withdraw.Merkle.check_path
         withdraw_path
-        withdraw_index
+        withdraw_position
         withdrawal
         withdrawals_merkle_root
       >>?= fun is_path_correct ->
@@ -1361,11 +1361,21 @@ let apply_external_manager_operation_content :
            ~message_index)
         Tx_rollup_errors.Withdraw_invalid_path
       >>=? fun () ->
-      Tx_rollup_withdraw.mem ctxt tx_rollup level ~message_index ~withdraw_index
+      Tx_rollup_withdraw.mem
+        ctxt
+        tx_rollup
+        level
+        ~message_index
+        ~withdraw_position
       >>=? fun (already_consumed, ctxt) ->
       fail_when already_consumed Tx_rollup_errors.Withdraw_already_consumed
       >>=? fun () ->
-      Tx_rollup_withdraw.add ctxt tx_rollup level ~message_index ~withdraw_index
+      Tx_rollup_withdraw.add
+        ctxt
+        tx_rollup
+        level
+        ~message_index
+        ~withdraw_position
       >>=? fun ctxt ->
       (* Now reconstruct the ticket sent as the parameter
           destination. *)

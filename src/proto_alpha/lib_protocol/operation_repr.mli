@@ -393,7 +393,7 @@ and _ manager_operation =
       withdraw_path : Tx_rollup_withdraw_repr.Merkle.path;
           (** The proof that this withdraw is indeed included in
               commitment for [tx_rollup] at [level] with [context_hash]. *)
-      withdraw_index : int;
+      withdraw_position : int;
           (** Index of [withdrawal] in the message result of message at [message_index]. *)
       contents : Script_repr.lazy_expr;  (** Contents of the withdrawn ticket *)
       ty : Script_repr.lazy_expr;

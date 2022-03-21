@@ -110,7 +110,7 @@ let () =
     ~id:"tx_rollup_negative_withdrawal_index"
     ~title:"The withdrawal index must be non-negative"
     ~description:"The withdrawal index must be non-negative"
-    (obj1 (req "withdraw_index" int31))
+    (obj1 (req "withdraw_position" int31))
     (function Negative_withdrawal_index i -> Some i | _ -> None)
     (fun i -> Negative_withdrawal_index i) ;
   register_error_kind
@@ -118,7 +118,7 @@ let () =
     ~id:"tx_rollup_invalid_withdrawal_argument"
     ~title:"The withdrawal index must be less than 64"
     ~description:"The withdrawal index must be less than 64"
-    (obj1 (req "withdraw_index" int31))
+    (obj1 (req "withdraw_position" int31))
     (function Too_big_withdrawal_index i -> Some i | _ -> None)
     (fun i -> Too_big_withdrawal_index i)
 

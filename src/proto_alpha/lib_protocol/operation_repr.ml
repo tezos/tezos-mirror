@@ -332,7 +332,7 @@ and _ manager_operation =
       message_index : int;
       withdrawals_merkle_root : Tx_rollup_withdraw_repr.Merkle.root;
       withdraw_path : Tx_rollup_withdraw_repr.Merkle.path;
-      withdraw_index : int;
+      withdraw_position : int;
       contents : Script_repr.lazy_expr;
       ty : Script_repr.lazy_expr;
       ticketer : Contract_repr.t;
@@ -775,7 +775,7 @@ module Encoding = struct
                  (req
                     "withdraw_path"
                     Tx_rollup_withdraw_repr.Merkle.path_encoding)
-                 (req "withdraw_index" int31)
+                 (req "withdraw_position" int31)
                  (req "ticket_contents" Script_repr.lazy_expr_encoding)
                  (req "ticket_ty" Script_repr.lazy_expr_encoding)
                  (req "ticket_ticketer" Contract_repr.encoding))
@@ -796,7 +796,7 @@ module Encoding = struct
                   message_index;
                   withdrawals_merkle_root;
                   withdraw_path;
-                  withdraw_index;
+                  withdraw_position;
                   contents;
                   ty;
                   ticketer;
@@ -810,7 +810,7 @@ module Encoding = struct
                     message_index,
                     withdrawals_merkle_root,
                     withdraw_path,
-                    withdraw_index,
+                    withdraw_position,
                     contents,
                     ty,
                     ticketer ),
@@ -822,7 +822,7 @@ module Encoding = struct
                      message_index,
                      withdrawals_merkle_root,
                      withdraw_path,
-                     withdraw_index,
+                     withdraw_position,
                      contents,
                      ty,
                      ticketer ),
@@ -835,7 +835,7 @@ module Encoding = struct
                   message_index;
                   withdrawals_merkle_root;
                   withdraw_path;
-                  withdraw_index;
+                  withdraw_position;
                   contents;
                   ty;
                   ticketer;
