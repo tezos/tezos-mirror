@@ -25,6 +25,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 open Protocol.Alpha_context
+open Common
 
 (** The RPC server and the Daemon main loop are sharing a variable of the
     type stored in the Irmin store. The [State] module allows access to this stored
@@ -33,24 +34,30 @@ open Protocol.Alpha_context
 (** The origination block and level of the rollup is kept in the state. *)
 type rollup_origination = {block_hash : Block_hash.t; block_level : int32}
 
-type t = private {
+(* TODO/TORU: have different operators (for commitments, rejections, batches,
+   etc.) and have multiple injection keys (except for commitments). *)
+
+type t = {
   store : Stores.t;
   context_index : Context.index;
   rollup : Tx_rollup.t;
   rollup_origination : rollup_origination;
   parameters : Protocol.Tx_rollup_l2_apply.parameters;
+  operator : signer option;
+  batcher_state : Batcher.state option;
 }
 
-(** [init ~data_dir ~context ~rollup_genesis rollup] creates a new state for the
-    rollup node with a new store and context.  If the [rollup_genesis] block hash
-    is provided, checks that the rollup [rollup_id] is created inside the block
-    identified by the hash. Otherwise, the genesis information is read from the
-    disk. Note that if a [rollup_genesis] is provided, it must also match the one
-    on disk. *)
+(** [init cctxt ~data_dir ~rollup_genesis ~operator rollup] creates a new state
+    for the rollup node with a new store and context.  If the [rollup_genesis]
+    block hash is provided, checks that the rollup [rollup_id] is created inside
+    the block identified by the hash. Otherwise, the genesis information is read
+    from the disk. Note that if a [rollup_genesis] is provided, it must also
+    match the one on disk. *)
 val init :
+  #Protocol_client_context.full ->
   data_dir:string ->
-  context:#Protocol_client_context.full ->
   ?rollup_genesis:Block_hash.t ->
+  operator:string option ->
   Tx_rollup.t ->
   t tzresult Lwt.t
 
@@ -91,8 +98,8 @@ val tezos_block_already_processed : t -> Block_hash.t -> bool Lwt.t
 
 (** {2 Saving the state to disk}  *)
 
-(** Set the current head of the rollup. *)
-val set_head : t -> L2block.header -> unit tzresult Lwt.t
+(** Set the current head of the rollup with it's context. *)
+val set_head : t -> L2block.header -> Context.t -> unit tzresult Lwt.t
 
 (** Save an L2 block to disk:
     - Save both the header and the inbox

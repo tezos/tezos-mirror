@@ -313,7 +313,8 @@ let rec process_block cctxt state current_hash rollup_id :
     | Some l2_header ->
         (* Already processed *)
         let*! () = Event.(emit block_already_processed) current_hash in
-        let* () = State.set_head state l2_header in
+        let* context = checkout_context state l2_header.context in
+        let* () = State.set_head state l2_header context in
         return (l2_header, None)
     | None ->
         let* block_info =
@@ -346,15 +347,22 @@ let rec process_block cctxt state current_hash rollup_id :
             block_info
             rollup_id
         in
-        let* () = State.set_head state l2_header in
+        let* () = State.set_head state l2_header context in
         let*! () = Event.(emit new_tezos_head) current_hash in
         let*! () = Event.(emit block_processed) (current_hash, block_level) in
         return (l2_header, Some context)
 
+let maybe_batch_and_inject cctxt state =
+  match state.State.batcher_state with
+  | None -> ()
+  | Some batcher_state -> Batcher.async_batch_and_inject cctxt batcher_state
+
 let process_head cctxt state current_hash rollup_id =
   let open Lwt_result_syntax in
   let*! () = Event.(emit new_block) current_hash in
-  process_block cctxt state current_hash rollup_id
+  let+ res = process_block cctxt state current_hash rollup_id in
+  maybe_batch_and_inject cctxt state ;
+  res
 
 let main_exit_callback state data_dir exit_status =
   let open Lwt_syntax in
@@ -378,11 +386,17 @@ let rec connect ~delay cctxt =
 let run configuration cctxt =
   let open Lwt_result_syntax in
   let*! () = Event.(emit starting_node) () in
-  let {Configuration.data_dir; rollup_id; rollup_genesis; reconnection_delay; _}
-      =
+  let {
+    Configuration.data_dir;
+    rollup_id;
+    rollup_genesis;
+    operator;
+    reconnection_delay;
+    _;
+  } =
     configuration
   in
-  let* state = State.init ~data_dir ~context:cctxt ?rollup_genesis rollup_id in
+  let* state = State.init cctxt ~data_dir ~operator ?rollup_genesis rollup_id in
   let* _rpc_server = RPC.start configuration state in
   let _ =
     (* Register cleaner callback *)

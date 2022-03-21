@@ -28,7 +28,7 @@
 open Protocol.Alpha_context
 open Protocol.Apply_results
 open Protocol_client_context
-module Block_hash_map = Map.Make (Block_hash)
+open Common
 
 type rollup_origination = {block_hash : Block_hash.t; block_level : int32}
 
@@ -38,6 +38,8 @@ type t = {
   rollup : Tx_rollup.t;
   rollup_origination : rollup_origination;
   parameters : Protocol.Tx_rollup_l2_apply.parameters;
+  operator : signer option;
+  batcher_state : Batcher.state option;
 }
 
 (* Stands for the manager operation pass, in which the rollup transactions are
@@ -46,7 +48,11 @@ let rollup_operation_index = 3
 
 let get_head state = Stores.L2_head.find state.store
 
-let set_head state header = Stores.L2_head.set state.store header
+let set_head state header context =
+  (match state.batcher_state with
+  | None -> ()
+  | Some batcher_state -> Batcher.update_incr_context batcher_state context) ;
+  Stores.L2_head.set state.store header
 
 let save_tezos_l2_block_hash state block info =
   Stores.Tezos_blocks.add state.store block info
@@ -144,7 +150,7 @@ let check_origination_in_block_info rollup block_info =
   | Some _ -> return_unit
   | None -> fail @@ Error.Tx_rollup_not_originated_in_the_given_block rollup
 
-let init_store ~data_dir ~context ?rollup_genesis rollup =
+let init_store cctxt ~data_dir ?rollup_genesis rollup =
   let open Lwt_result_syntax in
   let* store = Stores.load (Node_data.store_dir data_dir) in
   let*! origination_info = Stores.Rollup_origination.find store in
@@ -176,7 +182,7 @@ let init_store ~data_dir ~context ?rollup_genesis rollup =
     | (None, Some rollup_genesis) ->
         let block = `Hash (rollup_genesis, 0) in
         let* block_info =
-          Alpha_block_services.info context ~chain:context#chain ~block ()
+          Alpha_block_services.info cctxt ~chain:cctxt#chain ~block ()
         in
         let* () = check_origination_in_block_info rollup block_info in
         let rollup_orig =
@@ -210,11 +216,24 @@ let init_parameters cctxt =
         parametric.tx_rollup_max_withdrawals_per_batch;
     }
 
-let init ~data_dir ~context ?rollup_genesis rollup =
+let init cctxt ~data_dir ?rollup_genesis ~operator rollup =
   let open Lwt_result_syntax in
-  let store_orig = init_store ~data_dir ~context ?rollup_genesis rollup in
+  let store_orig = init_store cctxt ~data_dir ?rollup_genesis rollup in
   let context_index = init_context ~data_dir in
   let* (store, rollup_origination) = store_orig in
   let* context_index = context_index in
-  let* parameters = init_parameters context in
-  return {store; context_index; rollup; rollup_origination; parameters}
+  let* parameters = init_parameters cctxt in
+  let* batcher_state =
+    Batcher.init cctxt ~rollup ~signer:operator context_index parameters
+  in
+  let* operator = get_signer cctxt operator in
+  return
+    {
+      store;
+      context_index;
+      rollup;
+      rollup_origination;
+      parameters;
+      operator;
+      batcher_state;
+    }
