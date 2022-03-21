@@ -152,7 +152,7 @@ let burn_per_byte state = inbox_burn state 1
 (** [context_init n] initializes a context with no consensus rewards
     to not interfere with balances prediction. It returns the created
     context and [n] contracts. *)
-let context_init ?(tx_rollup_max_unfinalized_levels = 2100)
+let context_init ?(tx_rollup_max_inboxes_count = 2100)
     ?(tx_rollup_rejection_max_proof_size = 30_000)
     ?(tx_rollup_max_ticket_payload_size = 10_240) n =
   Context.init_with_constants
@@ -162,9 +162,9 @@ let context_init ?(tx_rollup_max_unfinalized_levels = 2100)
       tx_rollup_enable = true;
       tx_rollup_finality_period = 1;
       tx_rollup_withdraw_period = 1;
-      tx_rollup_max_finalized_levels = 2;
+      tx_rollup_max_commitments_count = 3;
       tx_rollup_rejection_max_proof_size;
-      tx_rollup_max_unfinalized_levels;
+      tx_rollup_max_inboxes_count;
       endorsing_reward_per_slot = Tez.zero;
       baking_reward_bonus_per_slot = Tez.zero;
       baking_reward_fixed_portion = Tez.zero;
@@ -175,10 +175,10 @@ let context_init ?(tx_rollup_max_unfinalized_levels = 2100)
 (** [context_init1] initializes a context with no consensus rewards
     to not interfere with balances prediction. It returns the created
     context and 1 contract. *)
-let context_init1 ?tx_rollup_max_unfinalized_levels
+let context_init1 ?tx_rollup_max_inboxes_count
     ?tx_rollup_max_ticket_payload_size ?tx_rollup_rejection_max_proof_size () =
   context_init
-    ?tx_rollup_max_unfinalized_levels
+    ?tx_rollup_max_inboxes_count
     ?tx_rollup_max_ticket_payload_size
     ?tx_rollup_rejection_max_proof_size
     1
@@ -189,12 +189,9 @@ let context_init1 ?tx_rollup_max_unfinalized_levels
 (** [context_init2] initializes a context with no consensus rewards
     to not interfere with balances prediction. It returns the created
     context and 2 contracts. *)
-let context_init2 ?tx_rollup_max_unfinalized_levels
+let context_init2 ?tx_rollup_max_inboxes_count
     ?tx_rollup_max_ticket_payload_size () =
-  context_init
-    ?tx_rollup_max_unfinalized_levels
-    ?tx_rollup_max_ticket_payload_size
-    2
+  context_init ?tx_rollup_max_inboxes_count ?tx_rollup_max_ticket_payload_size 2
   >|=? function
   | (b, contract_1 :: contract_2 :: _) -> (b, contract_1, contract_2)
   | (_, _) -> assert false
@@ -1158,8 +1155,7 @@ let test_deposit_by_non_internal_operation () =
 
 (** Test that block finalization changes gas rates *)
 let test_finalization () =
-  context_init ~tx_rollup_max_unfinalized_levels:5_000 2
-  >>=? fun (b, contracts) ->
+  context_init ~tx_rollup_max_inboxes_count:5_000 2 >>=? fun (b, contracts) ->
   let filler = WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0 in
   let contract =
     WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0
@@ -1422,7 +1418,7 @@ let test_full_inbox () =
       baking_reward_bonus_per_slot = Tez.zero;
       baking_reward_fixed_portion = Tez.zero;
       tx_rollup_enable = true;
-      tx_rollup_max_unfinalized_levels = 15;
+      tx_rollup_max_inboxes_count = 15;
     }
   in
   Context.init_with_constants constants 1 >>=? fun (b, contracts) ->
@@ -1534,8 +1530,7 @@ let test_too_many_commitments () =
   Incremental.add_operation
     i
     op
-    ~expect_failure:
-      (check_proto_error Tx_rollup_errors.Too_many_finalized_commitments)
+    ~expect_failure:(check_proto_error Tx_rollup_errors.Too_many_commitments)
   >>=? fun i ->
   (* Wait out the withdrawal period. *)
   bake_until i 12l >>=? fun i ->

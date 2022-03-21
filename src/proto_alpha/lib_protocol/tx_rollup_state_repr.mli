@@ -76,9 +76,9 @@ val burn_cost : limit:Tez_repr.t option -> t -> int -> Tez_repr.t tzresult
     commitment yet. *)
 val uncommitted_inboxes_count : t -> int
 
-(** [finalized_commitments_count t] returns the number of finalized
-    commitment still in the layer-1 context. *)
-val finalized_commitments_count : t -> int
+(** [commitments_count t] returns the number of commitment still in
+    the layer-1 context. *)
+val commitments_count : t -> int
 
 (** [inboxes_count state] returns the number of inboxes the rollup
     current has in the storage. *)

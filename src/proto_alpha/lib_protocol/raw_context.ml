@@ -857,7 +857,7 @@ let prepare_first_block ~level ~timestamp ctxt =
         (* Ignore reminder if any *)
         Int32.div c.blocks_per_voting_period c.blocks_per_cycle
       in
-      let tx_rollup_withdraw_period = 60_000 in
+      let tx_rollup_finality_period = 60_000 in
       let constants =
         Constants_repr.
           {
@@ -909,15 +909,16 @@ let prepare_first_block ~level ~timestamp ctxt =
             tx_rollup_hard_size_limit_per_message = 5_000;
             tx_rollup_max_withdrawals_per_batch = 255;
             tx_rollup_commitment_bond = Tez_repr.of_mutez_exn 10_000_000_000L;
-            tx_rollup_finality_period = 2_000;
-            tx_rollup_withdraw_period;
-            tx_rollup_max_unfinalized_levels = 2_100;
+            tx_rollup_finality_period;
+            tx_rollup_withdraw_period = tx_rollup_finality_period;
+            tx_rollup_max_inboxes_count = tx_rollup_finality_period + 100;
             (* This is determined by [max_operation_data_length] minus
                the overhead of a commitment (192) divided by the size of an
                Irmin Merkle root (32). But we subtract 8 just in case we
                later need to increase the size of a commitment. *)
             tx_rollup_max_messages_per_inbox = 1_010;
-            tx_rollup_max_finalized_levels = tx_rollup_withdraw_period + 100;
+            tx_rollup_max_commitments_count =
+              (2 * tx_rollup_finality_period) + 100;
             (* The default ema factor is [120] blocks, so about one hour. *)
             tx_rollup_cost_per_byte_ema_factor = 120;
             tx_rollup_max_ticket_payload_size = 10_240;

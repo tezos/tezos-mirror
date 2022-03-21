@@ -388,8 +388,8 @@ let inboxes_count {unfinalized_commitments; uncommitted_inboxes; _} =
 let uncommitted_inboxes_count {uncommitted_inboxes; _} =
   range_count uncommitted_inboxes
 
-let finalized_commitments_count {finalized_commitments; _} =
-  range_count finalized_commitments
+let commitments_count {finalized_commitments; unfinalized_commitments; _} =
+  range_count unfinalized_commitments + range_count finalized_commitments
 
 let record_inbox_creation t level =
   (match t.tezos_head_level with

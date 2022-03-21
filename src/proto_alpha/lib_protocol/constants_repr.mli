@@ -139,13 +139,13 @@ type parametric = {
   (* the minimum number of blocks to wait before removing a finalised
      commitment from the context. *)
   tx_rollup_withdraw_period : int;
-  tx_rollup_max_unfinalized_levels : int;
+  tx_rollup_max_inboxes_count : int;
   (* the maximum number of messages in an inbox.  This bounds the
      size of a commitment. *)
   tx_rollup_max_messages_per_inbox : int;
   (* the maximum number of finalized commitments, to ensure that
      remove_commitment is ever called *)
-  tx_rollup_max_finalized_levels : int;
+  tx_rollup_max_commitments_count : int;
   (* The number of blocks used to compute the ema factor determining
      the cost per byte for new messages in the inbox. *)
   tx_rollup_cost_per_byte_ema_factor : int;
