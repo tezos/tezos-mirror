@@ -102,6 +102,8 @@ module Commitment : sig
     number_of_ticks : Number_of_ticks.t;
   }
 
+  val pp : Format.formatter -> t -> unit
+
   val encoding : t Data_encoding.t
 
   val hash : t -> Commitment_hash.t

@@ -540,6 +540,15 @@ let refine_stake ctxt rollup staker commitment =
   in
   go Commitment.(commitment.predecessor) ctxt
 
+let publish_commitment ctxt rollup staker commitment =
+  let open Lwt_tzresult_syntax in
+  let* (ctxt, res) = Store.Stakers.find (ctxt, rollup) staker in
+  match res with
+  | None ->
+      let* ctxt = deposit_stake ctxt rollup staker in
+      refine_stake ctxt rollup staker commitment
+  | Some _ -> refine_stake ctxt rollup staker commitment
+
 let cement_commitment ctxt rollup new_lcc =
   let open Lwt_tzresult_syntax in
   let refutation_deadline_blocks =

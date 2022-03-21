@@ -237,6 +237,27 @@ module Commitment = struct
     number_of_ticks : Number_of_ticks.t;
   }
 
+  let pp fmt
+      {
+        compressed_state;
+        inbox_level;
+        predecessor;
+        number_of_messages;
+        number_of_ticks;
+      } =
+    Format.fprintf
+      fmt
+      "@[<v 2>SCORU Commitment:@ compressed_state: %a@ inbox_level: %a@ \
+       predecessor: %a@ number_of_messages: %d@ number_of_ticks: %d@]"
+      State_hash.pp
+      compressed_state
+      Raw_level_repr.pp
+      inbox_level
+      Commitment_hash.pp
+      predecessor
+      (Int32.to_int (Number_of_messages.to_int32 number_of_messages))
+      (Int32.to_int (Number_of_ticks.to_int32 number_of_ticks))
+
   let encoding =
     let open Data_encoding in
     conv
