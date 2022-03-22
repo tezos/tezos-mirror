@@ -76,6 +76,7 @@ type argument =
   | Peer of string  (** [--peer] *)
   | No_bootstrap_peers  (** [--no-bootstrap-peers] *)
   | Disable_operations_precheck  (** [--disable-mempool-precheck] *)
+  | Media_type of media_type  (** [--media-type] *)
 
 (** Tezos node states. *)
 type t
@@ -121,7 +122,6 @@ val create :
   ?advertised_net_port:int ->
   ?rpc_host:string ->
   ?rpc_port:int ->
-  ?media_type:media_type ->
   argument list ->
   t
 
@@ -389,7 +389,6 @@ val init :
   ?rpc_port:int ->
   ?event_level:Daemon.Level.default_level ->
   ?event_sections_levels:(string * Daemon.Level.level) list ->
-  ?media_type:media_type ->
   argument list ->
   t Lwt.t
 

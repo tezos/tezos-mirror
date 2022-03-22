@@ -44,6 +44,7 @@ type argument =
   | Peer of string
   | No_bootstrap_peers
   | Disable_operations_precheck
+  | Media_type of media_type
 
 let make_argument = function
   | Network x -> ["--network"; x]
@@ -64,6 +65,7 @@ let make_argument = function
   | Peer x -> ["--peer"; x]
   | No_bootstrap_peers -> ["--no-bootstrap-peers"]
   | Disable_operations_precheck -> ["--disable-mempool-precheck"]
+  | Media_type media_type -> ["--media-type"; string_of_media_type media_type]
 
 let make_arguments arguments = List.flatten (List.map make_argument arguments)
 
@@ -76,7 +78,6 @@ module Parameters = struct
     advertised_net_port : int option;
     rpc_host : string;
     rpc_port : int;
-    media_type : media_type;
     default_expected_pow : int;
     mutable arguments : argument list;
     mutable pending_ready : unit option Lwt.u list;
@@ -420,7 +421,7 @@ let wait_for_request ~request node =
 
 let create ?runner ?(path = Constant.tezos_node) ?name ?color ?data_dir
     ?event_pipe ?net_port ?advertised_net_port ?(rpc_host = "localhost")
-    ?rpc_port ?(media_type = Any) arguments =
+    ?rpc_port arguments =
   let name = match name with None -> fresh_name () | Some name -> name in
   let data_dir =
     match data_dir with None -> Temp.dir ?runner name | Some dir -> dir
@@ -454,7 +455,6 @@ let create ?runner ?(path = Constant.tezos_node) ?name ?color ?data_dir
         advertised_net_port;
         rpc_host;
         rpc_port;
-        media_type;
         arguments;
         default_expected_pow;
         runner;
@@ -527,11 +527,7 @@ let runlike_command_arguments node command arguments =
   (net_addr ^ string_of_int node.persistent_state.net_port)
   ::
   "--rpc-addr"
-  ::
-  (rpc_addr ^ string_of_int node.persistent_state.rpc_port)
-  ::
-  "--media-type"
-  :: string_of_media_type node.persistent_state.media_type :: command_args
+  :: (rpc_addr ^ string_of_int node.persistent_state.rpc_port) :: command_args
 
 let do_runlike_command ?(on_terminate = fun _ -> ()) ?event_level
     ?event_sections_levels node arguments =
@@ -582,7 +578,7 @@ let replay ?on_terminate ?event_level ?event_sections_levels
 
 let init ?runner ?path ?name ?color ?data_dir ?event_pipe ?net_port
     ?advertised_net_port ?rpc_host ?rpc_port ?event_level ?event_sections_levels
-    ?media_type arguments =
+    arguments =
   let node =
     create
       ?runner
@@ -595,7 +591,6 @@ let init ?runner ?path ?name ?color ?data_dir ?event_pipe ?net_port
       ?advertised_net_port
       ?rpc_host
       ?rpc_port
-      ?media_type
       arguments
   in
   let* () = identity_generate node in

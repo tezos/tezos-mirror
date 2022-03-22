@@ -995,11 +995,11 @@ let binary_regression_test () =
   else Test.fail "Unexpected binary answer"
 
 let test_node_binary_mode address () =
-  let node = Node.create ~media_type:Binary ~rpc_host:address [] in
+  let node = Node.create ~rpc_host:address [] in
   let endpoint = Client.(Node node) in
   let* () = Node.config_init node [] in
   let* () = Node.identity_generate node in
-  let* () = Node.run node [] in
+  let* () = Node.run node [Media_type Binary] in
   let* client = Client.init ~endpoint ~media_type:Json () in
   Client.spawn_rpc GET ["chains"; "main"; "blocks"] client
   |> Process.check_error ~exit_code:1
