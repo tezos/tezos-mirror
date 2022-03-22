@@ -400,60 +400,6 @@ let consume_control local_gas_counter ks =
 
 (*
 
-   Auxiliary functions used by the instrumentation
-   ===============================================
-
-*)
-
-let log_entry logger ctxt gas k sty accu stack =
-  let kinfo = kinfo_of_kinstr k in
-  let ctxt = update_context gas ctxt in
-  logger.log_entry k ctxt kinfo.iloc sty (accu, stack)
-
-let log_exit logger ctxt gas kinfo_prev k sty accu stack =
-  let _kinfo = kinfo_of_kinstr k in
-  let ctxt = update_context gas ctxt in
-  logger.log_exit k ctxt kinfo_prev.iloc sty (accu, stack)
-
-let log_control logger ks = logger.log_control ks
-
-let get_log = function
-  | None -> Lwt.return (Ok None)
-  | Some logger -> logger.get_log ()
-  [@@ocaml.inline always]
-
-(* [log_kinstr logger i] emits an instruction to instrument the
-   execution of [i] with [logger]. *)
-let log_kinstr logger sty i = ILog (kinfo_of_kinstr i, sty, LogEntry, logger, i)
-
-(* [log_next_kinstr logger i] instruments the next instruction of [i]
-   with the [logger].
-
-   Notice that the instrumentation breaks the sharing of continuations
-   that is normally enforced between branches of conditionals. This
-   has a performance cost. Anyway, the instrumentation allocates many
-   new [ILog] instructions and [KLog] continuations which makes
-   the execution of instrumented code significantly slower than
-   non-instrumented code. "Zero-cost logging" means that the normal
-   non-instrumented execution is not impacted by the ability to
-   instrument it, not that the logging itself has no cost.
-*)
-let log_next_kinstr logger sty i =
-  let apply sty k =
-    ILog
-      ( kinfo_of_kinstr k,
-        sty,
-        LogExit (kinfo_of_kinstr i),
-        logger,
-        log_kinstr logger sty k )
-  in
-  kinstr_rewritek sty i {apply}
-
-(* We pass the identity function when no instrumentation is needed. *)
-let id x = x [@@inline]
-
-(*
-
    Auxiliary functions used by the interpretation loop
    ===================================================
 

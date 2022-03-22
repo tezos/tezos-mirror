@@ -201,6 +201,7 @@
         "Tx_rollup_ticket",
 
         "Script_interpreter_defs",
+        "Script_interpreter_logging",
         "Script_interpreter",
         "Sc_rollup_management_protocol",
         "Sc_rollup_operations",

@@ -84,6 +84,7 @@
 
 open Alpha_context
 open Script_typed_ir
+open Script_interpreter_logging
 open Script_ir_translator
 open Local_gas_counter
 open Script_interpreter_defs
