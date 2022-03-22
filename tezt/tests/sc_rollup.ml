@@ -278,6 +278,47 @@ let test_rollup_inbox =
         node
         client)
 
+(* Fetching the initial level of a sc rollup
+   -----------------------------------------
+
+  We can fetch the level when a smart contract rollup was 
+  originated from the context.
+*)
+let test_rollup_get_initial_level =
+  let output_file _ = "sc_rollup_get_initial_level" in
+  test
+    ~__FILE__
+    ~output_file
+    ~tags:["initial_level"]
+    "get initial level of a sc rollup"
+    (fun protocol ->
+      setup ~protocol @@ fun node client bootstrap ->
+      let* current_level = RPC.get_current_level client in
+      ( with_fresh_rollup @@ fun sc_rollup_address _sc_rollup_node _filename ->
+        (* Bake 10 blocks to be sure that the initial level of rollup is different
+           from the current level. *)
+        let rec bake_blocks n =
+          match n with
+          | 0 -> return ()
+          | _ ->
+              Lwt.bind (Client.bake_for client) (fun _ -> bake_blocks (n - 1))
+        in
+        let* _ = bake_blocks 10 in
+        let* initial_level =
+          RPC.Sc_rollup.get_initial_level ~sc_rollup_address client
+        in
+        (* 1 Block for activating alpha + 1 block for originating the rollup
+           the rollup initial level should be 2 *)
+        Check.(
+          (JSON.as_int initial_level
+          = JSON.as_int (JSON.get "level" current_level) + 1)
+            int
+            ~error_msg:"expected value %L, got %R") ;
+        return () )
+        node
+        client
+        bootstrap)
+
 let test_rollup_list =
   let open Lwt.Syntax in
   let go node client bootstrap1 =
@@ -320,4 +361,5 @@ let register ~protocols =
   test_rollup_node_running protocols ;
   test_rollup_client_gets_address protocols ;
   test_rollup_inbox protocols ;
+  test_rollup_get_initial_level protocols ;
   test_rollup_list protocols

@@ -2953,6 +2953,13 @@ module RPC = struct
           ~output:Sc_rollup.Inbox.encoding
           RPC_path.(path /: Sc_rollup.Address.rpc_arg / "inbox")
 
+      let initial_level =
+        RPC_service.get_service
+          ~description:"Initial level for a smart-contract rollup"
+          ~query:RPC_query.empty
+          ~output:Raw_level_repr.encoding
+          RPC_path.(path /: Sc_rollup.Address.rpc_arg / "initial_level")
+
       let root =
         RPC_service.get_service
           ~description:"List of all originated smart contract rollups"
@@ -2976,6 +2983,12 @@ module RPC = struct
       Registration.register1 ~chunked:true S.kind @@ fun ctxt address () () ->
       Alpha_context.Sc_rollup.kind ctxt address
 
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/2688 *)
+    let register_initial_level () =
+      Registration.register1 ~chunked:true S.initial_level
+      @@ fun ctxt address () () ->
+      Alpha_context.Sc_rollup.initial_level ctxt address
+
     let register_root () =
       Registration.register0 ~chunked:true S.root (fun context () () ->
           Sc_rollup.list context)
@@ -2983,9 +2996,13 @@ module RPC = struct
     let register () =
       register_kind () ;
       register_inbox () ;
+      register_initial_level () ;
       register_root ()
 
     let list ctxt block = RPC_context.make_call0 S.root ctxt block () ()
+
+    let initial_level ctxt block sc_rollup_address =
+      RPC_context.make_call1 S.initial_level ctxt block sc_rollup_address ()
   end
 
   module Forge = struct

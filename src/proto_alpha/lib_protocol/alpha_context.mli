@@ -2464,6 +2464,8 @@ module Sc_rollup : sig
   val remove_staker : context -> t -> Staker.t -> context tzresult Lwt.t
 
   val list : context -> t list tzresult Lwt.t
+
+  val initial_level : context -> t -> Raw_level_repr.t tzresult Lwt.t
 end
 
 module Block_payload : sig

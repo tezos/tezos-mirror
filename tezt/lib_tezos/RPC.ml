@@ -652,6 +652,11 @@ module Sc_rollup = struct
       ~sc_rollup_address client =
     let path = path ~chain ~block ~sc_rollup_address @ ["inbox"] in
     Client.rpc ?endpoint ?hooks GET path client
+
+  let get_initial_level ?endpoint ?hooks ?(chain = "main") ?(block = "head")
+      ~sc_rollup_address client =
+    let path = path ~chain ~block ~sc_rollup_address @ ["initial_level"] in
+    Client.rpc ?endpoint ?hooks GET path client
 end
 
 module Curl = struct

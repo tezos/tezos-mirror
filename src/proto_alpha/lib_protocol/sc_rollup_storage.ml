@@ -690,3 +690,10 @@ let remove_staker ctxt rollup staker =
         go staked_on ctxt
 
 let list ctxt = Storage.Sc_rollup.PVM_kind.keys ctxt >|= Result.return
+
+let initial_level ctxt rollup =
+  let open Lwt_tzresult_syntax in
+  let* level = Storage.Sc_rollup.Initial_level.find ctxt rollup in
+  match level with
+  | None -> fail (Sc_rollup_does_not_exist rollup)
+  | Some level -> return level

@@ -589,6 +589,17 @@ let test_withdrawal_fails_when_not_staked_on_lcc () =
     (Sc_rollup_storage.withdraw_stake ctxt rollup staker)
     "Attempted to withdraw while not staked on the last cemented commitment."
 
+let test_initial_level_of_rollup () =
+  let* ctxt = new_context () in
+  let level_before_rollup = (Raw_context.current_level ctxt).level in
+  let* (rollup, ctxt) = lift @@ new_sc_rollup ctxt in
+  let ctxt = Raw_context.Internal_for_tests.add_level ctxt 10 in
+  let* initial_level = lift @@ Sc_rollup_storage.initial_level ctxt rollup in
+  Assert.equal_int32
+    ~loc:__LOC__
+    (Raw_level_repr.to_int32 level_before_rollup)
+    (Raw_level_repr.to_int32 initial_level)
+
 let test_stake_on_existing_node () =
   let* (ctxt, rollup, staker1, staker2) =
     originate_rollup_and_deposit_with_two_stakers ()
@@ -1295,6 +1306,9 @@ let test_remove_staker_from_missing_rollup () =
   assert_fails_with_missing_rollup ~loc:__LOC__ (fun ctxt rollup ->
       Sc_rollup_storage.remove_staker ctxt rollup Sc_rollup_repr.Staker.zero)
 
+let test_initial_level_of_missing_rollup () =
+  assert_fails_with_missing_rollup ~loc:__LOC__ Sc_rollup_storage.initial_level
+
 let test_concurrent_refinement_point_of_conflict () =
   let* (before_ctxt, rollup, staker1, staker2) =
     originate_rollup_and_deposit_with_two_stakers ()
@@ -1428,6 +1442,10 @@ let tests =
       `Quick
       test_withdrawal_fails_when_not_staked_on_lcc;
     Tztest.tztest
+      "initial_level returns correct level"
+      `Quick
+      test_initial_level_of_rollup;
+    Tztest.tztest
       "rollup starts in pre-boot state"
       `Quick
       test_initial_state_is_pre_boot;
@@ -1547,6 +1565,10 @@ let tests =
       "removing staker from missing rollup fails"
       `Quick
       test_remove_staker_from_missing_rollup;
+    Tztest.tztest
+      "initial level of missing rollup fails"
+      `Quick
+      test_initial_level_of_missing_rollup;
     Tztest.tztest
       "Refinement operations are commutative (point of conflict)"
       `Quick
