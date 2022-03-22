@@ -84,7 +84,6 @@
 
 open Alpha_context
 open Script_typed_ir
-open Script_interpreter_logging
 open Script_ir_translator
 open Local_gas_counter
 open Script_interpreter_defs
@@ -464,7 +463,8 @@ and iexec : type a b c d e f g. (a, b, c, d, e, f, g) iexec_type =
   let code =
     match logger with
     | None -> code.kinstr
-    | Some logger -> log_kinstr logger code.kbef code.kinstr
+    | Some logger ->
+        Script_interpreter_logging.log_kinstr logger code.kbef code.kinstr
   in
   let ks = KReturn (stack, KCons (k, ks)) in
   (step [@ocaml.tailcall]) g gas code ks arg (EmptyCell, EmptyCell)
@@ -1539,9 +1539,19 @@ and log :
  fun (logger, event) sty ((ctxt, _) as g) gas k ks accu stack ->
   (match (k, event) with
   | ILog _, LogEntry -> ()
-  | _, LogEntry -> log_entry logger ctxt gas k sty accu stack
-  | _, LogExit prev_loc -> log_exit logger ctxt gas prev_loc k sty accu stack) ;
-  log_next_kinstr logger sty k >>?= fun k ->
+  | _, LogEntry ->
+      Script_interpreter_logging.log_entry logger ctxt gas k sty accu stack
+  | _, LogExit prev_loc ->
+      Script_interpreter_logging.log_exit
+        logger
+        ctxt
+        gas
+        prev_loc
+        k
+        sty
+        accu
+        stack) ;
+  Script_interpreter_logging.log_next_kinstr logger sty k >>?= fun k ->
   match k with
   | IMul_teznat (location, k) ->
       (imul_teznat [@ocaml.tailcall])
@@ -1583,7 +1593,9 @@ and klog :
     s ->
     (r * f * outdated_context * local_gas_counter) tzresult Lwt.t =
  fun logger g gas ks accu stack ->
-  (match ks with KLog _ -> () | _ -> log_control logger ks) ;
+  (match ks with
+  | KLog _ -> ()
+  | _ -> Script_interpreter_logging.log_control logger ks) ;
   (next [@ocaml.tailcall]) g gas ks accu stack
  [@@inline]
 (*
