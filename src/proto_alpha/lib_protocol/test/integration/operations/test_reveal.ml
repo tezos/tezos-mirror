@@ -384,6 +384,62 @@ let test_already_revealed_manager_in_batch () =
       Stdlib.failwith
         "Unexpected unrevelation: failing batch shouldn't unreveal the manager")
 
+(* cf: #2386
+
+   We imitate the behaviour of
+
+   https://tzkt.io/ooSocfx3xxzDo7eFyGu6ZDR1svzMrbaJtBikQanXXhwrqMuWfGz
+
+   which provides evidence of a failing reveal with a gas exhaustion
+   error due to an incorrect gas limit of 0, which still takes effect
+   as witnessed by the subsequent (reveal-less) transfer
+
+   https://tzkt.io/opBQQJQ5senPP5v8PfPFf4uVQqKRE5RVjbwx8uD4SqeRs2JGcVw
+
+   This showcases a bad separation of concerns between pre-checking
+   and the application of manager operations per-se within
+   [Protocol.Apply.apply_operation]. The situation originated because
+   [precheck_manager_contents_lists] would reveal the manager by
+   calling [Protocol.Alpha_context.Contract.reveal_manager_key] before
+   [prepare_apply_manager_operation_content] has consumed the declared
+   gas.
+
+   With !5182 we have fixed this situation by revealing the manager
+   contract at application time. The following test isolates the
+   failing reveal and asserts that the manager is not revealed after
+   the failing op. *)
+let test_no_reveal_when_gas_exhausted () =
+  Context.init1 ~consensus_threshold:0 () >>=? fun (blk, c) ->
+  let new_c = Account.new_account () in
+  let new_contract = Contract.Implicit new_c.pkh in
+  (* Fund the contract with a sufficient balance *)
+  Op.transaction (B blk) c new_contract (Tez.of_mutez_exn 1_000L)
+  >>=? fun operation ->
+  (* Create the contract *)
+  Block.bake blk ~operation >>=? fun blk ->
+  (* Assert that the account has not been revealed yet *)
+  (Context.Contract.is_manager_key_revealed (B blk) new_contract >|=? function
+   | true -> Stdlib.failwith "Unexpected revelation: expected fresh pkh"
+   | false -> ())
+  >>=? fun () ->
+  (* We craft a new (bad) reveal operation with a 0 gas_limit *)
+  Op.revelation ~fee:Tez.zero ~gas_limit:Gas.Arith.zero (B blk) new_c.pk
+  >>=? fun op ->
+  Incremental.begin_construction blk >>=? fun inc ->
+  (* The application of this operation is expected to fail with a
+     {! Protocol.Raw_context.Operation_quota_exceeded} error *)
+  let expect_apply_failure = function
+    | [Environment.Ecoproto_error Raw_context.Operation_quota_exceeded] ->
+        return_unit
+    | _ -> assert false
+  in
+  Incremental.add_operation ~expect_apply_failure inc op >>=? fun inc ->
+  (* We assert the manager key is still unrevealed, as the operation has failed *)
+  Context.Contract.is_manager_key_revealed (I inc) new_contract
+  >>=? fun revelead ->
+  when_ revelead (fun () ->
+      failwith "Unexpected revelation: reveal operation failed")
+
 let tests =
   [
     Tztest.tztest "simple reveal" `Quick test_simple_reveal;
@@ -412,4 +468,8 @@ let tests =
       "cannot re-reveal a manager in a batch"
       `Quick
       test_already_revealed_manager_in_batch;
+    Tztest.tztest
+      "do not reveal when gas exhausted"
+      `Quick
+      test_no_reveal_when_gas_exhausted;
   ]
