@@ -1,16 +1,20 @@
 (library
  (name tezos_client_002_PsYLVpVv)
  (public_name tezos-client-002-PsYLVpVv)
- (libraries tezos-base
-            tezos-protocol-002-PsYLVpVv
-            tezos-protocol-environment
-            tezos-shell-services
-            tezos-rpc
-            tezos-signer-backends)
+ (libraries
+  tezos-base
+  tezos-shell-services
+  tezos-client-base
+  tezos-protocol-002-PsYLVpVv
+  tezos-signer-backends
+  tezos-rpc)
  (library_flags (:standard -linkall))
- (flags (:standard -w -9+27-30-32-40@8
-                   -open Tezos_base__TzPervasives
-                   -open Tezos_shell_services
-                   -open Tezos_client_base
-                   -open Tezos_protocol_002_PsYLVpVv
-                   -open Tezos_rpc)))
+ (flags
+  (:standard
+   -w
+   -9+27-30-32-40@8
+   -open Tezos_base.TzPervasives
+   -open Tezos_shell_services
+   -open Tezos_client_base
+   -open Tezos_protocol_002_PsYLVpVv
+   -open Tezos_rpc)))

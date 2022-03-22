@@ -1,24 +1,27 @@
 (library
  (name tezos_client_010_PtGRANAD)
- (instrumentation (backend bisect_ppx))
  (public_name tezos-client-010-PtGRANAD)
- (libraries tezos-base
-            tezos-protocol-010-PtGRANAD
-            tezos-shell-services
-            tezos-client-base
-            tezos-mockup-registration
-            tezos-proxy
-            tezos-rpc
-            tezos-signer-backends
-            tezos-protocol-010-PtGRANAD-parameters
-            tezos-protocol-plugin-010-PtGRANAD)
- (inline_tests)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  tezos-shell-services
+  tezos-client-base
+  tezos-protocol-010-PtGRANAD
+  tezos-mockup-registration
+  tezos-proxy
+  tezos-signer-backends
+  tezos-protocol-plugin-010-PtGRANAD
+  tezos-protocol-010-PtGRANAD-parameters
+  tezos-rpc)
+ (inline_tests (flags -verbose))
  (preprocess (pps ppx_inline_test))
  (library_flags (:standard -linkall))
- (flags (:standard -open Tezos_base__TzPervasives
-                   -open Tezos_shell_services
-                   -open Tezos_client_base
-                   -open Tezos_protocol_010_PtGRANAD
-                   -open Tezos_protocol_plugin_010_PtGRANAD
-                   -open Tezos_protocol_010_PtGRANAD_parameters
-                   -open Tezos_rpc)))
+ (flags
+  (:standard
+   -open Tezos_base.TzPervasives
+   -open Tezos_shell_services
+   -open Tezos_client_base
+   -open Tezos_protocol_010_PtGRANAD
+   -open Tezos_protocol_plugin_010_PtGRANAD
+   -open Tezos_protocol_010_PtGRANAD_parameters
+   -open Tezos_rpc)))

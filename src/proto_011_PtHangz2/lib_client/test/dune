@@ -1,17 +1,24 @@
 (tests
- (names test_michelson_v1_macros test_client_proto_contracts test_client_proto_context test_proxy)
- (libraries tezos-base
-            tezos-micheline
-            tezos-protocol-011-PtHangz2
-            tezos-client-011-PtHangz2
-            tezos-base-test-helpers
-            tezos-test-helpers
-            alcotest-lwt
-            qcheck-alcotest)
+ (names
+  test_michelson_v1_macros
+  test_client_proto_contracts
+  test_client_proto_context
+  test_proxy)
  (package tezos-client-011-PtHangz2)
- (flags (:standard -open Tezos_base__TzPervasives
-                   -open Tezos_micheline
-                   -open Tezos_client_011_PtHangz2
-                   -open Tezos_protocol_011_PtHangz2
-                   -open Tezos_base_test_helpers
-                   -open Lib_test)))
+ (libraries
+  tezos-base
+  tezos-micheline
+  tezos-client-011-PtHangz2
+  tezos-protocol-011-PtHangz2
+  tezos-base-test-helpers
+  tezos-test-helpers
+  alcotest-lwt
+  qcheck-alcotest)
+ (flags
+  (:standard
+   -open Tezos_base.TzPervasives
+   -open Tezos_micheline
+   -open Tezos_client_011_PtHangz2
+   -open Tezos_protocol_011_PtHangz2
+   -open Tezos_base_test_helpers
+   -open Lib_test)))

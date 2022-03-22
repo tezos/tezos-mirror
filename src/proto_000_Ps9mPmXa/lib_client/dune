@@ -1,16 +1,18 @@
 (library
  (name tezos_client_000_Ps9mPmXa)
  (public_name tezos-client-000-Ps9mPmXa)
- (libraries tezos-base
-            tezos-shell-services
-            tezos-client-base
-            tezos-client-commands
-            tezos-protocol-environment
-            tezos-protocol-000-Ps9mPmXa
-            tezos-stdlib-unix)
+ (libraries
+  tezos-base
+  tezos-shell-services
+  tezos-client-base
+  tezos-protocol-000-Ps9mPmXa
+  tezos-client-commands
+  tezos-stdlib-unix)
  (library_flags (:standard -linkall))
- (flags (:standard -open Tezos_base__TzPervasives
-                   -open Tezos_shell_services
-                   -open Tezos_client_base
-                   -open Tezos_protocol_000_Ps9mPmXa
-                   -open Tezos_client_commands)))
+ (flags
+  (:standard
+   -open Tezos_base.TzPervasives
+   -open Tezos_shell_services
+   -open Tezos_client_base
+   -open Tezos_protocol_000_Ps9mPmXa
+   -open Tezos_client_commands)))

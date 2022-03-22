@@ -1,15 +1,18 @@
 (library
  (name tezos_client_004_Pt24m4xi)
  (public_name tezos-client-004-Pt24m4xi)
- (libraries tezos-base
-            tezos-protocol-004-Pt24m4xi
-            tezos-shell-services
-            tezos-client-base
-            tezos-rpc
-            tezos-signer-backends)
+ (libraries
+  tezos-base
+  tezos-shell-services
+  tezos-client-base
+  tezos-protocol-004-Pt24m4xi
+  tezos-signer-backends
+  tezos-rpc)
  (library_flags (:standard -linkall))
- (flags (:standard -open Tezos_base__TzPervasives
-                   -open Tezos_shell_services
-                   -open Tezos_client_base
-                   -open Tezos_protocol_004_Pt24m4xi
-                   -open Tezos_rpc)))
+ (flags
+  (:standard
+   -open Tezos_base.TzPervasives
+   -open Tezos_shell_services
+   -open Tezos_client_base
+   -open Tezos_protocol_004_Pt24m4xi
+   -open Tezos_rpc)))

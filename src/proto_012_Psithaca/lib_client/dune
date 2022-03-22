@@ -1,24 +1,27 @@
 (library
  (name tezos_client_012_Psithaca)
- (instrumentation (backend bisect_ppx))
  (public_name tezos-client-012-Psithaca)
- (libraries tezos-base
-            tezos-protocol-012-Psithaca
-            tezos-shell-services
-            tezos-client-base
-            tezos-mockup-registration
-            tezos-proxy
-            tezos-rpc
-            tezos-signer-backends
-            tezos-protocol-012-Psithaca-parameters
-            tezos-protocol-plugin-012-Psithaca)
- (inline_tests)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  tezos-shell-services
+  tezos-client-base
+  tezos-protocol-012-Psithaca
+  tezos-mockup-registration
+  tezos-proxy
+  tezos-signer-backends
+  tezos-protocol-plugin-012-Psithaca
+  tezos-protocol-012-Psithaca-parameters
+  tezos-rpc)
+ (inline_tests (flags -verbose))
  (preprocess (pps ppx_inline_test))
  (library_flags (:standard -linkall))
- (flags (:standard -open Tezos_base__TzPervasives
-                   -open Tezos_shell_services
-                   -open Tezos_client_base
-                   -open Tezos_protocol_012_Psithaca
-                   -open Tezos_protocol_plugin_012_Psithaca
-                   -open Tezos_protocol_012_Psithaca_parameters
-                   -open Tezos_rpc)))
+ (flags
+  (:standard
+   -open Tezos_base.TzPervasives
+   -open Tezos_shell_services
+   -open Tezos_client_base
+   -open Tezos_protocol_012_Psithaca
+   -open Tezos_protocol_plugin_012_Psithaca
+   -open Tezos_protocol_012_Psithaca_parameters
+   -open Tezos_rpc)))

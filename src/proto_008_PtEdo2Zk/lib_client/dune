@@ -1,22 +1,25 @@
 (library
  (name tezos_client_008_PtEdo2Zk)
- (instrumentation (backend bisect_ppx))
  (public_name tezos-client-008-PtEdo2Zk)
- (libraries tezos-base
-            tezos-protocol-008-PtEdo2Zk
-            tezos-shell-services
-            tezos-client-base
-            tezos-mockup-registration
-            tezos-proxy
-            tezos-rpc
-            tezos-signer-backends
-            tezos-protocol-008-PtEdo2Zk-parameters
-            tezos-protocol-plugin-008-PtEdo2Zk)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  tezos-shell-services
+  tezos-client-base
+  tezos-protocol-008-PtEdo2Zk
+  tezos-mockup-registration
+  tezos-proxy
+  tezos-signer-backends
+  tezos-protocol-plugin-008-PtEdo2Zk
+  tezos-protocol-008-PtEdo2Zk-parameters
+  tezos-rpc)
  (library_flags (:standard -linkall))
- (flags (:standard -open Tezos_base__TzPervasives
-                   -open Tezos_shell_services
-                   -open Tezos_client_base
-                   -open Tezos_protocol_008_PtEdo2Zk
-                   -open Tezos_protocol_008_PtEdo2Zk_parameters
-                   -open Tezos_rpc
-                   -open Tezos_protocol_plugin_008_PtEdo2Zk)))
+ (flags
+  (:standard
+   -open Tezos_base.TzPervasives
+   -open Tezos_shell_services
+   -open Tezos_client_base
+   -open Tezos_protocol_008_PtEdo2Zk
+   -open Tezos_protocol_plugin_008_PtEdo2Zk
+   -open Tezos_protocol_008_PtEdo2Zk_parameters
+   -open Tezos_rpc)))

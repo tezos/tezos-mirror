@@ -1,24 +1,27 @@
 (library
  (name tezos_client_011_PtHangz2)
- (instrumentation (backend bisect_ppx))
  (public_name tezos-client-011-PtHangz2)
- (libraries tezos-base
-            tezos-protocol-011-PtHangz2
-            tezos-shell-services
-            tezos-client-base
-            tezos-mockup-registration
-            tezos-proxy
-            tezos-rpc
-            tezos-signer-backends
-            tezos-protocol-011-PtHangz2-parameters
-            tezos-protocol-plugin-011-PtHangz2)
- (inline_tests)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  tezos-shell-services
+  tezos-client-base
+  tezos-protocol-011-PtHangz2
+  tezos-mockup-registration
+  tezos-proxy
+  tezos-signer-backends
+  tezos-protocol-plugin-011-PtHangz2
+  tezos-protocol-011-PtHangz2-parameters
+  tezos-rpc)
+ (inline_tests (flags -verbose))
  (preprocess (pps ppx_inline_test))
  (library_flags (:standard -linkall))
- (flags (:standard -open Tezos_base__TzPervasives
-                   -open Tezos_shell_services
-                   -open Tezos_client_base
-                   -open Tezos_protocol_011_PtHangz2
-                   -open Tezos_protocol_plugin_011_PtHangz2
-                   -open Tezos_protocol_011_PtHangz2_parameters
-                   -open Tezos_rpc)))
+ (flags
+  (:standard
+   -open Tezos_base.TzPervasives
+   -open Tezos_shell_services
+   -open Tezos_client_base
+   -open Tezos_protocol_011_PtHangz2
+   -open Tezos_protocol_plugin_011_PtHangz2
+   -open Tezos_protocol_011_PtHangz2_parameters
+   -open Tezos_rpc)))
