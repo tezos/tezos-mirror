@@ -91,11 +91,7 @@ let aggregate_signature_exn : signature list -> signature =
 let (ticket1, ticket2) =
   match gen_n_ticket_hash 2 with [x; y] -> (x, y) | _ -> assert false
 
-let empty_indexes =
-  {
-    address_indexes = Address_indexes.empty;
-    ticket_indexes = Ticket_indexes.empty;
-  }
+let empty_indexes = {address_indexes = []; ticket_indexes = []}
 
 let unexpected_result = fail_msg "Unexpected result operation"
 
@@ -153,10 +149,6 @@ let eq_address = Alcotest.of_pp Tx_rollup_l2_address.pp
 
 let eq_ticket = Alcotest.of_pp Ticket_hash.pp
 
-let eq_addr_indexable = Alcotest.of_pp (Indexable.pp (fun _ _ -> ()))
-
-let eq_ticket_indexable = Alcotest.of_pp (Indexable.pp (fun _ _ -> ()))
-
 let pp_withdrawal fmt = function
   | Tx_rollup_withdraw.{claimer; ticket_hash; amount} ->
       Format.fprintf
@@ -171,46 +163,24 @@ let pp_withdrawal fmt = function
 
 let eq_withdrawal = Alcotest.of_pp pp_withdrawal
 
-let check_indexes addr_indexes ticket_indexes expected =
+let check_indexes expected_addr_indexes expected_ticket_indexes indexes =
   let open Syntax in
-  (* This is dirty but it orders the list by their indexes. *)
-  let expected_addr_indexes =
-    Address_indexes.bindings expected.address_indexes
-    |> List.sort (fun (_, idx1) (_, idx2) ->
-           Tx_rollup_l2_address.Indexable.compare idx1 idx2)
+  let strip_indexes l =
+    List.map (fun (v, idx) -> (v, Indexable.to_int32 idx)) l
+    |> List.sort (fun x y -> Int32.compare (snd x) (snd y))
   in
-
-  let expected_ticket_indexes =
-    Ticket_indexes.bindings expected.ticket_indexes
-    |> List.sort (fun (_, idx1) (_, idx2) ->
-           Tx_rollup_l2_context_sig.Ticket_indexable.compare idx1 idx2)
-  in
-
-  (* This is a dirty hack to build [Indexable.either] and then use the
-     [Indexable.pp] to build an [Alcotest.testable]. The other solution
-     would be to expose [Indexable.pp_index]. *)
-  let forget_ticket_indexes = List.map (fun (v, idx) -> (v, forget idx)) in
-  let expected_ticket_indexes = forget_ticket_indexes expected_ticket_indexes in
-  let ticket_indexes = forget_ticket_indexes ticket_indexes in
-
-  let forget_addr_indexes = List.map (fun (v, idx) -> (v, forget idx)) in
-  let expected_addr_indexes = forget_addr_indexes expected_addr_indexes in
-  let addr_indexes = forget_addr_indexes addr_indexes in
-
   Alcotest.(
     check
-      (list (pair eq_address eq_addr_indexable))
+      (list (pair eq_address int32))
       "indexables address created"
       expected_addr_indexes
-      addr_indexes) ;
-
+      (strip_indexes indexes.address_indexes)) ;
   Alcotest.(
     check
-      (list (pair eq_ticket eq_ticket_indexable))
+      (list (pair eq_ticket int32))
       "indexables ticket created"
       expected_ticket_indexes
-      ticket_indexes) ;
-
+      (strip_indexes indexes.ticket_indexes)) ;
   return ()
 
 (** {3. Helpers to build apply related values. } *)
@@ -304,6 +274,43 @@ let create_batch_v1
   in
   batch signatures transactions
 
+(** Takes almost the same parameters as {!transfers} but takes also the
+    secret keys to sign and create a valid message. *)
+let batch_from_transfers inputs =
+  let all_sks =
+    List.fold_left
+      (fun all_sks input ->
+        List.fold_left
+          (fun acc (sk, _, _, _, _, _) ->
+            let equal x y =
+              Bytes.equal
+                (Bls12_381.Signature.sk_to_bytes x)
+                (Bls12_381.Signature.sk_to_bytes y)
+            in
+            if List.mem ~equal sk acc then acc else sk :: acc)
+          []
+          input
+        :: all_sks)
+      []
+      inputs
+  in
+  let transactions =
+    List.fold_left
+      (fun transactions input ->
+        List.map
+          (fun (_, pk, dest, ticket, amount, counter) ->
+            transfer ~signer:(signer_pk pk) ~dest ~ticket ?counter amount)
+          input
+        :: transactions)
+      []
+      inputs
+  in
+  let batch = create_batch_v1 (List.rev transactions) (List.rev all_sks) in
+  let buf =
+    Data_encoding.Binary.to_string_exn Tx_rollup_l2_batch.encoding (V1 batch)
+  in
+  make_batch buf |> fst
+
 (** {2. Tests } *)
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/2461
@@ -323,9 +330,7 @@ let test_simple_deposit () =
   (* Applying the deposit should create an idx for both [addr1] and [ticket]. *)
   match (result, withdrawal_opt) with
   | (Deposit_success indexes, None) ->
-      let* () =
-        check_indexes [(addr1, index_exn 0l)] [(ticket1, index_exn 0l)] indexes
-      in
+      let* () = check_indexes [(addr1, 0l)] [(ticket1, 0l)] indexes in
       let* aidx_opt = Address_index.get ctxt addr1 in
       let* aidx = get_opt aidx_opt in
 
@@ -337,39 +342,6 @@ let test_simple_deposit () =
 
       return_unit
   | _ -> unexpected_result
-
-(** Test that deposit tickets in the layer2 does not create new indexes
-    if they already existed. *)
-let test_deposit_with_existing_indexes () =
-  let open Context_l2.Syntax in
-  let ctxt = empty_context in
-
-  (* We first associate an index to our address and ticket *)
-  let* (ctxt, _, aidx1) = Address_index.get_or_associate_index ctxt addr1 in
-  let* (ctxt, _, tidx1) = Ticket_index.get_or_associate_index ctxt ticket1 in
-
-  let deposit =
-    {
-      sender = pkh;
-      destination = value addr1;
-      ticket_hash = ticket1;
-      amount = Tx_rollup_l2_qty.of_int64_exn 1L;
-    }
-  in
-  let* (ctxt, result, withdrawal_opt) = apply_deposit ctxt deposit in
-
-  (* The indexes should not be considered as created *)
-  match (result, withdrawal_opt) with
-  | (Deposit_success indexes, None) ->
-      assert (indexes.address_indexes = Address_indexes.empty) ;
-      assert (indexes.ticket_indexes = Ticket_indexes.empty) ;
-
-      let* () =
-        check_balance ctxt "addr1" "ticket1" "deposit 1" tidx1 aidx1 1L
-      in
-
-      return_unit
-  | _ -> fail_msg "Unexpected operation result"
 
 (** Test that deposit overflow withdraws the amount sent. *)
 let test_returned_deposit () =
@@ -427,92 +399,6 @@ let apply_l2_batch ctxt batch =
 
 let apply_l2_message ctxt msg = apply_message ctxt apply_l2_parameters msg
 
-(** Test that all values used in a transaction creates indexes and they are
-    packed in the final indexes. *)
-let test_indexes_creation () =
-  let open Context_l2.Syntax in
-  let ctxt = empty_context in
-  let contracts = gen_n_address 4 in
-
-  let (sk1, pk1, addr1) = nth_exn contracts 0 in
-  let (_, _, addr2) = nth_exn contracts 1 in
-  let (_, _, addr3) = nth_exn contracts 2 in
-  let (_, _, addr4) = nth_exn contracts 3 in
-
-  (* We begin by deposit 100 tickets to [addr1] which would be
-     transfered between the other addresses. *)
-  let deposit =
-    {
-      sender = pkh;
-      destination = value addr1;
-      ticket_hash = ticket1;
-      amount = Tx_rollup_l2_qty.of_int64_exn 100L;
-    }
-  in
-  let* (ctxt, result, withdrawal_opt) = apply_deposit ctxt deposit in
-
-  let* () =
-    match (result, withdrawal_opt) with
-    | (Deposit_success indexes, None) ->
-        check_indexes [(addr1, index_exn 0l)] [(ticket1, index_exn 0l)] indexes
-    | _ -> unexpected_result
-  in
-
-  (* We create a transaction for each transfer, it makes the test of each
-     transaction result easier. *)
-  let transaction1 =
-    [
-      transfer
-        ~counter:1L
-        ~signer:(signer_pk pk1)
-        ~dest:addr2
-        ~ticket:ticket1
-        10L;
-    ]
-  in
-  let signature1 = sign_transaction [sk1] transaction1 in
-  let transaction2 =
-    [
-      transfer
-        ~counter:2L
-        ~signer:(signer_pk pk1)
-        ~dest:addr3
-        ~ticket:ticket1
-        20L;
-    ]
-  in
-  let signature2 = sign_transaction [sk1] transaction2 in
-
-  let transaction3 =
-    [
-      transfer
-        ~counter:3L
-        ~signer:(signer_pk pk1)
-        ~dest:addr4
-        ~ticket:ticket1
-        30L;
-    ]
-  in
-  let signature3 = sign_transaction [sk1] transaction3 in
-  let batch =
-    batch
-      (List.concat [signature1; signature2; signature3])
-      [transaction1; transaction2; transaction3]
-  in
-
-  let* (_ctxt, Batch_result {indexes; _}, _withdrawals) =
-    apply_l2_batch ctxt batch
-  in
-
-  let* () =
-    check_indexes
-      [(addr2, index_exn 1l); (addr3, index_exn 2l); (addr4, index_exn 3l)]
-      []
-      indexes
-  in
-
-  return_unit
-
 let test_indexes_creation_bad () =
   let open Context_l2.Syntax in
   let ctxt = empty_context in
@@ -569,7 +455,7 @@ let test_indexes_creation_bad () =
     | _ -> assert false
   in
 
-  let* () = check_indexes [(addr3, index_exn 1l)] [] indexes in
+  let* () = check_indexes [(addr3, 1l)] [] indexes in
 
   let* idx = Address_index.get ctxt addr2 in
   assert (idx = None) ;
@@ -1744,43 +1630,173 @@ let test_transfer_to_self () =
       return_unit
   | (_, _) -> fail_msg "The transaction should faild with [Invalid_destination]"
 
+module Indexes = struct
+  (** The context should be dropped during an invalid deposit, as the
+      indexes should be. *)
+  let test_drop_on_wrong_deposit () =
+    let open Context_l2.Syntax in
+    let (deposit, _) =
+      make_deposit pkh (value addr1) ticket1 Tx_rollup_l2_qty.one
+    in
+    (* We make the apply fail with an enormous address count *)
+    let* ctxt =
+      Address_index.Internal_for_tests.set_count empty_context Int32.max_int
+    in
+    let* (ctxt, _) = apply_l2_message ctxt deposit in
+    let* ticket_count = Ticket_index.count ctxt in
+    Alcotest.(check int32) "Ticket count should not change" 0l ticket_count ;
+    (* We make the apply fail with an enormous ticket count *)
+    let* ctxt =
+      Ticket_index.Internal_for_tests.set_count empty_context Int32.max_int
+    in
+    let* (ctxt, _) = apply_l2_message ctxt deposit in
+    let* address_count = Address_index.count ctxt in
+    Alcotest.(check int32) "Address count should not change" 0l address_count ;
+    return_unit
+
+  (** A deposit should created if they don't exist an index for both the ticket
+      and the destination. *)
+  let test_creation_on_deposit () =
+    let open Context_l2.Syntax in
+    let (deposit, _) =
+      make_deposit pkh (value addr1) ticket1 Tx_rollup_l2_qty.one
+    in
+    let* (ctxt, (result, _)) = apply_l2_message empty_context deposit in
+    let* ticket_count = Ticket_index.count ctxt in
+    Alcotest.(check int32) "Ticket count should change" 1l ticket_count ;
+    let* address_count = Address_index.count ctxt in
+    Alcotest.(check int32) "Address count should change" 1l address_count ;
+    match result with
+    | Deposit_result (Deposit_success indexes) ->
+        check_indexes [(addr1, 0l)] [(ticket1, 0l)] indexes
+    | _ -> fail_msg "Should be a success"
+
+  (** Deposit tickets in the layer2 does not create new indexes if they already
+      existed. *)
+  let test_deposit_with_existing_indexes () =
+    let open Context_l2.Syntax in
+    let* (ctxt, _, _) =
+      Address_index.get_or_associate_index empty_context addr1
+    in
+    let* (ctxt, _, _) = Ticket_index.get_or_associate_index ctxt ticket1 in
+    let (deposit, _) =
+      make_deposit pkh (value addr1) ticket1 Tx_rollup_l2_qty.one
+    in
+    let* (_, (result, _)) = apply_l2_message ctxt deposit in
+    match result with
+    | Deposit_result (Deposit_success indexes) -> check_indexes [] [] indexes
+    | _ -> fail_msg "Should be a success"
+
+  let test_creation_on_valid_batch () =
+    let open Context_l2.Syntax in
+    let contracts = gen_n_address 3 in
+    let (sk1, pk1, addr1) = nth_exn contracts 0 in
+    let (_, _, addr2) = nth_exn contracts 1 in
+    let (_, _, addr3) = nth_exn contracts 2 in
+    let (deposit, _) =
+      make_deposit
+        (Obj.magic pk1)
+        (value addr1)
+        ticket1
+        (Tx_rollup_l2_qty.of_int64_exn 10L)
+    in
+    let* (ctxt, _) = apply_l2_message empty_context deposit in
+    let batch =
+      batch_from_transfers
+        [
+          [(sk1, pk1, addr2, ticket1, 1L, Some 1L)];
+          [(sk1, pk1, addr3, ticket1, 1L, Some 2L)];
+        ]
+    in
+    let* (_, (result, _)) = apply_l2_message ctxt batch in
+    match result with
+    | Batch_V1_result (Batch_result {indexes; _}) ->
+        check_indexes [(addr2, 1l); (addr3, 2l)] [] indexes
+    | _ -> assert false
+
+  let test_drop_on_wrong_batch () =
+    let open Context_l2.Syntax in
+    let contracts = gen_n_address 4 in
+    let (sk1, pk1, addr1) = nth_exn contracts 0 in
+    let (sk2, pk2, addr2) = nth_exn contracts 1 in
+    let (_, _, addr3) = nth_exn contracts 2 in
+    let (_, _, addr4) = nth_exn contracts 3 in
+    let (deposit, _) =
+      make_deposit
+        (Obj.magic pk1)
+        (value addr1)
+        ticket1
+        (Tx_rollup_l2_qty.of_int64_exn 10L)
+    in
+    let* (ctxt, _) = apply_l2_message empty_context deposit in
+    let batch =
+      batch_from_transfers
+        [
+          (* This will be valid and create an index for [addr2] *)
+          [(sk1, pk1, addr2, ticket1, 1L, Some 1L)];
+          (* This will be wrong and must not create an index for [addr3] *)
+          [(sk1, pk1, addr3, ticket1, 1L, Some 1L)];
+          (* This has a valid transfer and an invalid one, both
+             indexes must be dropped. *)
+          [
+            (sk1, pk1, addr4, ticket1, 1L, Some 1L);
+            (sk2, pk2, addr3, ticket1, 1L, Some 1L);
+          ];
+        ]
+    in
+    let* (_ctxt, (result, _)) = apply_l2_message ctxt batch in
+    match result with
+    | Batch_V1_result (Batch_result {indexes; _}) ->
+        check_indexes [(addr2, 1l)] [] indexes
+    | _ -> assert false
+
+  let tests =
+    [
+      ("indexes are dropped on deposit failure", test_drop_on_wrong_deposit);
+      ("indexes are created on deposit success", test_creation_on_deposit);
+      ("deposit with existing indexes", test_deposit_with_existing_indexes);
+      ( "indexes are created on valid transfers transaction",
+        test_creation_on_valid_batch );
+      ( "indexes are dropped on invalid transfers transaction",
+        test_drop_on_wrong_batch );
+    ]
+end
+
 let tests =
   wrap_tztest_tests
-    [
-      ("simple transaction", test_simple_deposit);
-      ("returned transaction", test_returned_deposit);
-      ("deposit with existing indexes", test_deposit_with_existing_indexes);
-      ("test simple l1 transaction", test_simple_l1_transaction);
-      ( "test simple l1 transaction: inexistant ticket",
-        test_l1_transaction_inexistant_ticket );
-      ( "test simple l1 transaction: inexistant signer",
-        test_l1_transaction_inexistant_signer );
-      ("test simple l1 transaction: overdraft", test_l1_transaction_overdraft);
-      ("test simple l1 transaction: zero", test_l1_transaction_zero);
-      ("test simple l1 transaction: partial", test_l1_transaction_partial);
-      ("test simple l2 transaction", test_simple_l2_transaction);
-      ( "test l2 transaction with l2 addr: good",
-        test_l2_transaction_l2_addr_signer_good );
-      ( "test l2 transaction with l2 addr: bad",
-        test_l2_transaction_l2_addr_signer_bad );
-      ( "test simple transaction with indexes and values",
-        test_transaction_with_unknown_indexable );
-      ("invalid transaction", test_invalid_transaction);
-      ("indexes creation", test_indexes_creation);
-      ("indexes creation with failing transactions", test_indexes_creation_bad);
-      ("invalid counter", test_invalid_counter);
-      ("update counter", test_update_counter);
-      ("pre apply batch", test_pre_apply_batch);
-      ("apply batch from message", test_apply_message_batch);
-      ( "apply batch from message with withdrawals",
-        test_apply_message_batch_withdrawals );
-      ("apply deposit from message", test_apply_message_deposit);
-      ("apply unparseable message", test_apply_message_unparsable);
-      ("test transfer to self fail", test_transfer_to_self);
-      ( "nb withdrawals per batch below limit",
-        nb_withdrawals_per_batch_below_limit );
-      ( "nb withdrawals per batch equals limit",
-        nb_withdrawals_per_batch_equals_limit );
-      ( "nb withdrawals per batch above limit",
-        nb_withdrawals_per_batch_above_limit );
-    ]
+    ([
+       ("simple transaction", test_simple_deposit);
+       ("returned transaction", test_returned_deposit);
+       ("test simple l1 transaction", test_simple_l1_transaction);
+       ( "test simple l1 transaction: inexistant ticket",
+         test_l1_transaction_inexistant_ticket );
+       ( "test simple l1 transaction: inexistant signer",
+         test_l1_transaction_inexistant_signer );
+       ("test simple l1 transaction: overdraft", test_l1_transaction_overdraft);
+       ("test simple l1 transaction: zero", test_l1_transaction_zero);
+       ("test simple l1 transaction: partial", test_l1_transaction_partial);
+       ("test simple l2 transaction", test_simple_l2_transaction);
+       ( "test l2 transaction with l2 addr: good",
+         test_l2_transaction_l2_addr_signer_good );
+       ( "test l2 transaction with l2 addr: bad",
+         test_l2_transaction_l2_addr_signer_bad );
+       ( "test simple transaction with indexes and values",
+         test_transaction_with_unknown_indexable );
+       ("invalid transaction", test_invalid_transaction);
+       ("invalid counter", test_invalid_counter);
+       ("update counter", test_update_counter);
+       ("pre apply batch", test_pre_apply_batch);
+       ("apply batch from message", test_apply_message_batch);
+       ( "apply batch from message with withdrawals",
+         test_apply_message_batch_withdrawals );
+       ("apply deposit from message", test_apply_message_deposit);
+       ("apply unparseable message", test_apply_message_unparsable);
+       ("test transfer to self fail", test_transfer_to_self);
+       ( "nb withdrawals per batch below limit",
+         nb_withdrawals_per_batch_below_limit );
+       ( "nb withdrawals per batch equals limit",
+         nb_withdrawals_per_batch_equals_limit );
+       ( "nb withdrawals per batch above limit",
+         nb_withdrawals_per_batch_above_limit );
+     ]
+    @ Indexes.tests)
