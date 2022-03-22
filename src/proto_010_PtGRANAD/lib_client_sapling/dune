@@ -1,19 +1,24 @@
 (library
  (name tezos_client_sapling_010_PtGRANAD)
- (instrumentation (backend bisect_ppx))
  (public_name tezos-client-sapling-010-PtGRANAD)
- (libraries tezos-base
-            tezos-crypto
-            tezos-client-base
-            tezos-signer-backends
-            tezos-client-010-PtGRANAD
-            tezos-client-010-PtGRANAD-commands
-            tezos-protocol-010-PtGRANAD)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  tezos-crypto
+  tezos-stdlib-unix
+  tezos-client-base
+  tezos-signer-backends
+  tezos-client-010-PtGRANAD
+  tezos-client-010-PtGRANAD-commands
+  tezos-protocol-010-PtGRANAD
+  tezos-protocol-010-PtGRANAD.environment)
  (library_flags (:standard -linkall))
- (flags (:standard -open Tezos_base__TzPervasives
-                   -open Tezos_stdlib_unix
-                   -open Tezos_client_base
-                   -open Tezos_client_010_PtGRANAD
-                   -open Tezos_client_010_PtGRANAD_commands
-                   -open Tezos_protocol_010_PtGRANAD
-                   -open Tezos_protocol_environment_010_PtGRANAD)))
+ (flags
+  (:standard
+   -open Tezos_base.TzPervasives
+   -open Tezos_stdlib_unix
+   -open Tezos_client_base
+   -open Tezos_client_010_PtGRANAD
+   -open Tezos_client_010_PtGRANAD_commands
+   -open Tezos_protocol_010_PtGRANAD
+   -open Tezos_protocol_environment_010_PtGRANAD)))

@@ -1,19 +1,24 @@
 (library
  (name tezos_client_sapling_008_PtEdo2Zk)
- (instrumentation (backend bisect_ppx))
  (public_name tezos-client-sapling-008-PtEdo2Zk)
- (libraries tezos-base
-            tezos-crypto
-            tezos-client-base
-            tezos-signer-backends
-            tezos-client-008-PtEdo2Zk
-            tezos-client-008-PtEdo2Zk-commands
-            tezos-protocol-008-PtEdo2Zk)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  tezos-crypto
+  tezos-stdlib-unix
+  tezos-client-base
+  tezos-signer-backends
+  tezos-client-008-PtEdo2Zk
+  tezos-client-008-PtEdo2Zk-commands
+  tezos-protocol-008-PtEdo2Zk
+  tezos-protocol-008-PtEdo2Zk.environment)
  (library_flags (:standard -linkall))
- (flags (:standard -open Tezos_base__TzPervasives
-                   -open Tezos_stdlib_unix
-                   -open Tezos_client_base
-                   -open Tezos_client_008_PtEdo2Zk
-                   -open Tezos_client_008_PtEdo2Zk_commands
-                   -open Tezos_protocol_008_PtEdo2Zk
-                   -open Tezos_protocol_environment_008_PtEdo2Zk)))
+ (flags
+  (:standard
+   -open Tezos_base.TzPervasives
+   -open Tezos_stdlib_unix
+   -open Tezos_client_base
+   -open Tezos_client_008_PtEdo2Zk
+   -open Tezos_client_008_PtEdo2Zk_commands
+   -open Tezos_protocol_008_PtEdo2Zk
+   -open Tezos_protocol_environment_008_PtEdo2Zk)))
