@@ -163,46 +163,46 @@ let check_kind kinds expr =
 
 let rec ty_of_comparable_ty :
     type a. a comparable_ty -> (a, Dependent_bool.yes) ty = function
-  | Unit_key -> Unit_t
-  | Never_key -> Never_t
-  | Int_key -> Int_t
-  | Nat_key -> Nat_t
-  | Signature_key -> Signature_t
-  | String_key -> String_t
-  | Bytes_key -> Bytes_t
-  | Mutez_key -> Mutez_t
-  | Bool_key -> Bool_t
-  | Key_hash_key -> Key_hash_t
-  | Key_key -> Key_t
-  | Timestamp_key -> Timestamp_t
-  | Address_key -> Address_t
-  | Tx_rollup_l2_address_key -> Tx_rollup_l2_address_t
-  | Chain_id_key -> Chain_id_t
-  | Pair_key (l, r, meta, YesYes) ->
+  | Unit_t -> Unit_t
+  | Never_t -> Never_t
+  | Int_t -> Int_t
+  | Nat_t -> Nat_t
+  | Signature_t -> Signature_t
+  | String_t -> String_t
+  | Bytes_t -> Bytes_t
+  | Mutez_t -> Mutez_t
+  | Bool_t -> Bool_t
+  | Key_hash_t -> Key_hash_t
+  | Key_t -> Key_t
+  | Timestamp_t -> Timestamp_t
+  | Address_t -> Address_t
+  | Tx_rollup_l2_address_t -> Tx_rollup_l2_address_t
+  | Chain_id_t -> Chain_id_t
+  | Pair_t (l, r, meta, YesYes) ->
       Pair_t (ty_of_comparable_ty l, ty_of_comparable_ty r, meta, YesYes)
-  | Union_key (l, r, meta, YesYes) ->
+  | Union_t (l, r, meta, YesYes) ->
       Union_t (ty_of_comparable_ty l, ty_of_comparable_ty r, meta, YesYes)
-  | Option_key (t, meta, Yes) -> Option_t (ty_of_comparable_ty t, meta, Yes)
+  | Option_t (t, meta, Yes) -> Option_t (ty_of_comparable_ty t, meta, Yes)
 
 let rec unparse_comparable_ty_uncarbonated :
     type a loc. loc:loc -> a comparable_ty -> loc Script.michelson_node =
  fun ~loc -> function
-  | Unit_key -> Prim (loc, T_unit, [], [])
-  | Never_key -> Prim (loc, T_never, [], [])
-  | Int_key -> Prim (loc, T_int, [], [])
-  | Nat_key -> Prim (loc, T_nat, [], [])
-  | Signature_key -> Prim (loc, T_signature, [], [])
-  | String_key -> Prim (loc, T_string, [], [])
-  | Bytes_key -> Prim (loc, T_bytes, [], [])
-  | Mutez_key -> Prim (loc, T_mutez, [], [])
-  | Bool_key -> Prim (loc, T_bool, [], [])
-  | Key_hash_key -> Prim (loc, T_key_hash, [], [])
-  | Key_key -> Prim (loc, T_key, [], [])
-  | Timestamp_key -> Prim (loc, T_timestamp, [], [])
-  | Address_key -> Prim (loc, T_address, [], [])
-  | Tx_rollup_l2_address_key -> Prim (loc, T_tx_rollup_l2_address, [], [])
-  | Chain_id_key -> Prim (loc, T_chain_id, [], [])
-  | Pair_key (l, r, _meta, YesYes) -> (
+  | Unit_t -> Prim (loc, T_unit, [], [])
+  | Never_t -> Prim (loc, T_never, [], [])
+  | Int_t -> Prim (loc, T_int, [], [])
+  | Nat_t -> Prim (loc, T_nat, [], [])
+  | Signature_t -> Prim (loc, T_signature, [], [])
+  | String_t -> Prim (loc, T_string, [], [])
+  | Bytes_t -> Prim (loc, T_bytes, [], [])
+  | Mutez_t -> Prim (loc, T_mutez, [], [])
+  | Bool_t -> Prim (loc, T_bool, [], [])
+  | Key_hash_t -> Prim (loc, T_key_hash, [], [])
+  | Key_t -> Prim (loc, T_key, [], [])
+  | Timestamp_t -> Prim (loc, T_timestamp, [], [])
+  | Address_t -> Prim (loc, T_address, [], [])
+  | Tx_rollup_l2_address_t -> Prim (loc, T_tx_rollup_l2_address, [], [])
+  | Chain_id_t -> Prim (loc, T_chain_id, [], [])
+  | Pair_t (l, r, _meta, YesYes) -> (
       let tl = unparse_comparable_ty_uncarbonated ~loc l in
       let tr = unparse_comparable_ty_uncarbonated ~loc r in
       (* Fold [pair a1 (pair ... (pair an-1 an))] into [pair a1 ... an] *)
@@ -211,11 +211,11 @@ let rec unparse_comparable_ty_uncarbonated :
       match tr with
       | Prim (_, T_pair, ts, []) -> Prim (loc, T_pair, tl :: ts, [])
       | _ -> Prim (loc, T_pair, [tl; tr], []))
-  | Union_key (l, r, _meta, YesYes) ->
+  | Union_t (l, r, _meta, YesYes) ->
       let tl = unparse_comparable_ty_uncarbonated ~loc l in
       let tr = unparse_comparable_ty_uncarbonated ~loc r in
       Prim (loc, T_or, [tl; tr], [])
-  | Option_key (t, _meta, Yes) ->
+  | Option_t (t, _meta, Yes) ->
       Prim (loc, T_option, [unparse_comparable_ty_uncarbonated ~loc t], [])
 
 let unparse_memo_size ~loc memo_size =
@@ -342,32 +342,32 @@ let[@coq_axiom_with_reason "gadt"] rec comparable_ty_of_ty :
  fun ctxt loc ty ->
   Gas.consume ctxt Typecheck_costs.comparable_ty_of_ty_cycle >>? fun ctxt ->
   match ty with
-  | Unit_t -> ok ((Unit_key : a comparable_ty), ctxt)
-  | Never_t -> ok (Never_key, ctxt)
-  | Int_t -> ok (Int_key, ctxt)
-  | Nat_t -> ok (Nat_key, ctxt)
-  | Signature_t -> ok (Signature_key, ctxt)
-  | String_t -> ok (String_key, ctxt)
-  | Bytes_t -> ok (Bytes_key, ctxt)
-  | Mutez_t -> ok (Mutez_key, ctxt)
-  | Bool_t -> ok (Bool_key, ctxt)
-  | Key_hash_t -> ok (Key_hash_key, ctxt)
-  | Key_t -> ok (Key_key, ctxt)
-  | Timestamp_t -> ok (Timestamp_key, ctxt)
-  | Address_t -> ok (Address_key, ctxt)
-  | Tx_rollup_l2_address_t -> ok (Tx_rollup_l2_address_key, ctxt)
-  | Chain_id_t -> ok (Chain_id_key, ctxt)
+  | Unit_t -> ok ((Unit_t : a comparable_ty), ctxt)
+  | Never_t -> ok (Never_t, ctxt)
+  | Int_t -> ok (Int_t, ctxt)
+  | Nat_t -> ok (Nat_t, ctxt)
+  | Signature_t -> ok (Signature_t, ctxt)
+  | String_t -> ok (String_t, ctxt)
+  | Bytes_t -> ok (Bytes_t, ctxt)
+  | Mutez_t -> ok (Mutez_t, ctxt)
+  | Bool_t -> ok (Bool_t, ctxt)
+  | Key_hash_t -> ok (Key_hash_t, ctxt)
+  | Key_t -> ok (Key_t, ctxt)
+  | Timestamp_t -> ok (Timestamp_t, ctxt)
+  | Address_t -> ok (Address_t, ctxt)
+  | Tx_rollup_l2_address_t -> ok (Tx_rollup_l2_address_t, ctxt)
+  | Chain_id_t -> ok (Chain_id_t, ctxt)
   | Pair_t (l, r, pname, _) ->
       comparable_ty_of_ty ctxt loc l >>? fun (lty, ctxt) ->
       comparable_ty_of_ty ctxt loc r >|? fun (rty, ctxt) ->
-      (Pair_key (lty, rty, pname, YesYes), ctxt)
+      (Pair_t (lty, rty, pname, YesYes), ctxt)
   | Union_t (l, r, meta, _) ->
       comparable_ty_of_ty ctxt loc l >>? fun (lty, ctxt) ->
       comparable_ty_of_ty ctxt loc r >|? fun (rty, ctxt) ->
-      (Union_key (lty, rty, meta, YesYes), ctxt)
+      (Union_t (lty, rty, meta, YesYes), ctxt)
   | Option_t (tt, meta, _) ->
       comparable_ty_of_ty ctxt loc tt >|? fun (ty, ctxt) ->
-      (Option_key (ty, meta, Yes), ctxt)
+      (Option_t (ty, meta, Yes), ctxt)
   | Lambda_t _ | List_t _ | Ticket_t _ | Set_t _ | Map_t _ | Big_map_t _
   | Contract_t _ | Operation_t | Bls12_381_fr_t | Bls12_381_g1_t
   | Bls12_381_g2_t | Sapling_state_t _ | Sapling_transaction_t _
@@ -589,8 +589,8 @@ let unparse_option ~loc unparse_v ctxt = function
 
 let comparable_comb_witness2 :
     type t. t comparable_ty -> (t, unit -> unit -> unit) comb_witness = function
-  | Pair_key (_, Pair_key _, _, YesYes) -> Comb_Pair (Comb_Pair Comb_Any)
-  | Pair_key _ -> Comb_Pair Comb_Any
+  | Pair_t (_, Pair_t _, _, YesYes) -> Comb_Pair (Comb_Pair Comb_Any)
+  | Pair_t _ -> Comb_Pair Comb_Any
   | _ -> Comb_Any
 
 let[@coq_axiom_with_reason "gadt"] rec unparse_comparable_data :
@@ -612,36 +612,35 @@ let[@coq_axiom_with_reason "gadt"] rec unparse_comparable_data :
   >>?=
   fun ctxt ->
   match (ty, a) with
-  | (Unit_key, v) -> Lwt.return @@ unparse_unit ~loc ctxt v
-  | (Int_key, v) -> Lwt.return @@ unparse_int ~loc ctxt v
-  | (Nat_key, v) -> Lwt.return @@ unparse_nat ~loc ctxt v
-  | (String_key, s) -> Lwt.return @@ unparse_string ~loc ctxt s
-  | (Bytes_key, s) -> Lwt.return @@ unparse_bytes ~loc ctxt s
-  | (Bool_key, b) -> Lwt.return @@ unparse_bool ~loc ctxt b
-  | (Timestamp_key, t) -> Lwt.return @@ unparse_timestamp ~loc ctxt mode t
-  | (Address_key, address) ->
-      Lwt.return @@ unparse_address ~loc ctxt mode address
-  | (Tx_rollup_l2_address_key, address) ->
+  | (Unit_t, v) -> Lwt.return @@ unparse_unit ~loc ctxt v
+  | (Int_t, v) -> Lwt.return @@ unparse_int ~loc ctxt v
+  | (Nat_t, v) -> Lwt.return @@ unparse_nat ~loc ctxt v
+  | (String_t, s) -> Lwt.return @@ unparse_string ~loc ctxt s
+  | (Bytes_t, s) -> Lwt.return @@ unparse_bytes ~loc ctxt s
+  | (Bool_t, b) -> Lwt.return @@ unparse_bool ~loc ctxt b
+  | (Timestamp_t, t) -> Lwt.return @@ unparse_timestamp ~loc ctxt mode t
+  | (Address_t, address) -> Lwt.return @@ unparse_address ~loc ctxt mode address
+  | (Tx_rollup_l2_address_t, address) ->
       Lwt.return @@ unparse_tx_rollup_l2_address ~loc ctxt mode address
-  | (Signature_key, s) -> Lwt.return @@ unparse_signature ~loc ctxt mode s
-  | (Mutez_key, v) -> Lwt.return @@ unparse_mutez ~loc ctxt v
-  | (Key_key, k) -> Lwt.return @@ unparse_key ~loc ctxt mode k
-  | (Key_hash_key, k) -> Lwt.return @@ unparse_key_hash ~loc ctxt mode k
-  | (Chain_id_key, chain_id) ->
+  | (Signature_t, s) -> Lwt.return @@ unparse_signature ~loc ctxt mode s
+  | (Mutez_t, v) -> Lwt.return @@ unparse_mutez ~loc ctxt v
+  | (Key_t, k) -> Lwt.return @@ unparse_key ~loc ctxt mode k
+  | (Key_hash_t, k) -> Lwt.return @@ unparse_key_hash ~loc ctxt mode k
+  | (Chain_id_t, chain_id) ->
       Lwt.return @@ unparse_chain_id ~loc ctxt mode chain_id
-  | (Pair_key (tl, tr, _, YesYes), pair) ->
+  | (Pair_t (tl, tr, _, YesYes), pair) ->
       let r_witness = comparable_comb_witness2 tr in
       let unparse_l ctxt v = unparse_comparable_data ~loc ctxt mode tl v in
       let unparse_r ctxt v = unparse_comparable_data ~loc ctxt mode tr v in
       unparse_pair ~loc unparse_l unparse_r ctxt mode r_witness pair
-  | (Union_key (tl, tr, _, YesYes), v) ->
+  | (Union_t (tl, tr, _, YesYes), v) ->
       let unparse_l ctxt v = unparse_comparable_data ~loc ctxt mode tl v in
       let unparse_r ctxt v = unparse_comparable_data ~loc ctxt mode tr v in
       unparse_union ~loc unparse_l unparse_r ctxt v
-  | (Option_key (t, _, Yes), v) ->
+  | (Option_t (t, _, Yes), v) ->
       let unparse_v ctxt v = unparse_comparable_data ~loc ctxt mode t v in
       unparse_option ~loc unparse_v ctxt v
-  | (Never_key, _) -> .
+  | (Never_t, _) -> .
 
 let pack_node unparsed ctxt =
   Gas.consume ctxt (Script.strip_locations_cost unparsed) >>? fun ctxt ->
@@ -673,10 +672,9 @@ let hash_comparable_data ctxt ty data =
    checking this property when adding new types.
 *)
 let check_dupable_comparable_ty : type a. a comparable_ty -> unit = function
-  | Unit_key | Never_key | Int_key | Nat_key | Signature_key | String_key
-  | Bytes_key | Mutez_key | Bool_key | Key_hash_key | Key_key | Timestamp_key
-  | Chain_id_key | Address_key | Tx_rollup_l2_address_key | Pair_key _
-  | Union_key _ | Option_key _ ->
+  | Unit_t | Never_t | Int_t | Nat_t | Signature_t | String_t | Bytes_t
+  | Mutez_t | Bool_t | Key_hash_t | Key_t | Timestamp_t | Chain_id_t | Address_t
+  | Tx_rollup_l2_address_t | Pair_t _ | Union_t _ | Option_t _ ->
       ()
 
 let check_dupable_ty ctxt loc ty =
@@ -791,56 +789,55 @@ let rec comparable_ty_eq :
                     (ty_of_comparable_ty tb))
     in
     match (ta, tb) with
-    | (Unit_key, Unit_key) ->
-        return (Eq : (ta comparable_ty, tb comparable_ty) eq)
-    | (Unit_key, _) -> not_equal ()
-    | (Never_key, Never_key) -> return Eq
-    | (Never_key, _) -> not_equal ()
-    | (Int_key, Int_key) -> return Eq
-    | (Int_key, _) -> not_equal ()
-    | (Nat_key, Nat_key) -> return Eq
-    | (Nat_key, _) -> not_equal ()
-    | (Signature_key, Signature_key) -> return Eq
-    | (Signature_key, _) -> not_equal ()
-    | (String_key, String_key) -> return Eq
-    | (String_key, _) -> not_equal ()
-    | (Bytes_key, Bytes_key) -> return Eq
-    | (Bytes_key, _) -> not_equal ()
-    | (Mutez_key, Mutez_key) -> return Eq
-    | (Mutez_key, _) -> not_equal ()
-    | (Bool_key, Bool_key) -> return Eq
-    | (Bool_key, _) -> not_equal ()
-    | (Key_hash_key, Key_hash_key) -> return Eq
-    | (Key_hash_key, _) -> not_equal ()
-    | (Key_key, Key_key) -> return Eq
-    | (Key_key, _) -> not_equal ()
-    | (Timestamp_key, Timestamp_key) -> return Eq
-    | (Timestamp_key, _) -> not_equal ()
-    | (Chain_id_key, Chain_id_key) -> return Eq
-    | (Chain_id_key, _) -> not_equal ()
-    | (Address_key, Address_key) -> return Eq
-    | (Address_key, _) -> not_equal ()
-    | (Tx_rollup_l2_address_key, Tx_rollup_l2_address_key) -> return Eq
-    | (Tx_rollup_l2_address_key, _) -> not_equal ()
-    | ( Pair_key (left_a, right_a, meta_a, YesYes),
-        Pair_key (left_b, right_b, meta_b, YesYes) ) ->
+    | (Unit_t, Unit_t) -> return (Eq : (ta comparable_ty, tb comparable_ty) eq)
+    | (Unit_t, _) -> not_equal ()
+    | (Never_t, Never_t) -> return Eq
+    | (Never_t, _) -> not_equal ()
+    | (Int_t, Int_t) -> return Eq
+    | (Int_t, _) -> not_equal ()
+    | (Nat_t, Nat_t) -> return Eq
+    | (Nat_t, _) -> not_equal ()
+    | (Signature_t, Signature_t) -> return Eq
+    | (Signature_t, _) -> not_equal ()
+    | (String_t, String_t) -> return Eq
+    | (String_t, _) -> not_equal ()
+    | (Bytes_t, Bytes_t) -> return Eq
+    | (Bytes_t, _) -> not_equal ()
+    | (Mutez_t, Mutez_t) -> return Eq
+    | (Mutez_t, _) -> not_equal ()
+    | (Bool_t, Bool_t) -> return Eq
+    | (Bool_t, _) -> not_equal ()
+    | (Key_hash_t, Key_hash_t) -> return Eq
+    | (Key_hash_t, _) -> not_equal ()
+    | (Key_t, Key_t) -> return Eq
+    | (Key_t, _) -> not_equal ()
+    | (Timestamp_t, Timestamp_t) -> return Eq
+    | (Timestamp_t, _) -> not_equal ()
+    | (Chain_id_t, Chain_id_t) -> return Eq
+    | (Chain_id_t, _) -> not_equal ()
+    | (Address_t, Address_t) -> return Eq
+    | (Address_t, _) -> not_equal ()
+    | (Tx_rollup_l2_address_t, Tx_rollup_l2_address_t) -> return Eq
+    | (Tx_rollup_l2_address_t, _) -> not_equal ()
+    | ( Pair_t (left_a, right_a, meta_a, YesYes),
+        Pair_t (left_b, right_b, meta_b, YesYes) ) ->
         let* () = type_metadata_eq meta_a meta_b in
         let* Eq = comparable_ty_eq ~error_details left_a left_b in
         let+ Eq = comparable_ty_eq ~error_details right_a right_b in
         (Eq : (ta comparable_ty, tb comparable_ty) eq)
-    | (Pair_key _, _) -> not_equal ()
-    | ( Union_key (left_a, right_a, meta_a, YesYes),
-        Union_key (left_b, right_b, meta_b, YesYes) ) ->
+    | (Pair_t _, _) -> not_equal ()
+    | ( Union_t (left_a, right_a, meta_a, YesYes),
+        Union_t (left_b, right_b, meta_b, YesYes) ) ->
         let* () = type_metadata_eq meta_a meta_b in
         let* Eq = comparable_ty_eq ~error_details left_a left_b in
         let+ Eq = comparable_ty_eq ~error_details right_a right_b in
         (Eq : (ta comparable_ty, tb comparable_ty) eq)
-    | (Union_key _, _) -> not_equal ()
-    | (Option_key (ta, meta_a, Yes), Option_key (tb, meta_b, Yes)) ->
+    | (Union_t _, _) -> not_equal ()
+    | (Option_t (ta, meta_a, Yes), Option_t (tb, meta_b, Yes)) ->
         let* () = type_metadata_eq meta_a meta_b in
         let+ Eq = comparable_ty_eq ~error_details ta tb in
         (Eq : (ta comparable_ty, tb comparable_ty) eq)
-    | (Option_key _, _) -> not_equal ()
+    | (Option_t _, _) -> not_equal ()
 
 let memo_size_eq :
     type error_trace.
@@ -2386,7 +2383,7 @@ let parse_option parse_v ctxt ~legacy = function
 
 let comparable_comb_witness1 :
     type t. t comparable_ty -> (t, unit -> unit) comb_witness = function
-  | Pair_key _ -> Comb_Pair Comb_Any
+  | Pair_t _ -> Comb_Pair Comb_Any
   | _ -> Comb_Any
 
 let[@coq_axiom_with_reason "gadt"] rec parse_comparable_data :
@@ -2413,42 +2410,41 @@ let[@coq_axiom_with_reason "gadt"] rec parse_comparable_data :
   fun ctxt ->
   let legacy = false in
   match (ty, script_data) with
-  | (Unit_key, expr) ->
+  | (Unit_t, expr) ->
       Lwt.return @@ traced_no_lwt
       @@ (parse_unit ctxt ~legacy expr : (a * context) tzresult)
-  | (Bool_key, expr) ->
+  | (Bool_t, expr) ->
       Lwt.return @@ traced_no_lwt @@ parse_bool ctxt ~legacy expr
-  | (String_key, expr) -> Lwt.return @@ traced_no_lwt @@ parse_string ctxt expr
-  | (Bytes_key, expr) -> Lwt.return @@ traced_no_lwt @@ parse_bytes ctxt expr
-  | (Int_key, expr) -> Lwt.return @@ traced_no_lwt @@ parse_int ctxt expr
-  | (Nat_key, expr) -> Lwt.return @@ traced_no_lwt @@ parse_nat ctxt expr
-  | (Mutez_key, expr) -> Lwt.return @@ traced_no_lwt @@ parse_mutez ctxt expr
-  | (Timestamp_key, expr) ->
+  | (String_t, expr) -> Lwt.return @@ traced_no_lwt @@ parse_string ctxt expr
+  | (Bytes_t, expr) -> Lwt.return @@ traced_no_lwt @@ parse_bytes ctxt expr
+  | (Int_t, expr) -> Lwt.return @@ traced_no_lwt @@ parse_int ctxt expr
+  | (Nat_t, expr) -> Lwt.return @@ traced_no_lwt @@ parse_nat ctxt expr
+  | (Mutez_t, expr) -> Lwt.return @@ traced_no_lwt @@ parse_mutez ctxt expr
+  | (Timestamp_t, expr) ->
       Lwt.return @@ traced_no_lwt @@ parse_timestamp ctxt expr
-  | (Key_key, expr) -> Lwt.return @@ traced_no_lwt @@ parse_key ctxt expr
-  | (Key_hash_key, expr) ->
+  | (Key_t, expr) -> Lwt.return @@ traced_no_lwt @@ parse_key ctxt expr
+  | (Key_hash_t, expr) ->
       Lwt.return @@ traced_no_lwt @@ parse_key_hash ctxt expr
-  | (Signature_key, expr) ->
+  | (Signature_t, expr) ->
       Lwt.return @@ traced_no_lwt @@ parse_signature ctxt expr
-  | (Chain_id_key, expr) ->
+  | (Chain_id_t, expr) ->
       Lwt.return @@ traced_no_lwt @@ parse_chain_id ctxt expr
-  | (Address_key, expr) ->
-      Lwt.return @@ traced_no_lwt @@ parse_address ctxt expr
-  | (Tx_rollup_l2_address_key, expr) ->
+  | (Address_t, expr) -> Lwt.return @@ traced_no_lwt @@ parse_address ctxt expr
+  | (Tx_rollup_l2_address_t, expr) ->
       Lwt.return @@ traced_no_lwt @@ parse_tx_rollup_l2_address ctxt expr
-  | (Pair_key (tl, tr, _, YesYes), expr) ->
+  | (Pair_t (tl, tr, _, YesYes), expr) ->
       let r_witness = comparable_comb_witness1 tr in
       let parse_l ctxt v = parse_comparable_data ?type_logger ctxt tl v in
       let parse_r ctxt v = parse_comparable_data ?type_logger ctxt tr v in
       traced @@ parse_pair parse_l parse_r ctxt ~legacy r_witness expr
-  | (Union_key (tl, tr, _, YesYes), expr) ->
+  | (Union_t (tl, tr, _, YesYes), expr) ->
       let parse_l ctxt v = parse_comparable_data ?type_logger ctxt tl v in
       let parse_r ctxt v = parse_comparable_data ?type_logger ctxt tr v in
       traced @@ parse_union parse_l parse_r ctxt ~legacy expr
-  | (Option_key (t, _, Yes), expr) ->
+  | (Option_t (t, _, Yes), expr) ->
       let parse_v ctxt v = parse_comparable_data ?type_logger ctxt t v in
       traced @@ parse_option parse_v ctxt ~legacy expr
-  | (Never_key, expr) -> Lwt.return @@ traced_no_lwt @@ parse_never expr
+  | (Never_t, expr) -> Lwt.return @@ traced_no_lwt @@ parse_never expr
 
 (* -- parse data of any type -- *)
 

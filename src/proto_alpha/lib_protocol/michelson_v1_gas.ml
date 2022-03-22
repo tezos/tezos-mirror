@@ -1402,24 +1402,24 @@ module Cost_of = struct
           a Script_typed_ir.comparable_ty -> a -> a -> cost -> cont -> cost =
        fun ty x y acc k ->
         match ty with
-        | Unit_key -> (apply [@tailcall]) Gas.(acc +@ compare_unit) k
-        | Never_key -> ( match x with _ -> .)
-        | Bool_key -> (apply [@tailcall]) Gas.(acc +@ compare_bool) k
-        | String_key -> (apply [@tailcall]) Gas.(acc +@ compare_string x y) k
-        | Signature_key -> (apply [@tailcall]) Gas.(acc +@ compare_signature) k
-        | Bytes_key -> (apply [@tailcall]) Gas.(acc +@ compare_bytes x y) k
-        | Mutez_key -> (apply [@tailcall]) Gas.(acc +@ compare_mutez) k
-        | Int_key -> (apply [@tailcall]) Gas.(acc +@ compare_int x y) k
-        | Nat_key -> (apply [@tailcall]) Gas.(acc +@ compare_nat x y) k
-        | Key_hash_key -> (apply [@tailcall]) Gas.(acc +@ compare_key_hash) k
-        | Key_key -> (apply [@tailcall]) Gas.(acc +@ compare_key) k
-        | Timestamp_key ->
+        | Unit_t -> (apply [@tailcall]) Gas.(acc +@ compare_unit) k
+        | Never_t -> ( match x with _ -> .)
+        | Bool_t -> (apply [@tailcall]) Gas.(acc +@ compare_bool) k
+        | String_t -> (apply [@tailcall]) Gas.(acc +@ compare_string x y) k
+        | Signature_t -> (apply [@tailcall]) Gas.(acc +@ compare_signature) k
+        | Bytes_t -> (apply [@tailcall]) Gas.(acc +@ compare_bytes x y) k
+        | Mutez_t -> (apply [@tailcall]) Gas.(acc +@ compare_mutez) k
+        | Int_t -> (apply [@tailcall]) Gas.(acc +@ compare_int x y) k
+        | Nat_t -> (apply [@tailcall]) Gas.(acc +@ compare_nat x y) k
+        | Key_hash_t -> (apply [@tailcall]) Gas.(acc +@ compare_key_hash) k
+        | Key_t -> (apply [@tailcall]) Gas.(acc +@ compare_key) k
+        | Timestamp_t ->
             (apply [@tailcall]) Gas.(acc +@ compare_timestamp x y) k
-        | Address_key -> (apply [@tailcall]) Gas.(acc +@ compare_address) k
-        | Tx_rollup_l2_address_key ->
+        | Address_t -> (apply [@tailcall]) Gas.(acc +@ compare_address) k
+        | Tx_rollup_l2_address_t ->
             (apply [@tailcall]) Gas.(acc +@ compare_tx_rollup_l2_address) k
-        | Chain_id_key -> (apply [@tailcall]) Gas.(acc +@ compare_chain_id) k
-        | Pair_key (tl, tr, _, YesYes) ->
+        | Chain_id_t -> (apply [@tailcall]) Gas.(acc +@ compare_chain_id) k
+        | Pair_t (tl, tr, _, YesYes) ->
             (* Reasonable over-approximation of the cost of lexicographic comparison. *)
             let (xl, xr) = x in
             let (yl, yr) = y in
@@ -1429,7 +1429,7 @@ module Cost_of = struct
               yl
               Gas.(acc +@ compare_pair_tag)
               (Compare (tr, xr, yr, k))
-        | Union_key (tl, tr, _, YesYes) -> (
+        | Union_t (tl, tr, _, YesYes) -> (
             match (x, y) with
             | (L x, L y) ->
                 (compare [@tailcall]) tl x y Gas.(acc +@ compare_union_tag) k
@@ -1437,7 +1437,7 @@ module Cost_of = struct
             | (R _, L _) -> (apply [@tailcall]) Gas.(acc +@ compare_union_tag) k
             | (R x, R y) ->
                 (compare [@tailcall]) tr x y Gas.(acc +@ compare_union_tag) k)
-        | Option_key (t, _, Yes) -> (
+        | Option_t (t, _, Yes) -> (
             match (x, y) with
             | (None, None) ->
                 (apply [@tailcall]) Gas.(acc +@ compare_option_tag) k

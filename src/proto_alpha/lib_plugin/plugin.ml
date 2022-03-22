@@ -1986,30 +1986,30 @@ module RPC = struct
           type a loc.
           loc:loc -> a comparable_ty -> (loc, Script.prim) Micheline.node =
        fun ~loc -> function
-        | Unit_key -> Prim (loc, T_unit, [], [])
-        | Never_key -> Prim (loc, T_never, [], [])
-        | Int_key -> Prim (loc, T_int, [], [])
-        | Nat_key -> Prim (loc, T_nat, [], [])
-        | Signature_key -> Prim (loc, T_signature, [], [])
-        | String_key -> Prim (loc, T_string, [], [])
-        | Bytes_key -> Prim (loc, T_bytes, [], [])
-        | Mutez_key -> Prim (loc, T_mutez, [], [])
-        | Bool_key -> Prim (loc, T_bool, [], [])
-        | Key_hash_key -> Prim (loc, T_key_hash, [], [])
-        | Key_key -> Prim (loc, T_key, [], [])
-        | Timestamp_key -> Prim (loc, T_timestamp, [], [])
-        | Address_key -> Prim (loc, T_address, [], [])
-        | Tx_rollup_l2_address_key -> Prim (loc, T_tx_rollup_l2_address, [], [])
-        | Chain_id_key -> Prim (loc, T_chain_id, [], [])
-        | Pair_key (l, r, _meta, YesYes) ->
+        | Unit_t -> Prim (loc, T_unit, [], [])
+        | Never_t -> Prim (loc, T_never, [], [])
+        | Int_t -> Prim (loc, T_int, [], [])
+        | Nat_t -> Prim (loc, T_nat, [], [])
+        | Signature_t -> Prim (loc, T_signature, [], [])
+        | String_t -> Prim (loc, T_string, [], [])
+        | Bytes_t -> Prim (loc, T_bytes, [], [])
+        | Mutez_t -> Prim (loc, T_mutez, [], [])
+        | Bool_t -> Prim (loc, T_bool, [], [])
+        | Key_hash_t -> Prim (loc, T_key_hash, [], [])
+        | Key_t -> Prim (loc, T_key, [], [])
+        | Timestamp_t -> Prim (loc, T_timestamp, [], [])
+        | Address_t -> Prim (loc, T_address, [], [])
+        | Tx_rollup_l2_address_t -> Prim (loc, T_tx_rollup_l2_address, [], [])
+        | Chain_id_t -> Prim (loc, T_chain_id, [], [])
+        | Pair_t (l, r, _meta, YesYes) ->
             let tl = unparse_comparable_ty ~loc l in
             let tr = unparse_comparable_ty ~loc r in
             Prim (loc, T_pair, [tl; tr], [])
-        | Union_key (l, r, _meta, YesYes) ->
+        | Union_t (l, r, _meta, YesYes) ->
             let tl = unparse_comparable_ty ~loc l in
             let tr = unparse_comparable_ty ~loc r in
             Prim (loc, T_or, [tl; tr], [])
-        | Option_key (t, _meta, Yes) ->
+        | Option_t (t, _meta, Yes) ->
             Prim (loc, T_option, [unparse_comparable_ty ~loc t], [])
 
       let unparse_memo_size ~loc memo_size =
