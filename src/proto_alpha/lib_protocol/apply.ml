@@ -1887,8 +1887,23 @@ let precheck_manager_contents (type kind) ctxt (op : kind Kind.manager contents)
       Tx_rollup_commitment.check_commitment_level state commitment
       >>?= fun () -> return ctxt
   | Tx_rollup_return_bond _ | Tx_rollup_finalize_commitment _
-  | Tx_rollup_remove_commitment _ | Tx_rollup_withdraw _ ->
+  | Tx_rollup_remove_commitment _ ->
       assert_tx_rollup_feature_enabled ctxt >|=? fun () -> ctxt
+  | Tx_rollup_withdraw {withdraw_path; _} ->
+      assert_tx_rollup_feature_enabled ctxt >>=? fun () ->
+      let Constants.{tx_rollup_max_withdrawals_per_batch; _} =
+        Constants.parametric ctxt
+      in
+      let path_size = Tx_rollup_withdraw.Merkle.path_depth withdraw_path in
+      let maximum_path_size =
+        Tx_rollup_withdraw.maximum_path_depth
+          ~withdraw_count_limit:tx_rollup_max_withdrawals_per_batch
+      in
+      if Compare.Int.(path_size > maximum_path_size) then
+        fail
+          (Tx_rollup_errors.Wrong_withdraw_path_depth
+             {provided = path_size; limit = maximum_path_size})
+      else return ctxt
   | Tx_rollup_rejection {message_path; _} ->
       assert_tx_rollup_feature_enabled ctxt >>=? fun () ->
       let Constants.{tx_rollup_max_messages_per_inbox; _} =

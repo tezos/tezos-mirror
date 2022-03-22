@@ -70,11 +70,18 @@ module Merkle : sig
 
   val check_path : path -> int -> withdrawal -> root -> bool tzresult
 
+  val path_depth : path -> int
+
   (** [merklize_list messages] construct a merkle root by build a
       tree, appending the [messages] one by one in the same order of
       the list and finally computing the root. *)
   val merklize_list : withdrawal list -> root
 end
+
+(** [maximum_path_depth ~withdraw_count_limit] returns the maximum
+    depth of a path, depending on the maximimum number of a withdraw in
+    an inbox given by [message_count_limit]. *)
+val maximum_path_depth : withdraw_count_limit:int -> int
 
 (** [Withdrawal_accounting] provides an interface for the storage to
    account for which withdrawals (as identified by their index) have
