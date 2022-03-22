@@ -82,6 +82,14 @@ let connection_arguments_and_port ?rpc_port node =
     ],
     rpc_port )
 
+let spawn ?rpc_port ?(args = []) node =
+  let args = (connection_arguments_and_port ?rpc_port node |> fst) @ args in
+  Process.spawn
+    ~name:Parameters.base_default_name
+    ~color:Parameters.default_colors.(0)
+    Constant.tezos_proxy_server
+    args
+
 let create ?runner ?name ?rpc_port ?(args = []) node =
   let path = Constant.tezos_proxy_server in
   let user_arguments =

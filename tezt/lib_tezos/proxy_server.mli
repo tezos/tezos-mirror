@@ -51,6 +51,13 @@ val rpc_port : t -> int
     Return [None] if the proxy server runs on the local machine. *)
 val runner : t -> Runner.t option
 
+(** [spawn ?rpc_port node] spawns a new proxy server that serves
+    the given port and delegates its queries to [node].
+
+    This function is meant to be used by callers that need finer control
+    than what {!init} allows. *)
+val spawn : ?rpc_port:int -> ?args:string list -> Node.t -> Process.t
+
 (** [init ?runner ?name ?rpc_port ?event_level ?args node] creates and starts a proxy server
     that serves the given port and delegates its queries to [node].
 
