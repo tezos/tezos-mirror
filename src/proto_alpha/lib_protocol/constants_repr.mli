@@ -233,7 +233,7 @@ end
     depending how the protocol will be instantiated (sandboxed mode,
     test network, ...) we may want to change this limit. For each
     subcache, a parametric constant can be used to change the limit
-    (see {parametric}).
+    (see {!parametric}).
 
     The number of subcaches and the limits for all those subcaches form
     together what is called the [cache_layout]. *)

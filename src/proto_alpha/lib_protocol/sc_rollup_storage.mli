@@ -268,7 +268,7 @@ val refine_stake :
 
     May fail with:
     {ul
-      {li [Sc_rollup_does_not_exist] if [rollup] does not exist} *)
+      {li [Sc_rollup_does_not_exist] if [rollup] does not exist}} *)
 val last_cemented_commitment :
   Raw_context.t ->
   Sc_rollup_repr.t ->

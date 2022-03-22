@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 (** [find ctxt contract] returns the delegate associated to [contract], or [None]
-    if [contract] has no delegate]. *)
+    if [contract] has no delegate. *)
 val find :
   Raw_context.t ->
   Contract_repr.t ->

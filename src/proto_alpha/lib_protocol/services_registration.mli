@@ -49,7 +49,7 @@ type rpc_context = {
    representation (the one the shell knows).
 
     If [mode = `Head_level], the [Alpha_context] uses the same level
-   as the head of the chain (given by [rpc_context.block_header).
+   as the head of the chain (given by [rpc_context.block_header]).
 
     If [mode= `Successor_level], the [Alpha_context] uses the
    successor level of the head.

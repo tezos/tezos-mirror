@@ -673,7 +673,7 @@ let expr_encoding =
         (fun l -> Literal l);
         ]
   )
-}]
+]}
 
       Interestingly, the cases for known lengths can be generated
       programmatically.
