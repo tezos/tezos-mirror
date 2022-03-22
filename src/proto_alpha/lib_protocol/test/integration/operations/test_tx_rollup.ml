@@ -2864,8 +2864,6 @@ let test_state () =
   Block.bake b ~operations:[] >>=? fun b ->
   Block.bake b ~operations:[] >>=? fun b ->
   Block.bake b ~operations:[] >>=? fun b ->
-  Block.bake b ~operations:[] >>=? fun b ->
-  Block.bake b ~operations:[] >>=? fun b ->
   Op.tx_rollup_finalize (B b) account1 tx_rollup >>=? fun operation ->
   Block.bake b ~operation >>=? fun b ->
   (* Check we cannot finalize root anymore *)
@@ -2879,7 +2877,19 @@ let test_state () =
   >>=? fun b ->
   (* We can reject level 1 *)
   reject b Tx_rollup_level.(succ root) >>=? fun b ->
-  ignore b ;
+  (* There is no commitment to finalize anymore *)
+  Block.bake b ~operations:[] >>=? fun b ->
+  Block.bake b ~operations:[] >>=? fun b ->
+  Block.bake b ~operations:[] >>=? fun b ->
+  Op.tx_rollup_finalize (B b) account1 tx_rollup >>=? fun operation ->
+  Incremental.begin_construction b >>=? fun i ->
+  Incremental.add_operation
+    i
+    operation
+    ~expect_failure:
+      (check_proto_error Tx_rollup_errors.No_commitment_to_finalize)
+  >>=? fun i ->
+  ignore i ;
   return_unit
 
 (** [test_state_with_deleted] tests an edge cases in state management
