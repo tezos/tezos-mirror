@@ -47,7 +47,7 @@ let test_level_5 () =
   let config =
     {
       default_config with
-      timeout = Int32.to_int level_to_reach * 3;
+      timeout = Int32.to_int level_to_reach * 3 * 2;
       round0 = 2L;
       round1 = 3L;
     }
@@ -520,7 +520,7 @@ let test_scenario_f1 () =
               (3l, bootstrap3);
             ] );
         ];
-      timeout = 15;
+      timeout = 60;
     }
   in
   run
@@ -581,7 +581,7 @@ let test_scenario_f2 () =
               (4l, bootstrap1);
             ] );
         ];
-      timeout = 1000;
+      timeout = 60;
       round0 = 2L;
       round1 = 3L;
     }
@@ -644,7 +644,7 @@ let test_scenario_m1 () =
       | Baking_state.New_proposal {block; _} -> block.shell.level > 4l
       | _ -> false
   end in
-  let config = {default_config with timeout = 25} in
+  let config = {default_config with timeout = 60} in
   run
     ~config
     [
@@ -704,7 +704,7 @@ let test_scenario_m2 () =
         ];
       round0 = 2L;
       round1 = 3L;
-      timeout = 20;
+      timeout = 60;
     }
   in
   run
@@ -777,7 +777,7 @@ let test_scenario_m3 () =
         ];
       round0 = 2L;
       round1 = 3L;
-      timeout = 30;
+      timeout = 60;
     }
   in
   run
@@ -953,6 +953,16 @@ let test_scenario_m5 () =
       default_config with
       initial_seed =
         some_seed "rngGJmwLi7kPvGwV2LR3kjNQ6xamGPCZ9ooep9QcafbqRXZhYEciT";
+      delegate_selection =
+        [
+          ( 1l,
+            [
+              (0l, bootstrap1);
+              (1l, bootstrap2);
+              (2l, bootstrap3);
+              (3l, bootstrap4);
+            ] );
+        ];
       round0 = 3L;
       round1 = 4L;
     }
@@ -1086,7 +1096,7 @@ let test_scenario_m6 () =
               (3l, bootstrap4);
             ] );
         ];
-      timeout = 20;
+      timeout = 60;
     }
   in
   run
@@ -1293,7 +1303,7 @@ let test_scenario_m7 () =
               (3l, bootstrap4);
             ] );
         ];
-      timeout = 20;
+      timeout = 60;
     }
   in
   run
@@ -1438,7 +1448,7 @@ let test_scenario_m8 () =
               (3l, bootstrap4);
             ] );
         ];
-      timeout = 30;
+      timeout = 60;
     }
   in
   run
