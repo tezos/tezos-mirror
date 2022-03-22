@@ -1189,7 +1189,7 @@ let encoding =
           "metrics_addr"
           ~description:"Configuration of the Prometheus metrics endpoint"
           (list string)
-          []))
+          default_config.metrics_addr))
 
 (* Abstract version of [Json_encoding.Cannot_destruct]: first argument is the
    string representation of the path, second argument is the error message
@@ -1354,6 +1354,7 @@ let update ?(disable_config_validation = false) ?data_dir ?min_connections
       acl;
       media_type;
     }
+  and metrics_addr = unopt_list ~default:cfg.metrics_addr metrics_addr
   and log : Lwt_log_sink_unix.cfg =
     {cfg.log with output = Option.value ~default:cfg.log.output log_output}
   and shell : shell =

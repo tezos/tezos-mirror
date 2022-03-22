@@ -40,7 +40,10 @@ let check_node_initialization (history_mode : Node.history_mode) :
       (sf "node initialization (%s mode)" (Node.show_history_mode history_mode))
     ~tags:["basic"; "node"; Node.show_history_mode history_mode]
   @@ fun protocol ->
-  let* node = Node.init [History_mode history_mode] in
+  let metrics_addr = "localhost:" ^ string_of_int (Port.fresh ()) in
+  let* node =
+    Node.init [History_mode history_mode; Metrics_addr metrics_addr]
+  in
   let* client = Client.init ~endpoint:(Node node) () in
   let* () = Client.activate_protocol ~protocol client in
   Log.info "Activated protocol." ;
@@ -51,7 +54,12 @@ let check_node_initialization (history_mode : Node.history_mode) :
   let* identity = Node.wait_for_identity node in
   if identity = "" then Test.fail "identity is empty" ;
   Log.info "Identity is not empty." ;
-  return ()
+  let addr = "http://" ^ metrics_addr ^ "/metrics" in
+  let* metrics =
+    Process.spawn ~log_output:false "curl" ["-s"; addr]
+    |> Process.check_and_read_stdout
+  in
+  if metrics = "" then Test.fail "Unable to read metrics" else return ()
 
 let register ~protocols =
   check_node_initialization Archive protocols ;
