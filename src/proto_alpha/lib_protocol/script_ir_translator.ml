@@ -2278,72 +2278,10 @@ let parse_option parse_v ctxt ~legacy = function
       fail @@ Invalid_arity (loc, D_None, 0, List.length l)
   | expr -> fail @@ unexpected expr [] Constant_namespace [D_Some; D_None]
 
-(* -- parse data of comparable types -- *)
-
 let comb_witness1 : type t tc. (t, tc) ty -> (t, unit -> unit) comb_witness =
   function
   | Pair_t _ -> Comb_Pair Comb_Any
   | _ -> Comb_Any
-
-let[@coq_axiom_with_reason "gadt"] rec parse_comparable_data :
-    type a.
-    ?type_logger:type_logger ->
-    context ->
-    a comparable_ty ->
-    Script.node ->
-    (a * context) tzresult Lwt.t =
- fun ?type_logger ctxt ty script_data ->
-  (* No need for stack_depth here. Unlike [parse_data],
-     [parse_comparable_data] doesn't call [parse_returning].
-     The stack depth is bounded by the type depth, bounded by 1024. *)
-  let parse_data_error () =
-    let ty = serialize_ty_for_error ty in
-    Invalid_constant (location script_data, strip_locations script_data, ty)
-  in
-  let traced_no_lwt body = record_trace_eval parse_data_error body in
-  let traced body = trace_eval parse_data_error body in
-  Gas.consume ctxt Typecheck_costs.parse_data_cycle
-  (* We could have a smaller cost but let's keep it consistent with
-     [parse_data] for now. *)
-  >>?=
-  fun ctxt ->
-  let legacy = false in
-  match (ty, script_data) with
-  | (Unit_t, expr) ->
-      Lwt.return @@ traced_no_lwt
-      @@ (parse_unit ctxt ~legacy expr : (a * context) tzresult)
-  | (Bool_t, expr) ->
-      Lwt.return @@ traced_no_lwt @@ parse_bool ctxt ~legacy expr
-  | (String_t, expr) -> Lwt.return @@ traced_no_lwt @@ parse_string ctxt expr
-  | (Bytes_t, expr) -> Lwt.return @@ traced_no_lwt @@ parse_bytes ctxt expr
-  | (Int_t, expr) -> Lwt.return @@ traced_no_lwt @@ parse_int ctxt expr
-  | (Nat_t, expr) -> Lwt.return @@ traced_no_lwt @@ parse_nat ctxt expr
-  | (Mutez_t, expr) -> Lwt.return @@ traced_no_lwt @@ parse_mutez ctxt expr
-  | (Timestamp_t, expr) ->
-      Lwt.return @@ traced_no_lwt @@ parse_timestamp ctxt expr
-  | (Key_t, expr) -> Lwt.return @@ traced_no_lwt @@ parse_key ctxt expr
-  | (Key_hash_t, expr) ->
-      Lwt.return @@ traced_no_lwt @@ parse_key_hash ctxt expr
-  | (Signature_t, expr) ->
-      Lwt.return @@ traced_no_lwt @@ parse_signature ctxt expr
-  | (Chain_id_t, expr) ->
-      Lwt.return @@ traced_no_lwt @@ parse_chain_id ctxt expr
-  | (Address_t, expr) -> Lwt.return @@ traced_no_lwt @@ parse_address ctxt expr
-  | (Tx_rollup_l2_address_t, expr) ->
-      Lwt.return @@ traced_no_lwt @@ parse_tx_rollup_l2_address ctxt expr
-  | (Pair_t (tl, tr, _, YesYes), expr) ->
-      let r_witness = comb_witness1 tr in
-      let parse_l ctxt v = parse_comparable_data ?type_logger ctxt tl v in
-      let parse_r ctxt v = parse_comparable_data ?type_logger ctxt tr v in
-      traced @@ parse_pair parse_l parse_r ctxt ~legacy r_witness expr
-  | (Union_t (tl, tr, _, YesYes), expr) ->
-      let parse_l ctxt v = parse_comparable_data ?type_logger ctxt tl v in
-      let parse_r ctxt v = parse_comparable_data ?type_logger ctxt tr v in
-      traced @@ parse_union parse_l parse_r ctxt ~legacy expr
-  | (Option_t (t, _, Yes), expr) ->
-      let parse_v ctxt v = parse_comparable_data ?type_logger ctxt t v in
-      traced @@ parse_option parse_v ctxt ~legacy expr
-  | (Never_t, expr) -> Lwt.return @@ traced_no_lwt @@ parse_never expr
 
 (* -- parse data of any type -- *)
 
@@ -2402,7 +2340,7 @@ let[@coq_axiom_with_reason "gadt"] rec parse_data :
             (if legacy then Result.return_unit
             else error_unexpected_annot loc annot)
             >>?= fun () ->
-            parse_comparable_data ?type_logger ctxt key_type k
+            non_terminal_recursion ?type_logger ctxt ~legacy key_type k
             >>=? fun (k, ctxt) ->
             non_terminal_recursion ?type_logger ctxt ~legacy value_type v
             >>=? fun (v, ctxt) ->
@@ -2452,7 +2390,7 @@ let[@coq_axiom_with_reason "gadt"] rec parse_data :
             (if legacy then Result.return_unit
             else error_unexpected_annot loc annot)
             >>?= fun () ->
-            parse_comparable_data ?type_logger ctxt key_type k
+            non_terminal_recursion ?type_logger ctxt ~legacy key_type k
             >>=? fun (k, ctxt) ->
             hash_comparable_data ctxt key_type k >>=? fun (key_hash, ctxt) ->
             non_terminal_recursion ?type_logger ctxt ~legacy value_type v
@@ -2597,7 +2535,7 @@ let[@coq_axiom_with_reason "gadt"] rec parse_data :
   | (Ticket_t (t, _ty_name), expr) ->
       if allow_forged then
         opened_ticket_type (location expr) t >>?= fun ty ->
-        parse_comparable_data ?type_logger ctxt ty expr
+        non_terminal_recursion ?type_logger ctxt ~legacy ty expr
         >>=? fun (({destination; entrypoint = _}, (contents, amount)), ctxt) ->
         match destination with
         | Contract ticketer -> return ({ticketer; contents; amount}, ctxt)
@@ -2608,7 +2546,8 @@ let[@coq_axiom_with_reason "gadt"] rec parse_data :
       traced
       @@ List.fold_left_es
            (fun (last_value, set, ctxt) v ->
-             parse_comparable_data ?type_logger ctxt t v >>=? fun (v, ctxt) ->
+             non_terminal_recursion ?type_logger ctxt ~legacy t v
+             >>=? fun (v, ctxt) ->
              Lwt.return
                ( (match last_value with
                  | Some value ->
@@ -6279,6 +6218,8 @@ let list_of_big_map_ids ids =
   Lazy_storage.IdSet.fold Big_map (fun id acc -> id :: acc) ids []
 
 let parse_data = parse_data ~stack_depth:0
+
+let parse_comparable_data = parse_data ~legacy:false ~allow_forged:false
 
 let parse_instr :
     type a s.
