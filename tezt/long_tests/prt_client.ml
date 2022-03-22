@@ -31,9 +31,14 @@
 *)
 
 let grafana_panels : Grafana.panel list =
-  [Row "Test: client"; Grafana.simple_graph "client load time" "duration"]
+  [
+    Row "Test: client";
+    Grafana.simple_graph "client load time" "duration";
+    Row "Test: client";
+    Grafana.simple_graph "RPC.get_block response time" "duration";
+  ]
 
-let register ~executors () =
+let client_load_time ~executors () =
   Long_test.register
     ~__FILE__
     ~title:"client load time"
@@ -44,3 +49,20 @@ let register ~executors () =
   let client = Client.create () in
   Long_test.time_lwt ~repeat:5 "client load time" @@ fun () ->
   Client.version client
+
+let get_blocks_response_time ~executors () =
+  Long_test.register
+    ~__FILE__
+    ~title:"get blocks time"
+    ~tags:["rpc"]
+    ~timeout:(Seconds 20)
+    ~executors
+  @@ fun () ->
+  let* (_node, client) = Client.init_with_protocol `Client ~protocol:Alpha () in
+  Long_test.time_lwt "RPC.get_block response time" @@ fun () ->
+  let* _ = RPC.get_block client in
+  unit
+
+let register ~executors () =
+  client_load_time ~executors () ;
+  get_blocks_response_time ~executors ()
