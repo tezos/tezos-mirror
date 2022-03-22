@@ -592,17 +592,17 @@ let pack_node unparsed ctxt =
   let bytes = Bytes.cat (Bytes.of_string "\005") bytes in
   (bytes, ctxt)
 
-let pack_comparable_data ctxt ty data ~mode =
-  unparse_comparable_data ~loc:() ctxt mode ty data >>=? fun (unparsed, ctxt) ->
-  Lwt.return @@ pack_node unparsed ctxt
+let pack_comparable_data ctxt ty data =
+  unparse_comparable_data ~loc:() ctxt Optimized_legacy ty data
+  >>=? fun (unparsed, ctxt) -> Lwt.return @@ pack_node unparsed ctxt
 
 let hash_bytes ctxt bytes =
   Gas.consume ctxt (Michelson_v1_gas.Cost_of.Interpreter.blake2b bytes)
   >|? fun ctxt -> (Script_expr_hash.(hash_bytes [bytes]), ctxt)
 
 let hash_comparable_data ctxt ty data =
-  pack_comparable_data ctxt ty data ~mode:Optimized_legacy
-  >>=? fun (bytes, ctxt) -> Lwt.return @@ hash_bytes ctxt bytes
+  pack_comparable_data ctxt ty data >>=? fun (bytes, ctxt) ->
+  Lwt.return @@ hash_bytes ctxt bytes
 
 (* ---- Tickets ------------------------------------------------------------ *)
 
