@@ -78,10 +78,18 @@ module Merkle = struct
 
   let check_path = Merkle_list.check_path
 
+  let path_depth = Merkle_list.path_depth
+
   let merklize_list messages =
     let tree = tree_of_messages messages in
     root tree
 end
+
+let maximum_path_depth ~message_count_limit =
+  (* We assume that the Merkle_tree implemenation computes a tree in a
+     logarithmic size of the number of leaves. *)
+  let log2 n = Z.numbits (Z.of_int n) in
+  log2 message_count_limit
 
 type t = {inbox_length : int; cumulated_size : int; merkle_root : Merkle.root}
 

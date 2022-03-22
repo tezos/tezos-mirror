@@ -57,11 +57,18 @@ module Merkle : sig
   val check_path :
     path -> int -> Tx_rollup_message_repr.hash -> root -> bool tzresult
 
+  val path_depth : path -> int
+
   (** [merklize_list messages] construct a merkle root by build a
      tree, appending the [messages] one by one in the same order of
      the list and finally computing the root. *)
   val merklize_list : Tx_rollup_message_repr.hash list -> root
 end
+
+(** [maximum_path_depth ~message_count_limit] returns the maximum
+    depth of a path, depending on the maximimum number of a message in
+    an inbox given by [message_count_limit]. *)
+val maximum_path_depth : message_count_limit:int -> int
 
 (** The view of an inbox: stores the [cumulated_size] in bytes for
     the inbox, the [inbox_length] ({i i.e.}, the number of messages),

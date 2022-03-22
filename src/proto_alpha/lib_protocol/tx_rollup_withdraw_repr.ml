@@ -92,6 +92,8 @@ module Merkle = struct
 
   let check_path = Merkle_list.check_path
 
+  let path_depth = Merkle_list.path_depth
+
   let compute_path messages position =
     let tree = tree_of_messages messages in
     Merkle_list.compute_path tree position
@@ -100,6 +102,12 @@ module Merkle = struct
     let tree = tree_of_messages messages in
     root tree
 end
+
+let maximum_path_depth ~withdraw_count_limit =
+  (* We assume that the Merkle_tree implemenation computes a tree in a
+     logarithmic size of the number of leaves. *)
+  let log2 n = Z.numbits (Z.of_int n) in
+  log2 withdraw_count_limit
 
 type error += Negative_withdrawal_index of int | Too_big_withdrawal_index of int
 

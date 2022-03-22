@@ -59,6 +59,8 @@ type error +=
       position : int;
       length : int;
     }
+  | Wrong_message_path_depth of {provided : int; limit : int}
+  | Wrong_withdraw_path_depth of {provided : int; limit : int}
   | Wrong_message_path of {expected : Tx_rollup_inbox_repr.Merkle.root}
   | No_finalized_commitment_for_level of {
       level : Tx_rollup_level_repr.t;
@@ -374,6 +376,32 @@ let () =
       | _ -> None)
     (fun (level, position, length) ->
       Wrong_message_position {level; position; length}) ;
+  (* Wrong_message_path_depth *)
+  register_error_kind
+    `Permanent
+    ~id:"tx_rollup_wrong_message_path_depth"
+    ~title:"Wrong message path depth"
+    ~description:
+      "The rejection contains a message path which exceeds the maximum depth \
+       that can be witness for a valid inbox."
+    (obj2 (req "provided" int31) (req "limit" int31))
+    (function
+      | Wrong_message_path_depth {provided; limit} -> Some (provided, limit)
+      | _ -> None)
+    (fun (provided, limit) -> Wrong_message_path_depth {provided; limit}) ;
+  (* Wrong_withdraw_path_depth *)
+  register_error_kind
+    `Permanent
+    ~id:"tx_rollup_wrong_withdraw_path_depth"
+    ~title:"Wrong withdraw path depth"
+    ~description:
+      "The rejection contains a withdraw path which exceeds the maximum depth \
+       that can be witness for a valid message."
+    (obj2 (req "provided" int31) (req "limit" int31))
+    (function
+      | Wrong_withdraw_path_depth {provided; limit} -> Some (provided, limit)
+      | _ -> None)
+    (fun (provided, limit) -> Wrong_withdraw_path_depth {provided; limit}) ;
   (* Wrong_message_hash *)
   register_error_kind
     `Branch

@@ -2357,7 +2357,7 @@ module Rejection = struct
         (check_proto_error
            (Tx_rollup_errors.Wrong_message_position
               {level; position = 1; length = 1}))
-    >>=? fun _ -> return ()
+    >>=? fun _ -> return_unit
 
   (** Test rejecting a commitment to a non-trivial message -- that is,
       not a no-op. *)

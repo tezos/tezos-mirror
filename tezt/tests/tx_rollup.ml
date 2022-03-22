@@ -963,10 +963,147 @@ let test_rollup_wrong_rejection =
   | Interval (0, _) -> unit
   | _ -> Test.fail "Wrong rollup state: Expected commitment head at level 0"
 
+let test_rollup_wrong_path_for_rejection =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"wrong path for rejection"
+    ~tags:["tx_rollup"; "rejection"; "batch"]
+  @@ fun protocol ->
+  let parameters = Parameters.{finality_period = 1; withdraw_period = 1} in
+  let* ({rollup; client; node = _} as state) =
+    init_with_tx_rollup ~parameters ~protocol ()
+  in
+  let batch = "blob" in
+  let* () = submit_batch ~batch state in
+  let* () = Client.bake_for client in
+  let inbox_content = `Content [`Batch batch] in
+  let* () =
+    submit_commitment
+      ~level:0
+      ~roots:[Constant.tx_rollup_initial_message_result]
+      ~inbox_content
+      ~predecessor:None
+      state
+  in
+  let* () =
+    repeat parameters.finality_period (fun () -> Client.bake_for client)
+  in
+  let*! _ = RPC.Tx_rollup.get_state ~rollup client in
+  let* (`OpHash _op) =
+    Operation.inject_rejection
+      ~source:Constant.bootstrap1
+      ~tx_rollup:state.rollup
+      ~proof:Constant.tx_rollup_proof_initial_state
+      ~level:0
+      ~message:(`Batch batch)
+      ~message_position:0
+      ~message_path:[]
+      ~previous_message_result:
+        ( Constant.tx_rollup_empty_l2_context,
+          Constant.tx_rollup_empty_withdraw_list )
+      client
+  in
+  let* () = Client.bake_for client in
+  let* json = RPC.get_block client in
+  let operation_result =
+    JSON.(
+      json |-> "operations" |=> 3 |=> 0 |-> "contents" |=> 0 |-> "metadata"
+      |-> "operation_result")
+  in
+  let status = JSON.(operation_result |-> "status" |> as_string) in
+  Check.(status = "failed")
+    Check.string
+    ~error_msg:"Expected status: %R. Got %L" ;
+  let error_id =
+    JSON.(operation_result |-> "errors" |=> 0 |-> "id" |> as_string)
+  in
+  Check.(error_id = "proto.alpha.tx_rollup_wrong_message_path")
+    Check.string
+    ~error_msg:"Expected error id: %R. Got %L" ;
+  unit
+
+let test_rollup_wrong_rejection_long_path =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"wrong rejection wtih long path"
+    ~tags:["tx_rollup"; "rejection"; "batch"]
+  @@ fun protocol ->
+  let parameters = Parameters.{finality_period = 1; withdraw_period = 1} in
+  let* ({rollup = _; client; node = _} as state) =
+    init_with_tx_rollup ~parameters ~protocol ()
+  in
+  let batch = "blob" in
+  let* () = submit_batch ~batch state in
+  let* () = Client.bake_for client in
+  let inbox_content = `Content [`Batch batch] in
+  let* () =
+    submit_commitment
+      ~level:0
+      ~roots:[Constant.tx_rollup_initial_message_result]
+      ~inbox_content
+      ~predecessor:None
+      state
+  in
+  let* () =
+    repeat parameters.finality_period (fun () -> Client.bake_for client)
+  in
+  let message = `Batch batch in
+  let*! message_hash = Rollup.message_hash ~message client in
+  let message_hashes = List.init 1025 (fun _ -> message_hash) in
+  let position = 5 in
+  let*! bad_path =
+    Rollup.inbox_merkle_tree_path ~message_hashes ~position client
+  in
+  let message_hashes = List.init 1024 (fun _ -> message_hash) in
+  let*! good_path =
+    Rollup.inbox_merkle_tree_path ~message_hashes ~position client
+  in
+  let bad_path = JSON.encode bad_path in
+  let good_path = JSON.encode good_path in
+  let message = Ezjsonm.value_to_string @@ `O [("batch", `String batch)] in
+  let*? process =
+    Client.Tx_rollup.submit_rejection
+      ~src:Constant.bootstrap1.alias
+      ~rollup:state.rollup
+      ~proof:Constant.tx_rollup_proof_initial_state
+      ~level:0
+      ~message
+      ~position
+      ~path:bad_path
+      ~context_hash:Constant.tx_rollup_empty_l2_context
+      ~withdraw_list_hash:Constant.tx_rollup_empty_withdraw_list
+      state.client
+  in
+  let* () =
+    Process.check_error
+      ~msg:(rex "proto.alpha.tx_rollup_wrong_message_path_depth")
+      process
+  in
+  (* We check here the path is valid but the operation is rejected for
+     a different reason. *)
+  let*? process =
+    Client.Tx_rollup.submit_rejection
+      ~src:Constant.bootstrap1.alias
+      ~rollup:state.rollup
+      ~proof:Constant.tx_rollup_proof_initial_state
+      ~level:0
+      ~message
+      ~position:0
+      ~path:good_path
+      ~context_hash:Constant.tx_rollup_empty_l2_context
+      ~withdraw_list_hash:Constant.tx_rollup_empty_withdraw_list
+      state.client
+  in
+  Process.check_error
+    ~msg:(rex "proto.alpha.tx_rollup_wrong_message_path")
+    process
+
 let register ~protocols =
   Regressions.register protocols ;
   test_submit_batches_in_several_blocks protocols ;
   test_submit_from_originated_source protocols ;
   test_rollup_with_two_commitments protocols ;
   test_rollup_last_commitment_is_rejected protocols ;
-  test_rollup_wrong_rejection protocols
+  test_rollup_wrong_rejection protocols ;
+  test_rollup_wrong_path_for_rejection protocols ;
+  test_rollup_wrong_rejection_long_path protocols
