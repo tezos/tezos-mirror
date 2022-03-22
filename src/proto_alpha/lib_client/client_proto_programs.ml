@@ -136,6 +136,12 @@ type run_view_params = {
   entrypoint : Entrypoint.t;
 }
 
+type run_script_view_params = {
+  shared_params : simulation_params;
+  contract : Contract.t;
+  view : string;
+}
+
 type run_params = {
   shared_params : simulation_params;
   amount : Tez.t option;
@@ -162,6 +168,30 @@ let run_view (cctxt : #Protocol_client_context.rpc_context)
     ?gas
     ~contract
     ~entrypoint
+    ~input:input.expanded
+    ~chain_id
+    ?source
+    ?payer
+    ~unparsing_mode
+    ~now
+    ~level
+
+let run_script_view (cctxt : #Protocol_client_context.rpc_context)
+    ~(chain : Chain_services.chain) ~block (params : run_script_view_params) =
+  let {
+    shared_params = {input; unparsing_mode; now; level; source; payer; gas};
+    contract;
+    view;
+  } =
+    params
+  in
+  Chain_services.chain_id cctxt ~chain () >>=? fun chain_id ->
+  Plugin.RPC.Scripts.run_script_view
+    cctxt
+    (chain, block)
+    ?gas
+    ~contract
+    ~view
     ~input:input.expanded
     ~chain_id
     ?source

@@ -43,11 +43,18 @@ type simulation_params = {
   gas : Gas.Arith.integral option;
 }
 
-(* Parameters specific to simulations of views *)
+(* Parameters specific to simulations of TZIP4 views *)
 type run_view_params = {
   shared_params : simulation_params;
   contract : Contract.t;
   entrypoint : Entrypoint.t;
+}
+
+(* Parameters specific to simulations of Michelson views *)
+type run_script_view_params = {
+  shared_params : simulation_params;
+  contract : Contract.t;
+  view : string;
 }
 
 (* Parameters specific to simulations of contract calls *)
@@ -66,6 +73,15 @@ val run_view :
   chain:Shell_services.chain ->
   block:Shell_services.block ->
   run_view_params ->
+  Script.expr tzresult Lwt.t
+
+(** [run_script_view cctxt ~chain ~block params] executes the RPC to run a
+    Michelson view offchain and returns its value. *)
+val run_script_view :
+  #Protocol_client_context.rpc_context ->
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
+  run_script_view_params ->
   Script.expr tzresult Lwt.t
 
 val run :
