@@ -26,29 +26,33 @@
 open Constants
 
 let estimate_gas_tps ~average_block_path () =
-  Protocol.write_parameter_file
-    ~base:(Either.right (protocol, Some protocol_constants))
-    []
-  >>= fun parameter_file ->
-  Client.init_with_protocol
-    ~nodes_args:Node.[Connections 0; Synchronisation_threshold 0]
-    ~parameter_file
-    ~timestamp_delay:0.0
-    `Client
-    ~protocol
-    ()
-  >>= fun (node, client) ->
-  Average_block.load average_block_path >>= fun average_block ->
-  Average_block.check_for_unknown_smart_contracts average_block >>= fun () ->
-  Baker.init ~protocol ~delegates node client >>= fun _baker ->
+  let open Lwt_syntax in
+  let* parameter_file =
+    Protocol.write_parameter_file
+      ~base:(Either.right (protocol, Some protocol_constants))
+      []
+  in
+  let* (node, client) =
+    Client.init_with_protocol
+      ~nodes_args:Node.[Connections 0; Synchronisation_threshold 0]
+      ~parameter_file
+      ~timestamp_delay:0.0
+      `Client
+      ~protocol
+      ()
+  in
+  let* average_block = Average_block.load average_block_path in
+  let* () = Average_block.check_for_unknown_smart_contracts average_block in
+  let* _baker = Baker.init ~protocol ~delegates node client in
   Log.info "Originating smart contracts" ;
-  Client.stresstest_originate_smart_contracts originating_bootstrap client
-  >>= fun () ->
+  let* () =
+    Client.stresstest_originate_smart_contracts originating_bootstrap client
+  in
   Log.info "Waiting to reach the next level" ;
-  Node.wait_for_level node 2 >>= fun _ ->
+  let* _ = Node.wait_for_level node 2 in
   (* It is important to give the chain time to include the smart contracts
      we have originated before we run gas estimations. *)
-  Client.stresstest_estimate_gas client >>= fun transaction_costs ->
+  let* transaction_costs = Client.stresstest_estimate_gas client in
   let average_transaction_cost =
     Gas.average_transaction_cost transaction_costs average_block
   in
@@ -57,7 +61,7 @@ let estimate_gas_tps ~average_block_path () =
     Gas.deduce_tps ~protocol ~protocol_constants ~average_transaction_cost ()
   in
   Log.info "Gas TPS: %d" gas_tps ;
-  Node.terminate ~kill:true node >>= fun () ->
+  let* () = Node.terminate ~kill:true node in
   Lwt.return @@ float_of_int gas_tps
 
 let register () =

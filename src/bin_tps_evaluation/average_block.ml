@@ -38,13 +38,14 @@ let encoding =
        (req "contract" (assoc int31)))
 
 let load path_option =
+  let open Lwt_syntax in
   match path_option with
   | None ->
       Log.info "Using the default average block description" ;
       Lwt.return {regular = 1; origination = 0; contract = []}
   | Some path -> (
       Log.info "Reading description of the average block from %s" path ;
-      Lwt_io.(with_file ~mode:Input path (fun fp -> read fp)) >>= fun text ->
+      let* text = Lwt_io.(with_file ~mode:Input path (fun fp -> read fp)) in
       match Data_encoding.Json.from_string text with
       | Ok json -> Lwt.return (Data_encoding.Json.destruct encoding json)
       | Error msg ->

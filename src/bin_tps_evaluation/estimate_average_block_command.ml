@@ -199,21 +199,20 @@ end
 
 (** Execute the query against the database and formats the result. *)
 let query_db start_date end_date contract_min_percentage conn_str =
-  Lwt.bind (Db.get_operation_summary conn_str start_date end_date ()) (function
-      | Ok rows -> Lwt.return rows
-      | Error e -> Stdlib.failwith (Caqti_error.show e))
-  >>= fun summary ->
-  Lwt.bind
-    (Db.get_top_contracts
-       conn_str
-       start_date
-       end_date
-       contract_min_percentage
-       ())
-    (function
-      | Ok rows -> Lwt.return rows
-      | Error e -> Stdlib.failwith (Caqti_error.show e))
-  >>= fun top_contracts -> Lwt.return (Json.show_summary summary top_contracts)
+  let open Lwt_result_syntax in
+  let* summary = Db.get_operation_summary conn_str start_date end_date () in
+  let* top_contracts =
+    Db.get_top_contracts conn_str start_date end_date contract_min_percentage ()
+  in
+  Json.show_summary summary top_contracts ;
+  return_unit
+
+let query_db start_date end_date contract_min_percentage conn_str =
+  let open Lwt_syntax in
+  let+ r = query_db start_date end_date contract_min_percentage conn_str in
+  WithExceptions.Result.to_exn_f
+    ~error:(fun e -> Stdlib.Failure (Caqti_error.show e))
+    r
 
 let register () =
   Long_test.register

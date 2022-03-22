@@ -35,16 +35,19 @@ let benchmark_starting_level = 3
 (** Print out the file at [path] to the stdout. *)
 let print_out_file path =
   let open Lwt_io in
+  let open Lwt_syntax in
   with_file ~mode:Input path (fun ic ->
-      read ic >>= fun str ->
-      write stdout str >>= fun () ->
-      write stdout "\n\n" >>= fun () -> flush stdout)
+      let* str = read ic in
+      let* () = write stdout str in
+      let* () = write stdout "\n\n" in
+      flush stdout)
 
 (** Get a list of hashes of the given number of most recent blocks. *)
 let get_blocks blocks_total client =
+  let open Lwt_syntax in
   let path = ["chains"; "main"; "blocks"] in
   let query_string = [("length", Int.to_string blocks_total)] in
-  Client.rpc ~query_string GET path client >|= fun json ->
+  let+ json = Client.rpc ~query_string GET path client in
   List.map JSON.as_string (JSON.as_list (JSON.geti 0 json))
 
 (** Get the total number of injected transactions. *)
@@ -99,61 +102,69 @@ let get_total_applied_transactions_for_block block client =
 
     We are interested in 3, so we select that.
    *)
+  let open Lwt_syntax in
   let path = ["chains"; "main"; "blocks"; block; "operation_hashes"; "3"] in
-  Client.rpc GET path client >|= fun json -> List.length (JSON.as_list json)
+  let+ json = Client.rpc GET path client in
+  List.length (JSON.as_list json)
 
 (** The entry point of the benchmark. *)
 let run_benchmark ~lift_protocol_limits ~provided_tps_of_injection
     ~accounts_total ~blocks_total ~average_block_path () =
+  let open Lwt_syntax in
   Log.info "Tezos TPS benchmark" ;
   Log.info "Protocol: %s" (Protocol.name protocol) ;
   Log.info "Total number of accounts to use: %d" accounts_total ;
   Log.info "Blocks to bake: %d" blocks_total ;
-  Protocol.write_parameter_file
-    ~base:(Either.right (protocol, Some protocol_constants))
-    (if lift_protocol_limits then
-     [
-       (* We're using the maximum representable number. (2 ^ 31 - 1) *)
-       (["hard_gas_limit_per_block"], Some {|"2147483647"|});
-       (["hard_gas_limit_per_operation"], Some {|"2147483647"|});
-     ]
-    else [])
-  >>= fun parameter_file ->
+  let* parameter_file =
+    Protocol.write_parameter_file
+      ~base:(Either.right (protocol, Some protocol_constants))
+      (if lift_protocol_limits then
+       [
+         (* We're using the maximum representable number. (2 ^ 31 - 1) *)
+         (["hard_gas_limit_per_block"], Some {|"2147483647"|});
+         (["hard_gas_limit_per_operation"], Some {|"2147483647"|});
+       ]
+      else [])
+  in
   Log.info "Spinning up the network..." ;
   (* For now we disable operations precheck, but ideally we should
      pre-populate enough bootstrap accounts and do 1 transaction per
      account per block. *)
-  Client.init_with_protocol
-    ~nodes_args:
-      Node.
-        [
-          Connections 0; Synchronisation_threshold 0; Disable_operations_precheck;
-        ]
-    ~parameter_file
-    ~timestamp_delay:0.0
-    `Client
-    ~protocol
-    ()
-  >>= fun (node, client) ->
-  Average_block.load average_block_path >>= fun average_block ->
-  Average_block.check_for_unknown_smart_contracts average_block >>= fun () ->
-  Baker.init ~protocol ~delegates node client >>= fun _baker ->
+  let* (node, client) =
+    Client.init_with_protocol
+      ~nodes_args:
+        Node.
+          [
+            Connections 0;
+            Synchronisation_threshold 0;
+            Disable_operations_precheck;
+          ]
+      ~parameter_file
+      ~timestamp_delay:0.0
+      `Client
+      ~protocol
+      ()
+  in
+  let* average_block = Average_block.load average_block_path in
+  let* () = Average_block.check_for_unknown_smart_contracts average_block in
+  let* _baker = Baker.init ~protocol ~delegates node client in
   Log.info "Originating smart contracts" ;
-  Client.stresstest_originate_smart_contracts originating_bootstrap client
-  >>= fun () ->
+  let* () =
+    Client.stresstest_originate_smart_contracts originating_bootstrap client
+  in
   Log.info "Waiting to reach the next level" ;
-  Node.wait_for_level node 2 >>= fun _ ->
+  let* _ = Node.wait_for_level node 2 in
   (* It is important to give the chain time to include the smart contracts
      we have originated before we run gas estimations. *)
-  Client.stresstest_estimate_gas client >>= fun transaction_costs ->
+  let* transaction_costs = Client.stresstest_estimate_gas client in
   let average_transaction_cost =
     Gas.average_transaction_cost transaction_costs average_block
   in
   Log.info "Average transaction cost: %d" average_transaction_cost ;
   Log.info "Using the parameter file: %s" parameter_file ;
-  print_out_file parameter_file >>= fun () ->
+  let* () = print_out_file parameter_file in
   Log.info "Waiting to reach level %d" benchmark_starting_level ;
-  Node.wait_for_level node benchmark_starting_level >>= fun _ ->
+  let* _ = Node.wait_for_level node benchmark_starting_level in
   let bench_start = Unix.gettimeofday () in
   Log.info "The benchmark has been started" ;
   (* It is important to use a good estimate of max possible TPS that is
@@ -194,24 +205,26 @@ let run_benchmark ~lift_protocol_limits ~provided_tps_of_injection
       ~smart_contract_parameters
       client
   in
-  Node.wait_for_level node (benchmark_starting_level + blocks_total)
-  >>= fun _level ->
+  let* _level =
+    Node.wait_for_level node (benchmark_starting_level + blocks_total)
+  in
   Process.terminate client_stresstest_process ;
-  Process.wait client_stresstest_process >>= fun _ ->
+  let* _ = Process.wait client_stresstest_process in
   let bench_end = Unix.gettimeofday () in
   let bench_duration = bench_end -. bench_start in
   Log.info "Produced %d block(s) in %.2f seconds" blocks_total bench_duration ;
-  get_blocks blocks_total client >>= fun produced_block_hashes ->
+  let* produced_block_hashes = get_blocks blocks_total client in
   let total_injected_transactions = get_total_injected_transactions () in
   let total_applied_transactions = ref 0 in
   let handle_one_block block_hash =
-    get_total_applied_transactions_for_block block_hash client
-    >|= fun applied_transactions ->
+    let+ applied_transactions =
+      get_total_applied_transactions_for_block block_hash client
+    in
     total_applied_transactions :=
       !total_applied_transactions + applied_transactions ;
     Log.info "%s -> %d" block_hash applied_transactions
   in
-  List.iter_s handle_one_block (List.rev produced_block_hashes) >>= fun () ->
+  let* () = List.iter_s handle_one_block (List.rev produced_block_hashes) in
   Log.info "Total applied transactions: %d" !total_applied_transactions ;
   Log.info "Total injected transactions: %d" total_injected_transactions ;
   let empirical_tps =
@@ -223,7 +236,7 @@ let run_benchmark ~lift_protocol_limits ~provided_tps_of_injection
   Log.info "TPS of injection (target): %d" target_tps_of_injection ;
   Log.info "TPS of injection (de facto): %.2f" de_facto_tps_of_injection ;
   Log.info "Empirical TPS: %.2f" empirical_tps ;
-  Node.terminate ~kill:true node >>= fun () ->
+  let* () = Node.terminate ~kill:true node in
   return (de_facto_tps_of_injection, empirical_tps)
 
 let regression_handling defacto_tps_of_injection empirical_tps
