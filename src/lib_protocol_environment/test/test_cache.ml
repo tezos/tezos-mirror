@@ -81,9 +81,10 @@ let number_of_keys cache =
 
 let gen_entries ?(high_init_entries = high_init_entries) ncaches =
   QCheck.Gen.(
+    let* size = int_range low_init_entries high_init_entries in
     let* entries =
-      list_size
-        (int_range low_init_entries high_init_entries)
+      list_repeat
+        size
         (pair (int_bound (ncaches - 1)) (pair string_printable small_int))
     in
     List.sort_uniq

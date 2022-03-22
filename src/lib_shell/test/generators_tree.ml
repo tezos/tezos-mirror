@@ -285,16 +285,16 @@ module External_generators = Generators
     to generate protocol bytes of operations. *)
 let block_gen ?proto_gen () : Block.t QCheck2.Gen.t =
   let open QCheck2.Gen in
+  let ops_list_gen =
+    (* Having super long list of operations isn't necessary.
+       In addition it slows everything down. *)
+    list_size
+      (int_range 0 10)
+      (External_generators.operation_with_hash_gen ?proto_gen ())
+  in
   let* ops =
-    let ops_list_gen =
-      (* Having super long list of operations isn't necessary.
-         In addition it slows everything down. *)
-      list_size
-        (int_range 0 10)
-        (External_generators.operation_with_hash_gen ?proto_gen ())
-    in
     (* In production these lists are exactly of size 4, being more general *)
-    ops_list_gen |> list_size (int_range 0 8)
+    list_size (int_range 0 8) ops_list_gen
   in
   let hash = Block.hash_of_block ops in
   return Block.{hash; operations = ops}
@@ -322,7 +322,7 @@ let unique_nonempty_block_gen =
 let unique_block_gen_gt ?proto_gen ~(n : int) () : Block.Set.t QCheck2.Gen.t =
   assert (n >= 0) ;
   let open QCheck2.Gen in
-  let list_gen = list_size (return n) in
+  let list_gen = list_repeat n in
   let rec go generated =
     if Block.Set.cardinal generated >= n then return generated
     else

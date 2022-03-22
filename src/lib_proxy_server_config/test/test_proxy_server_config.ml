@@ -55,9 +55,8 @@ let rpc_addr_gen =
 let path_gen =
   let open QCheck.Gen in
   (* Generate something that looks like a Unix path *)
-  let+ s =
-    list_size (1 -- 8) (string_size ~gen:(char_range 'a' 'z') (1 -- 8))
-  in
+  let* size = 1 -- 8 in
+  let+ s = list_repeat size (string_size ~gen:(char_range 'a' 'z') (1 -- 8)) in
   String.concat "/" ("" :: s)
 
 (** A generator that generates valid values for the [rpc_tls] field *)

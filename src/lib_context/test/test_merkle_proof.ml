@@ -77,7 +77,9 @@ module Proof32 (Encoding : Tezos_context_sigs.Context.PROOF_ENCODING) = struct
 
     let inode_extender gen_a =
       let* length = int_range 1 10 in
-      let* segment = list_size (map succ (int_bound 5)) (int_bound 4) in
+      let* size = int_bound 5 in
+      let size = size + 1 in
+      let* segment = list_repeat size (int_bound 4) in
       let+ proof = gen_a in
       {length; segment; proof}
 
@@ -86,65 +88,51 @@ module Proof32 (Encoding : Tezos_context_sigs.Context.PROOF_ENCODING) = struct
         let+ hash = hash in
         Blinded_inode hash
       else
-        let* i = int_bound 3 in
-        match i with
-        | 0 ->
-            let+ hash = hash in
-            Blinded_inode hash
-        | 1 ->
-            let+ xs =
-              list_size
-                (map succ (int_bound 3))
-                (pair step (tree (depth - 1, width)))
-            in
-            Inode_values xs
-        | 2 ->
-            let+ i = inode width (inode_tree (depth - 1, width / 2)) in
-            Inode_tree i
-        | 3 ->
-            let+ i = inode_extender (inode_tree (depth - 1, width)) in
-            (Inode_extender i : inode_tree)
-        | _ -> assert false
+        oneof
+          [
+            (let+ hash = hash in
+             Blinded_inode hash);
+            (let* size = int_bound 3 in
+             let size = size + 1 in
+             let+ xs = list_repeat size (pair step (tree (depth - 1, width))) in
+             Inode_values xs);
+            (let+ i = inode width (inode_tree (depth - 1, width / 2)) in
+             Inode_tree i);
+            (let+ i = inode_extender (inode_tree (depth - 1, width)) in
+             (Inode_extender i : inode_tree));
+          ]
 
     and tree (depth, width) : tree t =
       if depth <= 0 then
-        let* i = int_bound 2 in
-        match i with
-        | 0 ->
-            let+ v = value in
-            (Value v : tree)
-        | 1 ->
-            let+ h = hash in
-            Blinded_value h
-        | 2 ->
-            let+ h = hash in
-            Blinded_node h
-        | _ -> assert false
+        oneof
+          [
+            (let+ v = value in
+             (Value v : tree));
+            (let+ h = hash in
+             Blinded_value h);
+            (let+ h = hash in
+             Blinded_node h);
+          ]
       else
-        let* i = int_bound 5 in
-        match i with
-        | 0 ->
-            let+ v = value in
-            (Value v : tree)
-        | 1 ->
-            let+ h = hash in
-            Blinded_value h
-        | 2 ->
-            let+ xs =
-              list_size (map succ (int_bound 4))
-              @@ pair step (tree (depth - 1, width))
-            in
-            (Node xs : tree)
-        | 3 ->
-            let+ h = hash in
-            Blinded_node h
-        | 4 ->
-            let+ i = inode width (inode_tree (depth - 1, width / 2)) in
-            (Inode i : tree)
-        | 5 ->
-            let+ i = inode_extender (inode_tree (depth - 1, width)) in
-            Extender i
-        | _ -> assert false
+        oneof
+          [
+            (let+ v = value in
+             (Value v : tree));
+            (let+ h = hash in
+             Blinded_value h);
+            (let* size = int_bound 4 in
+             let size = size + 1 in
+             let+ xs =
+               list_repeat size @@ pair step (tree (depth - 1, width))
+             in
+             (Node xs : tree));
+            (let+ h = hash in
+             Blinded_node h);
+            (let+ i = inode width (inode_tree (depth - 1, width / 2)) in
+             (Inode i : tree));
+            (let+ i = inode_extender (inode_tree (depth - 1, width)) in
+             Extender i);
+          ]
 
     let kinded_hash =
       let* h = hash in
@@ -161,27 +149,25 @@ module Proof32 (Encoding : Tezos_context_sigs.Context.PROOF_ENCODING) = struct
       open Stream
 
       let elt =
-        let* i = int_bound 3 in
-        match i with
-        | 0 ->
-            let+ v = value in
-            Value v
-        | 1 ->
-            let+ sks =
-              list_size (map succ (int_bound 4)) @@ pair step kinded_hash
-            in
-            Node sks
-        | 2 ->
-            let max_indices = 5 in
-            let+ i = inode max_indices hash in
-            Inode i
-        | 3 ->
-            let+ i = inode_extender hash in
-            Inode_extender i
-        | _ -> assert false
+        oneof
+          [
+            (let+ v = value in
+             Value v);
+            (let* size = int_bound 4 in
+             let size = size + 1 in
+             let+ sks = list_repeat size @@ pair step kinded_hash in
+             Node sks);
+            (let max_indices = 5 in
+             let+ i = inode max_indices hash in
+             Inode i);
+            (let+ i = inode_extender hash in
+             Inode_extender i);
+          ]
 
       let t : Stream.t Gen.t =
-        let+ xs = list_size (map succ (int_bound 10)) elt in
+        let* size = int_bound 10 in
+        let size = size + 1 in
+        let+ xs = list_repeat size elt in
         List.to_seq xs
     end
 
@@ -308,7 +294,9 @@ module Proof2 (Encoding : Tezos_context_sigs.Context.PROOF_ENCODING) = struct
 
     let inode_extender gen_a =
       let* length = int_range 1 10 in
-      let* segment = list_size (map succ (int_bound 5)) (int_bound 1) in
+      let* size = int_bound 5 in
+      let size = size + 1 in
+      let* segment = list_repeat size (int_bound 1) in
       let+ proof = gen_a in
       {length; segment; proof}
 
@@ -317,65 +305,51 @@ module Proof2 (Encoding : Tezos_context_sigs.Context.PROOF_ENCODING) = struct
         let+ hash = hash in
         Blinded_inode hash
       else
-        let* i = int_bound 3 in
-        match i with
-        | 0 ->
-            let+ hash = hash in
-            Blinded_inode hash
-        | 1 ->
-            let+ xs =
-              list_size
-                (map succ (int_bound 3))
-                (pair step (tree (depth - 1, width)))
-            in
-            Inode_values xs
-        | 2 ->
-            let+ i = inode width (inode_tree (depth - 1, width / 2)) in
-            Inode_tree i
-        | 3 ->
-            let+ i = inode_extender (inode_tree (depth - 1, width)) in
-            (Inode_extender i : inode_tree)
-        | _ -> assert false
+        oneof
+          [
+            (let+ hash = hash in
+             Blinded_inode hash);
+            (let* size = int_bound 3 in
+             let size = size + 1 in
+             let+ xs = list_repeat size (pair step (tree (depth - 1, width))) in
+             Inode_values xs);
+            (let+ i = inode width (inode_tree (depth - 1, width / 2)) in
+             Inode_tree i);
+            (let+ i = inode_extender (inode_tree (depth - 1, width)) in
+             (Inode_extender i : inode_tree));
+          ]
 
     and tree (depth, width) : tree t =
       if depth <= 0 then
-        let* i = int_bound 2 in
-        match i with
-        | 0 ->
-            let+ v = value in
-            (Value v : tree)
-        | 1 ->
-            let+ h = hash in
-            Blinded_value h
-        | 2 ->
-            let+ h = hash in
-            Blinded_node h
-        | _ -> assert false
+        oneof
+          [
+            (let+ v = value in
+             (Value v : tree));
+            (let+ h = hash in
+             Blinded_value h);
+            (let+ h = hash in
+             Blinded_node h);
+          ]
       else
-        let* i = int_bound 5 in
-        match i with
-        | 0 ->
-            let+ v = value in
-            (Value v : tree)
-        | 1 ->
-            let+ h = hash in
-            Blinded_value h
-        | 2 ->
-            let+ xs =
-              list_size (map succ (int_bound 4))
-              @@ pair step (tree (depth - 1, width))
-            in
-            (Node xs : tree)
-        | 3 ->
-            let+ h = hash in
-            Blinded_node h
-        | 4 ->
-            let+ i = inode width (inode_tree (depth - 1, width / 2)) in
-            (Inode i : tree)
-        | 5 ->
-            let+ i = inode_extender (inode_tree (depth - 1, width)) in
-            Extender i
-        | _ -> assert false
+        oneof
+          [
+            (let+ v = value in
+             (Value v : tree));
+            (let+ h = hash in
+             Blinded_value h);
+            (let* size = int_bound 4 in
+             let size = size + 1 in
+             let+ xs =
+               list_repeat size @@ pair step (tree (depth - 1, width))
+             in
+             (Node xs : tree));
+            (let+ h = hash in
+             Blinded_node h);
+            (let+ i = inode width (inode_tree (depth - 1, width / 2)) in
+             (Inode i : tree));
+            (let+ i = inode_extender (inode_tree (depth - 1, width)) in
+             Extender i);
+          ]
 
     let kinded_hash =
       let* h = hash in
@@ -392,27 +366,25 @@ module Proof2 (Encoding : Tezos_context_sigs.Context.PROOF_ENCODING) = struct
       open Stream
 
       let elt =
-        let* i = int_bound 3 in
-        match i with
-        | 0 ->
-            let+ v = value in
-            Value v
-        | 1 ->
-            let+ sks =
-              list_size (map succ (int_bound 4)) @@ pair step kinded_hash
-            in
-            Node sks
-        | 2 ->
-            let max_indices = 5 in
-            let+ i = inode max_indices hash in
-            Inode i
-        | 3 ->
-            let+ i = inode_extender hash in
-            Inode_extender i
-        | _ -> assert false
+        oneof
+          [
+            (let+ v = value in
+             Value v);
+            (let* size = int_bound 4 in
+             let size = size + 1 in
+             let+ sks = list_repeat size @@ pair step kinded_hash in
+             Node sks);
+            (let max_indices = 5 in
+             let+ i = inode max_indices hash in
+             Inode i);
+            (let+ i = inode_extender hash in
+             Inode_extender i);
+          ]
 
       let t : Stream.t Gen.t =
-        let+ xs = list_size (map succ (int_bound 10)) elt in
+        let* size = int_bound 10 in
+        let size = size + 1 in
+        let+ xs = list_repeat size elt in
         List.to_seq xs
     end
 
