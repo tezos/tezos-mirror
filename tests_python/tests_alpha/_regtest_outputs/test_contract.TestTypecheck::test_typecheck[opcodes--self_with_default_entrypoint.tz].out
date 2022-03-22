@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/self_with_default_entrypoint.tz]
 
 Well typed
-Gas remaining: 1039988.680 units remaining
+Gas remaining: 1039988.800 units remaining
 { parameter (or (or (nat %A) (bool %B)) (or %maybe_C (unit %default) (string %C))) ;
   storage unit ;
   code { DROP

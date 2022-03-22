@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[macros/assert_cmple.tz]
 
 Well typed
-Gas remaining: 1039991.476 units remaining
+Gas remaining: 1039991.596 units remaining
 { parameter (pair int int) ;
   storage unit ;
   code { CAR

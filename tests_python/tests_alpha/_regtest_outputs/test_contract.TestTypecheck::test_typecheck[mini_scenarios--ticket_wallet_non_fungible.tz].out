@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[mini_scenarios/ticket_wallet_non_fungible.tz]
 
 Well typed
-Gas remaining: 1039959.342 units remaining
+Gas remaining: 1039959.702 units remaining
 { parameter
     (or (ticket %receive nat)
         (pair %send (contract %destination (ticket nat)) (address %ticketer) (nat %id))) ;

@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[mini_scenarios/lockup.tz]
 
 Well typed
-Gas remaining: 1039982.995 units remaining
+Gas remaining: 1039983.115 units remaining
 { parameter unit ;
   storage (pair timestamp (pair mutez address)) ;
   code { CDR

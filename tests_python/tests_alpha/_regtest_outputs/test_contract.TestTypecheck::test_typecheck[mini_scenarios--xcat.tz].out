@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[mini_scenarios/xcat.tz]
 
 Well typed
-Gas remaining: 1039966.823 units remaining
+Gas remaining: 1039967.183 units remaining
 { parameter bytes ;
   storage unit ;
   code { CAR @preimage

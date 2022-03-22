@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[attic/spawn_identities.tz]
 
 Well typed
-Gas remaining: 1039976.320 units remaining
+Gas remaining: 1039976.440 units remaining
 { parameter nat ;
   storage (list address) ;
   code { /* [ pair string string ] */

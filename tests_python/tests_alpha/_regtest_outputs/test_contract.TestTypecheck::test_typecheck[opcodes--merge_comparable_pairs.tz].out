@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/merge_comparable_pairs.tz]
 
 Well typed
-Gas remaining: 1039992.053 units remaining
+Gas remaining: 1039992.173 units remaining
 { parameter (set (pair (nat %n) (pair %p (string %s) (int %i)))) ;
   storage nat ;
   code { UNPAIR

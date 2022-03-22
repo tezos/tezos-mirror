@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[macros/build_list.tz]
 
 Well typed
-Gas remaining: 1039984.871 units remaining
+Gas remaining: 1039985.111 units remaining
 { parameter nat ;
   storage (list nat) ;
   code { CAR @counter

@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[attic/accounts.tz]
 
 Well typed
-Gas remaining: 1039932.345 units remaining
+Gas remaining: 1039932.585 units remaining
 { parameter
     (or (key_hash %Initialize)
         (pair %Withdraw (key %from) (pair (mutez %withdraw_amount) (signature %sig)))) ;

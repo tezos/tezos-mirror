@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[macros/compare_bytes.tz]
 
 Well typed
-Gas remaining: 1039970.722 units remaining
+Gas remaining: 1039971.322 units remaining
 { parameter (pair bytes bytes) ;
   storage (list bool) ;
   code { CAR
