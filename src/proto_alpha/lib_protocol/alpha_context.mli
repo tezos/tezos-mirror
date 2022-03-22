@@ -1710,6 +1710,8 @@ module Tx_rollup_inbox : sig
     val compute_path : Tx_rollup_message.hash list -> int -> path tzresult
 
     val merklize_list : Tx_rollup_message.hash list -> root
+
+    val path_depth : path -> int
   end
 
   type t = {inbox_length : int; cumulated_size : int; merkle_root : Merkle.root}
@@ -1750,6 +1752,8 @@ module Tx_rollup_inbox : sig
     Tx_rollup_message.t ->
     Merkle.path ->
     context tzresult Lwt.t
+
+  val maximum_path_depth : message_count_limit:int -> int
 end
 
 (** This simply re-exports [Tx_rollup_commitment_repr] *)
@@ -1914,6 +1918,7 @@ module Tx_rollup_errors : sig
         position : int;
         length : int;
       }
+    | Wrong_message_path_depth of {provided : int; limit : int}
     | Wrong_message_path of {expected : Tx_rollup_inbox.Merkle.root}
     | No_finalized_commitment_for_level of {
         level : Tx_rollup_level.t;

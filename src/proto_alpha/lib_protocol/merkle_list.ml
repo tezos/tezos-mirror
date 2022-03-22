@@ -67,6 +67,8 @@ module type T = sig
 
   val check_path : path -> int -> elt -> h -> bool tzresult
 
+  val path_depth : path -> int
+
   val elt_bytes : elt -> Bytes.t
 
   module Internal_for_tests : sig
@@ -289,6 +291,8 @@ end)
       in
       ok (H.equal computed_root expected_root)
     else error Merkle_list_invalid_position
+
+  let path_depth path = List.length path
 
   let compute l =
     let rec aux l =

@@ -80,6 +80,10 @@ module type T = sig
       if it is greater than the number of elements in the list. *)
   val check_path : path -> int -> elt -> h -> bool tzresult
 
+  (** [path_depth path] returns the depth of the tree [path] is
+      related to. *)
+  val path_depth : path -> int
+
   val elt_bytes : elt -> Bytes.t
 
   (**/**)
