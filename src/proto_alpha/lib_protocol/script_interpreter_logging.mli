@@ -23,10 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-val get_log :
-  Script_typed_ir.logger option ->
-  (Script_typed_ir.execution_trace option, error trace) result Lwt.t
-
 val log_kinstr :
   Script_typed_ir.logger ->
   ('a, 'b) Script_typed_ir.stack_ty ->

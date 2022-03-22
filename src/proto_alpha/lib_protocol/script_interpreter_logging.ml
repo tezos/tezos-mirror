@@ -1695,11 +1695,6 @@ let log_exit logger ctxt gas loc_prev k sty accu stack =
 
 let log_control logger ks = logger.log_control ks
 
-let get_log = function
-  | None -> Lwt.return (Ok None)
-  | Some logger -> logger.get_log ()
-  [@@ocaml.inline always]
-
 (* [log_kinstr logger i] emits an instruction to instrument the
    execution of [i] with [logger]. *)
 let log_kinstr logger sty i = ILog (kinstr_location i, sty, LogEntry, logger, i)

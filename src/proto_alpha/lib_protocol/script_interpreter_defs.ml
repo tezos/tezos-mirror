@@ -398,6 +398,11 @@ let consume_control local_gas_counter ks =
   consume_opt local_gas_counter cost
   [@@ocaml.inline always]
 
+let get_log = function
+  | None -> Lwt.return (Ok None)
+  | Some logger -> logger.get_log ()
+  [@@ocaml.inline always]
+
 (*
 
    Auxiliary functions used by the interpretation loop
