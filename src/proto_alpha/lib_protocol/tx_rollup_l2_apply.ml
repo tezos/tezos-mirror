@@ -103,7 +103,7 @@ let () =
     `Permanent
     ~id:"tx_rollup_invalid_transaction_encoding"
     ~title:"Invalid transaction encoding"
-    ~description:"The transaction could not be encoded to bytes"
+    ~description:"The transaction could not be decoded from bytes"
     empty
     (function Invalid_transaction_encoding -> Some () | _ -> None)
     (function () -> Invalid_transaction_encoding) ;
@@ -112,7 +112,7 @@ let () =
     `Permanent
     ~id:"tx_rollup_invalid_batch_encoding"
     ~title:"Invalid batch encoding"
-    ~description:"The batch could not be encoded to bytes"
+    ~description:"The batch could not be decoded from bytes"
     empty
     (function Invalid_batch_encoding -> Some () | _ -> None)
     (function () -> Invalid_batch_encoding) ;
