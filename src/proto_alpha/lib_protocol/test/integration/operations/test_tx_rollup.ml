@@ -449,6 +449,7 @@ let test_burn_per_byte_update () =
       Alpha_context.Tx_rollup_state.Internal_for_tests.make
         ~burn_per_byte
         ~inbox_ema
+        ~allocated_storage:Z.zero
         ()
     in
     let factor = 120 (* default factor *) in

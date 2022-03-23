@@ -1562,7 +1562,7 @@ module Tx_rollup_message_result_hash : S.HASH
 module Tx_rollup_state : sig
   type t
 
-  val initial_state : t
+  val initial_state : pre_allocated_storage:Z.t -> t
 
   val encoding : t Data_encoding.t
 
@@ -1596,6 +1596,8 @@ module Tx_rollup_state : sig
       ?uncommitted_inboxes:Tx_rollup_level.t * Tx_rollup_level.t ->
       ?commitment_newest_hash:Tx_rollup_commitment_hash.t ->
       ?tezos_head_level:Raw_level.t ->
+      ?occupied_storage:Z.t ->
+      allocated_storage:Z.t ->
       unit ->
       t
 

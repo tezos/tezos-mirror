@@ -29,8 +29,10 @@
     in time, as the rollup progresses. *)
 type t
 
-(** The initial value of a transaction rollup state, after its origination. *)
-val initial_state : t
+(** [initial_state pre_allocated_storage] returns the initial state of
+    a transaction rollup (after its origination) with
+    [pre_allocated_storage] bytes of storage already paid for. *)
+val initial_state : pre_allocated_storage:Z.t -> t
 
 val encoding : t Data_encoding.t
 
@@ -220,6 +222,8 @@ module Internal_for_tests : sig
     ?uncommitted_inboxes:Tx_rollup_level_repr.t * Tx_rollup_level_repr.t ->
     ?commitment_newest_hash:Tx_rollup_commitment_repr.Commitment_hash.t ->
     ?tezos_head_level:Raw_level_repr.t ->
+    ?occupied_storage:Z.t ->
+    allocated_storage:Z.t ->
     unit ->
     t
 
