@@ -1543,10 +1543,10 @@ let apply_external_manager_operation_content :
   | Tx_rollup_submit_batch {tx_rollup; content; burn_limit} ->
       let (message, message_size) = Tx_rollup_message.make_batch content in
       Tx_rollup_state.get ctxt tx_rollup >>=? fun (ctxt, state) ->
-      Tx_rollup_state.burn_cost ~limit:burn_limit state message_size
-      >>?= fun cost ->
       Tx_rollup_inbox.append_message ctxt tx_rollup state message
       >>=? fun (ctxt, state) ->
+      Tx_rollup_state.burn_cost ~limit:burn_limit state message_size
+      >>?= fun cost ->
       Token.transfer ctxt (`Contract source_contract) `Burned cost
       >>=? fun (ctxt, balance_updates) ->
       Tx_rollup_state.update ctxt tx_rollup state >>=? fun ctxt ->

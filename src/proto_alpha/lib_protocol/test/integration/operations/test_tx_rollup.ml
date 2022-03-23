@@ -1227,6 +1227,7 @@ let test_finalization () =
   >>=? fun op ->
   Block.bake b ~operation:op >>=? fun b ->
   (* Predict the cost we had to pay. *)
+  Context.Tx_rollup.state (B b) tx_rollup >>=? fun state ->
   inbox_burn state contents_size >>?= fun cost ->
   Assert.balance_was_debited ~loc:__LOC__ (B b) contract balance cost
 
