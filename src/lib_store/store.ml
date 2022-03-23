@@ -334,6 +334,7 @@ module Block = struct
     | None -> fail @@ Block_not_found {hash; distance = 0}
 
   let locked_read_block_by_level chain_store head level =
+    let open Lwt_tzresult_syntax in
     let distance = Int32.(to_int (sub (Block_repr.level head) level)) in
     if distance < 0 then
       fail
@@ -2728,6 +2729,7 @@ let may_switch_history_mode ~store_dir ~context_dir genesis ~new_history_mode =
 let get_chain_store store chain_id =
   let chain_store = main_chain_store store in
   let rec loop chain_store =
+    let open Lwt_tzresult_syntax in
     if Chain_id.equal (Chain.chain_id chain_store) chain_id then
       return chain_store
     else

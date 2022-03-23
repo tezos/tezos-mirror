@@ -88,7 +88,7 @@ let test_fold_es_ordering =
   test_iterators_ordering
     ~name:"fold_es"
     ~iterator:Pending_ops.fold_es
-    return_unit
+    Lwt_tzresult_syntax.return_unit
 
 (* 2. Test partial iteration with fold_es *)
 

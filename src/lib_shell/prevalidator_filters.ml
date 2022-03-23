@@ -104,11 +104,13 @@ module No_filter (Proto : Registered_protocol.T) = struct
 
     type state = unit
 
-    let init _ ?validation_state:_ ~predecessor:_ () = return_unit
+    let init _ ?validation_state:_ ~predecessor:_ () =
+      Lwt_tzresult_syntax.return_unit
 
     let remove ~filter_state _ = filter_state
 
-    let on_flush _ _ ?validation_state:_ ~predecessor:_ () = return_unit
+    let on_flush _ _ ?validation_state:_ ~predecessor:_ () =
+      Lwt_tzresult_syntax.return_unit
 
     let precheck _ ~filter_state:_ ~validation_state:_ _ _
         ~nb_successful_prechecks:_ =

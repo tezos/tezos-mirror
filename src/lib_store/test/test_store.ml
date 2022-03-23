@@ -26,8 +26,6 @@
 
 open Test_utils
 
-let test_init _ = return_unit
-
 let test_cycles store =
   let open Lwt_result_syntax in
   let chain_store = Store.main_chain_store store in
@@ -41,14 +39,7 @@ let test_cycles store =
   in
   assert_presence_in_store chain_store blocks
 
-let test_cases =
-  let wrap_test (s, f) =
-    let f _ = f in
-    wrap_test (s, f)
-  in
-  List.map
-    wrap_test
-    [("initialisation", test_init); ("store cycles", test_cycles)]
+let test_cases = [wrap_test ("store cycles", fun _ store -> test_cycles store)]
 
 open Example_tree
 

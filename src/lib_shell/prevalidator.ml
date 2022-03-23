@@ -1303,258 +1303,256 @@ module Make
 
   let build_rpc_directory w =
     lazy
-      (let dir : state RPC_directory.t ref = ref RPC_directory.empty in
-       let module Proto_services =
-         Block_services.Make (Filter.Proto) (Filter.Proto)
-       in
-       dir :=
-         RPC_directory.register
-           !dir
-           (Proto_services.S.Mempool.get_filter RPC_path.open_root)
-           (fun pv params () ->
-             return
-               (get_filter_config_json
-                  ~include_default:params#include_default
-                  pv)) ;
-       dir :=
-         RPC_directory.register
-           !dir
-           (Proto_services.S.Mempool.set_filter RPC_path.open_root)
-           (fun pv () obj ->
-             let open Lwt_syntax in
-             let* () =
-               try
-                 let config =
-                   Data_encoding.Json.destruct
-                     Filter.Mempool.config_encoding
-                     obj
-                 in
-                 pv.filter_config <- config ;
-                 Lwt.return_unit
-               with _ -> Event.(emit invalid_mempool_filter_configuration) ()
-             in
-             return_ok (get_filter_config_json pv)) ;
-       (* Ban an operation (from its given hash): remove it from the
-          mempool if present. Add it to the set pv.banned_operations
-          to prevent it from being fetched/processed/injected in the
-          future.
-          Note: If the baker has already received the operation, then
-          it's necessary to restart it manually to flush the operation
-          from it. *)
-       dir :=
-         RPC_directory.register
-           !dir
-           (Proto_services.S.Mempool.ban_operation RPC_path.open_root)
-           (fun _pv () oph ->
-             Worker.Queue.push_request_and_wait w (Request.Ban oph)) ;
-       (* Unban an operation (from its given hash): remove it from the
-          set pv.banned_operations (nothing happens if it was not banned). *)
-       dir :=
-         RPC_directory.register
-           !dir
-           (Proto_services.S.Mempool.unban_operation RPC_path.open_root)
-           (fun pv () oph ->
-             pv.shell.banned_operations <-
-               Operation_hash.Set.remove oph pv.shell.banned_operations ;
-             return_unit) ;
-       (* Unban all operations: clear the set pv.banned_operations. *)
-       dir :=
-         RPC_directory.register
-           !dir
-           (Proto_services.S.Mempool.unban_all_operations RPC_path.open_root)
-           (fun pv () () ->
-             pv.shell.banned_operations <- Operation_hash.Set.empty ;
-             return_unit) ;
-       dir :=
-         RPC_directory.gen_register
-           !dir
-           (Proto_services.S.Mempool.pending_operations RPC_path.open_root)
-           (fun pv params () ->
-             let map_op_error oph (op, error) acc =
-               op.Prevalidation.protocol |> fun res ->
-               Operation_hash.Map.add oph (res, error) acc
-             in
-             let applied =
-               if params#applied then
-                 List.rev_map
-                   (fun op ->
-                     (op.Prevalidation.hash, op.Prevalidation.protocol))
-                   pv.shell.classification.applied_rev
-               else []
-             in
-             let filter f map =
-               Operation_hash.Map.fold f map Operation_hash.Map.empty
-             in
-             let refused =
-               if params#refused then
-                 filter
-                   map_op_error
-                   (Classification.map pv.shell.classification.refused)
-               else Operation_hash.Map.empty
-             in
-             let outdated =
-               if params#outdated then
-                 filter
-                   map_op_error
-                   (Classification.map pv.shell.classification.outdated)
-               else Operation_hash.Map.empty
-             in
-             let branch_refused =
-               if params#branch_refused then
-                 filter
-                   map_op_error
-                   (Classification.map pv.shell.classification.branch_refused)
-               else Operation_hash.Map.empty
-             in
-             let branch_delayed =
-               if params#branch_delayed then
-                 filter
-                   map_op_error
-                   (Classification.map pv.shell.classification.branch_delayed)
-               else Operation_hash.Map.empty
-             in
-             let unprocessed =
-               Pending_ops.fold
-                 (fun _prio oph op acc ->
-                   Operation_hash.Map.add oph op.protocol acc)
-                 pv.shell.pending
-                 Operation_hash.Map.empty
-             in
-             (* FIXME https://gitlab.com/tezos/tezos/-/issues/2250
+      (let open Lwt_tzresult_syntax in
+      let dir : state RPC_directory.t ref = ref RPC_directory.empty in
+      let module Proto_services =
+        Block_services.Make (Filter.Proto) (Filter.Proto)
+      in
+      dir :=
+        RPC_directory.register
+          !dir
+          (Proto_services.S.Mempool.get_filter RPC_path.open_root)
+          (fun pv params () ->
+            return
+              (get_filter_config_json
+                 ~include_default:params#include_default
+                 pv)) ;
+      dir :=
+        RPC_directory.register
+          !dir
+          (Proto_services.S.Mempool.set_filter RPC_path.open_root)
+          (fun pv () obj ->
+            let open Lwt_syntax in
+            let* () =
+              try
+                let config =
+                  Data_encoding.Json.destruct Filter.Mempool.config_encoding obj
+                in
+                pv.filter_config <- config ;
+                Lwt.return_unit
+              with _ -> Event.(emit invalid_mempool_filter_configuration) ()
+            in
+            return_ok (get_filter_config_json pv)) ;
+      (* Ban an operation (from its given hash): remove it from the
+         mempool if present. Add it to the set pv.banned_operations
+         to prevent it from being fetched/processed/injected in the
+         future.
+         Note: If the baker has already received the operation, then
+         it's necessary to restart it manually to flush the operation
+         from it. *)
+      dir :=
+        RPC_directory.register
+          !dir
+          (Proto_services.S.Mempool.ban_operation RPC_path.open_root)
+          (fun _pv () oph ->
+            Worker.Queue.push_request_and_wait w (Request.Ban oph)) ;
+      (* Unban an operation (from its given hash): remove it from the
+         set pv.banned_operations (nothing happens if it was not banned). *)
+      dir :=
+        RPC_directory.register
+          !dir
+          (Proto_services.S.Mempool.unban_operation RPC_path.open_root)
+          (fun pv () oph ->
+            pv.shell.banned_operations <-
+              Operation_hash.Set.remove oph pv.shell.banned_operations ;
+            return_unit) ;
+      (* Unban all operations: clear the set pv.banned_operations. *)
+      dir :=
+        RPC_directory.register
+          !dir
+          (Proto_services.S.Mempool.unban_all_operations RPC_path.open_root)
+          (fun pv () () ->
+            pv.shell.banned_operations <- Operation_hash.Set.empty ;
+            return_unit) ;
+      dir :=
+        RPC_directory.gen_register
+          !dir
+          (Proto_services.S.Mempool.pending_operations RPC_path.open_root)
+          (fun pv params () ->
+            let map_op_error oph (op, error) acc =
+              op.Prevalidation.protocol |> fun res ->
+              Operation_hash.Map.add oph (res, error) acc
+            in
+            let applied =
+              if params#applied then
+                List.rev_map
+                  (fun op -> (op.Prevalidation.hash, op.Prevalidation.protocol))
+                  pv.shell.classification.applied_rev
+              else []
+            in
+            let filter f map =
+              Operation_hash.Map.fold f map Operation_hash.Map.empty
+            in
+            let refused =
+              if params#refused then
+                filter
+                  map_op_error
+                  (Classification.map pv.shell.classification.refused)
+              else Operation_hash.Map.empty
+            in
+            let outdated =
+              if params#outdated then
+                filter
+                  map_op_error
+                  (Classification.map pv.shell.classification.outdated)
+              else Operation_hash.Map.empty
+            in
+            let branch_refused =
+              if params#branch_refused then
+                filter
+                  map_op_error
+                  (Classification.map pv.shell.classification.branch_refused)
+              else Operation_hash.Map.empty
+            in
+            let branch_delayed =
+              if params#branch_delayed then
+                filter
+                  map_op_error
+                  (Classification.map pv.shell.classification.branch_delayed)
+              else Operation_hash.Map.empty
+            in
+            let unprocessed =
+              Pending_ops.fold
+                (fun _prio oph op acc ->
+                  Operation_hash.Map.add oph op.protocol acc)
+                pv.shell.pending
+                Operation_hash.Map.empty
+            in
+            (* FIXME https://gitlab.com/tezos/tezos/-/issues/2250
 
-                We merge prechecked operation with applied operation
-                so that the encoding of the RPC does not need to be
-                changed. Once prechecking will be done by the protocol
-                and not the plugin, we will change the encoding to
-                reflect that. *)
-             let prechecked_with_applied =
-               if params#applied then
-                 (Operation_hash.Map.bindings pv.shell.classification.prechecked
-                 |> List.rev_map (fun (oph, op) ->
-                        (oph, op.Prevalidation.protocol)))
-                 @ applied
-               else applied
-             in
-             let pending_operations =
-               {
-                 Proto_services.Mempool.applied = prechecked_with_applied;
-                 refused;
-                 outdated;
-                 branch_refused;
-                 branch_delayed;
-                 unprocessed;
-               }
-             in
-             Proto_services.Mempool.pending_operations_version_dispatcher
-               ~version:params#version
-               pending_operations) ;
-       dir :=
-         RPC_directory.register
-           !dir
-           (Proto_services.S.Mempool.request_operations RPC_path.open_root)
-           (fun pv t () ->
-             pv.shell.parameters.tools.send_get_current_head ?peer:t#peer_id () ;
-             return_unit) ;
-       dir :=
-         RPC_directory.gen_register
-           !dir
-           (Proto_services.S.Mempool.monitor_operations RPC_path.open_root)
-           (fun pv params () ->
-             Lwt_mutex.with_lock pv.lock @@ fun () ->
-             let (op_stream, stopper) =
-               Lwt_watcher.create_stream pv.operation_stream
-             in
-             (* Convert ops *)
-             let fold_op hash (Prevalidation.{protocol; _}, error) acc =
-               (hash, protocol, error) :: acc
-             in
-             (* First call : retrieve the current set of op from the mempool *)
-             let applied =
-               if params#applied then
-                 List.map
-                   (fun op -> (op.Prevalidation.hash, op.protocol, []))
-                   pv.shell.classification.applied_rev
-               else []
-             in
-             (* FIXME https://gitlab.com/tezos/tezos/-/issues/2250
+               We merge prechecked operation with applied operation
+               so that the encoding of the RPC does not need to be
+               changed. Once prechecking will be done by the protocol
+               and not the plugin, we will change the encoding to
+               reflect that. *)
+            let prechecked_with_applied =
+              if params#applied then
+                (Operation_hash.Map.bindings pv.shell.classification.prechecked
+                |> List.rev_map (fun (oph, op) ->
+                       (oph, op.Prevalidation.protocol)))
+                @ applied
+              else applied
+            in
+            let pending_operations =
+              {
+                Proto_services.Mempool.applied = prechecked_with_applied;
+                refused;
+                outdated;
+                branch_refused;
+                branch_delayed;
+                unprocessed;
+              }
+            in
+            Proto_services.Mempool.pending_operations_version_dispatcher
+              ~version:params#version
+              pending_operations) ;
+      dir :=
+        RPC_directory.register
+          !dir
+          (Proto_services.S.Mempool.request_operations RPC_path.open_root)
+          (fun pv t () ->
+            pv.shell.parameters.tools.send_get_current_head ?peer:t#peer_id () ;
+            return_unit) ;
+      dir :=
+        RPC_directory.gen_register
+          !dir
+          (Proto_services.S.Mempool.monitor_operations RPC_path.open_root)
+          (fun pv params () ->
+            Lwt_mutex.with_lock pv.lock @@ fun () ->
+            let (op_stream, stopper) =
+              Lwt_watcher.create_stream pv.operation_stream
+            in
+            (* Convert ops *)
+            let fold_op hash (Prevalidation.{protocol; _}, error) acc =
+              (hash, protocol, error) :: acc
+            in
+            (* First call : retrieve the current set of op from the mempool *)
+            let applied =
+              if params#applied then
+                List.map
+                  (fun op -> (op.Prevalidation.hash, op.protocol, []))
+                  pv.shell.classification.applied_rev
+              else []
+            in
+            (* FIXME https://gitlab.com/tezos/tezos/-/issues/2250
 
-                For the moment, applied and prechecked operations are
-                handled the same way for the user point of view. *)
-             let prechecked =
-               if params#applied then
-                 Operation_hash.Map.fold
-                   (fun hash op acc ->
-                     (hash, op.Prevalidation.protocol, []) :: acc)
-                   pv.shell.classification.prechecked
-                   []
-               else []
-             in
-             let refused =
-               if params#refused then
-                 Operation_hash.Map.fold
-                   fold_op
-                   (Classification.map pv.shell.classification.refused)
-                   []
-               else []
-             in
-             let branch_refused =
-               if params#branch_refused then
-                 Operation_hash.Map.fold
-                   fold_op
-                   (Classification.map pv.shell.classification.branch_refused)
-                   []
-               else []
-             in
-             let branch_delayed =
-               if params#branch_delayed then
-                 Operation_hash.Map.fold
-                   fold_op
-                   (Classification.map pv.shell.classification.branch_delayed)
-                   []
-               else []
-             in
-             let current_mempool =
-               List.concat_map
-                 (List.map (function
-                     | (hash, op, []) -> ((hash, op), None)
-                     | (hash, op, errors) -> ((hash, op), Some errors)))
-                 [applied; prechecked; refused; branch_refused; branch_delayed]
-             in
-             let current_mempool = ref (Some current_mempool) in
-             let filter_result = function
-               | `Prechecked | `Applied -> params#applied
-               | `Refused _ -> params#refused
-               | `Outdated _ -> params#outdated
-               | `Branch_refused _ -> params#branch_refused
-               | `Branch_delayed _ -> params#branch_delayed
-             in
-             let rec next () =
-               let open Lwt_syntax in
-               match !current_mempool with
-               | Some mempool ->
-                   current_mempool := None ;
-                   Lwt.return_some mempool
-               | None -> (
-                   let* o = Lwt_stream.get op_stream in
-                   match o with
-                   | Some (kind, op) when filter_result kind ->
-                       let errors =
-                         match kind with
-                         | `Prechecked | `Applied -> None
-                         | `Branch_delayed errors
-                         | `Branch_refused errors
-                         | `Refused errors
-                         | `Outdated errors ->
-                             Some errors
-                       in
-                       Lwt.return_some
-                         [(Prevalidation.(op.hash, op.protocol), errors)]
-                   | Some _ -> next ()
-                   | None -> Lwt.return_none)
-             in
-             let shutdown () = Lwt_watcher.shutdown stopper in
-             RPC_answer.return_stream {next; shutdown}) ;
-       !dir)
+               For the moment, applied and prechecked operations are
+               handled the same way for the user point of view. *)
+            let prechecked =
+              if params#applied then
+                Operation_hash.Map.fold
+                  (fun hash op acc ->
+                    (hash, op.Prevalidation.protocol, []) :: acc)
+                  pv.shell.classification.prechecked
+                  []
+              else []
+            in
+            let refused =
+              if params#refused then
+                Operation_hash.Map.fold
+                  fold_op
+                  (Classification.map pv.shell.classification.refused)
+                  []
+              else []
+            in
+            let branch_refused =
+              if params#branch_refused then
+                Operation_hash.Map.fold
+                  fold_op
+                  (Classification.map pv.shell.classification.branch_refused)
+                  []
+              else []
+            in
+            let branch_delayed =
+              if params#branch_delayed then
+                Operation_hash.Map.fold
+                  fold_op
+                  (Classification.map pv.shell.classification.branch_delayed)
+                  []
+              else []
+            in
+            let current_mempool =
+              List.concat_map
+                (List.map (function
+                    | (hash, op, []) -> ((hash, op), None)
+                    | (hash, op, errors) -> ((hash, op), Some errors)))
+                [applied; prechecked; refused; branch_refused; branch_delayed]
+            in
+            let current_mempool = ref (Some current_mempool) in
+            let filter_result = function
+              | `Prechecked | `Applied -> params#applied
+              | `Refused _ -> params#refused
+              | `Outdated _ -> params#outdated
+              | `Branch_refused _ -> params#branch_refused
+              | `Branch_delayed _ -> params#branch_delayed
+            in
+            let rec next () =
+              let open Lwt_syntax in
+              match !current_mempool with
+              | Some mempool ->
+                  current_mempool := None ;
+                  Lwt.return_some mempool
+              | None -> (
+                  let* o = Lwt_stream.get op_stream in
+                  match o with
+                  | Some (kind, op) when filter_result kind ->
+                      let errors =
+                        match kind with
+                        | `Prechecked | `Applied -> None
+                        | `Branch_delayed errors
+                        | `Branch_refused errors
+                        | `Refused errors
+                        | `Outdated errors ->
+                            Some errors
+                      in
+                      Lwt.return_some
+                        [(Prevalidation.(op.hash, op.protocol), errors)]
+                  | Some _ -> next ()
+                  | None -> Lwt.return_none)
+            in
+            let shutdown () = Lwt_watcher.shutdown stopper in
+            RPC_answer.return_stream {next; shutdown}) ;
+      !dir)
 
   (** Module implementing the events at the {!Worker} level. Contrary
       to {!Requests}, these functions depend on [Worker]. *)
@@ -1749,7 +1747,7 @@ module Make
       | View (Notify _) | View Leftover | View (Arrived _) | View Advertise ->
           Event.(emit request_completed_debug) (Request.view r, st)
 
-    let on_no_request _ = return_unit
+    let on_no_request _ = Lwt_tzresult_syntax.return_unit
   end
 
   let table = Worker.create_table Queue

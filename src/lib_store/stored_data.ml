@@ -90,7 +90,7 @@ let write_file encoded_file data =
 
 let write (Stored_data v) data =
   Lwt_idle_waiter.force_idle v.scheduler (fun () ->
-      if v.cache = data then return_unit
+      if v.cache = data then Lwt_tzresult_syntax.return_unit
       else (
         v.cache <- data ;
         write_file v.file data))

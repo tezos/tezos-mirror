@@ -722,7 +722,9 @@ let ensure_valid_tmp_snapshot_path snapshot_tmp_dir =
     (Sys.file_exists (Naming.dir_path snapshot_tmp_dir))
     (Cannot_create_tmp_export_directory (Naming.dir_path snapshot_tmp_dir))
 
-let ensure_valid_export_path = function
+let ensure_valid_export_path =
+  let open Lwt_tzresult_syntax in
+  function
   | Some path -> fail_when (Sys.file_exists path) (Invalid_export_path path)
   | None -> return_unit
 
@@ -2167,6 +2169,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
   (* Ensures that the history mode requested to export is compatible
      with the current storage. *)
   let check_history_mode chain_store ~rolling =
+    let open Lwt_tzresult_syntax in
     match (Store.Chain.history_mode chain_store : History_mode.t) with
     | Archive | Full _ -> return_unit
     | Rolling _ when rolling -> return_unit

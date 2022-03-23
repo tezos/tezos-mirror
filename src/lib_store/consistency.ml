@@ -47,6 +47,7 @@ open Store_errors
    the cementing_highwatermark is consistent with the cemented
    store. *)
 let check_cementing_highwatermark ~cementing_highwatermark block_store =
+  let open Lwt_tzresult_syntax in
   let cemented_store = Block_store.cemented_block_store block_store in
   let highest_cemented_level =
     Cemented_block_store.get_highest_cemented_level cemented_store
@@ -362,22 +363,25 @@ let lowest_cemented_block cemented_block_files =
 
 (* Returns the lowest block level of a cemented metadata file. *)
 let lowest_metadata_entry metadata_file =
-  try
-    let metadata_file_path = Naming.file_path metadata_file in
-    let in_file = Zip.open_in metadata_file_path in
-    let entries = Zip.entries in_file in
-    let asc_entries =
-      List.sort
-        (fun {Zip.filename = a; _} {filename = b; _} ->
-          Int.compare (int_of_string a) (int_of_string b))
-        entries
-    in
-    match asc_entries with
-    | [] ->
-        (* A metadata file is never empty *)
-        assert false
-    | {Zip.filename; _} :: _ -> return_some (Int32.of_string filename)
-  with exn -> Lwt.fail exn
+  let metadata_file_path = Naming.file_path metadata_file in
+  let in_file = Zip.open_in metadata_file_path in
+  let entries = Zip.entries in_file in
+  match entries with
+  | [] ->
+      (* A metadata file is never empty *)
+      assert false
+  | entry :: entries ->
+      let lowest_entry =
+        List.fold_left
+          (fun lowest entry ->
+            let entry = entry.Zip.filename in
+            if Compare.Int.(int_of_string lowest <= int_of_string entry) then
+              lowest
+            else entry)
+          entry.Zip.filename
+          entries
+      in
+      Int32.of_string lowest_entry
 
 (* Returns the lowest block level, from the cemented store, which is
    associated to some block metadata *)
@@ -386,29 +390,25 @@ let lowest_cemented_metadata cemented_dir =
   let* metadata_files = Cemented_block_store.load_metadata_table cemented_dir in
   match metadata_files with
   | Some metadata_files ->
-      let rec aux = function
-        | [] -> return_none
-        | {Cemented_block_store.metadata_file; start_level; end_level} :: tl
-          -> (
-            let* v =
-              Lwt.catch
-                (fun () ->
-                  let* v = lowest_metadata_entry metadata_file in
-                  return_some v)
-                (function
-                  | _ ->
-                      (* Can be the case if the metadata file is
-                         corrupted. Raise a warning and continue the
-                         search in the next metadata file. *)
-                      let*! () =
-                        Store_events.(
-                          emit warning_missing_metadata (start_level, end_level))
-                      in
-                      return_none)
-            in
-            match v with Some v -> return v | None -> aux tl)
+      let*! m =
+        Seq_s.of_seq (Array.to_seq metadata_files)
+        |> Seq_s.filter_map_s
+             (fun {Cemented_block_store.metadata_file; start_level; end_level}
+             ->
+               match lowest_metadata_entry metadata_file with
+               | v -> Lwt.return_some v
+               | exception _ ->
+                   (* Can be the case if the metadata file is
+                      corrupted. Raise a warning and continue the
+                      search in the next metadata file. *)
+                   let*! () =
+                     Store_events.(
+                       emit warning_missing_metadata (start_level, end_level))
+                   in
+                   Lwt.return_none)
+        |> Seq_s.first
       in
-      aux (Array.to_list metadata_files)
+      return m
   | None -> return_none
 
 (* Returns both the lowest block and the lowest block with metadata

@@ -289,6 +289,7 @@ module Make (Proto : Registered_protocol.T) = struct
     return_unit
 
   let parse_block_header block_hash (block_header : Block_header.t) =
+    let open Lwt_tzresult_syntax in
     match
       Data_encoding.Binary.of_bytes_opt
         Proto.block_header_data_encoding
@@ -349,6 +350,7 @@ module Make (Proto : Registered_protocol.T) = struct
     let invalid_block = invalid_block block_hash in
     List.mapi_es
       (fun pass ->
+        let open Lwt_tzresult_syntax in
         List.map_es (fun op ->
             let op_hash = Operation.hash op in
             match
@@ -358,7 +360,6 @@ module Make (Proto : Registered_protocol.T) = struct
             with
             | None -> fail (invalid_block (Cannot_parse_operation op_hash))
             | Some protocol_data ->
-                let open Lwt_tzresult_syntax in
                 let op = {Proto.shell = op.shell; protocol_data} in
                 let allowed_pass = Proto.acceptable_passes op in
                 let* () =
@@ -1002,9 +1003,9 @@ module Make (Proto : Registered_protocol.T) = struct
   let precheck chain_id ~(predecessor_block_header : Block_header.t)
       ~predecessor_block_hash ~predecessor_context ~cache
       ~(block_header : Block_header.t) operations =
-    let open Lwt_syntax in
+    let open Lwt_tzresult_syntax in
     let block_hash = Block_header.hash block_header in
-    let* r =
+    let*! r =
       precheck
         block_hash
         chain_id
@@ -1016,10 +1017,8 @@ module Make (Proto : Registered_protocol.T) = struct
         operations
     in
     match r with
-    | Error err ->
-        Error_monad.fail
-          (invalid_block block_hash (Economic_protocol_error err))
-    | Ok () -> return_ok_unit
+    | Error err -> fail (invalid_block block_hash (Economic_protocol_error err))
+    | Ok () -> return_unit
 end
 
 let assert_no_duplicate_operations block_hash live_operations operations =
@@ -1147,8 +1146,7 @@ let apply ?cached_result c ~cache block_header operations =
   in
   match r with
   | Error (Exn (Unix.Unix_error (errno, fn, msg)) :: _) ->
-      Error_monad.fail
-        (System_error {errno = Unix.error_message errno; fn; msg})
+      fail (System_error {errno = Unix.error_message errno; fn; msg})
   | (Ok _ | Error _) as res -> Lwt.return res
 
 let precheck ~chain_id ~predecessor_block_header ~predecessor_block_hash
@@ -1226,8 +1224,8 @@ let preapply ~chain_id ~user_activated_upgrades
     ~live_operations ~predecessor_context ~predecessor_shell_header
     ~predecessor_hash ~predecessor_max_operations_ttl
     ~predecessor_block_metadata_hash ~predecessor_ops_metadata_hash operations =
-  let open Lwt_syntax in
-  let* r =
+  let open Lwt_tzresult_syntax in
+  let*! r =
     preapply
       ~chain_id
       ~user_activated_upgrades
@@ -1246,6 +1244,5 @@ let preapply ~chain_id ~user_activated_upgrades
   in
   match r with
   | Error (Exn (Unix.Unix_error (errno, fn, msg)) :: _) ->
-      Error_monad.fail
-        (System_error {errno = Unix.error_message errno; fn; msg})
+      fail (System_error {errno = Unix.error_message errno; fn; msg})
   | (Ok _ | Error _) as res -> Lwt.return res
