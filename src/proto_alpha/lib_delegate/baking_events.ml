@@ -367,7 +367,7 @@ module Scheduling = struct
       ~section
       ~name:"proposal_already_injected"
       ~level:Debug
-      ~msg:"proposal already injected for next level round, skipping..."
+      ~msg:"proposal already injected for next level, skipping..."
       ()
 
   let next_potential_slot =
