@@ -982,8 +982,18 @@ let expr_encoding =
     (** A compact encoding of the singleton value [unit], which has zero
         memory footprint.
 
-        Uses zero (0) bits of tag. *)
+        Uses zero (0) bits of tag.
+
+        In JSON it is represented as the empty object [{}]. *)
     val unit : unit t
+
+    (** A compact encoding of the singleton value [unit], which has zero
+        memory footprint.
+
+        Uses zero (0) bits of tag.
+
+        In JSON it is represented as [null]. *)
+    val null : unit t
 
     (** Efficient encoding of boolean values. It uses one (1) bit in the
         shared tag, and zero bit in the payload. *)
@@ -1366,6 +1376,12 @@ let expr_encoding =
       ?alt_description:string ->
       'a encoding ->
       (int32, 'a) Either.t t
+
+    (** {2 JSON tweaking} *)
+
+    (** [splitted ~json ~compact] is a compact encoding that is represented as
+        [compact] in binary and as [json] in JSON. *)
+    val splitted : json:'a encoding -> compact:'a t -> 'a t
 
     (** {1 Custom} *)
 
