@@ -25,82 +25,16 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** A [withdrawal] gives right to a L1 address [claimer] to
-    retrieve the quantity [amount] of a ticket whose hash is [ticket_hash].
+(** A withdraw order gives right to a L1 address [claimer] to retrieve
+    the quantity [amount] of a ticket whose hash is [ticket_hash].
     Withdrawals result from layer-2-to-layer-1 transfers, and from
     failed layer-2 deposits.*)
-type withdrawal = {
+type order = {
   claimer : Signature.Public_key_hash.t;
   ticket_hash : Ticket_hash_repr.t;
   amount : Tx_rollup_l2_qty.t;
 }
 
-type t = withdrawal
+type t = order
 
 val encoding : t Data_encoding.t
-
-module Merkle : sig
-  (** See {!Merkle_List} for the documentation of those functions. *)
-
-  type tree
-
-  type root
-
-  type path
-
-  val nil : tree
-
-  val empty : root
-
-  val root : tree -> root
-
-  val ( = ) : root -> root -> bool
-
-  val compare : root -> root -> int
-
-  val root_encoding : root Data_encoding.t
-
-  val root_of_b58check_opt : string -> root option
-
-  val pp_root : Format.formatter -> root -> unit
-
-  val path_encoding : path Data_encoding.t
-
-  val compute_path : withdrawal list -> int -> path tzresult
-
-  val check_path : path -> int -> withdrawal -> root -> bool tzresult
-
-  val path_depth : path -> int
-
-  (** [merklize_list messages] construct a merkle root by build a
-      tree, appending the [messages] one by one in the same order of
-      the list and finally computing the root. *)
-  val merklize_list : withdrawal list -> root
-end
-
-(** [maximum_path_depth ~withdraw_count_limit] returns the maximum
-    depth of a path, depending on the maximimum number of a withdraw in
-    an inbox given by [message_count_limit]. *)
-val maximum_path_depth : withdraw_count_limit:int -> int
-
-(** [Withdrawal_accounting] provides an interface for the storage to
-   account for which withdrawals (as identified by their index) have
-   been consumed. *)
-module Withdrawal_accounting : sig
-  type t
-
-  val encoding : t Data_encoding.t
-
-  (** The state of withdrawal accounting where no
-      withdrawals have been consumed. *)
-  val empty : t
-
-  (** [get l index] returns [true] if the withdrawal identified by
-      [index] has been been consumed (as registered through
-      {!Withdrawal_accounting.set}). Fails when [index] is negative. *)
-  val get : t -> int -> bool tzresult
-
-  (** [set l index] registers that the withdrawal identified by
-      [index] has been consumed. Fails when [index] is negative. *)
-  val set : t -> int -> t tzresult
-end

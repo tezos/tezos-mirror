@@ -80,8 +80,12 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    tx_rollup_l2_context_hash.mli tx_rollup_l2_context_hash.ml
    tx_rollup_repr.mli tx_rollup_repr.ml
    tx_rollup_withdraw_repr.mli tx_rollup_withdraw_repr.ml
+   tx_rollup_withdraw_list_hash_repr.mli tx_rollup_withdraw_list_hash_repr.ml
+   tx_rollup_reveal_repr.mli tx_rollup_reveal_repr.ml
    tx_rollup_message_repr.mli tx_rollup_message_repr.ml
    tx_rollup_inbox_repr.mli tx_rollup_inbox_repr.ml
+   tx_rollup_message_result_repr.mli tx_rollup_message_result_repr.ml
+   tx_rollup_message_result_hash_repr.mli tx_rollup_message_result_hash_repr.ml
    tx_rollup_commitment_repr.mli tx_rollup_commitment_repr.ml
    tx_rollup_errors_repr.ml
    tx_rollup_state_repr.mli tx_rollup_state_repr.ml
@@ -138,7 +142,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    global_constants_costs.mli global_constants_costs.ml
    global_constants_storage.mli global_constants_storage.ml
    tx_rollup_state_storage.mli tx_rollup_state_storage.ml
-   tx_rollup_withdraw_storage.mli tx_rollup_withdraw_storage.ml
+   tx_rollup_reveal_storage.mli tx_rollup_reveal_storage.ml
    tx_rollup_inbox_storage.mli tx_rollup_inbox_storage.ml
    tx_rollup_commitment_storage.mli tx_rollup_commitment_storage.ml
    tx_rollup_storage.mli tx_rollup_storage.ml
@@ -182,6 +186,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    ticket_token_map.mli ticket_token_map.ml
    ticket_operations_diff.mli ticket_operations_diff.ml
    ticket_accounting.mli ticket_accounting.ml
+   tx_rollup_ticket.mli tx_rollup_ticket.ml
    script_interpreter_defs.ml
    script_interpreter.mli script_interpreter.ml
    sc_rollup_operations.mli sc_rollup_operations.ml
@@ -261,8 +266,12 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    tx_rollup_l2_context_hash.mli tx_rollup_l2_context_hash.ml
    tx_rollup_repr.mli tx_rollup_repr.ml
    tx_rollup_withdraw_repr.mli tx_rollup_withdraw_repr.ml
+   tx_rollup_withdraw_list_hash_repr.mli tx_rollup_withdraw_list_hash_repr.ml
+   tx_rollup_reveal_repr.mli tx_rollup_reveal_repr.ml
    tx_rollup_message_repr.mli tx_rollup_message_repr.ml
    tx_rollup_inbox_repr.mli tx_rollup_inbox_repr.ml
+   tx_rollup_message_result_repr.mli tx_rollup_message_result_repr.ml
+   tx_rollup_message_result_hash_repr.mli tx_rollup_message_result_hash_repr.ml
    tx_rollup_commitment_repr.mli tx_rollup_commitment_repr.ml
    tx_rollup_errors_repr.ml
    tx_rollup_state_repr.mli tx_rollup_state_repr.ml
@@ -319,7 +328,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    global_constants_costs.mli global_constants_costs.ml
    global_constants_storage.mli global_constants_storage.ml
    tx_rollup_state_storage.mli tx_rollup_state_storage.ml
-   tx_rollup_withdraw_storage.mli tx_rollup_withdraw_storage.ml
+   tx_rollup_reveal_storage.mli tx_rollup_reveal_storage.ml
    tx_rollup_inbox_storage.mli tx_rollup_inbox_storage.ml
    tx_rollup_commitment_storage.mli tx_rollup_commitment_storage.ml
    tx_rollup_storage.mli tx_rollup_storage.ml
@@ -363,6 +372,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    ticket_token_map.mli ticket_token_map.ml
    ticket_operations_diff.mli ticket_operations_diff.ml
    ticket_accounting.mli ticket_accounting.ml
+   tx_rollup_ticket.mli tx_rollup_ticket.ml
    script_interpreter_defs.ml
    script_interpreter.mli script_interpreter.ml
    sc_rollup_operations.mli sc_rollup_operations.ml
@@ -442,8 +452,12 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    tx_rollup_l2_context_hash.mli tx_rollup_l2_context_hash.ml
    tx_rollup_repr.mli tx_rollup_repr.ml
    tx_rollup_withdraw_repr.mli tx_rollup_withdraw_repr.ml
+   tx_rollup_withdraw_list_hash_repr.mli tx_rollup_withdraw_list_hash_repr.ml
+   tx_rollup_reveal_repr.mli tx_rollup_reveal_repr.ml
    tx_rollup_message_repr.mli tx_rollup_message_repr.ml
    tx_rollup_inbox_repr.mli tx_rollup_inbox_repr.ml
+   tx_rollup_message_result_repr.mli tx_rollup_message_result_repr.ml
+   tx_rollup_message_result_hash_repr.mli tx_rollup_message_result_hash_repr.ml
    tx_rollup_commitment_repr.mli tx_rollup_commitment_repr.ml
    tx_rollup_errors_repr.ml
    tx_rollup_state_repr.mli tx_rollup_state_repr.ml
@@ -500,7 +514,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    global_constants_costs.mli global_constants_costs.ml
    global_constants_storage.mli global_constants_storage.ml
    tx_rollup_state_storage.mli tx_rollup_state_storage.ml
-   tx_rollup_withdraw_storage.mli tx_rollup_withdraw_storage.ml
+   tx_rollup_reveal_storage.mli tx_rollup_reveal_storage.ml
    tx_rollup_inbox_storage.mli tx_rollup_inbox_storage.ml
    tx_rollup_commitment_storage.mli tx_rollup_commitment_storage.ml
    tx_rollup_storage.mli tx_rollup_storage.ml
@@ -544,6 +558,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    ticket_token_map.mli ticket_token_map.ml
    ticket_operations_diff.mli ticket_operations_diff.ml
    ticket_accounting.mli ticket_accounting.ml
+   tx_rollup_ticket.mli tx_rollup_ticket.ml
    script_interpreter_defs.ml
    script_interpreter.mli script_interpreter.ml
    sc_rollup_operations.mli sc_rollup_operations.ml
@@ -645,8 +660,12 @@ include Tezos_raw_protocol_alpha.Main
    Tx_rollup_l2_context_hash
    Tx_rollup_repr
    Tx_rollup_withdraw_repr
+   Tx_rollup_withdraw_list_hash_repr
+   Tx_rollup_reveal_repr
    Tx_rollup_message_repr
    Tx_rollup_inbox_repr
+   Tx_rollup_message_result_repr
+   Tx_rollup_message_result_hash_repr
    Tx_rollup_commitment_repr
    Tx_rollup_errors_repr
    Tx_rollup_state_repr
@@ -703,7 +722,7 @@ include Tezos_raw_protocol_alpha.Main
    Global_constants_costs
    Global_constants_storage
    Tx_rollup_state_storage
-   Tx_rollup_withdraw_storage
+   Tx_rollup_reveal_storage
    Tx_rollup_inbox_storage
    Tx_rollup_commitment_storage
    Tx_rollup_storage
@@ -747,6 +766,7 @@ include Tezos_raw_protocol_alpha.Main
    Ticket_token_map
    Ticket_operations_diff
    Ticket_accounting
+   Tx_rollup_ticket
    Script_interpreter_defs
    Script_interpreter
    Sc_rollup_operations
@@ -867,8 +887,12 @@ include Tezos_raw_protocol_alpha.Main
    tx_rollup_l2_context_hash.mli tx_rollup_l2_context_hash.ml
    tx_rollup_repr.mli tx_rollup_repr.ml
    tx_rollup_withdraw_repr.mli tx_rollup_withdraw_repr.ml
+   tx_rollup_withdraw_list_hash_repr.mli tx_rollup_withdraw_list_hash_repr.ml
+   tx_rollup_reveal_repr.mli tx_rollup_reveal_repr.ml
    tx_rollup_message_repr.mli tx_rollup_message_repr.ml
    tx_rollup_inbox_repr.mli tx_rollup_inbox_repr.ml
+   tx_rollup_message_result_repr.mli tx_rollup_message_result_repr.ml
+   tx_rollup_message_result_hash_repr.mli tx_rollup_message_result_hash_repr.ml
    tx_rollup_commitment_repr.mli tx_rollup_commitment_repr.ml
    tx_rollup_errors_repr.ml
    tx_rollup_state_repr.mli tx_rollup_state_repr.ml
@@ -925,7 +949,7 @@ include Tezos_raw_protocol_alpha.Main
    global_constants_costs.mli global_constants_costs.ml
    global_constants_storage.mli global_constants_storage.ml
    tx_rollup_state_storage.mli tx_rollup_state_storage.ml
-   tx_rollup_withdraw_storage.mli tx_rollup_withdraw_storage.ml
+   tx_rollup_reveal_storage.mli tx_rollup_reveal_storage.ml
    tx_rollup_inbox_storage.mli tx_rollup_inbox_storage.ml
    tx_rollup_commitment_storage.mli tx_rollup_commitment_storage.ml
    tx_rollup_storage.mli tx_rollup_storage.ml
@@ -969,6 +993,7 @@ include Tezos_raw_protocol_alpha.Main
    ticket_token_map.mli ticket_token_map.ml
    ticket_operations_diff.mli ticket_operations_diff.ml
    ticket_accounting.mli ticket_accounting.ml
+   tx_rollup_ticket.mli tx_rollup_ticket.ml
    script_interpreter_defs.ml
    script_interpreter.mli script_interpreter.ml
    sc_rollup_operations.mli sc_rollup_operations.ml

@@ -1658,13 +1658,52 @@ module Tx_rollup : sig
   end
 end
 
+module Tx_rollup_withdraw : sig
+  type order = {
+    claimer : Signature.Public_key_hash.t;
+    ticket_hash : Ticket_hash.t;
+    amount : Tx_rollup_l2_qty.t;
+  }
+
+  type t = order
+
+  val encoding : t Data_encoding.t
+end
+
+module Tx_rollup_withdraw_list_hash : sig
+  include S.HASH
+
+  val hash : Tx_rollup_withdraw.t list -> t
+
+  val empty : t
+end
+
+module Tx_rollup_message_result : sig
+  type t = {
+    context_hash : Context_hash.t;
+    withdraw_list_hash : Tx_rollup_withdraw_list_hash.t;
+  }
+
+  val encoding : t Data_encoding.t
+
+  val empty_l2_context_hash : Context_hash.t
+
+  val init : t
+end
+
+module Tx_rollup_message_result_hash : sig
+  include S.HASH
+
+  val hash : Tx_rollup_message_result.t -> t
+
+  val init : t
+end
+
 module Tx_rollup_commitment_hash : sig
   val commitment_hash : string
 
   include S.HASH
 end
-
-module Tx_rollup_message_result_hash : S.HASH
 
 (** This module re-exports definitions from {!Tx_rollup_state_repr}
     and {!Tx_rollup_state_storage}. *)
@@ -1733,57 +1772,38 @@ module Tx_rollup_state : sig
   end
 end
 
-module Tx_rollup_withdraw : sig
-  type withdrawal = {
-    claimer : Signature.Public_key_hash.t;
-    ticket_hash : Ticket_hash.t;
+module Tx_rollup_reveal : sig
+  type t = {
+    contents : Script.lazy_expr;
+    ty : Script.lazy_expr;
+    ticketer : Contract.t;
     amount : Tx_rollup_l2_qty.t;
+    claimer : Signature.Public_key_hash.t;
   }
-
-  type t = withdrawal
 
   val encoding : t Data_encoding.t
 
-  module Merkle : sig
-    type root
-
-    type path
-
-    val empty : root
-
-    val path_encoding : path Data_encoding.t
-
-    val root_encoding : root Data_encoding.t
-
-    val root_of_b58check_opt : string -> root option
-
-    val compute_path : withdrawal list -> int -> path tzresult
-
-    val check_path : path -> int -> withdrawal -> root -> bool tzresult
-
-    val merklize_list : withdrawal list -> root
-
-    val path_depth : path -> int
-  end
-
-  val add :
+  val record :
     context ->
-    Tx_rollup_state.t ->
     Tx_rollup.t ->
+    Tx_rollup_state.t ->
     Tx_rollup_level.t ->
-    message_index:int ->
-    withdraw_position:int ->
+    message_position:int ->
     (context * Tx_rollup_state.t * Z.t) tzresult Lwt.t
 
   val mem :
     context ->
     Tx_rollup.t ->
     Tx_rollup_level.t ->
-    message_index:int ->
-    withdraw_position:int ->
-    (bool * context) tzresult Lwt.t
+    message_position:int ->
+    (context * bool) tzresult Lwt.t
 
-  val maximum_path_depth : withdraw_count_limit:int -> int
+  val remove :
+    context ->
+    Tx_rollup.t ->
+    Tx_rollup_state.t ->
+    Tx_rollup_level.t ->
+    (context * Tx_rollup_state_repr.t) tzresult Lwt.t
 end
 
 (** This module re-exports definitions from {!Tx_rollup_message_repr}. *)
@@ -1893,18 +1913,6 @@ end
 
 (** This simply re-exports [Tx_rollup_commitment_repr] *)
 module Tx_rollup_commitment : sig
-  type message_result = {
-    context_hash : Context_hash.t;
-    withdrawals_merkle_root : Tx_rollup_withdraw.Merkle.root;
-  }
-
-  val hash_message_result : message_result -> Tx_rollup_message_result_hash.t
-
-  val pp_message_result_hash :
-    Format.formatter -> Tx_rollup_message_result_hash.t -> unit
-
-  val empty_l2_context_hash : Context_hash.t
-
   type t = {
     level : Tx_rollup_level.t;
     messages : Tx_rollup_message_result_hash.t list;
@@ -1932,7 +1940,8 @@ module Tx_rollup_commitment : sig
 
   val hash : t -> Tx_rollup_commitment_hash.t
 
-  val check_message_result : t -> message_result -> message_index:int -> bool
+  val check_message_result :
+    t -> Tx_rollup_message_result.t -> message_index:int -> bool
 
   val add_commitment :
     context ->
@@ -1974,6 +1983,7 @@ module Tx_rollup_commitment : sig
   val get_finalized :
     context ->
     Tx_rollup.t ->
+    Tx_rollup_state.t ->
     Tx_rollup_level.t ->
     (context * Submitted_commitment.t) tzresult Lwt.t
 
@@ -2032,6 +2042,7 @@ module Tx_rollup_errors : sig
     | Message_size_exceeds_limit
     | Too_many_inboxes
     | Too_many_commitments
+    | Too_many_withdrawals
     | Wrong_batch_count
     | Commitment_too_early of {
         provided : Tx_rollup_level.t;
@@ -2049,7 +2060,6 @@ module Tx_rollup_errors : sig
         provided : Tx_rollup_commitment_hash.t option;
         expected : Tx_rollup_commitment_hash.t option;
       }
-    | Invalid_rejection_level_argument
     | Internal_error of string
     | Wrong_message_position of {
         level : Tx_rollup_level.t;
@@ -2065,16 +2075,17 @@ module Tx_rollup_errors : sig
       }
     | Withdraw_invalid_path
     | Withdraw_already_consumed
+    | Withdrawals_invalid_path
+    | Withdrawals_already_dispatched
     | Cannot_reject_level of {
         provided : Tx_rollup_level.t;
         accepted_range : (Tx_rollup_level.t * Tx_rollup_level.t) option;
       }
     | Wrong_rejection_hashes of {
-        provided : Tx_rollup_commitment.message_result;
+        provided : Tx_rollup_message_result.t;
         computed : Tx_rollup_message_result_hash.t;
         expected : Tx_rollup_message_result_hash.t;
       }
-    | Deposit_wrong_ticketer of Tx_rollup.t
     | Wrong_deposit_parameters
     | Proof_failed_to_reject
     | Proof_produced_rejected_state
@@ -2082,6 +2093,7 @@ module Tx_rollup_errors : sig
         agreed : Context_hash.t;
         provided : Context_hash.t;
       }
+    | No_withdrawals_to_dispatch
 end
 
 module Bond_id : sig
@@ -2762,7 +2774,9 @@ module Kind : sig
 
   type tx_rollup_rejection = Tx_rollup_rejection_kind
 
-  type tx_rollup_withdraw = Tx_rollup_withdraw_kind
+  type tx_rollup_dispatch_tickets = Tx_rollup_dispatch_tickets_kind
+
+  type transfer_ticket = Transfer_ticket_kind
 
   type sc_rollup_originate = Sc_rollup_originate_kind
 
@@ -2788,7 +2802,9 @@ module Kind : sig
     | Tx_rollup_remove_commitment_manager_kind
         : tx_rollup_remove_commitment manager
     | Tx_rollup_rejection_manager_kind : tx_rollup_rejection manager
-    | Tx_rollup_withdraw_manager_kind : tx_rollup_withdraw manager
+    | Tx_rollup_dispatch_tickets_manager_kind
+        : tx_rollup_dispatch_tickets manager
+    | Transfer_ticket_manager_kind : transfer_ticket manager
     | Sc_rollup_originate_manager_kind : sc_rollup_originate manager
     | Sc_rollup_add_messages_manager_kind : sc_rollup_add_messages manager
     | Sc_rollup_cement_manager_kind : sc_rollup_cement manager
@@ -2941,26 +2957,27 @@ and _ manager_operation =
       message : Tx_rollup_message.t;
       message_position : int;
       message_path : Tx_rollup_inbox.Merkle.path;
-      previous_message_result : Tx_rollup_commitment.message_result;
+      previous_message_result : Tx_rollup_message_result.t;
       proof : Tx_rollup_l2_proof.t;
     }
       -> Kind.tx_rollup_rejection manager_operation
-  | Tx_rollup_withdraw : {
+  | Tx_rollup_dispatch_tickets : {
       tx_rollup : Tx_rollup.t;
       level : Tx_rollup_level.t;
       context_hash : Context_hash.t;
       message_index : int;
-      withdrawals_merkle_root : Tx_rollup_withdraw.Merkle.root;
-      withdraw_path : Tx_rollup_withdraw.Merkle.path;
-      withdraw_position : int;
+      tickets_info : Tx_rollup_reveal.t list;
+    }
+      -> Kind.tx_rollup_dispatch_tickets manager_operation
+  | Transfer_ticket : {
       contents : Script.lazy_expr;
       ty : Script.lazy_expr;
       ticketer : Contract.t;
-      amount : Tx_rollup_l2_qty.t;
+      amount : Z.t;
       destination : Contract.t;
       entrypoint : Entrypoint.t;
     }
-      -> Kind.tx_rollup_withdraw manager_operation
+      -> Kind.transfer_ticket manager_operation
   | Sc_rollup_originate : {
       kind : Sc_rollup.Kind.t;
       boot_sector : string;
@@ -3123,7 +3140,10 @@ module Operation : sig
 
     val tx_rollup_rejection_case : Kind.tx_rollup_rejection Kind.manager case
 
-    val tx_rollup_withdraw_case : Kind.tx_rollup_withdraw Kind.manager case
+    val tx_rollup_dispatch_tickets_case :
+      Kind.tx_rollup_dispatch_tickets Kind.manager case
+
+    val transfer_ticket_case : Kind.transfer_ticket Kind.manager case
 
     val register_global_constant_case :
       Kind.register_global_constant Kind.manager case
@@ -3185,7 +3205,9 @@ module Operation : sig
 
       val tx_rollup_rejection_case : Kind.tx_rollup_rejection case
 
-      val tx_rollup_withdraw_case : Kind.tx_rollup_withdraw case
+      val tx_rollup_dispatch_tickets_case : Kind.tx_rollup_dispatch_tickets case
+
+      val transfer_ticket_case : Kind.transfer_ticket case
 
       val sc_rollup_originate_case : Kind.sc_rollup_originate case
 
@@ -3351,7 +3373,9 @@ end
     documentation of the functions there.
  *)
 module Ticket_balance : sig
-  type error += Used_storage_space_underflow
+  type error +=
+    | Negative_ticket_balance of {key : Ticket_hash.t; balance : Z.t}
+    | Used_storage_space_underflow
 
   val adjust_balance :
     context -> Ticket_hash.t -> delta:Z.t -> (Z.t * context) tzresult Lwt.t

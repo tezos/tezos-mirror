@@ -25,56 +25,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Message_result_hash = struct
-  let message_result_hash =
-    Tx_rollup_prefixes.message_result_hash.b58check_prefix
-
-  module H =
-    Blake2B.Make
-      (Base58)
-      (struct
-        let name = "Message_result_hash"
-
-        let title = "A message result"
-
-        let b58check_prefix = message_result_hash
-
-        let size = Some Tx_rollup_prefixes.message_result_hash.hash_size
-      end)
-
-  include H
-  include Path_encoding.Make_hex (H)
-
-  let () =
-    Tx_rollup_prefixes.(check_encoding message_result_hash b58check_encoding)
-end
-
-type message_result = {
-  context_hash : Context_hash.t;
-  withdrawals_merkle_root : Tx_rollup_withdraw_repr.Merkle.root;
-}
-
-let message_result_encoding =
-  let open Data_encoding in
-  conv
-    (fun {context_hash; withdrawals_merkle_root} ->
-      (context_hash, withdrawals_merkle_root))
-    (fun (context_hash, withdrawals_merkle_root) ->
-      {context_hash; withdrawals_merkle_root})
-    (obj2
-       (req "context_hash" Context_hash.encoding)
-       (req
-          "withdrawals_merkle_root"
-          Tx_rollup_withdraw_repr.Merkle.root_encoding))
-
-let hash_message_result result =
-  let bytes =
-    Data_encoding.Binary.to_bytes_exn message_result_encoding result
-  in
-  Message_result_hash.hash_bytes [bytes]
-
-let pp_message_result_hash = Message_result_hash.pp
-
 module Commitment_hash = struct
   let commitment_hash = Tx_rollup_prefixes.commitment_hash.b58check_prefix
 
@@ -113,7 +63,7 @@ end
 
 type t = {
   level : Tx_rollup_level_repr.t;
-  messages : Message_result_hash.t list;
+  messages : Tx_rollup_message_result_hash_repr.t list;
   predecessor : Commitment_hash.t option;
   inbox_merkle_root : Tx_rollup_inbox_repr.Merkle.root;
 }
@@ -123,7 +73,7 @@ let compare_or cmp c1 c2 f = match cmp c1 c2 with 0 -> f () | diff -> diff
 include Compare.Make (struct
   type nonrec t = t
 
-  module Compare_root_list = Compare.List (Message_result_hash)
+  module Compare_root_list = Compare.List (Tx_rollup_message_result_hash_repr)
 
   let compare r1 r2 =
     compare_or Tx_rollup_level_repr.compare r1.level r2.level (fun () ->
@@ -145,23 +95,12 @@ let pp : Format.formatter -> t -> unit =
     "commitment %a : messages = %a predecessor %a for inbox with merkle root %a"
     Tx_rollup_level_repr.pp
     t.level
-    (Format.pp_print_list Message_result_hash.pp)
+    (Format.pp_print_list Tx_rollup_message_result_hash_repr.pp)
     t.messages
     (Format.pp_print_option Commitment_hash.pp)
     t.predecessor
     Tx_rollup_inbox_repr.Merkle.pp_root
     t.inbox_merkle_root
-
-let empty_l2_context_hash =
-  Context_hash.of_b58check_exn
-    "CoVu7Pqp1Gh3z33mink5T5Q2kAQKtnn3GHxVhyehdKZpQMBxFBGF"
-
-let initial_message_result_hash =
-  hash_message_result
-    {
-      context_hash = empty_l2_context_hash;
-      withdrawals_merkle_root = Tx_rollup_withdraw_repr.Merkle.empty;
-    }
 
 let encoding =
   let open Data_encoding in
@@ -172,7 +111,7 @@ let encoding =
       {level; messages; predecessor; inbox_merkle_root})
     (obj4
        (req "level" Tx_rollup_level_repr.encoding)
-       (req "batches" (list Message_result_hash.encoding))
+       (req "batches" (list Tx_rollup_message_result_hash_repr.encoding))
        (req "predecessor" (option Commitment_hash.encoding))
        (req "inbox_merkle_root" Tx_rollup_inbox_repr.Merkle.root_encoding))
 
@@ -180,11 +119,12 @@ let hash c =
   let bytes = Data_encoding.Binary.to_bytes_exn encoding c in
   Commitment_hash.hash_bytes [bytes]
 
-let check_message_result : t -> message_result -> message_index:int -> bool =
+let check_message_result :
+    t -> Tx_rollup_message_result_repr.t -> message_index:int -> bool =
  fun {messages; _} result ~message_index ->
-  let computed = hash_message_result result in
+  let computed = Tx_rollup_message_result_hash_repr.hash result in
   match List.nth messages message_index with
-  | Some expected -> Message_result_hash.(computed = expected)
+  | Some expected -> Tx_rollup_message_result_hash_repr.(computed = expected)
   | None -> false
 
 module Index = struct

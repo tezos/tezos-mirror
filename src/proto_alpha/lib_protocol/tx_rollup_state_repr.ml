@@ -148,7 +148,7 @@ let pp_range fmt = function
 *)
 type t = {
   last_removed_commitment_hashes :
-    (Tx_rollup_commitment_repr.Message_result_hash.t
+    (Tx_rollup_message_result_hash_repr.t
     * Tx_rollup_commitment_repr.Commitment_hash.t)
     option;
   finalized_commitments : range;
@@ -275,7 +275,7 @@ let encoding : t Data_encoding.t =
           @@ obj2
                (req
                   "last_message_hash"
-                  Tx_rollup_commitment_repr.Message_result_hash.encoding)
+                  Tx_rollup_message_result_hash_repr.encoding)
                (req
                   "commitment_hash"
                   Tx_rollup_commitment_repr.Commitment_hash.encoding)))
@@ -329,7 +329,7 @@ let pp fmt
            fprintf
              fmt
              "(message result: %a, commitment: %a)"
-             Tx_rollup_commitment_repr.Message_result_hash.pp
+             Tx_rollup_message_result_hash_repr.pp
              m
              Tx_rollup_commitment_repr.Commitment_hash.pp
              c))
@@ -617,7 +617,7 @@ module Internal_for_tests = struct
       ?burn_per_byte:Tez_repr.t ->
       ?inbox_ema:int ->
       ?last_removed_commitment_hashes:
-        Tx_rollup_commitment_repr.Message_result_hash.t
+        Tx_rollup_message_result_hash_repr.t
         * Tx_rollup_commitment_repr.Commitment_hash.t ->
       ?finalized_commitments:Tx_rollup_level_repr.t * Tx_rollup_level_repr.t ->
       ?unfinalized_commitments:Tx_rollup_level_repr.t * Tx_rollup_level_repr.t ->

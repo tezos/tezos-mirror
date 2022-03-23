@@ -23,7 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type error += Used_storage_space_underflow
+type error +=
+  | Negative_ticket_balance of {key : Ticket_hash_repr.t; balance : Z.t}
+  | Used_storage_space_underflow
 
 (** [get_balance ctxt key] receives the ticket balance for the given
     [key] in the context [ctxt]. The [key] represents a ticket content and a

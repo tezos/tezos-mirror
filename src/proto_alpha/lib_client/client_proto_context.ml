@@ -1004,14 +1004,14 @@ let submit_tx_rollup_rejection (cctxt : #full) ~chain ~block ?confirmations
       failwith "%s is not a valid notation for a context hash" context_hash)
   >>=? fun context_hash ->
   (match
-     Tx_rollup_withdraw.Merkle.root_of_b58check_opt withdrawals_merkle_root
+     Tx_rollup_withdraw_list_hash.of_b58check_opt withdrawals_merkle_root
    with
   | Some hash -> return hash
   | None ->
       failwith
         "%s is not a valid notation for a withdraw list hash"
         withdrawals_merkle_root)
-  >>=? fun withdrawals_merkle_root ->
+  >>=? fun withdraw_list_hash ->
   (match Data_encoding.Json.from_string message_path with
   | Ok json ->
       Data_encoding.Json.destruct Tx_rollup_inbox.Merkle.path_encoding json
@@ -1038,7 +1038,7 @@ let submit_tx_rollup_rejection (cctxt : #full) ~chain ~block ?confirmations
               message;
               message_position;
               message_path;
-              previous_message_result = {context_hash; withdrawals_merkle_root};
+              previous_message_result = {context_hash; withdraw_list_hash};
               proof;
             }))
   in

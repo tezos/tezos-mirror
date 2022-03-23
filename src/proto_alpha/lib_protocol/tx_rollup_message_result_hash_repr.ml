@@ -25,58 +25,33 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** A specialized Blake2B implementation for hashing commitments with
-    "toc1" as a base58 prefix *)
-module Commitment_hash : sig
-  val commitment_hash : string
+let message_result_hash = Tx_rollup_prefixes.message_result_hash.b58check_prefix
 
-  include S.HASH
-end
+module H =
+  Blake2B.Make
+    (Base58)
+    (struct
+      let name = "Message_result_hash"
 
-(** A commitment describes the interpretation of the messages stored in the
-    inbox of a particular [level], on top of a particular layer-2 context.
+      let title = "A message result hash"
 
-    It includes one Merkle tree root for each of the [batches]. It has
-    a [predecessor], which is the identifier of the commitment for the
-    previous inbox. The [predecessor] is used to get the Merkle root
-    of the layer-2 context before any inboxes are processed. If
-    [predecessor] is [None], the commitment is for the first inbox
-    with messages in this rollup, and the initial Merkle root is the
-    empty tree. *)
-type t = {
-  level : Tx_rollup_level_repr.t;
-  messages : Tx_rollup_message_result_hash_repr.t list;
-  predecessor : Commitment_hash.t option;
-  inbox_merkle_root : Tx_rollup_inbox_repr.Merkle.root;
-}
+      let b58check_prefix = message_result_hash
 
-include Compare.S with type t := t
+      let size = Some Tx_rollup_prefixes.message_result_hash.hash_size
+    end)
 
-val pp : Format.formatter -> t -> unit
+include H
+include Path_encoding.Make_hex (H)
 
-val encoding : t Data_encoding.t
+let () =
+  Tx_rollup_prefixes.(check_encoding message_result_hash b58check_encoding)
 
-val hash : t -> Commitment_hash.t
+let hash result =
+  let bytes =
+    Data_encoding.Binary.to_bytes_exn
+      Tx_rollup_message_result_repr.encoding
+      result
+  in
+  H.hash_bytes [bytes]
 
-(** [check_message_result commitment result message_index] returns true
-    if the message result hash of the batch in [commitment] indexed by
-    [message_index] corresponds to the hash of [result]. *)
-val check_message_result :
-  t -> Tx_rollup_message_result_repr.t -> message_index:int -> bool
-
-module Index : Storage_description.INDEX with type t = Commitment_hash.t
-
-module Submitted_commitment : sig
-  (** When a commitment is submitted, we store the [committer] and the
-      block the commitment was [submitted_at] along with the
-      [commitment] itself with its hash. *)
-  type nonrec t = {
-    commitment : t;
-    commitment_hash : Commitment_hash.t;
-    committer : Signature.Public_key_hash.t;
-    submitted_at : Raw_level_repr.t;
-    finalized_at : Raw_level_repr.t option;
-  }
-
-  val encoding : t Data_encoding.t
-end
+let init = hash Tx_rollup_message_result_repr.init

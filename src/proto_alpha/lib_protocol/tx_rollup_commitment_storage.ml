@@ -103,12 +103,11 @@ let get :
 let get_finalized :
     Raw_context.t ->
     Tx_rollup_repr.t ->
+    Tx_rollup_state_repr.t ->
     Tx_rollup_level_repr.t ->
     (Raw_context.t * Tx_rollup_commitment_repr.Submitted_commitment.t) tzresult
     Lwt.t =
- fun ctxt tx_rollup level ->
-  Tx_rollup_state_storage.assert_exist ctxt tx_rollup >>=? fun ctxt ->
-  Storage.Tx_rollup.State.get ctxt tx_rollup >>=? fun (ctxt, state) ->
+ fun ctxt tx_rollup state level ->
   let window = Tx_rollup_state_repr.finalized_commitments_range state in
   (match window with
   | Some (first, last) ->
@@ -193,7 +192,8 @@ let add_commitment ctxt tx_rollup state pkh commitment =
   Storage.Tx_rollup.Commitment.add ctxt (commitment.level, tx_rollup) submitted
   >>=? fun (ctxt, commitment_size_alloc, _) ->
   let commitment_message_hash_preallocations =
-    List.length commitment.messages * Message_result_hash.size
+    List.length commitment.messages
+    * Tx_rollup_prefixes.message_result_hash.hash_size
   in
   let commitment_size_alloc_sans_preallocations =
     commitment_size_alloc - commitment_message_hash_preallocations
@@ -300,11 +300,7 @@ let remove_commitment ctxt rollup state =
         state
         ~delta:(Z.of_int freed_size |> Z.neg)
       >>?= fun (state, _paid_storage_size_diff) ->
-      let inbox_length =
-        (* safe because inbox cannot be more than int32 *)
-        Int32.of_int @@ List.length commitment.commitment.messages
-      in
-      Tx_rollup_withdraw_storage.remove ctxt state rollup tail ~inbox_length
+      Tx_rollup_reveal_storage.remove ctxt rollup state tail
       >>=? fun (ctxt, state) ->
       (* We update the state *)
       (match List.last_opt commitment.commitment.messages with
@@ -340,11 +336,7 @@ let get_before_and_after_results ctxt tx_rollup
   let level = commitment.level in
   if Compare.Int.(message_position = 0) then
     match Tx_rollup_level_repr.pred level with
-    | None ->
-        return
-          ( ctxt,
-            Tx_rollup_commitment_repr.initial_message_result_hash,
-            after_hash )
+    | None -> return (ctxt, Tx_rollup_message_result_hash_repr.init, after_hash)
     | Some pred_level -> (
         Storage.Tx_rollup.Commitment.find ctxt (pred_level, tx_rollup)
         >>=? function

@@ -1,8 +1,9 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
+(* Copyright (c) 2022 Marigold <contact@marigold.dev>                        *)
 (* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
-(* Copyright (c) 2022 Oxhead Alpha <info@oxheadalpha.com>                    *)
+(* Copyright (c) 2022 Oxhead Alpha <info@oxhead-alpha.com>                   *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,32 +25,35 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Alpha_context
+(** [record ctxt tx_rollup lvl message_position] adds
+    [message_position] to the list of message with revealed
+    withdrawals for [tx_rollup] at [lvl].
 
-module Verifier_storage : sig
-  include
-    Tx_rollup_l2_storage_sig.STORAGE
-      with type t = Context.tree
-       and type 'a m = ('a, error) result Lwt.t
-end
+    In addition to an updated context, returns a new rollup state, and
+    the number of bytes newly allocated by this function. *)
+val record :
+  Raw_context.t ->
+  Tx_rollup_repr.t ->
+  Tx_rollup_state_repr.t ->
+  Tx_rollup_level_repr.t ->
+  message_position:int ->
+  (Raw_context.t * Tx_rollup_state_repr.t * Z.t) tzresult Lwt.t
 
-module Verifier_context : sig
-  include Tx_rollup_l2_context_sig.CONTEXT with type t = Verifier_storage.t
-end
+(** [mem ctxt tx_rollup lvl message_position] checks if
+    [message_position] has already had its withdrawals revealed for
+    [tx_rollup] at [lvl]. *)
+val mem :
+  Raw_context.t ->
+  Tx_rollup_repr.t ->
+  Tx_rollup_level_repr.t ->
+  message_position:int ->
+  (Raw_context.t * bool) tzresult Lwt.t
 
-(** [verify_proof message proof ~agreed ~rejected ~max_proof_size] verifies
-    a Merkle proof for a L2 message, starting from the state [agreed]. If the
-    [proof] is correct, and the final Merkle hash is not equal to [rejected],
-    then [verify_proof] passes.
-    Note that if the proof is larger than [max_proof_size] and the final
-    Merkle hash is equal to [rejected], the needed proof for the rejected
-    commitment is too large, thus, [verify_proof] passes and the commitment
-    is rejected. *)
-val verify_proof :
-  Tx_rollup_l2_apply.parameters ->
-  Tx_rollup_message.t ->
-  Tx_rollup_l2_proof.t ->
-  agreed:Tx_rollup_message_result.t ->
-  rejected:Tx_rollup_message_result_hash.t ->
-  max_proof_size:int ->
-  unit tzresult Lwt.t
+(** [remove ctxt tx_rollup lvl] clean-up the reveal accounting data
+    from the layer-1 storage. *)
+val remove :
+  Raw_context.t ->
+  Tx_rollup_repr.t ->
+  Tx_rollup_state_repr.t ->
+  Tx_rollup_level_repr.t ->
+  (Raw_context.t * Tx_rollup_state_repr.t) tzresult Lwt.t

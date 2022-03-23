@@ -1464,32 +1464,12 @@ module Tx_rollup = struct
         let encoding = Tx_rollup_inbox_repr.encoding
       end)
 
-  module Int32_index = struct
-    type t = int32
-
-    let compare = Compare.Int32.compare
-
-    let encoding = Data_encoding.int32
-
-    let rpc_arg = RPC_arg.int32
-
-    let path_length = 1
-
-    let to_path i l = Int32.to_string i :: l
-
-    let of_path = function
-      | [] | _ :: _ :: _ -> None
-      | [i] -> Int32.of_string_opt i
-  end
-
-  module Consumed_withdraw =
-    Make_indexed_carbonated_data_storage
-      (Make_subcontext (Registered) (Level_tx_rollup_context.Raw_context)
-         (struct
-           let name = ["withdraw"]
-         end))
-         (Make_index (Int32_index))
-         (Tx_rollup_withdraw_repr.Withdrawal_accounting)
+  module Revealed_withdrawals =
+    Level_tx_rollup_context.Make_carbonated_map
+      (struct
+        let name = ["revealed_withdrawals"]
+      end)
+      (Bitset)
 
   module Level_indexed_context =
     Make_indexed_subcontext

@@ -249,14 +249,23 @@ let pp_manager_operation_content (type kind) source internal pp_result ppf
         source
         pp_result
         result
-  | Tx_rollup_withdraw {tx_rollup; _} ->
+  | Tx_rollup_dispatch_tickets {tx_rollup; _} ->
       Format.fprintf
         ppf
         "@[<v 2>%s:%a@,From: %a%a@]"
-        (if internal then "Internal tx rollup withdraw"
-        else "Tx rollup withdraw")
+        (if internal then "Internal tx rollup dispatch tickets"
+        else "Tx rollup dispatch tickets")
         Tx_rollup.pp
         tx_rollup
+        Contract.pp
+        source
+        pp_result
+        result
+  | Transfer_ticket _ ->
+      Format.fprintf
+        ppf
+        "@[<v 2>%s:@,From: %a%a@]"
+        (if internal then "Internal transfer ticket" else "Transfer ticket")
         Contract.pp
         source
         pp_result
@@ -619,8 +628,19 @@ let pp_manager_operation_contents_and_result ppf
       balance_updates ;
     Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas
   in
-  let pp_tx_rollup_withdraw_result
-      (Tx_rollup_withdraw_result
+  let pp_tx_rollup_dispatch_tickets_result
+      (Tx_rollup_dispatch_tickets_result
+        {balance_updates; consumed_gas; paid_storage_size_diff}) =
+    if paid_storage_size_diff <> Z.zero then
+      Format.fprintf
+        ppf
+        "@,Paid storage size diff: %s bytes"
+        (Z.to_string paid_storage_size_diff) ;
+    Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas ;
+    pp_balance_updates_opt ppf balance_updates
+  in
+  let pp_transfer_ticket_result
+      (Transfer_ticket_result
         {balance_updates; consumed_gas; paid_storage_size_diff}) =
     if paid_storage_size_diff <> Z.zero then
       Format.fprintf
@@ -795,17 +815,28 @@ let pp_manager_operation_contents_and_result ppf
           "@[<v 0>This tx rollup rejection operation was BACKTRACKED, its \
            expected effects (as follow) were NOT applied.@]" ;
         pp_tx_rollup_rejection_result op
-    | Applied (Tx_rollup_withdraw_result _ as op) ->
+    | Applied (Tx_rollup_dispatch_tickets_result _ as op) ->
         Format.fprintf
           ppf
-          "This tx rollup withdraw operation was successfully applied" ;
-        pp_tx_rollup_withdraw_result op
-    | Backtracked ((Tx_rollup_withdraw_result _ as op), _err) ->
+          "This tx rollup reveal_withdrawals operation was successfully applied" ;
+        pp_tx_rollup_dispatch_tickets_result op
+    | Backtracked ((Tx_rollup_dispatch_tickets_result _ as op), _err) ->
         Format.fprintf
           ppf
-          "@[<v 0>This tx rollup withdraw rollup operation was BACKTRACKED, \
-           its expected effects (as follow) were NOT applied.@]" ;
-        pp_tx_rollup_withdraw_result op
+          "@[<v 0>This tx rollup reveal_withdrawals rollup operation was \
+           BACKTRACKED, its expected effects (as follow) were NOT applied.@]" ;
+        pp_tx_rollup_dispatch_tickets_result op
+    | Applied (Transfer_ticket_result _ as op) ->
+        Format.fprintf
+          ppf
+          "This transfer ticket operation was successfully applied" ;
+        pp_transfer_ticket_result op
+    | Backtracked ((Transfer_ticket_result _ as op), _err) ->
+        Format.fprintf
+          ppf
+          "@[<v 0>This transfer ticket operation was BACKTRACKED, its expected \
+           effects (as follow) were NOT applied.@]" ;
+        pp_transfer_ticket_result op
     | Applied (Sc_rollup_originate_result _ as op) ->
         Format.fprintf
           ppf

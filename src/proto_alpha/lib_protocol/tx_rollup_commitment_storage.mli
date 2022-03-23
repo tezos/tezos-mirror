@@ -113,6 +113,7 @@ val get :
 val get_finalized :
   Raw_context.t ->
   Tx_rollup_repr.t ->
+  Tx_rollup_state_repr.t ->
   Tx_rollup_level_repr.t ->
   (Raw_context.t * Tx_rollup_commitment_repr.Submitted_commitment.t) tzresult
   Lwt.t
@@ -186,7 +187,7 @@ val get_before_and_after_results :
   message_position:int ->
   Tx_rollup_state_repr.t ->
   (Raw_context.t
-  * Tx_rollup_commitment_repr.Message_result_hash.t
-  * Tx_rollup_commitment_repr.Message_result_hash.t)
+  * Tx_rollup_message_result_hash_repr.t
+  * Tx_rollup_message_result_hash_repr.t)
   tzresult
   Lwt.t

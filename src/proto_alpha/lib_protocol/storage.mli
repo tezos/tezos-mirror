@@ -637,18 +637,17 @@ module Tx_rollup : sig
        and type key = Tx_rollup_repr.t
        and type value = Tx_rollup_inbox_repr.t
 
-  (** A carbonated storage of the set of withdrawals consumed
-      of those potentially associated to each message
-      of an inbox. The key is the message number, which is
-      sequentially assigned from 0. *)
-  module Consumed_withdraw :
+  (** A carbonated storage of the set of withdrawals revealed of those
+      potentially associated to each message of an inbox. The key is the message
+      number, which is sequentially assigned from 0. *)
+  module Revealed_withdrawals :
     Non_iterable_indexed_carbonated_data_storage
-      with type t := (Raw_context.t * Tx_rollup_level_repr.t) * Tx_rollup_repr.t
-       and type key = int32
-       and type value = Tx_rollup_withdraw_repr.Withdrawal_accounting.t
+      with type t := Raw_context.t * Tx_rollup_level_repr.t
+       and type key = Tx_rollup_repr.t
+       and type value = Bitset.t
 
   (** A rollup can have at most one commitment per rollup level. Some
-     metadata are saved in addition to the commitment itself. See
+      metadata are saved in addition to the commitment itself. See
      {!Tx_rollup_commitment_repr.Submitted_commitment.t} for the exact
      content. *)
   module Commitment :

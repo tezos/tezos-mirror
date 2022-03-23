@@ -97,6 +97,7 @@ type error +=
   | Tx_rollup_feature_disabled
   | Tx_rollup_invalid_transaction_amount
   | Tx_rollup_non_internal_transaction
+  | Cannot_transfer_ticket_to_implicit
   | Sc_rollup_feature_disabled
   | Inconsistent_counters
   | Wrong_voting_period of {expected : int32; provided : int32}
@@ -513,6 +514,15 @@ let () =
     Data_encoding.unit
     (function Tx_rollup_invalid_transaction_amount -> Some () | _ -> None)
     (fun () -> Tx_rollup_invalid_transaction_amount) ;
+
+  register_error_kind
+    `Permanent
+    ~id:"operation.cannot_transfer_ticket_to_implicit"
+    ~title:"Cannot transfer ticket to implicit account"
+    ~description:"Cannot transfer ticket to implicit account"
+    Data_encoding.unit
+    (function Cannot_transfer_ticket_to_implicit -> Some () | _ -> None)
+    (fun () -> Cannot_transfer_ticket_to_implicit) ;
 
   register_error_kind
     `Permanent
@@ -1271,151 +1281,115 @@ let apply_external_manager_operation_content :
         ~internal:false
   | Transaction {destination = Tx_rollup _; _} ->
       fail Tx_rollup_non_internal_transaction
-  | Tx_rollup_withdraw
-      {
-        tx_rollup;
-        level;
-        context_hash;
-        message_index;
-        withdrawals_merkle_root;
-        withdraw_path;
-        withdraw_position;
-        contents;
-        ty;
-        ticketer;
-        amount;
-        destination;
-        entrypoint;
-      } ->
-      (* Ticket parsing and hashing *)
-      Script.force_decode_in_context ~consume_deserialization_gas ctxt ty
-      >>?= fun (ty, ctxt) ->
-      Script.force_decode_in_context ~consume_deserialization_gas ctxt contents
-      >>?= fun (contents, ctxt) ->
-      Script_ir_translator.parse_comparable_ty ctxt (Micheline.root ty)
-      >>?= fun (Ex_comparable_ty contents_type, ctxt) ->
-      Script_ir_translator.parse_comparable_data
-        ctxt
-        contents_type
-        (Micheline.root contents)
-      >>=? fun (contents, ctxt) ->
-      let ticket_token =
-        Ticket_token.Ex_token {ticketer; contents_type; contents}
-      in
-      Ticket_balance_key.of_ex_token
-        ctxt
-        ~owner:(Tx_rollup tx_rollup)
-        ticket_token
-      (* Computing the withdrawal hash *)
-      >>=? fun (tx_rollup_ticket_hash, ctxt) ->
-      let withdrawal =
-        Tx_rollup_withdraw.
-          {claimer = source; ticket_hash = tx_rollup_ticket_hash; amount}
-      in
-      Tx_rollup_withdraw.Merkle.check_path
-        withdraw_path
-        withdraw_position
-        withdrawal
-        withdrawals_merkle_root
-      >>?= fun is_path_correct ->
-      fail_unless is_path_correct Tx_rollup_errors.Withdraw_invalid_path
-      >>=? fun () ->
-      Tx_rollup_commitment.get_finalized ctxt tx_rollup level
+  | Tx_rollup_dispatch_tickets
+      {tx_rollup; level; context_hash; message_index; tickets_info} ->
+      Tx_rollup_state.get ctxt tx_rollup >>=? fun (ctxt, state) ->
+      Tx_rollup_commitment.get_finalized ctxt tx_rollup state level
       >>=? fun (ctxt, commitment) ->
-      fail_unless
+      Tx_rollup_reveal.mem ctxt tx_rollup level ~message_position:message_index
+      >>=? fun (ctxt, already_revealed) ->
+      error_when
+        already_revealed
+        Tx_rollup_errors.Withdrawals_already_dispatched
+      >>?= fun () ->
+      (* The size of the list [tickets_info] is bounded by a
+         parametric constant, and checked in precheck. *)
+      List.fold_left_es
+        (fun (acc_withdraw, acc, ctxt)
+             Tx_rollup_reveal.{contents; ty; ticketer; amount; claimer} ->
+          Tx_rollup_ticket.parse_ticket
+            ~consume_deserialization_gas
+            ~ticketer
+            ~contents
+            ~ty
+            ctxt
+          >>=? fun (ctxt, ticket_token) ->
+          Tx_rollup_ticket.make_withdraw_order
+            ctxt
+            tx_rollup
+            ticket_token
+            claimer
+            amount
+          >>=? fun (ctxt, withdrawal) ->
+          return
+            (withdrawal :: acc_withdraw, (withdrawal, ticket_token) :: acc, ctxt))
+        ([], [], ctxt)
+        tickets_info
+      >>=? fun (rev_withdraw_list, rev_ex_token_and_hash_list, ctxt) ->
+      let withdraw_list_hash =
+        Tx_rollup_withdraw_list_hash.hash @@ List.rev rev_withdraw_list
+      in
+      error_unless
         (Tx_rollup_commitment.check_message_result
            commitment.commitment
-           {context_hash; withdrawals_merkle_root}
+           {context_hash; withdraw_list_hash}
            ~message_index)
-        Tx_rollup_errors.Withdraw_invalid_path
-      >>=? fun () ->
-      Tx_rollup_withdraw.mem
+        Tx_rollup_errors.Withdrawals_invalid_path
+      >>?= fun () ->
+      Tx_rollup_reveal.record
         ctxt
         tx_rollup
-        level
-        ~message_index
-        ~withdraw_position
-      >>=? fun (already_consumed, ctxt) ->
-      fail_when already_consumed Tx_rollup_errors.Withdraw_already_consumed
-      >>=? fun () ->
-      Tx_rollup_state.get ctxt tx_rollup >>=? fun (ctxt, state) ->
-      Tx_rollup_withdraw.add
-        ctxt
         state
-        tx_rollup
         level
-        ~message_index
-        ~withdraw_position
-      >>=? fun (ctxt, state, withdraw_paid_storage_size_diff) ->
-      Tx_rollup_state.update ctxt tx_rollup state >>=? fun ctxt ->
-      (* Now reconstruct the ticket sent as the parameter
-          destination. *)
-      Option.value_e
-        ~error:
-          (Error_monad.trace_of_error
-         @@ Tx_rollup_errors.Internal_error
-              "withdraw amount is negative, this can't happens because it \
-               comes from a qty.")
-        Script_int.(is_nat @@ of_int64 @@ Tx_rollup_l2_qty.to_int64 amount)
-      >>?= fun amount_node ->
-      Script_typed_ir.ticket_t Micheline.dummy_location contents_type
-      >>?= fun ticket_ty ->
-      let ticket = Script_typed_ir.{ticketer; contents; amount = amount_node} in
-      Script_ir_translator.unparse_data ctxt Optimized ticket_ty ticket
-      >>=? fun (parameters_expr, ctxt) ->
-      let parameters =
-        Script.lazy_expr (Micheline.strip_locations parameters_expr)
+        ~message_position:message_index
+      >>=? fun (ctxt, state, reveal_diff) ->
+      let adjust_ticket_balance (ctxt, state, acc_diff)
+          ( Tx_rollup_withdraw.
+              {claimer; amount; ticket_hash = tx_rollup_ticket_hash},
+            ticket_token ) =
+        let amount = Tx_rollup_l2_qty.to_z amount in
+        Ticket_balance_key.of_ex_token
+          ctxt
+          ~owner:(Contract (Contract.implicit_contract claimer))
+          ticket_token
+        >>=? fun (claimer_ticket_hash, ctxt) ->
+        Tx_rollup_ticket.transfer_ticket_with_hashes
+          ctxt
+          ~src_hash:tx_rollup_ticket_hash
+          ~dst_hash:claimer_ticket_hash
+          amount
+        >>=? fun (ctxt, diff) -> return (ctxt, state, Z.(add acc_diff diff))
       in
-      let op =
-        Script_typed_ir.Internal_operation
-          {
-            source = source_contract;
-            nonce = 0;
-            operation =
-              Transaction
-                {
-                  transaction =
-                    {
-                      amount = Tez.zero;
-                      parameters;
-                      destination = Contract destination;
-                      entrypoint;
-                    };
-                  location = Micheline.location parameters_expr;
-                  parameters_ty = ticket_ty;
-                  parameters = ticket;
-                };
-          }
-      in
-      (* remove tickets from the tx_rollup and add them to the destination
-         contract *)
-      Ticket_balance_key.of_ex_token
-        ctxt
-        ~owner:(Contract destination)
-        ticket_token
-      >>=? fun (destination_ticket_hash, ctxt) ->
-      Ticket_balance.adjust_balance
-        ctxt
-        tx_rollup_ticket_hash
-        ~delta:(Z.neg @@ Tx_rollup_l2_qty.to_z amount)
-      >>=? fun (tx_ticket_hash_storage_diff, ctxt) ->
-      Ticket_balance.adjust_balance
-        ctxt
-        destination_ticket_hash
-        ~delta:(Tx_rollup_l2_qty.to_z amount)
-      >>=? fun (dest_ticket_hash_storage_diff, ctxt) ->
-      let delta =
-        Z.add tx_ticket_hash_storage_diff dest_ticket_hash_storage_diff
-      in
-      Tx_rollup_state.get ctxt tx_rollup >>=? fun (ctxt, state) ->
-      Tx_rollup_state.adjust_storage_allocation state ~delta
-      >>?= fun (state, ticket_paid_storage_size_diff) ->
-      let paid_storage_size_diff =
-        Z.add ticket_paid_storage_size_diff withdraw_paid_storage_size_diff
-      in
+      List.fold_left_es
+        adjust_ticket_balance
+        (ctxt, state, reveal_diff)
+        rev_ex_token_and_hash_list
+      >>=? fun (ctxt, state, paid_storage_size_diff) ->
       Tx_rollup_state.update ctxt tx_rollup state >>=? fun ctxt ->
       let result =
-        Tx_rollup_withdraw_result
+        Tx_rollup_dispatch_tickets_result
+          {
+            balance_updates = [];
+            consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
+            paid_storage_size_diff;
+          }
+      in
+      return (ctxt, result, [])
+  | Transfer_ticket {contents; ty; ticketer; amount; destination; entrypoint} ->
+      error_when
+        (Option.is_some @@ Contract.is_implicit destination)
+        Cannot_transfer_ticket_to_implicit
+      >>?= fun () ->
+      Tx_rollup_ticket.parse_ticket_and_operation
+        ~consume_deserialization_gas
+        ~ticketer
+        ~contents
+        ~ty
+        ~source:source_contract
+        ~destination:(Contract destination)
+        ~entrypoint
+        ~amount
+        ctxt
+      >>=? fun (ctxt, ticket_token, op) ->
+      Tx_rollup_ticket.transfer_ticket
+        ctxt
+        ~src:(Contract source_contract)
+        ~dst:(Contract destination)
+        ticket_token
+        amount
+      >>=? fun (ctxt, paid_storage_size_diff) ->
+      let result =
+        Transfer_ticket_result
           {
             balance_updates = [];
             consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
@@ -1655,7 +1629,7 @@ let apply_external_manager_operation_content :
         ~message_position
       >>=? fun (ctxt, agreed_hash, rejected) ->
       let computed =
-        Tx_rollup_commitment.hash_message_result previous_message_result
+        Tx_rollup_message_result_hash.hash previous_message_result
       in
       fail_unless
         Tx_rollup_message_result_hash.(agreed_hash = computed)
@@ -1890,23 +1864,23 @@ let precheck_manager_contents (type kind) ctxt (op : kind Kind.manager contents)
         Tx_rollup_errors.Message_size_exceeds_limit
       >>=? fun () -> return ctxt
   | Tx_rollup_commit _ | Tx_rollup_return_bond _
-  | Tx_rollup_finalize_commitment _ | Tx_rollup_remove_commitment _ ->
-      assert_tx_rollup_feature_enabled ctxt >|=? fun () -> ctxt
-  | Tx_rollup_withdraw {withdraw_path; _} ->
+  | Tx_rollup_finalize_commitment _ | Tx_rollup_remove_commitment _
+  | Transfer_ticket _ ->
+      assert_tx_rollup_feature_enabled ctxt >>=? fun () -> return ctxt
+  | Tx_rollup_dispatch_tickets {tickets_info; _} ->
       assert_tx_rollup_feature_enabled ctxt >>=? fun () ->
       let Constants.{tx_rollup_max_withdrawals_per_batch; _} =
         Constants.parametric ctxt
       in
-      let path_size = Tx_rollup_withdraw.Merkle.path_depth withdraw_path in
-      let maximum_path_size =
-        Tx_rollup_withdraw.maximum_path_depth
-          ~withdraw_count_limit:tx_rollup_max_withdrawals_per_batch
-      in
-      if Compare.Int.(path_size > maximum_path_size) then
-        fail
-          (Tx_rollup_errors.Wrong_withdraw_path_depth
-             {provided = path_size; limit = maximum_path_size})
-      else return ctxt
+      error_when
+        Compare.List_length_with.(tickets_info = 0)
+        Tx_rollup_errors.No_withdrawals_to_dispatch
+      >>?= fun () ->
+      error_when
+        Compare.List_length_with.(
+          tickets_info > tx_rollup_max_withdrawals_per_batch)
+        Tx_rollup_errors.Too_many_withdrawals
+      >>?= fun () -> return ctxt
   | Tx_rollup_rejection {message_path; _} ->
       assert_tx_rollup_feature_enabled ctxt >>=? fun () ->
       let Constants.{tx_rollup_max_messages_per_inbox; _} =
@@ -2031,9 +2005,9 @@ let burn_storage_fees :
           storage_limit,
           Tx_rollup_origination_result {payload with balance_updates} )
   | Tx_rollup_return_bond_result _ | Tx_rollup_remove_commitment_result _
-  | Tx_rollup_rejection_result _ ->
+  | Tx_rollup_rejection_result _ | Tx_rollup_dispatch_tickets_result _ ->
       return (ctxt, storage_limit, smopr)
-  | Tx_rollup_withdraw_result payload ->
+  | Transfer_ticket_result payload ->
       let consumed = payload.paid_storage_size_diff in
       Fees.burn_storage_fees ctxt ~storage_limit ~payer consumed
       >>=? fun (ctxt, storage_limit, storage_bus) ->
@@ -2041,7 +2015,7 @@ let burn_storage_fees :
       return
         ( ctxt,
           storage_limit,
-          Tx_rollup_withdraw_result {payload with balance_updates} )
+          Transfer_ticket_result {payload with balance_updates} )
   | Tx_rollup_finalize_commitment_result payload ->
       let consumed = payload.paid_storage_size_diff in
       Fees.burn_storage_fees ctxt ~storage_limit ~payer consumed

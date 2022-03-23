@@ -179,7 +179,7 @@ val record_commitment_deletion :
   t ->
   Tx_rollup_level_repr.t ->
   Tx_rollup_commitment_repr.Commitment_hash.t ->
-  Tx_rollup_commitment_repr.Message_result_hash.t ->
+  Tx_rollup_message_result_hash_repr.t ->
   t tzresult
 
 (** [finalized_commitments_range state] returns the window of finalized
@@ -200,7 +200,7 @@ val check_level_can_be_rejected : t -> Tx_rollup_level_repr.t -> unit tzresult
     hash and the last commitment hash. *)
 val last_removed_commitment_hashes :
   t ->
-  (Tx_rollup_commitment_repr.Message_result_hash.t
+  (Tx_rollup_message_result_hash_repr.t
   * Tx_rollup_commitment_repr.Commitment_hash.t)
   option
 
@@ -232,7 +232,7 @@ module Internal_for_tests : sig
     ?burn_per_byte:Tez_repr.t ->
     ?inbox_ema:int ->
     ?last_removed_commitment_hashes:
-      Tx_rollup_commitment_repr.Message_result_hash.t
+      Tx_rollup_message_result_hash_repr.t
       * Tx_rollup_commitment_repr.Commitment_hash.t ->
     ?finalized_commitments:Tx_rollup_level_repr.t * Tx_rollup_level_repr.t ->
     ?unfinalized_commitments:Tx_rollup_level_repr.t * Tx_rollup_level_repr.t ->

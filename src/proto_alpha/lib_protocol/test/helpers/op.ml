@@ -595,10 +595,9 @@ let tx_rollup_remove_commitment ?counter ?fee ?gas_limit ?storage_limit ctxt
   Context.Contract.manager ctxt source >|=? fun account ->
   sign account.sk ctxt to_sign_op
 
-let tx_rollup_withdraw ?counter ?fee ?gas_limit ?storage_limit ctxt
-    ~(source : Contract.t) (tx_rollup : Tx_rollup.t) (level : Tx_rollup_level.t)
-    ~context_hash ~message_index ~contents ~ty ~ticketer amount ~destination
-    ~withdraw_position withdrawals_merkle_root withdraw_path entrypoint =
+let tx_rollup_dispatch_tickets ?counter ?fee ?gas_limit ?storage_limit ctxt
+    ~(source : Contract.t) ~message_index tx_rollup level context_hash
+    tickets_info =
   manager_operation
     ?counter
     ?fee
@@ -606,22 +605,23 @@ let tx_rollup_withdraw ?counter ?fee ?gas_limit ?storage_limit ctxt
     ?storage_limit
     ~source
     ctxt
-    (Tx_rollup_withdraw
-       {
-         tx_rollup;
-         level;
-         context_hash;
-         message_index;
-         withdrawals_merkle_root;
-         withdraw_path;
-         withdraw_position;
-         contents;
-         ty;
-         ticketer;
-         amount;
-         destination;
-         entrypoint;
-       })
+    (Tx_rollup_dispatch_tickets
+       {tx_rollup; level; context_hash; message_index; tickets_info})
+  >>=? fun to_sign_op ->
+  Context.Contract.manager ctxt source >|=? fun account ->
+  sign account.sk ctxt to_sign_op
+
+let transfer_ticket ?counter ?fee ?gas_limit ?storage_limit ctxt
+    ~(source : Contract.t) ~contents ~ty ~ticketer amount ~destination
+    entrypoint =
+  manager_operation
+    ?counter
+    ?fee
+    ?gas_limit
+    ?storage_limit
+    ~source
+    ctxt
+    (Transfer_ticket {contents; ty; ticketer; amount; destination; entrypoint})
   >>=? fun to_sign_op ->
   Context.Contract.manager ctxt source >|=? fun account ->
   sign account.sk ctxt to_sign_op
@@ -631,7 +631,7 @@ let tx_rollup_reject ?counter ?fee ?gas_limit ?storage_limit ctxt
     (message : Tx_rollup_message.t) ~(message_position : int)
     ~(message_path : Tx_rollup_inbox.Merkle.path)
     ~(proof : Tx_rollup_l2_proof.t)
-    ~(previous_message_result : Tx_rollup_commitment.message_result) =
+    ~(previous_message_result : Tx_rollup_message_result.t) =
   manager_operation
     ?counter
     ?fee

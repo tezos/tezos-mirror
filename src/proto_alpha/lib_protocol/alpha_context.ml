@@ -239,8 +239,7 @@ end
 
 module Tx_rollup_level = Tx_rollup_level_repr
 module Tx_rollup_commitment_hash = Tx_rollup_commitment_repr.Commitment_hash
-module Tx_rollup_message_result_hash =
-  Tx_rollup_commitment_repr.Message_result_hash
+module Tx_rollup_message_result_hash = Tx_rollup_message_result_hash_repr
 
 module Tx_rollup = struct
   include Tx_rollup_repr
@@ -258,9 +257,13 @@ module Tx_rollup_state = struct
   end
 end
 
-module Tx_rollup_withdraw = struct
-  include Tx_rollup_withdraw_repr
-  include Tx_rollup_withdraw_storage
+module Tx_rollup_withdraw = Tx_rollup_withdraw_repr
+module Tx_rollup_withdraw_list_hash = Tx_rollup_withdraw_list_hash_repr
+module Tx_rollup_message_result = Tx_rollup_message_result_repr
+
+module Tx_rollup_reveal = struct
+  include Tx_rollup_reveal_repr
+  include Tx_rollup_reveal_storage
 end
 
 module Tx_rollup_message = struct

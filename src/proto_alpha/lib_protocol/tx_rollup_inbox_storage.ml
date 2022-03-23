@@ -216,7 +216,7 @@ let append_message :
      total amount of pre-payed storage burn when calculating the
      storage burn of adding the commitment. *)
   let commitment_message_hash_preallocation =
-    Tx_rollup_commitment_repr.Message_result_hash.size
+    Tx_rollup_prefixes.message_result_hash.hash_size
   in
   Tx_rollup_state_repr.adjust_storage_allocation
     new_state

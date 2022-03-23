@@ -2,7 +2,6 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
-(* Copyright (c) 2022 Oxhead Alpha <info@oxheadalpha.com>                    *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,32 +23,25 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Alpha_context
+type t = {
+  context_hash : Context_hash.t;
+  withdraw_list_hash : Tx_rollup_withdraw_list_hash_repr.t;
+}
 
-module Verifier_storage : sig
-  include
-    Tx_rollup_l2_storage_sig.STORAGE
-      with type t = Context.tree
-       and type 'a m = ('a, error) result Lwt.t
-end
+val encoding : t Data_encoding.t
 
-module Verifier_context : sig
-  include Tx_rollup_l2_context_sig.CONTEXT with type t = Verifier_storage.t
-end
+val init : t
 
-(** [verify_proof message proof ~agreed ~rejected ~max_proof_size] verifies
-    a Merkle proof for a L2 message, starting from the state [agreed]. If the
-    [proof] is correct, and the final Merkle hash is not equal to [rejected],
-    then [verify_proof] passes.
-    Note that if the proof is larger than [max_proof_size] and the final
-    Merkle hash is equal to [rejected], the needed proof for the rejected
-    commitment is too large, thus, [verify_proof] passes and the commitment
-    is rejected. *)
-val verify_proof :
-  Tx_rollup_l2_apply.parameters ->
-  Tx_rollup_message.t ->
-  Tx_rollup_l2_proof.t ->
-  agreed:Tx_rollup_message_result.t ->
-  rejected:Tx_rollup_message_result_hash.t ->
-  max_proof_size:int ->
-  unit tzresult Lwt.t
+(** [empty_l2_context_hash] is the context hash of the layer-2 context
+    just after its origination.
+
+    The empty layer2 context hash is the hash of the underlying Irmin tree.
+    One important note is: an empty tree *must* not be hashed when it's empty.
+    See https://github.com/mirage/irmin/issues/1304.
+
+    Our solution is to write data in the tree to have a non-empty one.
+    We write the {!Tx_rollup_l2_context.Ticket_count} default value (i.e. 0)
+    and the {!Tx_rollup_l2_context.Address_count} as well in the tree. Then
+    we hash the resulting tree to create this constant.
+*)
+val empty_l2_context_hash : Context_hash.t

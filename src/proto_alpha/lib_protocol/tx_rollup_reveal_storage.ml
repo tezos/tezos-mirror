@@ -25,43 +25,35 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [add ctxt state tx_rollup lvl message_index withdraw_position] adds
-    [withdraw_position] to the list of already consumed withdrawawals for
-    [tx_rollup] at [lvl] for the message_result at [message_index].
-    This function occupies storage space so returns a new state to
-    and a storage space diff reflect storage change. *)
-val add :
-  Raw_context.t ->
-  Tx_rollup_state_repr.t ->
-  Tx_rollup_repr.t ->
-  Tx_rollup_level_repr.t ->
-  message_index:int ->
-  withdraw_position:int ->
-  (Raw_context.t * Tx_rollup_state_repr.t * Z.t) tzresult Lwt.t
+let record ctxt tx_rollup state level ~message_position =
+  Storage.Tx_rollup.Revealed_withdrawals.find (ctxt, level) tx_rollup
+  >>=? fun (ctxt, revealed_withdrawals_opt) ->
+  Bitset.add
+    (Option.value ~default:Bitset.empty revealed_withdrawals_opt)
+    message_position
+  >>?= fun revealed_withdrawals ->
+  Storage.Tx_rollup.Revealed_withdrawals.add
+    (ctxt, level)
+    tx_rollup
+    revealed_withdrawals
+  >>=? fun (ctxt, new_size, _is_new) ->
+  Tx_rollup_state_repr.adjust_storage_allocation
+    state
+    ~delta:(Z.of_int new_size)
+  >>?= fun (state, diff) -> return (ctxt, state, diff)
 
-(** [mem ctxt tx_rollup lvl message_index withdraw_position] checks if
-    [withdraw_position] has already been consumed for [tx_rollup] at [lvl] for the
-    message_result at [message_index]. This function consumes gas
-    and so returns a new context. *)
-val mem :
-  Raw_context.t ->
-  Tx_rollup_repr.t ->
-  Tx_rollup_level_repr.t ->
-  message_index:int ->
-  withdraw_position:int ->
-  (bool * Raw_context.t) tzresult Lwt.t
+let mem ctxt tx_rollup level ~message_position =
+  Storage.Tx_rollup.Revealed_withdrawals.find (ctxt, level) tx_rollup
+  >>=? fun (ctxt, revealed_withdrawals_opt) ->
+  match revealed_withdrawals_opt with
+  | Some field ->
+      Bitset.mem field message_position >>?= fun res -> return (ctxt, res)
+  | None -> return (ctxt, false)
 
-(** [remove ctxt state tx_rollup lvl] removes all withdrawal accounting for
-    [tx_rollup] at [lvl]. This must not be called before the
-    corresponding commitment is deleted. Otherwise, it would be
-    possible to retrieve the same withdrawal multiple times. This
-    function
-     - consumes gas and so returns a new context
-     - frees space from storage so returns a new state *)
-val remove :
-  Raw_context.t ->
-  Tx_rollup_state_repr.t ->
-  Tx_rollup_repr.t ->
-  Tx_rollup_level_repr.t ->
-  inbox_length:int32 ->
-  (Raw_context.t * Tx_rollup_state_repr.t) tzresult Lwt.t
+let remove ctxt tx_rollup state level =
+  Storage.Tx_rollup.Revealed_withdrawals.remove (ctxt, level) tx_rollup
+  >>=? fun (ctxt, freed_size, _existed) ->
+  Tx_rollup_state_repr.adjust_storage_allocation
+    state
+    ~delta:Z.(neg @@ of_int freed_size)
+  >>?= fun (state, _) -> return (ctxt, state)

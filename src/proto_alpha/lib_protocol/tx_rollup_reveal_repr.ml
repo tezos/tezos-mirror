@@ -2,7 +2,6 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
-(* Copyright (c) 2022 Oxhead Alpha <info@oxheadalpha.com>                    *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,32 +23,24 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Alpha_context
+type t = {
+  contents : Script_repr.lazy_expr;
+  ty : Script_repr.lazy_expr;
+  ticketer : Contract_repr.t;
+  amount : Tx_rollup_l2_qty.t;
+  claimer : Signature.Public_key_hash.t;
+}
 
-module Verifier_storage : sig
-  include
-    Tx_rollup_l2_storage_sig.STORAGE
-      with type t = Context.tree
-       and type 'a m = ('a, error) result Lwt.t
-end
-
-module Verifier_context : sig
-  include Tx_rollup_l2_context_sig.CONTEXT with type t = Verifier_storage.t
-end
-
-(** [verify_proof message proof ~agreed ~rejected ~max_proof_size] verifies
-    a Merkle proof for a L2 message, starting from the state [agreed]. If the
-    [proof] is correct, and the final Merkle hash is not equal to [rejected],
-    then [verify_proof] passes.
-    Note that if the proof is larger than [max_proof_size] and the final
-    Merkle hash is equal to [rejected], the needed proof for the rejected
-    commitment is too large, thus, [verify_proof] passes and the commitment
-    is rejected. *)
-val verify_proof :
-  Tx_rollup_l2_apply.parameters ->
-  Tx_rollup_message.t ->
-  Tx_rollup_l2_proof.t ->
-  agreed:Tx_rollup_message_result.t ->
-  rejected:Tx_rollup_message_result_hash.t ->
-  max_proof_size:int ->
-  unit tzresult Lwt.t
+let encoding : t Data_encoding.t =
+  let open Data_encoding in
+  conv
+    (fun {contents; ty; ticketer; amount; claimer} ->
+      (contents, ty, ticketer, amount, claimer))
+    (fun (contents, ty, ticketer, amount, claimer) ->
+      {contents; ty; ticketer; amount; claimer})
+    (obj5
+       (req "contents" Script_repr.lazy_expr_encoding)
+       (req "ty" Script_repr.lazy_expr_encoding)
+       (req "ticketer" Contract_repr.encoding)
+       (req "amount" Tx_rollup_l2_qty.encoding)
+       (req "claimer" Signature.Public_key_hash.encoding))
