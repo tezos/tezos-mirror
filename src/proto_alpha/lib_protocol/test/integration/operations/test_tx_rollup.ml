@@ -363,6 +363,40 @@ let assert_some res = match res with Some r -> r | None -> assert false
 
 let raw_level level = assert_ok @@ Raw_level.of_int32 level
 
+(** Create a deposit on the layer1 side through the origination of a contract
+      and return the associated deposit message to apply in the layer2. *)
+let make_deposit b tx_rollup account =
+  let (sk, pk, addr) = gen_l2_account () in
+  Contract_helpers.originate_contract
+    "contracts/tx_rollup_deposit.tz"
+    "Unit"
+    account
+    b
+    (is_implicit_exn account)
+  >>=? fun (contract, b) ->
+  let parameters = print_deposit_arg (`Typed tx_rollup) (`Hash addr) in
+  let fee = Test_tez.of_int 10 in
+  Op.transaction
+    ~counter:(Z.of_int 2)
+    ~fee
+    (B b)
+    account
+    contract
+    Tez.zero
+    ~parameters
+  >>=? fun operation ->
+  Block.bake ~operation b >>=? fun b ->
+  make_unit_ticket_key (B b) ~ticketer:contract tx_rollup
+  >>=? fun ticket_hash ->
+  let (deposit, cumulated_size) =
+    Tx_rollup_message.make_deposit
+      (is_implicit_exn account)
+      (Tx_rollup_l2_address.Indexable.value addr)
+      ticket_hash
+      (Tx_rollup_l2_qty.of_int64_exn 100_000L)
+  in
+  return (b, (deposit, cumulated_size), (sk, pk, addr), ticket_hash)
+
 (** Create an incomplete (but valid) commitment for a given level. It is
     incomplete in the sense that the Merkle roots for each message are generated
     with [Context_hash.hash_string message_index]. In the meantime provides the
@@ -983,41 +1017,15 @@ let test_inbox_count_too_big () =
 (** [test_valid_deposit] checks that a smart contract can deposit
     tickets to a transaction rollup. *)
 let test_valid_deposit () =
-  let (_, _, pkh) = gen_l2_account () in
   context_init1 () >>=? fun (b, account) ->
   originate b account >>=? fun (b, tx_rollup) ->
-  Contract_helpers.originate_contract
-    "contracts/tx_rollup_deposit.tz"
-    "Unit"
-    account
-    b
-    (is_implicit_exn account)
-  >>=? fun (contract, b) ->
-  let parameters = print_deposit_arg (`Typed tx_rollup) (`Hash pkh) in
-  let fee = Test_tez.of_int 10 in
-  Op.transaction
-    ~counter:(Z.of_int 2)
-    ~fee
-    (B b)
-    account
-    contract
-    Tez.zero
-    ~parameters
-  >>=? fun operation ->
-  Block.bake ~operation b >>=? fun b ->
+  make_deposit b tx_rollup account
+  >>=? fun (b, (deposit, cumulated_size), _, _) ->
+  Incremental.begin_construction b >|=? Incremental.alpha_ctxt >>=? fun _ctxt ->
   Context.Tx_rollup.inbox (B b) tx_rollup Tx_rollup_level.root >>=? fun inbox ->
-  make_unit_ticket_key (B b) ~ticketer:contract tx_rollup
-  >>=? fun ticket_hash ->
-  let (message, cumulated_size) =
-    Tx_rollup_message.make_deposit
-      (is_implicit_exn account)
-      (Tx_rollup_l2_address.Indexable.value pkh)
-      ticket_hash
-      (Tx_rollup_l2_qty.of_int64_exn 10L)
-  in
   let merkle_root =
     Tx_rollup_inbox.Merkle.merklize_list
-      [Tx_rollup_message_hash.hash_uncarbonated message]
+      [Tx_rollup_message_hash.hash_uncarbonated deposit]
   in
   let expected_inbox =
     Tx_rollup_inbox.{inbox_length = 1; cumulated_size; merkle_root}
@@ -2336,40 +2344,6 @@ module Rejection = struct
     replace_commitment ~l2_parameters ~commitment ~store messages
     >>= fun commitment -> return commitment
 
-  (** Create a deposit on the layer1 side through the origination of a contract
-      and return the associated deposit message to apply in the layer2. *)
-  let make_deposit b tx_rollup account =
-    let (sk, pk, addr) = gen_l2_account () in
-    Contract_helpers.originate_contract
-      "contracts/tx_rollup_deposit.tz"
-      "Unit"
-      account
-      b
-      (is_implicit_exn account)
-    >>=? fun (contract, b) ->
-    let parameters = print_deposit_arg (`Typed tx_rollup) (`Hash addr) in
-    let fee = Test_tez.of_int 10 in
-    Op.transaction
-      ~counter:(Z.of_int 2)
-      ~fee
-      (B b)
-      account
-      contract
-      Tez.zero
-      ~parameters
-    >>=? fun operation ->
-    Block.bake ~operation b >>=? fun b ->
-    make_unit_ticket_key (B b) ~ticketer:contract tx_rollup
-    >>=? fun ticket_hash ->
-    let (deposit, _) =
-      Tx_rollup_message.make_deposit
-        (is_implicit_exn account)
-        (Tx_rollup_l2_address.Indexable.value addr)
-        ticket_hash
-        (Tx_rollup_l2_qty.of_int64_exn 10L)
-    in
-    return (b, deposit, (sk, pk, addr), ticket_hash)
-
   let make_rejection_param (commitment : Tx_rollup_commitment.Full.t) ~index =
     let message_result_hash =
       WithExceptions.Option.get
@@ -2394,7 +2368,7 @@ module Rejection = struct
     context_init1 () >>=? fun (b, account) ->
     originate b account >>=? fun (b, tx_rollup) ->
     make_deposit b tx_rollup account
-    >>=? fun (b, deposit, l2_account, ticket_hash) ->
+    >>=? fun (b, (deposit, _), l2_account, ticket_hash) ->
     let deposit_hash = Tx_rollup_message_hash.hash_uncarbonated deposit in
     let message_path =
       match Tx_rollup_inbox.Merkle.(compute_path [deposit_hash] 0) with
@@ -3023,41 +2997,11 @@ module Rejection = struct
   (** Test rejecting a commitment to a non-trivial message -- that is,
       not a no-op. *)
   let test_nontrivial_rejection () =
-    let (_, _, addr) = gen_l2_account () in
     init_l2_store () >>= fun store ->
     context_init1 () >>=? fun (b, account) ->
     originate b account >>=? fun (b, tx_rollup) ->
-    Contract_helpers.originate_contract
-      "contracts/tx_rollup_deposit.tz"
-      "Unit"
-      account
-      b
-      (is_implicit_exn account)
-    >>=? fun (contract, b) ->
-    let parameters = print_deposit_arg (`Typed tx_rollup) (`Hash addr) in
-    let fee = Test_tez.of_int 10 in
-    Op.transaction
-      ~counter:(Z.of_int 2)
-      ~fee
-      (B b)
-      account
-      contract
-      Tez.zero
-      ~parameters
-    >>=? fun operation ->
-    Block.bake ~operation b >>=? fun b ->
-    make_unit_ticket_key (B b) ~ticketer:contract tx_rollup
-    >>=? fun ticket_hash ->
-    let (deposit_message, _size) =
-      Tx_rollup_message.make_deposit
-        (is_implicit_exn account)
-        (Tx_rollup_l2_address.Indexable.value addr)
-        ticket_hash
-        (Tx_rollup_l2_qty.of_int64_exn 10L)
-    in
-    let message_hash =
-      Tx_rollup_message_hash.hash_uncarbonated deposit_message
-    in
+    make_deposit b tx_rollup account >>=? fun (b, (deposit, _), _, _) ->
+    let message_hash = Tx_rollup_message_hash.hash_uncarbonated deposit in
     let message_path =
       match Tx_rollup_inbox.Merkle.(compute_path [message_hash] 0) with
       | Error _ -> assert false
@@ -3078,7 +3022,7 @@ module Rejection = struct
       account
       tx_rollup
       Tx_rollup_level.root
-      deposit_message
+      deposit
       ~message_position:0
       ~message_path
       ~message_result_hash
@@ -3095,13 +3039,13 @@ module Rejection = struct
     >>=? fun i ->
     (* Check with a reasonable proof *)
     l2_parameters (I i) >>=? fun l2_parameters ->
-    make_proof store l2_parameters deposit_message >>= fun proof ->
+    make_proof store l2_parameters deposit >>= fun proof ->
     Op.tx_rollup_reject
       (I i)
       account
       tx_rollup
       Tx_rollup_level.root
-      deposit_message
+      deposit
       ~message_position:0
       ~message_path
       ~message_result_hash
@@ -3122,39 +3066,11 @@ module Rejection = struct
     return ctxt
 
   let test_large_rejection size =
-    let (_sk, _pk, addr) = gen_l2_account () in
     init_l2_store () >>= fun store ->
     context_init1 ~tx_rollup_rejection_max_proof_size:size ()
     >>=? fun (b, account) ->
     originate b account >>=? fun (b, tx_rollup) ->
-    Contract_helpers.originate_contract
-      "contracts/tx_rollup_deposit.tz"
-      "Unit"
-      account
-      b
-      (is_implicit_exn account)
-    >>=? fun (contract, b) ->
-    let parameters = print_deposit_arg (`Typed tx_rollup) (`Hash addr) in
-    let fee = Test_tez.of_int 10 in
-    Op.transaction
-      ~counter:(Z.of_int 2)
-      ~fee
-      (B b)
-      account
-      contract
-      Tez.zero
-      ~parameters
-    >>=? fun operation ->
-    Block.bake ~operation b >>=? fun b ->
-    make_unit_ticket_key (B b) ~ticketer:contract tx_rollup
-    >>=? fun ticket_hash ->
-    let (deposit, _) =
-      Tx_rollup_message.make_deposit
-        (is_implicit_exn account)
-        (Tx_rollup_l2_address.Indexable.value addr)
-        ticket_hash
-        (Tx_rollup_l2_qty.of_int64_exn 10L)
-    in
+    make_deposit b tx_rollup account >>=? fun (b, (deposit, _), _, _) ->
     let deposit_hash = Tx_rollup_message_hash.hash_uncarbonated deposit in
     let message_path =
       match Tx_rollup_inbox.Merkle.(compute_path [deposit_hash] 0) with
@@ -3225,7 +3141,7 @@ module Rejection = struct
     context_init1 ~tx_rollup_rejection_max_proof_size:100 ()
     >>=? fun (b, account) ->
     originate b account >>=? fun (b, tx_rollup) ->
-    make_deposit b tx_rollup account >>=? fun (b, deposit, _, _) ->
+    make_deposit b tx_rollup account >>=? fun (b, (deposit, _), _, _) ->
     let deposit_hash = Tx_rollup_message_hash.hash_uncarbonated deposit in
     let message_path =
       match Tx_rollup_inbox.Merkle.(compute_path [deposit_hash] 0) with
