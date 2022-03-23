@@ -103,7 +103,7 @@ let mainnet_disclaimer () =
     The promise returned by [rpc_timeout] is then determined by the implemented behavior of [Error_monad.with_timeout].
 *)
 let rpc_timeout ~timeout ?canceler f ctxt =
-  let canceler = Option.value ~default:(Lwt_canceler.create ()) canceler in
+  let canceler = Option.value_f ~default:Lwt_canceler.create canceler in
   let request = Error_monad.protect ~canceler (fun () -> f ctxt) in
   let alarm =
     Tezos_stdlib_unix.Systime_os.sleep (Ptime.Span.of_int_s timeout)

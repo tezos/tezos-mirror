@@ -38,9 +38,9 @@ type t = {
 }
 
 let hostname =
-  Option.value
+  Option.value_f
     (Sys.getenv_opt "TEZOS_EVENT_HOSTNAME")
-    ~default:(Unix.gethostname ())
+    ~default:Unix.gethostname
 
 type 'event wrapped = {
   time_stamp : float;

@@ -212,7 +212,7 @@ let detach ?(prefix = "") ?canceler ?input_encoding ?output_encoding
     (f : ('sent, 'received) Channel.t -> 'result tzresult Lwt.t) :
     ('sent, 'received, 'result) t tzresult Lwt.t =
   let open Lwt_syntax in
-  let canceler = Option.value ~default:(Lwt_canceler.create ()) canceler in
+  let canceler = Option.value_f ~default:Lwt_canceler.create canceler in
   let* () = Lwt_io.flush_all () in
   protect
     ~canceler

@@ -215,8 +215,10 @@ module Make (E : MENV) = struct
     let header = E.rpc_context.block_header in
     let predecessor_context = E.rpc_context.context in
     let timestamp =
-      let default = Time.System.to_protocol @@ Tezos_base.Time.System.now () in
-      Option.value timestamp ~default
+      let default () =
+        Time.System.to_protocol @@ Tezos_base.Time.System.now ()
+      in
+      Option.value_f timestamp ~default
     in
     E.Protocol.begin_construction
       ~chain_id:E.chain_id
@@ -496,8 +498,9 @@ module Make (E : MENV) = struct
                         preapply_results
                  in
                  let timestamp =
-                   Option.value
-                     ~default:(Time.System.to_protocol (Time.System.now ()))
+                   Option.value_f
+                     ~default:(fun () ->
+                       Time.System.to_protocol (Time.System.now ()))
                      timestamp
                  in
                  let shell_header =

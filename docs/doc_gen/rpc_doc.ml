@@ -220,8 +220,8 @@ module Description = struct
       Format.fprintf
         ppf
         "@[<h>%a@]%a"
-        Format.pp_print_text
-        (html_encode (Option.value ~default:"" service.description))
+        Format.(pp_print_option pp_print_text)
+        (Option.map html_encode service.description)
         Query.pp
         service.query
 
