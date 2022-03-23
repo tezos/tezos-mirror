@@ -138,4 +138,5 @@ module type P = sig
     Lwt.t
 end
 
-module Make (Context : P) : S with type context = Context.Tree.t
+module Make (Context : P) :
+  S with type context = Context.Tree.t and type state = Context.tree
