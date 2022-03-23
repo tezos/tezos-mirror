@@ -2472,12 +2472,9 @@ module Rejection = struct
     let contents = contents [] transfers in
     operation src ?counter contents
 
-  let make_message_transfer ~signers all_transfers =
-    let transaction =
-      List.map
-        (fun (src, counter, transfers) -> make_transfers src counter transfers)
-        all_transfers
-    in
+  let bls_pk pk = Tx_rollup_l2_batch.Bls_pk pk
+
+  let make_and_sign_transaction ~signers transaction =
     let signatures =
       Tx_rollup_l2_helpers.sign_transaction signers transaction
     in
@@ -2495,6 +2492,14 @@ module Rejection = struct
     let msg = Tx_rollup_message.make_batch batch_bytes |> fst in
     (msg, batch_bytes)
 
+  let make_message_transfer ~signers all_transfers =
+    let transaction =
+      List.map
+        (fun (src, counter, transfers) -> make_transfers src counter transfers)
+        all_transfers
+    in
+    make_and_sign_transaction ~signers transaction
+
   (** Test that we can produce a simple but valid proof. *)
   let test_valid_proof_on_invalid_commitment () =
     init_with_deposit ()
@@ -2505,7 +2510,7 @@ module Rejection = struct
     let (message, batch_bytes) =
       make_message_transfer
         ~signers:[sk]
-        [(Bls_pk pk, None, [(addr, ticket_hash, 1L)])]
+        [(bls_pk pk, None, [(addr, ticket_hash, 1L)])]
     in
     let message_hash = Tx_rollup_message_hash.hash_uncarbonated message in
     let message_path =
@@ -2561,7 +2566,7 @@ module Rejection = struct
     let (message, batch_bytes) =
       make_message_transfer
         ~signers:[sk]
-        [(Bls_pk pk, None, [(addr, ticket_hash, 1L)])]
+        [(bls_pk pk, None, [(addr, ticket_hash, 1L)])]
     in
     let message_hash = Tx_rollup_message_hash.hash_uncarbonated message in
     let message_path =
