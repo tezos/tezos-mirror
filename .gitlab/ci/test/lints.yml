@@ -12,6 +12,8 @@ misc_checks:
     - make -C tests_python typecheck
     # Ensure that all unit tests are restricted to their opam package
     - make lint-tests-pkg
+    # Ensure there are no mli docstring syntax errors in alpha protocol
+    - ODOC_WARN_ERROR=true dune build @src/proto_alpha/lib_protocol/doc
     # check that the hack-module patch applies cleanly
     - git apply devtools/protocol-print/add-hack-module.patch
     # check that yes-wallet builds correctly
