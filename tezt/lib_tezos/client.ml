@@ -1240,6 +1240,43 @@ let typecheck_script ~script ?(details = false) ?(emacs = false)
     client
   |> Process.check_and_read_stdout
 
+let spawn_run_view ?hooks ?source ?payer ?gas ?unparsing_mode ~view ~contract
+    ?input client =
+  let unparsing_mode_to_string = function
+    | `Optimized -> "Optimized"
+    | `Optimized_legacy -> "Optimized_legacy"
+    | `Readable -> "Readable"
+  in
+  let input_params =
+    match input with None -> [] | Some input -> ["with"; "input"; input]
+  in
+  spawn_command
+    ?hooks
+    client
+    (["run"; "view"; view; "on"; "contract"; contract]
+    @ input_params
+    @ optional_arg ~name:"payer" Fun.id payer
+    @ optional_arg ~name:"source" Fun.id source
+    @ optional_arg
+        ~name:"unparsing-mode"
+        unparsing_mode_to_string
+        unparsing_mode
+    @ optional_arg ~name:"gas" Int.to_string gas)
+
+let run_view ?hooks ?source ?payer ?gas ?unparsing_mode ~view ~contract ?input
+    client =
+  spawn_run_view
+    ?hooks
+    ?source
+    ?payer
+    ?gas
+    ?unparsing_mode
+    ~view
+    ~contract
+    ?input
+    client
+  |> Process.check_and_read_stdout
+
 let spawn_list_protocols mode client =
   let mode_str =
     match mode with

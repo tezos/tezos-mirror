@@ -985,6 +985,37 @@ val spawn_typecheck_script :
   t ->
   Process.t
 
+(** Same as [run_view] but does not wait for the process to exit. *)
+val spawn_run_view :
+  ?hooks:Process.hooks ->
+  ?source:string ->
+  ?payer:string ->
+  ?gas:int ->
+  ?unparsing_mode:[`Optimized | `Optimized_legacy | `Readable] ->
+  view:string ->
+  contract:string ->
+  ?input:string ->
+  t ->
+  Process.t
+
+(** Run [tezos-client run view .. on contract .. with input ..].
+
+    Returns the value returned by a view as a string.
+
+    Fails if the view or the contract does not exist. If [input] is [None], it
+    runs [tezos-client run view .. on contract ..]. *)
+val run_view :
+  ?hooks:Process.hooks ->
+  ?source:string ->
+  ?payer:string ->
+  ?gas:int ->
+  ?unparsing_mode:[`Optimized | `Optimized_legacy | `Readable] ->
+  view:string ->
+  contract:string ->
+  ?input:string ->
+  t ->
+  string Lwt.t
+
 (** Run [tezos-client list mode protocols].
 
     Note: the [list protocols] command (without mode) is an admin command
