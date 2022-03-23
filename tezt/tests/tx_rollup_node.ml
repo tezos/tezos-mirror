@@ -102,7 +102,7 @@ let test_node_configuration =
       Log.info "Tx_rollup configuration file was successfully created" ;
       let () =
         let open Ezjsonm in
-        let req = ["client-keys"; "rollup-id"] in
+        let req = ["operator"; "rollup_id"; "rpc_addr"] in
         (* TODO: add optional args checks *)
         match from_channel @@ open_in filename with
         | `O fields ->
@@ -234,13 +234,7 @@ let raw_tx_node_rpc node ~url =
   match rpc with
   | None -> assert false
   | Some curl ->
-      let url =
-        Printf.sprintf
-          "%s/%s"
-          (Rollup_node.rpc_host node ^ ":"
-          ^ Int.to_string (Rollup_node.rpc_port node))
-          url
-      in
+      let url = Printf.sprintf "%s/%s" (Rollup_node.rpc_addr node) url in
       curl ~url
 
 (* FIXME/TORU: Must be replaced by the Tx_client.get_balance command *)

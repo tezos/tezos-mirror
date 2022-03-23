@@ -32,14 +32,13 @@ val create :
   ?runner:Runner.t ->
   ?data_dir:string ->
   ?addr:string ->
-  ?port:int ->
   ?dormant_mode:bool ->
   ?color:Log.Color.t ->
   ?event_pipe:string ->
   ?name:string ->
   rollup_id:string ->
   rollup_genesis:string ->
-  operator:string ->
+  ?operator:string ->
   Client.t ->
   Node.t ->
   t
@@ -71,8 +70,5 @@ val run : t -> unit Lwt.t
 (** See [Daemon.Make.terminate]. *)
 val terminate : ?kill:bool -> t -> unit Lwt.t
 
-(** Get the RPC host given as [--rpc-addr] to a node. *)
-val rpc_host : t -> string
-
-(** Get the RPC port given as [--rpc-port] to a node. *)
-val rpc_port : t -> int
+(** Get the RPC address given as [--rpc-addr] to a node. *)
+val rpc_addr : t -> string

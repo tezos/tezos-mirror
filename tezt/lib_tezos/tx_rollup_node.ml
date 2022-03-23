@@ -35,11 +35,10 @@ module Parameters = struct
     client : Client.t;
     data_dir : string;
     runner : Runner.t option;
-    operator : string;
+    operator : string option;
     rollup_id : string;
     rollup_genesis : string;
-    rpc_host : string;
-    rpc_port : int;
+    rpc_addr : string;
     dormant_mode : bool;
     mutable pending_ready : unit option Lwt.u list;
     mutable pending_level : (int * int option Lwt.u) list;
@@ -57,14 +56,11 @@ end
 open Parameters
 include Daemon.Make (Parameters)
 
-let rpc_host node = node.persistent_state.rpc_host
-
-let rpc_port node = node.persistent_state.rpc_port
+let rpc_addr node = node.persistent_state.rpc_addr
 
 let data_dir node = node.persistent_state.data_dir
 
-let endpoint node =
-  Printf.sprintf "http://%s:%d" (rpc_host node) (rpc_port node)
+let endpoint node = "http://" ^ rpc_addr node
 
 let operator node = node.persistent_state.operator
 
@@ -74,23 +70,20 @@ let spawn_command node =
 let spawn_config_init node rollup_id rollup_genesis =
   spawn_command
     node
-    [
-      "config";
-      "init";
-      "on";
-      "--operator";
-      operator node;
-      "--data-dir";
-      data_dir node;
-      "--rollup-id";
-      rollup_id;
-      "--rollup-genesis";
-      rollup_genesis;
-      "--rpc-addr";
-      rpc_host node;
-      "--rpc-port";
-      string_of_int @@ rpc_port node;
-    ]
+    ([
+       "config";
+       "init";
+       "on";
+       "--data-dir";
+       data_dir node;
+       "--rollup-id";
+       rollup_id;
+       "--rollup-genesis";
+       rollup_genesis;
+       "--rpc-addr";
+       rpc_addr node;
+     ]
+    @ match operator node with None -> [] | Some o -> ["--operator"; o])
 
 let config_init node rollup_id rollup_genesis =
   let process = spawn_config_init node rollup_id rollup_genesis in
@@ -170,10 +163,14 @@ let wait_for_tezos_level node level =
         promise
 
 let create ?(path = Constant.tx_rollup_node) ?runner ?data_dir
-    ?(addr = "127.0.0.1") ?port ?(dormant_mode = false) ?color ?event_pipe ?name
-    ~rollup_id ~rollup_genesis ~operator client tezos_node =
+    ?(addr = "127.0.0.1") ?(dormant_mode = false) ?color ?event_pipe ?name
+    ~rollup_id ~rollup_genesis ?operator client tezos_node =
   let name = match name with None -> fresh_name () | Some name -> name in
-  let rpc_port = Option.fold ~none:Port.fresh ~some:Fun.const port () in
+  let rpc_addr =
+    match String.rindex_opt addr ':' with
+    | Some _ -> addr
+    | None -> Printf.sprintf "%s:%d" addr (Port.fresh ())
+  in
   let data_dir =
     match data_dir with None -> Temp.dir name | Some dir -> dir
   in
@@ -188,8 +185,7 @@ let create ?(path = Constant.tx_rollup_node) ?runner ?data_dir
         tezos_node;
         data_dir;
         rollup_id;
-        rpc_host = addr;
-        rpc_port;
+        rpc_addr;
         rollup_genesis;
         runner;
         operator;
@@ -222,4 +218,12 @@ let do_runlike_command node arguments =
   run node {ready = false; level = Unknown} arguments ~on_terminate
 
 let run node =
-  do_runlike_command node ["run"; "--data-dir"; node.persistent_state.data_dir]
+  do_runlike_command
+    node
+    [
+      "--base-dir";
+      Client.base_dir node.persistent_state.client;
+      "run";
+      "--data-dir";
+      node.persistent_state.data_dir;
+    ]
