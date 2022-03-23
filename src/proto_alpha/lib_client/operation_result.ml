@@ -291,6 +291,17 @@ let pp_manager_operation_content (type kind) source internal pp_result ppf
         Sc_rollup.Address.pp
         rollup
         pp_result
+        result
+  | Sc_rollup_publish {rollup; commitment} ->
+      Format.fprintf
+        ppf
+        "@[<v 2>Publish commitment %a in the smart contract rollup at address \
+         %a%a@]"
+        Sc_rollup.Commitment.pp
+        commitment
+        Sc_rollup.Address.pp
+        rollup
+        pp_result
         result) ;
 
   Format.fprintf ppf "@]"
@@ -615,6 +626,15 @@ let pp_manager_operation_contents_and_result ppf
   let pp_sc_rollup_cement_result (Sc_rollup_cement_result {consumed_gas}) =
     Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas
   in
+  let pp_sc_rollup_publish_result
+      (Sc_rollup_publish_result {consumed_gas; staked_hash}) =
+    Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas ;
+    Format.fprintf
+      ppf
+      "@,Hash of commit: %a"
+      Sc_rollup.Commitment_hash.pp
+      staked_hash
+  in
   let pp_result (type kind) ppf (result : kind manager_operation_result) =
     Format.fprintf ppf "@," ;
     match result with
@@ -799,6 +819,19 @@ let pp_manager_operation_contents_and_result ppf
            rollup was BACKTRACKED, its expected effects (as follow) were NOT \
            applied.@]" ;
         pp_sc_rollup_cement_result op
+    | Applied (Sc_rollup_publish_result _ as op) ->
+        Format.fprintf
+          ppf
+          "This operation publishing a commitment on a smart contract rollup \
+           was successfully applied" ;
+        pp_sc_rollup_publish_result op
+    | Backtracked ((Sc_rollup_publish_result _ as op), _errs) ->
+        Format.fprintf
+          ppf
+          "@[<v 0>This operation publishing a commitment on a smart contract \
+           rollup was BACKTRACKED, its expected effects (as follow) were NOT \
+           applied.@]" ;
+        pp_sc_rollup_publish_result op
   in
 
   Format.fprintf

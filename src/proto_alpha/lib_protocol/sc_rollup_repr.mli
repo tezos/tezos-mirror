@@ -52,6 +52,10 @@ module Address : sig
   val encoded_size : int
 end
 
+module Internal_for_tests : sig
+  val originated_sc_rollup : Origination_nonce.t -> Address.t
+end
+
 module Commitment_hash : S.HASH
 
 module State_hash : S.HASH
@@ -101,6 +105,8 @@ module Commitment : sig
     number_of_messages : Number_of_messages.t;
     number_of_ticks : Number_of_ticks.t;
   }
+
+  val pp : Format.formatter -> t -> unit
 
   val encoding : t Data_encoding.t
 

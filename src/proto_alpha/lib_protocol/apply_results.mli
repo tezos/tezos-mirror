@@ -262,6 +262,11 @@ and _ successful_manager_operation_result =
       consumed_gas : Gas.Arith.fp;
     }
       -> Kind.sc_rollup_cement successful_manager_operation_result
+  | Sc_rollup_publish_result : {
+      consumed_gas : Gas.Arith.fp;
+      staked_hash : Sc_rollup.Commitment_hash.t;
+    }
+      -> Kind.sc_rollup_publish successful_manager_operation_result
 
 and packed_successful_manager_operation_result =
   | Successful_manager_result :

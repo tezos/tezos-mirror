@@ -159,7 +159,7 @@ let context_init ?(tx_rollup_max_inboxes_count = 2100)
     ?(tx_rollup_max_ticket_payload_size = 10_240) n =
   Context.init_with_constants
     {
-      Context.default_test_contants with
+      Context.default_test_constants with
       consensus_threshold = 0;
       tx_rollup_enable = true;
       tx_rollup_finality_period = 1;

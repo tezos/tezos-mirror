@@ -260,6 +260,37 @@ val refine_stake :
   Sc_rollup_repr.Commitment.t ->
   (Sc_rollup_repr.Commitment_hash.t * Raw_context.t) tzresult Lwt.t
 
+(** This is a wrapper around [deposit_stake] and [refine_stake] that
+    deposits a stake and then refines it to the specified commitment,
+    creating that commitment if necessary. Before calling
+    [deposit_stake] it checks that the staker is not already staked, and
+    if so will skip that step and go straight to calling [refine_stake].
+
+    May fail with:
+    {ul
+      {li [Sc_rollup_does_not_exist] if [rollup] does not exist}
+      {li [Sc_rollup_too_far_ahead] if [staker] would be more than
+        [sc_rollup_max_future_commitments] ahead of the Last Cemented Commitment}
+      {li [Sc_rollup_bad_inbox_level] if [commitment]'s predecessor is
+        less than [sc_rollup_commitment_frequency] blocks ahead}
+      {li [Sc_rollup_staker_backtracked] if [staker] is not staked on an ancestor
+        of [commitment]}
+      {li [Sc_rollup_unknown_commitment] if the parent of the given commitment
+        does not exist}
+      {li [Sc_rollup_staker_funds_too_low] if [staker] is not previously a staker, and does not have enough funds
+        to cover the deposit}
+    }
+
+    Returns the hash of the given commitment.
+
+    This function does not authenticate the staker. *)
+val publish_commitment :
+  Raw_context.t ->
+  Sc_rollup_repr.t ->
+  Sc_rollup_repr.Staker.t ->
+  Sc_rollup_repr.Commitment.t ->
+  (Sc_rollup_repr.Commitment_hash.t * Raw_context.t) tzresult Lwt.t
+
 (** [last_cemented_commitment context rollup] returns the last cemented
     commitment of the rollup.
 

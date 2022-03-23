@@ -75,7 +75,7 @@ val get_constants : t -> Constants.t tzresult Lwt.t
 
 (** The default constants used in the test framework. To be used with
     [init_with_constants]. *)
-val default_test_contants : Constants.parametric
+val default_test_constants : Constants.parametric
 
 val get_baking_reward_fixed_portion : t -> Tez.t tzresult Lwt.t
 

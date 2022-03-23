@@ -342,6 +342,7 @@ let estimated_gas_single (type kind)
     | Applied (Sc_rollup_add_messages_result {consumed_gas; _}) ->
         Ok consumed_gas
     | Applied (Sc_rollup_cement_result {consumed_gas; _}) -> Ok consumed_gas
+    | Applied (Sc_rollup_publish_result {consumed_gas; _}) -> Ok consumed_gas
     | Skipped _ -> assert false
     | Backtracked (_, None) ->
         Ok Gas.Arith.zero (* there must be another error for this to happen *)
@@ -395,7 +396,14 @@ let estimated_storage_single (type kind) ~tx_rollup_origination_size
     | Applied (Tx_rollup_withdraw_result _) -> Ok Z.zero
     | Applied (Sc_rollup_originate_result {size; _}) -> Ok size
     | Applied (Sc_rollup_add_messages_result _) -> Ok Z.zero
+    (* The following Sc_rollup operations have zero storage cost because we
+       consider them to be paid in the stake deposit.
+
+       TODO: https://gitlab.com/tezos/tezos/-/issues/2686
+       Document why this is safe.
+    *)
     | Applied (Sc_rollup_cement_result _) -> Ok Z.zero
+    | Applied (Sc_rollup_publish_result _) -> Ok Z.zero
     | Skipped _ -> assert false
     | Backtracked (_, None) ->
         Ok Z.zero (* there must be another error for this to happen *)
@@ -456,6 +464,7 @@ let originated_contracts_single (type kind)
     | Applied (Sc_rollup_originate_result _) -> Ok []
     | Applied (Sc_rollup_add_messages_result _) -> Ok []
     | Applied (Sc_rollup_cement_result _) -> Ok []
+    | Applied (Sc_rollup_publish_result _) -> Ok []
     | Skipped _ -> assert false
     | Backtracked (_, None) ->
         Ok [] (* there must be another error for this to happen *)

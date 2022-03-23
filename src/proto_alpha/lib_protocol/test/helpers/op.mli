@@ -237,20 +237,6 @@ val tx_rollup_submit_batch :
   string ->
   Operation.packed tzresult Lwt.t
 
-(** [sc_rollup_origination ctxt source kind boot_sector] originates a new
-    smart contract rollup of some given [kind] booting using [boot_sector].
-    The process is the same as in [tx_rollup_origination]. *)
-val sc_rollup_origination :
-  ?counter:counter ->
-  ?fee:Tez.t ->
-  ?gas_limit:Gas.Arith.integral ->
-  ?storage_limit:counter ->
-  Context.t ->
-  Contract.t ->
-  Sc_rollup.Kind.t ->
-  string ->
-  packed_operation tzresult Lwt.t
-
 (** [tx_rollup_commit ctxt source tx_rollup commitment] Commits to a tx
     rollup state. *)
 val tx_rollup_commit :
@@ -356,4 +342,44 @@ val tx_rollup_reject :
   message_path:Tx_rollup_inbox.Merkle.path ->
   proof:Tx_rollup_l2_proof.t ->
   previous_message_result:Tx_rollup_commitment.message_result ->
+  Operation.packed tzresult Lwt.t
+
+(** [sc_rollup_origination ctxt source kind boot_sector] originates a new
+    smart contract rollup of some given [kind] booting using [boot_sector].
+    The process is the same as in [tx_rollup_origination]. *)
+val sc_rollup_origination :
+  ?counter:counter ->
+  ?fee:Tez.t ->
+  ?gas_limit:Gas.Arith.integral ->
+  ?storage_limit:counter ->
+  Context.t ->
+  Contract.t ->
+  Sc_rollup.Kind.t ->
+  string ->
+  (packed_operation * Sc_rollup.t) tzresult Lwt.t
+
+(** [sc_rollup_publish ctxt source rollup commitment] tries to publish a
+    commitment to the SCORU. *)
+val sc_rollup_publish :
+  ?counter:Z.t ->
+  ?fee:Tez.tez ->
+  ?gas_limit:Gas.Arith.integral ->
+  ?storage_limit:Z.t ->
+  Context.t ->
+  Contract.t ->
+  Sc_rollup.t ->
+  Sc_rollup.Commitment.t ->
+  Operation.packed tzresult Lwt.t
+
+(** [sc_rollup_cement ctxt source rollup commitment] tries to cement the
+    specified commitment. *)
+val sc_rollup_cement :
+  ?counter:Z.t ->
+  ?fee:Tez.tez ->
+  ?gas_limit:Gas.Arith.integral ->
+  ?storage_limit:Z.t ->
+  Context.t ->
+  Contract.t ->
+  Sc_rollup.t ->
+  Sc_rollup.Commitment_hash.t ->
   Operation.packed tzresult Lwt.t

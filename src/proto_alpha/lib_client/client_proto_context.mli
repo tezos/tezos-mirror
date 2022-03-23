@@ -651,3 +651,28 @@ val sc_rollup_cement :
   * Kind.sc_rollup_cement Kind.manager Apply_results.contents_result)
   tzresult
   Lwt.t
+
+val sc_rollup_publish :
+  #Protocol_client_context.full ->
+  chain:Chain_services.chain ->
+  block:Block_services.block ->
+  ?confirmations:int ->
+  ?dry_run:bool ->
+  ?verbose_signing:bool ->
+  ?simulation:bool ->
+  ?fee:Tez.t ->
+  ?gas_limit:Gas.Arith.integral ->
+  ?storage_limit:counter ->
+  ?counter:counter ->
+  source:public_key_hash ->
+  rollup:Alpha_context.Sc_rollup.t ->
+  commitment:Alpha_context.Sc_rollup.Commitment.t ->
+  src_pk:public_key ->
+  src_sk:Client_keys.sk_uri ->
+  fee_parameter:Injection.fee_parameter ->
+  unit ->
+  (Operation_hash.t
+  * Kind.sc_rollup_publish Kind.manager contents
+  * Kind.sc_rollup_publish Kind.manager Apply_results.contents_result)
+  tzresult
+  Lwt.t

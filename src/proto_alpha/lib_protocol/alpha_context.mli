@@ -218,6 +218,8 @@ module Raw_level : sig
   val to_int32 : raw_level -> int32
 
   val of_int32 : int32 -> raw_level tzresult
+
+  val of_int32_exn : int32 -> raw_level
 end
 
 module Cycle : sig
@@ -2411,13 +2413,15 @@ module Sc_rollup : sig
   module Commitment : sig
     type t = {
       compressed_state : State_hash.t;
-      inbox_level : Raw_level_repr.t;
+      inbox_level : Raw_level.t;
       predecessor : Commitment_hash.t;
       number_of_messages : Number_of_messages.t;
       number_of_ticks : Number_of_ticks.t;
     }
 
     val encoding : t Data_encoding.t
+
+    val pp : Format.formatter -> t -> unit
 
     val hash : t -> Commitment_hash.t
   end
@@ -2456,6 +2460,13 @@ module Sc_rollup : sig
     Commitment.t ->
     (Commitment_hash.t * context) tzresult Lwt.t
 
+  val publish_commitment :
+    context ->
+    t ->
+    Staker.t ->
+    Commitment.t ->
+    (Commitment_hash.t * context) tzresult Lwt.t
+
   val cement_commitment :
     context -> t -> Commitment_hash.t -> context tzresult Lwt.t
 
@@ -2476,6 +2487,10 @@ module Sc_rollup : sig
   val list : context -> t list tzresult Lwt.t
 
   val initial_level : context -> t -> Raw_level_repr.t tzresult Lwt.t
+
+  module Internal_for_tests : sig
+    val originated_sc_rollup : Origination_nonce.Internal_for_tests.t -> t
+  end
 end
 
 module Block_payload : sig
@@ -2656,6 +2671,8 @@ module Kind : sig
 
   type sc_rollup_cement = Sc_rollup_cement_kind
 
+  type sc_rollup_publish = Sc_rollup_publish_kind
+
   type 'a manager =
     | Reveal_manager_kind : reveal manager
     | Transaction_manager_kind : transaction manager
@@ -2676,6 +2693,7 @@ module Kind : sig
     | Sc_rollup_originate_manager_kind : sc_rollup_originate manager
     | Sc_rollup_add_messages_manager_kind : sc_rollup_add_messages manager
     | Sc_rollup_cement_manager_kind : sc_rollup_cement manager
+    | Sc_rollup_publish_manager_kind : sc_rollup_publish manager
 end
 
 type 'a consensus_operation_type =
@@ -2859,6 +2877,11 @@ and _ manager_operation =
       commitment : Sc_rollup.Commitment_hash.t;
     }
       -> Kind.sc_rollup_cement manager_operation
+  | Sc_rollup_publish : {
+      rollup : Sc_rollup.t;
+      commitment : Sc_rollup.Commitment.t;
+    }
+      -> Kind.sc_rollup_publish manager_operation
 
 and counter = Z.t
 
@@ -3015,6 +3038,8 @@ module Operation : sig
 
     val sc_rollup_cement_case : Kind.sc_rollup_cement Kind.manager case
 
+    val sc_rollup_publish_case : Kind.sc_rollup_publish Kind.manager case
+
     module Manager_operations : sig
       type 'b case =
         | MCase : {
@@ -3068,6 +3093,8 @@ module Operation : sig
       val sc_rollup_add_messages_case : Kind.sc_rollup_add_messages case
 
       val sc_rollup_cement_case : Kind.sc_rollup_cement case
+
+      val sc_rollup_publish_case : Kind.sc_rollup_publish case
     end
   end
 
