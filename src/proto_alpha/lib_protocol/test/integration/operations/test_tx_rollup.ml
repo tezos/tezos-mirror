@@ -328,9 +328,7 @@ let print_deposit_arg tx_rollup account =
     (match account with
     | `Hash pk -> Format.sprintf "\"%s\"" (Tx_rollup_l2_address.to_b58check pk)
     | `Raw str -> str)
-  |> fun x ->
-  Format.printf "%s\n@?" x ;
-  x |> Expr.from_string |> lazy_expr
+  |> fun x -> x |> Expr.from_string |> lazy_expr
 
 let assert_ok res = match res with Ok r -> r | Error _ -> assert false
 
@@ -3631,11 +3629,6 @@ module Withdraw = struct
     let ctxt = Incremental.alpha_ctxt i in
     wrap_lwt @@ Contract.get_storage ctxt withdraw_contract
     >>=? fun (_ctxt, found_storage) ->
-    Format.printf
-      "found_storage %s"
-      (match found_storage with
-      | Some storage -> Expr.to_string storage
-      | None -> "None") ;
     let expected_storage =
       Format.sprintf
         "(Some (Pair 0x%s (Pair %d %s)))"
