@@ -221,18 +221,13 @@ let init_originate_and_submit ?(batch = String.make 5 'c') () =
   Block.bake ~operation b >>=? fun b ->
   return ((contract, balance), state, tx_rollup, b)
 
-let l2_parameters : Tx_rollup_l2_apply.parameters =
-  let res =
-    Lwt_main.run
-      ( context_init1 () >>=? fun (b, _) ->
-        Incremental.begin_construction b >>=? fun i ->
-        let ctxt = Incremental.alpha_ctxt i in
-        let tx_rollup_max_withdrawals_per_batch =
-          Constants.tx_rollup_max_withdrawals_per_batch ctxt
-        in
-        return Tx_rollup_l2_apply.{tx_rollup_max_withdrawals_per_batch} )
+let l2_parameters : Context.t -> Tx_rollup_l2_apply.parameters tzresult Lwt.t =
+ fun ctxt ->
+  Context.get_constants ctxt >>=? fun constants ->
+  let tx_rollup_max_withdrawals_per_batch =
+    constants.parametric.tx_rollup_max_withdrawals_per_batch
   in
-  match res with Ok x -> x | Error _ -> assert false
+  return Tx_rollup_l2_apply.{tx_rollup_max_withdrawals_per_batch}
 
 let commitment_testable =
   Alcotest.testable Tx_rollup_commitment.pp Tx_rollup_commitment.( = )
@@ -317,10 +312,7 @@ let raw_level level = assert_ok @@ Raw_level.of_int32 level
    [batch_index -> withdraw_list].  Be careful not to provide a too-big
    withdraw_list as the construction is expensive *)
 let make_incomplete_commitment_for_batch i level tx_rollup withdraw_list =
-  let ctxt = Incremental.alpha_ctxt i in
-  Context.Tx_rollup.state (I i) tx_rollup >>=? fun state ->
-  wrap_lwt (Alpha_context.Tx_rollup_inbox.get ctxt level tx_rollup)
-  >>=? fun (ctxt, metadata) ->
+  Context.Tx_rollup.inbox (I i) tx_rollup level >>=? fun metadata ->
   List.init ~when_negative_length:[] metadata.inbox_length (fun _ ->
       Tx_rollup_commitment.empty_l2_context_hash)
   >>?= fun batches_result ->
@@ -338,13 +330,13 @@ let make_incomplete_commitment_for_batch i level tx_rollup withdraw_list =
   in
   (match Tx_rollup_level.pred level with
   | None -> return_none
-  | Some predecessor_level -> (
-      wrap_lwt
-        (Tx_rollup_commitment.find ctxt tx_rollup state predecessor_level)
-      >|=? function
-      | (_, None) -> None
-      | (_, Some {commitment; _}) -> Some (Tx_rollup_commitment.hash commitment)
-      ))
+  | Some predecessor_level ->
+      Context.Tx_rollup.commitment (I i) tx_rollup predecessor_level
+      >|=? fun commitment_opt ->
+      Option.map
+        (fun Tx_rollup_commitment.Submitted_commitment.{commitment; _} ->
+          Tx_rollup_commitment.hash commitment)
+        commitment_opt)
   >>=? fun predecessor ->
   let inbox_merkle_root = metadata.merkle_root in
   let commitment : Tx_rollup_commitment.t =
@@ -793,7 +785,6 @@ let test_valid_deposit () =
     ~parameters
   >>=? fun operation ->
   Block.bake ~operation b >>=? fun b ->
-  Incremental.begin_construction b >|=? Incremental.alpha_ctxt >>=? fun _ctxt ->
   Context.Tx_rollup.inbox (B b) tx_rollup Tx_rollup_level.root >>=? fun inbox ->
   make_unit_ticket_key (B b) ~ticketer:contract tx_rollup
   >>=? fun ticket_hash ->
@@ -1279,10 +1270,12 @@ let test_commitment_duplication () =
     ~expect_failure:(check_proto_error Tx_rollup_errors.Wrong_batch_count)
   >>=? fun i ->
   (* Submit the correct one *)
-  let submitted_level = (Level.current (Incremental.alpha_ctxt i)).level in
+  Context.get_level (I i) >>?= fun level ->
+  let submitted_level = Raw_level.succ level in
   Op.tx_rollup_commit (I i) contract1 tx_rollup commitment >>=? fun op ->
   Incremental.add_operation i op >>=? fun i ->
-  let cost = Constants.tx_rollup_commitment_bond (Incremental.alpha_ctxt i) in
+  Context.get_constants (I i) >>=? fun constants ->
+  let cost = constants.parametric.tx_rollup_commitment_bond in
   Assert.balance_was_debited ~loc:__LOC__ (I i) contract1 balance cost
   >>=? fun () ->
   (* Successfully fail to submit a duplicate commitment *)
@@ -1460,7 +1453,8 @@ let test_bond_finalization () =
   make_transactions_in tx_rollup contract1 [2; 3; 4] b >>=? fun b ->
   (* Let’s try to remove the bond *)
   Incremental.begin_construction b >>=? fun i ->
-  let bond = Constants.tx_rollup_commitment_bond (Incremental.alpha_ctxt i) in
+  Context.get_constants (I i) >>=? fun constants ->
+  let bond = constants.parametric.tx_rollup_commitment_bond in
   Op.tx_rollup_return_bond (I i) contract1 tx_rollup >>=? fun op ->
   Incremental.add_operation
     i
@@ -1728,7 +1722,7 @@ module Rejection = struct
     Incremental.add_operation i op >|=? fun i ->
     (i, contract1, tx_rollup, level, message)
 
-  let run_transaction ctxt msg =
+  let run_transaction ctxt l2_parameters msg =
     let open Prover_context.Syntax in
     let* (ctxt, _) = Prover_apply.apply_message ctxt l2_parameters msg in
     return ctxt
@@ -1790,24 +1784,24 @@ module Rejection = struct
 
   (** [make_proof store msg] applies [msg] on [store] and returns the
       created proof. *)
-  let make_proof store msg =
+  let make_proof store l2_parameters msg =
     let open Context.Syntax in
     let index = C.index store in
     let* hash = hash_tree_from_store store in
     let* (proof, ()) =
       C.produce_stream_proof index (`Node hash) (fun ctxt ->
           catch
-            (run_transaction ctxt msg)
+            (run_transaction ctxt l2_parameters msg)
             (fun ctxt -> return (ctxt, ()))
             (fun _ -> return (ctxt, ())))
     in
     return proof
 
-  let valid_empty_proof () =
+  let valid_empty_proof l2_parameters =
     let open Context.Syntax in
     let* l2_store = init_l2_store () in
     let (message, _) = Tx_rollup_message.make_batch "bogus" in
-    make_proof l2_store message
+    make_proof l2_store l2_parameters message
 
   let invalid_proof : Tx_rollup_l2_proof.t =
     {
@@ -1822,7 +1816,7 @@ module Rejection = struct
       FIXME/TORU: this overrides the withdrawals merkle roots. This is not good
       but there is yet not tests calling this function which uses these roots.
       Although, it shouldn't be to hard to fix this. *)
-  let replace_commitment ~store ~commitment messages =
+  let replace_commitment ~l2_parameters ~store ~commitment messages =
     let open Context in
     let open Syntax in
     let* (_, rev_results) =
@@ -1858,8 +1852,9 @@ module Rejection = struct
       ?(withdrawals = []) ~store messages =
     make_incomplete_commitment_for_batch i level tx_rollup withdrawals
     >>=? fun (commitment, _) ->
-    replace_commitment ~commitment ~store messages >>= fun commitment ->
-    return commitment
+    l2_parameters (I i) >>=? fun l2_parameters ->
+    replace_commitment ~l2_parameters ~commitment ~store messages
+    >>= fun commitment -> return commitment
 
   (** Create a deposit on the layer1 side through the origination of a contract
       and return the associated deposit message to apply in the layer2. *)
@@ -1922,7 +1917,8 @@ module Rejection = struct
        we can not reject a valid state. We do not really need to test this
        here, as there are dedicated tests, but this behaves like a regression
        test. *)
-    make_proof store deposit >>= fun proof ->
+    l2_parameters (I i) >>=? fun l2_parameters ->
+    make_proof store l2_parameters deposit >>= fun proof ->
     Incremental.begin_construction b >>=? fun i ->
     Op.tx_rollup_reject
       (I i)
@@ -2024,7 +2020,8 @@ module Rejection = struct
     Incremental.add_operation i op >>=? fun i ->
     Incremental.finalize_block i >>=? fun b ->
     (* Now we produce a valid proof rejecting the commitment *)
-    make_proof store message >>= fun proof ->
+    l2_parameters (I i) >>=? fun l2_parameters ->
+    make_proof store l2_parameters message >>= fun proof ->
     Op.tx_rollup_reject
       (B b)
       account
@@ -2073,7 +2070,8 @@ module Rejection = struct
     Incremental.add_operation i op >>=? fun i ->
     Incremental.finalize_block i >>=? fun b ->
     (* Now we produce a valid proof rejecting the commitment *)
-    make_proof store message >>= fun proof ->
+    l2_parameters (B b) >>=? fun l2_parameters ->
+    make_proof store l2_parameters message >>= fun proof ->
     Op.tx_rollup_reject
       (B b)
       account
@@ -2131,7 +2129,8 @@ module Rejection = struct
     Incremental.add_operation i op >>=? fun i ->
     Incremental.finalize_block i >>=? fun b ->
     (* Now we produce a valid proof rejecting the commitment *)
-    make_proof store message >>= fun proof ->
+    l2_parameters (B b) >>=? fun l2_parameters ->
+    make_proof store l2_parameters message >>= fun proof ->
     Op.tx_rollup_reject
       (B b)
       account
@@ -2162,7 +2161,8 @@ module Rejection = struct
       | Error _ -> assert false
       | Ok path -> path
     in
-    valid_empty_proof () >>= fun proof ->
+    l2_parameters (I i) >>=? fun l2_parameters ->
+    valid_empty_proof l2_parameters >>= fun proof ->
     Op.tx_rollup_reject
       (I i)
       contract
@@ -2274,7 +2274,8 @@ module Rejection = struct
       | Error _ -> assert false
       | Ok path -> path
     in
-    valid_empty_proof () >>= fun proof ->
+    l2_parameters (I i) >>=? fun l2_parameters ->
+    valid_empty_proof l2_parameters >>= fun proof ->
     Op.tx_rollup_reject
       (I i)
       contract
@@ -2320,7 +2321,8 @@ module Rejection = struct
       | Error _ -> assert false
       | Ok path -> path
     in
-    valid_empty_proof () >>= fun proof ->
+    l2_parameters (I i) >>=? fun l2_parameters ->
+    valid_empty_proof l2_parameters >>= fun proof ->
     Op.tx_rollup_reject
       (I i)
       contract
@@ -2358,7 +2360,8 @@ module Rejection = struct
       | Error _ -> assert false
       | Ok path -> path
     in
-    valid_empty_proof () >>= fun proof ->
+    l2_parameters (I i) >>=? fun l2_parameters ->
+    valid_empty_proof l2_parameters >>= fun proof ->
     Op.tx_rollup_reject
       (I i)
       contract1
@@ -2390,7 +2393,8 @@ module Rejection = struct
       | Error _ -> assert false
       | Ok path -> path
     in
-    valid_empty_proof () >>= fun proof ->
+    l2_parameters (I i) >>=? fun l2_parameters ->
+    valid_empty_proof l2_parameters >>= fun proof ->
     Op.tx_rollup_reject
       (I i)
       contract1
@@ -2477,7 +2481,8 @@ module Rejection = struct
         (check_proto_error Tx_rollup_errors.Proof_failed_to_reject)
     >>=? fun i ->
     (* Check with a reasonable proof *)
-    make_proof store deposit_message >>= fun proof ->
+    l2_parameters (I i) >>=? fun l2_parameters ->
+    make_proof store l2_parameters deposit_message >>= fun proof ->
     Op.tx_rollup_reject
       (I i)
       account
@@ -2553,7 +2558,8 @@ module Rejection = struct
     Incremental.finalize_block i >>=? fun b ->
     (* The previous commitment produced a valid after hash. However, the
        proof required is above [size], so the rejection should succeed. *)
-    make_proof store deposit >>= fun proof ->
+    l2_parameters (I i) >>=? fun l2_parameters ->
+    make_proof store l2_parameters deposit >>= fun proof ->
     Incremental.begin_construction b >>=? fun i ->
     Op.tx_rollup_reject
       (I i)
@@ -2614,7 +2620,8 @@ module Rejection = struct
     (* The previous commitment produced a valid after hash. However, the
        proof required is above [size], so the rejection should succeed with
        a truncated proof. *)
-    make_proof store deposit >>= fun proof ->
+    l2_parameters (I i) >>=? fun l2_parameters ->
+    make_proof store l2_parameters deposit >>= fun proof ->
     let proof_truncated =
       let proof_node = proof.state () in
       let truncated_node = drop proof_node in

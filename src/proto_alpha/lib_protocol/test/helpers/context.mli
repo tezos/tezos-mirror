@@ -183,11 +183,20 @@ end
 module Tx_rollup : sig
   val state : t -> Tx_rollup.t -> Tx_rollup_state.t tzresult Lwt.t
 
-  (** [inbox ctxt tx_rollup] returns the inbox of this transaction
-      rollup at the current level. If the inbox does not exist, the
+  (** [inbox ctxt tx_rollup level] returns the inbox of this
+      transaction rollup at [level]. If the inbox does not exist, the
       function returns an error. *)
   val inbox :
     t -> Tx_rollup.t -> Tx_rollup_level.t -> Tx_rollup_inbox.t tzresult Lwt.t
+
+  (** [commitment ctxt tx_rollup] returns the commitment of this
+      transaction rollup at [level]. If the commitment does not exist,
+      the function returns an error. *)
+  val commitment :
+    t ->
+    Tx_rollup.t ->
+    Tx_rollup_level.t ->
+    Tx_rollup_commitment.Submitted_commitment.t option tzresult Lwt.t
 end
 
 (** [init n] : returns an initial block with [n] initialized accounts
