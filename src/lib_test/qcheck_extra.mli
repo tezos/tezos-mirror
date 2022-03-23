@@ -79,14 +79,14 @@ end
 
     We can define [and+] in terms of [map2] and vice versa:
 
-    [
+    {[
     let (and+) = map2 (fun x y -> (x,y))
 
     let map2 f x y =
       let+ a = x
       and+ b = y in
       f x y
-    ]
+    ]}
     assuming
 
     [ (and+) = product ]
@@ -123,12 +123,12 @@ end
 
     We can define [let*] in terms of [join] and vice versa:
 
-    [
+    {[
     let ( let* ) x f = join (map f x)
     let join x =
       let* y = x in
       y
-    ]
+    ]}
 
     assuming
 
@@ -147,12 +147,12 @@ end
 
     and
 
-    [ f >=> g =
+    {[ f >=> g =
       fun x ->
         let* y = f x in
         let* z = g y in
         return z
-    ]
+    ]}
 
  *)
 module Monad : sig
