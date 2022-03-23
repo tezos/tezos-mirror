@@ -277,7 +277,8 @@ let manager_operation ?counter ?(fee = Tez.zero) ?gas_limit ?storage_limit
       in
       Contents_list (Cons (op_reveal, Single op))
 
-let revelation ?(fee = Tez.zero) ctxt public_key =
+let revelation ?(fee = Tez.zero)
+    ?(gas_limit = Gas.Arith.integral_of_int_exn 10000) ctxt public_key =
   let pkh = Signature.Public_key.hash public_key in
   let source = Contract.Implicit pkh in
   Context.Contract.counter ctxt source >>=? fun counter ->
@@ -292,7 +293,7 @@ let revelation ?(fee = Tez.zero) ctxt public_key =
               fee;
               counter;
               operation = Reveal public_key;
-              gas_limit = Gas.Arith.integral_of_int_exn 10000;
+              gas_limit;
               storage_limit = Z.zero;
             }))
   in

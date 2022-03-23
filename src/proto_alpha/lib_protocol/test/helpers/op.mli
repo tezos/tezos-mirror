@@ -83,8 +83,24 @@ val set_deposits_limit :
   Tez.tez option ->
   Operation.packed tzresult Lwt.t
 
+(** [revelation ?fee ?gas_limit ctxt pkh] Creates a new [Reveal]
+   {!manager_operation} to reveal a public key [pkh] applying to
+   current context [ctxt].
+
+    Optional arguments allow to override defaults:
+
+    {ul {li [?fee:Tez.tez]: specify a fee, otherwise set to
+   [Tez.zero].}
+
+       {li [?gas_limit:Gas.Arith.integral]: force a gas limit,
+   otherwise set to 10000 gas units.}}
+*)
 val revelation :
-  ?fee:Tez.tez -> Context.t -> public_key -> Operation.packed tzresult Lwt.t
+  ?fee:Tez.tez ->
+  ?gas_limit:Gas.Arith.integral ->
+  Context.t ->
+  public_key ->
+  Operation.packed tzresult Lwt.t
 
 val failing_noop :
   Context.t -> public_key_hash -> string -> Operation.packed tzresult Lwt.t
@@ -92,7 +108,7 @@ val failing_noop :
 (** [contract_origination ctxt source] Create a new contract origination
     operation, sign it with [source] and returns it alongside the contract
     address. The contract address is using the initial origination nonce with the
-    hash of the operation. If this operation is combine with [combine_operations]
+    hash of the operation. If this operation is combined with [combine_operations]
     then the contract address is false as the nonce is not based on the correct
     operation hash. *)
 val contract_origination :
