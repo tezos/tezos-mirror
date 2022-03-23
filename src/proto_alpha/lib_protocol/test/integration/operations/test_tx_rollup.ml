@@ -1393,7 +1393,7 @@ let test_commitment_predecessor () =
     Tx_rollup_errors.Commitment_too_early
       {provided = tx_level 10l; expected = tx_level 0l}
   in
-  Incremental.add_operation i op ~expect_apply_failure:(check_proto_error error)
+  Incremental.add_operation i op ~expect_failure:(check_proto_error error)
   >>=? fun _ ->
   (* Now we submit a real commitment *)
   Op.tx_rollup_commit (I i) contract1 tx_rollup commitment >>=? fun op ->

@@ -412,10 +412,35 @@ let next_commitment_predecessor state = state.commitment_newest_hash
 let finalized_commitment_oldest_level state =
   range_oldest state.finalized_commitments
 
-let next_commitment_level state =
-  match range_oldest state.uncommitted_inboxes with
-  | Some level -> ok level
-  | None -> error No_uncommitted_inbox
+let next_commitment_level state current_level =
+  match
+    ( range_oldest state.uncommitted_inboxes,
+      range_newest state.uncommitted_inboxes )
+  with
+  | (Some oldest_level, Some newest_level) -> (
+      if
+        (* We want to return an error if there is only one inbox in the
+           storage, and this inbox has been created in the current
+           block. *)
+        Tx_rollup_level_repr.(oldest_level < newest_level)
+      then
+        (* If [oldest_level < newest_level], we know we are not in
+           this setup, and we can safely return [oldest_level]. *)
+        ok oldest_level
+      else
+        (* Otherwise, we know that [oldest_level = newest_level], and we
+           need to check at which Tezos level is has been created. *)
+        match state.tezos_head_level with
+        | Some newest_inbox_creation ->
+            error_when
+              Raw_level_repr.(current_level <= newest_inbox_creation)
+              No_uncommitted_inbox
+            >>? fun () -> ok oldest_level
+        | None -> error (Internal_error "tezos_head_level was not properly set")
+      )
+  | (None, None) -> error No_uncommitted_inbox
+  | (Some _, None) | (None, Some _) ->
+      error (Internal_error "rollup state is inconsistent")
 
 let next_commitment_to_finalize state =
   range_oldest state.unfinalized_commitments

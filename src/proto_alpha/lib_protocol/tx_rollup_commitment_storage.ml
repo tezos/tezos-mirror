@@ -125,8 +125,9 @@ let get_finalized :
   | None -> fail @@ Tx_rollup_errors_repr.Commitment_does_not_exist level
   | Some commitment -> return (ctxt, commitment)
 
-let check_commitment_level state commitment =
-  Tx_rollup_state_repr.next_commitment_level state >>? fun expected_level ->
+let check_commitment_level current_level state commitment =
+  Tx_rollup_state_repr.next_commitment_level state current_level
+  >>? fun expected_level ->
   error_when
     Tx_rollup_level_repr.(commitment.level < expected_level)
     (Level_already_has_commitment commitment.level)
@@ -173,12 +174,12 @@ let add_commitment ctxt tx_rollup state pkh commitment =
     Too_many_commitments
   >>=? fun () ->
   (* Check the commitment has the correct values *)
-  check_commitment_level state commitment >>?= fun () ->
+  let current_level = (Raw_context.current_level ctxt).level in
+  check_commitment_level current_level state commitment >>?= fun () ->
   check_commitment_predecessor ctxt state commitment >>=? fun ctxt ->
   check_commitment_batches_and_merkle_root ctxt tx_rollup commitment
   >>=? fun ctxt ->
   (* Everything has been sorted out, let’s update the storage *)
-  let current_level = (Raw_context.current_level ctxt).level in
   let commitment_hash = Tx_rollup_commitment_repr.hash commitment in
   let submitted : Tx_rollup_commitment_repr.Submitted_commitment.t =
     {

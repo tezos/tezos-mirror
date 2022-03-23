@@ -106,12 +106,13 @@ val next_commitment_to_remove : t -> Tx_rollup_level_repr.t option
     of the oldest finalized commitment. *)
 val finalized_commitment_oldest_level : t -> Tx_rollup_level_repr.t option
 
-(** [next_commitment_level state] returns the expected level of the
-    next valid commitment.
+(** [next_commitment_level current_level state] returns the expected
+    level of the next valid commitment.
 
     This function can return the error [No_uncommitted_inbox] if
     there is no inbox awaiting a commitment. *)
-val next_commitment_level : t -> Tx_rollup_level_repr.t tzresult
+val next_commitment_level :
+  t -> Raw_level_repr.t -> Tx_rollup_level_repr.t tzresult
 
 (** [next_commitment_predecessor state] returns the expected
     predecessor hash of the next valid commitment. *)

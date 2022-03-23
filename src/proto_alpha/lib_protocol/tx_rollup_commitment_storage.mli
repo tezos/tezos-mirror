@@ -28,10 +28,13 @@
 (** This module introduces various functions to manipulate the storage related
     to commitments for transaction rollups. *)
 
-(** [check_commitment_level state commitment] fails if [commitment]
+(** [check_commitment_level current_tezos_level state commitment] fails if [commitment]
     does not target the expected level. *)
 val check_commitment_level :
-  Tx_rollup_state_repr.t -> Tx_rollup_commitment_repr.t -> unit tzresult
+  Raw_level_repr.t ->
+  Tx_rollup_state_repr.t ->
+  Tx_rollup_commitment_repr.t ->
+  unit tzresult
 (* FIXME: move in Tx_rollup_commitment_repr *)
 
 (** [add_commitment context tx_rollup contract commitment] adds a
