@@ -102,7 +102,14 @@ let prepare_inbox :
       (match pred_level with
       | None -> return (ctxt, state)
       | Some tx_level ->
-          get ctxt tx_level rollup >>=? fun (ctxt, inbox) ->
+          find ctxt tx_level rollup >>=? fun (ctxt, minbox) ->
+          (* If the previous inbox is no longer in the storage, then
+             quite some Tezos blocks have been created without any
+             activity regarding this rollup. We can consider the inbox
+             was empty, it does not change much. *)
+          let final_size =
+            match minbox with Some inbox -> inbox.cumulated_size | None -> 0
+          in
           let hard_limit =
             Constants_storage.tx_rollup_hard_size_limit_per_inbox ctxt
           in
@@ -131,7 +138,7 @@ let prepare_inbox :
               state
               ~elapsed
               ~factor
-              ~final_size:inbox.cumulated_size
+              ~final_size
               ~hard_limit
           in
           Storage.Tx_rollup.State.add ctxt rollup state >|=? fun (ctxt, _, _) ->
