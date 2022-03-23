@@ -339,6 +339,32 @@ let pp fmt
       Z.pp_print
       occupied_storage)
 
+let adjust_storage_allocation : t -> delta:Z.t -> (t * Z.t) tzresult =
+ fun state ~delta ->
+  if Z.(equal zero delta) then ok (state, Z.zero)
+  else
+    let occupied_storage' = Z.add state.occupied_storage delta in
+    if Compare.Z.(occupied_storage' < Z.zero) then
+      (* returns [Internal_error] if [delta < 0] and [| delta | > state.occupied_storage].
+         This error should never happen. *)
+      error
+      @@ Internal_error
+           "Storage size should be positive after occupied space is freed."
+    else
+      let diff = Z.sub occupied_storage' state.allocated_storage in
+      if Compare.Z.(diff > Z.zero) then
+        let state =
+          {
+            state with
+            occupied_storage = occupied_storage';
+            allocated_storage = occupied_storage';
+          }
+        in
+        ok (state, diff)
+      else
+        let state = {state with occupied_storage = occupied_storage'} in
+        ok (state, Z.zero)
+
 let update_burn_per_byte_helper :
     t -> factor:int -> final_size:int -> hard_limit:int -> t =
  fun ({burn_per_byte; inbox_ema; _} as state) ~factor ~final_size ~hard_limit ->

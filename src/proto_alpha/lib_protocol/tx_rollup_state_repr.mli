@@ -209,6 +209,23 @@ val last_removed_commitment_hashes :
     which said inbox has been created. *)
 val head_levels : t -> (Tx_rollup_level_repr.t * Raw_level_repr.t) option
 
+(** [adjust_storage_allocation state ~delta] accounts for a change in
+    [delta] number of bytes used storage space by a transaction rollup.
+
+    A positive [delta] indicates that the occupied storage of the
+    rollup increased. A negative [delta] indicates that the
+    occupied storage of the rollup decreased.
+
+    Along with an updated state, a diff of storage space
+    is returned. The diff is
+    [max(0, allocated_storage - (occupied_storage + delta))].
+    That is, 0 if no new storage was allocated, and the number of bytes
+    allocated otherwise.
+
+    This function returns [Tx_rollup_errors.Internal_error] if
+    submitted [delta] would make [occupied_storage] negative. *)
+val adjust_storage_allocation : t -> delta:Z.t -> (t * Z.t) tzresult
+
 module Internal_for_tests : sig
   (** [make] returns a state for tests *)
   val make :

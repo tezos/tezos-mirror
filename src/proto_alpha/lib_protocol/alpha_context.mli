@@ -1585,6 +1585,8 @@ module Tx_rollup_state : sig
   val last_removed_commitment_hashes :
     t -> (Tx_rollup_message_result_hash.t * Tx_rollup_commitment_hash.t) option
 
+  val adjust_storage_allocation : t -> delta:Z.t -> (t * Z.t) tzresult
+
   module Internal_for_tests : sig
     val make :
       ?burn_per_byte:Tez.t ->
