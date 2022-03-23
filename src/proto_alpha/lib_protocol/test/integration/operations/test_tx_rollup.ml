@@ -204,7 +204,8 @@ let context_init ?(tx_rollup_max_inboxes_count = 2100)
     ?(tx_rollup_rejection_max_proof_size = 30_000)
     ?(tx_rollup_max_ticket_payload_size = 10_240)
     ?(tx_rollup_finality_period = 1) ?(tx_rollup_origination_size = 60_000)
-    ?(cost_per_byte = Tez.zero) n =
+    ?(cost_per_byte = Tez.zero) ?(tx_rollup_hard_size_limit_per_message = 5_000)
+    n =
   Context.init_with_constants
     {
       Context.default_test_constants with
@@ -217,6 +218,7 @@ let context_init ?(tx_rollup_max_inboxes_count = 2100)
       tx_rollup_origination_size;
       tx_rollup_rejection_max_proof_size;
       tx_rollup_max_inboxes_count;
+      tx_rollup_hard_size_limit_per_message;
       endorsing_reward_per_slot = Tez.zero;
       baking_reward_bonus_per_slot = Tez.zero;
       baking_reward_fixed_portion = Tez.zero;
@@ -230,7 +232,8 @@ let context_init ?(tx_rollup_max_inboxes_count = 2100)
     context and 1 contract. *)
 let context_init1 ?tx_rollup_max_inboxes_count
     ?tx_rollup_max_ticket_payload_size ?tx_rollup_rejection_max_proof_size
-    ?tx_rollup_finality_period ?tx_rollup_origination_size ?cost_per_byte () =
+    ?tx_rollup_finality_period ?tx_rollup_origination_size ?cost_per_byte
+    ?tx_rollup_hard_size_limit_per_message () =
   context_init
     ?tx_rollup_max_inboxes_count
     ?tx_rollup_max_ticket_payload_size
@@ -238,6 +241,7 @@ let context_init1 ?tx_rollup_max_inboxes_count
     ?tx_rollup_finality_period
     ?tx_rollup_origination_size
     ?cost_per_byte
+    ?tx_rollup_hard_size_limit_per_message
     1
   >|=? function
   | (b, contract_1 :: _) -> (b, contract_1)
@@ -2363,9 +2367,10 @@ module Rejection = struct
     in
     (message_result_hash, path)
 
-  let init_with_deposit () =
+  let init_with_deposit ?tx_rollup_hard_size_limit_per_message () =
     init_l2_store () >>= fun store ->
-    context_init1 () >>=? fun (b, account) ->
+    context_init1 ?tx_rollup_hard_size_limit_per_message ()
+    >>=? fun (b, account) ->
     originate b account >>=? fun (b, tx_rollup) ->
     make_deposit b tx_rollup account
     >>=? fun (b, (deposit, _), l2_account, ticket_hash) ->
@@ -3187,6 +3192,127 @@ module Rejection = struct
     >>=? fun op ->
     Incremental.add_operation i op >>=? fun _ -> return_unit
 
+  (** Create a context where the batcher submitted and committed for a layer2
+      batch that produces [n_withdraw] withdrawals.
+      The commitment is created without respecting the constant in the protocol.
+      Therefore, a valid rejection just has to respect this limit and
+      send its correct state (which may have returned
+      [Maximum_withdraws_per_message_exceeded])
+
+      In other terms, the rejection created in this function must fail
+      if [n_withdraw <= tx_rollup_max_withdrawals_per_batch] but also must
+      succeed to reject if [n_withdraw > tx_rollup_max_withdrawals_per_batch]. *)
+  let test_reject_withdrawals_helper ?expect_failure n_withdraw =
+    init_with_deposit ~tx_rollup_hard_size_limit_per_message:20_000 ()
+    >>=? fun (b, account, tx_rollup, store, (sk, pk, _), ticket_hash) ->
+    hash_tree_from_store store >>= fun l2_context_hash ->
+    (* 1. Create a batch with [n_withdraw] withdrawals. *)
+    let destination = is_implicit_exn account in
+    let qty = Tx_rollup_l2_qty.one in
+    let operation =
+      let open Tx_rollup_l2_batch.V1 in
+      let withdraws =
+        Stdlib.List.init n_withdraw (fun _ ->
+            Withdraw {destination; ticket_hash; qty})
+      in
+      {
+        signer = Indexable.from_value (bls_pk pk);
+        counter = 1L;
+        contents = withdraws;
+      }
+    in
+    let (message, batch_bytes) =
+      make_and_sign_transaction ~signers:[sk] [operation]
+    in
+
+    let message_hash = Tx_rollup_message_hash.hash_uncarbonated message in
+    let message_path =
+      match Tx_rollup_inbox.Merkle.(compute_path [message_hash] 0) with
+      | Error _ -> assert false
+      | Ok path -> path
+    in
+    (* 2. Submit and commit the batch. *)
+    Op.tx_rollup_submit_batch (B b) account tx_rollup batch_bytes
+    >>=? fun operation ->
+    Block.bake ~operation b >>=? fun b ->
+    let level = Tx_rollup_level.(succ root) in
+    let withdrawals =
+      Stdlib.List.init n_withdraw (fun _ ->
+          Tx_rollup_withdraw.{claimer = destination; ticket_hash; amount = qty})
+    in
+    Incremental.begin_construction b >>=? fun i ->
+    make_incomplete_commitment_for_batch
+      (I i)
+      level
+      tx_rollup
+      [(0, withdrawals)]
+    >>=? fun (commitment, _) ->
+    (* In the case where [n_withdraw] is above the limit, we want to create
+       a commitment that did not respect the limit. Therefore, we use a
+       a special [apply_message] with tweaked parameters. *)
+    Apply.apply_message
+      store
+      Tx_rollup_l2_apply.{tx_rollup_max_withdrawals_per_batch = n_withdraw + 42}
+      message
+    >>= fun (store', _) ->
+    hash_tree_from_store store' >>= fun to_commit_hash ->
+    let result_hash =
+      Tx_rollup_message_result_hash.hash_uncarbonated
+        {
+          context_hash = to_commit_hash;
+          withdraw_list_hash =
+            Tx_rollup_withdraw_list_hash.hash_uncarbonated withdrawals;
+        }
+    in
+    let commitment = {commitment with messages = [result_hash]} in
+    Op.tx_rollup_commit (I i) account tx_rollup commitment >>=? fun op ->
+    Incremental.add_operation i op >>=? fun i ->
+    Incremental.finalize_block i >>=? fun b ->
+    (* 4. Now we create a proof that used the correct layer2 apply with
+          the correct parameters. *)
+    l2_parameters (B b) >>=? fun l2_parameters ->
+    make_proof store l2_parameters message >>= fun proof ->
+    let previous_message_result : Tx_rollup_message_result.t =
+      {
+        context_hash = l2_context_hash;
+        withdraw_list_hash = Tx_rollup_withdraw_list_hash.empty;
+      }
+    in
+    let (message_result_hash, message_result_path) =
+      make_rejection_param commitment ~index:0
+    in
+    Op.tx_rollup_reject
+      (B b)
+      account
+      tx_rollup
+      level
+      message
+      ~message_position:0
+      ~message_path
+      ~message_result_hash
+      ~message_result_path
+      ~proof
+      ~previous_message_result
+      ~previous_message_result_path:Tx_rollup_commitment.Merkle.dummy_path
+    >>=? fun op ->
+    Incremental.add_operation i op ?expect_failure >>=? fun _ -> return_unit
+
+  let test_reject_withdrawals_limit () =
+    context_init1 () >>=? fun (b, _) ->
+    l2_parameters (B b) >>=? fun l2_parameters ->
+    let limit =
+      l2_parameters.Tx_rollup_l2_apply.tx_rollup_max_withdrawals_per_batch
+    in
+    let expect_failure =
+      check_proto_error Tx_rollup_errors.Proof_produced_rejected_state
+    in
+    (* It must not be rejected: (limit - 1) is below the limit *)
+    test_reject_withdrawals_helper ~expect_failure (limit - 1) >>=? fun () ->
+    (* It must not be rejected: limit is the limit :p. *)
+    test_reject_withdrawals_helper ~expect_failure limit >>=? fun () ->
+    (* It must be rejected: (limit + 1) is above the limit *)
+    test_reject_withdrawals_helper (limit + 1)
+
   let tests =
     [
       Tztest.tztest
@@ -3242,6 +3368,10 @@ module Rejection = struct
         "reject with a truncated proof above the limit"
         `Quick
         test_valid_proof_truncated;
+      Tztest.tztest
+        "reject withdrawals when out of bound"
+        `Quick
+        test_reject_withdrawals_limit;
     ]
 end
 
