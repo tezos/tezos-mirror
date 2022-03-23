@@ -152,14 +152,14 @@ the main module.
 For instance, let's create a new basic test in a new file named ``tezt/tests/basic.ml``:
 
 .. literalinclude:: ../../tezt/tests/basic.ml
-   :lines: 29-
+   :start-at: check_node_initialization
    :language: ocaml
 
 Then, let's launch the test from ``tezt/tests/main.ml`` by calling:
 
 .. code-block:: ocaml
 
-    Basic.register () ;
+    Basic.register ~protocols:[Alpha] ;
     Test.run () (* This call should already be there. *)
 
 Finally, let's try it with::
@@ -170,41 +170,43 @@ The ``--info`` flag allows you to see the ``Log.info`` messages.
 Here is what you should see::
 
     $ dune exec tezt/tests/main.exe -- basic --info
-    [13:45:36.666] Starting test: basic test (archive mode)
+    [13:45:36.666] Starting test: Alpha: node initialization (archive mode)
     [13:45:37.525] Activated protocol.
     [13:45:38.215] Baked 10 blocks.
     [13:45:38.215] Level is now 11.
     [13:45:38.215] Identity is not empty.
-    [13:45:38.231] [SUCCESS] basic test (archive mode)
-    [13:45:38.231] Starting test: basic test (full mode)
+    [13:45:38.231] [SUCCESS] (1/3) Alpha: node initialization (archive mode)
+    [13:45:38.231] Starting test: Alpha: node initialization (full mode)
     [13:45:39.113] Activated protocol.
     [13:45:39.813] Baked 10 blocks.
     [13:45:39.813] Level is now 11.
     [13:45:39.813] Identity is not empty.
-    [13:45:39.828] [SUCCESS] basic test (full mode)
-    [13:45:39.828] Starting test: basic test (rolling mode)
+    [13:45:39.828] [SUCCESS] (2/3) Alpha: node initialization (full mode)
+    [13:45:39.828] Starting test: Alpha: node initialization (rolling mode)
     [13:45:40.708] Activated protocol.
     [13:45:41.407] Baked 10 blocks.
     [13:45:41.407] Level is now 11.
     [13:45:41.407] Identity is not empty.
-    [13:45:41.422] [SUCCESS] basic test (rolling mode)
+    [13:45:41.422] [SUCCESS] (3/3) Alpha: node initialization (rolling mode)
 
 Detailed Walkthrough of the Basic Test
 --------------------------------------
 
 Let's review what our basic test in the previous section does.
 
-- First, we open the Tezt library and its Base module.
+- First, note that the Tezt library and its Base module are opened automatically by Dune
+  based on its configuration file.
   The Base module contains useful functions such as ``let*`` (which is ``Lwt.bind``)
   or ``sf`` (a short-hand for ``Printf.sprintf``).
 
 - Then, we define a function ``check_node_initialization`` which registers one test.
-  It is parameterized by a protocol and the history mode, so it is easy to run this test
-  on all protocols with all three modes.
+  It is parameterized by the history mode. ``Protocol.register_test`` is partially
+  applied here; ``check_node_initialization`` is also implicitly parameterized by the
+  list of protocols to run the test on.
 
-- Function ``Protocol.register_test`` registers a test.
+- The function ``Protocol.register_test`` registers a test.
   It is a wrapper over ``Test.register``.
-  This wrapper is preferred when the test is parameterized by a single protocol.
+  This wrapper is preferred when the test is parameterized by a list of protocols.
   The ``~__FILE__`` argument gives the source filename so that one can select this
   file with the ``--file`` argument, to only run tests declared in this file.
   Each test has a title which is used in logs and on the command-line with the ``--test``
@@ -214,7 +216,7 @@ Let's review what our basic test in the previous section does.
   No other test has this tag, so it is easy to run all of the tests of our new ``Basic``
   module, and only them, by adding ``basic`` on the command-line.
 
-- Function ``Protocol.register_test`` takes a function as an argument.
+- The function ``Protocol.register_test`` takes a function as an argument.
   This function contains the implementation of the test.
 
 - First, we initialize a node with ``Node.init``.
@@ -231,16 +233,16 @@ Let's review what our basic test in the previous section does.
   if we want to, it's just convenient to specify it once and for all.
 
 - Then, we activate the protocol with the ``activate protocol`` command of the client.
-  By default, this activates a protocol defined in the ``Constant`` module,
+  By default, this activates the protocol given as argument,
   with some default parameters and using the default activator key
-  (also defined in the ``Constant`` module).
+  (defined in the ``Constant`` module).
   This activator key was added to the client by ``Client.init``.
   You can override all of this.
   For instance, if you don't want the client to know the default activator key,
   use ``Client.create`` instead of ``Client.init``
   (you can use ``Client.import_secret_key`` to import another activator key, for instance).
-  Or, if you want to change the protocol, the fitness or the parameter file,
-  you can use the ``?protocol``, ``?fitness`` and ``?parameter_file`` optional
+  Or, if you want to change the fitness or the parameter file,
+  you can use the ``?fitness`` and ``?parameter_file`` optional
   arguments of ``Client.activate_protocol``.
 
 - Then, we log a message using ``Log.info``.
@@ -250,25 +252,24 @@ Let's review what our basic test in the previous section does.
 - Then, we repeat ``Client.bake_for`` 10 times, to bake 10 blocks.
 
 - Then, we wait for the level of the node to be at least 11 (the activation block
-  plus the 10 blocks that we baked). There is an internal listener for node events
-  that in particular receives level updates, and the ``Level_at_least 11`` event
-  triggers as soon as the level reaches 11. If you start listening to this event
-  and the level is already 11 or greater, ``Node.wait_for_event_or_fail``
-  triggers immediately. (Note: the ``_or_fail`` part means that if the node
-  stops before it reaches level 11, the test will fail.)
+  plus the 10 blocks that we baked) using ``Node.wait_for_level``. If you call this
+  function and the level is already 11 or greater, ``Node.wait_for_level`` returns
+  immediately. (Note: ``Node.wait_for_level`` makes the test fail if the node stops before
+  reaching level 11.)
 
-- Finally, we read the identity of the node by listening to the ``Read_identity``
-  event, which triggers as soon as the node sends the event stating that it read
-  the identity file. In fact, this event was probably received much sooner, but
-  the internal event listener of Tezt stores the identity in case you try to listen
-  to the event later, just like the level.
+- Finally, we read the identity of the node using ``Node.wait_for_identity`` which
+  returns as soon as the node reads the identity file. In fact, this was probably
+  done much sooner, but Tezt stores the identity in case you try to query it
+  later, just like the level. (Note: ``Node.wait_for_identity`` makes the test fail
+  if the node stops before reading the identity file.)
 
 - We check that the identity is not empty, and if it is we call ``Test.fail``.
   This causes the test to terminate immediately with an error.
   Note that it is not the only cause of failure for this test:
-  we already saw that ``Node.wait_for_event_or_fail`` can cause a test failure,
-  and if anything goes wrong (failing to initialize the node or the client,
-  failing to activate the protocol...) ``Test.fail`` is called automatically as well.
+  we already saw that ``Node.wait_for_level`` and ``Node.wait_for_identity`` can
+  cause a test failure, and if anything goes wrong (failing to initialize the
+  node or the client, failing to activate the protocol...) ``Test.fail`` is called
+  automatically as well.
 
 - After the test succeeds or fails, ``Test.run`` cleans up everything.
   It terminates all running processes by sending ``SIGTERM``.
