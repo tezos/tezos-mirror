@@ -30,7 +30,7 @@ let group = {name = "encoding"; title = "Commands to handle encodings"}
 let id_parameter =
   parameter (fun (cctxt : #Client_context.printer) id ->
       match Data_encoding.Registration.find id with
-      | Some record -> return record
+      | Some record -> Lwt.return_ok record
       | None -> cctxt#error "Unknown encoding id: %s" id)
 
 let json_parameter =
@@ -49,7 +49,7 @@ let json_parameter =
 let bytes_parameter =
   parameter (fun (cctxt : #Client_context.printer) hex ->
       match Hex.to_bytes (`Hex hex) with
-      | Some s -> return s
+      | Some s -> Lwt.return_ok s
       | None -> cctxt#error "Invalid hex string: %s" hex)
 
 let commands () =

@@ -41,7 +41,7 @@ let base_dir_arg =
       ("data directory\n\
         The directory where the Tezos codec will output logs.\n\
         By default: '" ^ default_base_dir ^ "'.")
-    (parameter (fun _ctxt x -> return x))
+    (parameter (fun _ctxt x -> Lwt.return_ok x))
 
 let global_options = Clic.args1 base_dir_arg
 

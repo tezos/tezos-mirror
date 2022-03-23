@@ -94,21 +94,21 @@ let test_simple {block2 = ctxt; _} =
   Assert.equal_string_option ~msg:__LOC__ (Some "Juin") (c juin) ;
 
   (* Mem function returns "true" if the key given leads to an existing leaf *)
-  Context.mem ctxt ["a"] >>= fun res ->
+  let* res = Context.mem ctxt ["a"] in
   Assert.equal_bool false res ;
-  Context.mem ctxt ["a"; "c"] >>= fun res ->
+  let* res = Context.mem ctxt ["a"; "c"] in
   Assert.equal_bool true res ;
-  Context.mem ctxt ["a"; "x"] >>= fun res ->
+  let* res = Context.mem ctxt ["a"; "x"] in
   Assert.equal_bool false res ;
 
   (* Mem_tree is like "mem", but also returns "true" for a trunk node *)
-  Context.mem_tree ctxt ["a"] >>= fun res ->
+  let* res = Context.mem_tree ctxt ["a"] in
   Assert.equal_bool true res ;
-  Context.mem_tree ctxt ["a"; "c"] >>= fun res ->
+  let* res = Context.mem_tree ctxt ["a"; "c"] in
   Assert.equal_bool true res ;
-  Context.mem_tree ctxt ["a"; "x"] >>= fun res ->
+  let* res = Context.mem_tree ctxt ["a"; "x"] in
   Assert.equal_bool false res ;
-  Lwt.return_unit
+  return_unit
 
 (** Restore the context applied until [block3a]. It is asserted that
     the following key-values are present:

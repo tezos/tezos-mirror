@@ -34,22 +34,24 @@ type gas_estimation_results = {
 
 let estimate_gas_tps ~average_block_path () =
   Log.info "Gas TPS estimation" ;
-  Protocol.write_parameter_file
-    ~base:(Either.right (protocol, Some protocol_constants))
-    []
-  >>= fun parameter_file ->
-  Client.init_with_protocol
-    ~nodes_args:Node.[Connections 0; Synchronisation_threshold 0]
-    ~parameter_file
-    ~timestamp_delay:0.0
-    `Client
-    ~protocol
-    ()
-  >>= fun (node, client) ->
-  Average_block.load average_block_path >>= fun average_block ->
-  Average_block.check_for_unknown_smart_contracts average_block >>= fun () ->
+  let* parameter_file =
+    Protocol.write_parameter_file
+      ~base:(Either.right (protocol, Some protocol_constants))
+      []
+  in
+  let* (node, client) =
+    Client.init_with_protocol
+      ~nodes_args:Node.[Connections 0; Synchronisation_threshold 0]
+      ~parameter_file
+      ~timestamp_delay:0.0
+      `Client
+      ~protocol
+      ()
+  in
+  let* average_block = Average_block.load average_block_path in
+  let* () = Average_block.check_for_unknown_smart_contracts average_block in
   let delegates = make_delegates Constants.default_bootstraps_count in
-  Baker.init ~protocol ~delegates node client >>= fun baker ->
+  let* baker = Baker.init ~protocol ~delegates node client in
   Log.info "Originating smart contracts" ;
   let* () =
     Client.stresstest_originate_smart_contracts originating_bootstrap client

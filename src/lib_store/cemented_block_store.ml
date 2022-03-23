@@ -668,7 +668,7 @@ let cement_blocks ?(check_consistency = true) (cemented_store : t)
   cemented_store.cemented_blocks_files <- Some new_array ;
   (* Compress and write the metadatas *)
   if write_metadata then
-    Store_events.(emit start_cementing_blocks_metadata) () >>= fun () ->
+    let*! () = Store_events.(emit start_cementing_blocks_metadata) () in
     cement_blocks_metadata cemented_store blocks
   else return_unit
 
@@ -728,9 +728,10 @@ let trigger_rolling_gc cemented_store cemented_blocks_files offset =
       files_to_remove
 
 let trigger_gc cemented_store history_mode =
-  Store_events.(emit start_store_garbage_collection) () >>= fun () ->
+  let open Lwt_syntax in
+  let* () = Store_events.(emit start_store_garbage_collection) () in
   match cemented_store.cemented_blocks_files with
-  | None -> Lwt.return_unit
+  | None -> return_unit
   | Some cemented_blocks_files -> (
       match history_mode with
       | History_mode.Archive -> Lwt.return_unit

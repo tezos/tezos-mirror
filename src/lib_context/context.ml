@@ -576,18 +576,20 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
       Tree.add t current_test_chain_key id
 
     let find_predecessor_block_metadata_hash t =
-      Tree.find t current_predecessor_block_metadata_hash_key >>= function
-      | None -> Lwt.return_none
+      let open Lwt_syntax in
+      let* o = Tree.find t current_predecessor_block_metadata_hash_key in
+      match o with
+      | None -> return_none
       | Some data -> (
           match
             Data_encoding.Binary.of_bytes_opt Block_metadata_hash.encoding data
           with
           | None ->
-              Lwt.fail
+              raise
                 (Failure
                    "Unexpected error \
                     (Context.get_predecessor_block_metadata_hash)")
-          | Some r -> Lwt.return_some r)
+          | Some r -> return_some r)
 
     let add_predecessor_block_metadata_hash t hash =
       let data =
@@ -596,8 +598,10 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
       Tree.add t current_predecessor_block_metadata_hash_key data
 
     let find_predecessor_ops_metadata_hash t =
-      Tree.find t current_predecessor_ops_metadata_hash_key >>= function
-      | None -> Lwt.return_none
+      let open Lwt_syntax in
+      let* o = Tree.find t current_predecessor_ops_metadata_hash_key in
+      match o with
+      | None -> return_none
       | Some data -> (
           match
             Data_encoding.Binary.of_bytes_opt
@@ -605,11 +609,11 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
               data
           with
           | None ->
-              Lwt.fail
+              raise
                 (Failure
                    "Unexpected error \
                     (Context.get_predecessor_ops_metadata_hash)")
-          | Some r -> Lwt.return_some r)
+          | Some r -> return_some r)
 
     let add_predecessor_ops_metadata_hash t hash =
       let data =
@@ -631,7 +635,9 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
     Root_tree.find_predecessor_ops_metadata_hash ctxt.tree
 
   let lift_tree_add_to_ctxt tree_add ctxt v =
-    tree_add ctxt.tree v >|= fun tree -> incr_ops {ctxt with tree}
+    let open Lwt_syntax in
+    let+ tree = tree_add ctxt.tree v in
+    incr_ops {ctxt with tree}
 
   let add_protocol = lift_tree_add_to_ctxt Root_tree.add_protocol
 

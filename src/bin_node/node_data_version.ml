@@ -61,6 +61,7 @@ let data_version = "0.0.8"
    converter), and to sequence them dynamically instead of
    statically. *)
 let upgradable_data_version =
+  let open Lwt_tzresult_syntax in
   [
     ( "0.0.6",
       fun ~data_dir:_ _ ~chain_name:_ ~sandbox_parameters:_ -> return_unit );

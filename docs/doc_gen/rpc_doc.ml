@@ -429,7 +429,7 @@ let make_default_acl _node =
     |> Data_encoding.Json.construct policy_encoding
   in
   Data_encoding.Json.pp Format.std_formatter policy ;
-  return ()
+  Lwt.return_ok ()
 
 let main node =
   let cmd = Sys.argv.(1) in

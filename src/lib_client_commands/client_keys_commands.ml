@@ -243,6 +243,7 @@ let keys_count_param =
     ~name:"keys_count"
     ~desc:"How many keys to generate"
     (parameter (fun _ s ->
+         let open Lwt_tzresult_syntax in
          match int_of_string_opt s with
          | None -> failwith "number of keys must be an integer"
          | Some x ->
@@ -287,8 +288,8 @@ let generate_test_keys =
             let (pkh, pk, sk) =
               Signature.generate_key ~algo:Signature.Ed25519 ()
             in
-            Tezos_signer_backends.Unencrypted.make_pk pk >>?= fun pk_uri ->
-            Tezos_signer_backends.Unencrypted.make_sk sk >>?= fun sk_uri ->
+            let*? pk_uri = Tezos_signer_backends.Unencrypted.make_pk pk in
+            let*? sk_uri = Tezos_signer_backends.Unencrypted.make_sk sk in
             return ({pkh; pk; sk}, pk_uri, sk_uri, alias))
       in
       let* () =

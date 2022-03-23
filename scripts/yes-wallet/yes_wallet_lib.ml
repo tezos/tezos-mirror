@@ -183,7 +183,7 @@ let get_delegates (proto : protocol) context
         Lwt.return @@ Environment.wrap_tzresult r
       in
       let* delegates =
-        Alpha_context.Delegate.fold ctxt ~init:(ok []) ~f:(fun pkh acc ->
+        Alpha_context.Delegate.fold ctxt ~init:(Ok []) ~f:(fun pkh acc ->
             let* pk =
               let*! r = Alpha_context.Roll.delegate_pubkey ctxt pkh in
               Lwt.return @@ Environment.wrap_tzresult r
@@ -224,7 +224,7 @@ let get_delegates (proto : protocol) context
         Lwt.return @@ Environment.wrap_tzresult r
       in
       let* delegates =
-        Alpha_context.Delegate.fold ctxt ~init:(ok []) ~f:(fun pkh acc ->
+        Alpha_context.Delegate.fold ctxt ~init:(Ok []) ~f:(fun pkh acc ->
             let* pk =
               let*! r = Alpha_context.Roll.delegate_pubkey ctxt pkh in
               Lwt.return @@ Environment.wrap_tzresult r
@@ -265,7 +265,7 @@ let get_delegates (proto : protocol) context
         Lwt.return @@ Environment.wrap_tzresult r
       in
       let* delegates =
-        Alpha_context.Delegate.fold ctxt ~init:(ok []) ~f:(fun pkh acc ->
+        Alpha_context.Delegate.fold ctxt ~init:(Ok []) ~f:(fun pkh acc ->
             let* pk =
               let*! r = Alpha_context.Roll.delegate_pubkey ctxt pkh in
               Lwt.return @@ Environment.wrap_tzresult r
@@ -304,7 +304,7 @@ let get_delegates (proto : protocol) context
         Alpha_context.Delegate.fold
           ctxt
           ~order:`Sorted
-          ~init:(ok [])
+          ~init:(Ok [])
           ~f:(fun pkh acc ->
             let* pk =
               let*! r = Alpha_context.Delegate.pubkey ctxt pkh in
@@ -344,7 +344,7 @@ let get_delegates (proto : protocol) context
         Alpha_context.Delegate.fold
           ctxt
           ~order:`Sorted
-          ~init:(ok [])
+          ~init:(Ok [])
           ~f:(fun pkh acc ->
             let* pk =
               let*! r = Alpha_context.Delegate.pubkey ctxt pkh in
