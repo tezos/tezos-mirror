@@ -1319,6 +1319,37 @@ let test_commitment_duplication () =
   ignore i ;
   return ()
 
+let test_commit_current_inbox () =
+  context_init2 () >>=? fun (b, contract1, contract2) ->
+  originate b contract1 >>=? fun (b, tx_rollup) ->
+  (* In order to have a permissible commitment, we need a transaction. *)
+  Incremental.begin_construction b >>=? fun i ->
+  let contents = "batch" in
+  let (message, _) = Tx_rollup_message.make_batch contents in
+  let message_hash = Tx_rollup_message.hash_uncarbonated message in
+  let inbox_hash = Tx_rollup_inbox.Merkle.merklize_list [message_hash] in
+  Op.tx_rollup_submit_batch (I i) contract1 tx_rollup contents
+  >>=? fun operation ->
+  Incremental.add_operation i operation >>=? fun i ->
+  Op.tx_rollup_commit
+    (I i)
+    contract2
+    tx_rollup
+    {
+      level = Tx_rollup_level.root;
+      inbox_merkle_root = inbox_hash;
+      predecessor = None;
+      messages = [Tx_rollup_message_result_hash.zero];
+    }
+  >>=? fun operation ->
+  Incremental.add_operation
+    i
+    operation
+    ~expect_failure:(check_proto_error Tx_rollup_errors.No_uncommitted_inbox)
+  >>=? fun i ->
+  ignore i ;
+  return_unit
+
 let make_transactions_in tx_rollup contract blocks b =
   let contents = "batch " in
   let rec aux cur blocks b =
@@ -4231,5 +4262,9 @@ let tests =
       test_finalization_edge_cases;
     Tztest.tztest "Test bond finalization" `Quick test_bond_finalization;
     Tztest.tztest "Test state" `Quick test_state;
+    Tztest.tztest
+      "Try to commit to the current inbox and fail"
+      `Quick
+      test_commit_current_inbox;
   ]
   @ Withdraw.tests @ Rejection.tests @ parsing_tests
