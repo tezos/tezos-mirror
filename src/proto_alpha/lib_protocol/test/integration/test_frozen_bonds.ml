@@ -266,7 +266,7 @@ let test_total_stake ~user_is_delegate () =
   Token.transfer ctxt user_account deposit_account2 deposit_amount
   >>>=? fun (ctxt, _) ->
   (* Test folding on bond ids. *)
-  Contract.fold_on_bond_ids
+  Bond_id.Internal_for_tests.fold_on_bond_ids
     ctxt
     user_contract
     ~init:[]
