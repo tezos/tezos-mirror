@@ -68,7 +68,16 @@ let make_client_bake_for () =
     node_wait_for_level !current_level client
 
 (* A helper to register a RPC test environment with a node and a client for the
-   given protocol version. *)
+   given protocol version.
+   - [test_mode_tag] specifies the client mode ([`Client], [`Light] or [`Proxy]).
+   - [test_function] is the function to run to perform RPCs after the test
+     environment is set up.
+   - [parameter_overrides] specifies protocol parameters to change from the default
+     sandbox parameters.
+   - [node_parameters] specifies additional parameters to pass to the node.
+   - [sub_group] is a short identifier for your test, used in the test title and as a tag.
+   Additionally, since this uses [Protocol.register_regression_test], this has an
+   implicit argument to specify the list of protocols to test. *)
 let check_rpc ~test_mode_tag ~test_function ?parameter_overrides
     ?node_parameters sub_group =
   let (client_mode_tag, title_tag) =
