@@ -1,9 +1,9 @@
 misc_checks:
   extends: .test_template
+  # These tests are not flaky at all so we overwrite the retry value
+  retry: 1
   needs: []
   script:
-    # checks that all deps of opam packages are already installed
-    - ./scripts/opam-check.sh
     # misc linting
     - find . ! -path "./_opam/*" -name "*.opam" -exec opam lint {} +;
     - make check-linting
@@ -18,6 +18,13 @@ misc_checks:
     - git apply devtools/protocol-print/add-hack-module.patch
     # check that yes-wallet builds correctly
     - dune build scripts/yes-wallet/yes_wallet.exe
+
+misc_opam_checks:
+  extends: .test_template
+  needs: []
+  script:
+    # checks that all deps of opam packages are already installed
+    - ./scripts/opam-check.sh
   artifacts:
     when: always
     paths:
