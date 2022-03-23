@@ -217,12 +217,8 @@ module Printer_ast = struct
   let toplevel (descr, encoding) =
     match encoding with
     | Obj {fields} ->
-        ( descr,
-          Table
-            {
-              headers = binary_table_headers;
-              body = filter_map (field_descr ()) fields;
-            } )
+        let body = filter_map (field_descr ()) fields in
+        (descr, Table {headers = binary_table_headers; body})
     | Cases {kind; tag_size; cases} ->
         ( {
             title =
@@ -324,7 +320,13 @@ module Printer = struct
     | Some s -> Format.fprintf ppf "%s@\n@\n" s
     | None -> ()
 
+  let zero_byte_value_message =
+    "This value's binary representation is empty. It takes zero (0) bytes of \
+     output."
+
   let pp_toplevel ppf = function
+    | Printer_ast.Table {body = []; _} ->
+        Format.pp_print_string ppf zero_byte_value_message
     | Printer_ast.Table table -> pp_table ppf table
     | Union (_tag_size, tables) ->
         Format.fprintf
@@ -334,15 +336,27 @@ module Printer = struct
             Format.pp_print_list
               ~pp_sep:(fun ppf () -> Format.fprintf ppf "@\n")
               (fun ppf (descr, table) ->
-                Format.fprintf
-                  ppf
-                  "%a%a%a"
-                  (pp_title 2)
-                  descr.title
-                  pp_option_nl
-                  descr.description
-                  pp_table
-                  table)
+                match table.Printer_ast.body with
+                | [] ->
+                    Format.fprintf
+                      ppf
+                      "%a%a%a"
+                      (pp_title 2)
+                      descr.title
+                      pp_option_nl
+                      (Some zero_byte_value_message)
+                      pp_option_nl
+                      descr.description
+                | _ :: _ ->
+                    Format.fprintf
+                      ppf
+                      "%a%a%a"
+                      (pp_title 2)
+                      descr.title
+                      pp_option_nl
+                      descr.description
+                      pp_table
+                      table)
               ppf)
           tables
 
