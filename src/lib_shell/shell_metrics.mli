@@ -64,3 +64,7 @@ module Chain_validator : sig
 
   val init : string trace -> Chain_id.t -> t
 end
+
+module Version : sig
+  val init : ('a, 'b, 'c) P2p.t -> unit
+end

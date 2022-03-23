@@ -246,6 +246,7 @@ let create ?(sandboxed = false) ?sandbox_parameters ~singleprocess
       p2p_params
       disable_mempool
   in
+  Shell_metrics.Version.init p2p ;
   let* (validator_process, store) =
     let open Block_validator_process in
     let validator_environment =
