@@ -40,7 +40,7 @@ type t = withdrawal
 val encoding : t Data_encoding.t
 
 module Merkle : sig
-  (** See {Merkle_List} for the documentation of those functions. *)
+  (** See {!Merkle_List} for the documentation of those functions. *)
 
   type tree
 

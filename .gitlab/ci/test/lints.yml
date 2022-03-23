@@ -1,9 +1,9 @@
 misc_checks:
   extends: .test_template
+  # These tests are not flaky at all so we overwrite the retry value
+  retry: 1
   needs: []
   script:
-    # checks that all deps of opam packages are already installed
-    - ./scripts/opam-check.sh
     # misc linting
     - find . ! -path "./_opam/*" -name "*.opam" -exec opam lint {} +;
     - make check-linting
@@ -12,10 +12,19 @@ misc_checks:
     - make -C tests_python typecheck
     # Ensure that all unit tests are restricted to their opam package
     - make lint-tests-pkg
+    # Ensure there are no mli docstring syntax errors in alpha protocol
+    - ODOC_WARN_ERROR=true dune build @src/proto_alpha/lib_protocol/doc
     # check that the hack-module patch applies cleanly
     - git apply devtools/protocol-print/add-hack-module.patch
     # check that yes-wallet builds correctly
     - dune build scripts/yes-wallet/yes_wallet.exe
+
+misc_opam_checks:
+  extends: .test_template
+  needs: []
+  script:
+    # checks that all deps of opam packages are already installed
+    - ./scripts/opam-check.sh
   artifacts:
     when: always
     paths:
