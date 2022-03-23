@@ -630,13 +630,9 @@ module Make (Context : P) :
 
   let get_is_stuck = result_of ~default:None @@ is_stuck
 
-  type input = {
-    inbox_level : Raw_level.t;
-    message_counter : Z.t;
-    payload : string;
-  }
-
-  let set_input_monadic {inbox_level; message_counter; payload} =
+  let set_input_monadic input =
+    let open Sc_rollup_PVM_sem in
+    let {inbox_level; message_counter; payload} = input in
     let open Monad.Syntax in
     let* boot_sector = Boot_sector.get in
     let msg = boot_sector ^ payload in

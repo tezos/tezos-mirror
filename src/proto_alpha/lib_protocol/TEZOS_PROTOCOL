@@ -171,6 +171,7 @@
         "Script_interpreter",
         "Sc_rollup_operations",
         "Sc_rollup_PVM_sem",
+        "Sc_rollup_game",
         "Sc_rollup_arith",
         "Sc_rollups",
 
