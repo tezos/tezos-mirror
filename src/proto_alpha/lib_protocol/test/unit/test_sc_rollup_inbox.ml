@@ -188,7 +188,7 @@ let tests =
       QCheck.(
         make
           Gen.(
-            let* l = list string in
+            let* l = list_size small_int string in
             let* n = 0 -- ((List.length l * 2) + 1) in
             return (l, n)))
       test_consume_messages;
@@ -198,9 +198,10 @@ let tests =
     QCheck.(
       make
         Gen.(
-          let* a = list string in
-          let* b = list string in
-          let* l = list (list string) in
+          let small = 2 -- 10 in
+          let* a = list_size small string in
+          let* b = list_size small string in
+          let* l = list_size small (list_size small string) in
           let l = a :: b :: l in
           let* n = 0 -- (List.length l - 2) in
           return (l, n)))

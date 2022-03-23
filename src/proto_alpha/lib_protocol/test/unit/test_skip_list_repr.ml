@@ -166,23 +166,23 @@ let tests =
   [
     Tztest.tztest_qcheck
       ~name:"Skip list: check produced paths for multiple basis."
-      ~count:1_000
+      ~count:10
       QCheck.(
         make
           Gen.(
             let* basis = 2 -- 73 in
-            let* i = 0 -- 1000 in
+            let* i = 0 -- 100 in
             let* j = 0 -- i in
             return (basis, i, j)))
       test_skip_list_nat_check_path;
     Tztest.tztest_qcheck
       ~name:"Skip list: reject invalid paths for multiple basis."
-      ~count:1_000
+      ~count:10
       QCheck.(
         make
           Gen.(
             let* basis = 2 -- 73 in
-            let* i = 0 -- 1000 in
+            let* i = 0 -- 100 in
             return (basis, i)))
       test_skip_list_nat_check_invalid_path;
   ]
