@@ -20,13 +20,14 @@ current_dir=$(cd "$(dirname "${0}")" && pwd)
 mkdir -pv ~/.docker
 
 echo '### Input variables'
-echo "MASTER_OR_RELEASE=${MASTER_OR_RELEASE:-}"
+echo "CI_DOCKER_HUB=${CI_DOCKER_HUB:-}"
 echo "IMAGE_ARCH_PREFIX=${IMAGE_ARCH_PREFIX:-}"
 echo "CI_PROJECT_NAMESPACE=${CI_PROJECT_NAMESPACE}"
 echo "TEZOS_DEFAULT_NAMESPACE=${TEZOS_DEFAULT_NAMESPACE}"
 
-# /!\ MASTER_OR_RELEASE can be unset, CI_DOCKER_AUTH is only available on protected branches
-if [ "${MASTER_OR_RELEASE:-}" = 'true' ] && [ "${CI_PROJECT_NAMESPACE}" = "${TEZOS_DEFAULT_NAMESPACE}" ] && [ -n "${CI_DOCKER_AUTH:-}" ]
+# CI_DOCKER_HUB is used to switch to Docker Hub if credentials are available with CI_DOCKER_AUTH
+# /!\ CI_DOCKER_HUB can be unset, CI_DOCKER_AUTH is only available on protected branches
+if [ "${CI_DOCKER_HUB:-}" = 'true' ] && [ "${CI_PROJECT_NAMESPACE}" = "${TEZOS_DEFAULT_NAMESPACE}" ] && [ -n "${CI_DOCKER_AUTH:-}" ]
 then
   # Docker Hub
   docker_image_name="docker.io/${CI_PROJECT_PATH}-"

@@ -59,7 +59,7 @@ docker_images_json="$(jq -c -n --arg url "https://hub.docker.com/layers/tezos/te
 assets="$assets --assets-link='$docker_images_json'"
 
 # this is for testing if the tag is not set, only on forks
-if [ -z "$MASTER_OR_RELEASE" ] && ! [ "$TEZOS_DEFAULT_NAMESPACE/$TEZOS_DEFAULT_BRANCH" = "tezos/tezos" ]; then
+if [ -z "$CI_DOCKER_HUB" ] && ! [ "$TEZOS_DEFAULT_NAMESPACE/$TEZOS_DEFAULT_BRANCH" = "tezos/tezos" ]; then
 CI_COMMIT_TAG=${CI_COMMIT_TAG:-"v0.0.1"}
   echo "Setting fake \$CI_COMMIT_TAG for testing $CI_COMMIT_TAG"
   curl --request DELETE --header "PRIVATE-TOKEN: $CI_JOB_TOKEN" "$PACKAGE_REGISTRY_URL/releases/$CI_COMMIT_TAG"
