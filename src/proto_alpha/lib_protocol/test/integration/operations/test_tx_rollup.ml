@@ -336,16 +336,19 @@ let assert_some res = match res with Some r -> r | None -> assert false
 
 let raw_level level = assert_ok @@ Raw_level.of_int32 level
 
-(** Create an incomplete (but valid) commitment for a given level. It
-    is incomplete in the sense that the Merkle roots for each message
-    are {!Tx_rollup_commitment.empty_l2_context_hash}.  In the meantime
-    provides the list of withdraw in a association list of
-   [batch_index -> withdraw_list].  Be careful not to provide a too-big
-   withdraw_list as the construction is expensive *)
-let make_incomplete_commitment_for_batch i level tx_rollup withdraw_list =
-  Context.Tx_rollup.inbox (I i) tx_rollup level >>=? fun metadata ->
-  List.init ~when_negative_length:[] metadata.inbox_length (fun _ ->
-      Tx_rollup_commitment.empty_l2_context_hash)
+(** Create an incomplete (but valid) commitment for a given level. It is
+    incomplete in the sense that the Merkle roots for each message are generated
+    with [Context_hash.hash_string message_index]. In the meantime provides the
+    list of withdraw in a association list of [batch_index -> withdraw_list].
+    Be careful not to provide a too-big withdraw_list as the construction is
+    expensive *)
+let make_incomplete_commitment_for_batch context level tx_rollup withdraw_list =
+  Context.Tx_rollup.inbox context tx_rollup level >>=? fun metadata ->
+  let str_for_context_hash =
+    Data_encoding.Binary.to_string_exn Tx_rollup_inbox.encoding metadata
+  in
+  List.init ~when_negative_length:[] metadata.inbox_length (fun i ->
+      Context_hash.hash_string [str_for_context_hash ^ string_of_int i])
   >>?= fun batches_result ->
   let messages =
     List.mapi
@@ -362,7 +365,7 @@ let make_incomplete_commitment_for_batch i level tx_rollup withdraw_list =
   (match Tx_rollup_level.pred level with
   | None -> return_none
   | Some predecessor_level ->
-      Context.Tx_rollup.commitment (I i) tx_rollup predecessor_level
+      Context.Tx_rollup.commitment context tx_rollup predecessor_level
       >|=? fun commitment_opt ->
       Option.map
         (fun Tx_rollup_commitment.Submitted_commitment.{commitment; _} ->
@@ -1488,7 +1491,7 @@ let test_commitment_duplication () =
   >>=? fun operation ->
   Block.bake ~operation b >>=? fun b ->
   Incremental.begin_construction b >>=? fun i ->
-  make_incomplete_commitment_for_batch i Tx_rollup_level.root tx_rollup []
+  make_incomplete_commitment_for_batch (I i) Tx_rollup_level.root tx_rollup []
   >>=? fun (commitment, _) ->
   (* Successfully fail to submit a different commitment from contract2 *)
   let batches2 : Tx_rollup_message_result_hash.t list =
@@ -1633,7 +1636,7 @@ let test_storage_burn_for_commitment () =
   (* test allocated storage size and balance before/after submit commitment *)
   Incremental.begin_construction b >>=? fun i ->
   occupied_storage_size (B b) tx_rollup >>=? fun storage_size_before_commit ->
-  make_incomplete_commitment_for_batch i Tx_rollup_level.root tx_rollup []
+  make_incomplete_commitment_for_batch (I i) Tx_rollup_level.root tx_rollup []
   >>=? fun (commitment, _) ->
   Op.tx_rollup_commit (I i) contract tx_rollup commitment >>=? fun op ->
   Incremental.add_operation i op >>=? fun i ->
@@ -1716,7 +1719,7 @@ let test_storage_burn_for_commitment_and_bond () =
   (* test allocated storage size and balance before/after submit commitment *)
   Incremental.begin_construction b >>=? fun i ->
   occupied_storage_size (B b) tx_rollup >>=? fun storage_size_before_commit ->
-  make_incomplete_commitment_for_batch i Tx_rollup_level.root tx_rollup []
+  make_incomplete_commitment_for_batch (I i) Tx_rollup_level.root tx_rollup []
   >>=? fun (commitment, _) ->
   Op.tx_rollup_commit (I i) contract tx_rollup commitment >>=? fun op ->
   Incremental.add_operation i op >>=? fun i ->
@@ -1795,7 +1798,7 @@ let test_commitment_predecessor () =
     Tx_rollup_commitment_hash.of_bytes_exn
       (Bytes.of_string "tcu1deadbeefdeadbeefdeadbeefdead")
   in
-  make_incomplete_commitment_for_batch i Tx_rollup_level.root tx_rollup []
+  make_incomplete_commitment_for_batch (I i) Tx_rollup_level.root tx_rollup []
   >>=? fun (commitment, _) ->
   let commitment_for_invalid_inbox = {commitment with level = tx_level 10l} in
   Op.tx_rollup_commit (I i) contract1 tx_rollup commitment_for_invalid_inbox
@@ -1811,7 +1814,7 @@ let test_commitment_predecessor () =
   Incremental.add_operation i op >>=? fun i ->
   (* Commitment without predecessor for block with predecessor*)
   make_incomplete_commitment_for_batch
-    i
+    (I i)
     Tx_rollup_level.(succ root)
     tx_rollup
     []
@@ -1907,7 +1910,7 @@ let test_bond_finalization () =
        | Tx_rollup_errors.Bond_does_not_exist a_pkh1 -> a_pkh1 = pkh1
        | _ -> false)
   >>=? fun i ->
-  make_incomplete_commitment_for_batch i Tx_rollup_level.root tx_rollup []
+  make_incomplete_commitment_for_batch (I i) Tx_rollup_level.root tx_rollup []
   >>=? fun (commitment_a, _) ->
   Op.tx_rollup_commit (I i) contract1 tx_rollup commitment_a >>=? fun op ->
   Incremental.add_operation i op >>=? fun i ->
@@ -1971,7 +1974,7 @@ let test_finalization_edge_cases () =
     ~expect_failure:
       (check_proto_error @@ Tx_rollup_errors.No_commitment_to_finalize)
   >>=? fun _i ->
-  make_incomplete_commitment_for_batch i (tx_level 0l) tx_rollup []
+  make_incomplete_commitment_for_batch (I i) (tx_level 0l) tx_rollup []
   >>=? fun (commitment, _) ->
   Op.tx_rollup_commit (I i) contract1 tx_rollup commitment >>=? fun op ->
   (* With a commitment, but too soon after the commitment *)
@@ -2000,7 +2003,7 @@ let test_too_many_commitments () =
   let rec make_commitments i level n =
     if n = 0 then return (i, level)
     else
-      make_incomplete_commitment_for_batch i level tx_rollup []
+      make_incomplete_commitment_for_batch (I i) level tx_rollup []
       >>=? fun (commitment, _) ->
       Op.tx_rollup_commit (I i) contract1 tx_rollup commitment >>=? fun op ->
       Incremental.add_operation i op >>=? fun i ->
@@ -2014,7 +2017,7 @@ let test_too_many_commitments () =
   Op.tx_rollup_finalize (I i) contract1 tx_rollup >>=? fun op ->
   Incremental.add_operation i op >>=? fun i ->
   (* Fail to add a new commitment. *)
-  make_incomplete_commitment_for_batch i level tx_rollup []
+  make_incomplete_commitment_for_batch (I i) level tx_rollup []
   >>=? fun (commitment, _) ->
   Op.tx_rollup_commit (I i) contract1 tx_rollup commitment >>=? fun op ->
   Incremental.add_operation
@@ -2135,7 +2138,7 @@ module Rejection = struct
   let init_with_valid_commitment () =
     init_with_bogus_batch ()
     >>=? fun (i, contract1, tx_rollup, level, message) ->
-    make_incomplete_commitment_for_batch i level tx_rollup []
+    make_incomplete_commitment_for_batch (I i) level tx_rollup []
     >>=? fun (commitment, _batches_result) ->
     Op.tx_rollup_commit (I i) contract1 tx_rollup commitment >>=? fun op ->
     Incremental.add_operation i op >|=? fun i ->
@@ -2144,7 +2147,7 @@ module Rejection = struct
   let init_with_invalid_commitment () =
     init_with_bogus_batch ()
     >>=? fun (i, contract1, tx_rollup, level, message) ->
-    make_incomplete_commitment_for_batch i level tx_rollup []
+    make_incomplete_commitment_for_batch (I i) level tx_rollup []
     >>=? fun (commitment, _batches_result) ->
     let commitment =
       {
@@ -2285,12 +2288,15 @@ module Rejection = struct
     return Tx_rollup_commitment.{commitment with messages = results}
 
   (** Produce an invalid commitment with {!make_incomplete_commitment_for_batch},
-      then changes the Merkle roots for each message result. *)
-  let make_valid_commitment_for_messages ~i ~level ~tx_rollup
+      then changes the Merkle roots for each message result.
+
+      FIXME/TORU: it is not perfectly valid, the withdrawals are still missing.
+      see {!replace_commitment} documentation. *)
+  let make_valid_commitment_for_messages ctxt ~level ~tx_rollup
       ?(withdrawals = []) ~store messages =
-    make_incomplete_commitment_for_batch i level tx_rollup withdrawals
+    make_incomplete_commitment_for_batch ctxt level tx_rollup withdrawals
     >>=? fun (commitment, _) ->
-    l2_parameters (I i) >>=? fun l2_parameters ->
+    l2_parameters ctxt >>=? fun l2_parameters ->
     replace_commitment ~l2_parameters ~commitment ~store messages
     >>= fun commitment -> return commitment
 
@@ -2342,7 +2348,7 @@ module Rejection = struct
     in
     Incremental.begin_construction b >>=? fun i ->
     make_valid_commitment_for_messages
-      ~i
+      (I i)
       ~level:Tx_rollup_level.root
       ~tx_rollup
       ~store
@@ -2452,7 +2458,7 @@ module Rejection = struct
     (* Make an invalid commitment for the submitted transfer *)
     let level = Tx_rollup_level.(succ root) in
     Incremental.begin_construction b >>=? fun i ->
-    make_incomplete_commitment_for_batch i level tx_rollup []
+    make_incomplete_commitment_for_batch (I i) level tx_rollup []
     >>=? fun (commitment, _) ->
     Op.tx_rollup_commit (I i) account tx_rollup commitment >>=? fun op ->
     Incremental.add_operation i op >>=? fun i ->
@@ -2502,7 +2508,7 @@ module Rejection = struct
     (* Make an invalid commitment for the submitted transfer *)
     let level = Tx_rollup_level.(succ root) in
     Incremental.begin_construction b >>=? fun i ->
-    make_valid_commitment_for_messages ~i ~level ~tx_rollup ~store [message]
+    make_valid_commitment_for_messages (I i) ~level ~tx_rollup ~store [message]
     >>=? fun commitment ->
     Op.tx_rollup_commit (I i) account tx_rollup commitment >>=? fun op ->
     Incremental.add_operation i op >>=? fun i ->
@@ -2561,7 +2567,7 @@ module Rejection = struct
     (* Make an invalid commitment for the submitted transfer *)
     let level = Tx_rollup_level.(succ root) in
     Incremental.begin_construction b >>=? fun i ->
-    make_incomplete_commitment_for_batch i level tx_rollup []
+    make_incomplete_commitment_for_batch (I i) level tx_rollup []
     >>=? fun (commitment, _) ->
     Op.tx_rollup_commit (I i) account tx_rollup commitment >>=? fun op ->
     Incremental.add_operation i op >>=? fun i ->
@@ -2746,7 +2752,7 @@ module Rejection = struct
     Incremental.finalize_block i >>=? fun b ->
     Incremental.begin_construction b >>=? fun i ->
     let level2 = Tx_rollup_level.succ level in
-    make_incomplete_commitment_for_batch i level2 tx_rollup []
+    make_incomplete_commitment_for_batch (I i) level2 tx_rollup []
     >>=? fun (commitment2, _) ->
     Op.tx_rollup_commit (I i) contract tx_rollup commitment2 >>=? fun op ->
     Incremental.add_operation i op >>=? fun i ->
@@ -2895,7 +2901,7 @@ module Rejection = struct
       | Ok path -> path
     in
     Incremental.begin_construction b >>=? fun i ->
-    make_incomplete_commitment_for_batch i Tx_rollup_level.root tx_rollup []
+    make_incomplete_commitment_for_batch (I i) Tx_rollup_level.root tx_rollup []
     >>=? fun (commitment, _) ->
     Op.tx_rollup_commit (I i) account tx_rollup commitment >>=? fun op ->
     Incremental.add_operation i op >>=? fun i ->
@@ -2985,7 +2991,7 @@ module Rejection = struct
     in
     Incremental.begin_construction b >>=? fun i ->
     make_valid_commitment_for_messages
-      ~i
+      (I i)
       ~level:Tx_rollup_level.root
       ~tx_rollup
       ~store
@@ -3050,7 +3056,7 @@ module Rejection = struct
     in
     Incremental.begin_construction b >>=? fun i ->
     let level = Tx_rollup_level.root in
-    make_valid_commitment_for_messages ~i ~level ~store ~tx_rollup [deposit]
+    make_valid_commitment_for_messages (I i) ~level ~store ~tx_rollup [deposit]
     >>=? fun commitment ->
     Op.tx_rollup_commit (I i) account tx_rollup commitment >>=? fun op ->
     Incremental.add_operation i op >>=? fun i ->
@@ -3458,37 +3464,60 @@ module Withdraw = struct
     return
       (account1, account2, tx_rollup, deposit_contract, withdraw_contract, b)
 
-  (** [context_finalize_batch_with_withdrawals account tx_rollup batch withdrawals b]
-      submits a batch containing the message [batch] to [tx_rollup] in the block [b].
-      In the following block, it adds a commitment for that block containing
-      [withdrawals] (same format as in [make_incomplete_commitment_for_batch]).
-      In the third and final block, it finalizes the commitment.
+  (** [finalize_all_commitment_with_withdrawals ~account ~tx_rollup ~withdrawals
+      b] commit and finalize all uncommitted inboxes for a tx_rollup and a
+      commitment containing [withdrawals] for the last unfinalized commitments
+      (same format as in [make_incomplete_commitment_for_batch]).
 
-      It returns the commitment and a list of dummy context hashes
-      that was mocked as the result of the applying the batch.
-   *)
-  let context_finalize_batch_with_withdrawals ~account ~tx_rollup
-      ?(batch = "batch") ~withdrawals b =
-    Op.tx_rollup_submit_batch (B b) account tx_rollup batch
-    >>=? fun operation ->
-    Block.bake ~operation b >>=? fun b ->
-    (* Make a commitment for the dummy batch. Mock the
-       list of withdrawals as per
-       [withdrawals]. Include the commitment in an operation and bake. *)
-    Incremental.begin_construction b >>=? fun i ->
+      It returns the commitment and a list of dummy context hashes for the last
+      inboxes committed.  *)
+  let finalize_all_commitment_with_withdrawals ~account ~tx_rollup ~withdrawals
+      b =
+    Context.get_level (B b) >>?= fun current_level ->
+    Context.Tx_rollup.state (B b) tx_rollup >>=? fun state ->
+    wrap
+    @@ Alpha_context.Tx_rollup_state.Internal_for_tests.next_commitment_level
+         state
+         current_level
+    >>?= fun next_commitment_level ->
+    let uncommitted_inboxes =
+      Alpha_context.Tx_rollup_state.Internal_for_tests.uncommitted_inboxes_count
+        state
+    in
+    let uncommitted_inboxes = max 0 (uncommitted_inboxes - 1) in
+    let rec aux b committed_inbox next_commitment_level =
+      if committed_inbox >= uncommitted_inboxes then
+        return (b, next_commitment_level)
+      else
+        (* Make a commitment for the dummy batch. Mock the list of withdrawals as
+              per [withdrawals]. Include the commitment in an operation and bake. *)
+        make_incomplete_commitment_for_batch
+          (B b)
+          next_commitment_level
+          tx_rollup
+          []
+        >>=? fun (commitment, _context_hash_list) ->
+        Op.tx_rollup_commit (B b) account tx_rollup commitment
+        >>=? fun operation ->
+        Block.bake ~operation b >>=? fun b ->
+        (* 3. Finalize the commitment *)
+        Op.tx_rollup_finalize (B b) account tx_rollup >>=? fun operation ->
+        Block.bake ~operation b >>=? fun b ->
+        aux b (committed_inbox + 1) (Tx_rollup_level.succ next_commitment_level)
+    in
+    aux b 0 next_commitment_level >>=? fun (b, next_commitment_level) ->
     make_incomplete_commitment_for_batch
-      i
-      Tx_rollup_level.root
+      (B b)
+      next_commitment_level
       tx_rollup
       withdrawals
     >>=? fun (commitment, context_hash_list) ->
-    Op.tx_rollup_commit (I i) account tx_rollup commitment >>=? fun operation ->
-    Incremental.add_operation i operation >>=? fun i ->
-    Incremental.finalize_block i >>=? fun b ->
+    Op.tx_rollup_commit (B b) account tx_rollup commitment >>=? fun operation ->
+    Block.bake ~operation b >>=? fun b ->
     (* 3. Finalize the commitment *)
     Op.tx_rollup_finalize (B b) account tx_rollup >>=? fun operation ->
     Block.bake ~operation b >>=? fun b ->
-    return (commitment, context_hash_list, b)
+    return (commitment, context_hash_list, next_commitment_level, b)
 
   (** [test_valid_withdraw] checks that a smart contract can deposit tickets to a
     transaction rollup. *)
@@ -3573,12 +3602,12 @@ module Withdraw = struct
     (* 2 Add a batch message to [b], a commitment for that inbox
        containing the withdrawal at index 0, and finalize that
        commitment *)
-    context_finalize_batch_with_withdrawals
+    finalize_all_commitment_with_withdrawals
       ~account:account1
       ~tx_rollup
       ~withdrawals:[(0, [withdraw1; withdraw2])]
       block
-    >>=? fun (_commitment, context_hash_list, block) ->
+    >>=? fun (_commitment, context_hash_list, committed_level, block) ->
     (* -- At this point, everything is in place for
        the user to execute the withdrawal -- *)
 
@@ -3602,7 +3631,7 @@ module Withdraw = struct
       (B block)
       ~source:account1
       tx_rollup
-      Tx_rollup_level.root
+      committed_level
       ~context_hash
       ~contents:(Script.lazy_expr Nat_ticket.contents)
       ~ty:(Script.lazy_expr Nat_ticket.ty)
@@ -3798,12 +3827,12 @@ module Withdraw = struct
       ~claimer:account1
       tx_rollup
     >>=? fun withdraw ->
-    context_finalize_batch_with_withdrawals
+    finalize_all_commitment_with_withdrawals
       ~account:account1
       ~tx_rollup
       ~withdrawals:[(0, [])]
       b
-    >>=? fun (_commitment, context_hash_list, b) ->
+    >>=? fun (_commitment, context_hash_list, committed_level, b) ->
     Incremental.begin_construction b >>=? fun i ->
     (let entrypoint = Entrypoint.default in
      let context_hash =
@@ -3823,7 +3852,7 @@ module Withdraw = struct
        (I i)
        ~source:account1
        tx_rollup
-       Tx_rollup_level.root
+       committed_level
        ~context_hash
        ~message_index:0
        ~contents:(Script.lazy_expr Nat_ticket.contents)
@@ -3858,12 +3887,12 @@ module Withdraw = struct
       ~claimer:account1
       tx_rollup
     >>=? fun withdraw ->
-    context_finalize_batch_with_withdrawals
+    finalize_all_commitment_with_withdrawals
       ~account:account1
       ~tx_rollup
       ~withdrawals:[(0, [withdraw])]
       b
-    >>=? fun (_commitment, context_hash_list, b) ->
+    >>=? fun (_commitment, context_hash_list, committed_level, b) ->
     (* Try executing the withdrawal with invalid amounts *)
     let entrypoint = Entrypoint.default in
     let context_hash =
@@ -3886,7 +3915,7 @@ module Withdraw = struct
            (I i)
            ~source:account1
            tx_rollup
-           Tx_rollup_level.root
+           committed_level
            ~context_hash
            ~message_index:0
            ~contents:(Script.lazy_expr Nat_ticket.contents)
@@ -3920,7 +3949,7 @@ module Withdraw = struct
         (I i)
         ~source:account1
         tx_rollup
-        Tx_rollup_level.root
+        committed_level
         ~context_hash
         ~message_index:0
         ~contents:(Script.lazy_expr Nat_ticket.contents)
@@ -4028,12 +4057,12 @@ module Withdraw = struct
     let withdrawal2 : Tx_rollup_withdraw.t =
       {withdrawal1 with amount = Tx_rollup_l2_qty.of_int64_exn 5L}
     in
-    context_finalize_batch_with_withdrawals
+    finalize_all_commitment_with_withdrawals
       ~account:account1
       ~tx_rollup
       ~withdrawals:[(0, [withdrawal1; withdrawal2])]
       b
-    >>=? fun (_commitment, context_hash_list, b) ->
+    >>=? fun (_commitment, context_hash_list, committed_level, b) ->
     let entrypoint = Entrypoint.default in
     let context_hash =
       WithExceptions.Option.get ~loc:__LOC__ @@ List.nth context_hash_list 0
@@ -4055,7 +4084,7 @@ module Withdraw = struct
       (I i)
       ~source:account1
       tx_rollup
-      Tx_rollup_level.root
+      committed_level
       ~context_hash
       ~message_index:0
       ~contents:(Script.lazy_expr Nat_ticket.contents)
@@ -4117,12 +4146,12 @@ module Withdraw = struct
       ~claimer:account1
       tx_rollup
     >>=? fun withdraw ->
-    context_finalize_batch_with_withdrawals
+    finalize_all_commitment_with_withdrawals
       ~account:account1
       ~tx_rollup
       ~withdrawals:[(0, [withdraw])]
       b
-    >>=? fun (_commitment, context_hash_list, b) ->
+    >>=? fun (_commitment, context_hash_list, committed_level, b) ->
     let entrypoint = Entrypoint.default in
     let context_hash =
       WithExceptions.Option.get ~loc:__LOC__ @@ List.nth context_hash_list 0
@@ -4140,7 +4169,7 @@ module Withdraw = struct
       (B b)
       ~source:account1
       tx_rollup
-      Tx_rollup_level.root
+      committed_level
       ~context_hash
       ~contents:(Script.lazy_expr Nat_ticket.contents)
       ~ty:(Script.lazy_expr Nat_ticket.ty)
@@ -4160,7 +4189,7 @@ module Withdraw = struct
       (I i)
       ~source:account1
       tx_rollup
-      Tx_rollup_level.root
+      committed_level
       ~context_hash
       ~contents:(Script.lazy_expr Nat_ticket.contents)
       ~ty:(Script.lazy_expr Nat_ticket.ty)
@@ -4200,12 +4229,12 @@ module Withdraw = struct
       tx_rollup
     >>=? fun withdraw2 ->
     let withdraws = [withdraw1; withdraw2] in
-    context_finalize_batch_with_withdrawals
+    finalize_all_commitment_with_withdrawals
       ~account:account1
       ~tx_rollup
       ~withdrawals:[(0, withdraws)]
       b
-    >>=? fun (_commitment, context_hash_list, b) ->
+    >>=? fun (_commitment, context_hash_list, committed_level, b) ->
     let entrypoint = Entrypoint.default in
     let context_hash =
       WithExceptions.Option.get ~loc:__LOC__ @@ List.nth context_hash_list 0
@@ -4217,7 +4246,7 @@ module Withdraw = struct
         (B b)
         ~source:account1
         tx_rollup
-        Tx_rollup_level.root
+        committed_level
         ~context_hash
         ~contents:(Script.lazy_expr Nat_ticket.contents)
         ~ty:(Script.lazy_expr Nat_ticket.ty)
@@ -4279,7 +4308,7 @@ module Withdraw = struct
     >>=? fun withdraw2 ->
     Incremental.begin_construction b >>=? fun i ->
     (* 2. Create a commitment *)
-    make_incomplete_commitment_for_batch i Tx_rollup_level.root tx_rollup []
+    make_incomplete_commitment_for_batch (I i) Tx_rollup_level.root tx_rollup []
     >>=? fun (commitment, _) ->
     Op.tx_rollup_commit (I i) account1 tx_rollup commitment
     >>=? fun operation ->
@@ -4295,7 +4324,7 @@ module Withdraw = struct
     Incremental.begin_construction b >>=? fun i ->
     (* 2. Create a commitment *)
     make_incomplete_commitment_for_batch
-      i
+      (I i)
       (tx_level 1l)
       tx_rollup
       [(0, [withdraw1]); (1, [withdraw2])]
@@ -4395,12 +4424,12 @@ module Withdraw = struct
       ~claimer:account1
       tx_rollup
     >>=? fun withdraw ->
-    context_finalize_batch_with_withdrawals
+    finalize_all_commitment_with_withdrawals
       ~account:account1
       ~tx_rollup
       ~withdrawals:[(0, [withdraw])]
       b
-    >>=? fun (_commitment, context_hash_list, b) ->
+    >>=? fun (_commitment, context_hash_list, committed_level, b) ->
     let entrypoint = Entrypoint.default in
     let context_hash =
       WithExceptions.Option.get ~loc:__LOC__ @@ List.nth context_hash_list 0
@@ -4420,7 +4449,7 @@ module Withdraw = struct
       (* The source of the withdrawal execution is not the recipient set in [withdraw] *)
       ~source:account2
       tx_rollup
-      Tx_rollup_level.root
+      committed_level
       ~context_hash
       ~contents:(Script.lazy_expr Nat_ticket.contents)
       ~ty:(Script.lazy_expr Nat_ticket.ty)
@@ -4462,12 +4491,12 @@ module Withdraw = struct
       ~claimer:account1
       tx_rollup
     >>=? fun withdraw ->
-    context_finalize_batch_with_withdrawals
+    finalize_all_commitment_with_withdrawals
       ~account:account1
       ~tx_rollup
       ~withdrawals:[(0, [withdraw])]
       b
-    >>=? fun (_commitment, context_hash_list, b) ->
+    >>=? fun (_commitment, context_hash_list, committed_level, b) ->
     let entrypoint = Entrypoint.default in
     let context_hash =
       WithExceptions.Option.get ~loc:__LOC__ @@ List.nth context_hash_list 0
@@ -4485,7 +4514,7 @@ module Withdraw = struct
       (I i)
       ~source:account1
       tx_rollup
-      Tx_rollup_level.root
+      committed_level
       ~context_hash
       ~contents:(Script.lazy_expr Nat_ticket.contents)
       ~ty:(Script.lazy_expr Nat_ticket.ty)
@@ -4519,12 +4548,12 @@ module Withdraw = struct
       ~claimer:account1
       tx_rollup
     >>=? fun withdraw ->
-    context_finalize_batch_with_withdrawals
+    finalize_all_commitment_with_withdrawals
       ~account:account1
       ~tx_rollup
       ~withdrawals:[(0, [withdraw])]
       b
-    >>=? fun (_commitment, context_hash_list, b) ->
+    >>=? fun (_commitment, context_hash_list, committed_level, b) ->
     let inexistant_entrypoint = Entrypoint.of_string_strict_exn "foobar" in
     let context_hash =
       WithExceptions.Option.get ~loc:__LOC__ @@ List.nth context_hash_list 0
@@ -4542,7 +4571,7 @@ module Withdraw = struct
       (I i)
       ~source:account1
       tx_rollup
-      Tx_rollup_level.root
+      committed_level
       ~context_hash
       ~contents:(Script.lazy_expr Nat_ticket.contents)
       ~ty:(Script.lazy_expr Nat_ticket.ty)
@@ -4596,7 +4625,7 @@ module Withdraw = struct
        it. *)
     Incremental.begin_construction b >>=? fun i ->
     make_incomplete_commitment_for_batch
-      i
+      (I i)
       Tx_rollup_level.root
       tx_rollup
       [(0, [withdraw])]
@@ -4663,12 +4692,12 @@ module Withdraw = struct
       ~claimer:account1
       tx_rollup
     >>=? fun withdraw ->
-    context_finalize_batch_with_withdrawals
+    finalize_all_commitment_with_withdrawals
       ~account:account1
       ~tx_rollup
       ~withdrawals:[(0, [withdraw])]
       b
-    >>=? fun (_commitment, context_hash_list, b) ->
+    >>=? fun (_commitment, context_hash_list, committed_level, b) ->
     (* Remove the commitment *)
     Op.tx_rollup_remove_commitment (B b) account1 tx_rollup
     >>=? fun operation ->
@@ -4692,7 +4721,7 @@ module Withdraw = struct
        (B b)
        ~source:account1
        tx_rollup
-       Tx_rollup_level.root
+       committed_level
        ~context_hash
        ~contents:(Script.lazy_expr Nat_ticket.contents)
        ~ty:(Script.lazy_expr Nat_ticket.ty)
@@ -4726,13 +4755,13 @@ module Withdraw = struct
     let open Error_monad_operators in
     context_init1_withdraw ()
     >>=? fun (account1, tx_rollup, deposit_contract, withdraw_contract, b) ->
-    let assert_consumed b ~msg consumed_expected =
+    let assert_consumed b ~msg committed_level consumed_expected =
       Incremental.begin_construction b >>=? fun i ->
       let ctxt = Incremental.alpha_ctxt i in
       Alpha_context.Tx_rollup_withdraw.mem
         ctxt
         tx_rollup
-        Tx_rollup_level.root
+        committed_level
         ~message_index:0
         ~withdraw_position:0
       >>=?? fun (consumed_actual, _) ->
@@ -4746,13 +4775,17 @@ module Withdraw = struct
       ~claimer:account1
       tx_rollup
     >>=? fun withdraw ->
-    context_finalize_batch_with_withdrawals
+    finalize_all_commitment_with_withdrawals
       ~account:account1
       ~tx_rollup
       ~withdrawals:[(0, [withdraw])]
       b
-    >>=? fun (_commitment, context_hash_list, b) ->
-    assert_consumed b ~msg:"should not be consumed before withdrawal" false
+    >>=? fun (_commitment, context_hash_list, committed_level, b) ->
+    assert_consumed
+      b
+      ~msg:"should not be consumed before withdrawal"
+      committed_level
+      false
     >>=? fun () ->
     (* Exexute with withdrawal *)
     (let entrypoint = Entrypoint.default in
@@ -4787,7 +4820,11 @@ module Withdraw = struct
        entrypoint)
     >>=? fun operation ->
     Block.bake ~operation b >>=? fun b ->
-    assert_consumed b ~msg:"should be consumed after withdrawal" true
+    assert_consumed
+      b
+      ~msg:"should be consumed after withdrawal"
+      committed_level
+      true
     >>=? fun () ->
     (* Remove the commitment *)
     Op.tx_rollup_remove_commitment (B b) account1 tx_rollup
@@ -4795,6 +4832,7 @@ module Withdraw = struct
     Block.bake ~operation b >>=? fun b ->
     assert_consumed
       b
+      committed_level
       ~msg:"consumtion memory should be removed with commitment"
       false
     >>=? fun () -> return_unit
@@ -4802,11 +4840,11 @@ module Withdraw = struct
   (** Confirm that executing a deposit message produces the correct withdraws.
       In order to check that the withdrawals are actually correct, we fail to
       reject them. *)
-  let make_and_check_correct_commitment i tx_rollup account store message level
-      withdrawals ~previous_message_result =
-    make_incomplete_commitment_for_batch i level tx_rollup withdrawals
+  let make_and_check_correct_commitment ctxt tx_rollup account store message
+      level withdrawals ~previous_message_result =
+    make_incomplete_commitment_for_batch ctxt level tx_rollup withdrawals
     >>=? fun (commitment, _) ->
-    l2_parameters (I i) >>=? fun l2_parameters ->
+    l2_parameters ctxt >>=? fun l2_parameters ->
     Rejection.make_proof store l2_parameters message >>= fun proof ->
     let after =
       match proof.after with `Value hash -> hash | `Node hash -> hash
@@ -4828,7 +4866,11 @@ module Withdraw = struct
       Tx_rollup_commitment.hash_message_result message_result
     in
     let commitment = {commitment with messages = [message_result_hash]} in
-    Op.tx_rollup_commit (I i) account tx_rollup commitment >>=? fun operation ->
+    Op.tx_rollup_commit ctxt account tx_rollup commitment >>=? fun operation ->
+    (match ctxt with
+    | B b -> Incremental.begin_construction b
+    | I i -> return i)
+    >>=? fun i ->
     Incremental.add_operation i operation >>=? fun i ->
     Incremental.finalize_block i >>=? fun b ->
     Incremental.begin_construction b >>=? fun i ->
@@ -4904,7 +4946,7 @@ module Withdraw = struct
     Rejection.init_l2_store () >>= fun store ->
     (* For the first deposit, we have no withdraws *)
     make_and_check_correct_commitment
-      i
+      (I i)
       tx_rollup
       account1
       store
@@ -4921,7 +4963,7 @@ module Withdraw = struct
     Rejection.commit_store store >>= fun store ->
     (* For the second deposit, we have one. *)
     make_and_check_correct_commitment
-      i
+      (I i)
       tx_rollup
       account1
       store
@@ -4935,7 +4977,7 @@ module Withdraw = struct
     Rejection.commit_store store >>= fun store ->
     (* For the third deposit, we have one. *)
     make_and_check_correct_commitment
-      i
+      (I i)
       tx_rollup
       account1
       store

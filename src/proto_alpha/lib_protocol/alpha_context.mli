@@ -1615,6 +1615,10 @@ module Tx_rollup_state : sig
     val get_allocated_storage : t -> Z.t
 
     val set_allocated_storage : Z.t -> t -> t
+
+    val next_commitment_level : t -> Raw_level.t -> Tx_rollup_level.t tzresult
+
+    val uncommitted_inboxes_count : t -> int
   end
 end
 
