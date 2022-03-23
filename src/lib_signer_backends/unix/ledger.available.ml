@@ -107,7 +107,10 @@ module Ledger_commands = struct
     let pp =
       Format.make_formatter
         (fun s ofs lgth -> Buffer.add_substring buf s ofs lgth)
-        (fun () -> Buffer.clear buf)
+        (fun () ->
+          Events.(emit__dont_wait__use_with_care Ledger.communication)
+            (Buffer.contents buf) ;
+          Buffer.clear buf)
     in
     let res = f pp in
     match res with Error err -> fail (LedgerError err) | Ok v -> return v
@@ -117,10 +120,11 @@ module Ledger_commands = struct
     let buf = Buffer.create 100 in
     let pp = Format.formatter_of_buffer buf in
     let version = Ledgerwallet_tezos.get_version ~pp h in
+    let*! () = Events.(emit Ledger.communication) (Buffer.contents buf) in
     match version with
     | Error e ->
         let*! () =
-          Events.(emit ledger_not_tezos)
+          Events.(emit Ledger.not_tezos)
             ( device_info.Hidapi.path,
               Format.asprintf "@[Ledger %a@]" Ledgerwallet.Transport.pp_error e
             )
@@ -139,7 +143,7 @@ module Ledger_commands = struct
           wrap_ledger_cmd (fun pp -> Ledgerwallet_tezos.get_git_commit ~pp h)
         in
         let*! () =
-          Events.(emit ledger_found_application)
+          Events.(emit Ledger.found_application)
             ( Format.asprintf "%a" Ledgerwallet_tezos.Version.pp version,
               device_info.path,
               git_commit )
@@ -556,7 +560,7 @@ let use_ledger ?(filter : Filter.t = `None) f =
       (enumerate ~vendor_id ())
   in
   let*! () =
-    Events.(emit ledger_found)
+    Events.(emit Ledger.found)
       ( List.length ledgers,
         String.concat
           " -- "
@@ -566,7 +570,7 @@ let use_ledger ?(filter : Filter.t = `None) f =
              ledgers) )
   in
   let process_device device_info f =
-    let*! () = Events.(emit ledger_processing) device_info.Hidapi.path in
+    let*! () = Events.(emit Ledger.processing) device_info.Hidapi.path in
     (* HID interfaces get the number 0
        (cf. https://github.com/LedgerHQ/ledger-nano-s/issues/48)
        *BUT* on MacOSX the Hidapi library does not report the interface-number
