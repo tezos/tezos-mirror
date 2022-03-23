@@ -24,6 +24,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** This module provides the gas costs for typechecking Michelson scripts,
+    parsing and unparsing Michelson values, and interpreting Michelson
+    instructions.
+*)
+
 open Alpha_context
 
 module Cost_of : sig
