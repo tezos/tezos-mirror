@@ -58,15 +58,15 @@ module Cost_of = struct
     let cost_N_IAbs_int size = S.safe_int (25 + (size lsr 4))
 
     (* model N_IAdd_bls12_381_fr *)
-    (* when benchmarking, compile bls12-381-unix without ADX *)
+    (* when benchmarking, compile bls12-381 without ADX *)
     let cost_N_IAdd_bls12_381_fr = S.safe_int 45
 
     (* model N_IAdd_bls12_381_g1 *)
-    (* when benchmarking, compile bls12-381-unix without ADX *)
+    (* when benchmarking, compile bls12-381 without ADX *)
     let cost_N_IAdd_bls12_381_g1 = S.safe_int 925
 
     (* model N_IAdd_bls12_381_g2 *)
-    (* when benchmarking, compile bls12-381-unix without ADX *)
+    (* when benchmarking, compile bls12-381 without ADX *)
     let cost_N_IAdd_bls12_381_g2 = S.safe_int 2_520
 
     let cost_linear_op_int size1 size2 =
@@ -347,7 +347,7 @@ module Cost_of = struct
     let cost_N_IImplicit_account = S.safe_int 10
 
     (* model N_IInt_bls12_381_z_fr *)
-    (* when benchmarking, compile bls12-381-unix without ADX *)
+    (* when benchmarking, compile bls12-381 without ADX *)
     let cost_N_IInt_bls12_381_z_fr = S.safe_int 125
 
     (* model N_IInt_nat *)
@@ -453,28 +453,28 @@ module Cost_of = struct
       S.safe_int 130 + (v0 lsr 4) + (v0 lsr 5)
 
     (* model N_IMul_bls12_381_fr *)
-    (* when benchmarking, compile bls12-381-unix without ADX *)
+    (* when benchmarking, compile bls12-381 without ADX *)
     let cost_N_IMul_bls12_381_fr = S.safe_int 65
 
     (* model N_IMul_bls12_381_fr_z *)
     (* Approximating 1.059386 x term *)
-    (* when benchmarking, compile bls12-381-unix without ADX *)
+    (* when benchmarking, compile bls12-381 without ADX *)
     let cost_N_IMul_bls12_381_fr_z size1 =
       let open S_syntax in
       let v0 = S.safe_int size1 in
       S.safe_int 330 + v0 + (v0 lsr 4)
 
     (* model N_IMul_bls12_381_g1 *)
-    (* when benchmarking, compile bls12-381-unix without ADX *)
+    (* when benchmarking, compile bls12-381 without ADX *)
     let cost_N_IMul_bls12_381_g1 = S.safe_int 103_000
 
     (* model N_IMul_bls12_381_g2 *)
-    (* when benchmarking, compile bls12-381-unix without ADX *)
+    (* when benchmarking, compile bls12-381 without ADX *)
     let cost_N_IMul_bls12_381_g2 = S.safe_int 220_000
 
     (* model N_IMul_bls12_381_z_fr *)
     (* Approximating 1.068674 x term *)
-    (* when benchmarking, compile bls12-381-unix without ADX *)
+    (* when benchmarking, compile bls12-381 without ADX *)
     let cost_N_IMul_bls12_381_z_fr size1 =
       let open S_syntax in
       let v0 = S.safe_int size1 in
@@ -501,15 +501,15 @@ module Cost_of = struct
     let cost_N_IMul_teznat = S.safe_int 50
 
     (* model N_INeg_bls12_381_fr *)
-    (* when benchmarking, compile bls12-381-unix without ADX *)
+    (* when benchmarking, compile bls12-381 without ADX *)
     let cost_N_INeg_bls12_381_fr = S.safe_int 45
 
     (* model N_INeg_bls12_381_g1 *)
-    (* when benchmarking, compile bls12-381-unix without ADX *)
+    (* when benchmarking, compile bls12-381 without ADX *)
     let cost_N_INeg_bls12_381_g1 = S.safe_int 60
 
     (* model N_INeg_bls12_381_g2 *)
-    (* when benchmarking, compile bls12-381-unix without ADX *)
+    (* when benchmarking, compile bls12-381 without ADX *)
     let cost_N_INeg_bls12_381_g2 = S.safe_int 85
 
     (* model N_INeg *)
@@ -560,7 +560,7 @@ module Cost_of = struct
     let cost_N_IOr_nat = cost_linear_op_int
 
     (* model N_IPairing_check_bls12_381 *)
-    (* when benchmarking, compile bls12-381-unix without ADX *)
+    (* when benchmarking, compile bls12-381 without ADX *)
     let cost_N_IPairing_check_bls12_381 size =
       S.add (S.safe_int 450_000) (S.mul (S.safe_int 342_500) (S.safe_int size))
 
@@ -738,17 +738,17 @@ module Cost_of = struct
     let cost_N_KUndip = S.safe_int 15
 
     (* model DECODING_BLS_FR *)
-    (* when benchmarking, compile bls12-381-unix without ADX, see
+    (* when benchmarking, compile bls12-381 without ADX, see
        https://gitlab.com/dannywillems/ocaml-bls12-381/-/blob/71d0b4d467fbfaa6452d702fcc408d7a70916a80/README.md#install
     *)
     let cost_DECODING_BLS_FR = S.safe_int 150
 
     (* model DECODING_BLS_G1 *)
-    (* when benchmarking, compile bls12-381-unix without ADX *)
+    (* when benchmarking, compile bls12-381 without ADX *)
     let cost_DECODING_BLS_G1 = S.safe_int 65_300
 
     (* model DECODING_BLS_G2 *)
-    (* when benchmarking, compile bls12-381-unix without ADX *)
+    (* when benchmarking, compile bls12-381 without ADX *)
     let cost_DECODING_BLS_G2 = S.safe_int 73_300
 
     (* model B58CHECK_DECODING_CHAIN_ID *)

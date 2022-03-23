@@ -9,7 +9,6 @@
   tezos-error-monad
   tezos-crypto
   tezos-base
-  bls12-381-unix
   tezos-hacl
   tezos-stdlib
   tezos-stdlib-unix

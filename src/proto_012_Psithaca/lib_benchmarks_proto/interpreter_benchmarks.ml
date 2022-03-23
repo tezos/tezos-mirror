@@ -2531,7 +2531,7 @@ module Registration_section = struct
       Registration_helpers.register (module B)
   end
 
-  (* when benchmarking, compile bls12-381-unix without ADX, see
+  (* when benchmarking, compile bls12-381 without ADX, see
      https://gitlab.com/dannywillems/ocaml-bls12-381/-/blob/71d0b4d467fbfaa6452d702fcc408d7a70916a80/README.md#install
   *)
   module Bls12_381 = struct
