@@ -248,9 +248,14 @@ module Regressions = struct
           ~predecessor:None
           state
       in
-      let*! _commitment =
+      let*! commitment =
         Rollup.get_commitment ~hooks ~block:"head" ~level:0 ~rollup client
       in
+      let hash = JSON.(commitment |-> "commitment_hash" |> as_string) in
+      let*! state = Rollup.get_state ~hooks ~rollup client in
+      Check.(state.Rollup.commitment_newest_hash = Some hash)
+        (Check.option Check.string)
+        ~error_msg:"Commitment hash mismatch: %L vs %R" ;
       unit
 
     let rpc_pending_bonded_commitment =
@@ -609,7 +614,7 @@ let test_submit_batches_in_several_blocks =
         unfinalized_commitments = Empty 0;
         uncommitted_inboxes = Empty 0;
         tezos_head_level = None;
-        commitment_head_hash = None;
+        commitment_newest_hash = None;
         burn_per_byte = 0;
         inbox_ema = 0;
       }
