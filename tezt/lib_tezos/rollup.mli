@@ -31,7 +31,7 @@ module Tx_rollup : sig
     unfinalized_commitments : range;
     uncommitted_inboxes : range;
     tezos_head_level : int option;
-    commitment_head_hash : string option;
+    commitment_newest_hash : string option;
     burn_per_byte : int;
     inbox_ema : int;
   }

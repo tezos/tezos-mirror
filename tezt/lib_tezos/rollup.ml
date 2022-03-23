@@ -43,7 +43,7 @@ module Tx_rollup = struct
     unfinalized_commitments : range;
     uncommitted_inboxes : range;
     tezos_head_level : int option;
-    commitment_head_hash : string option;
+    commitment_newest_hash : string option;
     burn_per_byte : int;
     inbox_ema : int;
   }
@@ -62,8 +62,8 @@ module Tx_rollup = struct
         JSON.(json |-> "uncommitted_inboxes" |> range_of_json)
       in
       let tezos_head_level = JSON.(json |-> "tezos_head_level" |> as_int_opt) in
-      let commitment_head_hash =
-        JSON.(json |-> "commitment_head_hash" |> as_string_opt)
+      let commitment_newest_hash =
+        JSON.(json |-> "commitment_newest_hash" |> as_string_opt)
       in
       let burn_per_byte = JSON.(json |-> "burn_per_byte" |> as_int) in
       let inbox_ema = JSON.(json |-> "inbox_ema" |> as_int) in
@@ -72,7 +72,7 @@ module Tx_rollup = struct
         unfinalized_commitments;
         uncommitted_inboxes;
         tezos_head_level;
-        commitment_head_hash;
+        commitment_newest_hash;
         burn_per_byte;
         inbox_ema;
       }
@@ -164,7 +164,7 @@ module Tx_rollup = struct
                unfinalized_commitments;
                uncommitted_inboxes;
                tezos_head_level;
-               commitment_head_hash;
+               commitment_newest_hash;
                burn_per_byte;
                inbox_ema;
              } ->
@@ -172,7 +172,7 @@ module Tx_rollup = struct
             unfinalized_commitments,
             uncommitted_inboxes,
             tezos_head_level,
-            (commitment_head_hash, burn_per_byte, inbox_ema) ))
+            (commitment_newest_hash, burn_per_byte, inbox_ema) ))
         (tuple5 range range range (option int) (tuple3 (option string) int int))
 
     let inbox : inbox Check.typ =
