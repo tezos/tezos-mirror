@@ -40,3 +40,6 @@ v0.5.1:
 
 v0.5.2:  
 - make compact encoding's JSON encoding less opinionated
+
+v0.5.3:  
+- fix bug wherein the binary description of zeroable encodings was invalid RST
