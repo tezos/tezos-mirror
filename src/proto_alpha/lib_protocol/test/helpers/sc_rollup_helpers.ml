@@ -35,7 +35,7 @@ let originated_rollup op =
 (** Returns a block in which a rollup originated. *)
 let originate_rollup src b baker kind boot_sector =
   Op.sc_rollup_origination (B b) src ~fee:(Test_tez.of_int 10) kind boot_sector
-  >>=? fun operation ->
+  >>=? fun (operation, _) ->
   Incremental.begin_construction ~policy:Block.(By_account baker) b
   >>=? fun incr ->
   Incremental.add_operation incr operation >>=? fun incr ->
