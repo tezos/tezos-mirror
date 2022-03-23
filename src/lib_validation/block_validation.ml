@@ -174,8 +174,6 @@ let init_test_chain chain_id ctxt forked_header =
       let*! () =
         Validation_events.(emit new_protocol_initialisation protocol)
       in
-      Proto_test.set_log_message_consumer
-        (Protocol_logging.make_log_message_consumer ()) ;
       let* {context = test_ctxt; _} =
         Proto_test.init chain_id test_ctxt forked_header.Block_header.shell
       in
@@ -575,8 +573,6 @@ module Make (Proto : Registered_protocol.T) = struct
           let*! () =
             Validation_events.(emit new_protocol_initialisation new_protocol)
           in
-          NewProto.set_log_message_consumer
-            (Protocol_logging.make_log_message_consumer ()) ;
           let* validation_result =
             NewProto.init chain_id validation_result.context block_header.shell
           in
@@ -1033,8 +1029,6 @@ module Make (Proto : Registered_protocol.T) = struct
                 Proto.environment_version
                 NewProto.environment_version
             in
-            NewProto.set_log_message_consumer
-              (Protocol_logging.make_log_message_consumer ()) ;
             let* validation_result =
               NewProto.init chain_id validation_result.context shell_header
             in
