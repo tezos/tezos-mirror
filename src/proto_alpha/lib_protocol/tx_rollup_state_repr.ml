@@ -382,6 +382,11 @@ let rec update_burn_per_byte :
     let elapsed = elapsed - 1 in
     update_burn_per_byte state' ~elapsed ~factor ~final_size ~hard_limit
 
+let has_valid_commitment_at {finalized_commitments; unfinalized_commitments; _}
+    level =
+  belongs_to finalized_commitments level
+  || belongs_to unfinalized_commitments level
+
 let inboxes_count {unfinalized_commitments; uncommitted_inboxes; _} =
   range_count unfinalized_commitments + range_count uncommitted_inboxes
 

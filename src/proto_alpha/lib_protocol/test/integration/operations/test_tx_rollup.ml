@@ -318,6 +318,7 @@ let raw_level level = assert_ok @@ Raw_level.of_int32 level
    withdraw_list as the construction is expensive *)
 let make_incomplete_commitment_for_batch i level tx_rollup withdraw_list =
   let ctxt = Incremental.alpha_ctxt i in
+  Context.Tx_rollup.state (I i) tx_rollup >>=? fun state ->
   wrap_lwt (Alpha_context.Tx_rollup_inbox.get ctxt level tx_rollup)
   >>=? fun (ctxt, metadata) ->
   List.init ~when_negative_length:[] metadata.inbox_length (fun _ ->
@@ -338,7 +339,8 @@ let make_incomplete_commitment_for_batch i level tx_rollup withdraw_list =
   (match Tx_rollup_level.pred level with
   | None -> return_none
   | Some predecessor_level -> (
-      wrap_lwt (Tx_rollup_commitment.find ctxt tx_rollup predecessor_level)
+      wrap_lwt
+        (Tx_rollup_commitment.find ctxt tx_rollup state predecessor_level)
       >|=? function
       | (_, None) -> None
       | (_, Some {commitment; _}) -> Some (Tx_rollup_commitment.hash commitment)
@@ -1295,8 +1297,9 @@ let test_commitment_duplication () =
   (* No charge. *)
   Assert.balance_was_debited ~loc:__LOC__ (I i) contract2 balance2 Tez.zero
   >>=? fun () ->
+  Context.Tx_rollup.state (I i) tx_rollup >>=? fun state ->
   let ctxt = Incremental.alpha_ctxt i in
-  wrap_lwt (Tx_rollup_commitment.find ctxt tx_rollup Tx_rollup_level.root)
+  wrap_lwt (Tx_rollup_commitment.find ctxt tx_rollup state Tx_rollup_level.root)
   >>=? fun (_, commitment_opt) ->
   (match commitment_opt with
   | None -> raise (Invalid_argument "No commitment")

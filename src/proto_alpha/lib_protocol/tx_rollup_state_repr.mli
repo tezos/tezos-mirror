@@ -71,6 +71,16 @@ val update_burn_per_byte :
 *)
 val burn_cost : limit:Tez_repr.t option -> t -> int -> Tez_repr.t tzresult
 
+(** [has_valid_commitment_at state level] returns [true] iff there is
+    a valid commitment for [level] in the layer-1 storage.
+
+    On the contrary, if there is not commitment for [level] in the
+    layer-1 storage, or if there exists an orphan commitment (that is,
+    a commitment which has been rejected, or with one of its ancestors
+    that has been rejected) at [level], this function returns
+    [false]. *)
+val has_valid_commitment_at : t -> Tx_rollup_level_repr.t -> bool
+
 (** [uncommitted_inboxes_count state] returns the number of inboxes
     the rollup current has in the storage which did not receive a
     commitment yet. *)

@@ -1643,7 +1643,7 @@ let apply_external_manager_operation_content :
       (* Check [level] *)
       Tx_rollup_state.check_level_can_be_rejected state level >>?= fun () ->
       (* Check [previous_message_result] *)
-      Tx_rollup_commitment.get ctxt tx_rollup level
+      Tx_rollup_commitment.get ctxt tx_rollup state level
       >>=? fun (ctxt, commitment) ->
       Tx_rollup_commitment.get_before_and_after_results
         ctxt

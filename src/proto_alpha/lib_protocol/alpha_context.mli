@@ -1818,12 +1818,14 @@ module Tx_rollup_commitment : sig
   val find :
     context ->
     Tx_rollup.t ->
+    Tx_rollup_state.t ->
     Tx_rollup_level.t ->
     (context * Submitted_commitment.t option) tzresult Lwt.t
 
   val get :
     context ->
     Tx_rollup.t ->
+    Tx_rollup_state.t ->
     Tx_rollup_level.t ->
     (context * Submitted_commitment.t) tzresult Lwt.t
 
