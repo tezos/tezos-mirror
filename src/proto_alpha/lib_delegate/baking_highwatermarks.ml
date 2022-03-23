@@ -38,7 +38,7 @@ let highwatermark_encoding : highwatermark Data_encoding.t =
        (req "level" int32))
 
 let pp_highwatermark fmt {round; level} =
-  Format.fprintf fmt "round: %a, level: %ld" Round.pp round level
+  Format.fprintf fmt "level: %ld, round: %a" level Round.pp round
 
 type error += Block_previously_baked of highwatermark
 
@@ -55,7 +55,8 @@ let () =
     ~pp:(fun ppf highwatermark ->
       Format.fprintf
         ppf
-        "Block (%a) was previously baked"
+        "A block with a higher watermark than the current one (%a) was \
+         previously baked."
         pp_highwatermark
         highwatermark)
     highwatermark_encoding
@@ -71,7 +72,8 @@ let () =
     ~pp:(fun ppf highwatermark ->
       Format.fprintf
         ppf
-        "Block %a was already preendorsed"
+        "A preendorsements with a higher watermark than the current one (%a) \
+         was already produced."
         pp_highwatermark
         highwatermark)
     highwatermark_encoding
@@ -87,7 +89,8 @@ let () =
     ~pp:(fun ppf highwatermark ->
       Format.fprintf
         ppf
-        "Block %a was previously endorsed"
+        "An endorsements with a higher watermark than the current one (%a) was \
+         already produced."
         pp_highwatermark
         highwatermark)
     highwatermark_encoding
