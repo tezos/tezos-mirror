@@ -66,21 +66,14 @@ type error +=
   | Invalid_zero_transfer
   | Maximum_withdraws_per_message_exceeded of {current : int; maximum : int}
 
-module Address_indexes : Map.S with type key = Tx_rollup_l2_address.t
-
-module Ticket_indexes : Map.S with type key = Ticket_hash.t
-
-type address_indexes = Tx_rollup_l2_address.t Indexable.index Address_indexes.t
-
-type ticket_indexes = Ticket_hash.t Indexable.index Ticket_indexes.t
-
 (** Applying operations in the layer2 can result in creating indexes
     associated to both the addresses and the ticket hashes. We keep track
     of these creations in order to replace the values by their indexes
     in future operations. *)
 type indexes = {
-  address_indexes : address_indexes;
-  ticket_indexes : ticket_indexes;
+  address_indexes :
+    (Tx_rollup_l2_address.t * Tx_rollup_l2_address.Indexable.index) list;
+  ticket_indexes : (Ticket_hash.t * Ticket_indexable.index) list;
 }
 
 module Message_result : sig
@@ -233,11 +226,4 @@ module Make (Context : CONTEXT) : sig
   *)
   val apply_message :
     ctxt -> parameters -> Tx_rollup_message.t -> (ctxt * Message_result.t) m
-end
-
-module Internal_for_tests : sig
-  val address_indexes_of_list :
-    (Tx_rollup_l2_address.t * 'a) list -> 'a Address_indexes.t
-
-  val ticket_indexes_of_list : (Ticket_hash.t * 'a) list -> 'a Ticket_indexes.t
 end

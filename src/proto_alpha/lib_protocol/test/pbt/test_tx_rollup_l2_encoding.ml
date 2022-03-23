@@ -100,15 +100,18 @@ let ticket_hash_gen : Protocol.Alpha_context.Ticket_hash.t QCheck2.Gen.t =
   let+ tx_rollup = l2_address_gen in
   Tx_rollup_l2_helpers.make_unit_ticket_key ticketer tx_rollup
 
-let idx_ticket_hash_idx_gen : Ticket_indexes.key either QCheck2.Gen.t =
+let idx_ticket_hash_idx_gen :
+    Protocol.Alpha_context.Ticket_hash.t either QCheck2.Gen.t =
   let open QCheck2.Gen in
   from_index_exn <$> ui32
 
-let idx_ticket_hash_value_gen : Ticket_indexes.key either QCheck2.Gen.t =
+let idx_ticket_hash_value_gen :
+    Protocol.Alpha_context.Ticket_hash.t either QCheck2.Gen.t =
   let open QCheck2.Gen in
   from_value <$> ticket_hash_gen
 
-let idx_ticket_hash_gen : Ticket_indexes.key either QCheck2.Gen.t =
+let idx_ticket_hash_gen :
+    Protocol.Alpha_context.Ticket_hash.t either QCheck2.Gen.t =
   let open QCheck2.Gen in
   oneof [idx_ticket_hash_idx_gen; idx_ticket_hash_value_gen]
 
@@ -169,19 +172,11 @@ let indexes_gen =
     | [ticket] -> pure ticket
     | _ -> assert false
   in
-  let* addresses =
+  let* address_indexes =
     small_list (pair l2_address_gen (map Protocol.Indexable.index_exn ui32))
   in
-  let+ tickets =
+  let+ ticket_indexes =
     small_list (pair ticket_hash_gen (map Protocol.Indexable.index_exn ui32))
-  in
-  let address_indexes : address_indexes =
-    Protocol.Tx_rollup_l2_apply.Internal_for_tests.address_indexes_of_list
-      addresses
-  in
-  let ticket_indexes : ticket_indexes =
-    Protocol.Tx_rollup_l2_apply.Internal_for_tests.ticket_indexes_of_list
-      tickets
   in
   {address_indexes; ticket_indexes}
 

@@ -179,53 +179,27 @@ let () =
     (fun (current, maximum) ->
       Maximum_withdraws_per_message_exceeded {current; maximum})
 
-module Address_indexes = Map.Make (Tx_rollup_l2_address)
-module Ticket_indexes = Map.Make (Ticket_hash)
-
-type address_indexes = Tx_rollup_l2_address.t Indexable.index Address_indexes.t
-
-type ticket_indexes = Ticket_hash.t Indexable.index Ticket_indexes.t
-
 type indexes = {
-  address_indexes : address_indexes;
-  ticket_indexes : ticket_indexes;
+  address_indexes :
+    (Tx_rollup_l2_address.t * Tx_rollup_l2_address.Indexable.index) list;
+  ticket_indexes : (Ticket_hash.t * Ticket_indexable.index) list;
 }
-
-let address_indexes_to_list x =
-  let seq = Address_indexes.to_seq x in
-  Seq.fold_left (fun acc x -> x :: acc) [] seq
-
-let address_indexes_of_list l =
-  let seq = List.fold_left (fun seq x -> Seq.cons x seq) Seq.empty l in
-  Address_indexes.of_seq seq
-
-let ticket_indexes_to_list x =
-  let seq = Ticket_indexes.to_seq x in
-  Seq.fold_left (fun acc x -> x :: acc) [] seq
-
-let ticket_indexes_of_list l =
-  let seq = List.fold_left (fun seq x -> Seq.cons x seq) Seq.empty l in
-  Ticket_indexes.of_seq seq
 
 let encoding_indexes : indexes Data_encoding.t =
   let open Data_encoding in
   conv
-    (fun {address_indexes; ticket_indexes} ->
-      ( address_indexes_to_list address_indexes,
-        ticket_indexes_to_list ticket_indexes ))
-    (fun (address_indexes_list, ticket_indexes_list) ->
-      let address_indexes = address_indexes_of_list address_indexes_list in
-      let ticket_indexes = ticket_indexes_of_list ticket_indexes_list in
-      {address_indexes; ticket_indexes})
-  @@ tup2
-       (list
-          (tup2
-             Tx_rollup_l2_address.encoding
-             Tx_rollup_l2_address.Indexable.index_encoding))
-       (list
-          (tup2
-             Ticket_hash.encoding
-             Tx_rollup_l2_context_sig.Ticket_indexable.index_encoding))
+    (fun {address_indexes; ticket_indexes} -> (address_indexes, ticket_indexes))
+    (fun (address_indexes, ticket_indexes) -> {address_indexes; ticket_indexes})
+  @@ obj2
+       (req
+          "address_indexes"
+          (list
+             (tup2
+                Tx_rollup_l2_address.encoding
+                Tx_rollup_l2_address.Indexable.index_encoding)))
+       (req
+          "ticket_indexes"
+          (list (tup2 Ticket_hash.encoding Ticket_indexable.index_encoding)))
 
 module Message_result = struct
   type transaction_result =
@@ -356,34 +330,29 @@ module Make (Context : CONTEXT) = struct
       create several indexes during the application of a {Tx_rollup_message.t}.
   *)
 
-  (** [get_index ctxt get_or_associate indexable] gets or associates [indexable]
-      in the [ctxt] using [get_or_associate]. It returns the context, whether
-      the index was created or existed, and finally, the index.
-
-      If a [Value v] was given there are two possibilities:
-
-      {ul {li The value was already associated to an index in previous
-              operations. Thus, we return [None].}
-          {li The value is not already associated and we create an index.
-              Thus, we return [Some v] so it can be returned in the list
-              of created indexes (see {!indexes}).}}
-  *)
-  let get_index ctxt get_or_associate indexable =
+  let index get_or_associate_index add_index ctxt indexes indexable =
     let open Indexable in
     match destruct indexable with
-    | Right v ->
-        let* (ctxt, created, idx) = get_or_associate ctxt v in
-        let created =
-          match created with `Existed -> None | `Created -> Some v
-        in
-        return (ctxt, created, idx)
-    | Left i -> return (ctxt, None, i)
+    | Right v -> (
+        let+ (ctxt, created, idx) = get_or_associate_index ctxt v in
+        match created with
+        | `Existed -> (ctxt, indexes, idx)
+        | `Created -> (ctxt, add_index indexes (v, idx), idx))
+    | Left i -> return (ctxt, indexes, i)
 
-  let address_index ctxt indexable =
-    get_index ctxt Address_index.get_or_associate_index indexable
+  let address_index ctxt indexes indexable =
+    let get_or_associate_index = Address_index.get_or_associate_index in
+    let add_index indexes x =
+      {indexes with address_indexes = x :: indexes.address_indexes}
+    in
+    index get_or_associate_index add_index ctxt indexes indexable
 
-  let ticket_index ctxt indexable =
-    get_index ctxt Ticket_index.get_or_associate_index indexable
+  let ticket_index ctxt indexes indexable =
+    let get_or_associate_index = Ticket_index.get_or_associate_index in
+    let add_index indexes x =
+      {indexes with ticket_indexes = x :: indexes.ticket_indexes}
+    in
+    index get_or_associate_index add_index ctxt indexes indexable
 
   let address_of_signer_index :
       Signer_indexable.index -> Tx_rollup_l2_address.Indexable.index =
@@ -393,39 +362,7 @@ module Make (Context : CONTEXT) = struct
       Tx_rollup_l2_address.Indexable.index -> Signer_indexable.index =
    fun idx -> Indexable.(index_exn (to_int32 idx))
 
-  let empty_indexes =
-    {
-      address_indexes = Address_indexes.empty;
-      ticket_indexes = Ticket_indexes.empty;
-    }
-
-  let add_to_addr_indexes addr_indexes (v, idx) =
-    match v with
-    | Some v -> Address_indexes.add v idx addr_indexes
-    | None -> addr_indexes
-
-  let add_to_ticket_indexes ticket_indexes (v, idx) =
-    match v with
-    | Some v -> Ticket_indexes.add v idx ticket_indexes
-    | None -> ticket_indexes
-
-  let add_addr_to_indexes indexes addr idx =
-    {
-      indexes with
-      address_indexes = Address_indexes.add addr idx indexes.address_indexes;
-    }
-
-  (** [add_indexes indexes (addr, aidx) (ticket, tidx)] adds to [indexes].
-      [addr] and [ticket] are optional values, if a some value is given,
-      it is supposed to be added in [indexes], otherwise it is ignored.
-
-      See {!get_index} for more information.
-  *)
-  let add_indexes indexes addr ticket =
-    {
-      address_indexes = add_to_addr_indexes indexes.address_indexes addr;
-      ticket_indexes = add_to_ticket_indexes indexes.ticket_indexes ticket;
-    }
+  let empty_indexes = {address_indexes = []; ticket_indexes = []}
 
   let assert_non_zero_quantity qty =
     fail_when Tx_rollup_l2_qty.(qty = zero) Invalid_zero_transfer
@@ -529,7 +466,12 @@ module Make (Context : CONTEXT) = struct
             | `Created ->
                 (* If the index is created, we need to add to indexes and
                    initialize the metadata. *)
-                let indexes = add_addr_to_indexes indexes addr idx in
+                let indexes =
+                  {
+                    indexes with
+                    address_indexes = (addr, idx) :: indexes.address_indexes;
+                  }
+                in
                 let* ctxt =
                   Address_metadata.init_with_public_key ctxt idx signer_pk
                 in
@@ -661,15 +603,12 @@ module Make (Context : CONTEXT) = struct
           let withdrawal = Tx_rollup_withdraw.{claimer; ticket_hash; amount} in
           return (ctxt, indexes, Some withdrawal)
       | Transfer {destination; ticket_hash; qty} ->
-          let* (ctxt, created_addr, dest_idx) =
-            address_index ctxt destination
+          let* (ctxt, indexes, dest_idx) =
+            address_index ctxt indexes destination
           in
-          let* (ctxt, created_ticket, tidx) = ticket_index ctxt ticket_hash in
+          let* (ctxt, indexes, tidx) = ticket_index ctxt indexes ticket_hash in
           let source_idx = address_of_signer_index source_idx in
           let* ctxt = transfer ctxt source_idx dest_idx tidx qty in
-          let indexes =
-            add_indexes indexes (created_addr, dest_idx) (created_ticket, tidx)
-          in
           return (ctxt, indexes, None)
 
     (** [check_counter ctxt signer counter] asserts that the provided [counter] is the
@@ -807,16 +746,13 @@ module Make (Context : CONTEXT) = struct
       (ctxt * deposit_result * Tx_rollup_withdraw.withdrawal option) m =
    fun initial_ctxt Tx_rollup_message.{sender; destination; ticket_hash; amount} ->
     let apply_deposit () =
-      let* (ctxt, created_addr, aidx) =
-        address_index initial_ctxt destination
+      let* (ctxt, indexes, aidx) =
+        address_index initial_ctxt empty_indexes destination
       in
-      let* (ctxt, created_ticket, tidx) =
-        ticket_index ctxt Indexable.(value ticket_hash)
+      let* (ctxt, indexes, tidx) =
+        ticket_index ctxt indexes Indexable.(value ticket_hash)
       in
       let* ctxt = deposit ctxt aidx tidx amount in
-      let indexes =
-        add_indexes empty_indexes (created_addr, aidx) (created_ticket, tidx)
-      in
       return (ctxt, indexes)
     in
     catch
@@ -850,10 +786,4 @@ module Make (Context : CONTEXT) = struct
             in
             return (ctxt, (Batch_V1_result result, withdrawals))
         | None -> fail Invalid_batch_encoding)
-end
-
-module Internal_for_tests = struct
-  let address_indexes_of_list = address_indexes_of_list
-
-  let ticket_indexes_of_list = ticket_indexes_of_list
 end
