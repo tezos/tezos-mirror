@@ -453,6 +453,8 @@ module type S = sig
     val shallow : repo -> kinded_key -> tree
 
     val is_shallow : tree -> bool
+
+    val kinded_key : tree -> kinded_key option
   end
 
   (** [produce r h f] runs [f] on top of a real store [r], producing a proof and

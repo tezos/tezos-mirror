@@ -58,6 +58,8 @@ module Make_tree (Conf : Conf) (DB : DB) : sig
 
   val shallow : DB.repo -> kinded_key -> DB.tree
 
+  val kinded_key : DB.tree -> kinded_key option
+
   val is_shallow : DB.tree -> bool
 
   (** Exception raised by [find_tree] and [add_tree] when applied to shallow
