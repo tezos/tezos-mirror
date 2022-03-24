@@ -2330,17 +2330,6 @@ let apply_manager_contents (type kind) ctxt mode chain_id
   | Error errors ->
       Lwt.return (Failure, Failed (manager_kind operation, errors), [])
 
-let skipped_operation_result :
-    type kind. kind manager_operation -> kind manager_operation_result =
-  function
-  | operation -> (
-      match operation with
-      | Reveal _ ->
-          Applied
-            (Reveal_result {consumed_gas = Gas.Arith.zero}
-              : kind successful_manager_operation_result)
-      | _ -> Skipped (manager_kind operation))
-
 let rec mark_skipped :
     type kind.
     payload_producer:Signature.Public_key_hash.t ->
@@ -2358,7 +2347,7 @@ let rec mark_skipped :
         (Manager_operation_result
            {
              balance_updates;
-             operation_result = skipped_operation_result operation;
+             operation_result = Skipped (manager_kind operation);
              internal_operation_results = [];
            })
   | PrecheckedCons
@@ -2371,7 +2360,7 @@ let rec mark_skipped :
         ( Manager_operation_result
             {
               balance_updates;
-              operation_result = skipped_operation_result operation;
+              operation_result = Skipped (manager_kind operation);
               internal_operation_results = [];
             },
           mark_skipped ~payload_producer level rest )
@@ -2536,54 +2525,50 @@ let rec apply_manager_contents_list_rec :
           (ctxt_result, Cons_result (result, results)))
 
 let mark_backtracked results =
-  let rec mark_contents_list :
+  let mark_results :
+      type kind.
+      kind Kind.manager contents_result -> kind Kind.manager contents_result =
+   fun results ->
+    let mark_manager_operation_result :
+        type kind.
+        kind manager_operation_result -> kind manager_operation_result =
+      function
+      | (Failed _ | Skipped _ | Backtracked _) as result -> result
+      | Applied result -> Backtracked (result, None)
+    in
+    let mark_internal_manager_operation_result :
+        type kind.
+        kind internal_manager_operation_result ->
+        kind internal_manager_operation_result = function
+      | (Failed _ | Skipped _ | Backtracked _) as result -> result
+      | Applied result -> Backtracked (result, None)
+    in
+    let mark_internal_operation_results
+        (Internal_manager_operation_result (kind, result)) =
+      Internal_manager_operation_result
+        (kind, mark_internal_manager_operation_result result)
+    in
+    match results with
+    | Manager_operation_result op ->
+        Manager_operation_result
+          {
+            balance_updates = op.balance_updates;
+            operation_result = mark_manager_operation_result op.operation_result;
+            internal_operation_results =
+              List.map
+                mark_internal_operation_results
+                op.internal_operation_results;
+          }
+  in
+  let rec traverse_apply_results :
       type kind.
       kind Kind.manager contents_result_list ->
       kind Kind.manager contents_result_list = function
-    | Single_result (Manager_operation_result op) ->
-        Single_result
-          (Manager_operation_result
-             {
-               balance_updates = op.balance_updates;
-               operation_result =
-                 mark_manager_operation_result op.operation_result;
-               internal_operation_results =
-                 List.map
-                   mark_internal_operation_results
-                   op.internal_operation_results;
-             })
-    | Cons_result (Manager_operation_result op, rest) ->
-        Cons_result
-          ( Manager_operation_result
-              {
-                balance_updates = op.balance_updates;
-                operation_result =
-                  mark_manager_operation_result op.operation_result;
-                internal_operation_results =
-                  List.map
-                    mark_internal_operation_results
-                    op.internal_operation_results;
-              },
-            mark_contents_list rest )
-  and mark_internal_operation_results
-      (Internal_manager_operation_result (kind, result)) =
-    Internal_manager_operation_result
-      (kind, mark_internal_manager_operation_result result)
-  and mark_manager_operation_result :
-      type kind. kind manager_operation_result -> kind manager_operation_result
-      = function
-    | (Failed _ | Skipped _ | Backtracked _) as result -> result
-    | Applied (Reveal_result _) as result -> result
-    | Applied result -> Backtracked (result, None)
-  and mark_internal_manager_operation_result :
-      type kind.
-      kind internal_manager_operation_result ->
-      kind internal_manager_operation_result = function
-    | (Failed _ | Skipped _ | Backtracked _) as result -> result
-    | Applied result -> Backtracked (result, None)
+    | Single_result res -> Single_result (mark_results res)
+    | Cons_result (res, rest) ->
+        Cons_result (mark_results res, traverse_apply_results rest)
   in
-  mark_contents_list results
-  [@@coq_axiom_with_reason "non-top-level mutual recursion"]
+  traverse_apply_results results
 
 type apply_mode =
   | Application of {

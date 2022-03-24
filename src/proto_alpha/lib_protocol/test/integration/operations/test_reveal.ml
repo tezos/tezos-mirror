@@ -269,6 +269,53 @@ let test_reveal_with_fake_account_already_revealed () =
         Tez.pp
         a_balance_after)
 
+(* cf: #2386
+
+   On tezos/tezos!5182 we have reverted the behaviour implemented by
+   tezos/tezos!587, which explicitly avoided marking reveal operations
+   as backtracked to reflect the fact that a reveal in a failing batch
+   did still take effect (cf #338).
+
+   We test that backtracked reveals stay backtracked. *)
+let test_backtracked_reveal_in_batch () =
+  Context.init1 ~consensus_threshold:0 () >>=? fun (blk, c) ->
+  let new_c = Account.new_account () in
+  let new_contract = Contract.Implicit new_c.pkh in
+  (* Create the contract *)
+  Op.transaction (B blk) c new_contract Tez.one >>=? fun operation ->
+  Block.bake blk ~operation >>=? fun blk ->
+  (Context.Contract.is_manager_key_revealed (B blk) new_contract >|=? function
+   | true -> Stdlib.failwith "Unexpected revelation: expected fresh pkh"
+   | false -> ())
+  >>=? fun () ->
+  Incremental.begin_construction blk >>=? fun inc ->
+  Op.revelation ~fee:Tez.zero (I inc) new_c.pk >>=? fun op_reveal ->
+  Op.transaction
+    ~force_reveal:false
+    ~fee:Tez.zero
+    (I inc)
+    new_contract
+    new_contract
+    (Tez.of_mutez_exn 1_000_001L)
+  >>=? fun op_transfer ->
+  Op.batch_operations
+    ~recompute_counters:true
+    ~source:new_contract
+    (I inc)
+    [op_reveal; op_transfer]
+  >>=? fun batched_operation ->
+  let expect_apply_failure = function
+    | [Environment.Ecoproto_error (Contract_storage.Balance_too_low _)] ->
+        return_unit
+    | _ -> assert false
+  in
+  Incremental.add_operation ~expect_apply_failure inc batched_operation
+  >>=? fun inc ->
+  (* We assert the manager key is still unrevealed, as the batch has failed *)
+  Context.Contract.is_manager_key_revealed (I inc) new_contract >>=? fun revelead ->
+  when_ revelead (fun () ->
+      failwith "Unexpected contract revelation: reveal was expected to fail")
+
 let tests =
   [
     Tztest.tztest "simple reveal" `Quick test_simple_reveal;
@@ -289,4 +336,8 @@ let tests =
       "cannot re-reveal an account with fake keys and signature"
       `Quick
       test_reveal_with_fake_account_already_revealed;
+    Tztest.tztest
+      "a backtracked reveal in a batch doesn't take effect"
+      `Quick
+      test_backtracked_reveal_in_batch;
   ]
