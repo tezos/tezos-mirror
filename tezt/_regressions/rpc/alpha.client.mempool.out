@@ -2164,86 +2164,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                             "$ref": "#/definitions/script_expr"
                                           },
                                           "amount": {
-                                            "oneOf": [
-                                              {
-                                                "title": "small",
-                                                "description": "An int64 which fits within a uint8",
-                                                "type": "object",
-                                                "properties": {
-                                                  "kind": {
-                                                    "$ref": "#/definitions/unistring"
-                                                  },
-                                                  "value": {
-                                                    "type": "integer",
-                                                    "minimum": 0,
-                                                    "maximum": 255
-                                                  }
-                                                },
-                                                "required": [
-                                                  "value",
-                                                  "kind"
-                                                ],
-                                                "additionalProperties": false
-                                              },
-                                              {
-                                                "title": "medium",
-                                                "description": "An int64 which fits within a uint16",
-                                                "type": "object",
-                                                "properties": {
-                                                  "kind": {
-                                                    "$ref": "#/definitions/unistring"
-                                                  },
-                                                  "value": {
-                                                    "type": "integer",
-                                                    "minimum": 0,
-                                                    "maximum": 65535
-                                                  }
-                                                },
-                                                "required": [
-                                                  "value",
-                                                  "kind"
-                                                ],
-                                                "additionalProperties": false
-                                              },
-                                              {
-                                                "title": "biggish",
-                                                "description": "An int64 which fits within a uint32",
-                                                "type": "object",
-                                                "properties": {
-                                                  "kind": {
-                                                    "$ref": "#/definitions/unistring"
-                                                  },
-                                                  "value": {
-                                                    "type": "integer",
-                                                    "minimum": -2147483648,
-                                                    "maximum": 2147483647
-                                                  }
-                                                },
-                                                "required": [
-                                                  "value",
-                                                  "kind"
-                                                ],
-                                                "additionalProperties": false
-                                              },
-                                              {
-                                                "title": "bigger",
-                                                "description": "An int64 which doesn't fit within a uint32",
-                                                "type": "object",
-                                                "properties": {
-                                                  "kind": {
-                                                    "$ref": "#/definitions/unistring"
-                                                  },
-                                                  "value": {
-                                                    "$ref": "#/definitions/int64"
-                                                  }
-                                                },
-                                                "required": [
-                                                  "value",
-                                                  "kind"
-                                                ],
-                                                "additionalProperties": false
-                                              }
-                                            ]
+                                            "$ref": "#/definitions/int64"
                                           }
                                         },
                                         "required": [
@@ -2301,25 +2222,12 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                         "title": "Value",
                                         "type": "object",
                                         "properties": {
-                                          "kind": {
-                                            "$ref": "#/definitions/unistring"
-                                          },
                                           "value": {
-                                            "type": "object",
-                                            "properties": {
-                                              "value": {
-                                                "$ref": "#/definitions/Context_hash"
-                                              }
-                                            },
-                                            "required": [
-                                              "value"
-                                            ],
-                                            "additionalProperties": false
+                                            "$ref": "#/definitions/Context_hash"
                                           }
                                         },
                                         "required": [
-                                          "value",
-                                          "kind"
+                                          "value"
                                         ],
                                         "additionalProperties": false
                                       },
@@ -2327,25 +2235,12 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                         "title": "Node",
                                         "type": "object",
                                         "properties": {
-                                          "kind": {
-                                            "$ref": "#/definitions/unistring"
-                                          },
-                                          "value": {
-                                            "type": "object",
-                                            "properties": {
-                                              "node": {
-                                                "$ref": "#/definitions/Context_hash"
-                                              }
-                                            },
-                                            "required": [
-                                              "node"
-                                            ],
-                                            "additionalProperties": false
+                                          "node": {
+                                            "$ref": "#/definitions/Context_hash"
                                           }
                                         },
                                         "required": [
-                                          "value",
-                                          "kind"
+                                          "node"
                                         ],
                                         "additionalProperties": false
                                       }
@@ -2357,25 +2252,12 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                         "title": "Value",
                                         "type": "object",
                                         "properties": {
-                                          "kind": {
-                                            "$ref": "#/definitions/unistring"
-                                          },
                                           "value": {
-                                            "type": "object",
-                                            "properties": {
-                                              "value": {
-                                                "$ref": "#/definitions/Context_hash"
-                                              }
-                                            },
-                                            "required": [
-                                              "value"
-                                            ],
-                                            "additionalProperties": false
+                                            "$ref": "#/definitions/Context_hash"
                                           }
                                         },
                                         "required": [
-                                          "value",
-                                          "kind"
+                                          "value"
                                         ],
                                         "additionalProperties": false
                                       },
@@ -2383,25 +2265,12 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                         "title": "Node",
                                         "type": "object",
                                         "properties": {
-                                          "kind": {
-                                            "$ref": "#/definitions/unistring"
-                                          },
-                                          "value": {
-                                            "type": "object",
-                                            "properties": {
-                                              "node": {
-                                                "$ref": "#/definitions/Context_hash"
-                                              }
-                                            },
-                                            "required": [
-                                              "node"
-                                            ],
-                                            "additionalProperties": false
+                                          "node": {
+                                            "$ref": "#/definitions/Context_hash"
                                           }
                                         },
                                         "required": [
-                                          "value",
-                                          "kind"
+                                          "node"
                                         ],
                                         "additionalProperties": false
                                       }
@@ -2415,192 +2284,52 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                           "title": "Inode",
                                           "type": "object",
                                           "properties": {
-                                            "kind": {
-                                              "$ref": "#/definitions/unistring"
-                                            },
-                                            "value": {
+                                            "inode": {
                                               "type": "object",
                                               "properties": {
-                                                "inode": {
-                                                  "type": "object",
-                                                  "properties": {
-                                                    "length": {
+                                                "length": {
+                                                  "$ref": "#/definitions/int64"
+                                                },
+                                                "proofs": {
+                                                  "type": "array",
+                                                  "items": [
+                                                    {
                                                       "oneOf": [
                                                         {
-                                                          "title": "small",
-                                                          "description": "An int64 which fits within a uint8",
-                                                          "type": "object",
-                                                          "properties": {
-                                                            "kind": {
-                                                              "$ref": "#/definitions/unistring"
-                                                            },
-                                                            "value": {
-                                                              "type": "integer",
-                                                              "minimum": 0,
-                                                              "maximum": 255
-                                                            }
-                                                          },
-                                                          "required": [
-                                                            "value",
-                                                            "kind"
-                                                          ],
-                                                          "additionalProperties": false
+                                                          "title": "none",
+                                                          "type": "null"
                                                         },
                                                         {
-                                                          "title": "medium",
-                                                          "description": "An int64 which fits within a uint16",
-                                                          "type": "object",
-                                                          "properties": {
-                                                            "kind": {
-                                                              "$ref": "#/definitions/unistring"
-                                                            },
-                                                            "value": {
-                                                              "type": "integer",
-                                                              "minimum": 0,
-                                                              "maximum": 65535
-                                                            }
-                                                          },
-                                                          "required": [
-                                                            "value",
-                                                            "kind"
-                                                          ],
-                                                          "additionalProperties": false
-                                                        },
-                                                        {
-                                                          "title": "biggish",
-                                                          "description": "An int64 which fits within a uint32",
-                                                          "type": "object",
-                                                          "properties": {
-                                                            "kind": {
-                                                              "$ref": "#/definitions/unistring"
-                                                            },
-                                                            "value": {
-                                                              "type": "integer",
-                                                              "minimum": -2147483648,
-                                                              "maximum": 2147483647
-                                                            }
-                                                          },
-                                                          "required": [
-                                                            "value",
-                                                            "kind"
-                                                          ],
-                                                          "additionalProperties": false
-                                                        },
-                                                        {
-                                                          "title": "bigger",
-                                                          "description": "An int64 which doesn't fit within a uint32",
-                                                          "type": "object",
-                                                          "properties": {
-                                                            "kind": {
-                                                              "$ref": "#/definitions/unistring"
-                                                            },
-                                                            "value": {
-                                                              "$ref": "#/definitions/int64"
-                                                            }
-                                                          },
-                                                          "required": [
-                                                            "value",
-                                                            "kind"
-                                                          ],
-                                                          "additionalProperties": false
+                                                          "title": "some",
+                                                          "$ref": "#/definitions/Context_hash"
                                                         }
                                                       ]
                                                     },
-                                                    "proofs": {
-                                                      "type": "array",
-                                                      "items": [
+                                                    {
+                                                      "oneOf": [
                                                         {
-                                                          "oneOf": [
-                                                            {
-                                                              "title": "none",
-                                                              "type": "object",
-                                                              "properties": {
-                                                                "kind": {
-                                                                  "$ref": "#/definitions/unistring"
-                                                                },
-                                                                "value": {}
-                                                              },
-                                                              "required": [
-                                                                "value",
-                                                                "kind"
-                                                              ],
-                                                              "additionalProperties": false
-                                                            },
-                                                            {
-                                                              "title": "some",
-                                                              "type": "object",
-                                                              "properties": {
-                                                                "kind": {
-                                                                  "$ref": "#/definitions/unistring"
-                                                                },
-                                                                "value": {
-                                                                  "$ref": "#/definitions/Context_hash"
-                                                                }
-                                                              },
-                                                              "required": [
-                                                                "value",
-                                                                "kind"
-                                                              ],
-                                                              "additionalProperties": false
-                                                            }
-                                                          ]
+                                                          "title": "none",
+                                                          "type": "null"
                                                         },
                                                         {
-                                                          "oneOf": [
-                                                            {
-                                                              "title": "none",
-                                                              "type": "object",
-                                                              "properties": {
-                                                                "kind": {
-                                                                  "$ref": "#/definitions/unistring"
-                                                                },
-                                                                "value": {}
-                                                              },
-                                                              "required": [
-                                                                "value",
-                                                                "kind"
-                                                              ],
-                                                              "additionalProperties": false
-                                                            },
-                                                            {
-                                                              "title": "some",
-                                                              "type": "object",
-                                                              "properties": {
-                                                                "kind": {
-                                                                  "$ref": "#/definitions/unistring"
-                                                                },
-                                                                "value": {
-                                                                  "$ref": "#/definitions/Context_hash"
-                                                                }
-                                                              },
-                                                              "required": [
-                                                                "value",
-                                                                "kind"
-                                                              ],
-                                                              "additionalProperties": false
-                                                            }
-                                                          ]
+                                                          "title": "some",
+                                                          "$ref": "#/definitions/Context_hash"
                                                         }
-                                                      ],
-                                                      "additionalItems": false
+                                                      ]
                                                     }
-                                                  },
-                                                  "required": [
-                                                    "proofs",
-                                                    "length"
                                                   ],
-                                                  "additionalProperties": false
+                                                  "additionalItems": false
                                                 }
                                               },
                                               "required": [
-                                                "inode"
+                                                "proofs",
+                                                "length"
                                               ],
                                               "additionalProperties": false
                                             }
                                           },
                                           "required": [
-                                            "value",
-                                            "kind"
+                                            "inode"
                                           ],
                                           "additionalProperties": false
                                         },
@@ -2608,365 +2337,144 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                           "title": "other_elts",
                                           "type": "object",
                                           "properties": {
-                                            "kind": {
-                                              "$ref": "#/definitions/unistring"
-                                            },
-                                            "value": {
-                                              "type": "object",
-                                              "properties": {
-                                                "other_elts": {
-                                                  "oneOf": [
-                                                    {
-                                                      "title": "Node",
-                                                      "type": "object",
-                                                      "properties": {
-                                                        "kind": {
-                                                          "$ref": "#/definitions/unistring"
-                                                        },
-                                                        "value": {
-                                                          "type": "object",
-                                                          "properties": {
-                                                            "node": {
-                                                              "type": "array",
-                                                              "items": {
-                                                                "type": "array",
-                                                                "items": [
-                                                                  {
-                                                                    "type": "string",
-                                                                    "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
-                                                                  },
-                                                                  {
-                                                                    "oneOf": [
-                                                                      {
-                                                                        "title": "Value",
-                                                                        "type": "object",
-                                                                        "properties": {
-                                                                          "kind": {
-                                                                            "$ref": "#/definitions/unistring"
-                                                                          },
-                                                                          "value": {
-                                                                            "type": "object",
-                                                                            "properties": {
-                                                                              "value": {
-                                                                                "$ref": "#/definitions/Context_hash"
-                                                                              }
-                                                                            },
-                                                                            "required": [
-                                                                              "value"
-                                                                            ],
-                                                                            "additionalProperties": false
-                                                                          }
-                                                                        },
-                                                                        "required": [
-                                                                          "value",
-                                                                          "kind"
-                                                                        ],
-                                                                        "additionalProperties": false
-                                                                      },
-                                                                      {
-                                                                        "title": "Node",
-                                                                        "type": "object",
-                                                                        "properties": {
-                                                                          "kind": {
-                                                                            "$ref": "#/definitions/unistring"
-                                                                          },
-                                                                          "value": {
-                                                                            "type": "object",
-                                                                            "properties": {
-                                                                              "node": {
-                                                                                "$ref": "#/definitions/Context_hash"
-                                                                              }
-                                                                            },
-                                                                            "required": [
-                                                                              "node"
-                                                                            ],
-                                                                            "additionalProperties": false
-                                                                          }
-                                                                        },
-                                                                        "required": [
-                                                                          "value",
-                                                                          "kind"
-                                                                        ],
-                                                                        "additionalProperties": false
-                                                                      }
-                                                                    ]
-                                                                  }
-                                                                ],
-                                                                "additionalItems": false
-                                                              }
-                                                            }
+                                            "other_elts": {
+                                              "oneOf": [
+                                                {
+                                                  "title": "Node",
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "node": {
+                                                      "type": "array",
+                                                      "items": {
+                                                        "type": "array",
+                                                        "items": [
+                                                          {
+                                                            "type": "string",
+                                                            "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
                                                           },
-                                                          "required": [
-                                                            "node"
-                                                          ],
-                                                          "additionalProperties": false
-                                                        }
-                                                      },
-                                                      "required": [
-                                                        "value",
-                                                        "kind"
-                                                      ],
-                                                      "additionalProperties": false
-                                                    },
-                                                    {
-                                                      "title": "other_elts",
-                                                      "type": "object",
-                                                      "properties": {
-                                                        "kind": {
-                                                          "$ref": "#/definitions/unistring"
-                                                        },
-                                                        "value": {
+                                                          {
+                                                            "oneOf": [
+                                                              {
+                                                                "title": "Value",
+                                                                "type": "object",
+                                                                "properties": {
+                                                                  "value": {
+                                                                    "$ref": "#/definitions/Context_hash"
+                                                                  }
+                                                                },
+                                                                "required": [
+                                                                  "value"
+                                                                ],
+                                                                "additionalProperties": false
+                                                              },
+                                                              {
+                                                                "title": "Node",
+                                                                "type": "object",
+                                                                "properties": {
+                                                                  "node": {
+                                                                    "$ref": "#/definitions/Context_hash"
+                                                                  }
+                                                                },
+                                                                "required": [
+                                                                  "node"
+                                                                ],
+                                                                "additionalProperties": false
+                                                              }
+                                                            ]
+                                                          }
+                                                        ],
+                                                        "additionalItems": false
+                                                      }
+                                                    }
+                                                  },
+                                                  "required": [
+                                                    "node"
+                                                  ],
+                                                  "additionalProperties": false
+                                                },
+                                                {
+                                                  "title": "other_elts",
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "other_elts": {
+                                                      "oneOf": [
+                                                        {
+                                                          "title": "Value",
                                                           "type": "object",
                                                           "properties": {
-                                                            "other_elts": {
+                                                            "value": {
                                                               "oneOf": [
                                                                 {
-                                                                  "title": "Value",
-                                                                  "type": "object",
-                                                                  "properties": {
-                                                                    "kind": {
-                                                                      "$ref": "#/definitions/unistring"
-                                                                    },
-                                                                    "value": {
-                                                                      "type": "object",
-                                                                      "properties": {
-                                                                        "value": {
-                                                                          "oneOf": [
-                                                                            {
-                                                                              "title": "short_bytes",
-                                                                              "type": "object",
-                                                                              "properties": {
-                                                                                "kind": {
-                                                                                  "$ref": "#/definitions/unistring"
-                                                                                },
-                                                                                "value": {
-                                                                                  "type": "string",
-                                                                                  "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
-                                                                                }
-                                                                              },
-                                                                              "required": [
-                                                                                "value",
-                                                                                "kind"
-                                                                              ],
-                                                                              "additionalProperties": false
-                                                                            },
-                                                                            {
-                                                                              "title": "medium_bytes",
-                                                                              "type": "object",
-                                                                              "properties": {
-                                                                                "kind": {
-                                                                                  "$ref": "#/definitions/unistring"
-                                                                                },
-                                                                                "value": {
-                                                                                  "type": "string",
-                                                                                  "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
-                                                                                }
-                                                                              },
-                                                                              "required": [
-                                                                                "value",
-                                                                                "kind"
-                                                                              ],
-                                                                              "additionalProperties": false
-                                                                            },
-                                                                            {
-                                                                              "title": "long_bytes",
-                                                                              "description": "This case is void. No data is accepted.",
-                                                                              "type": "object",
-                                                                              "properties": {
-                                                                                "kind": {
-                                                                                  "$ref": "#/definitions/unistring"
-                                                                                },
-                                                                                "value": {}
-                                                                              },
-                                                                              "required": [
-                                                                                "value",
-                                                                                "kind"
-                                                                              ],
-                                                                              "additionalProperties": false
-                                                                            },
-                                                                            {
-                                                                              "title": "unlimited_bytes",
-                                                                              "type": "object",
-                                                                              "properties": {
-                                                                                "kind": {
-                                                                                  "$ref": "#/definitions/unistring"
-                                                                                },
-                                                                                "value": {
-                                                                                  "type": "string",
-                                                                                  "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
-                                                                                }
-                                                                              },
-                                                                              "required": [
-                                                                                "value",
-                                                                                "kind"
-                                                                              ],
-                                                                              "additionalProperties": false
-                                                                            }
-                                                                          ]
-                                                                        }
-                                                                      },
-                                                                      "required": [
-                                                                        "value"
-                                                                      ],
-                                                                      "additionalProperties": false
-                                                                    }
-                                                                  },
-                                                                  "required": [
-                                                                    "value",
-                                                                    "kind"
-                                                                  ],
-                                                                  "additionalProperties": false
+                                                                  "title": "short_bytes",
+                                                                  "type": "string",
+                                                                  "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
                                                                 },
                                                                 {
-                                                                  "title": "Inode_extender",
-                                                                  "type": "object",
-                                                                  "properties": {
-                                                                    "kind": {
-                                                                      "$ref": "#/definitions/unistring"
-                                                                    },
-                                                                    "value": {
-                                                                      "type": "object",
-                                                                      "properties": {
-                                                                        "inode_extender": {
-                                                                          "type": "object",
-                                                                          "properties": {
-                                                                            "length": {
-                                                                              "oneOf": [
-                                                                                {
-                                                                                  "title": "small",
-                                                                                  "description": "An int64 which fits within a uint8",
-                                                                                  "type": "object",
-                                                                                  "properties": {
-                                                                                    "kind": {
-                                                                                      "$ref": "#/definitions/unistring"
-                                                                                    },
-                                                                                    "value": {
-                                                                                      "type": "integer",
-                                                                                      "minimum": 0,
-                                                                                      "maximum": 255
-                                                                                    }
-                                                                                  },
-                                                                                  "required": [
-                                                                                    "value",
-                                                                                    "kind"
-                                                                                  ],
-                                                                                  "additionalProperties": false
-                                                                                },
-                                                                                {
-                                                                                  "title": "medium",
-                                                                                  "description": "An int64 which fits within a uint16",
-                                                                                  "type": "object",
-                                                                                  "properties": {
-                                                                                    "kind": {
-                                                                                      "$ref": "#/definitions/unistring"
-                                                                                    },
-                                                                                    "value": {
-                                                                                      "type": "integer",
-                                                                                      "minimum": 0,
-                                                                                      "maximum": 65535
-                                                                                    }
-                                                                                  },
-                                                                                  "required": [
-                                                                                    "value",
-                                                                                    "kind"
-                                                                                  ],
-                                                                                  "additionalProperties": false
-                                                                                },
-                                                                                {
-                                                                                  "title": "biggish",
-                                                                                  "description": "An int64 which fits within a uint32",
-                                                                                  "type": "object",
-                                                                                  "properties": {
-                                                                                    "kind": {
-                                                                                      "$ref": "#/definitions/unistring"
-                                                                                    },
-                                                                                    "value": {
-                                                                                      "type": "integer",
-                                                                                      "minimum": -2147483648,
-                                                                                      "maximum": 2147483647
-                                                                                    }
-                                                                                  },
-                                                                                  "required": [
-                                                                                    "value",
-                                                                                    "kind"
-                                                                                  ],
-                                                                                  "additionalProperties": false
-                                                                                },
-                                                                                {
-                                                                                  "title": "bigger",
-                                                                                  "description": "An int64 which doesn't fit within a uint32",
-                                                                                  "type": "object",
-                                                                                  "properties": {
-                                                                                    "kind": {
-                                                                                      "$ref": "#/definitions/unistring"
-                                                                                    },
-                                                                                    "value": {
-                                                                                      "$ref": "#/definitions/int64"
-                                                                                    }
-                                                                                  },
-                                                                                  "required": [
-                                                                                    "value",
-                                                                                    "kind"
-                                                                                  ],
-                                                                                  "additionalProperties": false
-                                                                                }
-                                                                              ]
-                                                                            },
-                                                                            "segment": {
-                                                                              "type": "string",
-                                                                              "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
-                                                                            },
-                                                                            "proof": {
-                                                                              "$ref": "#/definitions/Context_hash"
-                                                                            }
-                                                                          },
-                                                                          "required": [
-                                                                            "proof",
-                                                                            "segment",
-                                                                            "length"
-                                                                          ],
-                                                                          "additionalProperties": false
-                                                                        }
-                                                                      },
-                                                                      "required": [
-                                                                        "inode_extender"
-                                                                      ],
-                                                                      "additionalProperties": false
-                                                                    }
-                                                                  },
-                                                                  "required": [
-                                                                    "value",
-                                                                    "kind"
-                                                                  ],
-                                                                  "additionalProperties": false
+                                                                  "title": "medium_bytes",
+                                                                  "type": "string",
+                                                                  "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                                                                },
+                                                                {
+                                                                  "title": "long_bytes",
+                                                                  "description": "This case is void. No data is accepted."
+                                                                },
+                                                                {
+                                                                  "title": "unlimited_bytes",
+                                                                  "type": "string",
+                                                                  "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
                                                                 }
                                                               ]
                                                             }
                                                           },
                                                           "required": [
-                                                            "other_elts"
+                                                            "value"
+                                                          ],
+                                                          "additionalProperties": false
+                                                        },
+                                                        {
+                                                          "title": "Inode_extender",
+                                                          "type": "object",
+                                                          "properties": {
+                                                            "inode_extender": {
+                                                              "type": "object",
+                                                              "properties": {
+                                                                "length": {
+                                                                  "$ref": "#/definitions/int64"
+                                                                },
+                                                                "segment": {
+                                                                  "type": "string",
+                                                                  "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                                                                },
+                                                                "proof": {
+                                                                  "$ref": "#/definitions/Context_hash"
+                                                                }
+                                                              },
+                                                              "required": [
+                                                                "proof",
+                                                                "segment",
+                                                                "length"
+                                                              ],
+                                                              "additionalProperties": false
+                                                            }
+                                                          },
+                                                          "required": [
+                                                            "inode_extender"
                                                           ],
                                                           "additionalProperties": false
                                                         }
-                                                      },
-                                                      "required": [
-                                                        "value",
-                                                        "kind"
-                                                      ],
-                                                      "additionalProperties": false
+                                                      ]
                                                     }
-                                                  ]
+                                                  },
+                                                  "required": [
+                                                    "other_elts"
+                                                  ],
+                                                  "additionalProperties": false
                                                 }
-                                              },
-                                              "required": [
-                                                "other_elts"
-                                              ],
-                                              "additionalProperties": false
+                                              ]
                                             }
                                           },
                                           "required": [
-                                            "value",
-                                            "kind"
+                                            "other_elts"
                                           ],
                                           "additionalProperties": false
                                         }
@@ -3213,86 +2721,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 "$ref": "#/definitions/alpha.contract_id"
                               },
                               "ticket_amount": {
-                                "oneOf": [
-                                  {
-                                    "title": "small",
-                                    "description": "An int64 which fits within a uint8",
-                                    "type": "object",
-                                    "properties": {
-                                      "kind": {
-                                        "$ref": "#/definitions/unistring"
-                                      },
-                                      "value": {
-                                        "type": "integer",
-                                        "minimum": 0,
-                                        "maximum": 255
-                                      }
-                                    },
-                                    "required": [
-                                      "value",
-                                      "kind"
-                                    ],
-                                    "additionalProperties": false
-                                  },
-                                  {
-                                    "title": "medium",
-                                    "description": "An int64 which fits within a uint16",
-                                    "type": "object",
-                                    "properties": {
-                                      "kind": {
-                                        "$ref": "#/definitions/unistring"
-                                      },
-                                      "value": {
-                                        "type": "integer",
-                                        "minimum": 0,
-                                        "maximum": 65535
-                                      }
-                                    },
-                                    "required": [
-                                      "value",
-                                      "kind"
-                                    ],
-                                    "additionalProperties": false
-                                  },
-                                  {
-                                    "title": "biggish",
-                                    "description": "An int64 which fits within a uint32",
-                                    "type": "object",
-                                    "properties": {
-                                      "kind": {
-                                        "$ref": "#/definitions/unistring"
-                                      },
-                                      "value": {
-                                        "type": "integer",
-                                        "minimum": -2147483648,
-                                        "maximum": 2147483647
-                                      }
-                                    },
-                                    "required": [
-                                      "value",
-                                      "kind"
-                                    ],
-                                    "additionalProperties": false
-                                  },
-                                  {
-                                    "title": "bigger",
-                                    "description": "An int64 which doesn't fit within a uint32",
-                                    "type": "object",
-                                    "properties": {
-                                      "kind": {
-                                        "$ref": "#/definitions/unistring"
-                                      },
-                                      "value": {
-                                        "$ref": "#/definitions/int64"
-                                      }
-                                    },
-                                    "required": [
-                                      "value",
-                                      "kind"
-                                    ],
-                                    "additionalProperties": false
-                                  }
-                                ]
+                                "$ref": "#/definitions/int64"
                               },
                               "destination": {
                                 "$ref": "#/definitions/alpha.contract_id"
@@ -11810,86 +11239,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                             "$ref": "#/definitions/script_expr"
                                           },
                                           "amount": {
-                                            "oneOf": [
-                                              {
-                                                "title": "small",
-                                                "description": "An int64 which fits within a uint8",
-                                                "type": "object",
-                                                "properties": {
-                                                  "kind": {
-                                                    "$ref": "#/definitions/unistring"
-                                                  },
-                                                  "value": {
-                                                    "type": "integer",
-                                                    "minimum": 0,
-                                                    "maximum": 255
-                                                  }
-                                                },
-                                                "required": [
-                                                  "value",
-                                                  "kind"
-                                                ],
-                                                "additionalProperties": false
-                                              },
-                                              {
-                                                "title": "medium",
-                                                "description": "An int64 which fits within a uint16",
-                                                "type": "object",
-                                                "properties": {
-                                                  "kind": {
-                                                    "$ref": "#/definitions/unistring"
-                                                  },
-                                                  "value": {
-                                                    "type": "integer",
-                                                    "minimum": 0,
-                                                    "maximum": 65535
-                                                  }
-                                                },
-                                                "required": [
-                                                  "value",
-                                                  "kind"
-                                                ],
-                                                "additionalProperties": false
-                                              },
-                                              {
-                                                "title": "biggish",
-                                                "description": "An int64 which fits within a uint32",
-                                                "type": "object",
-                                                "properties": {
-                                                  "kind": {
-                                                    "$ref": "#/definitions/unistring"
-                                                  },
-                                                  "value": {
-                                                    "type": "integer",
-                                                    "minimum": -2147483648,
-                                                    "maximum": 2147483647
-                                                  }
-                                                },
-                                                "required": [
-                                                  "value",
-                                                  "kind"
-                                                ],
-                                                "additionalProperties": false
-                                              },
-                                              {
-                                                "title": "bigger",
-                                                "description": "An int64 which doesn't fit within a uint32",
-                                                "type": "object",
-                                                "properties": {
-                                                  "kind": {
-                                                    "$ref": "#/definitions/unistring"
-                                                  },
-                                                  "value": {
-                                                    "$ref": "#/definitions/int64"
-                                                  }
-                                                },
-                                                "required": [
-                                                  "value",
-                                                  "kind"
-                                                ],
-                                                "additionalProperties": false
-                                              }
-                                            ]
+                                            "$ref": "#/definitions/int64"
                                           }
                                         },
                                         "required": [
@@ -11947,25 +11297,12 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                         "title": "Value",
                                         "type": "object",
                                         "properties": {
-                                          "kind": {
-                                            "$ref": "#/definitions/unistring"
-                                          },
                                           "value": {
-                                            "type": "object",
-                                            "properties": {
-                                              "value": {
-                                                "$ref": "#/definitions/Context_hash"
-                                              }
-                                            },
-                                            "required": [
-                                              "value"
-                                            ],
-                                            "additionalProperties": false
+                                            "$ref": "#/definitions/Context_hash"
                                           }
                                         },
                                         "required": [
-                                          "value",
-                                          "kind"
+                                          "value"
                                         ],
                                         "additionalProperties": false
                                       },
@@ -11973,25 +11310,12 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                         "title": "Node",
                                         "type": "object",
                                         "properties": {
-                                          "kind": {
-                                            "$ref": "#/definitions/unistring"
-                                          },
-                                          "value": {
-                                            "type": "object",
-                                            "properties": {
-                                              "node": {
-                                                "$ref": "#/definitions/Context_hash"
-                                              }
-                                            },
-                                            "required": [
-                                              "node"
-                                            ],
-                                            "additionalProperties": false
+                                          "node": {
+                                            "$ref": "#/definitions/Context_hash"
                                           }
                                         },
                                         "required": [
-                                          "value",
-                                          "kind"
+                                          "node"
                                         ],
                                         "additionalProperties": false
                                       }
@@ -12003,25 +11327,12 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                         "title": "Value",
                                         "type": "object",
                                         "properties": {
-                                          "kind": {
-                                            "$ref": "#/definitions/unistring"
-                                          },
                                           "value": {
-                                            "type": "object",
-                                            "properties": {
-                                              "value": {
-                                                "$ref": "#/definitions/Context_hash"
-                                              }
-                                            },
-                                            "required": [
-                                              "value"
-                                            ],
-                                            "additionalProperties": false
+                                            "$ref": "#/definitions/Context_hash"
                                           }
                                         },
                                         "required": [
-                                          "value",
-                                          "kind"
+                                          "value"
                                         ],
                                         "additionalProperties": false
                                       },
@@ -12029,25 +11340,12 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                         "title": "Node",
                                         "type": "object",
                                         "properties": {
-                                          "kind": {
-                                            "$ref": "#/definitions/unistring"
-                                          },
-                                          "value": {
-                                            "type": "object",
-                                            "properties": {
-                                              "node": {
-                                                "$ref": "#/definitions/Context_hash"
-                                              }
-                                            },
-                                            "required": [
-                                              "node"
-                                            ],
-                                            "additionalProperties": false
+                                          "node": {
+                                            "$ref": "#/definitions/Context_hash"
                                           }
                                         },
                                         "required": [
-                                          "value",
-                                          "kind"
+                                          "node"
                                         ],
                                         "additionalProperties": false
                                       }
@@ -12061,192 +11359,52 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                           "title": "Inode",
                                           "type": "object",
                                           "properties": {
-                                            "kind": {
-                                              "$ref": "#/definitions/unistring"
-                                            },
-                                            "value": {
+                                            "inode": {
                                               "type": "object",
                                               "properties": {
-                                                "inode": {
-                                                  "type": "object",
-                                                  "properties": {
-                                                    "length": {
+                                                "length": {
+                                                  "$ref": "#/definitions/int64"
+                                                },
+                                                "proofs": {
+                                                  "type": "array",
+                                                  "items": [
+                                                    {
                                                       "oneOf": [
                                                         {
-                                                          "title": "small",
-                                                          "description": "An int64 which fits within a uint8",
-                                                          "type": "object",
-                                                          "properties": {
-                                                            "kind": {
-                                                              "$ref": "#/definitions/unistring"
-                                                            },
-                                                            "value": {
-                                                              "type": "integer",
-                                                              "minimum": 0,
-                                                              "maximum": 255
-                                                            }
-                                                          },
-                                                          "required": [
-                                                            "value",
-                                                            "kind"
-                                                          ],
-                                                          "additionalProperties": false
+                                                          "title": "none",
+                                                          "type": "null"
                                                         },
                                                         {
-                                                          "title": "medium",
-                                                          "description": "An int64 which fits within a uint16",
-                                                          "type": "object",
-                                                          "properties": {
-                                                            "kind": {
-                                                              "$ref": "#/definitions/unistring"
-                                                            },
-                                                            "value": {
-                                                              "type": "integer",
-                                                              "minimum": 0,
-                                                              "maximum": 65535
-                                                            }
-                                                          },
-                                                          "required": [
-                                                            "value",
-                                                            "kind"
-                                                          ],
-                                                          "additionalProperties": false
-                                                        },
-                                                        {
-                                                          "title": "biggish",
-                                                          "description": "An int64 which fits within a uint32",
-                                                          "type": "object",
-                                                          "properties": {
-                                                            "kind": {
-                                                              "$ref": "#/definitions/unistring"
-                                                            },
-                                                            "value": {
-                                                              "type": "integer",
-                                                              "minimum": -2147483648,
-                                                              "maximum": 2147483647
-                                                            }
-                                                          },
-                                                          "required": [
-                                                            "value",
-                                                            "kind"
-                                                          ],
-                                                          "additionalProperties": false
-                                                        },
-                                                        {
-                                                          "title": "bigger",
-                                                          "description": "An int64 which doesn't fit within a uint32",
-                                                          "type": "object",
-                                                          "properties": {
-                                                            "kind": {
-                                                              "$ref": "#/definitions/unistring"
-                                                            },
-                                                            "value": {
-                                                              "$ref": "#/definitions/int64"
-                                                            }
-                                                          },
-                                                          "required": [
-                                                            "value",
-                                                            "kind"
-                                                          ],
-                                                          "additionalProperties": false
+                                                          "title": "some",
+                                                          "$ref": "#/definitions/Context_hash"
                                                         }
                                                       ]
                                                     },
-                                                    "proofs": {
-                                                      "type": "array",
-                                                      "items": [
+                                                    {
+                                                      "oneOf": [
                                                         {
-                                                          "oneOf": [
-                                                            {
-                                                              "title": "none",
-                                                              "type": "object",
-                                                              "properties": {
-                                                                "kind": {
-                                                                  "$ref": "#/definitions/unistring"
-                                                                },
-                                                                "value": {}
-                                                              },
-                                                              "required": [
-                                                                "value",
-                                                                "kind"
-                                                              ],
-                                                              "additionalProperties": false
-                                                            },
-                                                            {
-                                                              "title": "some",
-                                                              "type": "object",
-                                                              "properties": {
-                                                                "kind": {
-                                                                  "$ref": "#/definitions/unistring"
-                                                                },
-                                                                "value": {
-                                                                  "$ref": "#/definitions/Context_hash"
-                                                                }
-                                                              },
-                                                              "required": [
-                                                                "value",
-                                                                "kind"
-                                                              ],
-                                                              "additionalProperties": false
-                                                            }
-                                                          ]
+                                                          "title": "none",
+                                                          "type": "null"
                                                         },
                                                         {
-                                                          "oneOf": [
-                                                            {
-                                                              "title": "none",
-                                                              "type": "object",
-                                                              "properties": {
-                                                                "kind": {
-                                                                  "$ref": "#/definitions/unistring"
-                                                                },
-                                                                "value": {}
-                                                              },
-                                                              "required": [
-                                                                "value",
-                                                                "kind"
-                                                              ],
-                                                              "additionalProperties": false
-                                                            },
-                                                            {
-                                                              "title": "some",
-                                                              "type": "object",
-                                                              "properties": {
-                                                                "kind": {
-                                                                  "$ref": "#/definitions/unistring"
-                                                                },
-                                                                "value": {
-                                                                  "$ref": "#/definitions/Context_hash"
-                                                                }
-                                                              },
-                                                              "required": [
-                                                                "value",
-                                                                "kind"
-                                                              ],
-                                                              "additionalProperties": false
-                                                            }
-                                                          ]
+                                                          "title": "some",
+                                                          "$ref": "#/definitions/Context_hash"
                                                         }
-                                                      ],
-                                                      "additionalItems": false
+                                                      ]
                                                     }
-                                                  },
-                                                  "required": [
-                                                    "proofs",
-                                                    "length"
                                                   ],
-                                                  "additionalProperties": false
+                                                  "additionalItems": false
                                                 }
                                               },
                                               "required": [
-                                                "inode"
+                                                "proofs",
+                                                "length"
                                               ],
                                               "additionalProperties": false
                                             }
                                           },
                                           "required": [
-                                            "value",
-                                            "kind"
+                                            "inode"
                                           ],
                                           "additionalProperties": false
                                         },
@@ -12254,365 +11412,144 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                           "title": "other_elts",
                                           "type": "object",
                                           "properties": {
-                                            "kind": {
-                                              "$ref": "#/definitions/unistring"
-                                            },
-                                            "value": {
-                                              "type": "object",
-                                              "properties": {
-                                                "other_elts": {
-                                                  "oneOf": [
-                                                    {
-                                                      "title": "Node",
-                                                      "type": "object",
-                                                      "properties": {
-                                                        "kind": {
-                                                          "$ref": "#/definitions/unistring"
-                                                        },
-                                                        "value": {
-                                                          "type": "object",
-                                                          "properties": {
-                                                            "node": {
-                                                              "type": "array",
-                                                              "items": {
-                                                                "type": "array",
-                                                                "items": [
-                                                                  {
-                                                                    "type": "string",
-                                                                    "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
-                                                                  },
-                                                                  {
-                                                                    "oneOf": [
-                                                                      {
-                                                                        "title": "Value",
-                                                                        "type": "object",
-                                                                        "properties": {
-                                                                          "kind": {
-                                                                            "$ref": "#/definitions/unistring"
-                                                                          },
-                                                                          "value": {
-                                                                            "type": "object",
-                                                                            "properties": {
-                                                                              "value": {
-                                                                                "$ref": "#/definitions/Context_hash"
-                                                                              }
-                                                                            },
-                                                                            "required": [
-                                                                              "value"
-                                                                            ],
-                                                                            "additionalProperties": false
-                                                                          }
-                                                                        },
-                                                                        "required": [
-                                                                          "value",
-                                                                          "kind"
-                                                                        ],
-                                                                        "additionalProperties": false
-                                                                      },
-                                                                      {
-                                                                        "title": "Node",
-                                                                        "type": "object",
-                                                                        "properties": {
-                                                                          "kind": {
-                                                                            "$ref": "#/definitions/unistring"
-                                                                          },
-                                                                          "value": {
-                                                                            "type": "object",
-                                                                            "properties": {
-                                                                              "node": {
-                                                                                "$ref": "#/definitions/Context_hash"
-                                                                              }
-                                                                            },
-                                                                            "required": [
-                                                                              "node"
-                                                                            ],
-                                                                            "additionalProperties": false
-                                                                          }
-                                                                        },
-                                                                        "required": [
-                                                                          "value",
-                                                                          "kind"
-                                                                        ],
-                                                                        "additionalProperties": false
-                                                                      }
-                                                                    ]
-                                                                  }
-                                                                ],
-                                                                "additionalItems": false
-                                                              }
-                                                            }
+                                            "other_elts": {
+                                              "oneOf": [
+                                                {
+                                                  "title": "Node",
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "node": {
+                                                      "type": "array",
+                                                      "items": {
+                                                        "type": "array",
+                                                        "items": [
+                                                          {
+                                                            "type": "string",
+                                                            "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
                                                           },
-                                                          "required": [
-                                                            "node"
-                                                          ],
-                                                          "additionalProperties": false
-                                                        }
-                                                      },
-                                                      "required": [
-                                                        "value",
-                                                        "kind"
-                                                      ],
-                                                      "additionalProperties": false
-                                                    },
-                                                    {
-                                                      "title": "other_elts",
-                                                      "type": "object",
-                                                      "properties": {
-                                                        "kind": {
-                                                          "$ref": "#/definitions/unistring"
-                                                        },
-                                                        "value": {
+                                                          {
+                                                            "oneOf": [
+                                                              {
+                                                                "title": "Value",
+                                                                "type": "object",
+                                                                "properties": {
+                                                                  "value": {
+                                                                    "$ref": "#/definitions/Context_hash"
+                                                                  }
+                                                                },
+                                                                "required": [
+                                                                  "value"
+                                                                ],
+                                                                "additionalProperties": false
+                                                              },
+                                                              {
+                                                                "title": "Node",
+                                                                "type": "object",
+                                                                "properties": {
+                                                                  "node": {
+                                                                    "$ref": "#/definitions/Context_hash"
+                                                                  }
+                                                                },
+                                                                "required": [
+                                                                  "node"
+                                                                ],
+                                                                "additionalProperties": false
+                                                              }
+                                                            ]
+                                                          }
+                                                        ],
+                                                        "additionalItems": false
+                                                      }
+                                                    }
+                                                  },
+                                                  "required": [
+                                                    "node"
+                                                  ],
+                                                  "additionalProperties": false
+                                                },
+                                                {
+                                                  "title": "other_elts",
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "other_elts": {
+                                                      "oneOf": [
+                                                        {
+                                                          "title": "Value",
                                                           "type": "object",
                                                           "properties": {
-                                                            "other_elts": {
+                                                            "value": {
                                                               "oneOf": [
                                                                 {
-                                                                  "title": "Value",
-                                                                  "type": "object",
-                                                                  "properties": {
-                                                                    "kind": {
-                                                                      "$ref": "#/definitions/unistring"
-                                                                    },
-                                                                    "value": {
-                                                                      "type": "object",
-                                                                      "properties": {
-                                                                        "value": {
-                                                                          "oneOf": [
-                                                                            {
-                                                                              "title": "short_bytes",
-                                                                              "type": "object",
-                                                                              "properties": {
-                                                                                "kind": {
-                                                                                  "$ref": "#/definitions/unistring"
-                                                                                },
-                                                                                "value": {
-                                                                                  "type": "string",
-                                                                                  "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
-                                                                                }
-                                                                              },
-                                                                              "required": [
-                                                                                "value",
-                                                                                "kind"
-                                                                              ],
-                                                                              "additionalProperties": false
-                                                                            },
-                                                                            {
-                                                                              "title": "medium_bytes",
-                                                                              "type": "object",
-                                                                              "properties": {
-                                                                                "kind": {
-                                                                                  "$ref": "#/definitions/unistring"
-                                                                                },
-                                                                                "value": {
-                                                                                  "type": "string",
-                                                                                  "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
-                                                                                }
-                                                                              },
-                                                                              "required": [
-                                                                                "value",
-                                                                                "kind"
-                                                                              ],
-                                                                              "additionalProperties": false
-                                                                            },
-                                                                            {
-                                                                              "title": "long_bytes",
-                                                                              "description": "This case is void. No data is accepted.",
-                                                                              "type": "object",
-                                                                              "properties": {
-                                                                                "kind": {
-                                                                                  "$ref": "#/definitions/unistring"
-                                                                                },
-                                                                                "value": {}
-                                                                              },
-                                                                              "required": [
-                                                                                "value",
-                                                                                "kind"
-                                                                              ],
-                                                                              "additionalProperties": false
-                                                                            },
-                                                                            {
-                                                                              "title": "unlimited_bytes",
-                                                                              "type": "object",
-                                                                              "properties": {
-                                                                                "kind": {
-                                                                                  "$ref": "#/definitions/unistring"
-                                                                                },
-                                                                                "value": {
-                                                                                  "type": "string",
-                                                                                  "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
-                                                                                }
-                                                                              },
-                                                                              "required": [
-                                                                                "value",
-                                                                                "kind"
-                                                                              ],
-                                                                              "additionalProperties": false
-                                                                            }
-                                                                          ]
-                                                                        }
-                                                                      },
-                                                                      "required": [
-                                                                        "value"
-                                                                      ],
-                                                                      "additionalProperties": false
-                                                                    }
-                                                                  },
-                                                                  "required": [
-                                                                    "value",
-                                                                    "kind"
-                                                                  ],
-                                                                  "additionalProperties": false
+                                                                  "title": "short_bytes",
+                                                                  "type": "string",
+                                                                  "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
                                                                 },
                                                                 {
-                                                                  "title": "Inode_extender",
-                                                                  "type": "object",
-                                                                  "properties": {
-                                                                    "kind": {
-                                                                      "$ref": "#/definitions/unistring"
-                                                                    },
-                                                                    "value": {
-                                                                      "type": "object",
-                                                                      "properties": {
-                                                                        "inode_extender": {
-                                                                          "type": "object",
-                                                                          "properties": {
-                                                                            "length": {
-                                                                              "oneOf": [
-                                                                                {
-                                                                                  "title": "small",
-                                                                                  "description": "An int64 which fits within a uint8",
-                                                                                  "type": "object",
-                                                                                  "properties": {
-                                                                                    "kind": {
-                                                                                      "$ref": "#/definitions/unistring"
-                                                                                    },
-                                                                                    "value": {
-                                                                                      "type": "integer",
-                                                                                      "minimum": 0,
-                                                                                      "maximum": 255
-                                                                                    }
-                                                                                  },
-                                                                                  "required": [
-                                                                                    "value",
-                                                                                    "kind"
-                                                                                  ],
-                                                                                  "additionalProperties": false
-                                                                                },
-                                                                                {
-                                                                                  "title": "medium",
-                                                                                  "description": "An int64 which fits within a uint16",
-                                                                                  "type": "object",
-                                                                                  "properties": {
-                                                                                    "kind": {
-                                                                                      "$ref": "#/definitions/unistring"
-                                                                                    },
-                                                                                    "value": {
-                                                                                      "type": "integer",
-                                                                                      "minimum": 0,
-                                                                                      "maximum": 65535
-                                                                                    }
-                                                                                  },
-                                                                                  "required": [
-                                                                                    "value",
-                                                                                    "kind"
-                                                                                  ],
-                                                                                  "additionalProperties": false
-                                                                                },
-                                                                                {
-                                                                                  "title": "biggish",
-                                                                                  "description": "An int64 which fits within a uint32",
-                                                                                  "type": "object",
-                                                                                  "properties": {
-                                                                                    "kind": {
-                                                                                      "$ref": "#/definitions/unistring"
-                                                                                    },
-                                                                                    "value": {
-                                                                                      "type": "integer",
-                                                                                      "minimum": -2147483648,
-                                                                                      "maximum": 2147483647
-                                                                                    }
-                                                                                  },
-                                                                                  "required": [
-                                                                                    "value",
-                                                                                    "kind"
-                                                                                  ],
-                                                                                  "additionalProperties": false
-                                                                                },
-                                                                                {
-                                                                                  "title": "bigger",
-                                                                                  "description": "An int64 which doesn't fit within a uint32",
-                                                                                  "type": "object",
-                                                                                  "properties": {
-                                                                                    "kind": {
-                                                                                      "$ref": "#/definitions/unistring"
-                                                                                    },
-                                                                                    "value": {
-                                                                                      "$ref": "#/definitions/int64"
-                                                                                    }
-                                                                                  },
-                                                                                  "required": [
-                                                                                    "value",
-                                                                                    "kind"
-                                                                                  ],
-                                                                                  "additionalProperties": false
-                                                                                }
-                                                                              ]
-                                                                            },
-                                                                            "segment": {
-                                                                              "type": "string",
-                                                                              "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
-                                                                            },
-                                                                            "proof": {
-                                                                              "$ref": "#/definitions/Context_hash"
-                                                                            }
-                                                                          },
-                                                                          "required": [
-                                                                            "proof",
-                                                                            "segment",
-                                                                            "length"
-                                                                          ],
-                                                                          "additionalProperties": false
-                                                                        }
-                                                                      },
-                                                                      "required": [
-                                                                        "inode_extender"
-                                                                      ],
-                                                                      "additionalProperties": false
-                                                                    }
-                                                                  },
-                                                                  "required": [
-                                                                    "value",
-                                                                    "kind"
-                                                                  ],
-                                                                  "additionalProperties": false
+                                                                  "title": "medium_bytes",
+                                                                  "type": "string",
+                                                                  "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                                                                },
+                                                                {
+                                                                  "title": "long_bytes",
+                                                                  "description": "This case is void. No data is accepted."
+                                                                },
+                                                                {
+                                                                  "title": "unlimited_bytes",
+                                                                  "type": "string",
+                                                                  "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
                                                                 }
                                                               ]
                                                             }
                                                           },
                                                           "required": [
-                                                            "other_elts"
+                                                            "value"
+                                                          ],
+                                                          "additionalProperties": false
+                                                        },
+                                                        {
+                                                          "title": "Inode_extender",
+                                                          "type": "object",
+                                                          "properties": {
+                                                            "inode_extender": {
+                                                              "type": "object",
+                                                              "properties": {
+                                                                "length": {
+                                                                  "$ref": "#/definitions/int64"
+                                                                },
+                                                                "segment": {
+                                                                  "type": "string",
+                                                                  "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                                                                },
+                                                                "proof": {
+                                                                  "$ref": "#/definitions/Context_hash"
+                                                                }
+                                                              },
+                                                              "required": [
+                                                                "proof",
+                                                                "segment",
+                                                                "length"
+                                                              ],
+                                                              "additionalProperties": false
+                                                            }
+                                                          },
+                                                          "required": [
+                                                            "inode_extender"
                                                           ],
                                                           "additionalProperties": false
                                                         }
-                                                      },
-                                                      "required": [
-                                                        "value",
-                                                        "kind"
-                                                      ],
-                                                      "additionalProperties": false
+                                                      ]
                                                     }
-                                                  ]
+                                                  },
+                                                  "required": [
+                                                    "other_elts"
+                                                  ],
+                                                  "additionalProperties": false
                                                 }
-                                              },
-                                              "required": [
-                                                "other_elts"
-                                              ],
-                                              "additionalProperties": false
+                                              ]
                                             }
                                           },
                                           "required": [
-                                            "value",
-                                            "kind"
+                                            "other_elts"
                                           ],
                                           "additionalProperties": false
                                         }
@@ -12859,86 +11796,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 "$ref": "#/definitions/alpha.contract_id"
                               },
                               "ticket_amount": {
-                                "oneOf": [
-                                  {
-                                    "title": "small",
-                                    "description": "An int64 which fits within a uint8",
-                                    "type": "object",
-                                    "properties": {
-                                      "kind": {
-                                        "$ref": "#/definitions/unistring"
-                                      },
-                                      "value": {
-                                        "type": "integer",
-                                        "minimum": 0,
-                                        "maximum": 255
-                                      }
-                                    },
-                                    "required": [
-                                      "value",
-                                      "kind"
-                                    ],
-                                    "additionalProperties": false
-                                  },
-                                  {
-                                    "title": "medium",
-                                    "description": "An int64 which fits within a uint16",
-                                    "type": "object",
-                                    "properties": {
-                                      "kind": {
-                                        "$ref": "#/definitions/unistring"
-                                      },
-                                      "value": {
-                                        "type": "integer",
-                                        "minimum": 0,
-                                        "maximum": 65535
-                                      }
-                                    },
-                                    "required": [
-                                      "value",
-                                      "kind"
-                                    ],
-                                    "additionalProperties": false
-                                  },
-                                  {
-                                    "title": "biggish",
-                                    "description": "An int64 which fits within a uint32",
-                                    "type": "object",
-                                    "properties": {
-                                      "kind": {
-                                        "$ref": "#/definitions/unistring"
-                                      },
-                                      "value": {
-                                        "type": "integer",
-                                        "minimum": -2147483648,
-                                        "maximum": 2147483647
-                                      }
-                                    },
-                                    "required": [
-                                      "value",
-                                      "kind"
-                                    ],
-                                    "additionalProperties": false
-                                  },
-                                  {
-                                    "title": "bigger",
-                                    "description": "An int64 which doesn't fit within a uint32",
-                                    "type": "object",
-                                    "properties": {
-                                      "kind": {
-                                        "$ref": "#/definitions/unistring"
-                                      },
-                                      "value": {
-                                        "$ref": "#/definitions/int64"
-                                      }
-                                    },
-                                    "required": [
-                                      "value",
-                                      "kind"
-                                    ],
-                                    "additionalProperties": false
-                                  }
-                                ]
+                                "$ref": "#/definitions/int64"
                               },
                               "destination": {
                                 "$ref": "#/definitions/alpha.contract_id"
