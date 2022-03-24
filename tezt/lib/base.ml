@@ -74,8 +74,10 @@ let mandatory name = function
 
 type ('a, 'b) runnable = {value : 'a; run : 'a -> 'b Lwt.t}
 
+let run {value; run} = run value
+
 let ( let*! ) x f =
-  let* res = x.run x.value in
+  let* res = run x in
   f res
 
 let ( let*? ) x f = f x.value

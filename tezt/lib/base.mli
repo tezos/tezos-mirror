@@ -97,6 +97,9 @@ val mandatory : string -> 'a option -> 'a
 type ('a, 'b) runnable = {value : 'a; run : 'a -> 'b Lwt.t}
 
 (** Apply the function of a runnable to its value. *)
+val run : ('a, 'b) runnable -> 'b Lwt.t
+
+(** Same as [run], then continue with the given function. *)
 val ( let*! ) : ('a, 'b) runnable -> ('b -> 'c Lwt.t) -> 'c Lwt.t
 
 (** Get the value of a runnable and pass it to a continuation.
