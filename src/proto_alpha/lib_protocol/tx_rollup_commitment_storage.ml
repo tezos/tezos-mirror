@@ -70,27 +70,31 @@ let slash_bond ctxt tx_rollup contract =
 let find :
     Raw_context.t ->
     Tx_rollup_repr.t ->
+    Tx_rollup_state_repr.t ->
     Tx_rollup_level_repr.t ->
     (Raw_context.t * Tx_rollup_commitment_repr.Submitted_commitment.t option)
     tzresult
     Lwt.t =
- fun ctxt tx_rollup level ->
-  Storage.Tx_rollup.Commitment.find ctxt (level, tx_rollup)
-  >>=? fun (ctxt, commitment) ->
-  match commitment with
-  | None ->
-      Tx_rollup_state_storage.assert_exist ctxt tx_rollup >>=? fun ctxt ->
-      return (ctxt, None)
-  | Some res -> return (ctxt, Some res)
+ fun ctxt tx_rollup state level ->
+  if Tx_rollup_state_repr.has_valid_commitment_at state level then
+    Storage.Tx_rollup.Commitment.find ctxt (level, tx_rollup)
+    >>=? fun (ctxt, commitment) ->
+    match commitment with
+    | None ->
+        Tx_rollup_state_storage.assert_exist ctxt tx_rollup >>=? fun ctxt ->
+        return (ctxt, None)
+    | Some res -> return (ctxt, Some res)
+  else return (ctxt, None)
 
 let get :
     Raw_context.t ->
     Tx_rollup_repr.t ->
+    Tx_rollup_state_repr.t ->
     Tx_rollup_level_repr.t ->
     (Raw_context.t * Tx_rollup_commitment_repr.Submitted_commitment.t) tzresult
     Lwt.t =
- fun ctxt tx_rollup level ->
-  find ctxt tx_rollup level >>=? fun (ctxt, commitment) ->
+ fun ctxt tx_rollup state level ->
+  find ctxt tx_rollup state level >>=? fun (ctxt, commitment) ->
   match commitment with
   (* TODO: why not use directly `.get` and get the default error for a missing key ? *)
   | None -> fail @@ Tx_rollup_errors_repr.Commitment_does_not_exist level
@@ -121,8 +125,9 @@ let get_finalized :
   | None -> fail @@ Tx_rollup_errors_repr.Commitment_does_not_exist level
   | Some commitment -> return (ctxt, commitment)
 
-let check_commitment_level state commitment =
-  Tx_rollup_state_repr.next_commitment_level state >>? fun expected_level ->
+let check_commitment_level current_level state commitment =
+  Tx_rollup_state_repr.next_commitment_level state current_level
+  >>? fun expected_level ->
   error_when
     Tx_rollup_level_repr.(commitment.level < expected_level)
     (Level_already_has_commitment commitment.level)
@@ -169,12 +174,12 @@ let add_commitment ctxt tx_rollup state pkh commitment =
     Too_many_commitments
   >>=? fun () ->
   (* Check the commitment has the correct values *)
-  check_commitment_level state commitment >>?= fun () ->
+  let current_level = (Raw_context.current_level ctxt).level in
+  check_commitment_level current_level state commitment >>?= fun () ->
   check_commitment_predecessor ctxt state commitment >>=? fun ctxt ->
   check_commitment_batches_and_merkle_root ctxt tx_rollup commitment
   >>=? fun ctxt ->
   (* Everything has been sorted out, let’s update the storage *)
-  let current_level = (Raw_context.current_level ctxt).level in
   let commitment_hash = Tx_rollup_commitment_repr.hash commitment in
   let submitted : Tx_rollup_commitment_repr.Submitted_commitment.t =
     {
@@ -218,7 +223,7 @@ let finalize_commitment ctxt rollup state =
   | Some oldest_inbox_level ->
       (* Since the commitment head is not null, we know the oldest
          inbox has a commitment. *)
-      get ctxt rollup oldest_inbox_level >>=? fun (ctxt, commitment) ->
+      get ctxt rollup state oldest_inbox_level >>=? fun (ctxt, commitment) ->
       (* Is the finality period for this commitment over? *)
       let finality_period = Constants_storage.tx_rollup_finality_period ctxt in
       let current_level = (Raw_context.current_level ctxt).level in
@@ -252,7 +257,7 @@ let remove_commitment ctxt rollup state =
   match Tx_rollup_state_repr.next_commitment_to_remove state with
   | Some tail ->
       (* We check the commitment is old enough *)
-      get ctxt rollup tail >>=? fun (ctxt, commitment) ->
+      get ctxt rollup state tail >>=? fun (ctxt, commitment) ->
       (match commitment.finalized_at with
       | Some finalized_at ->
           let withdraw_period =
@@ -364,7 +369,7 @@ let reject_commitment ctxt rollup state level =
   (* Fetching the next predecessor hash to be used *)
   (match Tx_rollup_level_repr.pred level with
   | Some pred_level ->
-      find ctxt rollup pred_level >>=? fun (ctxt, pred_commitment) ->
+      find ctxt rollup state pred_level >>=? fun (ctxt, pred_commitment) ->
       let pred_hash =
         Option.map
           (fun (x : Submitted_commitment.t) ->

@@ -28,10 +28,13 @@
 (** This module introduces various functions to manipulate the storage related
     to commitments for transaction rollups. *)
 
-(** [check_commitment_level state commitment] fails if [commitment]
+(** [check_commitment_level current_tezos_level state commitment] fails if [commitment]
     does not target the expected level. *)
 val check_commitment_level :
-  Tx_rollup_state_repr.t -> Tx_rollup_commitment_repr.t -> unit tzresult
+  Raw_level_repr.t ->
+  Tx_rollup_state_repr.t ->
+  Tx_rollup_commitment_repr.t ->
+  unit tzresult
 (* FIXME: move in Tx_rollup_commitment_repr *)
 
 (** [add_commitment context tx_rollup contract commitment] adds a
@@ -76,23 +79,29 @@ val slash_bond :
   Signature.public_key_hash ->
   (Raw_context.t * bool) tzresult Lwt.t
 
-(** [find context tx_rollup level] returns the commitment
-    for a level, if any exists.  If the rollup does not exist,
-    the error [Tx_rollup_does_not_exist] is returned. *)
+(** [find context tx_rollup state level] returns the commitment for a
+    level, if any exists and is not orphan (that is, one of its
+    ancestors has been rejected).  If the rollup does not exist, the
+    error [Tx_rollup_does_not_exist] is returned. *)
 val find :
   Raw_context.t ->
   Tx_rollup_repr.t ->
+  Tx_rollup_state_repr.t ->
   Tx_rollup_level_repr.t ->
   (Raw_context.t * Tx_rollup_commitment_repr.Submitted_commitment.t option)
   tzresult
   Lwt.t
 
-(** [get context tx_rollup level] returns the commitment
-    for a level, if any exists.  If the rollup does not exist,
-    the error [Tx_rollup_does_not_exist] is returned. *)
+(** [get context tx_rollup state level] returns the commitment for a
+    level, if any exists.  If the rollup does not exist, the error
+    [Tx_rollup_does_not_exist] is returned. If there is no commitment
+    in the storage, or if a commitment exists but it is orphan (that
+    is, one of its ancestors has been rejected), then
+    [Commitment_does_not_exist] is returned. *)
 val get :
   Raw_context.t ->
   Tx_rollup_repr.t ->
+  Tx_rollup_state_repr.t ->
   Tx_rollup_level_repr.t ->
   (Raw_context.t * Tx_rollup_commitment_repr.Submitted_commitment.t) tzresult
   Lwt.t

@@ -1813,17 +1813,20 @@ module Tx_rollup_commitment : sig
     t ->
     (context * Tx_rollup_state.t) tzresult Lwt.t
 
-  val check_commitment_level : Tx_rollup_state.t -> t -> unit tzresult
+  val check_commitment_level :
+    Raw_level.t -> Tx_rollup_state.t -> t -> unit tzresult
 
   val find :
     context ->
     Tx_rollup.t ->
+    Tx_rollup_state.t ->
     Tx_rollup_level.t ->
     (context * Submitted_commitment.t option) tzresult Lwt.t
 
   val get :
     context ->
     Tx_rollup.t ->
+    Tx_rollup_state.t ->
     Tx_rollup_level.t ->
     (context * Submitted_commitment.t) tzresult Lwt.t
 

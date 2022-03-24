@@ -1543,10 +1543,10 @@ let apply_external_manager_operation_content :
   | Tx_rollup_submit_batch {tx_rollup; content; burn_limit} ->
       let (message, message_size) = Tx_rollup_message.make_batch content in
       Tx_rollup_state.get ctxt tx_rollup >>=? fun (ctxt, state) ->
-      Tx_rollup_state.burn_cost ~limit:burn_limit state message_size
-      >>?= fun cost ->
       Tx_rollup_inbox.append_message ctxt tx_rollup state message
       >>=? fun (ctxt, state) ->
+      Tx_rollup_state.burn_cost ~limit:burn_limit state message_size
+      >>?= fun cost ->
       Token.transfer ctxt (`Contract source_contract) `Burned cost
       >>=? fun (ctxt, balance_updates) ->
       Tx_rollup_state.update ctxt tx_rollup state >>=? fun ctxt ->
@@ -1643,7 +1643,7 @@ let apply_external_manager_operation_content :
       (* Check [level] *)
       Tx_rollup_state.check_level_can_be_rejected state level >>?= fun () ->
       (* Check [previous_message_result] *)
-      Tx_rollup_commitment.get ctxt tx_rollup level
+      Tx_rollup_commitment.get ctxt tx_rollup state level
       >>=? fun (ctxt, commitment) ->
       Tx_rollup_commitment.get_before_and_after_results
         ctxt
@@ -1887,13 +1887,8 @@ let precheck_manager_contents (type kind) ctxt (op : kind Kind.manager contents)
         Compare.Int.(message_size <= size_limit)
         Tx_rollup_errors.Message_size_exceeds_limit
       >>=? fun () -> return ctxt
-  | Tx_rollup_commit {commitment; tx_rollup} ->
-      assert_tx_rollup_feature_enabled ctxt >>=? fun () ->
-      Tx_rollup_state.get ctxt tx_rollup >>=? fun (ctxt, state) ->
-      Tx_rollup_commitment.check_commitment_level state commitment
-      >>?= fun () -> return ctxt
-  | Tx_rollup_return_bond _ | Tx_rollup_finalize_commitment _
-  | Tx_rollup_remove_commitment _ ->
+  | Tx_rollup_commit _ | Tx_rollup_return_bond _
+  | Tx_rollup_finalize_commitment _ | Tx_rollup_remove_commitment _ ->
       assert_tx_rollup_feature_enabled ctxt >|=? fun () -> ctxt
   | Tx_rollup_withdraw {withdraw_path; _} ->
       assert_tx_rollup_feature_enabled ctxt >>=? fun () ->

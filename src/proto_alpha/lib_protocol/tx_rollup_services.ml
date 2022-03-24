@@ -74,8 +74,9 @@ let register () =
   opt_register2 ~chunked:false S.inbox (fun ctxt tx_rollup level () () ->
       Tx_rollup_inbox.find ctxt level tx_rollup >|=? snd) ;
   register2 ~chunked:false S.commitment (fun ctxt tx_rollup level () () ->
-      Tx_rollup_commitment.find ctxt tx_rollup level >|=? fun (_, commitment) ->
-      commitment) ;
+      Tx_rollup_state.get ctxt tx_rollup >>=? fun (ctxt, state) ->
+      Tx_rollup_commitment.find ctxt tx_rollup state level
+      >|=? fun (_, commitment) -> commitment) ;
   register2
     ~chunked:false
     S.pending_bonded_commitments
