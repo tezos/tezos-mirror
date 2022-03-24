@@ -445,11 +445,11 @@ let freeze_deposits ?(origin = Receipt_repr.Block_application) ctxt ~new_cycle
   (* We want to be able to slash for at most [max_slashable_period] *)
   (match Cycle_repr.(sub new_cycle (max_slashable_period - 1)) with
   | None ->
-      Storage.Tenderbake.First_level.get ctxt
-      >>=? fun first_level_of_tenderbake ->
+      Storage.Tenderbake.First_level_of_protocol.get ctxt
+      >>=? fun first_level_of_protocol ->
       let cycle_eras = Raw_context.cycle_eras ctxt in
       let level =
-        Level_repr.level_from_raw ~cycle_eras first_level_of_tenderbake
+        Level_repr.level_from_raw ~cycle_eras first_level_of_protocol
       in
       return level.cycle
   | Some cycle -> return cycle)
