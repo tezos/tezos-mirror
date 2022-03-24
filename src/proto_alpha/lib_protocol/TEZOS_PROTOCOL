@@ -15,6 +15,7 @@
         "Origination_nonce",
         "Tx_rollup_prefixes",
         "Merkle_list",
+        "Bitset",
 
         "Slot_repr",
         "Tez_repr",

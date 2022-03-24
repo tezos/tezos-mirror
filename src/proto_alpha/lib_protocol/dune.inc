@@ -41,6 +41,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    origination_nonce.mli origination_nonce.ml
    tx_rollup_prefixes.mli tx_rollup_prefixes.ml
    merkle_list.mli merkle_list.ml
+   bitset.mli bitset.ml
    slot_repr.mli slot_repr.ml
    tez_repr.mli tez_repr.ml
    period_repr.mli period_repr.ml
@@ -221,6 +222,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    origination_nonce.mli origination_nonce.ml
    tx_rollup_prefixes.mli tx_rollup_prefixes.ml
    merkle_list.mli merkle_list.ml
+   bitset.mli bitset.ml
    slot_repr.mli slot_repr.ml
    tez_repr.mli tez_repr.ml
    period_repr.mli period_repr.ml
@@ -401,6 +403,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    origination_nonce.mli origination_nonce.ml
    tx_rollup_prefixes.mli tx_rollup_prefixes.ml
    merkle_list.mli merkle_list.ml
+   bitset.mli bitset.ml
    slot_repr.mli slot_repr.ml
    tez_repr.mli tez_repr.ml
    period_repr.mli period_repr.ml
@@ -603,6 +606,7 @@ include Tezos_raw_protocol_alpha.Main
    Origination_nonce
    Tx_rollup_prefixes
    Merkle_list
+   Bitset
    Slot_repr
    Tez_repr
    Period_repr
@@ -824,6 +828,7 @@ include Tezos_raw_protocol_alpha.Main
    origination_nonce.mli origination_nonce.ml
    tx_rollup_prefixes.mli tx_rollup_prefixes.ml
    merkle_list.mli merkle_list.ml
+   bitset.mli bitset.ml
    slot_repr.mli slot_repr.ml
    tez_repr.mli tez_repr.ml
    period_repr.mli period_repr.ml

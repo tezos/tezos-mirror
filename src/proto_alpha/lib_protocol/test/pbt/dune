@@ -9,6 +9,7 @@
         test_tez_repr
         test_tx_rollup_l2_encoding
         test_tx_rollup_l2_withdraw_storage
+        test_bitset
         test_sc_rollup_tick_repr
         refutation_game_pbt
         test_carbonated_map)
