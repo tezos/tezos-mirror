@@ -607,7 +607,7 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
   | Some gas -> (
       match i with
       | ILog (_, sty, event, logger, k) ->
-          (log [@ocaml.tailcall]) (logger, event) sty g gas k ks accu stack
+          (ilog [@ocaml.tailcall]) (logger, event) sty g gas k ks accu stack
       | IHalt _ -> (next [@ocaml.tailcall]) g gas ks accu stack
       (* stack ops *)
       | IDrop (_, k) ->
@@ -1589,7 +1589,7 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
    that starts the evaluation.
 
 *)
-and log :
+and ilog :
     type a s b t r f.
     logger * logging_event -> (a, s) stack_ty -> (a, s, b, t, r, f) step_type =
  fun (logger, event) sty ((ctxt, _) as g) gas k ks accu stack ->
