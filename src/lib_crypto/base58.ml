@@ -158,8 +158,10 @@ type 'a encoding = {
 let prefix {prefix; _} = prefix
 
 let simple_decode ?alphabet {prefix; of_raw; _} s =
-  let ( >?? ) = Option.bind in
-  safe_decode ?alphabet s >?? TzString.remove_prefix ~prefix >?? of_raw
+  let open Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Option_syntax in
+  let* s = safe_decode ?alphabet s in
+  let* s = TzString.remove_prefix ~prefix s in
+  of_raw s
 
 let simple_encode ?alphabet {prefix; to_raw; _} d =
   safe_encode ?alphabet (prefix ^ to_raw d)

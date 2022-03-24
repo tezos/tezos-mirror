@@ -213,12 +213,13 @@ module Sink_implementation : Internal_event.SINK with type t = t = struct
         Uri.get_query_param' uri "name-matches" |> Option.value ~default:[]
       in
       let names = Uri.get_query_param' uri "name" |> Option.value ~default:[] in
-      let levels =
-        let ( >?? ) = Option.bind in
-        Uri.get_query_param uri "level-at-least"
-        >?? Internal_event.Level.of_string
-        |> Option.fold ~none:[] ~some:(fun l -> [Event_filter.level_at_least l])
+      let level_o =
+        let open Option_syntax in
+        let* lal = Uri.get_query_param uri "level-at-least" in
+        let* lal = Internal_event.Level.of_string lal in
+        return (Event_filter.level_at_least lal)
       in
+      let levels = Option.to_list level_o in
       let sections =
         let somes =
           Uri.get_query_param' uri "section"
