@@ -1,26 +1,29 @@
 (library
  (name tezos_protocol_alpha_parameters)
- (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-alpha-parameters)
- (modules :standard \ gen)
- (libraries tezos-base
-            tezos-base.unix
-            tezos-protocol-environment
-            tezos-protocol-alpha)
- (flags (:standard -open Tezos_base__TzPervasives
-                   -open Tezos_protocol_alpha
-                   -linkall))
-)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  tezos-base.unix
+  tezos-protocol-environment
+  tezos-protocol-alpha)
+ (library_flags (:standard -linkall))
+ (flags (:standard -open Tezos_base.TzPervasives -open Tezos_protocol_alpha))
+ (modules (:standard \ gen)))
 
 (executable
  (name gen)
- (libraries tezos-base
-            tezos-protocol-alpha-parameters)
- (modules gen)
- (flags (:standard -open Tezos_base__TzPervasives
-                   -open Tezos_protocol_alpha_parameters
-                   -open Tezos_protocol_alpha
-                   -linkall)))
+ (libraries
+  tezos-base
+  tezos-protocol-alpha-parameters
+  tezos-protocol-alpha)
+ (link_flags (:standard -linkall))
+ (flags
+  (:standard
+   -open Tezos_base.TzPervasives
+   -open Tezos_protocol_alpha_parameters
+   -open Tezos_protocol_alpha))
+ (modules gen))
 
 (rule
  (targets sandbox-parameters.json)
@@ -40,8 +43,3 @@
 (install
  (section lib)
  (files sandbox-parameters.json test-parameters.json mainnet-parameters.json))
-
-(rule
- (alias runtest_lint)
- (deps (glob_files *.ml{,i}))
- (action (run %{lib:tezos-tooling:lint.sh} %{deps})))
