@@ -122,6 +122,9 @@ val string_fixed : int -> string QCheck2.Gen.t
 (** [bytes_gen] is a [QCheck2.Gen.t] for [bytes]. *)
 val bytes_gen : bytes QCheck2.Gen.t
 
+(** [bytes_fixed_gen n] is a [QCheck2.Gen.t] for [bytes] of length [n]. *)
+val bytes_fixed_gen : int -> bytes QCheck2.Gen.t
+
 (** [endpoint_gen] is a [QCheck2.Gen.t] for endpoints (such as
     [tezos-client]'s [--endpoint] flag). It returns URLs of the form:
     [(http|https)://(string\.)+(:port)?]. It is by no means the most
