@@ -113,10 +113,7 @@ let write_parameter_file :
               `String account.public_key_hash;
               `String
                 (string_of_int
-                   (Option.fold
-                      ~none:4000000000000
-                      ~some:Fun.id
-                      default_balance));
+                   (Option.value ~default:4000000000000 default_balance));
             ])
         additional_bootstrap_accounts
     in
