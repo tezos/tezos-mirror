@@ -406,6 +406,94 @@ let assert_ticket_balance ~loc block token owner expected =
   | (None, Some b) -> failwith "%s: Expected balance %d but got none" loc b
   | (None, None) -> return ()
 
+module Nat_ticket = struct
+  let ty_str = "nat"
+
+  let ty = Expr.from_string ty_str
+
+  let contents_nat = 1
+
+  let ex_token ~ticketer =
+    let contents =
+      WithExceptions.Option.get ~loc:__LOC__
+      @@ Script_int.(of_int contents_nat |> is_nat)
+    in
+    Ticket_token.Ex_token
+      {ticketer; contents_type = Script_typed_ir.nat_key; contents}
+
+  let contents = Expr.from_string (string_of_int contents_nat)
+
+  let int64_amount = 10L
+
+  let amount = Tx_rollup_l2_qty.of_int64_exn int64_amount
+
+  let ticket_hash ctxt ~ticketer ~tx_rollup =
+    make_ticket_key
+      ctxt
+      ~ty:(Tezos_micheline.Micheline.root ty)
+      ~contents:(Tezos_micheline.Micheline.root contents)
+      ~ticketer
+      tx_rollup
+
+  let withdrawal ctxt ~ticketer ?(claimer = ticketer) ?(amount = amount)
+      tx_rollup : Tx_rollup_withdraw.t tzresult Lwt.t =
+    ticket_hash ctxt ~ticketer ~tx_rollup >|=? fun ticket_hash ->
+    Tx_rollup_withdraw.{claimer = is_implicit_exn claimer; ticket_hash; amount}
+
+  (** Return an operation to originate a contract that will deposit [amount]
+      tickets to l2 address [pkh] on [tx_rollup] *)
+  let init_deposit amount ?(pkh = "tz4MSfZsn6kMDczShy8PMeB628TNukn9hi2K") block
+      tx_rollup account =
+    let script =
+      Format.asprintf
+        {| parameter (pair address tx_rollup_l2_address);
+         storage unit;
+         code {
+                # cast the address to contract type
+                CAR;
+                UNPAIR;
+                CONTRACT %%deposit (pair (ticket nat) tx_rollup_l2_address);
+                ASSERT_SOME;
+                SWAP;
+                PUSH mutez 0;
+                SWAP;
+                # create a ticket
+                PUSH nat %a;
+                PUSH %s %d;
+                TICKET;
+                PAIR ;
+                TRANSFER_TOKENS;
+                PUSH unit Unit;
+                NIL operation;
+                DIG 2 ;
+                CONS;
+                PAIR } |}
+        Z.pp_print
+        amount
+        ty_str
+        contents_nat
+    in
+    Contract_helpers.originate_contract_from_string
+      ~baker:(is_implicit_exn account)
+      ~source_contract:account
+      ~script
+      ~storage:"Unit"
+      block
+    >>=? fun (deposit_contract, _script, block) ->
+    Op.transaction
+      (B block)
+      ~entrypoint:Entrypoint.default
+      ~parameters:
+        (Script.lazy_expr @@ Expr.from_string
+        @@ Printf.sprintf {| Pair %S %S |} (Tx_rollup.to_b58check tx_rollup) pkh
+        )
+      ~fee:Tez.one
+      account
+      deposit_contract
+      (Tez.of_mutez_exn 0L)
+    >|=? fun op -> (op, block, deposit_contract)
+end
+
 (** ---- TESTS -------------------------------------------------------------- *)
 
 (** [test_origination] originates a transaction rollup and checks that
@@ -1246,6 +1334,33 @@ let test_valid_deposit_invalid_amount () =
     ~expect_failure:
       (check_proto_error Apply.Tx_rollup_invalid_transaction_amount)
   >>=? fun _ -> return_unit
+
+(** [test_deposit_too_many_tickets] checks that a deposit of
+     too many tickets is rejected *)
+let test_deposit_too_many_tickets () =
+  let too_many = Z.succ (Z.of_int64 Int64.max_int) in
+  let (_, _, pkh) = gen_l2_account () in
+  context_init 1 >>=? fun (block, accounts) ->
+  let account1 =
+    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth accounts 0
+  in
+  originate block account1 >>=? fun (block, tx_rollup) ->
+  Nat_ticket.init_deposit too_many block tx_rollup account1
+  >>=? fun (operation, b, deposit_contract) ->
+  Block.bake ~operation b >>=? fun b ->
+  let fee = Test_tez.of_int 10 in
+  let parameters = print_deposit_arg (`Typed tx_rollup) (`Hash pkh) in
+  Op.transaction ~fee (B b) account1 deposit_contract Tez.zero ~parameters
+  >>=? fun operation ->
+  Incremental.begin_construction b >>=? fun i ->
+  Incremental.add_operation
+    i
+    operation
+    ~expect_failure:
+      (check_proto_error Apply.Tx_rollup_invalid_transaction_amount)
+  >>=? fun i ->
+  ignore i ;
+  return_unit
 
 (** [test_deposit_by_non_internal_operation] checks that a transaction
     to the deposit entrypoint of a transaction rollup fails if it is
@@ -3284,100 +3399,18 @@ let test_state_message_storage_preallocation () =
   return_unit
 
 module Withdraw = struct
-  module Nat_ticket = struct
-    let ty_str = "nat"
-
-    let ty = Expr.from_string ty_str
-
-    let contents_nat = 1
-
-    let ex_token ~ticketer =
-      let contents =
-        WithExceptions.Option.get ~loc:__LOC__
-        @@ Script_int.(of_int contents_nat |> is_nat)
-      in
-      Ticket_token.Ex_token
-        {ticketer; contents_type = Script_typed_ir.nat_key; contents}
-
-    let contents = Expr.from_string (string_of_int contents_nat)
-
-    let int64_amount = 10L
-
-    let amount = Tx_rollup_l2_qty.of_int64_exn int64_amount
-
-    let ticket_hash ctxt ~ticketer ~tx_rollup =
-      make_ticket_key
-        ctxt
-        ~ty:(Tezos_micheline.Micheline.root ty)
-        ~contents:(Tezos_micheline.Micheline.root contents)
-        ~ticketer
-        tx_rollup
-
-    let withdrawal ctxt ~ticketer ?(claimer = ticketer) ?(amount = amount)
-        tx_rollup : Tx_rollup_withdraw.t tzresult Lwt.t =
-      ticket_hash ctxt ~ticketer ~tx_rollup >|=? fun ticket_hash ->
-      Tx_rollup_withdraw.
-        {claimer = is_implicit_exn claimer; ticket_hash; amount}
-  end
-
   (** [context_init_withdraw n] initializes a context with [n + 1] accounts, one rollup and a
       withdrawal recipient contract. *)
-  let context_init_withdraw ?tx_rollup_origination_size n =
+  let context_init_withdraw ?tx_rollup_origination_size
+      ?(amount = Z.of_int64 @@ Tx_rollup_l2_qty.to_int64 Nat_ticket.amount) n =
     context_init ?tx_rollup_origination_size (n + 1)
     >>=? fun (block, accounts) ->
     let account1 =
       WithExceptions.Option.get ~loc:__LOC__ @@ List.nth accounts 0
     in
     originate block account1 >>=? fun (block, tx_rollup) ->
-    let script =
-      Format.sprintf
-        {| parameter (pair address tx_rollup_l2_address);
-           storage unit;
-           code {
-                  # cast the address to contract type
-                  CAR;
-                  UNPAIR;
-                  CONTRACT %%deposit (pair (ticket nat) tx_rollup_l2_address);
-                  ASSERT_SOME;
-                  SWAP;
-                  PUSH mutez 0;
-                  SWAP;
-                  # create a ticket
-                  PUSH nat %Ld;
-                  PUSH %s %d;
-                  TICKET;
-                  PAIR ;
-                  TRANSFER_TOKENS;
-                  PUSH unit Unit;
-                  NIL operation;
-                  DIG 2 ;
-                  CONS;
-                  PAIR } |}
-        (Tx_rollup_l2_qty.to_int64 Nat_ticket.amount)
-        Nat_ticket.ty_str
-        Nat_ticket.contents_nat
-    in
-    Contract_helpers.originate_contract_from_string
-      ~baker:(is_implicit_exn account1)
-      ~source_contract:account1
-      ~script
-      ~storage:"Unit"
-      block
-    >>=? fun (deposit_contract, _script, block) ->
-    Op.transaction
-      (B block)
-      ~entrypoint:Entrypoint.default
-      ~parameters:
-        (Script.lazy_expr @@ Expr.from_string
-        @@ Printf.sprintf
-             {| Pair %S %S |}
-             (Tx_rollup.to_b58check tx_rollup)
-             "tz4MSfZsn6kMDczShy8PMeB628TNukn9hi2K")
-      ~fee:Tez.one
-      account1
-      deposit_contract
-      (Tez.of_mutez_exn 0L)
-    >>=? fun operation ->
+    Nat_ticket.init_deposit amount block tx_rollup account1
+    >>=? fun (operation, block, deposit_contract) ->
     Block.bake ~operation block >>=? fun block ->
     Contract_helpers.originate_contract_from_string
       ~script:
@@ -4892,6 +4925,10 @@ let tests =
       "Test valid deposit with non-zero amount"
       `Quick
       test_valid_deposit_invalid_amount;
+    Tztest.tztest
+      "Test depositing too many tickets"
+      `Quick
+      test_deposit_too_many_tickets;
     Tztest.tztest "Test finalization" `Quick test_finalization;
     Tztest.tztest "Smoke test commitment" `Quick test_commitment_duplication;
     Tztest.tztest
