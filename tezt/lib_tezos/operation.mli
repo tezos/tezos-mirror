@@ -106,7 +106,7 @@ val mk_rejection :
   tx_rollup:string ->
   proof:string ->
   level:int ->
-  message:[`Batch of string] ->
+  message:Rollup.Tx_rollup.message ->
   message_position:int ->
   message_path:string list ->
   previous_message_result:string * string ->
@@ -377,7 +377,7 @@ val inject_rejection :
   tx_rollup:string ->
   proof:string ->
   level:int ->
-  message:[`Batch of string] ->
+  message:Rollup.Tx_rollup.message ->
   message_position:int ->
   message_path:string list ->
   previous_message_result:string * string ->

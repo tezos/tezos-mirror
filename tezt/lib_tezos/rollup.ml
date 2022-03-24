@@ -50,6 +50,10 @@ module Tx_rollup = struct
 
   type inbox = {inbox_length : int; cumulated_size : int; merkle_root : string}
 
+  type message = [`Batch of Hex.t]
+
+  let make_batch batch = `Batch (Hex.of_string batch)
+
   let get_state ?hooks ~rollup client =
     let parse json =
       let finalized_commitments =
@@ -101,7 +105,7 @@ module Tx_rollup = struct
       ~pkh
       client
 
-  let message_hash ?hooks ~message:(`Batch message) client =
+  let message_hash ?hooks ~message:(`Batch (`Hex message) : message) client =
     let parse json = `Hash JSON.(json |-> "hash" |> as_string) in
     let data : JSON.u = `O [("message", `O [("batch", `String message)])] in
     let runnable = RPC.Tx_rollup.Forge.Inbox.message_hash ?hooks ~data client in
@@ -148,7 +152,12 @@ module Tx_rollup = struct
       {
         inbox_length = List.length messages;
         cumulated_size =
-          List.map (fun (`Batch message) -> String.length message) messages
+          List.map
+            (fun (`Batch (`Hex message)) ->
+              (* In the Hex reprensatated as a string, a byte is
+                 encoded using two characters. *)
+              String.length message / 2)
+            messages
           |> List.fold_left ( + ) 0;
         merkle_root;
       }

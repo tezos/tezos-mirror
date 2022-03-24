@@ -2,25 +2,25 @@ tezt/_regressions/tx_rollup_rpc_inbox_merkle_tree_path.out
 
 ./tezos-client rpc post /chains/main/blocks/head/helpers/forge/tx_rollup/inbox/message_hash with '{
   "message": {
-    "batch": "Kouroukoukou"
+    "batch": "4b6f75726f756b6f756b6f75"
   }
 }'
 
 ./tezos-client rpc post /chains/main/blocks/head/helpers/forge/tx_rollup/inbox/message_hash with '{
   "message": {
-    "batch": "roukoukou"
+    "batch": "726f756b6f756b6f75"
   }
 }'
 
 ./tezos-client rpc post /chains/main/blocks/head/helpers/forge/tx_rollup/inbox/message_hash with '{
   "message": {
-    "batch": "stach"
+    "batch": "7374616368"
   }
 }'
 
 ./tezos-client rpc post /chains/main/blocks/head/helpers/forge/tx_rollup/inbox/message_hash with '{
   "message": {
-    "batch": "stach"
+    "batch": "7374616368"
   }
 }'
 { "hash": "[TX_ROLLUP_MESSAGE_HASH]" }

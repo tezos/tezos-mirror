@@ -45,6 +45,11 @@ let deposit_encoding =
        (req "ticket_hash" Ticket_hash_repr.encoding)
        (req "amount" Tx_rollup_l2_qty.encoding)
 
+let batch_encoding =
+  let open Data_encoding in
+  let json = conv Bytes.of_string Bytes.to_string bytes in
+  splitted ~json ~binary:string
+
 type t = Batch of string | Deposit of deposit
 
 let encoding =
@@ -55,7 +60,7 @@ let encoding =
       case
         (Tag 0)
         ~title:"Batch"
-        (obj1 (req "batch" string))
+        (obj1 (req "batch" batch_encoding))
         (function Batch batch -> Some batch | _ -> None)
         (fun batch -> Batch batch);
       case

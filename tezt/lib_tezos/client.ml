@@ -1212,23 +1212,15 @@ module Tx_rollup = struct
     in
     {value = process; run = parse}
 
-  let submit_batch ?(wait = "none") ?burn_cap ?storage_limit ?hooks ~content
-      ~rollup ~src client =
+  let submit_batch ?(wait = "none") ?burn_cap ?storage_limit ?hooks
+      ~content:(`Hex content) ~rollup ~src client =
     let process =
       spawn_command
         ?hooks
         client
         (["--wait"; wait]
         @ [
-            "submit";
-            "tx";
-            "rollup";
-            "batch";
-            Hex.(of_string content |> show);
-            "to";
-            rollup;
-            "from";
-            src;
+            "submit"; "tx"; "rollup"; "batch"; content; "to"; rollup; "from"; src;
           ]
         @ Option.fold
             ~none:[]

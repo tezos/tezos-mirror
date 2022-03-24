@@ -57,7 +57,7 @@ let get_node_inbox ?(block = "head") node client =
       let parse_message json =
         if JSON.(is_null (json |-> "batch")) then
           Test.fail "This case is not handled yet"
-        else JSON.(json |-> "batch" |> as_string |> fun x -> `Batch x)
+        else JSON.(json |-> "batch" |> as_string |> fun x -> `Batch (`Hex x))
       in
       let messages =
         JSON.(
@@ -182,13 +182,9 @@ let test_tx_node_store_inbox =
       let* _ = Rollup_node.config_init tx_node rollup block_hash in
       let* () = Rollup_node.run tx_node in
       (* Submit a batch *)
-      let batch = "tezos_l2_batch_1" in
+      let (`Batch content) = Rollup.make_batch "tezos_l2_batch_1" in
       let*! () =
-        Client.Tx_rollup.submit_batch
-          ~content:batch
-          ~rollup
-          ~src:operator
-          client
+        Client.Tx_rollup.submit_batch ~content ~rollup ~src:operator client
       in
       let* () = Client.bake_for client in
       let* _ = Node.wait_for_level node 3 in
@@ -202,13 +198,9 @@ let test_tx_node_store_inbox =
         ~error_msg:
           "Unexpected inbox computed from the rollup node. Expected %R. \
            Computed %L" ;
-      let snd_batch = "tezos_l2_batch_2" in
+      let (`Batch content) = Rollup.make_batch "tezos_l2_batch_2" in
       let*! () =
-        Client.Tx_rollup.submit_batch
-          ~content:snd_batch
-          ~rollup
-          ~src:operator
-          client
+        Client.Tx_rollup.submit_batch ~content ~rollup ~src:operator client
       in
       let* () = Client.bake_for client in
       let* _ = Node.wait_for_level node 4 in
@@ -576,15 +568,16 @@ let test_l2_to_l2_transaction =
       in
       Log.info "Crafting a batch" ;
       let batch = craft_batch [[tx]] [[bls_sk_1]] in
-      let raw_batch =
-        Data_encoding.Binary.to_bytes_exn
-          Tezos_protocol_alpha.Protocol.Tx_rollup_l2_batch.encoding
-          (Tezos_protocol_alpha.Protocol.Tx_rollup_l2_batch.V1 batch)
+      let content =
+        Hex.of_string
+          (Data_encoding.Binary.to_string_exn
+             Tezos_protocol_alpha.Protocol.Tx_rollup_l2_batch.encoding
+             (Tezos_protocol_alpha.Protocol.Tx_rollup_l2_batch.V1 batch))
       in
       Log.info "Submiting a batch" ;
       let*! () =
         Client.Tx_rollup.submit_batch
-          ~content:(Bytes.to_string raw_batch)
+          ~content
           ~rollup:tx_rollup_hash
           ~src:operator
           client
