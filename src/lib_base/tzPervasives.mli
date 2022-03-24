@@ -98,6 +98,12 @@ include module type of Utils.Infix
 
 include module type of Tezos_error_monad.Error_monad
 
+module Option_syntax =
+  Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Option_syntax
+
+module Lwt_option_syntax =
+  Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Lwt_option_syntax
+
 module Internal_event = Internal_event
 
 module Filename : sig
