@@ -93,7 +93,7 @@ let () =
   Cli_tezos.register_protocol_independent () ;
   (* Tests that are heavily protocol-dependent.
      Those modules define different tests for different protocols in their [register]. *)
-  RPC_test.register () ;
+  RPC_test.register [Hangzhou; Alpha] ;
   Voting.register
     ~from_protocol:Hangzhou
     ~to_protocol:(Known Ithaca)
