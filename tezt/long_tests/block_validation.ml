@@ -55,8 +55,8 @@
     if the datadir folder could not be found. In this case, the module
     will first uncompress the archive before running the benchmarks. *)
 
-let apply_or_raise res f () =
-  match res with Ok v -> f v | Error e -> failwith e
+let apply_or_raise lazy_res f () =
+  match Lazy.force lazy_res with Ok v -> f v | Error e -> failwith e
 
 (** Provides an access to the set of data that will be used
     as input by this benchmarks. Providing the same data for several
@@ -418,7 +418,7 @@ let grafana_panels =
       Benchmark.subparts_steps
 
 let register ~executors () =
-  let datadir = Fixture.datadir () in
+  let datadir = lazy (Fixture.datadir ()) in
 
   Long_test.register
     ~__FILE__
