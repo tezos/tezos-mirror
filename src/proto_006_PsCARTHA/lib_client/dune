@@ -1,15 +1,18 @@
 (library
  (name tezos_client_006_PsCARTHA)
  (public_name tezos-client-006-PsCARTHA)
- (libraries tezos-base
-            tezos-protocol-006-PsCARTHA
-            tezos-shell-services
-            tezos-client-base
-            tezos-rpc
-            tezos-signer-backends)
+ (libraries
+  tezos-base
+  tezos-shell-services
+  tezos-client-base
+  tezos-protocol-006-PsCARTHA
+  tezos-signer-backends
+  tezos-rpc)
  (library_flags (:standard -linkall))
- (flags (:standard -open Tezos_base__TzPervasives
-                   -open Tezos_shell_services
-                   -open Tezos_client_base
-                   -open Tezos_protocol_006_PsCARTHA
-                   -open Tezos_rpc)))
+ (flags
+  (:standard
+   -open Tezos_base.TzPervasives
+   -open Tezos_shell_services
+   -open Tezos_client_base
+   -open Tezos_protocol_006_PsCARTHA
+   -open Tezos_rpc)))

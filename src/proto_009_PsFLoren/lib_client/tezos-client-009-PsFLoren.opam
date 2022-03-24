@@ -1,24 +1,23 @@
 opam-version: "2.0"
 maintainer: "contact@tezos.com"
-authors: [ "Tezos devteam" ]
+authors: ["Tezos devteam"]
 homepage: "https://www.tezos.com/"
 bug-reports: "https://gitlab.com/tezos/tezos/issues"
 dev-repo: "git+https://gitlab.com/tezos/tezos.git"
 license: "MIT"
 depends: [
   "dune" { >= "2.9" }
+  "ppx_inline_test"
   "tezos-base"
-  "tezos-protocol-environment"
-  "tezos-protocol-009-PsFLoren"
   "tezos-shell-services"
-  "tezos-client-base-unix"
+  "tezos-client-base"
+  "tezos-protocol-009-PsFLoren"
   "tezos-mockup-registration"
   "tezos-proxy"
   "tezos-signer-backends"
-  "tezos-protocol-009-PsFLoren-parameters"
   "tezos-protocol-plugin-009-PsFLoren"
-  "alcotest-lwt" { with-test & >= "1.1.0" }
-  "ppx_inline_test"
+  "tezos-protocol-009-PsFLoren-parameters"
+  "tezos-rpc"
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]
