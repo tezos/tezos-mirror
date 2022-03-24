@@ -2864,8 +2864,6 @@ let test_state () =
   Block.bake b ~operations:[] >>=? fun b ->
   Block.bake b ~operations:[] >>=? fun b ->
   Block.bake b ~operations:[] >>=? fun b ->
-  Block.bake b ~operations:[] >>=? fun b ->
-  Block.bake b ~operations:[] >>=? fun b ->
   Op.tx_rollup_finalize (B b) account1 tx_rollup >>=? fun operation ->
   Block.bake b ~operation >>=? fun b ->
   (* Check we cannot finalize root anymore *)
@@ -2879,6 +2877,103 @@ let test_state () =
   >>=? fun b ->
   (* We can reject level 1 *)
   reject b Tx_rollup_level.(succ root) >>=? fun b ->
+  (* There is no commitment to finalize anymore *)
+  Block.bake b ~operations:[] >>=? fun b ->
+  Block.bake b ~operations:[] >>=? fun b ->
+  Block.bake b ~operations:[] >>=? fun b ->
+  Op.tx_rollup_finalize (B b) account1 tx_rollup >>=? fun operation ->
+  Incremental.begin_construction b >>=? fun i ->
+  Incremental.add_operation
+    i
+    operation
+    ~expect_failure:
+      (check_proto_error Tx_rollup_errors.No_commitment_to_finalize)
+  >>=? fun i ->
+  ignore i ;
+  return_unit
+
+(** [test_state_with_deleted] tests an edge cases in state management
+    when rejecting commitment whose predecessor has already been
+    deleted. *)
+let test_state_with_deleted () =
+  context_init1 () >>=? fun (b, account1) ->
+  originate b account1 >>=? fun (b, tx_rollup) ->
+  let contents = "bogus" in
+  let (message, _) = Tx_rollup_message.make_batch contents in
+  let message_hash = Tx_rollup_message.hash_uncarbonated message in
+  (match Tx_rollup_inbox.Merkle.compute_path [message_hash] 0 with
+  | Ok message_path -> return message_path
+  | _ -> assert false)
+  >>=? fun message_path ->
+  let inbox_hash = Tx_rollup_inbox.Merkle.merklize_list [message_hash] in
+  let submit b =
+    Op.tx_rollup_submit_batch (B b) account1 tx_rollup contents
+    >>=? fun operation -> Block.bake b ~operation
+  in
+  (* Create three inboxes *)
+  submit b >>=? fun b ->
+  submit b >>=? fun b ->
+  submit b >>=? fun b ->
+  (* Commit to level 0 *)
+  let commit0 =
+    Tx_rollup_commitment.
+      {
+        level = Tx_rollup_level.root;
+        messages =
+          [
+            Tx_rollup_commitment.hash_message_result
+              Rejection.previous_message_result;
+          ];
+        predecessor = None;
+        inbox_merkle_root = inbox_hash;
+      }
+  in
+  Op.tx_rollup_commit (B b) account1 tx_rollup commit0 >>=? fun operation ->
+  Block.bake b ~operation >>=? fun b ->
+  (* Commit to level 1 *)
+  let commit1 =
+    Tx_rollup_commitment.
+      {
+        level = Tx_rollup_level.succ commit0.level;
+        messages = [Tx_rollup_message_result_hash.zero];
+        predecessor = Some (Tx_rollup_commitment.hash commit0);
+        inbox_merkle_root = inbox_hash;
+      }
+  in
+  Op.tx_rollup_commit (B b) account1 tx_rollup commit1 >>=? fun operation ->
+  Block.bake b ~operation >>=? fun b ->
+  (* Finalize *)
+  Op.tx_rollup_finalize (B b) account1 tx_rollup >>=? fun operation ->
+  Block.bake b ~operation >>=? fun b ->
+  (* Wait for some blocks, then remove *)
+  Block.bake b ~operations:[] >>=? fun b ->
+  Block.bake b ~operations:[] >>=? fun b ->
+  Block.bake b ~operations:[] >>=? fun b ->
+  Block.bake b ~operations:[] >>=? fun b ->
+  Op.tx_rollup_remove_commitment (B b) account1 tx_rollup >>=? fun operation ->
+  Incremental.begin_construction b >>=? fun i ->
+  Incremental.add_operation i operation >>=? fun i ->
+  Incremental.finalize_block i >>=? fun b ->
+  (* Reject *)
+  let reject ?expect_failure b level =
+    l2_parameters (B b) >>=? fun l2_parameters ->
+    Rejection.valid_empty_proof l2_parameters >>= fun proof ->
+    Op.tx_rollup_reject
+      (B b)
+      account1
+      tx_rollup
+      level
+      message
+      ~message_position:0
+      ~message_path
+      ~proof
+      ~previous_message_result:Rejection.previous_message_result
+    >>=? fun operation ->
+    Incremental.begin_construction b >>=? fun i ->
+    Incremental.add_operation i operation ?expect_failure >>=? fun i ->
+    Incremental.finalize_block i
+  in
+  reject b commit1.level >>=? fun b ->
   ignore b ;
   return_unit
 
@@ -4502,5 +4597,9 @@ let tests =
       "Try to commit to the current inbox and fail"
       `Quick
       test_commit_current_inbox;
+    Tztest.tztest
+      "Test state with deleted commitment"
+      `Quick
+      test_state_with_deleted;
   ]
   @ Withdraw.tests @ Rejection.tests @ parsing_tests
