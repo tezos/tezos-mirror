@@ -193,8 +193,17 @@ let with_open_in file read_f =
     raise x
 
 let read_file filename =
-  let* ic = Lwt_io.open_file ~mode:Lwt_io.Input filename in
-  Lwt_io.read ic
+  with_open_in filename @@ fun ch ->
+  let buffer = Buffer.create 512 in
+  let bytes = Bytes.create 512 in
+  let rec loop () =
+    let len = input ch bytes 0 512 in
+    if len > 0 then (
+      Buffer.add_subbytes buffer bytes 0 len ;
+      loop ())
+  in
+  loop () ;
+  Buffer.contents buffer
 
 module String_map = Map.Make (String)
 

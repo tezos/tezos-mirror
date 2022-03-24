@@ -70,7 +70,7 @@ let change_logging_configuration =
   in
   (* Let's make some noise: *)
   let* () = Client.bake_for client in
-  let* tmp0_content = read_file tmp0 in
+  let tmp0_content = read_file tmp0 in
   if String.length tmp0_content < 100 then
     Test.fail "File %s should have more data" tmp0 ;
   (* We reopen the same one plus another one with the same configuration: *)
@@ -83,8 +83,8 @@ let change_logging_configuration =
   in
   (* More noise *)
   let* () = Client.bake_for client in
-  let* tmp1_content_1 = read_file tmp1 in
-  let* tmp0_content_2 = read_file tmp0 in
+  let tmp1_content_1 = read_file tmp1 in
+  let tmp0_content_2 = read_file tmp0 in
   let lines s = String.split_on_char '\n' s in
   if lines tmp0_content_2 > lines tmp1_content_1 then
     Test.fail "%s is not smaller than %s" tmp1 tmp0 ;
@@ -93,12 +93,12 @@ let change_logging_configuration =
     call_config_activate
       [sf "file-descriptor-path://%s?level-at-least=debug" tmp1]
   in
-  let* tmp0_content_3 = read_file tmp0 in
+  let tmp0_content_3 = read_file tmp0 in
   let* () =
     (* More noise *)
     Client.bake_for client
   in
-  let* tmp0_content_4 = read_file tmp0 in
+  let tmp0_content_4 = read_file tmp0 in
   if tmp0_content_3 <> tmp0_content_4 then
     Test.fail "Sink %s has not stopped growing." tmp0 ;
   (* We now configure the sink to output only consume events in the `rpc`
@@ -114,7 +114,7 @@ let change_logging_configuration =
   in
   (* More noise *)
   let* () = Client.bake_for client in
-  let* tmp1_content = read_file tmp1 in
+  let tmp1_content = read_file tmp1 in
   (* Let's check they are all from the RPC or validator sections: *)
   let () =
     let check_line ith line =

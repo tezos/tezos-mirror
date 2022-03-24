@@ -262,10 +262,10 @@ let test_same_transfer_twice =
   let mempool_file = Client.base_dir client // "mockup" // "mempool.json" in
   Log.info "Transfer %s from %s to %s" (Tez.to_string amount) giver receiver ;
   let* () = Client.transfer ~amount ~giver ~receiver client in
-  let* mempool1 = read_file mempool_file in
+  let mempool1 = read_file mempool_file in
   Log.info "Transfer %s from %s to %s" (Tez.to_string amount) giver receiver ;
   let* () = transfer_expected_to_fail ~amount ~giver ~receiver client in
-  let* mempool2 = read_file mempool_file in
+  let mempool2 = read_file mempool_file in
   Log.info "Checking that mempool is unchanged" ;
   if mempool1 <> mempool2 then
     Test.fail
@@ -289,11 +289,11 @@ let test_transfer_same_participants =
   let thrashpool_file = base_dir // "mockup" // "trashpool.json" in
   Log.info "Transfer %s from %s to %s" (Tez.to_string amount) giver receiver ;
   let* () = Client.transfer ~amount ~giver ~receiver client in
-  let* mempool1 = read_file mempool_file in
+  let mempool1 = read_file mempool_file in
   let amount = Tez.(amount + one) in
   Log.info "Transfer %s from %s to %s" (Tez.to_string amount) giver receiver ;
   let* () = transfer_expected_to_fail ~amount ~giver ~receiver client in
-  let* mempool2 = read_file mempool_file in
+  let mempool2 = read_file mempool_file in
   Log.info "Checking that mempool is unchanged" ;
   if mempool1 <> mempool2 then
     Test.fail
@@ -302,7 +302,7 @@ let test_transfer_same_participants =
       mempool2 ;
   Log.info
     "Checking that last operation was discarded into a newly created trashpool" ;
-  let* str = read_file thrashpool_file in
+  let str = read_file thrashpool_file in
   if String.equal str "" then
     Test.fail "Expected thrashpool to have one operation" ;
   return ()

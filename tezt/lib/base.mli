@@ -198,8 +198,8 @@ val with_open_out : string -> (out_channel -> unit) -> unit
    error while reading, the channel is closed before raising the exception **)
 val with_open_in : string -> (in_channel -> 'a) -> 'a
 
-(** [read_file filename] returns the full contents of file [filename] *)
-val read_file : string -> string Lwt.t
+(** Read the whole contents of a file. *)
+val read_file : string -> string
 
 (** {2 Common structures} *)
 
