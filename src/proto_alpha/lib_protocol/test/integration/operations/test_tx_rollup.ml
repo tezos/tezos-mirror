@@ -440,10 +440,7 @@ module Nat_ticket = struct
     ticket_hash ctxt ~ticketer ~tx_rollup >|=? fun ticket_hash ->
     Tx_rollup_withdraw.{claimer = is_implicit_exn claimer; ticket_hash; amount}
 
-  (** Return an operation to originate a contract that will deposit [amount]
-      tickets to l2 address [pkh] on [tx_rollup] *)
-  let init_deposit amount ?(pkh = "tz4MSfZsn6kMDczShy8PMeB628TNukn9hi2K") block
-      tx_rollup account =
+  let init_deposit_contract amount block account =
     let script =
       Format.asprintf
         {| parameter (pair address tx_rollup_l2_address);
@@ -479,7 +476,8 @@ module Nat_ticket = struct
       ~script
       ~storage:"Unit"
       block
-    >>=? fun (deposit_contract, _script, block) ->
+
+  let deposit_op block tx_rollup pkh account deposit_contract =
     Op.transaction
       (B block)
       ~entrypoint:Entrypoint.default
@@ -491,7 +489,15 @@ module Nat_ticket = struct
       account
       deposit_contract
       (Tez.of_mutez_exn 0L)
-    >|=? fun op -> (op, block, deposit_contract)
+
+  (** Return an operation to originate a contract that will deposit [amount]
+      tickets to l2 address [pkh] on [tx_rollup] *)
+  let init_deposit amount ?(pkh = "tz4MSfZsn6kMDczShy8PMeB628TNukn9hi2K") block
+      tx_rollup account =
+    init_deposit_contract amount block account
+    >>=? fun (deposit_contract, _script, block) ->
+    deposit_op block tx_rollup pkh account deposit_contract >|=? fun op ->
+    (op, block, deposit_contract)
 end
 
 (** ---- TESTS -------------------------------------------------------------- *)
@@ -4802,6 +4808,152 @@ module Withdraw = struct
       false
     >>=? fun () -> return_unit
 
+  (** Confirm that executing a deposit message produces the correct withdraws.
+      In order to check that the withdrawals are actually correct, we fail to
+      reject them. *)
+  let make_and_check_correct_commitment i tx_rollup account store message level
+      withdrawals ~previous_message_result =
+    make_incomplete_commitment_for_batch i level tx_rollup withdrawals
+    >>=? fun (commitment, _) ->
+    l2_parameters (I i) >>=? fun l2_parameters ->
+    Rejection.make_proof store l2_parameters message >>= fun proof ->
+    let after =
+      match proof.after with `Value hash -> hash | `Node hash -> hash
+    in
+    let m1_withdrawals =
+      match List.nth withdrawals 0 with
+      | Some (_idx, withdrawals) -> withdrawals
+      | None -> []
+    in
+    let message_result =
+      Tx_rollup_commitment.
+        {
+          context_hash = after;
+          withdrawals_merkle_root =
+            Tx_rollup_withdraw.Merkle.merklize_list m1_withdrawals;
+        }
+    in
+    let message_result_hash =
+      Tx_rollup_commitment.hash_message_result message_result
+    in
+    let commitment = {commitment with messages = [message_result_hash]} in
+    Op.tx_rollup_commit (I i) account tx_rollup commitment >>=? fun operation ->
+    Incremental.add_operation i operation >>=? fun i ->
+    Incremental.finalize_block i >>=? fun b ->
+    Incremental.begin_construction b >>=? fun i ->
+    let message_path =
+      assert_ok
+        Tx_rollup_inbox.Merkle.(
+          compute_path [Tx_rollup_message.hash_uncarbonated message] 0)
+    in
+    Op.tx_rollup_reject
+      (I i)
+      account
+      tx_rollup
+      level
+      message
+      ~message_position:0
+      ~message_path
+      ~proof
+      ~previous_message_result
+    >>=? fun op ->
+    Incremental.add_operation
+      i
+      op
+      ~expect_failure:
+        (check_proto_error Tx_rollup_errors.Proof_produced_rejected_state)
+    >>=? fun _i -> return (i, message_result)
+
+  (** [test_deposit_overflow_to_withdrawal] checks that a deposit that
+      overflows causes withdrawals to be generated. *)
+  let test_deposit_overflow_to_withdrawal () =
+    (* We deposit one less than the max, so that we can prove that the
+       withdraw is equal to the deposit, rather than the remainder after
+       we overflow. *)
+    let max = Int64.(sub max_int 1L) in
+    let (_, _, pkh) = gen_l2_account () in
+    context_init 1 >>=? fun (b, accounts) ->
+    let account1 =
+      WithExceptions.Option.get ~loc:__LOC__ @@ List.nth accounts 0
+    in
+    originate b account1 >>=? fun (b, tx_rollup) ->
+    let pkh_str = Tx_rollup_l2_address.to_b58check pkh in
+    Nat_ticket.init_deposit_contract (Z.of_int64 max) b account1
+    >>=? fun (deposit_contract, _script, b) ->
+    let deposit_pkh = assert_some @@ Contract.is_implicit account1 in
+    let deposit b =
+      Nat_ticket.deposit_op b tx_rollup pkh_str account1 deposit_contract
+      >>=? fun operation -> Block.bake ~operation b
+    in
+    deposit b >>=? fun b ->
+    deposit b >>=? fun b ->
+    deposit b >>=? fun b ->
+    let fee = Test_tez.of_int 10 in
+    let parameters = print_deposit_arg (`Typed tx_rollup) (`Hash pkh) in
+    Op.transaction ~fee (B b) account1 account1 Tez.zero ~parameters
+    >>=? fun operation ->
+    Block.bake ~operation b >>=? fun b ->
+    Nat_ticket.withdrawal
+      (B b)
+      ~ticketer:deposit_contract
+      ~claimer:account1
+      ~amount:(Tx_rollup_l2_qty.of_int64_exn max)
+      tx_rollup
+    >>=? fun withdraw ->
+    Incremental.begin_construction b >>=? fun i ->
+    Nat_ticket.ticket_hash (B b) ~ticketer:deposit_contract ~tx_rollup
+    >>=? fun ticket_hash ->
+    let (deposit1, _) =
+      Tx_rollup_message.make_deposit
+        deposit_pkh
+        (Tx_rollup_l2_address.Indexable.value pkh)
+        ticket_hash
+        (Tx_rollup_l2_qty.of_int64_exn max)
+    in
+    Rejection.init_l2_store () >>= fun store ->
+    (* For the first deposit, we have no withdraws *)
+    make_and_check_correct_commitment
+      i
+      tx_rollup
+      account1
+      store
+      deposit1
+      (tx_level 0l)
+      []
+      ~previous_message_result:Rejection.previous_message_result
+    >>=? fun (i, previous_message_result) ->
+    l2_parameters (I i) >>=? fun l2_parameters ->
+    (* Finally, we apply the deposit manually to have the good resulting store
+       for next operations *)
+    Rejection.Apply.apply_message store l2_parameters deposit1
+    >>= fun (store, _) ->
+    Rejection.commit_store store >>= fun store ->
+    (* For the second deposit, we have one. *)
+    make_and_check_correct_commitment
+      i
+      tx_rollup
+      account1
+      store
+      deposit1
+      (tx_level 1l)
+      [(0, [withdraw])]
+      ~previous_message_result
+    >>=? fun (i, previous_message_result) ->
+    Rejection.Apply.apply_message store l2_parameters deposit1
+    >>= fun (store, _) ->
+    Rejection.commit_store store >>= fun store ->
+    (* For the third deposit, we have one. *)
+    make_and_check_correct_commitment
+      i
+      tx_rollup
+      account1
+      store
+      deposit1
+      (tx_level 2l)
+      [(0, [withdraw])]
+      ~previous_message_result
+    >>=? fun _ -> return_unit
+
   let tests =
     [
       Tztest.tztest "Test withdraw" `Quick test_valid_withdraw;
@@ -4854,6 +5006,10 @@ module Withdraw = struct
         "Test withdrawing is cleaned up after removal"
         `Quick
         test_withdrawal_accounting_is_cleaned_up_after_removal;
+      Tztest.tztest
+        "Test deposits overflowing to withdrawals"
+        `Quick
+        test_deposit_overflow_to_withdrawal;
     ]
 end
 
