@@ -105,11 +105,11 @@ let uri_scheme = "mock-log"
 
 let configure _ =
   activated := true ;
-  return ()
+  Lwt_tzresult_syntax.return_unit
 
 let is_activated () = !activated
 
-let close (_ : t) : unit tzresult Lwt.t = return ()
+let close (_ : t) : unit tzresult Lwt.t = Lwt_tzresult_syntax.return_unit
 
 let handle (type a) (_ : t) m ?section (f : unit -> a) =
   let module M = (val m : Internal_event.EVENT_DEFINITION with type t = a) in
@@ -124,7 +124,7 @@ let handle (type a) (_ : t) m ?section (f : unit -> a) =
     }
   in
   recorded_events := !recorded_events @ [event] ;
-  return ()
+  Lwt_tzresult_syntax.return_unit
 
 (** testing stuff *)
 

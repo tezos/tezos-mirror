@@ -37,6 +37,7 @@ open Tezos_error_monad.Error_monad
 (* definitions *)
 
 let keywords words =
+  let open Lwt_tzresult_syntax in
   let words = List.map (fun (w, v) -> (String.lowercase_ascii w, v)) words in
   let matcher _ w =
     let w = String.lowercase_ascii w in
@@ -47,25 +48,35 @@ let keywords words =
   let autocomplete _ = return (fst (List.split words)) in
   Clic.parameter ~autocomplete matcher
 
-type abcd = A | B | C | D
+type abcd = A | B | C | D | The
 
-type efgh = E | F | G | H
+type efgh = E | F | G | H | End
 
-let string_of_abcd = function A -> "A" | B -> "B" | C -> "C" | D -> "D"
+let string_of_abcd = function
+  | A -> "A"
+  | B -> "B"
+  | C -> "C"
+  | D -> "D"
+  | The -> "the"
 
-let string_of_efgh = function E -> "E" | F -> "F" | G -> "G" | H -> "H"
+let string_of_efgh = function
+  | E -> "E"
+  | F -> "F"
+  | G -> "G"
+  | H -> "H"
+  | End -> "end"
 
 let abcd_parameter : (abcd, unit) Clic.parameter =
-  keywords [("A", A); ("B", B); ("C", C); ("D", D)]
+  keywords [("A", A); ("B", B); ("C", C); ("D", D); ("the", The)]
 
 let efgh_parameter : (efgh, unit) Clic.parameter =
-  keywords [("E", E); ("F", F); ("G", G); ("H", H)]
+  keywords [("E", E); ("F", F); ("G", G); ("H", H); ("end", End)]
 
 let abcd_param ~name =
-  Clic.param ~name ~desc:"must be A,B,C or D" abcd_parameter
+  Clic.param ~name ~desc:"must be A,B,C,D, or \"the\"" abcd_parameter
 
 let efgh_param ~name =
-  Clic.param ~name ~desc:"must be E,F,G or H" efgh_parameter
+  Clic.param ~name ~desc:"must be E,F,G,H, or \"end\"" efgh_parameter
 
 (* instrumentation *)
 
@@ -215,10 +226,43 @@ let test_dispatch_advanced () =
     expect __LINE__ (Ok "EB") (dispatch [en; enp] ["b"; "the"; "end"])
   in
   let* () =
+    expect __LINE__ (Ok "Ethe") (dispatch [en; enp] ["the"; "the"; "end"])
+  in
+  let* () =
+    expect
+      __LINE__
+      (Ok "EBtheB")
+      (dispatch [en; enp] ["b"; "the"; "b"; "the"; "end"])
+  in
+  let* () =
+    expect
+      __LINE__
+      (Ok "EBthethethe")
+      (dispatch [en; enp] ["b"; "the"; "the"; "the"; "the"; "end"])
+  in
+  let* () =
+    expect
+      __LINE__
+      (Ok "EBtheBthethe")
+      (dispatch [en; enp] ["b"; "the"; "b"; "the"; "the"; "the"; "end"])
+  in
+  let* () =
     expect
       __LINE__
       (Ok "EBE")
       (dispatch [en; enp] ["b"; "the"; "end"; "of"; "e"])
+  in
+  let* () =
+    expect
+      __LINE__
+      (Ok "EBend")
+      (dispatch [en; enp] ["b"; "the"; "end"; "of"; "end"])
+  in
+  let* () =
+    expect
+      __LINE__
+      (Ok "Etheend")
+      (dispatch [en; enp] ["the"; "the"; "end"; "of"; "end"])
   in
   let* () =
     expect __LINE__ (Ok "EBE") (dispatch [enp] ["b"; "the"; "end"; "of"; "e"])
@@ -274,7 +318,7 @@ let string_param ~autocomplete next =
     param
       ~name:"string"
       ~desc:"string"
-      (parameter ~autocomplete (fun _ s -> return s))
+      (parameter ~autocomplete (fun _ s -> Lwt.return_ok s))
       next)
 
 let int_param ~autocomplete next =
@@ -282,7 +326,7 @@ let int_param ~autocomplete next =
     param
       ~name:"int"
       ~desc:"int"
-      (parameter ~autocomplete (fun _ s -> return @@ int_of_string s))
+      (parameter ~autocomplete (fun _ s -> Lwt.return_ok @@ int_of_string s))
       next)
 
 let test_autocompletion_case ~commands ~args ~expected () =
@@ -319,6 +363,7 @@ let test_autocompletion_case ~commands ~args ~expected () =
     and [non_terminal_seq].
 *)
 let test_parameters_autocompletion =
+  let open Lwt_tzresult_syntax in
   let param_commands =
     Clic.
       [

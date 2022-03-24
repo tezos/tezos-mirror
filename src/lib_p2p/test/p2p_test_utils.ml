@@ -50,7 +50,7 @@ type 'a timeout_t = {time : float; msg : 'a -> string}
      [timeout] is exceed an error is raised. There is a Lwt cooperation
      point. *)
 let wait_pred ?timeout ~pred ~arg () =
-  let open Lwt_result_syntax in
+  let open Lwt_tzresult_syntax in
   let rec inner_wait_pred () =
     let*! () = Lwt.pause () in
     if not (pred arg) then inner_wait_pred () else return_unit
@@ -61,12 +61,12 @@ let wait_pred ?timeout ~pred ~arg () =
       Lwt.pick
         [
           (let*! () = Lwt_unix.sleep timeout.time in
-           Error_monad.fail (Timeout_exceed (timeout.msg arg)));
+           fail (Timeout_exceed (timeout.msg arg)));
           inner_wait_pred ();
         ]
 
 let wait_pred_s ?timeout ~pred ~arg () =
-  let open Lwt_result_syntax in
+  let open Lwt_tzresult_syntax in
   let rec inner_wait_pred () =
     let*! () = Lwt.pause () in
     let*! cond = pred arg in
@@ -78,7 +78,7 @@ let wait_pred_s ?timeout ~pred ~arg () =
       Lwt.pick
         [
           (let*! () = Lwt_unix.sleep timeout.time in
-           Error_monad.fail (Timeout_exceed (timeout.msg arg)));
+           fail (Timeout_exceed (timeout.msg arg)));
           inner_wait_pred ();
         ]
 

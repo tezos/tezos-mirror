@@ -74,7 +74,7 @@ let propagation_tzresult points =
   let x = Random.int (List.length points) in
   let*! r =
     Node.detach_nodes
-      (fun i _ -> if x = i then Error_monad.fail Some_error else return_unit)
+      (fun i _ -> if x = i then fail Some_error else return_unit)
       points
   in
   match r with Ok () -> fail Invalid_test_result | Error _ -> return_unit

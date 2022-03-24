@@ -316,6 +316,7 @@ module Make (E : MENV) = struct
   module Trashpool = Rw (Files.Trashpool)
 
   let to_applied (shell_header, operation_data) =
+    let open Lwt_tzresult_syntax in
     let op =
       {E.Protocol.shell = shell_header; protocol_data = operation_data}
     in

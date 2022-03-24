@@ -32,6 +32,7 @@ let group =
   }
 
 let algo_param () =
+  let open Lwt_tzresult_syntax in
   Clic.parameter
     ~autocomplete:(fun _ -> return ["ed25519"; "secp256k1"; "p256"])
     (fun _ name ->

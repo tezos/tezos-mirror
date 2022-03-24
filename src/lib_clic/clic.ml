@@ -843,11 +843,13 @@ type error += Version : error
 
 type error += Help : 'a command option -> error
 
-let check_help_flag ?command = function
-  | ("-h" | "--help") :: _ -> fail (Help command)
-  | _ -> return_unit
+let check_help_flag ?command =
+  let open Lwt_tzresult_syntax in
+  function ("-h" | "--help") :: _ -> fail (Help command) | _ -> return_unit
 
-let check_version_flag = function
+let check_version_flag =
+  let open Lwt_tzresult_syntax in
+  function
   (* No "-v", it is taken by man output verbosity *)
   | "--version" :: _ -> fail Version
   | _ -> return_unit
@@ -1535,7 +1537,7 @@ let string ~name ~desc next =
   param
     ~name
     ~desc
-    {converter = (fun _ s -> return s); autocomplete = None}
+    {converter = (fun _ s -> Lwt.return_ok s); autocomplete = None}
     next
 
 let string_contains ~needle ~haystack =
@@ -1862,6 +1864,7 @@ let rec list_args : type arg ctx. (arg, ctx) args -> string list = function
   | AddArg (arg, args) -> get_arg arg @ list_args args
 
 let complete_func autocomplete cctxt =
+  let open Lwt_tzresult_syntax in
   match autocomplete with
   | None -> return_nil
   | Some autocomplete -> autocomplete cctxt
@@ -1871,7 +1874,9 @@ let list_command_args (Command {options = Argument {spec; _}; _}) =
 
 let complete_arg : type a ctx. ctx -> (a, ctx) arg -> string list tzresult Lwt.t
     =
- fun ctx -> function
+ fun ctx ->
+  let open Lwt_tzresult_syntax in
+  function
   | Arg {kind = {autocomplete; _}; _} -> complete_func autocomplete ctx
   | DefArg {kind = {autocomplete; _}; _} -> complete_func autocomplete ctx
   | Switch _ -> return_nil
@@ -1891,7 +1896,9 @@ let complete_options (type ctx) continuation args args_spec ind (ctx : ctx) =
   let arities = make_arities_dict args_spec StringMap.empty in
   let rec complete_spec :
       type a. string -> (a, ctx) args -> string list tzresult Lwt.t =
-   fun name -> function
+   fun name ->
+    let open Lwt_tzresult_syntax in
+    function
     | NoArgs -> return_nil
     | AddArg (Constant _, rest) -> complete_spec name rest
     | AddArg (arg, rest) ->
@@ -1940,37 +1947,40 @@ let complete_next_tree cctxt =
   | TStop command -> return (list_command_args command)
   | TEmpty -> return_nil
 
+let rec args_starting_from_suffix original_suffix ind matched_args = function
+  | ((s :: s_rest as suffix), a :: a_rest) ->
+      if s = a then
+        args_starting_from_suffix
+          original_suffix
+          ind
+          (matched_args @ [a])
+          (s_rest, a_rest)
+      else if matched_args = [] then
+        (* Suffix not found on args head, check the rest of the args *)
+        args_starting_from_suffix
+          original_suffix
+          (ind - 1)
+          matched_args
+          (suffix, a_rest)
+      else
+        (* After there is a suffix match, the rest of the suffix has
+           to be matched in the following args, unless it's empty. *)
+        None
+  | (unmatched_suffix, args)
+  (* Partial or full suffix match found *)
+    when Compare.List_lengths.(unmatched_suffix < original_suffix) ->
+      Some (matched_args @ args, ind)
+  | _ -> None
+
 let complete_tree cctxt tree index args =
   let rec help tree args ind =
+    let open Lwt_tzresult_syntax in
     if ind = 0 then complete_next_tree cctxt tree
     else
       match (tree, args) with
       | (TSeq _, _) -> complete_next_tree cctxt tree
       | ((TNonTerminalSeq {tree; suffix; _} as this_tree), _ :: _tl) -> (
-          let rec args_starting_from_suffix ind matched_args = function
-            | ((s :: s_rest as suffix), a :: a_rest) ->
-                if s = a then
-                  args_starting_from_suffix
-                    ind
-                    (matched_args @ [a])
-                    (s_rest, a_rest)
-                else if matched_args = [] then
-                  (* Suffix not found on args head, check the rest of the args *)
-                  args_starting_from_suffix
-                    (ind - 1)
-                    matched_args
-                    (suffix, a_rest)
-                else
-                  (* After there is a suffix match, the rest of the suffix has
-                     to be matched in the following args, unless it's empty. *)
-                  None
-            | (unmatched_suffix, args)
-            (* Partial or full suffix match found *)
-              when Compare.List_lengths.(unmatched_suffix < suffix) ->
-                Some (matched_args @ args, ind)
-            | _ -> None
-          in
-          match args_starting_from_suffix ind [] (suffix, args) with
+          match args_starting_from_suffix suffix ind [] (suffix, args) with
           | Some (args, ind) -> help tree args ind
           | _ -> complete_next_tree cctxt this_tree)
       | (TPrefix {prefix; _}, hd :: tl) -> (
@@ -2072,8 +2082,9 @@ let add_manual ~executable_name ~global_options format ppf commands =
                   ~short:'v'
                   ~placeholder:"0|1|2|3"
                   (parameter
-                     ~autocomplete:(fun _ -> return ["0"; "1"; "2"; "3"])
+                     ~autocomplete:(fun _ -> Lwt.return_ok ["0"; "1"; "2"; "3"])
                      (fun _ arg ->
+                       let open Lwt_tzresult_syntax in
                        match arg with
                        | "0" -> return Terse
                        | "1" -> return Short
@@ -2090,8 +2101,10 @@ let add_manual ~executable_name ~global_options format ppf commands =
                     | Plain -> "plain"
                     | Html -> "html")
                   (parameter
-                     ~autocomplete:(fun _ -> return ["colors"; "plain"; "html"])
+                     ~autocomplete:(fun _ ->
+                       Lwt.return_ok ["colors"; "plain"; "html"])
                      (fun _ arg ->
+                       let open Lwt_tzresult_syntax in
                        match arg with
                        | "colors" -> return Ansi
                        | "plain" -> return Plain
@@ -2120,6 +2133,7 @@ let add_manual ~executable_name ~global_options format ppf commands =
                 | None when Compare.List_length_with.(commands <= 3) -> Full
                 | None -> Short
               in
+              let open Lwt_tzresult_syntax in
               match commands with
               | [] -> fail (No_manual_entry keywords)
               | _ ->

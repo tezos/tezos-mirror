@@ -514,11 +514,12 @@ let meth_params ?(name = "HTTP method") ?(desc = "") params =
     ~desc
     (parameter
        ~autocomplete:(fun _ ->
-         return
+         Lwt.return_ok
          @@ List.map String.lowercase_ascii
          @@ List.map Resto.string_of_meth
          @@ [`GET; `POST; `DELETE; `PUT; `PATCH])
        (fun _ name ->
+         let open Lwt_tzresult_syntax in
          match Resto.meth_of_string (String.uppercase_ascii name) with
          | None -> failwith "Unknown HTTP method: %s" name
          | Some meth -> return meth))

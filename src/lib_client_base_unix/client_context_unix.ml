@@ -134,7 +134,7 @@ class unix_prompter : Client_context.prompter =
       Format.kasprintf (fun msg ->
           print_string msg ;
           let line = read_line () in
-          return line)
+          Lwt.return_ok line)
 
     method prompt_password : type a.
         (a, Bytes.t tzresult) Client_context.lwt_format -> a =
@@ -144,7 +144,7 @@ class unix_prompter : Client_context.prompter =
             if Unix.isatty Unix.stdin then Lwt_utils_unix.getpass ()
             else read_line ()
           in
-          return (Bytes.of_string line))
+          Lwt.return_ok (Bytes.of_string line))
 
     method multiple_password_retries = true
   end

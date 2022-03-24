@@ -579,10 +579,12 @@ let faked_network (msg_cfg : 'msg P2p_params.message_config) peer_cfg
     global_stat = (fun () -> Fake.empty_stat);
     get_peer_metadata = (fun _ -> peer_cfg.P2p_params.peer_meta_initial ());
     set_peer_metadata = (fun _ _ -> ());
-    connect = (fun ?timeout:_ _ -> fail P2p_errors.Connection_refused);
+    connect =
+      (fun ?timeout:_ _ ->
+        Lwt_tzresult_syntax.fail P2p_errors.Connection_refused);
     recv = (fun _ -> Lwt_utils.never_ending ());
     recv_any = (fun () -> Lwt_utils.never_ending ());
-    send = (fun _ _ -> fail P2p_errors.Connection_closed);
+    send = (fun _ _ -> Lwt_tzresult_syntax.fail P2p_errors.Connection_closed);
     try_send = (fun _ _ -> false);
     fold_connections = (fun ~init ~f:_ -> init);
     iter_connections = (fun _f -> ());

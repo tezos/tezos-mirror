@@ -1554,7 +1554,7 @@ module Lwt_log_sink = struct
 
     let uri_scheme = "lwt-log"
 
-    let configure _ = return_unit
+    let configure _ = Lwt_tzresult_syntax.return_unit
 
     let handle (type a) () m ?section (v : unit -> a) =
       let open Lwt_syntax in

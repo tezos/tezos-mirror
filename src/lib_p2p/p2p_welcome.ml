@@ -152,23 +152,23 @@ let rec worker_loop st =
   | Error err -> Events.(emit unexpected_error) err
 
 let create_listening_socket ~backlog ?(addr = Ipaddr.V6.unspecified) port =
-  let open Lwt_syntax in
+  let open Lwt_tzresult_syntax in
   Lwt.catch
     (fun () ->
       let main_socket = Lwt_unix.(socket PF_INET6 SOCK_STREAM 0) in
       Lwt_unix.(setsockopt main_socket SO_REUSEADDR true) ;
-      let* () =
+      let*! () =
         Lwt_unix.bind
           main_socket
           Unix.(ADDR_INET (Ipaddr_unix.V6.to_inet_addr addr, port))
       in
       Lwt_unix.listen main_socket backlog ;
-      return_ok main_socket)
+      return main_socket)
     (function
       | Unix.Unix_error (err, _, _) ->
-          Error_monad.fail
-          @@ Failed_to_open_listening_socket
-               {reason = err; address = addr; port}
+          fail
+            (Failed_to_open_listening_socket
+               {reason = err; address = addr; port})
       | exn -> Lwt.fail exn)
 
 let create ?addr ~backlog connect_handler port =

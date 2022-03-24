@@ -321,7 +321,7 @@ struct
       (function
         | Lwt_dropbox.Closed ->
             let name = Format.asprintf "%a" Name.pp w.name in
-            fail (Closed {base = base_name; name})
+            Lwt_tzresult_syntax.fail (Closed {base = base_name; name})
         | exn ->
             (* [Lwt_dropbox.put] can only raise [Closed] which is caught above.
                We don't want to catch any other exception but we cannot use an
@@ -385,7 +385,7 @@ struct
             t
           with Lwt_pipe.Closed ->
             let name = Format.asprintf "%a" Name.pp w.name in
-            fail (Closed {base = base_name; name}))
+            Lwt_tzresult_syntax.fail (Closed {base = base_name; name}))
       | Bounded_buffer message_queue ->
           let (t, u) = Lwt.wait () in
           Lwt.try_bind
@@ -395,7 +395,7 @@ struct
             (function
               | Lwt_pipe.Closed ->
                   let name = Format.asprintf "%a" Name.pp w.name in
-                  fail (Closed {base = base_name; name})
+                  Lwt_tzresult_syntax.fail (Closed {base = base_name; name})
               | exn -> raise exn)
 
     let pending_requests (type a) (w : a queue t) =

@@ -180,10 +180,10 @@ let terminate pid =
   Lwt.return_unit
 
 let wait ~value_encoding ~flags pid result_ch =
-  let open Lwt_syntax in
+  let open Lwt_tzresult_syntax in
   Lwt.catch
     (fun () ->
-      let* s = Lwt_unix.waitpid [] pid in
+      let*! s = Lwt_unix.waitpid [] pid in
       match s with
       | (_, Lwt_unix.WEXITED 0) ->
           received_result ~value_encoding ~flags result_ch
@@ -192,8 +192,8 @@ let wait ~value_encoding ~flags pid result_ch =
       | (_, Lwt_unix.WSTOPPED n) -> fail_with_exn (Stopped n))
     (function
       | Lwt.Canceled ->
-          let* () = terminate pid in
-          Error_monad.fail Canceled
+          let*! () = terminate pid in
+          fail Canceled
       | exn -> fail_with_exn exn)
 
 type ('a, 'b, 'c) t = {
@@ -467,11 +467,12 @@ let wait_all_results (processes : ('a, 'b, 'c) t list) =
   let terminations = List.map (fun p -> p.termination) processes in
   let* o = loop terminations in
   match o with
-  | None ->
+  | None -> (
       let* () = lwt_log_info "All done!" in
-      let* terminated = Error_monad.Lwt_syntax.all terminations in
-      return_ok
-      @@ List.map (function Ok a -> a | Error _ -> assert false) terminated
+      let* terminated = all terminations in
+      match List.partition_result terminated with
+      | (_, _ :: _) -> assert false
+      | (terminated, []) -> return_ok terminated)
   | Some (_err, remaining) ->
       let* () = lwt_log_error "Early error! Canceling remaining process." in
       List.iter Lwt.cancel remaining ;
@@ -494,7 +495,7 @@ let wait_all_results (processes : ('a, 'b, 'c) t list) =
           terminated
       in
       let* _ = print_results terminated in
-      Error_monad.fail (Par errors)
+      Lwt_tzresult_syntax.fail (Par errors)
 
 let wait_all pl =
   let open Lwt_result_syntax in

@@ -587,6 +587,7 @@ let accept t fd point =
           (Printexc.to_string exc))
 
 let fail_unless_disconnected_point point_info =
+  let open Lwt_tzresult_syntax in
   match P2p_point_state.get point_info with
   | Disconnected -> return_unit
   | Requested _ | Accepted _ -> fail P2p_errors.Pending_connection
@@ -718,7 +719,7 @@ module Internal_for_tests = struct
             P2p_socket.Internal_for_tests.mock_authenticated_connection
               default_metadata
           in
-          return (connection_info, authenticated_connection));
+          Lwt.return_ok (connection_info, authenticated_connection));
       socket_accept =
         (fun ?incoming_message_queue_size:_
              ?outgoing_message_queue_size:_
@@ -726,7 +727,8 @@ module Internal_for_tests = struct
              ~canceler:_
              authenticated_connection
              _encoding ->
-          return (P2p_socket.Internal_for_tests.mock authenticated_connection));
+          Lwt.return_ok
+            (P2p_socket.Internal_for_tests.mock authenticated_connection));
     }
 
   let dumb_config : config =

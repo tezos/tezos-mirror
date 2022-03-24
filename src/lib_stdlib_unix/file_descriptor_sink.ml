@@ -209,6 +209,7 @@ end) : Internal_event.SINK with type t = t = struct
 
   let handle (type a) {output; lwt_bad_citizen_hack; filter; format; _} m
       ?(section = Internal_event.Section.empty) (v : unit -> a) =
+    let open Lwt_tzresult_syntax in
     let module M = (val m : Internal_event.EVENT_DEFINITION with type t = a) in
     let now = Unix.gettimeofday () in
     let forced_event = v () in
@@ -257,16 +258,17 @@ end) : Internal_event.SINK with type t = t = struct
             Format.asprintf "%d:%s," (String.length bytes) bytes
       in
       lwt_bad_citizen_hack := to_write :: !lwt_bad_citizen_hack ;
-      Lwt.bind (output_one output to_write) (function
-          | Error [Exn (Unix.Unix_error (Unix.EBADF, _, _))] ->
-              (* The file descriptor was closed before the event arrived,
-                 ignore it. *)
-              return_unit
-          | Error _ as err -> Lwt.return err
-          | Ok () ->
-              lwt_bad_citizen_hack :=
-                List.filter (( = ) to_write) !lwt_bad_citizen_hack ;
-              return_unit))
+      let*! r = output_one output to_write in
+      match r with
+      | Error [Exn (Unix.Unix_error (Unix.EBADF, _, _))] ->
+          (* The file descriptor was closed before the event arrived,
+             ignore it. *)
+          return_unit
+      | Error _ as err -> Lwt.return err
+      | Ok () ->
+          lwt_bad_citizen_hack :=
+            List.filter (( = ) to_write) !lwt_bad_citizen_hack ;
+          return_unit)
     else return_unit
 
   let close {lwt_bad_citizen_hack; output; _} =
