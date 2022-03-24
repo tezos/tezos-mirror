@@ -126,3 +126,11 @@ end
     More precisely, wait until a [node_is_ready] event occurs.
     If such an event already occurred, return immediately. *)
 val wait_for_ready : t -> unit Lwt.t
+
+(** Wait until the layer 1 of the sc node is synchronized with some
+   given tezos level.
+
+    More precisely, wait until a [new_head] event with a large enough
+   level occurs.  If such an event already occurred, return
+   immediately. *)
+val wait_for_level : t -> int -> int Lwt.t

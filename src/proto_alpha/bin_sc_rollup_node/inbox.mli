@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,34 +23,29 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Tezos_rpc
+(** The rollup node maintains an inbox of incoming messages.
+
+   The incoming messages for a rollup are published on the layer 1. To
+   maintain the state of its inbox, a rollup node retrieves these
+   messages each time the tezos blockchain is updated.
+
+   The inbox state is persistent.
+
+*)
 open Protocol
-open Alpha_context
 
-let sc_rollup_address () =
-  RPC_service.get_service
-    ~description:"Smart-contract rollup address"
-    ~query:RPC_query.empty
-    ~output:Sc_rollup.Address.encoding
-    RPC_path.(open_root / "sc_rollup_address")
+(** [update cctxt store chain_event] changes the state of the inbox to react to
+    the [chain_event]. In particular, this process requests the tezos node
+    through the context client [cctxt] to retrieve the messages published
+    during this [chain_event]. *)
+val update :
+  #RPC_context.simple -> Store.t -> Layer1.chain_event -> unit tzresult Lwt.t
 
-let current_tezos_head () =
-  RPC_service.get_service
-    ~description:"Tezos head known to the smart-contract rollup node"
-    ~query:RPC_query.empty
-    ~output:(Data_encoding.option Block_hash.encoding)
-    RPC_path.(open_root / "tezos_head")
+(** [inbox_of_hash store block_hash] returns the rollup inbox at the end of the
+    given validation of [block_hash]. *)
+val inbox_of_hash :
+  Store.t -> Block_hash.t -> Alpha_context.Sc_rollup.Inbox.t Lwt.t
 
-let current_tezos_level () =
-  RPC_service.get_service
-    ~description:"Tezos level known to the smart-contract rollup node"
-    ~query:RPC_query.empty
-    ~output:(Data_encoding.option Data_encoding.int32)
-    RPC_path.(open_root / "tezos_level")
-
-let current_inbox () =
-  RPC_service.get_service
-    ~description:"Current inbox"
-    ~query:RPC_query.empty
-    ~output:Sc_rollup.Inbox.encoding
-    RPC_path.(open_root / "inbox")
+(** [start store rollup] initializes the inbox to track the messages published for
+    the given [rollup]. *)
+val start : Store.t -> Alpha_context.Sc_rollup.t -> unit Lwt.t
