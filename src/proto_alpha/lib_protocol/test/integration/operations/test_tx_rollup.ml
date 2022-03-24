@@ -716,10 +716,18 @@ let test_inbox_size_too_big () =
 (** Try to add enough batches to reach the batch count limit of an inbox. *)
 let test_inbox_count_too_big () =
   context_init1 () >>=? fun (b, contract) ->
+  let (_, _, pkh) = gen_l2_account () in
   Context.get_constants (B b) >>=? fun constant ->
   let message_count = constant.parametric.tx_rollup_max_messages_per_inbox in
   let contents = "some contents" in
   originate b contract >>=? fun (b, tx_rollup) ->
+  Contract_helpers.originate_contract
+    "contracts/tx_rollup_deposit.tz"
+    "Unit"
+    contract
+    b
+    (is_implicit_exn contract)
+  >>=? fun (deposit_contract, b) ->
   Incremental.begin_construction b >>=? fun i ->
   let rec fill_inbox i counter n =
     (* By default, the [gas_limit] is the maximum gas that can be
@@ -748,6 +756,28 @@ let test_inbox_count_too_big () =
     tx_rollup
     contents
   >>=? fun op ->
+  (* Submitting a new batch to a full inbox fails *)
+  Incremental.add_operation
+    i
+    op
+    ~expect_failure:
+      (check_proto_error_f @@ function
+       | Tx_rollup_errors.Inbox_count_would_exceed_limit rollup ->
+           rollup = tx_rollup
+       | _ -> false)
+  >>=? fun _i ->
+  let parameters = print_deposit_arg (`Typed tx_rollup) (`Hash pkh) in
+  let fee = Test_tez.of_int 10 in
+  Op.transaction
+    ~counter
+    ~fee
+    (I i)
+    contract
+    deposit_contract
+    Tez.zero
+    ~parameters
+  >>=? fun op ->
+  (* Submitting a new deposit to a full inbox fails *)
   Incremental.add_operation
     i
     op
