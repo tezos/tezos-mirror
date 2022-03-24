@@ -122,10 +122,7 @@ let write_parameter_file :
       bootstrap_accounts
       (Some (`A (existing_accounts @ additional_bootstrap_accounts)))
   in
-  let* overriden_parameters_out =
-    Lwt_io.open_file ~mode:Output overriden_parameters
-  in
-  let* () = Lwt_io.write overriden_parameters_out @@ JSON.encode_u parameters in
+  JSON.encode_to_file_u overriden_parameters parameters ;
   Lwt.return overriden_parameters
 
 let next_protocol = function
