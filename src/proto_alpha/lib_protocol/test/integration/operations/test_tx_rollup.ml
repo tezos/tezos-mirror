@@ -347,6 +347,7 @@ let raw_level level = assert_ok @@ Raw_level.of_int32 level
     expensive *)
 let make_incomplete_commitment_for_batch context level tx_rollup withdraw_list =
   Context.Tx_rollup.inbox context tx_rollup level >>=? fun metadata ->
+  let metadata = assert_some metadata in
   let str_for_context_hash =
     Data_encoding.Binary.to_string_exn Tx_rollup_inbox.encoding metadata
   in
@@ -702,11 +703,12 @@ let test_add_batch () =
     Tx_rollup_inbox.
       {inbox_length = 1; cumulated_size = contents_size; merkle_root}
   in
-  Alcotest.check
-    inbox_testable
-    "Expected inbox is not the computed one"
-    expected_inbox
-    inbox ;
+  Alcotest.(
+    check
+      (option inbox_testable)
+      "Expected inbox is not the computed one"
+      (Some expected_inbox)
+      inbox) ;
   inbox_burn state contents_size >>?= fun cost ->
   Assert.balance_was_debited ~loc:__LOC__ (B b) contract balance cost
 
@@ -795,10 +797,10 @@ let test_add_two_batches () =
   in
   Alcotest.(
     check
-      inbox_testable
+      (option inbox_testable)
       "The expected inbox is not the computed one"
       inbox
-      expected_inbox) ;
+      (Some expected_inbox)) ;
   inbox_burn state expected_inbox.cumulated_size >>?= fun cost ->
   Assert.balance_was_debited ~loc:__LOC__ (B b) contract balance cost
 
@@ -996,10 +998,10 @@ let test_valid_deposit () =
   in
   Alcotest.(
     check
-      inbox_testable
+      (option inbox_testable)
       "Expected inbox different from the computed one"
       inbox
-      expected_inbox) ;
+      (Some expected_inbox)) ;
   return_unit
 
 (** [test_additional_space_allocation_for_valid_deposit] originates a tx rollup with small [tx_rollup_origination_size], make a valid deposit and check additional space allocation *)

@@ -189,8 +189,8 @@ let test_tx_node_store_inbox =
       let*! expected_inbox_1 = Rollup.get_inbox ~rollup ~level:0 client in
       (* Ensure that stored inboxes on daemon's side are equivalent of
          inboxes returned by the rpc call. *)
-      Check.(node_inbox_1 = expected_inbox_1)
-        Rollup.Check.inbox
+      Check.(Some node_inbox_1 = expected_inbox_1)
+        (Check.option Rollup.Check.inbox)
         ~error_msg:
           "Unexpected inbox computed from the rollup node. Expected %R. \
            Computed %L" ;
@@ -205,8 +205,8 @@ let test_tx_node_store_inbox =
       let*! expected_inbox_2 = Rollup.get_inbox ~rollup ~level:1 client in
       (* Ensure that stored inboxes on daemon side are equivalent of inboxes
          returned by the rpc call. *)
-      Check.(node_inbox_2 = expected_inbox_2)
-        Rollup.Check.inbox
+      Check.(Some node_inbox_2 = expected_inbox_2)
+        (Check.option Rollup.Check.inbox)
         ~error_msg:
           "Unexpected inbox computed from the rollup node. Expected %R. \
            Computed %L" ;
@@ -215,8 +215,8 @@ let test_tx_node_store_inbox =
       let* () = Rollup_node.run tx_node in
       let* () = Rollup_node.wait_for_ready tx_node in
       let*! inbox_after_restart = Rollup.get_inbox ~rollup ~level:1 client in
-      Check.(node_inbox_2 = inbox_after_restart)
-        Rollup.Check.inbox
+      Check.(Some node_inbox_2 = inbox_after_restart)
+        (Check.option Rollup.Check.inbox)
         ~error_msg:
           "Unexpected inbox computed from the rollup node. Expected %R. \
            Computed %L" ;
