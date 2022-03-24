@@ -95,10 +95,8 @@ let prepare_inbox :
       >>=? fun (ctxt, metadata) -> return (ctxt, state, tx_lvl, metadata, Z.zero)
   | _ ->
       let pred_level =
-        Option.fold
-          ~none:None
-          ~some:(fun (tx_level, _) -> Tx_rollup_level_repr.pred tx_level)
-          current_levels
+        Option.bind current_levels (fun (tx_level, _) ->
+            Tx_rollup_level_repr.pred tx_level)
       in
       (match pred_level with
       | None -> return (ctxt, state)

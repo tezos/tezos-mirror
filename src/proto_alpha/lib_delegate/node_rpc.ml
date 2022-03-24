@@ -98,9 +98,7 @@ let raw_info cctxt ~chain ~block_hash shell payload_hash payload_round
          (e.g. Genesis) *)
       ok Round.zero)
   >>?= fun round ->
-  let prequorum =
-    Option.fold ~none:None ~some:extract_prequorum preendorsements
-  in
+  let prequorum = Option.bind preendorsements extract_prequorum in
   return
     {
       Baking_state.hash = block_hash;
