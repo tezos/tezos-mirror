@@ -41,8 +41,19 @@ type error +=
       Sc_rollup_unknown_commitment of
       Sc_rollup_repr.Commitment_hash.t
   | (* `Temporary *) Sc_rollup_bad_inbox_level
+  | (* `Temporary *) Sc_rollup_max_number_of_available_messages_reached
 
 let () =
+  register_error_kind
+    `Temporary
+    ~id:"Sc_rollup_max_number_of_available_messages_reached"
+    ~title:"Maximum number of available messages reached"
+    ~description:"Maximum number of available messages reached"
+    Data_encoding.unit
+    (function
+      | Sc_rollup_max_number_of_available_messages_reached -> Some ()
+      | _ -> None)
+    (fun () -> Sc_rollup_max_number_of_available_messages_reached) ;
   let description = "Already staked." in
   register_error_kind
     `Temporary
@@ -211,6 +222,7 @@ module Commitment_hash = Sc_rollup_repr.Commitment_hash
 
 let originate ctxt ~kind ~boot_sector =
   Raw_context.increment_origination_nonce ctxt >>?= fun (ctxt, nonce) ->
+  let level = Raw_context.current_level ctxt in
   Sc_rollup_repr.Address.from_nonce nonce >>?= fun address ->
   Storage.Sc_rollup.PVM_kind.add ctxt address kind >>= fun ctxt ->
   Storage.Sc_rollup.Initial_level.add
@@ -219,8 +231,8 @@ let originate ctxt ~kind ~boot_sector =
     (Level_storage.current ctxt).level
   >>= fun ctxt ->
   Storage.Sc_rollup.Boot_sector.add ctxt address boot_sector >>= fun ctxt ->
-  Storage.Sc_rollup.Inbox.init ctxt address Sc_rollup_inbox.empty
-  >>=? fun (ctxt, size_diff) ->
+  let inbox = Sc_rollup_inbox_repr.empty address level.level in
+  Storage.Sc_rollup.Inbox.init ctxt address inbox >>=? fun (ctxt, size_diff) ->
   Store.Last_cemented_commitment.init ctxt address Commitment_hash.zero
   >>=? fun (ctxt, lcc_size_diff) ->
   Store.Staker_count.init ctxt address 0l >>=? fun (ctxt, stakers_size_diff) ->
@@ -239,23 +251,23 @@ let originate ctxt ~kind ~boot_sector =
 
 let kind ctxt address = Storage.Sc_rollup.PVM_kind.find ctxt address
 
-(** Try to consume n messages. *)
-let consume_n_messages ctxt rollup n =
-  let open Lwt_tzresult_syntax in
-  let* (ctxt, inbox) = Storage.Sc_rollup.Inbox.get ctxt rollup in
-  match Sc_rollup_inbox.consume_n_messages n inbox with
-  | None -> return ctxt
-  | Some inbox ->
-      let* (ctxt, size) = Storage.Sc_rollup.Inbox.update ctxt rollup inbox in
-      assert (Compare.Int.(size <= 0)) ;
-      return ctxt
-
 let last_cemented_commitment ctxt rollup =
   let open Lwt_tzresult_syntax in
   let* (ctxt, res) = Store.Last_cemented_commitment.find ctxt rollup in
   match res with
   | None -> fail (Sc_rollup_does_not_exist rollup)
   | Some lcc -> return (lcc, ctxt)
+
+(** Try to consume n messages. *)
+let consume_n_messages ctxt rollup n =
+  let open Lwt_tzresult_syntax in
+  let* (ctxt, inbox) = Storage.Sc_rollup.Inbox.get ctxt rollup in
+  Sc_rollup_inbox_repr.consume_n_messages n inbox >>?= function
+  | None -> return ctxt
+  | Some inbox ->
+      let* (ctxt, size) = Storage.Sc_rollup.Inbox.update ctxt rollup inbox in
+      assert (Compare.Int.(size <= 0)) ;
+      return ctxt
 
 let inbox ctxt rollup =
   let open Lwt_tzresult_syntax in
@@ -264,16 +276,36 @@ let inbox ctxt rollup =
   | None -> fail (Sc_rollup_does_not_exist rollup)
   | Some inbox -> return (inbox, ctxt)
 
+let assert_inbox_size_ok ctxt next_size =
+  let max_size = Constants_storage.sc_rollup_max_available_messages ctxt in
+  fail_unless
+    Compare.Z.(next_size <= Z.of_int max_size)
+    Sc_rollup_max_number_of_available_messages_reached
+
 let add_messages ctxt rollup messages =
-  let open Lwt_tzresult_syntax in
-  let* (ctxt, res) = Storage.Sc_rollup.Inbox.find ctxt rollup in
-  match res with
-  | None -> fail (Sc_rollup_does_not_exist rollup)
-  | Some inbox ->
-      let {Level_repr.level; _} = Raw_context.current_level ctxt in
-      let inbox = Sc_rollup_inbox.add_messages messages level inbox in
-      let* (ctxt, size) = Storage.Sc_rollup.Inbox.update ctxt rollup inbox in
-      return (inbox, Z.of_int size, ctxt)
+  let open Raw_context in
+  inbox ctxt rollup >>=? fun (inbox, ctxt) ->
+  let next_size =
+    Z.add
+      (Sc_rollup_inbox_repr.number_of_available_messages inbox)
+      (Z.of_int (List.length messages))
+  in
+  assert_inbox_size_ok ctxt next_size >>=? fun () ->
+  Sc_rollup_in_memory_inbox.current_messages ctxt rollup
+  |> fun current_messages ->
+  let {Level_repr.level; _} = Raw_context.current_level ctxt in
+  (*
+      Notice that the protocol is forgetful: it throws away the inbox
+      history. On the contrary, the history is stored by the rollup
+      node to produce inclusion proofs when needed.
+    *)
+  Sc_rollup_inbox_repr.(
+    add_messages_no_history inbox level messages current_messages)
+  >>=? fun (current_messages, inbox) ->
+  Sc_rollup_in_memory_inbox.set_current_messages ctxt rollup current_messages
+  |> fun ctxt ->
+  Storage.Sc_rollup.Inbox.update ctxt rollup inbox >>=? fun (ctxt, size) ->
+  return (inbox, Z.of_int size, ctxt)
 
 (* This function is called in other functions in the module only after they have
    checked for the existence of the rollup, and therefore it is not necessary

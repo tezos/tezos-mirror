@@ -131,6 +131,10 @@ let constants_mainnet =
     sc_rollup_origination_size = 6_314;
     (* The challenge window is about a week with 30s block-time (604800s / 30s). *)
     sc_rollup_challenge_window_in_blocks = 20_160;
+    (* The following value is chosen to limit the length of inbox refutation proofs. *)
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/2556
+       The follow constants need to be refined. *)
+    sc_rollup_max_available_messages = 1_000_000;
   }
 
 let constants_sandbox =

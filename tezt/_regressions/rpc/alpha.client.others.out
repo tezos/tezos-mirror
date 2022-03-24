@@ -42,7 +42,8 @@ tezt/_regressions/rpc/alpha.client.others.out
   "tx_rollup_max_ticket_payload_size": 10240,
   "tx_rollup_rejection_max_proof_size": 30000, "sc_rollup_enable": false,
   "sc_rollup_origination_size": 6314,
-  "sc_rollup_challenge_window_in_blocks": 20160 }
+  "sc_rollup_challenge_window_in_blocks": 20160,
+  "sc_rollup_max_available_messages": 1000000 }
 
 ./tezos-client rpc get /chains/main/blocks/head/helpers/baking_rights
 [ { "level": 2, "delegate": "[PUBLIC_KEY_HASH]",

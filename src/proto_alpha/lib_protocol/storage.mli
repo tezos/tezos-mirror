@@ -697,7 +697,7 @@ module Sc_rollup : sig
   module Inbox :
     Non_iterable_indexed_carbonated_data_storage
       with type key = Sc_rollup_repr.t
-       and type value = Sc_rollup_inbox.t
+       and type value = Sc_rollup_inbox_repr.t
        and type t := Raw_context.t
 
   module Last_cemented_commitment :

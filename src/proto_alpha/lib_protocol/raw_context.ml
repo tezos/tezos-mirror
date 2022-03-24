@@ -229,6 +229,7 @@ type back = {
     Tez_repr.t Signature.Public_key_hash.Map.t option;
   tx_rollup_current_messages :
     Tx_rollup_inbox_repr.Merkle.tree Tx_rollup_repr.Map.t;
+  sc_rollup_current_messages : Context.tree Sc_rollup_repr.Address.Map.t;
 }
 
 (*
@@ -785,6 +786,7 @@ let prepare ~level ~predecessor_timestamp ~timestamp ctxt =
         sampler_state = Cycle_repr.Map.empty;
         stake_distribution_for_current_cycle = None;
         tx_rollup_current_messages = Tx_rollup_repr.Map.empty;
+        sc_rollup_current_messages = Sc_rollup_repr.Address.Map.empty;
       };
   }
 
@@ -927,6 +929,11 @@ let prepare_first_block ~level ~timestamp ctxt =
             (* The following value is chosen to prevent spam. *)
             sc_rollup_origination_size = 6_314;
             sc_rollup_challenge_window_in_blocks = 20_160;
+            (* The following value is chosen to limit the maximal
+               length of an inbox refutation proof. *)
+            (* TODO: https://gitlab.com/tezos/tezos/-/issues/2556
+               The follow constants need to be refined. *)
+            sc_rollup_max_available_messages = 1_000_000;
           }
       in
       add_constants ctxt constants >>= fun ctxt -> return ctxt)
@@ -1350,4 +1357,27 @@ module Tx_rollup = struct
     in
     let back = {ctxt.back with tx_rollup_current_messages = map} in
     ({ctxt with back}, !root)
+end
+
+(*
+   To optimize message insertion in smart contract rollup inboxes, we
+   maintain the sequence of current messages of each rollup used in
+   the block in a in-memory map.
+*)
+module Sc_rollup_in_memory_inbox = struct
+  let current_messages ctxt rollup =
+    Sc_rollup_repr.Address.Map.find rollup ctxt.back.sc_rollup_current_messages
+    |> function
+    | None -> Tree.empty ctxt
+    | Some tree -> tree
+
+  let set_current_messages ctxt rollup tree =
+    let sc_rollup_current_messages =
+      Sc_rollup_repr.Address.Map.add
+        rollup
+        tree
+        ctxt.back.sc_rollup_current_messages
+    in
+    let back = {ctxt.back with sc_rollup_current_messages} in
+    {ctxt with back}
 end

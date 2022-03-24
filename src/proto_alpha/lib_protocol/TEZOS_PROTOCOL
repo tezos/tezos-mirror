@@ -31,8 +31,9 @@
         "Fitness_repr",
         "Cycle_repr",
         "Level_repr",
-        "Sc_rollup_inbox",
         "Sc_rollup_repr",
+        "Skip_list_repr",
+        "Sc_rollup_inbox_repr",
         "Seed_repr",
         "Sampler",
         "Voting_period_repr",
@@ -75,6 +76,7 @@
 
         "Raw_context_intf",
         "Raw_context",
+
         "Storage_costs",
         "Storage_sigs",
         "Storage_functors",

@@ -157,6 +157,7 @@ type parametric = {
   sc_rollup_enable : bool;
   sc_rollup_origination_size : int;
   sc_rollup_challenge_window_in_blocks : int;
+  sc_rollup_max_available_messages : int;
 }
 
 val parametric_encoding : parametric Data_encoding.encoding

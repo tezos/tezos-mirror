@@ -45,10 +45,10 @@ let tztest (name : string) (speed : Alcotest.speed_level) (f : unit -> 'a Lwt.t)
           Format.printf "@\n%a@." pp_print_trace err ;
           Lwt.fail Alcotest.Test_error)
 
-let tztest_qcheck ~name generator f =
+let tztest_qcheck ?count ~name generator f =
   let (name, speed, run) =
     QCheck_alcotest.to_alcotest
-      ( QCheck.Test.make ~name generator @@ fun x ->
+      ( QCheck.Test.make ?count ~name generator @@ fun x ->
         match Lwt_main.run (f x) with
         | Ok _ -> true
         | Error err -> QCheck.Test.fail_reportf "@\n%a@." pp_print_trace err )

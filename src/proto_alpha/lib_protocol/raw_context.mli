@@ -364,3 +364,9 @@ module Tx_rollup : sig
     Tx_rollup_message_repr.hash ->
     t * Tx_rollup_inbox_repr.Merkle.root
 end
+
+module Sc_rollup_in_memory_inbox : sig
+  val current_messages : t -> Sc_rollup_repr.t -> Context.tree
+
+  val set_current_messages : t -> Sc_rollup_repr.t -> Context.tree -> t
+end

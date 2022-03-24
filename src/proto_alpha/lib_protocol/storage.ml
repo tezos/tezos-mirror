@@ -1555,9 +1555,9 @@ module Sc_rollup = struct
         let name = ["inbox"]
       end)
       (struct
-        type t = Sc_rollup_inbox.t
+        type t = Sc_rollup_inbox_repr.t
 
-        let encoding = Sc_rollup_inbox.encoding
+        let encoding = Sc_rollup_inbox_repr.encoding
       end)
 
   module Last_cemented_commitment =

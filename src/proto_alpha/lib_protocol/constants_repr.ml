@@ -176,6 +176,7 @@ type parametric = {
   sc_rollup_enable : bool;
   sc_rollup_origination_size : int;
   sc_rollup_challenge_window_in_blocks : int;
+  sc_rollup_max_available_messages : int;
 }
 
 let parametric_encoding =
@@ -234,7 +235,8 @@ let parametric_encoding =
                       c.tx_rollup_rejection_max_proof_size ) ),
                   ( c.sc_rollup_enable,
                     c.sc_rollup_origination_size,
-                    c.sc_rollup_challenge_window_in_blocks ) ) ) ) ) ) ))
+                    c.sc_rollup_challenge_window_in_blocks,
+                    c.sc_rollup_max_available_messages ) ) ) ) ) ) ))
     (fun ( ( preserved_cycles,
              blocks_per_cycle,
              blocks_per_commitment,
@@ -287,7 +289,8 @@ let parametric_encoding =
                          tx_rollup_rejection_max_proof_size ) ),
                      ( sc_rollup_enable,
                        sc_rollup_origination_size,
-                       sc_rollup_challenge_window_in_blocks ) ) ) ) ) ) ) ->
+                       sc_rollup_challenge_window_in_blocks,
+                       sc_rollup_max_available_messages ) ) ) ) ) ) ) ->
       {
         preserved_cycles;
         blocks_per_cycle;
@@ -342,6 +345,7 @@ let parametric_encoding =
         sc_rollup_enable;
         sc_rollup_origination_size;
         sc_rollup_challenge_window_in_blocks;
+        sc_rollup_max_available_messages;
       })
     (merge_objs
        (obj9
@@ -413,10 +417,11 @@ let parametric_encoding =
                             (req "tx_rollup_cost_per_byte_ema_factor" int31)
                             (req "tx_rollup_max_ticket_payload_size" int31)
                             (req "tx_rollup_rejection_max_proof_size" int31)))
-                      (obj3
+                      (obj4
                          (req "sc_rollup_enable" bool)
                          (req "sc_rollup_origination_size" int31)
-                         (req "sc_rollup_challenge_window_in_blocks" int31))))))))
+                         (req "sc_rollup_challenge_window_in_blocks" int31)
+                         (req "sc_rollup_max_available_messages" int31))))))))
 
 type t = {fixed : fixed; parametric : parametric}
 
