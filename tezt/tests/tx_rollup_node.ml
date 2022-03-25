@@ -414,7 +414,7 @@ let test_ticket_deposit_from_l1_to_l2 =
       let (bls_pkh, _, _) = generate_bls_addr client in
       let bls_pkh_str = Bls_public_key_hash.to_b58check bls_pkh in
       let arg = make_tx_rollup_deposit_argument tx_rollup_hash bls_pkh_str in
-      (* This smart contract call will transfer 10 tickets to the
+      (* This smart contract call will transfer 100_000 tickets to the
          given address. *)
       let* () =
         Client.transfer
@@ -443,7 +443,7 @@ let test_ticket_deposit_from_l1_to_l2 =
           ~block:"head"
           ~ticket_id
           ~tz4_address:bls_pkh_str
-          ~expected_balance:10
+          ~expected_balance:100_000
       in
       unit)
 
@@ -568,7 +568,7 @@ let test_l2_to_l2_transaction =
           ~block:"head"
           ~ticket_id
           ~tz4_address:bls_pkh_1_str
-          ~expected_balance:10
+          ~expected_balance:100_000
       in
       let arg_2 =
         make_tx_rollup_deposit_argument tx_rollup_hash bls_pkh_2_str
@@ -594,7 +594,7 @@ let test_l2_to_l2_transaction =
           ~block:"head"
           ~ticket_id
           ~tz4_address:bls_pkh_2_str
-          ~expected_balance:10
+          ~expected_balance:100_000
       in
       Log.info "Crafting a l2 transaction" ;
       (* FIXME/TORU: Use the client *)
@@ -636,14 +636,14 @@ let test_l2_to_l2_transaction =
           ~block:"head"
           ~ticket_id
           ~tz4_address:bls_pkh_1_str
-          ~expected_balance:9
+          ~expected_balance:99_999
       and* () =
         check_tz4_balance
           ~tx_node
           ~block:"head"
           ~ticket_id
           ~tz4_address:bls_pkh_2_str
-          ~expected_balance:11
+          ~expected_balance:100_001
       in
       unit)
 
@@ -713,7 +713,7 @@ let test_batcher =
           ~block:"head"
           ~ticket_id
           ~tz4_address:bls_pkh_1_str
-          ~expected_balance:10
+          ~expected_balance:100_000
       in
       let arg_2 =
         make_tx_rollup_deposit_argument tx_rollup_hash bls_pkh_2_str
@@ -739,7 +739,7 @@ let test_batcher =
           ~block:"head"
           ~ticket_id
           ~tz4_address:bls_pkh_2_str
-          ~expected_balance:10
+          ~expected_balance:100_000
       in
       Log.info
         "Crafting a l2 transaction: %s transfers 1 to %s"
@@ -820,7 +820,7 @@ let test_batcher =
           ~signer:(Bls_pk bls_pk_1)
           ~dest:bls_pkh_2_str
           ~ticket:ticket_id
-          15L
+          1_000_000L
       in
       let signature = sign_one_transaction bls_sk_1 [tx] in
       Log.info "Submitting the wrong amount L2 transaction" ;
@@ -850,14 +850,14 @@ let test_batcher =
           ~block:"head"
           ~ticket_id
           ~tz4_address:bls_pkh_1_str
-          ~expected_balance:14
+          ~expected_balance:100_004
       and* () =
         check_tz4_balance
           ~tx_node
           ~block:"head"
           ~ticket_id
           ~tz4_address:bls_pkh_2_str
-          ~expected_balance:6
+          ~expected_balance:99_996
       in
 
       let inject_tx ~counter ~from ~dest ?(amount = 1L) sk =
@@ -911,14 +911,14 @@ let test_batcher =
           ~block:"head"
           ~ticket_id
           ~tz4_address:bls_pkh_1_str
-          ~expected_balance:7
+          ~expected_balance:99_997
       and* () =
         check_tz4_balance
           ~tx_node
           ~block:"head"
           ~ticket_id
           ~tz4_address:bls_pkh_2_str
-          ~expected_balance:13
+          ~expected_balance:100_003
       in
       unit)
 
@@ -999,14 +999,14 @@ let test_reorganization =
       let* _ = Node.wait_for_level node2 4 in
       Log.info "Nodes are synchronized, shutting down node 2" ;
       let* () = Node.terminate node2 in
-      Log.info "Check that L2 balance is 10" ;
+      Log.info "Check that L2 balance is 100_000" ;
       let* () =
         check_tz4_balance
           ~tx_node
           ~block:"head"
           ~ticket_id
           ~tz4_address:bls_pkh_1_str
-          ~expected_balance:10
+          ~expected_balance:100_000
       in
       Log.info "crafting a branch of size 1 on node 1 with a L2 transfer" ;
       (* FIXME/TORU: Use the client *)
@@ -1035,14 +1035,14 @@ let test_reorganization =
       let* () = Client.bake_for client1 in
       let* _ = Node.wait_for_level node1 5 in
       let* _ = Rollup_node.wait_for_tezos_level tx_node 5 in
-      Log.info "Check that L2 balance is now 0" ;
+      Log.info "Check that L2 balance is now 99_990" ;
       let* () =
         check_tz4_balance
           ~tx_node
           ~block:"head"
           ~ticket_id
           ~tz4_address:bls_pkh_1_str
-          ~expected_balance:0
+          ~expected_balance:99_990
       in
       Log.info "Running the node2 in private mode and craft a branch of size 2" ;
       let* () = Node.run node2 (Node.Private_mode :: nodes_args) in
@@ -1069,7 +1069,7 @@ let test_reorganization =
           ~block:"head"
           ~ticket_id
           ~tz4_address:bls_pkh_1_str
-          ~expected_balance:10
+          ~expected_balance:100_000
       in
       unit)
 
