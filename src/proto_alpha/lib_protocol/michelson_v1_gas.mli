@@ -441,7 +441,7 @@ module Cost_of : sig
 
     val unit : Gas.cost
 
-    val timestamp_readable : Gas.cost
+    val timestamp_readable : string -> Gas.cost
 
     val tx_rollup_l2_address : Gas.cost
 

@@ -27,29 +27,14 @@ open Alpha_context
 module S = Saturation_repr
 
 module Constants = struct
-  (* TODO: #2508
-     Fill in real benchmarked values.
-     Need to create benchmark and fill in values.
-  *)
-  let cost_collect_tickets_step = S.safe_int 360
+  let cost_collect_tickets_step = S.safe_int 60
 
-  (* TODO: #2499
-     Fill in real benchmarked values.
-     Need to create benchmark and fill in values.
-  *)
-  let cost_has_tickets_of_ty type_size = S.mul (S.safe_int 20) type_size
+  let cost_has_tickets_of_ty type_size =
+    S.add (S.safe_int 10) (S.mul (S.safe_int 6) type_size)
 
-  (* TODO: #2498
-     Fill in real benchmarked values.
-     Need to create benchmark and fill in values.
-  *)
-  let cost_compare_ticket_hash = S.safe_int 100
+  let cost_compare_ticket_hash = S.safe_int 10
 
-  (* TODO: #2520
-     Fill in real benchmarked values.
-     Need to create benchmark and fill in values.
-  *)
-  let cost_compare_key_contract = S.safe_int 100
+  let cost_compare_key_contract = S.safe_int 10
 end
 
 let consume_gas_steps ctxt ~step_cost ~num_steps =

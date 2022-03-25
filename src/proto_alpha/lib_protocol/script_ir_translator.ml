@@ -2189,7 +2189,7 @@ let parse_timestamp ctxt :
     ->
       ok (Script_timestamp.of_zint v, ctxt)
   | String (loc, s) as expr (* As unparsed with [Readable]. *) -> (
-      Gas.consume ctxt Typecheck_costs.timestamp_readable >>? fun ctxt ->
+      Gas.consume ctxt (Typecheck_costs.timestamp_readable s) >>? fun ctxt ->
       match Script_timestamp.of_string s with
       | Some v -> ok (v, ctxt)
       | None ->
