@@ -383,9 +383,9 @@ let generate ~(nb_input : int) ~(nb_output : int) ~(nb_nf : int) ~(nb_cm : int)
       in
       let balance = Int64.sub input_amount output_amount in
       let bound_data =
-        (* in the reference usage this contains a pkh encoded in micheline,
-           thus roughly 32 bytes *)
-        String.make 32 '0'
+        (* The bound data are benched separately so we add
+           empty bound data*)
+        ""
       in
       let binding_sig =
         Tezos_sapling.Core.Client.Proving.make_binding_sig
