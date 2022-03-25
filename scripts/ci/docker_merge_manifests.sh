@@ -1,5 +1,5 @@
 #!/bin/sh
-set -eux
+set -eu
 
 current_dir=$(cd "$(dirname "${0}")" && pwd)
 
