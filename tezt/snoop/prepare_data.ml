@@ -35,7 +35,7 @@ type cfg = {
 
 let default_cfg =
   {
-    sapling_tx_count = 300;
+    sapling_tx_count = 40;
     micheline_jobs = 4;
     micheline_code_count = 75;
     micheline_data_count = 75;
@@ -140,7 +140,7 @@ let prepare_sapling_data snoop cfg protocol =
             ~protocol
             ~tx_count:cfg.sapling_tx_count
             ~max_inputs:0
-            ~max_outputs:100
+            ~max_outputs:60
             ~file:
               Files.(
                 working_dir // sapling_data_dir // sapling_txs_file (i + 1))
@@ -149,7 +149,7 @@ let prepare_sapling_data snoop cfg protocol =
           Snoop.sapling_generate
             ~protocol
             ~tx_count:cfg.sapling_tx_count
-            ~max_inputs:100
+            ~max_inputs:60
             ~max_outputs:0
             ~file:
               Files.(
@@ -159,8 +159,8 @@ let prepare_sapling_data snoop cfg protocol =
           Snoop.sapling_generate
             ~protocol
             ~tx_count:cfg.sapling_tx_count
-            ~max_inputs:100
-            ~max_outputs:100
+            ~max_inputs:60
+            ~max_outputs:60
             ~file:
               Files.(
                 working_dir // sapling_data_dir // sapling_txs_file (i + 3))
