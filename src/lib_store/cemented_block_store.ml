@@ -346,10 +346,10 @@ let find_block_file cemented_store block_level =
 
 (* Hypothesis: the table is ordered. *)
 let compute_location cemented_store block_level =
-  Option.map
-    (fun {start_level; file; _} ->
-      (file, Int32.(to_int (sub block_level start_level))))
-    (find_block_file cemented_store block_level)
+  let open Option_syntax in
+  let+ {start_level; file; _} = find_block_file cemented_store block_level in
+  let level_delta = Int32.(to_int (sub block_level start_level)) in
+  (file, level_delta)
 
 let is_cemented cemented_store hash =
   try
