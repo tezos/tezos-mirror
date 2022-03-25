@@ -57,7 +57,7 @@ let signer_gen : Signer_indexable.either QCheck2.Gen.t =
     [
       (1, (fun pk -> from_value (Bls_pk pk)) <$> bls_pk_gen);
       (5, (fun addr -> from_value (L2_addr addr)) <$> l2_address_gen);
-      (4, (fun x -> from_index_exn x) <$> ui32);
+      (4, from_index_exn <$> ui32);
     ]
 
 let signer_index_gen : Signer_indexable.index QCheck2.Gen.t =
