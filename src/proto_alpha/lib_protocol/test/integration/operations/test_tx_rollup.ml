@@ -368,15 +368,14 @@ let assert_some res = match res with Some r -> r | None -> assert false
 let raw_level level = assert_ok @@ Raw_level.of_int32 level
 
 (** Create a deposit on the layer1 side through the origination of a contract
-      and return the associated deposit message to apply in the layer2. *)
-let make_deposit b tx_rollup account =
-  let (sk, pk, addr) = gen_l2_account () in
+    and return the associated deposit message to apply in the layer2. *)
+let make_deposit b tx_rollup l1_src addr =
   Contract_helpers.originate_contract
     "contracts/tx_rollup_deposit.tz"
     "Unit"
-    account
+    l1_src
     b
-    (is_implicit_exn account)
+    (is_implicit_exn l1_src)
   >>=? fun (contract, b) ->
   let parameters = print_deposit_arg (`Typed tx_rollup) (`Hash addr) in
   let fee = Test_tez.of_int 10 in
@@ -384,7 +383,7 @@ let make_deposit b tx_rollup account =
     ~counter:(Z.of_int 2)
     ~fee
     (B b)
-    account
+    l1_src
     contract
     Tez.zero
     ~parameters
@@ -394,12 +393,12 @@ let make_deposit b tx_rollup account =
   >>=? fun ticket_hash ->
   let (deposit, cumulated_size) =
     Tx_rollup_message.make_deposit
-      (is_implicit_exn account)
+      (is_implicit_exn l1_src)
       (Tx_rollup_l2_address.Indexable.value addr)
       ticket_hash
       (Tx_rollup_l2_qty.of_int64_exn 100_000L)
   in
-  return (b, (deposit, cumulated_size), (sk, pk, addr), ticket_hash)
+  return (b, (deposit, cumulated_size), ticket_hash)
 
 (** Create an incomplete (but valid) commitment for a given level. It is
     incomplete in the sense that the Merkle roots for each message are generated
@@ -1021,10 +1020,11 @@ let test_inbox_count_too_big () =
 (** [test_valid_deposit] checks that a smart contract can deposit
     tickets to a transaction rollup. *)
 let test_valid_deposit () =
+  let (_, _, addr) = gen_l2_account () in
   context_init1 () >>=? fun (b, account) ->
   originate b account >>=? fun (b, tx_rollup) ->
-  make_deposit b tx_rollup account
-  >>=? fun (b, (deposit, cumulated_size), _, _) ->
+  make_deposit b tx_rollup account addr
+  >>=? fun (b, (deposit, cumulated_size), _) ->
   Incremental.begin_construction b >|=? Incremental.alpha_ctxt >>=? fun _ctxt ->
   Context.Tx_rollup.inbox (B b) tx_rollup Tx_rollup_level.root >>=? fun inbox ->
   let merkle_root =
@@ -2367,13 +2367,13 @@ module Rejection = struct
     in
     (message_result_hash, path)
 
-  let init_with_deposit ?tx_rollup_hard_size_limit_per_message () =
+  let init_with_deposit ?tx_rollup_hard_size_limit_per_message addr =
     init_l2_store () >>= fun store ->
     context_init1 ?tx_rollup_hard_size_limit_per_message ()
     >>=? fun (b, account) ->
     originate b account >>=? fun (b, tx_rollup) ->
-    make_deposit b tx_rollup account
-    >>=? fun (b, (deposit, _), l2_account, ticket_hash) ->
+    make_deposit b tx_rollup account addr
+    >>=? fun (b, (deposit, _), ticket_hash) ->
     let deposit_hash = Tx_rollup_message_hash.hash_uncarbonated deposit in
     let message_path =
       match Tx_rollup_inbox.Merkle.(compute_path [deposit_hash] 0) with
@@ -2426,7 +2426,7 @@ module Rejection = struct
        for next operations *)
     Apply.apply_message store l2_parameters deposit >>= fun (store, _) ->
     commit_store store >>= fun store ->
-    return (b, account, tx_rollup, store, l2_account, ticket_hash)
+    return (b, account, tx_rollup, store, ticket_hash)
 
   let operation_content destination ticket_hash qty =
     let open Tx_rollup_l2_batch.V1 in
@@ -2481,15 +2481,16 @@ module Rejection = struct
 
   (** Test that we can produce a simple but valid proof. *)
   let test_valid_proof_on_invalid_commitment () =
-    init_with_deposit ()
-    >>=? fun (b, account, tx_rollup, store, (sk, pk, _pkh), ticket_hash) ->
+    let (sk, pk, addr) = gen_l2_account () in
+    init_with_deposit addr
+    >>=? fun (b, account, tx_rollup, store, ticket_hash) ->
     hash_tree_from_store store >>= fun l2_context_hash ->
     (* Create a transfer from [pk] to a new address *)
-    let (_, _, addr) = gen_l2_account () in
+    let (_, _, addr2) = gen_l2_account () in
     let (message, batch_bytes) =
       make_message_transfer
         ~signers:[sk]
-        [(bls_pk pk, None, [(addr, ticket_hash, 1L)])]
+        [(bls_pk pk, None, [(addr2, ticket_hash, 1L)])]
     in
     let message_hash = Tx_rollup_message_hash.hash_uncarbonated message in
     let message_path =
@@ -2537,15 +2538,16 @@ module Rejection = struct
   (** It is really similar to {!test_valid_proof_on_invalid_commitment} but it
       tries to reject a valid commitment, thus, fails. *)
   let test_valid_proof_on_valid_commitment () =
-    init_with_deposit ()
-    >>=? fun (b, account, tx_rollup, store, (sk, pk, _pkh), ticket_hash) ->
+    let (sk, pk, addr) = gen_l2_account () in
+    init_with_deposit addr
+    >>=? fun (b, account, tx_rollup, store, ticket_hash) ->
     hash_tree_from_store store >>= fun l2_context_hash ->
     (* Create a transfer from [pk] to a new address *)
-    let (_, _, addr) = gen_l2_account () in
+    let (_, _, addr2) = gen_l2_account () in
     let (message, batch_bytes) =
       make_message_transfer
         ~signers:[sk]
-        [(bls_pk pk, None, [(addr, ticket_hash, 1L)])]
+        [(bls_pk pk, None, [(addr2, ticket_hash, 1L)])]
     in
     let message_hash = Tx_rollup_message_hash.hash_uncarbonated message in
     let message_path =
@@ -2602,8 +2604,9 @@ module Rejection = struct
       message whose l2 apply will fail in whatever specific way we
       wish to test. *)
   let do_test_proof_with_hard_fail_message make_bad_message =
-    init_with_deposit ()
-    >>=? fun (b, account, tx_rollup, store, (sk, pk, addr), ticket_hash) ->
+    let (sk, pk, addr) = gen_l2_account () in
+    init_with_deposit addr
+    >>=? fun (b, account, tx_rollup, store, ticket_hash) ->
     hash_tree_from_store store >>= fun l2_context_hash ->
     let (message, batch_bytes) = make_bad_message sk pk addr ticket_hash in
     let message_hash = Tx_rollup_message_hash.hash_uncarbonated message in
@@ -3002,10 +3005,11 @@ module Rejection = struct
   (** Test rejecting a commitment to a non-trivial message -- that is,
       not a no-op. *)
   let test_nontrivial_rejection () =
+    let (_, _, addr) = gen_l2_account () in
     init_l2_store () >>= fun store ->
     context_init1 () >>=? fun (b, account) ->
     originate b account >>=? fun (b, tx_rollup) ->
-    make_deposit b tx_rollup account >>=? fun (b, (deposit, _), _, _) ->
+    make_deposit b tx_rollup account addr >>=? fun (b, (deposit, _), _) ->
     let message_hash = Tx_rollup_message_hash.hash_uncarbonated deposit in
     let message_path =
       match Tx_rollup_inbox.Merkle.(compute_path [message_hash] 0) with
@@ -3071,11 +3075,12 @@ module Rejection = struct
     return ctxt
 
   let test_large_rejection size =
+    let (_, _, addr) = gen_l2_account () in
     init_l2_store () >>= fun store ->
     context_init1 ~tx_rollup_rejection_max_proof_size:size ()
     >>=? fun (b, account) ->
     originate b account >>=? fun (b, tx_rollup) ->
-    make_deposit b tx_rollup account >>=? fun (b, (deposit, _), _, _) ->
+    make_deposit b tx_rollup account addr >>=? fun (b, (deposit, _), _) ->
     let deposit_hash = Tx_rollup_message_hash.hash_uncarbonated deposit in
     let message_path =
       match Tx_rollup_inbox.Merkle.(compute_path [deposit_hash] 0) with
@@ -3142,11 +3147,12 @@ module Rejection = struct
     | Nil -> assert false
 
   let test_valid_proof_truncated () =
+    let (_, _, addr) = gen_l2_account () in
     init_l2_store () >>= fun store ->
     context_init1 ~tx_rollup_rejection_max_proof_size:100 ()
     >>=? fun (b, account) ->
     originate b account >>=? fun (b, tx_rollup) ->
-    make_deposit b tx_rollup account >>=? fun (b, (deposit, _), _, _) ->
+    make_deposit b tx_rollup account addr >>=? fun (b, (deposit, _), _) ->
     let deposit_hash = Tx_rollup_message_hash.hash_uncarbonated deposit in
     let message_path =
       match Tx_rollup_inbox.Merkle.(compute_path [deposit_hash] 0) with
@@ -3203,8 +3209,9 @@ module Rejection = struct
       if [n_withdraw <= tx_rollup_max_withdrawals_per_batch] but also must
       succeed to reject if [n_withdraw > tx_rollup_max_withdrawals_per_batch]. *)
   let test_reject_withdrawals_helper ?expect_failure n_withdraw =
-    init_with_deposit ~tx_rollup_hard_size_limit_per_message:20_000 ()
-    >>=? fun (b, account, tx_rollup, store, (sk, pk, _), ticket_hash) ->
+    let (sk, pk, addr) = gen_l2_account () in
+    init_with_deposit ~tx_rollup_hard_size_limit_per_message:20_000 addr
+    >>=? fun (b, account, tx_rollup, store, ticket_hash) ->
     hash_tree_from_store store >>= fun l2_context_hash ->
     (* 1. Create a batch with [n_withdraw] withdrawals. *)
     let destination = is_implicit_exn account in
