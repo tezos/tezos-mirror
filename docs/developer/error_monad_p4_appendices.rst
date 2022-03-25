@@ -476,7 +476,7 @@ following code fragment?
 ::
 
    match
-     let ( let* ) = Option.bind in
+     let open Option_syntax in
      let* z = find "zero" in
      let* o = find "one" in
      Some (z, o)
@@ -487,6 +487,9 @@ following code fragment?
 | Pros: the type of a function indicates if it can fail, you cannot
   forget to check for success/failure.
 | Cons: a single kind of errors means it cannot be very informative.
+
+Option is a common enough strategy that the ``Option_syntax`` and
+``Lwt_option_syntax`` modules are available in the Tezos source.
 
 **fallback**
 
