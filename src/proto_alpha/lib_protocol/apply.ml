@@ -1052,11 +1052,6 @@ let apply_origination ~consume_deserialization_gas ~ctxt ~parsed_script ~script
   Script.force_decode_in_context
     ~consume_deserialization_gas
     ctxt
-    script.Script.storage
-  >>?= fun (_unparsed_storage, ctxt) ->
-  Script.force_decode_in_context
-    ~consume_deserialization_gas
-    ctxt
     script.Script.code
   >>?= fun (unparsed_code, ctxt) ->
   (match parsed_script with
@@ -1457,6 +1452,11 @@ let apply_external_manager_operation_content :
          The address of external originations is generated here. *)
       Contract.fresh_contract_from_current_nonce ctxt
       >>?= fun (ctxt, contract) ->
+      Script.force_decode_in_context
+        ~consume_deserialization_gas
+        ctxt
+        script.Script.storage
+      >>?= fun (_unparsed_storage, ctxt) ->
       apply_origination
         ~consume_deserialization_gas
         ~ctxt
