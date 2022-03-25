@@ -978,6 +978,17 @@ module Tx_rollup : sig
     src:string ->
     t ->
     unit Process.runnable
+
+  (** Run [tezos-client submit tx rollup return bond to <tx_rollup> from <src>]. *)
+  val submit_return_bond :
+    ?wait:string ->
+    ?burn_cap:Tez.t ->
+    ?storage_limit:int ->
+    ?hooks:Process.hooks ->
+    rollup:string ->
+    src:string ->
+    t ->
+    unit Process.runnable
 end
 
 (** Run [tezos-client show voting period] and return the period name. *)

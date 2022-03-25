@@ -78,8 +78,8 @@ let submit_batch ~batch:(`Batch content) {rollup; client; node} =
   let* _ = Node.wait_for_level node (current_level + 1) in
   return ()
 
-let submit_commitment ~level ~roots ~inbox_content ~predecessor
-    {rollup; client; node} =
+let submit_commitment ?(src = Constant.bootstrap1.public_key_hash) ~level ~roots
+    ~inbox_content ~predecessor {rollup; client; node} =
   let* inbox_merkle_root =
     match inbox_content with
     | `Root inbox_merkle_root -> inbox_merkle_root
@@ -95,13 +95,21 @@ let submit_commitment ~level ~roots ~inbox_content ~predecessor
       ~inbox_merkle_root
       ~predecessor
       ~rollup
-      ~src:Constant.bootstrap1.public_key_hash
+      ~src
       client
   in
   let current_level = Node.get_level node in
   let* () = Client.bake_for client in
   let* _ = Node.wait_for_level node (current_level + 1) in
   return ()
+
+let submit_return_bond ?(src = Constant.bootstrap1.public_key_hash)
+    {rollup; client; node} =
+  let*! () = Client.Tx_rollup.submit_return_bond ~hooks ~rollup ~src client in
+  let current_level = Node.get_level node in
+  let* () = Client.bake_for client in
+  let* _ = Node.wait_for_level node (current_level + 1) in
+  unit
 
 let submit_finalize_commitment ?(src = Constant.bootstrap1.public_key_hash)
     {rollup; client; node = _} =
@@ -1105,6 +1113,108 @@ let test_rollup_wrong_rejection_long_path =
     ~msg:(rex "proto.alpha.tx_rollup_wrong_message_path")
     process
 
+let check_bond_is ~src client ~expected =
+  let*! bond = RPC.Contracts.get_frozen_bonds ~contract_id:src client in
+  let given = JSON.as_int bond in
+  Check.(given = expected)
+    Check.int
+    ~error_msg:"Unexpected frozen bond for tx rollup. Expected %R. Got %L" ;
+  unit
+
+let attempt_return_bond ~(expected : [`Ok | `Ko]) ~src state client =
+  let* expected_bond_after_op =
+    Lwt.catch
+      (fun () ->
+        let* () = submit_return_bond ~src state in
+        if expected = `Ko then
+          Test.fail "Return bond expected to fail but succeeded" ;
+        return 0)
+      (fun _exn ->
+        if expected = `Ok then
+          Test.fail "Return bond expected to succeed but failed" ;
+        let* constants = RPC.get_constants client in
+        return JSON.(constants |-> "tx_rollup_commitment_bond" |> as_int))
+  in
+  check_bond_is ~src state.client ~expected:expected_bond_after_op
+
+(** This function tests some simple situations where bond for commiting in a
+    rollup could be returned or not. *)
+let test_rollup_bond_return =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"bond return"
+    ~tags:["tx_rollup"; "bond"; "return"]
+  @@ fun protocol ->
+  let parameters = Parameters.{finality_period = 4; withdraw_period = 4} in
+  let* ({rollup; client; node = _} as state) =
+    init_with_tx_rollup ~parameters ~protocol ()
+  in
+  let src = Constant.bootstrap2.public_key_hash in
+  let* constants = RPC.get_constants client in
+  let commit_bond =
+    JSON.(constants |-> "tx_rollup_commitment_bond" |> as_int)
+  in
+  (* No bond deposited at the beginning *)
+  let* () = check_bond_is ~src client ~expected:0 in
+
+  (* Auxiliary function that sends a batch to a rollup, then the corresponding commitment,
+     and then finalizes the commitment if [finalize] is true. *)
+  let batch_commit_finalize =
+    let current_calls_counter = ref 0 in
+    let step msg = Log.info "call %d) - %s" !current_calls_counter msg in
+    fun ?(finalize = true) ~rollup_level () ->
+      incr current_calls_counter ;
+
+      step "1. Submit batch" ;
+      let batch = Rollup.make_batch "blob" in
+      let* () = submit_batch ~batch state in
+
+      step "2. Submit commitment" ;
+      let*! s = Rollup.get_state ~rollup client in
+      let* () =
+        submit_commitment
+          ~src
+          ~level:rollup_level
+          ~roots:[Constant.tx_rollup_initial_message_result]
+          ~predecessor:s.Rollup.commitment_newest_hash
+          ~inbox_content:(`Content [batch])
+          state
+      in
+
+      step "3. Repeat bake before finalizing commitment" ;
+      let* () =
+        repeat parameters.finality_period (fun () -> Client.bake_for client)
+      in
+
+      step "4. Attempt return bond, which should fail" ;
+      let* () = attempt_return_bond state client ~src ~expected:`Ko in
+      if not finalize then unit
+      else
+        let () = step "5. Submit finalize_commitment and bake" in
+        let*! () = submit_finalize_commitment state in
+        let* () = check_bond_is ~src client ~expected:commit_bond in
+        Client.bake_for client
+  in
+  (* 1st scenario: batch; commit; finalize; return bond (OK) *)
+  Log.info "1st scenario: batch; commit; finalize; return bond (OK)" ;
+  let* () = batch_commit_finalize ~rollup_level:0 () in
+  let* () = attempt_return_bond state client ~src ~expected:`Ok in
+
+  (* 2nd scenario: batch; commit; finalize; batch; commit; finalize;
+     return bond (OK) *)
+  Log.info "2nd scenario: (batch; commit; finalize)x2, return bond (OK)" ;
+  let* () = batch_commit_finalize ~rollup_level:1 () in
+  let* () = batch_commit_finalize ~rollup_level:2 () in
+  let* () = attempt_return_bond state client ~src ~expected:`Ok in
+
+  (* 3rd scenario: batch; commit; finalize; batch; commit; return bond (KO) *)
+  Log.info
+    "3rd scenario: batch; commit; finalize; batch; commit; return bond (KO)" ;
+  let* () = batch_commit_finalize ~rollup_level:3 () in
+  let* () = batch_commit_finalize ~rollup_level:4 ~finalize:false () in
+  let* () = attempt_return_bond state client ~src ~expected:`Ko in
+  unit
+
 let register ~protocols =
   Regressions.register protocols ;
   test_submit_batches_in_several_blocks protocols ;
@@ -1113,4 +1223,5 @@ let register ~protocols =
   test_rollup_last_commitment_is_rejected protocols ;
   test_rollup_wrong_rejection protocols ;
   test_rollup_wrong_path_for_rejection protocols ;
-  test_rollup_wrong_rejection_long_path protocols
+  test_rollup_wrong_rejection_long_path protocols ;
+  test_rollup_bond_return protocols
