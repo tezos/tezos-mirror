@@ -1047,8 +1047,8 @@ let apply_transaction_to_tx_rollup ~ctxt ~parameters_ty ~parameters ~amount
     return (ctxt, result, [])
   else fail (Script_tc_errors.No_such_entrypoint entrypoint)
 
-let apply_origination ~consume_deserialization_gas:_ ~ctxt ~parsed_script
-    ~unparsed_code ~contract ~delegate ~source ~credit ~before_operation =
+let apply_origination ~ctxt ~parsed_script ~unparsed_code ~contract ~delegate
+    ~source ~credit ~before_operation =
   let (Script_typed_ir.Script parsed_script) = parsed_script in
   let views_result =
     Script_ir_translator.typecheck_views
@@ -1222,7 +1222,6 @@ let apply_internal_manager_operation_content :
         script.Script.code
       >>?= fun (unparsed_code, ctxt) ->
       apply_origination
-        ~consume_deserialization_gas
         ~ctxt
         ~parsed_script
         ~unparsed_code
@@ -1459,7 +1458,6 @@ let apply_external_manager_operation_content :
         script.Script.code
       >>?= fun (unparsed_code, ctxt) ->
       apply_origination
-        ~consume_deserialization_gas
         ~ctxt
         ~parsed_script
         ~unparsed_code
