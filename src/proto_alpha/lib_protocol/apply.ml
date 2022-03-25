@@ -1047,29 +1047,21 @@ let apply_transaction_to_tx_rollup ~ctxt ~parameters_ty ~parameters ~amount
     return (ctxt, result, [])
   else fail (Script_tc_errors.No_such_entrypoint entrypoint)
 
-let apply_origination ~ctxt ~parsed_script ~unparsed_code ~contract ~delegate
-    ~source ~credit ~before_operation =
-  let (Script_typed_ir.Script parsed_script) = parsed_script in
-  Script_ir_translator.collect_lazy_storage
-    ctxt
-    parsed_script.storage_type
-    parsed_script.storage
+let apply_origination ~ctxt ~storage_type ~storage ~unparsed_code ~contract
+    ~delegate ~source ~credit ~before_operation =
+  Script_ir_translator.collect_lazy_storage ctxt storage_type storage
   >>?= fun (to_duplicate, ctxt) ->
   let to_update = Script_ir_translator.no_lazy_storage_id in
   Script_ir_translator.extract_lazy_storage_diff
     ctxt
     Optimized
-    parsed_script.storage_type
-    parsed_script.storage
+    storage_type
+    storage
     ~to_duplicate
     ~to_update
     ~temporary:false
   >>=? fun (storage, lazy_storage_diff, ctxt) ->
-  Script_ir_translator.unparse_data
-    ctxt
-    Optimized
-    parsed_script.storage_type
-    storage
+  Script_ir_translator.unparse_data ctxt Optimized storage_type storage
   >>=? fun (storage, ctxt) ->
   Gas.consume ctxt (Script.strip_locations_cost storage) >>?= fun ctxt ->
   let storage = Script.lazy_expr (Micheline.strip_locations storage) in
@@ -1212,9 +1204,11 @@ let apply_internal_manager_operation_content :
         ctxt
         script.Script.code
       >>?= fun (unparsed_code, ctxt) ->
+      let (Script {storage_type; storage; _}) = parsed_script in
       apply_origination
         ~ctxt
-        ~parsed_script
+        ~storage_type
+        ~storage
         ~unparsed_code
         ~contract
         ~delegate
@@ -1448,7 +1442,7 @@ let apply_external_manager_operation_content :
         ctxt
         script.Script.code
       >>?= fun (unparsed_code, ctxt) ->
-      let (Script {storage_type; views; _}) = parsed_script in
+      let (Script {storage_type; views; storage; _}) = parsed_script in
       let views_result =
         Script_ir_translator.typecheck_views
           ctxt
@@ -1462,7 +1456,8 @@ let apply_external_manager_operation_content :
       >>=? fun ctxt ->
       apply_origination
         ~ctxt
-        ~parsed_script
+        ~storage_type
+        ~storage
         ~unparsed_code
         ~contract
         ~delegate
