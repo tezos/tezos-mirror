@@ -134,14 +134,15 @@ let checksum s =
 let safe_encode ?alphabet s = raw_encode ?alphabet (s ^ checksum s)
 
 let safe_decode ?alphabet s =
-  Option.bind (raw_decode ?alphabet s) (fun s ->
-      let len = String.length s in
-      if len < 4 then None
-      else
-        (* only if the string is long enough to extract a checksum do we check it *)
-        let msg = String.sub s 0 (len - 4) in
-        let msg_hash = String.sub s (len - 4) 4 in
-        if msg_hash <> checksum msg then None else Some msg)
+  let open Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Option_syntax in
+  let* s = raw_decode ?alphabet s in
+  let len = String.length s in
+  if len < 4 then fail
+  else
+    (* only if the string is long enough to extract a checksum do we check it *)
+    let msg = String.sub s 0 (len - 4) in
+    let msg_hash = String.sub s (len - 4) 4 in
+    if msg_hash <> checksum msg then fail else return msg
 
 type data = ..
 
@@ -238,14 +239,14 @@ struct
         enc.encoded_length
 
   let decode ?alphabet s =
-    let rec find s = function
-      | [] -> None
-      | Encoding {prefix; of_raw; wrap; _} :: encodings -> (
-          match TzString.remove_prefix ~prefix s with
-          | None -> find s encodings
-          | Some msg -> of_raw msg |> Option.map wrap)
-    in
-    Option.bind (safe_decode ?alphabet s) (fun s -> find s !encodings)
+    let open Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Option_syntax in
+    let* s = safe_decode ?alphabet s in
+    List.find_map
+      (fun (Encoding {prefix; of_raw; wrap; _}) ->
+        let* msg = TzString.remove_prefix ~prefix s in
+        let+ v = of_raw msg in
+        wrap v)
+      !encodings
 end
 
 type 'a resolver =
