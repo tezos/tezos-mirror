@@ -93,8 +93,10 @@ type forge_info = {
   nf : Tezos_sapling.Core.Client.Nullifier.t;
 }
 
-let random_amount sum =
-  Random.int64 (Int64.sub Tezos_sapling.Core.Validator.UTXO.max_amount sum)
+let random_amount state sum =
+  Random.State.int64
+    state
+    (Int64.sub Tezos_sapling.Core.Validator.UTXO.max_amount sum)
 
 let reverse diff =
   Protocol.Sapling_repr.
@@ -126,7 +128,7 @@ let rec gen_rcm state =
 (* Adds a commitment, ciphertext, cv to an rpc_diff *)
 let add_input diff vk index position sum state =
   let rcm = gen_rcm state in
-  let amount = random_amount sum in
+  let amount = random_amount state sum in
   let new_idx, address =
     Tezos_sapling.Core.Client.Viewing_key.new_address vk index
   in
@@ -218,7 +220,7 @@ let state_from_rpc_diff rpc_diff =
 (* Create an (unspendable) output from a proving context and a vk *)
 let output proving_ctx vk sum =
   let address = Tezos_sapling.Core.Client.Viewing_key.dummy_address () in
-  let amount = random_amount sum in
+  let amount = random_amount (Random.State.make [|2|]) sum in
   let rcm = Tezos_sapling.Core.Client.Rcm.random () in
   let esk = Tezos_sapling.Core.Client.DH.esk_random () in
   let cv_o, proof_o =
@@ -336,7 +338,7 @@ let prepare_seeded_state_internal ~(nb_input : int) ~(nb_nf : int)
     ~index:index_start
     state
   >>=? fun (diff, to_forge) ->
-  Protocol.Sapling_storage.apply_diff ctxt id diff
+  Protocol.Sapling_storage.apply_diff ctxt id (reverse diff)
   >|= Protocol.Environment.wrap_tzresult
   >>=? fun (ctxt, _size) -> return (diff, to_forge, sk, vk, ctxt, id)
 
