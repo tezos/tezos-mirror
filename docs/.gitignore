@@ -15,4 +15,5 @@ tezos-client.html
 /api/errors.rst
 /shell/p2p_api.rst
 /user/default-acl.json
-/CHANGES.rst
+/CHANGES-dev.rst
+/developer/metrics.csv
