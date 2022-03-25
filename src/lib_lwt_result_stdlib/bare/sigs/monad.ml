@@ -183,6 +183,57 @@ module type S = sig
     val both : 'a Lwt.t -> 'b Lwt.t -> ('a * 'b) Lwt.t
   end
 
+  (** {2 The Option monad: for optional data} *)
+
+  (** Syntax module for Option. This is intended to be opened locally in
+      functions which use [option] for control-flow. Within the scope of this
+      module, the code can include binding operators, leading to a [let]-style
+      syntax.
+
+      See also {!Option} *)
+  module Option_syntax : sig
+    (** [return x] is [Some x]. *)
+    val return : 'a -> 'a option
+
+    (** [fail] is [None]. It is also an alias for [Option.none]. *)
+    val fail : 'a option
+
+    (** [return_unit] is [Some ()]. *)
+    val return_unit : unit option
+
+    (** [return_nil] is [Some []]. *)
+    val return_nil : 'a list option
+
+    (** [return_true] is [Some true]. *)
+    val return_true : bool option
+
+    (** [return_false] is [Some false]. *)
+    val return_false : bool option
+
+    (** Note that we do not provide [return_some] nor [return_none]. Both of
+        these functions are possible but somewhat confusing and rarely useful in
+        practice. If you need to carry [option]s within a Option-monad
+        computation (yielding to values of the type
+        ['a option option]), you need to do so by hand:
+        [return (Some …)] and [return None]. *)
+
+    (** [let*] is a binding operator alias for {!Option.bind}. *)
+    val ( let* ) : 'a option -> ('a -> 'b option) -> 'b option
+
+    (** [and*] is a binding operator alias for [both]. *)
+    val ( and* ) : 'a option -> 'b option -> ('a * 'b) option
+
+    (** [let+] is a binding operator alias for {!Option.map}. *)
+    val ( let+ ) : 'a option -> ('a -> 'b) -> 'b option
+
+    (** [and+] is a binding operator alias for [both]. *)
+    val ( and+ ) : 'a option -> 'b option -> ('a * 'b) option
+
+    (** [both] is the joining of two optional non-unit values. [both a b] is
+        [Some (x, y)] iff [a] is [Some x] and [b] is [Some y]. *)
+    val both : 'a option -> 'b option -> ('a * 'b) option
+  end
+
   (** {2 The (generic) Result monad: for success/failure} *)
 
   (** Syntax module for Result. This is intended to be opened locally in
@@ -241,6 +292,92 @@ module type S = sig
 
     (** [both] is the joining of two success/failure non-unit values. *)
     val both : ('a, 'e) result -> ('b, 'e) result -> ('a * 'b, 'e list) result
+  end
+
+  (** {2 The combined Lwt+Option monad: for concurrent optional values} *)
+
+  (** Syntax module for Lwt+Option. This is intended to be opened locally in
+      functions which use Lwt and [option] for control-flow. Within the scope of
+      this module, the code can include binding operators, leading to a
+      [let]-style syntax.
+
+      See also {!Lwt}, {!Option}. *)
+  module Lwt_option_syntax : sig
+    (** [return x] is [Lwt.return (Some x)]. *)
+    val return : 'a -> 'a option Lwt.t
+
+    (** [return_unit] is [Lwt.return (Some ())] . *)
+    val return_unit : unit option Lwt.t
+
+    (** [return_nil] is [Lwt.return (Some [])] . *)
+    val return_nil : 'a list option Lwt.t
+
+    (** [return_true] is [Lwt.return (Some true)] . *)
+    val return_true : bool option Lwt.t
+
+    (** [return_false] is [Lwt.return (Some false)] . *)
+    val return_false : bool option Lwt.t
+
+    (** Note that we do not provide [return_some] nor [return_none]. Both of
+        these functions are possible but somewhat confusing and rarely useful in
+        practice. If you need to carry [option]s within a LwtOption-monad
+        computation (yielding values of the type
+        ['a option option Lwt.t]), you need to do so by hand:
+        [return (Some …)] and [return (None)]. *)
+
+    (** [fail] is [Lwt.return None]. *)
+    val fail : 'a option Lwt.t
+
+    (** [let*] is a binding operator alias for {!Lwt.bind} mixed with {!Option.bind}. *)
+    val ( let* ) : 'a option Lwt.t -> ('a -> 'b option Lwt.t) -> 'b option Lwt.t
+
+    (** [and*] is a binding operator alias for [both]. *)
+    val ( and* ) : 'a option Lwt.t -> 'b option Lwt.t -> ('a * 'b) option Lwt.t
+
+    (** [let+] is a binding operator alias for {!Lwt.map} mixed with {!Option.map}. *)
+    val ( let+ ) : 'a option Lwt.t -> ('a -> 'b) -> 'b option Lwt.t
+
+    (** [and*] is a binding operator alias for [both]. *)
+    val ( and+ ) : 'a option Lwt.t -> 'b option Lwt.t -> ('a * 'b) option Lwt.t
+
+    (** The following values are for mixing expressions that are Lwt-only or
+        Option-only within the Lwt option monad. Note that there are fundamental
+        differences between [option] and [Lwt.t]: the former can be simply
+        matched on (i.e., it is possible to get out of the monad at any point)
+        whereas the latter can only be bound on (i.e., it is not possible to get
+        out of the monad). In addition, the former is for aborting computations
+        on failures (which in this case means that no value can be produced)
+        whereas the latter is for waiting before continuing.
+
+        Still, from a syntax point-of-view, both are handled the same way: with
+        a specialised binding operator. *)
+
+    (** [let*!] is for binding Lwt-only expressions into the Lwt option combined
+        monad.
+
+{[
+let open Lwt_option_syntax in
+let* x = … in
+let*! y = … in
+return (x + y)
+]}
+
+        *)
+    val ( let*! ) : 'a Lwt.t -> ('a -> 'b Lwt.t) -> 'b Lwt.t
+
+    (** [let*?] is for binding the value from Option-only
+        expressions into the Lwt option combined monad.
+
+{[
+let open Lwt_option_syntax in
+let* x = … in
+let*? y = … in
+…
+]} *)
+    val ( let*? ) : 'a option -> ('a -> 'b option Lwt.t) -> 'b option Lwt.t
+
+    (** [both] is the joining of two concurrent optional non-unit values. *)
+    val both : 'a option Lwt.t -> 'b option Lwt.t -> ('a * 'b) option Lwt.t
   end
 
   (** {2 The combined Lwt+Result monad: for concurrent successes/failures} *)

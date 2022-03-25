@@ -75,6 +75,13 @@ module Distributed_db_version = Distributed_db_version
 module Network_version = Network_version
 include Utils.Infix
 include Error_monad
+
+module Option_syntax =
+  Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Option_syntax
+
+module Lwt_option_syntax =
+  Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Lwt_option_syntax
+
 module Internal_event = Internal_event
 
 module Filename = struct
