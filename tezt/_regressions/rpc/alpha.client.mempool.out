@@ -1,4 +1,4 @@
-tezt/_regressions/rpc/alpha.client.mempool.out
+rpc/alpha.client.mempool.out
 
 curl -s 'http://localhost:[PORT]/chains/main/mempool/monitor_operations?applied=true&outdated=true&branch_delayed=true&refused=true&branch_refused=true'
 []

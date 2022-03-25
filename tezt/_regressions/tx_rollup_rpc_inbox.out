@@ -1,4 +1,4 @@
-tezt/_regressions/tx_rollup_rpc_inbox.out
+tx_rollup_rpc_inbox.out
 
 ./tezos-client --wait none originate tx rollup from '[PUBLIC_KEY_HASH]' --burn-cap 9999999 --storage-limit 60000
 Node is bootstrapped.

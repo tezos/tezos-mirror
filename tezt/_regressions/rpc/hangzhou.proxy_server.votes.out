@@ -1,4 +1,4 @@
-tezt/_regressions/rpc/hangzhou.proxy_server.votes.out
+rpc/hangzhou.proxy_server.votes.out
 
 ./tezos-client rpc get /chains/main/blocks/head/votes/ballot_list
 []

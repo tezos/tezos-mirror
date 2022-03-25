@@ -1,4 +1,4 @@
-tezt/_regressions/rpc/hangzhou.client.votes.out
+rpc/hangzhou.client.votes.out
 
 ./tezos-client rpc get /chains/main/blocks/head/votes/ballot_list
 []

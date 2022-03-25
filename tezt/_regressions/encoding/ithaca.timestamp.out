@@ -1,4 +1,4 @@
-tezt/_regressions/encoding/ithaca.timestamp.out
+encoding/ithaca.timestamp.out
 
 ./tezos-codec encode 012-Psithaca.timestamp from '"2020-04-20T16:19:59Z"'
 000000005e9dcbaf

@@ -1,4 +1,4 @@
-tezt/_regressions/rpc/alpha.light.delegates.out
+rpc/alpha.light.delegates.out
 
 ./tezos-client --mode light rpc get /chains/main/blocks/head/context/contracts
 [ "[CONTRACT_HASH]",

@@ -1,4 +1,4 @@
-tezt/_regressions/encoding/alpha.seed.out
+encoding/alpha.seed.out
 
 ./tezos-codec encode alpha.seed from '"0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8"'
 0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8

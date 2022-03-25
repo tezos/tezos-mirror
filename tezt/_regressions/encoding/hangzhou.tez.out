@@ -1,4 +1,4 @@
-tezt/_regressions/encoding/hangzhou.tez.out
+encoding/hangzhou.tez.out
 
 ./tezos-codec encode 011-PtHangz2.tez from '"7322135"'
 97f4be03

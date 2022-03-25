@@ -1,4 +1,4 @@
-tezt/_regressions/tx_rollup_finalize_commitment_no_commitment.out
+tx_rollup_finalize_commitment_no_commitment.out
 
 ./tezos-client --wait none originate tx rollup from '[PUBLIC_KEY_HASH]' --burn-cap 9999999 --storage-limit 60000
 Node is bootstrapped.

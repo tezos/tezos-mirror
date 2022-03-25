@@ -1,4 +1,4 @@
-tezt/_regressions/encoding/hangzhou.contract.out
+encoding/hangzhou.contract.out
 
 ./tezos-codec encode 011-PtHangz2.contract from '"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"'
 000002298c03ed7d454a101eb7022bc95f7e5f41ac78

@@ -1,4 +1,4 @@
-tezt/_regressions/encoding/alpha.voting_period.kind.out
+encoding/alpha.voting_period.kind.out
 
 ./tezos-codec encode alpha.voting_period.kind from '"promotion"'
 03

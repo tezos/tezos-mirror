@@ -67,6 +67,9 @@ type temporary_file_mode = Delete | Delete_if_successful | Keep
 (** How many times to loop. *)
 type loop_mode = Infinite | Count of int
 
+(* What to do with unknown regression files *)
+type on_unknown_regression_files_mode = Warn | Ignore | Fail | Delete
+
 (** Command-line options.
 
     [log_file] is [Some channel] where [channel] is open on [filename]
@@ -93,7 +96,7 @@ type options = {
   mutable retry : int;
   mutable regression_dir : string;
   mutable reset_regressions : bool;
-  mutable delete_unknown_regression_files : bool;
+  mutable on_unknown_regression_files_mode : on_unknown_regression_files_mode;
   mutable loop_mode : loop_mode;
   mutable time : bool;
   mutable starting_port : int;

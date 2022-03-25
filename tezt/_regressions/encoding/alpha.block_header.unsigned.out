@@ -1,4 +1,4 @@
-tezt/_regressions/encoding/alpha.block_header.unsigned.out
+encoding/alpha.block_header.unsigned.out
 
 ./tezos-codec encode alpha.block_header.unsigned from '{
   "level": 1331,

@@ -1,4 +1,4 @@
-tezt/_regressions/encoding/alpha.operation.internal.out
+encoding/alpha.operation.internal.out
 
 ./tezos-codec encode alpha.operation.internal from '{
   "source": "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",

@@ -1,4 +1,4 @@
-tezt/_regressions/rpc/alpha.light.others.out
+rpc/alpha.light.others.out
 
 ./tezos-client --mode light rpc get /chains/main/blocks/head/context/constants
 { "proof_of_work_nonce_size": 8, "nonce_length": 32,

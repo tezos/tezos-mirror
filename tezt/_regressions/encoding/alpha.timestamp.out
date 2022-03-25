@@ -1,4 +1,4 @@
-tezt/_regressions/encoding/alpha.timestamp.out
+encoding/alpha.timestamp.out
 
 ./tezos-codec encode alpha.timestamp from '"2020-04-20T16:19:59Z"'
 000000005e9dcbaf

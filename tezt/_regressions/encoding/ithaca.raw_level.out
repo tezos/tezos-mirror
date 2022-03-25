@@ -1,4 +1,4 @@
-tezt/_regressions/encoding/ithaca.raw_level.out
+encoding/ithaca.raw_level.out
 
 ./tezos-codec encode 012-Psithaca.raw_level from 2147483647
 7fffffff

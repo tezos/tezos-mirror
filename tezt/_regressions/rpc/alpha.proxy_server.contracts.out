@@ -1,4 +1,4 @@
-tezt/_regressions/rpc/alpha.proxy_server.contracts.out
+rpc/alpha.proxy_server.contracts.out
 
 ./tezos-client rpc get /chains/main/blocks/head/context/contracts
 [ "[CONTRACT_HASH]",

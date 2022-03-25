@@ -80,36 +80,40 @@ let log_regression_diff diff =
 
 let all_output_files = ref String_set.empty
 
+let output_file_extension = "out"
+
 let full_output_file output_file =
-  (Cli.options.regression_dir // output_file) ^ ".out"
+  (Cli.options.regression_dir // output_file) ^ "." ^ output_file_extension
 
 let register ~__FILE__ ~title ~tags ~output_file f =
   let tags = "regression" :: tags in
   all_output_files := String_set.add output_file !all_output_files ;
   Test.register ~__FILE__ ~title ~tags (fun () ->
-      (* We cannot compute [stored_output_file] before [Test.register]
+      (* We cannot compute [stored_full_output_file] before [Test.register]
          because [Cli.init] must have been called. *)
-      let stored_output_file = full_output_file output_file in
+      let stored_full_output_file = full_output_file output_file in
       (* when the stored output doesn't already exists, must reset regressions *)
       if
-        not (Sys.file_exists stored_output_file || Cli.options.reset_regressions)
+        not
+          (Sys.file_exists stored_full_output_file
+          || Cli.options.reset_regressions)
       then
         Test.fail
           "Regression output file not found: %s. To generate it, use: \
            --reset-regressions --title %s"
-          (Log.quote_shell stored_output_file)
+          (Log.quote_shell stored_full_output_file)
           (Log.quote_shell title) ;
-      let capture_f ~output_file =
-        run_and_capture_output ~output_file @@ fun () ->
-        capture stored_output_file ;
+      let capture_f ~full_output_file =
+        run_and_capture_output ~output_file:full_output_file @@ fun () ->
+        capture (output_file ^ "." ^ output_file_extension) ;
         f ()
       in
       if Cli.options.reset_regressions then
-        capture_f ~output_file:stored_output_file
+        capture_f ~full_output_file:stored_full_output_file
       else
         (* store the current run into a temp file *)
-        let temp_output_file = Temp.file output_file in
-        let* () = capture_f ~output_file:temp_output_file in
+        let temp_full_output_file = Temp.file output_file in
+        let* () = capture_f ~full_output_file:temp_full_output_file in
         (* compare the captured output with the stored output *)
         let diff_process =
           Process.spawn
@@ -122,8 +126,8 @@ let register ~__FILE__ ~title ~tags ~output_file f =
               "stored";
               "--label";
               "actual";
-              stored_output_file;
-              temp_output_file;
+              stored_full_output_file;
+              temp_full_output_file;
             ]
         in
         let* status = Process.wait diff_process in
@@ -145,12 +149,14 @@ let register ~__FILE__ ~title ~tags ~output_file f =
             Test.fail
               "Regression output file contains differences: %s. To accept the \
                differences, use: --reset-regressions --title %s"
-              (Log.quote_shell stored_output_file)
+              (Log.quote_shell stored_full_output_file)
               (Log.quote_shell title))
 
 let check_unknown_output_files () =
   let full_output_files = String_set.map full_output_file !all_output_files in
-  let explain_how_to_delete = ref false in
+  let found_unknown = ref false in
+  let mode = Cli.options.on_unknown_regression_files_mode in
+  let log_unused = match mode with Fail -> Log.error | _ -> Log.warn in
   let rec browse path =
     let handle_file filename =
       let full = path // filename in
@@ -161,40 +167,43 @@ let check_unknown_output_files () =
       | true -> browse full
       | false ->
           if not (String_set.mem full full_output_files) then
-            if Cli.options.delete_unknown_regression_files then
+            if mode = Delete then
               try
                 Sys.remove full ;
                 Log.report "Deleted file: %s" full
               with Sys_error message ->
                 Log.warn "Failed to delete file: %s" message
             else (
-              Log.warn "%s is not used by any test and can be deleted." full ;
-              explain_how_to_delete := true)
+              log_unused "%s is not used by any test and can be deleted." full ;
+              found_unknown := true)
     in
     Array.iter handle_file (Sys.readdir path) ;
     (* Check whether directory is empty now that we may have deleted files. *)
     match Sys.readdir path with
     | [||] ->
-        if Cli.options.delete_unknown_regression_files then
+        if mode = Delete then
           try
             Sys.rmdir path ;
             Log.report "Deleted directory: %s" path
           with Sys_error message ->
             Log.warn "Failed to delete directory: %s" message
         else (
-          Log.warn "%s is empty and can be deleted." path ;
-          explain_how_to_delete := true)
+          log_unused "%s is empty and can be deleted." path ;
+          found_unknown := true)
     | _ -> ()
   in
   browse Cli.options.regression_dir ;
-  if !explain_how_to_delete then
+  if !found_unknown then (
     Log.warn
       "Use --delete-unknown-regression-files to delete those files and/or \
        directories." ;
-  if Cli.options.delete_unknown_regression_files then exit 0
+    if mode = Fail then exit 1) ;
+  if mode = Delete then exit 0
 
 let () =
   (* We cannot run [check_unknown_output_files] before [Cli.init],
      and we cannot run it from the [Test] module because it would create
      a circular dependency. *)
-  Test.before_test_run check_unknown_output_files
+  Test.before_test_run (fun () ->
+      if Cli.options.on_unknown_regression_files_mode <> Ignore then
+        check_unknown_output_files ())

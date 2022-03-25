@@ -1,4 +1,4 @@
-tezt/_regressions/encoding/hangzhou.fitness.out
+encoding/hangzhou.fitness.out
 
 ./tezos-codec encode 011-PtHangz2.fitness from '[
   "01",
