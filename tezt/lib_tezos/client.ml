@@ -1334,6 +1334,28 @@ module Tx_rollup = struct
     in
     let parse process = Process.check process in
     {value = process; run = parse}
+
+  let submit_return_bond ?(wait = "none") ?burn_cap ?storage_limit ?hooks
+      ~rollup ~src client =
+    let process =
+      spawn_command
+        ?hooks
+        client
+        (["--wait"; wait]
+        @ [
+            "submit"; "tx"; "rollup"; "return"; "bond"; "to"; rollup; "from"; src;
+          ]
+        @ Option.fold
+            ~none:[]
+            ~some:(fun burn_cap -> ["--burn-cap"; Tez.to_string burn_cap])
+            burn_cap
+        @ Option.fold
+            ~none:[]
+            ~some:(fun s -> ["--storage-limit"; string_of_int s])
+            storage_limit)
+    in
+    let parse process = Process.check process in
+    {value = process; run = parse}
 end
 
 let spawn_show_voting_period ?endpoint client =

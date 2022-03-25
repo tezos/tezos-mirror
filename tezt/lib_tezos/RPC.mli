@@ -427,6 +427,26 @@ module Contracts : sig
     Client.t ->
     JSON.t Process.runnable
 
+  (** Call RPC /chain/[chain]/blocks/[block]/context/contracts/[contract_id]/frozen_bonds *)
+  val get_frozen_bonds :
+    ?endpoint:Client.endpoint ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    contract_id:string ->
+    Client.t ->
+    JSON.t Process.runnable
+
+  (** Call RPC /chain/[chain]/blocks/[block]/context/contracts/[contract_id]/balance_and_frozen_bonds *)
+  val get_balance_and_frozen_bonds :
+    ?endpoint:Client.endpoint ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    contract_id:string ->
+    Client.t ->
+    JSON.t Process.runnable
+
   (** Call RPC /chain/[chain]/blocks/[block]/context/contracts/[contract_id]/big_map_get *)
   val big_map_get :
     ?endpoint:Client.endpoint ->
