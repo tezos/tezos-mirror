@@ -39,9 +39,7 @@ open Protocol.Tx_rollup_l2_apply
 
 (* ------ generators and compact encodings ---------------------------------- *)
 
-let seed_gen =
-  let open QCheck2.Gen in
-  return @@ Bytes.init 32 (fun _ -> generate1 char)
+let seed_gen = bytes_fixed_gen 32
 
 let bls_pk_gen =
   let open QCheck2.Gen in
