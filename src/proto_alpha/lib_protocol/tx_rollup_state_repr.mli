@@ -29,8 +29,10 @@
     in time, as the rollup progresses. *)
 type t
 
-(** The initial value of a transaction rollup state, after its origination. *)
-val initial_state : t
+(** [initial_state pre_allocated_storage] returns the initial state of
+    a transaction rollup (after its origination) with
+    [pre_allocated_storage] bytes of storage already paid for. *)
+val initial_state : pre_allocated_storage:Z.t -> t
 
 val encoding : t Data_encoding.t
 
@@ -207,6 +209,23 @@ val last_removed_commitment_hashes :
     which said inbox has been created. *)
 val head_levels : t -> (Tx_rollup_level_repr.t * Raw_level_repr.t) option
 
+(** [adjust_storage_allocation state ~delta] accounts for a change in
+    [delta] number of bytes used storage space by a transaction rollup.
+
+    A positive [delta] indicates that the occupied storage of the
+    rollup increased. A negative [delta] indicates that the
+    occupied storage of the rollup decreased.
+
+    Along with an updated state, a diff of storage space
+    is returned. The diff is
+    [max(0, allocated_storage - (occupied_storage + delta))].
+    That is, 0 if no new storage was allocated, and the number of bytes
+    allocated otherwise.
+
+    This function returns [Tx_rollup_errors.Internal_error] if
+    submitted [delta] would make [occupied_storage] negative. *)
+val adjust_storage_allocation : t -> delta:Z.t -> (t * Z.t) tzresult
+
 module Internal_for_tests : sig
   (** [make] returns a state for tests *)
   val make :
@@ -220,8 +239,18 @@ module Internal_for_tests : sig
     ?uncommitted_inboxes:Tx_rollup_level_repr.t * Tx_rollup_level_repr.t ->
     ?commitment_newest_hash:Tx_rollup_commitment_repr.Commitment_hash.t ->
     ?tezos_head_level:Raw_level_repr.t ->
+    ?occupied_storage:Z.t ->
+    allocated_storage:Z.t ->
     unit ->
     t
 
   val get_inbox_ema : t -> int
+
+  val get_occupied_storage : t -> Z.t
+
+  val set_occupied_storage : Z.t -> t -> t
+
+  val get_allocated_storage : t -> Z.t
+
+  val set_allocated_storage : Z.t -> t -> t
 end

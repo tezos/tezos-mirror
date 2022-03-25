@@ -31,7 +31,11 @@ let init : Raw_context.t -> Tx_rollup_repr.t -> Raw_context.t tzresult Lwt.t =
  fun ctxt tx_rollup ->
   Storage.Tx_rollup.State.mem ctxt tx_rollup >>=? fun (ctxt, already_exists) ->
   fail_when already_exists (Tx_rollup_already_exists tx_rollup) >>=? fun () ->
-  Storage.Tx_rollup.State.init ctxt tx_rollup Tx_rollup_state_repr.initial_state
+  let pre_allocated_storage =
+    Z.of_int @@ Constants_storage.tx_rollup_origination_size ctxt
+  in
+  Storage.Tx_rollup.State.init ctxt tx_rollup
+  @@ Tx_rollup_state_repr.initial_state ~pre_allocated_storage
   >|=? fst
 
 let find :

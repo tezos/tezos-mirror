@@ -25,16 +25,19 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [add ctxt tx_rollup lvl message_index withdraw_position] adds
+(** [add ctxt state tx_rollup lvl message_index withdraw_position] adds
     [withdraw_position] to the list of already consumed withdrawawals for
-    [tx_rollup] at [lvl] for the message_result at [message_index]. *)
+    [tx_rollup] at [lvl] for the message_result at [message_index].
+    This function occupies storage space so returns a new state to
+    and a storage space diff reflect storage change. *)
 val add :
   Raw_context.t ->
+  Tx_rollup_state_repr.t ->
   Tx_rollup_repr.t ->
   Tx_rollup_level_repr.t ->
   message_index:int ->
   withdraw_position:int ->
-  Raw_context.t tzresult Lwt.t
+  (Raw_context.t * Tx_rollup_state_repr.t * Z.t) tzresult Lwt.t
 
 (** [mem ctxt tx_rollup lvl message_index withdraw_position] checks if
     [withdraw_position] has already been consumed for [tx_rollup] at [lvl] for the
@@ -48,14 +51,17 @@ val mem :
   withdraw_position:int ->
   (bool * Raw_context.t) tzresult Lwt.t
 
-(** [remove ctxt tx_rollup lvl] removes all withdrawal accounting for
+(** [remove ctxt state tx_rollup lvl] removes all withdrawal accounting for
     [tx_rollup] at [lvl]. This must not be called before the
     corresponding commitment is deleted. Otherwise, it would be
     possible to retrieve the same withdrawal multiple times. This
-    function consumes gas and so returns a new context.  *)
+    function
+     - consumes gas and so returns a new context
+     - frees space from storage so returns a new state *)
 val remove :
   Raw_context.t ->
+  Tx_rollup_state_repr.t ->
   Tx_rollup_repr.t ->
   Tx_rollup_level_repr.t ->
   inbox_length:int32 ->
-  Raw_context.t tzresult Lwt.t
+  (Raw_context.t * Tx_rollup_state_repr.t) tzresult Lwt.t

@@ -1562,7 +1562,7 @@ module Tx_rollup_message_result_hash : S.HASH
 module Tx_rollup_state : sig
   type t
 
-  val initial_state : t
+  val initial_state : pre_allocated_storage:Z.t -> t
 
   val encoding : t Data_encoding.t
 
@@ -1585,6 +1585,8 @@ module Tx_rollup_state : sig
   val last_removed_commitment_hashes :
     t -> (Tx_rollup_message_result_hash.t * Tx_rollup_commitment_hash.t) option
 
+  val adjust_storage_allocation : t -> delta:Z.t -> (t * Z.t) tzresult
+
   module Internal_for_tests : sig
     val make :
       ?burn_per_byte:Tez.t ->
@@ -1596,6 +1598,8 @@ module Tx_rollup_state : sig
       ?uncommitted_inboxes:Tx_rollup_level.t * Tx_rollup_level.t ->
       ?commitment_newest_hash:Tx_rollup_commitment_hash.t ->
       ?tezos_head_level:Raw_level.t ->
+      ?occupied_storage:Z.t ->
+      allocated_storage:Z.t ->
       unit ->
       t
 
@@ -1605,6 +1609,14 @@ module Tx_rollup_state : sig
     val get_inbox_ema : t -> int
 
     val record_inbox_deletion : t -> Tx_rollup_level.t -> t tzresult
+
+    val get_occupied_storage : t -> Z.t
+
+    val set_occupied_storage : Z.t -> t -> t
+
+    val get_allocated_storage : t -> Z.t
+
+    val set_allocated_storage : Z.t -> t -> t
   end
 end
 
@@ -1643,11 +1655,12 @@ module Tx_rollup_withdraw : sig
 
   val add :
     context ->
+    Tx_rollup_state.t ->
     Tx_rollup.t ->
     Tx_rollup_level.t ->
     message_index:int ->
     withdraw_position:int ->
-    context tzresult Lwt.t
+    (context * Tx_rollup_state.t * Z.t) tzresult Lwt.t
 
   val mem :
     context ->
@@ -1736,7 +1749,7 @@ module Tx_rollup_inbox : sig
     Tx_rollup.t ->
     Tx_rollup_state.t ->
     Tx_rollup_message.t ->
-    (context * Tx_rollup_state.t) tzresult Lwt.t
+    (context * Tx_rollup_state.t * Z.t) tzresult Lwt.t
 
   val size :
     context ->
@@ -1814,7 +1827,7 @@ module Tx_rollup_commitment : sig
     Tx_rollup_state.t ->
     Signature.public_key_hash ->
     t ->
-    (context * Tx_rollup_state.t) tzresult Lwt.t
+    (context * Tx_rollup_state.t * Z.t) tzresult Lwt.t
 
   val check_commitment_level :
     Raw_level.t -> Tx_rollup_state.t -> t -> unit tzresult
@@ -1867,7 +1880,7 @@ module Tx_rollup_commitment : sig
     context ->
     Tx_rollup.t ->
     Tx_rollup_state.t ->
-    (context * Tx_rollup_state.t * Tx_rollup_level.t) tzresult Lwt.t
+    (context * Tx_rollup_state.t * Tx_rollup_level.t * Z.t) tzresult Lwt.t
 
   val remove_commitment :
     context ->

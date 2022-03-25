@@ -158,6 +158,8 @@ type t = {
   tezos_head_level : Raw_level_repr.t option;
   burn_per_byte : Tez_repr.t;
   inbox_ema : int;
+  allocated_storage : Z.t;
+  occupied_storage : Z.t;
 }
 
 (*
@@ -205,7 +207,7 @@ type t = {
 
  *)
 
-let initial_state =
+let initial_state ~pre_allocated_storage =
   {
     last_removed_commitment_hashes = None;
     finalized_commitments = Empty {next = Tx_rollup_level_repr.root};
@@ -215,6 +217,8 @@ let initial_state =
     tezos_head_level = None;
     burn_per_byte = Tez_repr.zero;
     inbox_ema = 0;
+    allocated_storage = pre_allocated_storage;
+    occupied_storage = Z.zero;
   }
 
 let encoding : t Data_encoding.t =
@@ -228,6 +232,8 @@ let encoding : t Data_encoding.t =
            commitment_newest_hash;
            tezos_head_level;
            burn_per_byte;
+           allocated_storage;
+           occupied_storage;
            inbox_ema;
          } ->
       ( last_removed_commitment_hashes,
@@ -237,6 +243,8 @@ let encoding : t Data_encoding.t =
         commitment_newest_hash,
         tezos_head_level,
         burn_per_byte,
+        allocated_storage,
+        occupied_storage,
         inbox_ema ))
     (fun ( last_removed_commitment_hashes,
            finalized_commitments,
@@ -245,6 +253,8 @@ let encoding : t Data_encoding.t =
            commitment_newest_hash,
            tezos_head_level,
            burn_per_byte,
+           allocated_storage,
+           occupied_storage,
            inbox_ema ) ->
       {
         last_removed_commitment_hashes;
@@ -254,9 +264,11 @@ let encoding : t Data_encoding.t =
         commitment_newest_hash;
         tezos_head_level;
         burn_per_byte;
+        allocated_storage;
+        occupied_storage;
         inbox_ema;
       })
-    (obj8
+    (obj10
        (req
           "last_removed_commitment_hashes"
           (option
@@ -275,6 +287,8 @@ let encoding : t Data_encoding.t =
           (option Tx_rollup_commitment_repr.Commitment_hash.encoding))
        (req "tezos_head_level" (option Raw_level_repr.encoding))
        (req "burn_per_byte" Tez_repr.encoding)
+       (req "allocated_storage" n)
+       (req "occupied_storage" n)
        (req "inbox_ema" int31))
 
 let pp fmt
@@ -286,6 +300,8 @@ let pp fmt
       commitment_newest_hash;
       tezos_head_level;
       burn_per_byte;
+      allocated_storage;
+      occupied_storage;
       inbox_ema;
     } =
   Format.(
@@ -294,7 +310,8 @@ let pp fmt
       "cost_per_byte: %a inbox_ema: %d finalized_commitments: %a \
        unfinalized_commitments: %a uncommitted_inboxes: %a \
        commitment_newest_hash: %a tezos_head_level: %a \
-       last_removed_commitment_hashes: %a"
+       last_removed_commitment_hashes: %a allocated_storage: %a \
+       occupied_storage: %a"
       Tez_repr.pp
       burn_per_byte
       inbox_ema
@@ -316,7 +333,37 @@ let pp fmt
              m
              Tx_rollup_commitment_repr.Commitment_hash.pp
              c))
-      last_removed_commitment_hashes)
+      last_removed_commitment_hashes
+      Z.pp_print
+      allocated_storage
+      Z.pp_print
+      occupied_storage)
+
+let adjust_storage_allocation : t -> delta:Z.t -> (t * Z.t) tzresult =
+ fun state ~delta ->
+  if Z.(equal zero delta) then ok (state, Z.zero)
+  else
+    let occupied_storage' = Z.add state.occupied_storage delta in
+    if Compare.Z.(occupied_storage' < Z.zero) then
+      (* returns [Internal_error] if [delta < 0] and [| delta | > state.occupied_storage].
+         This error should never happen. *)
+      error
+      @@ Internal_error
+           "Storage size should be positive after occupied space is freed."
+    else
+      let diff = Z.sub occupied_storage' state.allocated_storage in
+      if Compare.Z.(diff > Z.zero) then
+        let state =
+          {
+            state with
+            occupied_storage = occupied_storage';
+            allocated_storage = occupied_storage';
+          }
+        in
+        ok (state, diff)
+      else
+        let state = {state with occupied_storage = occupied_storage'} in
+        ok (state, Z.zero)
 
 let update_burn_per_byte_helper :
     t -> factor:int -> final_size:int -> hard_limit:int -> t =
@@ -577,6 +624,8 @@ module Internal_for_tests = struct
       ?uncommitted_inboxes:Tx_rollup_level_repr.t * Tx_rollup_level_repr.t ->
       ?commitment_newest_hash:Tx_rollup_commitment_repr.Commitment_hash.t ->
       ?tezos_head_level:Raw_level_repr.t ->
+      ?occupied_storage:Z.t ->
+      allocated_storage:Z.t ->
       unit ->
       t =
    fun ?(burn_per_byte = Tez_repr.zero)
@@ -587,6 +636,8 @@ module Internal_for_tests = struct
        ?uncommitted_inboxes
        ?commitment_newest_hash
        ?tezos_head_level
+       ?(occupied_storage = Z.zero)
+       ~allocated_storage
        () ->
     let to_range = function
       | Some (oldest, newest) ->
@@ -602,6 +653,8 @@ module Internal_for_tests = struct
     {
       last_removed_commitment_hashes;
       burn_per_byte;
+      occupied_storage;
+      allocated_storage;
       inbox_ema;
       finalized_commitments;
       unfinalized_commitments;
@@ -611,4 +664,16 @@ module Internal_for_tests = struct
     }
 
   let get_inbox_ema : t -> int = fun {inbox_ema; _} -> inbox_ema
+
+  let get_occupied_storage : t -> Z.t =
+   fun {occupied_storage; _} -> occupied_storage
+
+  let set_occupied_storage : Z.t -> t -> t =
+   fun occupied_storage st -> {st with occupied_storage}
+
+  let get_allocated_storage : t -> Z.t =
+   fun {allocated_storage; _} -> allocated_storage
+
+  let set_allocated_storage : Z.t -> t -> t =
+   fun allocated_storage st -> {st with allocated_storage}
 end

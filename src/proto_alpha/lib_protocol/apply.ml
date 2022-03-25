@@ -1032,13 +1032,8 @@ let apply_transaction_to_tx_rollup ~ctxt ~parameters_ty ~parameters ~amount
       cost
     >>=? fun (ctxt, balance_updates) ->
     Tx_rollup_inbox.append_message ctxt dst_rollup state deposit
-    >>=? fun (ctxt, state) ->
+    >>=? fun (ctxt, state, paid_storage_size_diff) ->
     Tx_rollup_state.update ctxt dst_rollup state >>=? fun ctxt ->
-    (* TODO: https://gitlab.com/tezos/tezos/-/issues/2339
-       Storage fees for transaction rollup.
-       We need to charge for newly allocated storage (as we do for
-       Michelson’s big map). This also means taking into account
-       the global table of tickets. *)
     let result =
       Transaction_result
         (Transaction_to_tx_rollup_result
@@ -1046,6 +1041,7 @@ let apply_transaction_to_tx_rollup ~ctxt ~parameters_ty ~parameters ~amount
              balance_updates;
              consumed_gas = Gas.consumed ~since ~until:ctxt;
              ticket_hash;
+             paid_storage_size_diff;
            })
     in
     return (ctxt, result, [])
@@ -1370,13 +1366,16 @@ let apply_external_manager_operation_content :
       >>=? fun (already_consumed, ctxt) ->
       fail_when already_consumed Tx_rollup_errors.Withdraw_already_consumed
       >>=? fun () ->
+      Tx_rollup_state.get ctxt tx_rollup >>=? fun (ctxt, state) ->
       Tx_rollup_withdraw.add
         ctxt
+        state
         tx_rollup
         level
         ~message_index
         ~withdraw_position
-      >>=? fun ctxt ->
+      >>=? fun (ctxt, state, withdraw_paid_storage_size_diff) ->
+      Tx_rollup_state.update ctxt tx_rollup state >>=? fun ctxt ->
       (* Now reconstruct the ticket sent as the parameter
           destination. *)
       Option.value_e
@@ -1427,27 +1426,28 @@ let apply_external_manager_operation_content :
         ctxt
         tx_rollup_ticket_hash
         ~delta:(Z.neg @@ Tx_rollup_l2_qty.to_z amount)
-      >>=? fun (_tx_ticket_hash_storage_diff, ctxt) ->
+      >>=? fun (tx_ticket_hash_storage_diff, ctxt) ->
       Ticket_balance.adjust_balance
         ctxt
         destination_ticket_hash
         ~delta:(Tx_rollup_l2_qty.to_z amount)
-      >>=? fun (_dest_ticket_hash_storage_diff, ctxt) ->
+      >>=? fun (dest_ticket_hash_storage_diff, ctxt) ->
+      let delta =
+        Z.add tx_ticket_hash_storage_diff dest_ticket_hash_storage_diff
+      in
+      Tx_rollup_state.get ctxt tx_rollup >>=? fun (ctxt, state) ->
+      Tx_rollup_state.adjust_storage_allocation state ~delta
+      >>?= fun (state, ticket_paid_storage_size_diff) ->
+      let paid_storage_size_diff =
+        Z.add ticket_paid_storage_size_diff withdraw_paid_storage_size_diff
+      in
+      Tx_rollup_state.update ctxt tx_rollup state >>=? fun ctxt ->
       let result =
         Tx_rollup_withdraw_result
           {
             balance_updates = [];
             consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
-            paid_storage_size_diff =
-              (* TODO/TORU: #2339
-
-                 We set [paid_storage_size_diff] to zero for now, it should be something like
-
-                   Z.add _tx_ticket_hash_storage_diff _dest_ticket_hash_storage_diff
-
-                 with the fix of #2339.
-              *)
-              Z.zero;
+            paid_storage_size_diff;
           }
       in
       return (ctxt, result, [op])
@@ -1544,7 +1544,7 @@ let apply_external_manager_operation_content :
       let (message, message_size) = Tx_rollup_message.make_batch content in
       Tx_rollup_state.get ctxt tx_rollup >>=? fun (ctxt, state) ->
       Tx_rollup_inbox.append_message ctxt tx_rollup state message
-      >>=? fun (ctxt, state) ->
+      >>=? fun (ctxt, state, paid_storage_size_diff) ->
       Tx_rollup_state.burn_cost ~limit:burn_limit state message_size
       >>?= fun cost ->
       Token.transfer ctxt (`Contract source_contract) `Burned cost
@@ -1555,6 +1555,7 @@ let apply_external_manager_operation_content :
           {
             consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
             balance_updates;
+            paid_storage_size_diff;
           }
       in
       return (ctxt, result, [])
@@ -1572,13 +1573,14 @@ let apply_external_manager_operation_content :
         else return (ctxt, []) )
       >>=? fun (ctxt, balance_updates) ->
       Tx_rollup_commitment.add_commitment ctxt tx_rollup state source commitment
-      >>=? fun (ctxt, state) ->
+      >>=? fun (ctxt, state, paid_storage_size_diff) ->
       Tx_rollup_state.update ctxt tx_rollup state >>=? fun ctxt ->
       let result =
         Tx_rollup_commit_result
           {
             consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
             balance_updates;
+            paid_storage_size_diff;
           }
       in
       return (ctxt, result, [])
@@ -1604,7 +1606,7 @@ let apply_external_manager_operation_content :
   | Tx_rollup_finalize_commitment {tx_rollup} ->
       Tx_rollup_state.get ctxt tx_rollup >>=? fun (ctxt, state) ->
       Tx_rollup_commitment.finalize_commitment ctxt tx_rollup state
-      >>=? fun (ctxt, state, level) ->
+      >>=? fun (ctxt, state, level, paid_storage_size_diff) ->
       Tx_rollup_state.update ctxt tx_rollup state >>=? fun ctxt ->
       let result =
         Tx_rollup_finalize_commitment_result
@@ -1612,6 +1614,7 @@ let apply_external_manager_operation_content :
             consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
             balance_updates = [];
             level;
+            paid_storage_size_diff;
           }
       in
       return (ctxt, result, [])
@@ -1972,11 +1975,16 @@ let burn_storage_fees :
                  allocated_destination_contract =
                    payload.allocated_destination_contract;
                }) )
-  | Transaction_result (Transaction_to_tx_rollup_result _ as payload) ->
-      (* TODO: https://gitlab.com/tezos/tezos/-/issues/2339
-          We need to charge for newly allocated storage (as we do for
-          Michelson’s big map). *)
-      return (ctxt, storage_limit, Transaction_result payload)
+  | Transaction_result (Transaction_to_tx_rollup_result payload) ->
+      let consumed = payload.paid_storage_size_diff in
+      Fees.burn_storage_fees ctxt ~storage_limit ~payer consumed
+      >>=? fun (ctxt, storage_limit, storage_bus) ->
+      let balance_updates = storage_bus @ payload.balance_updates in
+      return
+        ( ctxt,
+          storage_limit,
+          Transaction_result
+            (Transaction_to_tx_rollup_result {payload with balance_updates}) )
   | Origination_result payload ->
       let consumed = payload.paid_storage_size_diff in
       Fees.burn_storage_fees ctxt ~storage_limit ~payer consumed
@@ -2023,12 +2031,8 @@ let burn_storage_fees :
         ( ctxt,
           storage_limit,
           Tx_rollup_origination_result {payload with balance_updates} )
-      (* TODO/TORU: https://gitlab.com/tezos/tezos/-/issues/2339
-          We need to charge for newly allocated storage (as we do for
-          Michelson’s big map). *)
-  | Tx_rollup_submit_batch_result _ | Tx_rollup_commit_result _
-  | Tx_rollup_return_bond_result _ | Tx_rollup_finalize_commitment_result _
-  | Tx_rollup_remove_commitment_result _ | Tx_rollup_rejection_result _ ->
+  | Tx_rollup_return_bond_result _ | Tx_rollup_remove_commitment_result _
+  | Tx_rollup_rejection_result _ ->
       return (ctxt, storage_limit, smopr)
   | Tx_rollup_withdraw_result payload ->
       let consumed = payload.paid_storage_size_diff in
@@ -2039,6 +2043,33 @@ let burn_storage_fees :
         ( ctxt,
           storage_limit,
           Tx_rollup_withdraw_result {payload with balance_updates} )
+  | Tx_rollup_finalize_commitment_result payload ->
+      let consumed = payload.paid_storage_size_diff in
+      Fees.burn_storage_fees ctxt ~storage_limit ~payer consumed
+      >>=? fun (ctxt, storage_limit, storage_bus) ->
+      let balance_updates = storage_bus @ payload.balance_updates in
+      return
+        ( ctxt,
+          storage_limit,
+          Tx_rollup_finalize_commitment_result {payload with balance_updates} )
+  | Tx_rollup_commit_result payload ->
+      let consumed = payload.paid_storage_size_diff in
+      Fees.burn_storage_fees ctxt ~storage_limit ~payer consumed
+      >>=? fun (ctxt, storage_limit, storage_bus) ->
+      let balance_updates = storage_bus @ payload.balance_updates in
+      return
+        ( ctxt,
+          storage_limit,
+          Tx_rollup_commit_result {payload with balance_updates} )
+  | Tx_rollup_submit_batch_result payload ->
+      let consumed = payload.paid_storage_size_diff in
+      Fees.burn_storage_fees ctxt ~storage_limit ~payer consumed
+      >>=? fun (ctxt, storage_limit, storage_bus) ->
+      let balance_updates = storage_bus @ payload.balance_updates in
+      return
+        ( ctxt,
+          storage_limit,
+          Tx_rollup_submit_batch_result {payload with balance_updates} )
   | Sc_rollup_originate_result payload ->
       Fees.burn_sc_rollup_origination_fees
         ctxt

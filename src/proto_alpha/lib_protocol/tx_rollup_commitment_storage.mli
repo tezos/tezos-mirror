@@ -38,7 +38,8 @@ val check_commitment_level :
 (* FIXME: move in Tx_rollup_commitment_repr *)
 
 (** [add_commitment context tx_rollup contract commitment] adds a
-    commitment to a rollup.
+    commitment to a rollup. It returns the new context, the new
+    state, and the storage size diff.
 
     This function returns the errors
 
@@ -58,12 +59,11 @@ val add_commitment :
   Tx_rollup_state_repr.t ->
   Signature.Public_key_hash.t ->
   Tx_rollup_commitment_repr.t ->
-  (Raw_context.t * Tx_rollup_state_repr.t) tzresult Lwt.t
+  (Raw_context.t * Tx_rollup_state_repr.t * Z.t) tzresult Lwt.t
 
-(** [remove_bond context tx_rollup contract] removes the bond counter
-    for an implicit contract.  This will fail if either the bond does
-    not exist, or the bond is currently in-use ({i i.e.}, the counter
-    is strictly positive). *)
+(** [remove_bond context state tx_rollup contract] removes the bond for an
+    implicit contract. This will fail if either the bond does not exist,
+    or if the bond is currently in use. *)
 val remove_bond :
   Raw_context.t ->
   Tx_rollup_repr.t ->
@@ -142,12 +142,14 @@ val has_bond :
 
     The state of the rollup is adjusted accordingly, and the finalized
     level is returned. Besides, the inbox at said level is removed
-    from the context. *)
+    from the context. This function returns the new context, the new
+    state, and the storage size diff. *)
 val finalize_commitment :
   Raw_context.t ->
   Tx_rollup_repr.t ->
   Tx_rollup_state_repr.t ->
-  (Raw_context.t * Tx_rollup_state_repr.t * Tx_rollup_level_repr.t) tzresult
+  (Raw_context.t * Tx_rollup_state_repr.t * Tx_rollup_level_repr.t * Z.t)
+  tzresult
   Lwt.t
 
 (** [remove_commitment ctxt tx_rollup state] tries to remove the

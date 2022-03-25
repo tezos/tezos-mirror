@@ -146,14 +146,11 @@ and successful_transaction_result =
       paid_storage_size_diff : Z.t;
       allocated_destination_contract : bool;
     }
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/2339
-     Storage fees for transaction rollup.
-     We need to charge for newly allocated storage (as we do for
-     Michelson’s big map). *)
   | Transaction_to_tx_rollup_result of {
       ticket_hash : Ticket_hash.t;
       balance_updates : Receipt.balance_updates;
       consumed_gas : Gas.Arith.fp;
+      paid_storage_size_diff : Z.t;
     }
 
 (** Result of applying a {!manager_operation_content}, either internal
@@ -211,11 +208,13 @@ and _ successful_manager_operation_result =
   | Tx_rollup_submit_batch_result : {
       balance_updates : Receipt.balance_updates;
       consumed_gas : Gas.Arith.fp;
+      paid_storage_size_diff : Z.t;
     }
       -> Kind.tx_rollup_submit_batch successful_manager_operation_result
   | Tx_rollup_commit_result : {
       balance_updates : Receipt.balance_updates;
       consumed_gas : Gas.Arith.fp;
+      paid_storage_size_diff : Z.t;
     }
       -> Kind.tx_rollup_commit successful_manager_operation_result
   | Tx_rollup_return_bond_result : {
@@ -227,6 +226,7 @@ and _ successful_manager_operation_result =
       balance_updates : Receipt.balance_updates;
       consumed_gas : Gas.Arith.fp;
       level : Tx_rollup_level.t;
+      paid_storage_size_diff : Z.t;
     }
       -> Kind.tx_rollup_finalize_commitment successful_manager_operation_result
   | Tx_rollup_remove_commitment_result : {

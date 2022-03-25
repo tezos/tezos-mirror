@@ -28,12 +28,13 @@ open Tx_rollup_withdraw_repr
 
 let add :
     Raw_context.t ->
+    Tx_rollup_state_repr.t ->
     Tx_rollup_repr.t ->
     Tx_rollup_level_repr.t ->
     message_index:int ->
     withdraw_position:int ->
-    Raw_context.t tzresult Lwt.t =
- fun ctxt tx_rollup commitment_lvl ~message_index ~withdraw_position ->
+    (Raw_context.t * Tx_rollup_state_repr.t * Z.t) tzresult Lwt.t =
+ fun ctxt state tx_rollup commitment_lvl ~message_index ~withdraw_position ->
   Storage.Tx_rollup.Consumed_withdraw.find
     ((ctxt, commitment_lvl), tx_rollup)
     (* TODO/TORU: https://gitlab.com/tezos/tezos/-/issues/2627
@@ -49,7 +50,12 @@ let add :
     ((ctxt, commitment_lvl), tx_rollup)
     (Int32.of_int message_index)
     consumed_withdraw
-  >|=? fun (ctxt, _new_size, _is_new) -> ctxt
+  >>=? fun (ctxt, newly_alloacted_size, _is_new) ->
+  Tx_rollup_state_repr.adjust_storage_allocation
+    state
+    ~delta:(Z.of_int newly_alloacted_size)
+  >>?= fun (state, paid_storage_size_diff) ->
+  return (ctxt, state, paid_storage_size_diff)
 
 let mem :
     Raw_context.t ->
@@ -75,18 +81,29 @@ let mem :
 
 let remove :
     Raw_context.t ->
+    Tx_rollup_state_repr.t ->
     Tx_rollup_repr.t ->
     Tx_rollup_level_repr.t ->
     inbox_length:int32 ->
-    Raw_context.t tzresult Lwt.t =
- fun ctxt rollup level ~inbox_length ->
-  let rec remove_withdrawal_accounting ctxt i len =
+    (Raw_context.t * Tx_rollup_state_repr.t) tzresult Lwt.t =
+ fun ctxt state rollup level ~inbox_length ->
+  let rec remove_withdrawal_accounting ctxt state i len ~acc_freed_size =
     if Compare.Int32.(i < len) then
       Storage.Tx_rollup.Consumed_withdraw.remove ((ctxt, level), rollup) i
-      >>=? fun (ctxt, _, _) ->
-      remove_withdrawal_accounting ctxt (Int32.succ i) len
-    else return ctxt
+      >>=? fun (ctxt, freed_size, _) ->
+      let acc_freed_size = acc_freed_size + freed_size in
+      remove_withdrawal_accounting ctxt state (Int32.succ i) len ~acc_freed_size
+    else return (ctxt, state, acc_freed_size)
   in
   (* for each message in the inbox, the storage contains one set of
      executed withdrawals that should be removed *)
-  remove_withdrawal_accounting ctxt 0l inbox_length
+  remove_withdrawal_accounting ctxt state 0l inbox_length ~acc_freed_size:0
+  >>=? fun (ctxt, state, freed_size) ->
+  (* while we free storage space and adjust storage
+     allocation, the returned [_paid_storage_size_diff]
+     is always 0. Therefore, we neglect
+     [_paid_storage_size_diff]. *)
+  Tx_rollup_state_repr.adjust_storage_allocation
+    state
+    ~delta:(Z.of_int freed_size |> Z.neg)
+  >>?= fun (state, _paid_storage_size_diff) -> return (ctxt, state)

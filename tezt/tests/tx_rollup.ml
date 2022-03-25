@@ -669,6 +669,7 @@ let test_submit_batches_in_several_blocks =
       ~tezos_level:5
       ~tx_level:2
   in
+  let*! _state = Rollup.get_state ~hooks ~rollup client in
   unit
 
 let test_submit_from_originated_source =

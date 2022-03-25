@@ -25,12 +25,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let just_ctxt (ctxt, _, _) = ctxt
-
 open Tx_rollup_commitment_repr
 open Tx_rollup_errors_repr
 
-let adjust_unfinalized_commitments_count ctxt tx_rollup pkh
+let adjust_unfinalized_commitments_count ctxt state tx_rollup pkh
     ~(dir : [`Incr | `Decr]) =
   let delta = match dir with `Incr -> 1 | `Decr -> -1 in
   let bond_key = (tx_rollup, pkh) in
@@ -41,7 +39,8 @@ let adjust_unfinalized_commitments_count ctxt tx_rollup pkh
   in
   fail_when Compare.Int.(count < 0) (Commitment_bond_negative count)
   >>=? fun () ->
-  Storage.Tx_rollup.Commitment_bond.add ctxt bond_key count >|=? just_ctxt
+  Storage.Tx_rollup.Commitment_bond.add ctxt bond_key count
+  >>=? fun (ctxt, _, _) -> return (ctxt, state)
 
 let remove_bond :
     Raw_context.t ->
@@ -54,7 +53,8 @@ let remove_bond :
   match bond with
   | None -> fail (Bond_does_not_exist contract)
   | Some 0 ->
-      Storage.Tx_rollup.Commitment_bond.remove ctxt bond_key >|=? just_ctxt
+      Storage.Tx_rollup.Commitment_bond.remove ctxt bond_key
+      >>=? fun (ctxt, _, _) -> return ctxt
   | Some _ -> fail (Bond_in_use contract)
 
 let slash_bond ctxt tx_rollup contract =
@@ -65,7 +65,7 @@ let slash_bond ctxt tx_rollup contract =
   | None -> return (ctxt, false)
   | Some c ->
       Storage.Tx_rollup.Commitment_bond.remove ctxt bond_key
-      >|=? fun (ctxt, _, _) -> (ctxt, Compare.Int.(0 < c))
+      >>=? fun (ctxt, _, _) -> return (ctxt, Compare.Int.(0 < c))
 
 let find :
     Raw_context.t ->
@@ -191,14 +191,25 @@ let add_commitment ctxt tx_rollup state pkh commitment =
     }
   in
   Storage.Tx_rollup.Commitment.add ctxt (commitment.level, tx_rollup) submitted
-  >>=? fun (ctxt, _, _) ->
+  >>=? fun (ctxt, commitment_size_alloc, _) ->
+  let commitment_message_hash_preallocations =
+    List.length commitment.messages * Message_result_hash.size
+  in
+  let commitment_size_alloc_sans_preallocations =
+    commitment_size_alloc - commitment_message_hash_preallocations
+  in
+  Tx_rollup_state_repr.adjust_storage_allocation
+    state
+    ~delta:(Z.of_int commitment_size_alloc_sans_preallocations)
+  >>?= fun (state, paid_storage_size_diff_for_commitment) ->
   Tx_rollup_state_repr.record_commitment_creation
     state
     commitment.level
     commitment_hash
   >>?= fun state ->
-  adjust_unfinalized_commitments_count ctxt tx_rollup pkh ~dir:`Incr
-  >>=? fun ctxt -> return (ctxt, state)
+  adjust_unfinalized_commitments_count ctxt state tx_rollup pkh ~dir:`Incr
+  >>=? fun (ctxt, state) ->
+  return (ctxt, state, paid_storage_size_diff_for_commitment)
 
 let pending_bonded_commitments :
     Raw_context.t ->
@@ -235,22 +246,29 @@ let finalize_commitment ctxt rollup state =
       (* Decrement the bond count of the committer *)
       adjust_unfinalized_commitments_count
         ctxt
+        state
         rollup
         commitment.committer
         ~dir:`Decr
-      >>=? fun ctxt ->
+      >>=? fun (ctxt, state) ->
       (* We remove the inbox *)
-      Tx_rollup_inbox_storage.remove ctxt oldest_inbox_level rollup
-      >>=? fun ctxt ->
+      Tx_rollup_inbox_storage.remove ctxt oldest_inbox_level rollup state
+      >>=? fun (ctxt, state) ->
       (* We update the commitment to mark it as finalized *)
       Storage.Tx_rollup.Commitment.update
         ctxt
         (oldest_inbox_level, rollup)
         {commitment with finalized_at = Some current_level}
-      >>=? fun (ctxt, _) ->
+      >>=? fun (ctxt, commitment_size_alloc) ->
+      Tx_rollup_state_repr.adjust_storage_allocation
+        state
+        ~delta:(Z.of_int commitment_size_alloc)
+      >>?= fun (state, paid_storage_size_diff_for_commitment) ->
       (* We update the state *)
       Tx_rollup_state_repr.record_inbox_deletion state oldest_inbox_level
-      >>?= fun state -> return (ctxt, state, oldest_inbox_level)
+      >>?= fun state ->
+      return
+        (ctxt, state, oldest_inbox_level, paid_storage_size_diff_for_commitment)
   | None -> fail No_commitment_to_finalize
 
 let remove_commitment ctxt rollup state =
@@ -274,13 +292,20 @@ let remove_commitment ctxt rollup state =
       >>=? fun () ->
       (* We remove the commitment *)
       Storage.Tx_rollup.Commitment.remove ctxt (tail, rollup)
-      >>=? fun (ctxt, _freed_size, _existed) ->
+      >>=? fun (ctxt, freed_size, _existed) ->
+      (* When we free storage space and adjust storage
+         allocation, the returned [_paid_storage_size_diff]
+         is always 0 and can thus safely be ignored. *)
+      Tx_rollup_state_repr.adjust_storage_allocation
+        state
+        ~delta:(Z.of_int freed_size |> Z.neg)
+      >>?= fun (state, _paid_storage_size_diff) ->
       let inbox_length =
         (* safe because inbox cannot be more than int32 *)
         Int32.of_int @@ List.length commitment.commitment.messages
       in
-      Tx_rollup_withdraw_storage.remove ctxt rollup tail ~inbox_length
-      >>=? fun ctxt ->
+      Tx_rollup_withdraw_storage.remove ctxt state rollup tail ~inbox_length
+      >>=? fun (ctxt, state) ->
       (* We update the state *)
       (match List.last_opt commitment.commitment.messages with
       | Some hash -> ok hash
