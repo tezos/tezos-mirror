@@ -100,10 +100,17 @@ module Block_round : Simple_single_data_storage with type value = Round_repr.t =
     (Round_repr)
 
 module Tenderbake = struct
-  module First_level =
+  module First_level_legacy =
     Make_single_data_storage (Registered) (Raw_context)
       (struct
         let name = ["first_level_of_Tenderbake"]
+      end)
+      (Raw_level_repr)
+
+  module First_level_of_protocol =
+    Make_single_data_storage (Registered) (Raw_context)
+      (struct
+        let name = ["first_level_of_protocol"]
       end)
       (Raw_level_repr)
 

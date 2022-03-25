@@ -106,12 +106,12 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp =
       (Constants_repr.cache_layout parametric)
   >|= fun ctxt -> Raw_context.Cache.clear ctxt )
   >>= fun ctxt ->
+  Raw_level_repr.of_int32 level >>?= fun level ->
+  Storage.Tenderbake.First_level_of_protocol.init ctxt level >>=? fun ctxt ->
   (match previous_protocol with
   | Genesis param ->
       (* This is the genesis protocol: initialise the state *)
       Storage.Block_round.init ctxt Round_repr.zero >>=? fun ctxt ->
-      Raw_level_repr.of_int32 level >>?= fun first_level ->
-      Storage.Tenderbake.First_level.init ctxt first_level >>=? fun ctxt ->
       let init_commitment (ctxt, balance_updates)
           Commitment_repr.{blinded_public_key_hash; amount} =
         Token.transfer
@@ -157,14 +157,14 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp =
           commitments_balance_updates @ bootstrap_balance_updates
           @ deposits_balance_updates )
   | Ithaca_012 ->
-      (* TODO (#2233): fix endorsement of migration block in Ithaca baker *)
-      Raw_level_repr.of_int32 level >>?= fun first_level ->
-      Storage.Tenderbake.First_level.update ctxt first_level >>=? fun ctxt ->
+      (* TODO (#2704): possibly handle endorsements for migration block (in bakers);
+         if that is done, do not set Storage.Tenderbake.First_level_of_protocol. *)
       Storage.Vote.Legacy_listings_size.remove ctxt >>= fun ctxt ->
       Vote_storage.update_listings ctxt >>=? fun ctxt ->
       Liquidity_baking_migration.Migration_from_Ithaca.update ctxt
       >>=? fun ctxt -> return (ctxt, []))
   >>=? fun (ctxt, balance_updates) ->
+  Storage.Tenderbake.First_level_legacy.remove ctxt >>= fun ctxt ->
   Receipt_repr.group_balance_updates balance_updates >>?= fun balance_updates ->
   Storage.Pending_migration.Balance_updates.add ctxt balance_updates
   >>= fun ctxt ->

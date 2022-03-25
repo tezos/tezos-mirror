@@ -3341,7 +3341,7 @@ module Ticket_balance : sig
     context -> Ticket_hash.t -> (Z.t option * context) tzresult Lwt.t
 end
 
-module First_level_of_tenderbake : sig
+module First_level_of_protocol : sig
   val get : context -> Raw_level.t tzresult Lwt.t
 end
 

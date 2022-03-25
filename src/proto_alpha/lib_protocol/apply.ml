@@ -3288,13 +3288,12 @@ let compute_payload_hash (ctxt : context) ~(predecessor : Block_hash.t)
   Block_payload.hash ~predecessor payload_round operations_hash
 
 let are_endorsements_required ctxt ~level =
-  First_level_of_tenderbake.get ctxt >|=? fun first_Tenderbake_level ->
-  (* NB: the first level is the level of the migration block. This
-     block was proposed by an Emmy* baker. There are no
-     endorsements for this block. Therefore the block at the next
-     level cannot contain endorsements. *)
-  let tenderbake_level_position = Raw_level.diff level first_Tenderbake_level in
-  Compare.Int32.(tenderbake_level_position > 1l)
+  First_level_of_protocol.get ctxt >|=? fun first_level ->
+  (* NB: the first level is the level of the migration block. There
+     are no endorsements for this block. Therefore the block at the
+     next level cannot contain endorsements. *)
+  let level_position_in_protocol = Raw_level.diff level first_level in
+  Compare.Int32.(level_position_in_protocol > 1l)
 
 let check_minimum_endorsements ~endorsing_power ~minimum =
   error_when

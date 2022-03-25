@@ -86,8 +86,8 @@ module Block_payload = struct
   include Block_payload_repr
 end
 
-module First_level_of_tenderbake = struct
-  let get = Storage.Tenderbake.First_level.get
+module First_level_of_protocol = struct
+  let get = Storage.Tenderbake.First_level_of_protocol.get
 end
 
 module Raw_level = Raw_level_repr

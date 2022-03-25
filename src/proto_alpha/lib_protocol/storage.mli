@@ -585,7 +585,15 @@ end
 (** Tenderbake *)
 
 module Tenderbake : sig
-  module First_level :
+  (** TODO: delete this module in K *)
+  module First_level_legacy :
+    Single_data_storage
+      with type t := Raw_context.t
+       and type value = Raw_level_repr.t
+
+  (** [First_level_of_protocol] stores the level of the first block of
+      this protocol. *)
+  module First_level_of_protocol :
     Single_data_storage
       with type t := Raw_context.t
        and type value = Raw_level_repr.t
