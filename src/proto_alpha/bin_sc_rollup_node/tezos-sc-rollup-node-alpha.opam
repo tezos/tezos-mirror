@@ -1,29 +1,32 @@
 opam-version: "2.0"
 maintainer: "contact@tezos.com"
-authors: [ "Tezos devteam" ]
+authors: ["Tezos devteam"]
 homepage: "https://www.tezos.com/"
 bug-reports: "https://gitlab.com/tezos/tezos/issues"
 dev-repo: "git+https://gitlab.com/tezos/tezos.git"
 license: "MIT"
 depends: [
-  "dune" { >= "2.0" }
+  "dune" { >= "2.9" }
   "tezos-base"
-  "tezos-client-alpha"
   "tezos-client-commands"
+  "tezos-stdlib-unix"
+  "tezos-client-base"
   "tezos-client-base-unix"
+  "tezos-client-alpha"
+  "tezos-context"
+  "tezos-protocol-alpha"
+  "tezos-protocol-plugin-alpha"
+  "tezos-protocol-alpha-parameters"
   "tezos-rpc"
   "tezos-rpc-http"
   "tezos-rpc-http-server"
   "tezos-shell-services"
   "tezos-sc-rollup-alpha"
-  "tezos-protocol-alpha"
-  "tezos-protocol-alpha-parameters"
-  "tezos-protocol-plugin-alpha"
-  "data-encoding"
-  "irmin"
-  "irmin-pack"
-  "ringo"
-  "ringo-lwt"
+  "data-encoding" { >= "0.5.1" & < "0.6" }
+  "irmin-pack" { >= "3.1.0" & < "3.2.0" }
+  "irmin" { >= "3.1.0" & < "3.2.0" }
+  "ringo" { = "0.7" }
+  "ringo-lwt" { = "0.7" }
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]
