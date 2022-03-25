@@ -1048,7 +1048,7 @@ let apply_transaction_to_tx_rollup ~ctxt ~parameters_ty ~parameters ~amount
   else fail (Script_tc_errors.No_such_entrypoint entrypoint)
 
 let apply_origination ~consume_deserialization_gas ~ctxt ~parsed_script ~script
-    ~internal:_ ~contract ~delegate ~source ~credit ~before_operation =
+    ~contract ~delegate ~source ~credit ~before_operation =
   Script.force_decode_in_context
     ~consume_deserialization_gas
     ctxt
@@ -1226,7 +1226,6 @@ let apply_internal_manager_operation_content :
         ~ctxt
         ~parsed_script
         ~script
-        ~internal:true
         ~contract
         ~delegate
         ~source
@@ -1459,7 +1458,6 @@ let apply_external_manager_operation_content :
         ~ctxt
         ~parsed_script
         ~script
-        ~internal:false
         ~contract
         ~delegate
         ~source:source_contract
