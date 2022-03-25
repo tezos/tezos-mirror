@@ -1048,22 +1048,13 @@ let apply_transaction_to_tx_rollup ~ctxt ~parameters_ty ~parameters ~amount
   else fail (Script_tc_errors.No_such_entrypoint entrypoint)
 
 let apply_origination ~consume_deserialization_gas ~ctxt ~parsed_script ~script
-    ~internal ~contract ~delegate ~source ~credit ~before_operation =
+    ~internal:_ ~contract ~delegate ~source ~credit ~before_operation =
   Script.force_decode_in_context
     ~consume_deserialization_gas
     ctxt
     script.Script.code
   >>?= fun (unparsed_code, ctxt) ->
-  (match parsed_script with
-  | None ->
-      Script_ir_translator.parse_script
-        ctxt
-        ~legacy:false
-        ~allow_forged_in_storage:internal
-        script
-  | Some parsed_script ->
-      return (Script_ir_translator.Ex_script parsed_script, ctxt))
-  >>=? fun (Ex_script (Script parsed_script), ctxt) ->
+  let (Script_typed_ir.Script parsed_script) = parsed_script in
   let views_result =
     Script_ir_translator.typecheck_views
       ctxt
@@ -1233,7 +1224,7 @@ let apply_internal_manager_operation_content :
       apply_origination
         ~consume_deserialization_gas
         ~ctxt
-        ~parsed_script:(Some parsed_script)
+        ~parsed_script
         ~script
         ~internal:true
         ~contract
@@ -1457,10 +1448,16 @@ let apply_external_manager_operation_content :
         ctxt
         script.Script.storage
       >>?= fun (_unparsed_storage, ctxt) ->
+      Script_ir_translator.parse_script
+        ctxt
+        ~legacy:false
+        ~allow_forged_in_storage:false
+        script
+      >>=? fun (Ex_script parsed_script, ctxt) ->
       apply_origination
         ~consume_deserialization_gas
         ~ctxt
-        ~parsed_script:None
+        ~parsed_script
         ~script
         ~internal:false
         ~contract
