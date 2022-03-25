@@ -1050,15 +1050,6 @@ let apply_transaction_to_tx_rollup ~ctxt ~parameters_ty ~parameters ~amount
 let apply_origination ~ctxt ~parsed_script ~unparsed_code ~contract ~delegate
     ~source ~credit ~before_operation =
   let (Script_typed_ir.Script parsed_script) = parsed_script in
-  let views_result =
-    Script_ir_translator.typecheck_views
-      ctxt
-      ~legacy:false
-      parsed_script.storage_type
-      parsed_script.views
-  in
-  trace (Script_tc_errors.Ill_typed_contract (unparsed_code, [])) views_result
-  >>=? fun ctxt ->
   Script_ir_translator.collect_lazy_storage
     ctxt
     parsed_script.storage_type
@@ -1457,6 +1448,18 @@ let apply_external_manager_operation_content :
         ctxt
         script.Script.code
       >>?= fun (unparsed_code, ctxt) ->
+      let (Script {storage_type; views; _}) = parsed_script in
+      let views_result =
+        Script_ir_translator.typecheck_views
+          ctxt
+          ~legacy:false
+          storage_type
+          views
+      in
+      trace
+        (Script_tc_errors.Ill_typed_contract (unparsed_code, []))
+        views_result
+      >>=? fun ctxt ->
       apply_origination
         ~ctxt
         ~parsed_script
