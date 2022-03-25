@@ -365,24 +365,34 @@ let lowest_cemented_block cemented_block_files =
 let lowest_metadata_entry metadata_file =
   let open Lwt_syntax in
   let metadata_file_path = Naming.file_path metadata_file in
-  let* in_file = Lwt_preemptive.detach Zip.open_in metadata_file_path in
-  let* entries = Lwt_preemptive.detach Zip.entries in_file in
-  match entries with
-  | [] ->
-      (* A metadata file is never empty *)
-      assert false
-  | entry :: entries ->
-      let lowest_entry =
-        List.fold_left
-          (fun lowest entry ->
-            let entry = entry.Zip.filename in
-            if Compare.Int.(int_of_string lowest <= int_of_string entry) then
-              lowest
-            else entry)
-          entry.Zip.filename
-          entries
-      in
-      return (Int32.of_string lowest_entry)
+  let* exists = Lwt_unix.file_exists metadata_file_path in
+  if exists then
+    let* in_file = Lwt_preemptive.detach Zip.open_in metadata_file_path in
+    Lwt.finalize
+      (fun () ->
+        let* entries = Lwt_preemptive.detach Zip.entries in_file in
+        match entries with
+        | [] ->
+            (* A metadata file is never empty *)
+            assert false
+        | entry :: entries ->
+            let lowest_entry =
+              List.fold_left
+                (fun lowest entry ->
+                  let entry = entry.Zip.filename in
+                  if Compare.Int.(int_of_string lowest <= int_of_string entry)
+                  then lowest
+                  else entry)
+                entry.Zip.filename
+                entries
+            in
+            return (Int32.of_string lowest_entry))
+      (fun () -> Lwt_preemptive.detach Zip.close_in in_file)
+  else
+    (* No need to use an error here as it will be caught and
+       ignored. *)
+    Lwt.fail_with
+      (Format.sprintf "cannot find metadata file %s" metadata_file_path)
 
 (* Returns the lowest block level, from the cemented store, which is
    associated to some block metadata *)
