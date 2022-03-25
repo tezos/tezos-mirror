@@ -821,7 +821,8 @@ let test_voting ~from_protocol ~(to_protocol : target_protocol) ~loser_protocols
       (* Bake the transition. *)
       Log.info "Baking transition block..." ;
       let everybody =
-        List.map (fun x -> x.Account.public_key_hash) Constant.bootstrap_keys
+        Array.map (fun x -> x.Account.public_key_hash) Account.Bootstrap.keys
+        |> Array.to_list
       in
       let* () = Client.bake_for ~keys:everybody client in
       let* () =

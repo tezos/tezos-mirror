@@ -63,5 +63,5 @@ let register ~protocols =
   signer_simple_test
     ~title:"signer test"
     ~tags:["node"; "baker"; "signer"]
-    ~keys:Constant.bootstrap_keys
+    ~keys:(Account.Bootstrap.keys |> Array.to_list)
     protocols

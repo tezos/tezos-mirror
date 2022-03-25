@@ -396,7 +396,7 @@ module Regressions = struct
       let (`Batch content) = Rollup.make_batch (String.make batch_limit 'a') in
       let* () =
         fold max_batch_number_per_inbox () (fun i () ->
-            let src = Account.bootstrap (i + 1) in
+            let src = Account.Bootstrap.alias (i + 1) in
             let*! () =
               Client.Tx_rollup.submit_batch ~hooks ~content ~rollup ~src client
             in
