@@ -128,6 +128,8 @@ let string_fixed n = QCheck2.Gen.(string_size (pure n))
 
 let bytes_gen = QCheck2.Gen.(map Bytes.of_string string)
 
+let bytes_fixed_gen size = QCheck2.Gen.map Bytes.of_string (string_fixed size)
+
 let sublist : 'a list -> 'a list QCheck2.Gen.t =
   (* [take_n n l] returns the first [n] elements of [l].
      We do not reuse the implementation from [Stdlib.TzList] to avoid a

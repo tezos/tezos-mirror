@@ -39,27 +39,27 @@ open Protocol.Tx_rollup_l2_apply
 
 (* ------ generators and compact encodings ---------------------------------- *)
 
-let seed_gen =
-  let open QCheck2.Gen in
-  return @@ Bytes.init 32 (fun _ -> generate1 char)
+let seed_gen = bytes_fixed_gen 32
 
-let bls_pk_gen =
-  let open QCheck2.Gen in
-  let+ seed = seed_gen in
-  let secret_key = Bls12_381.Signature.generate_sk seed in
-  Bls12_381.Signature.MinSig.derive_pk secret_key
+let bls_pk =
+  (* Generating byte sequences in Qcheck2 is slow. We hard code one
+     32byte IKMs: *)
+  let ikm =
+    `Hex "8fee216367c463821f82c942a1cee3a01469b1da782736ca269a2accea6e0cc4"
+    |> Hex.to_bytes_exn
+  in
+  let sk = Bls12_381.Signature.generate_sk ikm in
+  Bls12_381.Signature.MinSig.derive_pk sk
 
-let l2_address_gen =
-  let open QCheck2.Gen in
-  Protocol.Tx_rollup_l2_address.of_bls_pk <$> bls_pk_gen
+let l2_address = Protocol.Tx_rollup_l2_address.of_bls_pk bls_pk
 
 let signer_gen : Signer_indexable.either QCheck2.Gen.t =
   let open QCheck2.Gen in
   frequency
     [
-      (1, (fun pk -> from_value (Bls_pk pk)) <$> bls_pk_gen);
-      (5, (fun addr -> from_value (L2_addr addr)) <$> l2_address_gen);
-      (4, (fun x -> from_index_exn x) <$> ui32);
+      (1, return @@ from_value (Bls_pk bls_pk));
+      (5, return @@ from_value (L2_addr l2_address));
+      (4, from_index_exn <$> ui32);
     ]
 
 let signer_index_gen : Signer_indexable.index QCheck2.Gen.t =
@@ -70,13 +70,11 @@ let idx_l2_address_idx_gen =
   let open QCheck2.Gen in
   from_index_exn <$> ui32
 
-let idx_l2_address_value_gen =
-  let open QCheck2.Gen in
-  from_value <$> l2_address_gen
+let idx_l2_address_value = from_value l2_address
 
 let idx_l2_address_gen =
   let open QCheck2.Gen in
-  oneof [idx_l2_address_idx_gen; idx_l2_address_value_gen]
+  oneof [idx_l2_address_idx_gen; return idx_l2_address_value]
 
 let public_key_hash =
   Signature.Public_key_hash.of_b58check_exn
@@ -88,8 +86,7 @@ let public_key_hash_gen =
   let (pkh, _, _) = Tx_rollup_l2_helpers.gen_l1_address ~seed () in
   pkh
 
-let ticket_hash_gen : Protocol.Alpha_context.Ticket_hash.t QCheck2.Gen.t =
-  let open QCheck2.Gen in
+let ticket_hash : Protocol.Alpha_context.Ticket_hash.t =
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/2592
      we could introduce a bit more randomness here *)
   let ticketer_b58 = "tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU" in
@@ -97,23 +94,20 @@ let ticket_hash_gen : Protocol.Alpha_context.Ticket_hash.t QCheck2.Gen.t =
   let ticketer =
     Protocol.Alpha_context.Contract.implicit_contract ticketer_pkh
   in
-  let+ tx_rollup = l2_address_gen in
-  Tx_rollup_l2_helpers.make_unit_ticket_key ticketer tx_rollup
+  Tx_rollup_l2_helpers.make_unit_ticket_key ticketer l2_address
 
 let idx_ticket_hash_idx_gen :
     Protocol.Alpha_context.Ticket_hash.t either QCheck2.Gen.t =
   let open QCheck2.Gen in
   from_index_exn <$> ui32
 
-let idx_ticket_hash_value_gen :
-    Protocol.Alpha_context.Ticket_hash.t either QCheck2.Gen.t =
-  let open QCheck2.Gen in
-  from_value <$> ticket_hash_gen
+let idx_ticket_hash_value : Protocol.Alpha_context.Ticket_hash.t either =
+  from_value ticket_hash
 
 let idx_ticket_hash_gen :
     Protocol.Alpha_context.Ticket_hash.t either QCheck2.Gen.t =
   let open QCheck2.Gen in
-  oneof [idx_ticket_hash_idx_gen; idx_ticket_hash_value_gen]
+  oneof [idx_ticket_hash_idx_gen; return idx_ticket_hash_value]
 
 let qty_gen =
   let open QCheck2.Gen in
@@ -122,9 +116,7 @@ let qty_gen =
 
 let v1_withdraw_gen =
   let open QCheck2.Gen in
-  let+ destination = public_key_hash_gen
-  and+ ticket_hash = ticket_hash_gen
-  and+ qty = qty_gen in
+  let+ destination = public_key_hash_gen and+ qty = qty_gen in
   V1.Withdraw {destination; ticket_hash; qty}
 
 let v1_transfer_gen =
@@ -173,7 +165,8 @@ let indexes_gen =
     | _ -> assert false
   in
   let* address_indexes =
-    small_list (pair l2_address_gen (map Protocol.Indexable.index_exn ui32))
+    small_list
+      (pair (return l2_address) (map Protocol.Indexable.index_exn ui32))
   in
   let+ ticket_indexes =
     small_list (pair ticket_hash_gen (map Protocol.Indexable.index_exn ui32))
@@ -240,7 +233,6 @@ let withdrawal : Protocol.Alpha_context.Tx_rollup_withdraw.t QCheck2.Gen.t =
   let open QCheck2.Gen in
   let open Protocol.Alpha_context.Tx_rollup_withdraw in
   let claimer = public_key_hash in
-  let* ticket_hash = ticket_hash_gen in
   let* amount = qty_gen in
   return {claimer; ticket_hash; amount}
 
@@ -323,13 +315,13 @@ let () =
         qcheck_wrap
           [
             test_roundtrip
-              ~count:1_000
+              ~count:100
               "batch"
               batch
               ( = )
               Protocol.Tx_rollup_l2_batch.encoding;
             test_roundtrip
-              ~count:1_000
+              ~count:100
               "message_result"
               message_result_withdrawal
               ( = )
