@@ -9,6 +9,8 @@ License
 The Tezos software is distributed under the MIT license. Every OCaml source file should start with a header comment instantiating the following template (use appropriate comment syntax for other languages):
 
 .. literalinclude:: LICENSE.ml
+   :language: ocaml
+
 
 Note that:
 
