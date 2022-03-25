@@ -196,8 +196,9 @@ module Alias (Entity : Entity) = struct
     let open Lwt_result_syntax in
     let* mtime = wallet#last_modification_time Entity.name in
     let cache = peek_cache wallet in
-    match (mtime, Option.bind cache (fun c -> c.mtime)) with
-    | (Some fresh_mtime, Some cache_mtime) when fresh_mtime = cache_mtime ->
+    match (mtime, cache) with
+    | (Some fresh_mtime, Some {mtime = Some cache_mtime; _})
+      when fresh_mtime = cache_mtime ->
         return (WithExceptions.Option.get ~loc:__LOC__ cache)
     | _ ->
         let* list_assoc =
