@@ -1506,7 +1506,8 @@ and 'kind manager_operation =
   | Origination : {
       origination : Alpha_context.origination;
       preorigination : Contract.t;
-      script : ('arg, 'storage) script;
+      storage_type : ('storage, _) ty;
+      storage : 'storage;
     }
       -> Kind.origination manager_operation
   | Delegation :

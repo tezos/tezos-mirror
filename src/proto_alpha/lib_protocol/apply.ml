@@ -1197,14 +1197,14 @@ let apply_internal_manager_operation_content :
       {
         origination = {delegate; script; credit};
         preorigination = contract;
-        script = parsed_script;
+        storage_type;
+        storage;
       } ->
       Script.force_decode_in_context
         ~consume_deserialization_gas
         ctxt
         script.Script.code
       >>?= fun (unparsed_code, ctxt) ->
-      let (Script {storage_type; storage; _}) = parsed_script in
       apply_origination
         ~ctxt
         ~storage_type
