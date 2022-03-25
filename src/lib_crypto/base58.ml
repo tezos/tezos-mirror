@@ -112,19 +112,26 @@ let raw_encode ?(alphabet = Alphabet.default) s =
   String.make zeros zero ^ ress
 
 let raw_decode ?(alphabet = Alphabet.default) s =
-  TzString.fold_left
-    (fun a c ->
-      match (a, of_char ~alphabet c) with
-      | (Some a, Some i) -> Some Z.(add (of_int i) (mul a zbase))
-      | _ -> None)
-    (Some Z.zero)
-    s
-  |> Option.map (fun res ->
-         let res = Z.to_bits res in
-         let res_tzeros = count_trailing_char res '\000' in
-         let len = String.length res - res_tzeros in
-         let zeros = count_leading_char s alphabet.encode.[0] in
-         String.make zeros '\000' ^ String.init len (fun i -> res.[len - i - 1]))
+  let open Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Option_syntax in
+  let slen = String.length s in
+  let rec decode acc index =
+    if index >= slen then return acc
+    else
+      match of_char ~alphabet s.[index] with
+      | Some i ->
+          let acc = Z.(add (of_int i) (mul acc zbase)) in
+          (decode [@ocaml.tailcall]) acc (index + 1)
+      | _ -> fail
+  in
+  let* res = decode Z.zero 0 in
+  let res = Z.to_bits res in
+  let res_tzeros = count_trailing_char res '\000' in
+  let len = String.length res - res_tzeros in
+  let zeros = count_leading_char s alphabet.encode.[0] in
+  let v =
+    String.make zeros '\000' ^ String.init len (fun i -> res.[len - i - 1])
+  in
+  return v
 
 let checksum s =
   let hash = Hacl.Hash.SHA256.(digest (digest (Bytes.of_string s))) in
