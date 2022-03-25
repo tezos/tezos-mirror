@@ -172,8 +172,7 @@ module Info = struct
     | Some gr -> Time.System.compare now gr.end_time <= 0
 
   let reconnection_time {reconnection_info; _} =
-    (* TODO : use Option.map_default when will be available *)
-    match reconnection_info with None -> None | Some gr -> Some gr.end_time
+    Option.map (fun gr -> gr.end_time) reconnection_info
 
   let last_seen s =
     Time.System.recent

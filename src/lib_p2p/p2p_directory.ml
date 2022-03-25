@@ -138,10 +138,10 @@ let build_rpc_directory net =
       P2p_services.Connections.S.info
       (fun peer_id () () ->
         return
-        @@ Option.bind (P2p.pool net) (fun pool ->
-               Option.map
-                 P2p_conn.info
-                 (P2p_pool.Connection.find_by_peer_id pool peer_id)))
+          (let open Option_syntax in
+          let* pool = P2p.pool net in
+          let+ conn = P2p_pool.Connection.find_by_peer_id pool peer_id in
+          P2p_conn.info conn))
   in
   let dir =
     RPC_directory.lwt_register1
