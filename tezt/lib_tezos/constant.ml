@@ -128,12 +128,6 @@ let tx_rollup_initial_message_result =
 (** A valid rejection proof for the initial layer2 state. *)
 let tx_rollup_proof_initial_state =
   {|{ "version": 3,
-  "before":
-    { "kind": "Node",
-      "value":
-        { "node": "CoVu7Pqp1Gh3z33mink5T5Q2kAQKtnn3GHxVhyehdKZpQMBxFBGF" } },
-  "after":
-    { "kind": "Node",
-      "value":
-        { "node": "CoVu7Pqp1Gh3z33mink5T5Q2kAQKtnn3GHxVhyehdKZpQMBxFBGF" } },
+  "before": { "node": "CoVu7Pqp1Gh3z33mink5T5Q2kAQKtnn3GHxVhyehdKZpQMBxFBGF" },
+  "after": { "node": "CoVu7Pqp1Gh3z33mink5T5Q2kAQKtnn3GHxVhyehdKZpQMBxFBGF" } ,
   "state": [] }|}

@@ -253,7 +253,7 @@ let tx_client_get_balance ~tx_node ~block ~ticket_id ~tz4_address =
        ^ tz4_address)
   in
   let json = JSON.parse ~origin:"tx_client_get_balance" wrapped_result in
-  match JSON.(json |-> "value" |> as_int_opt) with
+  match JSON.(json |> as_int_opt) with
   | Some level -> Lwt.return level
   | None -> Test.fail "Cannot retrieve balance of tz4 address %s" tz4_address
 
