@@ -4549,6 +4549,9 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
     ->
       Tc_context.check_not_in_view ~legacy loc tc_context prim >>?= fun () ->
       check_two_var_annot loc annot >>?= fun () ->
+      (* We typecheck the script to make sure we will originate only well-typed
+         contracts but then we throw away the typed version, except for the
+         storage type which is kept for efficiency in the ticket scanner. *)
       let canonical_code = Micheline.strip_locations code in
       parse_toplevel ctxt ~legacy canonical_code
       >>?= fun ({arg_type; storage_type; code_field; views}, ctxt) ->
@@ -4583,9 +4586,9 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
            arg_type_full
            ret_type_full
            code_field)
-      >>=? fun ( (Lam
-                    ( {kbef = Item_t (arg, Bot_t); kaft = Item_t (ret, Bot_t); _},
-                      _ ) as lambda),
+      >>=? fun ( Lam
+                   ( {kbef = Item_t (arg, Bot_t); kaft = Item_t (ret, Bot_t); _},
+                     _ ),
                  ctxt ) ->
       let views_result =
         typecheck_views ctxt ?type_logger ~legacy storage_type views
@@ -4604,8 +4607,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
         {
           apply =
             (fun kinfo k ->
-              ICreate_contract
-                {kinfo; storage_type; arg_type; lambda; views; entrypoints; k});
+              ICreate_contract {kinfo; storage_type; code = canonical_code; k});
         }
       in
       let stack = Item_t (operation_t, Item_t (address_t, rest)) in

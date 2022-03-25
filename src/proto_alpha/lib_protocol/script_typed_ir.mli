@@ -856,10 +856,7 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
   | ICreate_contract : {
       kinfo : (public_key_hash option, Tez.t * ('a * 's)) kinfo;
       storage_type : ('a, _) ty;
-      arg_type : ('b, _) ty;
-      lambda : ('b * 'a, operation boxed_list * 'a) lambda;
-      views : view_map;
-      entrypoints : 'b entrypoints;
+      code : Script.expr;
       k : (operation, address * 's, 'r, 'f) kinstr;
     }
       -> (public_key_hash option, Tez.t * ('a * 's), 'r, 'f) kinstr

@@ -898,10 +898,7 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
   | ICreate_contract : {
       kinfo : (public_key_hash option, Tez.t * ('a * 's)) kinfo;
       storage_type : ('a, _) ty;
-      arg_type : ('b, _) ty;
-      lambda : ('b * 'a, operation boxed_list * 'a) lambda;
-      views : view_map;
-      entrypoints : 'b entrypoints;
+      code : Script.expr;
       k : (operation, address * 's, 'r, 'f) kinstr;
     }
       -> (public_key_hash option, Tez.t * ('a * 's), 'r, 'f) kinstr
@@ -1706,11 +1703,9 @@ let kinstr_rewritek :
   | ITransfer_tokens (kinfo, k) -> ITransfer_tokens (kinfo, f.apply k)
   | IView (kinfo, view_signature, k) -> IView (kinfo, view_signature, f.apply k)
   | IImplicit_account (kinfo, k) -> IImplicit_account (kinfo, f.apply k)
-  | ICreate_contract
-      {kinfo; storage_type; arg_type; lambda; views; entrypoints; k} ->
+  | ICreate_contract {kinfo; storage_type; code; k} ->
       let k = f.apply k in
-      ICreate_contract
-        {kinfo; storage_type; arg_type; lambda; views; entrypoints; k}
+      ICreate_contract {kinfo; storage_type; code; k}
   | ISet_delegate (kinfo, k) -> ISet_delegate (kinfo, f.apply k)
   | INow (kinfo, k) -> INow (kinfo, f.apply k)
   | IMin_block_time (kinfo, k) -> IMin_block_time (kinfo, f.apply k)
