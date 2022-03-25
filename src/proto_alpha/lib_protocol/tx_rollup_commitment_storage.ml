@@ -28,6 +28,29 @@
 open Tx_rollup_commitment_repr
 open Tx_rollup_errors_repr
 
+let check_message_result {messages; _} result ~path ~index =
+  let computed =
+    match result with
+    | `Hash hash -> hash
+    | `Result result -> Tx_rollup_message_result_hash_repr.hash result
+  in
+  let cond =
+    match
+      Merkle.check_path
+        path
+        index
+        computed
+        messages.Tx_rollup_commitment_repr.Compact.root
+    with
+    | Ok x -> x
+    | Error _ -> false
+  in
+  error_unless
+    cond
+    Tx_rollup_errors_repr.(
+      Wrong_rejection_hash
+        {provided = computed; expected = `Valid_path (messages.root, index)})
+
 let adjust_unfinalized_commitments_count ctxt state tx_rollup pkh
     ~(dir : [`Incr | `Decr]) =
   let delta = match dir with `Incr -> 1 | `Decr -> -1 in
@@ -72,9 +95,7 @@ let find :
     Tx_rollup_repr.t ->
     Tx_rollup_state_repr.t ->
     Tx_rollup_level_repr.t ->
-    (Raw_context.t * Tx_rollup_commitment_repr.Submitted_commitment.t option)
-    tzresult
-    Lwt.t =
+    (Raw_context.t * Submitted_commitment.t option) tzresult Lwt.t =
  fun ctxt tx_rollup state level ->
   if Tx_rollup_state_repr.has_valid_commitment_at state level then
     Storage.Tx_rollup.Commitment.find ctxt (level, tx_rollup)
@@ -91,8 +112,7 @@ let get :
     Tx_rollup_repr.t ->
     Tx_rollup_state_repr.t ->
     Tx_rollup_level_repr.t ->
-    (Raw_context.t * Tx_rollup_commitment_repr.Submitted_commitment.t) tzresult
-    Lwt.t =
+    (Raw_context.t * Submitted_commitment.t) tzresult Lwt.t =
  fun ctxt tx_rollup state level ->
   find ctxt tx_rollup state level >>=? fun (ctxt, commitment) ->
   match commitment with
@@ -105,8 +125,7 @@ let get_finalized :
     Tx_rollup_repr.t ->
     Tx_rollup_state_repr.t ->
     Tx_rollup_level_repr.t ->
-    (Raw_context.t * Tx_rollup_commitment_repr.Submitted_commitment.t) tzresult
-    Lwt.t =
+    (Raw_context.t * Submitted_commitment.t) tzresult Lwt.t =
  fun ctxt tx_rollup state level ->
   let window = Tx_rollup_state_repr.finalized_commitments_range state in
   (match window with
@@ -145,8 +164,8 @@ let check_commitment_predecessor ctxt state commitment =
     ( commitment.predecessor,
       Tx_rollup_state_repr.next_commitment_predecessor state )
   with
-  | (Some pred_hash, Some expected_hash)
-    when Commitment_hash.(pred_hash = expected_hash) ->
+  | (Some pred_hash, Some expected_hash) when Hash.(pred_hash = expected_hash)
+    ->
       return ctxt
   | (None, None) -> return ctxt
   | (provided, expected) -> fail (Wrong_predecessor_hash {provided; expected})
@@ -179,7 +198,8 @@ let add_commitment ctxt tx_rollup state pkh commitment =
   check_commitment_batches_and_merkle_root ctxt tx_rollup commitment
   >>=? fun ctxt ->
   (* Everything has been sorted out, let’s update the storage *)
-  let commitment_hash = Tx_rollup_commitment_repr.hash commitment in
+  let commitment = Tx_rollup_commitment_repr.Full.compact commitment in
+  let commitment_hash = Tx_rollup_commitment_repr.Compact.hash commitment in
   let submitted : Tx_rollup_commitment_repr.Submitted_commitment.t =
     {
       commitment;
@@ -191,16 +211,9 @@ let add_commitment ctxt tx_rollup state pkh commitment =
   in
   Storage.Tx_rollup.Commitment.add ctxt (commitment.level, tx_rollup) submitted
   >>=? fun (ctxt, commitment_size_alloc, _) ->
-  let commitment_message_hash_preallocations =
-    List.length commitment.messages
-    * Tx_rollup_prefixes.message_result_hash.hash_size
-  in
-  let commitment_size_alloc_sans_preallocations =
-    commitment_size_alloc - commitment_message_hash_preallocations
-  in
   Tx_rollup_state_repr.adjust_storage_allocation
     state
-    ~delta:(Z.of_int commitment_size_alloc_sans_preallocations)
+    ~delta:(Z.of_int commitment_size_alloc)
   >>?= fun (state, paid_storage_size_diff_for_commitment) ->
   Tx_rollup_state_repr.record_commitment_creation
     state
@@ -303,11 +316,7 @@ let remove_commitment ctxt rollup state =
       Tx_rollup_reveal_storage.remove ctxt rollup state tail
       >>=? fun (ctxt, state) ->
       (* We update the state *)
-      (match List.last_opt commitment.commitment.messages with
-      | Some hash -> ok hash
-      | None ->
-          error (Internal_error "empty commitments should not be possible"))
-      >>?= fun msg_hash ->
+      let msg_hash = commitment.commitment.messages.last_result_message_hash in
       Tx_rollup_state_repr.record_commitment_deletion
         state
         tail
@@ -316,70 +325,57 @@ let remove_commitment ctxt rollup state =
       >>?= fun state -> return (ctxt, state, tail)
   | None -> fail No_commitment_to_remove
 
-let get_nth_commitment commitment message_position =
-  let level = commitment.level in
-  Option.value_e
-    ~error:
-      (Error_monad.trace_of_error
-         (Wrong_message_position
-            {
-              level;
-              position = message_position;
-              length = List.length commitment.messages;
-            }))
-    (List.nth_opt commitment.messages message_position)
-
-let get_before_and_after_results ctxt tx_rollup
-    (submitted_commitment : Submitted_commitment.t) ~message_position state =
+let check_agreed_and_disputed_results ctxt tx_rollup state
+    (submitted_commitment : Submitted_commitment.t) ~agreed_result
+    ~agreed_result_path ~disputed_result ~disputed_position
+    ~disputed_result_path =
   let commitment = submitted_commitment.commitment in
-  get_nth_commitment commitment message_position >>?= fun after_hash ->
-  let level = commitment.level in
-  if Compare.Int.(message_position = 0) then
-    match Tx_rollup_level_repr.pred level with
-    | None -> return (ctxt, Tx_rollup_message_result_hash_repr.init, after_hash)
+  Tx_rollup_state_repr.check_level_can_be_rejected state commitment.level
+  >>?= fun () ->
+  check_message_result
+    commitment
+    (`Hash disputed_result)
+    ~path:disputed_result_path
+    ~index:disputed_position
+  >>?= fun () ->
+  if Compare.Int.(disputed_position = 0) then
+    let agreed = Tx_rollup_message_result_hash_repr.hash agreed_result in
+    match Tx_rollup_level_repr.pred commitment.level with
+    | None ->
+        let expected = Tx_rollup_message_result_hash_repr.init in
+        fail_unless
+          Tx_rollup_message_result_hash_repr.(agreed = expected)
+          (Wrong_rejection_hash {provided = agreed; expected = `Hash expected})
+        >>=? fun () -> return ctxt
     | Some pred_level -> (
         Storage.Tx_rollup.Commitment.find ctxt (pred_level, tx_rollup)
-        >>=? function
-        | (ctxt, None) -> (
-            (* In this case, the predecessor commitment is not stored.  We need to
-               check a bunch of things to ensure that the last removed commitment
-               is a valid predecessor.
-            *)
+        >>=? fun (ctxt, candidate) ->
+        match candidate with
+        | Some commitment ->
+            let expected =
+              commitment.commitment.messages.last_result_message_hash
+            in
             fail_unless
-              (Option.is_none
-                 (Tx_rollup_state_repr.finalized_commitment_oldest_level state))
-              (Internal_error "Missing commitment predecessor")
-            >>=? fun () ->
+              Tx_rollup_message_result_hash_repr.(agreed = expected)
+              (Wrong_rejection_hash
+                 {provided = agreed; expected = `Hash expected})
+            >>=? fun () -> return ctxt
+        | None -> (
             match Tx_rollup_state_repr.last_removed_commitment_hashes state with
-            | None -> fail (Internal_error "Missing last removed commitment")
-            | Some (message_commitment, commitment_hash) ->
-                Option.value_e
-                  ~error:
-                    (Error_monad.trace_of_error
-                       (Internal_error
-                          "Non-initial commitment has empty predecessor"))
-                  commitment.predecessor
-                >>?= fun predecessor_commitment_hash ->
+            | Some (last_hash, _) ->
                 fail_unless
-                  (Commitment_hash.( = )
-                     predecessor_commitment_hash
-                     commitment_hash)
-                  (Internal_error
-                     "Last removed commitment has wrong predecessor hash")
-                >>=? fun () -> return (ctxt, message_commitment, after_hash))
-        | (ctxt, Some {commitment = {messages; _}; _}) ->
-            Option.value_e
-              ~error:
-                (Error_monad.trace_of_error (Internal_error "Empty commitment"))
-              (List.last_opt messages)
-            >>?= fun message_result -> return (ctxt, message_result, after_hash)
-        )
+                  Tx_rollup_message_result_hash_repr.(agreed = last_hash)
+                  (Wrong_rejection_hash
+                     {provided = agreed; expected = `Hash last_hash})
+                >>=? fun () -> return ctxt
+            | None -> fail (Internal_error "Missing commitment predecessor")))
   else
-    Storage.Tx_rollup.Commitment.get ctxt (level, tx_rollup)
-    >>=? fun (ctxt, submitted_commitment) ->
-    let commitment = submitted_commitment.commitment in
-    get_nth_commitment commitment (message_position - 1) >>?= fun before_hash ->
-    return (ctxt, before_hash, after_hash)
+    check_message_result
+      commitment
+      (`Result agreed_result)
+      ~path:agreed_result_path
+      ~index:(disputed_position - 1)
+    >>?= fun () -> return ctxt
 
 let reject_commitment ctxt rollup state level =
   Tx_rollup_state_repr.check_level_can_be_rejected state level >>?= fun () ->
@@ -390,7 +386,7 @@ let reject_commitment ctxt rollup state level =
       let pred_hash =
         Option.map
           (fun (x : Submitted_commitment.t) ->
-            Tx_rollup_commitment_repr.hash x.commitment)
+            Tx_rollup_commitment_repr.Compact.hash x.commitment)
           pred_commitment
       in
       return (ctxt, pred_hash)

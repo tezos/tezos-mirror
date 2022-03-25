@@ -247,7 +247,7 @@ val tx_rollup_commit :
   Context.t ->
   Contract.t ->
   Tx_rollup.t ->
-  Tx_rollup_commitment.t ->
+  Tx_rollup_commitment.Full.t ->
   Operation.packed tzresult Lwt.t
 
 (** [tx_rollup_return_bond ctxt source tx_rollup] returns a commitment bond. *)
@@ -298,6 +298,7 @@ val tx_rollup_dispatch_tickets :
   Context.t ->
   source:Contract.t ->
   message_index:int ->
+  message_result_path:Tx_rollup_commitment.Merkle.path ->
   Tx_rollup.t ->
   Tx_rollup_level.t ->
   Context_hash.t ->
@@ -351,8 +352,11 @@ val tx_rollup_reject :
   Tx_rollup_message.t ->
   message_position:int ->
   message_path:Tx_rollup_inbox.Merkle.path ->
+  message_result_hash:Tx_rollup_message_result_hash.t ->
+  message_result_path:Tx_rollup_commitment.Merkle.path ->
   proof:Tx_rollup_l2_proof.t ->
   previous_message_result:Tx_rollup_message_result.t ->
+  previous_message_result_path:Tx_rollup_commitment.Merkle.path ->
   Operation.packed tzresult Lwt.t
 
 (** [sc_rollup_origination ctxt source kind boot_sector] originates a new

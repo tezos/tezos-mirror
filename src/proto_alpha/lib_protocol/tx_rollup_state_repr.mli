@@ -118,8 +118,7 @@ val next_commitment_level :
 
 (** [next_commitment_predecessor state] returns the expected
     predecessor hash of the next valid commitment. *)
-val next_commitment_predecessor :
-  t -> Tx_rollup_commitment_repr.Commitment_hash.t option
+val next_commitment_predecessor : t -> Tx_rollup_commitment_repr.Hash.t option
 
 (** [record_inbox_creation state level] updates the state of a rollup
     to take into account the creation of of a new inbox at the given
@@ -149,10 +148,7 @@ val record_inbox_deletion : t -> Tx_rollup_level_repr.t -> t tzresult
     successor level of the current commitment head, or if [level] is
     greater than the inbox head. *)
 val record_commitment_creation :
-  t ->
-  Tx_rollup_level_repr.t ->
-  Tx_rollup_commitment_repr.Commitment_hash.t ->
-  t tzresult
+  t -> Tx_rollup_level_repr.t -> Tx_rollup_commitment_repr.Hash.t -> t tzresult
 
 (** [record_commitment_rejection state level pred_hash] updates
     [state] to take into account the fact that the commitment for the
@@ -165,7 +161,7 @@ val record_commitment_creation :
 val record_commitment_rejection :
   t ->
   Tx_rollup_level_repr.t ->
-  Tx_rollup_commitment_repr.Commitment_hash.t option ->
+  Tx_rollup_commitment_repr.Hash.t option ->
   t tzresult
 
 (** [record_commitment_deletion state level msg_hash commitment_hash]
@@ -178,7 +174,7 @@ val record_commitment_rejection :
 val record_commitment_deletion :
   t ->
   Tx_rollup_level_repr.t ->
-  Tx_rollup_commitment_repr.Commitment_hash.t ->
+  Tx_rollup_commitment_repr.Hash.t ->
   Tx_rollup_message_result_hash_repr.t ->
   t tzresult
 
@@ -200,8 +196,7 @@ val check_level_can_be_rejected : t -> Tx_rollup_level_repr.t -> unit tzresult
     hash and the last commitment hash. *)
 val last_removed_commitment_hashes :
   t ->
-  (Tx_rollup_message_result_hash_repr.t
-  * Tx_rollup_commitment_repr.Commitment_hash.t)
+  (Tx_rollup_message_result_hash_repr.t * Tx_rollup_commitment_repr.Hash.t)
   option
 
 (** [head_levels state] returns the level of the last inbox which has
@@ -232,12 +227,11 @@ module Internal_for_tests : sig
     ?burn_per_byte:Tez_repr.t ->
     ?inbox_ema:int ->
     ?last_removed_commitment_hashes:
-      Tx_rollup_message_result_hash_repr.t
-      * Tx_rollup_commitment_repr.Commitment_hash.t ->
+      Tx_rollup_message_result_hash_repr.t * Tx_rollup_commitment_repr.Hash.t ->
     ?finalized_commitments:Tx_rollup_level_repr.t * Tx_rollup_level_repr.t ->
     ?unfinalized_commitments:Tx_rollup_level_repr.t * Tx_rollup_level_repr.t ->
     ?uncommitted_inboxes:Tx_rollup_level_repr.t * Tx_rollup_level_repr.t ->
-    ?commitment_newest_hash:Tx_rollup_commitment_repr.Commitment_hash.t ->
+    ?commitment_newest_hash:Tx_rollup_commitment_repr.Hash.t ->
     ?tezos_head_level:Raw_level_repr.t ->
     ?occupied_storage:Z.t ->
     allocated_storage:Z.t ->

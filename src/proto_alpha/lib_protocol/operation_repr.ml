@@ -307,7 +307,7 @@ and _ manager_operation =
       -> Kind.tx_rollup_submit_batch manager_operation
   | Tx_rollup_commit : {
       tx_rollup : Tx_rollup_repr.t;
-      commitment : Tx_rollup_commitment_repr.t;
+      commitment : Tx_rollup_commitment_repr.Full.t;
     }
       -> Kind.tx_rollup_commit manager_operation
   | Tx_rollup_return_bond : {
@@ -328,7 +328,10 @@ and _ manager_operation =
       message : Tx_rollup_message_repr.t;
       message_position : int;
       message_path : Tx_rollup_inbox_repr.Merkle.path;
+      message_result_hash : Tx_rollup_message_result_hash_repr.t;
+      message_result_path : Tx_rollup_commitment_repr.Merkle.path;
       previous_message_result : Tx_rollup_message_result_repr.t;
+      previous_message_result_path : Tx_rollup_commitment_repr.Merkle.path;
       proof : Tx_rollup_l2_proof.t;
     }
       -> Kind.tx_rollup_rejection manager_operation
@@ -337,6 +340,7 @@ and _ manager_operation =
       level : Tx_rollup_level_repr.t;
       context_hash : Context_hash.t;
       message_index : int;
+      message_result_path : Tx_rollup_commitment_repr.Merkle.path;
       tickets_info : Tx_rollup_reveal_repr.t list;
     }
       -> Kind.tx_rollup_dispatch_tickets manager_operation
@@ -664,7 +668,7 @@ module Encoding = struct
           encoding =
             obj2
               (req "rollup" Tx_rollup_repr.encoding)
-              (req "commitment" Tx_rollup_commitment_repr.encoding);
+              (req "commitment" Tx_rollup_commitment_repr.Full.encoding);
           select =
             (function
             | Manager (Tx_rollup_commit _ as op) -> Some op | _ -> None);
@@ -725,15 +729,24 @@ module Encoding = struct
           tag = tx_rollup_operation_rejection_tag;
           name = "tx_rollup_rejection";
           encoding =
-            obj7
+            obj10
               (req "rollup" Tx_rollup_repr.encoding)
               (req "level" Tx_rollup_level_repr.encoding)
               (req "message" Tx_rollup_message_repr.encoding)
               (req "message_position" n)
               (req "message_path" Tx_rollup_inbox_repr.Merkle.path_encoding)
               (req
+                 "message_result_hash"
+                 Tx_rollup_message_result_hash_repr.encoding)
+              (req
+                 "message_result_path"
+                 Tx_rollup_commitment_repr.Merkle.path_encoding)
+              (req
                  "previous_message_result"
                  Tx_rollup_message_result_repr.encoding)
+              (req
+                 "previous_message_result_path"
+                 Tx_rollup_commitment_repr.Merkle.path_encoding)
               (req "proof" Tx_rollup_l2_proof.encoding);
           select =
             (function
@@ -747,7 +760,10 @@ module Encoding = struct
                   message;
                   message_position;
                   message_path;
+                  message_result_hash;
+                  message_result_path;
                   previous_message_result;
+                  previous_message_result_path;
                   proof;
                 } ->
                 ( tx_rollup,
@@ -755,7 +771,10 @@ module Encoding = struct
                   message,
                   Z.of_int message_position,
                   message_path,
+                  message_result_hash,
+                  message_result_path,
                   previous_message_result,
+                  previous_message_result_path,
                   proof ));
           inj =
             (fun ( tx_rollup,
@@ -763,7 +782,10 @@ module Encoding = struct
                    message,
                    message_position,
                    message_path,
+                   message_result_hash,
+                   message_result_path,
                    previous_message_result,
+                   previous_message_result_path,
                    proof ) ->
               Tx_rollup_rejection
                 {
@@ -772,7 +794,10 @@ module Encoding = struct
                   message;
                   message_position = Z.to_int message_position;
                   message_path;
+                  message_result_hash;
+                  message_result_path;
                   previous_message_result;
+                  previous_message_result_path;
                   proof;
                 });
         }
@@ -783,11 +808,14 @@ module Encoding = struct
           tag = tx_rollup_operation_dispatch_tickets_tag;
           name = "tx_rollup_dispatch_tickets";
           encoding =
-            obj5
+            obj6
               (req "tx_rollup" Tx_rollup_repr.encoding)
               (req "level" Tx_rollup_level_repr.encoding)
               (req "context_hash" Context_hash.encoding)
               (req "message_index" int31)
+              (req
+                 "message_result_path"
+                 Tx_rollup_commitment_repr.Merkle.path_encoding)
               (req
                  "tickets_info"
                  (Data_encoding.list Tx_rollup_reveal_repr.encoding));
@@ -798,12 +826,36 @@ module Encoding = struct
           proj =
             (function
             | Tx_rollup_dispatch_tickets
-                {tx_rollup; level; context_hash; message_index; tickets_info} ->
-                (tx_rollup, level, context_hash, message_index, tickets_info));
+                {
+                  tx_rollup;
+                  level;
+                  context_hash;
+                  message_index;
+                  message_result_path;
+                  tickets_info;
+                } ->
+                ( tx_rollup,
+                  level,
+                  context_hash,
+                  message_index,
+                  message_result_path,
+                  tickets_info ));
           inj =
-            (fun (tx_rollup, level, context_hash, message_index, tickets_info) ->
+            (fun ( tx_rollup,
+                   level,
+                   context_hash,
+                   message_index,
+                   message_result_path,
+                   tickets_info ) ->
               Tx_rollup_dispatch_tickets
-                {tx_rollup; level; context_hash; message_index; tickets_info});
+                {
+                  tx_rollup;
+                  level;
+                  context_hash;
+                  message_index;
+                  message_result_path;
+                  tickets_info;
+                });
         }
 
     let[@coq_axiom_with_reason "gadt"] transfer_ticket_case =

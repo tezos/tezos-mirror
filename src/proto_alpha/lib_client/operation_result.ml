@@ -194,7 +194,7 @@ let pp_manager_operation_content (type kind) source internal pp_result ppf
         else "Tx rollup commitment")
         Tx_rollup.pp
         tx_rollup
-        Tx_rollup_commitment.pp
+        Tx_rollup_commitment.Full.pp
         commitment
         Contract.pp
         source
@@ -224,7 +224,7 @@ let pp_manager_operation_content (type kind) source internal pp_result ppf
         source
         pp_result
         result
-  | Tx_rollup_remove_commitment {tx_rollup} ->
+  | Tx_rollup_remove_commitment {tx_rollup; _} ->
       Format.fprintf
         ppf
         "@[<v 2>%s:%a @,From: %a%a@]"

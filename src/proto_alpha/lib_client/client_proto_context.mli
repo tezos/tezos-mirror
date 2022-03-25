@@ -566,8 +566,11 @@ val submit_tx_rollup_rejection :
   message:string ->
   message_position:int ->
   message_path:string ->
-  context_hash:string ->
-  withdrawals_merkle_root:string ->
+  message_result_hash:string ->
+  message_result_path:string ->
+  previous_context_hash:string ->
+  previous_withdraw_list_hash:string ->
+  previous_message_result_path:string ->
   proof:string ->
   unit ->
   (Operation_hash.t

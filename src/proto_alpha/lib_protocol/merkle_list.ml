@@ -45,6 +45,8 @@ module type T = sig
 
   type path
 
+  val dummy_path : path
+
   val pp_path : Format.formatter -> path -> unit
 
   val nil : t
@@ -124,6 +126,8 @@ end)
   type t = {tree : tree; depth : int; next_pos : int}
 
   type path = h list
+
+  let dummy_path = []
 
   let pp_path ppf =
     Format.fprintf

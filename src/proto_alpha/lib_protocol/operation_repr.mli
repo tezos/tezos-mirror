@@ -353,7 +353,7 @@ and _ manager_operation =
       -> Kind.tx_rollup_submit_batch manager_operation
   | Tx_rollup_commit : {
       tx_rollup : Tx_rollup_repr.t;
-      commitment : Tx_rollup_commitment_repr.t;
+      commitment : Tx_rollup_commitment_repr.Full.t;
     }
       -> Kind.tx_rollup_commit manager_operation
   | Tx_rollup_return_bond : {
@@ -374,7 +374,10 @@ and _ manager_operation =
       message : Tx_rollup_message_repr.t;
       message_position : int;
       message_path : Tx_rollup_inbox_repr.Merkle.path;
+      message_result_hash : Tx_rollup_message_result_hash_repr.t;
+      message_result_path : Tx_rollup_commitment_repr.Merkle.path;
       previous_message_result : Tx_rollup_message_result_repr.t;
+      previous_message_result_path : Tx_rollup_commitment_repr.Merkle.path;
       proof : Tx_rollup_l2_proof.t;
     }
       -> Kind.tx_rollup_rejection manager_operation
@@ -388,6 +391,7 @@ and _ manager_operation =
           inbox from where this withdrawal was enabled. *)
       message_index : int;
           (** Index of the message in the inbox at [level] where this withdrawal was enabled. *)
+      message_result_path : Tx_rollup_commitment_repr.Merkle.path;
       tickets_info : Tx_rollup_reveal_repr.t list;
     }
       -> Kind.tx_rollup_dispatch_tickets manager_operation

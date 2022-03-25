@@ -148,13 +148,12 @@ let pp_range fmt = function
 *)
 type t = {
   last_removed_commitment_hashes :
-    (Tx_rollup_message_result_hash_repr.t
-    * Tx_rollup_commitment_repr.Commitment_hash.t)
+    (Tx_rollup_message_result_hash_repr.t * Tx_rollup_commitment_repr.Hash.t)
     option;
   finalized_commitments : range;
   unfinalized_commitments : range;
   uncommitted_inboxes : range;
-  commitment_newest_hash : Tx_rollup_commitment_repr.Commitment_hash.t option;
+  commitment_newest_hash : Tx_rollup_commitment_repr.Hash.t option;
   tezos_head_level : Raw_level_repr.t option;
   burn_per_byte : Tez_repr.t;
   inbox_ema : int;
@@ -276,15 +275,13 @@ let encoding : t Data_encoding.t =
                (req
                   "last_message_hash"
                   Tx_rollup_message_result_hash_repr.encoding)
-               (req
-                  "commitment_hash"
-                  Tx_rollup_commitment_repr.Commitment_hash.encoding)))
+               (req "commitment_hash" Tx_rollup_commitment_repr.Hash.encoding)))
        (req "finalized_commitments" range_encoding)
        (req "unfinalized_commitments" range_encoding)
        (req "uncommitted_inboxes" range_encoding)
        (req
           "commitment_newest_hash"
-          (option Tx_rollup_commitment_repr.Commitment_hash.encoding))
+          (option Tx_rollup_commitment_repr.Hash.encoding))
        (req "tezos_head_level" (option Raw_level_repr.encoding))
        (req "burn_per_byte" Tez_repr.encoding)
        (req "allocated_storage" n)
@@ -321,7 +318,7 @@ let pp fmt
       unfinalized_commitments
       pp_range
       uncommitted_inboxes
-      (pp_print_option Tx_rollup_commitment_repr.Commitment_hash.pp)
+      (pp_print_option Tx_rollup_commitment_repr.Hash.pp)
       commitment_newest_hash
       (pp_print_option Raw_level_repr.pp)
       tezos_head_level
@@ -331,7 +328,7 @@ let pp fmt
              "(message result: %a, commitment: %a)"
              Tx_rollup_message_result_hash_repr.pp
              m
-             Tx_rollup_commitment_repr.Commitment_hash.pp
+             Tx_rollup_commitment_repr.Hash.pp
              c))
       last_removed_commitment_hashes
       Z.pp_print
@@ -617,12 +614,11 @@ module Internal_for_tests = struct
       ?burn_per_byte:Tez_repr.t ->
       ?inbox_ema:int ->
       ?last_removed_commitment_hashes:
-        Tx_rollup_message_result_hash_repr.t
-        * Tx_rollup_commitment_repr.Commitment_hash.t ->
+        Tx_rollup_message_result_hash_repr.t * Tx_rollup_commitment_repr.Hash.t ->
       ?finalized_commitments:Tx_rollup_level_repr.t * Tx_rollup_level_repr.t ->
       ?unfinalized_commitments:Tx_rollup_level_repr.t * Tx_rollup_level_repr.t ->
       ?uncommitted_inboxes:Tx_rollup_level_repr.t * Tx_rollup_level_repr.t ->
-      ?commitment_newest_hash:Tx_rollup_commitment_repr.Commitment_hash.t ->
+      ?commitment_newest_hash:Tx_rollup_commitment_repr.Hash.t ->
       ?tezos_head_level:Raw_level_repr.t ->
       ?occupied_storage:Z.t ->
       allocated_storage:Z.t ->

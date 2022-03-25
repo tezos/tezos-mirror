@@ -1282,7 +1282,14 @@ let apply_external_manager_operation_content :
   | Transaction {destination = Tx_rollup _; _} ->
       fail Tx_rollup_non_internal_transaction
   | Tx_rollup_dispatch_tickets
-      {tx_rollup; level; context_hash; message_index; tickets_info} ->
+      {
+        tx_rollup;
+        level;
+        context_hash;
+        message_index;
+        message_result_path;
+        tickets_info;
+      } ->
       Tx_rollup_state.get ctxt tx_rollup >>=? fun (ctxt, state) ->
       Tx_rollup_commitment.get_finalized ctxt tx_rollup state level
       >>=? fun (ctxt, commitment) ->
@@ -1319,12 +1326,11 @@ let apply_external_manager_operation_content :
       let withdraw_list_hash =
         Tx_rollup_withdraw_list_hash.hash @@ List.rev rev_withdraw_list
       in
-      error_unless
-        (Tx_rollup_commitment.check_message_result
-           commitment.commitment
-           {context_hash; withdraw_list_hash}
-           ~message_index)
-        Tx_rollup_errors.Withdrawals_invalid_path
+      Tx_rollup_commitment.check_message_result
+        commitment.commitment
+        (`Result {context_hash; withdraw_list_hash})
+        ~path:message_result_path
+        ~index:message_index
       >>?= fun () ->
       Tx_rollup_reveal.record
         ctxt
@@ -1611,36 +1617,30 @@ let apply_external_manager_operation_content :
         tx_rollup;
         level;
         message;
-        previous_message_result;
         message_position;
         message_path;
+        message_result_hash;
+        message_result_path;
+        previous_message_result;
+        previous_message_result_path;
       } ->
       Tx_rollup_state.get ctxt tx_rollup >>=? fun (ctxt, state) ->
       (* Check [level] *)
       Tx_rollup_state.check_level_can_be_rejected state level >>?= fun () ->
-      (* Check [previous_message_result] *)
       Tx_rollup_commitment.get ctxt tx_rollup state level
       >>=? fun (ctxt, commitment) ->
-      Tx_rollup_commitment.get_before_and_after_results
-        ctxt
-        tx_rollup
-        commitment
-        state
-        ~message_position
-      >>=? fun (ctxt, agreed_hash, rejected) ->
-      let computed =
-        Tx_rollup_message_result_hash.hash previous_message_result
-      in
-      fail_unless
-        Tx_rollup_message_result_hash.(agreed_hash = computed)
-        (Tx_rollup_errors.Wrong_rejection_hashes
-           {
-             expected = agreed_hash;
-             provided = previous_message_result;
-             computed;
-           })
       (* Check [message] *)
-      >>=? fun () ->
+      error_when
+        Compare.Int.(
+          message_position < 0
+          || commitment.commitment.messages.count <= message_position)
+        (Tx_rollup_errors.Wrong_message_position
+           {
+             level = commitment.commitment.level;
+             position = message_position;
+             length = commitment.commitment.messages.count;
+           })
+      >>?= fun () ->
       Tx_rollup_inbox.check_message_hash
         ctxt
         level
@@ -1648,6 +1648,18 @@ let apply_external_manager_operation_content :
         ~position:message_position
         message
         message_path
+      >>=? fun ctxt ->
+      (* Check message result paths *)
+      Tx_rollup_commitment.check_agreed_and_disputed_results
+        ctxt
+        tx_rollup
+        state
+        commitment
+        ~agreed_result:previous_message_result
+        ~agreed_result_path:previous_message_result_path
+        ~disputed_result:message_result_hash
+        ~disputed_result_path:message_result_path
+        ~disputed_position:message_position
       >>=? fun ctxt ->
       (* Check [proof] *)
       let parameters =
@@ -1662,7 +1674,7 @@ let apply_external_manager_operation_content :
         message
         proof
         ~agreed:previous_message_result
-        ~rejected
+        ~rejected:message_result_hash
         ~max_proof_size:
           (Alpha_context.Constants.tx_rollup_rejection_max_proof_size ctxt)
       >>=? fun () ->
@@ -1867,11 +1879,21 @@ let precheck_manager_contents (type kind) ctxt (op : kind Kind.manager contents)
   | Tx_rollup_finalize_commitment _ | Tx_rollup_remove_commitment _
   | Transfer_ticket _ ->
       assert_tx_rollup_feature_enabled ctxt >>=? fun () -> return ctxt
-  | Tx_rollup_dispatch_tickets {tickets_info; _} ->
+  | Tx_rollup_dispatch_tickets {tickets_info; message_result_path; _} ->
       assert_tx_rollup_feature_enabled ctxt >>=? fun () ->
-      let Constants.{tx_rollup_max_withdrawals_per_batch; _} =
+      let Constants.
+            {
+              tx_rollup_max_messages_per_inbox;
+              tx_rollup_max_withdrawals_per_batch;
+              _;
+            } =
         Constants.parametric ctxt
       in
+      Tx_rollup_errors.check_path_depth
+        `Commitment
+        (Tx_rollup_commitment.Merkle.path_depth message_result_path)
+        ~count_limit:tx_rollup_max_messages_per_inbox
+      >>?= fun () ->
       error_when
         Compare.List_length_with.(tickets_info = 0)
         Tx_rollup_errors.No_withdrawals_to_dispatch
@@ -1881,21 +1903,27 @@ let precheck_manager_contents (type kind) ctxt (op : kind Kind.manager contents)
           tickets_info > tx_rollup_max_withdrawals_per_batch)
         Tx_rollup_errors.Too_many_withdrawals
       >>?= fun () -> return ctxt
-  | Tx_rollup_rejection {message_path; _} ->
+  | Tx_rollup_rejection
+      {message_path; message_result_path; previous_message_result_path; _} ->
       assert_tx_rollup_feature_enabled ctxt >>=? fun () ->
       let Constants.{tx_rollup_max_messages_per_inbox; _} =
         Constants.parametric ctxt
       in
-      let path_size = Tx_rollup_inbox.Merkle.path_depth message_path in
-      let maximum_path_size =
-        Tx_rollup_inbox.maximum_path_depth
-          ~message_count_limit:tx_rollup_max_messages_per_inbox
-      in
-      if Compare.Int.(path_size > maximum_path_size) then
-        fail
-          (Tx_rollup_errors.Wrong_message_path_depth
-             {provided = path_size; limit = maximum_path_size})
-      else return ctxt
+      Tx_rollup_errors.check_path_depth
+        `Inbox
+        (Tx_rollup_inbox.Merkle.path_depth message_path)
+        ~count_limit:tx_rollup_max_messages_per_inbox
+      >>?= fun () ->
+      Tx_rollup_errors.check_path_depth
+        `Inbox
+        (Tx_rollup_commitment.Merkle.path_depth message_result_path)
+        ~count_limit:tx_rollup_max_messages_per_inbox
+      >>?= fun () ->
+      Tx_rollup_errors.check_path_depth
+        `Inbox
+        (Tx_rollup_commitment.Merkle.path_depth previous_message_result_path)
+        ~count_limit:tx_rollup_max_messages_per_inbox
+      >>?= fun () -> return ctxt
   | Sc_rollup_originate _ | Sc_rollup_add_messages _ | Sc_rollup_cement _
   | Sc_rollup_publish _ ->
       assert_sc_rollup_feature_enabled ctxt >|=? fun () -> ctxt)

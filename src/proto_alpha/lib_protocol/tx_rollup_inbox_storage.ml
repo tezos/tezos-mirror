@@ -208,20 +208,9 @@ let append_message :
   (* Checks have passed, so we can actually record in the storage. *)
   Storage.Tx_rollup.Inbox.add (ctxt, tx_level) rollup new_inbox
   >>=? fun (ctxt, new_inbox_size_alloc, _) ->
-  (* To protect against spam, the message depositor pays upfront the
-     storage burn [commitment_message_hash_preallocation] that will be
-     require to commit this message in the future.
-
-     In {!Tx_rollup_commitment_storage.add_commitment} we deduct the
-     total amount of pre-payed storage burn when calculating the
-     storage burn of adding the commitment. *)
-  let commitment_message_hash_preallocation =
-    Tx_rollup_prefixes.message_result_hash.hash_size
-  in
   Tx_rollup_state_repr.adjust_storage_allocation
     new_state
-    ~delta:
-      (Z.of_int (new_inbox_size_alloc + commitment_message_hash_preallocation))
+    ~delta:Z.(of_int new_inbox_size_alloc)
   >>?= fun (new_state, paid_storage_space_diff) ->
   return
     ( ctxt,

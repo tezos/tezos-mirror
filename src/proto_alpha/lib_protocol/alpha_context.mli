@@ -1907,24 +1907,43 @@ module Tx_rollup_inbox : sig
     Tx_rollup_message.t ->
     Merkle.path ->
     context tzresult Lwt.t
-
-  val maximum_path_depth : message_count_limit:int -> int
 end
 
 (** This simply re-exports [Tx_rollup_commitment_repr] *)
 module Tx_rollup_commitment : sig
-  type t = {
+  module Merkle_hash : S.HASH
+
+  module Merkle :
+    Merkle_list.T
+      with type elt = Tx_rollup_message_result_hash.t
+       and type h = Merkle_hash.t
+
+  type 'a template = {
     level : Tx_rollup_level.t;
-    messages : Tx_rollup_message_result_hash.t list;
+    messages : 'a;
     predecessor : Tx_rollup_commitment_hash.t option;
     inbox_merkle_root : Tx_rollup_inbox.Merkle.root;
   }
 
-  include Compare.S with type t := t
+  module Compact : sig
+    type excerpt = {
+      count : int;
+      root : Merkle.h;
+      last_result_message_hash : Tx_rollup_message_result_hash.t;
+    }
+
+    type t = excerpt template
+
+    val pp : Format.formatter -> t -> unit
+
+    val encoding : t Data_encoding.t
+
+    val hash : t -> Tx_rollup_commitment_hash.t
+  end
 
   module Submitted_commitment : sig
     type nonrec t = {
-      commitment : t;
+      commitment : Compact.t;
       commitment_hash : Tx_rollup_commitment_hash.t;
       committer : Signature.Public_key_hash.t;
       submitted_at : Raw_level.t;
@@ -1934,25 +1953,31 @@ module Tx_rollup_commitment : sig
     val encoding : t Data_encoding.t
   end
 
-  val pp : Format.formatter -> t -> unit
+  module Full : sig
+    type t = Tx_rollup_message_result_hash.t list template
 
-  val encoding : t Data_encoding.t
+    val encoding : t Data_encoding.t
 
-  val hash : t -> Tx_rollup_commitment_hash.t
+    val pp : Format.formatter -> t -> unit
+
+    val compact : t -> Compact.t
+  end
 
   val check_message_result :
-    t -> Tx_rollup_message_result.t -> message_index:int -> bool
+    Compact.t ->
+    [ `Hash of Tx_rollup_message_result_hash.t
+    | `Result of Tx_rollup_message_result.t ] ->
+    path:Merkle.path ->
+    index:int ->
+    unit tzresult
 
   val add_commitment :
     context ->
     Tx_rollup.t ->
     Tx_rollup_state.t ->
     Signature.public_key_hash ->
-    t ->
+    Full.t ->
     (context * Tx_rollup_state.t * Z.t) tzresult Lwt.t
-
-  val check_commitment_level :
-    Raw_level.t -> Tx_rollup_state.t -> t -> unit tzresult
 
   val find :
     context ->
@@ -1968,17 +1993,17 @@ module Tx_rollup_commitment : sig
     Tx_rollup_level.t ->
     (context * Submitted_commitment.t) tzresult Lwt.t
 
-  val get_before_and_after_results :
+  val check_agreed_and_disputed_results :
     context ->
     Tx_rollup.t ->
-    Submitted_commitment.t ->
-    message_position:int ->
     Tx_rollup_state.t ->
-    (context
-    * Tx_rollup_message_result_hash.t
-    * Tx_rollup_message_result_hash.t)
-    tzresult
-    Lwt.t
+    Submitted_commitment.t ->
+    agreed_result:Tx_rollup_message_result.t ->
+    agreed_result_path:Merkle.path ->
+    disputed_result:Tx_rollup_message_result_hash.t ->
+    disputed_position:int ->
+    disputed_result_path:Merkle.path ->
+    context tzresult Lwt.t
 
   val get_finalized :
     context ->
@@ -2066,8 +2091,11 @@ module Tx_rollup_errors : sig
         position : int;
         length : int;
       }
-    | Wrong_message_path_depth of {provided : int; limit : int}
-    | Wrong_withdraw_path_depth of {provided : int; limit : int}
+    | Wrong_path_depth of {
+        kind : [`Inbox | `Commitment];
+        provided : int;
+        limit : int;
+      }
     | Wrong_message_path of {expected : Tx_rollup_inbox.Merkle.root}
     | No_finalized_commitment_for_level of {
         level : Tx_rollup_level.t;
@@ -2081,10 +2109,11 @@ module Tx_rollup_errors : sig
         provided : Tx_rollup_level.t;
         accepted_range : (Tx_rollup_level.t * Tx_rollup_level.t) option;
       }
-    | Wrong_rejection_hashes of {
-        provided : Tx_rollup_message_result.t;
-        computed : Tx_rollup_message_result_hash.t;
-        expected : Tx_rollup_message_result_hash.t;
+    | Wrong_rejection_hash of {
+        provided : Tx_rollup_message_result_hash.t;
+        expected :
+          [ `Valid_path of Tx_rollup_commitment.Merkle.h * int
+          | `Hash of Tx_rollup_message_result_hash.t ];
       }
     | Wrong_deposit_parameters
     | Proof_failed_to_reject
@@ -2094,6 +2123,9 @@ module Tx_rollup_errors : sig
         provided : Context_hash.t;
       }
     | No_withdrawals_to_dispatch
+
+  val check_path_depth :
+    [`Inbox | `Commitment] -> int -> count_limit:int -> unit tzresult
 end
 
 module Bond_id : sig
@@ -2936,7 +2968,7 @@ and _ manager_operation =
       -> Kind.tx_rollup_submit_batch manager_operation
   | Tx_rollup_commit : {
       tx_rollup : Tx_rollup.t;
-      commitment : Tx_rollup_commitment.t;
+      commitment : Tx_rollup_commitment.Full.t;
     }
       -> Kind.tx_rollup_commit manager_operation
   | Tx_rollup_return_bond : {
@@ -2957,7 +2989,10 @@ and _ manager_operation =
       message : Tx_rollup_message.t;
       message_position : int;
       message_path : Tx_rollup_inbox.Merkle.path;
+      message_result_hash : Tx_rollup_message_result_hash.t;
+      message_result_path : Tx_rollup_commitment.Merkle.path;
       previous_message_result : Tx_rollup_message_result.t;
+      previous_message_result_path : Tx_rollup_commitment.Merkle.path;
       proof : Tx_rollup_l2_proof.t;
     }
       -> Kind.tx_rollup_rejection manager_operation
@@ -2966,6 +3001,7 @@ and _ manager_operation =
       level : Tx_rollup_level.t;
       context_hash : Context_hash.t;
       message_index : int;
+      message_result_path : Tx_rollup_commitment.Merkle.path;
       tickets_info : Tx_rollup_reveal.t list;
     }
       -> Kind.tx_rollup_dispatch_tickets manager_operation

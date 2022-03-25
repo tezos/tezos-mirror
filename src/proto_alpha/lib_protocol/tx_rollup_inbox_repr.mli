@@ -65,11 +65,6 @@ module Merkle : sig
   val merklize_list : Tx_rollup_message_repr.hash list -> root
 end
 
-(** [maximum_path_depth ~message_count_limit] returns the maximum
-    depth of a path, depending on the maximimum number of a message in
-    an inbox given by [message_count_limit]. *)
-val maximum_path_depth : message_count_limit:int -> int
-
 (** The view of an inbox: stores the [cumulated_size] in bytes for
     the inbox, the [inbox_length] ({i i.e.}, the number of messages),
     and the cumulative [hash] of the inbox contents. For newly created
