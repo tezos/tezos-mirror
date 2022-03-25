@@ -98,18 +98,20 @@ let get_active_chains {active_chains; _} =
   List.rev l
 
 let read_block store h =
-  let open Lwt_syntax in
-  let* chain_stores = Store.all_chain_stores store in
+  let open Lwt_option_syntax in
+  let*! chain_stores = Store.all_chain_stores store in
   List.find_map_s
     (fun chain_store ->
-      let+ b = Store.Block.read_block_opt chain_store h in
-      Option.map (fun b -> (Store.Chain.chain_id chain_store, b)) b)
+      let* b = Store.Block.read_block_opt chain_store h in
+      let id = Store.Chain.chain_id chain_store in
+      return (id, b))
     chain_stores
 
 let read_block_header db h =
-  let open Lwt_syntax in
-  let+ b = read_block (Distributed_db.store db) h in
-  Option.map (fun (chain_id, block) -> (chain_id, Store.Block.header block)) b
+  let open Lwt_option_syntax in
+  let* (chain_id, block) = read_block (Distributed_db.store db) h in
+  let header = Store.Block.header block in
+  return (chain_id, header)
 
 let validate_block v ?(force = false) ?chain_id bytes operations =
   let open Lwt_result_syntax in
