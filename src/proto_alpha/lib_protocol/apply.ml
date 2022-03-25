@@ -1452,9 +1452,9 @@ let apply_external_manager_operation_content :
       in
       return (ctxt, result, [op])
   | Origination {delegate; script; credit} ->
-      (* The contract is only used to early return the address of an originated
-         contract in Michelson.
-         It cannot come from the outside. *)
+      (* Internal originations have their address generated in the interpreter
+         so that the script can use it immediately.
+         The address of external originations is generated here. *)
       Contract.fresh_contract_from_current_nonce ctxt
       >>?= fun (ctxt, contract) ->
       apply_origination
