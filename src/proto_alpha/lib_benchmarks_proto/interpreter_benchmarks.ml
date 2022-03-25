@@ -2500,6 +2500,28 @@ module Registration_section = struct
                   let ctxt, state, step_constants =
                     prepare_sapling_execution_environment seed transition
                   in
+                  let address =
+                    Alpha_context.Contract.to_b58check step_constants.self
+                  in
+                  let chain_id =
+                    Environment.Chain_id.to_b58check step_constants.chain_id
+                  in
+                  let anti_replay = address ^ chain_id in
+                  (* Checks that the transaction is correct*)
+                  let () =
+                    match
+                      Sapling_validator.verify_update
+                        (Sapling_generation.alpha_to_raw ctxt)
+                        (Obj.magic state)
+                        transition.sapling_tx
+                        anti_replay
+                      |> Lwt_main.run
+                    with
+                    | Ok (_, Some _) -> ()
+                    | Ok (_, None) ->
+                        Stdlib.failwith "benchmarked transaction is incorrect"
+                    | _ -> assert false
+                  in
                   let stack_instr =
                     Ex_stack_and_kinstr
                       {stack = (transition.sapling_tx, (state, eos)); kinstr}
