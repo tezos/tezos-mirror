@@ -922,10 +922,164 @@ let test_batcher =
       in
       unit)
 
+(* Check that the rollup node is successfully doing reorganizations.
+   To do so, we are going to:
+   - create a branch of size one on node 1 (updating a L2 balance)
+   - create a branch of size two on node 2 (with no L2 operations)
+   - connecting node 1 and node 2
+   - check that operation modifying the L2 balance was not applied
+ *)
+let test_reorganization =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"TX_rollup: L2 rollup node reorganization"
+    ~tags:["tx_rollup"; "node"; "reorganization"]
+    (fun protocol ->
+      let* parameter_file = get_rollup_parameter_file ~protocol in
+      let nodes_args = Node.[Connections 2; Synchronisation_threshold 0] in
+      let* (node1, client1) =
+        Client.init_with_protocol
+          ~nodes_args
+          ~parameter_file
+          `Client
+          ~protocol
+          ()
+      in
+      let* () = Client.bake_for client1 in
+      let* _ = Node.wait_for_level node1 2 in
+      let operator = Constant.bootstrap1.public_key_hash in
+      let* (tx_rollup_hash, tx_node) =
+        init_and_run_rollup_node ~operator node1 client1
+      in
+      let* contract_id =
+        Client.originate_contract
+          ~alias:"rollup_deposit"
+          ~amount:Tez.zero
+          ~src:"bootstrap1"
+          ~prg:"file:./tezt/tests/contracts/proto_alpha/tx_rollup_deposit.tz"
+          ~init:"Unit"
+          ~burn_cap:Tez.(of_int 1)
+          client1
+      in
+      let* () = Client.bake_for client1 in
+      let* _ = Node.wait_for_level node1 3 in
+      Log.info
+        "The tx_rollup_deposit %s contract was successfully originated"
+        contract_id ;
+      (* Genarating some identities *)
+      let (bls_1_pkh, bls_pk_1, bls_sk_1) = generate_bls_addr client1 in
+      let bls_pkh_1_str = Bls_public_key_hash.to_b58check bls_1_pkh in
+      (* FIXME/TORU: Use the client *)
+      let (bls_2_pkh, _, _) = generate_bls_addr client1 in
+      let bls_pkh_2_str = Bls_public_key_hash.to_b58check bls_2_pkh in
+      let arg_1 =
+        make_tx_rollup_deposit_argument tx_rollup_hash bls_pkh_1_str
+      in
+      let* () =
+        Client.transfer
+          ~gas_limit:100_000
+          ~fee:Tez.one
+          ~amount:Tez.zero
+          ~burn_cap:Tez.one
+          ~storage_limit:10_000
+          ~giver:"bootstrap1"
+          ~receiver:contract_id
+          ~arg:arg_1
+          client1
+      in
+      let* () = Client.bake_for client1 in
+      let* _ = Node.wait_for_level node1 4 in
+      let* _ = Rollup_node.wait_for_tezos_level tx_node 4 in
+      let* inbox = tx_client_get_inbox ~tx_node ~block:"head" in
+      let ticket_id =
+        get_ticket_hash_from_deposit JSON.(inbox |-> "contents" |=> 0)
+      in
+      (* Run the node that will be used to forge an alternative branch *)
+      let* node2 = Node.init nodes_args in
+      let* client2 = Client.init ~endpoint:Client.(Node node2) () in
+      let* () = Client.Admin.connect_address client2 ~peer:node1 in
+      let* _ = Node.wait_for_level node2 5 in
+      Log.info "Nodes are synchronized, shutting down node 2" ;
+      let* () = Node.terminate node2 in
+      Log.info "Check that L2 balance is 10" ;
+      let* () =
+        check_tz4_balance
+          ~tx_node
+          ~block:"head"
+          ~ticket_id
+          ~tz4_address:bls_pkh_1_str
+          ~expected_balance:10
+      in
+      Log.info "crafting a branch of size 1 on node 1 with a L2 transfer" ;
+      (* FIXME/TORU: Use the client *)
+      let tx =
+        craft_tx
+          ~counter:1L
+          ~signer:(Bls_pk bls_pk_1)
+          ~dest:bls_pkh_2_str
+          ~ticket:ticket_id
+          10L
+      in
+      let batch = craft_batch [[tx]] [[bls_sk_1]] in
+      let content_batch1 =
+        Hex.of_string
+          (Data_encoding.Binary.to_string_exn
+             Tezos_protocol_alpha.Protocol.Tx_rollup_l2_batch.encoding
+             (Tezos_protocol_alpha.Protocol.Tx_rollup_l2_batch.V1 batch))
+      in
+      let*! () =
+        Client.Tx_rollup.submit_batch
+          ~content:content_batch1
+          ~rollup:tx_rollup_hash
+          ~src:operator
+          client1
+      in
+      let* () = Client.bake_for client1 in
+      let* _ = Node.wait_for_level node1 6 in
+      let* _ = Rollup_node.wait_for_tezos_level tx_node 6 in
+      Log.info "Check that L2 balance is now 0" ;
+      let* () =
+        check_tz4_balance
+          ~tx_node
+          ~block:"head"
+          ~ticket_id
+          ~tz4_address:bls_pkh_1_str
+          ~expected_balance:0
+      in
+      Log.info "Running the node2 in private mode and craft a branch of size 2" ;
+      let* () = Node.run node2 (Node.Private_mode :: nodes_args) in
+      let* () = Node.wait_for_ready node2 in
+      let* () =
+        Client.bake_for ~keys:[Constant.bootstrap2.public_key_hash] client2
+      in
+      let* () =
+        Client.bake_for ~keys:[Constant.bootstrap2.public_key_hash] client2
+      in
+      let* _ = Node.wait_for_level node2 7 in
+      Log.info "Reconnecting node 1 and 2" ;
+      let* () = Client.Admin.trust_address client2 ~peer:node1 in
+      let* () = Client.Admin.connect_address client2 ~peer:node1 in
+      let* _ = Node.wait_for_level node1 7 in
+      let* _ = Rollup_node.wait_for_tezos_level tx_node 7 in
+      (* Check that the balance is untouched, that is to say that the
+         rollup node had backtracked the operation from the
+         alternative branch. *)
+      Log.info "Check that L2 balance is back to 10" ;
+      let* () =
+        check_tz4_balance
+          ~tx_node
+          ~block:"head"
+          ~ticket_id
+          ~tz4_address:bls_pkh_1_str
+          ~expected_balance:10
+      in
+      unit)
+
 let register ~protocols =
   test_node_configuration protocols ;
   test_tx_node_origination protocols ;
   test_tx_node_store_inbox protocols ;
   test_ticket_deposit_from_l1_to_l2 protocols ;
   test_l2_to_l2_transaction protocols ;
-  test_batcher protocols
+  test_batcher protocols ;
+  test_reorganization protocols
