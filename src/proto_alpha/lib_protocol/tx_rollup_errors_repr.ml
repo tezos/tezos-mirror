@@ -408,7 +408,7 @@ let () =
     ~id:"tx_rollup_wrong_message_path"
     ~title:"Wrong message path in rejection."
     ~description:
-      "This rejection has sent a message  and a path that does not fit the \
+      "This rejection has sent a message and a path that does not fit the \
        current merkle root hash in the corresponding inbox"
     (obj1
        (req "expected_merkle_root" Tx_rollup_inbox_repr.Merkle.root_encoding))
