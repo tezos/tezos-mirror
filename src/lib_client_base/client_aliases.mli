@@ -63,6 +63,11 @@ module type Alias = sig
   val add :
     force:bool -> #Client_context.wallet -> string -> t -> unit tzresult Lwt.t
 
+  (** Similar to repeated calls to {!add}, but more efficient. Always
+      forces addition of new elements. *)
+  val add_many :
+    #Client_context.wallet -> (string * t) list -> unit tzresult Lwt.t
+
   val del : #Client_context.wallet -> string -> unit tzresult Lwt.t
 
   val update : #Client_context.wallet -> string -> t -> unit tzresult Lwt.t

@@ -69,6 +69,14 @@ val name : t -> string
     configuration files. It corresponds to the [--base-dir] option. *)
 val base_dir : t -> string
 
+(** Get [Account.key list] of all extra bootstraps.
+
+    Additional bootstrap accounts are created when you use the
+    [additional_bootstrap_account_count] argument of [init_with_protocol].
+    They do not include the default accounts that are always created.
+ *)
+val additional_bootstraps : t -> Account.key list
+
 (** Create a client.
 
     The standard output and standard error output of the node will

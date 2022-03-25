@@ -237,6 +237,76 @@ let fail_if_already_registered cctxt force pk_uri name =
             --force"
            name)
 
+let keys_count_param =
+  let open Clic in
+  param
+    ~name:"keys_count"
+    ~desc:"How many keys to generate"
+    (parameter (fun _ s ->
+         match int_of_string_opt s with
+         | None -> failwith "number of keys must be an integer"
+         | Some x ->
+             if x < 0 then failwith "number of keys must be positive"
+             else return x))
+
+(** The kind of info that the [generate_test_keys] command outputs. *)
+type source = {
+  pkh : Signature.public_key_hash;
+  pk : Signature.public_key;
+  sk : Signature.secret_key;
+}
+
+let source_encoding =
+  let open Data_encoding in
+  conv
+    (fun {pkh; pk; sk} -> (pkh, pk, sk))
+    (fun (pkh, pk, sk) -> {pkh; pk; sk})
+    (obj3
+       (req "pkh" Signature.Public_key_hash.encoding)
+       (req "pk" Signature.Public_key.encoding)
+       (req "sk" Signature.Secret_key.encoding))
+
+let source_list_encoding = Data_encoding.list source_encoding
+
+(** Generate an array of accounts for testing purposes and output them to
+    stdout in the JSON format. It is essential that this command lives here
+    and not in the protocol-specific code because it should be available
+    before a protocol is activated. *)
+let generate_test_keys =
+  let open Clic in
+  command
+    ~group
+    ~desc:"Generate an array of accounts for testing purposes."
+    no_options
+    (prefixes ["stresstest"; "gen"; "keys"] @@ keys_count_param @@ stop)
+    (fun () n (cctxt : Client_context.full) ->
+      let open Lwt_result_syntax in
+      let* source_list =
+        List.init_es ~when_negative_length:[] n (fun i ->
+            let alias = Format.sprintf "bootstrap%d" (i + 6) in
+            let (pkh, pk, sk) =
+              Signature.generate_key ~algo:Signature.Ed25519 ()
+            in
+            Tezos_signer_backends.Unencrypted.make_pk pk >>?= fun pk_uri ->
+            Tezos_signer_backends.Unencrypted.make_sk sk >>?= fun sk_uri ->
+            return ({pkh; pk; sk}, pk_uri, sk_uri, alias))
+      in
+      let* () =
+        register_keys
+          cctxt
+          (List.map
+             (fun (x, pk_uri, sk_uri, alias) ->
+               (alias, x.pkh, x.pk, pk_uri, sk_uri))
+             source_list)
+      in
+      let json =
+        Data_encoding.Json.construct
+          source_list_encoding
+          (List.map (fun (x, _, _, _) -> x) source_list)
+      in
+      Format.printf "%a" Data_encoding.Json.pp json ;
+      return_unit)
+
 let commands network : Client_context.full Clic.command list =
   let open Lwt_tzresult_syntax in
   let open Clic in
@@ -252,6 +322,7 @@ let commands network : Client_context.full Clic.command list =
     switch ~long:"show-secret" ~short:'S' ~doc:"show the private key" ()
   in
   [
+    generate_test_keys;
     command
       ~group
       ~desc:

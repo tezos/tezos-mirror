@@ -92,7 +92,7 @@ let deduce_fee_and_gas_limit gas_estimation =
               .minimal_nanotez_per_gas_unit)
       / 100)
   in
-  (fee, gas_estimation + 100)
+  (fee, gas_estimation + Constants.gas_safety_margin)
 
 let calculate_smart_contract_parameters (average_block : Average_block.t)
     (transaction_costs : Client.stresstest_gas_estimation) =

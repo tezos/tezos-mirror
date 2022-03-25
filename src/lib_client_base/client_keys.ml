@@ -427,6 +427,27 @@ let register_key cctxt ?(force = false) (public_key_hash, pk_uri, sk_uri)
   let* () = Public_key_hash.add ~force cctxt name public_key_hash in
   return_unit
 
+let register_keys cctxt xs =
+  let open Lwt_result_syntax in
+  let* () =
+    Public_key.add_many
+      cctxt
+      (List.map (fun (name, _, pk, pk_uri, _) -> (name, (pk_uri, Some pk))) xs)
+  in
+  let* () =
+    Secret_key.add_many
+      cctxt
+      (List.map (fun (name, _, _, _, sk_uri) -> (name, sk_uri)) xs)
+  in
+  let* () =
+    Public_key_hash.add_many
+      cctxt
+      (List.map
+         (fun (name, public_key_hash, _, _, _) -> (name, public_key_hash))
+         xs)
+  in
+  return_unit
+
 (* This function is used to chose between two aliases associated
    to the same key hash; if we know the secret key for one of them
    we take it, otherwise if we know the public key for one of them

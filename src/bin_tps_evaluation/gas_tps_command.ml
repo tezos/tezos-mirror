@@ -25,25 +25,31 @@
 
 open Constants
 
+type gas_estimation_results = {
+  average_block : Average_block.t;
+  transaction_costs : Client.stresstest_gas_estimation;
+  average_transaction_cost : int;
+  gas_tps : int;
+}
+
 let estimate_gas_tps ~average_block_path () =
-  let open Lwt_syntax in
-  let* parameter_file =
-    Protocol.write_parameter_file
-      ~base:(Either.right (protocol, Some protocol_constants))
-      []
-  in
-  let* (node, client) =
-    Client.init_with_protocol
-      ~nodes_args:Node.[Connections 0; Synchronisation_threshold 0]
-      ~parameter_file
-      ~timestamp_delay:0.0
-      `Client
-      ~protocol
-      ()
-  in
-  let* average_block = Average_block.load average_block_path in
-  let* () = Average_block.check_for_unknown_smart_contracts average_block in
-  let* _baker = Baker.init ~protocol ~delegates node client in
+  Log.info "Gas TPS estimation" ;
+  Protocol.write_parameter_file
+    ~base:(Either.right (protocol, Some protocol_constants))
+    []
+  >>= fun parameter_file ->
+  Client.init_with_protocol
+    ~nodes_args:Node.[Connections 0; Synchronisation_threshold 0]
+    ~parameter_file
+    ~timestamp_delay:0.0
+    `Client
+    ~protocol
+    ()
+  >>= fun (node, client) ->
+  Average_block.load average_block_path >>= fun average_block ->
+  Average_block.check_for_unknown_smart_contracts average_block >>= fun () ->
+  let delegates = make_delegates Constants.default_bootstraps_count in
+  Baker.init ~protocol ~delegates node client >>= fun baker ->
   Log.info "Originating smart contracts" ;
   let* () =
     Client.stresstest_originate_smart_contracts originating_bootstrap client
@@ -61,8 +67,10 @@ let estimate_gas_tps ~average_block_path () =
     Gas.deduce_tps ~protocol ~protocol_constants ~average_transaction_cost ()
   in
   Log.info "Gas TPS: %d" gas_tps ;
-  let* () = Node.terminate ~kill:true node in
-  Lwt.return @@ float_of_int gas_tps
+  let* _ = Node.terminate ~kill:true node in
+  let* _ = Baker.terminate ~kill:true baker in
+  Lwt.return
+  @@ {average_block; transaction_costs; average_transaction_cost; gas_tps}
 
 let register () =
   Long_test.register
@@ -84,4 +92,6 @@ let register () =
         ~stddev:false
         ~repeat:1
         "tps_evaluation"
-      @@ estimate_gas_tps ~average_block_path)
+      @@ fun () ->
+      let* x = estimate_gas_tps ~average_block_path () in
+      return (float_of_int x.gas_tps))

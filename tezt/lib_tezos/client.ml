@@ -47,6 +47,7 @@ type t = {
   name : string;
   color : Log.Color.t;
   base_dir : string;
+  mutable additional_bootstraps : Account.key list;
   mutable mode : mode;
 }
 
@@ -64,6 +65,8 @@ type stresstest_contract_parameters = {
 let name t = t.name
 
 let base_dir t = t.base_dir
+
+let additional_bootstraps t = t.additional_bootstraps
 
 let get_mode t = t.mode
 
@@ -99,7 +102,8 @@ let create_with_mode ?(path = Constant.tezos_client)
   let base_dir =
     match base_dir with None -> Temp.dir name | Some dir -> dir
   in
-  {path; admin_path; name; color; base_dir; mode}
+  let additional_bootstraps = [] in
+  {path; admin_path; name; color; base_dir; additional_bootstraps; mode}
 
 let create ?path ?admin_path ?name ?color ?base_dir ?endpoint ?media_type () =
   create_with_mode
@@ -906,8 +910,15 @@ let spawn_stresstest ?endpoint ?(source_aliases = []) ?(source_pkhs = [])
       | [] -> List.map account_to_obj Constant.bootstrap_keys
       | _ :: _ -> source_objs
     in
-    Ezjsonm.value_to_string (`A source_objs)
+    `A source_objs
   in
+  (* It is important to write the sources to a file because if we use a few
+     thousands of sources the command line becomes too long. *)
+  let sources_filename =
+    Temp.file (Format.sprintf "sources-%s.json" client.name)
+  in
+  with_open_out sources_filename (fun ch ->
+      output_string ch (JSON.encode_u sources)) ;
   let seed =
     (* Note: Tezt does not call [Random.self_init] so this is not
        randomized from one run to the other (if the exact same tests
@@ -956,7 +967,14 @@ let spawn_stresstest ?endpoint ?(source_aliases = []) ?(source_pkhs = [])
         ]
   in
   spawn_command ?endpoint client
-  @@ ["stresstest"; "transfer"; "using"; sources; "--seed"; seed]
+  @@ [
+       "stresstest";
+       "transfer";
+       "using";
+       "file:" ^ sources_filename;
+       "--seed";
+       seed;
+     ]
   @ fee_arg
   @ make_int_opt_arg "--gas-limit" gas_limit
   @ make_int_opt_arg "--transfers" transfers
@@ -1525,22 +1543,39 @@ let init_light ?path ?admin_path ?name ?color ?base_dir ?(min_agreement = 0.66)
   in
   return (client, node1, node2)
 
-let get_parameter_file ?additional_bootstrap_account_count
-    ?default_accounts_balance ?parameter_file ~protocol client =
-  match additional_bootstrap_account_count with
+let stresstest_gen_keys ?endpoint n client =
+  let* output =
+    spawn_command
+      ?endpoint
+      client
+      ["stresstest"; "gen"; "keys"; Int.to_string n]
+    |> Process.check_and_read_stdout
+  in
+  let json = JSON.parse ~origin:"stresstest_gen_keys" output in
+  let read_one i json : Account.key =
+    let alias = Account.bootstrap (i + 6) in
+    let public_key_hash = JSON.(json |-> "pkh" |> as_string) in
+    let public_key = JSON.(json |-> "pk" |> as_string) in
+    let secret_key = Account.Unencrypted JSON.(json |-> "sk" |> as_string) in
+    {alias; public_key_hash; public_key; secret_key}
+  in
+  let additional_bootstraps = List.mapi read_one (JSON.as_list json) in
+  client.additional_bootstraps <- additional_bootstraps ;
+  Lwt.return additional_bootstraps
+
+let get_parameter_file ?additional_bootstrap_accounts ?default_accounts_balance
+    ?parameter_file protocol =
+  match additional_bootstrap_accounts with
   | None -> return parameter_file
-  | Some n ->
-      let* additional_bootstrap_accounts =
-        Lwt_list.map_s
-          (fun i ->
-            let alias = Account.bootstrap i in
-            let* key = gen_and_show_keys ~alias client in
-            return (key, default_accounts_balance))
-          (range 6 (5 + n))
+  | Some additional_account_keys ->
+      let additional_bootstraps =
+        List.map
+          (fun x -> (x, default_accounts_balance))
+          additional_account_keys
       in
       let* parameter_file =
         Protocol.write_parameter_file
-          ~additional_bootstrap_accounts
+          ~additional_bootstrap_accounts:additional_bootstraps
           ~base:
             (Option.fold
                ~none:(Either.right protocol)
@@ -1592,13 +1627,19 @@ let init_with_protocol ?path ?admin_path ?name ?color ?base_dir ?event_level
       tag
       ()
   in
+  let* additional_bootstrap_accounts =
+    match additional_bootstrap_account_count with
+    | None -> return None
+    | Some n ->
+        let* r = stresstest_gen_keys n client in
+        return (Some r)
+  in
   let* parameter_file =
     get_parameter_file
-      ?additional_bootstrap_account_count
+      ?additional_bootstrap_accounts
       ?default_accounts_balance
       ?parameter_file
-      ~protocol:(protocol, None)
-      client
+      (protocol, None)
   in
   let* () =
     activate_protocol
