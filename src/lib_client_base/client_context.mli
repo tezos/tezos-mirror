@@ -163,6 +163,12 @@ class type ui =
     method now : unit -> Ptime.t
   end
 
+(** User experience options. *)
+class type ux_options =
+  object
+    method verbose_rpc_error_diagnostics : bool
+  end
+
 (** A comprehensive class type gathering the above class types, that
     is used for #Protocol_client_context.full. *)
 class type full =
@@ -180,6 +186,8 @@ class type full =
     inherit block
 
     inherit ui
+
+    inherit ux_options
   end
 
 (** A simple printer can be used to implement a printer as it is done

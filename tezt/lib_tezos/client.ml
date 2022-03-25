@@ -217,8 +217,8 @@ let rpc_path_query_to_string ?(query_string = []) path =
   string_of_path path ^ string_of_query_string query_string
 
 module Spawn = struct
-  let rpc ?endpoint ?hooks ?env ?data ?query_string meth path client :
-      JSON.t Process.runnable =
+  let rpc ?(better_errors = false) ?endpoint ?hooks ?env ?data ?query_string
+      meth path client : JSON.t Process.runnable =
     let process =
       let data =
         Option.fold ~none:[] ~some:(fun x -> ["with"; JSON.encode_u x]) data
@@ -228,12 +228,13 @@ module Spawn = struct
       in
       let path = string_of_path path in
       let full_path = path ^ query_string in
+      let better_error = if better_errors then ["--better-errors"] else [] in
       spawn_command
         ?endpoint
         ?hooks
         ?env
         client
-        (["rpc"; string_of_meth meth; full_path] @ data)
+        (better_error @ ["rpc"; string_of_meth meth; full_path] @ data)
     in
     let parse process =
       let* output = Process.check_and_read_stdout process in
@@ -242,15 +243,35 @@ module Spawn = struct
     {value = process; run = parse}
 end
 
-let spawn_rpc ?endpoint ?hooks ?env ?data ?query_string meth path client =
+let spawn_rpc ?better_errors ?endpoint ?hooks ?env ?data ?query_string meth path
+    client =
   let*? res =
-    Spawn.rpc ?endpoint ?hooks ?env ?data ?query_string meth path client
+    Spawn.rpc
+      ?better_errors
+      ?endpoint
+      ?hooks
+      ?env
+      ?data
+      ?query_string
+      meth
+      path
+      client
   in
   res
 
-let rpc ?endpoint ?hooks ?env ?data ?query_string meth path client =
+let rpc ?better_errors ?endpoint ?hooks ?env ?data ?query_string meth path
+    client =
   let*! res =
-    Spawn.rpc ?endpoint ?hooks ?env ?data ?query_string meth path client
+    Spawn.rpc
+      ?better_errors
+      ?endpoint
+      ?hooks
+      ?env
+      ?data
+      ?query_string
+      meth
+      path
+      client
   in
   return res
 

@@ -1012,7 +1012,7 @@ let test_no_service_at_valid_prefix address () =
   let* () = Node.run node [] in
   let* client = Client.init ~endpoint () in
   let* () =
-    Client.spawn_rpc GET ["chains"; "main"] client
+    Client.spawn_rpc ~better_errors:true GET ["chains"; "main"] client
     |> Process.check_error
          ~exit_code:1
          ~msg:

@@ -35,6 +35,7 @@ type cli_args = {
   protocol : Protocol_hash.t option;
   print_timings : bool;
   log_requests : bool;
+  better_errors : bool;
   client_mode : client_mode;
 }
 
@@ -318,6 +319,7 @@ let default_cli_args =
     protocol = None;
     print_timings = false;
     log_requests = false;
+    better_errors = false;
     client_mode = `Mode_client;
   }
 
@@ -483,6 +485,15 @@ let protocol_arg () =
 
 let log_requests_switch () =
   switch ~long:"log-requests" ~short:'l' ~doc:"log all requests to the node" ()
+
+let better_errors () =
+  switch
+    ~long:"better-errors"
+    ~doc:
+      "Error reporting is more detailed. Can be used if a call to an RPC fails \
+       or if you don't know the input accepted by the RPC. It may happen that \
+       the RPC calls take more time however."
+    ()
 
 (* Command-line args which can be set in config file as well *)
 let addr_confdesc = "-A/--addr ('node_addr' in config file)"
@@ -839,7 +850,7 @@ let commands config_file cfg (client_mode : client_mode)
   ]
 
 let global_options () =
-  args17
+  args18
     (base_dir_arg ())
     (config_file_arg ())
     (timings_switch ())
@@ -848,6 +859,7 @@ let global_options () =
     (wait_arg ())
     (protocol_arg ())
     (log_requests_switch ())
+    (better_errors ())
     (addr_arg ())
     (port_arg ())
     (tls_switch ())
@@ -1017,6 +1029,7 @@ let parse_config_args (ctx : #Client_context.full) argv =
            confirmations,
            protocol,
            log_requests,
+           better_errors,
            node_addr,
            node_port,
            tls,
@@ -1181,6 +1194,7 @@ let parse_config_args (ctx : #Client_context.full) argv =
       sources;
       print_timings = timings;
       log_requests;
+      better_errors;
       password_filename;
       protocol;
       client_mode;
@@ -1204,6 +1218,7 @@ type t =
   * Shell_services.block
   * int option option
   * Protocol_hash.t option option
+  * bool
   * bool
   * string option
   * int option

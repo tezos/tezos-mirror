@@ -169,4 +169,6 @@ class unix_faked ~base_dir ~filesystem ~chain_id ~hooks : Client_context.full =
     method block = `Head 0
 
     method confirmations = None
+
+    method verbose_rpc_error_diagnostics = false
   end

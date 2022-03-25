@@ -192,7 +192,7 @@ class unix_ui : Client_context.ui =
   end
 
 class unix_full ~base_dir ~chain ~block ~confirmations ~password_filename
-  ~rpc_config : Client_context.full =
+  ~rpc_config ~verbose_rpc_error_diagnostics : Client_context.full =
   object
     inherit unix_logger ~base_dir
 
@@ -212,6 +212,8 @@ class unix_full ~base_dir ~chain ~block ~confirmations ~password_filename
     method block = block
 
     method confirmations = confirmations
+
+    method verbose_rpc_error_diagnostics = verbose_rpc_error_diagnostics
   end
 
 class unix_mockup ~base_dir ~mem_only ~mockup_env ~chain_id ~rpc_context
@@ -239,6 +241,8 @@ class unix_mockup ~base_dir ~mem_only ~mockup_env ~chain_id ~rpc_context
     method block = `Head 0
 
     method confirmations = None
+
+    method verbose_rpc_error_diagnostics = true
   end
 
 class unix_proxy ~base_dir ~chain ~block ~confirmations ~password_filename
@@ -266,4 +270,6 @@ class unix_proxy ~base_dir ~chain ~block ~confirmations ~password_filename
     method block = block
 
     method confirmations = confirmations
+
+    method verbose_rpc_error_diagnostics = true
   end

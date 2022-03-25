@@ -62,6 +62,11 @@ Node
 Client
 ------
 
+- The client no longer computes the description of RPCs by default.
+  This makes the client run faster at the cost of possibly getting
+  less informative error messages. You can switch back to the previous
+  behavior using new command-line option ``--better-errors``.
+
 - A new ``--force`` option was added to the ``transfer`` command. It
   makes the client inject the transaction in a node even if the
   simulation of the transaction fails.

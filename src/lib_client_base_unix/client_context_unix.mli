@@ -43,6 +43,7 @@ class unix_full :
   -> confirmations:int option
   -> password_filename:string option
   -> rpc_config:Tezos_rpc_http_client_unix.RPC_client_unix.config
+  -> verbose_rpc_error_diagnostics:bool
   -> Client_context.full
 
 class unix_mockup :

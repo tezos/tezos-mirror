@@ -130,6 +130,11 @@ class type ui =
     method now : unit -> Ptime.t
   end
 
+class type ux_options =
+  object
+    method verbose_rpc_error_diagnostics : bool
+  end
+
 class type full =
   object
     inherit printer
@@ -145,6 +150,8 @@ class type full =
     inherit block
 
     inherit ui
+
+    inherit ux_options
   end
 
 class proxy_context (obj : full) =
@@ -220,6 +227,8 @@ class proxy_context (obj : full) =
     method now : unit -> Ptime.t = obj#now
 
     method get_base_dir : string = obj#get_base_dir
+
+    method verbose_rpc_error_diagnostics = obj#verbose_rpc_error_diagnostics
   end
 
 let log _ _ = Lwt.return_unit
