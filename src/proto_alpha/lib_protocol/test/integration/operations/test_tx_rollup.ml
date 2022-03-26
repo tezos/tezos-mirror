@@ -2253,29 +2253,27 @@ module Rejection = struct
       state = Seq.empty;
     }
 
-  (** Takes a commitment and replaces the message results with valid results.
-
-      FIXME/TORU: this overrides the withdrawals merkle roots. This is not good
-      but there is yet not tests calling this function which uses these roots.
-      Although, it shouldn't be to hard to fix this. *)
+  (** Takes a commitment and replaces the message results with valid
+      results. *)
   let replace_commitment ~l2_parameters ~store ~commitment messages =
     let open Context in
     let open Syntax in
     let* (_, rev_results) =
       list_fold_left_m
         (fun (store, rev_results) msg ->
-          let* store =
+          let* (store, withdraws) =
             catch
               (Apply.apply_message store l2_parameters msg)
-              (fun (store, _) -> return store)
-              (fun _reason -> return store)
+              (fun (store, (_, withdraws)) -> return (store, withdraws))
+              (fun _reason -> return (store, []))
           in
           let* hash_tree = hash_tree_from_store store in
           let result_hash =
             Tx_rollup_commitment.hash_message_result
               {
                 context_hash = hash_tree;
-                withdrawals_merkle_root = Tx_rollup_withdraw.Merkle.empty;
+                withdrawals_merkle_root =
+                  Tx_rollup_withdraw.Merkle.merklize_list withdraws;
               }
           in
           return (store, result_hash :: rev_results))
@@ -2286,10 +2284,7 @@ module Rejection = struct
     return Tx_rollup_commitment.{commitment with messages = results}
 
   (** Produce an invalid commitment with {!make_incomplete_commitment_for_batch},
-      then changes the Merkle roots for each message result.
-
-      FIXME/TORU: it is not perfectly valid, the withdrawals are still missing.
-      see {!replace_commitment} documentation. *)
+      then changes the Merkle roots for each message result. *)
   let make_valid_commitment_for_messages ~i ~level ~tx_rollup
       ?(withdrawals = []) ~store messages =
     make_incomplete_commitment_for_batch i level tx_rollup withdrawals
