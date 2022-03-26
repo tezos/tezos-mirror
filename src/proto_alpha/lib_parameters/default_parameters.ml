@@ -108,10 +108,6 @@ let constants_mainnet =
     (* Transaction rollup’s size limits are expressed in number of bytes *)
     tx_rollup_hard_size_limit_per_inbox = 100_000;
     tx_rollup_hard_size_limit_per_message = 5_000;
-    (* We limit the number of withdraws per message to avoid costly
-       allocations/iterations in the accounting mechanism used for each
-       withdraw claiming in L1 and cleaned when removing a commitment. *)
-    tx_rollup_max_withdrawals_per_batch = 255;
     tx_rollup_commitment_bond = Tez.of_mutez_exn 10_000_000_000L;
     tx_rollup_finality_period;
     tx_rollup_max_inboxes_count = tx_rollup_finality_period + 100;
@@ -121,7 +117,23 @@ let constants_mainnet =
     (* Must be greater than the withdraw period. *)
     tx_rollup_max_commitments_count = (2 * tx_rollup_finality_period) + 100;
     tx_rollup_cost_per_byte_ema_factor = 120;
-    tx_rollup_max_ticket_payload_size = 10_240;
+    (* Tickets are transmitted in batches in the
+       [Tx_rollup_dispatch_tickets] operation.
+
+       The semantics is that this operation is used to
+       concretize the withdraw orders emitted by the layer-2,
+       one layer-1 operation per messages of an
+       inbox. Therefore, it is of significant importance that
+       a valid batch does not produce a list of withdraw
+       orders which could not fit in a layer-1 operation.
+
+       With these values, at least 2048 bytes remain available
+       to store the rest of the operands of
+       [Tx_rollup_dispatch_tickets] (in practice, even more,
+       because we overapproximate the size of tickets). So we
+       are safe. *)
+    tx_rollup_max_withdrawals_per_batch = 15;
+    tx_rollup_max_ticket_payload_size = 2_048;
     (* Must be smaller than maximum limit of a manager operation
        (minus overhead), since we need to limit our proofs to those
        that can fit in an operation. *)

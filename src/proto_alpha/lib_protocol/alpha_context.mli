@@ -795,7 +795,6 @@ module Constants : sig
     tx_rollup_origination_size : int;
     tx_rollup_hard_size_limit_per_inbox : int;
     tx_rollup_hard_size_limit_per_message : int;
-    tx_rollup_max_withdrawals_per_batch : int;
     tx_rollup_commitment_bond : Tez.t;
     tx_rollup_finality_period : int;
     tx_rollup_withdraw_period : int;
@@ -804,6 +803,7 @@ module Constants : sig
     tx_rollup_max_commitments_count : int;
     tx_rollup_cost_per_byte_ema_factor : int;
     tx_rollup_max_ticket_payload_size : int;
+    tx_rollup_max_withdrawals_per_batch : int;
     tx_rollup_rejection_max_proof_size : int;
     sc_rollup_enable : bool;
     sc_rollup_origination_size : int;
