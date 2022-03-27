@@ -100,7 +100,7 @@ let constants_mainnet =
     cache_stake_distribution_cycles = 8;
     (* One for the sampler state for all cycles stored at any moment (as above). *)
     cache_sampler_state_cycles = 8;
-    tx_rollup_enable = false;
+    tx_rollup_enable = true;
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/2152
        Transaction rollups parameters need to be refined,
        currently the following values are merely placeholders. *)

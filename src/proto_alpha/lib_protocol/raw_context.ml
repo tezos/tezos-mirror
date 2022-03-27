@@ -901,7 +901,7 @@ let prepare_first_block ~level ~timestamp ctxt =
             cache_script_size = 100_000_000;
             cache_stake_distribution_cycles = 8;
             cache_sampler_state_cycles = 8;
-            tx_rollup_enable = false;
+            tx_rollup_enable = true;
             (* TODO: https://gitlab.com/tezos/tezos/-/issues/2152
                Transaction rollups parameters need to be refined,
                currently the following values are merely

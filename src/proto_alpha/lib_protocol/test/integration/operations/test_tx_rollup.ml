@@ -63,7 +63,10 @@ let is_implicit_exn x =
 (** [test_disable_feature_flag] try to originate a tx rollup with the feature
     flag is deactivated and check it fails *)
 let test_disable_feature_flag () =
-  Context.init 1 >>=? fun (b, contracts) ->
+  Context.init_with_constants
+    {Context.default_test_constants with tx_rollup_enable = false}
+    1
+  >>=? fun (b, contracts) ->
   let contract =
     WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0
   in
