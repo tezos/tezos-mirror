@@ -31,7 +31,7 @@ This sequence of operations was run:
 
 ./tezos-client --wait none submit tx rollup batch 626c6f62 to '[TX_ROLLUP_HASH]' from '[PUBLIC_KEY_HASH]'
 Node is bootstrapped.
-Estimated gas: 2021.382 units (will add 100 for safety)
+Estimated gas: 2021.390 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -53,9 +53,10 @@ This sequence of operations was run:
       This tx rollup submit operation was successfully applied
       Balance updates:
         
-      Consumed gas: 2021.382
+      Consumed gas: 2021.390
 
 
 ./tezos-client rpc get '/chains/main/blocks/head/context/tx_rollup/[TX_ROLLUP_HASH]/inbox/0'
 { "inbox_length": 1, "cumulated_size": 4,
-  "merkle_root": "[TX_ROLLUP_INBOX_HASH]" }
+  "merkle_root": "[TX_ROLLUP_INBOX_HASH]",
+  "orphan": true }

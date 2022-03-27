@@ -1306,8 +1306,9 @@ module Tx_rollup = struct
     {value = process; run = parse}
 
   let submit_rejection ?(wait = "none") ?burn_cap ?storage_limit ?hooks ~level
-      ~message ~position ~path ~proof ~context_hash ~withdraw_list_hash ~rollup
-      ~src client =
+      ~message ~position ~path ~message_result_hash
+      ~rejected_message_result_path ~agreed_message_result_path ~proof
+      ~context_hash ~withdraw_list_hash ~rollup ~src client =
     let process =
       spawn_command
         ?hooks
@@ -1317,9 +1318,13 @@ module Tx_rollup = struct
         @ ["at"; "level"; string_of_int level]
         @ ["message"; message]
         @ ["at"; "position"; string_of_int position]
-        @ ["and"; "path"; path] @ ["with"; "proof"; proof]
+        @ ["and"; "path"; path]
+        @ ["to"; "reject"; message_result_hash]
+        @ ["with"; "path"; rejected_message_result_path]
+        @ ["with"; "proof"; proof]
         @ ["with"; "agreed"; "context"; "hash"; context_hash]
         @ ["and"; "withdraw"; "list"; withdraw_list_hash]
+        @ ["with"; "path"; agreed_message_result_path]
         @ ["to"; rollup] @ ["from"; src]
         @ optional_arg ~name:"burn-cap" Tez.to_string burn_cap
         @ optional_arg ~name:"storage-limit" string_of_int storage_limit)

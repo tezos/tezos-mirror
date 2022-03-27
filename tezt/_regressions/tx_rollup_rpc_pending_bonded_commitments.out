@@ -31,7 +31,7 @@ This sequence of operations was run:
 
 ./tezos-client --wait none submit tx rollup batch 626c6f62 to '[TX_ROLLUP_HASH]' from '[PUBLIC_KEY_HASH]'
 Node is bootstrapped.
-Estimated gas: 2021.382 units (will add 100 for safety)
+Estimated gas: 2021.390 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -53,12 +53,12 @@ This sequence of operations was run:
       This tx rollup submit operation was successfully applied
       Balance updates:
         
-      Consumed gas: 2021.382
+      Consumed gas: 2021.390
 
 
 ./tezos-client --wait none submit tx rollup commitment 0 '[TX_ROLLUP_INBOX_HASH]'  '[TX_ROLLUP_MESSAGE_RESULT_HASH]' to '[TX_ROLLUP_HASH]' from '[PUBLIC_KEY_HASH]'
 Node is bootstrapped.
-Estimated gas: 3270.982 units (will add 100 for safety)
+Estimated gas: 3471.272 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -69,20 +69,20 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.000655
+    Fee to the baker: ꜩ0.000675
     Expected counter: 3
-    Gas limit: 3371
+    Gas limit: 3572
     Storage limit: 0 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.000655
-      payload fees(the block proposer) ....... +ꜩ0.000655
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000675
+      payload fees(the block proposer) ....... +ꜩ0.000675
     Tx rollup commitment:[TX_ROLLUP_HASH], commitment 0 : messages = [TX_ROLLUP_MESSAGE_RESULT_HASH] predecessor  for inbox with merkle root [TX_ROLLUP_INBOX_HASH]
       From: [PUBLIC_KEY_HASH]
       This tx rollup commit operation was successfully applied
       Balance updates:
         [PUBLIC_KEY_HASH] ....................................................... -ꜩ10000
         Frozen_bonds([PUBLIC_KEY_HASH],[TX_ROLLUP_HASH]) ... +ꜩ10000
-      Consumed gas: 3270.982
+      Consumed gas: 3471.272
 
 
 ./tezos-client rpc get '/chains/main/blocks/head/context/tx_rollup/[TX_ROLLUP_HASH]/pending_bonded_commitments/[PUBLIC_KEY_HASH]'

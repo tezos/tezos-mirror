@@ -123,7 +123,7 @@ let tx_rollup_empty_withdraw_list =
   "txw1sFoLju3ySMAdY6v1dcHUMqJ4Zxc1kcynC8xkYgCmH6bpNSDhV"
 
 let tx_rollup_initial_message_result =
-  "txmr2DouKqJu5o8KEVGe6gLoiw1J3krjsxhf6C2a1kDNTTr8BdKpf2"
+  "txmr344vtdPzvWsfnoSd3mJ3MCFA5ehKLQs1pK9WGcX4FEACg1rVgC"
 
 (** A valid rejection proof for the initial layer2 state. *)
 let tx_rollup_proof_initial_state =

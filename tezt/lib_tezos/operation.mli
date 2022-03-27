@@ -126,7 +126,11 @@ val mk_rejection :
   message:Rollup.Tx_rollup.message ->
   message_position:int ->
   message_path:string list ->
-  previous_message_result:string * string ->
+  message_result_hash:string ->
+  message_result_path:JSON.u ->
+  previous_message_result_path:JSON.u ->
+  previous_message_context_hash:string ->
+  previous_message_withdraw_list_hash:string ->
   Client.t ->
   manager_operation_content Lwt.t
 
@@ -438,6 +442,10 @@ val inject_rejection :
   message:Rollup.Tx_rollup.message ->
   message_position:int ->
   message_path:string list ->
-  previous_message_result:string * string ->
+  message_result_hash:string ->
+  message_result_path:JSON.u ->
+  previous_message_result_path:JSON.u ->
+  previous_message_context_hash:string ->
+  previous_message_withdraw_list_hash:string ->
   Client.t ->
   [> `OpHash of string] Lwt.t
