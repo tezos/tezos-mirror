@@ -49,8 +49,7 @@ module Type_name = struct
   let hash = Stdlib.Hashtbl.hash
 end
 
-module Type_name_multiset =
-  Basic_structures.Basic_impl.Free_module.Float_valued.Make_with_map (Type_name)
+module Type_name_hashtbl = Hashtbl.Make (Type_name)
 
 let rec tnames_of_type :
     type a. a Script_typed_ir.ty -> type_name list -> type_name list =
@@ -154,7 +153,7 @@ open Stats
 let tnames_dist : type_name list -> type_name Fin.Float.prb =
  fun tnames ->
   Emp.of_raw_data (Array.of_list tnames)
-  |> Fin.Float.counts_of_empirical (module Type_name_multiset)
+  |> Fin.Float.counts_of_empirical (module Type_name_hashtbl)
   |> Fin.Float.normalize
 
 let rec sample nsamples acc =
@@ -178,5 +177,5 @@ let dist nsamples =
 let () =
   Format.printf
     "stats:@.%a@."
-    Fin.Float.pp_fin_mes
-    (Fin.as_measure (dist 500 (Random.State.make [|0x1337; 0x533D|])))
+    (Fin.Float.pp_fin_mes Type_name.pp)
+    (Fin.Float.as_measure (dist 500 (Random.State.make [|0x1337; 0x533D|])))
