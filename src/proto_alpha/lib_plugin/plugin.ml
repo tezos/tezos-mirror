@@ -3083,6 +3083,39 @@ module RPC = struct
               ~output:(obj1 (req "path" Tx_rollup_inbox.Merkle.path_encoding))
               RPC_path.(path / "merkle_tree_path")
         end
+
+        module Commitment = struct
+          let path = RPC_path.(path / "commitment")
+
+          let merkle_tree_hash =
+            RPC_service.post_service
+              ~description:"Compute the merkle tree hash of a commitment"
+              ~query:RPC_query.empty
+              ~input:
+                (obj1
+                   (req
+                      "message_result_hashes"
+                      (list Tx_rollup_message_result_hash.encoding)))
+              ~output:
+                (obj1 (req "hash" Tx_rollup_commitment.Merkle_hash.encoding))
+              RPC_path.(path / "merkle_tree_hash")
+
+          let merkle_tree_path =
+            RPC_service.post_service
+              ~description:
+                "Compute a path of a message result hash in the commitment \
+                 merkle tree"
+              ~query:RPC_query.empty
+              ~input:
+                (obj2
+                   (req
+                      "message_result_hashes"
+                      (list Tx_rollup_message_result_hash.encoding))
+                   (req "position" int16))
+              ~output:
+                (obj1 (req "path" Tx_rollup_commitment.Merkle.path_encoding))
+              RPC_path.(path / "merkle_tree_path")
+        end
       end
     end
 
@@ -3130,7 +3163,21 @@ module RPC = struct
         S.Tx_rollup.Inbox.merkle_tree_path
         (fun () (message_hashes, position) ->
           Lwt.return
-            (Tx_rollup_inbox.Merkle.compute_path message_hashes position))
+            (Tx_rollup_inbox.Merkle.compute_path message_hashes position)) ;
+      Registration.register0_noctxt
+        ~chunked:true
+        S.Tx_rollup.Commitment.merkle_tree_hash
+        (fun () message_result_hashes ->
+          let open Tx_rollup_commitment.Merkle in
+          let tree = List.fold_left snoc nil message_result_hashes in
+          return (root tree)) ;
+      Registration.register0_noctxt
+        ~chunked:true
+        S.Tx_rollup.Commitment.merkle_tree_path
+        (fun () (message_result_hashes, position) ->
+          let open Tx_rollup_commitment.Merkle in
+          let tree = List.fold_left snoc nil message_result_hashes in
+          Lwt.return (compute_path tree position))
 
     module Manager = struct
       let[@coq_axiom_with_reason "cast on e"] operations ctxt block ~branch
