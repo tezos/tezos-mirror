@@ -125,6 +125,8 @@ let debug = ref false
 
 let debug_msg msg = if !debug then msg () else Lwt.return_unit
 
+let pp_sep ppf () = Format.fprintf ppf ",@ "
+
 let default_parameters =
   {
     seed = 0x533D;
@@ -742,10 +744,10 @@ let stat_on_exit (cctxt : Protocol_client_context.full) state =
     let included_ops_count = inter_cardinal injected_ops included_ops in
     debug_msg (fun () ->
         cctxt#message
-          "injected : %a\nincluded: %a"
-          (Format.pp_print_list Operation_hash.pp)
+          "injected : [%a]@.included: [%a]"
+          (Format.pp_print_list ~pp_sep Operation_hash.pp)
           injected_ops
-          (Format.pp_print_list Operation_hash.pp)
+          (Format.pp_print_list ~pp_sep Operation_hash.pp)
           included_ops)
     >>= fun () ->
     let injected_ops_count = List.length injected_ops in
