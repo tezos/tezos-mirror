@@ -55,6 +55,7 @@ type t = {
   internal_events : Internal_event_config.t;
   shell : shell;
   blockchain_network : blockchain_network;
+  metrics_addr : string list;
 }
 
 and p2p = {
@@ -123,6 +124,7 @@ val update :
   ?rpc_listen_addrs:string list ->
   ?allow_all_rpc:P2p_point.Id.addr_port_id list ->
   ?media_type:Media_type.Command_line.t ->
+  ?metrics_addr:string list ->
   ?private_mode:bool ->
   ?disable_mempool:bool ->
   ?disable_mempool_precheck:bool ->
@@ -166,6 +168,12 @@ val resolve_discovery_addrs : string -> (Ipaddr.V4.t * int) list tzresult Lwt.t
    returns a list of [points]. The default port is
    [default_rpc_port]. Fails if the address could not be parsed. *)
 val resolve_rpc_listening_addrs : string -> P2p_point.Id.t list tzresult Lwt.t
+
+(** [resolve_metrics_addrs metrics_addr] parses [metrics_addr] and returns a list of
+    returns a list of [points]).
+    The default host is "localhost" and the default port is [default_metrics_port].
+    Fails if the address could not be parsed.*)
+val resolve_metrics_addrs : string -> P2p_point.Id.t list tzresult Lwt.t
 
 (** [resolve_boostrap_addrs bs_addrs] parses [bs_addrs] and returns
    for each [addr] a list of [points]. The default port is

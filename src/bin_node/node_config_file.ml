@@ -34,6 +34,8 @@ let default_data_dir = home // ".tezos-node"
 
 let default_rpc_port = 8732
 
+let default_metrics_port = 9932
+
 let default_p2p_port = 9732
 
 let default_discovery_port = 10732
@@ -347,6 +349,7 @@ type t = {
   internal_events : Internal_event_config.t;
   shell : shell;
   blockchain_network : blockchain_network;
+  metrics_addr : string list;
 }
 
 and p2p = {
@@ -457,6 +460,7 @@ let default_config =
     shell = default_shell;
     blockchain_network = blockchain_network_mainnet;
     disable_config_validation = default_disable_config_validation;
+    metrics_addr = [];
   }
 
 let limit : P2p.limits Data_encoding.t =
@@ -1088,6 +1092,7 @@ let encoding =
            internal_events;
            shell;
            blockchain_network;
+           metrics_addr;
          } ->
       ( data_dir,
         disable_config_validation,
@@ -1096,7 +1101,8 @@ let encoding =
         log,
         internal_events,
         shell,
-        blockchain_network ))
+        blockchain_network,
+        metrics_addr ))
     (fun ( data_dir,
            disable_config_validation,
            rpc,
@@ -1104,7 +1110,8 @@ let encoding =
            log,
            internal_events,
            shell,
-           blockchain_network ) ->
+           blockchain_network,
+           metrics_addr ) ->
       {
         disable_config_validation;
         data_dir;
@@ -1114,8 +1121,9 @@ let encoding =
         internal_events;
         shell;
         blockchain_network;
+        metrics_addr;
       })
-    (obj8
+    (obj9
        (dft
           "data-dir"
           ~description:"Location of the data dir on disk."
@@ -1156,7 +1164,12 @@ let encoding =
           "network"
           ~description:"Configuration of which network/blockchain to connect to"
           sugared_blockchain_network_encoding
-          blockchain_network_mainnet))
+          blockchain_network_mainnet)
+       (dft
+          "metrics_addr"
+          ~description:"Configuration of the Prometheus metrics endpoint"
+          (list string)
+          []))
 
 (* Abstract version of [Json_encoding.Cannot_destruct]: first argument is the
    string representation of the path, second argument is the error message
@@ -1247,7 +1260,7 @@ let update ?(disable_config_validation = false) ?data_dir ?min_connections
     ?binary_chunks_size ?peer_table_size ?expected_pow ?bootstrap_peers
     ?listen_addr ?advertised_net_port ?discovery_addr ?(rpc_listen_addrs = [])
     ?(allow_all_rpc = []) ?(media_type = Media_type.Command_line.Any)
-    ?(private_mode = false) ?(disable_mempool = false)
+    ?(metrics_addr = []) ?(private_mode = false) ?(disable_mempool = false)
     ?(disable_mempool_precheck =
       default_shell.prevalidator_limits.disable_precheck)
     ?(enable_testchain = false) ?(cors_origins = []) ?(cors_headers = [])
@@ -1367,6 +1380,7 @@ let update ?(disable_config_validation = false) ?data_dir ?min_connections
       log;
       shell;
       blockchain_network;
+      metrics_addr;
     }
 
 type Error_monad.error += Failed_to_parse_address of (string * string)
@@ -1471,6 +1485,17 @@ let resolve_rpc_listening_addrs listen_addr =
       ~default_port:default_rpc_port
       ~passive:true
       listen_addr
+  in
+  List.map fst addrs
+
+let resolve_metrics_addrs metrics_addr =
+  let open Lwt_tzresult_syntax in
+  let+ addrs =
+    resolve_addr
+      ~default_addr:"localhost"
+      ~default_port:default_metrics_port
+      ~passive:true
+      metrics_addr
   in
   List.map fst addrs
 

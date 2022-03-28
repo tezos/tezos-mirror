@@ -137,6 +137,15 @@ module Event = struct
       ("port", Data_encoding.uint16)
       ("tls", Data_encoding.bool)
 
+  let starting_metrics_server =
+    declare_2
+      ~section
+      ~name:"starting_metrics_server"
+      ~msg:"starting metrics server on {host}:{port}"
+      ~level:Notice
+      ("host", Data_encoding.string)
+      ("port", Data_encoding.uint16)
+
   let starting_node =
     declare_3
       ~section
@@ -417,8 +426,32 @@ let init_rpc (config : Node_config_file.t) node =
             addrs)
     config.rpc.listen_addrs
 
+module Metrics_server = Prometheus_app.Cohttp (Cohttp_lwt_unix.Server)
+
+let metrics_serve metrics_addrs =
+  let open Lwt_tzresult_syntax in
+  let* addrs =
+    List.map_ep Node_config_file.resolve_metrics_addrs metrics_addrs
+  in
+  let*! servers =
+    List.map_p
+      (fun (addr, port) ->
+        let host = Ipaddr.V6.to_string addr in
+        let*! () = Event.(emit starting_metrics_server) (host, port) in
+        let*! ctx = Conduit_lwt_unix.init ~src:host () in
+        let ctx = Cohttp_lwt_unix.Net.init ~ctx () in
+        let mode = `TCP (`Port port) in
+        let callback = Metrics_server.callback in
+        Cohttp_lwt_unix.Server.create
+          ~ctx
+          ~mode
+          (Cohttp_lwt_unix.Server.make ~callback ()))
+      (List.flatten addrs)
+  in
+  return servers
+
 let run ?verbosity ?sandbox ?target ~singleprocess ~force_history_mode_switch
-    ~prometheus_config (config : Node_config_file.t) =
+    (config : Node_config_file.t) =
   let open Lwt_tzresult_syntax in
   let* () = Node_data_version.ensure_data_dir config.data_dir in
   (* Main loop *)
@@ -484,11 +517,11 @@ let run ?verbosity ?sandbox ?target ~singleprocess ~force_history_mode_switch
         let*! () = Event.(emit bye) exit_status in
         Tezos_base_unix.Internal_event_unix.close ())
   in
-  let _ = Prometheus_unix.serve prometheus_config in
+  let _ = metrics_serve config.metrics_addr in
   Lwt_utils.never_ending ()
 
 let process sandbox verbosity target singleprocess force_history_mode_switch
-    prometheus_config args =
+    args =
   let open Lwt_tzresult_syntax in
   let verbosity =
     let open Internal_event in
@@ -541,7 +574,6 @@ let process sandbox verbosity target singleprocess force_history_mode_switch
           ?target
           ~singleprocess
           ~force_history_mode_switch
-          ~prometheus_config
           config)
       (function exn -> fail_with_exn exn)
   in
@@ -634,8 +666,7 @@ module Term = struct
     Cmdliner.Term.(
       ret
         (const process $ sandbox $ verbosity $ target $ singleprocess
-       $ force_history_mode_switch $ Prometheus_unix.opts
-       $ Node_shared_arg.Term.args))
+       $ force_history_mode_switch $ Node_shared_arg.Term.args))
 end
 
 module Manpage = struct
