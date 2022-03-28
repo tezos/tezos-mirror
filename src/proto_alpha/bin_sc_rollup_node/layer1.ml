@@ -313,3 +313,11 @@ let predecessor store (Head {hash; _}) =
   let open Lwt_syntax in
   let+ (Block {predecessor; _}) = State.block_of_hash store hash in
   predecessor
+
+let processed_head (Head {hash; level}) =
+  Layer1_event.new_head_processed hash level
+
+let processed = function
+  | SameBranch {new_head; intermediate_heads} ->
+      List.iter_s processed_head (intermediate_heads @ [new_head])
+  | Rollback {new_head} -> processed_head new_head

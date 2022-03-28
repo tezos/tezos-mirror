@@ -72,6 +72,15 @@ module Simple = struct
       ~level:Notice
       ("rollback_hash", Block_hash.encoding)
       ("new_blocks", Data_encoding.list Block_hash.encoding)
+
+  let new_head_processed =
+    declare_2
+      ~section
+      ~name:"sc_rollup_node_layer_1_new_head_processed"
+      ~msg:"Finished processing layer 1 head {hash} at level {level}"
+      ~level:Notice
+      ("hash", Block_hash.encoding)
+      ("level", Data_encoding.int32)
 end
 
 let starting = Simple.(emit starting)
@@ -79,6 +88,9 @@ let starting = Simple.(emit starting)
 let stopping = Simple.(emit stopping)
 
 let setting_new_head hash level = Simple.(emit setting_new_head (hash, level))
+
+let new_head_processed hash level =
+  Simple.(emit new_head_processed (hash, level))
 
 let reacting_to_reorganization h hs =
   Simple.(emit reacting_to_reorganization (h, hs))
