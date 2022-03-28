@@ -440,6 +440,228 @@ let test_no_reveal_when_gas_exhausted () =
   when_ revelead (fun () ->
       failwith "Unexpected revelation: reveal operation failed")
 
+(* Fix #2774
+
+   We test that reveals can only succeed if they are placed at the
+   first position in a batch of manager operations, and that moreover
+   reveal operations occur uniquely in batches.
+
+   - First, [test_reveal_incorrect_position_in_batch] asserts that a
+   [[transfer; reveal]] batch where a valid reveal follows another
+   valid op (different from a reveal, so here a transfer) fails with
+   an [Apply.Incorrect_reveal_position] error.
+
+   - Second, we test a batch consisting of duplicate (potentially)
+   valid reveal operations. We assert the second reveal to fail again
+   with an [Apply.Incorrect_reveal_position] error, and for the first
+   reveal to be backtracked.
+
+   - Then, we test batches with duplicate reveals which follow a
+   failing one and we assert again the second reveal fails skipped. We
+   do this for the 3 different reasons a well-placed reveal might fail
+   (as tested above): gas exhaustion, insolvency, and emptying the
+   balance while revealing.
+*)
+let test_reveal_incorrect_position_in_batch () =
+  Context.init1 ~consensus_threshold:0 () >>=? fun (blk, c) ->
+  let new_c = Account.new_account () in
+  let new_contract = Contract.Implicit new_c.pkh in
+  (* Create the contract *)
+  Op.transaction (B blk) c new_contract Tez.one >>=? fun operation ->
+  Block.bake blk ~operation >>=? fun blk ->
+  (Context.Contract.is_manager_key_revealed (B blk) new_contract >|=? function
+   | true -> Stdlib.failwith "Unexpected revelation: expected fresh pkh"
+   | false -> ())
+  >>=? fun () ->
+  Incremental.begin_construction blk >>=? fun inc ->
+  Op.transaction
+    ~force_reveal:false
+    ~fee:Tez.zero
+    (I inc)
+    new_contract
+    new_contract
+    (Tez.of_mutez_exn 1L)
+  >>=? fun op_transfer ->
+  Op.revelation ~fee:Tez.zero (I inc) new_c.pk >>=? fun op_reveal ->
+  Op.batch_operations
+    ~recompute_counters:true
+    ~source:new_contract
+    (I inc)
+    [op_transfer; op_reveal]
+  >>=? fun batched_operation ->
+  let expect_failure = function
+    | [Environment.Ecoproto_error Apply.Incorrect_reveal_position] ->
+        return_unit
+    | _ -> assert false
+  in
+  Incremental.add_operation ~expect_failure inc batched_operation
+  >>=? fun inc ->
+  (* We assert the manager key is still unrevealed, as the operation has failed *)
+  Context.Contract.is_manager_key_revealed (I inc) new_contract
+  >>=? fun revelead ->
+  when_ revelead (fun () ->
+      failwith "Unexpected revelation: reveal operation was expected to fail")
+
+(* Test that a batch [reveal pk; reveal pk] where the first reveal
+   succeeds but the second one results in the second one failing, and
+   then first reveal being backtracked. *)
+let test_duplicate_valid_reveals () =
+  Context.init1 ~consensus_threshold:0 () >>=? fun (blk, c) ->
+  let new_c = Account.new_account () in
+  let new_contract = Contract.Implicit new_c.pkh in
+  (* Create the contract *)
+  Op.transaction (B blk) c new_contract Tez.one >>=? fun operation ->
+  Block.bake blk ~operation >>=? fun blk ->
+  (Context.Contract.is_manager_key_revealed (B blk) new_contract >|=? function
+   | true -> Stdlib.failwith "Unexpected revelation: expected fresh pkh"
+   | false -> ())
+  >>=? fun () ->
+  Incremental.begin_construction blk >>=? fun inc ->
+  Op.revelation ~fee:Tez.zero (I inc) new_c.pk >>=? fun op_rev1 ->
+  Op.revelation ~fee:Tez.zero (I inc) new_c.pk >>=? fun op_rev2 ->
+  Op.batch_operations
+    ~recompute_counters:true
+    ~source:new_contract
+    (I inc)
+    [op_rev1; op_rev2]
+  >>=? fun batched_operation ->
+  let expect_failure = function
+    | [Environment.Ecoproto_error Apply.Incorrect_reveal_position] ->
+        return_unit
+    | _ -> assert false
+  in
+  Incremental.add_operation ~expect_failure inc batched_operation
+  >>=? fun inc ->
+  (* We assert the manager key is still unrevealed, as the operation has failed *)
+  Context.Contract.is_manager_key_revealed (I inc) new_contract
+  >>=? fun revelead ->
+  when_ revelead (fun () ->
+      failwith "Unexpected contract revelation: backtracking expected")
+
+(* Test that a batch [failed_reveal pk; reveal pk] where the first
+   reveal fails with a gas exhaustion results in the second one
+   failing due to not being well-placed at the beginnning of the
+   batch. *)
+let test_valid_reveal_after_gas_exhausted_one () =
+  Context.init1 ~consensus_threshold:0 () >>=? fun (blk, c) ->
+  let new_c = Account.new_account () in
+  let new_contract = Contract.Implicit new_c.pkh in
+  (* Create the contract *)
+  Op.transaction (B blk) c new_contract Tez.one >>=? fun operation ->
+  Block.bake blk ~operation >>=? fun blk ->
+  (Context.Contract.is_manager_key_revealed (B blk) new_contract >|=? function
+   | true -> Stdlib.failwith "Unexpected revelation: expected fresh pkh"
+   | false -> ())
+  >>=? fun () ->
+  Incremental.begin_construction blk >>=? fun inc ->
+  (* We first craft a (bad) reveal operation with a 0 gas_limit *)
+  Op.revelation ~fee:Tez.zero ~gas_limit:Gas.Arith.zero (B blk) new_c.pk
+  >>=? fun bad_reveal ->
+  (* While the second is a valid one *)
+  Op.revelation ~fee:Tez.zero (I inc) new_c.pk >>=? fun good_reveal ->
+  Op.batch_operations
+    ~recompute_counters:true
+    ~source:new_contract
+    (I inc)
+    [bad_reveal; good_reveal]
+  >>=? fun batched_operation ->
+  let expect_failure = function
+    | [Environment.Ecoproto_error Apply.Incorrect_reveal_position] ->
+        return_unit
+    | _ -> assert false
+  in
+  Incremental.add_operation ~expect_failure inc batched_operation
+  >>=? fun inc ->
+  (* We assert the manager key is still unrevealed, as the batch has failed *)
+  Context.Contract.is_manager_key_revealed (I inc) new_contract
+  >>=? fun revelead ->
+  when_ revelead (fun () ->
+      failwith "Unexpected contract revelation: no valid reveal in batch")
+
+(* Test that a batch [failed_reveal pk; reveal pk; transfer] where the
+   first reveal fails with insufficient funds results in the second
+   one failing due to not being well-placed at the beginnning of the
+   batch. We add the trailing transfer to ensure covering all branches
+   of `check_batch_tail_sanity` in `find_manager_public_key` when
+   calling {!Apply.check_manager_signature} to verify the manager's pk
+   while processing the second reveal. *)
+let test_valid_reveal_after_insolvent_one () =
+  Context.init1 ~consensus_threshold:0 () >>=? fun (blk, c) ->
+  let new_c = Account.new_account () in
+  let new_contract = Contract.Implicit new_c.pkh in
+  (* Create the contract *)
+  Op.transaction (B blk) c new_contract Tez.one >>=? fun operation ->
+  Block.bake blk ~operation >>=? fun blk ->
+  (Context.Contract.is_manager_key_revealed (B blk) new_contract >|=? function
+   | true -> Stdlib.failwith "Unexpected revelation: expected fresh pkh"
+   | false -> ())
+  >>=? fun () ->
+  Incremental.begin_construction blk >>=? fun inc ->
+  (* We first craft an insolvent reveal operation *)
+  Op.revelation ~fee:ten_tez (B blk) new_c.pk >>=? fun bad_reveal ->
+  (* While the second is a free valid one *)
+  Op.revelation ~fee:Tez.zero (I inc) new_c.pk >>=? fun good_reveal ->
+  Op.transaction ~fee:Tez.zero (I inc) new_contract c Tez.one
+  >>=? fun transfer ->
+  Op.batch_operations
+    ~recompute_counters:true
+    ~source:new_contract
+    (I inc)
+    [bad_reveal; good_reveal; transfer]
+  >>=? fun batched_operation ->
+  let expect_failure = function
+    | [Environment.Ecoproto_error Apply.Incorrect_reveal_position] ->
+        return_unit
+    | _ -> assert false
+  in
+  Incremental.add_operation ~expect_failure inc batched_operation
+  >>=? fun inc ->
+  (* We assert the manager key is still unrevealed, as the batch has failed *)
+  Context.Contract.is_manager_key_revealed (I inc) new_contract
+  >>=? fun revelead ->
+  when_ revelead (fun () ->
+      failwith "Unexpected contract revelation: no valid reveal in batch")
+
+(* Test that a batch [failed_reveal pk; reveal pk] where the first
+   reveal fails with insufficient funds results in the second one
+   failing due to not being well-placed at the beginnning of the
+   batch. *)
+let test_valid_reveal_after_emptying_balance () =
+  Context.init1 ~consensus_threshold:0 () >>=? fun (blk, c) ->
+  let new_c = Account.new_account () in
+  let new_contract = Contract.Implicit new_c.pkh in
+  let amount = Tez.one_mutez in
+  (* Create the contract *)
+  Op.transaction (B blk) c new_contract amount >>=? fun operation ->
+  Block.bake blk ~operation >>=? fun blk ->
+  (Context.Contract.is_manager_key_revealed (B blk) new_contract >|=? function
+   | true -> Stdlib.failwith "Unexpected revelation"
+   | false -> ())
+  >>=? fun () ->
+  Incremental.begin_construction blk >>=? fun inc ->
+  (* Reveal the contract, spending all its balance in fees *)
+  Op.revelation ~fee:amount (B blk) new_c.pk >>=? fun bad_reveal ->
+  (* While the second is a free valid one *)
+  Op.revelation ~fee:Tez.zero (I inc) new_c.pk >>=? fun good_reveal ->
+  Op.batch_operations
+    ~recompute_counters:true
+    ~source:new_contract
+    (I inc)
+    [bad_reveal; good_reveal]
+  >>=? fun batched_operation ->
+  let expect_failure = function
+    | [Environment.Ecoproto_error Apply.Incorrect_reveal_position] ->
+        return_unit
+    | _ -> assert false
+  in
+  Incremental.add_operation ~expect_failure inc batched_operation
+  >>=? fun inc ->
+  (* We assert the manager key is still unrevealed, as the batch has failed *)
+  Context.Contract.is_manager_key_revealed (I inc) new_contract
+  >>=? fun revelead ->
+  when_ revelead (fun () ->
+      failwith "Unexpected contract revelation: no valid reveal in batch")
+
 let tests =
   [
     Tztest.tztest "simple reveal" `Quick test_simple_reveal;
@@ -472,4 +694,24 @@ let tests =
       "do not reveal when gas exhausted"
       `Quick
       test_no_reveal_when_gas_exhausted;
+    Tztest.tztest
+      "incorrect reveal position in batch"
+      `Quick
+      test_reveal_incorrect_position_in_batch;
+    Tztest.tztest
+      "cannot duplicate valid reveals in batch"
+      `Quick
+      test_duplicate_valid_reveals;
+    Tztest.tztest
+      "cannot batch a good reveal after a gas-exhausted one"
+      `Quick
+      test_valid_reveal_after_gas_exhausted_one;
+    Tztest.tztest
+      "cannot batch a good reveal after an insolvent one"
+      `Quick
+      test_valid_reveal_after_insolvent_one;
+    Tztest.tztest
+      "cannot batch a good reveal after one emptying account"
+      `Quick
+      test_valid_reveal_after_emptying_balance;
   ]
