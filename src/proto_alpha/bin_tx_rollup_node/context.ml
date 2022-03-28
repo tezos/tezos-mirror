@@ -152,3 +152,31 @@ module Prover_storage :
 end
 
 module Prover_context = Protocol.Tx_rollup_l2_context.Make (Prover_storage)
+
+let hash_tree = Tree.hash
+
+let add_tree ctxt tree =
+  let open Lwt_syntax in
+  let* ctxt = add_tree ctxt [] tree in
+  (* Irmin requires that we commit the context before generating the proof. *)
+  let* ctxt_hash = commit ctxt in
+  return (ctxt, ctxt_hash)
+
+(** The initial context must be constructed using the internal empty tree.
+    This tree however, *needs* to be non-empty. Otherwise, its hash will
+    be inconsistent.
+    See {!Protocol.Tx_rollup_commitment_repr.empty_l2_context_hash} for more
+    context.
+*)
+let init_context index =
+  let open Prover_context.Syntax in
+  let ctxt = empty index in
+  let tree = Tree.empty ctxt in
+  let* tree = Prover_context.Address_index.init_counter tree in
+  let* tree = Prover_context.Ticket_index.init_counter tree in
+  let tree_hash = hash_tree tree in
+  assert (
+    Context_hash.(
+      tree_hash = Protocol.Tx_rollup_message_result_repr.empty_l2_context_hash)) ;
+  let* (ctxt, _) = add_tree ctxt tree in
+  return ctxt

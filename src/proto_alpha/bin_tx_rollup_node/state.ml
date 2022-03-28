@@ -393,15 +393,16 @@ let init_context ~data_dir =
 let init_head (stores : Stores.t) context_index rollup rollup_info =
   let open Lwt_syntax in
   let* hash = Stores.Head_store.read stores.head in
-  let+ head =
+  let* head =
     match hash with
     | None -> return_none
     | Some hash -> get_block_store stores hash
   in
   match head with
-  | Some head -> head
+  | Some head -> return head
   | None ->
-      L2block.genesis_block context_index rollup rollup_info.origination_block
+      let* ctxt = Context.init_context context_index in
+      L2block.genesis_block ctxt rollup rollup_info.origination_block
 
 let init_parameters cctxt =
   let open Lwt_result_syntax in

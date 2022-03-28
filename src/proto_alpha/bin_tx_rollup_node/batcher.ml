@@ -179,6 +179,7 @@ let async_batch_and_inject ?at_least_one_full_batch state =
 
 let init cctxt ~rollup ~signer index parameters =
   let open Lwt_result_syntax in
+  let*! incr_context = Context.init_context index in
   let+ signer = get_signer cctxt signer in
   Option.map
     (fun signer ->
@@ -188,7 +189,7 @@ let init cctxt ~rollup ~signer index parameters =
         signer;
         parameters;
         transactions = Tx_queue.create 500_000;
-        incr_context = Context.empty index;
+        incr_context;
         lock = Lwt_mutex.create ();
       })
     signer

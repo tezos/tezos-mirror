@@ -44,8 +44,9 @@ val init :
   string ->
   index Lwt.t
 
-(** Build an empty context from an index. Don't commit an empty context. *)
-val empty : index -> t
+(** Initialize an "empty" context from an index. It is not really empty in the
+    sense that the underlying tree is not empty, it is then committed. *)
+val init_context : index -> t Lwt.t
 
 (** Close the index. Does not fail when the context is already closed. *)
 val close : index -> unit Lwt.t

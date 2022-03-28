@@ -239,12 +239,9 @@ let extract_messages_from_block block_info rollup_id =
 
 let create_genesis_block state tezos_block =
   let open Lwt_syntax in
-  let ctxt = Context.empty state.State.context_index in
-  let genesis_block =
-    L2block.genesis_block
-      state.context_index
-      state.rollup_info.rollup_id
-      tezos_block
+  let* ctxt = Context.init_context state.State.context_index in
+  let* genesis_block =
+    L2block.genesis_block ctxt state.rollup_info.rollup_id tezos_block
   in
   let+ _block_hash = State.save_block state genesis_block in
   (genesis_block, ctxt)
