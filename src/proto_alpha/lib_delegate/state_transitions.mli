@@ -67,8 +67,11 @@ val propose_fresh_block_action :
 val propose_block_action :
   state -> delegate -> Round.t -> proposal -> action Lwt.t
 
+(** Increase the current round and propose at the new round (same
+   level), if the baker has a proposer slot. *)
 val end_of_round : state -> Round.t -> (state * action) Lwt.t
 
+(** Propose (if possible) for the first time at a new level. *)
 val time_to_bake : state -> Round.t -> (state * action) Lwt.t
 
 val update_locked_round : state -> Round.t -> Block_payload_hash.t -> state
