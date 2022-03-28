@@ -249,7 +249,7 @@ module Points = struct
         ~output:Data_encoding.empty
         ~description:
           "DEPRECATED: Remove an address from the blacklist. Use PATCH \
-           `/network/point/:peerid` instead."
+           `/network/point/<point_id>` instead."
         RPC_path.(root / "network" / "points" /: P2p_point.Id.rpc_arg / "unban")
 
     let trust =
