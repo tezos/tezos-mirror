@@ -45,7 +45,7 @@ val transfer_and_check_balances :
   loc:string ->
   Incremental.t ->
   ?fee:Tez.t ->
-  ?expect_failure:(error trace -> unit tzresult Lwt.t) ->
+  ?expect_apply_failure:(error trace -> unit tzresult Lwt.t) ->
   Contract.t ->
   Contract.t ->
   Tez.t ->

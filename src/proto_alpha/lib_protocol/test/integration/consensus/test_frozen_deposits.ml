@@ -197,7 +197,7 @@ let test_set_too_high_limit () =
              Int64.(div max_int 100L))
           1L)
   in
-  let expect_failure = function
+  let expect_apply_failure = function
     | Environment.Ecoproto_error err :: _ ->
         Assert.test_error_encodings err ;
         let error_info =
@@ -211,7 +211,7 @@ let test_set_too_high_limit () =
   Incremental.begin_construction genesis >>=? fun b ->
   Op.set_deposits_limit (B genesis) contract1 (Some max_limit)
   >>=? fun operation ->
-  Incremental.add_operation ~expect_failure b operation >>=? fun b ->
+  Incremental.add_operation ~expect_apply_failure b operation >>=? fun b ->
   Incremental.finalize_block b >>=? fun _ -> return_unit
 
 let test_unset_limit () =

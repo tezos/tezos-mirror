@@ -109,9 +109,7 @@ let test_transfer_fees_emptying_after_reveal_batched () =
   >>=? fun transaction ->
   Op.batch_operations ~source:new_contract (I inc) [reveal; transaction]
   >>=? fun op ->
-  (* This operation is expected to fail at application time, not
-     during validation. *)
-  Incremental.add_operation ~expect_failure:(fun _ -> return_unit) inc op
+  Incremental.add_operation ~expect_apply_failure:(fun _ -> return_unit) inc op
   >>=? fun _inc -> return_unit
 
 let tests =

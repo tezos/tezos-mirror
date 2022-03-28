@@ -156,7 +156,7 @@ let detect_script_failure :
   in
   fun {contents} -> detect_script_failure contents
 
-let add_operation ?expect_apply_failure ?expect_failure ?(check_size = true) st
+let add_operation ?expect_failure ?expect_apply_failure ?(check_size = true) st
     op =
   let open Apply_results in
   (if check_size then
@@ -169,7 +169,7 @@ let add_operation ?expect_apply_failure ?expect_failure ?(check_size = true) st
              operation_size
              Constants_repr.max_operation_data_length))) ;
   apply_operation st.state op >|= Environment.wrap_tzresult >>= fun result ->
-  match (expect_apply_failure, result) with
+  match (expect_failure, result) with
   | Some _, Ok _ -> failwith "Error expected while adding operation"
   | Some f, Error err -> f err >|=? fun () -> st
   | None, result -> (
@@ -177,7 +177,7 @@ let add_operation ?expect_apply_failure ?expect_failure ?(check_size = true) st
       match result with
       | state, (Operation_metadata result as metadata) ->
           detect_script_failure result |> fun result ->
-          (match expect_failure with
+          (match expect_apply_failure with
           | None -> Lwt.return result
           | Some f -> (
               match result with

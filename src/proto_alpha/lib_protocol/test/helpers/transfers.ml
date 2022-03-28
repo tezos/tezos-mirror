@@ -28,7 +28,7 @@ open Alpha_context
 open Test_tez
 
 let transfer_and_check_balances ?(with_burn = false) ~loc b ?(fee = Tez.zero)
-    ?expect_failure src dst amount =
+    ?expect_apply_failure src dst amount =
   let open Lwt_result_syntax in
   let*? amount_fee = fee +? amount in
   let* bal_src = Context.Contract.balance (I b) src in
@@ -42,7 +42,7 @@ let transfer_and_check_balances ?(with_burn = false) ~loc b ?(fee = Tez.zero)
       dst
       amount
   in
-  let* b = Incremental.add_operation ?expect_failure b op in
+  let* b = Incremental.add_operation ?expect_apply_failure b op in
   let* {parametric = {origination_size; cost_per_byte; _}; _} =
     Context.get_constants (I b)
   in

@@ -91,7 +91,7 @@ let bootstrap_delegate_cannot_change ~fee () =
   if fee > balance0 then expect_too_low_balance_error i set_delegate
   else
     Incremental.add_operation
-      ~expect_failure:(expect_no_change_registered_delegate_pkh delegate0)
+      ~expect_apply_failure:(expect_no_change_registered_delegate_pkh delegate0)
       i
       set_delegate
     >>=? fun i ->
@@ -114,7 +114,8 @@ let bootstrap_delegate_cannot_be_removed ~fee () =
   if fee > balance then expect_too_low_balance_error i set_delegate
   else
     Incremental.add_operation
-      ~expect_failure:(expect_no_change_registered_delegate_pkh manager.pkh)
+      ~expect_apply_failure:
+        (expect_no_change_registered_delegate_pkh manager.pkh)
       i
       set_delegate
     >>=? fun i ->
@@ -202,7 +203,7 @@ let bootstrap_manager_already_registered_delegate ~fee () =
   if fee > balance then expect_too_low_balance_error i sec_reg
   else
     Incremental.add_operation
-      ~expect_failure:(function
+      ~expect_apply_failure:(function
         | Environment.Ecoproto_error Delegate_storage.Active_delegate :: _ ->
             return_unit
         | _ -> failwith "Delegate is already active and operation should fail.")
@@ -236,7 +237,7 @@ let delegate_to_bootstrap_by_origination ~fee () =
   if fee > balance then expect_too_low_balance_error i op
   else if total_fee > balance && balance >= fee then
     (* origination did not proceed; fee has been debited *)
-    let expect_failure = function
+    let expect_apply_failure = function
       | Environment.Ecoproto_error err :: _ ->
           Assert.test_error_encodings err ;
           let error_info =
@@ -249,7 +250,7 @@ let delegate_to_bootstrap_by_origination ~fee () =
             "Test_delegation.delegate_to_bootstrap_by_origination was expected \
              to fail but has not"
     in
-    Incremental.add_operation i ~expect_failure op >>=? fun i ->
+    Incremental.add_operation i ~expect_apply_failure op >>=? fun i ->
     (* fee was taken *)
     Assert.balance_was_debited ~loc:__LOC__ (I i) bootstrap balance fee
     >>=? fun () ->
@@ -477,7 +478,7 @@ let test_unregistered_delegate_key_init_origination ~fee () =
   else
     (* origination did not proceed; fee has been debited *)
     Incremental.add_operation
-      ~expect_failure:(expect_unregistered_key unregistered_pkh)
+      ~expect_apply_failure:(expect_unregistered_key unregistered_pkh)
       i
       op
     >>=? fun i ->
@@ -515,7 +516,7 @@ let test_unregistered_delegate_key_init_delegation ~fee () =
     (* fee has been debited; no delegate *)
     Incremental.add_operation
       i
-      ~expect_failure:(expect_unregistered_key unregistered_delegate_pkh)
+      ~expect_apply_failure:(expect_unregistered_key unregistered_delegate_pkh)
       delegate_op
     >>=? fun i ->
     Assert.balance_was_debited ~loc:__LOC__ (I i) impl_contract credit fee
@@ -559,7 +560,7 @@ let test_unregistered_delegate_key_switch_delegation ~fee () =
     (* fee has been debited; no delegate *)
     Incremental.add_operation
       i
-      ~expect_failure:(expect_unregistered_key unregistered_delegate_pkh)
+      ~expect_apply_failure:(expect_unregistered_key unregistered_delegate_pkh)
       delegate_op
     >>=? fun i ->
     Assert.balance_was_debited ~loc:__LOC__ (I i) impl_contract credit fee
@@ -594,7 +595,7 @@ let test_unregistered_delegate_key_init_origination_credit ~fee ~amount () =
   else
     (* origination not done, fee taken *)
     Incremental.add_operation
-      ~expect_failure:(expect_unregistered_key unregistered_pkh)
+      ~expect_apply_failure:(expect_unregistered_key unregistered_pkh)
       i
       op
     >>=? fun i ->
@@ -634,7 +635,7 @@ let test_unregistered_delegate_key_init_delegation_credit ~fee ~amount () =
   else
     (* fee has been taken, no delegate for contract *)
     Incremental.add_operation
-      ~expect_failure:(expect_unregistered_key unregistered_delegate_pkh)
+      ~expect_apply_failure:(expect_unregistered_key unregistered_delegate_pkh)
       i
       delegate_op
     >>=? fun i ->
@@ -681,7 +682,7 @@ let test_unregistered_delegate_key_switch_delegation_credit ~fee ~amount () =
   else
     (* fee has been taken, delegate for contract has not changed *)
     Incremental.add_operation
-      ~expect_failure:(expect_unregistered_key unregistered_delegate_pkh)
+      ~expect_apply_failure:(expect_unregistered_key unregistered_delegate_pkh)
       i
       delegate_op
     >>=? fun i ->
@@ -722,7 +723,7 @@ let test_unregistered_delegate_key_init_origination_credit_debit ~fee ~amount ()
   else
     (* fee taken, origination not processed *)
     Incremental.add_operation
-      ~expect_failure:(expect_unregistered_key unregistered_pkh)
+      ~expect_apply_failure:(expect_unregistered_key unregistered_pkh)
       i
       op
     >>=? fun i ->
@@ -767,7 +768,7 @@ let test_unregistered_delegate_key_init_delegation_credit_debit ~amount ~fee ()
   else
     (* fee has been taken, no delegate for contract *)
     Incremental.add_operation
-      ~expect_failure:(expect_unregistered_key unregistered_delegate_pkh)
+      ~expect_apply_failure:(expect_unregistered_key unregistered_delegate_pkh)
       i
       delegate_op
     >>=? fun i ->
@@ -818,7 +819,7 @@ let test_unregistered_delegate_key_switch_delegation_credit_debit ~fee ~amount
   else
     (* fee has been taken, delegate for contract has not changed *)
     Incremental.add_operation
-      ~expect_failure:(expect_unregistered_key unregistered_delegate_pkh)
+      ~expect_apply_failure:(expect_unregistered_key unregistered_delegate_pkh)
       i
       delegate_op
     >>=? fun i ->
@@ -1186,7 +1187,7 @@ let test_unregistered_and_unrevealed_self_delegate_key_init_delegation ~fee () =
   else
     (* origination did not proceed; fee has been debited *)
     Incremental.add_operation
-      ~expect_failure:(expect_unregistered_key delegate_pkh)
+      ~expect_apply_failure:(expect_unregistered_key delegate_pkh)
       i
       op
     >>=? fun i ->
@@ -1209,7 +1210,7 @@ let test_unregistered_and_revealed_self_delegate_key_init_delegation ~fee () =
   else
     (* origination did not proceed; fee has been debited *)
     Incremental.add_operation
-      ~expect_failure:(expect_unregistered_key delegate_pkh)
+      ~expect_apply_failure:(expect_unregistered_key delegate_pkh)
       i
       op
     >>=? fun i ->
@@ -1234,7 +1235,7 @@ let test_self_delegation_emptying_contract () =
   >>=? fun () ->
   (* The delegation operation should be applied and the fees
      debited but it is expected to fail in the apply-part. *)
-  Incremental.add_operation ~expect_failure:(fun _ -> return_unit) i op
+  Incremental.add_operation ~expect_apply_failure:(fun _ -> return_unit) i op
   >>=? fun i ->
   Context.Contract.is_manager_key_revealed (I i) contract >>=? function
   | false -> return_unit

@@ -79,7 +79,7 @@ let test_disable_feature_flag () =
   Incremental.begin_construction b >>=? fun i ->
   Op.tx_rollup_origination (I i) contract >>=? fun (op, _tx_rollup) ->
   Incremental.add_operation
-    ~expect_apply_failure:(check_proto_error Apply.Tx_rollup_feature_disabled)
+    ~expect_failure:(check_proto_error Apply.Tx_rollup_feature_disabled)
     i
     op
   >>=? fun _i -> return_unit
@@ -101,7 +101,7 @@ let test_sunset () =
   Incremental.begin_construction b >>=? fun i ->
   Op.tx_rollup_origination (I i) contract >>=? fun (op, _tx_rollup) ->
   Incremental.add_operation
-    ~expect_apply_failure:(check_proto_error Apply.Tx_rollup_feature_disabled)
+    ~expect_failure:(check_proto_error Apply.Tx_rollup_feature_disabled)
     i
     op
   >>=? fun _i -> return_unit
@@ -841,7 +841,7 @@ let test_add_batch_with_limit () =
   Incremental.add_operation
     i
     op
-    ~expect_failure:
+    ~expect_apply_failure:
       (check_proto_error_f (function
           | Tx_rollup_errors.Submit_batch_burn_exceeded _ -> true
           | _ -> false))
@@ -910,7 +910,7 @@ let test_batch_too_big () =
   Op.tx_rollup_submit_batch (I i) contract tx_rollup contents >>=? fun op ->
   Incremental.add_operation
     i
-    ~expect_apply_failure:
+    ~expect_failure:
       (check_proto_error Tx_rollup_errors.Message_size_exceeds_limit)
     op
   >>=? fun _ -> return_unit
@@ -963,7 +963,7 @@ let test_inbox_size_too_big () =
       Incremental.add_operation
         i
         op
-        ~expect_failure:
+        ~expect_apply_failure:
           (check_proto_error_f (function
               | Tx_rollup_errors.Inbox_size_would_exceed_limit _ -> true
               | _ -> false))
@@ -1016,7 +1016,7 @@ let test_inbox_count_too_big () =
   Incremental.add_operation
     i
     op
-    ~expect_failure:
+    ~expect_apply_failure:
       (check_proto_error_f @@ function
        | Tx_rollup_errors.Inbox_count_would_exceed_limit rollup ->
            rollup = tx_rollup
@@ -1037,7 +1037,7 @@ let test_inbox_count_too_big () =
   Incremental.add_operation
     i
     op
-    ~expect_failure:
+    ~expect_apply_failure:
       (check_proto_error_f @@ function
        | Tx_rollup_errors.Inbox_count_would_exceed_limit rollup ->
            rollup = tx_rollup
@@ -1124,7 +1124,7 @@ let test_valid_deposit_inexistant_rollup () =
   Incremental.add_operation
     i
     op
-    ~expect_failure:
+    ~expect_apply_failure:
       (check_proto_error_f (function
           | Script_interpreter.Runtime_contract_error _ -> true
           | _ -> false))
@@ -1151,7 +1151,7 @@ let test_invalid_deposit_not_ticket () =
   Incremental.add_operation
     i
     op
-    ~expect_failure:
+    ~expect_apply_failure:
       (check_proto_error_f (function
           | Script_interpreter.Bad_contract_parameter _ -> true
           | _ -> false))
@@ -1241,7 +1241,7 @@ let test_invalid_deposit_too_big_ticket () =
   Incremental.add_operation
     i
     op
-    ~expect_failure:
+    ~expect_apply_failure:
       (check_proto_error_f (function
           | Tx_rollup_errors_repr.Ticket_payload_size_limit_exceeded _ -> true
           | _ -> false))
@@ -1292,7 +1292,7 @@ let test_invalid_deposit_too_big_ticket_type () =
   Incremental.add_operation
     i
     op
-    ~expect_failure:
+    ~expect_apply_failure:
       (check_proto_error_f (function
           | Tx_rollup_errors_repr.Ticket_payload_size_limit_exceeded _ -> true
           | _ -> false))
@@ -1369,7 +1369,7 @@ let test_invalid_entrypoint () =
   Incremental.add_operation
     i
     op
-    ~expect_failure:
+    ~expect_apply_failure:
       (check_proto_error_f (function
           | Script_interpreter.Bad_contract_parameter _ -> true
           | _ -> false))
@@ -1396,7 +1396,7 @@ let test_invalid_l2_address () =
   Incremental.add_operation
     i
     op
-    ~expect_failure:
+    ~expect_apply_failure:
       (check_proto_error_f (function
           | Script_interpreter.Bad_contract_parameter _ -> true
           | _ -> false))
@@ -1422,7 +1422,7 @@ let test_valid_deposit_invalid_amount () =
   Incremental.add_operation
     i
     op
-    ~expect_failure:
+    ~expect_apply_failure:
       (check_runtime_error
          Script_interpreter_defs.Tx_rollup_invalid_transaction_amount)
   >>=? fun _ -> return_unit
@@ -1445,7 +1445,7 @@ let test_deposit_too_many_tickets () =
   Incremental.add_operation
     i
     operation
-    ~expect_failure:
+    ~expect_apply_failure:
       (check_proto_error Apply.Tx_rollup_invalid_transaction_ticket_amount)
   >>=? fun i ->
   ignore i ;
@@ -1572,7 +1572,7 @@ let test_commitment_duplication () =
   Incremental.add_operation
     i
     op
-    ~expect_failure:(check_proto_error Tx_rollup_errors.Wrong_batch_count)
+    ~expect_apply_failure:(check_proto_error Tx_rollup_errors.Wrong_batch_count)
   >>=? fun i ->
   (* Submit the correct one *)
   Context.get_level (I i) >>?= fun level ->
@@ -1654,7 +1654,8 @@ let test_commit_current_inbox () =
   Incremental.add_operation
     i
     operation
-    ~expect_failure:(check_proto_error Tx_rollup_errors.No_uncommitted_inbox)
+    ~expect_apply_failure:
+      (check_proto_error Tx_rollup_errors.No_uncommitted_inbox)
   >>=? fun i ->
   ignore i ;
   return_unit
@@ -1863,7 +1864,7 @@ let test_commitment_predecessor () =
     Tx_rollup_errors.Commitment_too_early
       {provided = tx_level 10l; expected = tx_level 0l}
   in
-  Incremental.add_operation i op ~expect_failure:(check_proto_error error)
+  Incremental.add_operation i op ~expect_apply_failure:(check_proto_error error)
   >>=? fun _ ->
   (* Now we submit a real commitment *)
   Op.tx_rollup_commit (I i) contract1 tx_rollup commitment >>=? fun op ->
@@ -1887,7 +1888,7 @@ let test_commitment_predecessor () =
   Incremental.add_operation
     i
     op
-    ~expect_failure:
+    ~expect_apply_failure:
       (check_proto_error_f @@ function
        | Tx_rollup_errors.Wrong_predecessor_hash {provided = None; expected} ->
            expected = commitment.predecessor
@@ -1902,7 +1903,7 @@ let test_commitment_predecessor () =
   Incremental.add_operation
     i
     op
-    ~expect_failure:
+    ~expect_apply_failure:
       (check_proto_error_f @@ function
        | Tx_rollup_errors.Wrong_predecessor_hash {provided = _; expected} ->
            expected = commitment.predecessor
@@ -1943,7 +1944,7 @@ let test_full_inbox () =
   Incremental.add_operation
     i
     op
-    ~expect_failure:(check_proto_error Tx_rollup_errors.Too_many_inboxes)
+    ~expect_apply_failure:(check_proto_error Tx_rollup_errors.Too_many_inboxes)
   >>=? fun i ->
   ignore i ;
   return ()
@@ -1965,7 +1966,7 @@ let test_bond_finalization () =
   Incremental.add_operation
     i
     op
-    ~expect_failure:
+    ~expect_apply_failure:
       (check_proto_error_f @@ function
        | Tx_rollup_errors.Bond_does_not_exist a_pkh1 -> a_pkh1 = pkh1
        | _ -> false)
@@ -1978,7 +1979,7 @@ let test_bond_finalization () =
   Incremental.add_operation
     i
     op
-    ~expect_failure:
+    ~expect_apply_failure:
       (check_proto_error_f @@ function
        | Tx_rollup_errors.Bond_in_use a_pkh1 -> a_pkh1 = pkh1
        | _ -> false)
@@ -2017,7 +2018,7 @@ let test_finalization_edge_cases () =
   Incremental.add_operation
     i
     op
-    ~expect_failure:
+    ~expect_apply_failure:
       (check_proto_error @@ Tx_rollup_errors.No_commitment_to_finalize)
   >>=? fun _i ->
   let message = "bogus" in
@@ -2031,7 +2032,7 @@ let test_finalization_edge_cases () =
   Incremental.add_operation
     i
     op
-    ~expect_failure:
+    ~expect_apply_failure:
       (check_proto_error @@ Tx_rollup_errors.No_commitment_to_finalize)
   >>=? fun _i ->
   make_incomplete_commitment_for_batch (I i) (tx_level 0l) tx_rollup []
@@ -2045,7 +2046,7 @@ let test_finalization_edge_cases () =
   Incremental.add_operation
     i
     op
-    ~expect_failure:
+    ~expect_apply_failure:
       (check_proto_error @@ Tx_rollup_errors.No_commitment_to_finalize)
   >>=? fun _i ->
   Incremental.finalize_block i >>=? fun b ->
@@ -2083,7 +2084,8 @@ let test_too_many_commitments () =
   Incremental.add_operation
     i
     op
-    ~expect_failure:(check_proto_error Tx_rollup_errors.Too_many_commitments)
+    ~expect_apply_failure:
+      (check_proto_error Tx_rollup_errors.Too_many_commitments)
   >>=? fun i ->
   (* Wait out the withdrawal period. *)
   bake_until i 12l >>=? fun i ->
@@ -2408,7 +2410,7 @@ module Rejection = struct
     Incremental.add_operation
       i
       op
-      ~expect_failure:
+      ~expect_apply_failure:
         (check_proto_error Tx_rollup_errors.Proof_produced_rejected_state)
     >>=? fun i ->
     Incremental.finalize_block i >>=? fun b ->
@@ -2573,7 +2575,7 @@ module Rejection = struct
     Incremental.add_operation
       i
       op
-      ~expect_failure:
+      ~expect_apply_failure:
         (check_proto_error_f @@ function
          | Tx_rollup_errors.Proof_produced_rejected_state -> true
          | _ -> false)
@@ -2863,7 +2865,7 @@ module Rejection = struct
     Incremental.add_operation
       i
       op
-      ~expect_failure:
+      ~expect_apply_failure:
         (check_proto_error Tx_rollup_errors.Proof_failed_to_reject)
     >>=? fun _ -> return_unit
 
@@ -2904,7 +2906,7 @@ module Rejection = struct
     Incremental.add_operation
       i
       op
-      ~expect_failure:
+      ~expect_apply_failure:
         (check_proto_error
            (Tx_rollup_errors.Wrong_rejection_hash
               {
@@ -2951,7 +2953,7 @@ module Rejection = struct
     Incremental.add_operation
       i
       op
-      ~expect_failure:
+      ~expect_apply_failure:
         (check_proto_error
            (Tx_rollup_errors.Cannot_reject_level
               {provided = level; accepted_range = None}))
@@ -3001,7 +3003,7 @@ module Rejection = struct
     Incremental.add_operation
       i
       op
-      ~expect_failure:
+      ~expect_apply_failure:
         (check_proto_error
            (Tx_rollup_errors.Cannot_reject_level
               {provided = level; accepted_range = Some (level2, level2)}))
@@ -3045,7 +3047,7 @@ module Rejection = struct
     Incremental.add_operation
       i
       op
-      ~expect_failure:
+      ~expect_apply_failure:
         (check_proto_error
            (Tx_rollup_errors.Wrong_message_path {expected = expected_root}))
     >>=? fun _ -> return_unit
@@ -3077,7 +3079,7 @@ module Rejection = struct
     Incremental.add_operation
       i
       op
-      ~expect_failure:
+      ~expect_apply_failure:
         (check_proto_error
            (Tx_rollup_errors.Wrong_message_position
               {level; position = 1; length = 1}))
@@ -3121,7 +3123,7 @@ module Rejection = struct
     Incremental.add_operation
       i
       op
-      ~expect_failure:
+      ~expect_apply_failure:
         (check_proto_error Tx_rollup_errors.Proof_failed_to_reject)
     >>=? fun i ->
     (* Check with a reasonable proof *)
@@ -3207,7 +3209,7 @@ module Rejection = struct
     test_large_rejection 10_000 >>=? fun (i, op) ->
     Incremental.add_operation
       i
-      ~expect_failure:
+      ~expect_apply_failure:
         (check_proto_error Tx_rollup_errors.Proof_produced_rejected_state)
       op
     >>=? fun _ -> return_unit
@@ -3282,7 +3284,7 @@ module Rejection = struct
       In other terms, the rejection created in this function must fail
       if [n_withdraw <= tx_rollup_max_withdrawals_per_batch] but also must
       succeed to reject if [n_withdraw > tx_rollup_max_withdrawals_per_batch]. *)
-  let test_reject_withdrawals_helper ?expect_failure n_withdraw =
+  let test_reject_withdrawals_helper ?expect_apply_failure n_withdraw =
     let sk, pk, addr = gen_l2_account () in
     init_with_deposit ~tx_rollup_hard_size_limit_per_message:20_000 addr
     >>=? fun (b, account, _, tx_rollup, store, ticket_hash) ->
@@ -3373,7 +3375,8 @@ module Rejection = struct
       ~previous_message_result
       ~previous_message_result_path:Tx_rollup_commitment.Merkle.dummy_path
     >>=? fun op ->
-    Incremental.add_operation i op ?expect_failure >>=? fun _ -> return_unit
+    Incremental.add_operation i op ?expect_apply_failure >>=? fun _ ->
+    return_unit
 
   let test_reject_withdrawals_limit () =
     context_init1 () >>=? fun (b, _) ->
@@ -3381,13 +3384,14 @@ module Rejection = struct
     let limit =
       l2_parameters.Tx_rollup_l2_apply.tx_rollup_max_withdrawals_per_batch
     in
-    let expect_failure =
+    let expect_apply_failure =
       check_proto_error Tx_rollup_errors.Proof_produced_rejected_state
     in
     (* It must not be rejected: (limit - 1) is below the limit *)
-    test_reject_withdrawals_helper ~expect_failure (limit - 1) >>=? fun () ->
+    test_reject_withdrawals_helper ~expect_apply_failure (limit - 1)
+    >>=? fun () ->
     (* It must not be rejected: limit is the limit :p. *)
-    test_reject_withdrawals_helper ~expect_failure limit >>=? fun () ->
+    test_reject_withdrawals_helper ~expect_apply_failure limit >>=? fun () ->
     (* It must be rejected: (limit + 1) is above the limit *)
     test_reject_withdrawals_helper (limit + 1)
 
@@ -3648,12 +3652,12 @@ module Single_message_inbox = struct
     Op.tx_rollup_submit_batch (B b) account tx_rollup contents
     >>=? fun operation -> Block.bake b ~operation
 
-  let reject ?expect_failure b tx_rollup account level commitment =
+  let reject ?expect_apply_failure b tx_rollup account level commitment =
     Format.printf
       "Rejecting level %a (%s)\n"
       Tx_rollup_level.pp
       level
-      (if Option.is_some expect_failure then "x" else "√") ;
+      (if Option.is_some expect_apply_failure then "x" else "√") ;
     l2_parameters (B b) >>=? fun l2_parameters ->
     Rejection.valid_empty_proof l2_parameters >>= fun proof ->
     let message_position = 0 in
@@ -3675,7 +3679,7 @@ module Single_message_inbox = struct
       ~previous_message_result_path:Tx_rollup_commitment.Merkle.dummy_path
     >>=? fun operation ->
     Incremental.begin_construction b >>=? fun i ->
-    Incremental.add_operation i operation ?expect_failure >>=? fun i ->
+    Incremental.add_operation i operation ?expect_apply_failure >>=? fun i ->
     Incremental.finalize_block i
 
   let make_commit predecessor_commit messages =
@@ -3705,15 +3709,15 @@ module Single_message_inbox = struct
           Rejection.previous_message_result;
       ]
 
-  let commit ?expect_failure b tx_rollup account commit =
+  let commit ?expect_apply_failure b tx_rollup account commit =
     Format.printf
       "Commiting for level %a (%s)\n"
       Tx_rollup_level.pp
       commit.Tx_rollup_commitment.level
-      (if Option.is_some expect_failure then "x" else "√") ;
+      (if Option.is_some expect_apply_failure then "x" else "√") ;
     Incremental.begin_construction b >>=? fun i ->
     Op.tx_rollup_commit (B b) account tx_rollup commit >>=? fun operation ->
-    Incremental.add_operation i operation ?expect_failure >>=? fun i ->
+    Incremental.add_operation i operation ?expect_apply_failure >>=? fun i ->
     Incremental.finalize_block i
 end
 
@@ -3770,7 +3774,7 @@ let test_state () =
     tx_rollup
     account1
     commit1
-    ~expect_failure:(check_proto_error Tx_rollup_errors.Invalid_committer)
+    ~expect_apply_failure:(check_proto_error Tx_rollup_errors.Invalid_committer)
   >>=? fun b ->
   (* Commit an incorrect commitment again. *)
   commit b tx_rollup account2 commit1 >>=? fun b ->
@@ -3835,7 +3839,7 @@ let test_state () =
     account2
     Tx_rollup_level.root
     commit1
-    ~expect_failure:
+    ~expect_apply_failure:
       (check_proto_error_f (function
           | Tx_rollup_errors.Cannot_reject_level _ -> true
           | _ -> false))
@@ -3851,7 +3855,7 @@ let test_state () =
   Incremental.add_operation
     i
     operation
-    ~expect_failure:
+    ~expect_apply_failure:
       (check_proto_error Tx_rollup_errors.No_commitment_to_finalize)
   >>=? fun i ->
   ignore i ;
@@ -3906,7 +3910,7 @@ let test_state_with_deleted () =
   Incremental.add_operation
     i
     operation
-    ~expect_failure:
+    ~expect_apply_failure:
       (check_proto_error Tx_rollup_errors.Remove_commitment_too_early)
   >>=? fun _ ->
   (* Wait for some blocks, then remove *)
@@ -4449,7 +4453,7 @@ module Withdraw = struct
     (* any non-empty list will fail *)
     >>=? fun operation ->
     Incremental.add_operation
-      ~expect_failure:
+      ~expect_apply_failure:
         (check_proto_error_f @@ function
          | Tx_rollup_errors.No_finalized_commitment_for_level
              {level; window = None} ->
@@ -4495,7 +4499,7 @@ module Withdraw = struct
       []
     >>=? fun operation ->
     Incremental.add_operation
-      ~expect_apply_failure:
+      ~expect_failure:
         (check_proto_error Tx_rollup_errors.No_withdrawals_to_dispatch)
       incr
       operation
@@ -4546,7 +4550,7 @@ module Withdraw = struct
       [{ticket_info with amount = Tx_rollup_l2_qty.of_int64_exn 9L}]
     >>=? fun operation ->
     Incremental.add_operation
-      ~expect_failure:
+      ~expect_apply_failure:
         (check_proto_error_f @@ function
          | Tx_rollup_errors.Wrong_rejection_hash
              {provided = _; expected = `Valid_path (_, 0)} ->
@@ -4567,7 +4571,7 @@ module Withdraw = struct
       [ticket_info; ticket_info]
     >>=? fun operation ->
     Incremental.add_operation
-      ~expect_failure:
+      ~expect_apply_failure:
         (check_proto_error_f @@ function
          | Tx_rollup_errors.Wrong_rejection_hash
              {provided = _; expected = `Valid_path (_, 0)} ->
@@ -4588,7 +4592,7 @@ module Withdraw = struct
       [{ticket_info with ty = Script.lazy_expr @@ Expr.from_string "unit"}]
     >>=? fun operation ->
     Incremental.add_operation
-      ~expect_failure:(function
+      ~expect_apply_failure:(function
         | Environment.Ecoproto_error
             (Script_tc_errors.Invalid_constant (_, _, _))
           :: _ ->
@@ -4609,7 +4613,7 @@ module Withdraw = struct
       [{ticket_info with contents = Script.lazy_expr @@ Expr.from_string "2"}]
     >>=? fun operation ->
     Incremental.add_operation
-      ~expect_failure:
+      ~expect_apply_failure:
         (check_proto_error_f @@ function
          | Tx_rollup_errors.Wrong_rejection_hash
              {provided = _; expected = `Valid_path (_, 0)} ->
@@ -4630,7 +4634,7 @@ module Withdraw = struct
       [{ticket_info with ticketer = withdraw_contract}]
     >>=? fun operation ->
     Incremental.add_operation
-      ~expect_failure:
+      ~expect_apply_failure:
         (check_proto_error_f @@ function
          | Tx_rollup_errors.Wrong_rejection_hash
              {provided = _; expected = `Valid_path (_, 0)} ->
@@ -4695,7 +4699,7 @@ module Withdraw = struct
     >>=? fun operation ->
     Incremental.begin_construction block >>=? fun incr ->
     Incremental.add_operation
-      ~expect_failure:
+      ~expect_apply_failure:
         (check_proto_error Tx_rollup_errors.Withdrawals_already_dispatched)
       incr
       operation
@@ -4807,7 +4811,7 @@ module Withdraw = struct
     withdraw_op account1 block Z.one >>=? fun operation ->
     Incremental.begin_construction block >>=? fun incr ->
     Incremental.add_operation
-      ~expect_failure:(function
+      ~expect_apply_failure:(function
         | Environment.Ecoproto_error
             (Ticket_balance.Negative_ticket_balance {key = _; balance})
           :: _ ->
@@ -4917,7 +4921,7 @@ module Withdraw = struct
       [ticket_info]
     >>=? fun operation ->
     Incremental.add_operation
-      ~expect_failure:
+      ~expect_apply_failure:
         (check_proto_error_f @@ function
          | Tx_rollup_errors.Wrong_rejection_hash
              {provided = _; expected = `Valid_path (_, idx)} ->
@@ -4938,7 +4942,7 @@ module Withdraw = struct
       [ticket_info]
     >>=? fun operation ->
     Incremental.add_operation
-      ~expect_failure:
+      ~expect_apply_failure:
         (check_proto_error_f @@ function
          | Tx_rollup_errors.Wrong_rejection_hash
              {provided = _; expected = `Valid_path (_, idx)} ->
@@ -4961,7 +4965,7 @@ module Withdraw = struct
       [ticket_info]
     >>=? fun operation ->
     Incremental.add_operation
-      ~expect_failure:
+      ~expect_apply_failure:
         (check_proto_error_f @@ function
          | Tx_rollup_errors.Wrong_rejection_hash
              {provided = _; expected = `Valid_path (_, idx)} ->
@@ -5030,7 +5034,7 @@ module Withdraw = struct
     >>=? fun operation ->
     (* try with correct withdraw but too late *)
     Incremental.add_operation
-      ~expect_failure:
+      ~expect_apply_failure:
         (check_proto_error_f @@ function
          | Tx_rollup_errors.No_finalized_commitment_for_level
              {level; window = None} ->
@@ -5175,7 +5179,7 @@ module Withdraw = struct
     Incremental.add_operation
       i
       op
-      ~expect_failure:
+      ~expect_apply_failure:
         (check_proto_error Tx_rollup_errors.Proof_produced_rejected_state)
     >>=? fun _i -> return (i, message_result)
 
@@ -5512,7 +5516,8 @@ module Withdraw = struct
       >>=? fun operation ->
       Incremental.begin_construction block >>=? fun incr ->
       Incremental.add_operation
-        ~expect_failure:(check_proto_error Apply.Forbidden_zero_ticket_quantity)
+        ~expect_apply_failure:
+          (check_proto_error Apply.Forbidden_zero_ticket_quantity)
         incr
         operation
       >>=? fun _incr -> return_unit
@@ -5553,7 +5558,8 @@ module Withdraw = struct
       >>=? fun operation ->
       Incremental.begin_construction block >>=? fun incr ->
       Incremental.add_operation
-        ~expect_failure:(check_proto_error Apply.Forbidden_zero_ticket_quantity)
+        ~expect_apply_failure:
+          (check_proto_error Apply.Forbidden_zero_ticket_quantity)
         incr
         operation
       >>=? fun _incr -> return_unit
@@ -5571,7 +5577,8 @@ module Withdraw = struct
       >>=? fun operation ->
       Incremental.begin_construction block >>=? fun incr ->
       Incremental.add_operation
-        ~expect_failure:(check_proto_error Apply.Forbidden_zero_ticket_quantity)
+        ~expect_apply_failure:
+          (check_proto_error Apply.Forbidden_zero_ticket_quantity)
         incr
         operation
       >>=? fun _incr -> return_unit

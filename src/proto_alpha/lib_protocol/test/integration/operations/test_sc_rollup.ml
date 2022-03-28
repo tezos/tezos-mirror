@@ -90,14 +90,13 @@ let test_disable_feature_flag () =
     let parameters_ty = Script.lazy_expr @@ Expr.from_string "unit" in
     Op.sc_rollup_origination (I i) contract kind "" parameters_ty
   in
-
-  let expect_failure = function
+  let expect_apply_failure = function
     | Environment.Ecoproto_error (Apply.Sc_rollup_feature_disabled as e) :: _ ->
         Assert.test_error_encodings e ;
         return_unit
     | _ -> failwith "It should have failed with [Sc_rollup_feature_disabled]"
   in
-  let*! _ = Incremental.add_operation ~expect_failure i op in
+  let*! _ = Incremental.add_operation ~expect_apply_failure i op in
   return_unit
 
 (** [test_sc_rollups_all_well_defined] checks that [Sc_rollups.all]
@@ -228,7 +227,7 @@ let test_publish_fails_on_backtrack () =
   let* b = Incremental.finalize_block i in
   let* operation2 = Op.sc_rollup_publish (B b) contract rollup commitment2 in
   let* i = Incremental.begin_construction b in
-  let expect_failure = function
+  let expect_apply_failure = function
     | Environment.Ecoproto_error
         (Sc_rollup_errors.Sc_rollup_staker_backtracked as e)
       :: _ ->
@@ -236,7 +235,7 @@ let test_publish_fails_on_backtrack () =
         return_unit
     | _ -> failwith "It should have failed with [Sc_rollup_staker_backtracked]"
   in
-  let* _ = Incremental.add_operation ~expect_failure i operation2 in
+  let* _ = Incremental.add_operation ~expect_apply_failure i operation2 in
   return_unit
 
 (** [test_cement_fails_on_conflict] creates a rollup and then publishes
@@ -267,18 +266,18 @@ let test_cement_fails_on_conflict () =
   let* i = Incremental.begin_construction b in
   let hash = Sc_rollup.Commitment.hash commitment1 in
   let* cement_op = Op.sc_rollup_cement (I i) contract1 rollup hash in
-  let expect_failure = function
+  let expect_apply_failure = function
     | Environment.Ecoproto_error (Sc_rollup_errors.Sc_rollup_disputed as e) :: _
       ->
         Assert.test_error_encodings e ;
         return_unit
     | _ -> failwith "It should have failed with [Sc_rollup_disputed]"
   in
-
-  let* _ = Incremental.add_operation ~expect_failure i cement_op in
+  let* _ = Incremental.add_operation ~expect_apply_failure i cement_op in
   return_unit
 
-let commit_and_cement_after_n_bloc ?expect_failure ctxt contract rollup n =
+let commit_and_cement_after_n_bloc ?expect_apply_failure ctxt contract rollup n
+    =
   let* i = Incremental.begin_construction ctxt in
   let* commitment = dummy_commitment i rollup in
   let* operation = Op.sc_rollup_publish (B ctxt) contract rollup commitment in
@@ -289,7 +288,7 @@ let commit_and_cement_after_n_bloc ?expect_failure ctxt contract rollup n =
   let* i = Incremental.begin_construction b in
   let hash = Sc_rollup.Commitment.hash commitment in
   let* cement_op = Op.sc_rollup_cement (I i) contract rollup hash in
-  let* _ = Incremental.add_operation ?expect_failure i cement_op in
+  let* _ = Incremental.add_operation ?expect_apply_failure i cement_op in
   return_unit
 
 (** [test_challenge_window_period_boundaries] checks that cementing a commitment
@@ -303,7 +302,7 @@ let test_challenge_window_period_boundaries () =
   (* Should fail because the waiting period is not strictly greater than the
      challenge window period. *)
   let* () =
-    let expect_failure = function
+    let expect_apply_failure = function
       | Environment.Ecoproto_error (Sc_rollup_errors.Sc_rollup_too_recent as e)
         :: _ ->
           Assert.test_error_encodings e ;
@@ -311,7 +310,7 @@ let test_challenge_window_period_boundaries () =
       | _ -> failwith "It should have failed with [Sc_rollup_too_recent]"
     in
     commit_and_cement_after_n_bloc
-      ~expect_failure
+      ~expect_apply_failure
       ctxt
       contract
       rollup
@@ -429,7 +428,7 @@ let test_atomic_batch_fails () =
       ~inclusion_proof:"xyz"
       ~atomic_transaction_batch:"xyz"
   in
-  let expect_failure = function
+  let expect_apply_failure = function
     | Environment.Ecoproto_error
         (Sc_rollup_operations.Sc_rollup_invalid_atomic_batch as e)
       :: _ ->
@@ -437,7 +436,7 @@ let test_atomic_batch_fails () =
         return_unit
     | _ -> failwith "For some reason in did not fail with the right error"
   in
-  let* _ = Incremental.add_operation ~expect_failure i batch_op in
+  let* _ = Incremental.add_operation ~expect_apply_failure i batch_op in
 
   return_unit
 
