@@ -353,71 +353,62 @@ let generate_fresh_source state =
   state.pool_size <- state.pool_size + 1 ;
   fresh.source
 
-(* [heads_iter cctxt f] calls [f head] each time there is a new head
-   received by the streamed RPC /monitor/heads/main *)
+(* [heads_iter cctxt f] calls [f head] each time there is a new head received
+   by the streamed RPC /monitor/heads/main and returns [promise, stopper].
+   [promise] resolved when the stream is closed. [stopper ()] closes the
+   stream. *)
 let heads_iter (cctxt : Protocol_client_context.full)
     (f : Block_hash.t * Tezos_base.Block_header.t -> unit tzresult Lwt.t) :
-    unit tzresult Lwt.t =
+    (unit tzresult Lwt.t * RPC_context.stopper) tzresult Lwt.t =
   let open Lwt_tzresult_syntax in
-  Error_monad.protect
-    (fun () ->
-      let* (heads_stream, stopper) = Shell_services.Monitor.heads cctxt `Main in
-      let rec loop () : unit tzresult Lwt.t =
-        let*! block_hash_and_header = Lwt_stream.get heads_stream in
-        match block_hash_and_header with
-        | None -> Error_monad.failwith "unexpected end of block stream@."
-        | Some ((new_block_hash, _block_header) as block_hash_and_header) ->
-            Lwt.catch
-              (fun () ->
-                let*! () =
-                  log Debug (fun () ->
-                      cctxt#message
-                        "heads_iter: new block received %a@."
-                        Block_hash.pp
-                        new_block_hash)
-                in
-                let* protocols =
-                  Shell_services.Blocks.protocols
-                    cctxt
-                    ~block:(`Hash (new_block_hash, 0))
-                    ()
-                in
-                if Protocol_hash.(protocols.current_protocol = Protocol.hash)
-                then
-                  let* () = f block_hash_and_header in
-                  loop ()
-                else
-                  let*! () =
-                    log Debug (fun () ->
-                        cctxt#message
-                          "heads_iter: new block on protocol %a. Stopping \
-                           iteration.@."
-                          Protocol_hash.pp
-                          protocols.current_protocol)
-                  in
-                  return_unit)
-              (fun exn ->
-                Error_monad.failwith
-                  "An exception occured on a function bound on new heads : %s@."
-                  (Printexc.to_string exn))
-      in
-      let* () = loop () in
-      stopper () ;
-      let*! () =
-        log Debug (fun () ->
-            cctxt#message
-              "head iteration for proto %a stopped@."
-              Protocol_hash.pp
-              Protocol.hash)
-      in
-      return_unit)
-    ~on_error:(fun trace ->
-      cctxt#error
-        "An error while monitoring the new heads for proto %a occured: %a@."
-        Protocol_hash.pp
-        Protocol.hash
-        Error_monad.pp_print_trace
-        trace)
+  let* (heads_stream, stopper) = Shell_services.Monitor.heads cctxt `Main in
+  let rec loop () : unit tzresult Lwt.t =
+    let*! block_hash_and_header = Lwt_stream.get heads_stream in
+    match block_hash_and_header with
+    | None -> Error_monad.failwith "unexpected end of block stream@."
+    | Some ((new_block_hash, _block_header) as block_hash_and_header) ->
+        Lwt.catch
+          (fun () ->
+            let*! () =
+              log Debug (fun () ->
+                  cctxt#message
+                    "heads_iter: new block received %a@."
+                    Block_hash.pp
+                    new_block_hash)
+            in
+            let* protocols =
+              Shell_services.Blocks.protocols
+                cctxt
+                ~block:(`Hash (new_block_hash, 0))
+                ()
+            in
+            if Protocol_hash.(protocols.current_protocol = Protocol.hash) then
+              let* () = f block_hash_and_header in
+              loop ()
+            else
+              let*! () =
+                log Debug (fun () ->
+                    cctxt#message
+                      "heads_iter: new block on protocol %a. Stopping \
+                       iteration.@."
+                      Protocol_hash.pp
+                      protocols.current_protocol)
+              in
+              return_unit)
+          (fun exn ->
+            Error_monad.failwith
+              "An exception occured on a function bound on new heads : %s@."
+              (Printexc.to_string exn))
+  in
+  let promise = loop () in
+  let*! () =
+    log Debug (fun () ->
+        cctxt#message
+          "head iteration for proto %a stopped@."
+          Protocol_hash.pp
+          Protocol.hash)
+  in
+  return (promise, stopper)
 
 let sample_smart_contracts smart_contracts rng_state =
   let smart_contract =
@@ -836,9 +827,11 @@ let launch (cctxt : Protocol_client_context.full) (parameters : parameters)
         (* only wait for the end of the head stream; don't act on heads *)
         fun _ -> update_target_block ()
   in
-  let heads_iteration = heads_iter cctxt on_new_head in
+  heads_iter cctxt on_new_head >>=? fun (heads_iteration, stopper) ->
   (* The head iteration stops at protocol change. *)
-  Lwt.pick [loop (); heads_iteration]
+  Lwt.pick [loop (); heads_iteration] >>=? fun () ->
+  (match Lwt.state heads_iteration with Lwt.Return _ -> () | _ -> stopper ()) ;
+  return_unit
 
 let group =
   Clic.{name = "stresstest"; title = "Commands for stress-testing the network"}
