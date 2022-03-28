@@ -5551,7 +5551,7 @@ let typecheck_code :
   trace (Ill_typed_contract (code, !type_map)) views_result >|=? fun ctxt ->
   (!type_map, ctxt)
 
-let list_entrypoints ctxt (type full fullc) (full : (full, fullc) ty)
+let list_entrypoints _ctxt (type full fullc) (full : (full, fullc) ty)
     (entrypoints : full entrypoints) =
   let merge path (type t tc) (ty : (t, tc) ty)
       (entrypoints : t entrypoints_node) reachable ((unreachables, all) as acc)
@@ -5565,13 +5565,13 @@ let list_entrypoints ctxt (type full fullc) (full : (full, fullc) ty)
               | Union_t _ -> acc
               | _ -> (List.rev path :: unreachables, all)),
             reachable )
-    | Some {name; original_type = _} ->
+    | Some {name; original_type} ->
         (if Entrypoint.Map.mem name all then
          ok (List.rev path :: unreachables, all)
         else
-          unparse_ty ~loc:() ctxt ty >|? fun (unparsed_ty, _) ->
-          ( unreachables,
-            Entrypoint.Map.add name (List.rev path, unparsed_ty) all ))
+          ok
+            ( unreachables,
+              Entrypoint.Map.add name (List.rev path, original_type) all ))
         >|? fun unreachable_all -> (unreachable_all, true)
   in
   let rec fold_tree :
@@ -5580,11 +5580,8 @@ let list_entrypoints ctxt (type full fullc) (full : (full, fullc) ty)
       t entrypoints_node ->
       prim list ->
       bool ->
-      prim list list
-      * (prim list * Script.unlocated_michelson_node) Entrypoint.Map.t ->
-      (prim list list
-      * (prim list * Script.unlocated_michelson_node) Entrypoint.Map.t)
-      tzresult =
+      prim list list * (prim list * Script.node) Entrypoint.Map.t ->
+      (prim list list * (prim list * Script.node) Entrypoint.Map.t) tzresult =
    fun t entrypoints path reachable acc ->
     match (t, entrypoints) with
     | (Union_t (tl, tr, _, _), {nested = Entrypoints_Union {left; right}; _}) ->
@@ -5596,12 +5593,11 @@ let list_entrypoints ctxt (type full fullc) (full : (full, fullc) ty)
         fold_tree tr right (D_Right :: path) r_reachable acc
     | _ -> ok acc
   in
-  unparse_ty ~loc:() ctxt full >>? fun (unparsed_full, _) ->
   let (init, reachable) =
     match entrypoints.root.at_node with
     | None -> (Entrypoint.Map.empty, false)
-    | Some {name; original_type = _} ->
-        (Entrypoint.Map.singleton name ([], unparsed_full), true)
+    | Some {name; original_type} ->
+        (Entrypoint.Map.singleton name ([], original_type), true)
   in
   fold_tree full entrypoints.root [] reachable ([], init)
   [@@coq_axiom_with_reason "unsupported syntax"]

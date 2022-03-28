@@ -432,8 +432,7 @@ val list_entrypoints :
   ('t, _) Script_typed_ir.ty ->
   't Script_typed_ir.entrypoints ->
   (Michelson_v1_primitives.prim list list
-  * (Michelson_v1_primitives.prim list * Script.unlocated_michelson_node)
-    Entrypoint.Map.t)
+  * (Michelson_v1_primitives.prim list * Script.node) Entrypoint.Map.t)
   tzresult
 
 val pack_data :
