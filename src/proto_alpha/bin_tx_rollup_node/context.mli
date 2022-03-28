@@ -77,3 +77,15 @@ val hash : ?message:string -> t -> Protocol.Tx_rollup_l2_context_hash.t
     additional [message]. *)
 val commit :
   ?message:string -> context -> Protocol.Tx_rollup_l2_context_hash.t Lwt.t
+
+(** {2 Prover Context} *)
+
+(** The prover context is a subset of the context. It uses the internal
+    context tree to produce proofs. *)
+
+type tree
+
+module Prover_context :
+  Protocol.Tx_rollup_l2_context_sig.CONTEXT
+    with type t = tree
+     and type 'a m = 'a Lwt.t

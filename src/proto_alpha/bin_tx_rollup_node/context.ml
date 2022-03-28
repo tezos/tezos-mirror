@@ -114,3 +114,41 @@ let checkout_exn index hash =
   let open Lwt_syntax in
   let+ context = checkout index hash in
   match context with None -> raise Not_found | Some context -> context
+
+(** {2 Prover context} *)
+
+exception Error of Environment.Error_monad.error
+
+module Prover_storage :
+  Protocol.Tx_rollup_l2_storage_sig.STORAGE
+    with type t = tree
+     and type 'a m = 'a Lwt.t = struct
+  type t = tree
+
+  type 'a m = 'a Lwt.t
+
+  module Syntax = struct
+    include Lwt.Syntax
+
+    let return = Lwt.return
+
+    let fail e = Lwt.fail (Error e)
+
+    let catch (m : 'a m) k h =
+      Lwt.catch
+        (fun () -> m >>= k)
+        (function Error e -> h e | e -> Lwt.fail e)
+
+    let list_fold_left_m = Lwt_list.fold_left_s
+  end
+
+  let path k = [Bytes.to_string k]
+
+  let get store key = Tree.find store (path key)
+
+  let set store key value = Tree.add store (path key) value
+
+  let remove store key = Tree.remove store (path key)
+end
+
+module Prover_context = Protocol.Tx_rollup_l2_context.Make (Prover_storage)
