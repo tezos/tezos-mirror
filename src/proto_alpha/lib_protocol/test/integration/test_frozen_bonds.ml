@@ -319,6 +319,253 @@ let test_rpcs () =
       Assert.equal_tez ~loc:__LOC__ balance_and_frozen_bonds balance
   | _ -> (* Exactly one account has been generated. *) assert false
 
+(** A helper to test a particular delegation/freezing scenario
+*)
+let test_scenario scenario =
+  init_test ~user_is_delegate:false
+  >>=? fun (ctxt, user_contract, user_account, delegate1) ->
+  let (delegate2, delegate_pk2, _) = Signature.generate_key () in
+  let delegate_contract2 = Contract.implicit_contract delegate2 in
+  let delegate_account2 = `Contract (Contract.implicit_contract delegate2) in
+  let delegate_balance2 = big_random_amount () in
+  Token.transfer ctxt `Minted delegate_account2 delegate_balance2
+  >>>=? fun (ctxt, _) ->
+  (* Configure delegate, as a delegate by self-delegation, for which
+     revealing its manager key is a prerequisite. *)
+  Contract.reveal_manager_key ctxt delegate2 delegate_pk2 >>>=? fun ctxt ->
+  Delegate.set ctxt delegate_contract2 (Some delegate2) >>>=? fun ctxt ->
+  let (tx_rollup1, nonce) = mk_tx_rollup () in
+  let (tx_rollup2, _) = mk_tx_rollup ~nonce () in
+  let bond_id1 = Bond_id.Tx_rollup_bond_id tx_rollup1 in
+  let bond_id2 = Bond_id.Tx_rollup_bond_id tx_rollup2 in
+  let deposit_amount = Tez.of_mutez_exn 1000L in
+  let deposit_account1 = `Frozen_bonds (user_contract, bond_id1) in
+  let deposit_account2 = `Frozen_bonds (user_contract, bond_id2) in
+  let do_delegate ?(delegate = delegate1) ctxt =
+    (* Fetch staking balance before delegation *)
+    Delegate.staking_balance ctxt delegate >>>=? fun staking_balance ->
+    (* Fetch user's initial balance before delegate. *)
+    Contract.get_balance_and_frozen_bonds ctxt user_contract
+    >>>=? fun user_balance ->
+    (* Let user delegate to "delegate". *)
+    Delegate.set ctxt user_contract (Some delegate) >>>=? fun ctxt ->
+    (* Fetch staking balance after delegation  *)
+    Delegate.staking_balance ctxt delegate >>>=? fun staking_balance' ->
+    Assert.equal_tez
+      ~loc:__LOC__
+      staking_balance'
+      (staking_balance +! user_balance)
+    >|=? fun () -> (ctxt, user_balance)
+  in
+  let do_freeze ?(deposit_account = deposit_account1) ctxt =
+    (* Fetch staking balance before freeze *)
+    Delegate.staking_balance ctxt delegate1 >>>=? fun staking_balance1 ->
+    Delegate.staking_balance ctxt delegate2 >>>=? fun staking_balance2 ->
+    (* Freeze a tx-rollup deposit. *)
+    Token.transfer ctxt user_account deposit_account deposit_amount
+    >>>=? fun (ctxt, _) ->
+    (* Fetch staking balance after freeze. *)
+    Delegate.staking_balance ctxt delegate1 >>>=? fun staking_balance1' ->
+    Delegate.staking_balance ctxt delegate2 >>>=? fun staking_balance2' ->
+    (* Ensure staking balance did not change. *)
+    Assert.equal_tez ~loc:__LOC__ staking_balance1' staking_balance1
+    >>=? fun () ->
+    Assert.equal_tez ~loc:__LOC__ staking_balance2' staking_balance2
+    >|=? fun () -> ctxt
+  in
+  let do_unfreeze ?(deposit_account = deposit_account1) ctxt =
+    (* Fetch staking balance before unfreeze *)
+    Delegate.staking_balance ctxt delegate1 >>>=? fun staking_balance1 ->
+    Delegate.staking_balance ctxt delegate2 >>>=? fun staking_balance2 ->
+    (* Unfreeze the deposit *)
+    Token.transfer ctxt deposit_account user_account deposit_amount
+    >>>=? fun (ctxt, _) ->
+    (* Fetch staking balance after unfreeze. *)
+    Delegate.staking_balance ctxt delegate1 >>>=? fun staking_balance1' ->
+    Delegate.staking_balance ctxt delegate2 >>>=? fun staking_balance2' ->
+    (* Ensure staking balance did not change. *)
+    Assert.equal_tez ~loc:__LOC__ staking_balance1' staking_balance1
+    >>=? fun () ->
+    Assert.equal_tez ~loc:__LOC__ staking_balance2' staking_balance2
+    >|=? fun () -> ctxt
+  in
+  let do_slash ?(deposit_account = deposit_account1)
+      ?(current_delegate = Some delegate1) ctxt =
+    (* Fetch staking balance before slash *)
+    (match current_delegate with
+    | None -> return Tez.zero
+    | Some current_delegate -> Delegate.staking_balance ctxt current_delegate)
+    >>>=? fun staking_balance ->
+    (* Slash the deposit *)
+    Token.transfer
+      ctxt
+      deposit_account
+      `Tx_rollup_rejection_punishments
+      deposit_amount
+    >>>=? fun (ctxt, _) ->
+    (* Fetch staking balance after slash. *)
+    (match current_delegate with
+    | None -> return_unit
+    | Some current_delegate ->
+        Delegate.staking_balance ctxt current_delegate
+        >>>=? fun staking_balance' ->
+        (* Ensure balance slashed  *)
+        Assert.equal_tez
+          ~loc:__LOC__
+          staking_balance'
+          (staking_balance -! deposit_amount))
+    >|=? fun () -> ctxt
+  in
+  let do_undelegate ?(delegate = delegate1) ctxt amount =
+    (* Fetch staking balance before undelegate *)
+    Delegate.staking_balance ctxt delegate >>>=? fun staking_balance ->
+    (* Fetch user's initial balance before undelegate. *)
+    Token.balance ctxt user_account >>>=? fun (_, user_balance) ->
+    (* Remove delegation. *)
+    Delegate.set ctxt user_contract None >>>=? fun ctxt ->
+    (* Fetch staking balance after delegation removal. *)
+    Delegate.staking_balance ctxt delegate >>>=? fun staking_balance' ->
+    (* Ensure staking balance decreased by delegation amount *)
+    Assert.equal_tez ~loc:__LOC__ staking_balance' (staking_balance -! amount)
+    >>=? fun () ->
+    (* Fetch user's balance again. *)
+    Token.balance ctxt user_account >>>=? fun (_, user_balance') ->
+    (* Ensure user's balance unchanged. *)
+    Assert.equal_tez ~loc:__LOC__ user_balance' user_balance >|=? fun () -> ctxt
+  in
+  let initial_ctxt = ctxt in
+  (* delegate-then-freeze *)
+  do_delegate ctxt >>=? fun (ctxt, amount_delegated) ->
+  do_freeze ctxt >>=? fun ctxt ->
+  scenario
+    ctxt
+    ~accounts:(deposit_account1, deposit_account2)
+    ~delegates:(delegate1, delegate2)
+    amount_delegated
+    do_delegate
+    do_undelegate
+    do_freeze
+    do_unfreeze
+    do_slash
+  >>=? fun () ->
+  (* freeze-then-delegate *)
+  let ctxt = initial_ctxt in
+  do_freeze ctxt >>=? fun ctxt ->
+  do_delegate ctxt >>=? fun (ctxt, amount_delegated) ->
+  scenario
+    ctxt
+    ~accounts:(deposit_account1, deposit_account2)
+    ~delegates:(delegate1, delegate2)
+    amount_delegated
+    do_delegate
+    do_undelegate
+    do_freeze
+    do_unfreeze
+    do_slash
+
+let test_delegate_freeze_unfreeze_undelegate () =
+  test_scenario
+    (fun
+      ctxt
+      ~accounts:_
+      ~delegates:_
+      amount_delegated
+      _do_delegate
+      do_undelegate
+      _do_freeze
+      do_unfreeze
+      _do_slash
+    ->
+      do_unfreeze ctxt >>=? fun ctxt ->
+      do_undelegate ctxt amount_delegated >>=? fun _ -> return_unit)
+
+let test_delegate_freeze_undelegate_unfreeze () =
+  test_scenario
+    (fun
+      ctxt
+      ~accounts:_
+      ~delegates:_
+      amount_delegated
+      _do_delegate
+      do_undelegate
+      _do_freeze
+      do_unfreeze
+      _do_slash
+    ->
+      do_undelegate ctxt amount_delegated >>=? fun ctxt ->
+      do_unfreeze ctxt >>=? fun _ -> return_unit)
+
+let test_delegate_double_freeze_undelegate_unfreeze () =
+  test_scenario
+    (fun
+      ctxt
+      ~accounts:(deposit_account1, deposit_account2)
+      ~delegates:_
+      amount_delegated
+      _do_delegate
+      do_undelegate
+      do_freeze
+      do_unfreeze
+      _do_slash
+    ->
+      do_freeze ~deposit_account:deposit_account2 ctxt >>=? fun ctxt ->
+      do_undelegate ctxt amount_delegated >>=? fun ctxt ->
+      do_unfreeze ~deposit_account:deposit_account1 ctxt >>=? fun _ ->
+      return_unit)
+
+let test_delegate_freeze_redelegate_unfreeze () =
+  test_scenario
+    (fun
+      ctxt
+      ~accounts:_
+      ~delegates:(_delegate1, delegate2)
+      _amount_delegated
+      do_delegate
+      do_undelegate
+      _do_freeze
+      do_unfreeze
+      _do_slash
+    ->
+      do_delegate ~delegate:delegate2 ctxt >>=? fun (ctxt, amount2) ->
+      do_unfreeze ctxt >>=? fun ctxt ->
+      do_undelegate ~delegate:delegate2 ctxt amount2 >>=? fun _ -> return_unit)
+
+let test_delegate_freeze_unfreeze_freeze_redelegate () =
+  test_scenario
+    (fun
+      ctxt
+      ~accounts:_
+      ~delegates:(_delegate1, delegate2)
+      _amount_delegated
+      do_delegate
+      do_undelegate
+      do_freeze
+      do_unfreeze
+      _do_slash
+    ->
+      do_unfreeze ctxt >>=? fun ctxt ->
+      do_freeze ctxt >>=? fun ctxt ->
+      do_delegate ~delegate:delegate2 ctxt >>=? fun (ctxt, amount2) ->
+      do_undelegate ~delegate:delegate2 ctxt amount2 >>=? fun _ -> return_unit)
+
+let test_delegate_freeze_slash_undelegate () =
+  let slash_amount = Tez.of_mutez_exn 1000L in
+  test_scenario
+    (fun
+      ctxt
+      ~accounts:_
+      ~delegates:_
+      amount_delegated
+      _do_delegate
+      do_undelegate
+      _do_freeze
+      _do_unfreeze
+      do_slash
+    ->
+      do_slash ctxt >>=? fun ctxt ->
+      do_undelegate ctxt (amount_delegated -! slash_amount) >>=? fun _ ->
+      return_unit)
+
 let tests =
   Tztest.
     [
@@ -347,4 +594,28 @@ let tests =
         `Quick
         (test_total_stake ~user_is_delegate:true);
       tztest "frozen bonds - test rpcs" `Quick test_rpcs;
+      tztest
+        "test: delegate, freeze, unfreeze, undelegate"
+        `Quick
+        test_delegate_freeze_unfreeze_undelegate;
+      tztest
+        "test: delegate, freeze, undelegate, unfreeze"
+        `Quick
+        test_delegate_freeze_undelegate_unfreeze;
+      tztest
+        "test: delegate, double freeze, undelegate, unfreeze"
+        `Quick
+        test_delegate_double_freeze_undelegate_unfreeze;
+      tztest
+        "test: delegate, freeze, redelegate, unfreeze"
+        `Quick
+        test_delegate_freeze_redelegate_unfreeze;
+      tztest
+        "test: delegate, freeze, unfreeze, freeze, redelegate"
+        `Quick
+        test_delegate_freeze_unfreeze_freeze_redelegate;
+      tztest
+        "test: delegate, freeze, slash"
+        `Quick
+        test_delegate_freeze_slash_undelegate;
     ]
