@@ -416,6 +416,17 @@ let heads_iter (cctxt : Protocol_client_context.full)
         Error_monad.pp_print_trace
         trace)
 
+let sample_smart_contracts smart_contracts rng_state =
+  let smart_contract =
+    Smart_contracts.select smart_contracts (Random.State.float rng_state 1.0)
+  in
+  Option.map
+    (fun invocation_parameters ->
+      ( Originated invocation_parameters,
+        invocation_parameters.fee,
+        invocation_parameters.gas_limit ))
+    smart_contract
+
 (* We perform rejection sampling of valid sources.
    We could maintain a local cache of existing contracts with sufficient balance. *)
 let rec sample_transfer (cctxt : Protocol_client_context.full) chain block
@@ -441,9 +452,7 @@ let rec sample_transfer (cctxt : Protocol_client_context.full) chain block
       Random.State.float state.rng_state 1.0 < parameters.fresh_probability
     in
     (match
-       Smart_contracts.select
-         parameters.smart_contracts
-         (Random.State.float state.rng_state 1.0)
+       sample_smart_contracts parameters.smart_contracts state.rng_state
      with
     | None ->
         (if fresh then Lwt.return (generate_fresh_source state)
@@ -453,11 +462,7 @@ let rec sample_transfer (cctxt : Protocol_client_context.full) chain block
           ( Implicit dest.pkh,
             parameters.regular_transfer_fee,
             parameters.regular_transfer_gas_limit )
-    | Some invocation_parameters ->
-        return
-          ( Originated invocation_parameters,
-            invocation_parameters.fee,
-            invocation_parameters.gas_limit ))
+    | Some v -> return v)
     >>=? fun (dst, fee, gas_limit) ->
     let amount =
       match parameters.strategy with
@@ -1222,86 +1227,73 @@ let generate_random_transactions =
                (fun _retcode -> save_injected_operations ())) ;
           launch cctxt parameters state save_pool)
 
-let estimate_transaction_cost parameters (cctxt : Protocol_client_context.full)
-    : Gas.Arith.integral tzresult Lwt.t =
-  let sources_json =
-    From_string
-      {
-        json =
-          `A
-            [
-              `O [("alias", `String "bootstrap1")];
-              `O [("alias", `String "bootstrap2")];
-            ];
-      }
+let estimate_transaction_cost ?smart_contracts
+    (cctxt : Protocol_client_context.full) : Gas.Arith.integral tzresult Lwt.t =
+  normalize_source cctxt (Wallet_alias "bootstrap1") >>= fun src ->
+  normalize_source cctxt (Wallet_alias "bootstrap2") >>= fun dst ->
+  let rng_state = Random.State.make [|default_parameters.seed|] in
+  (match (src, dst) with
+  | (Some src, Some dst) -> return (src, dst)
+  | _ ->
+      cctxt#error "Cannot find bootstrap1 or bootstrap2 accounts in the wallet.")
+  >>=? fun (src, dst) ->
+  let chain = cctxt#chain in
+  let block = cctxt#block in
+  let selected_smart_constract =
+    Option.bind smart_contracts (fun smart_contracts ->
+        sample_smart_contracts smart_contracts rng_state)
   in
-  match
-    Data_encoding.Json.destruct
-      input_source_list_encoding
-      (json_of_pool_source sources_json)
-  with
-  | exception _ -> cctxt#error "Could not decode list of sources"
-  | [] -> cctxt#error "It is required to provide sources"
-  | sources0 -> (
-      List.filter_map_p (normalize_source cctxt) sources0 >>= fun sources ->
-      Protocol_client_context.Alpha_block_services.header cctxt ()
-      >>=? fun header_on_start ->
-      let current_head_on_start = header_on_start.hash in
-      let counters = Signature.Public_key_hash.Table.create 1023 in
-      Shell_services.Blocks.hash cctxt ~block:(`Head 2) ()
-      >>=? fun current_target_block ->
-      let rng_state = Random.State.make [|parameters.seed|] in
-      let state =
-        {
-          rng_state;
-          current_head_on_start;
-          counters;
-          pool = sources;
-          pool_size = List.length sources;
-          shuffled_pool = None;
-          revealed = Signature.Public_key_hash.Set.empty;
-          last_block = current_head_on_start;
-          last_level = Int32.to_int header_on_start.shell.level;
-          target_block = current_target_block;
-          new_block_condition = Lwt_condition.create ();
-          injected_operations = Block_hash.Table.create 1023;
-        }
-      in
-      let chain = cctxt#chain in
-      let block = cctxt#block in
-      sample_transfer cctxt chain block parameters state >>=? fun transfer ->
-      Alpha_services.Contract.counter cctxt (chain, block) transfer.src.pkh
-      >>=? fun current_counter ->
-      let transf_counter = Z.succ current_counter in
-      let manager_op =
-        manager_op_of_transfer
-          {
-            parameters with
-            regular_transfer_gas_limit =
-              Default_parameters.constants_mainnet.hard_gas_limit_per_operation;
-          }
-          {transfer with counter = Some transf_counter}
-      in
-      Injection.simulate cctxt ~chain ~block (Single manager_op)
-      >>=? fun (_oph, op, result) ->
-      match result.contents with
-      | Single_result (Manager_operation_result {operation_result; _}) -> (
-          match operation_result with
-          | Applied
-              (Transaction_result
-                (Transaction_to_contract_result {consumed_gas; _})) ->
-              return (Gas.Arith.ceil consumed_gas)
-          | _ ->
-              (match operation_result with
-              | Failed (_, errors) ->
-                  Error_monad.pp_print_trace
-                    Format.err_formatter
-                    (Environment.wrap_tztrace errors)
-              | _ -> assert false) ;
-              cctxt#error
-                "@[<v 2>Simulation result:@,%a@]"
-                Operation_result.pp_operation_result
-                (op.protocol_data.contents, result.contents)))
+  let (dst, fee, gas_limit) =
+    Option.value
+      selected_smart_constract
+      ~default:
+        ( Implicit dst.source.pkh,
+          default_parameters.regular_transfer_fee,
+          default_parameters.regular_transfer_gas_limit )
+  in
+  Alpha_services.Contract.counter cctxt (chain, block) src.source.pkh
+  >>=? fun current_counter ->
+  let transf_counter = Z.succ current_counter in
+  let transfer =
+    {
+      src = src.source;
+      dst;
+      fee;
+      gas_limit;
+      amount = Tez.of_mutez_exn (Int64.of_int 1);
+      counter = Some transf_counter;
+      fresh_dst = false;
+    }
+  in
+  let manager_op =
+    manager_op_of_transfer
+      {
+        default_parameters with
+        regular_transfer_gas_limit =
+          Default_parameters.constants_mainnet.hard_gas_limit_per_operation;
+      }
+      transfer
+  in
+  Injection.simulate cctxt ~chain ~block (Single manager_op)
+  >>=? fun (_oph, op, result) ->
+  match result.contents with
+  | Single_result (Manager_operation_result {operation_result; _}) -> (
+      match operation_result with
+      | Applied
+          (Transaction_result
+            (Transaction_to_contract_result {consumed_gas; _})) ->
+          return (Gas.Arith.ceil consumed_gas)
+      | _ ->
+          (match operation_result with
+          | Failed (_, errors) ->
+              Error_monad.pp_print_trace
+                Format.err_formatter
+                (Environment.wrap_tztrace errors)
+          | _ -> assert false) ;
+          cctxt#error
+            "@[<v 2>Simulation result:@,%a@]"
+            Operation_result.pp_operation_result
+            (op.protocol_data.contents, result.contents))
 
 let estimate_transaction_costs : Protocol_client_context.full Clic.command =
   let open Clic in
@@ -1311,12 +1303,11 @@ let estimate_transaction_costs : Protocol_client_context.full Clic.command =
     no_options
     (prefixes ["stresstest"; "estimate"; "gas"] @@ stop)
     (fun () cctxt ->
-      estimate_transaction_cost default_parameters cctxt >>=? fun regular ->
+      estimate_transaction_cost cctxt >>=? fun regular ->
       Smart_contracts.with_every_known_smart_contract
         cctxt
         (fun smart_contracts ->
-          let params = {default_parameters with smart_contracts} in
-          estimate_transaction_cost params cctxt)
+          estimate_transaction_cost ~smart_contracts cctxt)
       >>=? fun smart_contracts ->
       let transaction_costs : transaction_costs = {regular; smart_contracts} in
       let json =
