@@ -37,6 +37,8 @@ type error +=
       Inconsistent_public_key of
       Signature.Public_key.t * Signature.Public_key.t
   | (* `Permanent *) Failure of string
+  | (* `Branch *)
+      Empty_implicit_contract of Signature.Public_key_hash.t
 
 (** [allocated ctxt contract] returns [true] if and only if the
    contract is stored in [Storage.Contract.Balance]. *)

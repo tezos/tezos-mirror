@@ -67,19 +67,28 @@ let test_empty_account_on_reveal () =
   Op.transaction (B blk) c new_contract amount >>=? fun operation ->
   Block.bake blk ~operation >>=? fun blk ->
   (Context.Contract.is_manager_key_revealed (B blk) new_contract >|=? function
-   | true -> Stdlib.failwith "Unexpected revelation"
+   | true -> Stdlib.failwith "Unexpected revelation: expecting fresh pkh"
    | false -> ())
   >>=? fun () ->
   (* Reveal the contract *)
   Op.revelation ~fee:amount (B blk) new_c.pk >>=? fun operation ->
   Incremental.begin_construction blk >>=? fun inc ->
-  Incremental.add_operation inc operation >>=? fun _ ->
-  Block.bake blk ~operation >>=? fun blk ->
-  Context.Contract.is_manager_key_revealed (B blk) new_contract >|=? function
+  let expect_apply_failure = function
+    | [
+        Environment.Ecoproto_error (Contract_storage.Empty_implicit_contract pkh);
+      ]
+      when pkh = new_c.pkh ->
+        return_unit
+    | _ -> assert false
+  in
+  Incremental.add_operation ~expect_apply_failure inc operation >>=? fun inc ->
+  Context.Contract.balance (I inc) new_contract >>=? fun balance ->
+  Assert.equal_tez ~loc:__LOC__ balance Tez.zero >>=? fun () ->
+  Context.Contract.is_manager_key_revealed (I inc) new_contract >|=? function
   | false -> ()
   | true -> Stdlib.failwith "Empty account still exists and is revealed."
 
-let test_not_enough_found_for_reveal () =
+let test_not_enough_funds_for_reveal () =
   Context.init1 () >>=? fun (blk, c) ->
   let new_c = Account.new_account () in
   let new_contract = Alpha_context.Contract.Implicit new_c.pkh in
@@ -109,8 +118,16 @@ let test_transfer_fees_emptying_after_reveal_batched () =
   >>=? fun transaction ->
   Op.batch_operations ~source:new_contract (I inc) [reveal; transaction]
   >>=? fun op ->
-  Incremental.add_operation ~expect_apply_failure:(fun _ -> return_unit) inc op
-  >>=? fun _inc -> return_unit
+  let expect_apply_failure = function
+    | [
+        Environment.Ecoproto_error (Contract_storage.Empty_implicit_contract pkh);
+      ]
+      when pkh = new_c.pkh ->
+        return_unit
+    | _ -> assert false
+  in
+  Incremental.add_operation ~expect_apply_failure inc op >>=? fun _inc ->
+  return_unit
 
 (* We assert that the changes introduced in !5182, splitting the
    application of Reveal operations into a pre-checking and
@@ -312,7 +329,8 @@ let test_backtracked_reveal_in_batch () =
   Incremental.add_operation ~expect_apply_failure inc batched_operation
   >>=? fun inc ->
   (* We assert the manager key is still unrevealed, as the batch has failed *)
-  Context.Contract.is_manager_key_revealed (I inc) new_contract >>=? fun revelead ->
+  Context.Contract.is_manager_key_revealed (I inc) new_contract
+  >>=? fun revelead ->
   when_ revelead (fun () ->
       failwith "Unexpected contract revelation: reveal was expected to fail")
 
@@ -321,9 +339,9 @@ let tests =
     Tztest.tztest "simple reveal" `Quick test_simple_reveal;
     Tztest.tztest "empty account on reveal" `Quick test_empty_account_on_reveal;
     Tztest.tztest
-      "not enough found for reveal"
+      "not enough funds for reveal"
       `Quick
-      test_not_enough_found_for_reveal;
+      test_not_enough_funds_for_reveal;
     Tztest.tztest
       "transfer fees emptying balance after reveal in batch"
       `Quick

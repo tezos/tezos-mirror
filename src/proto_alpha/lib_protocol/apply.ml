@@ -1239,6 +1239,14 @@ let apply_external_manager_operation_content :
   >>=? fun (ctxt, before_operation, consume_deserialization_gas) ->
   match operation with
   | Reveal pk ->
+      (* TODO #2603
+
+         Even if [precheck_manager_contents] has already asserted that
+         the implicit contract is allocated, we must re-do this check in
+         case the manager has been emptied while collecting fees. This
+         should be solved by forking out [validate_operation] from
+         [apply_operation]. *)
+      Contract.must_be_allocated ctxt source_contract >>=? fun () ->
       (* TODO tezos/tezos#3070
 
          We have already asserted the consistency of the supplied public
