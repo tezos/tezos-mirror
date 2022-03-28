@@ -18,4 +18,4 @@ build: [
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Framework for integration tests with external processes"
+synopsis: "Test framework for unit tests, integration tests, and regression tests"
