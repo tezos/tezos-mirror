@@ -79,6 +79,7 @@ let test_from_bootstrapped ~descr (store_dir, context_dir) store
             ~user_activated_upgrades:[]
             ~user_activated_protocol_overrides:[]
             ~operation_metadata_size_limit:None
+            ~progress_display_mode:Animation.Auto
         in
         return_false)
       ~on_error:(function
@@ -206,6 +207,7 @@ let test_from_snapshot ~descr:_ (store_dir, context_dir) store
             ~chain_name
             ~snapshot_path
             ~on_disk:false
+            ~progress_display_mode:Animation.Auto
             genesis
         in
         let* () =
@@ -221,6 +223,7 @@ let test_from_snapshot ~descr:_ (store_dir, context_dir) store
             ~user_activated_protocol_overrides:[]
             ~operation_metadata_size_limit:None
             ~in_memory:true
+            ~progress_display_mode:Animation.Auto
             genesis
         in
         let* () =
@@ -232,6 +235,7 @@ let test_from_snapshot ~descr:_ (store_dir, context_dir) store
             ~user_activated_upgrades:[]
             ~user_activated_protocol_overrides:[]
             ~operation_metadata_size_limit:None
+            ~progress_display_mode:Animation.Auto
         in
         return_false)
       ~on_error:(function

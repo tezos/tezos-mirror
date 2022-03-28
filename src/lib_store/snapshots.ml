@@ -1310,7 +1310,12 @@ module type EXPORTER = sig
     unit Lwt.t
 
   val dump_context :
-    t -> Context.index -> Context_hash.t -> on_disk:bool -> int tzresult Lwt.t
+    t ->
+    Context.index ->
+    Context_hash.t ->
+    on_disk:bool ->
+    Animation.progress_display_mode ->
+    int tzresult Lwt.t
 
   val copy_cemented_block :
     t -> file:string -> start_level:int32 -> end_level:int32 -> unit Lwt.t
@@ -1399,7 +1404,7 @@ module Raw_exporter : EXPORTER = struct
       (fun () -> Lwt_utils_unix.write_bytes fd bytes)
       (fun () -> Lwt_unix.close fd)
 
-  let dump_context t context_index context_hash ~on_disk =
+  let dump_context t context_index context_hash ~on_disk progress_display_mode =
     let open Lwt_syntax in
     let* fd =
       Lwt_unix.openfile
@@ -1408,7 +1413,13 @@ module Raw_exporter : EXPORTER = struct
         0o444
     in
     Lwt.finalize
-      (fun () -> Context.dump_context context_index context_hash ~fd ~on_disk)
+      (fun () ->
+        Context.dump_context
+          context_index
+          context_hash
+          ~fd
+          ~on_disk
+          ~progress_display_mode)
       (fun () -> Lwt_unix.close fd)
 
   let copy_cemented_block t ~file ~start_level ~end_level =
@@ -1634,11 +1645,16 @@ module Tar_exporter : EXPORTER = struct
       ~f:(fun fd -> Lwt_utils_unix.write_bytes fd bytes)
       ~filename:Naming.(snapshot_block_data_file t.snapshot_tar |> file_path)
 
-  let dump_context t context_index context_hash ~on_disk =
+  let dump_context t context_index context_hash ~on_disk progress_display_mode =
     Onthefly.add_raw_and_finalize
       t.tar
       ~f:(fun context_fd ->
-        Context.dump_context context_index context_hash ~fd:context_fd ~on_disk)
+        Context.dump_context
+          context_index
+          context_hash
+          ~fd:context_fd
+          ~on_disk
+          ~progress_display_mode)
       ~filename:Naming.(snapshot_context_file t.snapshot_tar |> file_path)
 
   let copy_cemented_block t ~file ~start_level ~end_level =
@@ -1824,6 +1840,7 @@ module type Snapshot_exporter = sig
     context_dir:string ->
     chain_name:Distributed_db_version.Name.t ->
     on_disk:bool ->
+    progress_display_mode:Animation.progress_display_mode ->
     Genesis.t ->
     unit tzresult Lwt.t
 end
@@ -1834,6 +1851,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
   let init = Exporter.init
 
   let copy_cemented_blocks snapshot_exporter ~should_filter_indexes
+      ~progress_display_mode
       (files : Cemented_block_store.cemented_blocks_file list) =
     let open Lwt_result_syntax in
     let open Cemented_block_store in
@@ -1851,6 +1869,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
                 "Copying cemented blocks and populating indexes: %d/%d cycles"
                 i
                 nb_cycles)
+            ~progress_display_mode
             (fun notify ->
               (* Bound the number of copying threads *)
               List.iter_es
@@ -1958,7 +1977,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
   (* Export the protocol table (info regarding the protocol transitions)
      as well as all the stored protocols *)
   let export_protocols snapshot_exporter export_block all_protocol_levels
-      protocol_store_dir =
+      protocol_store_dir progress_display_mode =
     let open Lwt_syntax in
     let export_level = Store.Block.level export_block in
     (* Filter protocols to only export the protocols with an activation
@@ -1988,6 +2007,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
     Animation.display_progress
       ~pp_print_step:(fun fmt i ->
         Format.fprintf fmt "Copying protocols: %d/%d" i nb_proto_to_export)
+      ~progress_display_mode
       (fun notify ->
         let rec copy_protocols () =
           Lwt.catch
@@ -2221,7 +2241,8 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
     | Rolling _ as stored ->
         tzfail (Incompatible_history_mode {stored; requested = Full None})
 
-  let export_floating_block_stream snapshot_exporter floating_block_stream =
+  let export_floating_block_stream snapshot_exporter floating_block_stream
+      progress_display_mode =
     let open Lwt_syntax in
     let f fd =
       let* is_empty = Lwt_stream.is_empty floating_block_stream in
@@ -2237,6 +2258,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
                 let* () = write_floating_block fd b in
                 notify ())
               floating_block_stream)
+          ~progress_display_mode
     in
     let* () = Exporter.write_floating_blocks snapshot_exporter ~f in
     return_ok_unit
@@ -2321,7 +2343,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
         (return_unit, floating_block_stream) )
 
   let export_full snapshot_exporter ~store_dir ~context_dir ~block ~rolling
-      genesis =
+      genesis ~progress_display_mode =
     let open Lwt_result_syntax in
     let export_full_f chain_store =
       let* () = check_history_mode chain_store ~rolling in
@@ -2412,6 +2434,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
         snapshot_exporter
         ~should_filter_indexes
         cemented_table
+        ~progress_display_mode
     in
     let finalizer () =
       let*! _ = Lwt_utils_unix.safe_close floating_ro_fd in
@@ -2456,7 +2479,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
           (Invalid_chain_store_export (chain_id, Naming.dir_path store_dir))
 
   let export ?snapshot_path ?(rolling = false) ~block ~store_dir ~context_dir
-      ~chain_name ~on_disk genesis =
+      ~chain_name ~on_disk ~progress_display_mode genesis =
     let open Lwt_result_syntax in
     let chain_id = Chain_id.of_block_hash genesis.Genesis.block in
     let* () = ensure_valid_export_chain_dir store_dir chain_id in
@@ -2488,6 +2511,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
                 ~context_dir
                 ~block
                 ~rolling
+                ~progress_display_mode
                 genesis
           in
           (* TODO: when the context's GC is implemented, make sure a context
@@ -2522,9 +2546,13 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
               context_index
               (Store.Block.context_hash pred_block)
               ~on_disk
+              progress_display_mode
           in
           let* () =
-            export_floating_block_stream snapshot_exporter floating_block_stream
+            export_floating_block_stream
+              snapshot_exporter
+              floating_block_stream
+              progress_display_mode
           in
           let* () = reading_thread in
           let* () =
@@ -2533,6 +2561,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
               export_block
               protocol_levels
               (Naming.protocol_store_dir (Naming.store_dir ~dir_path:store_dir))
+              progress_display_mode
           in
           let metadata =
             {
@@ -2714,6 +2743,7 @@ module type IMPORTER = sig
     nb_context_elements:int ->
     legacy:bool ->
     in_memory:bool ->
+    progress_display_mode:Animation.progress_display_mode ->
     unit tzresult Lwt.t
 
   val load_protocol_table :
@@ -2784,7 +2814,7 @@ module Raw_importer : IMPORTER = struct
     | None -> tzfail (Cannot_read {kind = `Block_data; path = file})
 
   let restore_context t context_index ~expected_context_hash
-      ~nb_context_elements ~legacy ~in_memory =
+      ~nb_context_elements ~legacy ~in_memory ~progress_display_mode =
     let open Lwt_result_syntax in
     let context_file_path =
       Naming.(snapshot_context_file t.snapshot_dir |> file_path)
@@ -2815,6 +2845,7 @@ module Raw_importer : IMPORTER = struct
             ~nb_context_elements
             ~legacy
             ~in_memory
+            ~progress_display_mode
         in
         (* FIXME: Is this test really usefull? *)
         let*! current = Lwt_unix.lseek fd 0 Lwt_unix.SEEK_CUR in
@@ -3063,7 +3094,7 @@ module Tar_importer : IMPORTER = struct
     | None -> tzfail (Cannot_read {kind = `Block_data; path = filename})
 
   let restore_context t context_index ~expected_context_hash
-      ~nb_context_elements ~legacy ~in_memory =
+      ~nb_context_elements ~legacy ~in_memory ~progress_display_mode =
     let open Lwt_result_syntax in
     let filename = Naming.(snapshot_context_file t.snapshot_tar |> file_path) in
     let* header =
@@ -3080,6 +3111,7 @@ module Tar_importer : IMPORTER = struct
       ~fd
       ~legacy
       ~in_memory
+      ~progress_display_mode
 
   let load_protocol_table t =
     let open Lwt_result_syntax in
@@ -3302,6 +3334,7 @@ module type Snapshot_importer = sig
     user_activated_protocol_overrides:User_activated.protocol_overrides ->
     operation_metadata_size_limit:int option ->
     in_memory:bool ->
+    progress_display_mode:Animation.progress_display_mode ->
     Genesis.t ->
     (unit, error trace) result Lwt.t
 end
@@ -3316,7 +3349,7 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
   let read_snapshot_header = Importer.load_snapshot_header
 
   let restore_cemented_blocks ?(check_consistency = true) ~dst_chain_dir
-      ~genesis_hash snapshot_importer =
+      ~genesis_hash ~progress_display_mode snapshot_importer =
     let open Lwt_result_syntax in
     let*! () = Importer.restore_cemented_indexes snapshot_importer in
     let* cemented_files = Importer.load_cemented_files snapshot_importer in
@@ -3331,6 +3364,7 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
               i
               nb_cemented_files
               (100 * i / nb_cemented_files))
+          ~progress_display_mode
           (fun notify ->
             List.iter_es
               (fun file ->
@@ -3376,6 +3410,7 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
                   i
                   nb_cemented_files
                   (100 * i / nb_cemented_files))
+              ~progress_display_mode
               (fun notify ->
                 Cemented_block_store.check_indexes_consistency
                   ~post_step:notify
@@ -3389,7 +3424,7 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
   let read_floating_blocks snapshot_importer ~genesis_hash =
     Importer.restore_floating_blocks snapshot_importer genesis_hash
 
-  let restore_protocols snapshot_importer =
+  let restore_protocols snapshot_importer progress_display_mode =
     let open Lwt_result_syntax in
     (* Import protocol table *)
     let* protocol_levels = Importer.load_protocol_table snapshot_importer in
@@ -3405,6 +3440,7 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
             "Copying protocols: %d/%d"
             i
             (List.length protocols))
+        ~progress_display_mode
         (fun notify ->
           let validate_and_copy protocol_hash =
             let* () =
@@ -3447,8 +3483,8 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
 
   let restore_and_apply_context snapshot_importer ?user_expected_block
       ~context_index ~user_activated_upgrades ~user_activated_protocol_overrides
-      ~operation_metadata_size_limit ~legacy ~in_memory snapshot_metadata
-      genesis chain_id =
+      ~operation_metadata_size_limit ~legacy ~in_memory ~progress_display_mode
+      snapshot_metadata genesis chain_id =
     let open Lwt_result_syntax in
     (* Start by committing genesis *)
     let* genesis_ctxt_hash =
@@ -3495,6 +3531,7 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
         ~nb_context_elements:snapshot_metadata.context_elements
         ~legacy
         ~in_memory
+        ~progress_display_mode
     in
     let pred_context_hash = predecessor_header.shell.context in
     let* predecessor_context =
@@ -3550,7 +3587,7 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
       ?(check_consistency = true) ~dst_store_dir ~dst_context_dir ~chain_name
       ~configured_history_mode ~user_activated_upgrades
       ~user_activated_protocol_overrides ~operation_metadata_size_limit
-      ~in_memory (genesis : Genesis.t) =
+      ~in_memory ~progress_display_mode (genesis : Genesis.t) =
     let open Lwt_result_syntax in
     let chain_id = Chain_id.of_block_hash genesis.Genesis.block in
     let*! snapshot_importer = init ~snapshot_path ~dst_store_dir chain_id in
@@ -3638,6 +3675,7 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
         ~user_activated_upgrades
         ~user_activated_protocol_overrides
         ~operation_metadata_size_limit
+        ~progress_display_mode
         snapshot_metadata
         genesis
         chain_id
@@ -3646,7 +3684,9 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
     in
     (* Restore store *)
     (* Restore protocols *)
-    let* protocol_levels = restore_protocols snapshot_importer in
+    let* protocol_levels =
+      restore_protocols snapshot_importer progress_display_mode
+    in
     (* Restore cemented dir *)
     let* () =
       restore_cemented_blocks
@@ -3654,6 +3694,7 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
         ~check_consistency
         ~dst_chain_dir
         ~genesis_hash:genesis.block
+        ~progress_display_mode
     in
     let* (reading_thread, floating_blocks_stream) =
       read_floating_blocks snapshot_importer ~genesis_hash:genesis.block
@@ -3709,6 +3750,7 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
         ~every:100
         ~pp_print_step:(fun fmt i ->
           Format.fprintf fmt "Storing floating blocks: %d blocks wrote" i)
+        ~progress_display_mode
         (fun notify ->
           Store.Unsafe.restore_from_snapshot
             ~notify
@@ -3770,7 +3812,7 @@ let snapshot_file_kind ~snapshot_path =
         return Tar)
 
 let export ?snapshot_path export_format ?rolling ~block ~store_dir ~context_dir
-    ~chain_name ~on_disk genesis =
+    ~chain_name ~on_disk ~progress_display_mode genesis =
   let (module Exporter) =
     match export_format with
     | Tar -> (module Make_snapshot_exporter (Tar_exporter) : Snapshot_exporter)
@@ -3784,6 +3826,7 @@ let export ?snapshot_path export_format ?rolling ~block ~store_dir ~context_dir
     ~context_dir
     ~chain_name
     ~on_disk
+    ~progress_display_mode
     genesis
 
 let read_snapshot_header ~snapshot_path =
@@ -3800,7 +3843,7 @@ let read_snapshot_header ~snapshot_path =
 let import ~snapshot_path ?patch_context ?block ?check_consistency
     ~dst_store_dir ~dst_context_dir ~chain_name ~configured_history_mode
     ~user_activated_upgrades ~user_activated_protocol_overrides
-    ~operation_metadata_size_limit ~in_memory genesis =
+    ~operation_metadata_size_limit ~in_memory ~progress_display_mode genesis =
   let open Lwt_result_syntax in
   let* kind = snapshot_file_kind ~snapshot_path in
   let (module Importer) =
@@ -3822,4 +3865,5 @@ let import ~snapshot_path ?patch_context ?block ?check_consistency
     ~user_activated_protocol_overrides
     ~operation_metadata_size_limit
     ~in_memory
+    ~progress_display_mode
     genesis

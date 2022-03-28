@@ -44,7 +44,7 @@ let () =
 (** Main *)
 
 module Term = struct
-  let process args sandbox_file =
+  let process args sandbox_file progress_display_mode =
     let run =
       let open Lwt_result_syntax in
       let*! () = Tezos_base_unix.Internal_event_unix.init () in
@@ -87,6 +87,7 @@ module Term = struct
           node_config.blockchain_network.user_activated_protocol_overrides
         ~operation_metadata_size_limit:
           node_config.shell.block_validator_limits.operation_metadata_size_limit
+        ~progress_display_mode
     in
     match Lwt_main.run @@ Lwt_exit.wrap_and_exit run with
     | Ok () -> `Ok ()
@@ -111,9 +112,29 @@ module Term = struct
           ~docv:"FILE.json"
           ["sandbox"])
 
+  let progress_display_mode =
+    let open Cmdliner in
+    let doc =
+      Format.sprintf
+        "Determine whether the progress animation will be displayed to the \
+         logs. 'auto' will display progress animation only to a TTY. 'always' \
+         will display progress animation to any file descriptor. 'never' will \
+         not display progress animation."
+    in
+    Arg.(
+      value
+      & opt (enum Animation.progress_display_mode_enum) Animation.Auto
+      & info
+          ~docs:Node_shared_arg.Manpage.misc_section
+          ~doc
+          ~docv:"<auto|always|never>"
+          ["progress-display-mode"])
+
   let term =
     let open Cmdliner.Term in
-    ret (const process $ Node_shared_arg.Term.args $ sandbox)
+    ret
+      (const process $ Node_shared_arg.Term.args $ sandbox
+     $ progress_display_mode)
 end
 
 module Manpage = struct

@@ -180,6 +180,7 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) : sig
     Context_hash.t ->
     fd:Lwt_unix.file_descr ->
     on_disk:bool ->
+    progress_display_mode:Animation.progress_display_mode ->
     int tzresult Lwt.t
 
   (** Rebuild a context from a given snapshot. *)
@@ -190,6 +191,7 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) : sig
     fd:Lwt_unix.file_descr ->
     legacy:bool ->
     in_memory:bool ->
+    progress_display_mode:Animation.progress_display_mode ->
     unit tzresult Lwt.t
 
   val retrieve_commit_info :

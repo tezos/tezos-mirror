@@ -25,6 +25,14 @@
 
 open Lwt.Syntax
 
+type progress_display_mode = Auto | Always | Never
+
+let progress_display_mode_enum =
+  [("auto", Auto); ("always", Always); ("never", Never)]
+
+let progress_display_mode_encoding =
+  Data_encoding.string_enum progress_display_mode_enum
+
 let animation =
   [|
     "|.....|";
@@ -66,13 +74,19 @@ let make_with_animation ppf ~make ~on_retry seed =
   Format.fprintf ppf "%s%s\n%!" clean init ;
   Lwt.return result
 
-let display_progress ?(every = 1) ?(out = Lwt_unix.stdout) ~pp_print_step f =
+let display_progress ?(every = 1) ?(out = Lwt_unix.stdout)
+    ~progress_display_mode ~pp_print_step f =
   if every <= 0 then
     raise
       (Invalid_argument "display_progress: negative or null repetition period") ;
   (* pp_print_step must only write on a single-line with no carriage return *)
-  let* is_a_tty = Lwt_unix.isatty out in
-  if not is_a_tty then f (fun () -> Lwt.return_unit)
+  let* print_progress =
+    match progress_display_mode with
+    | Auto -> Lwt_unix.isatty out
+    | Always -> Lwt.return_true
+    | Never -> Lwt.return_false
+  in
+  if not print_progress then f (fun () -> Lwt.return_unit)
   else
     let clear_line fmt = Format.fprintf fmt "\027[2K\r" in
     let (stream, notifier) = Lwt_stream.create () in

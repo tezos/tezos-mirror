@@ -1075,22 +1075,28 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
   module Context_dumper_legacy = Context_dump.Make_legacy (Dumpable_context)
 
   (* provides functions dump_context and restore_context *)
-  let dump_context idx data ~fd ~on_disk =
+  let dump_context idx data ~fd ~on_disk ~progress_display_mode =
     let open Lwt_syntax in
     let* res =
-      Context_dumper.dump_context_fd idx data ~context_fd:fd ~on_disk
+      Context_dumper.dump_context_fd
+        idx
+        data
+        ~context_fd:fd
+        ~on_disk
+        ~progress_display_mode
     in
     let* () = Lwt_unix.fsync fd in
     Lwt.return res
 
   let restore_context idx ~expected_context_hash ~nb_context_elements ~fd
-      ~legacy ~in_memory =
+      ~legacy ~in_memory ~progress_display_mode =
     if legacy then
       Context_dumper_legacy.restore_context_fd
         idx
         ~expected_context_hash
         ~fd
         ~nb_context_elements
+        ~progress_display_mode
     else
       Context_dumper.restore_context_fd
         idx
@@ -1098,4 +1104,5 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
         ~expected_context_hash
         ~fd
         ~nb_context_elements
+        ~progress_display_mode
 end

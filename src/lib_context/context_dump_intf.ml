@@ -192,6 +192,7 @@ module type S = sig
     context_hash ->
     context_fd:Lwt_unix.file_descr ->
     on_disk:bool ->
+    progress_display_mode:Animation.progress_display_mode ->
     int tzresult Lwt.t
 
   val restore_context_fd :
@@ -200,6 +201,7 @@ module type S = sig
     fd:Lwt_unix.file_descr ->
     nb_context_elements:int ->
     in_memory:bool ->
+    progress_display_mode:Animation.progress_display_mode ->
     unit tzresult Lwt.t
 end
 
@@ -230,6 +232,7 @@ module type Context_dump = sig
       expected_context_hash:context_hash ->
       fd:Lwt_unix.file_descr ->
       nb_context_elements:int ->
+      progress_display_mode:Animation.progress_display_mode ->
       unit tzresult Lwt.t
   end
   with type index := I.index

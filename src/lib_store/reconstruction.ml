@@ -490,7 +490,7 @@ let gather_available_metadata chain_store ~start_level ~end_level =
    nop. *)
 let reconstruct_cemented chain_store context_index ~user_activated_upgrades
     ~user_activated_protocol_overrides ~operation_metadata_size_limit
-    ~start_block_level =
+    ~start_block_level ~progress_display_mode =
   let open Lwt_result_syntax in
   let block_store = Store.Unsafe.get_block_store chain_store in
   let cemented_block_store = Block_store.cemented_block_store block_store in
@@ -524,6 +524,7 @@ let reconstruct_cemented chain_store context_index ~user_activated_upgrades
         "Reconstructing cemented blocks: %i/%d cycles rebuilt"
         (i + start_cycle_index)
         (List.length cemented_cycles + start_cycle_index))
+    ~progress_display_mode
     (fun notify ->
       let rec aux = function
         | [] ->
@@ -594,7 +595,8 @@ let reconstruct_cemented chain_store context_index ~user_activated_upgrades
       aux cemented_cycles)
 
 let reconstruct_floating chain_store context_index ~user_activated_upgrades
-    ~user_activated_protocol_overrides ~operation_metadata_size_limit =
+    ~user_activated_protocol_overrides ~operation_metadata_size_limit
+    ~progress_display_mode =
   let open Lwt_result_syntax in
   let chain_id = Store.Chain.chain_id chain_store in
   let chain_dir = Store.Chain.chain_dir chain_store in
@@ -608,6 +610,7 @@ let reconstruct_floating chain_store context_index ~user_activated_upgrades
     Animation.display_progress
       ~pp_print_step:(fun ppf i ->
         Format.fprintf ppf "Reconstructing floating blocks: %i" i)
+      ~progress_display_mode
       (fun notify ->
         List.iter_es
           (fun fs ->
@@ -874,7 +877,7 @@ let locked chain_dir f =
 
 let reconstruct ?patch_context ~store_dir ~context_dir genesis
     ~user_activated_upgrades ~user_activated_protocol_overrides
-    ~operation_metadata_size_limit =
+    ~operation_metadata_size_limit ~progress_display_mode =
   let open Lwt_result_syntax in
   (* We need to inhibit the cache to avoid hitting the cache with
      already loaded blocks with missing metadata. *)
@@ -935,6 +938,7 @@ let reconstruct ?patch_context ~store_dir ~context_dir genesis
                 ~user_activated_protocol_overrides
                 ~operation_metadata_size_limit
                 ~start_block_level
+                ~progress_display_mode
             in
             let* () =
               reconstruct_floating
@@ -943,6 +947,7 @@ let reconstruct ?patch_context ~store_dir ~context_dir genesis
                 ~user_activated_upgrades
                 ~user_activated_protocol_overrides
                 ~operation_metadata_size_limit
+                ~progress_display_mode
             in
             restore_constants
               chain_store

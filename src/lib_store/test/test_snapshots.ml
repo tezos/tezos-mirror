@@ -120,6 +120,7 @@ let export_import ~test_descr ~previously_baked_blocks ?exported_block_hash
       ~context_dir
       ~chain_name
       ~on_disk:false
+      ~progress_display_mode:Animation.Auto
       genesis
   in
   let dir = store_dir // "imported_store" in
@@ -137,6 +138,7 @@ let export_import ~test_descr ~previously_baked_blocks ?exported_block_hash
       ~user_activated_protocol_overrides:[]
       ~operation_metadata_size_limit:None
       ~in_memory:false
+      ~progress_display_mode:Animation.Auto
       genesis
   in
   let* store' =
@@ -509,6 +511,7 @@ let test_rolling () =
         ~context_dir
         ~chain_name
         ~on_disk:false
+        ~progress_display_mode:Animation.Auto
         genesis
     in
     let* () =
@@ -522,6 +525,7 @@ let test_rolling () =
         ~user_activated_protocol_overrides:[]
         ~operation_metadata_size_limit:None
         ~in_memory:false
+        ~progress_display_mode:Animation.Auto
         genesis
     in
     let* store' =
@@ -631,6 +635,7 @@ let test_drag_after_import () =
         ~context_dir
         ~chain_name
         ~on_disk:false
+        ~progress_display_mode:Animation.Auto
         genesis
     in
     let* () =
@@ -645,6 +650,7 @@ let test_drag_after_import () =
         ~operation_metadata_size_limit:None
         ~block:export_block_hash
         ~in_memory:false
+        ~progress_display_mode:Animation.Auto
         genesis
     in
     let* store' =
