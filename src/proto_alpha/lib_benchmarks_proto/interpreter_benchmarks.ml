@@ -754,11 +754,7 @@ module Registration_section = struct
                  >>=? fun (judgement, _) ->
                  match judgement with
                  | Script_ir_translator.Typed descr ->
-                     let kinstr =
-                       descr.instr.apply
-                         (dummy_kinfo ())
-                         (IHalt (dummy_kinfo ()))
-                     in
+                     let kinstr = descr.instr.apply (IHalt (dummy_kinfo ())) in
                      return
                        (Ex_stack_and_kinstr
                           {stack; kinstr; stack_type = descr.bef})
