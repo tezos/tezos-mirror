@@ -436,7 +436,7 @@ let patch_context ctxt ~json =
   let ctxt = Shell_context.wrap_disk_context ctxt in
   let* r = Main.init ctxt shell in
   match r with
-  | Error _ -> assert false
+  | Error e -> failwith "%a" Environment.Error_monad.pp_trace e
   | Ok {context; _} -> return_ok (Shell_context.unwrap_disk_context context)
 
 let default_patch_context ctxt =
