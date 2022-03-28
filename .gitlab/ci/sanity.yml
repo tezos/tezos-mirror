@@ -12,6 +12,9 @@ sanity_ci:
     - src/tooling/lint.sh --check-gitlab-ci-yml
 
 docker:hadolint:
+  extends:
+    - .default_settings_template
+    - .rules_template__development_dockerfile
   image: hadolint/hadolint:latest-debian
   stage: sanity
   needs: []

@@ -71,16 +71,13 @@ ometrics-code-quality-default:
   stage: test
   extends:
     - .template__code_quality
-  rules:
     # See https://gitlab.com/gitlab-org/gitlab/-/issues/215279
     # In short, GitLab requires a code quality report from the target branch.
     # As ometrics tries to find code quality issues against the target branch
     # (i.e. previously introduced issues will not be reported), we create a fake
     # empty report on the default branch which is supposed to be the target branch
     # in most cases.
-    - if: '$CI_COMMIT_BRANCH == $TEZOS_DEFAULT_BRANCH'
-      when: always
-    - when: never
+    - .rules_template__tezos_default_branch_only
   script:
     - mkdir -p _reports/
     - echo "[]" > $CODE_QUALITY_REPORT
@@ -95,6 +92,7 @@ ometrics-code-quality:
     - .default_settings_template
     - .image_template__runtime_build_test_dependencies_template
     - .template__code_quality
+    - .rules_template__merge_request_only
   script:
     - OMETRICS_GIT=$CI_MERGE_REQUEST_SOURCE_PROJECT_URL OMETRICS_BRANCH=$CI_MERGE_REQUEST_SOURCE_BRANCH_NAME make lint-ometrics-gitlab
   artifacts:
@@ -105,5 +103,3 @@ ometrics-code-quality:
     paths:
       - _reports/
     expire_in: 15 days
-  only:
-    - merge_requests
