@@ -471,8 +471,7 @@ let rec sample_transfer (cctxt : Protocol_client_context.full) chain block
     in
     return {src; dst; fee; gas_limit; amount; counter = None; fresh_dst = fresh}
 
-let inject_contents (cctxt : Protocol_client_context.full) chain branch sk
-    contents =
+let inject_contents (cctxt : Protocol_client_context.full) branch sk contents =
   let bytes =
     Data_encoding.Binary.to_bytes_exn
       Operation.unsigned_encoding
@@ -487,7 +486,7 @@ let inject_contents (cctxt : Protocol_client_context.full) chain branch sk
   let bytes =
     Data_encoding.Binary.to_bytes_exn Operation.encoding (Operation.pack op)
   in
-  Shell_services.Injection.operation cctxt ~chain bytes
+  Shell_services.Injection.operation cctxt bytes
 
 (* counter _must_ be set before calling this function *)
 let manager_op_of_transfer parameters
@@ -525,17 +524,17 @@ let manager_op_of_transfer parameters
 let cost_of_manager_operation = Gas.Arith.integral_of_int_exn 1_000
 
 let inject_transfer (cctxt : Protocol_client_context.full) parameters state
-    chain block transfer =
-  Alpha_services.Contract.counter cctxt (chain, block) transfer.src.pkh
+    transfer =
+  Shell_services.Blocks.hash cctxt () >>=? fun branch ->
+  Alpha_services.Contract.counter cctxt (`Main, `Head 0) transfer.src.pkh
   >>=? fun pcounter ->
-  Shell_services.Blocks.hash cctxt ~chain ~block () >>=? fun branch ->
   (* If there is a new block refresh the fresh_pool *)
   if not (Block_hash.equal branch state.last_block) then (
     state.last_block <- branch ;
     (* Because of how Tenderbake works the target block should stay 2
        blocks in the past because this guarantees that we are targeting a
        block that is decided. *)
-    Shell_services.Blocks.hash cctxt ~chain ~block:(`Head 2) ()
+    Shell_services.Blocks.hash cctxt ~block:(`Head 2) ()
     >>=? fun target_block ->
     state.target_block <- target_block ;
     if Option.is_some state.shuffled_pool then
@@ -574,7 +573,10 @@ let inject_transfer (cctxt : Protocol_client_context.full) parameters state
          case the key is revealed in the end. *)
       state.revealed <-
         Signature.Public_key_hash.Set.add transfer.src.pkh state.revealed ;
-      Alpha_services.Contract.manager_key cctxt (chain, block) transfer.src.pkh
+      Alpha_services.Contract.manager_key
+        cctxt
+        (`Main, `Head 0)
+        transfer.src.pkh
       >>=? fun pk_opt -> return (Option.is_some pk_opt)))
     >>=? fun already_revealed ->
     (if not already_revealed then (
@@ -619,7 +621,7 @@ let inject_transfer (cctxt : Protocol_client_context.full) parameters state
         "counter in the future" if a block switch happens in between the moment we
         get the branch and the moment we inject, and the new block does not include
         all the operations we injected. *)
-     inject_contents cctxt chain state.target_block transfer.src.sk list)
+     inject_contents cctxt state.target_block transfer.src.sk list)
     else
       let transf_counter = Z.succ freshest_counter in
       let manager_op =
@@ -645,7 +647,7 @@ let inject_transfer (cctxt : Protocol_client_context.full) parameters state
       else Lwt.return_unit)
       >>= fun () ->
       (* See comment above. *)
-      inject_contents cctxt chain state.target_block transfer.src.sk list)
+      inject_contents cctxt state.target_block transfer.src.sk list)
     >>= function
     | Ok op_hash ->
         debug_msg (fun () ->
@@ -808,8 +810,7 @@ let launch (cctxt : Protocol_client_context.full) (parameters : parameters)
       >>=? fun transfer ->
       debug_msg (fun () -> cctxt#message "launch.loop: invoke inject_transfer")
       >>= fun () ->
-      inject_transfer cctxt parameters state cctxt#chain cctxt#block transfer
-      >>=? fun () ->
+      inject_transfer cctxt parameters state transfer >>=? fun () ->
       incr injected ;
       let stop = Mtime_clock.elapsed () in
       let elapsed = Mtime.Span.(to_s stop -. to_s start) in
