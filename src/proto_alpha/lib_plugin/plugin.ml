@@ -2641,10 +2641,11 @@ module RPC = struct
           parse_toplevel ~legacy ctxt expr >>=? fun ({arg_type; _}, ctxt) ->
           Lwt.return
             ( parse_parameter_ty_and_entrypoints ctxt ~legacy arg_type
-            >>? fun (Ex_parameter_ty_and_entrypoints {arg_type; entrypoints}, _)
+            >|? fun (Ex_parameter_ty_and_entrypoints {arg_type; entrypoints}, _)
               ->
-              Script_ir_translator.list_entrypoints arg_type entrypoints
-              >|? fun (unreachable_entrypoint, map) ->
+              let (unreachable_entrypoint, map) =
+                Script_ir_translator.list_entrypoints arg_type entrypoints
+              in
               ( unreachable_entrypoint,
                 Entrypoint.Map.fold
                   (fun entry (_, ty) acc ->

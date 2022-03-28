@@ -419,11 +419,12 @@ let[@coq_axiom_with_reason "gadt"] register () =
           >>?= fun (expr, _) ->
           parse_toplevel ctxt ~legacy expr >>=? fun ({arg_type; _}, ctxt) ->
           Lwt.return
-            ( ( parse_parameter_ty_and_entrypoints ctxt ~legacy arg_type
-              >>? fun ( Ex_parameter_ty_and_entrypoints {arg_type; entrypoints},
-                        _ ) ->
-                Script_ir_translator.list_entrypoints arg_type entrypoints )
-            >|? fun (unreachable_entrypoint, map) ->
+            ( parse_parameter_ty_and_entrypoints ctxt ~legacy arg_type
+            >|? fun (Ex_parameter_ty_and_entrypoints {arg_type; entrypoints}, _)
+              ->
+              let (unreachable_entrypoint, map) =
+                Script_ir_translator.list_entrypoints arg_type entrypoints
+              in
               Some
                 ( unreachable_entrypoint,
                   Entrypoint.Map.fold

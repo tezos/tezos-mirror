@@ -5559,21 +5559,19 @@ let list_entrypoints (type full fullc) (full : (full, fullc) ty)
       =
     match entrypoints.at_node with
     | None ->
-        ok
-          ( (if reachable then acc
-            else
-              match ty with
-              | Union_t _ -> acc
-              | _ -> (List.rev path :: unreachables, all)),
-            reachable )
+        ( (if reachable then acc
+          else
+            match ty with
+            | Union_t _ -> acc
+            | _ -> (List.rev path :: unreachables, all)),
+          reachable )
     | Some {name; original_type} ->
-        (if Entrypoint.Map.mem name all then
-         ok (List.rev path :: unreachables, all)
-        else
-          ok
+        ( (if Entrypoint.Map.mem name all then
+           (List.rev path :: unreachables, all)
+          else
             ( unreachables,
-              Entrypoint.Map.add name (List.rev path, original_type) all ))
-        >|? fun unreachable_all -> (unreachable_all, true)
+              Entrypoint.Map.add name (List.rev path, original_type) all )),
+          true )
   in
   let rec fold_tree :
       type t tc.
@@ -5582,17 +5580,17 @@ let list_entrypoints (type full fullc) (full : (full, fullc) ty)
       prim list ->
       bool ->
       prim list list * (prim list * Script.node) Entrypoint.Map.t ->
-      (prim list list * (prim list * Script.node) Entrypoint.Map.t) tzresult =
+      prim list list * (prim list * Script.node) Entrypoint.Map.t =
    fun t entrypoints path reachable acc ->
     match (t, entrypoints) with
     | (Union_t (tl, tr, _, _), {nested = Entrypoints_Union {left; right}; _}) ->
-        merge (D_Left :: path) tl left reachable acc
-        >>? fun (acc, l_reachable) ->
-        merge (D_Right :: path) tr right reachable acc
-        >>? fun (acc, r_reachable) ->
-        fold_tree tl left (D_Left :: path) l_reachable acc >>? fun acc ->
+        let (acc, l_reachable) = merge (D_Left :: path) tl left reachable acc in
+        let (acc, r_reachable) =
+          merge (D_Right :: path) tr right reachable acc
+        in
+        let acc = fold_tree tl left (D_Left :: path) l_reachable acc in
         fold_tree tr right (D_Right :: path) r_reachable acc
-    | _ -> ok acc
+    | _ -> acc
   in
   let (init, reachable) =
     match entrypoints.root.at_node with
