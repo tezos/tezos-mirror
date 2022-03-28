@@ -75,3 +75,9 @@ type error += Tx_rollup_mismatch
 
 (** Error when Tezos block cannot be fetched. *)
 type error += Tx_rollup_cannot_fetch_tezos_block of Block_hash.t
+
+(** Error when the tree is not found in the context. *)
+type error += Tx_rollup_tree_not_found
+
+(** Error when the kinded key is not found in the tree. *)
+type error += Tx_rollup_tree_kinded_key_not_found

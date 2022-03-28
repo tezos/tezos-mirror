@@ -90,3 +90,41 @@ module Prover_context :
   Protocol.Tx_rollup_l2_context_sig.CONTEXT
     with type t = tree
      and type 'a m = 'a Lwt.t
+
+(** ['a produce_proof_result] is the result type needed for the {!produce_proof}
+    callback function. *)
+type 'a produce_proof_result = {
+  tree : tree;  (** the tree modified by the callback function *)
+  result : 'a;  (** the callback result. *)
+}
+
+(** [produce_proof ctxt f] applies [f] in the {!tree} inside [ctxt].
+
+    It returns a proof that is produced by applying [f], the proof is
+    constructed using low-levels accesses to the three, that is, it needs the
+    modified tree to be included in the [f]'s result to calculate the proof.
+
+    Beside the proof production, this function can be used to perform sementical
+    changes in the {!Prover_context}. Thus, we give the possibility to return a
+    result in {!'a produce_proof_result} to observe [f]'s results.
+*)
+val produce_proof :
+  context ->
+  (tree -> 'a produce_proof_result Lwt.t) ->
+  (Protocol.Tx_rollup_l2_proof.t * 'a produce_proof_result) tzresult Lwt.t
+
+val hash_tree : tree -> Context_hash.t
+
+(** [add_tree ctxt tree] adds [tree] in the [ctxt]. In order to perform
+    actions on the tree (e.g. proof production), it needs to be persistent. Thus,
+    the context is committed on disk after we added the tree, that is, after
+    every modification on the tree such as a message interpretation.
+
+    FIXME: https://gitlab.com/tezos/tezos/-/issues/2780
+    We would like to avoid the commit in this function for performance
+    matters.
+*)
+val add_tree :
+  context -> tree -> (context * Protocol.Tx_rollup_l2_context_hash.t) Lwt.t
+
+val tree_hash_of_context : context -> Context_hash.t tzresult Lwt.t

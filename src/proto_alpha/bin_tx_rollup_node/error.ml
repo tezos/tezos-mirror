@@ -275,3 +275,39 @@ let () =
     Data_encoding.(obj1 (req "block" Block_hash.encoding))
     (function Tx_rollup_cannot_fetch_tezos_block b -> Some b | _ -> None)
     (fun b -> Tx_rollup_cannot_fetch_tezos_block b)
+
+type error += Tx_rollup_tree_not_found
+
+let () =
+  register_error_kind
+    ~id:"tx_rollup.node.tree_not_found"
+    ~title:"Tree not found in context"
+    ~description:"The tree is not found in the context."
+    ~pp:(fun ppf () ->
+      Format.fprintf
+        ppf
+        "The tree was not found in the context. The merkle proof associated to \
+         a message can not be produced, the rollup can not interpret the \
+         message.")
+    `Permanent
+    Data_encoding.empty
+    (function Tx_rollup_tree_not_found -> Some () | _ -> None)
+    (fun () -> Tx_rollup_tree_not_found)
+
+type error += Tx_rollup_tree_kinded_key_not_found
+
+let () =
+  register_error_kind
+    ~id:"tx_rollup.node.tree_kinded_key_not_found"
+    ~title:"Kinded key not found in tree"
+    ~description:"The kinded key is not found in the tree."
+    ~pp:(fun ppf () ->
+      Format.fprintf
+        ppf
+        "The kinded key was not found in the tree. The merkle proof associated \
+         to a message can not be produced, the rollup can not interpret the \
+         message.")
+    `Permanent
+    Data_encoding.empty
+    (function Tx_rollup_tree_kinded_key_not_found -> Some () | _ -> None)
+    (fun () -> Tx_rollup_tree_kinded_key_not_found)
