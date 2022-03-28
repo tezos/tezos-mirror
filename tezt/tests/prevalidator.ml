@@ -2733,6 +2733,7 @@ let refetch_failed_operation =
   let* () =
     Node.run ~event_sections_levels:[("prevalidator", `Debug)] node_2 []
   in
+  let* () = Node.wait_for_ready node_2 in
   let* client_1 = Client.init ~endpoint:(Node node_1) ()
   and* client_2 = Client.init ~endpoint:(Node node_2) () in
   let* () = Client.Admin.trust_address client_1 ~peer:node_2
