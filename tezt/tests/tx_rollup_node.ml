@@ -495,12 +495,14 @@ let test_l2_to_l2_transaction =
       Log.info
         "The tx_rollup_deposit %s contract was successfully originated"
         contract_id ;
-      (* Genarating some identities *)
+      (* Generating some identities *)
       let (bls_1_pkh, bls_pk_1, bls_sk_1) = generate_bls_addr client in
       let bls_pkh_1_str = Bls_public_key_hash.to_b58check bls_1_pkh in
       (* FIXME/TORU: Use the client *)
-      let (bls_2_pkh, _, _) = generate_bls_addr client in
+      let (bls_2_pkh, bls_pk_2, bls_sk_2) = generate_bls_addr client in
       let bls_pkh_2_str = Bls_public_key_hash.to_b58check bls_2_pkh in
+      let (bls_3_pkh, _, _) = generate_bls_addr client in
+      let bls_pkh_3_str = Bls_public_key_hash.to_b58check bls_3_pkh in
       let arg_1 =
         make_tx_rollup_deposit_argument tx_rollup_hash bls_pkh_1_str
       in
@@ -558,28 +560,53 @@ let test_l2_to_l2_transaction =
       in
       Log.info "Crafting a l2 transaction" ;
       (* FIXME/TORU: Use the client *)
-      let tx =
+      let tx1 =
         craft_tx
           ~counter:1L
           ~signer:(Bls_pk bls_pk_1)
           ~dest:bls_pkh_2_str
           ~ticket:ticket_id
-          1L
+          5L
       in
-      Log.info "Crafting a batch" ;
-      let batch = craft_batch [[tx]] [[bls_sk_1]] in
+
+      Log.info "Crafting a first batch" ;
+      let batch = craft_batch [[tx1]] [[bls_sk_1]] in
       let content =
         Hex.of_string
           (Data_encoding.Binary.to_string_exn
              Tezos_protocol_alpha.Protocol.Tx_rollup_l2_batch.encoding
              (Tezos_protocol_alpha.Protocol.Tx_rollup_l2_batch.V1 batch))
       in
-      Log.info "Submiting a batch" ;
+      Log.info "Submitting the first batch" ;
       let*! () =
         Client.Tx_rollup.submit_batch
           ~content
           ~rollup:tx_rollup_hash
           ~src:operator
+          client
+      in
+      Log.info "Crafting a second batch" ;
+      let tx2 =
+        craft_tx
+          ~counter:1L
+          ~signer:(Bls_pk bls_pk_2)
+          ~dest:bls_pkh_3_str
+          ~ticket:ticket_id
+          15L
+      in
+      let batch = craft_batch [[tx2]] [[bls_sk_2]] in
+      let content =
+        Hex.of_string
+          (Data_encoding.Binary.to_string_exn
+             Tezos_protocol_alpha.Protocol.Tx_rollup_l2_batch.encoding
+             (Tezos_protocol_alpha.Protocol.Tx_rollup_l2_batch.V1 batch))
+      in
+      Log.info "Submitting the second batch" ;
+      let*! () =
+        Client.Tx_rollup.submit_batch
+          ~content
+          ~rollup:tx_rollup_hash
+          ~src:Constant.bootstrap2.public_key_hash
           client
       in
       Log.info "Baking the batch" ;
@@ -590,20 +617,31 @@ let test_l2_to_l2_transaction =
          line can be uncommented once it is fixed.
 
          let* _node_inbox = get_node_inbox tx_node client in *)
+      (* Having two batches in the same inbox we can test that:
+         1. The batches are applied in the correct order
+         2. The apply supports multiple batches
+      *)
       let* () =
         check_tz4_balance
           ~tx_node
           ~block:"head"
           ~ticket_id
           ~tz4_address:bls_pkh_1_str
-          ~expected_balance:99_999
+          ~expected_balance:99_995
       and* () =
         check_tz4_balance
           ~tx_node
           ~block:"head"
           ~ticket_id
           ~tz4_address:bls_pkh_2_str
-          ~expected_balance:100_001
+          ~expected_balance:99_990
+      and* () =
+        check_tz4_balance
+          ~tx_node
+          ~block:"head"
+          ~ticket_id
+          ~tz4_address:bls_pkh_3_str
+          ~expected_balance:15
       in
       unit)
 
