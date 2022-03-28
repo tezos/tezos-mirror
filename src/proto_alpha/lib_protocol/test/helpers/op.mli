@@ -57,6 +57,7 @@ val miss_signed_endorsement :
   Kind.endorsement Operation.t tzresult Lwt.t
 
 val transaction :
+  ?force_reveal:bool ->
   ?counter:Z.t ->
   ?fee:Tez.tez ->
   ?gas_limit:Gas.Arith.integral ->
@@ -69,7 +70,35 @@ val transaction :
   Tez.t ->
   Operation.packed tzresult Lwt.t
 
+(** Same as [transaction], but with a more generic destination
+   parameter. It is said unsafe because it can construct transactions
+   that will always fail, such as
+
+    {ul {li Transaction to the deposit entrypoint of a transaction
+   rollup, as these transactions are necessarily internals.}}
+
+    Optional arguments allow to override defaults:
+
+    {ul {li [?force_reveal:bool]: prepend the operation to reveal
+   [source]'s public key if the latter has not been revealed
+   yet. Enabled (set to [true]) by default.}}*)
+val unsafe_transaction :
+  ?force_reveal:bool ->
+  ?counter:counter ->
+  ?fee:Tez.t ->
+  ?gas_limit:Fixed_point_repr.integral_tag Gas.Arith.t ->
+  ?storage_limit:counter ->
+  ?parameters:
+    Michelson_v1_primitives.prim Micheline.canonical Data_encoding.lazy_t ->
+  ?entrypoint:Entrypoint_repr.t ->
+  Context.t ->
+  Contract.t ->
+  Contract.t ->
+  Tez.t ->
+  packed_operation tzresult Lwt.t
+
 val delegation :
+  ?force_reveal:bool ->
   ?fee:Tez.tez ->
   Context.t ->
   Contract.t ->
@@ -77,6 +106,7 @@ val delegation :
   Operation.packed tzresult Lwt.t
 
 val set_deposits_limit :
+  ?force_reveal:bool ->
   ?fee:Tez.tez ->
   Context.t ->
   Contract.t ->
@@ -110,8 +140,15 @@ val failing_noop :
     address. The contract address is using the initial origination nonce with the
     hash of the operation. If this operation is combined with [combine_operations]
     then the contract address is false as the nonce is not based on the correct
-    operation hash. *)
+    operation hash.
+
+    Optional arguments allow to override defaults:
+
+    {ul {li [?force_reveal:bool]: prepend the operation to reveal
+   [source]'s public key if the latter has not been revealed
+   yet. Enabled (set to [true]) by default.}}*)
 val contract_origination :
+  ?force_reveal:bool ->
   ?counter:Z.t ->
   ?delegate:public_key_hash ->
   script:Script.t ->
@@ -125,6 +162,7 @@ val contract_origination :
   (Operation.packed * Contract.t) tzresult Lwt.t
 
 val contract_origination_hash :
+  ?force_reveal:bool ->
   ?counter:Z.t ->
   ?delegate:public_key_hash ->
   script:Script.t ->
@@ -140,6 +178,7 @@ val contract_origination_hash :
 val originated_contract : Operation.packed -> Contract.t
 
 val register_global_constant :
+  ?force_reveal:bool ->
   ?counter:Z.t ->
   ?public_key:Signature.public_key ->
   ?fee:Tez.tez ->
@@ -223,6 +262,7 @@ val dummy_script_cost : Tez.t
     tx rollup address is false as the nonce is not based on the correct operation
     hash. *)
 val tx_rollup_origination :
+  ?force_reveal:bool ->
   ?counter:Z.t ->
   ?fee:Tez.tez ->
   ?gas_limit:Gas.Arith.integral ->
@@ -233,8 +273,15 @@ val tx_rollup_origination :
 
 (** [tx_rollup_submit_batch ctxt source tx_rollup batch] submits
     [batch], an array of bytes that is expected to be a batch of L2
-    transactions, to be appended in the inbox of [tx_rollup].  *)
+    transactions, to be appended in the inbox of [tx_rollup].
+
+    Optional arguments allow to override defaults:
+
+    {ul {li [?force_reveal:bool]: prepend the operation to reveal
+   [source]'s public key if the latter has not been revealed
+   yet. Enabled (set to [true]) by default.}}*)
 val tx_rollup_submit_batch :
+  ?force_reveal:bool ->
   ?counter:Z.t ->
   ?fee:Tez.tez ->
   ?burn_limit:Tez.tez ->
@@ -246,9 +293,16 @@ val tx_rollup_submit_batch :
   string ->
   Operation.packed tzresult Lwt.t
 
-(** [tx_rollup_commit ctxt source tx_rollup commitment] Commits to a tx
-    rollup state. *)
+(** [tx_rollup_commit ctxt source tx_rollup commitment] Commits to a
+   tx.
+
+    Optional arguments allow to override defaults:
+
+    {ul {li [?force_reveal:bool]: prepend the operation to reveal
+   [source]'s public key if the latter has not been revealed
+   yet. Enabled (set to [true]) by default.}}*)
 val tx_rollup_commit :
+  ?force_reveal:bool ->
   ?counter:Z.t ->
   ?fee:Tez.tez ->
   ?gas_limit:Gas.Arith.integral ->
@@ -259,8 +313,16 @@ val tx_rollup_commit :
   Tx_rollup_commitment.Full.t ->
   Operation.packed tzresult Lwt.t
 
-(** [tx_rollup_return_bond ctxt source tx_rollup] returns a commitment bond. *)
+(** [tx_rollup_return_bond ctxt source tx_rollup] returns a commitment
+   bond.
+
+    Optional arguments allow to override defaults:
+
+    {ul {li [?force_reveal:bool]: prepend the operation to reveal
+   [source]'s public key if the latter has not been revealed
+   yet. Enabled (set to [true]) by default.}}*)
 val tx_rollup_return_bond :
+  ?force_reveal:bool ->
   ?counter:Z.t ->
   ?fee:Tez.tez ->
   ?gas_limit:Gas.Arith.integral ->
@@ -270,9 +332,16 @@ val tx_rollup_return_bond :
   Tx_rollup.t ->
   Operation.packed tzresult Lwt.t
 
-(** [tx_rollup_finalize ctxt source tx_rollup] finalizes the most recent
-    final level of a rollup. *)
+(** [tx_rollup_finalize ctxt source tx_rollup] finalizes the most
+   recent final level of a rollup.
+
+    Optional arguments allow to override defaults:
+
+    {ul {li [?force_reveal:bool]: prepend the operation to reveal
+   [source]'s public key if the latter has not been revealed
+   yet. Enabled (set to [true]) by default.}}*)
 val tx_rollup_finalize :
+  ?force_reveal:bool ->
   ?counter:Z.t ->
   ?fee:Tez.tez ->
   ?gas_limit:Gas.Arith.integral ->
@@ -285,6 +354,7 @@ val tx_rollup_finalize :
 (** [tx_rollup_remove_commitment ctxt source tx_rollup] tries to
     remove a commitment from the rollup context. *)
 val tx_rollup_remove_commitment :
+  ?force_reveal:bool ->
   ?counter:Z.t ->
   ?fee:Tez.tez ->
   ?gas_limit:Gas.Arith.integral ->
@@ -295,11 +365,18 @@ val tx_rollup_remove_commitment :
   Operation.packed tzresult Lwt.t
 
 (** [tx_rollup_dispatch_tickets ctxt ~source ~message_index tx_rollup
-    level context_hash tickets_info] sends all tickets from
-    [tickets_info] to the appropriate implicit accounts, as authorized
-    by the [message_index]th hash of the commitment of [tx_rollup]
-    posted for [level]. *)
+   level context_hash tickets_info] sends all tickets from
+   [tickets_info] to the appropriate implicit accounts, as authorized
+   by the [message_index]th hash of the commitment of [tx_rollup]
+   posted for [level].
+
+    Optional arguments allow to override defaults:
+
+    {ul {li [?force_reveal:bool]: prepend the operation to reveal
+   [source]'s public key if the latter has not been revealed
+   yet. Enabled (set to [true]) by default.}} *)
 val tx_rollup_dispatch_tickets :
+  ?force_reveal:bool ->
   ?counter:counter ->
   ?fee:Tez.t ->
   ?gas_limit:Gas.Arith.integral ->
@@ -331,8 +408,15 @@ val tx_rollup_dispatch_tickets :
       {li [destination:Contract.t]: the destination contract that
           should receive the ticket of the withdrawal}
       {li [Entrypoint_repr.t]: the entrypoint of the destination
-          contract to which the ticket should be sent}} *)
+          contract to which the ticket should be sent}}
+
+    Optional arguments allow to override defaults:
+
+    {ul {li [?force_reveal:bool]: prepend the operation to reveal
+   [source]'s public key if the latter has not been revealed
+   yet. Enabled (set to [true]) by default.}}*)
 val transfer_ticket :
+  ?force_reveal:bool ->
   ?counter:counter ->
   ?fee:Tez.t ->
   ?gas_limit:Gas.Arith.integral ->
@@ -348,8 +432,15 @@ val transfer_ticket :
   (packed_operation, tztrace) result Lwt.t
 
 (** [tx_rollup_reject ctxt source tx_rollup tx_rollup level message
-    index proof] Rejects a tx rollup commitment. *)
+   index proof] Rejects a tx rollup commitment.
+
+    Optional arguments allow to override defaults:
+
+    {ul {li [?force_reveal:bool]: prepend the operation to reveal
+   [source]'s public key if the latter has not been revealed
+   yet. Enabled (set to [true]) by default.}}*)
 val tx_rollup_reject :
+  ?force_reveal:bool ->
   ?counter:Z.t ->
   ?fee:Tez.tez ->
   ?gas_limit:Gas.Arith.integral ->
@@ -368,10 +459,18 @@ val tx_rollup_reject :
   previous_message_result_path:Tx_rollup_commitment.Merkle.path ->
   Operation.packed tzresult Lwt.t
 
-(** [sc_rollup_origination ctxt source kind boot_sector] originates a new
-    smart contract rollup of some given [kind] booting using [boot_sector].
-    The process is the same as in [tx_rollup_origination]. *)
+(** [sc_rollup_origination ctxt source kind boot_sector] originates a
+   new smart contract rollup of some given [kind] booting using
+   [boot_sector].  The process is the same as in
+   [tx_rollup_origination].
+
+    Optional arguments allow to override defaults:
+
+    {ul {li [?force_reveal:bool]: prepend the operation to reveal
+   [source]'s public key if the latter has not been revealed
+   yet. Enabled (set to [true]) by default.}}*)
 val sc_rollup_origination :
+  ?force_reveal:bool ->
   ?counter:counter ->
   ?fee:Tez.t ->
   ?gas_limit:Gas.Arith.integral ->
@@ -383,9 +482,17 @@ val sc_rollup_origination :
   Script.lazy_expr ->
   (packed_operation * Sc_rollup.t) tzresult Lwt.t
 
-(** [sc_rollup_publish ctxt source rollup commitment] tries to publish a
-    commitment to the SCORU. *)
+(** [sc_rollup_publish ctxt source rollup commitment] tries to publish
+   a commitment to the SCORU.  Optional arguments allow to override
+   defaults:
+
+    Optional arguments allow to override defaults:
+
+    {ul {li [?force_reveal:bool]: prepend the operation to reveal
+   [source]'s public key if the latter has not been revealed
+   yet. Enabled (set to [true]) by default.}}*)
 val sc_rollup_publish :
+  ?force_reveal:bool ->
   ?counter:Z.t ->
   ?fee:Tez.tez ->
   ?gas_limit:Gas.Arith.integral ->
@@ -396,9 +503,16 @@ val sc_rollup_publish :
   Sc_rollup.Commitment.t ->
   Operation.packed tzresult Lwt.t
 
-(** [sc_rollup_cement ctxt source rollup commitment] tries to cement the
-    specified commitment. *)
+(** [sc_rollup_cement ctxt source rollup commitment] tries to cement
+   the specified commitment.
+
+    Optional arguments allow to override defaults:
+
+    {ul {li [?force_reveal:bool]: prepend the operation to reveal
+   [source]'s public key if the latter has not been revealed
+   yet. Enabled (set to [true]) by default.}}*)
 val sc_rollup_cement :
+  ?force_reveal:bool ->
   ?counter:Z.t ->
   ?fee:Tez.tez ->
   ?gas_limit:Gas.Arith.integral ->
