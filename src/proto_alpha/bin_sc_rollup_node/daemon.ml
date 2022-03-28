@@ -23,7 +23,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let on_layer_1_chain_event cctxt chain_event = Inbox.update cctxt chain_event
+let on_layer_1_chain_event cctxt store chain_event =
+  let open Lwt_tzresult_syntax in
+  let* () = Inbox.update cctxt store chain_event in
+  let*! () = Layer1.processed chain_event in
+  return ()
 
 let iter_stream stream handle =
   let rec go () =

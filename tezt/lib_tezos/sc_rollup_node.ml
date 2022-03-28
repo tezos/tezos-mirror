@@ -180,7 +180,7 @@ let wait_for_level sc_node level =
 let handle_event sc_node {name; value} =
   match name with
   | "sc_rollup_node_is_ready.v0" -> set_ready sc_node
-  | "sc_rollup_node_layer_1_new_head.v0" ->
+  | "sc_rollup_node_layer_1_new_head_processed.v0" ->
       let level = JSON.(value |-> "level" |> as_int) in
       update_level sc_node level
   | _ -> ()

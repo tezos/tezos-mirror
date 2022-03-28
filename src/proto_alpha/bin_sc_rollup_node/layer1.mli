@@ -73,3 +73,7 @@ val predecessor : Store.t -> head -> Block_hash.t Lwt.t
 
 (** [genesis_hash] is the hash of the genesis block of the chain. *)
 val genesis_hash : Block_hash.t
+
+(** [processed chain_event] emits a log event to officialize the
+    processing of some layer 1 [chain_event]. *)
+val processed : chain_event -> unit Lwt.t
