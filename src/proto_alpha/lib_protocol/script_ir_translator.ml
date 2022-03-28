@@ -5551,7 +5551,8 @@ let typecheck_code :
   trace (Ill_typed_contract (code, !type_map)) views_result >|=? fun ctxt ->
   (!type_map, ctxt)
 
-let list_entrypoints _ctxt (type full fullc) (full : (full, fullc) ty)
+(* Uncarbonated because used only in RPCs *)
+let list_entrypoints (type full fullc) (full : (full, fullc) ty)
     (entrypoints : full entrypoints) =
   let merge path (type t tc) (ty : (t, tc) ty)
       (entrypoints : t entrypoints_node) reachable ((unreachables, all) as acc)

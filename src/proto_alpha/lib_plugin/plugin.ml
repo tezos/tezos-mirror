@@ -2643,7 +2643,7 @@ module RPC = struct
             ( parse_parameter_ty_and_entrypoints ctxt ~legacy arg_type
             >>? fun (Ex_parameter_ty_and_entrypoints {arg_type; entrypoints}, _)
               ->
-              Script_ir_translator.list_entrypoints ctxt arg_type entrypoints
+              Script_ir_translator.list_entrypoints arg_type entrypoints
               >|? fun (unreachable_entrypoint, map) ->
               ( unreachable_entrypoint,
                 Entrypoint.Map.fold

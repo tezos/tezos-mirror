@@ -428,7 +428,6 @@ val find_entrypoint :
   ('t ex_ty_cstr, 'error_trace) Gas_monad.t
 
 val list_entrypoints :
-  context ->
   ('t, _) Script_typed_ir.ty ->
   't Script_typed_ir.entrypoints ->
   (Michelson_v1_primitives.prim list list
