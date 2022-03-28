@@ -91,9 +91,8 @@ type ('a, 's, 'r, 'f) ex_split_kinstr =
         ('a, 's, 't, 'g) kinstr;
     }
       -> ('a, 's, 't, 'g) ex_split_kinstr
-  | Ex_split_halt : ('a, 's) kinfo -> ('a, 's, 'a, 's) ex_split_kinstr
+  | Ex_split_halt : Script.location -> ('a, 's, 'a, 's) ex_split_kinstr
   | Ex_split_failwith : {
-      kinfo : ('a, 's) kinfo;
       location : Script.location;
       arg_ty : ('a, _) ty;
       cast : ('a, 's) failed_kinstr_cast;
@@ -128,98 +127,98 @@ let kinstr_split :
     (a, s, r, f) kinstr ->
     (a, s, r, f) ex_split_kinstr tzresult =
  fun s i ->
-  let loc = Micheline.dummy_location in
+  let dummy = Micheline.dummy_location in
   match (i, s) with
-  | IDrop (kinfo, k), Item_t (_a, s) ->
+  | IDrop (loc, k), Item_t (_a, s) ->
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> IDrop (kinfo, k));
+             reconstruct = (fun k -> IDrop (loc, k));
            }
-  | IDup (kinfo, k), Item_t (a, s) ->
+  | IDup (loc, k), Item_t (a, s) ->
       let s = Item_t (a, Item_t (a, s)) in
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> IDup (kinfo, k));
+             reconstruct = (fun k -> IDup (loc, k));
            }
-  | ISwap (kinfo, k), Item_t (a, Item_t (b, s)) ->
+  | ISwap (loc, k), Item_t (a, Item_t (b, s)) ->
       let s = Item_t (b, Item_t (a, s)) in
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> ISwap (kinfo, k));
+             reconstruct = (fun k -> ISwap (loc, k));
            }
-  | IConst (kinfo, a, x, k), s ->
+  | IConst (loc, a, x, k), s ->
       let s = Item_t (a, s) in
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> IConst (kinfo, a, x, k));
+             reconstruct = (fun k -> IConst (loc, a, x, k));
            }
-  | ICons_pair (kinfo, k), Item_t (a, Item_t (b, s)) ->
-      pair_t loc a b >|? fun (Ty_ex_c c) ->
+  | ICons_pair (loc, k), Item_t (a, Item_t (b, s)) ->
+      pair_t dummy a b >|? fun (Ty_ex_c c) ->
       let s = Item_t (c, s) in
       Ex_split_kinstr
         {
           cont_init_stack = s;
           continuation = k;
-          reconstruct = (fun k -> ICons_pair (kinfo, k));
+          reconstruct = (fun k -> ICons_pair (loc, k));
         }
-  | ICar (kinfo, k), Item_t (Pair_t (a, _b, _meta, _), s) ->
+  | ICar (loc, k), Item_t (Pair_t (a, _b, _meta, _), s) ->
       let s = Item_t (a, s) in
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> ICar (kinfo, k));
+             reconstruct = (fun k -> ICar (loc, k));
            }
-  | ICdr (kinfo, k), Item_t (Pair_t (_a, b, _meta, _), s) ->
+  | ICdr (loc, k), Item_t (Pair_t (_a, b, _meta, _), s) ->
       let s = Item_t (b, s) in
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> ICdr (kinfo, k));
+             reconstruct = (fun k -> ICdr (loc, k));
            }
-  | IUnpair (kinfo, k), Item_t (Pair_t (a, b, _meta, _), s) ->
+  | IUnpair (loc, k), Item_t (Pair_t (a, b, _meta, _), s) ->
       let s = Item_t (a, Item_t (b, s)) in
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> IUnpair (kinfo, k));
+             reconstruct = (fun k -> IUnpair (loc, k));
            }
-  | ICons_some (kinfo, k), Item_t (a, s) ->
-      option_t loc a >|? fun o ->
+  | ICons_some (loc, k), Item_t (a, s) ->
+      option_t dummy a >|? fun o ->
       let s = Item_t (o, s) in
       Ex_split_kinstr
         {
           cont_init_stack = s;
           continuation = k;
-          reconstruct = (fun k -> ICons_some (kinfo, k));
+          reconstruct = (fun k -> ICons_some (loc, k));
         }
-  | ICons_none (kinfo, a, k), s ->
-      option_t loc a >|? fun o ->
+  | ICons_none (loc, a, k), s ->
+      option_t dummy a >|? fun o ->
       let s = Item_t (o, s) in
       Ex_split_kinstr
         {
           cont_init_stack = s;
           continuation = k;
-          reconstruct = (fun k -> ICons_none (kinfo, a, k));
+          reconstruct = (fun k -> ICons_none (loc, a, k));
         }
-  | ( IIf_none {kinfo; branch_if_none; branch_if_some; k},
+  | ( IIf_none {loc; branch_if_none; branch_if_some; k},
       Item_t (Option_t (a, _meta, _), s) ) ->
       ok
       @@ Ex_split_if
@@ -231,9 +230,9 @@ let kinstr_split :
              continuation = k;
              reconstruct =
                (fun branch_if_none branch_if_some k ->
-                 IIf_none {kinfo; branch_if_none; branch_if_some; k});
+                 IIf_none {loc; branch_if_none; branch_if_some; k});
            }
-  | IOpt_map {kinfo; body; k}, Item_t (Option_t (a, _meta, _), s) ->
+  | IOpt_map {loc; body; k}, Item_t (Option_t (a, _meta, _), s) ->
       ok
       @@ Ex_split_loop_may_not_fail
            {
@@ -242,28 +241,28 @@ let kinstr_split :
              continuation = k;
              aft_body_stack_transform =
                (function
-               | Item_t (b, s) -> option_t loc b >|? fun o -> Item_t (o, s));
-             reconstruct = (fun body k -> IOpt_map {kinfo; body; k});
+               | Item_t (b, s) -> option_t dummy b >|? fun o -> Item_t (o, s));
+             reconstruct = (fun body k -> IOpt_map {loc; body; k});
            }
-  | ICons_left (kinfo, b, k), Item_t (a, s) ->
-      union_t loc a b >|? fun (Ty_ex_c c) ->
+  | ICons_left (loc, b, k), Item_t (a, s) ->
+      union_t dummy a b >|? fun (Ty_ex_c c) ->
       let s = Item_t (c, s) in
       Ex_split_kinstr
         {
           cont_init_stack = s;
           continuation = k;
-          reconstruct = (fun k -> ICons_left (kinfo, b, k));
+          reconstruct = (fun k -> ICons_left (loc, b, k));
         }
-  | ICons_right (kinfo, a, k), Item_t (b, s) ->
-      union_t loc a b >|? fun (Ty_ex_c c) ->
+  | ICons_right (loc, a, k), Item_t (b, s) ->
+      union_t dummy a b >|? fun (Ty_ex_c c) ->
       let s = Item_t (c, s) in
       Ex_split_kinstr
         {
           cont_init_stack = s;
           continuation = k;
-          reconstruct = (fun k -> ICons_right (kinfo, a, k));
+          reconstruct = (fun k -> ICons_right (loc, a, k));
         }
-  | ( IIf_left {kinfo; branch_if_left; branch_if_right; k},
+  | ( IIf_left {loc; branch_if_left; branch_if_right; k},
       Item_t (Union_t (a, b, _meta, _), s) ) ->
       ok
       @@ Ex_split_if
@@ -275,27 +274,27 @@ let kinstr_split :
              continuation = k;
              reconstruct =
                (fun branch_if_left branch_if_right k ->
-                 IIf_left {kinfo; branch_if_left; branch_if_right; k});
+                 IIf_left {loc; branch_if_left; branch_if_right; k});
            }
-  | ICons_list (kinfo, k), Item_t (_a, Item_t (l, s)) ->
+  | ICons_list (loc, k), Item_t (_a, Item_t (l, s)) ->
       let s = Item_t (l, s) in
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> ICons_list (kinfo, k));
+             reconstruct = (fun k -> ICons_list (loc, k));
            }
-  | INil (kinfo, a, k), s ->
-      list_t loc a >|? fun l ->
+  | INil (loc, a, k), s ->
+      list_t dummy a >|? fun l ->
       let s = Item_t (l, s) in
       Ex_split_kinstr
         {
           cont_init_stack = s;
           continuation = k;
-          reconstruct = (fun k -> INil (kinfo, a, k));
+          reconstruct = (fun k -> INil (loc, a, k));
         }
-  | ( IIf_cons {kinfo; branch_if_cons; branch_if_nil; k},
+  | ( IIf_cons {loc; branch_if_cons; branch_if_nil; k},
       Item_t ((List_t (a, _meta) as l), s) ) ->
       ok
       @@ Ex_split_if
@@ -307,9 +306,9 @@ let kinstr_split :
              continuation = k;
              reconstruct =
                (fun branch_if_cons branch_if_nil k ->
-                 IIf_cons {kinfo; branch_if_cons; branch_if_nil; k});
+                 IIf_cons {loc; branch_if_cons; branch_if_nil; k});
            }
-  | IList_map (kinfo, body, k), Item_t (List_t (a, _meta), s) ->
+  | IList_map (loc, body, k), Item_t (List_t (a, _meta), s) ->
       let s = Item_t (a, s) in
       ok
       @@ Ex_split_loop_may_not_fail
@@ -319,10 +318,10 @@ let kinstr_split :
              continuation = k;
              aft_body_stack_transform =
                (function
-               | Item_t (b, s) -> list_t loc b >|? fun l -> Item_t (l, s));
-             reconstruct = (fun body k -> IList_map (kinfo, body, k));
+               | Item_t (b, s) -> list_t dummy b >|? fun l -> Item_t (l, s));
+             reconstruct = (fun body k -> IList_map (loc, body, k));
            }
-  | IList_iter (kinfo, ty, body, k), Item_t (List_t (a, _meta), s) ->
+  | IList_iter (loc, ty, body, k), Item_t (List_t (a, _meta), s) ->
       ok
       @@ Ex_split_loop_may_fail
            {
@@ -330,27 +329,27 @@ let kinstr_split :
              body;
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun body k -> IList_iter (kinfo, ty, body, k));
+             reconstruct = (fun body k -> IList_iter (loc, ty, body, k));
            }
-  | IList_size (kinfo, k), Item_t (_l, s) ->
+  | IList_size (loc, k), Item_t (_l, s) ->
       let s = Item_t (nat_t, s) in
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> IList_size (kinfo, k));
+             reconstruct = (fun k -> IList_size (loc, k));
            }
-  | IEmpty_set (kinfo, a, k), s ->
-      set_t loc a >|? fun b ->
+  | IEmpty_set (loc, a, k), s ->
+      set_t dummy a >|? fun b ->
       let s = Item_t (b, s) in
       Ex_split_kinstr
         {
           cont_init_stack = s;
           continuation = k;
-          reconstruct = (fun k -> IEmpty_set (kinfo, a, k));
+          reconstruct = (fun k -> IEmpty_set (loc, a, k));
         }
-  | ISet_iter (kinfo, a, body, k), Item_t (_b, s) ->
+  | ISet_iter (loc, a, body, k), Item_t (_b, s) ->
       ok
       @@ Ex_split_loop_may_fail
            {
@@ -358,55 +357,56 @@ let kinstr_split :
              body;
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun body k -> ISet_iter (kinfo, a, body, k));
+             reconstruct = (fun body k -> ISet_iter (loc, a, body, k));
            }
-  | ISet_mem (kinfo, k), Item_t (_, Item_t (_, s)) ->
+  | ISet_mem (loc, k), Item_t (_, Item_t (_, s)) ->
       let s = Item_t (bool_t, s) in
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> ISet_mem (kinfo, k));
+             reconstruct = (fun k -> ISet_mem (loc, k));
            }
-  | ISet_update (kinfo, k), Item_t (_, Item_t (_, s)) ->
+  | ISet_update (loc, k), Item_t (_, Item_t (_, s)) ->
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> ISet_update (kinfo, k));
+             reconstruct = (fun k -> ISet_update (loc, k));
            }
-  | ISet_size (kinfo, k), Item_t (_, s) ->
+  | ISet_size (loc, k), Item_t (_, s) ->
       let s = Item_t (nat_t, s) in
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> ISet_size (kinfo, k));
+             reconstruct = (fun k -> ISet_size (loc, k));
            }
-  | IEmpty_map (kinfo, cty, vty, k), s ->
-      map_t loc cty vty >|? fun m ->
+  | IEmpty_map (loc, cty, vty, k), s ->
+      map_t dummy cty vty >|? fun m ->
       let s = Item_t (m, s) in
       Ex_split_kinstr
         {
           cont_init_stack = s;
           continuation = k;
-          reconstruct = (fun k -> IEmpty_map (kinfo, cty, vty, k));
+          reconstruct = (fun k -> IEmpty_map (loc, cty, vty, k));
         }
-  | IMap_map (kinfo, key_ty, body, k), Item_t (Map_t (kty, vty, _meta), s) ->
-      pair_t loc key_ty vty >|? fun (Ty_ex_c p) ->
+  | IMap_map (loc, key_ty, body, k), Item_t (Map_t (kty, vty, _meta), s) ->
+      pair_t dummy key_ty vty >|? fun (Ty_ex_c p) ->
       Ex_split_loop_may_not_fail
         {
           body_init_stack = Item_t (p, s);
           body;
           continuation = k;
           aft_body_stack_transform =
-            (fun (Item_t (b, s)) -> map_t loc kty b >|? fun m -> Item_t (m, s));
-          reconstruct = (fun body k -> IMap_map (kinfo, key_ty, body, k));
+            (fun (Item_t (b, s)) ->
+              map_t dummy kty b >|? fun m -> Item_t (m, s));
+          reconstruct = (fun body k -> IMap_map (loc, key_ty, body, k));
         }
-  | IMap_iter (kinfo, kvty, body, k), Item_t (_, stack) ->
+  | IMap_iter (loc, kvty, body, k), Item_t (_, stack) ->
       ok
       @@ Ex_split_loop_may_fail
            {
@@ -414,448 +414,448 @@ let kinstr_split :
              body;
              cont_init_stack = stack;
              continuation = k;
-             reconstruct = (fun body k -> IMap_iter (kinfo, kvty, body, k));
+             reconstruct = (fun body k -> IMap_iter (loc, kvty, body, k));
            }
-  | IMap_mem (kinfo, k), Item_t (_, Item_t (_, s)) ->
+  | IMap_mem (loc, k), Item_t (_, Item_t (_, s)) ->
       let s = Item_t (bool_t, s) in
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> IMap_mem (kinfo, k));
+             reconstruct = (fun k -> IMap_mem (loc, k));
            }
-  | IMap_get (kinfo, k), Item_t (_, Item_t (Map_t (_kty, vty, _meta), s)) ->
-      option_t loc vty >|? fun o ->
+  | IMap_get (loc, k), Item_t (_, Item_t (Map_t (_kty, vty, _meta), s)) ->
+      option_t dummy vty >|? fun o ->
       let s = Item_t (o, s) in
       Ex_split_kinstr
         {
           cont_init_stack = s;
           continuation = k;
-          reconstruct = (fun k -> IMap_get (kinfo, k));
+          reconstruct = (fun k -> IMap_get (loc, k));
         }
-  | IMap_update (kinfo, k), Item_t (_, Item_t (_, s)) ->
+  | IMap_update (loc, k), Item_t (_, Item_t (_, s)) ->
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> IMap_update (kinfo, k));
+             reconstruct = (fun k -> IMap_update (loc, k));
            }
-  | IMap_get_and_update (kinfo, k), Item_t (_, s) ->
+  | IMap_get_and_update (loc, k), Item_t (_, s) ->
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> IMap_get_and_update (kinfo, k));
+             reconstruct = (fun k -> IMap_get_and_update (loc, k));
            }
-  | IMap_size (kinfo, k), Item_t (_, s) ->
+  | IMap_size (loc, k), Item_t (_, s) ->
       let s = Item_t (nat_t, s) in
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> IMap_size (kinfo, k));
+             reconstruct = (fun k -> IMap_size (loc, k));
            }
-  | IEmpty_big_map (kinfo, cty, ty, k), s ->
-      big_map_t loc cty ty >|? fun b ->
+  | IEmpty_big_map (loc, cty, ty, k), s ->
+      big_map_t dummy cty ty >|? fun b ->
       let s = Item_t (b, s) in
       Ex_split_kinstr
         {
           cont_init_stack = s;
           continuation = k;
-          reconstruct = (fun k -> IEmpty_big_map (kinfo, cty, ty, k));
+          reconstruct = (fun k -> IEmpty_big_map (loc, cty, ty, k));
         }
-  | IBig_map_mem (kinfo, k), Item_t (_, Item_t (_, s)) ->
+  | IBig_map_mem (loc, k), Item_t (_, Item_t (_, s)) ->
       let s = Item_t (bool_t, s) in
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> IBig_map_mem (kinfo, k));
+             reconstruct = (fun k -> IBig_map_mem (loc, k));
            }
-  | IBig_map_get (kinfo, k), Item_t (_, Item_t (Big_map_t (_kty, vty, _meta), s))
+  | IBig_map_get (loc, k), Item_t (_, Item_t (Big_map_t (_kty, vty, _meta), s))
     ->
-      option_t loc vty >|? fun o ->
+      option_t dummy vty >|? fun o ->
       let s = Item_t (o, s) in
       Ex_split_kinstr
         {
           cont_init_stack = s;
           continuation = k;
-          reconstruct = (fun k -> IBig_map_get (kinfo, k));
+          reconstruct = (fun k -> IBig_map_get (loc, k));
         }
-  | IBig_map_update (kinfo, k), Item_t (_, Item_t (_, s)) ->
+  | IBig_map_update (loc, k), Item_t (_, Item_t (_, s)) ->
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> IBig_map_update (kinfo, k));
+             reconstruct = (fun k -> IBig_map_update (loc, k));
            }
-  | IBig_map_get_and_update (kinfo, k), Item_t (_, s) ->
+  | IBig_map_get_and_update (loc, k), Item_t (_, s) ->
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> IBig_map_get_and_update (kinfo, k));
+             reconstruct = (fun k -> IBig_map_get_and_update (loc, k));
            }
-  | IConcat_string (kinfo, k), Item_t (_, s) ->
+  | IConcat_string (loc, k), Item_t (_, s) ->
       let s = Item_t (string_t, s) in
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> IConcat_string (kinfo, k));
+             reconstruct = (fun k -> IConcat_string (loc, k));
            }
-  | IConcat_string_pair (kinfo, k), Item_t (_, s) ->
+  | IConcat_string_pair (loc, k), Item_t (_, s) ->
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> IConcat_string_pair (kinfo, k));
+             reconstruct = (fun k -> IConcat_string_pair (loc, k));
            }
-  | ISlice_string (kinfo, k), Item_t (_, Item_t (_, Item_t (_, s))) ->
+  | ISlice_string (loc, k), Item_t (_, Item_t (_, Item_t (_, s))) ->
       let s = Item_t (option_string_t, s) in
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> ISlice_string (kinfo, k));
+             reconstruct = (fun k -> ISlice_string (loc, k));
            }
-  | IString_size (kinfo, k), Item_t (_, s) ->
+  | IString_size (loc, k), Item_t (_, s) ->
       let s = Item_t (nat_t, s) in
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> IString_size (kinfo, k));
+             reconstruct = (fun k -> IString_size (loc, k));
            }
-  | IConcat_bytes (kinfo, k), Item_t (_, s) ->
+  | IConcat_bytes (loc, k), Item_t (_, s) ->
       let s = Item_t (bytes_t, s) in
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> IConcat_bytes (kinfo, k));
+             reconstruct = (fun k -> IConcat_bytes (loc, k));
            }
-  | IConcat_bytes_pair (kinfo, k), Item_t (_, s) ->
+  | IConcat_bytes_pair (loc, k), Item_t (_, s) ->
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> IConcat_bytes_pair (kinfo, k));
+             reconstruct = (fun k -> IConcat_bytes_pair (loc, k));
            }
-  | ISlice_bytes (kinfo, k), Item_t (_, Item_t (_, Item_t (_, s))) ->
+  | ISlice_bytes (loc, k), Item_t (_, Item_t (_, Item_t (_, s))) ->
       let s = Item_t (option_bytes_t, s) in
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> ISlice_bytes (kinfo, k));
+             reconstruct = (fun k -> ISlice_bytes (loc, k));
            }
-  | IBytes_size (kinfo, k), Item_t (_, s) ->
+  | IBytes_size (loc, k), Item_t (_, s) ->
       let s = Item_t (nat_t, s) in
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> IBytes_size (kinfo, k));
+             reconstruct = (fun k -> IBytes_size (loc, k));
            }
-  | IAdd_seconds_to_timestamp (kinfo, k), Item_t (_, s) ->
+  | IAdd_seconds_to_timestamp (loc, k), Item_t (_, s) ->
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> IAdd_seconds_to_timestamp (kinfo, k));
+             reconstruct = (fun k -> IAdd_seconds_to_timestamp (loc, k));
            }
-  | IAdd_timestamp_to_seconds (kinfo, k), Item_t (_, Item_t (_, s)) ->
+  | IAdd_timestamp_to_seconds (loc, k), Item_t (_, Item_t (_, s)) ->
       let s = Item_t (timestamp_t, s) in
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> IAdd_timestamp_to_seconds (kinfo, k));
+             reconstruct = (fun k -> IAdd_timestamp_to_seconds (loc, k));
            }
-  | ISub_timestamp_seconds (kinfo, k), Item_t (_, Item_t (_, s)) ->
+  | ISub_timestamp_seconds (loc, k), Item_t (_, Item_t (_, s)) ->
       let s = Item_t (timestamp_t, s) in
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> ISub_timestamp_seconds (kinfo, k));
+             reconstruct = (fun k -> ISub_timestamp_seconds (loc, k));
            }
-  | IDiff_timestamps (kinfo, k), Item_t (_, Item_t (_, s)) ->
+  | IDiff_timestamps (loc, k), Item_t (_, Item_t (_, s)) ->
       let s = Item_t (int_t, s) in
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> IDiff_timestamps (kinfo, k));
+             reconstruct = (fun k -> IDiff_timestamps (loc, k));
            }
-  | IAdd_tez (kinfo, k), Item_t (_, s) ->
+  | IAdd_tez (loc, k), Item_t (_, s) ->
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> IAdd_tez (kinfo, k));
+             reconstruct = (fun k -> IAdd_tez (loc, k));
            }
-  | ISub_tez (kinfo, k), Item_t (_, Item_t (_, s)) ->
+  | ISub_tez (loc, k), Item_t (_, Item_t (_, s)) ->
       let s = Item_t (option_mutez_t, s) in
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> ISub_tez (kinfo, k));
+             reconstruct = (fun k -> ISub_tez (loc, k));
            }
-  | ISub_tez_legacy (kinfo, k), Item_t (_, s) ->
+  | ISub_tez_legacy (loc, k), Item_t (_, s) ->
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> ISub_tez_legacy (kinfo, k));
+             reconstruct = (fun k -> ISub_tez_legacy (loc, k));
            }
-  | IMul_teznat (kinfo, k), Item_t (_, Item_t (_, s)) ->
+  | IMul_teznat (loc, k), Item_t (_, Item_t (_, s)) ->
       let s = Item_t (mutez_t, s) in
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> IMul_teznat (kinfo, k));
+             reconstruct = (fun k -> IMul_teznat (loc, k));
            }
-  | IMul_nattez (kinfo, k), Item_t (_, s) ->
+  | IMul_nattez (loc, k), Item_t (_, s) ->
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> IMul_nattez (kinfo, k));
+             reconstruct = (fun k -> IMul_nattez (loc, k));
            }
-  | IEdiv_teznat (kinfo, k), Item_t (_, Item_t (_, s)) ->
+  | IEdiv_teznat (loc, k), Item_t (_, Item_t (_, s)) ->
       let s = Item_t (option_pair_mutez_mutez_t, s) in
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> IEdiv_teznat (kinfo, k));
+             reconstruct = (fun k -> IEdiv_teznat (loc, k));
            }
-  | IEdiv_tez (kinfo, k), Item_t (_, Item_t (_, s)) ->
+  | IEdiv_tez (loc, k), Item_t (_, Item_t (_, s)) ->
       let s = Item_t (option_pair_nat_mutez_t, s) in
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> IEdiv_tez (kinfo, k));
+             reconstruct = (fun k -> IEdiv_tez (loc, k));
            }
-  | IOr (kinfo, k), Item_t (_, s) ->
+  | IOr (loc, k), Item_t (_, s) ->
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> IOr (kinfo, k));
+             reconstruct = (fun k -> IOr (loc, k));
            }
-  | IAnd (kinfo, k), Item_t (_, s) ->
+  | IAnd (loc, k), Item_t (_, s) ->
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> IAnd (kinfo, k));
+             reconstruct = (fun k -> IAnd (loc, k));
            }
-  | IXor (kinfo, k), Item_t (_, s) ->
+  | IXor (loc, k), Item_t (_, s) ->
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> IXor (kinfo, k));
+             reconstruct = (fun k -> IXor (loc, k));
            }
-  | INot (kinfo, k), s ->
+  | INot (loc, k), s ->
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> INot (kinfo, k));
+             reconstruct = (fun k -> INot (loc, k));
            }
-  | IIs_nat (kinfo, k), Item_t (_, s) ->
+  | IIs_nat (loc, k), Item_t (_, s) ->
       let s = Item_t (option_nat_t, s) in
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> IIs_nat (kinfo, k));
+             reconstruct = (fun k -> IIs_nat (loc, k));
            }
-  | INeg (kinfo, k), Item_t (_, s) ->
+  | INeg (loc, k), Item_t (_, s) ->
       let s = Item_t (int_t, s) in
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> INeg (kinfo, k));
+             reconstruct = (fun k -> INeg (loc, k));
            }
-  | IAbs_int (kinfo, k), Item_t (_, s) ->
+  | IAbs_int (loc, k), Item_t (_, s) ->
       let s = Item_t (nat_t, s) in
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> IAbs_int (kinfo, k));
+             reconstruct = (fun k -> IAbs_int (loc, k));
            }
-  | IInt_nat (kinfo, k), Item_t (_, s) ->
+  | IInt_nat (loc, k), Item_t (_, s) ->
       let s = Item_t (int_t, s) in
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> IInt_nat (kinfo, k));
+             reconstruct = (fun k -> IInt_nat (loc, k));
            }
-  | IAdd_int (kinfo, k), Item_t (_, Item_t (_, s)) ->
+  | IAdd_int (loc, k), Item_t (_, Item_t (_, s)) ->
       let s = Item_t (int_t, s) in
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> IAdd_int (kinfo, k));
+             reconstruct = (fun k -> IAdd_int (loc, k));
            }
-  | IAdd_nat (kinfo, k), Item_t (_, s) ->
+  | IAdd_nat (loc, k), Item_t (_, s) ->
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> IAdd_nat (kinfo, k));
+             reconstruct = (fun k -> IAdd_nat (loc, k));
            }
-  | ISub_int (kinfo, k), Item_t (_, Item_t (_, s)) ->
+  | ISub_int (loc, k), Item_t (_, Item_t (_, s)) ->
       let s = Item_t (int_t, s) in
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> ISub_int (kinfo, k));
+             reconstruct = (fun k -> ISub_int (loc, k));
            }
-  | IMul_int (kinfo, k), Item_t (_, Item_t (_, s)) ->
+  | IMul_int (loc, k), Item_t (_, Item_t (_, s)) ->
       let s = Item_t (int_t, s) in
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> IMul_int (kinfo, k));
+             reconstruct = (fun k -> IMul_int (loc, k));
            }
-  | IMul_nat (kinfo, k), Item_t (_, s) ->
+  | IMul_nat (loc, k), Item_t (_, s) ->
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> IMul_nat (kinfo, k));
+             reconstruct = (fun k -> IMul_nat (loc, k));
            }
-  | IEdiv_int (kinfo, k), Item_t (_, Item_t (_, s)) ->
+  | IEdiv_int (loc, k), Item_t (_, Item_t (_, s)) ->
       let s = Item_t (option_pair_int_nat_t, s) in
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> IEdiv_int (kinfo, k));
+             reconstruct = (fun k -> IEdiv_int (loc, k));
            }
-  | IEdiv_nat (kinfo, k), Item_t (_, Item_t (a, s)) ->
-      pair_t loc a nat_t >>? fun (Ty_ex_c p) ->
-      option_t loc p >|? fun o ->
+  | IEdiv_nat (loc, k), Item_t (_, Item_t (a, s)) ->
+      pair_t dummy a nat_t >>? fun (Ty_ex_c p) ->
+      option_t dummy p >|? fun o ->
       let s = Item_t (o, s) in
       Ex_split_kinstr
         {
           cont_init_stack = s;
           continuation = k;
-          reconstruct = (fun k -> IEdiv_nat (kinfo, k));
+          reconstruct = (fun k -> IEdiv_nat (loc, k));
         }
-  | ILsl_nat (kinfo, k), Item_t (_, s) ->
+  | ILsl_nat (loc, k), Item_t (_, s) ->
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> ILsl_nat (kinfo, k));
+             reconstruct = (fun k -> ILsl_nat (loc, k));
            }
-  | ILsr_nat (kinfo, k), Item_t (_, s) ->
+  | ILsr_nat (loc, k), Item_t (_, s) ->
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> ILsr_nat (kinfo, k));
+             reconstruct = (fun k -> ILsr_nat (loc, k));
            }
-  | IOr_nat (kinfo, k), Item_t (_, s) ->
+  | IOr_nat (loc, k), Item_t (_, s) ->
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> IOr_nat (kinfo, k));
+             reconstruct = (fun k -> IOr_nat (loc, k));
            }
-  | IAnd_nat (kinfo, k), Item_t (_, s) ->
+  | IAnd_nat (loc, k), Item_t (_, s) ->
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> IAnd_nat (kinfo, k));
+             reconstruct = (fun k -> IAnd_nat (loc, k));
            }
-  | IAnd_int_nat (kinfo, k), Item_t (_, s) ->
+  | IAnd_int_nat (loc, k), Item_t (_, s) ->
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> IAnd_int_nat (kinfo, k));
+             reconstruct = (fun k -> IAnd_int_nat (loc, k));
            }
-  | IXor_nat (kinfo, k), Item_t (_, s) ->
+  | IXor_nat (loc, k), Item_t (_, s) ->
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> IXor_nat (kinfo, k));
+             reconstruct = (fun k -> IXor_nat (loc, k));
            }
-  | INot_int (kinfo, k), Item_t (_, s) ->
+  | INot_int (loc, k), Item_t (_, s) ->
       let s = Item_t (int_t, s) in
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> INot_int (kinfo, k));
+             reconstruct = (fun k -> INot_int (loc, k));
            }
-  | IIf {kinfo; branch_if_true; branch_if_false; k}, Item_t (_, s) ->
+  | IIf {loc; branch_if_true; branch_if_false; k}, Item_t (_, s) ->
       ok
       @@ Ex_split_if
            {
@@ -866,9 +866,9 @@ let kinstr_split :
              continuation = k;
              reconstruct =
                (fun branch_if_true branch_if_false k ->
-                 IIf {kinfo; branch_if_true; branch_if_false; k});
+                 IIf {loc; branch_if_true; branch_if_false; k});
            }
-  | ILoop (kinfo, body, k), Item_t (_, s) ->
+  | ILoop (loc, body, k), Item_t (_, s) ->
       ok
       @@ Ex_split_loop_may_fail
            {
@@ -876,9 +876,9 @@ let kinstr_split :
              body;
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun body k -> ILoop (kinfo, body, k));
+             reconstruct = (fun body k -> ILoop (loc, body, k));
            }
-  | ILoop_left (kinfo, kl, kr), Item_t (Union_t (a, b, _meta, _), s) ->
+  | ILoop_left (loc, kl, kr), Item_t (Union_t (a, b, _meta, _), s) ->
       ok
       @@ Ex_split_loop_may_fail
            {
@@ -886,9 +886,9 @@ let kinstr_split :
              body = kl;
              cont_init_stack = Item_t (b, s);
              continuation = kr;
-             reconstruct = (fun kl kr -> ILoop_left (kinfo, kl, kr));
+             reconstruct = (fun kl kr -> ILoop_left (loc, kl, kr));
            }
-  | IDip (kinfo, body, k), Item_t (a, s) ->
+  | IDip (loc, body, k), Item_t (a, s) ->
       ok
       @@ Ex_split_loop_may_not_fail
            {
@@ -896,159 +896,154 @@ let kinstr_split :
              body;
              continuation = k;
              aft_body_stack_transform = (fun s -> ok @@ Item_t (a, s));
-             reconstruct = (fun body k -> IDip (kinfo, body, k));
+             reconstruct = (fun body k -> IDip (loc, body, k));
            }
-  | IExec (kinfo, k), Item_t (_, Item_t (Lambda_t (_, b, _meta), s)) ->
+  | IExec (loc, k), Item_t (_, Item_t (Lambda_t (_, b, _meta), s)) ->
       let s = Item_t (b, s) in
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> IExec (kinfo, k));
+             reconstruct = (fun k -> IExec (loc, k));
            }
-  | ( IApply (kinfo, ty, k),
+  | ( IApply (loc, ty, k),
       Item_t (_, Item_t (Lambda_t (Pair_t (_, a, _, _), b, _), s)) ) ->
-      lambda_t loc a b >|? fun l ->
+      lambda_t dummy a b >|? fun l ->
       let s = Item_t (l, s) in
       Ex_split_kinstr
         {
           cont_init_stack = s;
           continuation = k;
-          reconstruct = (fun k -> IApply (kinfo, ty, k));
+          reconstruct = (fun k -> IApply (loc, ty, k));
         }
-  | ILambda (kinfo, l, k), s ->
+  | ILambda (loc, l, k), s ->
       let (Lam (desc, _)) = l in
       let (Item_t (a, Bot_t)) = desc.kbef in
       let (Item_t (b, Bot_t)) = desc.kaft in
-      lambda_t loc a b >|? fun lam ->
+      lambda_t dummy a b >|? fun lam ->
       let s = Item_t (lam, s) in
       Ex_split_kinstr
         {
           cont_init_stack = s;
           continuation = k;
-          reconstruct = (fun k -> ILambda (kinfo, l, k));
+          reconstruct = (fun k -> ILambda (loc, l, k));
         }
-  | IFailwith (kinfo, location, arg_ty), _ ->
+  | IFailwith (location, arg_ty), _ ->
       ok
       @@ Ex_split_failwith
-           {
-             kinfo;
-             location;
-             arg_ty;
-             cast = {cast = IFailwith (kinfo, location, arg_ty)};
-           }
-  | ICompare (kinfo, ty, k), Item_t (_, Item_t (_, s)) ->
+           {location; arg_ty; cast = {cast = IFailwith (location, arg_ty)}}
+  | ICompare (loc, ty, k), Item_t (_, Item_t (_, s)) ->
       let s = Item_t (int_t, s) in
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> ICompare (kinfo, ty, k));
+             reconstruct = (fun k -> ICompare (loc, ty, k));
            }
-  | IEq (kinfo, k), Item_t (_, s) ->
+  | IEq (loc, k), Item_t (_, s) ->
       let s = Item_t (bool_t, s) in
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> IEq (kinfo, k));
+             reconstruct = (fun k -> IEq (loc, k));
            }
-  | INeq (kinfo, k), Item_t (_, s) ->
+  | INeq (loc, k), Item_t (_, s) ->
       let s = Item_t (bool_t, s) in
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> INeq (kinfo, k));
+             reconstruct = (fun k -> INeq (loc, k));
            }
-  | ILt (kinfo, k), Item_t (_, s) ->
+  | ILt (loc, k), Item_t (_, s) ->
       let s = Item_t (bool_t, s) in
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> ILt (kinfo, k));
+             reconstruct = (fun k -> ILt (loc, k));
            }
-  | IGt (kinfo, k), Item_t (_, s) ->
+  | IGt (loc, k), Item_t (_, s) ->
       let s = Item_t (bool_t, s) in
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> IGt (kinfo, k));
+             reconstruct = (fun k -> IGt (loc, k));
            }
-  | ILe (kinfo, k), Item_t (_, s) ->
+  | ILe (loc, k), Item_t (_, s) ->
       let s = Item_t (bool_t, s) in
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> ILe (kinfo, k));
+             reconstruct = (fun k -> ILe (loc, k));
            }
-  | IGe (kinfo, k), Item_t (_, s) ->
+  | IGe (loc, k), Item_t (_, s) ->
       let s = Item_t (bool_t, s) in
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> IGe (kinfo, k));
+             reconstruct = (fun k -> IGe (loc, k));
            }
-  | IAddress (kinfo, k), Item_t (_, s) ->
+  | IAddress (loc, k), Item_t (_, s) ->
       let s = Item_t (address_t, s) in
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> IAddress (kinfo, k));
+             reconstruct = (fun k -> IAddress (loc, k));
            }
-  | IContract (kinfo, ty, code, k), Item_t (_, s) ->
-      contract_t loc ty >>? fun c ->
-      option_t loc c >|? fun o ->
+  | IContract (loc, ty, code, k), Item_t (_, s) ->
+      contract_t dummy ty >>? fun c ->
+      option_t dummy c >|? fun o ->
       let s = Item_t (o, s) in
       Ex_split_kinstr
         {
           cont_init_stack = s;
           continuation = k;
-          reconstruct = (fun k -> IContract (kinfo, ty, code, k));
+          reconstruct = (fun k -> IContract (loc, ty, code, k));
         }
-  | ITransfer_tokens (kinfo, k), Item_t (_, Item_t (_, Item_t (_, s))) ->
+  | ITransfer_tokens (loc, k), Item_t (_, Item_t (_, Item_t (_, s))) ->
       let s = Item_t (operation_t, s) in
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> ITransfer_tokens (kinfo, k));
+             reconstruct = (fun k -> ITransfer_tokens (loc, k));
            }
-  | ( IView (kinfo, (View_signature {output_ty; _} as view_signature), k),
+  | ( IView (loc, (View_signature {output_ty; _} as view_signature), k),
       Item_t (_, Item_t (_, s)) ) ->
-      option_t loc output_ty >|? fun b ->
+      option_t dummy output_ty >|? fun b ->
       let s = Item_t (b, s) in
       Ex_split_kinstr
         {
           cont_init_stack = s;
           continuation = k;
-          reconstruct = (fun k -> IView (kinfo, view_signature, k));
+          reconstruct = (fun k -> IView (loc, view_signature, k));
         }
-  | IImplicit_account (kinfo, k), Item_t (_, s) ->
+  | IImplicit_account (loc, k), Item_t (_, s) ->
       let s = Item_t (contract_unit_t, s) in
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> IImplicit_account (kinfo, k));
+             reconstruct = (fun k -> IImplicit_account (loc, k));
            }
-  | ( ICreate_contract {kinfo; storage_type; code; k},
+  | ( ICreate_contract {loc; storage_type; code; k},
       Item_t (_, Item_t (_, Item_t (_, s))) ) ->
       ok
       @@ Ex_split_kinstr
@@ -1056,179 +1051,179 @@ let kinstr_split :
              cont_init_stack = Item_t (operation_t, Item_t (address_t, s));
              continuation = k;
              reconstruct =
-               (fun k -> ICreate_contract {kinfo; storage_type; code; k});
+               (fun k -> ICreate_contract {loc; storage_type; code; k});
            }
-  | ISet_delegate (kinfo, k), Item_t (_, s) ->
+  | ISet_delegate (loc, k), Item_t (_, s) ->
       let s = Item_t (operation_t, s) in
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> ISet_delegate (kinfo, k));
+             reconstruct = (fun k -> ISet_delegate (loc, k));
            }
-  | INow (kinfo, k), s ->
+  | INow (loc, k), s ->
       let s = Item_t (timestamp_t, s) in
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> INow (kinfo, k));
+             reconstruct = (fun k -> INow (loc, k));
            }
-  | IBalance (kinfo, k), s ->
+  | IBalance (loc, k), s ->
       let s = Item_t (mutez_t, s) in
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> IBalance (kinfo, k));
+             reconstruct = (fun k -> IBalance (loc, k));
            }
-  | ILevel (kinfo, k), s ->
+  | ILevel (loc, k), s ->
       let s = Item_t (nat_t, s) in
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> ILevel (kinfo, k));
+             reconstruct = (fun k -> ILevel (loc, k));
            }
-  | ICheck_signature (kinfo, k), Item_t (_, Item_t (_, Item_t (_, s))) ->
+  | ICheck_signature (loc, k), Item_t (_, Item_t (_, Item_t (_, s))) ->
       let s = Item_t (bool_t, s) in
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> ICheck_signature (kinfo, k));
+             reconstruct = (fun k -> ICheck_signature (loc, k));
            }
-  | IHash_key (kinfo, k), Item_t (_, s) ->
+  | IHash_key (loc, k), Item_t (_, s) ->
       let s = Item_t (key_hash_t, s) in
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> IHash_key (kinfo, k));
+             reconstruct = (fun k -> IHash_key (loc, k));
            }
-  | IPack (kinfo, ty, k), Item_t (_, s) ->
+  | IPack (loc, ty, k), Item_t (_, s) ->
       let s = Item_t (bytes_t, s) in
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> IPack (kinfo, ty, k));
+             reconstruct = (fun k -> IPack (loc, ty, k));
            }
-  | IUnpack (kinfo, ty, k), Item_t (_, s) ->
-      option_t loc ty >|? fun o ->
+  | IUnpack (loc, ty, k), Item_t (_, s) ->
+      option_t dummy ty >|? fun o ->
       let s = Item_t (o, s) in
       Ex_split_kinstr
         {
           cont_init_stack = s;
           continuation = k;
-          reconstruct = (fun k -> IUnpack (kinfo, ty, k));
+          reconstruct = (fun k -> IUnpack (loc, ty, k));
         }
-  | IBlake2b (kinfo, k), s ->
+  | IBlake2b (loc, k), s ->
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> IBlake2b (kinfo, k));
+             reconstruct = (fun k -> IBlake2b (loc, k));
            }
-  | ISha256 (kinfo, k), s ->
+  | ISha256 (loc, k), s ->
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> ISha256 (kinfo, k));
+             reconstruct = (fun k -> ISha256 (loc, k));
            }
-  | ISha512 (kinfo, k), s ->
+  | ISha512 (loc, k), s ->
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> ISha512 (kinfo, k));
+             reconstruct = (fun k -> ISha512 (loc, k));
            }
-  | ISource (kinfo, k), s ->
+  | ISource (loc, k), s ->
       let s = Item_t (address_t, s) in
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> ISource (kinfo, k));
+             reconstruct = (fun k -> ISource (loc, k));
            }
-  | ISender (kinfo, k), s ->
+  | ISender (loc, k), s ->
       let s = Item_t (address_t, s) in
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> ISender (kinfo, k));
+             reconstruct = (fun k -> ISender (loc, k));
            }
-  | ISelf (kinfo, ty, ep, k), s ->
-      contract_t loc ty >|? fun c ->
+  | ISelf (loc, ty, ep, k), s ->
+      contract_t dummy ty >|? fun c ->
       let s = Item_t (c, s) in
       Ex_split_kinstr
         {
           cont_init_stack = s;
           continuation = k;
-          reconstruct = (fun k -> ISelf (kinfo, ty, ep, k));
+          reconstruct = (fun k -> ISelf (loc, ty, ep, k));
         }
-  | ISelf_address (kinfo, k), s ->
+  | ISelf_address (loc, k), s ->
       let s = Item_t (address_t, s) in
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> ISelf_address (kinfo, k));
+             reconstruct = (fun k -> ISelf_address (loc, k));
            }
-  | IAmount (kinfo, k), s ->
+  | IAmount (loc, k), s ->
       let s = Item_t (mutez_t, s) in
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> IAmount (kinfo, k));
+             reconstruct = (fun k -> IAmount (loc, k));
            }
-  | ISapling_empty_state (kinfo, memo_size, k), s ->
+  | ISapling_empty_state (loc, memo_size, k), s ->
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = Item_t (sapling_state_t ~memo_size, s);
              continuation = k;
-             reconstruct = (fun k -> ISapling_empty_state (kinfo, memo_size, k));
+             reconstruct = (fun k -> ISapling_empty_state (loc, memo_size, k));
            }
-  | ( ISapling_verify_update_deprecated (kinfo, k),
-      Item_t (_, Item_t (state_ty, s)) ) ->
-      pair_t loc int_t state_ty >>? fun (Ty_ex_c pair_ty) ->
-      option_t loc pair_ty >|? fun ty ->
+  | ISapling_verify_update_deprecated (loc, k), Item_t (_, Item_t (state_ty, s))
+    ->
+      pair_t dummy int_t state_ty >>? fun (Ty_ex_c pair_ty) ->
+      option_t dummy pair_ty >|? fun ty ->
       Ex_split_kinstr
         {
           cont_init_stack = Item_t (ty, s);
           continuation = k;
-          reconstruct = (fun k -> ISapling_verify_update_deprecated (kinfo, k));
+          reconstruct = (fun k -> ISapling_verify_update_deprecated (loc, k));
         }
-  | ISapling_verify_update (kinfo, k), Item_t (_, Item_t (state_ty, s)) ->
-      pair_t loc int_t state_ty >>? fun (Ty_ex_c int_state_ty) ->
-      pair_t loc bytes_t int_state_ty >>? fun (Ty_ex_c pair_ty) ->
-      option_t loc pair_ty >|? fun ty ->
+  | ISapling_verify_update (loc, k), Item_t (_, Item_t (state_ty, s)) ->
+      pair_t dummy int_t state_ty >>? fun (Ty_ex_c int_state_ty) ->
+      pair_t dummy bytes_t int_state_ty >>? fun (Ty_ex_c pair_ty) ->
+      option_t dummy pair_ty >|? fun ty ->
       let s = Item_t (ty, s) in
       Ex_split_kinstr
         {
           cont_init_stack = s;
           continuation = k;
-          reconstruct = (fun k -> ISapling_verify_update (kinfo, k));
+          reconstruct = (fun k -> ISapling_verify_update (loc, k));
         }
-  | IDig (kinfo, n, p, k), s ->
+  | IDig (loc, n, p, k), s ->
       let (Item_t (b, s)) = stack_prefix_preservation_witness_split_input p s in
       let s = stack_prefix_preservation_witness_split_output p s in
       let s = Item_t (b, s) in
@@ -1237,9 +1232,9 @@ let kinstr_split :
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> IDig (kinfo, n, p, k));
+             reconstruct = (fun k -> IDig (loc, n, p, k));
            }
-  | IDug (kinfo, n, p, k), Item_t (a, s) ->
+  | IDug (loc, n, p, k), Item_t (a, s) ->
       let s = stack_prefix_preservation_witness_split_input p s in
       let s = Item_t (a, s) in
       let s = stack_prefix_preservation_witness_split_output p s in
@@ -1248,9 +1243,9 @@ let kinstr_split :
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> IDug (kinfo, n, p, k));
+             reconstruct = (fun k -> IDug (loc, n, p, k));
            }
-  | IDipn (kinfo, n, p, k1, k2), s ->
+  | IDipn (loc, n, p, k1, k2), s ->
       ok
       @@ Ex_split_loop_may_not_fail
            {
@@ -1260,174 +1255,173 @@ let kinstr_split :
              aft_body_stack_transform =
                (fun s ->
                  ok @@ stack_prefix_preservation_witness_split_output p s);
-             reconstruct = (fun k1 k2 -> IDipn (kinfo, n, p, k1, k2));
+             reconstruct = (fun k1 k2 -> IDipn (loc, n, p, k1, k2));
            }
-  | IDropn (kinfo, n, p, k), s ->
+  | IDropn (loc, n, p, k), s ->
       let s = stack_prefix_preservation_witness_split_input p s in
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> IDropn (kinfo, n, p, k));
+             reconstruct = (fun k -> IDropn (loc, n, p, k));
            }
-  | IChainId (kinfo, k), s ->
+  | IChainId (loc, k), s ->
       let s = Item_t (chain_id_t, s) in
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> IChainId (kinfo, k));
+             reconstruct = (fun k -> IChainId (loc, k));
            }
-  | INever kinfo, Item_t (arg_ty, _) ->
+  | INever location, Item_t (arg_ty, _) ->
       ok
-      @@ Ex_split_failwith
-           {kinfo; location = loc; arg_ty; cast = {cast = INever kinfo}}
-  | IVoting_power (kinfo, k), Item_t (_, s) ->
+      @@ Ex_split_failwith {location; arg_ty; cast = {cast = INever location}}
+  | IVoting_power (loc, k), Item_t (_, s) ->
       let s = Item_t (nat_t, s) in
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> IVoting_power (kinfo, k));
+             reconstruct = (fun k -> IVoting_power (loc, k));
            }
-  | ITotal_voting_power (kinfo, k), s ->
+  | ITotal_voting_power (loc, k), s ->
       let s = Item_t (nat_t, s) in
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> ITotal_voting_power (kinfo, k));
+             reconstruct = (fun k -> ITotal_voting_power (loc, k));
            }
-  | IKeccak (kinfo, k), s ->
+  | IKeccak (loc, k), s ->
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> IKeccak (kinfo, k));
+             reconstruct = (fun k -> IKeccak (loc, k));
            }
-  | ISha3 (kinfo, k), s ->
+  | ISha3 (loc, k), s ->
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> ISha3 (kinfo, k));
+             reconstruct = (fun k -> ISha3 (loc, k));
            }
-  | IAdd_bls12_381_g1 (kinfo, k), Item_t (_, s) ->
+  | IAdd_bls12_381_g1 (loc, k), Item_t (_, s) ->
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> IAdd_bls12_381_g1 (kinfo, k));
+             reconstruct = (fun k -> IAdd_bls12_381_g1 (loc, k));
            }
-  | IAdd_bls12_381_g2 (kinfo, k), Item_t (_, s) ->
+  | IAdd_bls12_381_g2 (loc, k), Item_t (_, s) ->
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> IAdd_bls12_381_g2 (kinfo, k));
+             reconstruct = (fun k -> IAdd_bls12_381_g2 (loc, k));
            }
-  | IAdd_bls12_381_fr (kinfo, k), Item_t (_, s) ->
+  | IAdd_bls12_381_fr (loc, k), Item_t (_, s) ->
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> IAdd_bls12_381_fr (kinfo, k));
+             reconstruct = (fun k -> IAdd_bls12_381_fr (loc, k));
            }
-  | IMul_bls12_381_g1 (kinfo, k), Item_t (g1, Item_t (_, s)) ->
+  | IMul_bls12_381_g1 (loc, k), Item_t (g1, Item_t (_, s)) ->
       let s = Item_t (g1, s) in
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> IMul_bls12_381_g1 (kinfo, k));
+             reconstruct = (fun k -> IMul_bls12_381_g1 (loc, k));
            }
-  | IMul_bls12_381_g2 (kinfo, k), Item_t (g2, Item_t (_, s)) ->
+  | IMul_bls12_381_g2 (loc, k), Item_t (g2, Item_t (_, s)) ->
       let s = Item_t (g2, s) in
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> IMul_bls12_381_g2 (kinfo, k));
+             reconstruct = (fun k -> IMul_bls12_381_g2 (loc, k));
            }
-  | IMul_bls12_381_fr (kinfo, k), Item_t (_, s) ->
+  | IMul_bls12_381_fr (loc, k), Item_t (_, s) ->
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> IMul_bls12_381_fr (kinfo, k));
+             reconstruct = (fun k -> IMul_bls12_381_fr (loc, k));
            }
-  | IMul_bls12_381_z_fr (kinfo, k), Item_t (fr, Item_t (_, s)) ->
+  | IMul_bls12_381_z_fr (loc, k), Item_t (fr, Item_t (_, s)) ->
       let s = Item_t (fr, s) in
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> IMul_bls12_381_z_fr (kinfo, k));
+             reconstruct = (fun k -> IMul_bls12_381_z_fr (loc, k));
            }
-  | IMul_bls12_381_fr_z (kinfo, k), Item_t (_, s) ->
+  | IMul_bls12_381_fr_z (loc, k), Item_t (_, s) ->
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> IMul_bls12_381_fr_z (kinfo, k));
+             reconstruct = (fun k -> IMul_bls12_381_fr_z (loc, k));
            }
-  | IInt_bls12_381_fr (kinfo, k), Item_t (_, s) ->
+  | IInt_bls12_381_fr (loc, k), Item_t (_, s) ->
       let s = Item_t (int_t, s) in
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> IInt_bls12_381_fr (kinfo, k));
+             reconstruct = (fun k -> IInt_bls12_381_fr (loc, k));
            }
-  | INeg_bls12_381_g1 (kinfo, k), s ->
+  | INeg_bls12_381_g1 (loc, k), s ->
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> INeg_bls12_381_g1 (kinfo, k));
+             reconstruct = (fun k -> INeg_bls12_381_g1 (loc, k));
            }
-  | INeg_bls12_381_g2 (kinfo, k), s ->
+  | INeg_bls12_381_g2 (loc, k), s ->
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> INeg_bls12_381_g2 (kinfo, k));
+             reconstruct = (fun k -> INeg_bls12_381_g2 (loc, k));
            }
-  | INeg_bls12_381_fr (kinfo, k), s ->
+  | INeg_bls12_381_fr (loc, k), s ->
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> INeg_bls12_381_fr (kinfo, k));
+             reconstruct = (fun k -> INeg_bls12_381_fr (loc, k));
            }
-  | IPairing_check_bls12_381 (kinfo, k), Item_t (_, s) ->
+  | IPairing_check_bls12_381 (loc, k), Item_t (_, s) ->
       let s = Item_t (bool_t, s) in
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> IPairing_check_bls12_381 (kinfo, k));
+             reconstruct = (fun k -> IPairing_check_bls12_381 (loc, k));
            }
-  | IComb (kinfo, n, p, k), s ->
+  | IComb (loc, n, p, k), s ->
       let rec aux :
           type a b s c d t.
           (a, b * s) stack_ty ->
@@ -1438,16 +1432,16 @@ let kinstr_split :
         | Comb_one, s -> ok s
         | Comb_succ w, Item_t (a, s) ->
             aux s w >>? fun (Item_t (c, t)) ->
-            pair_t loc a c >|? fun (Ty_ex_c p) -> Item_t (p, t)
+            pair_t dummy a c >|? fun (Ty_ex_c p) -> Item_t (p, t)
       in
       aux s p >|? fun s ->
       Ex_split_kinstr
         {
           cont_init_stack = s;
           continuation = k;
-          reconstruct = (fun k -> IComb (kinfo, n, p, k));
+          reconstruct = (fun k -> IComb (loc, n, p, k));
         }
-  | IUncomb (kinfo, n, p, k), s ->
+  | IUncomb (loc, n, p, k), s ->
       let rec aux :
           type a b s c d t.
           (a, b * s) stack_ty ->
@@ -1466,9 +1460,9 @@ let kinstr_split :
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> IUncomb (kinfo, n, p, k));
+             reconstruct = (fun k -> IUncomb (loc, n, p, k));
            }
-  | IComb_get (kinfo, n, p, k), Item_t (c, s) ->
+  | IComb_get (loc, n, p, k), Item_t (c, s) ->
       let rec aux :
           type c cc a. (c, cc) ty -> (c, a) comb_get_gadt_witness -> a ty_ex_c =
        fun c w ->
@@ -1486,9 +1480,9 @@ let kinstr_split :
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> IComb_get (kinfo, n, p, k));
+             reconstruct = (fun k -> IComb_get (loc, n, p, k));
            }
-  | IComb_set (kinfo, n, p, k), Item_t (a, Item_t (b, s)) ->
+  | IComb_set (loc, n, p, k), Item_t (a, Item_t (b, s)) ->
       let rec aux :
           type a b c ca cb.
           (a, ca) ty ->
@@ -1498,9 +1492,9 @@ let kinstr_split :
        fun a b w ->
         match (w, b) with
         | Comb_set_zero, _ -> ok (Ty_ex_c a)
-        | Comb_set_one, Pair_t (_hd, tl, _meta, _) -> pair_t loc a tl
+        | Comb_set_one, Pair_t (_hd, tl, _meta, _) -> pair_t dummy a tl
         | Comb_set_plus_two w, Pair_t (hd, tl, _meta, _) ->
-            aux a tl w >>? fun (Ty_ex_c c) -> pair_t loc hd c
+            aux a tl w >>? fun (Ty_ex_c c) -> pair_t dummy hd c
       in
       aux a b p >|? fun (Ty_ex_c c) ->
       let s = Item_t (c, s) in
@@ -1508,9 +1502,9 @@ let kinstr_split :
         {
           cont_init_stack = s;
           continuation = k;
-          reconstruct = (fun k -> IComb_set (kinfo, n, p, k));
+          reconstruct = (fun k -> IComb_set (loc, n, p, k));
         }
-  | IDup_n (kinfo, n, p, k), s ->
+  | IDup_n (loc, n, p, k), s ->
       let rec aux :
           type a b s t.
           (a, b * s) stack_ty -> (a, b, s, t) dup_n_gadt_witness -> t ty_ex_c =
@@ -1528,72 +1522,72 @@ let kinstr_split :
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> IDup_n (kinfo, n, p, k));
+             reconstruct = (fun k -> IDup_n (loc, n, p, k));
            }
-  | ITicket (kinfo, cty, k), Item_t (_, Item_t (_, s)) ->
-      ticket_t loc cty >|? fun t ->
+  | ITicket (loc, cty, k), Item_t (_, Item_t (_, s)) ->
+      ticket_t dummy cty >|? fun t ->
       let s = Item_t (t, s) in
       Ex_split_kinstr
         {
           cont_init_stack = s;
           continuation = k;
-          reconstruct = (fun k -> ITicket (kinfo, cty, k));
+          reconstruct = (fun k -> ITicket (loc, cty, k));
         }
-  | IRead_ticket (kinfo, a, k), s ->
-      pair_t loc a nat_t >>? fun (Ty_ex_c p) ->
-      pair_t loc address_t p >|? fun (Ty_ex_c t) ->
+  | IRead_ticket (loc, a, k), s ->
+      pair_t dummy a nat_t >>? fun (Ty_ex_c p) ->
+      pair_t dummy address_t p >|? fun (Ty_ex_c t) ->
       let s = Item_t (t, s) in
       Ex_split_kinstr
         {
           cont_init_stack = s;
           continuation = k;
-          reconstruct = (fun k -> IRead_ticket (kinfo, a, k));
+          reconstruct = (fun k -> IRead_ticket (loc, a, k));
         }
-  | ISplit_ticket (kinfo, k), Item_t (t, Item_t (_, s)) ->
-      pair_t loc t t >>? fun (Ty_ex_c p) ->
-      option_t loc p >|? fun o ->
+  | ISplit_ticket (loc, k), Item_t (t, Item_t (_, s)) ->
+      pair_t dummy t t >>? fun (Ty_ex_c p) ->
+      option_t dummy p >|? fun o ->
       let s = Item_t (o, s) in
       Ex_split_kinstr
         {
           cont_init_stack = s;
           continuation = k;
-          reconstruct = (fun k -> ISplit_ticket (kinfo, k));
+          reconstruct = (fun k -> ISplit_ticket (loc, k));
         }
-  | IJoin_tickets (kinfo, ty, k), Item_t (Pair_t (t, _t, _meta, _), s) ->
-      option_t loc t >|? fun o ->
+  | IJoin_tickets (loc, ty, k), Item_t (Pair_t (t, _t, _meta, _), s) ->
+      option_t dummy t >|? fun o ->
       let s = Item_t (o, s) in
       Ex_split_kinstr
         {
           cont_init_stack = s;
           continuation = k;
-          reconstruct = (fun k -> IJoin_tickets (kinfo, ty, k));
+          reconstruct = (fun k -> IJoin_tickets (loc, ty, k));
         }
-  | IOpen_chest (kinfo, k), Item_t (_, Item_t (_, Item_t (_, s))) ->
+  | IOpen_chest (loc, k), Item_t (_, Item_t (_, Item_t (_, s))) ->
       let s = Item_t (union_bytes_bool_t, s) in
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> IOpen_chest (kinfo, k));
+             reconstruct = (fun k -> IOpen_chest (loc, k));
            }
-  | IMin_block_time (kinfo, k), s ->
+  | IMin_block_time (loc, k), s ->
       let s = Item_t (nat_t, s) in
       ok
       @@ Ex_split_kinstr
            {
              cont_init_stack = s;
              continuation = k;
-             reconstruct = (fun k -> IMin_block_time (kinfo, k));
+             reconstruct = (fun k -> IMin_block_time (loc, k));
            }
-  | IHalt kinfo, _s -> ok @@ Ex_split_halt kinfo
-  | ILog (kinfo, _stack_ty, event, logger, continuation), stack ->
+  | IHalt loc, _s -> ok @@ Ex_split_halt loc
+  | ILog (loc, _stack_ty, event, logger, continuation), stack ->
       ok
       @@ Ex_split_log
            {
              stack;
              continuation;
-             reconstruct = (fun k -> ILog (kinfo, s, event, logger, k));
+             reconstruct = (fun k -> ILog (loc, s, event, logger, k));
            }
 
 let rec kinstr_final_stack_type :
@@ -1687,19 +1681,17 @@ let kinstr_rewritek :
         (f.apply left_init_stack left_branch)
         (f.apply right_init_stack right_branch)
         k
-  | Ex_split_halt kinfo -> ok @@ IHalt kinfo
-  | Ex_split_failwith {kinfo; location; arg_ty; _} ->
-      ok @@ IFailwith (kinfo, location, arg_ty)
+  | Ex_split_halt loc -> ok @@ IHalt loc
+  | Ex_split_failwith {location; arg_ty; _} -> ok @@ IFailwith (location, arg_ty)
 
 let log_entry logger ctxt gas k sty accu stack =
-  let kinfo = kinfo_of_kinstr k in
   let ctxt = Local_gas_counter.update_context gas ctxt in
-  logger.log_entry k ctxt kinfo.iloc sty (accu, stack)
+  logger.log_entry k ctxt (kinstr_location k) sty (accu, stack)
 
-let log_exit logger ctxt gas kinfo_prev k sty accu stack =
-  let _kinfo = kinfo_of_kinstr k in
+let log_exit logger ctxt gas loc_prev k sty accu stack =
+  let _loc = kinstr_location k in
   let ctxt = Local_gas_counter.update_context gas ctxt in
-  logger.log_exit k ctxt kinfo_prev.iloc sty (accu, stack)
+  logger.log_exit k ctxt loc_prev sty (accu, stack)
 
 let log_control logger ks = logger.log_control ks
 
@@ -1710,7 +1702,7 @@ let get_log = function
 
 (* [log_kinstr logger i] emits an instruction to instrument the
    execution of [i] with [logger]. *)
-let log_kinstr logger sty i = ILog (kinfo_of_kinstr i, sty, LogEntry, logger, i)
+let log_kinstr logger sty i = ILog (kinstr_location i, sty, LogEntry, logger, i)
 
 (* [log_next_kinstr logger i] instruments the next instruction of [i]
    with the [logger].
@@ -1727,9 +1719,9 @@ let log_kinstr logger sty i = ILog (kinfo_of_kinstr i, sty, LogEntry, logger, i)
 let log_next_kinstr logger sty i =
   let apply sty k =
     ILog
-      ( kinfo_of_kinstr k,
+      ( kinstr_location k,
         sty,
-        LogExit (kinfo_of_kinstr i),
+        LogExit (kinstr_location i),
         logger,
         log_kinstr logger sty k )
   in

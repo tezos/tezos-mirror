@@ -416,8 +416,8 @@ let rec kundip :
     a * s * (e, z, b, t) kinstr =
  fun w accu stack k ->
   match w with
-  | KPrefix (kinfo, ty, w) ->
-      let k = IConst (kinfo, ty, accu, k) in
+  | KPrefix (loc, ty, w) ->
+      let k = IConst (loc, ty, accu, k) in
       let accu, stack = stack in
       kundip w accu stack k
   | KRest -> (accu, stack, k)
@@ -440,13 +440,11 @@ let apply ctxt gas capture_ty capture lam =
           kbef = arg_stack_ty;
           kaft = descr.kaft;
           kinstr =
-            (let kinfo_const = {iloc = descr.kloc} in
-             let kinfo_pair = {iloc = descr.kloc} in
-             IConst
-               ( kinfo_const,
-                 capture_ty,
-                 capture,
-                 ICons_pair (kinfo_pair, descr.kinstr) ));
+            IConst
+              ( descr.kloc,
+                capture_ty,
+                capture,
+                ICons_pair (descr.kloc, descr.kinstr) );
         }
       in
       let full_expr =
@@ -818,7 +816,7 @@ type ('a, 'b, 'c, 'd, 'e, 'f) imul_teznat_type =
   logger option ->
   outdated_context * step_constants ->
   local_gas_counter ->
-  (Tez.t, 'a) kinfo ->
+  Script.location ->
   (Tez.t, 'b, 'c, 'd) kinstr ->
   ('c, 'd, 'e, 'f) continuation ->
   Tez.t ->
@@ -829,7 +827,7 @@ type ('a, 'b, 'c, 'd, 'e, 'f) imul_nattez_type =
   logger option ->
   outdated_context * step_constants ->
   local_gas_counter ->
-  (Script_int.n Script_int.num, 'a) kinfo ->
+  Script.location ->
   (Tez.t, 'b, 'c, 'd) kinstr ->
   ('c, 'd, 'e, 'f) continuation ->
   Script_int.n Script_int.num ->
@@ -840,7 +838,7 @@ type ('a, 'b, 'c, 'd, 'e, 'f) ilsl_nat_type =
   logger option ->
   outdated_context * step_constants ->
   local_gas_counter ->
-  (Script_int.n Script_int.num, 'a) kinfo ->
+  Script.location ->
   (Script_int.n Script_int.num, 'b, 'c, 'd) kinstr ->
   ('c, 'd, 'e, 'f) continuation ->
   Script_int.n Script_int.num ->
@@ -851,7 +849,7 @@ type ('a, 'b, 'c, 'd, 'e, 'f) ilsr_nat_type =
   logger option ->
   outdated_context * step_constants ->
   local_gas_counter ->
-  (Script_int.n Script_int.num, 'a) kinfo ->
+  Script.location ->
   (Script_int.n Script_int.num, 'b, 'c, 'd) kinstr ->
   ('c, 'd, 'e, 'f) continuation ->
   Script_int.n Script_int.num ->

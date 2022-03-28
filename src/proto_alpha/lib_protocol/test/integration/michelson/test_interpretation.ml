@@ -101,6 +101,8 @@ let test_multiplication_close_to_overflow_passes () =
   | Error errs ->
       Alcotest.failf "Unexpected error: %a" Error_monad.pp_print_trace errs
 
+let dummy_loc = -1
+
 (** The purpose of these two tests is to check that the Michelson interpreter is
     stack-safe (because it is tail-recursive).
 
@@ -122,14 +124,13 @@ let test_stack_overflow () =
   in
   let stack = Bot_t in
   let descr kinstr = {kloc = 0; kbef = stack; kaft = stack; kinstr} in
-  let kinfo = {iloc = -1} in
-  let kinfo' = {iloc = -1} in
   let enorme_et_seq n =
     let rec aux n acc =
       if n = 0 then acc
-      else aux (n - 1) (IConst (kinfo, Bool_t, true, IDrop (kinfo', acc)))
+      else
+        aux (n - 1) (IConst (dummy_loc, Bool_t, true, IDrop (dummy_loc, acc)))
     in
-    aux n (IHalt kinfo)
+    aux n (IHalt dummy_loc)
   in
   run_step ctxt (descr (enorme_et_seq 1_000_000)) EmptyCell EmptyCell
   >>= function
@@ -153,8 +154,7 @@ let test_stack_overflow_in_lwt () =
   in
   let stack = Bot_t in
   let descr kinstr = {kloc = 0; kbef = stack; kaft = stack; kinstr} in
-  let kinfo = {iloc = -1} in
-  let push_empty_big_map k = IEmpty_big_map (kinfo, unit_t, unit_t, k) in
+  let push_empty_big_map k = IEmpty_big_map (dummy_loc, unit_t, unit_t, k) in
   let large_mem_seq n =
     let rec aux n acc =
       if n = 0 then acc
@@ -162,12 +162,14 @@ let test_stack_overflow_in_lwt () =
         aux
           (n - 1)
           (IDup
-             ( kinfo,
+             ( dummy_loc,
                IConst
-                 (kinfo, Unit_t, (), IBig_map_mem (kinfo, IDrop (kinfo, acc)))
-             ))
+                 ( dummy_loc,
+                   Unit_t,
+                   (),
+                   IBig_map_mem (dummy_loc, IDrop (dummy_loc, acc)) ) ))
     in
-    aux n (IDrop (kinfo, IHalt kinfo))
+    aux n (IDrop (dummy_loc, IHalt dummy_loc))
   in
   let script = push_empty_big_map (large_mem_seq 1_000_000) in
   run_step ctxt (descr script) EmptyCell EmptyCell >>= function

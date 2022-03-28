@@ -47,7 +47,7 @@ val log_exit :
   Script_typed_ir.logger ->
   Local_gas_counter.outdated_context ->
   Local_gas_counter.local_gas_counter ->
-  ('a, 'b) Script_typed_ir.kinfo ->
+  Alpha_context.Script.location ->
   ('c, 'd, 'e, 'f) Script_typed_ir.kinstr ->
   ('g, 'h) Script_typed_ir.stack_ty ->
   'g ->

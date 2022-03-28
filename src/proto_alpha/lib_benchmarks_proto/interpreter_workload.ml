@@ -1309,7 +1309,7 @@ let extract_ir_sized_step :
   | IExec (_, _), _ -> Instructions.exec
   | IApply (_, _, _), _ -> Instructions.apply
   | ILambda (_, _, _), _ -> Instructions.lambda
-  | IFailwith (_, _, _), _ -> Instructions.failwith_
+  | IFailwith (_, _), _ -> Instructions.failwith_
   | ICompare (_, cmp_ty, _), (a, (b, _)) ->
       extract_compare_sized_step cmp_ty a b
   | IEq (_, _), _ -> Instructions.eq

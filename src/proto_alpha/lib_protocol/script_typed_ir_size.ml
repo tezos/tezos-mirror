@@ -145,7 +145,7 @@ let peano_shape_proof =
   fun k -> scale *? k
 
 let stack_prefix_preservation_witness_size =
-  let scale = h3w in
+  let scale = header_size +! h2w in
   fun k -> scale *? k
 
 let comb_gadt_witness_size = peano_shape_proof
@@ -196,8 +196,6 @@ let chest_key_size _ =
   let unlocked_value_size = 256 in
   let proof_size = 256 in
   h2w +? (unlocked_value_size + proof_size)
-
-let kinfo_size = !!0
 
 (* The following mutually recursive functions are mostly
    tail-recursive and the only recursive call that is not a tailcall
@@ -339,7 +337,7 @@ and kinstr_size :
     (a, s, r, f) kinstr ->
     nodes_and_size =
  fun ~count_lambda_nodes accu t ->
-  let base = h2w +! kinfo_size in
+  let base = h2w in
   let apply :
       type a s r f. nodes_and_size -> (a, s, r, f) kinstr -> nodes_and_size =
    fun accu t ->
@@ -454,7 +452,8 @@ and kinstr_size :
     | ILambda (_, lambda, _) ->
         let accu = ret_succ_adding accu (base +! word_size) in
         (lambda_size [@ocaml.tailcall]) ~count_lambda_nodes accu lambda
-    | IFailwith (_, _, ty) -> ret_succ_adding (accu ++ ty_size ty) base
+    | IFailwith (_, ty) ->
+        ret_succ_adding (accu ++ ty_size ty) base
     | ICompare (_, cty, _) ->
         ret_succ_adding (accu ++ ty_size cty) (base +! word_size)
     | IEq (_, _) -> ret_succ_adding accu base
@@ -519,7 +518,7 @@ and kinstr_size :
           accu
           (base +! (word_size *? 2) +! stack_prefix_preservation_witness_size n)
     | IChainId (_, _) -> ret_succ_adding accu base
-    | INever _ -> ret_succ_adding accu h1w
+    | INever _loc -> ret_succ_adding accu h1w
     | IVoting_power (_, _) -> ret_succ_adding accu base
     | ITotal_voting_power (_, _) -> ret_succ_adding accu base
     | IKeccak (_, _) -> ret_succ_adding accu base
@@ -565,7 +564,7 @@ and kinstr_size :
     | IJoin_tickets (_, cty, _) ->
         ret_succ_adding (accu ++ ty_size cty) (base +! word_size)
     | IOpen_chest (_, _) -> ret_succ_adding accu base
-    | IHalt _ -> ret_succ_adding accu (h1w +! kinfo_size)
+    | IHalt _ -> ret_succ_adding accu h1w
     | ILog _ ->
         (* This instruction is ignored because it is only used for testing. *)
         accu
