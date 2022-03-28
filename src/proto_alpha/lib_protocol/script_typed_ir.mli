@@ -279,7 +279,7 @@ type view = {
 
 type view_map = (Script_string.t, view) map
 
-type present_entrypoint = {name : Entrypoint.t}
+type present_entrypoint = {name : Entrypoint.t; original_type : Script.node}
 
 (** ['arg entrypoints] represents the tree of entrypoints of a parameter type
     ['arg].

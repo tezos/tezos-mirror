@@ -421,7 +421,7 @@ type view = {
 
 type view_map = (Script_string.t, view) map
 
-type present_entrypoint = {name : Entrypoint.t}
+type present_entrypoint = {name : Entrypoint.t; original_type : Script.node}
 
 type 'arg entrypoints_node = {
   at_node : present_entrypoint option;
