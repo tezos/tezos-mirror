@@ -27,23 +27,6 @@
 
 open Tx_rollup_errors_repr
 
-let size :
-    Raw_context.t ->
-    Tx_rollup_level_repr.t ->
-    Tx_rollup_repr.t ->
-    (Raw_context.t * int) tzresult Lwt.t =
- fun ctxt level tx_rollup ->
-  Storage.Tx_rollup.Inbox.find (ctxt, level) tx_rollup >>=? function
-  | (ctxt, Some {cumulated_size; _}) -> return (ctxt, cumulated_size)
-  | (ctxt, None) ->
-      (*
-        Prior to raising an error related to the missing inbox, we
-        check whether or not the transaction rollup address is valid,
-        to raise the appropriate error if need be.
-       *)
-      Tx_rollup_state_storage.assert_exist ctxt tx_rollup >>=? fun _ctxt ->
-      fail (Inbox_does_not_exist (tx_rollup, level))
-
 let find :
     Raw_context.t ->
     Tx_rollup_level_repr.t ->
@@ -145,14 +128,13 @@ let prepare_inbox :
       >>=? fun (ctxt, state) ->
       (* We need a new inbox *)
       Tx_rollup_state_repr.record_inbox_creation state level
-      >>?= fun (state, tx_level) ->
+      >>?= fun (state, tx_level, paid_storage_space_diff) ->
       let inbox = Tx_rollup_inbox_repr.empty in
       Storage.Tx_rollup.Inbox.init (ctxt, tx_level) rollup inbox
-      >>=? fun (ctxt, inbox_size_alloc) ->
-      Tx_rollup_state_repr.adjust_storage_allocation
-        state
-        ~delta:(Z.of_int inbox_size_alloc)
-      >>?= fun (state, paid_storage_space_diff) ->
+      >>=? fun (ctxt, _inbox_size_alloc) ->
+      (* Storage accounting is done by
+         [Tx_rollup_state_repr.record_inbox_creation], so we can
+         ignore [inbox_size_alloc]. *)
       return (ctxt, state, tx_level, inbox, paid_storage_space_diff)
 
 (** [update_inbox inbox msg_size] updates [metadata] to account
@@ -221,18 +203,10 @@ let remove :
     Raw_context.t ->
     Tx_rollup_level_repr.t ->
     Tx_rollup_repr.t ->
-    Tx_rollup_state_repr.t ->
-    (Raw_context.t * Tx_rollup_state_repr.t) tzresult Lwt.t =
- fun ctxt level rollup state ->
+    Raw_context.t tzresult Lwt.t =
+ fun ctxt level rollup ->
   Storage.Tx_rollup.Inbox.remove (ctxt, level) rollup
-  >>=? fun (ctxt, freed, _) ->
-  let delta = Z.of_int freed |> Z.neg in
-  (* while we free storage space and adjust storage
-     allocation, the returned [_paid_storage_size_diff]
-     is always 0. Therefore, we neglect
-     [_paid_storage_size_diff]. *)
-  Tx_rollup_state_repr.adjust_storage_allocation state ~delta
-  >>?= fun (state, _paid_storage_size_diff) -> return (ctxt, state)
+  >>=? fun (ctxt, _freed, _) -> return ctxt
 
 let check_message_hash :
     Raw_context.t ->

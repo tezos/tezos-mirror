@@ -1747,6 +1747,7 @@ module Tx_rollup_state : sig
       ?commitment_newest_hash:Tx_rollup_commitment_hash.t ->
       ?tezos_head_level:Raw_level.t ->
       ?occupied_storage:Z.t ->
+      ?commitments_watermark:Tx_rollup_level.t ->
       allocated_storage:Z.t ->
       unit ->
       t
@@ -1769,6 +1770,10 @@ module Tx_rollup_state : sig
     val next_commitment_level : t -> Raw_level.t -> Tx_rollup_level.t tzresult
 
     val uncommitted_inboxes_count : t -> int
+
+    val reset_commitments_watermark : t -> t
+
+    val get_commitments_watermark : t -> Tx_rollup_level.t option
   end
 end
 
@@ -1866,6 +1871,8 @@ module Tx_rollup_inbox : sig
 
   type t = {inbox_length : int; cumulated_size : int; merkle_root : Merkle.root}
 
+  val size : Z.t
+
   val ( = ) : t -> t -> bool
 
   val pp : Format.formatter -> t -> unit
@@ -1878,12 +1885,6 @@ module Tx_rollup_inbox : sig
     Tx_rollup_state.t ->
     Tx_rollup_message.t ->
     (context * Tx_rollup_state.t * Z.t) tzresult Lwt.t
-
-  val size :
-    context ->
-    Tx_rollup_level.t ->
-    Tx_rollup.t ->
-    (context * int) tzresult Lwt.t
 
   val get :
     context -> Tx_rollup_level.t -> Tx_rollup.t -> (context * t) tzresult Lwt.t

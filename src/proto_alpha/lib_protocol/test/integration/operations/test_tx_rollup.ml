@@ -1641,7 +1641,7 @@ let test_storage_burn_for_commitment () =
         ~pos:__POS__
         zestable
         msg
-        (Z.of_int expected_delta)
+        expected_delta
         Z.(sub size_after size_before))
   in
   let tx_rollup_origination_size = 1 in
@@ -1656,9 +1656,10 @@ let test_storage_burn_for_commitment () =
   Op.tx_rollup_commit (I i) contract tx_rollup commitment >>=? fun op ->
   Incremental.add_operation i op >>=? fun i ->
   occupied_storage_size (I i) tx_rollup >>=? fun storage_size_after_commit ->
-  (* no storage burn for commitment because of the bond *)
-  let commitment_add_delta = 0 in
-  let commitment_remove_delta = 0 in
+  (* adding a commitment frees the inbox storage *)
+  let commitment_add_delta = Z.neg Tx_rollup_inbox.size in
+  (* removing a commitment doesn't change anything storage burn related *)
+  let commitment_remove_delta = Z.zero in
   check_storage_delta
     ~__POS__
     "Size increase after adding commitment"
@@ -1670,17 +1671,9 @@ let test_storage_burn_for_commitment () =
   Op.tx_rollup_finalize (B b) contract tx_rollup >>=? fun op ->
   Block.bake ~operation:op b >>=? fun b ->
   occupied_storage_size (B b) tx_rollup >>=? fun freed_space_after_finalize ->
-  let inbox_delta =
-    -1
-    * Data_encoding.Binary.length
-        Tx_rollup_inbox.encoding
-        Tx_rollup_inbox.
-          {
-            cumulated_size = 0;
-            inbox_length = 0;
-            merkle_root = Merkle.merklize_list [];
-          }
-  in
+  (* the inbox does not allocate anything, because it was already
+     allocated by a freed inboxes *)
+  let inbox_delta = Z.zero in
   check_storage_delta
     ~__POS__
     "Storage space is freed after finalize"
@@ -1693,7 +1686,7 @@ let test_storage_burn_for_commitment () =
   Block.bake b ~operation >>=? fun b ->
   occupied_storage_size (B b) tx_rollup
   >>=? fun freed_space_after_remove_commitment ->
-  let commitment_remove_delta = -commitment_remove_delta in
+  let commitment_remove_delta = Z.neg commitment_remove_delta in
   check_storage_delta
     ~__POS__
     "Storage space is freed after removing commitment"
@@ -1705,7 +1698,7 @@ let test_storage_burn_for_commitment () =
   Block.bake b ~operation >>=? fun b ->
   occupied_storage_size (B b) tx_rollup
   >>=? fun freed_space_after_return_bond ->
-  let bond_remove_delta = 0 in
+  let bond_remove_delta = Z.zero in
   check_storage_delta
     ~__POS__
     "Storage space is freed after removing bond"
@@ -3315,7 +3308,12 @@ let test_state () =
       tx_rollup_state_testable_no_storage
       "state unchanged by commit/reject at root"
       initial_state
-      state_after_reject) ;
+      (Tx_rollup_state.Internal_for_tests.reset_commitments_watermark
+         state_after_reject)) ;
+  assert (
+    Tx_rollup_state.Internal_for_tests.get_commitments_watermark
+      state_after_reject
+    = Some Tx_rollup_level.root) ;
   (* Commit an incorrect commitment again *)
   Op.tx_rollup_commit (B b) account1 tx_rollup commit1 >>=? fun operation ->
   Block.bake b ~operation >>=? fun b ->
@@ -3339,7 +3337,8 @@ let test_state () =
       tx_rollup_state_testable_no_storage
       "state unchanged by commit/reject at root"
       initial_state
-      state_after_reject) ;
+      (Tx_rollup_state.Internal_for_tests.reset_commitments_watermark
+         state_after_reject)) ;
   (* Commit twice *)
   let commit1 =
     Tx_rollup_commitment.
@@ -3501,13 +3500,13 @@ let test_state_message_storage_preallocation () =
   in
   (* The size an empty inbox as created in
      {!Tx_rollup_inbox_storage.prepare_inbox}. *)
-  let inbox_preparation = 40 in
+  let inbox_preparation = Tx_rollup_inbox.size in
   Alcotest.check
     ~pos:__POS__
     zestable
     "the storage occupied by the first message is the size of the inbox plus \
      the preallocation for commiting the message"
-    (Z.of_int inbox_preparation)
+    inbox_preparation
     (Z.sub occupied_storage_after occupied_storage_before) ;
   let occupied_storage_before =
     Tx_rollup_state.Internal_for_tests.get_occupied_storage state

@@ -117,10 +117,12 @@ let encoding =
 let empty =
   {inbox_length = 0; cumulated_size = 0; merkle_root = Merkle_list.empty}
 
+let size = Z.of_int @@ Data_encoding.Binary.length encoding empty
+
 let pp fmt {inbox_length; cumulated_size; merkle_root} =
   Format.fprintf
     fmt
-    "Inbox with length %d, size %d and merkle root %a"
+    "Inbox with length %d, size %d, merkle root %a"
     inbox_length
     cumulated_size
     Merkle.pp_root

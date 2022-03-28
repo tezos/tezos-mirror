@@ -123,13 +123,13 @@ val next_commitment_predecessor : t -> Tx_rollup_commitment_repr.Hash.t option
 (** [record_inbox_creation state level] updates the state of a rollup
     to take into account the creation of of a new inbox at the given
     Tezos [level], and returns the rollup level to associate to this
-    inbox.
+    inbox and the number of bytes allocated for the inbox.
 
     This function may return an [Internal_error] iff an inbox has
     already been created at a level greater (or equal) than
     [level]. It is the responsibility of the caller to avoid that. *)
 val record_inbox_creation :
-  t -> Raw_level_repr.t -> (t * Tx_rollup_level_repr.t) tzresult
+  t -> Raw_level_repr.t -> (t * Tx_rollup_level_repr.t * Z.t) tzresult
 
 (** [record_inbox_deletion state level] updates [state] to take into
     account the deletion of the inbox stored at Tezos [level] from the
@@ -234,6 +234,7 @@ module Internal_for_tests : sig
     ?commitment_newest_hash:Tx_rollup_commitment_repr.Hash.t ->
     ?tezos_head_level:Raw_level_repr.t ->
     ?occupied_storage:Z.t ->
+    ?commitments_watermark:Tx_rollup_level_repr.t ->
     allocated_storage:Z.t ->
     unit ->
     t
@@ -247,4 +248,8 @@ module Internal_for_tests : sig
   val get_allocated_storage : t -> Z.t
 
   val set_allocated_storage : Z.t -> t -> t
+
+  val reset_commitments_watermark : t -> t
+
+  val get_commitments_watermark : t -> Tx_rollup_level_repr.t option
 end

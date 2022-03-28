@@ -115,6 +115,15 @@ let pp_range fmt = function
           Tx_rollup_level_repr.pp
           newest)
 
+type watermark = Tx_rollup_level_repr.t option
+
+let is_above_watermark watermark level =
+  match watermark with
+  | Some watermark -> Tx_rollup_level_repr.(watermark < level)
+  | None -> true
+
+let make_watermark level = Some level
+
 (** The state of a transaction rollup is composed of [burn_per_byte]
     and [inbox_ema] fields. [initial_state] introduces their initial
     values. Both values are updated by [update_burn_per_byte] as the
@@ -159,6 +168,7 @@ type t = {
   inbox_ema : int;
   allocated_storage : Z.t;
   occupied_storage : Z.t;
+  commitments_watermark : watermark;
 }
 
 (*
@@ -218,6 +228,7 @@ let initial_state ~pre_allocated_storage =
     inbox_ema = 0;
     allocated_storage = pre_allocated_storage;
     occupied_storage = Z.zero;
+    commitments_watermark = None;
   }
 
 let encoding : t Data_encoding.t =
@@ -234,27 +245,30 @@ let encoding : t Data_encoding.t =
            allocated_storage;
            occupied_storage;
            inbox_ema;
+           commitments_watermark;
          } ->
-      ( last_removed_commitment_hashes,
-        finalized_commitments,
-        unfinalized_commitments,
-        uncommitted_inboxes,
-        commitment_newest_hash,
-        tezos_head_level,
-        burn_per_byte,
-        allocated_storage,
-        occupied_storage,
-        inbox_ema ))
-    (fun ( last_removed_commitment_hashes,
-           finalized_commitments,
-           unfinalized_commitments,
-           uncommitted_inboxes,
-           commitment_newest_hash,
-           tezos_head_level,
-           burn_per_byte,
-           allocated_storage,
-           occupied_storage,
-           inbox_ema ) ->
+      ( ( last_removed_commitment_hashes,
+          finalized_commitments,
+          unfinalized_commitments,
+          uncommitted_inboxes,
+          commitment_newest_hash,
+          tezos_head_level,
+          burn_per_byte,
+          allocated_storage,
+          occupied_storage,
+          inbox_ema ),
+        commitments_watermark ))
+    (fun ( ( last_removed_commitment_hashes,
+             finalized_commitments,
+             unfinalized_commitments,
+             uncommitted_inboxes,
+             commitment_newest_hash,
+             tezos_head_level,
+             burn_per_byte,
+             allocated_storage,
+             occupied_storage,
+             inbox_ema ),
+           commitments_watermark ) ->
       {
         last_removed_commitment_hashes;
         finalized_commitments;
@@ -266,27 +280,33 @@ let encoding : t Data_encoding.t =
         allocated_storage;
         occupied_storage;
         inbox_ema;
+        commitments_watermark;
       })
-    (obj10
-       (req
-          "last_removed_commitment_hashes"
-          (option
-          @@ obj2
-               (req
-                  "last_message_hash"
-                  Tx_rollup_message_result_hash_repr.encoding)
-               (req "commitment_hash" Tx_rollup_commitment_repr.Hash.encoding)))
-       (req "finalized_commitments" range_encoding)
-       (req "unfinalized_commitments" range_encoding)
-       (req "uncommitted_inboxes" range_encoding)
-       (req
-          "commitment_newest_hash"
-          (option Tx_rollup_commitment_repr.Hash.encoding))
-       (req "tezos_head_level" (option Raw_level_repr.encoding))
-       (req "burn_per_byte" Tez_repr.encoding)
-       (req "allocated_storage" n)
-       (req "occupied_storage" n)
-       (req "inbox_ema" int31))
+    (merge_objs
+       (obj10
+          (req
+             "last_removed_commitment_hashes"
+             (option
+             @@ obj2
+                  (req
+                     "last_message_hash"
+                     Tx_rollup_message_result_hash_repr.encoding)
+                  (req
+                     "commitment_hash"
+                     Tx_rollup_commitment_repr.Hash.encoding)))
+          (req "finalized_commitments" range_encoding)
+          (req "unfinalized_commitments" range_encoding)
+          (req "uncommitted_inboxes" range_encoding)
+          (req
+             "commitment_newest_hash"
+             (option Tx_rollup_commitment_repr.Hash.encoding))
+          (req "tezos_head_level" (option Raw_level_repr.encoding))
+          (req "burn_per_byte" Tez_repr.encoding)
+          (req "allocated_storage" n)
+          (req "occupied_storage" n)
+          (req "inbox_ema" int31))
+       (obj1
+          (req "commitments_watermark" @@ option Tx_rollup_level_repr.encoding)))
 
 let pp fmt
     {
@@ -300,6 +320,7 @@ let pp fmt
       allocated_storage;
       occupied_storage;
       inbox_ema;
+      commitments_watermark;
     } =
   Format.(
     fprintf
@@ -308,7 +329,7 @@ let pp fmt
        unfinalized_commitments: %a uncommitted_inboxes: %a \
        commitment_newest_hash: %a tezos_head_level: %a \
        last_removed_commitment_hashes: %a allocated_storage: %a \
-       occupied_storage: %a"
+       occupied_storage: %a commitments_watermark: %a"
       Tez_repr.pp
       burn_per_byte
       inbox_ema
@@ -334,7 +355,9 @@ let pp fmt
       Z.pp_print
       allocated_storage
       Z.pp_print
-      occupied_storage)
+      occupied_storage
+      (pp_print_option Tx_rollup_level_repr.pp)
+      commitments_watermark)
 
 let adjust_storage_allocation : t -> delta:Z.t -> (t * Z.t) tzresult =
  fun state ~delta ->
@@ -449,7 +472,12 @@ let record_inbox_creation t level =
   | None -> ok ())
   >>? fun () ->
   let (uncommitted_inboxes, new_level) = extend t.uncommitted_inboxes in
-  ok ({t with tezos_head_level = Some level; uncommitted_inboxes}, new_level)
+  adjust_storage_allocation t ~delta:Tx_rollup_inbox_repr.size
+  >>? fun (t, diff) ->
+  ok
+    ( {t with tezos_head_level = Some level; uncommitted_inboxes},
+      new_level,
+      diff )
 
 let next_commitment_predecessor state = state.commitment_newest_hash
 
@@ -508,13 +536,22 @@ let record_commitment_creation state level hash =
       >>? fun () ->
       shrink state.uncommitted_inboxes >>? fun uncommitted_inboxes ->
       let (unfinalized_commitments, _) = extend state.unfinalized_commitments in
-      ok
+      let state =
         {
           state with
           uncommitted_inboxes;
           unfinalized_commitments;
           commitment_newest_hash = Some hash;
         }
+      in
+      if is_above_watermark state.commitments_watermark level then
+        (* See {{Note inbox}} in [Tx_rollup_commitment_storage] for
+           why it is safe to “free” the inbox storage when it is
+           committed too. *)
+        adjust_storage_allocation state ~delta:(Z.neg Tx_rollup_inbox_repr.size)
+        >>? fun (state, _) ->
+        ok {state with commitments_watermark = make_watermark level}
+      else ok state
   | None ->
       error (Internal_error "Cannot create a commitment due to lack of inbox")
 
@@ -621,6 +658,7 @@ module Internal_for_tests = struct
       ?commitment_newest_hash:Tx_rollup_commitment_repr.Hash.t ->
       ?tezos_head_level:Raw_level_repr.t ->
       ?occupied_storage:Z.t ->
+      ?commitments_watermark:Tx_rollup_level_repr.t ->
       allocated_storage:Z.t ->
       unit ->
       t =
@@ -633,6 +671,7 @@ module Internal_for_tests = struct
        ?commitment_newest_hash
        ?tezos_head_level
        ?(occupied_storage = Z.zero)
+       ?commitments_watermark
        ~allocated_storage
        () ->
     let to_range = function
@@ -657,6 +696,7 @@ module Internal_for_tests = struct
       uncommitted_inboxes;
       commitment_newest_hash;
       tezos_head_level;
+      commitments_watermark;
     }
 
   let get_inbox_ema : t -> int = fun {inbox_ema; _} -> inbox_ema
@@ -672,4 +712,10 @@ module Internal_for_tests = struct
 
   let set_allocated_storage : Z.t -> t -> t =
    fun allocated_storage st -> {st with allocated_storage}
+
+  let reset_commitments_watermark : t -> t =
+   fun st -> {st with commitments_watermark = None}
+
+  let get_commitments_watermark : t -> Tx_rollup_level_repr.t option =
+   fun st -> st.commitments_watermark
 end

@@ -65,11 +65,16 @@ module Merkle : sig
   val merklize_list : Tx_rollup_message_repr.hash list -> root
 end
 
-(** The view of an inbox: stores the [cumulated_size] in bytes for
-    the inbox, the [inbox_length] ({i i.e.}, the number of messages),
-    and the cumulative [hash] of the inbox contents. For newly created
-    inboxes, the [hash] is initialized as an array 32 null byte. *)
+(** The view of an inbox: stores the [cumulated_size] in bytes for the
+    inbox, the [inbox_length] ({i i.e.}, the number of messages), and
+    the cumulative [hash] of the inbox contents. For newly created
+    inboxes, the [hash] is initialized as an array 32 null
+    byte. *)
 type t = {inbox_length : int; cumulated_size : int; merkle_root : Merkle.root}
+
+(** [size] is the number of bytes necessary to store an inbox in the
+    layer-1 storage. *)
+val size : Z.t
 
 val ( = ) : t -> t -> bool
 

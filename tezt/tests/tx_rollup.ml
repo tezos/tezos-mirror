@@ -1156,7 +1156,7 @@ let test_rollup_bond_return =
   let batch_commit_finalize =
     let current_calls_counter = ref 0 in
     let step msg = Log.info "call %d) - %s" !current_calls_counter msg in
-    fun ?(finalize = true) ~rollup_level () ->
+    fun ?(finalize = true) ?(remove = true) ~rollup_level () ->
       incr current_calls_counter ;
 
       step "1. Submit batch" ;
@@ -1186,8 +1186,18 @@ let test_rollup_bond_return =
       else
         let () = step "5. Submit finalize_commitment and bake" in
         let*! () = submit_finalize_commitment state in
-        let* () = check_bond_is ~src client ~expected:commit_bond in
-        Client.bake_for client
+        if not remove then unit
+        else (
+          step "6. Repeat bake before finalizing commitment" ;
+          let* () =
+            (* +1 because [submit_finalize_commitment] does not bake *)
+            repeat (parameters.withdraw_period + 1) (fun () ->
+                Client.bake_for client)
+          in
+          let () = step "7. Submit remove_commitment and bake" in
+          let*! () = submit_remove_commitment state in
+          let* () = check_bond_is ~src client ~expected:commit_bond in
+          Client.bake_for client)
   in
   (* 1st scenario: batch; commit; finalize; return bond (OK) *)
   Log.info "1st scenario: batch; commit; finalize; return bond (OK)" ;
