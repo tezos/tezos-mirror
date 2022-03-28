@@ -119,11 +119,14 @@ type transaction_costs = {
       (** Cost of a smart contract call (per contract alias). *)
 }
 
-let verbose = ref false
+type verbosity = Notice | Info | Debug
 
-let debug = ref false
+let verbosity = ref Notice
 
-let debug_msg msg = if !debug then msg () else Lwt.return_unit
+let log level msg =
+  match (level, !verbosity) with
+  | (Notice, _) | (Info, Info) | (Info, Debug) | (Debug, Debug) -> msg ()
+  | _ -> Lwt.return_unit
 
 let pp_sep ppf () = Format.fprintf ppf ",@ "
 
@@ -323,7 +326,7 @@ let rec sample_source_from_pool state (cctxt : Protocol_client_context.full) =
   | None -> sample_any_source_from_pool state
   | Some (source :: l) ->
       state.shuffled_pool <- Some l ;
-      debug_msg (fun () ->
+      log Debug (fun () ->
           cctxt#message
             "sample_transfer: %d unused sources for the block next to %a"
             (List.length l)
@@ -367,7 +370,7 @@ let heads_iter (cctxt : Protocol_client_context.full)
             Lwt.catch
               (fun () ->
                 let*! () =
-                  debug_msg (fun () ->
+                  log Debug (fun () ->
                       cctxt#message
                         "heads_iter: new block received %a@."
                         Block_hash.pp
@@ -385,7 +388,7 @@ let heads_iter (cctxt : Protocol_client_context.full)
                   loop ()
                 else
                   let*! () =
-                    debug_msg (fun () ->
+                    log Debug (fun () ->
                         cctxt#message
                           "heads_iter: new block on protocol %a. Stopping \
                            iteration.@."
@@ -401,7 +404,7 @@ let heads_iter (cctxt : Protocol_client_context.full)
       let* () = loop () in
       stopper () ;
       let*! () =
-        debug_msg (fun () ->
+        log Debug (fun () ->
             cctxt#message
               "head iteration for proto %a stopped@."
               Protocol_hash.pp
@@ -438,7 +441,7 @@ let rec sample_transfer (cctxt : Protocol_client_context.full) chain block
     (Contract.implicit_contract src.pkh)
   >>=? fun tez ->
   if Tez.(tez = zero) then
-    debug_msg (fun () ->
+    log Debug (fun () ->
         cctxt#message
           "sample_transfer: invalid balance %a"
           Signature.Public_key_hash.pp
@@ -590,18 +593,17 @@ let inject_transfer (cctxt : Protocol_client_context.full) parameters state
      state.counters
      transfer.src.pkh
      (branch, transf_counter) ;
-   (if !verbose then
-    cctxt#message
-      "injecting reveal+transfer from %a (counters=%a,%a) to %a"
-      Signature.Public_key_hash.pp
-      transfer.src.pkh
-      Z.pp_print
-      reveal_counter
-      Z.pp_print
-      transf_counter
-      Contract.pp
-      (destination_to_contract transfer.dst)
-   else Lwt.return_unit)
+   log Info (fun () ->
+       cctxt#message
+         "injecting reveal+transfer from %a (counters=%a,%a) to %a"
+         Signature.Public_key_hash.pp
+         transfer.src.pkh
+         Z.pp_print
+         reveal_counter
+         Z.pp_print
+         transf_counter
+         Contract.pp
+         (destination_to_contract transfer.dst))
    >>= fun () ->
    (* NB: regardless of our best efforts to keep track of counters, injection can fail with
       "counter in the future" if a block switch happens in between the moment we
@@ -621,22 +623,21 @@ let inject_transfer (cctxt : Protocol_client_context.full) parameters state
       state.counters
       transfer.src.pkh
       (branch, transf_counter) ;
-    (if !verbose then
-     cctxt#message
-       "injecting transfer from %a (counter=%a) to %a"
-       Signature.Public_key_hash.pp
-       transfer.src.pkh
-       Z.pp_print
-       transf_counter
-       Contract.pp
-       (destination_to_contract transfer.dst)
-    else Lwt.return_unit)
+    log Info (fun () ->
+        cctxt#message
+          "injecting transfer from %a (counter=%a) to %a"
+          Signature.Public_key_hash.pp
+          transfer.src.pkh
+          Z.pp_print
+          transf_counter
+          Contract.pp
+          (destination_to_contract transfer.dst))
     >>= fun () ->
     (* See comment above. *)
     inject_contents cctxt state.target_block transfer.src.sk list)
   >>= function
   | Ok op_hash ->
-      debug_msg (fun () ->
+      log Debug (fun () ->
           cctxt#message
             "inject_transfer: op injected %a"
             Operation_hash.pp
@@ -650,7 +651,7 @@ let inject_transfer (cctxt : Protocol_client_context.full) parameters state
       Block_hash.Table.replace state.injected_operations branch (op_hash :: ops) ;
       return_unit
   | Error e ->
-      debug_msg (fun () ->
+      log Debug (fun () ->
           cctxt#message
             "inject_transfer: error, op not injected: %a"
             Error_monad.pp_print_trace
@@ -723,7 +724,7 @@ let stat_on_exit (cctxt : Protocol_client_context.full) state =
     in
     get_included_ops state.current_head_on_start >>=? fun included_ops ->
     let included_ops_count = inter_cardinal injected_ops included_ops in
-    debug_msg (fun () ->
+    log Debug (fun () ->
         cctxt#message
           "injected : [%a]@.included: [%a]"
           (Format.pp_print_list ~pp_sep Operation_hash.pp)
@@ -787,11 +788,11 @@ let launch (cctxt : Protocol_client_context.full) (parameters : parameters)
       stat_on_exit cctxt state
     else
       let start = Mtime_clock.elapsed () in
-      debug_msg (fun () -> cctxt#message "launch.loop: invoke sample_transfer")
+      log Debug (fun () -> cctxt#message "launch.loop: invoke sample_transfer")
       >>= fun () ->
       sample_transfer cctxt cctxt#chain cctxt#block parameters state
       >>=? fun transfer ->
-      debug_msg (fun () -> cctxt#message "launch.loop: invoke inject_transfer")
+      log Debug (fun () -> cctxt#message "launch.loop: invoke inject_transfer")
       >>= fun () ->
       inject_transfer cctxt parameters state transfer >>=? fun () ->
       incr injected ;
@@ -1035,10 +1036,12 @@ let level_limit_arg =
 let verbose_arg =
   Clic.switch
     ~long:"verbose"
+    ~short:'v'
     ~doc:"Display detailed logs of the injected operations"
     ()
 
-let debug_arg = Clic.switch ~long:"debug" ~doc:"Display debug logs" ()
+let debug_arg =
+  Clic.switch ~long:"debug" ~short:'V' ~doc:"Display debug logs" ()
 
 let set_option opt f x = Option.fold ~none:x ~some:(f x) opt
 
@@ -1111,8 +1114,11 @@ let generate_random_transactions =
            debug_flag )
          sources_json
          (cctxt : Protocol_client_context.full) ->
-      verbose := verbose_flag ;
-      debug := debug_flag ;
+      (verbosity :=
+         match (debug_flag, verbose_flag) with
+         | (true, _) -> Debug
+         | (false, true) -> Info
+         | (false, false) -> Notice) ;
       Smart_contracts.init
         cctxt
         (Option.value ~default:[] smart_contract_parameters)
@@ -1146,12 +1152,10 @@ let generate_random_transactions =
       | exception _ -> cctxt#error "Could not decode list of sources"
       | [] -> cctxt#error "It is required to provide sources"
       | sources ->
-          (if !verbose then cctxt#message "starting to normalize sources"
-          else Lwt.return_unit)
+          log Info (fun () -> cctxt#message "starting to normalize sources")
           >>= fun () ->
           List.filter_map_s (normalize_source cctxt) sources >>= fun sources ->
-          (if !verbose then cctxt#message "all sources have been normalized"
-          else Lwt.return_unit)
+          log Info (fun () -> cctxt#message "all sources have been normalized")
           >>= fun () ->
           let sources =
             List.sort_uniq
