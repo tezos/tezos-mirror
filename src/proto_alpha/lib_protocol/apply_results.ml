@@ -158,7 +158,6 @@ type _ successful_manager_operation_result =
   | Tx_rollup_commit_result : {
       balance_updates : Receipt.balance_updates;
       consumed_gas : Gas.Arith.fp;
-      paid_storage_size_diff : Z.t;
     }
       -> Kind.tx_rollup_commit successful_manager_operation_result
   | Tx_rollup_return_bond_result : {
@@ -170,7 +169,6 @@ type _ successful_manager_operation_result =
       balance_updates : Receipt.balance_updates;
       consumed_gas : Gas.Arith.fp;
       level : Tx_rollup_level.t;
-      paid_storage_size_diff : Z.t;
     }
       -> Kind.tx_rollup_finalize_commitment successful_manager_operation_result
   | Tx_rollup_remove_commitment_result : {
@@ -669,34 +667,21 @@ module Manager_result = struct
       ~op_case:Operation.Encoding.Manager_operations.tx_rollup_commit_case
       ~encoding:
         Data_encoding.(
-          obj4
+          obj3
             (req "balance_updates" Receipt.balance_updates_encoding)
             (dft "consumed_gas" Gas.Arith.n_integral_encoding Gas.Arith.zero)
-            (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
-            (req "paid_storage_size_diff" n))
+            (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero))
       ~select:(function
         | Successful_manager_result (Tx_rollup_commit_result _ as op) -> Some op
         | _ -> None)
       ~kind:Kind.Tx_rollup_commit_manager_kind
       ~proj:(function
-        | Tx_rollup_commit_result
-            {balance_updates; consumed_gas; paid_storage_size_diff} ->
-            ( balance_updates,
-              Gas.Arith.ceil consumed_gas,
-              consumed_gas,
-              paid_storage_size_diff ))
-      ~inj:
-        (fun ( balance_updates,
-               consumed_gas,
-               consumed_milligas,
-               paid_storage_size_diff ) ->
+        | Tx_rollup_commit_result {balance_updates; consumed_gas} ->
+            (balance_updates, Gas.Arith.ceil consumed_gas, consumed_gas))
+      ~inj:(fun (balance_updates, consumed_gas, consumed_milligas) ->
         assert (Gas.Arith.(equal (ceil consumed_milligas) consumed_gas)) ;
         Tx_rollup_commit_result
-          {
-            balance_updates;
-            consumed_gas = consumed_milligas;
-            paid_storage_size_diff;
-          })
+          {balance_updates; consumed_gas = consumed_milligas})
 
   let[@coq_axiom_with_reason "gadt"] tx_rollup_return_bond_case =
     make
@@ -726,12 +711,11 @@ module Manager_result = struct
         Operation.Encoding.Manager_operations.tx_rollup_finalize_commitment_case
       ~encoding:
         Data_encoding.(
-          obj5
+          obj4
             (req "balance_updates" Receipt.balance_updates_encoding)
             (dft "consumed_gas" Gas.Arith.n_integral_encoding Gas.Arith.zero)
             (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
-            (req "level" Tx_rollup_level.encoding)
-            (req "paid_storage_size_diff" n))
+            (req "level" Tx_rollup_level.encoding))
       ~select:(function
         | Successful_manager_result
             (Tx_rollup_finalize_commitment_result _ as op) ->
@@ -740,26 +724,12 @@ module Manager_result = struct
       ~kind:Kind.Tx_rollup_finalize_commitment_manager_kind
       ~proj:(function
         | Tx_rollup_finalize_commitment_result
-            {balance_updates; consumed_gas; level; paid_storage_size_diff} ->
-            ( balance_updates,
-              Gas.Arith.ceil consumed_gas,
-              consumed_gas,
-              level,
-              paid_storage_size_diff ))
-      ~inj:
-        (fun ( balance_updates,
-               consumed_gas,
-               consumed_milligas,
-               level,
-               paid_storage_size_diff ) ->
+            {balance_updates; consumed_gas; level} ->
+            (balance_updates, Gas.Arith.ceil consumed_gas, consumed_gas, level))
+      ~inj:(fun (balance_updates, consumed_gas, consumed_milligas, level) ->
         assert (Gas.Arith.(equal (ceil consumed_milligas) consumed_gas)) ;
         Tx_rollup_finalize_commitment_result
-          {
-            balance_updates;
-            consumed_gas = consumed_milligas;
-            level;
-            paid_storage_size_diff;
-          })
+          {balance_updates; consumed_gas = consumed_milligas; level})
 
   let[@coq_axiom_with_reason "gadt"] tx_rollup_remove_commitment_case =
     make

@@ -1656,35 +1656,9 @@ let test_storage_burn_for_commitment () =
   Op.tx_rollup_commit (I i) contract tx_rollup commitment >>=? fun op ->
   Incremental.add_operation i op >>=? fun i ->
   occupied_storage_size (I i) tx_rollup >>=? fun storage_size_after_commit ->
-  (* extra space should be allocated for submitting commitment *)
-  let compact_commitment = Tx_rollup_commitment.Full.compact commitment in
-  let commitment_add_delta =
-    (* dummy values for the [Submitted_commitment] because we only
-       care about the size *)
-    Data_encoding.Binary.length
-      Tx_rollup_commitment.Submitted_commitment.encoding
-      {
-        commitment = compact_commitment;
-        commitment_hash = Tx_rollup_commitment.Compact.hash compact_commitment;
-        committer = is_implicit_exn contract;
-        submitted_at = Raw_level.root;
-        finalized_at = None;
-      }
-  in
-  let commitment_remove_delta =
-    (* dummy values for the [Submitted_commitment] because we only
-       care about the size *)
-    Data_encoding.Binary.length
-      Tx_rollup_commitment.Submitted_commitment.encoding
-      {
-        commitment = compact_commitment;
-        commitment_hash = Tx_rollup_commitment.Compact.hash compact_commitment;
-        committer = is_implicit_exn contract;
-        submitted_at = Raw_level.root;
-        (* It was finalized *)
-        finalized_at = Some Raw_level.root;
-      }
-  in
+  (* no storage burn for commitment because of the bond *)
+  let commitment_add_delta = 0 in
+  let commitment_remove_delta = 0 in
   check_storage_delta
     ~__POS__
     "Size increase after adding commitment"
@@ -1696,7 +1670,17 @@ let test_storage_burn_for_commitment () =
   Op.tx_rollup_finalize (B b) contract tx_rollup >>=? fun op ->
   Block.bake ~operation:op b >>=? fun b ->
   occupied_storage_size (B b) tx_rollup >>=? fun freed_space_after_finalize ->
-  let inbox_delta = -36 in
+  let inbox_delta =
+    -1
+    * Data_encoding.Binary.length
+        Tx_rollup_inbox.encoding
+        Tx_rollup_inbox.
+          {
+            cumulated_size = 0;
+            inbox_length = 0;
+            merkle_root = Merkle.merklize_list [];
+          }
+  in
   check_storage_delta
     ~__POS__
     "Storage space is freed after finalize"

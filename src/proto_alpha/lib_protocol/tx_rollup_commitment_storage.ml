@@ -28,6 +28,20 @@
 open Tx_rollup_commitment_repr
 open Tx_rollup_errors_repr
 
+(*
+
+   {{Note}} The functions of this module ignore storage allocations on
+   purposes. This is because any storage allocated here is done under
+   the condition that a user has agreed to freeze a significant bond
+   of tez.
+
+   Not only this bond covers the maximum number of bytes a transaction
+   rollup can allocate, but it can be recovered iff the storage
+   associated with this bond is deallocated. In other word, rollup
+   operators have an incentive to keep the storage clean.
+
+ *)
+
 let check_message_result {messages; _} result ~path ~index =
   let computed =
     match result with
@@ -51,8 +65,7 @@ let check_message_result {messages; _} result ~path ~index =
       Wrong_rejection_hash
         {provided = computed; expected = `Valid_path (messages.root, index)})
 
-let adjust_unfinalized_commitments_count ctxt state tx_rollup pkh
-    ~(dir : [`Incr | `Decr]) =
+let adjust_commitments_count ctxt tx_rollup pkh ~(dir : [`Incr | `Decr]) =
   let delta = match dir with `Incr -> 1 | `Decr -> -1 in
   let bond_key = (tx_rollup, pkh) in
   Storage.Tx_rollup.Commitment_bond.find ctxt bond_key
@@ -63,7 +76,7 @@ let adjust_unfinalized_commitments_count ctxt state tx_rollup pkh
   fail_when Compare.Int.(count < 0) (Commitment_bond_negative count)
   >>=? fun () ->
   Storage.Tx_rollup.Commitment_bond.add ctxt bond_key count
-  >>=? fun (ctxt, _, _) -> return (ctxt, state)
+  >>=? fun (ctxt, _, _) -> return ctxt
 
 let remove_bond :
     Raw_context.t ->
@@ -210,19 +223,15 @@ let add_commitment ctxt tx_rollup state pkh commitment =
     }
   in
   Storage.Tx_rollup.Commitment.add ctxt (commitment.level, tx_rollup) submitted
-  >>=? fun (ctxt, commitment_size_alloc, _) ->
-  Tx_rollup_state_repr.adjust_storage_allocation
-    state
-    ~delta:(Z.of_int commitment_size_alloc)
-  >>?= fun (state, paid_storage_size_diff_for_commitment) ->
+  >>=? fun (ctxt, _commitment_size_alloc, _) ->
+  (* See {{Note}} for a rationale on why ignoring storage allocation is safe. *)
   Tx_rollup_state_repr.record_commitment_creation
     state
     commitment.level
     commitment_hash
   >>?= fun state ->
-  adjust_unfinalized_commitments_count ctxt state tx_rollup pkh ~dir:`Incr
-  >>=? fun (ctxt, state) ->
-  return (ctxt, state, paid_storage_size_diff_for_commitment)
+  adjust_commitments_count ctxt tx_rollup pkh ~dir:`Incr >>=? fun ctxt ->
+  return (ctxt, state)
 
 let pending_bonded_commitments :
     Raw_context.t ->
@@ -256,14 +265,6 @@ let finalize_commitment ctxt rollup state =
           current_level < add commitment.submitted_at finality_period)
         No_commitment_to_finalize
       >>=? fun () ->
-      (* Decrement the bond count of the committer *)
-      adjust_unfinalized_commitments_count
-        ctxt
-        state
-        rollup
-        commitment.committer
-        ~dir:`Decr
-      >>=? fun (ctxt, state) ->
       (* We remove the inbox *)
       Tx_rollup_inbox_storage.remove ctxt oldest_inbox_level rollup state
       >>=? fun (ctxt, state) ->
@@ -272,16 +273,12 @@ let finalize_commitment ctxt rollup state =
         ctxt
         (oldest_inbox_level, rollup)
         {commitment with finalized_at = Some current_level}
-      >>=? fun (ctxt, commitment_size_alloc) ->
-      Tx_rollup_state_repr.adjust_storage_allocation
-        state
-        ~delta:(Z.of_int commitment_size_alloc)
-      >>?= fun (state, paid_storage_size_diff_for_commitment) ->
+      >>=? fun (ctxt, _commitment_size_alloc) ->
+      (* See {{Note}} for a rationale on why ignoring storage
+         allocation is safe. *)
       (* We update the state *)
       Tx_rollup_state_repr.record_inbox_deletion state oldest_inbox_level
-      >>?= fun state ->
-      return
-        (ctxt, state, oldest_inbox_level, paid_storage_size_diff_for_commitment)
+      >>?= fun state -> return (ctxt, state, oldest_inbox_level)
   | None -> fail No_commitment_to_finalize
 
 let remove_commitment ctxt rollup state =
@@ -303,18 +300,15 @@ let remove_commitment ctxt rollup state =
           (* unreachable code if the implementation is correct *)
           fail (Internal_error "Missing finalized_at field"))
       >>=? fun () ->
+      (* Decrement the bond count of the committer *)
+      adjust_commitments_count ctxt rollup commitment.committer ~dir:`Decr
+      >>=? fun ctxt ->
       (* We remove the commitment *)
       Storage.Tx_rollup.Commitment.remove ctxt (tail, rollup)
-      >>=? fun (ctxt, freed_size, _existed) ->
-      (* When we free storage space and adjust storage
-         allocation, the returned [_paid_storage_size_diff]
-         is always 0 and can thus safely be ignored. *)
-      Tx_rollup_state_repr.adjust_storage_allocation
-        state
-        ~delta:(Z.of_int freed_size |> Z.neg)
-      >>?= fun (state, _paid_storage_size_diff) ->
-      Tx_rollup_reveal_storage.remove ctxt rollup state tail
-      >>=? fun (ctxt, state) ->
+      >>=? fun (ctxt, _freed_size, _existed) ->
+      (* See {{Note}} for a rationale on why ignoring storage
+         allocation is safe. *)
+      Tx_rollup_reveal_storage.remove ctxt rollup tail >>=? fun ctxt ->
       (* We update the state *)
       let msg_hash = commitment.commitment.messages.last_result_message_hash in
       Tx_rollup_state_repr.record_commitment_deletion

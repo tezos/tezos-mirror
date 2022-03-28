@@ -1786,10 +1786,9 @@ module Tx_rollup_reveal : sig
   val record :
     context ->
     Tx_rollup.t ->
-    Tx_rollup_state.t ->
     Tx_rollup_level.t ->
     message_position:int ->
-    (context * Tx_rollup_state.t * Z.t) tzresult Lwt.t
+    context tzresult Lwt.t
 
   val mem :
     context ->
@@ -1799,11 +1798,7 @@ module Tx_rollup_reveal : sig
     (context * bool) tzresult Lwt.t
 
   val remove :
-    context ->
-    Tx_rollup.t ->
-    Tx_rollup_state.t ->
-    Tx_rollup_level.t ->
-    (context * Tx_rollup_state_repr.t) tzresult Lwt.t
+    context -> Tx_rollup.t -> Tx_rollup_level.t -> context tzresult Lwt.t
 end
 
 (** This module re-exports definitions from {!Tx_rollup_message_repr}. *)
@@ -1977,7 +1972,7 @@ module Tx_rollup_commitment : sig
     Tx_rollup_state.t ->
     Signature.public_key_hash ->
     Full.t ->
-    (context * Tx_rollup_state.t * Z.t) tzresult Lwt.t
+    (context * Tx_rollup_state.t) tzresult Lwt.t
 
   val find :
     context ->
@@ -2028,7 +2023,7 @@ module Tx_rollup_commitment : sig
     context ->
     Tx_rollup.t ->
     Tx_rollup_state.t ->
-    (context * Tx_rollup_state.t * Tx_rollup_level.t * Z.t) tzresult Lwt.t
+    (context * Tx_rollup_state.t * Tx_rollup_level.t) tzresult Lwt.t
 
   val remove_commitment :
     context ->

@@ -569,19 +569,13 @@ let pp_manager_operation_contents_and_result ppf
         (Z.to_string paid_storage_size_diff)
   in
   let pp_tx_rollup_commit_result
-      (Tx_rollup_commit_result
-        {balance_updates; consumed_gas; paid_storage_size_diff}) =
+      (Tx_rollup_commit_result {balance_updates; consumed_gas}) =
     Format.fprintf
       ppf
       "@,Balance updates:@,  %a"
       pp_balance_updates
       balance_updates ;
-    Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas ;
-    if paid_storage_size_diff <> Z.zero then
-      Format.fprintf
-        ppf
-        "@,Paid storage size diff: %s bytes"
-        (Z.to_string paid_storage_size_diff)
+    Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas
   in
   let pp_tx_rollup_return_bond_result
       (Tx_rollup_return_bond_result {balance_updates; consumed_gas}) =
@@ -594,19 +588,14 @@ let pp_manager_operation_contents_and_result ppf
   in
   let pp_tx_rollup_finalize_commitment_result
       (Tx_rollup_finalize_commitment_result
-        {balance_updates; consumed_gas; level; paid_storage_size_diff}) =
+        {balance_updates; consumed_gas; level}) =
     Format.fprintf
       ppf
       "@,Balance updates:@,  %a"
       pp_balance_updates
       balance_updates ;
     Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas ;
-    Format.fprintf ppf "@finalized level:@,  %a" Tx_rollup_level.pp level ;
-    if paid_storage_size_diff <> Z.zero then
-      Format.fprintf
-        ppf
-        "@,Paid storage size diff: %s bytes"
-        (Z.to_string paid_storage_size_diff)
+    Format.fprintf ppf "@finalized level:@,  %a" Tx_rollup_level.pp level
   in
   let pp_tx_rollup_remove_commitment_result
       (Tx_rollup_remove_commitment_result

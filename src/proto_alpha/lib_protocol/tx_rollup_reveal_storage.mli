@@ -27,17 +27,13 @@
 
 (** [record ctxt tx_rollup lvl message_position] adds
     [message_position] to the list of message with revealed
-    withdrawals for [tx_rollup] at [lvl].
-
-    In addition to an updated context, returns a new rollup state, and
-    the number of bytes newly allocated by this function. *)
+    withdrawals for [tx_rollup] at [lvl]. *)
 val record :
   Raw_context.t ->
   Tx_rollup_repr.t ->
-  Tx_rollup_state_repr.t ->
   Tx_rollup_level_repr.t ->
   message_position:int ->
-  (Raw_context.t * Tx_rollup_state_repr.t * Z.t) tzresult Lwt.t
+  Raw_context.t tzresult Lwt.t
 
 (** [mem ctxt tx_rollup lvl message_position] checks if
     [message_position] has already had its withdrawals revealed for
@@ -54,6 +50,5 @@ val mem :
 val remove :
   Raw_context.t ->
   Tx_rollup_repr.t ->
-  Tx_rollup_state_repr.t ->
   Tx_rollup_level_repr.t ->
-  (Raw_context.t * Tx_rollup_state_repr.t) tzresult Lwt.t
+  Raw_context.t tzresult Lwt.t

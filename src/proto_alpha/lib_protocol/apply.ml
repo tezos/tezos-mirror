@@ -1335,10 +1335,9 @@ let apply_external_manager_operation_content :
       Tx_rollup_reveal.record
         ctxt
         tx_rollup
-        state
         level
         ~message_position:message_index
-      >>=? fun (ctxt, state, reveal_diff) ->
+      >>=? fun ctxt ->
       let adjust_ticket_balance (ctxt, state, acc_diff)
           ( Tx_rollup_withdraw.
               {claimer; amount; ticket_hash = tx_rollup_ticket_hash},
@@ -1358,7 +1357,7 @@ let apply_external_manager_operation_content :
       in
       List.fold_left_es
         adjust_ticket_balance
-        (ctxt, state, reveal_diff)
+        (ctxt, state, Z.zero)
         rev_ex_token_and_hash_list
       >>=? fun (ctxt, state, paid_storage_size_diff) ->
       Tx_rollup_state.update ctxt tx_rollup state >>=? fun ctxt ->
@@ -1552,14 +1551,13 @@ let apply_external_manager_operation_content :
         else return (ctxt, []) )
       >>=? fun (ctxt, balance_updates) ->
       Tx_rollup_commitment.add_commitment ctxt tx_rollup state source commitment
-      >>=? fun (ctxt, state, paid_storage_size_diff) ->
+      >>=? fun (ctxt, state) ->
       Tx_rollup_state.update ctxt tx_rollup state >>=? fun ctxt ->
       let result =
         Tx_rollup_commit_result
           {
             consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
             balance_updates;
-            paid_storage_size_diff;
           }
       in
       return (ctxt, result, [])
@@ -1585,7 +1583,7 @@ let apply_external_manager_operation_content :
   | Tx_rollup_finalize_commitment {tx_rollup} ->
       Tx_rollup_state.get ctxt tx_rollup >>=? fun (ctxt, state) ->
       Tx_rollup_commitment.finalize_commitment ctxt tx_rollup state
-      >>=? fun (ctxt, state, level, paid_storage_size_diff) ->
+      >>=? fun (ctxt, state, level) ->
       Tx_rollup_state.update ctxt tx_rollup state >>=? fun ctxt ->
       let result =
         Tx_rollup_finalize_commitment_result
@@ -1593,7 +1591,6 @@ let apply_external_manager_operation_content :
             consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
             balance_updates = [];
             level;
-            paid_storage_size_diff;
           }
       in
       return (ctxt, result, [])
@@ -2033,7 +2030,8 @@ let burn_storage_fees :
           storage_limit,
           Tx_rollup_origination_result {payload with balance_updates} )
   | Tx_rollup_return_bond_result _ | Tx_rollup_remove_commitment_result _
-  | Tx_rollup_rejection_result _ | Tx_rollup_dispatch_tickets_result _ ->
+  | Tx_rollup_rejection_result _ | Tx_rollup_finalize_commitment_result _
+  | Tx_rollup_commit_result _ ->
       return (ctxt, storage_limit, smopr)
   | Transfer_ticket_result payload ->
       let consumed = payload.paid_storage_size_diff in
@@ -2044,24 +2042,6 @@ let burn_storage_fees :
         ( ctxt,
           storage_limit,
           Transfer_ticket_result {payload with balance_updates} )
-  | Tx_rollup_finalize_commitment_result payload ->
-      let consumed = payload.paid_storage_size_diff in
-      Fees.burn_storage_fees ctxt ~storage_limit ~payer consumed
-      >>=? fun (ctxt, storage_limit, storage_bus) ->
-      let balance_updates = storage_bus @ payload.balance_updates in
-      return
-        ( ctxt,
-          storage_limit,
-          Tx_rollup_finalize_commitment_result {payload with balance_updates} )
-  | Tx_rollup_commit_result payload ->
-      let consumed = payload.paid_storage_size_diff in
-      Fees.burn_storage_fees ctxt ~storage_limit ~payer consumed
-      >>=? fun (ctxt, storage_limit, storage_bus) ->
-      let balance_updates = storage_bus @ payload.balance_updates in
-      return
-        ( ctxt,
-          storage_limit,
-          Tx_rollup_commit_result {payload with balance_updates} )
   | Tx_rollup_submit_batch_result payload ->
       let consumed = payload.paid_storage_size_diff in
       Fees.burn_storage_fees ctxt ~storage_limit ~payer consumed
@@ -2071,6 +2051,15 @@ let burn_storage_fees :
         ( ctxt,
           storage_limit,
           Tx_rollup_submit_batch_result {payload with balance_updates} )
+  | Tx_rollup_dispatch_tickets_result payload ->
+      let consumed = payload.paid_storage_size_diff in
+      Fees.burn_storage_fees ctxt ~storage_limit ~payer consumed
+      >>=? fun (ctxt, storage_limit, storage_bus) ->
+      let balance_updates = storage_bus @ payload.balance_updates in
+      return
+        ( ctxt,
+          storage_limit,
+          Tx_rollup_dispatch_tickets_result {payload with balance_updates} )
   | Sc_rollup_originate_result payload ->
       Fees.burn_sc_rollup_origination_fees
         ctxt

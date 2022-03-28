@@ -25,7 +25,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let record ctxt tx_rollup state level ~message_position =
+let record ctxt tx_rollup level ~message_position =
   Storage.Tx_rollup.Revealed_withdrawals.find (ctxt, level) tx_rollup
   >>=? fun (ctxt, revealed_withdrawals_opt) ->
   Bitset.add
@@ -36,11 +36,9 @@ let record ctxt tx_rollup state level ~message_position =
     (ctxt, level)
     tx_rollup
     revealed_withdrawals
-  >>=? fun (ctxt, new_size, _is_new) ->
-  Tx_rollup_state_repr.adjust_storage_allocation
-    state
-    ~delta:(Z.of_int new_size)
-  >>?= fun (state, diff) -> return (ctxt, state, diff)
+  >>=? fun (ctxt, _new_size, _is_new) -> return ctxt
+(* See {{Note}} in [Tx_rollup_commitment_storage] for a rationale on
+   why ignoring storage allocation is safe. *)
 
 let mem ctxt tx_rollup level ~message_position =
   Storage.Tx_rollup.Revealed_withdrawals.find (ctxt, level) tx_rollup
@@ -50,10 +48,8 @@ let mem ctxt tx_rollup level ~message_position =
       Bitset.mem field message_position >>?= fun res -> return (ctxt, res)
   | None -> return (ctxt, false)
 
-let remove ctxt tx_rollup state level =
+let remove ctxt tx_rollup level =
   Storage.Tx_rollup.Revealed_withdrawals.remove (ctxt, level) tx_rollup
-  >>=? fun (ctxt, freed_size, _existed) ->
-  Tx_rollup_state_repr.adjust_storage_allocation
-    state
-    ~delta:Z.(neg @@ of_int freed_size)
-  >>?= fun (state, _) -> return (ctxt, state)
+  >>=? fun (ctxt, _freed_size, _existed) -> return ctxt
+(* See {{Note}} in [Tx_rollup_commitment_storage] for a rationale on
+   why ignoring storage allocation is safe. *)
