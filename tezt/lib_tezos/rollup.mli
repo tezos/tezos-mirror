@@ -87,6 +87,19 @@ module Tx_rollup : sig
     Client.t ->
     JSON.t Process.runnable
 
+  val commitment_merkle_tree_hash :
+    ?hooks:Process.hooks ->
+    message_result_hashes:[`Hash of string] list ->
+    Client.t ->
+    [> `Hash of string] Process.runnable
+
+  val commitment_merkle_tree_path :
+    ?hooks:Process.hooks ->
+    message_result_hashes:[`Hash of string] list ->
+    position:int ->
+    Client.t ->
+    JSON.t Process.runnable
+
   val compute_inbox_from_messages :
     ?hooks:Process.hooks -> message list -> Client.t -> inbox Lwt.t
 

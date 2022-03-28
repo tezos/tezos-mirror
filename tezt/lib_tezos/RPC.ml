@@ -649,6 +649,42 @@ module Tx_rollup = struct
         in
         Client.Spawn.rpc ?endpoint ?hooks ~data POST path client
     end
+
+    module Commitment = struct
+      let merkle_tree_hash ?endpoint ?hooks ?(chain = "main") ?(block = "head")
+          ~data client =
+        let path =
+          [
+            "chains";
+            chain;
+            "blocks";
+            block;
+            "helpers";
+            "forge";
+            "tx_rollup";
+            "commitment";
+            "merkle_tree_hash";
+          ]
+        in
+        Client.Spawn.rpc ?endpoint ?hooks ~data POST path client
+
+      let merkle_tree_path ?endpoint ?hooks ?(chain = "main") ?(block = "head")
+          ~data client =
+        let path =
+          [
+            "chains";
+            chain;
+            "blocks";
+            block;
+            "helpers";
+            "forge";
+            "tx_rollup";
+            "commitment";
+            "merkle_tree_path";
+          ]
+        in
+        Client.Spawn.rpc ?endpoint ?hooks ~data POST path client
+    end
   end
 end
 
