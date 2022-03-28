@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestOriginateContractFromContract::test_originate_contract_from_contract_transfer
 
 Node is bootstrapped.
-Estimated gas: 3470.319 units (will add 100 for safety)
+Estimated gas: 3468.749 units (will add 100 for safety)
 Estimated storage: 295 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[BLOCK_HASH]'
@@ -12,13 +12,13 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [CONTRACT_HASH]
-    Fee to the baker: ꜩ0.000607
+    Fee to the baker: ꜩ0.000606
     Expected counter: [EXPECTED_COUNTER]
-    Gas limit: 3571
+    Gas limit: 3569
     Storage limit: 315 bytes
     Balance updates:
-      [CONTRACT_HASH] ... -ꜩ0.000607
-      payload fees(the block proposer) ....... +ꜩ0.000607
+      [CONTRACT_HASH] ... -ꜩ0.000606
+      payload fees(the block proposer) ....... +ꜩ0.000606
     Transaction:
       Amount: ꜩ0
       From: [CONTRACT_HASH]
@@ -26,7 +26,7 @@ This sequence of operations was run:
       This transaction was successfully applied
       Updated storage: Unit
       Storage size: 93 bytes
-      Consumed gas: 2066.252
+      Consumed gas: 2064.682
     Internal operations:
       Origination:
         From: [CONTRACT_HASH]

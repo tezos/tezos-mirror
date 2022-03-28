@@ -60,36 +60,24 @@ let contract_factory_with_annotations =
 
 let lazy_none = Script.lazy_expr (Expr.from_string "None")
 
-(* Checks that [contract_with_annotations] once originated is stored as is. *)
-let test_external_origination () =
+let init_and_originate contract_code_string =
   Context.init ~consensus_threshold:0 1 >>=? fun (b, contracts) ->
   Incremental.begin_construction b >>=? fun inc ->
   let source = WithExceptions.Option.get ~loc:__LOC__ @@ List.hd contracts in
-  let code = Expr.toplevel_from_string contract_with_annotations in
+  let code = Expr.toplevel_from_string contract_code_string in
   let script = Script.{code = lazy_expr code; storage = lazy_none} in
   Op.contract_origination (I inc) source ~script >>=? fun (operation, addr) ->
-  Incremental.add_operation inc operation >>=? fun inc ->
+  Incremental.add_operation inc operation >|=? fun inc -> (inc, source, addr)
+
+let assert_stored_script_equal inc addr expected_code_string =
   Context.Contract.script (I inc) addr >>=? fun stored_script ->
   Assert.equal_string
     ~loc:__LOC__
-    contract_with_annotations
+    expected_code_string
     (Expr.to_string stored_script)
 
-(* Checks that [contract_with_annotations] originated from
-   [contract_factory_with_annotations] is stored as is. *)
-let test_internal_origination () =
-  Context.init ~consensus_threshold:0 1 >>=? fun (b, contracts) ->
-  Incremental.begin_construction b >>=? fun inc ->
-  let source = WithExceptions.Option.get ~loc:__LOC__ @@ List.hd contracts in
-  let code = Expr.toplevel_from_string contract_factory_with_annotations in
-  let script = Script.{code = lazy_expr code; storage = lazy_none} in
-  Op.contract_origination (I inc) source ~script
-  >>=? fun (operation, factory) ->
-  Incremental.add_operation inc operation >>=? fun inc ->
-  Op.transaction (I inc) source factory ~parameters:lazy_none Tez.zero
-  >>=? fun operation ->
-  Incremental.add_operation inc operation >>=? fun inc ->
-  Context.Contract.storage (I inc) factory >>=? fun factory_storage ->
+let get_address_from_storage inc factory_addr =
+  Context.Contract.storage (I inc) factory_addr >>=? fun factory_storage ->
   let ctxt = Incremental.alpha_ctxt inc in
   Environment.wrap_tzresult Script_typed_ir.(option_t 0 address_t)
   >>?= fun option_address_t ->
@@ -107,15 +95,27 @@ let test_internal_origination () =
   | Some {destination = Tx_rollup _; _} ->
       failwith "Did not expect non-contract address"
   | Some {destination = Contract addr; entrypoint = _it_is_default} ->
-      Context.Contract.script (I inc) addr >>=? fun stored_script ->
-      Assert.equal_string
-        ~loc:__LOC__
-        contract_with_annotations
-        (Expr.to_string stored_script)
+      return addr
   | _ ->
       failwith
         "The factory contract should have stored the address of the originated \
          contract"
+
+(* Checks that [contract_with_annotations] once originated is stored as is. *)
+let test_external_origination () =
+  init_and_originate contract_with_annotations >>=? fun (inc, _source, addr) ->
+  assert_stored_script_equal inc addr contract_with_annotations
+
+(* Checks that [contract_with_annotations] originated from
+   [contract_factory_with_annotations] is stored as is. *)
+let test_internal_origination () =
+  init_and_originate contract_factory_with_annotations
+  >>=? fun (inc, source, factory) ->
+  Op.transaction (I inc) source factory ~parameters:lazy_none Tez.zero
+  >>=? fun operation ->
+  Incremental.add_operation inc operation >>=? fun inc ->
+  get_address_from_storage inc factory >>=? fun addr ->
+  assert_stored_script_equal inc addr contract_with_annotations
 
 let tests =
   [
