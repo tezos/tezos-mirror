@@ -43,8 +43,14 @@
 (** [validation_mode] permits to differenciate [!type:validation_state]
     values.
 
-    TODO: #2536
-      Add some documentation for the different modes.
+    There are four validation modes:
+    - [Application]
+    - [Partial_application]
+    - [Partial_construction]
+    - [Full_construction]
+
+    For the meaning and typical uses of each mode, refer to the
+    comments attached to the corresponding type constructors below.
 *)
 type validation_mode =
   | Application of {
@@ -65,7 +71,7 @@ type validation_mode =
       predecessor_level : Alpha_context.Level.t;
       predecessor_round : Alpha_context.Round.t;
     }
-      (** [Partial_application] is used in chain bootstrapping - not all checks
+      (** [Partial_application] is used in pre-checking of blocks - not all checks
          are done. Special case of [Application] to allow quick rejection of bad
          blocks. See
          {!val:Tezos_protocol_environment_sigs.V5.T.Updater.PROTOCOL.begin_partial_application}

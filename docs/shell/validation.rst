@@ -131,6 +131,8 @@ the chain validator will propagate this information to its associated
 *prevalidator*, and may decide to kill or spawn the test network
 according to the protocol's decision.
 
+The validator :ref:`interacts with the protocol <shell_proto_interact>` in order to determine valid blocks.
+
 .. _prevalidator_component:
 
 Prevalidator
@@ -141,7 +143,7 @@ responsible for determining which operations to propagate for this chain over th
 peer-to-peer network. The page :doc:`./prevalidation` gives a detailed
 description of the prevalidator component.
 
-
+The prevalidator also :ref:`interacts with the protocol <shell_proto_interact>` in order to determine valid operations in the mempool to propagate in the gossip network.
 
 Distributed DB
 --------------
