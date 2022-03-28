@@ -25,8 +25,8 @@ depends: [
   "data-encoding" { >= "0.5.1" & < "0.6" }
   "irmin-pack" { >= "3.1.0" & < "3.2.0" }
   "irmin" { >= "3.1.0" & < "3.2.0" }
-  "ringo" { = "0.7" }
-  "ringo-lwt" { = "0.7" }
+  "ringo" { = "0.8" }
+  "ringo-lwt" { = "0.8" }
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]

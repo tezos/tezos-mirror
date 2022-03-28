@@ -20,7 +20,7 @@ depends: [
   "tezos-stdlib-unix"
   "tezos-stdlib"
   "lwt-watcher" { = "0.2" }
-  "ringo-lwt" { = "0.7" }
+  "ringo-lwt" { = "0.8" }
   "camlzip" { = "1.11" }
   "tar"
   "tar-unix" { = "2.0.0" }
