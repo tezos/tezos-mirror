@@ -26,12 +26,21 @@ docker:merge_manifests:
     - .rules_template__master_and_releases
     - .image_template__docker
     - .docker_registry_auth # Sets up a before_script
+  image: "${CI_REGISTRY}/tezos/docker-images/ci-docker:v1.1.0"
   stage: publish_release
   script:
-    - apk add git
     # Environment variables from before_script
     - . ./scripts/ci/docker.env
     - ./scripts/ci/docker_merge_manifests.sh
-  needs:
-    - docker:build_amd64
-    - docker:build_arm64
+
+docker:promote_to_latest:
+  extends:
+    - .rules_template__latest_release
+    - .image_template__docker
+    - .docker_registry_auth # Sets up a before_script
+  image: "${CI_REGISTRY}/tezos/docker-images/ci-docker:v1.1.0"
+  stage: publish_release
+  script:
+    # Environment variables from before_script
+    - . ./scripts/ci/docker.env
+    - ./scripts/ci/docker_promote_to_latest.sh

@@ -78,8 +78,6 @@ integration:sandboxes:acc-endorsement:
 .integration_python_template:
   extends:
     - .test_template
-  needs:
-    - build_x86_64
   dependencies:
     - build_x86_64
   before_script:
@@ -96,8 +94,6 @@ integration:static-binaries:
   extends:
     - .integration_python_template
   allow_failure: true
-  needs:
-    - build:static-x86_64-linux-binaries
   dependencies:
     - build:static-x86_64-linux-binaries
   script:

@@ -89,7 +89,9 @@ build_x86_64:
 
 # arm64 static binaries are built in the stage `build_release` and only for master and releases.
 build:static-x86_64-linux-binaries:
-  extends: .build_static_binaries_template
+  extends:
+    - .build_static_binaries_template
+    - .rules_template__not_on_latest_release
   script:
     - sudo apk --no-cache --virtual add upx
     # Compress resulting binaries
