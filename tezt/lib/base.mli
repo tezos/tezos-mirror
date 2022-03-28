@@ -196,5 +196,9 @@ module String_map : Map.S with type key = string
 module String_set : sig
   include Set.S with type elt = string
 
+  (** Pretty-print a set of strings.
+
+      Items are quoted, separated by commas and breakable spaces,
+      and the result is surrounded by braces. *)
   val pp : Format.formatter -> t -> unit
 end
