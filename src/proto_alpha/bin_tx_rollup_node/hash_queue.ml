@@ -2,8 +2,6 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
-(* Copyright (c) 2022 Marigold, <contact@marigold.dev>                       *)
-(* Copyright (c) 2022 Oxhead Alpha <info@oxhead-alpha.com>                   *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -25,50 +23,62 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t
+module RingoMaker : Ringo.MAP_MAKER =
+(val Ringo.(map_maker ~replacement:FIFO ~overflow:Strong ~accounting:Precise))
 
-val create :
-  ?path:string ->
-  ?runner:Runner.t ->
-  ?data_dir:string ->
-  ?addr:string ->
-  ?dormant_mode:bool ->
-  ?color:Log.Color.t ->
-  ?event_pipe:string ->
-  ?name:string ->
-  rollup_id:string ->
-  rollup_genesis:string ->
-  ?operator:string ->
-  Client.t ->
-  Node.t ->
-  t
+module Make
+    (K : Stdlib.Hashtbl.HashedType) (V : sig
+      type t
+    end) =
+struct
+  module Ring = RingoMaker (K)
+  include Ring
 
-(** Returns the node's endpoint. *)
-val endpoint : t -> string
+  type nonrec t = V.t t
 
-(** Wait until the node is ready.
+  let elements q = Ring.fold (fun _ x acc -> x :: acc) q []
 
-    More precisely, wait until a [node_is_ready] event occurs.
-    If such an event already occurred, return immediately. *)
-val wait_for_ready : t -> unit Lwt.t
+  (** [oldest_elements q n f] returns the (at most) [n] oldest elements of the
+      queue and calls [f] on the bindings for these elements. The elements are
+      returned from oldest to newest. *)
+  let oldest_elements q n action =
+    (* FIXME: https://gitlab.com/nomadic-labs/ringo/-/issues/5 *)
+    (* Ring.fold is from newest to oldest elements. So we iterate on the
+       elements until we reach the [n] ones at the end, i.e. the elements we
+       want to "take". *)
+    let first_index = Ring.length q - n in
+    Ring.fold
+      (fun k v (count, acc) ->
+        let acc =
+          if count >= first_index then (
+            action k v q ;
+            v :: acc)
+          else acc
+        in
+        (count + 1, acc))
+      q
+      (0, [])
+    |> snd
 
-(** Wait for a given Tezos chain level.
+  (* Redefining fold to have elements treated in order of oldest to newest *)
+  (* FIXME: https://gitlab.com/nomadic-labs/ringo/-/issues/5 *)
+  let fold f q acc =
+    let bindings = fold (fun k v acc -> (k, v) :: acc) q [] in
+    List.fold_left (fun acc (k, v) -> f k v acc) acc bindings
 
-    More precisely, wait until the rollup node have successfully
-    validated a block of given [level], received from the Tezos node
-    it is connected to.
-    If such an event already occurred, return immediately. *)
-val wait_for_tezos_level : t -> int -> int Lwt.t
+  let peek q =
+    match oldest_elements q 1 (fun _ _ _ -> ()) with
+    | [] -> None
+    | [x] -> Some x
+    | _ -> assert false
 
-(** Connected to a tezos node.
-    Returns the name of the configuration file. *)
-val config_init : t -> string -> string -> string Lwt.t
+  let take q =
+    match oldest_elements q 1 (fun k _ q -> remove q k) with
+    | [] -> None
+    | [x] -> Some x
+    | _ -> assert false
 
-(** [run node] launches the given transaction rollup node. *)
-val run : t -> unit Lwt.t
+  let peek_at_most q n = oldest_elements q n (fun _ _ _ -> ())
 
-(** See [Daemon.Make.terminate]. *)
-val terminate : ?kill:bool -> t -> unit Lwt.t
-
-(** Get the RPC address given as [--rpc-addr] to a node. *)
-val rpc_addr : t -> string
+  let take_at_most q n = oldest_elements q n (fun k _ q -> remove q k)
+end

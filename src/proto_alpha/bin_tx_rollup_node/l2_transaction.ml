@@ -2,8 +2,6 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
-(* Copyright (c) 2022 Marigold, <contact@marigold.dev>                       *)
-(* Copyright (c) 2022 Oxhead Alpha <info@oxhead-alpha.com>                   *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -25,50 +23,49 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t
+open Protocol
 
-val create :
-  ?path:string ->
-  ?runner:Runner.t ->
-  ?data_dir:string ->
-  ?addr:string ->
-  ?dormant_mode:bool ->
-  ?color:Log.Color.t ->
-  ?event_pipe:string ->
-  ?name:string ->
-  rollup_id:string ->
-  rollup_genesis:string ->
-  ?operator:string ->
-  Client.t ->
-  Node.t ->
-  t
+type t = {
+  transaction :
+    (Indexable.unknown, Indexable.unknown) Tx_rollup_l2_batch.V1.transaction;
+  signature : Tx_rollup_l2_batch.V1.signature;
+}
 
-(** Returns the node's endpoint. *)
-val endpoint : t -> string
+let encoding =
+  let open Data_encoding in
+  conv
+    (fun {transaction; signature} -> (transaction, signature))
+    (fun (transaction, signature) -> {transaction; signature})
+  @@ obj2
+       (req "transaction" Tx_rollup_l2_batch.V1.transaction_encoding)
+       (req "signature" Tx_rollup_l2_context_sig.signature_encoding)
 
-(** Wait until the node is ready.
+let batch l =
+  let contents = List.map (fun {transaction; _} -> transaction) l in
+  let aggregated_signature =
+    Environment.Bls_signature.aggregate_signature_opt
+    @@ List.map (fun {signature; _} -> signature) l
+  in
+  match aggregated_signature with
+  | None -> error_with "Cannot aggregate signatures"
+  | Some aggregated_signature ->
+      ok Tx_rollup_l2_batch.(V1 V1.{contents; aggregated_signature})
 
-    More precisely, wait until a [node_is_ready] event occurs.
-    If such an event already occurred, return immediately. *)
-val wait_for_ready : t -> unit Lwt.t
+module Hash =
+  Blake2B.Make
+    (Base58)
+    (struct
+      let name = "tx_rollup_l2_transaction_hash"
 
-(** Wait for a given Tezos chain level.
+      let title = "An tx_rollup L2 transaction"
 
-    More precisely, wait until the rollup node have successfully
-    validated a block of given [level], received from the Tezos node
-    it is connected to.
-    If such an event already occurred, return immediately. *)
-val wait_for_tezos_level : t -> int -> int Lwt.t
+      let b58check_prefix = "\018\007\031\191" (* txL2(54) *)
 
-(** Connected to a tezos node.
-    Returns the name of the configuration file. *)
-val config_init : t -> string -> string -> string Lwt.t
+      let size = None
+    end)
 
-(** [run node] launches the given transaction rollup node. *)
-val run : t -> unit Lwt.t
+let () = Base58.check_encoded_prefix Hash.b58check_encoding "txL2" 54
 
-(** See [Daemon.Make.terminate]. *)
-val terminate : ?kill:bool -> t -> unit Lwt.t
+type hash = Hash.t
 
-(** Get the RPC address given as [--rpc-addr] to a node. *)
-val rpc_addr : t -> string
+let hash t = Hash.hash_bytes [Data_encoding.Binary.to_bytes_exn encoding t]

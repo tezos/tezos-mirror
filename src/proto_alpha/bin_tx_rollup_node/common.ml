@@ -2,8 +2,6 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
-(* Copyright (c) 2022 Marigold, <contact@marigold.dev>                       *)
-(* Copyright (c) 2022 Oxhead Alpha <info@oxhead-alpha.com>                   *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -25,50 +23,29 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t
+type signer = {
+  alias : string;
+  pkh : Signature.public_key_hash;
+  pk : Signature.public_key;
+  sk : Client_keys.sk_uri;
+}
 
-val create :
-  ?path:string ->
-  ?runner:Runner.t ->
-  ?data_dir:string ->
-  ?addr:string ->
-  ?dormant_mode:bool ->
-  ?color:Log.Color.t ->
-  ?event_pipe:string ->
-  ?name:string ->
-  rollup_id:string ->
-  rollup_genesis:string ->
-  ?operator:string ->
-  Client.t ->
-  Node.t ->
-  t
-
-(** Returns the node's endpoint. *)
-val endpoint : t -> string
-
-(** Wait until the node is ready.
-
-    More precisely, wait until a [node_is_ready] event occurs.
-    If such an event already occurred, return immediately. *)
-val wait_for_ready : t -> unit Lwt.t
-
-(** Wait for a given Tezos chain level.
-
-    More precisely, wait until the rollup node have successfully
-    validated a block of given [level], received from the Tezos node
-    it is connected to.
-    If such an event already occurred, return immediately. *)
-val wait_for_tezos_level : t -> int -> int Lwt.t
-
-(** Connected to a tezos node.
-    Returns the name of the configuration file. *)
-val config_init : t -> string -> string -> string Lwt.t
-
-(** [run node] launches the given transaction rollup node. *)
-val run : t -> unit Lwt.t
-
-(** See [Daemon.Make.terminate]. *)
-val terminate : ?kill:bool -> t -> unit Lwt.t
-
-(** Get the RPC address given as [--rpc-addr] to a node. *)
-val rpc_addr : t -> string
+let get_signer cctxt signer =
+  let open Lwt_result_syntax in
+  match signer with
+  | None -> return None
+  | Some operator -> (
+      let*! pkh_err = Client_keys.Public_key_hash.of_source operator in
+      match pkh_err with
+      | Ok pkh ->
+          let* (alias, pk, sk) = Client_keys.get_key cctxt pkh in
+          return_some {alias; pkh; pk; sk}
+      | Error _ -> (
+          (* TODO/TORU: use proper errors *)
+          let* keys = Client_keys.alias_keys cctxt operator in
+          match keys with
+          | None -> failwith "Unknown signer alias %s" operator
+          | Some ((_, None, _) | (_, _, None)) ->
+              failwith "Unknown secret key for signer %s" operator
+          | Some (pkh, Some pk, Some sk) ->
+              return_some {alias = operator; pkh; pk; sk}))

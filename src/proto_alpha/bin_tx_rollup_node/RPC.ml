@@ -25,9 +25,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 open Protocol
-open Tezos_rpc
-open Tezos_rpc_http
-open Tezos_rpc_http_server
 
 type block_id =
   [ `Head
@@ -126,6 +123,17 @@ module Arg = struct
       ~name:"context_id"
       ~construct:construct_context_id
       ~destruct:destruct_context_id
+      ()
+
+  let l2_transaction : L2_transaction.hash RPC_arg.t =
+    RPC_arg.make
+      ~descr:"An L2 transaction identifier."
+      ~name:"l2_transaction_hash"
+      ~construct:L2_transaction.Hash.to_b58check
+      ~destruct:(fun s ->
+        match L2_transaction.Hash.of_b58check_opt s with
+        | None -> Error "Cannot parse L2 transaction hash"
+        | Some h -> Ok h)
       ()
 end
 
@@ -230,7 +238,7 @@ module Block = struct
     |> RPC_directory.prefix RPC_path.(open_root / "block" /: Arg.block_id)
 end
 
-module Context = struct
+module Context_RPC = struct
   open Lwt_tzresult_syntax
 
   let path = RPC_path.open_root
@@ -452,35 +460,90 @@ module Context = struct
     |> RPC_directory.prefix RPC_path.(open_root / "context" /: Arg.context_id)
 end
 
+module Injection = struct
+  let path = RPC_path.(open_root / "queue")
+
+  let directory : Batcher.state RPC_directory.t ref = ref RPC_directory.empty
+
+  let register service f =
+    directory := RPC_directory.register !directory service f
+
+  let build_directory state =
+    match state.State.batcher_state with
+    | None -> RPC_directory.empty
+    | Some batcher_state ->
+        !directory |> RPC_directory.map (fun () -> Lwt.return batcher_state)
+
+  let inject_query =
+    let open RPC_query in
+    query (fun eager_batch ->
+        object
+          method eager_batch = eager_batch
+        end)
+    |+ flag "eager_batch" (fun t -> t#eager_batch)
+    |> seal
+
+  let inject_transaction =
+    RPC_service.post_service
+      ~description:"Inject an L2 transaction in the queue of the rollup node."
+      ~query:inject_query
+      ~input:L2_transaction.encoding
+      ~output:L2_transaction.Hash.encoding
+      RPC_path.(path / "injection" / "transaction")
+
+  let get_transaction =
+    RPC_service.get_service
+      ~description:"Retrieve an L2 transaction in the queue."
+      ~query:RPC_query.empty
+      ~output:(Data_encoding.option L2_transaction.encoding)
+      RPC_path.(path / "transaction" /: Arg.l2_transaction)
+
+  let get_queue =
+    RPC_service.get_service
+      ~description:"Get the whole queue of L2 transactions."
+      ~query:RPC_query.empty
+      ~output:(Data_encoding.list L2_transaction.encoding)
+      path
+
+  let () =
+    register inject_transaction (fun state q transaction ->
+        Batcher.register_transaction
+          ~eager_batch:q#eager_batch
+          state
+          transaction)
+
+  let () =
+    register get_transaction (fun (state, tr_hash) () () ->
+        return @@ Batcher.find_transaction state tr_hash)
+
+  let () =
+    register get_queue (fun state () () -> return @@ Batcher.get_queue state)
+end
+
 let register state =
   List.fold_left
     (fun dir f -> RPC_directory.merge dir (f state))
     RPC_directory.empty
-    [Block.build_directory; Context.build_directory]
+    [
+      Block.build_directory;
+      Context_RPC.build_directory;
+      Injection.build_directory;
+    ]
 
 let launch ~host ~acl ~node ~dir () =
-  let open Lwt_tzresult_syntax in
-  let*! r =
-    RPC_server.launch
-      ~media_types:Media_type.all_media_types
-      ~host
-      ~acl
-      node
-      dir
-  in
-  return r
+  RPC_server.launch ~media_types:Media_type.all_media_types ~host ~acl node dir
 
 let start configuration state =
-  let open Lwt_syntax in
-  let Configuration.{rpc_addr; rpc_port; _} = configuration in
-  let addr = P2p_addr.of_string_exn rpc_addr in
-  let host = Ipaddr.V6.to_string addr in
+  let open Lwt_result_syntax in
+  let Configuration.{rpc_addr; _} = configuration in
+  let (host, rpc_port) = rpc_addr in
+  let host = P2p_addr.to_string host in
   let dir = register state in
   let node = `TCP (`Port rpc_port) in
-  let acl = RPC_server.Acl.default addr in
+  let acl = RPC_server.Acl.allow_all in
   Lwt.catch
     (fun () ->
-      let* rpc_server = launch ~host ~acl ~node ~dir () in
-      let* () = Event.(emit rpc_server_is_ready) (rpc_addr, rpc_port) in
-      Lwt.return rpc_server)
+      let*! rpc_server = launch ~host ~acl ~node ~dir () in
+      let*! () = Event.(emit rpc_server_is_ready) rpc_addr in
+      return rpc_server)
     fail_with_exn

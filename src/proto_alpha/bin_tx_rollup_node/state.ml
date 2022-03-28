@@ -28,7 +28,7 @@
 open Protocol.Alpha_context
 open Protocol.Apply_results
 open Protocol_client_context
-module Block_hash_map = Map.Make (Block_hash)
+open Common
 
 type rollup_origination = {block_hash : Block_hash.t; block_level : int32}
 
@@ -38,15 +38,23 @@ type t = {
   rollup : Tx_rollup.t;
   rollup_origination : rollup_origination;
   parameters : Protocol.Tx_rollup_l2_apply.parameters;
+  operator : signer option;
+  batcher_state : Batcher.state option;
+}
+
+type 'block reorg = {
+  ancestor : 'block option;
+  old_chain : 'block list;
+  new_chain : 'block list;
 }
 
 (* Stands for the manager operation pass, in which the rollup transactions are
    stored. *)
 let rollup_operation_index = 3
 
-let get_head state = Stores.L2_head.find state.store
+let no_reorg = {ancestor = None; old_chain = []; new_chain = []}
 
-let set_head state header = Stores.L2_head.set state.store header
+let get_head state = Stores.L2_head.find state.store
 
 let save_tezos_l2_block_hash state block info =
   Stores.Tezos_blocks.add state.store block info
@@ -74,7 +82,7 @@ let get_tezos_l2_block state block =
   let* l2_hash = get_tezos_l2_block_hash state block in
   match l2_hash with
   | None -> return None
-  | Some l2_hash -> get_header state l2_hash
+  | Some l2_hash -> get_block state l2_hash
 
 let get_level state level = Stores.Rollup_levels.find state.store level
 
@@ -94,7 +102,6 @@ let save_block state L2block.{header; inbox} =
   let+ () =
     join
       [
-        save_tezos_l2_block_hash state header.tezos_block hash;
         save_level state header.level hash;
         save_header state hash header;
         save_inbox state hash inbox;
@@ -102,6 +109,117 @@ let save_block state L2block.{header; inbox} =
     |> lwt_map_error (function [] -> [] | trace :: _ -> trace)
   in
   hash
+
+let distance_l2_levels l1 l2 =
+  let to_int32 = function
+    | L2block.Genesis -> -1l
+    | Rollup_level l -> Tx_rollup_level.to_int32 l
+  in
+  Int32.sub (to_int32 l2) (to_int32 l1)
+
+(* Compute the reorganization of L2 blocks from the chain whose head is
+   [old_head_hash] and the chain whose head [new_head_hash]. *)
+let rollup_reorg state ~old_head ~new_head =
+  let open Lwt_syntax in
+  let rec loop old_chain new_chain (old_head, old_head_hash)
+      (new_head, new_head_hash) =
+    match (old_head, new_head) with
+    | (None, _) | (_, None) ->
+        return
+          {
+            ancestor = None;
+            old_chain = List.rev old_chain;
+            new_chain = List.rev new_chain;
+          }
+    | (Some old_head, Some new_head) ->
+        if L2block.Hash.(old_head_hash = new_head_hash) then
+          return
+            {
+              ancestor = Some (old_head, old_head_hash);
+              old_chain = List.rev old_chain;
+              new_chain = List.rev new_chain;
+            }
+        else
+          let diff =
+            distance_l2_levels
+              old_head.L2block.header.level
+              new_head.L2block.header.level
+          in
+          let* (old_chain, new_chain, old, new_) =
+            if diff = 0l then
+              (* Heads at same level *)
+              let new_chain = (new_head, new_head_hash) :: new_chain in
+              let old_chain = (old_head, old_head_hash) :: old_chain in
+              let new_head_hash = new_head.L2block.header.predecessor in
+              let old_head_hash = old_head.L2block.header.predecessor in
+              let* new_head = get_block state new_head_hash in
+              let+ old_head = get_block state old_head_hash in
+              ( old_chain,
+                new_chain,
+                (old_head, old_head_hash),
+                (new_head, new_head_hash) )
+            else if diff > 0l then
+              (* New chain is longer *)
+              let new_chain = (new_head, new_head_hash) :: new_chain in
+              let new_head_hash = new_head.L2block.header.predecessor in
+              let+ new_head = get_block state new_head_hash in
+              ( old_chain,
+                new_chain,
+                (Some old_head, old_head_hash),
+                (new_head, new_head_hash) )
+            else
+              (* Old chain was longer *)
+              let old_chain = (old_head, old_head_hash) :: old_chain in
+              let old_head_hash = old_head.L2block.header.predecessor in
+              let+ old_head = get_block state old_head_hash in
+              ( old_chain,
+                new_chain,
+                (old_head, old_head_hash),
+                (Some new_head, new_head_hash) )
+          in
+          loop old_chain new_chain old new_
+  in
+  let (old_head, old_head_hash) = old_head in
+  let (new_head, new_head_hash) = new_head in
+  loop [] [] (Some old_head, old_head_hash) (Some new_head, new_head_hash)
+
+let patch_l2_levels state (reorg : (L2block.t * L2block.hash) reorg) =
+  let open Lwt_result_syntax in
+  let* () =
+    List.iter_es
+      (fun (old_, _) ->
+        Stores.Rollup_levels.remove state.store old_.L2block.header.level)
+      reorg.old_chain
+  in
+  List.iter_es
+    (fun (new_, new_hash) ->
+      save_level state new_.L2block.header.level new_hash)
+    reorg.new_chain
+
+let set_head state head context =
+  let open Lwt_result_syntax in
+  (match state.batcher_state with
+  | None -> ()
+  | Some batcher_state -> Batcher.update_incr_context batcher_state context) ;
+  let*! old_header = Stores.L2_head.find state.store in
+  let* () = Stores.L2_head.set state.store head.L2block.header in
+  let hash = L2block.hash_header head.header in
+  let*! l2_reorg =
+    match old_header with
+    | None -> Lwt.return no_reorg
+    | Some old_header -> (
+        let old_hash = L2block.hash_header old_header in
+        let*! old_head = get_block state old_hash in
+        match old_head with
+        | None -> Lwt.return no_reorg
+        | Some old_head ->
+            rollup_reorg
+              state
+              ~old_head:(old_head, old_hash)
+              ~new_head:(head, hash))
+  in
+  let* () = patch_l2_levels state l2_reorg in
+  return l2_reorg
 
 let tezos_block_already_processed state hash =
   let open Lwt_syntax in
@@ -144,7 +262,7 @@ let check_origination_in_block_info rollup block_info =
   | Some _ -> return_unit
   | None -> fail @@ Error.Tx_rollup_not_originated_in_the_given_block rollup
 
-let init_store ~data_dir ~context ?rollup_genesis rollup =
+let init_store cctxt ~data_dir ?rollup_genesis rollup =
   let open Lwt_result_syntax in
   let* store = Stores.load (Node_data.store_dir data_dir) in
   let*! origination_info = Stores.Rollup_origination.find store in
@@ -176,7 +294,7 @@ let init_store ~data_dir ~context ?rollup_genesis rollup =
     | (None, Some rollup_genesis) ->
         let block = `Hash (rollup_genesis, 0) in
         let* block_info =
-          Alpha_block_services.info context ~chain:context#chain ~block ()
+          Alpha_block_services.info cctxt ~chain:cctxt#chain ~block ()
         in
         let* () = check_origination_in_block_info rollup block_info in
         let rollup_orig =
@@ -210,11 +328,24 @@ let init_parameters cctxt =
         parametric.tx_rollup_max_withdrawals_per_batch;
     }
 
-let init ~data_dir ~context ?rollup_genesis rollup =
+let init cctxt ~data_dir ?rollup_genesis ~operator rollup =
   let open Lwt_result_syntax in
-  let store_orig = init_store ~data_dir ~context ?rollup_genesis rollup in
+  let store_orig = init_store cctxt ~data_dir ?rollup_genesis rollup in
   let context_index = init_context ~data_dir in
   let* (store, rollup_origination) = store_orig in
   let* context_index = context_index in
-  let* parameters = init_parameters context in
-  return {store; context_index; rollup; rollup_origination; parameters}
+  let* parameters = init_parameters cctxt in
+  let* batcher_state =
+    Batcher.init cctxt ~rollup ~signer:operator context_index parameters
+  in
+  let* operator = get_signer cctxt operator in
+  return
+    {
+      store;
+      context_index;
+      rollup;
+      rollup_origination;
+      parameters;
+      operator;
+      batcher_state;
+    }

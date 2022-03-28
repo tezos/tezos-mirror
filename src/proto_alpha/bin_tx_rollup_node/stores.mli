@@ -56,6 +56,8 @@ module type MAP = sig
   val get : t -> key -> value tzresult Lwt.t
 
   val add : t -> key -> value -> unit tzresult Lwt.t
+
+  val remove : t -> key -> unit tzresult Lwt.t
 end
 
 (** An interface that describes a generic value reference. *)

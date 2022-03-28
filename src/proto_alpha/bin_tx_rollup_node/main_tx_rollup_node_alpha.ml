@@ -26,16 +26,11 @@
 (*****************************************************************************)
 
 let data_dir_doc =
-  Format.sprintf
-    "The directory path to the transaction rollup node data. The default path \
-     is %s"
+  Format.sprintf "The directory path to the transaction rollup node data."
 
 let rpc_addr_doc =
   Format.asprintf
-    "The address where the node listens. The default address is %s"
-
-let rpc_port_doc =
-  Format.asprintf "The port where the node listens. The default port is %d"
+    "The address and port where the node listens to RPCs. The default is %s"
 
 let reconnection_delay_doc =
   Format.asprintf
@@ -43,13 +38,11 @@ let reconnection_delay_doc =
      %f"
 
 let data_dir_arg =
-  let default = Configuration.default_data_dir in
-  let doc = data_dir_doc default in
-  Clic.default_arg
+  let doc = data_dir_doc in
+  Clic.arg
     ~long:"data-dir"
     ~placeholder:"data_dir"
     ~doc
-    ~default
     Client_proto_args.string_parameter
 
 let operator_arg =
@@ -58,7 +51,7 @@ let operator_arg =
     ~long:"operator"
     ~placeholder:"public_key"
     ~doc
-    (Clic.parameter (fun _ -> Client_keys.Public_key_hash.of_source))
+    Client_proto_args.string_parameter
 
 let rollup_id_arg =
   Clic.arg
@@ -82,24 +75,17 @@ let rollup_genesis_arg =
          @@ Block_hash.of_b58check_opt str))
 
 let rpc_addr_arg =
-  let default = Configuration.default_rpc_addr in
+  let default = P2p_point.Id.to_string Configuration.default_rpc_addr in
   let doc = rpc_addr_doc default in
   Clic.default_arg
     ~long:"rpc-addr"
-    ~placeholder:"address|ip"
+    ~placeholder:"address:port"
     ~doc
     ~default
-    Client_proto_args.string_parameter
-
-let rpc_port_arg =
-  let default = Configuration.default_rpc_port in
-  let doc = rpc_port_doc default in
-  Clic.default_arg
-    ~long:"rpc-port"
-    ~placeholder:"port"
-    ~doc
-    ~default:(string_of_int default)
-    Client_proto_args.int_parameter
+    (Clic.parameter (fun _ s ->
+         P2p_point.Id.of_string s
+         |> Result.map_error (fun e -> [Exn (Failure e)])
+         |> Lwt.return))
 
 let reconnection_delay_arg =
   let default = Configuration.default_reconnection_delay in
@@ -126,41 +112,41 @@ let configuration_init_command =
   command
     ~group
     ~desc:"Configure the transaction rollup daemon."
-    (args7
+    (args6
        data_dir_arg
        operator_arg
        rollup_id_arg
        rollup_genesis_arg
        rpc_addr_arg
-       rpc_port_arg
        reconnection_delay_arg)
     (prefixes ["config"; "init"; "on"] @@ stop)
     (fun ( data_dir,
-           client_keys,
+           operator,
            rollup_id,
            rollup_genesis,
            rpc_addr,
-           rpc_port,
            reconnection_delay )
          cctxt ->
       let open Lwt_result_syntax in
       let*! () = Event.(emit preamble_warning) () in
-      let* client_keys = to_tzresult "Missing arg --operator" client_keys in
-      let* rollup_id = to_tzresult "Missing arg --rollup_id" rollup_id in
+      let* rollup_id = to_tzresult "Missing arg --rollup-id" rollup_id in
+      let data_dir =
+        match data_dir with
+        | Some d -> d
+        | None -> Configuration.default_data_dir rollup_id
+      in
       let config =
         Configuration.
           {
             data_dir;
-            client_keys;
+            operator;
             rollup_id;
             rollup_genesis;
             rpc_addr;
-            rpc_port;
             reconnection_delay;
           }
       in
-      let file = Configuration.get_configuration_filename data_dir in
-      let* () = Configuration.save config in
+      let* file = Configuration.save config in
       (* This is necessary because the node has not yet been launched, so event
          listening can't be used. *)
       let*! () = cctxt#message "Configuration written in %s" file in
@@ -168,23 +154,32 @@ let configuration_init_command =
       return_unit)
 
 let run_command =
-  let open Lwt_syntax in
+  let open Lwt_result_syntax in
   let open Clic in
   command
     ~group
     ~desc:"Run the transaction rollup daemon."
-    (args1 data_dir_arg)
+    (args2 data_dir_arg rollup_id_arg)
     (prefixes ["run"] @@ stop)
-    (fun data_dir cctxt ->
-      let* () = Event.(emit preamble_warning) () in
-      Daemon.run ~data_dir cctxt)
+    (fun (data_dir, rollup_id) cctxt ->
+      let*! () = Event.(emit preamble_warning) () in
+      let* data_dir =
+        match data_dir with
+        | Some d -> return d
+        | None ->
+            let* rollup_id =
+              to_tzresult "Provide at least --rollup-id or --data-dir" rollup_id
+            in
+            return (Configuration.default_data_dir rollup_id)
+      in
+      let* config = Configuration.load ~data_dir in
+      Daemon.run config cctxt)
 
 let tx_rollup_commands () =
   List.map
     (Clic.map_command (new Protocol_client_context.wrap_full))
     [configuration_init_command; run_command]
 
-let select_commands _ _ =
-  return (tx_rollup_commands () @ Client_helpers_commands.commands ())
+let select_commands _ _ = return (tx_rollup_commands ())
 
 let () = Client_main_run.run (module Client_config) ~select_commands

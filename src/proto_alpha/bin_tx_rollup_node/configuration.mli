@@ -31,31 +31,24 @@
 
 type t = {
   data_dir : string;
-  client_keys : Client_keys.Public_key_hash.t;
   rollup_id : Protocol.Alpha_context.Tx_rollup.t;
   rollup_genesis : Block_hash.t option;
-  rpc_addr : string;
-  rpc_port : int;
+  rpc_addr : P2p_point.Id.t;
   reconnection_delay : float;
+  operator : string option;
 }
 
 (** [default_data_dir] is the default value for [data_dir]. *)
-val default_data_dir : string
+val default_data_dir : Protocol.Alpha_context.Tx_rollup.t -> string
 
 (** [default_rpc_addr] is the default value for [rpc_addr]. *)
-val default_rpc_addr : string
-
-(** [default_rpc_port] is the default value for [rpc_port]. *)
-val default_rpc_port : int
+val default_rpc_addr : P2p_point.Id.t
 
 (** [default_reconnection_delay] is the default value for [reconnection-delay]*)
 val default_reconnection_delay : float
 
-(** [get_configuration_filename data_dir] returns the [configuration] filename in [data_dir]. *)
-val get_configuration_filename : string -> string
-
-(** [save configuration] overwrites [configuration] file. *)
-val save : t -> unit tzresult Lwt.t
+(** [save configuration] overwrites [configuration] file and returns the filename. *)
+val save : t -> string tzresult Lwt.t
 
 (** [load ~data_dir] loads a configuration stored in [data_dir]. *)
 val load : data_dir:string -> t tzresult Lwt.t

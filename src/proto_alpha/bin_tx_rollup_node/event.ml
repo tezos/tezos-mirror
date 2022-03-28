@@ -57,13 +57,12 @@ let starting_node =
     ()
 
 let rpc_server_is_ready =
-  declare_2
+  declare_1
     ~section
     ~name:"tx_rollup_node_rpc_server_is_ready"
-    ~msg:"the transaction rollup node RPC server is listening to {addr}:{port}"
+    ~msg:"the transaction rollup node RPC server is listening on {addr}"
     ~level:Notice
-    ("addr", Data_encoding.string)
-    ("port", Data_encoding.uint16)
+    ("addr", P2p_point.Id.encoding)
 
 let node_is_ready =
   declare_0
@@ -187,3 +186,48 @@ let new_tezos_head =
     ~msg:"a new tezos head ({tezos_head}) is stored"
     ~level:Notice
     ("tezos_head", Block_hash.encoding)
+
+module Batcher = struct
+  let section = section @ ["batcher"]
+
+  let queue =
+    declare_1
+      ~section
+      ~name:"queue"
+      ~msg:"adding {tr_hash} to queue"
+      ~level:Notice
+      ("tr_hash", L2_transaction.Hash.encoding)
+
+  let batch =
+    declare_2
+      ~section
+      ~name:"batch"
+      ~msg:"batching {nb_transactions} transactions into {nb_batches} batches"
+      ~level:Notice
+      ("nb_batches", Data_encoding.int31)
+      ("nb_transactions", Data_encoding.int31)
+
+  let no_full_batch =
+    declare_0
+      ~section
+      ~name:"no_full_batch"
+      ~msg:"No full batch to inject and we requested so"
+      ~level:Info
+      ()
+
+  let inject =
+    declare_0
+      ~section
+      ~name:"inject"
+      ~msg:"Injecting batches on Tezos node"
+      ~level:Info
+      ()
+
+  let injection_success =
+    declare_1
+      ~section
+      ~name:"injection_success"
+      ~msg:"batches were successfully injected in operation {oph}"
+      ~level:Notice
+      ("oph", Operation_hash.encoding)
+end

@@ -2,8 +2,6 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
-(* Copyright (c) 2022 Marigold, <contact@marigold.dev>                       *)
-(* Copyright (c) 2022 Oxhead Alpha <info@oxhead-alpha.com>                   *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -25,50 +23,31 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t
+open Protocol
 
-val create :
-  ?path:string ->
-  ?runner:Runner.t ->
-  ?data_dir:string ->
-  ?addr:string ->
-  ?dormant_mode:bool ->
-  ?color:Log.Color.t ->
-  ?event_pipe:string ->
-  ?name:string ->
-  rollup_id:string ->
-  rollup_genesis:string ->
-  ?operator:string ->
-  Client.t ->
-  Node.t ->
-  t
+(**  {2 Types for L2 transactions} *)
 
-(** Returns the node's endpoint. *)
-val endpoint : t -> string
+type t = {
+  transaction :
+    (Indexable.unknown, Indexable.unknown) Tx_rollup_l2_batch.V1.transaction;
+  signature : Tx_rollup_l2_batch.V1.signature;
+}
 
-(** Wait until the node is ready.
+(** Hash with b58check encoding txL2(54), for hashes of L2 transactions *)
+module Hash : S.HASH
 
-    More precisely, wait until a [node_is_ready] event occurs.
-    If such an event already occurred, return immediately. *)
-val wait_for_ready : t -> unit Lwt.t
+(** Alias for transaction hash *)
+type hash = Hash.t
 
-(** Wait for a given Tezos chain level.
+(**  {2 Serialization} *)
 
-    More precisely, wait until the rollup node have successfully
-    validated a block of given [level], received from the Tezos node
-    it is connected to.
-    If such an event already occurred, return immediately. *)
-val wait_for_tezos_level : t -> int -> int Lwt.t
+val encoding : t Data_encoding.encoding
 
-(** Connected to a tezos node.
-    Returns the name of the configuration file. *)
-val config_init : t -> string -> string -> string Lwt.t
+val hash : t -> Hash.t
 
-(** [run node] launches the given transaction rollup node. *)
-val run : t -> unit Lwt.t
+(**  {2 Batching} *)
 
-(** See [Daemon.Make.terminate]. *)
-val terminate : ?kill:bool -> t -> unit Lwt.t
-
-(** Get the RPC address given as [--rpc-addr] to a node. *)
-val rpc_addr : t -> string
+(** Build a L2 batch of transactions by aggregating the BLS signatures of
+    individual transactions *)
+val batch :
+  t list -> (Indexable.unknown, Indexable.unknown) Tx_rollup_l2_batch.t tzresult

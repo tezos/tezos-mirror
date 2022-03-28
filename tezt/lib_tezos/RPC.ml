@@ -691,6 +691,44 @@ module Curl = struct
               curl_path_cache := Some curl_path ;
               return curl_path
         in
-        return @@ Some (fun ~url -> run_and_read_stdout curl_path ["-s"; url])
+        return
+        @@ Some
+             (fun ~url ->
+               let* output = run_and_read_stdout curl_path ["-s"; url] in
+               return (JSON.parse ~origin:url output))
+      with _ -> return @@ None)
+
+  let post () =
+    Process.(
+      try
+        let* curl_path =
+          match !curl_path_cache with
+          | Some curl_path -> return curl_path
+          | None ->
+              let* curl_path =
+                run_and_read_stdout "sh" ["-c"; "command -v curl"]
+              in
+              let curl_path = String.trim curl_path in
+              curl_path_cache := Some curl_path ;
+              return curl_path
+        in
+        return
+        @@ Some
+             (fun ~url data ->
+               let* output =
+                 run_and_read_stdout
+                   curl_path
+                   [
+                     "-X";
+                     "POST";
+                     "-H";
+                     "Content-Type: application/json";
+                     "-s";
+                     url;
+                     "-d";
+                     JSON.encode data;
+                   ]
+               in
+               return (JSON.parse ~origin:url output))
       with _ -> return @@ None)
 end
