@@ -56,6 +56,18 @@ let ref_of_service (prefix, meth) =
        "\\1"
        (String.concat "--" prefix))
 
+(** Encode HTML special characters in string s using escape sequences "&xxx;" *)
+let html_encode =
+  let rexp = Str.regexp ".*[&><]" in
+  fun s ->
+    (* ensure no string allocation is done in the common case *)
+    if Str.string_match rexp s 0 then
+      let s1 = Str.global_replace (Str.regexp "&") "&amp;" s in
+      let s2 = Str.global_replace (Str.regexp "<") "&lt;" s1 in
+      let s3 = Str.global_replace (Str.regexp ">") "&gt;" s2 in
+      s3
+    else s
+
 module Index = struct
   let rec pp prefix ppf dir =
     let open Resto.Description in
@@ -152,7 +164,7 @@ module Description = struct
           | Flag -> Format.fprintf ppf "<span class=\"query\">%s</span>" name) ;
           match description with
           | None -> ()
-          | Some descr -> Format.fprintf ppf " : %s" descr)
+          | Some descr -> Format.fprintf ppf " : %s" (html_encode descr))
 
     let pp ppf query =
       match query with
@@ -209,7 +221,7 @@ module Description = struct
         ppf
         "@[<h>%a@]%a"
         Format.pp_print_text
-        (Option.value ~default:"" service.description)
+        (html_encode (Option.value ~default:"" service.description))
         Query.pp
         service.query
 
