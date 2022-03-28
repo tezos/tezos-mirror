@@ -710,6 +710,13 @@ module Sc_rollup = struct
     Client.rpc ?endpoint ?hooks GET path client
 end
 
+let raw_bytes ?endpoint ?hooks ?(chain = "main") ?(block = "head") ?(path = [])
+    client =
+  let path =
+    ["chains"; chain; "blocks"; block; "context"; "raw"; "bytes"] @ path
+  in
+  Client.rpc ?endpoint ?hooks GET path client
+
 module Curl = struct
   let curl_path_cache = ref None
 

@@ -1004,6 +1004,15 @@ module Sc_rollup : sig
     JSON.t Lwt.t
 end
 
+val raw_bytes :
+  ?endpoint:Client.endpoint ->
+  ?hooks:Process.hooks ->
+  ?chain:string ->
+  ?block:string ->
+  ?path:string list ->
+  Client.t ->
+  JSON.t Lwt.t
+
 module Curl : sig
   (** [get ()] returns [Some curl] where [curl ~url] returns the raw response obtained
       by curl when requesting [url]. Returns [None] if [curl] cannot be found. *)
