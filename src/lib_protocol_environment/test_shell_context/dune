@@ -1,0 +1,17 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(test
+ (name test_proxy_context)
+ (package tezos-shell-context-test)
+ (libraries
+  tezos-shell-context
+  alcotest-lwt
+  tezos-test-helpers
+  tezos-base
+  tezos-protocol-environment)
+ (flags
+  (:standard
+   -open Lib_test
+   -open Tezos_base.TzPervasives
+   -open Tezos_protocol_environment)))

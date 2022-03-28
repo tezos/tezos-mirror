@@ -53,6 +53,9 @@ let equal_string_option ?msg o1 o2 =
 let is_none ?(msg = "") x = if x <> None then fail "None" "Some _" msg
 
 let make_equal_list eq prn ?(msg = "") x y =
+  let to_string l =
+    Printf.sprintf "[%s]" (String.concat "; " (List.map prn l))
+  in
   let rec iter i x y =
     match (x, y) with
     | (hd_x :: tl_x, hd_y :: tl_y) ->
@@ -61,11 +64,21 @@ let make_equal_list eq prn ?(msg = "") x y =
           let fm = Printf.sprintf "%s (at index %d)" msg i in
           fail (prn hd_x) (prn hd_y) fm
     | (_ :: _, []) | ([], _ :: _) ->
-        let fm = Printf.sprintf "%s (lists of different sizes)" msg in
+        let fm =
+          Printf.sprintf
+            "%s (lists of different sizes: %d <> %d, the lists being %s and %s)"
+            msg
+            (List.length x)
+            (List.length y)
+            (to_string x)
+            (to_string y)
+        in
         fail_msg "%s" fm
     | ([], []) -> ()
   in
   iter 0 x y
+
+let equal_string_list = make_equal_list String.equal Fun.id
 
 let equal_string_list_list ?msg l1 l2 =
   let pr_persist l =
