@@ -353,7 +353,7 @@ let generate_fresh_source state =
 (* [heads_iter cctxt f] calls [f head] each time there is a new head
    received by the streamed RPC /monitor/heads/main *)
 let heads_iter (cctxt : Protocol_client_context.full)
-    (f : Block_hash.t * Tezos_base.Block_header.t -> unit Lwt.t) :
+    (f : Block_hash.t * Tezos_base.Block_header.t -> unit tzresult Lwt.t) :
     unit tzresult Lwt.t =
   let open Lwt_tzresult_syntax in
   Error_monad.protect
@@ -381,7 +381,7 @@ let heads_iter (cctxt : Protocol_client_context.full)
                 in
                 if Protocol_hash.(protocols.current_protocol = Protocol.hash)
                 then
-                  let*! () = f block_hash_and_header in
+                  let* () = f block_hash_and_header in
                   loop ()
                 else
                   let*! () =
@@ -535,151 +535,127 @@ let inject_transfer (cctxt : Protocol_client_context.full) parameters state
   Shell_services.Blocks.hash cctxt () >>=? fun branch ->
   Alpha_services.Contract.counter cctxt (`Main, `Head 0) transfer.src.pkh
   >>=? fun pcounter ->
-  (* If there is a new block refresh the fresh_pool *)
-  if not (Block_hash.equal branch state.last_block) then (
-    state.last_block <- branch ;
-    (* Because of how Tenderbake works the target block should stay 2
-       blocks in the past because this guarantees that we are targeting a
-       block that is decided. *)
-    Shell_services.Blocks.hash cctxt ~block:(`Head 2) ()
-    >>=? fun target_block ->
-    state.target_block <- target_block ;
-    if Option.is_some state.shuffled_pool then
-      state.shuffled_pool <-
-        Some
-          (List.shuffle
-             ~rng:state.rng_state
-             (List.map (fun src_org -> src_org.source) state.pool)) ;
-    return ())
-  else
-    return () >>=? fun () ->
-    let freshest_counter =
-      match
-        Signature.Public_key_hash.Table.find state.counters transfer.src.pkh
-      with
-      | None ->
-          (* This is the first operation we inject for this pkh: the counter given
-             by the RPC _must_ be the freshest one. *)
+  let freshest_counter =
+    match
+      Signature.Public_key_hash.Table.find state.counters transfer.src.pkh
+    with
+    | None ->
+        (* This is the first operation we inject for this pkh: the counter given
+           by the RPC _must_ be the freshest one. *)
+        pcounter
+    | Some (previous_branch, previous_counter) ->
+        if Block_hash.equal branch previous_branch then
+          (* We already injected an operation on top of this block: the one stored
+             locally is the freshest one. *)
+          previous_counter
+        else
+          (* It seems the block changed since we last injected an operation:
+             this invalidates the previously stored counter. We return the counter
+             given by the RPC. *)
           pcounter
-      | Some (previous_branch, previous_counter) ->
-          if Block_hash.equal branch previous_branch then
-            (* We already injected an operation on top of this block: the one stored
-               locally is the freshest one. *)
-            previous_counter
-          else
-            (* It seems the block changed since we last injected an operation:
-               this invalidates the previously stored counter. We return the counter
-               given by the RPC. *)
-            pcounter
+  in
+  (if Signature.Public_key_hash.Set.mem transfer.src.pkh state.revealed then
+   return true
+  else (
+    (* Either the [manager_key] RPC tells us the key is already
+       revealed, or we immediately inject a reveal operation: in any
+       case the key is revealed in the end. *)
+    state.revealed <-
+      Signature.Public_key_hash.Set.add transfer.src.pkh state.revealed ;
+    Alpha_services.Contract.manager_key cctxt (`Main, `Head 0) transfer.src.pkh
+    >>=? fun pk_opt -> return (Option.is_some pk_opt)))
+  >>=? fun already_revealed ->
+  (if not already_revealed then (
+   let reveal_counter = Z.succ freshest_counter in
+   let transf_counter = Z.succ reveal_counter in
+   let reveal =
+     Manager_operation
+       {
+         source = transfer.src.pkh;
+         fee = Tez.zero;
+         counter = reveal_counter;
+         gas_limit = cost_of_manager_operation;
+         storage_limit = Z.zero;
+         operation = Reveal transfer.src.pk;
+       }
+   in
+   let manager_op =
+     manager_op_of_transfer
+       parameters
+       {transfer with counter = Some transf_counter}
+   in
+   let list = Cons (reveal, Single manager_op) in
+   Signature.Public_key_hash.Table.remove state.counters transfer.src.pkh ;
+   Signature.Public_key_hash.Table.add
+     state.counters
+     transfer.src.pkh
+     (branch, transf_counter) ;
+   (if !verbose then
+    cctxt#message
+      "injecting reveal+transfer from %a (counters=%a,%a) to %a"
+      Signature.Public_key_hash.pp
+      transfer.src.pkh
+      Z.pp_print
+      reveal_counter
+      Z.pp_print
+      transf_counter
+      Contract.pp
+      (destination_to_contract transfer.dst)
+   else Lwt.return_unit)
+   >>= fun () ->
+   (* NB: regardless of our best efforts to keep track of counters, injection can fail with
+      "counter in the future" if a block switch happens in between the moment we
+      get the branch and the moment we inject, and the new block does not include
+      all the operations we injected. *)
+   inject_contents cctxt state.target_block transfer.src.sk list)
+  else
+    let transf_counter = Z.succ freshest_counter in
+    let manager_op =
+      manager_op_of_transfer
+        parameters
+        {transfer with counter = Some transf_counter}
     in
-    (if Signature.Public_key_hash.Set.mem transfer.src.pkh state.revealed then
-     return true
-    else (
-      (* Either the [manager_key] RPC tells us the key is already
-         revealed, or we immediately inject a reveal operation: in any
-         case the key is revealed in the end. *)
-      state.revealed <-
-        Signature.Public_key_hash.Set.add transfer.src.pkh state.revealed ;
-      Alpha_services.Contract.manager_key
-        cctxt
-        (`Main, `Head 0)
-        transfer.src.pkh
-      >>=? fun pk_opt -> return (Option.is_some pk_opt)))
-    >>=? fun already_revealed ->
-    (if not already_revealed then (
-     let reveal_counter = Z.succ freshest_counter in
-     let transf_counter = Z.succ reveal_counter in
-     let reveal =
-       Manager_operation
-         {
-           source = transfer.src.pkh;
-           fee = Tez.zero;
-           counter = reveal_counter;
-           gas_limit = cost_of_manager_operation;
-           storage_limit = Z.zero;
-           operation = Reveal transfer.src.pk;
-         }
-     in
-     let manager_op =
-       manager_op_of_transfer
-         parameters
-         {transfer with counter = Some transf_counter}
-     in
-     let list = Cons (reveal, Single manager_op) in
-     Signature.Public_key_hash.Table.remove state.counters transfer.src.pkh ;
-     Signature.Public_key_hash.Table.add
-       state.counters
+    let list = Single manager_op in
+    Signature.Public_key_hash.Table.remove state.counters transfer.src.pkh ;
+    Signature.Public_key_hash.Table.add
+      state.counters
+      transfer.src.pkh
+      (branch, transf_counter) ;
+    (if !verbose then
+     cctxt#message
+       "injecting transfer from %a (counter=%a) to %a"
+       Signature.Public_key_hash.pp
        transfer.src.pkh
-       (branch, transf_counter) ;
-     (if !verbose then
-      cctxt#message
-        "injecting reveal+transfer from %a (counters=%a,%a) to %a"
-        Signature.Public_key_hash.pp
-        transfer.src.pkh
-        Z.pp_print
-        reveal_counter
-        Z.pp_print
-        transf_counter
-        Contract.pp
-        (destination_to_contract transfer.dst)
-     else Lwt.return_unit)
-     >>= fun () ->
-     (* NB: regardless of our best efforts to keep track of counters, injection can fail with
-        "counter in the future" if a block switch happens in between the moment we
-        get the branch and the moment we inject, and the new block does not include
-        all the operations we injected. *)
-     inject_contents cctxt state.target_block transfer.src.sk list)
-    else
-      let transf_counter = Z.succ freshest_counter in
-      let manager_op =
-        manager_op_of_transfer
-          parameters
-          {transfer with counter = Some transf_counter}
-      in
-      let list = Single manager_op in
-      Signature.Public_key_hash.Table.remove state.counters transfer.src.pkh ;
-      Signature.Public_key_hash.Table.add
-        state.counters
-        transfer.src.pkh
-        (branch, transf_counter) ;
-      (if !verbose then
-       cctxt#message
-         "injecting transfer from %a (counter=%a) to %a"
-         Signature.Public_key_hash.pp
-         transfer.src.pkh
-         Z.pp_print
-         transf_counter
-         Contract.pp
-         (destination_to_contract transfer.dst)
-      else Lwt.return_unit)
+       Z.pp_print
+       transf_counter
+       Contract.pp
+       (destination_to_contract transfer.dst)
+    else Lwt.return_unit)
+    >>= fun () ->
+    (* See comment above. *)
+    inject_contents cctxt state.target_block transfer.src.sk list)
+  >>= function
+  | Ok op_hash ->
+      debug_msg (fun () ->
+          cctxt#message
+            "inject_transfer: op injected %a"
+            Operation_hash.pp
+            op_hash)
       >>= fun () ->
-      (* See comment above. *)
-      inject_contents cctxt state.target_block transfer.src.sk list)
-    >>= function
-    | Ok op_hash ->
-        debug_msg (fun () ->
-            cctxt#message
-              "inject_transfer: op injected %a"
-              Operation_hash.pp
-              op_hash)
-        >>= fun () ->
-        let ops =
-          Option.value
-            ~default:[]
-            (Block_hash.Table.find state.injected_operations branch)
-        in
-        Block_hash.Table.replace
-          state.injected_operations
-          branch
-          (op_hash :: ops) ;
-        return_unit
-    | Error e ->
-        debug_msg (fun () ->
-            cctxt#message
-              "inject_transfer: error, op not injected: %a"
-              Error_monad.pp_print_trace
-              e)
-        >>= fun () -> return_unit
+      let ops =
+        Option.value
+          ~default:[]
+          (Block_hash.Table.find state.injected_operations branch)
+      in
+      Block_hash.Table.replace state.injected_operations branch (op_hash :: ops) ;
+      return_unit
+  | Error e ->
+      debug_msg (fun () ->
+          cctxt#message
+            "inject_transfer: error, op not injected: %a"
+            Error_monad.pp_print_trace
+            e)
+      >>= fun () -> return_unit
 
 let save_injected_operations (cctxt : Protocol_client_context.full) state =
   let json =
@@ -829,11 +805,22 @@ let launch (cctxt : Protocol_client_context.full) (parameters : parameters)
       else Lwt_unix.sleep remaining)
       >>= loop
   in
-  let on_new_head : Block_hash.t * Tezos_base.Block_header.t -> unit Lwt.t =
+  let on_new_head :
+      Block_hash.t * Tezos_base.Block_header.t -> unit tzresult Lwt.t =
+    (* Because of how Tenderbake works the target block should stay 2
+       blocks in the past because this guarantees that we are targeting a
+       block that is decided. *)
+    let update_target_block () =
+      Shell_services.Blocks.hash cctxt ~block:(`Head 2) ()
+      >>=? fun target_block ->
+      state.target_block <- target_block ;
+      return_unit
+    in
     match state.shuffled_pool with
     (* Some _ if and only if [single_op_per_pkh_per_block] is true. *)
     | Some _ ->
         fun (new_block_hash, new_block_header) ->
+          update_target_block () >>=? fun () ->
           if not (Block_hash.equal new_block_hash state.last_block) then (
             state.last_block <- new_block_hash ;
             state.last_level <- Int32.to_int new_block_header.shell.level ;
@@ -843,10 +830,10 @@ let launch (cctxt : Protocol_client_context.full) (parameters : parameters)
                    ~rng:state.rng_state
                    (List.map (fun src_org -> src_org.source) state.pool))) ;
           Lwt_condition.broadcast state.new_block_condition () ;
-          Lwt.return_unit
+          return_unit
     | None ->
         (* only wait for the end of the head stream; don't act on heads *)
-        fun _ -> Lwt.return_unit
+        fun _ -> update_target_block ()
   in
   let heads_iteration = heads_iter cctxt on_new_head in
   (* The head iteration stops at protocol change. *)
