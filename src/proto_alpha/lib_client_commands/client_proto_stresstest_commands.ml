@@ -1175,10 +1175,19 @@ let generate_random_transactions =
           let counters = Signature.Public_key_hash.Table.create 1023 in
           let rng_state = Random.State.make [|parameters.seed|] in
           Shell_services.Blocks.hash cctxt () >>=? fun current_head_on_start ->
-          Shell_services.Blocks.hash cctxt ~block:(`Head 2) ()
-          >>=? fun current_target_block ->
           Shell_services.Blocks.Header.shell_header cctxt ()
           >>=? fun header_on_start ->
+          (if header_on_start.level <= 2l then
+           cctxt#error
+             "The level of the head (%a) needs to be greater than 2 and is \
+              actually %ld."
+             Block_hash.pp
+             current_head_on_start
+             header_on_start.level
+          else return_unit)
+          >>=? fun () ->
+          Shell_services.Blocks.hash cctxt ~block:(`Head 2) ()
+          >>=? fun current_target_block ->
           let state =
             {
               rng_state;
