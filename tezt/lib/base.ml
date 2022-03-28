@@ -138,6 +138,21 @@ let ( =~** ) s (_, r) =
   | None -> None
   | Some group -> Some (get_group group 1, get_group group 2)
 
+let ( =~*** ) s (_, r) =
+  match Re.exec_opt r s with
+  | None -> None
+  | Some group -> Some (get_group group 1, get_group group 2, get_group group 3)
+
+let ( =~**** ) s (_, r) =
+  match Re.exec_opt r s with
+  | None -> None
+  | Some group ->
+      Some
+        ( get_group group 1,
+          get_group group 2,
+          get_group group 3,
+          get_group group 4 )
+
 let matches s (_, r) = Re.all r s |> List.map (fun g -> get_group g 1)
 
 let replace_string ?pos ?len ?all (_, r) ~by s =
