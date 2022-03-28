@@ -654,7 +654,7 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
     let open Lwt_syntax in
     let+ repo =
       let indexing_strategy =
-        Option.value indexing_strategy ~default:(Indexing_strategy.get ())
+        Option.value_f indexing_strategy ~default:Indexing_strategy.get
         |> Indexing_strategy.to_irmin
       in
       Store.Repo.v

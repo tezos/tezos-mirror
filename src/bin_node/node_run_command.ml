@@ -376,7 +376,7 @@ let launch_rpc_server ~acl_policy ~media_types (config : Node_config_file.t)
   let acl =
     let open RPC_server.Acl in
     find_policy acl_policy (Ipaddr.V6.to_string addr, Some port)
-    |> Option.value ~default:(default addr)
+    |> Option.value_f ~default:(fun () -> default addr)
   in
   let*! () =
     Event.(emit starting_rpc_server) (host, port, rpc_config.tls <> None)

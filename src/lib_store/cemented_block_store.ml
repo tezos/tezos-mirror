@@ -347,9 +347,8 @@ let find_block_file cemented_store block_level =
 (* Hypothesis: the table is ordered. *)
 let compute_location cemented_store block_level =
   Option.map
-    (function
-      | {start_level; file; _} ->
-          (file, Int32.(to_int (sub block_level start_level))))
+    (fun {start_level; file; _} ->
+      (file, Int32.(to_int (sub block_level start_level))))
     (find_block_file cemented_store block_level)
 
 let is_cemented cemented_store hash =
@@ -486,8 +485,7 @@ let read_block fd block_number =
     Lwt_utils_unix.read_bytes ~pos:0 ~len:offset_length fd offset_buffer
   in
   let offset =
-    Data_encoding.(Binary.of_bytes_opt offset_encoding offset_buffer)
-    |> WithExceptions.Option.get ~loc:__LOC__
+    Data_encoding.(Binary.of_bytes_exn offset_encoding offset_buffer)
   in
   let* _ofs = Lwt_unix.lseek fd offset Unix.SEEK_SET in
   (* We move the cursor to the element's position *)

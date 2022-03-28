@@ -33,9 +33,8 @@ let pk_encoding : Bls_signature.pk Data_encoding.t =
     conv_with_guard
       Bls_signature.pk_to_bytes
       (fun x ->
-        Option.fold
-          ~none:(Error "not a valid bls public key")
-          ~some:ok
+        Option.to_result
+          ~none:"not a valid bls public key"
           (Bls_signature.pk_of_bytes_opt x))
       bytes)
 

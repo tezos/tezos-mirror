@@ -520,32 +520,27 @@ let check_error ?exit_code ?msg process =
     }
   in
   match status with
-  | WEXITED n ->
-      if not (Option.fold ~none:(n <> 0) ~some:(( = ) n) exit_code) then
-        raise
-          (Failed
-             {
-               error with
-               reason =
-                 Some
-                   (Option.fold
-                      ~none:" with any non-zero code"
-                      ~some:(fun exit_code ->
-                        sf " with code %d but failed with code %d" exit_code n)
-                      exit_code);
-             }) ;
-      Option.iter
-        (fun msg ->
-          if err_msg =~! msg then
-            raise
-              (Failed
-                 {
-                   error with
-                   reason =
-                     Some (sf " but failed with stderr =~! %s" (show_rex msg));
-                 }))
-        msg ;
-      unit
+  | WEXITED n -> (
+      match exit_code with
+      | None when n = 0 ->
+          raise (Failed {error with reason = Some " with any non-zero code"})
+      | Some exit_code when n <> exit_code ->
+          let reason = sf " with code %d but failed with code %d" exit_code n in
+          raise (Failed {error with reason = Some reason})
+      | _ ->
+          Option.iter
+            (fun msg ->
+              if err_msg =~! msg then
+                raise
+                  (Failed
+                     {
+                       error with
+                       reason =
+                         Some
+                           (sf " but failed with stderr =~! %s" (show_rex msg));
+                     }))
+            msg ;
+          unit)
   | _ -> raise (Failed error)
 
 let program_path program =

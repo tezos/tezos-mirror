@@ -453,7 +453,8 @@ let load_mainnet_bakers_public_keys base_dir active_bakers_only =
              alias_pkh_pk_list
          in
          let alias =
-           Option.value ~default:(Format.asprintf "baker_%d" i) alias
+           Option.value_f alias ~default:(fun () ->
+               Format.asprintf "baker_%d" i)
          in
          (alias, pkh, pk))
        delegates

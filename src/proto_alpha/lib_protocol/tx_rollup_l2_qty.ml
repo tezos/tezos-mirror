@@ -42,7 +42,7 @@ let to_z = Z.of_int64
 
 let to_string q = Int64.to_string q
 
-let of_string q = Option.fold ~none:None ~some:of_int64 (Int64.of_string_opt q)
+let of_string q = Option.bind (Int64.of_string_opt q) of_int64
 
 let pp fmt q = Format.pp_print_string fmt (to_string q)
 

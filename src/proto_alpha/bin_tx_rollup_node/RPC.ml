@@ -251,9 +251,8 @@ module Context = struct
       conv_with_guard
         Environment.Bls_signature.pk_to_bytes
         (fun x ->
-          Option.fold
-            ~none:(Error "not a valid bls public key")
-            ~some:ok
+          Option.to_result
+            ~none:"not a valid bls public key"
             (Environment.Bls_signature.pk_of_bytes_opt x))
         bytes)
 
