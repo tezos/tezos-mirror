@@ -90,7 +90,7 @@ This sequence of operations was run:
     { "level": 0,
       "messages":
         { "count": 1,
-          "root": "txM36Kjo7cRtSCREhUPJCSnC2CahmR15sif2bW8qTjTq8GHenH89v",
+          "root": "[TX_ROLLUP_MESSAGE_RESULT_LIST_HASH]",
           "last_message_result_hash":
             "[TX_ROLLUP_MESSAGE_RESULT_HASH]" },
       "predecessor": null,
