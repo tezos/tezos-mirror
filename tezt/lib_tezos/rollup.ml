@@ -81,8 +81,7 @@ module Tx_rollup = struct
         inbox_ema;
       }
     in
-    let runnable = RPC.Tx_rollup.get_state ?hooks ~rollup client in
-    Process.runnable_map parse runnable
+    RPC.Tx_rollup.get_state ?hooks ~rollup client |> map_runnable parse
 
   let get_inbox ?hooks ~rollup ~level client =
     let parse json =
@@ -91,8 +90,7 @@ module Tx_rollup = struct
       let merkle_root = JSON.(json |-> "merkle_root" |> as_string) in
       {inbox_length; cumulated_size; merkle_root}
     in
-    let runnable = RPC.Tx_rollup.get_inbox ?hooks ~rollup ~level client in
-    Process.runnable_map parse runnable
+    RPC.Tx_rollup.get_inbox ?hooks ~rollup ~level client |> map_runnable parse
 
   let get_commitment ?hooks ?block ~rollup ~level client =
     RPC.Tx_rollup.get_commitment ?hooks ?block ~rollup ~level client
@@ -108,8 +106,8 @@ module Tx_rollup = struct
   let message_hash ?hooks ~message:(`Batch (`Hex message) : message) client =
     let parse json = `Hash JSON.(json |-> "hash" |> as_string) in
     let data : JSON.u = `O [("message", `O [("batch", `String message)])] in
-    let runnable = RPC.Tx_rollup.Forge.Inbox.message_hash ?hooks ~data client in
-    Process.runnable_map parse runnable
+    RPC.Tx_rollup.Forge.Inbox.message_hash ?hooks ~data client
+    |> map_runnable parse
 
   let inbox_merkle_tree_hash ?hooks ~message_hashes client =
     let parse json = `Hash JSON.(json |-> "hash" |> as_string) in
@@ -117,10 +115,8 @@ module Tx_rollup = struct
     let data =
       `O [("message_hashes", `A (List.map make_message message_hashes))]
     in
-    let runnable =
-      RPC.Tx_rollup.Forge.Inbox.merkle_tree_hash ?hooks ~data client
-    in
-    Process.runnable_map parse runnable
+    RPC.Tx_rollup.Forge.Inbox.merkle_tree_hash ?hooks ~data client
+    |> map_runnable parse
 
   let inbox_merkle_tree_path ?hooks ~message_hashes ~position client =
     let parse json = JSON.(json |-> "path") in
@@ -132,10 +128,8 @@ module Tx_rollup = struct
           ("position", `Float (float_of_int position));
         ]
     in
-    let runnable =
-      RPC.Tx_rollup.Forge.Inbox.merkle_tree_path ?hooks ~data client
-    in
-    Process.runnable_map parse runnable
+    RPC.Tx_rollup.Forge.Inbox.merkle_tree_path ?hooks ~data client
+    |> map_runnable parse
 
   let compute_inbox_from_messages ?hooks messages client =
     let* message_hashes =

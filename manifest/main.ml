@@ -2423,7 +2423,8 @@ let tezt =
   public_lib
     "tezt"
     ~path:"tezt/lib"
-    ~synopsis:"Framework for integration tests with external processes"
+    ~synopsis:
+      "Test framework for unit tests, integration tests, and regression tests"
     ~ocaml:V.(at_least "4.08")
     ~bisect_ppx:false
     ~deps:[re; lwt_unix; ezjsonm]

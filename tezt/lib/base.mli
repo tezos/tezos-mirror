@@ -46,7 +46,7 @@ val ( and* ) : 'a Lwt.t -> 'b Lwt.t -> ('a * 'b) Lwt.t
     More precisely, if one of the two promises is rejected
     or canceled, cancel the other promise and reject the resulting
     promise immediately with the original exception. *)
-val ( and*! ) : 'a Lwt.t -> 'b Lwt.t -> ('a * 'b) Lwt.t
+val lwt_both_fail_early : 'a Lwt.t -> 'b Lwt.t -> ('a * 'b) Lwt.t
 
 (** Same as [Lwt.return]. *)
 val return : 'a -> 'a Lwt.t
@@ -97,12 +97,18 @@ val mandatory : string -> 'a option -> 'a
 type ('a, 'b) runnable = {value : 'a; run : 'a -> 'b Lwt.t}
 
 (** Apply the function of a runnable to its value. *)
+val run : ('a, 'b) runnable -> 'b Lwt.t
+
+(** Same as [run], then continue with the given function. *)
 val ( let*! ) : ('a, 'b) runnable -> ('b -> 'c Lwt.t) -> 'c Lwt.t
 
 (** Get the value of a runnable and pass it to a continuation.
 
     You can also just access field [value] directly. *)
 val ( let*? ) : ('a, 'b) runnable -> ('a -> 'c) -> 'c
+
+(** Convert the output of a runnable to make another runnable. *)
+val map_runnable : ('b -> 'c) -> ('a, 'b) runnable -> ('a, 'c) runnable
 
 (** {2 Lists} *)
 
@@ -147,6 +153,12 @@ val ( =~* ) : string -> rex -> string option
 
 (** Match a regular expression with two capture groups. *)
 val ( =~** ) : string -> rex -> (string * string) option
+
+(** Match a regular expression with three capture groups. *)
+val ( =~*** ) : string -> rex -> (string * string * string) option
+
+(** Match a regular expression with four capture groups. *)
+val ( =~**** ) : string -> rex -> (string * string * string * string) option
 
 (** Match a regular expression with one capture group and return all results. *)
 val matches : string -> rex -> string list
@@ -196,5 +208,9 @@ module String_map : Map.S with type key = string
 module String_set : sig
   include Set.S with type elt = string
 
+  (** Pretty-print a set of strings.
+
+      Items are quoted, separated by commas and breakable spaces,
+      and the result is surrounded by braces. *)
   val pp : Format.formatter -> t -> unit
 end

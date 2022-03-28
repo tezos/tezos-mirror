@@ -42,7 +42,7 @@ let ( let* ) = Lwt.bind
 
 let ( and* ) = Lwt.both
 
-let ( and*! ) a b =
+let lwt_both_fail_early a b =
   let (main_promise, main_awakener) = Lwt.task () in
   let already_woke_up = ref false in
   Lwt.on_failure a (fun exn ->
@@ -74,11 +74,20 @@ let mandatory name = function
 
 type ('a, 'b) runnable = {value : 'a; run : 'a -> 'b Lwt.t}
 
+let run {value; run} = run value
+
 let ( let*! ) x f =
-  let* res = x.run x.value in
+  let* res = run x in
   f res
 
 let ( let*? ) x f = f x.value
+
+let map_runnable f {value; run} =
+  let run x =
+    let* output = run x in
+    return (f output)
+  in
+  {value; run}
 
 let range a b =
   let rec range ?(acc = []) a b =
@@ -129,6 +138,21 @@ let ( =~** ) s (_, r) =
   | None -> None
   | Some group -> Some (get_group group 1, get_group group 2)
 
+let ( =~*** ) s (_, r) =
+  match Re.exec_opt r s with
+  | None -> None
+  | Some group -> Some (get_group group 1, get_group group 2, get_group group 3)
+
+let ( =~**** ) s (_, r) =
+  match Re.exec_opt r s with
+  | None -> None
+  | Some group ->
+      Some
+        ( get_group group 1,
+          get_group group 2,
+          get_group group 3,
+          get_group group 4 )
+
 let matches s (_, r) = Re.all r s |> List.map (fun g -> get_group g 1)
 
 let replace_string ?pos ?len ?all (_, r) ~by s =
@@ -178,5 +202,13 @@ module String_set = struct
   include Set.Make (String)
 
   let pp fmt set =
-    Format.pp_print_list Format.pp_print_string fmt (elements set)
+    if is_empty set then Format.fprintf fmt "{}"
+    else
+      Format.fprintf
+        fmt
+        "@[<hov 2>{ %a }@]"
+        (Format.pp_print_list
+           ~pp_sep:(fun fmt () -> Format.fprintf fmt ",@ ")
+           (fun fmt -> Format.fprintf fmt "%S"))
+        (elements set)
 end
