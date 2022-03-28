@@ -831,6 +831,13 @@ let test_rollup_with_two_commitments =
   let* () = Client.bake_for client in
   let*! _commitment = Rollup.get_commitment ~hooks ~rollup ~level:0 client in
   let*! _commitment = Rollup.get_commitment ~hooks ~rollup ~level:1 client in
+  let* () = submit_return_bond ~src:Constant.bootstrap1.public_key_hash state in
+  let* json = RPC.raw_bytes ~path:["tx_rollup"] client in
+  let json_object = JSON.as_object json in
+  (* Only the state for the rollup should be allocated. *)
+  Check.(List.length json_object = 1)
+    Check.int
+    ~error_msg:"Expected the rollup storage containing one field. Got: %L" ;
   unit
 
 let test_rollup_last_commitment_is_rejected =
