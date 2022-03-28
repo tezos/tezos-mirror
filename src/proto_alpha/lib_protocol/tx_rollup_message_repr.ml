@@ -146,24 +146,3 @@ let hash_uncarbonated msg =
   Message_hash.hash_bytes [Data_encoding.Binary.to_bytes_exn encoding msg]
 
 let hash_equal = Message_hash.equal
-
-type error += Negative_message_index of int | Too_big_message_index of int
-
-let () =
-  let open Data_encoding in
-  register_error_kind
-    `Permanent
-    ~id:"tx_rollup_negative_message_index"
-    ~title:"The message index must be non-negative"
-    ~description:"The message index must be non-negative"
-    (obj1 (req "message_position" int31))
-    (function Negative_message_index i -> Some i | _ -> None)
-    (fun i -> Negative_message_index i) ;
-  register_error_kind
-    `Permanent
-    ~id:"tx_rollup_invalid_message_argument"
-    ~title:"The message index must be less than 64"
-    ~description:"The message index must be less than 64"
-    (obj1 (req "message_position" int31))
-    (function Too_big_message_index i -> Some i | _ -> None)
-    (fun i -> Too_big_message_index i)
