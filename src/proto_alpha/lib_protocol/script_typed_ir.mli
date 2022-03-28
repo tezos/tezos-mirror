@@ -281,14 +281,14 @@ type view_map = (Script_string.t, view) map
 
 (** ['arg entrypoints] represents the tree of entrypoints of a parameter type
     ['arg].
-    [name] is the name of the entrypoint at that node if it is not [None].
+    [at_node] is the name of the entrypoint at that node if it is not [None].
     [nested] are the entrypoints below the node in the tree.
       It is always [Entrypoints_None] for non-union nodes.
       But it is also ok to have [Entrypoints_None] for a union node, it just
       means that there are no entrypoints below that node in the tree.
 *)
 type 'arg entrypoints_node = {
-  name : Entrypoint.t option;
+  at_node : Entrypoint.t option;
   nested : 'arg nested_entrypoints;
 }
 
@@ -300,7 +300,7 @@ and 'arg nested_entrypoints =
       -> ('l, 'r) union nested_entrypoints
   | Entrypoints_None : _ nested_entrypoints
 
-(** [no_entrypoints] is [{name = None; nested = Entrypoints_None}] *)
+(** [no_entrypoints] is [{at_node = None; nested = Entrypoints_None}] *)
 val no_entrypoints : _ entrypoints_node
 
 type 'arg entrypoints = {root : 'arg entrypoints_node}
