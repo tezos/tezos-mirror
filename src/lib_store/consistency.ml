@@ -363,25 +363,36 @@ let lowest_cemented_block cemented_block_files =
 
 (* Returns the lowest block level of a cemented metadata file. *)
 let lowest_metadata_entry metadata_file =
+  let open Lwt_syntax in
   let metadata_file_path = Naming.file_path metadata_file in
-  let in_file = Zip.open_in metadata_file_path in
-  let entries = Zip.entries in_file in
-  match entries with
-  | [] ->
-      (* A metadata file is never empty *)
-      assert false
-  | entry :: entries ->
-      let lowest_entry =
-        List.fold_left
-          (fun lowest entry ->
-            let entry = entry.Zip.filename in
-            if Compare.Int.(int_of_string lowest <= int_of_string entry) then
-              lowest
-            else entry)
-          entry.Zip.filename
-          entries
-      in
-      Int32.of_string lowest_entry
+  let* exists = Lwt_unix.file_exists metadata_file_path in
+  if exists then
+    let* in_file = Lwt_preemptive.detach Zip.open_in metadata_file_path in
+    Lwt.finalize
+      (fun () ->
+        let* entries = Lwt_preemptive.detach Zip.entries in_file in
+        match entries with
+        | [] ->
+            (* A metadata file is never empty *)
+            assert false
+        | entry :: entries ->
+            let lowest_entry =
+              List.fold_left
+                (fun lowest entry ->
+                  let entry = entry.Zip.filename in
+                  if Compare.Int.(int_of_string lowest <= int_of_string entry)
+                  then lowest
+                  else entry)
+                entry.Zip.filename
+                entries
+            in
+            return (Int32.of_string lowest_entry))
+      (fun () -> Lwt_preemptive.detach Zip.close_in in_file)
+  else
+    (* No need to use an error here as it will be caught and
+       ignored. *)
+    Lwt.fail_with
+      (Format.sprintf "cannot find metadata file %s" metadata_file_path)
 
 (* Returns the lowest block level, from the cemented store, which is
    associated to some block metadata *)
@@ -395,17 +406,20 @@ let lowest_cemented_metadata cemented_dir =
         |> Seq_s.filter_map_s
              (fun {Cemented_block_store.metadata_file; start_level; end_level}
              ->
-               match lowest_metadata_entry metadata_file with
-               | v -> Lwt.return_some v
-               | exception _ ->
-                   (* Can be the case if the metadata file is
-                      corrupted. Raise a warning and continue the
-                      search in the next metadata file. *)
-                   let*! () =
+               let*! lowest_metadata_entry =
+                 Option.catch_s (fun () -> lowest_metadata_entry metadata_file)
+               in
+               let*! () =
+                 match lowest_metadata_entry with
+                 | Some _ -> Lwt.return_unit
+                 | None ->
+                     (* Can be the case if the metadata file is
+                        corrupted. Raise a warning and continue the
+                        search in the next metadata file. *)
                      Store_events.(
                        emit warning_missing_metadata (start_level, end_level))
-                   in
-                   Lwt.return_none)
+               in
+               Lwt.return lowest_metadata_entry)
         |> Seq_s.first
       in
       return m
