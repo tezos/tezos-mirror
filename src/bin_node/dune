@@ -21,6 +21,7 @@
   tezos-store
   tezos-context
   tezos-validator
+  tezos-validation
   tezos-shell-context
   tezos-workers
   tezos-protocol-updater
@@ -125,6 +126,7 @@
    -open Tezos_store
    -open Tezos_context
    -open Tezos_validator
+   -open Tezos_validation
    -open Tezos_shell_context
    -open Tezos_workers
    -open Tezos_protocol_updater)))

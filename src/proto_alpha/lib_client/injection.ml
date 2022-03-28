@@ -994,10 +994,14 @@ let inject_operation_internal (type kind) cctxt ~chain ~block ?confirmations
           j
         >>=? fun op' ->
         match op'.receipt with
-        | None -> failwith "Internal error: pruned metadata."
-        | Some No_operation_metadata ->
-            failwith "Internal error: unexpected receipt."
-        | Some (Operation_metadata receipt) -> (
+        | Empty -> failwith "Internal error: pruned metadata."
+        | Too_large -> failwith "Internal error: too large metadata."
+        | Receipt No_operation_metadata ->
+            cctxt#message
+              "The operation metadata was not stored because it was too big, \
+               thus the failure to display the receipt."
+            >>= fun () -> failwith "Internal error: unexpected receipt."
+        | Receipt (Operation_metadata receipt) -> (
             match Apply_results.kind_equal_list contents receipt.contents with
             | Some Apply_results.Eq ->
                 return (receipt : kind operation_metadata)

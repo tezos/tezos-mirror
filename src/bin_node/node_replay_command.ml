@@ -244,7 +244,7 @@ let replay ~singleprocess (config : Node_config_file.t) blocks =
                 let* metadata =
                   Store.Block.get_block_metadata main_chain_store block
                 in
-                let expected_block_receipt =
+                let expected_block_receipt_bytes =
                   Store.Block.block_metadata metadata
                 in
                 let expected_operation_receipts =
@@ -283,10 +283,13 @@ let replay ~singleprocess (config : Node_config_file.t) blocks =
                         result.validation_store.context_hash )
                   else Lwt.return_unit
                 in
+                let block_metadata_bytes = fst result.block_metadata in
                 let* () =
                   if
                     not
-                      (Bytes.equal expected_block_receipt result.block_metadata)
+                      (Bytes.equal
+                         expected_block_receipt_bytes
+                         block_metadata_bytes)
                   then
                     let* protocol =
                       Store.Block.protocol_hash main_chain_store block
@@ -301,15 +304,17 @@ let replay ~singleprocess (config : Node_config_file.t) blocks =
                            Proto.block_header_metadata_encoding
                            block
                     in
-                    let exp = to_json expected_block_receipt in
-                    let got = to_json result.block_metadata in
+                    let exp = to_json expected_block_receipt_bytes in
+                    let got = to_json block_metadata_bytes in
                     let*! () =
                       Event.(emit inconsistent_block_receipt) (exp, got)
                     in
                     return_unit
                   else return_unit
                 in
-                let rec check_receipts i j exp got =
+                let rec check_receipts i j
+                    (exp : Block_validation.operation_metadata list list)
+                    (got : Block_validation.operation_metadata list list) =
                   match (exp, got) with
                   | ([], []) -> return_unit
                   | ([], _ :: _) | (_ :: _, []) -> assert false
@@ -319,7 +324,14 @@ let replay ~singleprocess (config : Node_config_file.t) blocks =
                       assert false
                   | ((exp :: exps) :: expss, (got :: gots) :: gotss) ->
                       let* () =
-                        if not (Bytes.equal exp got) then
+                        let equal a b =
+                          match (a, b) with
+                          | Block_validation.(Metadata a, Metadata b) ->
+                              Bytes.equal a b
+                          | (Too_large_metadata, Too_large_metadata) -> true
+                          | _ -> false
+                        in
+                        if not (equal exp got) then
                           let* protocol =
                             Store.Block.protocol_hash main_chain_store block
                           in
@@ -335,6 +347,11 @@ let replay ~singleprocess (config : Node_config_file.t) blocks =
                             |> fun {proto; _} -> proto
                           in
                           let to_json receipt =
+                            let receipt =
+                              match receipt with
+                              | Block_validation.Metadata receipt -> receipt
+                              | Too_large_metadata -> Bytes.empty
+                            in
                             Data_encoding.Json.construct
                               Proto.operation_data_and_receipt_encoding
                               Data_encoding.Binary.
@@ -358,7 +375,11 @@ let replay ~singleprocess (config : Node_config_file.t) blocks =
                   0
                   0
                   expected_operation_receipts
-                  result.ops_metadata)
+                  (match result.ops_metadata with
+                  | Block_validation.No_metadata_hash ops_metadata ->
+                      ops_metadata
+                  | Block_validation.Metadata_hash ops_metadata ->
+                      List.map (List.map fst) ops_metadata))
         blocks)
     (fun () ->
       let*! () = Block_validator_process.close validator_process in

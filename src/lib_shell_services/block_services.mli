@@ -186,12 +186,17 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
     operation_list_quota : operation_list_quota list;
   }
 
+  type operation_receipt =
+    | Empty
+    | Too_large
+    | Receipt of Proto.operation_receipt
+
   type operation = {
     chain_id : Chain_id.t;
     hash : Operation_hash.t;
     shell : Operation.shell_header;
     protocol_data : Proto.operation_data;
-    receipt : Proto.operation_receipt option;
+    receipt : operation_receipt;
   }
 
   type block_info = {

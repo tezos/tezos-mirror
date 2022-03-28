@@ -1,0 +1,22 @@
+# This script always fails with a string full of "a"'s. If the
+# parameter n is less than 2 then the length of the error message is
+# 2, otherwise it is 2^n.
+parameter int;
+storage unit;
+code
+  {
+    CAR;
+    PUSH string "a";
+    SWAP;
+    PUSH bool True;
+    LOOP
+      {
+        SWAP;
+        DUP; CONCAT;
+        SWAP;
+        PUSH int -1; ADD;
+        DUP; GT
+      };
+    DROP;
+    FAILWITH
+  }

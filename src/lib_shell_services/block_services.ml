@@ -491,12 +491,17 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
                (dynamic_size Operation.shell_header_encoding)
                (dynamic_size Next_proto.operation_data_encoding)))
 
+  type operation_receipt =
+    | Empty
+    | Too_large
+    | Receipt of Proto.operation_receipt
+
   type operation = {
     chain_id : Chain_id.t;
     hash : Operation_hash.t;
     shell : Operation.shell_header;
     protocol_data : Proto.operation_data;
-    receipt : Proto.operation_receipt option;
+    receipt : operation_receipt;
   }
 
   let operation_data_encoding =
@@ -505,20 +510,31 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
       ~tag_size:`Uint8
       [
         case
-          ~title:"Operation with metadata"
+          ~title:"Operation with too large metadata"
           (Tag 0)
-          Proto.operation_data_and_receipt_encoding
+          (merge_objs
+             Proto.operation_data_encoding
+             (obj1 (req "metadata" (constant "too large"))))
           (function
-            | (operation_data, Some receipt) -> Some (operation_data, receipt)
+            | (operation_data, Too_large) -> Some (operation_data, ())
             | _ -> None)
-          (function
-            | (operation_data, receipt) -> (operation_data, Some receipt));
+          (fun (operation_data, ()) -> (operation_data, Too_large));
         case
           ~title:"Operation without metadata"
           (Tag 1)
           Proto.operation_data_encoding
-          (function (operation_data, None) -> Some operation_data | _ -> None)
-          (fun operation_data -> (operation_data, None));
+          (function
+            | (operation_data, Empty) -> Some operation_data | _ -> None)
+          (fun operation_data -> (operation_data, Empty));
+        case
+          ~title:"Operation with metadata"
+          (Tag 2)
+          Proto.operation_data_and_receipt_encoding
+          (function
+            | (operation_data, Receipt receipt) -> Some (operation_data, receipt)
+            | _ -> None)
+          (function
+            | (operation_data, receipt) -> (operation_data, Receipt receipt));
       ]
 
   let operation_encoding =

@@ -347,6 +347,20 @@ let store_raw_block chain_store (raw_block : Block_repr.t) =
   let metadata =
     WithExceptions.Option.get ~loc:__LOC__ (Block_repr.metadata raw_block)
   in
+  let ops_metadata =
+    let operations_metadata = Block_repr.operations_metadata metadata in
+    match Block_repr.operations_metadata_hashes raw_block with
+    | Some metadata_hashes ->
+        let res =
+          WithExceptions.List.map2
+            ~loc:__LOC__
+            (WithExceptions.List.map2 ~loc:__LOC__ (fun x y -> (x, y)))
+            operations_metadata
+            metadata_hashes
+        in
+        Block_validation.Metadata_hash res
+    | None -> Block_validation.(No_metadata_hash operations_metadata)
+  in
   let validation_result =
     {
       Tezos_validation.Block_validation.validation_store =
@@ -357,10 +371,10 @@ let store_raw_block chain_store (raw_block : Block_repr.t) =
           max_operations_ttl = Block_repr.max_operations_ttl metadata;
           last_allowed_fork_level = Block_repr.last_allowed_fork_level metadata;
         };
-      block_metadata = Block_repr.block_metadata metadata;
-      ops_metadata = Block_repr.operations_metadata metadata;
-      block_metadata_hash = Block_repr.block_metadata_hash raw_block;
-      ops_metadata_hashes = Block_repr.operations_metadata_hashes raw_block;
+      block_metadata =
+        ( Block_repr.block_metadata metadata,
+          Block_repr.block_metadata_hash raw_block );
+      ops_metadata;
     }
   in
   let* r =

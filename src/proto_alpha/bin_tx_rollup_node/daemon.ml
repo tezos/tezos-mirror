@@ -215,7 +215,7 @@ let extract_messages_from_block block_info rollup_id =
   let finalize_receipt acc operation =
     match Alpha_block_services.(operation.protocol_data, operation.receipt) with
     | ( Operation_data {contents = operation_contents; _},
-        Some (Operation_metadata {contents = result_contents}) ) -> (
+        Receipt (Operation_metadata {contents = result_contents}) ) -> (
         match kind_equal_list operation_contents result_contents with
         | Some Eq ->
             let operation_and_result =
@@ -225,7 +225,7 @@ let extract_messages_from_block block_info rollup_id =
         | None ->
             (* Should not happen *)
             ok acc)
-    | (_, Some No_operation_metadata) | (_, None) ->
+    | (_, Receipt No_operation_metadata) | (_, Empty) | (_, Too_large) ->
         error (Tx_rollup_no_operation_metadata operation.hash)
   in
   match managed_operation with

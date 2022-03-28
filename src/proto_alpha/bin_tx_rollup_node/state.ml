@@ -136,9 +136,9 @@ let check_origination_in_block_info rollup block_info =
   in
   let check_receipt operation =
     match operation.Alpha_block_services.receipt with
-    | Some (Operation_metadata {contents}) ->
+    | Receipt (Operation_metadata {contents}) ->
         check_origination_content_result_list contents
-    | Some No_operation_metadata | None -> false
+    | Receipt No_operation_metadata | Empty | Too_large -> false
   in
   match Option.bind managed_operation @@ List.find_opt check_receipt with
   | Some _ -> return_unit

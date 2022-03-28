@@ -92,7 +92,7 @@ let process_endorsements (cctxt : #Protocol_client_context.full) state
                     });
               _;
             },
-          Some
+          Receipt
             Apply_results.(
               Operation_metadata
                 {

@@ -51,8 +51,9 @@ let version_file_name = "version.json"
  *  - 0.0.4 : context upgrade (switching from LMDB to IRMIN v2)
  *  - 0.0.5 : never released (but used in 10.0~rc1 and 10.0~rc2)
  *  - 0.0.6 : store upgrade (switching from LMDB)
- *  - 0.0.7 : context upgrade (upgrade to irmin.3.0) *)
-let data_version = "0.0.7"
+ *  - 0.0.7 : context upgrade (upgrade to irmin.3.0)
+ *  - 0.0.8 : new store metadata representation *)
+let data_version = "0.0.8"
 
 (* List of upgrade functions from each still supported previous
    version to the current [data_version] above. If this list grows too
@@ -62,8 +63,9 @@ let data_version = "0.0.7"
 let upgradable_data_version =
   [
     ( "0.0.6",
-      fun ~data_dir:_ _ ~chain_name:_ ~sandbox_parameters:_ ->
-        Lwt_tzresult_syntax.return_unit );
+      fun ~data_dir:_ _ ~chain_name:_ ~sandbox_parameters:_ -> return_unit );
+    ( "0.0.7",
+      fun ~data_dir:_ _ ~chain_name:_ ~sandbox_parameters:_ -> return_unit );
   ]
 
 let version_encoding = Data_encoding.(obj1 (req "version" string))
@@ -334,10 +336,11 @@ let ensure_data_dir ?(bare = false) data_dir =
   let* o = ensure_data_dir bare data_dir in
   match o with
   | None -> return_unit
-  (* Here, we enable the automatic upgrade from "0.0.6" to
-     "0.0.7". This should be removed as soon as the "0.0.7" version or
+  (* Here, we enable the automatic upgrade from "0.0.6" and "0.0.7" to
+     "0.0.8". This should be removed as soon as the "0.0.8" version or
      above is mandatory. *)
-  | Some ("0.0.6", _upgrade) ->
+  | Some (v, _upgrade) when String.(equal "0.0.6" v) || String.(equal "0.0.7" v)
+    ->
       upgrade_data_dir ~data_dir () ~chain_name:() ~sandbox_parameters:()
   | Some (version, _) ->
       fail (Data_dir_needs_upgrade {expected = data_version; actual = version})

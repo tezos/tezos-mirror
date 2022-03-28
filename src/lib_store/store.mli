@@ -289,7 +289,7 @@ module Block : sig
     max_operations_ttl : int;
     last_allowed_fork_level : Int32.t;
     block_metadata : Bytes.t;
-    operations_metadata : Bytes.t list list;
+    operations_metadata : Block_validation.operation_metadata list list;
   }
 
   (* FIXME: could be misleading. *)
@@ -554,9 +554,10 @@ module Block : sig
 
   val last_allowed_fork_level : metadata -> int32
 
-  val block_metadata : metadata -> bytes
+  val block_metadata : metadata -> Bytes.t
 
-  val operations_metadata : metadata -> bytes list list
+  val operations_metadata :
+    metadata -> Block_validation.operation_metadata list list
 
   (** [operations_path block nth] computes the [nth] operations list
       of [block] along with the hash of all operations. *)
