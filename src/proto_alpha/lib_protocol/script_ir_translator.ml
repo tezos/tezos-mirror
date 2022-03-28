@@ -304,7 +304,7 @@ let rec unparse_ty_entrypoints_uncarbonated :
   let annot =
     match at_node with
     | None -> []
-    | Some name -> [Entrypoint.unparse_as_field_annot name]
+    | Some {name} -> [Entrypoint.unparse_as_field_annot name]
   in
   Prim (loc, name, args, annot)
 
@@ -1279,10 +1279,11 @@ let[@coq_axiom_with_reason "complex mutually recursive definition"] rec parse_ty
       match ret with
       | Don't_parse_entrypoints -> (Ex_ty ty, ctxt)
       | Parse_entrypoints ->
+          let at_node = Option.map (fun name -> {name}) name in
           ( Ex_parameter_ty_and_entrypoints_node
               {
                 arg_type = ty;
-                entrypoints = {at_node = name; nested = Entrypoints_None};
+                entrypoints = {at_node; nested = Entrypoints_None};
               },
             ctxt )
     in
@@ -1424,7 +1425,8 @@ let[@coq_axiom_with_reason "complex mutually recursive definition"] rec parse_ty
             in
             union_t loc tl tr >|? fun (Ty_ex_c arg_type) ->
             let entrypoints =
-              {at_node = name; nested = Entrypoints_Union {left; right}}
+              let at_node = Option.map (fun name -> {name}) name in
+              {at_node; nested = Entrypoints_Union {left; right}}
             in
             (Ex_parameter_ty_and_entrypoints_node {arg_type; entrypoints}, ctxt)
         )
@@ -1934,7 +1936,7 @@ let find_entrypoint (type full fullc error_trace)
    fun ty entrypoints entrypoint ->
     let* () = Gas_monad.consume_gas Typecheck_costs.find_entrypoint_cycle in
     match (ty, entrypoints) with
-    | (_, {at_node = Some name; _}) when Entrypoint.(name = entrypoint) ->
+    | (_, {at_node = Some {name}; _}) when Entrypoint.(name = entrypoint) ->
         return (Ex_ty_cstr (ty, fun e -> e))
     | (Union_t (tl, tr, _, _), {nested = Entrypoints_Union {left; right}; _})
       -> (
@@ -1967,7 +1969,8 @@ let find_entrypoint_for_type (type full fullc exp expc error_trace)
   match res with
   | Ex_ty_cstr (ty, _) -> (
       match entrypoints.root.at_node with
-      | Some e when Entrypoint.is_root e && Entrypoint.is_default entrypoint ->
+      | Some {name}
+        when Entrypoint.is_root name && Entrypoint.is_default entrypoint ->
           Gas_monad.bind_recover
             (ty_eq ~error_details:Fast loc ty expected)
             (function
@@ -1996,7 +1999,7 @@ let well_formed_entrypoints (type full fullc) (full : (full, fullc) ty)
                   | None -> (Some (List.rev path), all)
                   | Some _ -> acc)),
             reachable )
-    | Some name ->
+    | Some {name} ->
         if Entrypoint.Set.mem name all then error (Duplicate_entrypoint name)
         else ok ((first_unreachable, Entrypoint.Set.add name all), true)
   in
@@ -2022,7 +2025,7 @@ let well_formed_entrypoints (type full fullc) (full : (full, fullc) ty)
   let (init, reachable) =
     match entrypoints.at_node with
     | None -> (Entrypoint.Set.empty, false)
-    | Some name -> (Entrypoint.Set.singleton name, true)
+    | Some {name} -> (Entrypoint.Set.singleton name, true)
   in
   check full entrypoints [] reachable (None, init)
   >>? fun (first_unreachable, all) ->
@@ -5557,7 +5560,7 @@ let list_entrypoints ctxt (type full fullc) (full : (full, fullc) ty)
               | Union_t _ -> acc
               | _ -> (List.rev path :: unreachables, all)),
             reachable )
-    | Some name ->
+    | Some {name} ->
         (if Entrypoint.Map.mem name all then
          ok (List.rev path :: unreachables, all)
         else
@@ -5592,7 +5595,7 @@ let list_entrypoints ctxt (type full fullc) (full : (full, fullc) ty)
   let (init, reachable) =
     match entrypoints.root.at_node with
     | None -> (Entrypoint.Map.empty, false)
-    | Some name -> (Entrypoint.Map.singleton name ([], unparsed_full), true)
+    | Some {name} -> (Entrypoint.Map.singleton name ([], unparsed_full), true)
   in
   fold_tree full entrypoints.root [] reachable ([], init)
   [@@coq_axiom_with_reason "unsupported syntax"]
