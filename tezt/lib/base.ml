@@ -80,6 +80,13 @@ let ( let*! ) x f =
 
 let ( let*? ) x f = f x.value
 
+let map_runnable f {value; run} =
+  let run x =
+    let* output = run x in
+    return (f output)
+  in
+  {value; run}
+
 let range a b =
   let rec range ?(acc = []) a b =
     if b < a then acc else range ~acc:(b :: acc) a (b - 1)

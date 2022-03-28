@@ -104,6 +104,9 @@ val ( let*! ) : ('a, 'b) runnable -> ('b -> 'c Lwt.t) -> 'c Lwt.t
     You can also just access field [value] directly. *)
 val ( let*? ) : ('a, 'b) runnable -> ('a -> 'c) -> 'c
 
+(** Convert the output of a runnable to make another runnable. *)
+val map_runnable : ('b -> 'c) -> ('a, 'b) runnable -> ('a, 'c) runnable
+
 (** {2 Lists} *)
 
 (** Make a list of all integers between two integers.

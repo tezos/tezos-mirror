@@ -556,10 +556,3 @@ let program_path program =
     (fun _ -> return None)
 
 type nonrec 'a runnable = (t, 'a) runnable
-
-let runnable_map f {value; run} =
-  let run x =
-    let* output = run x in
-    return (f output)
-  in
-  {value; run}
