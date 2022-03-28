@@ -14,7 +14,7 @@ depends: [
   "caqti"
   "caqti-driver-postgresql"
   "caqti-lwt"
-  "data-encoding" { >= "0.5.1" & < "0.6" }
+  "data-encoding" { >= "0.5.3" & < "0.6" }
   "lwt" { >= "5.4.0" }
   "tezos-baking-alpha"
   "tezos-client-alpha-commands"

@@ -13,7 +13,7 @@ depends: [
   "tezos-stdlib"
   "tezos-crypto"
   "tezos-lwt-result-stdlib"
-  "data-encoding" { >= "0.5.1" & < "0.6" }
+  "data-encoding" { >= "0.5.3" & < "0.6" }
   "bls12-381-legacy"
   "zarith" { >= "1.12" & < "1.13" }
   "zarith_stubs_js"

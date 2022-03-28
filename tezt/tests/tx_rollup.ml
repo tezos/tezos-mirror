@@ -936,14 +936,8 @@ let test_rollup_wrong_rejection =
       ~tx_rollup:state.rollup
       ~proof:
         {|{ "version": 3,
-  "before":
-    { "kind": "Node",
-      "value":
-        { "node": "CoVu7Pqp1Gh3z33mink5T5Q2kAQKtnn3GHxVhyehdKZpQMBxFBGF" } },
-  "after":
-    { "kind": "Node",
-      "value":
-        { "node": "CoUeJrcPBj3T3iJL3PY4jZHnmZa5rRZ87VQPdSBNBcwZRMWJGh9j" } },
+  "before": { "node": "CoVu7Pqp1Gh3z33mink5T5Q2kAQKtnn3GHxVhyehdKZpQMBxFBGF" } ,
+  "after": { "node": "CoUeJrcPBj3T3iJL3PY4jZHnmZa5rRZ87VQPdSBNBcwZRMWJGh9j" } ,
   "state": [] }|}
       ~level:0
       ~message
