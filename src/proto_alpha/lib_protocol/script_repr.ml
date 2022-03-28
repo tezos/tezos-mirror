@@ -36,8 +36,6 @@ type lazy_expr = expr Data_encoding.lazy_t
 type 'location michelson_node =
   ('location, Michelson_v1_primitives.prim) Micheline.node
 
-type unlocated_michelson_node = unit michelson_node
-
 type node = location michelson_node
 
 let expr_encoding =
