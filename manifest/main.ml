@@ -2936,6 +2936,8 @@ let _tezos_store_tests =
         tezos_protocol_alpha_parameters |> open_;
         Protocol.(plugin_exn alpha) |> open_;
         alcotest_lwt;
+        tezos_test_helpers;
+        tezos_test_helpers_base;
       ]
     ~action:Dune.[setenv "SLOW_TEST" "false" @@ run_exe "test" []]
     ~dune:

@@ -23,8 +23,49 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Assert = Lib_test.Assert
+module Assert_base = Lib_test_base.Assert_base
 open Alcotest_lwt
 open Filename.Infix
+
+let equal_metadata ?msg m1 m2 =
+  let eq m1 m2 =
+    match (m1, m2) with
+    | (None, None) -> true
+    | (Some m1, Some m2) -> m1 = m2
+    | _ -> false
+  in
+  let prn (md : Tezos_store.Store.Block.metadata option) =
+    let option_pp ~default pp fmt = function
+      | None -> Format.fprintf fmt "%s" default
+      | Some x -> Format.fprintf fmt "%a" pp x
+    in
+    Format.asprintf
+      "%a"
+      (option_pp
+         ~default:"None"
+         (fun
+           fmt
+           ({
+              message;
+              max_operations_ttl;
+              last_allowed_fork_level;
+              block_metadata = _;
+              operations_metadata = _;
+            } :
+             Store.Block.metadata)
+         ->
+           Format.fprintf
+             fmt
+             "message: %a@.max_operations_ttl: %d@. last_allowed_fork_level: \
+              %ld@."
+             (option_pp ~default:"None" Format.pp_print_string)
+             message
+             max_operations_ttl
+             last_allowed_fork_level))
+      md
+  in
+  Assert.equal ?msg ~prn ~eq m1 m2
 
 let genesis_hash =
   Block_hash.of_b58check_exn
@@ -77,13 +118,12 @@ let check_invariants ?(expected_checkpoint = None) ?(expected_savepoint = None)
         | Some l -> snd l
         | None -> Block.last_allowed_fork_level head_metadata
       in
-      Assert.is_true
-        ~msg:
-          (Format.sprintf
-             "check_invariant: checkpoint.level(%ld) < \
-              head.last_allowed_fork_level(%ld)"
-             (snd checkpoint)
-             expected_checkpoint_level)
+      Assert.assert_true
+        (Format.sprintf
+           "check_invariant: checkpoint.level(%ld) < \
+            head.last_allowed_fork_level(%ld)"
+           (snd checkpoint)
+           expected_checkpoint_level)
         Compare.Int32.(snd checkpoint >= expected_checkpoint_level) ;
       let*! savepoint_b_opt =
         Block.read_block_opt chain_store (fst savepoint)
@@ -535,7 +575,7 @@ let assert_presence_in_store ?(with_metadata = false) chain_store blocks =
         | Some b' ->
             let b_header = Store.Block.header b in
             let b'_header = Store.Block.header b' in
-            Assert.equal_block
+            Assert_base.equal_block
               ~msg:"assert_presence: different header"
               b_header
               b'_header ;
@@ -547,7 +587,7 @@ let assert_presence_in_store ?(with_metadata = false) chain_store blocks =
                 let* b'_metadata =
                   Store.Block.get_block_metadata_opt chain_store b'
                 in
-                Assert.equal_metadata
+                equal_metadata
                   b_metadata
                   b'_metadata
                   ~msg:"assert_presence: different metadata" ;
