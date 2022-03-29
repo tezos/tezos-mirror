@@ -539,6 +539,8 @@ val reveal :
   ?endpoint:endpoint ->
   ?wait:string ->
   ?fee:Tez.t ->
+  ?fee_cap:Tez.t ->
+  ?force_low_fee:bool ->
   src:string ->
   t ->
   unit Process.runnable

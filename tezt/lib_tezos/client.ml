@@ -713,19 +713,17 @@ let set_delegate ?endpoint ?(wait = "none") ?fee ?fee_cap
   in
   {value; run = Process.check}
 
-let reveal ?endpoint ?(wait = "none") ?fee ~src client =
+let reveal ?endpoint ?(wait = "none") ?fee ?fee_cap ?(force_low_fee = false)
+    ~src client =
   let value =
     spawn_command
       ?endpoint
       client
       (["--wait"; wait]
       @ ["reveal"; "key"; "for"; src]
-      @ Option.fold
-          ~none:[]
-          ~some:(fun f ->
-            let fee_amount = Tez.to_string f in
-            ["--fee"; fee_amount; "--force-low-fee"; "--fee-cap"; fee_amount])
-          fee)
+      @ optional_arg ~name:"fee" Tez.to_string fee
+      @ optional_arg ~name:"fee-cap" Tez.to_string fee_cap
+      @ if force_low_fee then ["--force-low-fee"] else [])
   in
   {value; run = Process.check}
 
