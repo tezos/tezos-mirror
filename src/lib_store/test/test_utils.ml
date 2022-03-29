@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 module Assert = Lib_test.Assert
-module Assert_base = Lib_test_base.Assert_base
+module Assert_lib = Lib_test_extra.Assert_lib
 open Alcotest_lwt
 open Filename.Infix
 
@@ -575,7 +575,7 @@ let assert_presence_in_store ?(with_metadata = false) chain_store blocks =
         | Some b' ->
             let b_header = Store.Block.header b in
             let b'_header = Store.Block.header b' in
-            Assert_base.equal_block
+            Assert_lib.Crypto.equal_block
               ~msg:"assert_presence: different header"
               b_header
               b'_header ;

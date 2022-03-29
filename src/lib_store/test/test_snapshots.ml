@@ -25,7 +25,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Assert_base = Lib_test_base.Assert_base
+module Assert_lib = Lib_test_extra.Assert_lib
 open Test_utils
 
 let check_import_invariants ~test_descr ~rolling
@@ -47,7 +47,7 @@ let check_import_invariants ~test_descr ~rolling
           imported_chain_store
           [exported_block]
       in
-      Assert_base.equal_block
+      Assert_lib.Crypto.equal_block
         ~msg:("imported head consistency: " ^ test_descr)
         (Store.Block.header exported_block)
         (Store.Block.header head) ;
@@ -241,7 +241,7 @@ let check_baking_continuity ~test_descr ~exported_chain_store
       return last
     else Store.Block.read_block_by_level exported_chain_store level_to_reach
   in
-  Assert_base.equal_block
+  Assert_lib.Crypto.equal_block
     ~msg:("check both head after baking: " ^ test_descr)
     (Store.Block.header last)
     (Store.Block.header last') ;
