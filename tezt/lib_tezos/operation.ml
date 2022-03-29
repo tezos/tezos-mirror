@@ -301,6 +301,16 @@ let inject_operation ?(async = false) ?(force = false) ?wait_for_injection
   let* () = waiter in
   return (`OpHash (JSON.as_string oph_json))
 
+let runnable_inject_operation ?(async = false) ?(force = false) ~unsigned_op
+    ~signature client =
+  let (`Hex unsigned_op) = unsigned_op in
+  let (`Hex signature) = signature in
+  let signed_op = unsigned_op ^ signature in
+  let inject =
+    if force then RPC.private_inject_operation else RPC.inject_operation
+  in
+  inject ~async ~data:(`String signed_op) client
+
 let forge_and_inject_operation ?protocol ?branch ?async ?force
     ?wait_for_injection ~batch ~signer client =
   let* branch = get_injection_branch ?branch client in
@@ -313,6 +323,14 @@ let forge_and_inject_operation ?protocol ?branch ?async ?force
     ~unsigned_op
     ~signature
     client
+
+let runnable_forge_and_inject_operation ?protocol ?branch ?async ?force ~batch
+    ~signer client =
+  let* branch = get_injection_branch ?branch client in
+  let* unsigned_op = forge_operation ?protocol ~batch ~branch client in
+  let signature = sign_manager_op_hex ~signer unsigned_op in
+  return
+    (runnable_inject_operation ?async ?force ~unsigned_op ~signature client)
 
 (** High level operations injection wrappers *)
 
