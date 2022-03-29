@@ -14,6 +14,28 @@
   pure-splitmix
   data-encoding)
  (js_of_ocaml)
- (library_flags (:standard -linkall)))
+ (library_flags (:standard -linkall))
+ (modules
+  assert
+  lwt_assert
+  qcheck2_helpers
+  qcheck_extra
+  qcheck_helpers
+  random_pure
+  roundtrip
+  testable))
 
 (rule (alias runtest_js) (action progn))
+
+(library
+ (name lib_test_base)
+ (public_name tezos-test-helpers-base)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  tezos-crypto
+  tezos-test-helpers
+  tezos-shell-services)
+ (modules assert_base))
+
+(rule (alias runtest_js_base) (action progn))
