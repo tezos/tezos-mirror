@@ -321,7 +321,7 @@ let unparse_comparable_ty ~loc ctxt comp_ty =
 
 let unparse_parameter_ty ~loc ctxt ty ~entrypoints =
   Gas.consume ctxt (Unparse_costs.unparse_type ty) >|? fun ctxt ->
-  (unparse_ty_entrypoints_uncarbonated ~loc ty entrypoints, ctxt)
+  (unparse_ty_entrypoints_uncarbonated ~loc ty entrypoints.root, ctxt)
 
 let serialize_ty_for_error ty =
   (*
@@ -1942,7 +1942,7 @@ let find_entrypoint (type full fullc error_trace)
             Ex_ty_cstr (t, fun e -> R (f e)))
     | (_, {nested = Entrypoints_None; _}) -> Gas_monad.of_result (Error ())
   in
-  Gas_monad.bind_recover (find_entrypoint full entrypoints entrypoint)
+  Gas_monad.bind_recover (find_entrypoint full entrypoints.root entrypoint)
   @@ function
   | Ok f_t -> return f_t
   | Error () ->
@@ -1963,7 +1963,7 @@ let find_entrypoint_for_type (type full fullc exp expc error_trace)
   let* res = find_entrypoint ~error_details full entrypoints entrypoint in
   match res with
   | Ex_ty_cstr (ty, _) -> (
-      match entrypoints.name with
+      match entrypoints.root.name with
       | Some e when Entrypoint.is_root e && Entrypoint.is_default entrypoint ->
           Gas_monad.bind_recover
             (ty_eq ~error_details:Fast loc ty expected)
@@ -2053,7 +2053,9 @@ let parse_parameter_ty_and_entrypoints :
     ->
   (if legacy then Result.return_unit
   else well_formed_entrypoints arg_type entrypoints)
-  >|? fun () -> (Ex_parameter_ty_and_entrypoints {arg_type; entrypoints}, ctxt)
+  >|? fun () ->
+  let entrypoints = {root = entrypoints} in
+  (Ex_parameter_ty_and_entrypoints {arg_type; entrypoints}, ctxt)
 
 let parse_passable_ty = parse_passable_ty ~ret:Don't_parse_entrypoints
 
@@ -5585,11 +5587,11 @@ let list_entrypoints ctxt (type full fullc) (full : (full, fullc) ty)
   in
   unparse_ty ~loc:() ctxt full >>? fun (unparsed_full, _) ->
   let (init, reachable) =
-    match entrypoints.name with
+    match entrypoints.root.name with
     | None -> (Entrypoint.Map.empty, false)
     | Some name -> (Entrypoint.Map.singleton name ([], unparsed_full), true)
   in
-  fold_tree full entrypoints [] reachable ([], init)
+  fold_tree full entrypoints.root [] reachable ([], init)
   [@@coq_axiom_with_reason "unsupported syntax"]
 
 (* ---- Unparsing (Typed IR -> Untyped expressions) --------------------------*)
