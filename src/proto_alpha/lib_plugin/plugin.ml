@@ -2245,10 +2245,9 @@ module RPC = struct
                  arg_type
                  entrypoints
                  entrypoint
-            >>? fun (r, ctxt) ->
-            r >>? fun (Ex_ty_cstr {ty; _}) ->
-            unparse_ty ~loc:() ctxt ty >|? fun (ty_node, _) ->
-            Micheline.strip_locations ty_node )
+            >>? fun (r, _ctxt) ->
+            r >|? fun (Ex_ty_cstr {original_type; _}) ->
+            Micheline.strip_locations original_type )
       in
       Registration.register0
         ~chunked:true

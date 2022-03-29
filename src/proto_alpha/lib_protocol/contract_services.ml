@@ -398,11 +398,10 @@ let[@coq_axiom_with_reason "gadt"] register () =
                    arg_type
                    entrypoints
                    entrypoint
-              >>? fun (r, ctxt) ->
+              >>? fun (r, _ctxt) ->
               r |> function
-              | Ok (Ex_ty_cstr {ty; _}) ->
-                  unparse_ty ~loc:() ctxt ty >|? fun (ty_node, _) ->
-                  Some (Micheline.strip_locations ty_node)
+              | Ok (Ex_ty_cstr {original_type; _}) ->
+                  ok (Some (Micheline.strip_locations original_type))
               | Error _ -> Result.return_none )) ;
   opt_register1 ~chunked:true S.list_entrypoints (fun ctxt v () () ->
       Contract.get_script_code ctxt v >>=? fun (_, expr) ->
