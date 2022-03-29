@@ -156,10 +156,16 @@ val rpc_path_query_to_string : ?query_string:query_string -> path -> string
     Run [rpc meth path?query_string with data].
     Fail the test if the RPC call failed.
 
-    [env] can be used to customize environment variables, e.g.
+    See the documentation of {!Process.spawn} for information about
+    [log_*], [hooks] and [env] arguments.
+
+    In particular, [env] can be used to pass [TEZOS_LOG], e.g.
     [("TEZOS_LOG", Protocol.daemon_name protocol ^ ".proxy_rpc->debug")] to enable
     logging. *)
 val rpc :
+  ?log_command:bool ->
+  ?log_status_on_exit:bool ->
+  ?log_output:bool ->
   ?better_errors:bool ->
   ?endpoint:endpoint ->
   ?hooks:Process.hooks ->
@@ -173,6 +179,9 @@ val rpc :
 
 (** Same as [rpc], but do not wait for the process to exit. *)
 val spawn_rpc :
+  ?log_command:bool ->
+  ?log_status_on_exit:bool ->
+  ?log_output:bool ->
   ?better_errors:bool ->
   ?endpoint:endpoint ->
   ?hooks:Process.hooks ->
@@ -188,6 +197,9 @@ module Spawn : sig
   (* FIXME: This module is temporary and is here to make the new
      interface cohabits with the old one. *)
   val rpc :
+    ?log_command:bool ->
+    ?log_status_on_exit:bool ->
+    ?log_output:bool ->
     ?better_errors:bool ->
     ?endpoint:endpoint ->
     ?hooks:Process.hooks ->
@@ -1175,6 +1187,9 @@ val init_light :
    It can be used, for example, for low-level one-shot customization of client
    commands.  *)
 val spawn_command :
+  ?log_command:bool ->
+  ?log_status_on_exit:bool ->
+  ?log_output:bool ->
   ?env:string String_map.t ->
   ?endpoint:endpoint ->
   ?hooks:Process.hooks ->

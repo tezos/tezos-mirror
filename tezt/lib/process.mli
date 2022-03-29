@@ -41,6 +41,9 @@ type hooks = {
 
     Usage: [spawn command arguments]
 
+    If [log_command] is [true] (which is the default), log the command
+    being executed.
+
     If [log_status_on_exit] is [true] (which is the default), log the exit code
     when the process terminates.
 
@@ -67,6 +70,7 @@ type hooks = {
     Example: [spawn "git" [ "log"; "-p" ]] *)
 val spawn :
   ?runner:Runner.t ->
+  ?log_command:bool ->
   ?log_status_on_exit:bool ->
   ?log_output:bool ->
   ?name:string ->
@@ -80,6 +84,7 @@ val spawn :
 (** Same as {!spawn}, but with a channel to send data to the process [stdin]. *)
 val spawn_with_stdin :
   ?runner:Runner.t ->
+  ?log_command:bool ->
   ?log_status_on_exit:bool ->
   ?log_output:bool ->
   ?name:string ->

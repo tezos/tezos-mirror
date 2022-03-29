@@ -445,7 +445,22 @@ module Test = struct
   *)
   let call_rpc client {meth; full_path; input; _} :
       (JSON.t, Unix.process_status) result Lwt.t =
-    let proc = Client.spawn_rpc ?data:input meth full_path client in
+    let proc =
+      (* As this test performs many RPC calls, we don't want to log,
+         to avoid consuming a lot of storage space on the CI.
+         Only checking if the node stays alive matters.
+
+         In case this test needs to be debugged, set all three [log_*] flags
+         to [true], to get feedback on the faulty RPC. *)
+      Client.spawn_rpc
+        ~log_command:false
+        ~log_status_on_exit:false
+        ~log_output:false
+        ?data:input
+        meth
+        full_path
+        client
+    in
     let* exit_code = Process.wait proc in
     match exit_code with
     | WEXITED 0 ->
@@ -470,7 +485,8 @@ module Test = struct
          }
 
   let test_instance client rpc_instance : unit Lwt.t =
-    let () = Log.info "%s" (show_rpc_instance rpc_instance) in
+    (* To see the RPC being called: *)
+    (* let () = Log.info "%s" (show_rpc_instance rpc_instance) in *)
     let* _ = call_rpc client rpc_instance in
     let* node_alive = check_node_alive client in
     match node_alive with
