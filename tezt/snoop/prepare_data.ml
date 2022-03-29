@@ -121,51 +121,52 @@ let call_if_no_file ~file ~if_present ~if_absent =
   else if_absent ()
 
 let prepare_sapling_data snoop cfg protocol =
-  Lwt_list.iter_s
-    (fun i ->
-      let file =
-        Files.(working_dir // sapling_data_dir // sapling_txs_file i)
-      in
-      call_if_no_file ~file ~if_present:Lwt.return_unit ~if_absent:(fun () ->
-          let open Lwt in
-          Snoop.sapling_generate
-            ~protocol
-            ~tx_count:1
-            ~max_inputs:0
-            ~max_outputs:0
-            ~file:Files.(working_dir // sapling_data_dir // sapling_txs_file i)
-            snoop
-          >>= fun () ->
-          Snoop.sapling_generate
-            ~protocol
-            ~tx_count:cfg.sapling_tx_count
-            ~max_inputs:0
-            ~max_outputs:60
-            ~file:
-              Files.(
-                working_dir // sapling_data_dir // sapling_txs_file (i + 1))
-            snoop
-          >>= fun () ->
-          Snoop.sapling_generate
-            ~protocol
-            ~tx_count:cfg.sapling_tx_count
-            ~max_inputs:60
-            ~max_outputs:0
-            ~file:
-              Files.(
-                working_dir // sapling_data_dir // sapling_txs_file (i + 2))
-            snoop
-          >>= fun () ->
-          Snoop.sapling_generate
-            ~protocol
-            ~tx_count:cfg.sapling_tx_count
-            ~max_inputs:60
-            ~max_outputs:60
-            ~file:
-              Files.(
-                working_dir // sapling_data_dir // sapling_txs_file (i + 3))
-            snoop))
-    (range 0 0)
+  let file = Files.(working_dir // sapling_data_dir // sapling_txs_file 0) in
+  let* () =
+    call_if_no_file ~file ~if_present:Lwt.return_unit ~if_absent:(fun () ->
+        let open Lwt in
+        Snoop.sapling_generate
+          ~protocol
+          ~tx_count:1
+          ~max_inputs:0
+          ~max_outputs:0
+          ~file
+          snoop)
+  in
+  let file = Files.(working_dir // sapling_data_dir // sapling_txs_file 1) in
+  let* () =
+    call_if_no_file ~file ~if_present:Lwt.return_unit ~if_absent:(fun () ->
+        let open Lwt in
+        Snoop.sapling_generate
+          ~protocol
+          ~tx_count:cfg.sapling_tx_count
+          ~max_inputs:0
+          ~max_outputs:60
+          ~file
+          snoop)
+  in
+  let file = Files.(working_dir // sapling_data_dir // sapling_txs_file 2) in
+  let* () =
+    call_if_no_file ~file ~if_present:Lwt.return_unit ~if_absent:(fun () ->
+        let open Lwt in
+        Snoop.sapling_generate
+          ~protocol
+          ~tx_count:cfg.sapling_tx_count
+          ~max_inputs:60
+          ~max_outputs:0
+          ~file
+          snoop)
+  in
+  let file = Files.(working_dir // sapling_data_dir // sapling_txs_file 3) in
+  call_if_no_file ~file ~if_present:Lwt.return_unit ~if_absent:(fun () ->
+      let open Lwt in
+      Snoop.sapling_generate
+        ~protocol
+        ~tx_count:cfg.sapling_tx_count
+        ~max_inputs:60
+        ~max_outputs:60
+        ~file
+        snoop)
 
 let concat snoop protocol tmp_files target =
   Log.info "Copying %s to %s" (List.hd tmp_files) target ;
