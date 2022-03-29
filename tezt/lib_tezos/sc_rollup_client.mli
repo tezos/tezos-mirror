@@ -41,3 +41,18 @@ val create :
 (** [sc_rollup_address client] returns the smart contract rollup
    address of the node associated to the [client]. *)
 val sc_rollup_address : t -> string Lwt.t
+
+(** [rpc_get client path] issues a GET request for [path]. *)
+val rpc_get : ?hooks:Process.hooks -> t -> Client.path -> JSON.t Lwt.t
+
+(** [total_ticks client] gets the total number of ticks for the PVM. *)
+val total_ticks : ?hooks:Process.hooks -> t -> int Lwt.t
+
+(** [ticks client] gets the number of ticks for the PVM for the current head. *)
+val ticks : ?hooks:Process.hooks -> t -> int Lwt.t
+
+(** [state_hash client] gets the corresponding PVM state hash for the current head block. *)
+val state_hash : ?hooks:Process.hooks -> t -> string Lwt.t
+
+(** [status client] gets the corresponding PVM status for the current head block. *)
+val status : ?hooks:Process.hooks -> t -> string Lwt.t
