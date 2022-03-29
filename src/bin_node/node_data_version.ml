@@ -51,8 +51,8 @@ let version_file_name = "version.json"
  *  - 0.0.4 : context upgrade (switching from LMDB to IRMIN v2)
  *  - 0.0.5 : never released (but used in 10.0~rc1 and 10.0~rc2)
  *  - 0.0.6 : store upgrade (switching from LMDB)
- *  - 0.0.7 : context upgrade (upgrade to irmin.3.0)
- *  - 0.0.8 : new store metadata representation *)
+ *  - 0.0.7 : new store metadata representation
+ *  - 0.0.8 : context upgrade (upgrade to irmin.3.0) *)
 let data_version = "0.0.8"
 
 (* List of upgrade functions from each still supported previous

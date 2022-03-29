@@ -49,12 +49,6 @@ Node
 - Adds ``tezos-node storage head-commmit`` command to print the current
   context head commit hash to stdout.
 
-- The node context storage format was upgraded. To this end, a new storage
-  version was introduced: 0.0.7 (previously 0.0.6). Upgrading from 0.0.6 to
-  0.0.7 is done automatically by the node the first time you run it. This
-  upgrade is instantaneous. However, be careful that previous versions of Octez
-  will refuse to run on a data directory which was used with Octez 12.0.
-
 - Added a check to ensure the consistency between the imported
   snapshot history mode and the one stored in the targeted data
   directory configuration file.
@@ -62,12 +56,11 @@ Node
 - Fixed a wrong behavior that could cause the savepoint to be dragged
   too early.
 
-- The node no longer stores large metadata. To this end, a new storage
-  version was introduced: 0.0.8 (previously 0.0.7). Upgrading from
-  0.0.7 to 0.0.8 is done automatically by the node the first time you
-  run it. This upgrade is instantaneous. However, be careful that
-  previous versions of Octez will refuse to run on a data directory
-  which was used with Octez 12.0.
+- The node context storage format was upgraded. To this end, a new storage
+  version was introduced: 0.0.8 (previously 0.0.7). Upgrading from 0.0.7 to
+  0.0.8 is done automatically by the node the first time you run it. This
+  upgrade is instantaneous. However, be careful that previous versions of Octez
+  will refuse to run on a data directory which was used with Octez 13.0.
 
 Client
 ------
