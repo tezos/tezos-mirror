@@ -218,9 +218,9 @@ let state_from_rpc_diff rpc_diff =
     rpc_diff.Protocol.Sapling_repr.commitments_and_ciphertexts
 
 (* Create an (unspendable) output from a proving context and a vk *)
-let output proving_ctx vk sum =
+let output proving_ctx vk sum state =
   let address = Tezos_sapling.Core.Client.Viewing_key.dummy_address () in
-  let amount = random_amount (Random.State.make [|2|]) sum in
+  let amount = random_amount state sum in
   let rcm = Tezos_sapling.Core.Client.Rcm.random () in
   let esk = Tezos_sapling.Core.Client.DH.esk_random () in
   let cv_o, proof_o =
@@ -243,12 +243,12 @@ let output proving_ctx vk sum =
   (Tezos_sapling.Core.Validator.UTXO.{cm; proof_o; ciphertext}, amount)
 
 (* Returns a list of outputs and the sum of their amount *)
-let outputs nb_output proving_ctx vk =
+let outputs nb_output proving_ctx vk state =
   let rec aux output_amount list_outputs nb_output sum =
     match nb_output with
     | 0 -> (output_amount, list_outputs)
     | nb_output ->
-        let output, amount = output proving_ctx vk sum in
+        let output, amount = output proving_ctx vk sum state in
         assert (
           Int64.compare
             amount
@@ -366,7 +366,7 @@ let generate ~(nb_input : int) ~(nb_output : int) ~(nb_nf : int) ~(nb_cm : int)
   Tezos_sapling.Core.Client.Proving.with_proving_ctx (fun proving_ctx ->
       make_inputs to_forge local_state proving_ctx sk vk root anti_replay
       >>=? fun inputs ->
-      let output_amount, outputs = outputs nb_output proving_ctx vk in
+      let output_amount, outputs = outputs nb_output proving_ctx vk state in
       let input_amount =
         List.fold_left
           (fun sum {amount; _} ->
