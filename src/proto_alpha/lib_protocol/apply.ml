@@ -2251,20 +2251,18 @@ let precheck_manager_contents_list ctxt contents_list ~mempool_mode =
   check_counters_consistency contents_list >>=? fun () ->
   rec_precheck_manager_contents_list ctxt contents_list
 
-let check_manager_signature ctxt chain_id (op : _ Kind.manager contents_list)
-    raw_operation =
+let find_manager_public_key ctxt (op : _ Kind.manager contents_list) =
   (* Currently, the [op] only contains one signature, so
      all operations are required to be from the same manager. This may
      change in the future, allowing several managers to group-sign a
      sequence of transactions. *)
   let check_same_manager (source, source_key) manager =
     match manager with
-    | None ->
-        (* Consistency already checked by
-           [reveal_manager_key] in [precheck_manager_contents]. *)
-        ok (source, source_key)
+    | None -> ok (source, source_key)
     | Some (manager, manager_key) ->
         if Signature.Public_key_hash.equal source manager then
+          (* Consistency will be checked by
+             [reveal_manager_key] in [precheck_manager_contents]. *)
           ok (source, Option.either manager_key source_key)
         else error Inconsistent_sources
   in
@@ -2287,10 +2285,13 @@ let check_manager_signature ctxt chain_id (op : _ Kind.manager contents_list)
         find_source rest (Some manager)
   in
   find_source op None >>?= fun (source, source_key) ->
-  (match source_key with
+  match source_key with
   | Some key -> return key
-  | None -> Contract.get_manager_key ctxt source)
-  >>=? fun public_key ->
+  | None -> Contract.get_manager_key ctxt source
+
+let check_manager_signature ctxt chain_id (op : _ Kind.manager contents_list)
+    raw_operation =
+  find_manager_public_key ctxt op >>=? fun public_key ->
   Lwt.return (Operation.check_signature public_key chain_id raw_operation)
 
 let rec apply_manager_contents_list_rec :
@@ -2967,9 +2968,12 @@ let apply_contents_list (type kind) ctxt chain_id (apply_mode : apply_mode) mode
       (* Failing_noop _ always fails *)
       fail Failing_noop_error
   | Single (Manager_operation _) as op ->
+      (* Use the initial context, the contract may be deleted by the
+         fee transfer in [precheck_manager_contents] *)
+      find_manager_public_key ctxt op >>=? fun public_key ->
       precheck_manager_contents_list ctxt op ~mempool_mode
       >>=? fun (ctxt, prechecked_contents_list) ->
-      check_manager_signature ctxt chain_id op operation >>=? fun () ->
+      Operation.check_signature public_key chain_id operation >>?= fun () ->
       apply_manager_contents_list
         ctxt
         mode
@@ -2978,9 +2982,12 @@ let apply_contents_list (type kind) ctxt chain_id (apply_mode : apply_mode) mode
         prechecked_contents_list
       >|= ok
   | Cons (Manager_operation _, _) as op ->
+      (* Use the initial context, the contract may be deleted by the
+         fee transfer in [precheck_manager_contents] *)
+      find_manager_public_key ctxt op >>=? fun public_key ->
       precheck_manager_contents_list ctxt op ~mempool_mode
       >>=? fun (ctxt, prechecked_contents_list) ->
-      check_manager_signature ctxt chain_id op operation >>=? fun () ->
+      Operation.check_signature public_key chain_id operation >>?= fun () ->
       apply_manager_contents_list
         ctxt
         mode
