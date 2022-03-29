@@ -26,6 +26,7 @@
 open Protocol
 open Alpha_context
 open Operation_pool
+module Events = Baking_events.Selection
 
 let quota = Main.validation_passes
 
@@ -167,32 +168,23 @@ type simulation_result = {
 
 let validate_operation inc op =
   Baking_simulator.add_operation inc op >>= function
-  | Error _errs ->
-      (* TODO: log debug *)
-      (* "@[<v 4>Client-side validation: filtered invalid operation %a@\n\
-       *          %a@]"
-       *)
-      Lwt.return_none
+  | Error errs ->
+      Events.(emit invalid_operation_filtered) (Operation.hash_packed op, errs)
+      >>= fun () -> Lwt.return_none
   | Ok (resulting_state, receipt) -> (
-      try
-        (* Check that the metadata are serializable/deserializable *)
-        let _ =
-          Data_encoding.Binary.(
-            of_bytes_exn
-              Protocol.operation_receipt_encoding
-              (to_bytes_exn Protocol.operation_receipt_encoding receipt))
-        in
-        Lwt.return_some resulting_state
-      with _exn ->
-        (* TODO: log debug *)
-        (*       f "Client-side validation: filtered invalid operation %a"
-         *       -% t event "baking_rejected_invalid_operation"
-         *       -% a
-         *            errs_tag
-         *            [ Validation_errors.Cannot_serialize_operation_metadata;
-         *              Exn exn ])
-         * >>= fun () -> *)
-        Lwt.return_none)
+      (* Check that the metadata are serializable/deserializable *)
+      let encoding_result =
+        let enc = Protocol.operation_receipt_encoding in
+        Option.bind
+          (Data_encoding.Binary.to_bytes_opt enc receipt)
+          (Data_encoding.Binary.of_bytes_opt enc)
+      in
+      match encoding_result with
+      | None ->
+          Events.(emit cannot_serialize_operation_metadata)
+            (Operation.hash_packed op)
+          >>= fun () -> Lwt.return_none
+      | Some _b -> Lwt.return_some resulting_state)
 
 let filter_valid_operations_up_to_quota inc (ops, quota) =
   let {Environment_context.max_size; max_op} = quota in
