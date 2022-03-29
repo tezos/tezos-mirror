@@ -52,7 +52,7 @@ type metadata = {
   max_operations_ttl : int;
   last_allowed_fork_level : Int32.t;
   block_metadata : Bytes.t;
-  operations_metadata : Bytes.t list list;
+  operations_metadata : Block_validation.operation_metadata list list;
 }
 
 (** The type for a [block] stored on disk.
@@ -149,9 +149,10 @@ val max_operations_ttl : metadata -> int
 
 val last_allowed_fork_level : metadata -> Int32.t
 
-val block_metadata : metadata -> Bytes.t
+val block_metadata : metadata -> bytes
 
-val operations_metadata : metadata -> Bytes.t list list
+val operations_metadata :
+  metadata -> Block_validation.operation_metadata list list
 
 (** {1 Utility functions} *)
 

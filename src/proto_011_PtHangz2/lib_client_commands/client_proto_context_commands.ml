@@ -56,6 +56,12 @@ let simulate_switch =
       "Simulate the execution of the command, without needing any signatures."
     ()
 
+let force_switch =
+  Clic.switch
+    ~long:"force"
+    ~doc:"Inject the operation even if the simulation results in a failure."
+    ()
+
 let report_michelson_errors ?(no_print_source = false) ~msg
     (cctxt : #Client_context.printer) = function
   | Error errs ->
@@ -109,6 +115,7 @@ let transfer_command amount source destination cctxt
       dry_run,
       verbose_signing,
       simulation,
+      force,
       gas_limit,
       storage_limit,
       counter,
@@ -144,6 +151,7 @@ let transfer_command amount source destination cctxt
         ~dry_run
         ~verbose_signing
         ~simulation
+        ~force
         ~fee_parameter
         ?fee
         ~contract
@@ -167,6 +175,7 @@ let transfer_command amount source destination cctxt
         ?confirmations:cctxt#confirmations
         ~dry_run
         ~simulation
+        ~force
         ~verbose_signing
         ~fee_parameter
         ~source
@@ -948,11 +957,12 @@ let commands network () =
     command
       ~group
       ~desc:"Transfer tokens / call a smart contract."
-      (args16
+      (args17
          fee_arg
          dry_run_switch
          verbose_signing_switch
          simulate_switch
+         force_switch
          gas_limit_arg
          storage_limit_arg
          counter_arg
@@ -980,6 +990,7 @@ let commands network () =
              dry_run,
              verbose_signing,
              simulation,
+             force,
              gas_limit,
              storage_limit,
              counter,
@@ -1005,6 +1016,7 @@ let commands network () =
             dry_run,
             verbose_signing,
             simulation,
+            force,
             gas_limit,
             storage_limit,
             counter,
@@ -1101,11 +1113,12 @@ let commands network () =
     command
       ~group
       ~desc:"Call a smart contract (same as 'transfer 0')."
-      (args16
+      (args17
          fee_arg
          dry_run_switch
          verbose_signing_switch
          simulate_switch
+         force_switch
          gas_limit_arg
          storage_limit_arg
          counter_arg
@@ -1131,6 +1144,7 @@ let commands network () =
              dry_run,
              verbose_signing,
              simulation,
+             force,
              gas_limit,
              storage_limit,
              counter,
@@ -1156,6 +1170,7 @@ let commands network () =
             dry_run,
             verbose_signing,
             simulation,
+            force,
             gas_limit,
             storage_limit,
             counter,

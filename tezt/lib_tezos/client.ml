@@ -566,7 +566,8 @@ let gen_and_show_keys ?alias client =
   show_address ~alias client
 
 let spawn_transfer ?endpoint ?(wait = "none") ?burn_cap ?fee ?gas_limit
-    ?storage_limit ?counter ?arg ~amount ~giver ~receiver client =
+    ?storage_limit ?counter ?arg ?(force = false) ~amount ~giver ~receiver
+    client =
   spawn_command
     ?endpoint
     client
@@ -592,10 +593,11 @@ let spawn_transfer ?endpoint ?(wait = "none") ?burn_cap ?fee ?gas_limit
         ~none:[]
         ~some:(fun s -> ["--counter"; string_of_int s])
         counter
-    @ Option.fold ~none:[] ~some:(fun p -> ["--arg"; p]) arg)
+    @ Option.fold ~none:[] ~some:(fun p -> ["--arg"; p]) arg
+    @ if force then ["--force"] else [])
 
 let transfer ?endpoint ?wait ?burn_cap ?fee ?gas_limit ?storage_limit ?counter
-    ?arg ~amount ~giver ~receiver client =
+    ?arg ?force ~amount ~giver ~receiver client =
   spawn_transfer
     ?endpoint
     ?wait
@@ -605,6 +607,7 @@ let transfer ?endpoint ?wait ?burn_cap ?fee ?gas_limit ?storage_limit ?counter
     ?storage_limit
     ?counter
     ?arg
+    ?force
     ~amount
     ~giver
     ~receiver

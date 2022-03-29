@@ -424,6 +424,11 @@ let rec originated_contracts : type kind. kind contents_result_list -> _ =
       originated_contracts rest >>? fun contracts2 ->
       Ok (List.rev_append contracts1 contracts2)
 
+(* When --force is used, we don't want [originated_contracts] to fail as
+   it would stop the client before the injection of the operation. *)
+let originated_contracts ~force results =
+  match originated_contracts results with Error _ when force -> Ok [] | e -> e
+
 let detect_script_failure : type kind. kind operation_metadata -> _ =
   let rec detect_script_failure : type kind. kind contents_result_list -> _ =
     let detect_script_failure_single (type kind)
@@ -826,8 +831,8 @@ let tenderbake_adjust_confirmations (cctxt : #Client_context.full) = function
    were tenderbake_finality_confirmations.
  *)
 let inject_operation_internal (type kind) cctxt ~chain ~block ?confirmations
-    ?(dry_run = false) ?(simulation = false) ?branch ?src_sk ?verbose_signing
-    ~fee_parameter (contents : kind contents_list) =
+    ?(dry_run = false) ?(simulation = false) ?(force = false) ?branch ?src_sk
+    ?verbose_signing ~fee_parameter (contents : kind contents_list) =
   (if simulation then simulate cctxt ~chain ~block ?branch contents
   else
     preapply
@@ -847,7 +852,7 @@ let inject_operation_internal (type kind) cctxt ~chain ~block ?confirmations
         "@[<v 2>This simulation failed:@,%a@]"
         Operation_result.pp_operation_result
         (op.protocol_data.contents, result.contents)
-      >>= fun () -> Lwt.return res)
+      >>= fun () -> if force then return_unit else Lwt.return res)
   >>=? fun () ->
   let bytes =
     Data_encoding.Binary.to_bytes_exn Operation.encoding (Operation.pack op)
@@ -905,10 +910,14 @@ let inject_operation_internal (type kind) cctxt ~chain ~block ?confirmations
           j
         >>=? fun op' ->
         match op'.receipt with
-        | None -> failwith "Internal error: pruned metadata."
-        | Some No_operation_metadata ->
-            failwith "Internal error: unexpected receipt."
-        | Some (Operation_metadata receipt) -> (
+        | Empty -> failwith "Internal error: pruned metadata."
+        | Too_large -> failwith "Internal error: too large metadata."
+        | Receipt No_operation_metadata ->
+            cctxt#message
+              "The operation metadata was not stored because it was too big, \
+               thus the failure to display the receipt."
+            >>= fun () -> failwith "Internal error: unexpected receipt."
+        | Receipt (Operation_metadata receipt) -> (
             match Apply_results.kind_equal_list contents receipt.contents with
             | Some Apply_results.Eq ->
                 return (receipt : kind operation_metadata)
@@ -919,7 +928,8 @@ let inject_operation_internal (type kind) cctxt ~chain ~block ?confirmations
       Operation_result.pp_operation_result
       (op.protocol_data.contents, result.contents)
     >>= fun () ->
-    Lwt.return (originated_contracts result.contents) >>=? fun contracts ->
+    Lwt.return (originated_contracts result.contents ~force)
+    >>=? fun contracts ->
     List.iter_s
       (fun c -> cctxt#message "New contract %a originated." Contract.pp c)
       contracts
@@ -1158,7 +1168,7 @@ let may_replace_operation (type kind) (cctxt : #full) chain from
     Lwt.return_ok contents
 
 let inject_manager_operation cctxt ~chain ~block ?branch ?confirmations ?dry_run
-    ?verbose_signing ?simulation ~source ~src_pk ~src_sk ~fee ~gas_limit
+    ?verbose_signing ?simulation ?force ~source ~src_pk ~src_sk ~fee ~gas_limit
     ~storage_limit ?counter ?(replace_by_fees = false) ~fee_parameter
     (type kind) (operations : kind Annotated_manager_operation.annotated_list) :
     (Operation_hash.t
@@ -1237,6 +1247,7 @@ let inject_manager_operation cctxt ~chain ~block ?branch ?confirmations ?dry_run
         ?confirmations
         ?dry_run
         ?simulation
+        ?force
         ~fee_parameter
         ?verbose_signing
         ?branch
@@ -1268,6 +1279,7 @@ let inject_manager_operation cctxt ~chain ~block ?branch ?confirmations ?dry_run
         ?dry_run
         ?verbose_signing
         ?simulation
+        ?force
         ~fee_parameter
         ?branch
         ~src_sk

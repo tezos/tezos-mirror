@@ -3267,21 +3267,19 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
     >>=? fun () ->
     read_floating_blocks snapshot_importer ~genesis_hash:genesis.block
     >>=? fun (reading_thread, floating_blocks_stream) ->
-    let {
-      Block_validation.validation_store;
-      block_metadata;
-      ops_metadata;
-      block_metadata_hash;
-      ops_metadata_hashes;
-    } =
+    let {Block_validation.validation_store; block_metadata; ops_metadata} =
       block_validation_result
     in
     let contents =
       {
         Block_repr.header = block_data.block_header;
         operations = block_data.operations;
-        block_metadata_hash;
-        operations_metadata_hashes = ops_metadata_hashes;
+        block_metadata_hash = snd block_metadata;
+        operations_metadata_hashes =
+          (match ops_metadata with
+          | Block_validation.No_metadata_hash _ -> None
+          | Block_validation.Metadata_hash ops_metadata ->
+              Some (List.map (List.map snd) ops_metadata));
       }
     in
     let metadata =
@@ -3290,8 +3288,12 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
            message = validation_store.message;
            max_operations_ttl = validation_store.max_operations_ttl;
            last_allowed_fork_level = validation_store.last_allowed_fork_level;
-           block_metadata;
-           operations_metadata = ops_metadata;
+           block_metadata = fst block_metadata;
+           operations_metadata =
+             (match ops_metadata with
+             | Block_validation.No_metadata_hash x -> x
+             | Block_validation.Metadata_hash ops_metadata ->
+                 List.map (List.map fst) ops_metadata);
          }
           : Block_repr.metadata)
     in

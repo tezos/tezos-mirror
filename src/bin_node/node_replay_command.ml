@@ -229,7 +229,7 @@ let replay ~singleprocess (config : Node_config_file.t) blocks =
                 let expected_context_hash = Store.Block.context_hash block in
                 Store.Block.get_block_metadata main_chain_store block
                 >>=? fun metadata ->
-                let expected_block_receipt =
+                let expected_block_receipt_bytes =
                   Store.Block.block_metadata metadata
                 in
                 let expected_operation_receipts =
@@ -261,38 +261,33 @@ let replay ~singleprocess (config : Node_config_file.t) blocks =
                    (expected_context_hash, result.validation_store.context_hash)
                 else Lwt.return_unit)
                 >>= fun () ->
+                let block_metadata_bytes = fst result.block_metadata in
                 (if
-                 not (Bytes.equal expected_block_receipt result.block_metadata)
+                 not
+                   (Bytes.equal
+                      expected_block_receipt_bytes
+                      block_metadata_bytes)
                 then
                  Store.Block.protocol_hash main_chain_store block
                  >>=? fun protocol ->
                  Registered_protocol.get_result protocol
                  >>=? fun (module Proto) ->
-                 let exp =
-                   Data_encoding.Binary.of_bytes_exn
-                     Proto.block_header_metadata_encoding
-                     expected_block_receipt
-                 in
-                 let got =
-                   Data_encoding.Binary.of_bytes_exn
-                     Proto.block_header_metadata_encoding
-                     result.block_metadata
-                 in
-                 let exp =
+                 let to_json block =
                    Data_encoding.Json.construct
                      Proto.block_header_metadata_encoding
-                     exp
+                   @@ Data_encoding.Binary.of_bytes_exn
+                        Proto.block_header_metadata_encoding
+                        block
                  in
-                 let got =
-                   Data_encoding.Json.construct
-                     Proto.block_header_metadata_encoding
-                     got
-                 in
+                 let exp = to_json expected_block_receipt_bytes in
+                 let got = to_json block_metadata_bytes in
                  Event.(emit inconsistent_block_receipt) (exp, got)
                  >>= fun () -> return_unit
                 else return_unit)
                 >>=? fun () ->
-                let rec check_receipts i j exp got =
+                let rec check_receipts i j
+                    (exp : Block_validation.operation_metadata list list)
+                    (got : Block_validation.operation_metadata list list) =
                   match (exp, got) with
                   | ([], []) -> return_unit
                   | ([], _ :: _) | (_ :: _, []) -> assert false
@@ -301,46 +296,46 @@ let replay ~singleprocess (config : Node_config_file.t) blocks =
                   | ((_ :: _) :: _, [] :: _) | ([] :: _, (_ :: _) :: _) ->
                       assert false
                   | ((exp :: exps) :: expss, (got :: gots) :: gotss) ->
-                      (if not (Bytes.equal exp got) then
-                       Store.Block.protocol_hash main_chain_store block
-                       >>=? fun protocol ->
-                       Registered_protocol.get_result protocol
-                       >>=? fun (module Proto) ->
-                       let exp =
-                         Data_encoding.Binary.of_bytes_exn
-                           Proto.operation_receipt_encoding
-                           exp
+                      (let equal a b =
+                         match (a, b) with
+                         | Block_validation.(Metadata a, Metadata b) ->
+                             Bytes.equal a b
+                         | (Too_large_metadata, Too_large_metadata) -> true
+                         | _ -> false
                        in
-                       let got =
-                         Data_encoding.Binary.of_bytes_exn
-                           Proto.operation_receipt_encoding
-                           got
-                       in
-                       let op =
-                         operations
-                         |> (fun l -> List.nth_opt l i)
-                         |> Option.value_f ~default:(fun () -> assert false)
-                         |> (fun l -> List.nth_opt l j)
-                         |> Option.value_f ~default:(fun () -> assert false)
-                         |> fun {proto; _} ->
-                         Data_encoding.Binary.of_bytes_exn
-                           Proto.operation_data_encoding
-                           proto
-                       in
-                       let exp =
-                         Data_encoding.Json.construct
-                           Proto.operation_data_and_receipt_encoding
-                           (op, exp)
-                       in
-                       let got =
-                         Data_encoding.Json.construct
-                           Proto.operation_data_and_receipt_encoding
-                           (op, got)
-                       in
-                       Event.(emit inconsistent_operation_receipt)
-                         ((i, j), exp, got)
-                       >>= fun () -> return_unit
-                      else return_unit)
+                       if not (equal exp got) then
+                         Store.Block.protocol_hash main_chain_store block
+                         >>=? fun protocol ->
+                         Registered_protocol.get_result protocol
+                         >>=? fun (module Proto) ->
+                         let op =
+                           operations
+                           |> (fun l -> List.nth_opt l i)
+                           |> Option.value_f ~default:(fun () -> assert false)
+                           |> (fun l -> List.nth_opt l j)
+                           |> Option.value_f ~default:(fun () -> assert false)
+                           |> fun {proto; _} -> proto
+                         in
+                         let to_json receipt =
+                           let receipt =
+                             match receipt with
+                             | Block_validation.Metadata receipt -> receipt
+                             | Too_large_metadata -> Bytes.empty
+                           in
+                           Data_encoding.Json.construct
+                             Proto.operation_data_and_receipt_encoding
+                             Data_encoding.Binary.
+                               ( of_bytes_exn Proto.operation_data_encoding op,
+                                 of_bytes_exn
+                                   Proto.operation_receipt_encoding
+                                   receipt )
+                         in
+                         let exp = to_json exp in
+                         let got = to_json got in
+                         Event.(emit inconsistent_operation_receipt)
+                           ((i, j), exp, got)
+                         >>= fun () -> return_unit
+                       else return_unit)
                       >>=? fun () ->
                       check_receipts i (succ j) (exps :: expss) (gots :: gotss)
                 in
@@ -348,7 +343,11 @@ let replay ~singleprocess (config : Node_config_file.t) blocks =
                   0
                   0
                   expected_operation_receipts
-                  result.ops_metadata)
+                  (match result.ops_metadata with
+                  | Block_validation.No_metadata_hash ops_metadata ->
+                      ops_metadata
+                  | Block_validation.Metadata_hash ops_metadata ->
+                      List.map (List.map fst) ops_metadata))
         blocks)
     (fun () ->
       Block_validator_process.close validator_process >>= fun () ->
@@ -408,8 +407,8 @@ module Term = struct
     let open Cmdliner in
     let doc =
       "Increase log level. Using $(b,-v) is equivalent to using \
-       $(b,TEZOS_LOG='* -> info'), and $(b,-vv) is equivalent to using \
-       $(b,TEZOS_LOG='* -> debug')."
+       $(b,TEZOS_LOG='* -> info'), and $(b,-vv) is equivalent to using \
+       $(b,TEZOS_LOG='* -> debug')."
     in
     Arg.(
       value & flag_all
@@ -478,12 +477,11 @@ module Manpage = struct
       `S "DEBUG";
       `P
         ("The environment variable $(b,TEZOS_LOG) is used to fine-tune what is \
-          going to be logged. The syntax is \
-          $(b,TEZOS_LOG='<section> -> <level> [ ; ...]') where section is \
-          one of $(i," ^ log_sections
+          going to be logged. The syntax is $(b,TEZOS_LOG='<section> -> \
+          <level> [ ; ...]') where section is one of $(i," ^ log_sections
        ^ ") and level is one of $(i,fatal), $(i,error), $(i,warn), \
           $(i,notice), $(i,info) or $(i,debug). A $(b,*) can be used as a \
-          wildcard in sections, i.e. $(b, client* -> debug). The rules are \
+          wildcard in sections, i.e. $(b, client* -> debug). The rules are \
           matched left to right, therefore the leftmost rule is highest \
           priority .");
     ]
