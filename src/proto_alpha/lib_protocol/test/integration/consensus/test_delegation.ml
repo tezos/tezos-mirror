@@ -1276,6 +1276,34 @@ let test_unregistered_and_revealed_self_delegate_key_init_delegation ~fee () =
     >>=? fun i ->
     Assert.balance_was_debited ~loc:__LOC__ (I i) contract balance fee
 
+(** Self-delegation emptying a fresh contract. *)
+let test_self_delegation_emptying_contract () =
+  Context.init 1 >>=? fun (b, bootstrap_contracts) ->
+  Incremental.begin_construction b >>=? fun i ->
+  let bootstrap =
+    WithExceptions.Option.get ~loc:__LOC__ @@ List.hd bootstrap_contracts
+  in
+  let {Account.pkh; pk; _} = Account.new_account () in
+  let {Account.pkh = delegate_pkh; _} = Account.new_account () in
+  let contract = Alpha_context.Contract.implicit_contract pkh in
+  let amount = of_int 10 in
+  Op.transaction (I i) bootstrap contract amount >>=? fun op ->
+  Incremental.add_operation i op >>=? fun i ->
+  Op.revelation ~fee:Tez.zero (I i) pk >>=? fun op ->
+  Incremental.add_operation i op >>=? fun i ->
+  Op.delegation ~fee:amount (I i) contract (Some delegate_pkh) >>=? fun op ->
+  (Context.Contract.is_manager_key_revealed (I i) contract >>=? function
+   | false -> failwith "contract should exist"
+   | true -> return_unit)
+  >>=? fun () ->
+  (* The delegation operation should be applied and the fees
+     debited but it is expected to fail in the apply-part. *)
+  Incremental.add_operation ~expect_failure:(fun _ -> return_unit) i op
+  >>=? fun i ->
+  Context.Contract.is_manager_key_revealed (I i) contract >>=? function
+  | false -> return_unit
+  | true -> failwith "contract should have been removed"
+
 (** Self-delegation on revealed and registered contract. *)
 let test_registered_self_delegate_key_init_delegation () =
   Context.init 1 >>=? fun (b, bootstrap_contracts) ->
@@ -1446,6 +1474,10 @@ let tests_delegate_registration =
       `Quick
       (test_unregistered_and_revealed_self_delegate_key_init_delegation
          ~fee:max_tez);
+    Tztest.tztest
+      "unregistered and revealed self-delegation (fee = balance)"
+      `Quick
+      test_self_delegation_emptying_contract;
     (* self delegation on registered contract *)
     Tztest.tztest
       "registered and revealed self-delegation"

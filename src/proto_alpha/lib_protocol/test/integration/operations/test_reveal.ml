@@ -98,6 +98,26 @@ let test_not_enough_found_for_reveal () =
   Block.bake blk ~operation >>= fun res ->
   Assert.proto_error_with_info ~loc:__LOC__ res "Balance too low"
 
+let test_transfer_fees_emptying_after_reveal_batched () =
+  Context.init 1 >>=? fun (blk, contracts) ->
+  let c = WithExceptions.Option.get ~loc:__LOC__ @@ List.hd contracts in
+  let new_c = Account.new_account () in
+  let new_contract = Alpha_context.Contract.implicit_contract new_c.pkh in
+  (* Create the contract *)
+  Op.transaction (B blk) c new_contract Tez.one >>=? fun operation ->
+  Block.bake blk ~operation >>=? fun blk ->
+  Incremental.begin_construction blk >>=? fun inc ->
+  Op.revelation ~fee:Tez.zero (I inc) new_c.pk >>=? fun reveal ->
+  Incremental.add_operation inc reveal >>=? fun tmp_inc ->
+  Op.transaction ~fee:Tez.one (I tmp_inc) new_contract c Tez.one
+  >>=? fun transaction ->
+  Op.batch_operations ~source:new_contract (I inc) [reveal; transaction]
+  >>=? fun op ->
+  (* This operation is expected to fail at application time, not
+     during validation. *)
+  Incremental.add_operation ~expect_failure:(fun _ -> return_unit) inc op
+  >>=? fun _inc -> return_unit
+
 let tests =
   [
     Tztest.tztest "simple reveal" `Quick test_simple_reveal;
@@ -106,4 +126,8 @@ let tests =
       "not enough found for reveal"
       `Quick
       test_not_enough_found_for_reveal;
+    Tztest.tztest
+      "transfer fees emptying balance after reveal in batch"
+      `Quick
+      test_transfer_fees_emptying_after_reveal_batched;
   ]
