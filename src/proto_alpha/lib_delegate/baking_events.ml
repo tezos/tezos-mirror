@@ -854,3 +854,27 @@ module Liquidity_baking = struct
       ~msg:"Will vote to continue or restart Liquidity Baking"
       ()
 end
+
+module Selection = struct
+  include Internal_event.Simple
+
+  let invalid_operation_filtered =
+    declare_2
+      ~section
+      ~name:"invalid_operation_filtered"
+      ~level:Warning
+      ~msg:"filtered invalid operation {op}: {errors}"
+      ~pp1:Operation_hash.pp
+      ("op", Operation_hash.encoding)
+      ~pp2:pp_print_top_error_of_trace
+      ("errors", Error_monad.(TzTrace.encoding error_encoding))
+
+  let cannot_serialize_operation_metadata =
+    declare_1
+      ~section
+      ~name:"cannot_serialize_operation_metadata"
+      ~level:Warning
+      ~msg:"cannot serialize operation {op} metadata"
+      ~pp1:Operation_hash.pp
+      ("op", Operation_hash.encoding)
+end

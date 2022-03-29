@@ -561,6 +561,47 @@ let wrong_branch_operation_dismissal =
   Log.info "Checking that the transfer is not included in the current head." ;
   check_op_not_in_baked_block client oph
 
+let baking_operation_exception =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"ensure we can still bake with a faulty operation"
+    ~tags:["baking"; "exception"]
+  @@ fun protocol ->
+  let* (node, client) = Client.init_with_protocol `Client ~protocol () in
+  let data_dir = Node.data_dir node in
+  let wait_injection = Node.wait_for_request ~request:`Inject node in
+  let* new_account = Client.gen_and_show_keys client in
+  let* () =
+    Client.transfer
+      ~giver:"bootstrap1"
+      ~receiver:new_account.alias
+      ~amount:(Tez.of_int 10)
+      ~burn_cap:Tez.one
+      client
+  in
+  let* () = wait_injection in
+  (* We use [context_path] to ensure the baker will not use the
+     preapply RPC. Indeed, this test was introduced because of a bug
+     that happens when the baker does not use the preapply RPC. *)
+  let* () = Client.bake_for ~context_path:(data_dir // "context") client in
+  let wait_injection = Node.wait_for_request ~request:`Inject node in
+  let*! () = Client.reveal ~fee:Tez.one ~src:new_account.alias client in
+  let* () = wait_injection in
+  let* () = Client.bake_for ~context_path:(data_dir // "context") client in
+  let wait_injection = Node.wait_for_request ~request:`Inject node in
+  let* _ =
+    Operation.inject_delegation
+      ~fee:9_000_000
+      ~source:new_account
+      ~delegate:new_account.public_key_hash
+      client
+  in
+  let* () = wait_injection in
+  let* () = Client.bake_for ~context_path:(data_dir // "context") client in
+  let* _ = Node.wait_for_level node 4 in
+  unit
+
 let register ~protocols =
   test_ordering protocols ;
-  wrong_branch_operation_dismissal protocols
+  wrong_branch_operation_dismissal protocols ;
+  baking_operation_exception protocols

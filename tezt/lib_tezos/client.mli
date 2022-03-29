@@ -526,19 +526,24 @@ val get_delegate : ?endpoint:endpoint -> src:string -> t -> string option Lwt.t
 val set_delegate :
   ?endpoint:endpoint ->
   ?wait:string ->
+  ?fee:Tez.t ->
+  ?fee_cap:Tez.t ->
+  ?force_low_fee:bool ->
   src:string ->
   delegate:string ->
   t ->
-  unit Lwt.t
+  unit Process.runnable
 
-(** Same as [set_delegate], but do not wait for the process to exit. *)
-val spawn_set_delegate :
+(** Run [tezos-client reveal key for <src>]. *)
+val reveal :
   ?endpoint:endpoint ->
   ?wait:string ->
+  ?fee:Tez.t ->
+  ?fee_cap:Tez.t ->
+  ?force_low_fee:bool ->
   src:string ->
-  delegate:string ->
   t ->
-  Process.t
+  unit Process.runnable
 
 (** Run [tezos-client withdraw delegate from <src>]. *)
 val withdraw_delegate :

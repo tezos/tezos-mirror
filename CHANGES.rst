@@ -100,6 +100,9 @@ Baker / Endorser / Accuser
   the following strings: ``"on"`` to vote to continue Liquidity
   Baking, ``"off"`` to vote to stop it, or ``"pass"`` to abstain.
 
+- Fixed an incorrect behavior that could make the baker crash under
+  certain circumstances.
+
 Signer
 ------
 
