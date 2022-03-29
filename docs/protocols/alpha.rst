@@ -170,6 +170,8 @@ Minor Changes
 
 - Change ``blocks_per_voting period`` in context with ``cycles_per_voting_period`` (MR :gl:`!4456`)
 
+- Retrieve a contract's public key before prechecking an operation. (MR :gl:`!4877`)
+
 Michelson
 ---------
 
