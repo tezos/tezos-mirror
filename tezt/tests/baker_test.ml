@@ -50,7 +50,7 @@ let baker_stresstest =
   Protocol.register_test
     ~__FILE__
     ~title:"baker stresstest"
-    ~tags:["node"; "baker"]
+    ~tags:["node"; "baker"; "stresstest"]
   @@ fun protocol ->
   let* (node, client) =
     Client.init_with_protocol `Client ~protocol () ~timestamp_delay:0.0
