@@ -56,7 +56,7 @@ val string_seq_of_jsonm_lexeme_seq :
     instructions become invalid: the content of [buff] may have been rewritten
     by the side effect of forcing the next element.
 
-    @raise [Invalid_argument _] if [Bytes.length buffer] is less than 32. *)
+    @raise Invalid_argument if [Bytes.length buffer] is less than 32. *)
 val blit_instructions_seq_of_jsonm_lexeme_seq :
   newline:bool ->
   buffer:bytes ->
