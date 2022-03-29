@@ -232,29 +232,6 @@ let chest_key_size _ =
   let proof_size = 256 in
   h2w +? (unlocked_value_size + proof_size)
 
-let view_size {input_ty; output_ty; view_code} =
-  ret_adding
-    (node_size input_ty ++ node_size output_ty ++ node_size view_code)
-    h3w
-
-let views_size views =
-  Script_map.fold
-    (fun k view accu ->
-      ret_adding (accu ++ view_size view) (script_string_size k +! h4w))
-    views
-    zero
-
-let rec entrypoints_size : type arg. arg entrypoints -> nodes_and_size =
- fun {name; nested} ->
-  let name_size = option_size Entrypoint.in_memory_size name in
-  let nested_size =
-    match nested with
-    | Entrypoints_None -> zero
-    | Entrypoints_Union {left; right} ->
-        ret_adding (entrypoints_size left ++ entrypoints_size right) h2w
-  in
-  ret_succ_adding nested_size name_size
-
 let kinfo_size {iloc = _; kstack_ty = _} = h2w
 
 (* The following mutually recursive functions are mostly
@@ -553,16 +530,10 @@ and kinstr_size :
         ret_succ_adding (accu ++ view_signature_size s) (base kinfo +! word_size)
     | ITransfer_tokens (kinfo, _) -> ret_succ_adding accu (base kinfo)
     | IImplicit_account (kinfo, _) -> ret_succ_adding accu (base kinfo)
-    | ICreate_contract
-        {kinfo; storage_type; arg_type; lambda; entrypoints; views; k = _} ->
-        let accu =
-          ret_succ_adding
-            (accu ++ ty_size storage_type ++ ty_size arg_type
-           ++ views_size views
-            ++ entrypoints_size entrypoints)
-            (base kinfo +! (word_size *? 4))
-        in
-        (lambda_size [@ocaml.tailcall]) ~count_lambda_nodes accu lambda
+    | ICreate_contract {kinfo; storage_type; code; k = _} ->
+        ret_succ_adding
+          (accu ++ ty_size storage_type ++ expr_size code)
+          (base kinfo +! (word_size *? 2))
     | ISet_delegate (kinfo, _) -> ret_succ_adding accu (base kinfo)
     | INow (kinfo, _) -> ret_succ_adding accu (base kinfo)
     | IMin_block_time (kinfo, _) -> ret_succ_adding accu (base kinfo)
@@ -705,7 +676,6 @@ let rec kinstr_extra_size : type a s r f. (a, s, r, f) kinstr -> nodes_and_size
           let kinfo = Script_typed_ir.kinfo_of_kinstr body in
           match kinfo.kstack_ty with Item_t (ty, _) -> ty_size ty)
       | ILambda (_, lambda, _) -> lambda_extra_size lambda
-      | ICreate_contract {lambda; _} -> lambda_extra_size lambda
       | _ -> zero
     in
     ret_succ (accu ++ self_size)

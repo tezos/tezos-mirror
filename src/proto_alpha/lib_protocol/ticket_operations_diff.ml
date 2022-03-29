@@ -220,17 +220,7 @@ let tickets_of_transaction ctxt ~destination ~entrypoint ~location
       return (Some {destination = Contract destination; tickets}, ctxt)
 
 (** Extract tickets of an origination operation by scanning the storage. *)
-let tickets_of_origination ctxt ~preorigination
-    (Script_typed_ir.Script
-      {
-        storage_type;
-        storage;
-        code = _;
-        arg_type = _;
-        views = _;
-        entrypoints = _;
-        code_size = _;
-      }) =
+let tickets_of_origination ctxt ~preorigination ~storage_type ~storage =
   (* Extract any tickets from the storage. Note that if the type of the contract
      storage does not contain tickets, storage is not scanned. *)
   Ticket_scanner.type_has_tickets ctxt storage_type
@@ -290,9 +280,10 @@ let tickets_of_operation ctxt
       {
         origination = {delegate = _; script = _; credit = _};
         preorigination;
-        script;
+        storage_type;
+        storage;
       } ->
-      tickets_of_origination ctxt ~preorigination script
+      tickets_of_origination ctxt ~preorigination ~storage_type ~storage
   | Delegation _ -> return (None, ctxt)
 
 let add_transfer_to_token_map ctxt token_map {destination; tickets} =

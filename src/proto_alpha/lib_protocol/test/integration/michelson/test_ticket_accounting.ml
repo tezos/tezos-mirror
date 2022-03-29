@@ -332,7 +332,18 @@ let originate_script block ~script ~storage ~src ~baker ~forges_tickets =
 
 let origination_operation ctxt ~src ~script ~orig_contract =
   let open Lwt_tzresult_syntax in
-  let* (Script_ir_translator.Ex_script parsed_script, ctxt) =
+  let* ( Script_ir_translator.Ex_script
+           (Script
+             {
+               storage_type;
+               storage;
+               code = _;
+               arg_type = _;
+               views = _;
+               entrypoints = _;
+               code_size = _;
+             }),
+         ctxt ) =
     wrap
     @@ Script_ir_translator.parse_script
          ctxt
@@ -349,7 +360,8 @@ let origination_operation ctxt ~src ~script ~orig_contract =
             {
               origination = {delegate = None; script; credit = Tez.one};
               preorigination = orig_contract;
-              script = parsed_script;
+              storage_type;
+              storage;
             };
         nonce = 1;
       }

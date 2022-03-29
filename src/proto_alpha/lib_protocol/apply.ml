@@ -1047,57 +1047,21 @@ let apply_transaction_to_tx_rollup ~ctxt ~parameters_ty ~parameters ~amount
     return (ctxt, result, [])
   else fail (Script_tc_errors.No_such_entrypoint entrypoint)
 
-let apply_origination ~consume_deserialization_gas ~ctxt ~parsed_script ~script
-    ~internal ~contract ~delegate ~source ~credit ~before_operation =
-  Script.force_decode_in_context
-    ~consume_deserialization_gas
-    ctxt
-    script.Script.storage
-  >>?= fun (_unparsed_storage, ctxt) ->
-  Script.force_decode_in_context
-    ~consume_deserialization_gas
-    ctxt
-    script.Script.code
-  >>?= fun (unparsed_code, ctxt) ->
-  (match parsed_script with
-  | None ->
-      Script_ir_translator.parse_script
-        ctxt
-        ~legacy:false
-        ~allow_forged_in_storage:internal
-        script
-  | Some parsed_script ->
-      return (Script_ir_translator.Ex_script parsed_script, ctxt))
-  >>=? fun (Ex_script (Script parsed_script), ctxt) ->
-  let views_result =
-    Script_ir_translator.typecheck_views
-      ctxt
-      ~legacy:false
-      parsed_script.storage_type
-      parsed_script.views
-  in
-  trace (Script_tc_errors.Ill_typed_contract (unparsed_code, [])) views_result
-  >>=? fun ctxt ->
-  Script_ir_translator.collect_lazy_storage
-    ctxt
-    parsed_script.storage_type
-    parsed_script.storage
+let apply_origination ~ctxt ~storage_type ~storage ~unparsed_code ~contract
+    ~delegate ~source ~credit ~before_operation =
+  Script_ir_translator.collect_lazy_storage ctxt storage_type storage
   >>?= fun (to_duplicate, ctxt) ->
   let to_update = Script_ir_translator.no_lazy_storage_id in
   Script_ir_translator.extract_lazy_storage_diff
     ctxt
     Optimized
-    parsed_script.storage_type
-    parsed_script.storage
+    storage_type
+    storage
     ~to_duplicate
     ~to_update
     ~temporary:false
   >>=? fun (storage, lazy_storage_diff, ctxt) ->
-  Script_ir_translator.unparse_data
-    ctxt
-    Optimized
-    parsed_script.storage_type
-    storage
+  Script_ir_translator.unparse_data ctxt Optimized storage_type storage
   >>=? fun (storage, ctxt) ->
   Gas.consume ctxt (Script.strip_locations_cost storage) >>?= fun ctxt ->
   let storage = Script.lazy_expr (Micheline.strip_locations storage) in
@@ -1233,14 +1197,19 @@ let apply_internal_manager_operation_content :
       {
         origination = {delegate; script; credit};
         preorigination = contract;
-        script = parsed_script;
+        storage_type;
+        storage;
       } ->
-      apply_origination
+      Script.force_decode_in_context
         ~consume_deserialization_gas
+        ctxt
+        script.Script.code
+      >>?= fun (unparsed_code, ctxt) ->
+      apply_origination
         ~ctxt
-        ~parsed_script:(Some parsed_script)
-        ~script
-        ~internal:true
+        ~storage_type
+        ~storage
+        ~unparsed_code
         ~contract
         ~delegate
         ~source
@@ -1452,17 +1421,44 @@ let apply_external_manager_operation_content :
       in
       return (ctxt, result, [op])
   | Origination {delegate; script; credit} ->
-      (* The contract is only used to early return the address of an originated
-         contract in Michelson.
-         It cannot come from the outside. *)
+      (* Internal originations have their address generated in the interpreter
+         so that the script can use it immediately.
+         The address of external originations is generated here. *)
       Contract.fresh_contract_from_current_nonce ctxt
       >>?= fun (ctxt, contract) ->
-      apply_origination
+      Script.force_decode_in_context
         ~consume_deserialization_gas
+        ctxt
+        script.Script.storage
+      >>?= fun (_unparsed_storage, ctxt) ->
+      Script_ir_translator.parse_script
+        ctxt
+        ~legacy:false
+        ~allow_forged_in_storage:false
+        script
+      >>=? fun (Ex_script parsed_script, ctxt) ->
+      Script.force_decode_in_context
+        ~consume_deserialization_gas
+        ctxt
+        script.Script.code
+      >>?= fun (unparsed_code, ctxt) ->
+      let (Script {storage_type; views; storage; _}) = parsed_script in
+      let views_result =
+        Script_ir_translator.typecheck_views
+          ctxt
+          ~legacy:false
+          storage_type
+          views
+      in
+      trace
+        (Script_tc_errors.Ill_typed_contract (unparsed_code, []))
+        views_result
+      >>=? fun ctxt ->
+      apply_origination
         ~ctxt
-        ~parsed_script:None
-        ~script
-        ~internal:false
+        ~storage_type
+        ~storage
+        ~unparsed_code
         ~contract
         ~delegate
         ~source:source_contract

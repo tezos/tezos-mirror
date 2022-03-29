@@ -2176,26 +2176,6 @@ module Registration_section = struct
         ()
 
     let () =
-      let lambda =
-        let open Script_typed_ir in
-        let (Ty_ex_c pair_list_operation_unit) = pair (list operation) unit in
-        let descr =
-          {
-            kloc = 0;
-            kbef = cpair unit unit @$ bot;
-            kaft = pair_list_operation_unit @$ bot;
-            kinstr =
-              ICdr
-                ( kinfo (cpair unit unit @$ bot),
-                  INil
-                    ( kinfo (unit @$ bot),
-                      ICons_pair
-                        ( kinfo (list operation @$ unit @$ bot),
-                          IHalt (kinfo (pair_list_operation_unit @$ bot)) ) ) );
-          }
-        in
-        Lam (descr, Micheline.Int (0, Z.zero))
-      in
       simple_benchmark
         ~name:Interpreter_workload.N_ICreate_contract
         ~kinstr:
@@ -2203,10 +2183,7 @@ module Registration_section = struct
              {
                kinfo = kinfo (option key_hash @$ mutez @$ unit @$ bot);
                storage_type = unit;
-               arg_type = unit;
-               lambda;
-               views = Script_map.empty string_key;
-               entrypoints = no_entrypoints;
+               code = Micheline.(strip_locations @@ Seq (0, []));
                k = halt (operation @$ address @$ bot);
              })
         ()
