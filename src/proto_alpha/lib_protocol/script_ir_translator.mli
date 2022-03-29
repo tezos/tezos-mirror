@@ -418,7 +418,11 @@ val parse_contract_for_script :
     existential. Typically, it will be used to go from the type of an
     entry-point to the full type of a contract. *)
 type 'a ex_ty_cstr =
-  | Ex_ty_cstr : ('b, _) Script_typed_ir.ty * ('b -> 'a) -> 'a ex_ty_cstr
+  | Ex_ty_cstr : {
+      ty : ('b, _) Script_typed_ir.ty;
+      box : 'b -> 'a;
+    }
+      -> 'a ex_ty_cstr
 
 val find_entrypoint :
   error_details:'error_trace error_details ->

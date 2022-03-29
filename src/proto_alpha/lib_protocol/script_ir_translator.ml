@@ -1924,7 +1924,12 @@ let rec make_comb_set_proof_argument :
       let whole_stack = serialize_stack_for_error ctxt stack_ty in
       error (Bad_stack (loc, I_UPDATE, 2, whole_stack))
 
-type 'a ex_ty_cstr = Ex_ty_cstr : ('b, _) ty * ('b -> 'a) -> 'a ex_ty_cstr
+type 'a ex_ty_cstr =
+  | Ex_ty_cstr : {
+      ty : ('b, _) Script_typed_ir.ty;
+      box : 'b -> 'a;
+    }
+      -> 'a ex_ty_cstr
 
 let find_entrypoint (type full fullc error_trace)
     ~(error_details : error_trace error_details) (full : (full, fullc) ty)
@@ -1942,14 +1947,15 @@ let find_entrypoint (type full fullc error_trace)
     match (ty, entrypoints) with
     | (_, {at_node = Some {name; original_type = _}; _})
       when Entrypoint.(name = entrypoint) ->
-        return (Ex_ty_cstr (ty, fun e -> e))
+        return (Ex_ty_cstr {ty; box = (fun e -> e)})
     | (Union_t (tl, tr, _, _), {nested = Entrypoints_Union {left; right}; _})
       -> (
         Gas_monad.bind_recover (find_entrypoint tl left entrypoint) @@ function
-        | Ok (Ex_ty_cstr (t, f)) -> return (Ex_ty_cstr (t, fun e -> L (f e)))
+        | Ok (Ex_ty_cstr {ty; box}) ->
+            return (Ex_ty_cstr {ty; box = (fun e -> L (box e))})
         | Error () ->
-            let+ (Ex_ty_cstr (t, f)) = find_entrypoint tr right entrypoint in
-            Ex_ty_cstr (t, fun e -> R (f e)))
+            let+ (Ex_ty_cstr {ty; box}) = find_entrypoint tr right entrypoint in
+            Ex_ty_cstr {ty; box = (fun e -> R (box e))})
     | (_, {nested = Entrypoints_None; _}) -> Gas_monad.of_result (Error ())
   in
   Gas_monad.bind_recover (find_entrypoint full entrypoints.root entrypoint)
@@ -1957,7 +1963,7 @@ let find_entrypoint (type full fullc error_trace)
   | Ok f_t -> return f_t
   | Error () ->
       if Entrypoint.is_default entrypoint then
-        return (Ex_ty_cstr (full, fun e -> e))
+        return (Ex_ty_cstr {ty = full; box = (fun e -> e)})
       else
         Gas_monad.of_result
         @@ Error
@@ -1972,7 +1978,7 @@ let find_entrypoint_for_type (type full fullc exp expc error_trace)
   let open Gas_monad.Syntax in
   let* res = find_entrypoint ~error_details full entrypoints entrypoint in
   match res with
-  | Ex_ty_cstr (ty, _) -> (
+  | Ex_ty_cstr {ty; _} -> (
       match entrypoints.root.at_node with
       | Some {name; original_type = _}
         when Entrypoint.is_root name && Entrypoint.is_default entrypoint ->
@@ -4709,7 +4715,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
                    entrypoints
                    entrypoint
               >>? fun (r, ctxt) ->
-              r >>? fun (Ex_ty_cstr (param_type, _)) ->
+              r >>? fun (Ex_ty_cstr {ty = param_type; _}) ->
               contract_t loc param_type >>? fun res_ty ->
               let instr =
                 {

@@ -1756,7 +1756,7 @@ let execute_any_arg logger ctxt mode step_constants ~entrypoint ~internal
     (find_entrypoint ~error_details:Informative arg_type entrypoints entrypoint)
   >>?= fun (r, ctxt) ->
   record_trace (Bad_contract_parameter step_constants.self) r
-  >>?= fun (Ex_ty_cstr (entrypoint_ty, box)) ->
+  >>?= fun (Ex_ty_cstr {ty = entrypoint_ty; box}) ->
   trace
     (Bad_contract_parameter step_constants.self)
     (lift_execution_arg ctxt ~internal entrypoint_ty box arg)

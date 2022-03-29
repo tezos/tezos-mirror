@@ -400,7 +400,7 @@ let[@coq_axiom_with_reason "gadt"] register () =
                    entrypoint
               >>? fun (r, ctxt) ->
               r |> function
-              | Ok (Ex_ty_cstr (ty, _)) ->
+              | Ok (Ex_ty_cstr {ty; _}) ->
                   unparse_ty ~loc:() ctxt ty >|? fun (ty_node, _) ->
                   Some (Micheline.strip_locations ty_node)
               | Error _ -> Result.return_none )) ;
