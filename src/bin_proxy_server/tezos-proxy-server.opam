@@ -19,6 +19,7 @@ depends: [
   "tezos-rpc-http-client-unix"
   "tezos-rpc-http-server"
   "tezos-shell-services"
+  "tezos-shell-context"
   "tezos-version"
 ]
 depopts: [

@@ -83,7 +83,8 @@ let check_rpc ~test_mode_tag ~test_function ?parameter_overrides
   let (client_mode_tag, title_tag) =
     match test_mode_tag with
     | `Client -> (`Client, "client")
-    | `Client_with_proxy_server -> (`Client, "proxy_server")
+    | `Client_data_dir_proxy_server -> (`Client, "proxy_server_data_dir")
+    | `Client_rpc_proxy_server -> (`Client, "proxy_server_rpc")
     | `Light -> (`Light, "light")
     | `Proxy -> (`Proxy, "proxy")
   in
@@ -109,7 +110,7 @@ let check_rpc ~test_mode_tag ~test_function ?parameter_overrides
   in
   let bake =
     match test_mode_tag with
-    | `Client_with_proxy_server ->
+    | `Client_data_dir_proxy_server | `Client_rpc_proxy_server ->
         (* Because the proxy server doesn't support genesis. *)
         true
     | `Client | `Light | `Proxy -> false
@@ -126,8 +127,15 @@ let check_rpc ~test_mode_tag ~test_function ?parameter_overrides
   let* endpoint =
     match test_mode_tag with
     | `Client | `Light | `Proxy -> return Client.(Node node)
-    | `Client_with_proxy_server ->
-        let* proxy_server = Proxy_server.init node in
+    | (`Client_rpc_proxy_server | `Client_data_dir_proxy_server) as
+      proxy_server_mode ->
+        let args =
+          Some
+            (match proxy_server_mode with
+            | `Client_rpc_proxy_server -> [Proxy_server.Data_dir]
+            | `Client_data_dir_proxy_server -> [])
+        in
+        let* proxy_server = Proxy_server.init ?args node in
         return Client.(Proxy_server proxy_server)
   in
   let* _ = test_function protocol ?endpoint:(Some endpoint) client in
@@ -1071,7 +1079,7 @@ let register protocols =
       ~test_function:test_others
       ~parameter_overrides:consensus_threshold ;
     match test_mode_tag with
-    | `Client_with_proxy_server | `Light -> ()
+    | `Client_data_dir_proxy_server | `Client_rpc_proxy_server | `Light -> ()
     | _ ->
         check_rpc
           "mempool"
@@ -1080,7 +1088,13 @@ let register protocols =
   in
   List.iter
     (register protocols)
-    [`Client; `Light; `Proxy; `Client_with_proxy_server] ;
+    [
+      `Client;
+      `Light;
+      `Proxy;
+      `Client_data_dir_proxy_server;
+      `Client_rpc_proxy_server;
+    ] ;
 
   let addresses = ["localhost"; "127.0.0.1"] in
   let mk_title list_type address =

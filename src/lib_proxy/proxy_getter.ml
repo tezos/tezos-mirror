@@ -120,9 +120,13 @@ end
 
 type proxy_m = (module M)
 
+type proxy_builder =
+  | Of_rpc of (Proxy_proto.proto_rpc -> proxy_m Lwt.t)
+  | Of_data_dir of (Context_hash.t -> Proxy_delegate.t tzresult Lwt.t)
+
 type rpc_context_args = {
   printer : Tezos_client_base.Client_context.printer option;
-  proxy_builder : Proxy_proto.proto_rpc -> proxy_m Lwt.t;
+  proxy_builder : proxy_builder;
   rpc_context : RPC_context.generic;
   mode : Proxy.mode;
   chain : Tezos_shell_services.Block_services.chain;
@@ -130,6 +134,31 @@ type rpc_context_args = {
 }
 
 module StringMap = String.Map
+
+let make_delegate (ctx : rpc_context_args)
+    (proto_rpc : (module Proxy_proto.PROTO_RPC)) (hash : Context_hash.t) :
+    Proxy_delegate.t tzresult Lwt.t =
+  match ctx.proxy_builder with
+  | Of_rpc f ->
+      let open Lwt_result_syntax in
+      let*! (module Initial_context) = f proto_rpc in
+      let pgi : Proxy.proxy_getter_input =
+        {
+          rpc_context = (ctx.rpc_context :> RPC_context.simple);
+          mode = ctx.mode;
+          chain = ctx.chain;
+          block = ctx.block;
+        }
+      in
+      return
+        (module struct
+          let proxy_dir_mem = Initial_context.proxy_dir_mem pgi
+
+          let proxy_get = Initial_context.proxy_get pgi
+
+          let proxy_mem = Initial_context.proxy_mem pgi
+        end : Proxy_delegate.T)
+  | Of_data_dir f -> f hash
 
 module Tree : Proxy.TREE with type t = Local.tree with type key = Local.key =
 struct

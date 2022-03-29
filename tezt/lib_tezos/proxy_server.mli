@@ -30,6 +30,12 @@ type t
 
     Not all arguments are available here, because it was not needed so far. *)
 type argument =
+  | Data_dir
+      (** Whether to pass [--data-dir], to read the node's data-dir from disk,
+          instead of using a RPC. This case doesn't need a parameter, because it is computed
+          automatically from the {!Node.t} value in {!init}. Think
+          of this argument as a Boolean flag (not an argument) whether to pass
+          [--data-dir] to [tezos-proxy-server]. *)
   | Symbolic_block_caching_time of int
       (** Time interval (in seconds) during which data for a symbolic block
           identifier (like HEAD) is kept. A symbolic identifier

@@ -119,7 +119,8 @@ type mode =
   | Proxy_server of {
       sleep : float -> unit Lwt.t;
       sym_block_caching_time : int option;
-      data_dir : string option;
+      on_disk_proxy_builder :
+        (Context_hash.t -> Proxy_delegate.t tzresult Lwt.t) option;
     }
 
 let to_client_server_mode = function
@@ -266,25 +267,32 @@ let build_directory (printer : Tezos_client_base.Client_context.printer)
         (module BlockToHashClient (Proxy_environment))
   in
   let module B2H = (val b2h : BLOCK_TO_HASH) in
-  let make chain block (module P_RPC : Proxy_proto.PROTO_RPC) =
-    let open Lwt_syntax in
+  let make chain block =
     match mode with
     | Light_client sources ->
-        let (module C) =
-          Light_core.get_core (module Proxy_environment) printer sources
-        in
-        let (chain_string, block_string) =
-          Tezos_shell_services.Block_services.
-            (chain_to_string chain, to_string block)
-        in
-        let* () =
-          Light_logger.Logger.(emit core_created (chain_string, block_string))
-        in
-        let module M = Proxy_getter.Make (C) (P_RPC) in
-        Lwt.return (module M : Proxy_getter.M)
-    | Proxy_client | Proxy_server _ ->
-        let module M = Proxy_getter.MakeProxy (P_RPC) in
-        Lwt.return (module M : Proxy_getter.M)
+        Proxy_getter.Of_rpc
+          (fun (module P_RPC : Proxy_proto.PROTO_RPC) ->
+            let open Lwt_syntax in
+            let (module C) =
+              Light_core.get_core (module Proxy_environment) printer sources
+            in
+            let (chain_string, block_string) =
+              Tezos_shell_services.Block_services.
+                (chain_to_string chain, to_string block)
+            in
+            let* () =
+              Light_logger.Logger.(
+                emit core_created (chain_string, block_string))
+            in
+            let module M = Proxy_getter.Make (C) (P_RPC) in
+            Lwt.return (module M : Proxy_getter.M))
+    | Proxy_client | Proxy_server {on_disk_proxy_builder = None; _} ->
+        Proxy_getter.Of_rpc
+          (fun (module P_RPC : Proxy_proto.PROTO_RPC) ->
+            let module M = Proxy_getter.MakeProxy (P_RPC) in
+            Lwt.return (module M : Proxy_getter.M))
+    | Proxy_server {on_disk_proxy_builder = Some f; _} ->
+        Proxy_getter.Of_data_dir f
   in
   (* proxy_server case: given that a new block arrives every minute,
      make the cache keep blocks from approximately the last hour.

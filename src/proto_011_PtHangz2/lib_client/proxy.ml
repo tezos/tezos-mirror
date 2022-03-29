@@ -108,34 +108,28 @@ module ProtoRpc : Tezos_proxy.Proxy_proto.PROTO_RPC = struct
     >>= fun () -> return raw_context
 end
 
-let initial_context
-    ({printer = _; proxy_builder; rpc_context; mode; chain; block} :
-      Tezos_proxy.Proxy_getter.rpc_context_args) :
-    Environment_context.Context.t Lwt.t =
-  let p_rpc = (module ProtoRpc : Tezos_proxy.Proxy_proto.PROTO_RPC) in
-  proxy_builder p_rpc >>= fun (module M) ->
-  L.emit
-    L.proxy_getter_created
-    ( Tezos_shell_services.Block_services.chain_to_string chain,
-      Tezos_shell_services.Block_services.to_string block )
-  >>= fun () ->
-  let pgi : Tezos_proxy.Proxy.proxy_getter_input =
-    {rpc_context = (rpc_context :> RPC_context.simple); mode; chain; block}
+let initial_context (ctx : Tezos_proxy.Proxy_getter.rpc_context_args)
+    (hash : Context_hash.t) : Environment_context.Context.t tzresult Lwt.t =
+  let open Lwt_result_syntax in
+  let*! () =
+    L.emit
+      L.proxy_getter_created
+      ( Tezos_shell_services.Block_services.chain_to_string ctx.chain,
+        Tezos_shell_services.Block_services.to_string ctx.block )
   in
-  let module N : Proxy_delegate.T = struct
-    let proxy_dir_mem = M.proxy_dir_mem pgi
-
-    let proxy_get = M.proxy_get pgi
-
-    let proxy_mem = M.proxy_mem pgi
-  end in
-  let empty = Proxy_context.empty @@ Some (module N) in
+  let p_rpc = (module ProtoRpc : Tezos_proxy.Proxy_proto.PROTO_RPC) in
+  let* (module ProxyDelegation) =
+    Tezos_proxy.Proxy_getter.make_delegate ctx p_rpc hash
+  in
+  let empty = Proxy_context.empty @@ Some (module ProxyDelegation) in
   let version_value = "hangzhou_011" in
-  Tezos_protocol_environment.Context.add
-    empty
-    ["version"]
-    (Bytes.of_string version_value)
-  >>= fun ctxt -> Protocol.Main.init_context ctxt
+  let*! ctxt =
+    Tezos_protocol_environment.Context.add
+      empty
+      ["version"]
+      (Bytes.of_string version_value)
+  in
+  Lwt_result.ok (Protocol.Main.init_context ctxt)
 
 let time_between_blocks (rpc_context : RPC_context.generic)
     (chain : Tezos_shell_services.Block_services.chain)
@@ -148,11 +142,16 @@ let time_between_blocks (rpc_context : RPC_context.generic)
 
 let init_env_rpc_context (ctxt : Tezos_proxy.Proxy_getter.rpc_context_args) :
     Tezos_protocol_environment.rpc_context tzresult Lwt.t =
-  proxy_block_header ctxt.rpc_context ctxt.chain ctxt.block
-  >>=? fun {shell; hash; _} ->
-  let block_hash = hash in
-  initial_context ctxt >>= fun context ->
-  return {Tezos_protocol_environment.block_hash; block_header = shell; context}
+  let open Lwt_result_syntax in
+  let* header = proxy_block_header ctxt.rpc_context ctxt.chain ctxt.block in
+  let block_hash = header.hash in
+  let* context = initial_context ctxt header.shell.context in
+  return
+    {
+      Tezos_protocol_environment.block_hash;
+      block_header = header.shell;
+      context;
+    }
 
 let () =
   let open Tezos_proxy.Registration in

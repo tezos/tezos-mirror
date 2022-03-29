@@ -1,4 +1,4 @@
-rpc/hangzhou.proxy_server.others.out
+rpc/hangzhou.proxy_server_data_dir.others.out
 
 ./tezos-client rpc get /chains/main/blocks/head/context/constants
 { "proof_of_work_nonce_size": 8, "nonce_length": 32,

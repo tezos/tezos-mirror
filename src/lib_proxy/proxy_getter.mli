@@ -89,12 +89,21 @@ end
 
 type proxy_m = (module M)
 
+(** The different ways to obtain data from the node. The two functions
+    being wrapped are ultimately used to build {!Proxy_delegate.t} values,
+    that are passed to {!Proxy_context.empty}. *)
+type proxy_builder =
+  | Of_rpc of (Proxy_proto.proto_rpc -> proxy_m Lwt.t)
+      (** Build a proxy that uses network requests for all data. *)
+  | Of_data_dir of (Context_hash.t -> Proxy_delegate.t tzresult Lwt.t)
+      (** Build a proxy that looks up data in a running node's data dir. *)
+
 (** Input data required by the proxy mode to build a
     {!Tezos_protocol_environment.rpc_context}. *)
 type rpc_context_args = {
   printer : Tezos_client_base.Client_context.printer option;
       (** Optional printer to display information in some custom format. *)
-  proxy_builder : Proxy_proto.proto_rpc -> proxy_m Lwt.t;
+  proxy_builder : proxy_builder;
       (** Given the protocol implementation of the RPCs required by the proxy mode,
           how to build an instance of {!proxy_m} that will then make it possible
           to build a {!Tezos_protocol_environment.Proxy_context}. *)
@@ -108,6 +117,14 @@ type rpc_context_args = {
   block : Tezos_shell_services.Block_services.block;
       (** The block to provide RPC calls for. *)
 }
+
+(** Builds a proxy delegate in the way specified by the proxy_builder field of
+    the {!rpc_context_args} argument. *)
+val make_delegate :
+  rpc_context_args ->
+  (module Proxy_proto.PROTO_RPC) ->
+  Context_hash.t ->
+  Proxy_delegate.t tzresult Lwt.t
 
 (** Functor to obtain the implementation of [M] for the proxy
     mode (as opposed to the light mode implementation) *)
