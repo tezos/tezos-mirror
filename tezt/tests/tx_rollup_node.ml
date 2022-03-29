@@ -407,7 +407,7 @@ let test_ticket_deposit_from_l1_to_l2 =
           client
       in
       let* () = Client.bake_for client in
-      let* _ = Node.wait_for_level node 2 in
+      let* _ = Node.wait_for_level node 3 in
       Log.info
         "The tx_rollup_deposit %s contract was successfully originated"
         contract_id ;
@@ -429,7 +429,7 @@ let test_ticket_deposit_from_l1_to_l2 =
           client
       in
       let* () = Client.bake_for client in
-      let* _ = Node.wait_for_level node 3 in
+      let* _ = Node.wait_for_level node 4 in
       (* Get the operation containing the ticket transfer. We assume
          that only one operation is issued in this block. *)
       let* inbox = tx_client_get_inbox ~tx_node ~block:"head" in
