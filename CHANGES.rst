@@ -198,6 +198,9 @@ Baker / Endorser / Accuser
 - Improved the log messages of the Ithaca baker for the default
   (`Notice`) and `Info` logging levels.
 
+- Fixed an incorrect behaviour that could make the baker crash under
+  certain circumstances.
+
 Version 12.0~rc1
 ================
 
