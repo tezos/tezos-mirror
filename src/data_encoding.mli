@@ -26,6 +26,12 @@
 
 (** Type-safe serialization and deserialization of data structures. *)
 
+(** This page is for the API documentation of data-encoding: the technical
+    description of each of the available type and combinator exported by the
+    data-encoding library.
+
+    For a high-level view and a tutorial, see {!page-tutorial}. *)
+
 (** {1 Data Encoding} *)
 
 (** {2 Overview}

@@ -20,6 +20,7 @@ depends: [
   "either"
   "ocamlformat" { = "0.20.1" & with-doc } # not technically a doc dep; modify when with-dev becomes available
   "odoc" { with-doc }
+  "md2mld" { with-doc }
   "js_of_ocaml-compiler" { with-test }
 ]
 build: [
