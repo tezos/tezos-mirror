@@ -894,7 +894,9 @@ let update_grafana_dashboard (dashboard : Grafana.dashboard) =
                   graph with
                   queries =
                     List.map
-                      (InfluxDB.prefix_measurement influxdb_config)
+                      (fun (query, alias) ->
+                        ( InfluxDB.prefix_measurement influxdb_config query,
+                          alias ))
                       graph.queries;
                 }
         in

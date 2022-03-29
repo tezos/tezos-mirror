@@ -28,11 +28,14 @@
 (** Grafana configuration.
 
     [url] is the base URL of the Grafana API.
+
     [api_token] is the bearer token to use in the Authorization header.
+    If not provided, it will try to connect without authenticating (insecure mode).
+
     [data_source] is the name of the InfluxDB data source configured in Grafana. *)
 type config = {
   url : Uri.t;
-  api_token : string;
+  api_token : string option;
   data_source : string;
   timeout : float;
 }
@@ -47,12 +50,32 @@ val config_of_json : JSON.t -> config
     See Grafana documentation for other possible values. *)
 type yaxis = {format : string; label : string option}
 
+(** Represent a duration, used to express intervals for example. *)
+type duration =
+  | Seconds of int
+  | Minutes of int
+  | Hours of int
+  | Days of int
+  | Weeks of int
+  | Month of int
+  | Years of int
+
+(** The alias associated to a curve in the graph. *)
+type alias = string
+
 (** Grafana graph panels.
 
     Queries should use [Grafana_time_filter] in their WHERE clause
     and [Grafana_interval] in a GROUP BY time clause to reduce the size of the query.
+    If an [interval] is specified, it will represent the minimum accepted by [Grafana_interval]
+    to draw the graph.
+
     The GROUP BY time clause should usually also contain a FILL clause to make
     continuous graphs instead of bunches of dots.
+
+    Each query is optionally associated to an alias. This alias will be used to name the resulting
+    curve in the graph key. If this alias is not given, Grafana will deduce it automatically from
+    the query.
 
     Example query:
     [
@@ -60,12 +83,13 @@ type yaxis = {format : string; label : string option}
         [Function (MEAN, Field "duration")]
         ~from:(Measurement "rpc")
         ~where:Grafana_time_filter
-        ~group_by:(Time {interval = Grafana_interval; tag = None; fill = Some Previous})
+        ~group_by:(Time {interval = Grafana_interval; tag = None; fill = None})
     ] *)
 type graph = {
   title : string;
   description : string;
-  queries : InfluxDB.select list;
+  queries : (InfluxDB.select * alias option) list;
+  interval : duration option;
   yaxis_1 : yaxis option;
   yaxis_2 : yaxis option;
 }
@@ -98,7 +122,12 @@ val update_dashboard : config -> dashboard -> unit Lwt.t
 
 (** Make a simple SELECT query for a graph panel.
 
-    Usage: [simple_query ~tags:[("tag1", "value1"), ("tag2", "value2")] measurement field]
+    Usage: [simple_query
+             ~tags:[("tag1", "value1"), ("tag2", "value2")]
+             ~measurement
+             ~field
+             ~test:test_title
+             ()]
 
     Default [tags] is an empty list.
 
@@ -106,16 +135,20 @@ val update_dashboard : config -> dashboard -> unit Lwt.t
     [
       SELECT MEAN(field)
       FROM measurement
-      WHERE $timeFilter AND tag1 = value1 AND tag2 = value2
+      WHERE $timeFilter AND test = test_title AND tag1 = value1 AND tag2 = value2
       GROUP BY time($__interval) fill(previous)
     ] *)
 val simple_query :
   ?tags:(InfluxDB.tag * string) list ->
-  InfluxDB.measurement ->
-  InfluxDB.field ->
+  measurement:InfluxDB.measurement ->
+  field:InfluxDB.field ->
+  test:string ->
+  unit ->
   InfluxDB.select
 
 (** Make a graph panel from a simple query.
+
+    Usage: [simple_graph ~measurement ~field ~test ()]
 
     The query is built using {!simple_query}.
 
@@ -128,6 +161,50 @@ val simple_graph :
   ?description:string ->
   ?yaxis_format:string ->
   ?tags:(InfluxDB.tag * string) list ->
-  InfluxDB.measurement ->
-  InfluxDB.field ->
+  ?interval:duration ->
+  measurement:InfluxDB.measurement ->
+  field:InfluxDB.field ->
+  test:string ->
+  unit ->
+  panel
+
+(** Make a graph panel that draws a curve per given tag.
+
+    Usage: [graphs_per_tags
+             ~measurement
+             ~field
+             ~test:test_title
+             ~tags:[(tag1, value1); (tag2, value2)]
+             ()]
+
+    This will draw a curve in the resulting graph for each one of the following request:
+
+    [
+      SELECT MEAN(field)
+      FROM measurement
+      WHERE $timeFilter AND test = test_title AND tag1 = value1
+      GROUP BY time($__interval) fill(previous)
+    ]
+
+    [
+      SELECT MEAN(field)
+      FROM measurement
+      WHERE $timeFilter AND test = test_name AND tag2 = value2
+      GROUP BY time($__interval) fill(previous)
+    ]
+
+    Default [title] is the measurement name.
+    Default [description] is [""].
+    Default [yaxis_format] is [s] (seconds).
+    Default [tags] is an empty list. *)
+val graphs_per_tags :
+  ?title:string ->
+  ?description:string ->
+  ?yaxis_format:string ->
+  ?interval:duration ->
+  measurement:InfluxDB.measurement ->
+  field:InfluxDB.field ->
+  test:string ->
+  tags:(InfluxDB.tag * string) list ->
+  unit ->
   panel

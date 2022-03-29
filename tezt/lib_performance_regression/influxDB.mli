@@ -25,11 +25,17 @@
 
 (** Send and retrieve data points from InfluxDB. *)
 
+(** Credentials used to authenticate to the database. *)
+type credentials = {username : string; password : string}
+
 (** InfluxDB configuration.
 
     [url] is the base URL of the InfluxDB API.
+
     [database] is the name of the InfluxDB database to read from and write to.
-    [username] and [password] are the credentials for this database.
+
+    [credentials] are used to authenticate to this database. If not provided,
+    it will try to connect without authenticating (insecure mode).
 
     [measurement_prefix] is prepended to all measurement names when sending data points
     and in SELECT queries.
@@ -39,8 +45,7 @@ type config =
   | V1_8 of {
       url : Uri.t;
       database : string;
-      username : string;
-      password : string;
+      credentials : credentials option;
       measurement_prefix : string;
       tags : (string * string) list;
       timeout : float;

@@ -434,8 +434,10 @@ val update_grafana_dashboard : Grafana.dashboard -> unit
         "influxdb": {
             "url": "https://localhost:8086",
             "database": "db",
-            "username": "user",
-            "password": "password",
+            "credentials": {
+                "username": "user",
+                "password": "password"
+            },
             "measurement_prefix": "tezt_",
             "tags": { "commit_hash": "12345678" },
             "timeout": 20
@@ -478,8 +480,10 @@ v}
       (optional, data points are not sent nor queried if not specified);
       - [url] is the base URL of the InfuxDB API;
       - [database] is the name of the InfluxDB database;
-      - [username] is the username used to log in the InfluxDB database;
-      - [password] is the password used to log in the InfluxDB database;
+      - [credentials] contains the credentials needed to authenticate to the database.
+        (optional, can be omitted for test databases that don't need authentication);
+        - [username] is the username used to log in the InfluxDB database;
+        - [password] is the password used to log in the InfluxDB database;
       - [measurement_prefix] is a prefix which is prepended to all measurement names
         to prevent accidentally polluting other data of the database - it is
         automatically prepended both when sending data points and in SELECT queries;
@@ -494,7 +498,9 @@ v}
     - [grafana] configures how to update graph dashboards
       (optional, dashboards are not updated if not specified);
       - [url] is the base URL of the Grafana API (ending with [/api]);
-      - [api_token] is an API token the Grafana admin can create in the Grafana interface;
+      - [api_token] is an API token the Grafana admin can create in the Grafana interface
+        (optional, If the grafana instance is run in insecure mode (no authentication required),
+        it can be ommited. This is particularly useful to connect to a Grafana test instance);
       - [data_source] is the name of the InfluxDB data source configured by the Grafana admin;
       - [timeout] is how long, in seconds, to wait when updating dashboards before giving up
         (optional, default value is 20).
@@ -507,7 +513,11 @@ v}
     because measurements in Grafana queries are prefixed with the measurement prefix
     configured for InfluxDB. *)
 
-(** Read configuration file. *)
+(** Read configuration file.
+
+    Please, be sure this function is called at first before using
+    any function from [Long_test] to avoid undesired behaviour regarding
+    the loading of the configuration. *)
 val init : unit -> unit
 
 (** Get the [test_data_path] field from the configuration. *)

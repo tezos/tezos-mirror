@@ -1,0 +1,29 @@
+version: "3"
+services:
+  influxdb:
+    image: influxdb:1.8
+    ports:
+      - "8086:8086"
+    volumes:
+      - ./influxdb:/docker-entrypoint-initdb.d
+      - influxdb:/var/lib/influxdb
+  dashboard:
+    image: grafana/grafana
+    links:
+      - influxdb
+    ports:
+      - "3000:3000"
+    environment:
+      # Disable authentication
+      - GF_AUTH_DISABLE_LOGIN_FORM=true
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_NAME=Main Org.
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - ./grafana/datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml
+      - grafana:/var/lib/grafana
+
+volumes:
+  influxdb:
+  grafana:

@@ -404,18 +404,42 @@ module Benchmark = struct
 end
 
 let grafana_panels =
+  let step_tag = "step" in
+  let simple_graph ?interval title test tags =
+    Grafana.simple_graph
+      ?interval
+      ~title
+      ~tags
+      ~measurement:Benchmark.influxDB_measurement
+      ~field:"duration"
+      ~test
+      ()
+  in
+  let specific_benchmark_tags =
+    List.map (fun label -> (step_tag, label)) Benchmark.subparts_steps
+  in
   [
     Grafana.Row "Block Validation";
-    Grafana.simple_graph Benchmark.chunk_title "duration";
-    Grafana.simple_graph Benchmark.specific_title "duration";
+    simple_graph
+      "Mean validation duration per block on a chunk of consecutive blocks"
+      Benchmark.chunk_title
+      [];
+    simple_graph
+      ~interval:(Minutes 10)
+      ("Mean validation duration for the block of level "
+     ^ Benchmark.block_with_highest_gas)
+      Benchmark.specific_title
+      [];
+    Grafana.graphs_per_tags
+      ~title:
+        ("Mean validation's subparts duration for the block of level "
+       ^ Benchmark.block_with_highest_gas)
+      ~measurement:Benchmark.influxDB_measurement
+      ~field:"duration"
+      ~test:Benchmark.subparts_title
+      ~tags:specific_benchmark_tags
+      ();
   ]
-  @ List.map
-      (fun label ->
-        Grafana.simple_graph
-          ~tags:[("step", label)]
-          Benchmark.subparts_title
-          "duration")
-      Benchmark.subparts_steps
 
 let register ~executors () =
   let datadir = lazy (Fixture.datadir ()) in

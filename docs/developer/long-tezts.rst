@@ -142,64 +142,92 @@ Testing Your Benchmarks Locally
 -------------------------------
 
 When developing a benchmark depending on the Performance Regression Test
-framework, it can be useful to test it using a development database so
-that your tests does not impact the production database.
+framework, it can be useful to test it using development backends so that
+your tests does not impact production ones.
 
-This section describes how to easily set up an InfluxDB database so that the
-framework can operate with it.
+The Performance Regression Test framework now contains a setup that can
+automatically provision and configure InfuxDB and Grafana instances using
+Docker Compose.
 
-The following steps assume that you already installed Docker and correctly
-configured it. For more information on this subject, please refer to:
-https://docs.docker.com/engine/install/#desktop
+Provisioning InfluxDB and Grafana
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-We will first install and bootstrap an InfluxDB database. This can be done
-using the official Docker image: https://hub.docker.com/_/influxdb
+The following steps assume that you already installed ``Docker`` as well
+as ``docker-compose`` and correctly configured it. For more information
+on this subject, please refer to:
 
-From a terminal, run the following commands::
+- https://docs.docker.com/engine/install/#desktop
+- https://docs.docker.com/compose/
 
-    mkdir $HOME/influxdb
+From the root folder of ``tezos`` run the following commands from a terminal
+to start the Docker containers in background::
 
-    docker run -d -p 8086:8086 \
-      -v $HOME/influxdb/data:/var/lib/influxdb2 \
-      -v $HOME/influxdb/config:/etc/influxdb2 \
-      -e DOCKER_INFLUXDB_INIT_MODE=setup \
-      -e DOCKER_INFLUXDB_INIT_USERNAME=<user> \
-      -e DOCKER_INFLUXDB_INIT_PASSWORD=<password> \
-      -e DOCKER_INFLUXDB_INIT_ORG=my-org \
-      -e DOCKER_INFLUXDB_INIT_BUCKET=my-bucket \
-      influxdb:1.8
+    docker-compose -f tezt/lib_performance_regression/local-sandbox/docker-compose.yml up -d
 
-This will download an image of the version 1.8 of InfluxDB and start a
-container with it. Version 1.8 is mandatory as the framework does not
-support newer versions for now.
+After containers have been started, you can test that InfluxDB is properly started and
+that the ``performance_regression`` database has been automatically created::
 
-Of course, ``<user>`` and ``<password>`` should be replaced by values of your choice.
+    curl --get http://localhost:8086/query\?pretty\=true --data-urlencode "q=show databases"
 
-When the container is bootstrapped, you need to create the database
-that will be used by the framework.
-
-Run the following command to connect to the InfluxDB server and create
-a database named ``prt``::
-
-    curl -X POST http://localhost:8086/query\?pretty\=true \
-    --user "<user>:<password>" \
-    --data-urlencode "q=create database prt"
-
-After the database is created, you can use the following JSON
-configuration to set up the framework with your local database:
-
-``tezt_config.json``:
-
-.. code-block:: json
+The command should display the following::
 
     {
-      "influxdb": {
-        "url": "http://localhost:8086",
-        "database": "prt",
-        "username": "<user>",
-        "password": "<password>"
-      }
+        "results": [
+            {
+                "statement_id": 0,
+                "series": [
+                    {
+                        "name": "databases",
+                        "columns": [
+                            "name"
+                        ],
+                        "values": [
+                            [
+                                "performance_regression"
+                            ],
+                            [
+                                "_internal"
+                            ]
+                        ]
+                    }
+                ]
+            }
+        ]
     }
 
-For more information about the configuration file, please refer
+Also, you should be able to connect to the Grafana web UI by connecting to
+``http://localhost:3000`` on your browser. By going to the ``Datasources`` menu in the
+webapp configuration, you can see that an InfluxDB datasource has been pre-configured
+and is connected to the ``performance_regression``.
+
+Note that as security does not really matter for tests, it has been disable for ease.
+This is why you can connect to the Graphana web app with full privileges or send requests
+to InfluxDB without having to authenticate.
+
+To stop the container, simply run::
+
+    docker-compose -f tezt/lib_performance_regression/local-sandbox/docker-compose.yml down
+
+The created containers use persistent Docker volumes, so that data stored in the database
+and created dashboards will be preserved between container runs. To permanently remove these
+docker volumes, run the command `docker volume rm local-sandbox_influxdb local-sandbox_grafana`.
+
+Configuring and Running Tezt Long Tests
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+For more information about how to use the configuration file, please refer
 to the `Long test module API <https://gitlab.com/tezos/tezos/-/blob/master/tezt/long_tests/long_test.mli>`__.
+
+A predefined configuration has already been shiped in ``tezt/lib_performance_regression/local-sandbox/tezt_config.json``.
+It allows to use the InfluxDB and Grafana instances set up by the
+Docker compose file presented in the previous section.
+
+All content related to Grafana and InfluxDB has already been set and can be used as is.
+
+Other aspects of the configuration (for example the ``test_data_path``) should be updated to match the needs
+of your local machine.
+
+To run Tezt long tests, run the following command::
+
+    TEZT_CONFIG=tezt/lib_performance_regression/local-sandbox/tezt_config.json dune exec tezt/long_tests/main.exe
+
