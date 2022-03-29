@@ -50,11 +50,11 @@ type block_error =
       allowed_pass : int list;
     }
   | Cannot_parse_block_header
-  | Economic_protocol_error of error list
+  | Economic_protocol_error
   | Invalid_protocol_environment_transition of
       Protocol.env_version * Protocol.env_version
 
-let block_error_encoding error_encoding =
+let block_error_encoding =
   let open Data_encoding in
   union
     [
@@ -206,12 +206,9 @@ let block_error_encoding error_encoding =
       case
         (Tag 14)
         ~title:"Economic_protocol_error"
-        (obj2
-           (req "error" (constant "economic_protocol_error"))
-           (req "trace" (list error_encoding)))
-        (function
-          | Economic_protocol_error trace -> Some ((), trace) | _ -> None)
-        (fun ((), trace) -> Economic_protocol_error trace);
+        (obj1 (req "error" (constant "economic_protocol_error")))
+        (function Economic_protocol_error -> Some () | _ -> None)
+        (fun () -> Economic_protocol_error);
       case
         (Tag 15)
         ~title:"Invalid_protocol_environment_transition"
@@ -310,12 +307,11 @@ let pp_block_error ppf = function
         allowed_pass
   | Cannot_parse_block_header ->
       Format.fprintf ppf "Failed to parse the block header."
-  | Economic_protocol_error err ->
+  | Economic_protocol_error ->
       Format.fprintf
         ppf
-        "Failed to validate the economic-protocol content of the block: %a."
-        Error_monad.pp_print_trace
-        err
+        "Failed to validate the economic-protocol content of the block. More \
+         details in the trace."
   | Invalid_protocol_environment_transition (before, after) ->
       Format.fprintf
         ppf
@@ -414,7 +410,7 @@ type error +=
   | Cannot_validate_while_shutting_down
 
 let () =
-  Error_monad.register_recursive_error_kind
+  Error_monad.register_error_kind
     `Permanent
     ~id:"validator.invalid_block"
     ~title:"Invalid block"
@@ -427,11 +423,10 @@ let () =
         block
         pp_block_error
         error)
-    (fun error_encoding ->
-      Data_encoding.(
-        merge_objs
-          (obj1 (req "invalid_block" Block_hash.encoding))
-          (block_error_encoding error_encoding)))
+    Data_encoding.(
+      obj2
+        (req "invalid_block" Block_hash.encoding)
+        (req "error" block_error_encoding))
     (function Invalid_block {block; error} -> Some (block, error) | _ -> None)
     (fun (block, error) -> Invalid_block {block; error}) ;
   Error_monad.register_error_kind

@@ -50,7 +50,7 @@ type block_error =
       allowed_pass : int list;
     }
   | Cannot_parse_block_header
-  | Economic_protocol_error of error list
+  | Economic_protocol_error
   | Invalid_protocol_environment_transition of
       Protocol.env_version * Protocol.env_version
 

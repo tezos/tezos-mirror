@@ -382,7 +382,6 @@ module Make (Proto : Registered_protocol.T) = struct
       combined
 
   let parse_operations block_hash operations =
-    let invalid_block = invalid_block block_hash in
     List.mapi_es
       (fun pass ->
         let open Lwt_tzresult_syntax in
@@ -393,7 +392,8 @@ module Make (Proto : Registered_protocol.T) = struct
                 Proto.operation_data_encoding
                 op.Operation.proto
             with
-            | None -> fail (invalid_block (Cannot_parse_operation op_hash))
+            | None ->
+                fail (invalid_block block_hash (Cannot_parse_operation op_hash))
             | Some protocol_data ->
                 let op = {Proto.shell = op.shell; protocol_data} in
                 let allowed_pass = Proto.acceptable_passes op in
@@ -401,6 +401,7 @@ module Make (Proto : Registered_protocol.T) = struct
                   fail_unless
                     (List.mem ~equal:Int.equal pass allowed_pass)
                     (invalid_block
+                       block_hash
                        (Unallowed_pass {operation = op_hash; pass; allowed_pass}))
                 in
                 return op))
@@ -506,7 +507,6 @@ module Make (Proto : Registered_protocol.T) = struct
           Context_hash.equal context_hash result.validation_store.context_hash) ;
         return cached_result
     | Some _ | None ->
-        let invalid_block = invalid_block block_hash in
         let* () =
           check_block_header ~predecessor_block_header block_hash block_header
         in
@@ -537,45 +537,43 @@ module Make (Proto : Registered_protocol.T) = struct
         in
         let context = Shell_context.wrap_disk_context context in
         let* (validation_result, block_metadata, ops_metadata) =
-          let*! r =
-            let* state =
-              (Proto.begin_application
-                 ~chain_id
-                 ~predecessor_context:context
-                 ~predecessor_timestamp:predecessor_block_header.shell.timestamp
-                 ~predecessor_fitness:predecessor_block_header.shell.fitness
-                 ~cache
-                 block_header [@time.duration_lwt application_beginning])
-            in
-            let* (state, ops_metadata) =
-              (List.fold_left_es
-                 (fun (state, acc) ops ->
-                   let* (state, ops_metadata) =
-                     List.fold_left_es
-                       (fun (state, acc) op ->
-                         let* (state, op_metadata) =
-                           Proto.apply_operation state op
-                         in
-                         return (state, op_metadata :: acc))
-                       (state, [])
-                       ops
-                   in
-                   return (state, List.rev ops_metadata :: acc))
-                 (state, [])
-                 operations [@time.duration_lwt operations_application])
-            in
-            let ops_metadata = List.rev ops_metadata in
-            let* (validation_result, block_data) =
-              (Proto.finalize_block
-                 state
-                 (Some block_header.shell)
-               [@time.duration_lwt block_finalization])
-            in
-            return (validation_result, block_data, ops_metadata)
-          in
-          match r with
-          | Error err -> fail (invalid_block (Economic_protocol_error err))
-          | Ok o -> return o
+          trace
+            (invalid_block block_hash Economic_protocol_error)
+            (let* state =
+               (Proto.begin_application
+                  ~chain_id
+                  ~predecessor_context:context
+                  ~predecessor_timestamp:
+                    predecessor_block_header.shell.timestamp
+                  ~predecessor_fitness:predecessor_block_header.shell.fitness
+                  ~cache
+                  block_header [@time.duration_lwt application_beginning])
+             in
+             let* (state, ops_metadata) =
+               (List.fold_left_es
+                  (fun (state, acc) ops ->
+                    let* (state, ops_metadata) =
+                      List.fold_left_es
+                        (fun (state, acc) op ->
+                          let* (state, op_metadata) =
+                            Proto.apply_operation state op
+                          in
+                          return (state, op_metadata :: acc))
+                        (state, [])
+                        ops
+                    in
+                    return (state, List.rev ops_metadata :: acc))
+                  (state, [])
+                  operations [@time.duration_lwt operations_application])
+             in
+             let ops_metadata = List.rev ops_metadata in
+             let* (validation_result, block_data) =
+               (Proto.finalize_block
+                  state
+                  (Some block_header.shell)
+                [@time.duration_lwt block_finalization])
+             in
+             return (validation_result, block_data, ops_metadata))
         in
         let*! validation_result =
           may_patch_protocol
@@ -597,6 +595,7 @@ module Make (Proto : Registered_protocol.T) = struct
           fail_when
             (block_header.shell.proto_level <> expected_proto_level)
             (invalid_block
+               block_hash
                (Invalid_proto_level
                   {
                     found = block_header.shell.proto_level;
@@ -607,6 +606,7 @@ module Make (Proto : Registered_protocol.T) = struct
           fail_when
             Fitness.(validation_result.fitness <> block_header.shell.fitness)
             (invalid_block
+               block_hash
                (Invalid_fitness
                   {
                     expected = block_header.shell.fitness;
@@ -1028,22 +1028,17 @@ module Make (Proto : Registered_protocol.T) = struct
   let precheck chain_id ~(predecessor_block_header : Block_header.t)
       ~predecessor_block_hash ~predecessor_context ~cache
       ~(block_header : Block_header.t) operations =
-    let open Lwt_tzresult_syntax in
     let block_hash = Block_header.hash block_header in
-    let*! r =
-      precheck
-        block_hash
-        chain_id
-        ~predecessor_block_header
-        ~predecessor_block_hash
-        ~predecessor_context
-        ~cache
-        ~block_header
-        operations
-    in
-    match r with
-    | Error err -> fail (invalid_block block_hash (Economic_protocol_error err))
-    | Ok () -> return_unit
+    trace (invalid_block block_hash Economic_protocol_error)
+    @@ precheck
+         block_hash
+         chain_id
+         ~predecessor_block_header
+         ~predecessor_block_hash
+         ~predecessor_context
+         ~cache
+         ~block_header
+         operations
 end
 
 let assert_no_duplicate_operations block_hash live_operations operations =
