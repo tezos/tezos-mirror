@@ -62,22 +62,14 @@ let set_ready t =
 let handle_event t ({name; _} : event) =
   match name with "starting_proxy_rpc_server.v0" -> set_ready t | _ -> ()
 
-let create ?runner ?name ?rpc_port ?(args = []) node =
-  let path = Constant.tezos_proxy_server in
+(** Returns the [--endpoint] and [--rpc-addr] arguments corresponding to [?rpc_port]
+    and [node]. Also returns the chosen rpc port, in case it was omitted
+    and got generated. *)
+let connection_arguments_and_port ?rpc_port node =
   let rpc_port =
     match rpc_port with None -> Port.fresh () | Some port -> port
   in
-  let user_arguments =
-    List.map
-      (function
-        | Data_dir -> ["--data-dir"; Node.data_dir node]
-        | Symbolic_block_caching_time s ->
-            ["--sym-block-caching-time"; Int.to_string s])
-      args
-    |> List.concat
-  in
-  let connection_arguments =
-    [
+  ( [
       "--endpoint";
       "http://localhost:" ^ string_of_int (Node.rpc_port node);
       (* "-l"; <- to debug RPC delegations to the node
@@ -87,9 +79,32 @@ let create ?runner ?name ?rpc_port ?(args = []) node =
       *)
       "--rpc-addr";
       "http://127.0.0.1:" ^ string_of_int rpc_port;
-    ]
+    ],
+    rpc_port )
+
+let spawn ?rpc_port ?(args = []) node =
+  let args = (connection_arguments_and_port ?rpc_port node |> fst) @ args in
+  Process.spawn
+    ~name:Parameters.base_default_name
+    ~color:Parameters.default_colors.(0)
+    Constant.tezos_proxy_server
+    args
+
+let create ?runner ?name ?rpc_port ?(args = []) node =
+  let path = Constant.tezos_proxy_server in
+  let user_arguments =
+    List.map
+      (function
+        | Data_dir -> ["--data-dir"; Node.data_dir node]
+        | Symbolic_block_caching_time s ->
+            ["--sym-block-caching-time"; Int.to_string s])
+      args
+    |> List.concat
   in
-  let arguments = connection_arguments @ user_arguments in
+  let (arguments, rpc_port) =
+    connection_arguments_and_port ?rpc_port node |> fun (args, rpc_port) ->
+    (args @ user_arguments, rpc_port)
+  in
   let t =
     create ?runner ~path ?name {arguments; pending_ready = []; rpc_port; runner}
   in

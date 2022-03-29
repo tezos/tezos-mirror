@@ -203,6 +203,26 @@ let test_equivalence =
   let tz_log = [("alpha.proxy_rpc", "debug"); ("proxy_getter", "debug")] in
   check_equivalence ~tz_log alt_mode clients
 
+let test_wrong_data_dir =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"proxy_server wrong data_dir"
+    ~tags:["data_dir"]
+  @@ fun protocol ->
+  let* (node, _client) = Client.init_with_protocol `Client ~protocol () in
+  let wrong_data_dir = Temp.dir "empty" in
+  let args = ["--data-dir"; wrong_data_dir] in
+  let process = Proxy_server.spawn ~args node in
+  let* stderr = Process.check_and_read_stderr ~expect_failure:true process in
+  let re_str = "error reading data-dir.*" in
+  let good_match = stderr =~ rex re_str in
+  if not good_match then
+    Test.fail
+      "Unexpected error message: %s. It doesn't match the regexp %S"
+      stderr
+      re_str
+  else Lwt.return_unit
+
 let register ~protocols =
   let register mode =
     let mode_tag =
@@ -221,4 +241,5 @@ let register ~protocols =
   register `Node ;
   register `Proxy_server_data_dir ;
   register `Proxy_server_rpc ;
-  test_equivalence protocols
+  test_equivalence protocols ;
+  test_wrong_data_dir protocols
