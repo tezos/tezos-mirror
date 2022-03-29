@@ -382,10 +382,13 @@ struct
         (Tezos_error_monad.TzLwtreslib.Monad)
 
     (* below is for backward compatibility *)
+    include Error_monad_infix_globals
     include Error_monad_traversors
     include Error_monad_trace_eval
 
-    let ( >>|? ) = Lwt_result_syntax.( let+ )
+    let fail e = Lwt.return_error (TzTrace.make e)
+
+    let error e = Error (TzTrace.make e)
 
     (* Shouldn't be used, only to keep the same environment interface *)
     let classify_errors = function

@@ -26,6 +26,7 @@
  (flags
   (:standard
    -open Tezos_base.TzPervasives
+   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
    -open Tezos_protocol_alpha
    -open Tezos_protocol_plugin_alpha
    -open Tezos_shell_services
@@ -59,6 +60,7 @@
  (flags
   (:standard
    -open Tezos_base.TzPervasives
+   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
    -open Tezos_protocol_alpha
    -open Tezos_stdlib_unix
    -open Tezos_shell_services

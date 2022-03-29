@@ -18,6 +18,7 @@
    v0/context_hash.ml
    v0/error_monad_traversors.ml
    v0/data_encoding.ml
+   v0/error_monad_infix_globals.ml
    v0/error_monad_trace_eval.ml
    v0/error_monad_classification.ml
  )

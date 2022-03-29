@@ -82,8 +82,7 @@ let parse code =
   Lwt.return
     ( Micheline_parser.no_parsing_error
     @@ Michelson_v1_parser.parse_expression code
-    >>? fun exp ->
-      Error_monad.ok @@ Script.lazy_expr Michelson_v1_parser.(exp.expanded) )
+    >>? fun exp -> ok @@ Script.lazy_expr Michelson_v1_parser.(exp.expanded) )
 
 let build_lambda_for_set_delegate ~delegate =
   match delegate with

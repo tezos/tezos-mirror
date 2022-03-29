@@ -149,7 +149,7 @@ let make_rpc_context ~chain_id ctxt block =
       {shell = header; protocol_data = Store.Block.protocol_data block}
   in
   let ctxt = Shell_context.wrap_disk_context ctxt in
-  let* value_of_key =
+  let*! value_of_key =
     Main.value_of_key
       ~chain_id
       ~predecessor_context:ctxt
@@ -158,16 +158,22 @@ let make_rpc_context ~chain_id ctxt block =
       ~predecessor_fitness
       ~predecessor
       ~timestamp
-    >|= Tezos_protocol_alpha.Protocol.Environment.wrap_tzresult
   in
-  Tezos_protocol_environment.Context.load_cache
-    (Store.Block.hash block)
-    ctxt
-    `Lazy
-    (fun key ->
-      value_of_key key
-      >|= Tezos_protocol_alpha.Protocol.Environment.wrap_tzresult)
-  >>=? fun ctxt ->
+  let*? value_of_key =
+    Tezos_protocol_alpha.Protocol.Environment.wrap_tzresult value_of_key
+  in
+  let* ctxt =
+    Tezos_protocol_environment.Context.load_cache
+      (Store.Block.hash block)
+      ctxt
+      `Lazy
+      (fun key ->
+        let*! value = value_of_key key in
+        let*? value =
+          Tezos_protocol_alpha.Protocol.Environment.wrap_tzresult value
+        in
+        return value)
+  in
   return
   @@ new Environment.proto_rpc_context_of_directory
        (fun block ->

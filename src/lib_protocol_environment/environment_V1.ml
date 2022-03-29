@@ -569,9 +569,14 @@ struct
         (Tezos_error_monad.TzLwtreslib.Monad)
 
     (* Backwards compatibility additions (traversors, dont_wait, trace) *)
+    include Error_monad_infix_globals
     include Error_monad_traversors
     include Error_monad_preallocated_values
     include Error_monad_trace_eval
+
+    let fail e = Lwt.return_error (TzTrace.make e)
+
+    let error e = Error (TzTrace.make e)
 
     let dont_wait ex er f = dont_wait f er ex
 

@@ -34,32 +34,34 @@ end)
   Sig.MONAD_EXTENSION
     with type error := Error.error
      and type 'error trace := 'error Trace.trace = struct
-  (* we default to exposing the combined monad syntax everywhere.
-     We do the bulk of this by including [Lwt_traced_result_syntax] directly. *)
-  include Monad.Lwt_traced_result_syntax
+  module Legacy_monad_globals = struct
+    (* we default to exposing the combined monad syntax everywhere.
+       We do the bulk of this by including [Lwt_traced_result_syntax] directly. *)
+    include Monad.Lwt_traced_result_syntax
 
-  (* Some globals that Lwtreslib does not expose but that the Tezos code uses a
-     lot. *)
-  let ( >>= ) = Monad.Lwt_syntax.( let* )
+    (* Some globals that Lwtreslib does not expose but that the Tezos code uses a
+       lot. *)
+    let ( >>= ) = Monad.Lwt_syntax.( let* )
 
-  let ( >|= ) = Monad.Lwt_syntax.( let+ )
+    let ( >|= ) = Monad.Lwt_syntax.( let+ )
 
-  let ( >>? ) = Monad.Result_syntax.( let* )
+    let ( >>? ) = Monad.Result_syntax.( let* )
 
-  let ( >|? ) = Monad.Result_syntax.( let+ )
+    let ( >|? ) = Monad.Result_syntax.( let+ )
 
-  let ok = Monad.Result_syntax.return
+    let ok = Monad.Result_syntax.return
 
-  let error = Monad.Traced_result_syntax.fail
+    let error = Monad.Traced_result_syntax.fail
 
-  let ( >>=? ) = Monad.Lwt_result_syntax.( let* )
+    let ( >>=? ) = Monad.Lwt_result_syntax.( let* )
 
-  let ( >|=? ) = Monad.Lwt_result_syntax.( let+ )
+    let ( >|=? ) = Monad.Lwt_result_syntax.( let+ )
 
-  let ( >>?= ) = Monad.Lwt_result_syntax.( let*? )
+    let ( >>?= ) = Monad.Lwt_result_syntax.( let*? )
 
-  let ( >|?= ) r f =
-    match r with Error _ as e -> Lwt.return e | Ok o -> Lwt_result.ok (f o)
+    let ( >|?= ) r f =
+      match r with Error _ as e -> Lwt.return e | Ok o -> Lwt_result.ok (f o)
+  end
 
   (* default (traced-everywhere) helper types *)
   type tztrace = Error.error Trace.trace
@@ -127,18 +129,26 @@ end)
     | ok -> Lwt.return ok
 
   let error_unless cond exn =
-    if cond then Monad.Traced_result_syntax.return_unit else error exn
+    let open Monad.Traced_result_syntax in
+    if cond then return_unit else fail exn
 
   let error_when cond exn =
-    if cond then error exn else Monad.Traced_result_syntax.return_unit
+    let open Monad.Traced_result_syntax in
+    if cond then fail exn else return_unit
 
-  let fail_unless cond exn = if cond then return_unit else fail exn
+  let fail_unless cond exn =
+    let open Monad.Lwt_traced_result_syntax in
+    if cond then return_unit else fail exn
 
-  let fail_when cond exn = if cond then fail exn else return_unit
+  let fail_when cond exn =
+    let open Monad.Lwt_traced_result_syntax in
+    if cond then fail exn else return_unit
 
-  let unless cond f = if cond then return_unit else f ()
+  let unless cond f =
+    if cond then Monad.Lwt_traced_result_syntax.return_unit else f ()
 
-  let when_ cond f = if cond then f () else return_unit
+  let when_ cond f =
+    if cond then f () else Monad.Lwt_traced_result_syntax.return_unit
 
   let dont_wait f err_handler exc_handler =
     let open Monad.Lwt_syntax in

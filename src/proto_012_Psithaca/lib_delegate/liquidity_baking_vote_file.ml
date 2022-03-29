@@ -126,7 +126,7 @@ let () =
       Block_vote_file_missing_liquidity_baking_escape_vote file_path)
 
 let traced_option_to_result ~error =
-  Option.fold ~some:ok ~none:(Error_monad.error error)
+  Option.fold ~some:ok ~none:(Tzresult_syntax.fail error)
 
 let check_file_exists file =
   if Sys.file_exists file then Result.return_unit

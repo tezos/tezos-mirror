@@ -24,7 +24,6 @@
 (*****************************************************************************)
 
 open Protocol
-open Error_monad
 
 type context = Alpha_context.context * Script_interpreter.step_constants
 

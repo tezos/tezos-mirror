@@ -4,6 +4,7 @@
    v3/data_encoding.ml
    v3/replicated_signatures.ml
    v3/lwtreslib_list_combine.ml
+   v0/error_monad_infix_globals.ml
  )
 
 (action (with-stdout-to %{targets} (chdir %{workspace_root}}

@@ -71,8 +71,7 @@ let parse code =
   Lwt.return
     ( Micheline_parser.no_parsing_error
     @@ Michelson_v1_parser.parse_expression code
-    >>? fun exp ->
-      Error_monad.ok @@ Script.lazy_expr Michelson_v1_parser.(exp.expanded) )
+    >>? fun exp -> ok @@ Script.lazy_expr Michelson_v1_parser.(exp.expanded) )
 
 let set_delegate (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ?verbose_signing ?branch ~fee_parameter ?fee ~source ~src_pk ~src_sk

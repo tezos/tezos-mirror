@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,61 +23,40 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol
+let return = Lwt.return_ok
 
-type context = Alpha_context.context * Script_interpreter.step_constants
+let return_unit = Lwt.return_ok ()
 
-let context_init_memory ~rng_state =
-  Context.init
-    ~rng_state
-    ~initial_balances:
-      [
-        4_000_000_000_000L;
-        4_000_000_000_000L;
-        4_000_000_000_000L;
-        4_000_000_000_000L;
-        4_000_000_000_000L;
-      ]
-    5
-  >>=? fun (block, accounts) ->
-  match accounts with
-  | [bs1; bs2; bs3; bs4; bs5] ->
-      return (`Mem_block (block, (bs1, bs2, bs3, bs4, bs5)))
-  | _ -> assert false
+let return_true = Lwt.return_ok true
 
-let context_init ~rng_state = context_init_memory ~rng_state
+let return_false = Lwt.return_ok false
 
-let make ~rng_state =
-  context_init_memory ~rng_state >>=? fun context ->
-  let amount = Alpha_context.Tez.one in
-  let chain_id = Chain_id.zero in
-  let now = Alpha_context.Script_timestamp.of_zint Z.zero in
-  let level = Alpha_context.Script_int.zero_n in
-  let open Script_interpreter in
-  (match context with
-  | `Mem_block (block, (bs1, bs2, bs3, _, _)) ->
-      let source = bs1 in
-      let payer = bs2 in
-      let self = bs3 in
-      let step_constants =
-        {source; payer; self; amount; chain_id; now; level}
-      in
-      return (block, step_constants)
-  | `Disk_block (block, source) ->
-      let step_constants =
-        {source; payer = source; self = source; amount; chain_id; now; level}
-      in
-      return (block, step_constants))
-  >>=? fun (block, step_constants) ->
-  Incremental.begin_construction
-    ~timestamp:(Time.Protocol.add block.header.shell.timestamp 30L)
-    block
-  >>=? fun vs ->
-  let ctxt = Incremental.alpha_ctxt vs in
-  let ctxt =
-    (* Required for eg Create_contract *)
-    Protocol.Alpha_context.Contract.init_origination_nonce
-      ctxt
-      Operation_hash.zero
-  in
-  return (ctxt, step_constants)
+let return_nil = Lwt.return_ok []
+
+let return_none = Lwt.return_ok None
+
+let return_some x = Lwt.return_ok (Some x)
+
+let ( >>= ) = Lwt.bind
+
+let ( >|= ) v f = Lwt.map f v
+
+let ( >>? ) = Result.bind
+
+let ( >|? ) v f = Result.map f v
+
+let ( >>=? ) = Lwt_result.bind
+
+let ( >|=? ) v f = Lwt_result.map f v
+
+let ( >>?= ) v f = match v with Error e -> Lwt.return_error e | Ok o -> f o
+
+let ( >|?= ) v f =
+  match v with
+  | Error e -> Lwt.return_error e
+  | Ok o -> f o >>= fun x -> Lwt.return_ok x
+
+let ok x = Ok x
+
+let ( >>|? ) v f =
+  v >>= function Error e -> Lwt.return_error e | Ok v -> Lwt.return_ok (f v)

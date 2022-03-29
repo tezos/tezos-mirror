@@ -19,6 +19,7 @@
  (library_flags (:standard -linkall))
  (modules (:standard \ alpha_commands_registration))
  (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
                    -open Tezos_protocol_alpha
                    -open Tezos_protocol_alpha_parameters
                    -open Tezos_stdlib_unix
@@ -49,6 +50,7 @@
  (library_flags (:standard -linkall))
  (modules alpha_commands_registration)
  (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
                    -open Tezos_protocol_alpha
                    -open Tezos_protocol_alpha_parameters
                    -open Tezos_shell_services

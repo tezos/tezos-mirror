@@ -17,6 +17,7 @@
  (library_flags (:standard -linkall))
  (modules (:standard \ alpha_commands_registration))
  (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
                    -open Tezos_protocol_008_PtEdo2Zk
                    -open Tezos_stdlib_unix
                    -open Tezos_shell_services
@@ -44,6 +45,7 @@
  (library_flags (:standard -linkall))
  (modules alpha_commands_registration)
  (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
                    -open Tezos_protocol_008_PtEdo2Zk
                    -open Tezos_shell_services
                    -open Tezos_client_base
