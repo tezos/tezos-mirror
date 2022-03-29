@@ -2647,7 +2647,7 @@ module RPC = struct
               in
               ( unreachable_entrypoint,
                 Entrypoint.Map.fold
-                  (fun entry (_, ty) acc ->
+                  (fun entry ty acc ->
                     (Entrypoint.to_string entry, Micheline.strip_locations ty)
                     :: acc)
                   map

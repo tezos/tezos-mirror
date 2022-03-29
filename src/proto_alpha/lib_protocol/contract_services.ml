@@ -427,7 +427,7 @@ let[@coq_axiom_with_reason "gadt"] register () =
               Some
                 ( unreachable_entrypoint,
                   Entrypoint.Map.fold
-                    (fun entry (_, ty) acc ->
+                    (fun entry ty acc ->
                       (Entrypoint.to_string entry, Micheline.strip_locations ty)
                       :: acc)
                     map
