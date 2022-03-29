@@ -162,6 +162,9 @@ val ediv : 'a t -> _ t -> 'a t
    [Division_by_zero]. *)
 val erem : _ t -> 'b t -> 'b t
 
+(** [sqrt x] returns the square root of x, rounded down. *)
+val sqrt : _ t -> 'a t
+
 (** [of_int_opt x] returns [Some x] if [x >= 0] and [x < saturated],
     and [None] otherwise. *)
 val of_int_opt : int -> may_saturate t option
