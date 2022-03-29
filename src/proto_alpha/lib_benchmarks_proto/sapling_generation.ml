@@ -483,21 +483,21 @@ let load ~filename type_transaction =
         filename
     in
     let files = get_all_sapling_data_files filename in
-    List.concat (List.map load_file files)
+    List.concat_map load_file files
     |> List.filter (fun (_str, transac) ->
            match type_transaction with
            | Empty ->
-               List.length transac.sapling_tx.outputs = 0
-               && List.length transac.sapling_tx.inputs = 0
+               List.is_empty transac.sapling_tx.outputs
+               && List.is_empty transac.sapling_tx.inputs
            | No_inputs ->
-               List.length transac.sapling_tx.outputs != 0
-               && List.length transac.sapling_tx.inputs = 0
+               (not (List.is_empty transac.sapling_tx.outputs))
+               && List.is_empty transac.sapling_tx.inputs
            | No_outputs ->
-               List.length transac.sapling_tx.outputs = 0
-               && List.length transac.sapling_tx.inputs != 0
+               List.is_empty transac.sapling_tx.outputs
+               && not (List.is_empty transac.sapling_tx.inputs)
            | Full_transaction ->
-               List.length transac.sapling_tx.outputs != 0
-               && List.length transac.sapling_tx.inputs != 0)
+               (not (List.is_empty transac.sapling_tx.outputs))
+               && not (List.is_empty transac.sapling_tx.inputs))
   else load_file filename
 
 let shared_seed = [|9798798; 217861209; 876786|]

@@ -2501,7 +2501,8 @@ module Registration_section = struct
                     prepare_sapling_execution_environment seed transition
                   in
                   let address =
-                    Alpha_context.Contract.to_b58check step_constants.self
+                    Alpha_context.Contract.(
+                      to_b58check (Originated step_constants.self))
                   in
                   let chain_id =
                     Environment.Chain_id.to_b58check step_constants.chain_id
@@ -2536,42 +2537,38 @@ module Registration_section = struct
   end
 
   module Sapling_empty = struct
-    let module Empty_transaction = struct
+    let module A = Register_Sapling_benchmark (struct
       let type_transaction = Sapling_generation.Empty
 
       let suffix = "empty"
-    end in
-    let module A = Register_Sapling_benchmark (Empty_transaction) in
+    end) in
     ()
   end
 
   module Sapling_no_inputs = struct
-    let module No_inputs_transaction = struct
+    let module A = Register_Sapling_benchmark (struct
       let type_transaction = Sapling_generation.No_inputs
 
       let suffix = "no_inputs"
-    end in
-    let module A = Register_Sapling_benchmark (No_inputs_transaction) in
+    end) in
     ()
   end
 
   module Sapling_no_outputs = struct
-    let module No_outputs_transaction = struct
+    let module A = Register_Sapling_benchmark (struct
       let type_transaction = Sapling_generation.No_outputs
 
       let suffix = "no_output"
-    end in
-    let module A = Register_Sapling_benchmark (No_outputs_transaction) in
+    end) in
     ()
   end
 
   module Sapling_full = struct
-    let module Full_transaction = struct
+    let module A = Register_Sapling_benchmark (struct
       let type_transaction = Sapling_generation.Full_transaction
 
       let suffix = "full"
-    end in
-    let module A = Register_Sapling_benchmark (Full_transaction) in
+    end) in
     ()
   end
 
