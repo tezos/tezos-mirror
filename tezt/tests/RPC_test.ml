@@ -217,7 +217,7 @@ let test_contracts _protocol ?endpoint client =
       client
   in
   let* () = client_bake_for client in
-  let* () =
+  let*! () =
     Client.set_delegate ~src:delegated_implicit ~delegate:bootstrap1 client
   in
   let* () = client_bake_for client in

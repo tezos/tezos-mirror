@@ -75,7 +75,7 @@ let () =
      test since it requires Alpha) or about baking (which would make it possible to run
      on previous protocols, if not for a problem that was introduced in
      Client.bake_for which causes the default key to be a baking account key). *)
-  Baking.register ~protocols:[Alpha] ;
+  Baking.register ~protocols:[Ithaca; Alpha] ;
   Prevalidator.register ~protocols:[Ithaca; Alpha] ;
   Monitor_operations.register ~protocols:[Alpha] ;
   Stresstest_command.register ~protocols:[Alpha] ;

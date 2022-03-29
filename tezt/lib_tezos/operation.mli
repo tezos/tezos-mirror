@@ -90,6 +90,23 @@ val mk_reveal :
   Client.t ->
   manager_operation_content Lwt.t
 
+(** [mk_delegation] allows to construct a manager operation representing a
+    delegation to the [delegate] account.
+
+    - Default [counter] is the successor of the counter of [source].
+    - Default [fee] is [1000] mutez.
+    - Default [gas_limit] is [1040] gas.
+    - Default [storage_limit] is [0]. *)
+val mk_delegation :
+  source:Account.key ->
+  ?counter:int ->
+  ?fee:int ->
+  ?gas_limit:int ->
+  ?storage_limit:int ->
+  delegate:string ->
+  Client.t ->
+  manager_operation_content Lwt.t
+
 (** [mk_rejection] allows to construct a mangager operation
    representing a tx_rollup rejection operation.
 
@@ -288,6 +305,29 @@ val inject_public_key_revelation :
   ?gas_limit:int ->
   ?storage_limit:int ->
   ?public_key:string ->
+  Client.t ->
+  [`OpHash of string] Lwt.t
+
+(** [inject_delegation] is a high-level wrapper that allows to build
+    delegation operations and to inject them using the given client. The
+    [signer] can be different from the [source] to be able to inject missigned
+    operations.
+
+    See {!mk_delegation} and {!forge_and_inject_operation} for the list of
+    parameters and their default values. *)
+val inject_delegation :
+  ?protocol:Protocol.t ->
+  ?async:bool ->
+  ?force:bool ->
+  ?wait_for_injection:Node.t ->
+  ?branch:string ->
+  source:Account.key ->
+  ?signer:Account.key ->
+  ?counter:int ->
+  ?fee:int ->
+  ?gas_limit:int ->
+  ?storage_limit:int ->
+  delegate:string ->
   Client.t ->
   [`OpHash of string] Lwt.t
 

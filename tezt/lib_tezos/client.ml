@@ -699,14 +699,35 @@ let get_delegate ?endpoint ~src client =
   in
   Lwt.return (output =~* rex "(tz[a-zA-Z0-9]+) \\(.*\\)")
 
-let spawn_set_delegate ?endpoint ?(wait = "none") ~src ~delegate client =
-  spawn_command
-    ?endpoint
-    client
-    (["--wait"; wait] @ ["set"; "delegate"; "for"; src; "to"; delegate])
+let set_delegate ?endpoint ?(wait = "none") ?fee ?fee_cap
+    ?(force_low_fee = false) ~src ~delegate client =
+  let value =
+    spawn_command
+      ?endpoint
+      client
+      (["--wait"; wait]
+      @ ["set"; "delegate"; "for"; src; "to"; delegate]
+      @ optional_arg ~name:"fee" Tez.to_string fee
+      @ optional_arg ~name:"fee-cap" Tez.to_string fee_cap
+      @ if force_low_fee then ["--force-low-fee"] else [])
+  in
+  {value; run = Process.check}
 
-let set_delegate ?endpoint ?wait ~src ~delegate client =
-  spawn_set_delegate ?endpoint ?wait ~src ~delegate client |> Process.check
+let reveal ?endpoint ?(wait = "none") ?fee ~src client =
+  let value =
+    spawn_command
+      ?endpoint
+      client
+      (["--wait"; wait]
+      @ ["reveal"; "key"; "for"; src]
+      @ Option.fold
+          ~none:[]
+          ~some:(fun f ->
+            let fee_amount = Tez.to_string f in
+            ["--fee"; fee_amount; "--force-low-fee"; "--fee-cap"; fee_amount])
+          fee)
+  in
+  {value; run = Process.check}
 
 let spawn_withdraw_delegate ?endpoint ?(wait = "none") ~src client =
   spawn_command
