@@ -2066,8 +2066,35 @@ module Revamped = struct
         ~outdated:[oph3]
         client1
     in
-
     unit
+
+  let precheck_with_empty_balance =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Precheck refused an operation which empties a balance"
+      ~tags:["mempool"; "precheck"; "empty"; "balance"]
+    @@ fun protocol ->
+    let* (_node, client) = Client.init_with_protocol ~protocol `Client () in
+    let* json_balance =
+      RPC.Contracts.get_balance
+        ~contract_id:Constant.bootstrap1.public_key_hash
+        client
+    in
+    let balance = JSON.as_string json_balance |> int_of_string in
+    let* op =
+      Operation.mk_transfer
+        ~fee:balance
+        ~source:Constant.bootstrap1
+        ~dest:Constant.bootstrap2
+        client
+    in
+    let* process =
+      Operation.spawn_forge_and_inject_operation
+        ~batch:[op]
+        ~signer:Constant.bootstrap1
+        client
+    in
+    Process.check_error ~msg:(rex "proto.012-Psithaca.balance_is_empty") process
 end
 
 let check_operation_is_in_applied_mempool ops oph =
@@ -4241,6 +4268,8 @@ let register ~protocols =
   Revamped.test_prefiltered_limit ~protocols ;
   Revamped.test_prefiltered_limit_remove ~protocols ;
   Revamped.wrong_signed_branch_delayed_becomes_refused ~protocols ;
+  Revamped.precheck_with_empty_balance ~protocols:[Protocol.Ithaca]
+  (* FIXME: handle the case for Alpha. *) ;
   run_batched_operation ~protocols ;
   propagation_future_endorsement ~protocols ;
   forge_pre_filtered_operation ~protocols ;
