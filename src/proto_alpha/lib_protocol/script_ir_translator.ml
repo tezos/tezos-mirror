@@ -1225,12 +1225,12 @@ let[@coq_struct "ty"] rec parse_comparable_ty :
 
 type ex_ty = Ex_ty : ('a, _) ty -> ex_ty
 
-type ex_parameter_ty_and_entrypoints =
-  | Ex_parameter_ty_and_entrypoints : {
+type ex_parameter_ty_and_entrypoints_node =
+  | Ex_parameter_ty_and_entrypoints_node : {
       arg_type : ('a, _) ty;
-      entrypoints : 'a entrypoints;
+      entrypoints : 'a entrypoints_node;
     }
-      -> ex_parameter_ty_and_entrypoints
+      -> ex_parameter_ty_and_entrypoints_node
 
 (** [parse_ty] can be used to parse regular types as well as parameter types
     together with their entrypoints.
@@ -1239,12 +1239,12 @@ type ex_parameter_ty_and_entrypoints =
     return an [ex_ty].
 
     In the second case, use [~ret:Parse_entrypoints], [parse_ty] will return
-    an [ex_parameter_ty_and_entrypoints].
+    an [ex_parameter_ty_and_entrypoints_node].
 *)
 type ('ret, 'name) parse_ty_ret =
   | Don't_parse_entrypoints : (ex_ty, unit) parse_ty_ret
   | Parse_entrypoints
-      : (ex_parameter_ty_and_entrypoints, Entrypoint.t option) parse_ty_ret
+      : (ex_parameter_ty_and_entrypoints_node, Entrypoint.t option) parse_ty_ret
 
 let[@coq_axiom_with_reason "complex mutually recursive definition"] rec parse_ty :
     type ret name.
@@ -1279,7 +1279,7 @@ let[@coq_axiom_with_reason "complex mutually recursive definition"] rec parse_ty
       match ret with
       | Don't_parse_entrypoints -> (Ex_ty ty, ctxt)
       | Parse_entrypoints ->
-          ( Ex_parameter_ty_and_entrypoints
+          ( Ex_parameter_ty_and_entrypoints_node
               {arg_type = ty; entrypoints = {name; nested = Entrypoints_None}},
             ctxt )
     in
@@ -1411,11 +1411,11 @@ let[@coq_axiom_with_reason "complex mutually recursive definition"] rec parse_ty
             let (Ex_ty tr) = parsed_r in
             union_t loc tl tr >|? fun (Ty_ex_c ty) -> ((Ex_ty ty : ret), ctxt)
         | Parse_entrypoints ->
-            let (Ex_parameter_ty_and_entrypoints
+            let (Ex_parameter_ty_and_entrypoints_node
                   {arg_type = tl; entrypoints = left}) =
               parsed_l
             in
-            let (Ex_parameter_ty_and_entrypoints
+            let (Ex_parameter_ty_and_entrypoints_node
                   {arg_type = tr; entrypoints = right}) =
               parsed_r
             in
@@ -1423,7 +1423,8 @@ let[@coq_axiom_with_reason "complex mutually recursive definition"] rec parse_ty
             let entrypoints =
               {name; nested = Entrypoints_Union {left; right}}
             in
-            (Ex_parameter_ty_and_entrypoints {arg_type; entrypoints}, ctxt))
+            (Ex_parameter_ty_and_entrypoints_node {arg_type; entrypoints}, ctxt)
+        )
     | Prim (loc, T_lambda, [uta; utr], annot) ->
         parse_any_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy uta
         >>? fun (Ex_ty ta, ctxt) ->
@@ -2028,6 +2029,13 @@ let well_formed_entrypoints (type full fullc) (full : (full, fullc) ty)
     | None -> Result.return_unit
     | Some path -> error (Unreachable_entrypoint path)
 
+type ex_parameter_ty_and_entrypoints =
+  | Ex_parameter_ty_and_entrypoints : {
+      arg_type : ('a, _) ty;
+      entrypoints : 'a entrypoints;
+    }
+      -> ex_parameter_ty_and_entrypoints
+
 let parse_parameter_ty_and_entrypoints :
     context ->
     stack_depth:int ->
@@ -2041,12 +2049,11 @@ let parse_parameter_ty_and_entrypoints :
     ~legacy
     node
     ~ret:Parse_entrypoints
-  >>? fun (res, ctxt) ->
+  >>? fun (Ex_parameter_ty_and_entrypoints_node {arg_type; entrypoints}, ctxt)
+    ->
   (if legacy then Result.return_unit
-  else
-    let (Ex_parameter_ty_and_entrypoints {arg_type; entrypoints}) = res in
-    well_formed_entrypoints arg_type entrypoints)
-  >|? fun () -> (res, ctxt)
+  else well_formed_entrypoints arg_type entrypoints)
+  >|? fun () -> (Ex_parameter_ty_and_entrypoints {arg_type; entrypoints}, ctxt)
 
 let parse_passable_ty = parse_passable_ty ~ret:Don't_parse_entrypoints
 
