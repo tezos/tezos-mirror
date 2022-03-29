@@ -251,11 +251,13 @@ let context_init1 ?tx_rollup_max_inboxes_count
     to not interfere with balances prediction. It returns the created
     context and 2 contracts. *)
 let context_init2 ?tx_rollup_max_inboxes_count
-    ?tx_rollup_max_ticket_payload_size ?cost_per_byte () =
+    ?tx_rollup_max_ticket_payload_size ?cost_per_byte
+    ?tx_rollup_hard_size_limit_per_message () =
   context_init
     ?tx_rollup_max_inboxes_count
     ?tx_rollup_max_ticket_payload_size
     ?cost_per_byte
+    ?tx_rollup_hard_size_limit_per_message
     2
   >|=? function
   | (b, contract_1 :: contract_2 :: _) -> (b, contract_1, contract_2)
@@ -443,6 +445,7 @@ let make_incomplete_commitment_for_batch context level tx_rollup withdraw_list =
   in
   return (commitment, batches_result)
 
+(** Check that the given contract has [count] pending bonded commitments *)
 let check_bond ctxt tx_rollup contract count =
   let pkh = is_implicit_exn contract in
   wrap_lwt (Tx_rollup_commitment.pending_bonded_commitments ctxt tx_rollup pkh)
@@ -2371,8 +2374,8 @@ module Rejection = struct
 
   let init_with_deposit ?tx_rollup_hard_size_limit_per_message addr =
     init_l2_store () >>= fun store ->
-    context_init1 ?tx_rollup_hard_size_limit_per_message ()
-    >>=? fun (b, account) ->
+    context_init2 ?tx_rollup_hard_size_limit_per_message ()
+    >>=? fun (b, account, account2) ->
     originate b account >>=? fun (b, tx_rollup) ->
     make_deposit b tx_rollup account addr
     >>=? fun (b, (deposit, _), ticket_hash) ->
@@ -2429,7 +2432,7 @@ module Rejection = struct
        for next operations *)
     Apply.apply_message store l2_parameters deposit >>= fun (store, _) ->
     commit_store store >>= fun store ->
-    return (b, account, tx_rollup, store, ticket_hash)
+    return (b, account, account2, tx_rollup, store, ticket_hash)
 
   let operation_content destination ticket_hash qty =
     let open Tx_rollup_l2_batch.V1 in
@@ -2486,7 +2489,7 @@ module Rejection = struct
   let test_valid_proof_on_invalid_commitment () =
     let (sk, pk, addr) = gen_l2_account () in
     init_with_deposit addr
-    >>=? fun (b, account, tx_rollup, store, ticket_hash) ->
+    >>=? fun (b, account, _, tx_rollup, store, ticket_hash) ->
     hash_tree_from_store store >>= fun l2_context_hash ->
     (* Create a transfer from [pk] to a new address *)
     let (_, _, addr2) = gen_l2_account () in
@@ -2544,7 +2547,11 @@ module Rejection = struct
   let test_valid_proof_on_valid_commitment () =
     let (sk, pk, addr) = gen_l2_account () in
     init_with_deposit addr
-    >>=? fun (b, account, tx_rollup, store, ticket_hash) ->
+    >>=? fun (b, account, _, tx_rollup, store, ticket_hash) ->
+    (* init_with_deposit creates a commitment -- we'll just check the bond
+       here so that this test is easier to read. *)
+    Incremental.begin_construction b >>=? fun i ->
+    check_bond (Incremental.alpha_ctxt i) tx_rollup account 1 >>=? fun () ->
     hash_tree_from_store store >>= fun l2_context_hash ->
     (* Create a transfer from [pk] to a new address *)
     let (_, _, addr2) = gen_l2_account () in
@@ -2602,7 +2609,151 @@ module Rejection = struct
         (check_proto_error_f @@ function
          | Tx_rollup_errors.Proof_produced_rejected_state -> true
          | _ -> false)
-    >>=? fun _ -> return_unit
+    >>=? fun i ->
+    check_bond (Incremental.alpha_ctxt i) tx_rollup account 2 >>=? fun () ->
+    return_unit
+
+  (** Test that rejection rewards and slashing work:
+      1. Create two messages and two commitments
+      2. Reject the second commitment
+      3. Ensure that slashing and rewards happen
+      4. Reject the first commitment
+      5. Ensure that there is no further slashing or reward
+    *)
+  let test_rejection_rewards () =
+    let open Error_monad_operators in
+    let (_, _, addr) = gen_l2_account () in
+    init_l2_store () >>= fun store ->
+    context_init2 () >>=? fun (b, contract1, contract2) ->
+    originate b contract1 >>=? fun (b, tx_rollup) ->
+    make_deposit b tx_rollup contract1 addr
+    >>=? fun (b, (deposit_message, _), _ticket_hash) ->
+    Context.Contract.balance (B b) contract1 >>=? fun balance ->
+    Context.Contract.balance (B b) contract2 >>=? fun balance2 ->
+    (* [check_frozen] checks that contract1 has [expect] frozen tez. *)
+    let check_frozen ~loc i expect =
+      Contract.get_frozen_bonds (Incremental.alpha_ctxt i) contract1
+      >>=?? fun frozen -> Assert.equal_tez ~loc expect frozen
+    in
+    Incremental.begin_construction b >>=? fun i ->
+    (* Nothing frozen to start *)
+    check_frozen ~loc:__LOC__ i Tez.zero >>=? fun () ->
+    (* No-op batch for second inbox *)
+    Op.tx_rollup_submit_batch (B b) contract1 tx_rollup "fake"
+    >>=? fun operation ->
+    Block.bake ~operation b >>=? fun b ->
+    Incremental.begin_construction b >>=? fun i ->
+    l2_parameters (B b) >>=? fun l2_parameters ->
+    let (message, _) = Tx_rollup_message.make_batch "fake" in
+    let message_hash = Tx_rollup_message_hash.hash_uncarbonated message in
+    let message_path =
+      assert_ok @@ Tx_rollup_inbox.Merkle.(compute_path [message_hash] 0)
+    in
+    hash_tree_from_store store >>= fun l2_context_hash ->
+    let make_invalid_commitment i level h =
+      (* Make some invalid commitments for the submitted messages *)
+      make_incomplete_commitment_for_batch (I i) level tx_rollup []
+      >>=? fun (commitment, _) ->
+      (* Make this commitment bogus *)
+      let message_result =
+        Tx_rollup_message_result.
+          {
+            context_hash = h;
+            withdraw_list_hash = Tx_rollup_withdraw_list_hash.empty;
+          }
+      in
+      let message_result_hash =
+        Tx_rollup_message_result_hash.hash_uncarbonated message_result
+      in
+      let commitment = {commitment with messages = [message_result_hash]} in
+      Op.tx_rollup_commit (I i) contract1 tx_rollup commitment >>=? fun op ->
+      Incremental.add_operation i op >|=? fun i -> (i, commitment)
+    in
+    let level0 = tx_level 0l in
+    let level1 = tx_level 1l in
+    make_invalid_commitment i level0 l2_context_hash
+    >>=? fun (i, commitment0) ->
+    make_invalid_commitment i level1 Context_hash.zero
+    >>=? fun (i, commitment1) ->
+    Context.get_constants (I i) >>=? fun constants ->
+    let bond_cost = constants.parametric.tx_rollup_commitment_bond in
+    Assert.balance_was_debited ~loc:__LOC__ (I i) contract1 balance bond_cost
+    >>=? fun () ->
+    check_frozen ~loc:__LOC__ i bond_cost >>=? fun () ->
+    Incremental.finalize_block i >>=? fun b ->
+    Incremental.begin_construction b >>=? fun i ->
+    (* Now we produce a valid proof rejecting the second commitment *)
+    make_proof store l2_parameters message >>= fun proof ->
+    let message_position = 0 in
+    let (message_result_hash, message_result_path) =
+      message_result_hash_and_path commitment1 ~message_position
+    in
+    Op.tx_rollup_reject
+      (I i)
+      contract2
+      tx_rollup
+      level1
+      message
+      ~message_position
+      ~message_path
+      ~message_result_hash
+      ~message_result_path
+      ~proof
+      ~previous_message_result:
+        {
+          context_hash = l2_context_hash;
+          withdraw_list_hash = Tx_rollup_withdraw_list_hash.empty;
+        }
+      ~previous_message_result_path:Tx_rollup_commitment.Merkle.dummy_path
+    >>=? fun op ->
+    Incremental.add_operation i op >>=? fun i ->
+    check_bond (Incremental.alpha_ctxt i) tx_rollup contract1 0 >>=? fun () ->
+    Assert.balance_was_debited ~loc:__LOC__ (I i) contract1 balance bond_cost
+    >>=? fun () ->
+    (* Now we need to check that the tez is really gone -- not just frozen *)
+    check_frozen ~loc:__LOC__ i Tez.zero >>=? fun () ->
+    let reward = assert_ok Tez.(bond_cost /? 2L) in
+    Assert.balance_was_credited ~loc:__LOC__ (I i) contract2 balance2 reward
+    >>=? fun () ->
+    (* Now, we can still reject the root commitment, but we won't get a reward *)
+    Context.Contract.balance (I i) contract1 >>=? fun balance ->
+    Context.Contract.balance (I i) contract2 >>=? fun balance2 ->
+    make_proof store l2_parameters deposit_message >>= fun proof ->
+    let message_hash =
+      Tx_rollup_message_hash.hash_uncarbonated deposit_message
+    in
+    let message_path =
+      assert_ok @@ Tx_rollup_inbox.Merkle.(compute_path [message_hash] 0)
+    in
+    let message_position = 0 in
+    let (message_result_hash, message_result_path) =
+      message_result_hash_and_path commitment0 ~message_position
+    in
+    Op.tx_rollup_reject
+      (I i)
+      contract2
+      tx_rollup
+      level0
+      deposit_message
+      ~message_position
+      ~message_path
+      ~message_result_hash
+      ~message_result_path
+      ~proof
+      ~previous_message_result:
+        {
+          context_hash = l2_context_hash;
+          withdraw_list_hash = Tx_rollup_withdraw_list_hash.empty;
+        }
+      ~previous_message_result_path:Tx_rollup_commitment.Merkle.dummy_path
+    >>=? fun op ->
+    Incremental.add_operation i op >>=? fun i ->
+    check_bond (Incremental.alpha_ctxt i) tx_rollup contract1 0 >>=? fun () ->
+    Assert.balance_was_debited ~loc:__LOC__ (I i) contract1 balance Tez.zero
+    >>=? fun () ->
+    (* Now we need to check that the tez still really gone -- not just frozen *)
+    check_frozen ~loc:__LOC__ i Tez.zero >>=? fun () ->
+    Assert.balance_was_credited ~loc:__LOC__ (I i) contract2 balance2 Tez.zero
 
   (** Test the proof production (used in this test file) and the proof
       verification handles a hard failure. [make_bad_message] makes a
@@ -2611,7 +2762,7 @@ module Rejection = struct
   let do_test_proof_with_hard_fail_message make_bad_message =
     let (sk, pk, addr) = gen_l2_account () in
     init_with_deposit addr
-    >>=? fun (b, account, tx_rollup, store, ticket_hash) ->
+    >>=? fun (b, account, _, tx_rollup, store, ticket_hash) ->
     hash_tree_from_store store >>= fun l2_context_hash ->
     let (message, batch_bytes) = make_bad_message sk pk addr ticket_hash in
     let message_hash = Tx_rollup_message_hash.hash_uncarbonated message in
@@ -2656,7 +2807,9 @@ module Rejection = struct
         }
       ~previous_message_result_path:Tx_rollup_commitment.Merkle.dummy_path
     >>=? fun op ->
-    Incremental.add_operation i op >>=? fun _ -> return_unit
+    Incremental.add_operation i op >>=? fun i ->
+    check_bond (Incremental.alpha_ctxt i) tx_rollup account 0 >>=? fun () ->
+    return_unit
 
   (** Test that proof production and verification can handle an invalid
       signature *)
@@ -3225,7 +3378,7 @@ module Rejection = struct
   let test_reject_withdrawals_helper ?expect_failure n_withdraw =
     let (sk, pk, addr) = gen_l2_account () in
     init_with_deposit ~tx_rollup_hard_size_limit_per_message:20_000 addr
-    >>=? fun (b, account, tx_rollup, store, ticket_hash) ->
+    >>=? fun (b, account, _, tx_rollup, store, ticket_hash) ->
     hash_tree_from_store store >>= fun l2_context_hash ->
     (* 1. Create a batch with [n_withdraw] withdrawals. *)
     let destination = is_implicit_exn account in
@@ -3349,6 +3502,7 @@ module Rejection = struct
         "reject valid commitment fails"
         `Quick
         test_valid_proof_on_valid_commitment;
+      Tztest.tztest "rejection rewards" `Quick test_rejection_rewards;
       Tztest.tztest
         "proof for a hard failing message: invalid signature"
         `Quick

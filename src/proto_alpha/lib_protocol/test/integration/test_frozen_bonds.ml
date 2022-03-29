@@ -319,14 +319,13 @@ let test_rpcs () =
       Assert.equal_tez ~loc:__LOC__ balance_and_frozen_bonds balance
   | _ -> (* Exactly one account has been generated. *) assert false
 
-(** A helper to test a particular delegation/freezing scenario
-*)
+(** A helper to test a particular delegation/freezing scenario *)
 let test_scenario scenario =
   init_test ~user_is_delegate:false
   >>=? fun (ctxt, user_contract, user_account, delegate1) ->
   let (delegate2, delegate_pk2, _) = Signature.generate_key () in
   let delegate_contract2 = Contract.implicit_contract delegate2 in
-  let delegate_account2 = `Contract (Contract.implicit_contract delegate2) in
+  let delegate_account2 = `Contract delegate_contract2 in
   let delegate_balance2 = big_random_amount () in
   Token.transfer ctxt `Minted delegate_account2 delegate_balance2
   >>>=? fun (ctxt, _) ->
@@ -442,11 +441,11 @@ let test_scenario scenario =
     ~accounts:(deposit_account1, deposit_account2)
     ~delegates:(delegate1, delegate2)
     amount_delegated
-    do_delegate
-    do_undelegate
-    do_freeze
-    do_unfreeze
-    do_slash
+    ~do_delegate
+    ~do_undelegate
+    ~do_freeze
+    ~do_unfreeze
+    ~do_slash
   >>=? fun () ->
   (* freeze-then-delegate *)
   let ctxt = initial_ctxt in
@@ -457,11 +456,11 @@ let test_scenario scenario =
     ~accounts:(deposit_account1, deposit_account2)
     ~delegates:(delegate1, delegate2)
     amount_delegated
-    do_delegate
-    do_undelegate
-    do_freeze
-    do_unfreeze
-    do_slash
+    ~do_delegate
+    ~do_undelegate
+    ~do_freeze
+    ~do_unfreeze
+    ~do_slash
 
 let test_delegate_freeze_unfreeze_undelegate () =
   test_scenario
@@ -470,11 +469,11 @@ let test_delegate_freeze_unfreeze_undelegate () =
       ~accounts:_
       ~delegates:_
       amount_delegated
-      _do_delegate
-      do_undelegate
-      _do_freeze
-      do_unfreeze
-      _do_slash
+      ~do_delegate:_
+      ~do_undelegate
+      ~do_freeze:_
+      ~do_unfreeze
+      ~do_slash:_
     ->
       do_unfreeze ctxt >>=? fun ctxt ->
       do_undelegate ctxt amount_delegated >>=? fun _ -> return_unit)
@@ -486,11 +485,11 @@ let test_delegate_freeze_undelegate_unfreeze () =
       ~accounts:_
       ~delegates:_
       amount_delegated
-      _do_delegate
-      do_undelegate
-      _do_freeze
-      do_unfreeze
-      _do_slash
+      ~do_delegate:_
+      ~do_undelegate
+      ~do_freeze:_
+      ~do_unfreeze
+      ~do_slash:_
     ->
       do_undelegate ctxt amount_delegated >>=? fun ctxt ->
       do_unfreeze ctxt >>=? fun _ -> return_unit)
@@ -502,11 +501,11 @@ let test_delegate_double_freeze_undelegate_unfreeze () =
       ~accounts:(deposit_account1, deposit_account2)
       ~delegates:_
       amount_delegated
-      _do_delegate
-      do_undelegate
-      do_freeze
-      do_unfreeze
-      _do_slash
+      ~do_delegate:_
+      ~do_undelegate
+      ~do_freeze
+      ~do_unfreeze
+      ~do_slash:_
     ->
       do_freeze ~deposit_account:deposit_account2 ctxt >>=? fun ctxt ->
       do_undelegate ctxt amount_delegated >>=? fun ctxt ->
@@ -520,11 +519,11 @@ let test_delegate_freeze_redelegate_unfreeze () =
       ~accounts:_
       ~delegates:(_delegate1, delegate2)
       _amount_delegated
-      do_delegate
-      do_undelegate
-      _do_freeze
-      do_unfreeze
-      _do_slash
+      ~do_delegate
+      ~do_undelegate
+      ~do_freeze:_
+      ~do_unfreeze
+      ~do_slash:_
     ->
       do_delegate ~delegate:delegate2 ctxt >>=? fun (ctxt, amount2) ->
       do_unfreeze ctxt >>=? fun ctxt ->
@@ -537,11 +536,11 @@ let test_delegate_freeze_unfreeze_freeze_redelegate () =
       ~accounts:_
       ~delegates:(_delegate1, delegate2)
       _amount_delegated
-      do_delegate
-      do_undelegate
-      do_freeze
-      do_unfreeze
-      _do_slash
+      ~do_delegate
+      ~do_undelegate
+      ~do_freeze
+      ~do_unfreeze
+      ~do_slash:_
     ->
       do_unfreeze ctxt >>=? fun ctxt ->
       do_freeze ctxt >>=? fun ctxt ->
@@ -556,11 +555,11 @@ let test_delegate_freeze_slash_undelegate () =
       ~accounts:_
       ~delegates:_
       amount_delegated
-      _do_delegate
-      do_undelegate
-      _do_freeze
-      _do_unfreeze
-      do_slash
+      ~do_delegate:_
+      ~do_undelegate
+      ~do_freeze:_
+      ~do_unfreeze:_
+      ~do_slash
     ->
       do_slash ctxt >>=? fun ctxt ->
       do_undelegate ctxt (amount_delegated -! slash_amount) >>=? fun _ ->
@@ -615,7 +614,7 @@ let tests =
         `Quick
         test_delegate_freeze_unfreeze_freeze_redelegate;
       tztest
-        "test: delegate, freeze, slash"
+        "test: delegate, freeze, slash, undelegate"
         `Quick
         test_delegate_freeze_slash_undelegate;
     ]
