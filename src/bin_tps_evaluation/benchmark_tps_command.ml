@@ -40,6 +40,15 @@ let get_minimal_block_delay protocol protocol_constants =
   in
   int_of_float JSON.(json |-> "minimal_block_delay" |> as_float)
 
+(** Set max prechecked manager operations count. *)
+let set_max_prechecked_manager_operations n client =
+  let path = ["chains"; "main"; "mempool"; "filter"] in
+  let data =
+    `O [("max_prechecked_manager_operations", `Float (Float.of_int n))]
+  in
+  let* _ = Client.rpc ~data POST path client in
+  Lwt.return_unit
+
 (** Get a list of hashes of the given number of most recent blocks. *)
 let get_blocks blocks_total client =
   let open Lwt_syntax in
@@ -202,6 +211,7 @@ let run_benchmark ~lift_protocol_limits ~provided_tps_of_injection ~blocks_total
   let* () =
     Client.stresstest_originate_smart_contracts originating_bootstrap client
   in
+  let* () = set_max_prechecked_manager_operations total_bootstraps client in
   Log.info "Waiting to reach the next level" ;
   let* _ = Node.wait_for_level node (benchmark_starting_level - 1) in
   Log.info "Using the parameter file: %s" parameter_file ;
