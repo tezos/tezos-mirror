@@ -633,8 +633,8 @@ module Tx_rollup : sig
      for a description of the actual content. *)
   module Inbox :
     Non_iterable_indexed_carbonated_data_storage
-      with type t := Raw_context.t * Tx_rollup_level_repr.t
-       and type key = Tx_rollup_repr.t
+      with type t := Raw_context.t * Tx_rollup_repr.t
+       and type key = Tx_rollup_level_repr.t
        and type value = Tx_rollup_inbox_repr.t
 
   (** A carbonated storage of the set of withdrawals revealed of those
@@ -642,8 +642,8 @@ module Tx_rollup : sig
       number, which is sequentially assigned from 0. *)
   module Revealed_withdrawals :
     Non_iterable_indexed_carbonated_data_storage
-      with type t := Raw_context.t * Tx_rollup_level_repr.t
-       and type key = Tx_rollup_repr.t
+      with type t := Raw_context.t * Tx_rollup_repr.t
+       and type key = Tx_rollup_level_repr.t
        and type value = Bitset.t
 
   (** A rollup can have at most one commitment per rollup level. Some
@@ -652,18 +652,18 @@ module Tx_rollup : sig
      content. *)
   module Commitment :
     Non_iterable_indexed_carbonated_data_storage
-      with type key = Tx_rollup_level_repr.t * Tx_rollup_repr.t
+      with type key = Tx_rollup_level_repr.t
        and type value = Tx_rollup_commitment_repr.Submitted_commitment.t
-       and type t := Raw_context.t
+       and type t := Raw_context.t * Tx_rollup_repr.t
 
   (** This stores information about which contracts have bonds
      for each rollup, and how many commitments those bonds
      stake. *)
   module Commitment_bond :
     Non_iterable_indexed_carbonated_data_storage
-      with type key = Tx_rollup_repr.t * Signature.public_key_hash
+      with type key = Signature.public_key_hash
        and type value = int
-       and type t := Raw_context.t
+       and type t := Raw_context.t * Tx_rollup_repr.t
 end
 
 module Sc_rollup : sig

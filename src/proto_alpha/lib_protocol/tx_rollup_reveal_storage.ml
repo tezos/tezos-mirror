@@ -26,22 +26,22 @@
 (*****************************************************************************)
 
 let record ctxt tx_rollup level ~message_position =
-  Storage.Tx_rollup.Revealed_withdrawals.find (ctxt, level) tx_rollup
+  Storage.Tx_rollup.Revealed_withdrawals.find (ctxt, tx_rollup) level
   >>=? fun (ctxt, revealed_withdrawals_opt) ->
   Bitset.add
     (Option.value ~default:Bitset.empty revealed_withdrawals_opt)
     message_position
   >>?= fun revealed_withdrawals ->
   Storage.Tx_rollup.Revealed_withdrawals.add
-    (ctxt, level)
-    tx_rollup
+    (ctxt, tx_rollup)
+    level
     revealed_withdrawals
   >>=? fun (ctxt, _new_size, _is_new) -> return ctxt
 (* See {{Note}} in [Tx_rollup_commitment_storage] for a rationale on
    why ignoring storage allocation is safe. *)
 
 let mem ctxt tx_rollup level ~message_position =
-  Storage.Tx_rollup.Revealed_withdrawals.find (ctxt, level) tx_rollup
+  Storage.Tx_rollup.Revealed_withdrawals.find (ctxt, tx_rollup) level
   >>=? fun (ctxt, revealed_withdrawals_opt) ->
   match revealed_withdrawals_opt with
   | Some field ->
@@ -49,7 +49,7 @@ let mem ctxt tx_rollup level ~message_position =
   | None -> return (ctxt, false)
 
 let remove ctxt tx_rollup level =
-  Storage.Tx_rollup.Revealed_withdrawals.remove (ctxt, level) tx_rollup
+  Storage.Tx_rollup.Revealed_withdrawals.remove (ctxt, tx_rollup) level
   >>=? fun (ctxt, _freed_size, _existed) -> return ctxt
 (* See {{Note}} in [Tx_rollup_commitment_storage] for a rationale on
    why ignoring storage allocation is safe. *)

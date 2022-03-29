@@ -33,7 +33,7 @@ let find :
     Tx_rollup_repr.t ->
     (Raw_context.t * Tx_rollup_inbox_repr.t option) tzresult Lwt.t =
  fun ctxt level tx_rollup ->
-  Storage.Tx_rollup.Inbox.find (ctxt, level) tx_rollup
+  Storage.Tx_rollup.Inbox.find (ctxt, tx_rollup) level
 
 let get :
     Raw_context.t ->
@@ -74,7 +74,7 @@ let prepare_inbox :
       fail (Internal_error "Trying to write into an inbox from the past")
   | Some (tx_lvl, tezos_lvl) when Raw_level_repr.(tezos_lvl = level) ->
       (* An inbox should already exists *)
-      Storage.Tx_rollup.Inbox.get (ctxt, tx_lvl) rollup
+      Storage.Tx_rollup.Inbox.get (ctxt, rollup) tx_lvl
       >>=? fun (ctxt, metadata) -> return (ctxt, state, tx_lvl, metadata, Z.zero)
   | _ ->
       let pred_level =
@@ -130,7 +130,7 @@ let prepare_inbox :
       Tx_rollup_state_repr.record_inbox_creation state level
       >>?= fun (state, tx_level, paid_storage_space_diff) ->
       let inbox = Tx_rollup_inbox_repr.empty in
-      Storage.Tx_rollup.Inbox.init (ctxt, tx_level) rollup inbox
+      Storage.Tx_rollup.Inbox.init (ctxt, rollup) tx_level inbox
       >>=? fun (ctxt, _inbox_size_alloc) ->
       (* Storage accounting is done by
          [Tx_rollup_state_repr.record_inbox_creation], so we can
@@ -188,7 +188,7 @@ let append_message :
     (Inbox_size_would_exceed_limit rollup)
   >>=? fun () ->
   (* Checks have passed, so we can actually record in the storage. *)
-  Storage.Tx_rollup.Inbox.add (ctxt, tx_level) rollup new_inbox
+  Storage.Tx_rollup.Inbox.add (ctxt, rollup) tx_level new_inbox
   >>=? fun (ctxt, new_inbox_size_alloc, _) ->
   Tx_rollup_state_repr.adjust_storage_allocation
     new_state
@@ -205,7 +205,7 @@ let remove :
     Tx_rollup_repr.t ->
     Raw_context.t tzresult Lwt.t =
  fun ctxt level rollup ->
-  Storage.Tx_rollup.Inbox.remove (ctxt, level) rollup
+  Storage.Tx_rollup.Inbox.remove (ctxt, rollup) level
   >>=? fun (ctxt, _freed, _) -> return ctxt
 
 let check_message_hash :
@@ -217,7 +217,7 @@ let check_message_hash :
     Tx_rollup_inbox_repr.Merkle.path ->
     Raw_context.t tzresult Lwt.t =
  fun ctxt level tx_rollup ~position message path ->
-  Storage.Tx_rollup.Inbox.get (ctxt, level) tx_rollup >>=? fun (ctxt, inbox) ->
+  Storage.Tx_rollup.Inbox.get (ctxt, tx_rollup) level >>=? fun (ctxt, inbox) ->
   let message_hash = Tx_rollup_message_repr.hash_uncarbonated message in
   Tx_rollup_inbox_repr.Merkle.check_path
     path

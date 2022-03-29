@@ -75,15 +75,14 @@ let check_message_result {messages; _} result ~path ~index =
 
 let adjust_commitments_count ctxt tx_rollup pkh ~(dir : [`Incr | `Decr]) =
   let delta = match dir with `Incr -> 1 | `Decr -> -1 in
-  let bond_key = (tx_rollup, pkh) in
-  Storage.Tx_rollup.Commitment_bond.find ctxt bond_key
+  Storage.Tx_rollup.Commitment_bond.find (ctxt, tx_rollup) pkh
   >>=? fun (ctxt, commitment) ->
   let count =
     match commitment with Some count -> count + delta | None -> delta
   in
   fail_when Compare.Int.(count < 0) (Commitment_bond_negative count)
   >>=? fun () ->
-  Storage.Tx_rollup.Commitment_bond.add ctxt bond_key count
+  Storage.Tx_rollup.Commitment_bond.add (ctxt, tx_rollup) pkh count
   >>=? fun (ctxt, _, _) -> return ctxt
 
 let remove_bond :
@@ -92,23 +91,22 @@ let remove_bond :
     Signature.public_key_hash ->
     Raw_context.t tzresult Lwt.t =
  fun ctxt tx_rollup contract ->
-  let bond_key = (tx_rollup, contract) in
-  Storage.Tx_rollup.Commitment_bond.find ctxt bond_key >>=? fun (ctxt, bond) ->
+  Storage.Tx_rollup.Commitment_bond.find (ctxt, tx_rollup) contract
+  >>=? fun (ctxt, bond) ->
   match bond with
   | None -> fail (Bond_does_not_exist contract)
   | Some 0 ->
-      Storage.Tx_rollup.Commitment_bond.remove ctxt bond_key
+      Storage.Tx_rollup.Commitment_bond.remove (ctxt, tx_rollup) contract
       >>=? fun (ctxt, _, _) -> return ctxt
   | Some _ -> fail (Bond_in_use contract)
 
 let slash_bond ctxt tx_rollup contract =
-  let bond_key = (tx_rollup, contract) in
-  Storage.Tx_rollup.Commitment_bond.find ctxt bond_key
+  Storage.Tx_rollup.Commitment_bond.find (ctxt, tx_rollup) contract
   >>=? fun (ctxt, bond_counter) ->
   match bond_counter with
   | None -> return (ctxt, false)
   | Some c ->
-      Storage.Tx_rollup.Commitment_bond.remove ctxt bond_key
+      Storage.Tx_rollup.Commitment_bond.remove (ctxt, tx_rollup) contract
       >>=? fun (ctxt, _, _) -> return (ctxt, Compare.Int.(0 < c))
 
 let find :
@@ -119,7 +117,7 @@ let find :
     (Raw_context.t * Submitted_commitment.t option) tzresult Lwt.t =
  fun ctxt tx_rollup state level ->
   if Tx_rollup_state_repr.has_valid_commitment_at state level then
-    Storage.Tx_rollup.Commitment.find ctxt (level, tx_rollup)
+    Storage.Tx_rollup.Commitment.find (ctxt, tx_rollup) level
     >>=? fun (ctxt, commitment) ->
     match commitment with
     | None ->
@@ -158,7 +156,7 @@ let get_finalized :
       error
         (Tx_rollup_errors_repr.No_finalized_commitment_for_level {level; window}))
   >>?= fun () ->
-  Storage.Tx_rollup.Commitment.find ctxt (level, tx_rollup)
+  Storage.Tx_rollup.Commitment.find (ctxt, tx_rollup) level
   >>=? fun (ctxt, commitment) ->
   match commitment with
   | None -> fail @@ Tx_rollup_errors_repr.Commitment_does_not_exist level
@@ -230,7 +228,7 @@ let add_commitment ctxt tx_rollup state pkh commitment =
       finalized_at = None;
     }
   in
-  Storage.Tx_rollup.Commitment.add ctxt (commitment.level, tx_rollup) submitted
+  Storage.Tx_rollup.Commitment.add (ctxt, tx_rollup) commitment.level submitted
   >>=? fun (ctxt, _commitment_size_alloc, _) ->
   (* See {{Note}} for a rationale on why ignoring storage allocation is safe. *)
   Tx_rollup_state_repr.record_commitment_creation
@@ -247,7 +245,7 @@ let pending_bonded_commitments :
     Signature.public_key_hash ->
     (Raw_context.t * int) tzresult Lwt.t =
  fun ctxt tx_rollup pkh ->
-  Storage.Tx_rollup.Commitment_bond.find ctxt (tx_rollup, pkh)
+  Storage.Tx_rollup.Commitment_bond.find (ctxt, tx_rollup) pkh
   >|=? fun (ctxt, pending) -> (ctxt, Option.value ~default:0 pending)
 
 let has_bond :
@@ -256,7 +254,7 @@ let has_bond :
     Signature.public_key_hash ->
     (Raw_context.t * bool) tzresult Lwt.t =
  fun ctxt tx_rollup pkh ->
-  Storage.Tx_rollup.Commitment_bond.find ctxt (tx_rollup, pkh)
+  Storage.Tx_rollup.Commitment_bond.find (ctxt, tx_rollup) pkh
   >|=? fun (ctxt, pending) -> (ctxt, Option.is_some pending)
 
 let finalize_commitment ctxt rollup state =
@@ -278,8 +276,8 @@ let finalize_commitment ctxt rollup state =
       >>=? fun ctxt ->
       (* We update the commitment to mark it as finalized *)
       Storage.Tx_rollup.Commitment.update
-        ctxt
-        (oldest_inbox_level, rollup)
+        (ctxt, rollup)
+        oldest_inbox_level
         {commitment with finalized_at = Some current_level}
       >>=? fun (ctxt, _commitment_size_alloc) ->
       (* See {{Note}} for a rationale on why ignoring storage
@@ -312,7 +310,7 @@ let remove_commitment ctxt rollup state =
       adjust_commitments_count ctxt rollup commitment.committer ~dir:`Decr
       >>=? fun ctxt ->
       (* We remove the commitment *)
-      Storage.Tx_rollup.Commitment.remove ctxt (tail, rollup)
+      Storage.Tx_rollup.Commitment.remove (ctxt, rollup) tail
       >>=? fun (ctxt, _freed_size, _existed) ->
       (* See {{Note}} for a rationale on why ignoring storage
          allocation is safe. *)
@@ -350,7 +348,7 @@ let check_agreed_and_disputed_results ctxt tx_rollup state
           (Wrong_rejection_hash {provided = agreed; expected = `Hash expected})
         >>=? fun () -> return ctxt
     | Some pred_level -> (
-        Storage.Tx_rollup.Commitment.find ctxt (pred_level, tx_rollup)
+        Storage.Tx_rollup.Commitment.find (ctxt, tx_rollup) pred_level
         >>=? fun (ctxt, candidate) ->
         match candidate with
         | Some commitment ->

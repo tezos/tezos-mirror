@@ -752,6 +752,7 @@ let test_rollup_with_two_commitments =
   let* () =
     repeat parameters.finality_period (fun () -> Client.bake_for client)
   in
+  let* _ = RPC.raw_bytes ~path:[] client in
   let*! () = submit_finalize_commitment state in
   (* A second submission just to ensure it can be included into a
      block even if it fails. *)
