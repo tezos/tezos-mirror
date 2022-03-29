@@ -13,7 +13,7 @@ depends: [
   "tezos-base"
   "tezos-version"
   "index" { >= "1.6.0" & < "1.7.0" }
-  "irmin-pack" { >= "3.1.0" & < "3.2.0" }
+  "irmin-pack" { >= "3.2.0" & < "3.3.0" }
   "tezos-context"
   "tezos-validation"
   "tezos-protocol-updater"
