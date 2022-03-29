@@ -2071,7 +2071,7 @@ let parse_parameter_ty_and_entrypoints :
   (if legacy then Result.return_unit
   else well_formed_entrypoints arg_type entrypoints)
   >|? fun () ->
-  let entrypoints = {root = entrypoints} in
+  let entrypoints = {root = entrypoints; original_type = node} in
   (Ex_parameter_ty_and_entrypoints {arg_type; entrypoints}, ctxt)
 
 let parse_passable_ty = parse_passable_ty ~ret:Don't_parse_entrypoints

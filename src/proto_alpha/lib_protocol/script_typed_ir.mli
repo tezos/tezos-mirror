@@ -305,7 +305,10 @@ and 'arg nested_entrypoints =
 (** [no_entrypoints] is [{at_node = None; nested = Entrypoints_None}] *)
 val no_entrypoints : _ entrypoints_node
 
-type 'arg entrypoints = {root : 'arg entrypoints_node}
+type 'arg entrypoints = {
+  root : 'arg entrypoints_node;
+  original_type : Script.node;
+}
 
 type ('arg, 'storage) script =
   | Script : {

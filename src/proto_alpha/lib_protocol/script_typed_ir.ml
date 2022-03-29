@@ -438,7 +438,10 @@ and 'arg nested_entrypoints =
 
 let no_entrypoints = {at_node = None; nested = Entrypoints_None}
 
-type 'arg entrypoints = {root : 'arg entrypoints_node}
+type 'arg entrypoints = {
+  root : 'arg entrypoints_node;
+  original_type : Script.node;
+}
 
 type ('arg, 'storage) script =
   | Script : {
