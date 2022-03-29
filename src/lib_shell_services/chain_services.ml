@@ -159,7 +159,9 @@ module S = struct
            "min_date"
            ~descr:
              "When `min_date` is provided, blocks with a timestamp before \
-              `min_date` are filtered out"
+              `min_date` are filtered out. However, if the `length` parameter \
+              is also provided, then up to that number of predecessors will be \
+              returned regardless of their date."
            Time.Protocol.rpc_arg
            (fun x -> x#min_date)
       |> seal
