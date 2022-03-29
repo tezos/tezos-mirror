@@ -224,7 +224,7 @@ let unparse_memo_size ~loc memo_size =
 
 let rec unparse_ty_entrypoints_uncarbonated :
     type a ac loc.
-    loc:loc -> (a, ac) ty -> a entrypoints -> loc Script.michelson_node =
+    loc:loc -> (a, ac) ty -> a entrypoints_node -> loc Script.michelson_node =
  fun ~loc ty {nested = nested_entrypoints; name = entrypoint_name} ->
   let (name, args) =
     match ty with
@@ -1924,7 +1924,7 @@ let find_entrypoint (type full fullc error_trace)
   let rec find_entrypoint :
       type t tc.
       (t, tc) ty ->
-      t entrypoints ->
+      t entrypoints_node ->
       Entrypoint.t ->
       (t ex_ty_cstr, unit) Gas_monad.t =
    fun ty entrypoints entrypoint ->
@@ -1977,8 +1977,9 @@ let find_entrypoint_for_type (type full fullc exp expc error_trace)
 
 let well_formed_entrypoints (type full fullc) (full : (full, fullc) ty)
     entrypoints =
-  let merge path (type t tc) (ty : (t, tc) ty) (entrypoints : t entrypoints)
-      reachable ((first_unreachable, all) as acc) =
+  let merge path (type t tc) (ty : (t, tc) ty)
+      (entrypoints : t entrypoints_node) reachable
+      ((first_unreachable, all) as acc) =
     match entrypoints.name with
     | None ->
         ok
@@ -1998,7 +1999,7 @@ let well_formed_entrypoints (type full fullc) (full : (full, fullc) ty)
   let rec check :
       type t tc.
       (t, tc) ty ->
-      t entrypoints ->
+      t entrypoints_node ->
       prim list ->
       bool ->
       prim list option * Entrypoint.Set.t ->
@@ -5532,8 +5533,9 @@ let typecheck_code :
 
 let list_entrypoints ctxt (type full fullc) (full : (full, fullc) ty)
     (entrypoints : full entrypoints) =
-  let merge path (type t tc) (ty : (t, tc) ty) (entrypoints : t entrypoints)
-      reachable ((unreachables, all) as acc) =
+  let merge path (type t tc) (ty : (t, tc) ty)
+      (entrypoints : t entrypoints_node) reachable ((unreachables, all) as acc)
+      =
     match entrypoints.name with
     | None ->
         ok
@@ -5555,7 +5557,7 @@ let list_entrypoints ctxt (type full fullc) (full : (full, fullc) ty)
   let rec fold_tree :
       type t tc.
       (t, tc) ty ->
-      t entrypoints ->
+      t entrypoints_node ->
       prim list ->
       bool ->
       prim list list

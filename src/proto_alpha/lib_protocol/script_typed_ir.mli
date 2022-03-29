@@ -287,21 +287,23 @@ type view_map = (Script_string.t, view) map
       But it is also ok to have [Entrypoints_None] for a union node, it just
       means that there are no entrypoints below that node in the tree.
 *)
-type 'arg entrypoints = {
+type 'arg entrypoints_node = {
   name : Entrypoint.t option;
   nested : 'arg nested_entrypoints;
 }
 
 and 'arg nested_entrypoints =
   | Entrypoints_Union : {
-      left : 'l entrypoints;
-      right : 'r entrypoints;
+      left : 'l entrypoints_node;
+      right : 'r entrypoints_node;
     }
       -> ('l, 'r) union nested_entrypoints
   | Entrypoints_None : _ nested_entrypoints
 
 (** [no_entrypoints] is [{name = None; nested = Entrypoints_None}] *)
-val no_entrypoints : _ entrypoints
+val no_entrypoints : _ entrypoints_node
+
+type 'arg entrypoints = 'arg entrypoints_node
 
 type ('arg, 'storage) script =
   | Script : {
