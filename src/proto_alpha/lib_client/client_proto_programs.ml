@@ -140,6 +140,7 @@ type run_script_view_params = {
   shared_params : simulation_params;
   contract : Contract.t;
   view : string;
+  unlimited_gas : bool;
 }
 
 type run_params = {
@@ -182,6 +183,7 @@ let run_script_view (cctxt : #Protocol_client_context.rpc_context)
     shared_params = {input; unparsing_mode; now; level; source; payer; gas};
     contract;
     view;
+    unlimited_gas;
   } =
     params
   in
@@ -193,6 +195,7 @@ let run_script_view (cctxt : #Protocol_client_context.rpc_context)
     ~contract
     ~view
     ~input:input.expanded
+    ~unlimited_gas
     ~chain_id
     ?source
     ?payer

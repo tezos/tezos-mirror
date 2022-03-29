@@ -1754,17 +1754,19 @@ module RPC = struct
 
       let run_script_view_encoding =
         let open Data_encoding in
-        obj10
-          (req "contract" Contract.encoding)
-          (req "view" string)
-          (req "input" Script.expr_encoding)
-          (req "chain_id" Chain_id.encoding)
-          (opt "source" Contract.encoding)
-          (opt "payer" Contract.encoding)
-          (opt "gas" Gas.Arith.z_integral_encoding)
-          (req "unparsing_mode" unparsing_mode_encoding)
-          (opt "now" Script_timestamp.encoding)
-          (opt "level" Script_int.n_encoding)
+        merge_objs
+          (obj10
+             (req "contract" Contract.encoding)
+             (req "view" string)
+             (req "input" Script.expr_encoding)
+             (dft "unlimited_gas" bool false)
+             (req "chain_id" Chain_id.encoding)
+             (opt "source" Contract.encoding)
+             (opt "payer" Contract.encoding)
+             (opt "gas" Gas.Arith.z_integral_encoding)
+             (req "unparsing_mode" unparsing_mode_encoding)
+             (opt "now" Script_timestamp.encoding))
+          (obj1 (opt "level" Script_int.n_encoding))
 
       let run_code =
         RPC_service.post_service
@@ -2584,15 +2586,16 @@ module RPC = struct
         (fun
           ctxt
           ()
-          ( contract,
-            view,
-            input,
-            chain_id,
-            source,
-            payer,
-            gas,
-            unparsing_mode,
-            now,
+          ( ( contract,
+              view,
+              input,
+              unlimited_gas,
+              chain_id,
+              source,
+              payer,
+              gas,
+              unparsing_mode,
+              now ),
             level )
         ->
           Contract.get_script ctxt contract >>=? fun (ctxt, script_opt) ->
@@ -2612,14 +2615,23 @@ module RPC = struct
             | (None, Some payer) -> (payer, payer)
             | (None, None) -> (contract, contract)
           in
+          let now =
+            match now with None -> Script_timestamp.now ctxt | Some t -> t
+          in
+          (* Using [Gas.set_unlimited] won't work, since the interpreter doesn't
+             use this mode (see !4034#note_774734253) and still consumes gas.
+             Our best shot to emulate this is to use the maximum amount of
+             milligas possible which is represented by [2^62 - 1] according to
+             [Saturation_repr.saturated], which is [max_int]. *)
+          let max_gas = Gas.fp_of_milligas_int max_int in
           let gas =
             Option.value
               ~default:(Constants.hard_gas_limit_per_operation ctxt)
               gas
           in
-          let ctxt = Gas.set_limit ctxt gas in
-          let now =
-            match now with None -> Script_timestamp.now ctxt | Some t -> t
+          let ctxt =
+            if unlimited_gas then Gas.set_limit ctxt max_gas
+            else Gas.set_limit ctxt gas
           in
           let level =
             Option.value
@@ -2895,23 +2907,24 @@ module RPC = struct
           level )
 
     (** [run_script_view] is an helper function to call the corresponding
-        RPC. *)
-    let run_script_view ?gas ~contract ~view ~input ~chain_id ~now ~level
-        ?source ?payer ~unparsing_mode ctxt block =
+        RPC. [unlimited_gas] is set to [false] by default. *)
+    let run_script_view ?gas ~contract ~view ~input ?(unlimited_gas = false)
+        ~chain_id ~now ~level ?source ?payer ~unparsing_mode ctxt block =
       RPC_context.make_call0
         S.run_script_view
         ctxt
         block
         ()
-        ( contract,
-          view,
-          input,
-          chain_id,
-          source,
-          payer,
-          gas,
-          unparsing_mode,
-          now,
+        ( ( contract,
+            view,
+            input,
+            unlimited_gas,
+            chain_id,
+            source,
+            payer,
+            gas,
+            unparsing_mode,
+            now ),
           level )
 
     let typecheck_code ?gas ?legacy ~script ?show_types ctxt block =

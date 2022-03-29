@@ -55,6 +55,7 @@ type run_script_view_params = {
   shared_params : simulation_params;
   contract : Contract.t;
   view : string;
+  unlimited_gas : bool;
 }
 
 (* Parameters specific to simulations of contract calls *)

@@ -982,10 +982,11 @@ let commands () =
     command
       ~group
       ~desc:"Ask the node to run a Michelson view with Unit as input."
-      (args6
+      (args7
          source_arg
          payer_arg
          run_gas_limit_arg
+         unlimited_gas_arg
          (unparsing_mode_arg ~default:"Readable")
          now_arg
          level_arg)
@@ -996,7 +997,7 @@ let commands () =
            ~name:"contract"
            ~desc:"the contract containing the view"
       @@ stop)
-      (fun (source, payer, gas, unparsing_mode, now, level)
+      (fun (source, payer, gas, unlimited_gas, unparsing_mode, now, level)
            view
            (_, contract)
            cctxt ->
@@ -1014,15 +1015,17 @@ let commands () =
               {input; unparsing_mode; now; level; source; payer; gas};
             contract;
             view;
+            unlimited_gas;
           }
         >>= fun res -> print_view_result cctxt res);
     command
       ~group
       ~desc:"Ask the node to run a Michelson view."
-      (args6
+      (args7
          source_arg
          payer_arg
          run_gas_limit_arg
+         unlimited_gas_arg
          (unparsing_mode_arg ~default:"Readable")
          now_arg
          level_arg)
@@ -1038,7 +1041,7 @@ let commands () =
            ~desc:"the argument provided to the view"
            data_parameter
       @@ stop)
-      (fun (source, payer, gas, unparsing_mode, now, level)
+      (fun (source, payer, gas, unlimited_gas, unparsing_mode, now, level)
            view
            (_, contract)
            input
@@ -1054,6 +1057,7 @@ let commands () =
               {input; unparsing_mode; now; level; source; payer; gas};
             contract;
             view;
+            unlimited_gas;
           }
         >>= fun res -> print_view_result cctxt res);
   ]

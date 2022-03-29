@@ -38,6 +38,11 @@ let viewable_script =
   view "add_v" nat nat { UNPAIR; ADD };
   view "mul_v" nat nat { UNPAIR; MUL };
   view "value" unit nat { CDR };
+  view
+    "loop" int unit
+    {CAR; DUP; EQ;
+     IF{DROP; UNIT}
+       {SELF_ADDRESS; SWAP; PUSH int -1; ADD; VIEW "loop" unit; ASSERT_SOME}};
 }
 |}
 
@@ -120,6 +125,26 @@ let test_run_view_unknown_view ~protocol () =
   let msg = rex "The contract ([^ ]+) does not have a view named `unknown`." in
   Process.check_error ~exit_code:1 ~msg failed_command
 
+(* Runs high consumption view `loop` with 961 as input and default gas limit,
+   and fails because of gas exhaustion. *)
+let test_run_view_loop_default_limit ~protocol () =
+  let* (client, contract) = init_with_contract ~protocol in
+  let failed_command =
+    Client.spawn_run_view ~view:"loop" ~contract ~input:"961" client
+  in
+  let msg = rex "Gas limit exceeded during typechecking or execution." in
+  Process.check_error ~exit_code:1 ~msg failed_command
+
+(* Runs high consumption view `loop` with 961 as input with unlimited gas
+   consumption. *)
+let test_run_view_loop_unlimited_gas ~protocol =
+  test_run_view_generic
+    ~protocol
+    ~view:"loop"
+    ~input:(Some "961")
+    ~expected:"Unit"
+    ~unlimited_gas:true
+
 let make_for ~protocol () =
   List.iter
     (fun (title, f) ->
@@ -133,6 +158,10 @@ let make_for ~protocol () =
         test_run_view_unknown_contract ~protocol );
       ( "Run on non existing view `unknown`",
         test_run_view_unknown_view ~protocol );
+      ( "Run view `loop` with default gas limit",
+        test_run_view_loop_default_limit ~protocol );
+      ( "Run view `loop` with unlimited gas",
+        test_run_view_loop_unlimited_gas ~protocol );
     ]
 
 let register ~protocols =

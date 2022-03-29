@@ -1241,7 +1241,7 @@ let typecheck_script ~script ?(details = false) ?(emacs = false)
   |> Process.check_and_read_stdout
 
 let spawn_run_view ?hooks ?source ?payer ?gas ?unparsing_mode ~view ~contract
-    ?input client =
+    ?input ?(unlimited_gas = false) client =
   let unparsing_mode_to_string = function
     | `Optimized -> "Optimized"
     | `Optimized_legacy -> "Optimized_legacy"
@@ -1261,10 +1261,11 @@ let spawn_run_view ?hooks ?source ?payer ?gas ?unparsing_mode ~view ~contract
         ~name:"unparsing-mode"
         unparsing_mode_to_string
         unparsing_mode
-    @ optional_arg ~name:"gas" Int.to_string gas)
+    @ optional_arg ~name:"gas" Int.to_string gas
+    @ if unlimited_gas then ["--unlimited-gas"] else [])
 
 let run_view ?hooks ?source ?payer ?gas ?unparsing_mode ~view ~contract ?input
-    client =
+    ?unlimited_gas client =
   spawn_run_view
     ?hooks
     ?source
@@ -1274,6 +1275,7 @@ let run_view ?hooks ?source ?payer ?gas ?unparsing_mode ~view ~contract ?input
     ~view
     ~contract
     ?input
+    ?unlimited_gas
     client
   |> Process.check_and_read_stdout
 

@@ -995,6 +995,7 @@ val spawn_run_view :
   view:string ->
   contract:string ->
   ?input:string ->
+  ?unlimited_gas:bool ->
   t ->
   Process.t
 
@@ -1013,6 +1014,7 @@ val run_view :
   view:string ->
   contract:string ->
   ?input:string ->
+  ?unlimited_gas:bool ->
   t ->
   string Lwt.t
 
