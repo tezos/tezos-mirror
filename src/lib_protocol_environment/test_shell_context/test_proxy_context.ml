@@ -31,6 +31,8 @@
     Subject:      Low-level operations on proxy contexts.
 *)
 
+module Assert = Lib_test.Assert
+
 (* Generates data inside the context of the block *)
 let create_block (ctxt : Tezos_context_memory.Context.t) :
     Tezos_context_memory.Context.t Lwt.t =

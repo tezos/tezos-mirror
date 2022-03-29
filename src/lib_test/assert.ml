@@ -25,25 +25,90 @@
 
 (** [assert] contains Alcotest convenience assertions. *)
 
-open Alcotest
+let fail ~msg expected given =
+  Format.kasprintf
+    Stdlib.failwith
+    "@[%s@ expected: %s@ got: %s@]"
+    msg
+    expected
+    given
 
-(** Alcotest check that [b] is [true]. *)
-let assert_true str b = check bool str true b
+let fail_msg fmt = Format.kasprintf (fun msg -> fail ~msg "" "") fmt
 
-(** Alcotest check that [b] is [false]. *)
-let assert_false str b = check bool str false b
+let assert_true msg b = Alcotest.check Alcotest.bool msg true b
 
-(** Alcotest version of [assert false]. *)
+let assert_false msg b = Alcotest.check Alcotest.bool msg false b
+
+let assert_none ?(msg = "") x = if x <> None then fail ~msg "None" "Some _"
+
 let impossible str = assert_true str false
 
-(** Assert that at least one value in [l] satisfies [f]. *)
 let check_any ?(msg = "No value in the list satifies the condition.") f l =
-  if not (List.exists f l) then fail msg
+  if not (List.exists f l) then Alcotest.fail msg
 
-(** [contains m msg x ls] asserts that one testable in [ls] equals
-    [x], and otherwise fails with [msg] *)
-let contains (type a) (m : a testable) msg (x : a) (ls : a list) : unit =
+let contains (type a) (m : a Alcotest.testable) msg x ls =
   let (module M) = m in
-  let (module L) = list m in
+  let (module L) = Alcotest.list m in
   if not @@ List.exists (M.equal x) ls then
-    failf "%s. Could not find %a in %a" msg M.pp x L.pp ls
+    Alcotest.failf "%s. Could not find %a in %a" msg M.pp x L.pp ls
+
+let default_printer _ = ""
+
+let equal ?(eq = ( = )) ?(prn = default_printer) ?(msg = "") x y =
+  if not (eq x y) then fail ~msg (prn x) (prn y)
+
+let equal_bytes ?msg s1 s2 = equal ?msg ~prn:Bytes.to_string s1 s2
+
+let equal_bytes_option ?msg o1 o2 =
+  let prn = function None -> "None" | Some s -> Bytes.to_string s in
+  equal ?msg ~prn o1 o2
+
+let equal_bool ?msg b1 b2 = equal ?msg ~prn:string_of_bool b1 b2
+
+let equal_string_option ?msg o1 o2 =
+  let prn = function None -> "None" | Some s -> s in
+  equal ?msg ~prn o1 o2
+
+let make_equal_list eq prn ?(msg = "") (x : 'a list) (y : 'a list) =
+  let pp_list ppf l =
+    Format.fprintf
+      ppf
+      "[%a]"
+      (Format.pp_print_list
+         ~pp_sep:(fun ppf () -> Format.fprintf ppf ";@ ")
+         (fun ppf e -> Format.fprintf ppf "%s" (prn e)))
+      l
+  in
+
+  let rec iter i x y =
+    match (x, y) with
+    | (hd_x :: tl_x, hd_y :: tl_y) ->
+        if eq hd_x hd_y then iter (succ i) tl_x tl_y
+        else
+          let msg = Printf.sprintf "%s (at index %d)" msg i in
+          fail ~msg (prn hd_x) (prn hd_y)
+    | (_ :: _, []) | ([], _ :: _) ->
+        fail_msg
+          "@[<v 2>%s. Lists have different sizes: %d <> %d. The lists are@,\
+           @[<hov>%a@]@,\
+           and@,\
+           @[<hov>%a@]@]"
+          msg
+          (List.length x)
+          (List.length y)
+          pp_list
+          x
+          pp_list
+          y
+    | ([], []) -> ()
+  in
+  iter 0 x y
+
+let equal_string_list = make_equal_list String.equal Fun.id
+
+let equal_string_list_list ?msg l1 l2 =
+  let pr_persist l =
+    let res = String.concat ";" (List.map (fun s -> Printf.sprintf "%S" s) l) in
+    Printf.sprintf "[%s]" res
+  in
+  equal_string_list ?msg (List.map pr_persist l1) (List.map pr_persist l2)
