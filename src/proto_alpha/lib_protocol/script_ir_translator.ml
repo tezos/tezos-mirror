@@ -1928,6 +1928,7 @@ type 'a ex_ty_cstr =
   | Ex_ty_cstr : {
       ty : ('b, _) Script_typed_ir.ty;
       box : 'b -> 'a;
+      original_type : Script.node;
     }
       -> 'a ex_ty_cstr
 
@@ -1945,25 +1946,27 @@ let find_entrypoint (type full fullc error_trace)
    fun ty entrypoints entrypoint ->
     let* () = Gas_monad.consume_gas Typecheck_costs.find_entrypoint_cycle in
     match (ty, entrypoints) with
-    | (_, {at_node = Some {name; original_type = _}; _})
+    | (_, {at_node = Some {name; original_type}; _})
       when Entrypoint.(name = entrypoint) ->
-        return (Ex_ty_cstr {ty; box = (fun e -> e)})
+        return (Ex_ty_cstr {ty; box = (fun e -> e); original_type})
     | (Union_t (tl, tr, _, _), {nested = Entrypoints_Union {left; right}; _})
       -> (
         Gas_monad.bind_recover (find_entrypoint tl left entrypoint) @@ function
-        | Ok (Ex_ty_cstr {ty; box}) ->
-            return (Ex_ty_cstr {ty; box = (fun e -> L (box e))})
+        | Ok (Ex_ty_cstr {ty; box; original_type}) ->
+            return (Ex_ty_cstr {ty; box = (fun e -> L (box e)); original_type})
         | Error () ->
-            let+ (Ex_ty_cstr {ty; box}) = find_entrypoint tr right entrypoint in
-            Ex_ty_cstr {ty; box = (fun e -> R (box e))})
+            let+ (Ex_ty_cstr {ty; box; original_type}) =
+              find_entrypoint tr right entrypoint
+            in
+            Ex_ty_cstr {ty; box = (fun e -> R (box e)); original_type})
     | (_, {nested = Entrypoints_None; _}) -> Gas_monad.of_result (Error ())
   in
-  Gas_monad.bind_recover (find_entrypoint full entrypoints.root entrypoint)
-  @@ function
+  let {root; original_type} = entrypoints in
+  Gas_monad.bind_recover (find_entrypoint full root entrypoint) @@ function
   | Ok f_t -> return f_t
   | Error () ->
       if Entrypoint.is_default entrypoint then
-        return (Ex_ty_cstr {ty = full; box = (fun e -> e)})
+        return (Ex_ty_cstr {ty = full; box = (fun e -> e); original_type})
       else
         Gas_monad.of_result
         @@ Error
