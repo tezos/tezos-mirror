@@ -426,6 +426,7 @@ let commands_ro () =
           ~chain:cctxt#chain
           ~block:cctxt#block
           ~contract
+          ~normalize_types:false
         >>= Michelson_v1_entrypoints.print_entrypoints_list
               cctxt
               ~emacs:false

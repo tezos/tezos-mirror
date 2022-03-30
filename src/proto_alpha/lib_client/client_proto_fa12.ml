@@ -724,6 +724,7 @@ let contract_has_fa12_interface :
         ~chain
         ~block
         ~contract
+        ~normalize_types:true
       >>=? fun entrypoints ->
       List.iter_e (check_entrypoint entrypoints) standard_entrypoints
       |> Lwt.return

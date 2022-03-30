@@ -106,20 +106,34 @@ let print_entrypoint_type (cctxt : #Client_context.printer)
       >>= fun () -> return_unit
   | Error errs -> on_errors errs
 
-let list_contract_unreachables_and_entrypoints cctxt ~chain ~block ~contract =
+let list_contract_unreachables_and_entrypoints cctxt ~chain ~block ~contract
+    ~normalize_types =
   Alpha_services.Contract.list_entrypoints
     cctxt
     (chain, block)
     contract
-    ~normalize_types:false
+    ~normalize_types
 
 let list_contract_unreachables cctxt ~chain ~block ~contract =
-  list_contract_unreachables_and_entrypoints cctxt ~chain ~block ~contract
-  >>=? fun (unreachables, _) -> return unreachables
+  let normalize_types =
+    (* no need to normalize types as typed entrypoints are ignored *)
+    false
+  in
+  list_contract_unreachables_and_entrypoints
+    cctxt
+    ~chain
+    ~block
+    ~contract
+    ~normalize_types
+  >>=? fun (unreachables, _typed_entrypoints) -> return unreachables
 
-let list_contract_entrypoints cctxt ~chain ~block ~contract =
-  let normalize_types = false in
-  list_contract_unreachables_and_entrypoints cctxt ~chain ~block ~contract
+let list_contract_entrypoints cctxt ~chain ~block ~contract ~normalize_types =
+  list_contract_unreachables_and_entrypoints
+    cctxt
+    ~chain
+    ~block
+    ~contract
+    ~normalize_types
   >>=? fun (_, entrypoints) ->
   if not @@ List.mem_assoc ~equal:String.equal "default" entrypoints then
     contract_entrypoint_type
