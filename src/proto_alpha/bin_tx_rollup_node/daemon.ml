@@ -246,7 +246,6 @@ let create_genesis_block state tezos_block =
       state.rollup_info.rollup_id
       tezos_block
   in
-  let* _ctxt_hash = Context.commit ctxt in
   let+ _block_hash = State.save_block state genesis_block in
   (genesis_block, ctxt)
 

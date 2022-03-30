@@ -83,10 +83,6 @@ let l2_to_context_hash hash =
 
 let exists index hash = exists index (l2_to_context_hash hash)
 
-let checkout index hash = checkout index (l2_to_context_hash hash)
-
-let checkout_exn index hash = checkout_exn index (l2_to_context_hash hash)
-
 (* The context hashes are not dependant on the time, we use EPOCH (i.e. 0) to
    commit (and hash). *)
 
@@ -95,5 +91,26 @@ let hash ?(message = "") context =
 
 let commit ?(message = "") context =
   let open Lwt_syntax in
-  let+ hash = commit ~time:Time.Protocol.epoch ~message context in
-  context_hash_to_l2 hash
+  if is_empty context then
+    (* We cannot commit empty contexts with Irmin 3 *)
+    return (hash ~message context)
+  else
+    let+ hash = commit ~time:Time.Protocol.epoch ~message context in
+    context_hash_to_l2 hash
+
+let checkout index context_hash =
+  let open Lwt_syntax in
+  let+ context = checkout index (l2_to_context_hash context_hash) in
+  match context with
+  | Some context -> Some context
+  | None ->
+      let empty = empty index in
+      let hash_empty = hash empty in
+      if Protocol.Tx_rollup_l2_context_hash.(context_hash = hash_empty) then
+        Some empty
+      else None
+
+let checkout_exn index hash =
+  let open Lwt_syntax in
+  let+ context = checkout index hash in
+  match context with None -> raise Not_found | Some context -> context

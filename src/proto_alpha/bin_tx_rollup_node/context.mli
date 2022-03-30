@@ -44,8 +44,7 @@ val init :
   string ->
   index Lwt.t
 
-(** Build an empty context from an index. The resulting context is not yet
-    commited. *)
+(** Build an empty context from an index. Don't commit an empty context. *)
 val empty : index -> t
 
 (** Close the index. Does not fail when the context is already closed. *)
