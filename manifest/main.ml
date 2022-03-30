@@ -242,9 +242,9 @@ let resto_cohttp_server = external_lib "resto-cohttp-server" resto_version
 let resto_directory =
   external_lib ~js_compatible:true "resto-directory" resto_version
 
-let ringo = external_lib ~js_compatible:true "ringo" V.(exactly "0.7")
+let ringo = external_lib ~js_compatible:true "ringo" V.(exactly "0.8")
 
-let ringo_lwt = external_lib "ringo-lwt" V.(exactly "0.7")
+let ringo_lwt = external_lib "ringo-lwt" V.(exactly "0.8")
 
 let secp256k1_internal =
   external_lib
