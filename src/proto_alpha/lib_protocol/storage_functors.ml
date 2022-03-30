@@ -377,9 +377,8 @@ module Make_indexed_carbonated_data_storage_INTERNAL
   let len_key i = I.to_path i [len_name]
 
   let consume_mem_gas c key =
-    C.consume_gas
-      c
-      (Storage_costs.read_access ~path_length:(List.length key) ~read_bytes:0)
+    let path_length = List.length @@ C.absolute_key c key in
+    C.consume_gas c (Storage_costs.read_access ~path_length ~read_bytes:0)
 
   let existing_size c i =
     C.find c (len_key i) >|= function
@@ -389,13 +388,10 @@ module Make_indexed_carbonated_data_storage_INTERNAL
   let consume_read_gas get c i =
     let len_key = len_key i in
     get c len_key >>=? fun len ->
+    let path_length = List.length @@ C.absolute_key c len_key in
     Lwt.return
       ( decode_len_value len_key len >>? fun read_bytes ->
-        let cost =
-          Storage_costs.read_access
-            ~path_length:(List.length len_key)
-            ~read_bytes
-        in
+        let cost = Storage_costs.read_access ~path_length ~read_bytes in
         C.consume_gas c cost )
 
   (* For the future: here, we bill a generic cost for encoding the value
@@ -992,9 +988,8 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
 
     let data_name = data_name :: N.name
 
-    let path_length = List.length N.name + 1
-
     let consume_mem_gas c =
+      let path_length = List.length (Raw_context.absolute_key c N.name) + 1 in
       Raw_context.consume_gas
         c
         (Storage_costs.read_access ~path_length ~read_bytes:0)
@@ -1005,6 +1000,7 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
       | Some len -> decode_len_value len_name len >|? fun len -> (len, true)
 
     let consume_read_gas get c =
+      let path_length = List.length (Raw_context.absolute_key c N.name) + 1 in
       get c len_name >>=? fun len ->
       Lwt.return
         ( decode_len_value len_name len >>? fun read_bytes ->
