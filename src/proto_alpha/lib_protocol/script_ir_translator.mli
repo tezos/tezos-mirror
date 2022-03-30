@@ -420,7 +420,7 @@ val parse_contract_for_script :
 type 'a ex_ty_cstr =
   | Ex_ty_cstr : {
       ty : ('b, _) Script_typed_ir.ty;
-      box : 'b -> 'a;
+      construct : 'b -> 'a;
       original_type_expr : Script.node;
     }
       -> 'a ex_ty_cstr

@@ -1928,7 +1928,7 @@ let rec make_comb_set_proof_argument :
 type 'a ex_ty_cstr =
   | Ex_ty_cstr : {
       ty : ('b, _) Script_typed_ir.ty;
-      box : 'b -> 'a;
+      construct : 'b -> 'a;
       original_type_expr : Script.node;
     }
       -> 'a ex_ty_cstr
@@ -1949,18 +1949,24 @@ let find_entrypoint (type full fullc error_trace)
     match (ty, entrypoints) with
     | (_, {at_node = Some {name; original_type_expr}; _})
       when Entrypoint.(name = entrypoint) ->
-        return (Ex_ty_cstr {ty; box = (fun e -> e); original_type_expr})
+        return (Ex_ty_cstr {ty; construct = (fun e -> e); original_type_expr})
     | (Union_t (tl, tr, _, _), {nested = Entrypoints_Union {left; right}; _})
       -> (
         Gas_monad.bind_recover (find_entrypoint tl left entrypoint) @@ function
-        | Ok (Ex_ty_cstr {ty; box; original_type_expr}) ->
+        | Ok (Ex_ty_cstr {ty; construct; original_type_expr}) ->
             return
-              (Ex_ty_cstr {ty; box = (fun e -> L (box e)); original_type_expr})
+              (Ex_ty_cstr
+                 {
+                   ty;
+                   construct = (fun e -> L (construct e));
+                   original_type_expr;
+                 })
         | Error () ->
-            let+ (Ex_ty_cstr {ty; box; original_type_expr}) =
+            let+ (Ex_ty_cstr {ty; construct; original_type_expr}) =
               find_entrypoint tr right entrypoint
             in
-            Ex_ty_cstr {ty; box = (fun e -> R (box e)); original_type_expr})
+            Ex_ty_cstr
+              {ty; construct = (fun e -> R (construct e)); original_type_expr})
     | (_, {nested = Entrypoints_None; _}) -> Gas_monad.of_result (Error ())
   in
   let {root; original_type_expr} = entrypoints in
@@ -1968,7 +1974,8 @@ let find_entrypoint (type full fullc error_trace)
   | Ok f_t -> return f_t
   | Error () ->
       if Entrypoint.is_default entrypoint then
-        return (Ex_ty_cstr {ty = full; box = (fun e -> e); original_type_expr})
+        return
+          (Ex_ty_cstr {ty = full; construct = (fun e -> e); original_type_expr})
       else
         Gas_monad.of_result
         @@ Error
