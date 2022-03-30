@@ -53,8 +53,9 @@ type header = {
 }
 
 (** L2 blocks are composed of a header and an inbox. The inbox contains the
-    actual messages.  *)
-type t = {header : header; inbox : Inbox.t}
+    actual messages. The hash in the block structure corresponds the hash of the
+    header. *)
+type t = {hash : hash; header : header; inbox : Inbox.t}
 
 (** Build the genesis block  *)
 val genesis_block : Context.index -> Tx_rollup.t -> Block_hash.t -> t

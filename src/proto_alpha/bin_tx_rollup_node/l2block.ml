@@ -52,7 +52,7 @@ type header = {
   context : Tx_rollup_l2_context_hash.t;
 }
 
-type t = {header : header; inbox : Inbox.t}
+type t = {hash : hash; header : header; inbox : Inbox.t}
 
 let level_encoding =
   let open Data_encoding in
@@ -107,9 +107,12 @@ let header_encoding =
 let encoding =
   let open Data_encoding in
   conv
-    (fun {header; inbox} -> (header, inbox))
-    (fun (header, inbox) -> {header; inbox})
-    (obj2 (req "header" header_encoding) (req "inbox" Inbox.encoding))
+    (fun {hash; header; inbox} -> (hash, header, inbox))
+    (fun (hash, header, inbox) -> {hash; header; inbox})
+    (obj3
+       (req "hash" Hash.encoding)
+       (req "header" header_encoding)
+       (req "inbox" Inbox.encoding))
 
 let genesis_hash rollup = Hash.hash_string [Tx_rollup.to_b58check rollup]
 
@@ -126,14 +129,15 @@ let hash_header h =
 let genesis_block index rollup tezos_block =
   let ctxt = Context.empty index in
   let context_hash = Context.hash ctxt in
+  let hash = genesis_hash rollup in
   let header =
     {
       level = Genesis;
       tezos_block;
-      predecessor = genesis_hash rollup;
+      predecessor = hash;
       (* Genesis block is its own predecessor *)
       context = context_hash;
     }
   in
   let inbox : Inbox.t = {contents = []; cumulated_size = 0} in
-  {header; inbox}
+  {hash; header; inbox}

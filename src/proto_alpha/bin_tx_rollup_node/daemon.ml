@@ -280,12 +280,13 @@ let process_messages_and_inboxes (state : State.t) ~(predecessor : L2block.t)
         {
           level;
           tezos_block = current_hash;
-          predecessor = L2block.hash_header predecessor.header;
+          predecessor = predecessor.hash;
           context = context_hash;
         }
       in
-      let block = L2block.{header; inbox} in
-      let*! hash = State.save_block state block in
+      let hash = L2block.hash_header header in
+      let block = L2block.{hash; header; inbox} in
+      let*! () = State.save_block state block in
       let*! () =
         Event.(emit rollup_block) (header.level, hash, header.tezos_block)
       in
@@ -359,7 +360,7 @@ let rec process_block cctxt state current_hash rollup_id :
           State.save_tezos_block_info
             state
             current_hash
-            (L2block.hash_header l2_block.header)
+            l2_block.hash
             ~level:block_info.header.shell.level
             ~predecessor:block_info.header.shell.predecessor
         in

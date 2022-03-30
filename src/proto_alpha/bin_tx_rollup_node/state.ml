@@ -189,11 +189,7 @@ let get_level_l2_block state level =
 
 let save_block state (block : L2block.t) =
   let open Lwt_syntax in
-  let hash = L2block.hash_header block.header in
-  let+ () =
-    join [save_level state block.header.level hash; save_block state block]
-  in
-  hash
+  join [save_level state block.header.level block.hash; save_block state block]
 
 let distance_l2_levels l1 l2 =
   let to_int32 = function
@@ -288,12 +284,8 @@ let set_head state head context =
   | Some batcher_state -> Batcher.update_incr_context batcher_state context) ;
   state.head <- head ;
   let*! old_head = Stores.Head_store.read state.stores.head in
-  let* () =
-    Stores.Head_store.write
-      state.stores.head
-      (L2block.hash_header head.L2block.header)
-  in
-  let hash = L2block.hash_header head.header in
+  let hash = head.L2block.hash in
+  let* () = Stores.Head_store.write state.stores.head hash in
   let*! l2_reorg =
     match old_head with
     | None -> Lwt.return no_reorg
