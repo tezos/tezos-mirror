@@ -41,6 +41,7 @@ val contract_entrypoint_type :
   block:Block_services.block ->
   contract:Alpha_context.Contract.t ->
   entrypoint:Alpha_context.Entrypoint.t ->
+  normalize_types:bool ->
   Alpha_context.Script.expr option tzresult Lwt.t
 
 val print_entrypoint_type :

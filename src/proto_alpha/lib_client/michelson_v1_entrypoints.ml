@@ -62,13 +62,13 @@ let script_entrypoint_type cctxt ~(chain : Chain_services.chain) ~block
   | Error _ as err -> Lwt.return err
 
 let contract_entrypoint_type cctxt ~(chain : Chain_services.chain) ~block
-    ~contract ~entrypoint =
+    ~contract ~entrypoint ~normalize_types =
   Alpha_services.Contract.entrypoint_type
     cctxt
     (chain, block)
     contract
     entrypoint
-    ~normalize_types:false
+    ~normalize_types
   >>= function
   | Ok ty -> return_some ty
   | Error (RPC_context.Not_found _ :: _) -> return None
@@ -118,6 +118,7 @@ let list_contract_unreachables cctxt ~chain ~block ~contract =
   >>=? fun (unreachables, _) -> return unreachables
 
 let list_contract_entrypoints cctxt ~chain ~block ~contract =
+  let normalize_types = false in
   list_contract_unreachables_and_entrypoints cctxt ~chain ~block ~contract
   >>=? fun (_, entrypoints) ->
   if not @@ List.mem_assoc ~equal:String.equal "default" entrypoints then
@@ -127,6 +128,7 @@ let list_contract_entrypoints cctxt ~chain ~block ~contract =
       ~block
       ~contract
       ~entrypoint:Entrypoint.default
+      ~normalize_types
     >>= function
     | Ok (Some ty) -> return (("default", ty) :: entrypoints)
     | Ok None -> return entrypoints
