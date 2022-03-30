@@ -684,6 +684,42 @@ module Tx_rollup = struct
           ]
         in
         Client.Spawn.rpc ?endpoint ?hooks ~data POST path client
+
+      let message_result_hash ?endpoint ?hooks ?(chain = "main")
+          ?(block = "head") ~data client =
+        let path =
+          [
+            "chains";
+            chain;
+            "blocks";
+            block;
+            "helpers";
+            "forge";
+            "tx_rollup";
+            "commitment";
+            "message_result_hash";
+          ]
+        in
+        Client.Spawn.rpc ?endpoint ?hooks ~data POST path client
+    end
+
+    module Withdraw = struct
+      let withdraw_list_hash ?endpoint ?hooks ?(chain = "main")
+          ?(block = "head") ~data client =
+        let path =
+          [
+            "chains";
+            chain;
+            "blocks";
+            block;
+            "helpers";
+            "forge";
+            "tx_rollup";
+            "withdraw";
+            "withdraw_list_hash";
+          ]
+        in
+        Client.Spawn.rpc ?endpoint ?hooks ~data POST path client
     end
   end
 end
