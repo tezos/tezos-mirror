@@ -509,6 +509,7 @@ let[@coq_axiom_with_reason "gadt"] register () =
             ~legacy:true
             ~allow_forged_in_storage:true
             Readable
+            ~normalize_types:true
             script
           >|=? fun (script, ctxt) -> (Some script, ctxt))
       >|=? fun (script, _ctxt) -> {balance; delegate; script; counter}) ;

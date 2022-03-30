@@ -5893,7 +5893,7 @@ and[@coq_axiom_with_reason "gadt"] unparse_code ctxt ~stack_depth mode code =
   | (Int _ | String _ | Bytes _) as atom -> return (atom, ctxt)
 
 let parse_and_unparse_script_unaccounted ctxt ~legacy ~allow_forged_in_storage
-    mode {code; storage} =
+    mode ~normalize_types {code; storage} =
   Script.force_decode_in_context
     ~consume_deserialization_gas:When_needed
     ctxt
@@ -5902,7 +5902,13 @@ let parse_and_unparse_script_unaccounted ctxt ~legacy ~allow_forged_in_storage
   typecheck_code ~legacy ~show_types:false ctxt code
   >>=? fun ( Typechecked_code_internal
                {
-                 toplevel = {code_field; arg_type = _; storage_type = _; views};
+                 toplevel =
+                   {
+                     code_field;
+                     arg_type = original_arg_type_expr;
+                     storage_type = original_storage_type_expr;
+                     views;
+                   };
                  arg_type;
                  storage_type;
                  entrypoints;
@@ -5921,9 +5927,13 @@ let parse_and_unparse_script_unaccounted ctxt ~legacy ~allow_forged_in_storage
   >>=? fun (storage, ctxt) ->
   Lwt.return
     (let loc = Micheline.dummy_location in
-     unparse_parameter_ty ~loc ctxt arg_type ~entrypoints
-     >>? fun (arg_type, ctxt) ->
-     unparse_ty ~loc ctxt storage_type >|? fun (storage_type, ctxt) ->
+     (if normalize_types then
+      unparse_parameter_ty ~loc ctxt arg_type ~entrypoints
+      >>? fun (arg_type, ctxt) ->
+      unparse_ty ~loc ctxt storage_type >|? fun (storage_type, ctxt) ->
+      (arg_type, storage_type, ctxt)
+     else ok (original_arg_type_expr, original_storage_type_expr, ctxt))
+     >|? fun (arg_type, storage_type, ctxt) ->
      let open Micheline in
      let unparse_view_unaccounted name {input_ty; output_ty; view_code} views =
        Prim

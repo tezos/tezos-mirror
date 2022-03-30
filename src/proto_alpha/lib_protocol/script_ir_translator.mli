@@ -399,6 +399,7 @@ val parse_and_unparse_script_unaccounted :
   legacy:bool ->
   allow_forged_in_storage:bool ->
   unparsing_mode ->
+  normalize_types:bool ->
   Script.t ->
   (Script.t * context) tzresult Lwt.t
 

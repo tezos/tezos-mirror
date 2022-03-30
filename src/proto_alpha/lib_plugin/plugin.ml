@@ -2846,6 +2846,7 @@ module RPC = struct
                 ~legacy:true
                 ~allow_forged_in_storage:true
                 unparsing_mode
+                ~normalize_types:true
                 script
               >>=? fun (script, _ctxt) -> return_some script)
 

@@ -59,6 +59,7 @@ let test_unparse_view () =
     ~legacy:true
     ~allow_forged_in_storage:false
     Readable
+    ~normalize_types:true
     script
   >>=?? fun (unparsed_script, _ctx) ->
   let aft = Data_encoding.force_bytes unparsed_script.code in
