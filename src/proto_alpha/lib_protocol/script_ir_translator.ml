@@ -5893,14 +5893,30 @@ and[@coq_axiom_with_reason "gadt"] unparse_code ctxt ~stack_depth mode code =
   | (Int _ | String _ | Bytes _) as atom -> return (atom, ctxt)
 
 let parse_and_unparse_script_unaccounted ctxt ~legacy ~allow_forged_in_storage
-    mode original_script =
-  parse_script ctxt ~legacy ~allow_forged_in_storage original_script
-  >>=? fun ( Ex_script
-               (Script
-                 {code; arg_type; storage; storage_type; entrypoints; views; _}),
+    mode {code; storage} =
+  Script.force_decode_in_context
+    ~consume_deserialization_gas:When_needed
+    ctxt
+    code
+  >>?= fun (code, ctxt) ->
+  typecheck_code ~legacy ~show_types:false ctxt code
+  >>=? fun ( Typechecked_code_internal
+               {
+                 toplevel = {code_field; arg_type = _; storage_type = _; views};
+                 arg_type;
+                 storage_type;
+                 entrypoints;
+                 type_map = _;
+               },
              ctxt ) ->
-  let (Lam (_, original_code)) = code in
-  unparse_code ctxt ~stack_depth:0 mode original_code >>=? fun (code, ctxt) ->
+  parse_storage
+    ctxt
+    ~legacy
+    ~allow_forged:allow_forged_in_storage
+    storage_type
+    ~storage
+  >>=? fun (storage, ctxt) ->
+  unparse_code ctxt ~stack_depth:0 mode code_field >>=? fun (code, ctxt) ->
   unparse_data ctxt ~stack_depth:0 mode storage_type storage
   >>=? fun (storage, ctxt) ->
   Lwt.return
