@@ -4738,11 +4738,6 @@ module Withdraw = struct
     deposit b >>=? fun b ->
     deposit b >>=? fun b ->
     deposit b >>=? fun b ->
-    let fee = Test_tez.of_int 10 in
-    let parameters = print_deposit_arg (`Typed tx_rollup) (`Hash pkh) in
-    Op.transaction ~fee (B b) account1 account1 Tez.zero ~parameters
-    >>=? fun operation ->
-    Block.bake ~operation b >>=? fun b ->
     Nat_ticket.withdrawal
       (B b)
       ~ticketer:deposit_contract
