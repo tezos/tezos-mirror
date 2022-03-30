@@ -1,57 +1,64 @@
 (library
  (name tezos_client_008_PtEdo2Zk_commands)
- (instrumentation (backend bisect_ppx))
  (public_name tezos-client-008-PtEdo2Zk-commands)
- (libraries tezos-base
-            tezos-stdlib-unix
-            tezos-protocol-008-PtEdo2Zk
-            tezos-protocol-environment
-            tezos-shell-services
-            tezos-mockup
-            tezos-mockup-registration
-            tezos-mockup-commands
-            tezos-client-008-PtEdo2Zk
-            tezos-client-commands
-            tezos-rpc
-            tezos-protocol-plugin-008-PtEdo2Zk)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  tezos-protocol-008-PtEdo2Zk
+  tezos-stdlib-unix
+  tezos-protocol-environment
+  tezos-shell-services
+  tezos-mockup
+  tezos-mockup-registration
+  tezos-mockup-commands
+  tezos-client-base
+  tezos-client-008-PtEdo2Zk
+  tezos-client-commands
+  tezos-rpc
+  tezos-protocol-plugin-008-PtEdo2Zk)
  (library_flags (:standard -linkall))
- (modules (:standard \ alpha_commands_registration))
- (flags (:standard -open Tezos_base__TzPervasives
-                   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
-                   -open Tezos_protocol_008_PtEdo2Zk
-                   -open Tezos_stdlib_unix
-                   -open Tezos_shell_services
-                   -open Tezos_client_base
-                   -open Tezos_client_008_PtEdo2Zk
-                   -open Tezos_client_commands
-                   -open Tezos_rpc
-                   -open Tezos_protocol_plugin_008_PtEdo2Zk)))
+ (flags
+  (:standard
+   -open Tezos_base.TzPervasives
+   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+   -open Tezos_protocol_008_PtEdo2Zk
+   -open Tezos_stdlib_unix
+   -open Tezos_shell_services
+   -open Tezos_client_base
+   -open Tezos_client_008_PtEdo2Zk
+   -open Tezos_client_commands
+   -open Tezos_rpc
+   -open Tezos_protocol_plugin_008_PtEdo2Zk))
+ (modules (:standard \ alpha_commands_registration)))
 
 (library
  (name tezos_client_008_PtEdo2Zk_commands_registration)
- (instrumentation (backend bisect_ppx))
  (public_name tezos-client-008-PtEdo2Zk-commands-registration)
- (libraries tezos-base
-            tezos-protocol-008-PtEdo2Zk
-            tezos-protocol-environment
-            tezos-shell-services
-            tezos-client-base
-            tezos-client-008-PtEdo2Zk
-            tezos-client-commands
-            tezos-client-008-PtEdo2Zk-commands
-            tezos-client-sapling-008-PtEdo2Zk
-            tezos-rpc
-            tezos-protocol-plugin-008-PtEdo2Zk)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  tezos-protocol-008-PtEdo2Zk
+  tezos-protocol-environment
+  tezos-shell-services
+  tezos-client-base
+  tezos-client-008-PtEdo2Zk
+  tezos-client-commands
+  tezos-client-008-PtEdo2Zk-commands
+  tezos-client-sapling-008-PtEdo2Zk
+  tezos-rpc
+  tezos-protocol-plugin-008-PtEdo2Zk)
  (library_flags (:standard -linkall))
- (modules alpha_commands_registration)
- (flags (:standard -open Tezos_base__TzPervasives
-                   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
-                   -open Tezos_protocol_008_PtEdo2Zk
-                   -open Tezos_shell_services
-                   -open Tezos_client_base
-                   -open Tezos_client_008_PtEdo2Zk
-                   -open Tezos_client_commands
-                   -open Tezos_client_008_PtEdo2Zk_commands
-                   -open Tezos_client_sapling_008_PtEdo2Zk
-                   -open Tezos_rpc
-                   -open Tezos_protocol_plugin_008_PtEdo2Zk)))
+ (flags
+  (:standard
+   -open Tezos_base.TzPervasives
+   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+   -open Tezos_protocol_008_PtEdo2Zk
+   -open Tezos_shell_services
+   -open Tezos_client_base
+   -open Tezos_client_008_PtEdo2Zk
+   -open Tezos_client_commands
+   -open Tezos_client_008_PtEdo2Zk_commands
+   -open Tezos_client_sapling_008_PtEdo2Zk
+   -open Tezos_rpc
+   -open Tezos_protocol_plugin_008_PtEdo2Zk))
+ (modules alpha_commands_registration))
