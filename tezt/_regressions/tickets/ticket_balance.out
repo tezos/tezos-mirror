@@ -3,17 +3,30 @@ tickets/ticket_balance.out
   "ticket_balance",
   [
     [
-      "ac416953333d9a59b1a1ae19f2781ee1d6b3823b3c594ce525365511772764c3",
+      "paid_bytes",
+      "8201"
+    ],
+    [
+      "table",
       [
         [
-          "data",
-          "01"
-        ],
-        [
-          "len",
-          "00000001"
+          "ac416953333d9a59b1a1ae19f2781ee1d6b3823b3c594ce525365511772764c3",
+          [
+            [
+              "data",
+              "01"
+            ],
+            [
+              "len",
+              "00000001"
+            ]
+          ]
         ]
       ]
+    ],
+    [
+      "used_bytes",
+      "8201"
     ]
   ]
 ]

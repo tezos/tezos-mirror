@@ -580,6 +580,12 @@ module Ticket_balance : sig
       with type t := Raw_context.t
        and type key = Ticket_hash_repr.t
        and type value = Z.t
+
+  module Paid_storage_space :
+    Single_data_storage with type t := Raw_context.t and type value = Z.t
+
+  module Used_storage_space :
+    Single_data_storage with type t := Raw_context.t and type value = Z.t
 end
 
 (** Tenderbake *)

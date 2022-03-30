@@ -25,6 +25,7 @@
 
 type error +=
   | Negative_ticket_balance of {key : Ticket_hash_repr.t; balance : Z.t}
+  | Used_storage_space_underflow
 
 let () =
   let open Data_encoding in
@@ -45,7 +46,16 @@ let () =
     (function
       | Negative_ticket_balance {key; balance} -> Some (key, balance)
       | _ -> None)
-    (fun (key, balance) -> Negative_ticket_balance {key; balance})
+    (fun (key, balance) -> Negative_ticket_balance {key; balance}) ;
+  register_error_kind
+    `Permanent
+    ~id:"Used_storage_underflow"
+    ~title:"Ticket balance used storage underflow"
+    ~description:
+      "Attempt to free more bytes than allocated for the tickets balance"
+    empty
+    (function Used_storage_space_underflow -> Some () | _ -> None)
+    (fun () -> Used_storage_space_underflow)
 
 let get_balance ctxt key =
   Storage.Ticket_balance.Table.find ctxt key >|=? fun (ctxt, res) -> (res, ctxt)
@@ -79,3 +89,23 @@ let adjust_balance ctxt key ~delta =
   get_balance ctxt key >>=? fun (res, ctxt) ->
   let old_balance = Option.value ~default:Z.zero res in
   set_balance ctxt key (Z.add old_balance delta)
+
+let adjust_storage_space ctxt ~storage_diff =
+  if Compare.Z.(storage_diff = Z.zero) then return (Z.zero, ctxt)
+  else
+    Storage.Ticket_balance.Used_storage_space.find ctxt >>=? fun used_storage ->
+    let used_storage = Option.value ~default:Z.zero used_storage in
+    Storage.Ticket_balance.Paid_storage_space.find ctxt >>=? fun paid_storage ->
+    let paid_storage = Option.value ~default:Z.zero paid_storage in
+    let new_used_storage = Z.add used_storage storage_diff in
+    error_when
+      Compare.Z.(new_used_storage < Z.zero)
+      Used_storage_space_underflow
+    >>?= fun () ->
+    Storage.Ticket_balance.Used_storage_space.add ctxt new_used_storage
+    >>= fun ctxt ->
+    let diff = Z.sub new_used_storage paid_storage in
+    if Compare.Z.(Z.zero < diff) then
+      Storage.Ticket_balance.Paid_storage_space.add ctxt new_used_storage
+      >>= fun ctxt -> return (diff, ctxt)
+    else return (Z.zero, ctxt)

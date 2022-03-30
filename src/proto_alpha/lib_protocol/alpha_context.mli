@@ -3345,8 +3345,13 @@ end
     documentation of the functions there.
  *)
 module Ticket_balance : sig
+  type error += Used_storage_space_underflow
+
   val adjust_balance :
     context -> Ticket_hash.t -> delta:Z.t -> (Z.t * context) tzresult Lwt.t
+
+  val adjust_storage_space :
+    context -> storage_diff:Z.t -> (Z.t * context) tzresult Lwt.t
 
   val get_balance :
     context -> Ticket_hash.t -> (Z.t option * context) tzresult Lwt.t
@@ -3426,10 +3431,7 @@ end
 
 module Fees : sig
   val record_paid_storage_space :
-    context ->
-    Contract.t ->
-    ticket_table_size_diff:Z.t ->
-    (context * Z.t * Z.t) tzresult Lwt.t
+    context -> Contract.t -> (context * Z.t * Z.t) tzresult Lwt.t
 
   val record_global_constant_storage_space : context -> Z.t -> context * Z.t
 

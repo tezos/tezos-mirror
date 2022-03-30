@@ -1388,10 +1388,31 @@ module Ticket_balance = struct
     let name = ["ticket_balance"]
   end
 
-  module Sub_context = Make_subcontext (Registered) (Raw_context) (Name)
+  module Raw_context = Make_subcontext (Registered) (Raw_context) (Name)
+
+  module Paid_storage_space =
+    Make_single_data_storage (Registered) (Raw_context)
+      (struct
+        let name = ["paid_bytes"]
+      end)
+      (Encoding.Z)
+
+  module Used_storage_space =
+    Make_single_data_storage (Registered) (Raw_context)
+      (struct
+        let name = ["used_bytes"]
+      end)
+      (Encoding.Z)
+
+  module Table_context =
+    Make_subcontext (Registered) (Raw_context)
+      (struct
+        let name = ["table"]
+      end)
+
   module Index = Make_index (Ticket_hash_repr.Index)
   module Table =
-    Make_indexed_carbonated_data_storage (Sub_context) (Index) (Encoding.Z)
+    Make_indexed_carbonated_data_storage (Table_context) (Index) (Encoding.Z)
 end
 
 module Tx_rollup = struct

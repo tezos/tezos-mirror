@@ -31,7 +31,6 @@ let add_ticket_balance contract ctxt ticket =
   Ticket_balance_key.of_ex_token ctxt ~owner:contract token
   >>=? fun (hash, ctxt) ->
   Ticket_balance.adjust_balance ctxt hash ~delta:(Script_int.to_zint amount)
-  >|=? fun ((_added_size : Z.t), ctxt) -> ctxt
 
 let update_contract_tickets ctxt contract =
   (* We could fetch and parse code and storage separately, and extract tickets
@@ -40,7 +39,7 @@ let update_contract_tickets ctxt contract =
      code, which is required for accessing storage type. *)
   Contract.get_script ctxt contract >>=? fun (ctxt, script) ->
   match script with
-  | None -> return ctxt
+  | None -> return (Z.zero, ctxt)
   | Some script ->
       Script_ir_translator.parse_script
         ctxt
@@ -58,8 +57,10 @@ let update_contract_tickets ctxt contract =
         storage
       >>=? fun (tickets, ctxt) ->
       List.fold_left_es
-        (add_ticket_balance (Destination.Contract contract))
-        ctxt
+        (fun (acc_size, ctxt) t ->
+          add_ticket_balance (Destination.Contract contract) ctxt t
+          >|=? fun (added_size, ctxt) -> (Z.add acc_size added_size, ctxt))
+        (Z.zero, ctxt)
         tickets
 
 let is_originated contract =
@@ -69,4 +70,12 @@ let init ctxt =
   Contract.list ctxt >>= fun contracts ->
   (* Implicit accounts cannot own tickets, so we filter them out. *)
   let contracts = List.filter is_originated contracts in
-  List.fold_left_es update_contract_tickets ctxt contracts
+  List.fold_left_es
+    (fun (acc_size, ctxt) t ->
+      update_contract_tickets ctxt t >|=? fun (added_size, ctxt) ->
+      (Z.add added_size acc_size, ctxt))
+    (Z.zero, ctxt)
+    contracts
+  >>=? fun (added_size, ctxt) ->
+  Ticket_balance.adjust_storage_space ctxt ~storage_diff:added_size
+  >|=? fun (_sponsored_storage, ctxt) -> ctxt

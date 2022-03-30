@@ -885,8 +885,10 @@ let apply_transaction_to_smart_contract ~ctxt ~source ~contract ~amount
     ticket_diffs
     operations
   >>=? fun (ticket_table_size_diff, ctxt) ->
-  Fees.record_paid_storage_space ctxt contract ~ticket_table_size_diff
-  >>=? fun (ctxt, new_size, paid_storage_size_diff) ->
+  Ticket_balance.adjust_storage_space ctxt ~storage_diff:ticket_table_size_diff
+  >>=? fun (ticket_paid_storage_diff, ctxt) ->
+  Fees.record_paid_storage_space ctxt contract
+  >>=? fun (ctxt, new_size, contract_paid_storage_size_diff) ->
   Contract.originated_from_current_nonce ~since:before_operation ~until:ctxt
   >>=? fun originated_contracts ->
   Lwt.return
@@ -906,7 +908,8 @@ let apply_transaction_to_smart_contract ~ctxt ~source ~contract ~amount
                originated_contracts;
                consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
                storage_size = new_size;
-               paid_storage_size_diff;
+               paid_storage_size_diff =
+                 Z.add contract_paid_storage_size_diff ticket_paid_storage_diff;
                allocated_destination_contract;
              })
       in
@@ -1086,7 +1089,7 @@ let apply_origination ~ctxt ~storage_type ~storage ~unparsed_code ~contract
   >>=? fun ctxt ->
   Token.transfer ctxt (`Contract source) (`Contract contract) credit
   >>=? fun (ctxt, balance_updates) ->
-  Fees.record_paid_storage_space ctxt contract ~ticket_table_size_diff:Z.zero
+  Fees.record_paid_storage_space ctxt contract
   >|=? fun (ctxt, size, paid_storage_size_diff) ->
   let result =
     Origination_result
@@ -3155,8 +3158,11 @@ let apply_liquidity_baking_subsidy ctxt ~toggle_vote =
                Fees.record_paid_storage_space
                  ctxt
                  liquidity_baking_cpmm_contract
-                 ~ticket_table_size_diff
                >>=? fun (ctxt, new_size, paid_storage_size_diff) ->
+               Ticket_balance.adjust_storage_space
+                 ctxt
+                 ~storage_diff:ticket_table_size_diff
+               >>=? fun (ticket_paid_storage_diff, ctxt) ->
                let consumed_gas =
                  Gas.consumed ~since:backtracking_ctxt ~until:ctxt
                in
@@ -3182,7 +3188,8 @@ let apply_liquidity_baking_subsidy ctxt ~toggle_vote =
                         originated_contracts = [];
                         consumed_gas;
                         storage_size = new_size;
-                        paid_storage_size_diff;
+                        paid_storage_size_diff =
+                          Z.add paid_storage_size_diff ticket_paid_storage_diff;
                         allocated_destination_contract = false;
                       })
                in
