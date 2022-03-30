@@ -19,12 +19,12 @@ Sapling, etc), and some details about its implementation.
 .. toctree::
    :maxdepth: 2
 
-   consensus
+   proof_of_stake
 
 .. toctree::
    :maxdepth: 2
 
-   proof_of_stake
+   consensus
 
 .. toctree::
    :maxdepth: 2
