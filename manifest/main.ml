@@ -116,7 +116,7 @@ let hacl_x25519 = external_lib "hacl_x25519" V.True
 
 let hex = external_lib ~js_compatible:true "hex" V.(at_least "1.3.0")
 
-let index = external_lib "index" V.(at_least "1.3.0")
+let index = external_lib "index" V.(at_least "1.6.0" && less_than "1.7.0")
 
 let integers = external_lib ~js_compatible:true "integers" V.True
 
