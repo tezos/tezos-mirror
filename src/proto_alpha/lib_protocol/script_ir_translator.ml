@@ -5564,7 +5564,7 @@ let typecheck_code :
   (!type_map, ctxt)
 
 (* Uncarbonated because used only in RPCs *)
-let list_entrypoints (type full fullc) (full : (full, fullc) ty)
+let list_entrypoints_uncarbonated (type full fullc) (full : (full, fullc) ty)
     (entrypoints : full entrypoints) =
   let merge path (type t tc) (ty : (t, tc) ty)
       (entrypoints : t entrypoints_node) reachable ((unreachables, all) as acc)

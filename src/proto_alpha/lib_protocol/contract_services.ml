@@ -444,7 +444,9 @@ let[@coq_axiom_with_reason "gadt"] register () =
             >>? fun (Ex_parameter_ty_and_entrypoints {arg_type; entrypoints}, _)
               ->
               let (unreachable_entrypoint, map) =
-                Script_ir_translator.list_entrypoints arg_type entrypoints
+                Script_ir_translator.list_entrypoints_uncarbonated
+                  arg_type
+                  entrypoints
               in
               Entrypoint.Map.fold_e
                 (fun entry (Ex_ty ty, original_type_expr) (acc, ctxt) ->

@@ -2643,7 +2643,9 @@ module RPC = struct
             >|? fun (Ex_parameter_ty_and_entrypoints {arg_type; entrypoints}, _)
               ->
               let (unreachable_entrypoint, map) =
-                Script_ir_translator.list_entrypoints arg_type entrypoints
+                Script_ir_translator.list_entrypoints_uncarbonated
+                  arg_type
+                  entrypoints
               in
               ( unreachable_entrypoint,
                 Entrypoint.Map.fold
