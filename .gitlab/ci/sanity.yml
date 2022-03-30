@@ -11,7 +11,7 @@ sanity_ci:
     - src/tooling/lint.sh --check-gitlab-ci-yml
 
 docker-hadolint:
-  image: hadolint/hadolint:latest-debian
+  image: hadolint/hadolint:2.9.3-debian
   stage: sanity
   needs: []
   script:
