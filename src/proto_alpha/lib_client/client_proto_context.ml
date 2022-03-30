@@ -61,6 +61,7 @@ let get_script (rpc : #rpc_context) ~chain ~block ~unparsing_mode contract =
     rpc
     (chain, block)
     ~unparsing_mode
+    ~normalize_types:true
     ~contract
 
 let get_script_hash (rpc : #rpc_context) ~chain ~block contract =

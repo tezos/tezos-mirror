@@ -2804,7 +2804,10 @@ module RPC = struct
           ~description:
             "Access the script of the contract and normalize it using the \
              requested unparsing mode."
-          ~input:(obj1 (req "unparsing_mode" unparsing_mode_encoding))
+          ~input:
+            (obj2
+               (req "unparsing_mode" unparsing_mode_encoding)
+               (dft "normalize_types" bool false))
           ~query:RPC_query.empty
           ~output:(option Script.encoding)
           RPC_path.(path /: Contract.rpc_arg / "script" / "normalized")
@@ -2835,7 +2838,7 @@ module RPC = struct
       Registration.register1
         ~chunked:true
         S.get_script_normalized
-        (fun ctxt contract () unparsing_mode ->
+        (fun ctxt contract () (unparsing_mode, normalize_types) ->
           Contract.get_script ctxt contract >>=? fun (ctxt, script) ->
           match script with
           | None -> return_none
@@ -2846,7 +2849,7 @@ module RPC = struct
                 ~legacy:true
                 ~allow_forged_in_storage:true
                 unparsing_mode
-                ~normalize_types:true
+                ~normalize_types
                 script
               >>=? fun (script, _ctxt) -> return_some script)
 
@@ -2859,14 +2862,15 @@ module RPC = struct
         ()
         unparsing_mode
 
-    let get_script_normalized ctxt block ~contract ~unparsing_mode =
+    let get_script_normalized ctxt block ~contract ~unparsing_mode
+        ~normalize_types =
       RPC_context.make_call1
         S.get_script_normalized
         ctxt
         block
         contract
         ()
-        unparsing_mode
+        (unparsing_mode, normalize_types)
   end
 
   module Big_map = struct
