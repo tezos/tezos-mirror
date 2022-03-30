@@ -136,8 +136,14 @@ module Measurement = struct
   (** [register_map_as_datapoints influxDB_measurement map] takes a
       [map] of [Measurement.value] list indexed by [Measurement.key]
       and creates a new influxDB datapoints serie inside the given
-      [influxDB_measurement] for each of them. *)
-  let register_map_as_datapoints ?margin influxDB_measurement =
+      [influxDB_measurement] for each of them.
+
+      Since this data is mainly useful to see the evolution of each
+      subpart (using dashboards), but contains micro-measurements,
+      it is not a problem and better not to check regressions to avoid
+      false positive detections as variance may be high. Regressions
+      will be checked for the whole validation process. *)
+  let register_map_as_datapoints influxDB_measurement =
     Map.iter_s (fun (label, _) durations ->
         let tags = [("step", label)] in
         let data_points =
@@ -150,15 +156,7 @@ module Measurement = struct
             durations
         in
         Log.debug "Registering data points for step: %s" label ;
-        List.iter Long_test.add_data_point data_points ;
-        Log.debug "Testing regression for step: %s" label ;
-        Long_test.check_regression
-          ~stddev:true
-          ~data_points
-          ~tags
-          ?margin
-          influxDB_measurement
-          "duration")
+        return @@ List.iter Long_test.add_data_point data_points)
 end
 
 (** Defines functions to wait for the same event repeatedly. *)
@@ -387,7 +385,7 @@ module Benchmark = struct
       substep of the validation of the given [block]. The benchmark
       is performed [size] time to collect several measurements for each substep.
       Then, it performs some statistical analysis by substep. *)
-  let batch_of_same_block_subparts ?margin ~size block datadir =
+  let batch_of_same_block_subparts ~size block datadir =
     if size <= 0 then
       invalid_arg "batch_of_same_block_subparts: size must be > 0" ;
     let blocks = List.init size (fun _ -> block) in
@@ -397,10 +395,7 @@ module Benchmark = struct
     let* measurements =
       Validation.run_and_measure_subparts_duration blocks datadir
     in
-    Measurement.register_map_as_datapoints
-      ?margin
-      influxDB_measurement
-      measurements
+    Measurement.register_map_as_datapoints influxDB_measurement measurements
 end
 
 let grafana_panels =
@@ -473,6 +468,5 @@ let register ~executors () =
     ~executors
   @@ apply_or_raise datadir
   @@ Benchmark.batch_of_same_block_subparts
-       ~margin:0.8
        ~size:30
        Benchmark.block_with_highest_gas
