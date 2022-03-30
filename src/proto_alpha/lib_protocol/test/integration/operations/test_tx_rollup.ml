@@ -274,8 +274,8 @@ let originate b contract =
     Returns the first contract and its balance, the originated tx_rollup,
     the state with the tx_rollup, and the baked block with the batch submitted.
 *)
-let init_originate_and_submit ?(batch = String.make 5 'c')
-    ?tx_rollup_origination_size () =
+let init_originate_and_submit ?(batch = "batch") ?tx_rollup_origination_size ()
+    =
   context_init1 ?tx_rollup_origination_size () >>=? fun (b, contract) ->
   originate b contract >>=? fun (b, tx_rollup) ->
   Context.Contract.balance (B b) contract >>=? fun balance ->
@@ -829,7 +829,7 @@ let test_add_batch_with_limit () =
   (* From an empty context the burn will be [Tez.zero], we set the hard limit to
      [Tez.zero], so [cost] >= [limit] *)
   let burn_limit = Tez.zero in
-  let contents = String.make 5 'd' in
+  let contents = "batch" in
   context_init1 () >>=? fun (b, contract) ->
   originate b contract >>=? fun (b, tx_rollup) ->
   Incremental.begin_construction b >>=? fun i ->
@@ -852,14 +852,12 @@ let test_add_two_batches () =
     TODO: https://gitlab.com/tezos/tezos/-/issues/2331
     This test can be generalized using a property-based approach.
    *)
-  let contents_size1 = 5 in
-  let contents1 = String.make contents_size1 'c' in
+  let contents1 = "batch" in
   init_originate_and_submit ~batch:contents1 ()
   >>=? fun ((contract, balance), state, tx_rollup, b) ->
   Op.tx_rollup_submit_batch (B b) contract tx_rollup contents1 >>=? fun op1 ->
   Context.Contract.counter (B b) contract >>=? fun counter ->
-  let contents_size2 = 6 in
-  let contents2 = String.make contents_size2 'd' in
+  let contents2 = "batch2" in
   Op.tx_rollup_submit_batch
     ~counter:Z.(add counter (of_int 1))
     (B b)
