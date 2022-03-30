@@ -80,8 +80,6 @@ build_release:docker_amd64:
   variables:
     IMAGE_ARCH_PREFIX: "amd64_"
   stage: build_release
-  tags:
-    - safe_docker
 
 build_release:docker_arm64:
   extends:
