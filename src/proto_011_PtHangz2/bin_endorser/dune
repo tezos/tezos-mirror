@@ -1,21 +1,25 @@
-; build static executable with --profile static
-(env
- (static
-  (flags (:standard
-           -ccopt -static))))
+(env (static (flags (:standard -ccopt -static))))
 
 (executable
  (name main_endorser_011_PtHangz2)
- (instrumentation (backend bisect_ppx))
  (public_name tezos-endorser-011-PtHangz2)
- (libraries tezos-client-base-unix
-            tezos-client-commands
-            tezos-baking-011-PtHangz2-commands)
- (flags (:standard -open Tezos_base__TzPervasives
-                   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
-                   -open Tezos_protocol_011_PtHangz2
-                   -open Tezos_client_011_PtHangz2
-                   -open Tezos_client_commands
-                   -open Tezos_baking_011_PtHangz2_commands
-                   -open Tezos_stdlib_unix
-                   -open Tezos_client_base_unix)))
+ (package tezos-endorser-011-PtHangz2)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  tezos-protocol-011-PtHangz2
+  tezos-client-011-PtHangz2
+  tezos-client-commands
+  tezos-baking-011-PtHangz2-commands
+  tezos-stdlib-unix
+  tezos-client-base-unix)
+ (flags
+  (:standard
+   -open Tezos_base.TzPervasives
+   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+   -open Tezos_protocol_011_PtHangz2
+   -open Tezos_client_011_PtHangz2
+   -open Tezos_client_commands
+   -open Tezos_baking_011_PtHangz2_commands
+   -open Tezos_stdlib_unix
+   -open Tezos_client_base_unix)))
