@@ -12,6 +12,5 @@ sudo add-apt-repository ppa:serokell/tezos-rc && sudo apt-get update
 # [install tezos]
 sudo apt-get install -y tezos-client
 sudo apt-get install -y tezos-node
-sudo apt-get install -y tezos-baker-011-pthangz2
-sudo apt-get install -y tezos-endorser-011-pthangz2
-sudo apt-get install -y tezos-accuser-011-pthangz2
+sudo apt-get install -y tezos-baker-012-psithaca
+sudo apt-get install -y tezos-accuser-012-psithaca
