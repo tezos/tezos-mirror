@@ -5885,11 +5885,20 @@ and[@coq_axiom_with_reason "gadt"] unparse_code ctxt ~stack_depth mode code =
       return (Prim (loc, prim, List.rev items, annot), ctxt)
   | (Int _ | String _ | Bytes _) as atom -> return (atom, ctxt)
 
-let unparse_script ctxt mode
-    (Ex_script
-      (Script {code; arg_type; storage; storage_type; entrypoints; views; _})) =
-  let (Lam (_, original_code)) = code in
+let parse_and_unparse_script_unaccounted ?type_logger ctxt ~legacy
+    ~allow_forged_in_storage mode original_script =
   Gas.consume ctxt Unparse_costs.unparse_script >>?= fun ctxt ->
+  parse_script
+    ?type_logger
+    ctxt
+    ~legacy
+    ~allow_forged_in_storage
+    original_script
+  >>=? fun ( Ex_script
+               (Script
+                 {code; arg_type; storage; storage_type; entrypoints; views; _}),
+             ctxt ) ->
+  let (Lam (_, original_code)) = code in
   unparse_code ctxt ~stack_depth:0 mode original_code >>=? fun (code, ctxt) ->
   unparse_data ctxt ~stack_depth:0 mode storage_type storage
   >>=? fun (storage, ctxt) ->

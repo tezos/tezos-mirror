@@ -38,7 +38,8 @@ open Error_monad_operators
 
 let wrap_error_lwt x = x >>= fun x -> Lwt.return @@ Environment.wrap_tzresult x
 
-(* Test for Script_ir_translator.unparse_script on a script declaring views. *)
+(* Test for Script_ir_translator.parse_and_unparse_script_unaccounted on a
+   script declaring views. *)
 let test_unparse_view () =
   let dummy_contract =
     "{parameter unit; storage unit; code { CAR; NIL operation; PAIR }; view \
@@ -53,15 +54,14 @@ let test_unparse_view () =
   Context.init 3 >>=? fun (b, _cs) ->
   Incremental.begin_construction b >>=? fun v ->
   let ctx = Incremental.alpha_ctxt v in
-  Script_ir_translator.parse_script
+  Script_ir_translator.parse_and_unparse_script_unaccounted
     ctx
     ~legacy:true
     ~allow_forged_in_storage:false
+    Readable
     script
-  >>=?? fun (ex_script, ctx) ->
-  Script_ir_translator.unparse_script ctx Readable ex_script
-  >>=?? fun (unparse_script, _ctx) ->
-  let aft = Data_encoding.force_bytes unparse_script.code in
+  >>=?? fun (unparsed_script, _ctx) ->
+  let aft = Data_encoding.force_bytes unparsed_script.code in
   Alcotest.(check bytes) "didn't match" bef aft |> return
 
 let test_context () =

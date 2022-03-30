@@ -2841,14 +2841,12 @@ module RPC = struct
           | None -> return_none
           | Some script ->
               let ctxt = Gas.set_unlimited ctxt in
-              let open Script_ir_translator in
-              parse_script
+              Script_ir_translator.parse_and_unparse_script_unaccounted
                 ctxt
                 ~legacy:true
                 ~allow_forged_in_storage:true
+                unparsing_mode
                 script
-              >>=? fun (ex_script, ctxt) ->
-              unparse_script ctxt unparsing_mode ex_script
               >>=? fun (script, _ctxt) -> return_some script)
 
     let get_storage_normalized ctxt block ~contract ~unparsing_mode =

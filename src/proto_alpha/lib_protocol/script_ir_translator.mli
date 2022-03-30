@@ -394,8 +394,14 @@ val parse_script :
   (ex_script * context) tzresult Lwt.t
 
 (* Gas accounting may not be perfect in this function, as it is only called by RPCs. *)
-val unparse_script :
-  context -> unparsing_mode -> ex_script -> (Script.t * context) tzresult Lwt.t
+val parse_and_unparse_script_unaccounted :
+  ?type_logger:type_logger ->
+  context ->
+  legacy:bool ->
+  allow_forged_in_storage:bool ->
+  unparsing_mode ->
+  Script.t ->
+  (Script.t * context) tzresult Lwt.t
 
 val parse_contract :
   context ->

@@ -504,11 +504,13 @@ let[@coq_axiom_with_reason "gadt"] register () =
       | None -> return (None, ctxt)
       | Some script ->
           let ctxt = Gas.set_unlimited ctxt in
-          let open Script_ir_translator in
-          parse_script ctxt ~legacy:true ~allow_forged_in_storage:true script
-          >>=? fun (ex_script, ctxt) ->
-          unparse_script ctxt Readable ex_script >|=? fun (script, ctxt) ->
-          (Some script, ctxt))
+          Script_ir_translator.parse_and_unparse_script_unaccounted
+            ctxt
+            ~legacy:true
+            ~allow_forged_in_storage:true
+            Readable
+            script
+          >|=? fun (script, ctxt) -> (Some script, ctxt))
       >|=? fun (script, _ctxt) -> {balance; delegate; script; counter}) ;
   S.Sapling.register ()
 
