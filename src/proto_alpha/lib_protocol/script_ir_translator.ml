@@ -5516,17 +5516,27 @@ let[@coq_axiom_with_reason "gadt"] parse_script :
          {code_size; code; arg_type; storage; storage_type; views; entrypoints}),
     ctxt )
 
+type typechecked_code_internal =
+  | Typechecked_code_internal : {
+      toplevel : toplevel;
+      arg_type : ('arg, _) ty;
+      storage_type : ('storage, _) ty;
+      entrypoints : 'arg entrypoints;
+      type_map : type_map;
+    }
+      -> typechecked_code_internal
+
 let typecheck_code :
     legacy:bool ->
     show_types:bool ->
     context ->
     Script.expr ->
-    (type_map * context) tzresult Lwt.t =
+    (typechecked_code_internal * context) tzresult Lwt.t =
  fun ~legacy ~show_types ctxt code ->
   (* Constants need to be expanded or [parse_toplevel] may fail. *)
   Global_constants_storage.expand ctxt code >>=? fun (ctxt, code) ->
-  parse_toplevel ctxt ~legacy code
-  >>?= fun ({arg_type; storage_type; code_field; views}, ctxt) ->
+  parse_toplevel ctxt ~legacy code >>?= fun (toplevel, ctxt) ->
+  let {arg_type; storage_type; code_field; views} = toplevel in
   let type_map = ref [] in
   let arg_type_loc = location arg_type in
   record_trace
@@ -5537,7 +5547,8 @@ let typecheck_code :
   record_trace
     (Ill_formed_type (Some "storage", code, storage_type_loc))
     (parse_storage_ty ctxt ~stack_depth:0 ~legacy storage_type)
-  >>?= fun (Ex_ty storage_type, ctxt) ->
+  >>?= fun (ex_storage_type, ctxt) ->
+  let (Ex_ty storage_type) = ex_storage_type in
   pair_t storage_type_loc arg_type storage_type
   >>?= fun (Ty_ex_c arg_type_full) ->
   pair_t storage_type_loc list_operation_t storage_type
@@ -5562,7 +5573,9 @@ let typecheck_code :
     typecheck_views ctxt ?type_logger ~legacy storage_type views
   in
   trace (Ill_typed_contract (code, !type_map)) views_result >|=? fun ctxt ->
-  (!type_map, ctxt)
+  ( Typechecked_code_internal
+      {toplevel; arg_type; storage_type; entrypoints; type_map = !type_map},
+    ctxt )
 
 (* Uncarbonated because used only in RPCs *)
 let list_entrypoints_uncarbonated (type full fullc) (full : (full, fullc) ty)
@@ -6491,3 +6504,7 @@ let script_size
   in
   let cost = Script_typed_ir_size_costs.nodes_cost ~nodes in
   (Saturation_repr.(add code_size storage_size |> to_int), cost)
+
+let typecheck_code ~legacy ~show_types ctxt code =
+  typecheck_code ~legacy ~show_types ctxt code
+  >|=? fun (Typechecked_code_internal {type_map; _}, ctxt) -> (type_map, ctxt)
