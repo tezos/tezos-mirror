@@ -582,12 +582,10 @@ let transfer (ctxt, sc) gas amount location parameters_ty parameters destination
   let (gas, ctxt) = local_gas_counter_and_outdated_context ctxt in
   return (res, ctxt, gas)
 
-(* [create_contract (ctxt, sc) gas storage_ty param_ty code entrypoints
-   delegate credit init] creates an origination operation for a
-   contract represented by [code], with some [entrypoints], some initial
-   [credit] (taken to contract being executed), and an initial storage
-   [init] of type [storage_ty]. The type of the new contract argument
-   is [param_ty]. *)
+(** [create_contract (ctxt, sc) gas storage_ty code delegate credit init]
+    creates an origination operation for a contract represented by [code], some
+    initial [credit] (withdrawn from the contract being executed), and an
+    initial storage [init] of type [storage_ty]. *)
 let create_contract (ctxt, sc) gas storage_type code delegate credit init =
   let ctxt = update_context gas ctxt in
   collect_lazy_storage ctxt storage_type init >>?= fun (to_duplicate, ctxt) ->
