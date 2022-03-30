@@ -81,3 +81,6 @@ type error += Tx_rollup_tree_not_found
 
 (** Error when the kinded key is not found in the tree. *)
 type error += Tx_rollup_tree_kinded_key_not_found
+
+(** Error when a message position does not exist in the inbox for the proof RPC *)
+type error += Tx_rollup_invalid_message_position_in_inbox of int

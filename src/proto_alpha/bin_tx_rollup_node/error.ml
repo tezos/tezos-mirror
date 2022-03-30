@@ -311,3 +311,18 @@ let () =
     Data_encoding.empty
     (function Tx_rollup_tree_kinded_key_not_found -> Some () | _ -> None)
     (fun () -> Tx_rollup_tree_kinded_key_not_found)
+
+type error += Tx_rollup_invalid_message_position_in_inbox of int
+
+let () =
+  register_error_kind
+    ~id:"tx_rollup.node.invalid_message_position"
+    ~title:"Message position invalid in the inbox"
+    ~description:"The message position is invalid the inbox."
+    ~pp:(fun ppf i ->
+      Format.fprintf ppf "The message position %d is invalid in the inbox" i)
+    `Permanent
+    Data_encoding.(obj1 (req "message_position" int31))
+    (function
+      | Tx_rollup_invalid_message_position_in_inbox i -> Some i | _ -> None)
+    (fun i -> Tx_rollup_invalid_message_position_in_inbox i)

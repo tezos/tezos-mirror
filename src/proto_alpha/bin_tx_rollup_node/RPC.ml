@@ -34,6 +34,26 @@ type block_id =
 
 type context_id = [block_id | `Context of Tx_rollup_l2_context_hash.t]
 
+let context_of_l2_block state b =
+  Stores.L2_block_store.context state.State.stores.blocks b
+
+let context_of_block_id state block_id =
+  let open Lwt_syntax in
+  match block_id with
+  | `L2_block b -> context_of_l2_block state b
+  | `Tezos_block b -> (
+      let* b = State.get_tezos_l2_block_hash state b in
+      match b with None -> return_none | Some b -> context_of_l2_block state b)
+  | `Head -> return_some (State.get_head state).header.context
+  | `Level l -> (
+      let* b = State.get_level state l in
+      match b with None -> return_none | Some b -> context_of_l2_block state b)
+
+let context_of_id state context_id =
+  match context_id with
+  | #block_id as block_id -> context_of_block_id state block_id
+  | `Context c -> Lwt.return_some c
+
 module Arg = struct
   let indexable ~kind ~construct ~destruct =
     let construct i =
@@ -182,6 +202,14 @@ module Block = struct
     | `Head -> return_some (State.get_head state)
     | `Level l -> State.get_level_l2_block state l
 
+  let proof =
+    RPC_service.get_service
+      ~description:
+        "Get the merkle proof for a given message for a given block inbox"
+      ~query:RPC_query.empty
+      ~output:Data_encoding.(option Protocol.Tx_rollup_l2_proof.encoding)
+      RPC_path.(path / "proof" / "message" /: RPC_arg.int)
+
   let () =
     register block @@ fun (state, block_id) () () ->
     let*! block = block_of_id state block_id in
@@ -205,6 +233,76 @@ module Block = struct
             (* Tezos block has no l2 inbox *)
             return None
         | _ -> return (Some block.inbox))
+
+  let () =
+    register proof @@ fun ((state, block_id), message_pos) () () ->
+    let*! block = block_of_id state block_id in
+    match block with
+    | None -> return_none
+    | Some block -> (
+        match block_id with
+        | `Tezos_block b when Block_hash.(block.header.tezos_block <> b) ->
+            (* Tezos block has no l2 inbox *)
+            failwith "The tezos block (%a) has not l2 inbox" Block_hash.pp b
+        | _ ->
+            let open Inbox in
+            let inbox = block.inbox in
+            let index = state.context_index in
+            let* (prev_ctxt, message) =
+              if message_pos = 0 then
+                (* We must take the block predecessor context *)
+                let*? message =
+                  match List.nth_opt inbox.contents message_pos with
+                  | Some x -> ok x
+                  | None ->
+                      error
+                        (Error.Tx_rollup_invalid_message_position_in_inbox
+                           message_pos)
+                in
+                let pred_block_hash = block.header.predecessor in
+                let*! pred_block = State.get_block state pred_block_hash in
+                match pred_block with
+                | None ->
+                    failwith
+                      "The block (%a) does not have a predecessor"
+                      L2block.Hash.pp
+                      block.hash
+                | Some block -> (
+                    let hash = block.hash in
+                    let*! ctxt_hash = context_of_l2_block state hash in
+                    match ctxt_hash with
+                    | Some ctxt_hash ->
+                        let*! ctxt = Context.checkout_exn index ctxt_hash in
+                        return (ctxt, message)
+                    | None ->
+                        failwith
+                          "The block can not be retrieved from the hash %a"
+                          L2block.Hash.pp
+                          hash)
+              else
+                let*? (pred_message, message) =
+                  match List.drop_n (message_pos - 1) inbox.contents with
+                  | pred_message :: message :: _ -> ok (pred_message, message)
+                  | _ ->
+                      error
+                        (Error.Tx_rollup_invalid_message_position_in_inbox
+                           message_pos)
+                in
+                let ctxt_hash = pred_message.l2_context_hash.irmin_hash in
+                let*! ctxt = Context.checkout_exn index ctxt_hash in
+                return (ctxt, message)
+            in
+            let l2_parameters =
+              Protocol.Tx_rollup_l2_apply.
+                {
+                  tx_rollup_max_withdrawals_per_batch =
+                    state.l1_constants.tx_rollup_max_withdrawals_per_batch;
+                }
+            in
+            let* (proof, _) =
+              Prover_apply.apply_message prev_ctxt l2_parameters message.message
+            in
+            return_some proof)
 
   let build_directory state =
     !directory
@@ -403,30 +501,6 @@ module Context_RPC = struct
         match metadata with
         | None -> return None
         | Some {public_key; _} -> return (Some public_key))
-
-  let context_of_l2_block state b =
-    Stores.L2_block_store.context state.State.stores.blocks b
-
-  let context_of_block_id state block_id =
-    let open Lwt_syntax in
-    match block_id with
-    | `L2_block b -> context_of_l2_block state b
-    | `Tezos_block b -> (
-        let* b = State.get_tezos_l2_block_hash state b in
-        match b with
-        | None -> return_none
-        | Some b -> context_of_l2_block state b)
-    | `Head -> return_some (State.get_head state).header.context
-    | `Level l -> (
-        let* b = State.get_level state l in
-        match b with
-        | None -> return_none
-        | Some b -> context_of_l2_block state b)
-
-  let context_of_id state context_id =
-    match context_id with
-    | #block_id as block_id -> context_of_block_id state block_id
-    | `Context c -> Lwt.return_some c
 
   let build_directory state =
     !directory
