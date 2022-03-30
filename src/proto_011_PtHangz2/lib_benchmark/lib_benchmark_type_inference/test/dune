@@ -1,10 +1,14 @@
 (tests
- (names test_uf
-        test_inference)
+ (names test_uf test_inference)
  (package tezos-benchmark-type-inference-011-PtHangz2)
- (libraries tezos-micheline tezos-micheline-rewriting
-            tezos-benchmark-type-inference-011-PtHangz2 tezos-protocol-011-PtHangz2
-            tezos-error-monad tezos-client-011-PtHangz2)
+ (libraries
+  tezos-micheline
+  tezos-micheline-rewriting
+  tezos-benchmark-type-inference-011-PtHangz2
+  tezos-protocol-011-PtHangz2
+  tezos-error-monad
+  tezos-client-011-PtHangz2)
  (flags
-    (:standard -open Tezos_micheline
-               -open Tezos_benchmark_type_inference_011_PtHangz2)))
+  (:standard
+   -open Tezos_micheline
+   -open Tezos_benchmark_type_inference_011_PtHangz2)))
