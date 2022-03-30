@@ -70,10 +70,6 @@ Client
   less informative error messages. You can switch back to the previous
   behavior using new command-line option ``--better-errors``.
 
-- A new ``--force`` option was added to the ``transfer`` command. It
-  makes the client inject the transaction in a node even if the
-  simulation of the transaction fails.
-
 - A new ``--self-address`` option was added to the ``run script``
   command. It makes the given address be considered the address of
   the contract being run. The address must actually exist in the
@@ -99,9 +95,6 @@ Baker / Endorser / Accuser
   to ``liquidity_baking_toggle_vote`` and the value must now be one of
   the following strings: ``"on"`` to vote to continue Liquidity
   Baking, ``"off"`` to vote to stop it, or ``"pass"`` to abstain.
-
-- Fixed an incorrect behavior that could make the baker crash under
-  certain circumstances.
 
 Signer
 ------

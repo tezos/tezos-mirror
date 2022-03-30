@@ -3,6 +3,35 @@
 Changelog
 '''''''''
 
+Version 12.1
+============
+
+Node
+----
+
+- Added optional argument ``cycle`` to RPC ``selected_snapshot``.
+  See more information in the changelog of the protocol:
+  :doc:`../protocols/012_ithaca`
+
+- The node no longer stores large metadata. To this end, a new storage
+  version was introduced: 0.0.7 (previously 0.0.6). Upgrading from
+  0.0.6 to 0.0.7 is done automatically by the node the first time you
+  run it. This upgrade is instantaneous. However, be careful that
+  previous versions of Octez will refuse to run on a data directory
+  which was used with Octez 12.1 or later.
+
+- A new ``--force`` option was added to the ``transfer`` command. It
+  makes the client inject the transaction in a node even if the
+  simulation of the transaction fails.
+
+- Fixed a corner case where the mempool would propagate invalid operations.
+
+Baker
+-----
+
+- Fixed an incorrect behavior that could make the baker crash under
+  certain circumstances.
+
 Version 12.0
 ============
 
@@ -178,8 +207,8 @@ Node
   without having to restart the node. See also the new documentation pages
   related to logging.
 
-- Better handling of mempool cache in the `distributed_db` which
-  should make the `distributed_db` RAM consumption strongly
+- Better handling of mempool cache in the ``distributed_db`` which
+  should make the ``distributed_db`` RAM consumption strongly
   correlated to the one of the mempool.
 
 - Fixed RPC GET ``/chains/<chain_id>/mempool/filter``, that did not
