@@ -5885,8 +5885,6 @@ and[@coq_axiom_with_reason "gadt"] unparse_code ctxt ~stack_depth mode code =
       return (Prim (loc, prim, List.rev items, annot), ctxt)
   | (Int _ | String _ | Bytes _) as atom -> return (atom, ctxt)
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/1688
-   Refactor the sharing part of unparse_script and create_contract *)
 let unparse_script ctxt mode
     (Ex_script
       (Script {code; arg_type; storage; storage_type; entrypoints; views; _})) =
