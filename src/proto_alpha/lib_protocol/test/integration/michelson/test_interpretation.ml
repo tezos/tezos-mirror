@@ -102,12 +102,6 @@ let test_multiplication_close_to_overflow_passes () =
   | Error errs ->
       Alcotest.failf "Unexpected error: %a" Error_monad.pp_print_trace errs
 
-let read_file filename =
-  let ch = open_in filename in
-  let s = really_input_string ch (in_channel_length ch) in
-  close_in ch ;
-  s
-
 (** The purpose of these two tests is to check that the Michelson interpreter is
     stack-safe (because it is tail-recursive).
 
