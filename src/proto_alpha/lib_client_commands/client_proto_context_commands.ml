@@ -35,6 +35,14 @@ open Client_proto_args
 let encrypted_switch =
   Clic.switch ~long:"encrypted" ~doc:"encrypt the key on-disk" ()
 
+let normalize_types_switch =
+  Clic.switch
+    ~long:"normalize-types"
+    ~doc:
+      "Whether types should be normalized (annotations removed, combs \
+       flattened) or kept as they appeared in the original script."
+    ()
+
 let report_michelson_errors ?(no_print_source = false) ~msg
     (cctxt : #Client_context.full) = function
   | Error errs ->
@@ -380,7 +388,7 @@ let commands_ro () =
     command
       ~group
       ~desc:"Get the type of an entrypoint of a contract."
-      no_options
+      (args1 normalize_types_switch)
       (prefixes ["get"; "contract"; "entrypoint"; "type"; "of"]
       @@ Clic.param
            ~name:"entrypoint"
@@ -389,14 +397,17 @@ let commands_ro () =
       @@ prefixes ["for"]
       @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
       @@ stop)
-      (fun () entrypoint (_, contract) (cctxt : Protocol_client_context.full) ->
+      (fun normalize_types
+           entrypoint
+           (_, contract)
+           (cctxt : Protocol_client_context.full) ->
         Michelson_v1_entrypoints.contract_entrypoint_type
           cctxt
           ~chain:cctxt#chain
           ~block:cctxt#block
           ~contract
           ~entrypoint
-          ~normalize_types:false
+          ~normalize_types
         >>= Michelson_v1_entrypoints.print_entrypoint_type
               cctxt
               ~emacs:false
