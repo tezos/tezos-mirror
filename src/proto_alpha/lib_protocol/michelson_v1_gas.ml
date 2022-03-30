@@ -955,13 +955,6 @@ module Cost_of = struct
     (* TODO: Add benchmarked value from [Unparse_comparable_type_benchmark]. *)
     let cost_UNPARSE_COMPARABLE_TYPE type_size = S.mul (S.safe_int 20) type_size
 
-    (* model the unparse_views sub function of unparse_script *)
-    let cost_UNPARSING_VIEWS number_of_views =
-      S.mul (S.safe_int 30) (S.safe_int number_of_views)
-
-    (* model unparse_script *)
-    let cost_UNPARSING_SCRIPT = S.safe_int 460
-
     (* TODO: benchmark *)
     let cost_COMPARABLE_TY_OF_TY = S.safe_int 120
 
@@ -1815,12 +1808,6 @@ module Cost_of = struct
     let unparse_instr_cycle = atomic_step_cost cost_UNPARSING_CODE
 
     let unparse_data_cycle = atomic_step_cost cost_UNPARSING_DATA
-
-    let unparse_views (views : Script_typed_ir.view_map) =
-      let (module Box) = Script_map.get_module views in
-      atomic_step_cost @@ cost_UNPARSING_VIEWS Box.size
-
-    let unparse_script = atomic_step_cost cost_UNPARSING_SCRIPT
 
     let unit = Gas.free
 

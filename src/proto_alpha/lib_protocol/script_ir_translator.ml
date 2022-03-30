@@ -5887,7 +5887,6 @@ and[@coq_axiom_with_reason "gadt"] unparse_code ctxt ~stack_depth mode code =
 
 let parse_and_unparse_script_unaccounted ?type_logger ctxt ~legacy
     ~allow_forged_in_storage mode original_script =
-  Gas.consume ctxt Unparse_costs.unparse_script >>?= fun ctxt ->
   parse_script
     ?type_logger
     ctxt
@@ -5906,7 +5905,7 @@ let parse_and_unparse_script_unaccounted ?type_logger ctxt ~legacy
     (let loc = Micheline.dummy_location in
      unparse_parameter_ty ~loc ctxt arg_type ~entrypoints
      >>? fun (arg_type, ctxt) ->
-     unparse_ty ~loc ctxt storage_type >>? fun (storage_type, ctxt) ->
+     unparse_ty ~loc ctxt storage_type >|? fun (storage_type, ctxt) ->
      let open Micheline in
      let unparse_view_unaccounted name {input_ty; output_ty; view_code} views =
        Prim
@@ -5921,14 +5920,9 @@ let parse_and_unparse_script_unaccounted ?type_logger ctxt ~legacy
            [] )
        :: views
      in
-     let unparse_views views =
-       Gas.consume ctxt (Unparse_costs.unparse_views views) >|? fun ctxt ->
-       let views =
-         Script_map.fold unparse_view_unaccounted views [] |> List.rev
-       in
-       (views, ctxt)
+     let views =
+       Script_map.fold unparse_view_unaccounted views [] |> List.rev
      in
-     unparse_views views >>? fun (views, ctxt) ->
      let code =
        Seq
          ( loc,
@@ -5939,8 +5933,6 @@ let parse_and_unparse_script_unaccounted ?type_logger ctxt ~legacy
            ]
            @ views )
      in
-     Gas.consume ctxt (Script.strip_locations_cost code) >>? fun ctxt ->
-     Gas.consume ctxt (Script.strip_locations_cost storage) >|? fun ctxt ->
      ( {
          code = lazy_expr (strip_locations code);
          storage = lazy_expr (strip_locations storage);
