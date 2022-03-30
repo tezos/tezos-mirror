@@ -1018,6 +1018,7 @@ module Mempool = struct
       Operation_hash.t ->
       Tezos_base.Operation.shell_header ->
       t Kind.manager protocol_data ->
+      nb_successful_prechecks:int ->
       fee:Tez.t ->
       gas_limit:manager_gas_witness Gas.Arith.t ->
       public_key_hash ->
@@ -1031,6 +1032,7 @@ module Mempool = struct
        oph
        shell
        ({contents; _} as protocol_data : t Kind.manager protocol_data)
+       ~nb_successful_prechecks
        ~fee
        ~gas_limit
        source ->
@@ -1039,7 +1041,13 @@ module Mempool = struct
         let (raw_operation : t Kind.manager operation) =
           Alpha_context.{shell; protocol_data}
         in
-        Main.check_manager_signature validation_state contents raw_operation )
+        if Compare.Int.(nb_successful_prechecks > 0) then
+          (* Signature succesfully checked at least once. *)
+          return_unit
+        else
+          (* Signature probably never checked. *)
+          Main.check_manager_signature validation_state contents raw_operation
+      )
       >|= function
       | Ok () -> on_success
       | Error err -> (
@@ -1134,6 +1142,7 @@ module Mempool = struct
       validation_state:validation_state ->
       Operation_hash.t ->
       Main.operation ->
+      nb_successful_prechecks:int ->
       [ `Passed_precheck of
         state
         * [`No_replace | `Replace of Operation_hash.t * error_classification]
@@ -1144,7 +1153,8 @@ module Mempool = struct
        ~filter_state
        ~validation_state
        oph
-       {shell = shell_header; protocol_data = Operation_data protocol_data} ->
+       {shell = shell_header; protocol_data = Operation_data protocol_data}
+       ~nb_successful_prechecks ->
     let precheck_manager protocol_data source op =
       match get_manager_operation_gas_and_fee op with
       | Error err -> Lwt.return (`Refused (Environment.wrap_tztrace err))
@@ -1165,6 +1175,7 @@ module Mempool = struct
             shell_header
             protocol_data
             source
+            ~nb_successful_prechecks
             ~fee
             ~gas_limit
           >|= function
