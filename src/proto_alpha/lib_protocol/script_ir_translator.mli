@@ -395,7 +395,6 @@ val parse_script :
 
 (* Gas accounting may not be perfect in this function, as it is only called by RPCs. *)
 val parse_and_unparse_script_unaccounted :
-  ?type_logger:type_logger ->
   context ->
   legacy:bool ->
   allow_forged_in_storage:bool ->

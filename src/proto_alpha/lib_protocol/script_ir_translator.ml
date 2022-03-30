@@ -5879,14 +5879,9 @@ and[@coq_axiom_with_reason "gadt"] unparse_code ctxt ~stack_depth mode code =
       return (Prim (loc, prim, List.rev items, annot), ctxt)
   | (Int _ | String _ | Bytes _) as atom -> return (atom, ctxt)
 
-let parse_and_unparse_script_unaccounted ?type_logger ctxt ~legacy
-    ~allow_forged_in_storage mode original_script =
-  parse_script
-    ?type_logger
-    ctxt
-    ~legacy
-    ~allow_forged_in_storage
-    original_script
+let parse_and_unparse_script_unaccounted ctxt ~legacy ~allow_forged_in_storage
+    mode original_script =
+  parse_script ctxt ~legacy ~allow_forged_in_storage original_script
   >>=? fun ( Ex_script
                (Script
                  {code; arg_type; storage; storage_type; entrypoints; views; _}),
