@@ -229,6 +229,14 @@ val inject_operation :
   Client.t ->
   [`OpHash of string] Lwt.t
 
+val runnable_inject_operation :
+  ?async:bool ->
+  ?force:bool ->
+  unsigned_op:Hex.t ->
+  signature:Hex.t ->
+  Client.t ->
+  JSON.t Process.runnable
+
 (** [forge_and_inject_operation] allows to forge, sign and inject to a
     node, via the provided [client], the list [batch] of managed operations.
     The forged operation is signed by the given [signer] account.
@@ -257,6 +265,16 @@ val forge_and_inject_operation :
   signer:Account.key ->
   Client.t ->
   [`OpHash of string] Lwt.t
+
+val runnable_forge_and_inject_operation :
+  ?protocol:Protocol.t ->
+  ?branch:string ->
+  ?async:bool ->
+  ?force:bool ->
+  batch:manager_operation_content list ->
+  signer:Account.key ->
+  Client.t ->
+  JSON.t Process.runnable Lwt.t
 
 (** {2 High-level injection functions} *)
 
