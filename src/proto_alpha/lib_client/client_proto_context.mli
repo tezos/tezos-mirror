@@ -83,6 +83,7 @@ val get_script :
   chain:Shell_services.chain ->
   block:Shell_services.block ->
   unparsing_mode:Script_ir_translator.unparsing_mode ->
+  normalize_types:bool ->
   Contract.t ->
   Script.t option tzresult Lwt.t
 

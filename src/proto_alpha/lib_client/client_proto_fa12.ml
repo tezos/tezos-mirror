@@ -673,6 +673,7 @@ let get_contract_parameter cctxt ~chain ~block contract =
     ~block
     contract
     ~unparsing_mode:Optimized
+    ~normalize_types:true
   >>=? function
   | None -> fail (Contract_has_no_script contract)
   | Some {code; _} -> (

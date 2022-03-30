@@ -360,6 +360,7 @@ let commands_ro () =
           ~chain:cctxt#chain
           ~block:cctxt#block
           ~unparsing_mode
+          ~normalize_types:true
           contract
         >>=? function
         | None -> cctxt#error "This is not a smart contract."
