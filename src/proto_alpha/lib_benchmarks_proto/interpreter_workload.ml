@@ -1483,7 +1483,7 @@ let extract_deps (type bef_top bef aft_top aft) ctxt step_constants
   try
     let res =
       Lwt_main.run
-        (Script_interpreter.kstep
+        (Script_interpreter.Internals.kstep
            (Some logger)
            ctxt
            step_constants

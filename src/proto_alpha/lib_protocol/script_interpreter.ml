@@ -1885,4 +1885,6 @@ module Internals = struct
 
   let step (ctxt, step_constants) gas ks accu stack =
     internal_step ctxt step_constants gas ks accu stack
+
+  let kstep = kstep
 end
