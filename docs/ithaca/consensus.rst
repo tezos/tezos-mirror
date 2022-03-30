@@ -444,13 +444,41 @@ There are two additional fields: ``payload_hash`` and ``payload_round`` which ar
 
 .. _fitness_ithaca:
 
-The fitness is given by the tuple ``(level, locked_round, predecessor_round, round)``.
+The fitness is given by the tuple ``(version, level, locked_round, - predecessor_round - 1, round)``.
+The current version of the fitness is 2 (version 0 was used by Emmy, and version 1 by Emmy+ and Emmy*).
 The fitness encapsulates more information than in Emmy* because Tenderbake is more complex: recall that blocks at the last level only represent :ref:`candidate blocks<finality_ithaca>`.
 In Emmy*, only the level mattered.
 But in Tenderbake, we need to, for instance, allow for new blocks at the same level to be accepted by nodes.
-Therefore the fitness also includes the block's round.
+Therefore the fitness also includes the block's round (as the fifth component).
 Furthermore, we also allow to change the predecessor block when it has a :ref:`smaller round<finality_ithaca>`.
-Therefore the fitness also includes the predecessor block's round.
+Therefore the fitness also includes the opposite of predecessor block's round as the forth component (the predecessor is taken for technical reasons).
+Finally, to (partially) enforce :ref:`the rule on
+re-proposals<quorum_ithaca>`, the fitness also includes, as the third
+component, the round at which a preendorsement quorum was observed by
+the baker, if any (this component can therefore be empty). By the way,
+preendorsements are present in a block if and only if the locked round
+component is non-empty and if so, the locked round has to match the
+round of the included preendorsements.
+
+Next, we provide two examples of fitness values:
+``02::00001000::::ffffffff::00000000`` and
+``02::00001000::00000000::fffffffe::00000001`` (in the hexadecimal
+format that one may observe in the node's logs). These two values have
+the following components:
+
+- the 1st component, ``02``, is the fitness version;
+- the 2nd component, ``00001000``, is the block's level (level 4096);
+- the 3rd component is the block's locked round: empty in the first case, 0 in the second;
+- the 4th component is the round of the predecessor block, here 0 in the first case and 1 in the second case;
+- the 5th component is the block's round: 0 in the first case, 1 in the second case.
+
+We recall (see :ref:`shell_header`) that the fitness is, from the
+shell's perspective, a sequence of sequences of unsigned bytes and
+comparison is done first by the length of the sequence and then
+lexicographically (both for the outer sequence, and for each of the
+inner sequences). So the first fitness is smaller than the second one,
+because of the third component, the empty bitstring being smaller than
+any other bitstring.
 
 
 
