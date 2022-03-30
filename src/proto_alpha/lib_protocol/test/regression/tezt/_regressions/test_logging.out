@@ -1,12 +1,15 @@
 test_logging.out
-interp
-entry
-exit
-entry
-exit
-entry
-exit
-entry
-exit
-entry
-ctrl
+
+trace
+  - location: 7 (remaining gas: unaccounted)
+    [ (Pair 3 5) ]
+  - location: 7 (remaining gas: unaccounted)
+    [ 3
+      5 ]
+  - location: 8 (remaining gas: unaccounted)
+    [ 8 ]
+  - location: 9 (remaining gas: unaccounted)
+    [ {}
+      8 ]
+  - location: 11 (remaining gas: unaccounted)
+    [ (Pair {} 8) ]

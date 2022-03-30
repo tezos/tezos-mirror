@@ -33,16 +33,63 @@
 
 open Lwt_result_syntax
 open Protocol
+open Alpha_context
 open Tezt
 
-let logger : Script_typed_ir.logger =
-  let log = Regression.capture in
-  let log_interp _ _ctxt _loc _sty _stack = log "interp" in
-  let log_entry _ _ctxt _loc _sty _stack = log "entry" in
-  let log_exit _ _ctxt _loc _sty _stack = log "exit" in
-  let log_control _ = log "ctrl" in
-  let get_log () = return_none in
-  {log_exit; log_entry; log_interp; get_log; log_control}
+module Traced_interpreter = Plugin.RPC.Scripts.Traced_interpreter (struct
+  let unparsing_mode = Script_ir_translator.Readable
+end)
+
+type log_element =
+  | With_stack :
+      context
+      * Script.location
+      * ('a * 's)
+      * ('a, 's) Script_typed_ir.stack_ty
+      * int (* indentation change *)
+      -> log_element
+
+type trace_element =
+  | TInstr : Script.location * Gas.t * Script.expr list -> trace_element
+
+let pp_trace fmt = function
+  | TInstr (loc, gas, stack) ->
+      Format.fprintf
+        fmt
+        "- @[<v 0>location: %d (remaining gas: %a)@,[ @[<v 0>%a ]@]@]"
+        loc
+        Gas.pp
+        gas
+        (Format.pp_print_list (fun ppf e ->
+             Format.fprintf ppf "@[<v 0>%a@]" Michelson_v1_printer.print_expr e))
+        stack
+
+let logger () :
+    (unit -> trace_element list tzresult Lwt.t) * Script_typed_ir.logger =
+  let log : log_element list ref = ref [] in
+  let log_interp _ ctxt loc sty stack =
+    log := With_stack (ctxt, loc, stack, sty, 0) :: !log
+  in
+  let log_entry _ _ctxt _loc _sty _stack = () in
+  let log_exit _ ctxt loc sty stack =
+    log := With_stack (ctxt, loc, stack, sty, 0) :: !log
+  in
+  let log_control _ = () in
+  let get_log () = assert false in
+  let assemble_log () =
+    let+ l =
+      List.map_es
+        (fun (With_stack (ctxt, loc, stack, stack_ty, _)) ->
+          let+ stack =
+            Lwt.map Environment.wrap_tzresult
+            @@ Traced_interpreter.unparse_stack ctxt (stack, stack_ty)
+          in
+          TInstr (loc, Gas.level ctxt, stack))
+        !log
+    in
+    List.rev l
+  in
+  (assemble_log, {log_exit; log_entry; log_interp; get_log; log_control})
 
 let test_context () =
   let* b, _cs = Context.init1 ~consensus_threshold:0 () in
@@ -50,6 +97,7 @@ let test_context () =
   return (Incremental.alpha_ctxt v)
 
 let first_reg_test () =
+  let get_log, logger = logger () in
   let* ctxt = test_context () in
   let script = Contract_helpers.read_file "contracts/add_to_store.tz" in
   let* _res, _ctxt =
@@ -57,10 +105,16 @@ let first_reg_test () =
       ctxt
       script
       ~logger
-      ~storage:"0"
-      ~parameter:"2"
+      ~storage:"5"
+      ~parameter:"3"
       ()
   in
+  let* log = get_log () in
+  Format.kasprintf
+    Regression.capture
+    "@,@[<v 2>trace@,%a@]"
+    (Format.pp_print_list pp_trace)
+    log ;
   return_unit
 
 let fail_on_error f () =
