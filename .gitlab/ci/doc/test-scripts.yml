@@ -2,9 +2,9 @@
   stage: doc
   needs: []
   before_script:
-    # Trigger an allowed fail on runner that do not have the tezos_infra tag
-    - if ! echo $CI_RUNNER_TAGS | grep -qe '\btezos_infra\b'; then
-        echo -e "\e[33m/.\ This test is skipped on runners lacking the tezos_infra tag\e[0m";
+    # Trigger an allowed fail on runner that do not have the tezos tag
+    - if ! echo $CI_RUNNER_TAGS | grep -qe '\btezos\b'; then
+        echo -e "\e[33m/.\ This test is skipped on runners lacking the tezos tag\e[0m";
         exit 137;
       fi
   allow_failure:
