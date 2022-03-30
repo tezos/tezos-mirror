@@ -4799,6 +4799,69 @@ module Withdraw = struct
       ~previous_message_result
     >>=? fun _ -> return_unit
 
+  (** [test_deposit_multiple_destinations_at_limit] checks that we can
+      deposit the maximum number of tickets to multiple destinations ]
+      without overflowing. *)
+  let test_deposit_multiple_destinations_at_limit () =
+    let max = Int64.max_int in
+    let (_, _, pkh1) = gen_l2_account () in
+    let (_, _, pkh2) = gen_l2_account () in
+    context_init1 () >>=? fun (b, account1) ->
+    originate b account1 >>=? fun (b, tx_rollup) ->
+    Nat_ticket.init_deposit_contract (Z.of_int64 max) b account1
+    >>=? fun (deposit_contract, _script, b) ->
+    let deposit_pkh = assert_some @@ Contract.is_implicit account1 in
+    let deposit b pkh =
+      let pkh_str = Tx_rollup_l2_address.to_b58check pkh in
+      Nat_ticket.deposit_op b tx_rollup pkh_str account1 deposit_contract
+      >>=? fun operation -> Block.bake ~operation b
+    in
+    deposit b pkh1 >>=? fun b ->
+    deposit b pkh2 >>=? fun b ->
+    Incremental.begin_construction b >>=? fun i ->
+    Nat_ticket.ticket_hash (B b) ~ticketer:deposit_contract ~tx_rollup
+    >>=? fun ticket_hash ->
+    let make_deposit pkh =
+      Tx_rollup_message.make_deposit
+        deposit_pkh
+        (Tx_rollup_l2_address.Indexable.value pkh)
+        ticket_hash
+        (Tx_rollup_l2_qty.of_int64_exn max)
+    in
+    let (deposit1, _) = make_deposit pkh1 in
+    let (deposit2, _) = make_deposit pkh2 in
+    Rejection.init_l2_store () >>= fun store ->
+    (* For the first deposit, we have no withdraws *)
+    make_and_check_correct_commitment
+      (I i)
+      tx_rollup
+      account1
+      store
+      deposit1
+      (tx_level 0l)
+      []
+      ~previous_message_result:Rejection.previous_message_result
+    >>=? fun (i, previous_message_result) ->
+    l2_parameters (I i) >>=? fun l2_parameters ->
+    (* Finally, we apply the deposit manually to have the good resulting store
+       for next operations *)
+    Rejection.Apply.apply_message store l2_parameters deposit1
+    >>= fun (store, _) ->
+    Rejection.commit_store store >>= fun store ->
+    (* For the second deposit, still no withdraws. *)
+    make_and_check_correct_commitment
+      (I i)
+      tx_rollup
+      account1
+      store
+      deposit2
+      (tx_level 1l)
+      []
+      ~previous_message_result
+    >>=? fun (i, _) ->
+    ignore i ;
+    return_unit
+
   let tests =
     [
       Tztest.tztest "Test withdraw" `Quick test_valid_withdraw;
@@ -4831,6 +4894,10 @@ module Withdraw = struct
         "Test deposits overflowing to withdrawals"
         `Quick
         test_deposit_overflow_to_withdrawal;
+      Tztest.tztest
+        "Test deposit to multiple destinations don't overflow"
+        `Quick
+        test_deposit_multiple_destinations_at_limit;
       Tztest.tztest
         "Test multiple withdrawals from the same batch and from different \
          batches"
