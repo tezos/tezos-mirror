@@ -1,25 +1,31 @@
 (library
  (name tezos_protocol_plugin_009_PsFLoren)
- (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-plugin-009-PsFLoren)
- (libraries tezos-base
-            tezos-protocol-009-PsFLoren)
- (modules (:standard) \ Plugin_registerer)
- (flags (:standard -open Tezos_base__TzPervasives
-                   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
-                   -open Tezos_protocol_009_PsFLoren)))
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  tezos-protocol-009-PsFLoren)
+ (flags
+  (:standard
+   -open Tezos_base.TzPervasives
+   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+   -open Tezos_protocol_009_PsFLoren))
+ (modules (:standard \ Plugin_registerer)))
 
 (library
  (name tezos_protocol_plugin_009_PsFLoren_registerer)
- (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-plugin-009-PsFLoren-registerer)
- (libraries tezos-base
-            tezos-embedded-protocol-009-PsFLoren
-            tezos-protocol-plugin-009-PsFLoren
-            tezos-shell)
- (modules Plugin_registerer)
- (flags (:standard -open Tezos_base__TzPervasives
-                   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
-                   -open Tezos_embedded_protocol_009_PsFLoren
-                   -open Tezos_protocol_plugin_009_PsFLoren
-                   -open Tezos_shell)))
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  tezos-embedded-protocol-009-PsFLoren
+  tezos-protocol-plugin-009-PsFLoren
+  tezos-shell)
+ (flags
+  (:standard
+   -open Tezos_base.TzPervasives
+   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+   -open Tezos_embedded_protocol_009_PsFLoren
+   -open Tezos_protocol_plugin_009_PsFLoren
+   -open Tezos_shell))
+ (modules Plugin_registerer))
