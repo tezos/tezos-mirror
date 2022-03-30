@@ -188,7 +188,7 @@ let run_benchmark ~lift_protocol_limits ~provided_tps_of_injection ~blocks_total
     Client.init_with_protocol
       ~nodes_args:Node.[Connections 0; Synchronisation_threshold 0]
       ~parameter_file
-      ~timestamp_delay:0.0
+      ~timestamp:Now
       ~additional_bootstrap_account_count
       ~default_accounts_balance
       `Client

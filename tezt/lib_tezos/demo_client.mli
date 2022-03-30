@@ -23,22 +23,22 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Time = Tezos_base.Time.System
+
 (** Run Tezos client with commands related to `demo_protocol`. *)
 
 (** Run [tezos-client activate protocol] with `demo_protocol`.
 
-    If [timestamp] is not specified explicitely, it is set to [now
-    -. timestamp_delay]. Default value for [timestamp_delay] is 365
-    days, which allows to bake plenty of blocks before their timestamp
-    reach the present (at which point one would have to wait between
-    each block so that peers do not reject them for being in the
-    future). *)
+    If [timestamp] is not specified explicitely, it is set to [Ago
+    timestamp_delay], where [timestamp_delay] is 365 days, which
+    allows to bake plenty of blocks before their timestamp reach the
+    present (at which point one would have to wait between each block
+    so that peers do not reject them for being in the future). *)
 val activate :
   ?endpoint:Client.endpoint ->
   ?fitness:int ->
   ?key:string ->
-  ?timestamp:string ->
-  ?timestamp_delay:float ->
+  ?timestamp:Client.timestamp ->
   Client.t ->
   unit Lwt.t
 

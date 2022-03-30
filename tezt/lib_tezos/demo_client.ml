@@ -23,23 +23,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Time = Tezos_base.Time.System
+
+let default_delay = Time.Span.of_seconds_exn (3600. *. 24. *. 365.)
+
 let spawn_activate_protocol ?endpoint ?(fitness = 1)
-    ?(key = Constant.activator.alias) ?timestamp
-    ?(timestamp_delay = 3600. *. 24. *. 365.) ~parameter_file client =
-  let timestamp =
-    match timestamp with
-    | Some timestamp -> timestamp
-    | None ->
-        let tm = Unix.gmtime (Unix.time () -. timestamp_delay) in
-        Printf.sprintf
-          "%04d-%02d-%02dT%02d:%02d:%02dZ"
-          (tm.tm_year + 1900)
-          (tm.tm_mon + 1)
-          tm.tm_mday
-          tm.tm_hour
-          tm.tm_min
-          tm.tm_sec
-  in
+    ?(key = Constant.activator.alias) ?(timestamp = Client.Ago default_delay)
+    ~parameter_file client =
+  let timestamp = Client.time_of_timestamp timestamp in
   Client.spawn_command
     ?endpoint
     client
@@ -57,10 +48,10 @@ let spawn_activate_protocol ?endpoint ?(fitness = 1)
       "parameters";
       parameter_file;
       "--timestamp";
-      timestamp;
+      Time.to_notation timestamp;
     ]
 
-let activate ?endpoint ?fitness ?key ?timestamp ?timestamp_delay client =
+let activate ?endpoint ?fitness ?key ?timestamp client =
   Lwt_io.with_temp_file (fun (parameter_file, ch) ->
       let* () = Lwt_io.write_line ch "{}" in
       spawn_activate_protocol
@@ -68,7 +59,6 @@ let activate ?endpoint ?fitness ?key ?timestamp ?timestamp_delay client =
         ?fitness
         ?key
         ?timestamp
-        ?timestamp_delay
         ~parameter_file
         client
       |> Process.check)

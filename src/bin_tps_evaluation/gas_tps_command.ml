@@ -43,7 +43,7 @@ let estimate_gas_tps ~average_block_path () =
     Client.init_with_protocol
       ~nodes_args:Node.[Connections 0; Synchronisation_threshold 0]
       ~parameter_file
-      ~timestamp_delay:0.0
+      ~timestamp:Now
       `Client
       ~protocol
       ()

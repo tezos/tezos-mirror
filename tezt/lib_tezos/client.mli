@@ -25,6 +25,8 @@
 
 (** Run Tezos client commands. *)
 
+module Time = Tezos_base.Time.System
+
 (** Values that can be passed to the client's [--endpoint] argument *)
 type endpoint =
   | Node of Node.t  (** A full-fledged node *)
@@ -32,6 +34,13 @@ type endpoint =
 
 (** Values that can be passed to the client's [--media-type] argument *)
 type media_type = Json | Binary | Any
+
+(** Values that can be passed to the client's [--timestamp] argument *)
+type timestamp = Now | Ago of Time.Span.t | At of Time.t
+
+(** Convert [timestamp] into a concrete [Time.t], relative to
+    [Time.now ()]. *)
+val time_of_timestamp : timestamp -> Time.t
 
 (** [rpc_port endpoint] returns the port on which to reach [endpoint]
     when doing RPC calls. *)
@@ -300,17 +309,17 @@ val spawn_import_secret_key :
 
 (** Run [tezos-client activate protocol].
 
-    If [timestamp] is not specified explicitely, it is set to [now -. timestamp_delay].
-    Default value for [timestamp_delay] is 365 days, which allows to bake plenty of blocks
-    before their timestamp reach the present (at which point one would have to wait
-    between each block so that peers do not reject them for being in the future). *)
+    If [timestamp] is not specified explicitely, it is set to [Ago
+    timestamp_delay], where [timestamp_delay] is 365 days, which
+    allows to bake plenty of blocks before their timestamp reach the
+    present (at which point one would have to wait between each block
+    so that peers do not reject them for being in the future). *)
 val activate_protocol :
   ?endpoint:endpoint ->
   protocol:Protocol.t ->
   ?fitness:int ->
   ?key:string ->
-  ?timestamp:string ->
-  ?timestamp_delay:float ->
+  ?timestamp:timestamp ->
   ?parameter_file:string ->
   t ->
   unit Lwt.t
@@ -321,8 +330,7 @@ val spawn_activate_protocol :
   protocol:Protocol.t ->
   ?fitness:int ->
   ?key:string ->
-  ?timestamp:string ->
-  ?timestamp_delay:float ->
+  ?timestamp:timestamp ->
   ?parameter_file:string ->
   t ->
   Process.t
@@ -1233,8 +1241,7 @@ val init_with_protocol :
   ?additional_bootstrap_account_count:int ->
   ?default_accounts_balance:int ->
   ?parameter_file:string ->
-  ?timestamp:string ->
-  ?timestamp_delay:float ->
+  ?timestamp:timestamp ->
   ?keys:Account.key list ->
   [`Client | `Light | `Proxy] ->
   protocol:Protocol.t ->

@@ -403,23 +403,25 @@ let import_signer_key ?endpoint ?force client key signer_uri =
 let import_secret_key ?endpoint client key =
   spawn_import_secret_key ?endpoint client key |> Process.check
 
+module Time = Tezos_base.Time.System
+
+let default_delay = Time.Span.of_seconds_exn (3600. *. 24. *. 365.)
+
+type timestamp = Now | Ago of Time.Span.t | At of Time.t
+
+let time_of_timestamp timestamp =
+  match timestamp with
+  | Now -> Time.now ()
+  | Ago delay -> (
+      match Ptime.sub_span (Time.now ()) delay with
+      | None -> Ptime.epoch
+      | Some tm -> tm)
+  | At tm -> tm
+
 let spawn_activate_protocol ?endpoint ~protocol ?(fitness = 1)
-    ?(key = Constant.activator.alias) ?timestamp
-    ?(timestamp_delay = 3600. *. 24. *. 365.) ?parameter_file client =
-  let timestamp =
-    match timestamp with
-    | Some timestamp -> timestamp
-    | None ->
-        let tm = Unix.gmtime (Unix.time () -. timestamp_delay) in
-        Printf.sprintf
-          "%04d-%02d-%02dT%02d:%02d:%02dZ"
-          (tm.tm_year + 1900)
-          (tm.tm_mon + 1)
-          tm.tm_mday
-          tm.tm_hour
-          tm.tm_min
-          tm.tm_sec
-  in
+    ?(key = Constant.activator.alias) ?(timestamp = Ago default_delay)
+    ?parameter_file client =
+  let timestamp = time_of_timestamp timestamp in
   spawn_command
     ?endpoint
     client
@@ -437,18 +439,17 @@ let spawn_activate_protocol ?endpoint ~protocol ?(fitness = 1)
       "parameters";
       Option.value parameter_file ~default:(Protocol.parameter_file protocol);
       "--timestamp";
-      timestamp;
+      Time.to_notation timestamp;
     ]
 
 let activate_protocol ?endpoint ~protocol ?fitness ?key ?timestamp
-    ?timestamp_delay ?parameter_file client =
+    ?parameter_file client =
   spawn_activate_protocol
     ?endpoint
     ~protocol
     ?fitness
     ?key
     ?timestamp
-    ?timestamp_delay
     ?parameter_file
     client
   |> Process.check
@@ -1717,8 +1718,8 @@ let init_with_node ?path ?admin_path ?name ?color ?base_dir ?event_level
 
 let init_with_protocol ?path ?admin_path ?name ?color ?base_dir ?event_level
     ?event_sections_levels ?nodes_args ?additional_bootstrap_account_count
-    ?default_accounts_balance ?parameter_file ?timestamp ?timestamp_delay ?keys
-    tag ~protocol () =
+    ?default_accounts_balance ?parameter_file ?timestamp ?keys tag ~protocol ()
+    =
   let* (node, client) =
     init_with_node
       ?path
@@ -1747,14 +1748,7 @@ let init_with_protocol ?path ?admin_path ?name ?color ?base_dir ?event_level
       ?parameter_file
       (protocol, None)
   in
-  let* () =
-    activate_protocol
-      ?parameter_file
-      ~protocol
-      ?timestamp
-      ?timestamp_delay
-      client
-  in
+  let* () = activate_protocol ?parameter_file ~protocol ?timestamp client in
   let* _ = Node.wait_for_level node 1 in
   return (node, client)
 

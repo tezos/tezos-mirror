@@ -175,7 +175,7 @@ let check_prevalidator_start =
     Lwt_list.iter_p (fun node -> wait_for_sync node) [node1; node2]
   in
   let* client = Client.init ~endpoint:(Node node1) () in
-  let* () = Client.activate_protocol ~protocol client ~timestamp_delay:0. in
+  let* () = Client.activate_protocol ~protocol client ~timestamp:Now in
   Log.info "Activated protocol." ;
   let* () = Client.bake_for ~minimal_timestamp:false client in
   let connect node node' =

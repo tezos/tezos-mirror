@@ -1168,20 +1168,9 @@ let test_user_activated_protocol_override_baker_vote ~from_protocol ~to_protocol
        default delay between blocks, to give us larger
        margins. Therefore, we activate the protocol at the current
        timestamp. *)
-    let timestamp_now =
-      let tm = Unix.gmtime (Unix.time ()) in
-      Printf.sprintf
-        "%04d-%02d-%02dT%02d:%02d:%02dZ"
-        (tm.tm_year + 1900)
-        (tm.tm_mon + 1)
-        tm.tm_mday
-        tm.tm_hour
-        tm.tm_min
-        tm.tm_sec
-    in
     Client.activate_protocol
       ~protocol:from_protocol
-      ~timestamp:timestamp_now
+      ~timestamp:Now
       ~parameter_file
       client
   in

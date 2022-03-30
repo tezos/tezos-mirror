@@ -545,11 +545,7 @@ let wrong_branch_operation_dismissal =
       ]
   in
   let* () =
-    Client.activate_protocol
-      ~timestamp_delay:0.
-      ~protocol
-      ~parameter_file
-      client
+    Client.activate_protocol ~timestamp:Now ~protocol ~parameter_file client
   in
   Log.info "Activated protocol." ;
   Log.info "Baking a first proposal." ;
