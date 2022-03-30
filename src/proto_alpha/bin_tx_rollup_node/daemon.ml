@@ -412,11 +412,20 @@ let run configuration cctxt =
     rollup_genesis;
     operator;
     reconnection_delay;
+    l2_blocks_cache_size;
     _;
   } =
     configuration
   in
-  let* state = State.init cctxt ~data_dir ~operator ?rollup_genesis rollup_id in
+  let* state =
+    State.init
+      cctxt
+      ~data_dir
+      ~l2_blocks_cache_size
+      ~operator
+      ?rollup_genesis
+      rollup_id
+  in
   let* _rpc_server = RPC.start configuration state in
   let _ =
     (* Register cleaner callback *)

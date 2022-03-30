@@ -422,10 +422,12 @@ let init_parameters cctxt =
         parametric.tx_rollup_max_withdrawals_per_batch;
     }
 
-let init cctxt ~data_dir ?(readonly = false) ?rollup_genesis ~operator rollup =
+let init cctxt ~data_dir ?(readonly = false) ?rollup_genesis
+    ~l2_blocks_cache_size ~operator rollup =
   let open Lwt_result_syntax in
-  (* TODO/TORU make blocks_cache_size configurable *)
-  let*! stores = Stores.init ~data_dir ~readonly ~blocks_cache_size:1024 in
+  let*! stores =
+    Stores.init ~data_dir ~readonly ~blocks_cache_size:l2_blocks_cache_size
+  in
   let* (rollup_info, context_index) =
     both
       (init_rollup_info cctxt stores ?rollup_genesis rollup)
@@ -438,7 +440,8 @@ let init cctxt ~data_dir ?(readonly = false) ?rollup_genesis ~operator rollup =
     Batcher.init cctxt ~rollup ~signer:operator context_index parameters
   in
   let* operator = get_signer cctxt operator in
-  let tezos_blocks_cache = Tezos_blocks_cache.create 128 in
+  (* L1 blocks are cached to handle reorganizations efficiently *)
+  let tezos_blocks_cache = Tezos_blocks_cache.create 32 in
   return
     {
       stores;
