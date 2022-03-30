@@ -416,11 +416,11 @@ let[@coq_axiom_with_reason "gadt"] register () =
                    entrypoint
               >>? fun (r, ctxt) ->
               r |> function
-              | Ok (Ex_ty_cstr {ty; original_type; _}) ->
+              | Ok (Ex_ty_cstr {ty; original_type_expr; _}) ->
                   if normalize_types then
                     unparse_ty ~loc:() ctxt ty >|? fun (ty_node, _ctxt) ->
                     Some (Micheline.strip_locations ty_node)
-                  else ok (Some (Micheline.strip_locations original_type))
+                  else ok (Some (Micheline.strip_locations original_type_expr))
               | Error _ -> Result.return_none )) ;
   opt_register1
     ~chunked:true
@@ -447,11 +447,11 @@ let[@coq_axiom_with_reason "gadt"] register () =
                 Script_ir_translator.list_entrypoints arg_type entrypoints
               in
               Entrypoint.Map.fold_e
-                (fun entry (Ex_ty ty, original_type) (acc, ctxt) ->
+                (fun entry (Ex_ty ty, original_type_expr) (acc, ctxt) ->
                   (if normalize_types then
                    unparse_ty ~loc:() ctxt ty >|? fun (ty_node, ctxt) ->
                    (Micheline.strip_locations ty_node, ctxt)
-                  else ok (Micheline.strip_locations original_type, ctxt))
+                  else ok (Micheline.strip_locations original_type_expr, ctxt))
                   >|? fun (ty_expr, ctxt) ->
                   ((Entrypoint.to_string entry, ty_expr) :: acc, ctxt))
                 map

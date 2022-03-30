@@ -2246,8 +2246,8 @@ module RPC = struct
                  entrypoints
                  entrypoint
             >>? fun (r, _ctxt) ->
-            r >|? fun (Ex_ty_cstr {original_type; _}) ->
-            Micheline.strip_locations original_type )
+            r >|? fun (Ex_ty_cstr {original_type_expr; _}) ->
+            Micheline.strip_locations original_type_expr )
       in
       Registration.register0
         ~chunked:true
@@ -2647,9 +2647,9 @@ module RPC = struct
               in
               ( unreachable_entrypoint,
                 Entrypoint.Map.fold
-                  (fun entry (_ex_ty, original_type) acc ->
+                  (fun entry (_ex_ty, original_type_expr) acc ->
                     ( Entrypoint.to_string entry,
-                      Micheline.strip_locations original_type )
+                      Micheline.strip_locations original_type_expr )
                     :: acc)
                   map
                   [] ) ))

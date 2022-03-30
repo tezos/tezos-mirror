@@ -421,7 +421,7 @@ type 'a ex_ty_cstr =
   | Ex_ty_cstr : {
       ty : ('b, _) Script_typed_ir.ty;
       box : 'b -> 'a;
-      original_type : Script.node;
+      original_type_expr : Script.node;
     }
       -> 'a ex_ty_cstr
 

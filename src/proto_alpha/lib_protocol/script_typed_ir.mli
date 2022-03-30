@@ -279,7 +279,7 @@ type view = {
 
 type view_map = (Script_string.t, view) map
 
-type entrypoint_info = {name : Entrypoint.t; original_type : Script.node}
+type entrypoint_info = {name : Entrypoint.t; original_type_expr : Script.node}
 
 (** ['arg entrypoints] represents the tree of entrypoints of a parameter type
     ['arg].
@@ -307,7 +307,7 @@ val no_entrypoints : _ entrypoints_node
 
 type 'arg entrypoints = {
   root : 'arg entrypoints_node;
-  original_type : Script.node;
+  original_type_expr : Script.node;
 }
 
 type ('arg, 'storage) script =
