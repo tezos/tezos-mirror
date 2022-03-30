@@ -435,7 +435,8 @@ val find_entrypoint :
 val list_entrypoints :
   ('t, _) Script_typed_ir.ty ->
   't Script_typed_ir.entrypoints ->
-  Michelson_v1_primitives.prim list list * Script.node Entrypoint.Map.t
+  Michelson_v1_primitives.prim list list
+  * (ex_ty * Script.node) Entrypoint.Map.t
 
 val pack_data :
   context ->

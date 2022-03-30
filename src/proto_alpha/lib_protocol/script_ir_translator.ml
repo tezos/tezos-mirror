@@ -5577,7 +5577,8 @@ let list_entrypoints (type full fullc) (full : (full, fullc) ty)
     | Some {name; original_type} ->
         ( (if Entrypoint.Map.mem name all then
            (List.rev path :: unreachables, all)
-          else (unreachables, Entrypoint.Map.add name original_type all)),
+          else
+            (unreachables, Entrypoint.Map.add name (Ex_ty ty, original_type) all)),
           true )
   in
   let rec fold_tree :
@@ -5586,8 +5587,8 @@ let list_entrypoints (type full fullc) (full : (full, fullc) ty)
       t entrypoints_node ->
       prim list ->
       bool ->
-      prim list list * Script.node Entrypoint.Map.t ->
-      prim list list * Script.node Entrypoint.Map.t =
+      prim list list * (ex_ty * Script.node) Entrypoint.Map.t ->
+      prim list list * (ex_ty * Script.node) Entrypoint.Map.t =
    fun t entrypoints path reachable acc ->
     match (t, entrypoints) with
     | (Union_t (tl, tr, _, _), {nested = Entrypoints_Union {left; right}; _}) ->
@@ -5603,7 +5604,7 @@ let list_entrypoints (type full fullc) (full : (full, fullc) ty)
     match entrypoints.root.at_node with
     | None -> (Entrypoint.Map.empty, false)
     | Some {name; original_type} ->
-        (Entrypoint.Map.singleton name original_type, true)
+        (Entrypoint.Map.singleton name (Ex_ty full, original_type), true)
   in
   fold_tree full entrypoints.root [] reachable ([], init)
   [@@coq_axiom_with_reason "unsupported syntax"]
