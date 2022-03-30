@@ -33,6 +33,8 @@ type alert_config = {
   (* minimum delay between two alerts for the same category, in seconds *)
   rate_limit_per_category : float;
   last_alerts_filename : string;
+  max_alert_size : int;
+  max_alert_lines : int;
 }
 
 type config = {
@@ -79,6 +81,12 @@ let as_alert_config json =
       JSON.(
         json |-> "last_alerts_filename" |> as_string_opt
         |> Option.value ~default:"last_alerts.json");
+    max_alert_size =
+      JSON.(
+        json |-> "max_alert_size" |> as_int_opt |> Option.value ~default:1000);
+    max_alert_lines =
+      JSON.(
+        json |-> "max_alert_lines" |> as_int_opt |> Option.value ~default:20);
   }
 
 let read_config_file filename =
@@ -324,11 +332,36 @@ module Slack = struct
     unit
 end
 
+let shorten_message ~max_size ~max_lines message =
+  let max_size = max 1 max_size in
+  let max_lines = max 1 max_lines in
+  let message_length = String.length message in
+  let rec shortened_length newlines i =
+    if i >= max_size then max_size
+    else if i >= message_length then message_length
+    else
+      match message.[i] with
+      | '\n' ->
+          let newlines = newlines + 1 in
+          if newlines >= max_lines then i else shortened_length newlines (i + 1)
+      | _ -> shortened_length newlines (i + 1)
+  in
+  let new_length = shortened_length 0 0 in
+  if new_length < String.length message then
+    String.sub message 0 (max 0 new_length) ^ "[...]"
+  else message
+
 let alert_s ?category ~log message =
   if log then Log.error "Alert: %s" message ;
   match !config.alerts with
   | None -> ()
   | Some alert_cfg ->
+      let message =
+        shorten_message
+          ~max_size:alert_cfg.max_alert_size
+          ~max_lines:alert_cfg.max_alert_lines
+          message
+      in
       let may_send_rate_limit = Alerts.may_send_rate_limit alert_cfg category in
       let may_send =
         !total_alert_count < alert_cfg.max_total
