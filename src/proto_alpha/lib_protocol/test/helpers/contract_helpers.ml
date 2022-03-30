@@ -36,20 +36,23 @@ let init () =
   in
   (b, baker, src1, src2)
 
-(** Returns a block in which the contract is originated. *)
-let originate_contract file storage src b baker =
-  let load_file f =
-    let ic = open_in f in
-    let res = really_input_string ic (in_channel_length ic) in
-    close_in ic ;
-    res
-  in
-  let contract_string = load_file file in
+(** Return contents of a given file as string. *)
+let read_file f =
+  let ic = open_in f in
+  let res = really_input_string ic (in_channel_length ic) in
+  close_in ic ;
+  res
+
+(** Loads a script from file. *)
+let load_script ~storage file =
+  let contract_string = read_file file in
   let code = Expr.toplevel_from_string contract_string in
   let storage = Expr.from_string storage in
-  let script =
-    Alpha_context.Script.{code = lazy_expr code; storage = lazy_expr storage}
-  in
+  Alpha_context.Script.{code = lazy_expr code; storage = lazy_expr storage}
+
+(** Returns a block in which the contract is originated. *)
+let originate_contract file storage src b baker =
+  let script = load_script ~storage file in
   Op.contract_origination (B b) src ~fee:(Test_tez.of_int 10) ~script
   >>=? fun (operation, dst) ->
   Incremental.begin_construction ~policy:Block.(By_account baker) b
