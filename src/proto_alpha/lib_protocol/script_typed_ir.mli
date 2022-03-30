@@ -279,7 +279,7 @@ type view = {
 
 type view_map = (Script_string.t, view) map
 
-type present_entrypoint = {name : Entrypoint.t; original_type : Script.node}
+type entrypoint_info = {name : Entrypoint.t; original_type : Script.node}
 
 (** ['arg entrypoints] represents the tree of entrypoints of a parameter type
     ['arg].
@@ -290,7 +290,7 @@ type present_entrypoint = {name : Entrypoint.t; original_type : Script.node}
       means that there are no entrypoints below that node in the tree.
 *)
 type 'arg entrypoints_node = {
-  at_node : present_entrypoint option;
+  at_node : entrypoint_info option;
   nested : 'arg nested_entrypoints;
 }
 
