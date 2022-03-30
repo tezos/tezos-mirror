@@ -90,6 +90,7 @@ val entrypoint_type :
   'a ->
   Contract.t ->
   Entrypoint.t ->
+  normalize_types:bool ->
   Script.expr shell_tzresult Lwt.t
 
 val list_entrypoints :

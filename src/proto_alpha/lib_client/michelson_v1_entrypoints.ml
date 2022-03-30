@@ -68,6 +68,7 @@ let contract_entrypoint_type cctxt ~(chain : Chain_services.chain) ~block
     (chain, block)
     contract
     entrypoint
+    ~normalize_types:false
   >>= function
   | Ok ty -> return_some ty
   | Error (RPC_context.Not_found _ :: _) -> return None

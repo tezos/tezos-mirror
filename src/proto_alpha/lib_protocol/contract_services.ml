@@ -117,10 +117,23 @@ module S = struct
       ~output:Script.expr_encoding
       RPC_path.(custom_root /: Contract.rpc_arg / "storage")
 
+  type normalize_types_query = {normalize_types : bool}
+
+  let normalize_types_query : normalize_types_query RPC_query.t =
+    let open RPC_query in
+    query (fun normalize_types -> {normalize_types})
+    |+ flag
+         ~descr:
+           "Whether types should be normalized (annotations removed, combs \
+            flattened) or kept as they appeared in the original script."
+         "normalize_types"
+         (fun t -> t.normalize_types)
+    |> seal
+
   let entrypoint_type =
     RPC_service.get_service
       ~description:"Return the type of the given entrypoint of the contract"
-      ~query:RPC_query.empty
+      ~query:normalize_types_query
       ~output:Script.expr_encoding
       RPC_path.(
         custom_root /: Contract.rpc_arg / "entrypoints" /: Entrypoint.rpc_arg)
@@ -374,7 +387,10 @@ let[@coq_axiom_with_reason "gadt"] register () =
             ctxt
             script.storage
           >>?= fun (storage, _ctxt) -> return_some storage) ;
-  opt_register2 ~chunked:true S.entrypoint_type (fun ctxt v entrypoint () () ->
+  opt_register2
+    ~chunked:true
+    S.entrypoint_type
+    (fun ctxt v entrypoint {normalize_types} () ->
       Contract.get_script_code ctxt v >>=? fun (_, expr) ->
       match expr with
       | None -> return_none
@@ -398,10 +414,13 @@ let[@coq_axiom_with_reason "gadt"] register () =
                    arg_type
                    entrypoints
                    entrypoint
-              >>? fun (r, _ctxt) ->
+              >>? fun (r, ctxt) ->
               r |> function
-              | Ok (Ex_ty_cstr {original_type; _}) ->
-                  ok (Some (Micheline.strip_locations original_type))
+              | Ok (Ex_ty_cstr {ty; original_type; _}) ->
+                  if normalize_types then
+                    unparse_ty ~loc:() ctxt ty >|? fun (ty_node, _ctxt) ->
+                    Some (Micheline.strip_locations ty_node)
+                  else ok (Some (Micheline.strip_locations original_type))
               | Error _ -> Result.return_none )) ;
   opt_register1 ~chunked:true S.list_entrypoints (fun ctxt v () () ->
       Contract.get_script_code ctxt v >>=? fun (_, expr) ->
@@ -535,8 +554,15 @@ let script_opt ctxt block contract =
 let storage ctxt block contract =
   RPC_context.make_call1 S.storage ctxt block contract () ()
 
-let entrypoint_type ctxt block contract entrypoint =
-  RPC_context.make_call2 S.entrypoint_type ctxt block contract entrypoint () ()
+let entrypoint_type ctxt block contract entrypoint ~normalize_types =
+  RPC_context.make_call2
+    S.entrypoint_type
+    ctxt
+    block
+    contract
+    entrypoint
+    {normalize_types}
+    ()
 
 let list_entrypoints ctxt block contract =
   RPC_context.make_call1 S.list_entrypoints ctxt block contract () ()
