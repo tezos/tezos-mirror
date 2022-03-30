@@ -1,25 +1,28 @@
 (library
  (name tezos_protocol_009_PsFLoren_parameters)
- (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-009-PsFLoren-parameters)
- (modules :standard \ gen)
- (libraries tezos-base
-            tezos-base.unix
-            tezos-protocol-environment
-            tezos-protocol-009-PsFLoren)
- (flags (:standard -open Tezos_base__TzPervasives
-                   -open Tezos_protocol_009_PsFLoren
-                   -linkall))
-)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  tezos-base.unix
+  tezos-protocol-environment
+  tezos-protocol-009-PsFLoren)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard -open Tezos_base.TzPervasives -open Tezos_protocol_009_PsFLoren))
+ (modules (:standard \ gen)))
 
 (executable
  (name gen)
- (libraries tezos-base
-            tezos-protocol-009-PsFLoren-parameters)
- (modules gen)
- (flags (:standard -open Tezos_base__TzPervasives
-                   -open Tezos_protocol_009_PsFLoren_parameters
-                   -linkall)))
+ (libraries
+  tezos-base
+  tezos-protocol-009-PsFLoren-parameters)
+ (link_flags (:standard -linkall))
+ (flags
+  (:standard
+   -open Tezos_base.TzPervasives
+   -open Tezos_protocol_009_PsFLoren_parameters))
+ (modules gen))
 
 (rule
  (targets sandbox-parameters.json)
