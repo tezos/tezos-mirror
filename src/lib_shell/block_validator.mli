@@ -28,7 +28,10 @@
 
 type t
 
-type limits = {protocol_timeout : Time.System.Span.t}
+type limits = {
+  protocol_timeout : Time.System.Span.t;
+  operation_metadata_size_limit : int option;
+}
 
 (** [create limits ddb bvp start_testchain] creates a
    [Block_validator].

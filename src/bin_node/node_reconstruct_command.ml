@@ -85,6 +85,8 @@ module Term = struct
           node_config.blockchain_network.user_activated_upgrades
         ~user_activated_protocol_overrides:
           node_config.blockchain_network.user_activated_protocol_overrides
+        ~operation_metadata_size_limit:
+          node_config.shell.block_validator_limits.operation_metadata_size_limit
     in
     match Lwt_main.run @@ Lwt_exit.wrap_and_exit run with
     | Ok () -> `Ok ()

@@ -133,6 +133,7 @@ let export_import ~test_descr ~previously_baked_blocks ?exported_block_hash
       ~configured_history_mode:None
       ~user_activated_upgrades:[]
       ~user_activated_protocol_overrides:[]
+      ~operation_metadata_size_limit:None
       genesis
   in
   let* store' =
@@ -514,6 +515,7 @@ let test_rolling () =
         ~configured_history_mode:None
         ~user_activated_upgrades:[]
         ~user_activated_protocol_overrides:[]
+        ~operation_metadata_size_limit:None
         genesis
     in
     let* store' =
@@ -639,6 +641,7 @@ let test_drag_after_import () =
         ~configured_history_mode:None
         ~user_activated_upgrades:[]
         ~user_activated_protocol_overrides:[]
+        ~operation_metadata_size_limit:None
         ~block:export_block_hash
         genesis
     in

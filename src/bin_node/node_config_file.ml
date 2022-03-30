@@ -879,13 +879,33 @@ let timeout_encoding = Time.System.Span.encoding
 let block_validator_limits_encoding =
   let open Data_encoding in
   conv
-    (fun {Block_validator.protocol_timeout} -> protocol_timeout)
-    (fun protocol_timeout -> {protocol_timeout})
-    (obj1
+    (fun {Block_validator.protocol_timeout; operation_metadata_size_limit} ->
+      (protocol_timeout, operation_metadata_size_limit))
+    (fun (protocol_timeout, operation_metadata_size_limit) ->
+      {protocol_timeout; operation_metadata_size_limit})
+    (obj2
        (dft
           "protocol_request_timeout"
           timeout_encoding
-          default_shell.block_validator_limits.protocol_timeout))
+          default_shell.block_validator_limits.protocol_timeout)
+       (dft
+          "operation_metadata_size_limit"
+          (union
+             [
+               case
+                 ~title:"unlimited"
+                 (Tag 0)
+                 (constant "unlimited")
+                 (function None -> Some () | _ -> None)
+                 (fun () -> None);
+               case
+                 ~title:"limited"
+                 (Tag 1)
+                 int31
+                 (function Some i -> Some i | None -> None)
+                 (fun i -> Some i);
+             ])
+          default_shell.block_validator_limits.operation_metadata_size_limit))
 
 let prevalidator_limits_encoding =
   let open Data_encoding in
@@ -1260,7 +1280,8 @@ let update ?(disable_config_validation = false) ?data_dir ?min_connections
     ?binary_chunks_size ?peer_table_size ?expected_pow ?bootstrap_peers
     ?listen_addr ?advertised_net_port ?discovery_addr ?(rpc_listen_addrs = [])
     ?(allow_all_rpc = []) ?(media_type = Media_type.Command_line.Any)
-    ?(metrics_addr = []) ?(private_mode = false) ?(disable_mempool = false)
+    ?(metrics_addr = []) ?operation_metadata_size_limit ?(private_mode = false)
+    ?(disable_mempool = false)
     ?(disable_mempool_precheck =
       default_shell.prevalidator_limits.disable_precheck)
     ?(enable_testchain = false) ?(cors_origins = []) ?(cors_headers = [])
@@ -1338,7 +1359,15 @@ let update ?(disable_config_validation = false) ?data_dir ?min_connections
   and shell : shell =
     {
       peer_validator_limits = cfg.shell.peer_validator_limits;
-      block_validator_limits = cfg.shell.block_validator_limits;
+      block_validator_limits =
+        {
+          cfg.shell.block_validator_limits with
+          operation_metadata_size_limit =
+            Option.value
+              ~default:
+                cfg.shell.block_validator_limits.operation_metadata_size_limit
+              operation_metadata_size_limit;
+        };
       prevalidator_limits =
         {
           cfg.shell.prevalidator_limits with

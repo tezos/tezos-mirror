@@ -32,6 +32,7 @@ type config = {
   sandboxed_chain_name : Distributed_db_version.Name.t;
   user_activated_upgrades : User_activated.upgrades;
   user_activated_protocol_overrides : User_activated.protocol_overrides;
+  operation_metadata_size_limit : int option;
   data_dir : string;
   store_root : string;
   context_root : string;

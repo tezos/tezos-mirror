@@ -28,7 +28,10 @@
 open Block_validator_worker_state
 open Block_validator_errors
 
-type limits = {protocol_timeout : Time.System.Span.t}
+type limits = {
+  protocol_timeout : Time.System.Span.t;
+  operation_metadata_size_limit : int option;
+}
 
 type result =
   | Already_commited

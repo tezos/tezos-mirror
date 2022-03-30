@@ -162,6 +162,8 @@ let replay ~singleprocess (config : Node_config_file.t) blocks =
       user_activated_upgrades = config.blockchain_network.user_activated_upgrades;
       user_activated_protocol_overrides =
         config.blockchain_network.user_activated_protocol_overrides;
+      operation_metadata_size_limit =
+        config.shell.block_validator_limits.operation_metadata_size_limit;
     }
   in
   let* (validator_process, store) =

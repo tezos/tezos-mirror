@@ -54,6 +54,7 @@ let init_validator
       {
         Block_validator_process.user_activated_upgrades = [];
         user_activated_protocol_overrides = [];
+        operation_metadata_size_limit = None;
       }
     in
     let* block_validator =

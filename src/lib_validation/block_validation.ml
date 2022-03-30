@@ -85,6 +85,10 @@ let validation_store_encoding =
 
 type operation_metadata = Metadata of Bytes.t | Too_large_metadata
 
+(* [default_operation_metadata_size_limit] is used to filter and potentially discard a
+   given metadata if its size exceed the cap. *)
+let default_operation_metadata_size_limit = Some 10_000_000
+
 let operation_metadata_encoding =
   let open Data_encoding in
   def
@@ -402,15 +406,12 @@ module Make (Proto : Registered_protocol.T) = struct
                 return op))
       operations
 
-  (* [metadata_size_cap] is used to filter and potentially discard a
-     given metadata if its size exceed the cap. *)
-  let metadata_size_cap = 10_000
-
   (* FIXME: This code is used by preapply but emitting time
      measurement events in prevalidation should not impact current
      benchmarks.
      See https://gitlab.com/tezos/tezos/-/issues/2716 *)
-  let compute_metadata proto_env_version block_data ops_metadata =
+  let compute_metadata ~operation_metadata_size_limit proto_env_version
+      block_data ops_metadata =
     let open Lwt_tzresult_syntax in
     (* Block and operation metadata hashes are not required for
        environment V0. *)
@@ -450,8 +451,11 @@ module Make (Proto : Registered_protocol.T) = struct
                      bytes
                  in
                  let metadata =
-                   if Bytes.length bytes < metadata_size_cap then Metadata bytes
-                   else Too_large_metadata
+                   match operation_metadata_size_limit with
+                   | None -> Metadata bytes
+                   | Some size_limit ->
+                       if Bytes.length bytes < size_limit then Metadata bytes
+                       else Too_large_metadata
                  in
                  (bytes, metadata)))
             ops_metadata
@@ -477,8 +481,8 @@ module Make (Proto : Registered_protocol.T) = struct
     return (block_metadata, ops_metadata)
 
   let apply ?cached_result chain_id ~cache ~user_activated_upgrades
-      ~user_activated_protocol_overrides ~max_operations_ttl
-      ~(predecessor_block_header : Block_header.t)
+      ~user_activated_protocol_overrides ~operation_metadata_size_limit
+      ~max_operations_ttl ~(predecessor_block_header : Block_header.t)
       ~predecessor_block_metadata_hash ~predecessor_ops_metadata_hash
       ~predecessor_context ~(block_header : Block_header.t) operations =
     let open Lwt_tzresult_syntax in
@@ -643,7 +647,11 @@ module Make (Proto : Registered_protocol.T) = struct
         in
         let validation_result = {validation_result with max_operations_ttl} in
         let* (block_metadata, ops_metadata) =
-          compute_metadata new_protocol_env_version block_metadata ops_metadata
+          compute_metadata
+            ~operation_metadata_size_limit
+            new_protocol_env_version
+            block_metadata
+            ops_metadata
         in
         let (Context {cache; _}) = validation_result.context in
         let context =
@@ -734,8 +742,9 @@ module Make (Proto : Registered_protocol.T) = struct
       return {hash; raw; protocol_data}
 
   let preapply ~chain_id ~cache ~user_activated_upgrades
-      ~user_activated_protocol_overrides ~protocol_data ~live_blocks
-      ~live_operations ~timestamp ~predecessor_context
+      ~user_activated_protocol_overrides ~operation_metadata_size_limit
+      ~protocol_data ~live_blocks ~live_operations ~timestamp
+      ~predecessor_context
       ~(predecessor_shell_header : Block_header.shell_header) ~predecessor_hash
       ~predecessor_max_operations_ttl ~predecessor_block_metadata_hash
       ~predecessor_ops_metadata_hash ~operations =
@@ -948,6 +957,7 @@ module Make (Proto : Registered_protocol.T) = struct
     in
     let* (block_metadata, ops_metadata) =
       compute_metadata
+        ~operation_metadata_size_limit
         new_protocol_env_version
         block_header_metadata
         applied_ops_metadata
@@ -1089,6 +1099,7 @@ type apply_environment = {
   predecessor_ops_metadata_hash : Operation_metadata_list_list_hash.t option;
   user_activated_upgrades : User_activated.upgrades;
   user_activated_protocol_overrides : User_activated.protocol_overrides;
+  operation_metadata_size_limit : int option;
 }
 
 let apply ?cached_result
@@ -1096,6 +1107,7 @@ let apply ?cached_result
       chain_id;
       user_activated_upgrades;
       user_activated_protocol_overrides;
+      operation_metadata_size_limit;
       max_operations_ttl;
       predecessor_block_header;
       predecessor_block_metadata_hash;
@@ -1118,6 +1130,7 @@ let apply ?cached_result
     chain_id
     ~user_activated_upgrades
     ~user_activated_protocol_overrides
+    ~operation_metadata_size_limit
     ~max_operations_ttl
     ~predecessor_block_header
     ~predecessor_block_metadata_hash
@@ -1188,9 +1201,9 @@ let precheck ~chain_id ~predecessor_block_header ~predecessor_block_hash
     operations
 
 let preapply ~chain_id ~user_activated_upgrades
-    ~user_activated_protocol_overrides ~timestamp ~protocol_data ~live_blocks
-    ~live_operations ~predecessor_context ~predecessor_shell_header
-    ~predecessor_hash ~predecessor_max_operations_ttl
+    ~user_activated_protocol_overrides ~operation_metadata_size_limit ~timestamp
+    ~protocol_data ~live_blocks ~live_operations ~predecessor_context
+    ~predecessor_shell_header ~predecessor_hash ~predecessor_max_operations_ttl
     ~predecessor_block_metadata_hash ~predecessor_ops_metadata_hash operations =
   let open Lwt_tzresult_syntax in
   let*! protocol = Context.get_protocol predecessor_context in
@@ -1222,6 +1235,7 @@ let preapply ~chain_id ~user_activated_upgrades
     ~cache:`Force_load
     ~user_activated_upgrades
     ~user_activated_protocol_overrides
+    ~operation_metadata_size_limit
     ~protocol_data
     ~live_blocks
     ~live_operations
@@ -1235,9 +1249,9 @@ let preapply ~chain_id ~user_activated_upgrades
     ~operations
 
 let preapply ~chain_id ~user_activated_upgrades
-    ~user_activated_protocol_overrides ~timestamp ~protocol_data ~live_blocks
-    ~live_operations ~predecessor_context ~predecessor_shell_header
-    ~predecessor_hash ~predecessor_max_operations_ttl
+    ~user_activated_protocol_overrides ~operation_metadata_size_limit ~timestamp
+    ~protocol_data ~live_blocks ~live_operations ~predecessor_context
+    ~predecessor_shell_header ~predecessor_hash ~predecessor_max_operations_ttl
     ~predecessor_block_metadata_hash ~predecessor_ops_metadata_hash operations =
   let open Lwt_tzresult_syntax in
   let*! r =
@@ -1245,6 +1259,7 @@ let preapply ~chain_id ~user_activated_upgrades
       ~chain_id
       ~user_activated_upgrades
       ~user_activated_protocol_overrides
+      ~operation_metadata_size_limit
       ~timestamp
       ~protocol_data
       ~live_blocks
