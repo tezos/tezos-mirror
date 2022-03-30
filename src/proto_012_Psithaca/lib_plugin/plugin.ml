@@ -37,6 +37,9 @@ type Environment.Error_monad.error += Cannot_serialize_log
 
 type Environment.Error_monad.error += Cannot_retrieve_predecessor_level
 
+type Environment.Error_monad.error +=
+  | Balance_is_empty of {source : public_key_hash}
+
 let () =
   Environment.Error_monad.register_error_kind
     `Branch
@@ -65,7 +68,17 @@ let () =
     ~description:"Cannot retrieve predecessor level."
     Data_encoding.empty
     (function Cannot_retrieve_predecessor_level -> Some () | _ -> None)
-    (fun () -> Cannot_retrieve_predecessor_level)
+    (fun () -> Cannot_retrieve_predecessor_level) ;
+  Environment.Error_monad.register_error_kind
+    `Temporary
+    ~id:"balance_is_empty"
+    ~title:"Balance of manager account is empty after precheck"
+    ~description:
+      "If the balance is empty after precheck, the operation is invalid."
+    Data_encoding.(
+      obj1 (req "public_key_hash" Signature.Public_key_hash.encoding))
+    (function Balance_is_empty {source} -> Some source | _ -> None)
+    (fun source -> Balance_is_empty {source})
 
 module Mempool = struct
   type error_classification =
@@ -1047,7 +1060,18 @@ module Mempool = struct
         else
           (* Signature probably never checked. *)
           Main.check_manager_signature validation_state contents raw_operation
-      )
+          >>=? fun () ->
+          (* This assumes the only way for a manager balance to
+             decrease comes from an operation he has signed
+             himself. *)
+          Alpha_context.Contract.get_balance
+            validation_state.ctxt
+            (Contract.implicit_contract source)
+          >>=? fun balance ->
+          if Tez.(balance = fee) then
+            Lwt.return
+              (Environment.Error_monad.error (Balance_is_empty {source}))
+          else return_unit )
       >|= function
       | Ok () -> on_success
       | Error err -> (
