@@ -107,7 +107,11 @@ let print_entrypoint_type (cctxt : #Client_context.printer)
   | Error errs -> on_errors errs
 
 let list_contract_unreachables_and_entrypoints cctxt ~chain ~block ~contract =
-  Alpha_services.Contract.list_entrypoints cctxt (chain, block) contract
+  Alpha_services.Contract.list_entrypoints
+    cctxt
+    (chain, block)
+    contract
+    ~normalize_types:false
 
 let list_contract_unreachables cctxt ~chain ~block ~contract =
   list_contract_unreachables_and_entrypoints cctxt ~chain ~block ~contract

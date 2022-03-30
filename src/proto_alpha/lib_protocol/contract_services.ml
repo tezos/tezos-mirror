@@ -141,7 +141,7 @@ module S = struct
   let list_entrypoints =
     RPC_service.get_service
       ~description:"Return the list of entrypoints of the contract"
-      ~query:RPC_query.empty
+      ~query:normalize_types_query
       ~output:
         (obj2
            (dft
@@ -422,7 +422,10 @@ let[@coq_axiom_with_reason "gadt"] register () =
                     Some (Micheline.strip_locations ty_node)
                   else ok (Some (Micheline.strip_locations original_type))
               | Error _ -> Result.return_none )) ;
-  opt_register1 ~chunked:true S.list_entrypoints (fun ctxt v () () ->
+  opt_register1
+    ~chunked:true
+    S.list_entrypoints
+    (fun ctxt v {normalize_types} () ->
       Contract.get_script_code ctxt v >>=? fun (_, expr) ->
       match expr with
       | None -> return_none
@@ -438,20 +441,23 @@ let[@coq_axiom_with_reason "gadt"] register () =
           parse_toplevel ctxt ~legacy expr >>=? fun ({arg_type; _}, ctxt) ->
           Lwt.return
             ( parse_parameter_ty_and_entrypoints ctxt ~legacy arg_type
-            >|? fun (Ex_parameter_ty_and_entrypoints {arg_type; entrypoints}, _)
+            >>? fun (Ex_parameter_ty_and_entrypoints {arg_type; entrypoints}, _)
               ->
               let (unreachable_entrypoint, map) =
                 Script_ir_translator.list_entrypoints arg_type entrypoints
               in
-              Some
-                ( unreachable_entrypoint,
-                  Entrypoint.Map.fold
-                    (fun entry (_ex_ty, original_type) acc ->
-                      ( Entrypoint.to_string entry,
-                        Micheline.strip_locations original_type )
-                      :: acc)
-                    map
-                    [] ) )) ;
+              Entrypoint.Map.fold_e
+                (fun entry (Ex_ty ty, original_type) (acc, ctxt) ->
+                  (if normalize_types then
+                   unparse_ty ~loc:() ctxt ty >|? fun (ty_node, ctxt) ->
+                   (Micheline.strip_locations ty_node, ctxt)
+                  else ok (Micheline.strip_locations original_type, ctxt))
+                  >|? fun (ty_expr, ctxt) ->
+                  ((Entrypoint.to_string entry, ty_expr) :: acc, ctxt))
+                map
+                ([], ctxt)
+              >|? fun (entrypoint_types, _ctxt) ->
+              Some (unreachable_entrypoint, entrypoint_types) )) ;
   opt_register1
     ~chunked:true
     S.contract_big_map_get_opt
@@ -565,8 +571,14 @@ let entrypoint_type ctxt block contract entrypoint ~normalize_types =
     {normalize_types}
     ()
 
-let list_entrypoints ctxt block contract =
-  RPC_context.make_call1 S.list_entrypoints ctxt block contract () ()
+let list_entrypoints ctxt block contract ~normalize_types =
+  RPC_context.make_call1
+    S.list_entrypoints
+    ctxt
+    block
+    contract
+    {normalize_types}
+    ()
 
 let storage_opt ctxt block contract =
   RPC_context.make_opt_call1 S.storage ctxt block contract () ()
