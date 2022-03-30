@@ -416,17 +416,17 @@ let commands_ro () =
     command
       ~group
       ~desc:"Get the entrypoint list of a contract."
-      no_options
+      (args1 normalize_types_switch)
       (prefixes ["get"; "contract"; "entrypoints"; "for"]
       @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
       @@ stop)
-      (fun () (_, contract) (cctxt : Protocol_client_context.full) ->
+      (fun normalize_types (_, contract) (cctxt : Protocol_client_context.full) ->
         Michelson_v1_entrypoints.list_contract_entrypoints
           cctxt
           ~chain:cctxt#chain
           ~block:cctxt#block
           ~contract
-          ~normalize_types:false
+          ~normalize_types
         >>= Michelson_v1_entrypoints.print_entrypoints_list
               cctxt
               ~emacs:false
