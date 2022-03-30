@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,49 +23,52 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let on_layer_1_chain_event cctxt store chain_event =
-  let open Lwt_tzresult_syntax in
-  let* () = Inbox.update cctxt store chain_event in
-  let* () = Interpreter.Arith.update store chain_event in
-  let*! () = Layer1.processed chain_event in
-  return ()
+open Protocol
+open Alpha_context
 
-let iter_stream stream handle =
-  let rec go () =
-    Lwt.bind (Lwt_stream.get stream) @@ fun tok ->
-    match tok with
-    | None -> return_unit
-    | Some element -> Lwt_result.bind (handle element) go
-  in
-  go ()
+(** This module manifests the proof format used by the Arith PVM as defined by
+    the Layer 1 implementation for it.
 
-let daemonize cctxt store layer_1_chain_events =
-  Lwt.no_cancel
-  @@ iter_stream layer_1_chain_events
-  @@ on_layer_1_chain_event cctxt store
+    It is imperative that this is aligned with the protocol's implementation.
+*)
+module Arith_proof_format = struct
+  open Store
 
-let install_finalizer store rpc_server =
-  let open Lwt_syntax in
-  Lwt_exit.register_clean_up_callback ~loc:__LOC__ @@ fun exit_status ->
-  let* () = RPC_server.Arith.shutdown rpc_server in
-  let* () = Store.close store in
-  let* () = Event.shutdown_node exit_status in
-  Tezos_base_unix.Internal_event_unix.close ()
+  type proof = IStoreProof.Proof.tree IStoreProof.Proof.t
 
-let run ~data_dir (cctxt : Protocol_client_context.full) =
-  let open Lwt_tzresult_syntax in
-  let start () =
-    let*! () = Event.starting_node () in
-    let* configuration = Configuration.load ~data_dir in
-    let open Configuration in
-    let {rpc_addr; rpc_port; sc_rollup_address; _} = configuration in
-    let*! store = Store.load configuration in
-    let* tezos_heads = Layer1.start configuration cctxt store in
-    let*! () = Inbox.start store sc_rollup_address in
-    let* () = Interpreter.Arith.start store in
-    let* rpc_server = RPC_server.Arith.start store configuration in
-    let _ = install_finalizer store rpc_server in
-    let*! () = Event.node_is_ready ~rpc_addr ~rpc_port in
-    daemonize cctxt store tezos_heads
-  in
-  start ()
+  let verify_proof = IStoreProof.verify_tree_proof
+
+  let kinded_hash_to_state_hash :
+      IStoreProof.Proof.kinded_hash -> Sc_rollup.State_hash.t = function
+    | `Value hash | `Node hash ->
+        Sc_rollup.State_hash.hash_bytes [Context_hash.to_bytes hash]
+
+  let proof_start_state proof =
+    kinded_hash_to_state_hash proof.IStoreProof.Proof.before
+
+  let proof_stop_state proof =
+    kinded_hash_to_state_hash proof.IStoreProof.Proof.after
+
+  let proof_encoding =
+    Tezos_context_helpers.Merkle_proof_encoding.V2.Tree32.tree_proof_encoding
+end
+
+module Impl : Pvm.S = struct
+  include Sc_rollup_arith.Make (struct
+    open Store
+    module Tree = IStoreTree
+
+    type tree = IStoreTree.tree
+
+    include Arith_proof_format
+  end)
+
+  let string_of_status status =
+    match status with
+    | Halted -> "Halted"
+    | WaitingForInputMessage -> "WaitingForInputMessage"
+    | Parsing -> "Parsing"
+    | Evaluating -> "Evaluating"
+end
+
+include Impl

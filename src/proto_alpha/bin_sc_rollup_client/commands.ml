@@ -36,7 +36,7 @@ let get_sc_rollup_addresses_command () =
       RPC.get_sc_rollup_addresses_command cctxt >>=? fun addr ->
       cctxt#message "@[%a@]" Sc_rollup.Address.pp addr >>= fun () -> return_unit)
 
-(** [display_answer cctxt answer] will print an RPC answer to the screen. *)
+(** [display_answer cctxt answer] prints an RPC answer. *)
 let display_answer (cctxt : #Configuration.sc_client_context) :
     RPC_context.generic_call_result -> unit Lwt.t = function
   | `Json (`Ok json) -> cctxt#answer "%a" Json_repr.(pp (module Ezjsonm)) json
@@ -82,11 +82,11 @@ let call_get (cctxt : #Configuration.sc_client_context) raw_url =
   let*! () = display_answer cctxt answer in
   return_unit
 
-let rpc_get =
+let rpc_get_command =
   command
     ~desc:"Call an RPC with the GET method."
     no_options
     (prefixes ["rpc"; "get"] @@ string ~name:"url" ~desc:"the RPC URL" @@ stop)
     (fun () url cctxt -> call_get cctxt url)
 
-let all () = [get_sc_rollup_addresses_command (); rpc_get]
+let all () = [get_sc_rollup_addresses_command (); rpc_get_command]

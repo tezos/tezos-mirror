@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,49 +23,28 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let on_layer_1_chain_event cctxt store chain_event =
-  let open Lwt_tzresult_syntax in
-  let* () = Inbox.update cctxt store chain_event in
-  let* () = Interpreter.Arith.update store chain_event in
-  let*! () = Layer1.processed chain_event in
-  return ()
+open Protocol.Alpha_context.Sc_rollup
 
-let iter_stream stream handle =
-  let rec go () =
-    Lwt.bind (Lwt_stream.get stream) @@ fun tok ->
-    match tok with
-    | None -> return_unit
-    | Some element -> Lwt_result.bind (handle element) go
-  in
-  go ()
+module Simple = struct
+  include Internal_event.Simple
 
-let daemonize cctxt store layer_1_chain_events =
-  Lwt.no_cancel
-  @@ iter_stream layer_1_chain_events
-  @@ on_layer_1_chain_event cctxt store
+  let section = ["sc_rollup_node"; "interpreter"]
 
-let install_finalizer store rpc_server =
+  let transitioned_pvm =
+    declare_3
+      ~section
+      ~name:"sc_rollup_node_interpreter_transitioned_pvm"
+      ~msg:
+        "Transitioned PVM to {state_hash} at tick {ticks} with {num_messages} \
+         messages"
+      ~level:Notice
+      ("state_hash", State_hash.encoding)
+      ("ticks", Tick.encoding)
+      ("num_messages", Data_encoding.z)
+end
+
+let transitioned_pvm state num_messages =
   let open Lwt_syntax in
-  Lwt_exit.register_clean_up_callback ~loc:__LOC__ @@ fun exit_status ->
-  let* () = RPC_server.Arith.shutdown rpc_server in
-  let* () = Store.close store in
-  let* () = Event.shutdown_node exit_status in
-  Tezos_base_unix.Internal_event_unix.close ()
-
-let run ~data_dir (cctxt : Protocol_client_context.full) =
-  let open Lwt_tzresult_syntax in
-  let start () =
-    let*! () = Event.starting_node () in
-    let* configuration = Configuration.load ~data_dir in
-    let open Configuration in
-    let {rpc_addr; rpc_port; sc_rollup_address; _} = configuration in
-    let*! store = Store.load configuration in
-    let* tezos_heads = Layer1.start configuration cctxt store in
-    let*! () = Inbox.start store sc_rollup_address in
-    let* () = Interpreter.Arith.start store in
-    let* rpc_server = RPC_server.Arith.start store configuration in
-    let _ = install_finalizer store rpc_server in
-    let*! () = Event.node_is_ready ~rpc_addr ~rpc_port in
-    daemonize cctxt store tezos_heads
-  in
-  start ()
+  let* hash = Arith_pvm.state_hash state in
+  let* ticks = Arith_pvm.get_tick state in
+  Simple.(emit transitioned_pvm (hash, ticks, num_messages))
