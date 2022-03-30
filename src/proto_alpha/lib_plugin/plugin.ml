@@ -2827,14 +2827,10 @@ module RPC = struct
                 ~legacy:true
                 ~allow_forged_in_storage:true
                 script
-              >>=? fun (ex_script, ctxt) ->
-              unparse_script ctxt unparsing_mode ex_script
-              >>=? fun (script, ctxt) ->
-              Script.force_decode_in_context
-                ~consume_deserialization_gas:When_needed
-                ctxt
-                script.storage
-              >>?= fun (storage, _ctxt) -> return_some storage) ;
+              >>=? fun (Ex_script (Script {storage; storage_type; _}), ctxt) ->
+              unparse_data ctxt unparsing_mode storage_type storage
+              >|=? fun (storage, _ctxt) ->
+              Some (Micheline.strip_locations storage)) ;
       (* Patched RPC: get_script *)
       Registration.register1
         ~chunked:true

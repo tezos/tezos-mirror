@@ -380,13 +380,9 @@ let[@coq_axiom_with_reason "gadt"] register () =
           let ctxt = Gas.set_unlimited ctxt in
           let open Script_ir_translator in
           parse_script ctxt ~legacy:true ~allow_forged_in_storage:true script
-          >>=? fun (ex_script, ctxt) ->
-          unparse_script ctxt Readable ex_script >>=? fun (script, ctxt) ->
-          Script.force_decode_in_context
-            ~consume_deserialization_gas:When_needed
-            ctxt
-            script.storage
-          >>?= fun (storage, _ctxt) -> return_some storage) ;
+          >>=? fun (Ex_script (Script {storage; storage_type; _}), ctxt) ->
+          unparse_data ctxt Readable storage_type storage
+          >|=? fun (storage, _ctxt) -> Some (Micheline.strip_locations storage)) ;
   opt_register2
     ~chunked:true
     S.entrypoint_type
