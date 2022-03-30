@@ -350,17 +350,19 @@ let commands_ro () =
     command
       ~group
       ~desc:"Get the code of a contract."
-      (args1 (unparsing_mode_arg ~default:"Readable"))
+      (args2 (unparsing_mode_arg ~default:"Readable") normalize_types_switch)
       (prefixes ["get"; "contract"; "code"; "for"]
       @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
       @@ stop)
-      (fun unparsing_mode (_, contract) (cctxt : Protocol_client_context.full) ->
+      (fun (unparsing_mode, normalize_types)
+           (_, contract)
+           (cctxt : Protocol_client_context.full) ->
         get_script
           cctxt
           ~chain:cctxt#chain
           ~block:cctxt#block
           ~unparsing_mode
-          ~normalize_types:true
+          ~normalize_types
           contract
         >>=? function
         | None -> cctxt#error "This is not a smart contract."
