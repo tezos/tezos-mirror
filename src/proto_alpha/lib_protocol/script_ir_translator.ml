@@ -5559,13 +5559,7 @@ let typecheck_code :
   in
   trace (Ill_typed_contract (code, !type_map)) result >>=? fun (Lam _, ctxt) ->
   let views_result =
-    typecheck_views
-      ctxt
-      ~type_logger:(fun loc ~stack_ty_before ~stack_ty_after ->
-        type_map := (loc, (stack_ty_before, stack_ty_after)) :: !type_map)
-      ~legacy
-      storage_type
-      views
+    typecheck_views ctxt ?type_logger ~legacy storage_type views
   in
   trace (Ill_typed_contract (code, !type_map)) views_result >|=? fun ctxt ->
   (!type_map, ctxt)
