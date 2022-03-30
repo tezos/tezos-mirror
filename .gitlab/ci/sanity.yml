@@ -15,7 +15,7 @@ docker:hadolint:
   extends:
     - .default_settings_template
     - .rules_template__development_dockerfile
-  image: hadolint/hadolint:latest-debian
+  image: hadolint/hadolint:2.9.3-debian
   stage: sanity
   needs: []
   script:
