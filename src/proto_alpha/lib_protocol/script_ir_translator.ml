@@ -1820,6 +1820,7 @@ type 'storage typed_view =
       input_ty : ('input, _) ty;
       output_ty : ('output, _) ty;
       kinstr : ('input * 'storage, end_of_stack, 'output, end_of_stack) kinstr;
+      original_code_expr : Script.node;
     }
       -> 'storage typed_view
 
@@ -2995,7 +2996,10 @@ and parse_view :
   match judgement with
   | Failed {descr} ->
       let {kinstr; _} = close_descr (descr (Item_t (output_ty, Bot_t))) in
-      ok (Typed_view {input_ty; output_ty; kinstr}, ctxt)
+      ok
+        ( Typed_view
+            {input_ty; output_ty; kinstr; original_code_expr = view_code},
+          ctxt )
   | Typed ({loc; aft; _} as descr) -> (
       let ill_type_view loc stack_ty () =
         let actual = serialize_stack_for_error ctxt stack_ty in
@@ -3013,7 +3017,9 @@ and parse_view :
           >>? fun (eq, ctxt) ->
           eq >|? fun Eq ->
           let {kinstr; _} = close_descr descr in
-          (Typed_view {input_ty; output_ty; kinstr}, ctxt)
+          ( Typed_view
+              {input_ty; output_ty; kinstr; original_code_expr = view_code},
+            ctxt )
       | _ -> error (ill_type_view loc aft ()))
 
 and parse_views :

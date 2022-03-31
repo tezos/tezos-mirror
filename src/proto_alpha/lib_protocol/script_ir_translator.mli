@@ -124,6 +124,7 @@ type 'storage typed_view =
           'output,
           Script_typed_ir.end_of_stack )
         Script_typed_ir.kinstr;
+      original_code_expr : Script.node;
     }
       -> 'storage typed_view
 

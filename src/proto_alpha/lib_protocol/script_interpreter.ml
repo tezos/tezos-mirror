@@ -1079,6 +1079,7 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
                                      input_ty = input_ty';
                                      output_ty = output_ty';
                                      kinstr;
+                                     original_code_expr = _;
                                    },
                                  ctxt ) ->
                       let loc = Micheline.location view.view_code in
