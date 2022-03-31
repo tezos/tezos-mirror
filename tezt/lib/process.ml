@@ -312,12 +312,13 @@ let to_key_equal_value (kv_map : string String_map.t) : string array =
   |> Seq.map (fun (name, value) -> name ^ "=" ^ value)
   |> Array.of_seq
 
-let spawn_with_stdin ?runner ?(log_status_on_exit = true) ?(log_output = true)
-    ?name ?(color = Log.Color.FG.cyan) ?(env = String_map.empty) ?hooks command
-    arguments =
+let spawn_with_stdin ?runner ?(log_command = true) ?(log_status_on_exit = true)
+    ?(log_output = true) ?name ?(color = Log.Color.FG.cyan)
+    ?(env = String_map.empty) ?hooks command arguments =
   let name = Option.value ~default:(get_unique_name command) name in
   Option.iter (fun hooks -> hooks.on_spawn command arguments) hooks ;
-  Log.command ~color:Log.Color.bold ~prefix:name command arguments ;
+  if log_command then
+    Log.command ~color:Log.Color.bold ~prefix:name command arguments ;
   let lwt_command =
     match runner with
     | None -> (command, Array.of_list (command :: arguments))
@@ -385,11 +386,12 @@ let spawn_with_stdin ?runner ?(log_status_on_exit = true) ?(log_output = true)
   process.handle <- handle_process ~log_output process ;
   (process, process.lwt_process#stdin)
 
-let spawn ?runner ?log_status_on_exit ?log_output ?name ?color ?env ?hooks
-    command arguments =
+let spawn ?runner ?log_command ?log_status_on_exit ?log_output ?name ?color ?env
+    ?hooks command arguments =
   let (process, stdin) =
     spawn_with_stdin
       ?runner
+      ?log_command
       ?log_status_on_exit
       ?log_output
       ?name

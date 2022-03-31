@@ -157,8 +157,8 @@ let mode_arg client =
   | Light _ -> ["--mode"; "light"; "--sources"; sources_file client]
   | Proxy _ -> ["--mode"; "proxy"]
 
-let spawn_command ?(env = String_map.empty) ?endpoint ?hooks ?(admin = false)
-    client command =
+let spawn_command ?log_command ?log_status_on_exit ?log_output
+    ?(env = String_map.empty) ?endpoint ?hooks ?(admin = false) client command =
   let env =
     (* Set disclaimer to "Y" if unspecified, otherwise use given value *)
     String_map.update
@@ -170,6 +170,9 @@ let spawn_command ?(env = String_map.empty) ?endpoint ?hooks ?(admin = false)
     ~name:client.name
     ~color:client.color
     ~env
+    ?log_command
+    ?log_status_on_exit
+    ?log_output
     ?hooks
     (if admin then client.admin_path else client.path)
   @@ endpoint_arg ?endpoint client
@@ -216,8 +219,9 @@ let rpc_path_query_to_string ?(query_string = []) path =
   string_of_path path ^ string_of_query_string query_string
 
 module Spawn = struct
-  let rpc ?(better_errors = false) ?endpoint ?hooks ?env ?data ?query_string
-      meth path client : JSON.t Process.runnable =
+  let rpc ?log_command ?log_status_on_exit ?log_output ?(better_errors = false)
+      ?endpoint ?hooks ?env ?data ?query_string meth path client :
+      JSON.t Process.runnable =
     let process =
       let data =
         Option.fold ~none:[] ~some:(fun x -> ["with"; JSON.encode_u x]) data
@@ -229,6 +233,9 @@ module Spawn = struct
       let full_path = path ^ query_string in
       let better_error = if better_errors then ["--better-errors"] else [] in
       spawn_command
+        ?log_command
+        ?log_status_on_exit
+        ?log_output
         ?endpoint
         ?hooks
         ?env
@@ -242,10 +249,13 @@ module Spawn = struct
     {value = process; run = parse}
 end
 
-let spawn_rpc ?better_errors ?endpoint ?hooks ?env ?data ?query_string meth path
-    client =
+let spawn_rpc ?log_command ?log_status_on_exit ?log_output ?better_errors
+    ?endpoint ?hooks ?env ?data ?query_string meth path client =
   let*? res =
     Spawn.rpc
+      ?log_command
+      ?log_status_on_exit
+      ?log_output
       ?better_errors
       ?endpoint
       ?hooks
@@ -258,10 +268,13 @@ let spawn_rpc ?better_errors ?endpoint ?hooks ?env ?data ?query_string meth path
   in
   res
 
-let rpc ?better_errors ?endpoint ?hooks ?env ?data ?query_string meth path
-    client =
+let rpc ?log_command ?log_status_on_exit ?log_output ?better_errors ?endpoint
+    ?hooks ?env ?data ?query_string meth path client =
   let*! res =
     Spawn.rpc
+      ?log_command
+      ?log_status_on_exit
+      ?log_output
       ?better_errors
       ?endpoint
       ?hooks
