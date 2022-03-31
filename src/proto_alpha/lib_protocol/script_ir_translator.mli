@@ -115,12 +115,16 @@ type ('arg, 'storage) code =
 type ex_code = Ex_code : ('a, 'c) code -> ex_code
 
 type 'storage typed_view =
-  | Typed_view :
-      ( 'input * 'storage,
-        Script_typed_ir.end_of_stack,
-        'output,
-        Script_typed_ir.end_of_stack )
-      Script_typed_ir.kdescr
+  | Typed_view : {
+      input_ty : ('input, _) Script_typed_ir.ty;
+      output_ty : ('output, _) Script_typed_ir.ty;
+      kdescr :
+        ( 'input * 'storage,
+          Script_typed_ir.end_of_stack,
+          'output,
+          Script_typed_ir.end_of_stack )
+        Script_typed_ir.kdescr;
+    }
       -> 'storage typed_view
 
 type 'storage typed_view_map =

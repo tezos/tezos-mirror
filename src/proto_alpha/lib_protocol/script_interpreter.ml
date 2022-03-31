@@ -1076,10 +1076,15 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
                         view_result
                       >>=? fun ( Typed_view
                                    {
-                                     kloc;
-                                     kaft = Item_t (aft_ty, Bot_t);
-                                     kbef = Item_t (bef_ty, Bot_t);
-                                     kinstr;
+                                     input_ty = _;
+                                     output_ty = _;
+                                     kdescr =
+                                       {
+                                         kloc;
+                                         kaft = Item_t (aft_ty, Bot_t);
+                                         kbef = Item_t (bef_ty, Bot_t);
+                                         kinstr;
+                                       };
                                    },
                                  ctxt ) ->
                       pair_t kloc input_ty storage_type
