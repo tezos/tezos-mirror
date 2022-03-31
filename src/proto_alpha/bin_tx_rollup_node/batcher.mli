@@ -68,13 +68,9 @@ val register_transaction :
 (** Create L2 batches of operations from the queue and pack them in an L1 batch
     operation. The batch operation is injected on the Tezos node by the
     signer. If the injection to L1 fails, the transactions are not removed from
-    the queue. Nothing is injected if [at_least_one_full_batch] is [true] (by
-    default [false]) and there isn't at least a full batch to inject. *)
-val batch_and_inject :
-  ?at_least_one_full_batch:bool ->
-  state ->
-  Operation_hash.t option tzresult Lwt.t
+    the queue. *)
+val batch_and_inject : state -> Operation_hash.t option tzresult Lwt.t
 
 (** Same as [batch_and_inject] but asynchronous. In particular, the potential
     failures are not reported here. *)
-val async_batch_and_inject : ?at_least_one_full_batch:bool -> state -> unit
+val async_batch_and_inject : state -> unit

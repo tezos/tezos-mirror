@@ -107,3 +107,18 @@ let interpret_messages ~rejection_max_proof_size ctxt l2_parameters messages =
   | _ ->
       let contents = List.rev rev_contents in
       (ctxt, Some contents)
+
+let interpret_batch ~rejection_max_proof_size ctxt l2_parameters batch =
+  let open Lwt_result_syntax in
+  let batch_bytes =
+    Data_encoding.Binary.to_string_exn
+      Protocol.Tx_rollup_l2_batch.encoding
+      batch
+  in
+  let (message, _) =
+    Protocol.Alpha_context.Tx_rollup_message.make_batch batch_bytes
+  in
+  let* (_tree, result) =
+    interpret_message ~rejection_max_proof_size ctxt l2_parameters message
+  in
+  match result with Inbox.Discarded trace -> fail trace | _ -> return ()

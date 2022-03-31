@@ -40,3 +40,22 @@ val interpret_messages :
   Protocol.Tx_rollup_l2_apply.parameters ->
   Protocol.Alpha_context.Tx_rollup_message.t trace ->
   (Context.context * Inbox.message list option) tzresult Lwt.t
+
+(** Interpreting the [batch] in the context.
+
+    Similarly to {!interp_messages}, it uses internally the {!Prover_apply}.
+    However, the function fails if the interpretation produces a proof
+    that is larger than the configuration limit.
+    We here want to check only if the batch is interpretable, the modified
+    tree is discarded.
+
+    TODO/TORU: maybe we could check the results for each transaction in the batch
+*)
+val interpret_batch :
+  rejection_max_proof_size:int ->
+  Context.context ->
+  Protocol.Tx_rollup_l2_apply.parameters ->
+  ( Protocol.Indexable.unknown,
+    Protocol.Indexable.unknown )
+  Protocol.Tx_rollup_l2_batch.t ->
+  unit tzresult Lwt.t
