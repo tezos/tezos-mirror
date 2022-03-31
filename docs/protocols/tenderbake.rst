@@ -26,7 +26,7 @@ delegates that participate in consensus at a given level are called
 :ref:`validators<tb_validator>` in Tenderbake and validator rights in
 Tenderbake are similar to endorsing rights in Emmy*. Baking rights are
 deduced from endorsing rights: the baker at round ``r`` is the
-validator that has endorsing slot ``r``.
+validator that owns the endorsing slot ``r``.
 
 Operations
 ~~~~~~~~~~
@@ -254,7 +254,7 @@ Signer
 The signer's messages were of the form
 ``<magic_byte><chain_id><block|endorsement>`` and are now of the form
 ``<magic_byte><chain_id><block|preendorsement|endorsement>``, where
-the magic byte has changes from ``0x01`` for blocks and ``0x02`` for
+the magic byte has changed from ``0x01`` for blocks and ``0x02`` for
 endorsements, to ``0x11`` for blocks, ``0x12`` for preendorsements,
 ``0x13`` for endorsements.
 

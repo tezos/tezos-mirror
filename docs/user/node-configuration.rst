@@ -266,6 +266,7 @@ hard-coded in :src:`src/lib_rpc_http/RPC_server.ml` (remember to replace
 actually listening on):
 
 .. literalinclude:: default-acl.json
+   :language: json
 
 The endpoints specifically required for baking can be found in
 :src:`vendors/flextesa-lib/tezos_node.ml`.

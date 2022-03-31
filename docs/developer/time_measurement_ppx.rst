@@ -134,11 +134,15 @@ This is useful to prevent our code from embedding benchmarking tooling in
 production by mistake: If no backend is specified for the compilation, added
 attributes will just be ignored by the OCaml compiler and that's it!
 
-We can now compile our ready-to-benchmark code:::
+We can now compile our ready-to-benchmark code:
+
+.. code-block::
 
     dune build --instrument-with tezos-time-measurement
 
-We can then run the executable:::
+We can then run the executable:
+
+.. code-block::
 
     ./my_program.exe
 
@@ -187,6 +191,8 @@ Instrumenting the tezos-node executable
 ---------------------------------------
 
 A helper has been added in the ``Makefile``, so you just need to run the following
-command to instrument the node during the compilation:::
+command to instrument the node during the compilation:
 
-    ./make enable-time-measurement
+.. code-block::
+
+   ./make enable-time-measurement
