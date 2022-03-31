@@ -121,6 +121,7 @@ val update :
   ?discovery_addr:string ->
   ?rpc_listen_addrs:string list ->
   ?allow_all_rpc:P2p_point.Id.addr_port_id list ->
+  ?operation_metadata_size_limit:int option ->
   ?private_mode:bool ->
   ?disable_mempool:bool ->
   ?disable_mempool_precheck:bool ->

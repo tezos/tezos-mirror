@@ -123,6 +123,7 @@ let export_import ~test_descr ~previously_baked_blocks ?exported_block_hash
     ~chain_name
     ~user_activated_upgrades:[]
     ~user_activated_protocol_overrides:[]
+    ~operation_metadata_size_limit:None
     genesis
   >>=? fun () ->
   Store.init
@@ -480,6 +481,7 @@ let test_rolling () =
       ~chain_name
       ~user_activated_upgrades:[]
       ~user_activated_protocol_overrides:[]
+      ~operation_metadata_size_limit:None
       genesis
     >>=? fun () ->
     Store.init
@@ -590,6 +592,7 @@ let test_drag_after_import () =
       ~chain_name
       ~user_activated_upgrades:[]
       ~user_activated_protocol_overrides:[]
+      ~operation_metadata_size_limit:None
       ~block:export_block_hash
       genesis
     >>=? fun () ->

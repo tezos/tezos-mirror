@@ -45,6 +45,14 @@ Node
   previous versions of Octez will refuse to run on a data directory
   which was used with Octez 12.0.
 
+- **Breaking change**: Prevent too large operation metadata from being
+  stored. RPC requesting these kind of metadata will return
+  ```"too large"``.
+
+- Added ``--metadata-size-limit`` option to the node to configure the
+  operation metadata size limit. This default to 10MB but can be
+  overriden by providing the value ``unlimited``.
+
 Client
 ------
 

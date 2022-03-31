@@ -35,6 +35,8 @@ type validator_environment = {
       (** user activated upgrades *)
   user_activated_protocol_overrides : User_activated.protocol_overrides;
       (** user activated protocol overrides *)
+  operation_metadata_size_limit : int option;
+      (** size limit for operation metadata that should be written on disk *)
 }
 
 (** For performances reasons, it may be interesting to use another processus

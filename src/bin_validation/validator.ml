@@ -158,6 +158,7 @@ let init input =
             genesis;
             user_activated_upgrades;
             user_activated_protocol_overrides;
+            operation_metadata_size_limit;
           } ->
   let sandbox_param =
     Option.map (fun p -> ("sandbox_parameter", p)) sandbox_parameters
@@ -171,7 +172,8 @@ let init input =
       protocol_root,
       genesis,
       user_activated_upgrades,
-      user_activated_protocol_overrides )
+      user_activated_protocol_overrides,
+      operation_metadata_size_limit )
 
 let run input output =
   handshake input output >>=? fun () ->
@@ -180,7 +182,8 @@ let run input output =
             protocol_root,
             genesis,
             user_activated_upgrades,
-            user_activated_protocol_overrides ) ->
+            user_activated_protocol_overrides,
+            operation_metadata_size_limit ) ->
   let rec loop (cache : Environment_context.Context.block_cache option)
       cached_result =
     External_validation.recv input External_validation.request_encoding
@@ -239,6 +242,7 @@ let run input output =
                 Block_validation.chain_id;
                 user_activated_upgrades;
                 user_activated_protocol_overrides;
+                operation_metadata_size_limit;
                 max_operations_ttl;
                 predecessor_block_header;
                 predecessor_block_metadata_hash;
@@ -322,6 +326,7 @@ let run input output =
                  ~chain_id
                  ~user_activated_upgrades
                  ~user_activated_protocol_overrides
+                 ~operation_metadata_size_limit
                  ~timestamp
                  ~protocol_data
                  ~live_blocks

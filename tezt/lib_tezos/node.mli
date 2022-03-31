@@ -74,6 +74,7 @@ type argument =
   | Peer of string  (** [--peer] *)
   | No_bootstrap_peers  (** [--no-bootstrap-peers] *)
   | Disable_operations_precheck  (** [--disable-mempool-precheck] *)
+  | Metadata_size_limit of int option  (** --metadata-size-limit *)
 
 (** Tezos node states. *)
 type t

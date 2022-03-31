@@ -2994,6 +2994,7 @@ module type Snapshot_importer = sig
     chain_name:Distributed_db_version.Name.t ->
     user_activated_upgrades:User_activated.upgrades ->
     user_activated_protocol_overrides:User_activated.protocol_overrides ->
+    operation_metadata_size_limit:int option ->
     Genesis.t ->
     (unit, error trace) result Lwt.t
 end
@@ -3115,7 +3116,7 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
 
   let restore_and_apply_context snapshot_importer ?user_expected_block
       ~context_index ~user_activated_upgrades ~user_activated_protocol_overrides
-      snapshot_metadata genesis chain_id =
+      ~operation_metadata_size_limit snapshot_metadata genesis chain_id =
     (* Start by committing genesis *)
     Context.commit_genesis
       context_index
@@ -3171,6 +3172,7 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
         predecessor_ops_metadata_hash;
         user_activated_upgrades;
         user_activated_protocol_overrides;
+        operation_metadata_size_limit;
       }
     in
     (Block_validation.apply
@@ -3201,7 +3203,7 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
   let import ~snapshot_path ?patch_context ?block:user_expected_block
       ?(check_consistency = true) ~dst_store_dir ~dst_context_dir ~chain_name
       ~user_activated_upgrades ~user_activated_protocol_overrides
-      (genesis : Genesis.t) =
+      ~operation_metadata_size_limit (genesis : Genesis.t) =
     let chain_id = Chain_id.of_block_hash genesis.Genesis.block in
     init ~snapshot_path ~dst_store_dir chain_id >>= fun snapshot_importer ->
     let dst_store_dir = Naming.dir_path dst_store_dir in
@@ -3251,6 +3253,7 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
       ~context_index
       ~user_activated_upgrades
       ~user_activated_protocol_overrides
+      ~operation_metadata_size_limit
       snapshot_metadata
       genesis
       chain_id
@@ -3401,7 +3404,7 @@ let read_snapshot_header ~snapshot_path =
 
 let import ~snapshot_path ?patch_context ?block ?check_consistency
     ~dst_store_dir ~dst_context_dir ~chain_name ~user_activated_upgrades
-    ~user_activated_protocol_overrides genesis =
+    ~user_activated_protocol_overrides ~operation_metadata_size_limit genesis =
   snapshot_file_kind ~snapshot_path >>=? fun kind ->
   let (module Importer) =
     match kind with
@@ -3419,4 +3422,5 @@ let import ~snapshot_path ?patch_context ?block ?check_consistency
     ~chain_name
     ~user_activated_upgrades
     ~user_activated_protocol_overrides
+    ~operation_metadata_size_limit
     genesis
