@@ -70,15 +70,6 @@ type step_constants = Script_typed_ir.step_constants = {
   level : Script_int.n Script_int.num;
 }
 
-val step :
-  logger option ->
-  context ->
-  Script_typed_ir.step_constants ->
-  ('a, 's, 'r, 'f) Script_typed_ir.kdescr ->
-  'a ->
-  's ->
-  ('r * 'f * context) tzresult Lwt.t
-
 (** [execute ?logger ctxt ~cached_script mode step_constant ~script
    ~entrypoint ~parameter ~internal] interprets the [script]'s
    [entrypoint] for a given [parameter].
@@ -177,6 +168,15 @@ module Internals : sig
     * Local_gas_counter.local_gas_counter)
     tzresult
     Lwt.t
+
+  val step_descr :
+    logger option ->
+    context ->
+    Script_typed_ir.step_constants ->
+    ('a, 's, 'r, 'f) Script_typed_ir.kdescr ->
+    'a ->
+    's ->
+    ('r * 'f * context) tzresult Lwt.t
 
   (** [kstep logger ctxt step_constants kinstr accu stack] interprets the
       script represented by [kinstr] under the context [ctxt]. This will
