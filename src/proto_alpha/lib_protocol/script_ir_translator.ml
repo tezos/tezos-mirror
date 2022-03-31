@@ -5536,6 +5536,7 @@ type typechecked_code_internal =
       arg_type : ('arg, _) ty;
       storage_type : ('storage, _) ty;
       entrypoints : 'arg entrypoints;
+      typed_views : 'storage typed_view_map;
       type_map : type_map;
     }
       -> typechecked_code_internal
@@ -5585,9 +5586,16 @@ let typecheck_code :
   trace (Ill_typed_contract (code, !type_map)) result >>=? fun (Lam _, ctxt) ->
   let views_result = parse_views ctxt ?type_logger ~legacy storage_type views in
   trace (Ill_typed_contract (code, !type_map)) views_result
-  >|=? fun (_typed_views, ctxt) ->
+  >|=? fun (typed_views, ctxt) ->
   ( Typechecked_code_internal
-      {toplevel; arg_type; storage_type; entrypoints; type_map = !type_map},
+      {
+        toplevel;
+        arg_type;
+        storage_type;
+        entrypoints;
+        typed_views;
+        type_map = !type_map;
+      },
     ctxt )
 
 (* Uncarbonated because used only in RPCs *)
@@ -5925,6 +5933,7 @@ let parse_and_unparse_script_unaccounted ctxt ~legacy ~allow_forged_in_storage
                  arg_type;
                  storage_type;
                  entrypoints;
+                 typed_views;
                  type_map = _;
                },
              ctxt ) ->
@@ -5943,9 +5952,19 @@ let parse_and_unparse_script_unaccounted ctxt ~legacy ~allow_forged_in_storage
    unparse_parameter_ty ~loc ctxt arg_type ~entrypoints
    >>?= fun (arg_type, ctxt) ->
    unparse_ty ~loc ctxt storage_type >>?= fun (storage_type, ctxt) ->
-   return (arg_type, storage_type, ctxt)
-  else return (original_arg_type_expr, original_storage_type_expr, ctxt))
-  >>=? fun (arg_type, storage_type, ctxt) ->
+   Script_map.map_es_in_context
+     (fun ctxt
+          _name
+          (Typed_view {input_ty; output_ty; kinstr = _; original_code_expr}) ->
+       Lwt.return
+         ( unparse_ty ~loc ctxt input_ty >>? fun (input_ty, ctxt) ->
+           unparse_ty ~loc ctxt output_ty >|? fun (output_ty, ctxt) ->
+           ({input_ty; output_ty; view_code = original_code_expr}, ctxt) ))
+     ctxt
+     typed_views
+   >|=? fun (views, ctxt) -> (arg_type, storage_type, views, ctxt)
+  else return (original_arg_type_expr, original_storage_type_expr, views, ctxt))
+  >>=? fun (arg_type, storage_type, views, ctxt) ->
   let open Micheline in
   let unparse_view_unaccounted name {input_ty; output_ty; view_code} views =
     Prim
