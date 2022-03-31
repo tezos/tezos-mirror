@@ -194,7 +194,7 @@ let ocplib_endian_bigstring =
 let ocplib_ocamlres =
   external_lib ~opam:"ocp-ocamlres" "ocplib-ocamlres" V.(at_least "0.4")
 
-let ometrics = opam_only "ometrics" V.(at_least "0.1.1")
+let ometrics = opam_only "ometrics" V.(at_least "0.1.3")
 
 let parsexp = external_lib ~js_compatible:true "parsexp" V.True
 
