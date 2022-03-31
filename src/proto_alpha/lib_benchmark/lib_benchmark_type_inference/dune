@@ -1,17 +1,19 @@
 (library
  (name tezos_benchmark_type_inference_alpha)
- (instrumentation (backend bisect_ppx))
  (public_name tezos-benchmark-type-inference-alpha)
+ (instrumentation (backend bisect_ppx))
  (libraries
   tezos-stdlib
   tezos-error-monad
   tezos-crypto
   tezos-micheline
-  tezos-protocol-alpha
   tezos-micheline-rewriting
+  tezos-protocol-alpha
   hashcons)
- (flags (:standard -open Tezos_stdlib
-                   -open Tezos_error_monad
-                   -open Tezos_micheline
-                   -open Tezos_micheline_rewriting
-                   -open Tezos_protocol_alpha)))
+ (flags
+  (:standard
+   -open Tezos_stdlib
+   -open Tezos_error_monad
+   -open Tezos_micheline
+   -open Tezos_micheline_rewriting
+   -open Tezos_protocol_alpha)))

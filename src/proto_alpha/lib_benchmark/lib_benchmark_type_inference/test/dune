@@ -1,10 +1,12 @@
 (tests
- (names test_uf
-        test_inference)
+ (names test_uf test_inference)
  (package tezos-benchmark-type-inference-alpha)
- (libraries tezos-micheline tezos-micheline-rewriting
-            tezos-benchmark-type-inference-alpha tezos-protocol-alpha
-            tezos-error-monad tezos-client-alpha)
+ (libraries
+  tezos-micheline
+  tezos-micheline-rewriting
+  tezos-benchmark-type-inference-alpha
+  tezos-protocol-alpha
+  tezos-error-monad
+  tezos-client-alpha)
  (flags
-    (:standard -open Tezos_micheline
-               -open Tezos_benchmark_type_inference_alpha)))
+  (:standard -open Tezos_micheline -open Tezos_benchmark_type_inference_alpha)))
