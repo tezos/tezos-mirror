@@ -7,6 +7,7 @@
 # shellcheck disable=SC2034
 docker_build_image="${DOCKER_IMAGE_NAME}build"
 
+# Shell parameter expansion: %? trims the last character of variable DOCKER_IMAGE_NAME
 # shellcheck disable=SC2034
 docker_images="${DOCKER_IMAGE_NAME}debug ${DOCKER_IMAGE_NAME}bare ${DOCKER_IMAGE_NAME%?}"
 

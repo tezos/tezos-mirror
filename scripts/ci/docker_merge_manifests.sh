@@ -30,6 +30,8 @@ do
   # Loop over tags
   for docker_tag in ${docker_tags}
   do
+    # Because of the variable amends, we use eval here to first construct the command
+    # by concatenating all the arguments together (space separated), then read and execute it
     eval "docker manifest create ${docker_image}:${docker_tag}${amends}"
     docker manifest push "${docker_image}:${docker_tag}"
   done
