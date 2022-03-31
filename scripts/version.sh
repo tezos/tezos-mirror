@@ -1,4 +1,4 @@
-#! /bin/sh
+#!/bin/sh
 
 ## This script is not meant to be executed interactively. Instead it is meant to
 ## be used in other scripts to provide common variables for version numbers and

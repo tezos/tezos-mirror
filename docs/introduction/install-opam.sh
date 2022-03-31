@@ -1,4 +1,4 @@
-#! /usr/bin/env bash
+#!/usr/bin/env bash
 # shellcheck source=/dev/null
 # for not checking the existence of sourced file $HOME/.cargo/env
 # shellcheck disable=SC2154
