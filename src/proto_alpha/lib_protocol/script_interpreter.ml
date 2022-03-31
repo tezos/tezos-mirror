@@ -1076,19 +1076,17 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
                         view_result
                       >>=? fun ( Typed_view
                                    {
-                                     input_ty = _;
+                                     input_ty = input_ty';
                                      output_ty = _;
                                      kdescr =
                                        {
                                          kloc;
                                          kaft = Item_t (aft_ty, Bot_t);
-                                         kbef = Item_t (bef_ty, Bot_t);
+                                         kbef = Item_t (_, Bot_t);
                                          kinstr;
                                        };
                                    },
                                  ctxt ) ->
-                      pair_t kloc input_ty storage_type
-                      >>?= fun (Ty_ex_c pair_ty) ->
                       let io_ty =
                         let open Gas_monad.Syntax in
                         let* out_eq =
@@ -1099,7 +1097,7 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
                             output_ty
                         in
                         let+ in_eq =
-                          ty_eq ~error_details:Fast kloc bef_ty pair_ty
+                          ty_eq ~error_details:Fast kloc input_ty input_ty'
                         in
                         (out_eq, in_eq)
                       in
