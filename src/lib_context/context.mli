@@ -50,7 +50,7 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) : sig
 
   val index : context -> index
 
-  (** Open or initialize a versioned store at a given path. 
+  (** Open or initialize a versioned store at a given path.
 
       @param indexing_strategy determines whether newly-exported objects by
       this store handle should also be added to the store's index. [`Minimal]
@@ -76,9 +76,12 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) : sig
 
   val compute_testchain_genesis : Block_hash.t -> Block_hash.t
 
-  (** Build an empty context from an index. The resulting context is not yet
-      commited. *)
+  (** Build an empty context from an index. The resulting context should not
+      be committed. *)
   val empty : index -> t
+
+  (** Returns [true] if the context is empty. *)
+  val is_empty : t -> bool
 
   val commit_genesis :
     index ->

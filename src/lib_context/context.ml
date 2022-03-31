@@ -679,6 +679,8 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
 
   let empty index = {index; tree = Store.Tree.empty (); parents = []; ops = 0}
 
+  let is_empty {tree; _} = Store.Tree.is_empty tree
+
   let commit_genesis index ~chain_id ~time ~protocol =
     let open Lwt_result_syntax in
     let ctxt = empty index in
