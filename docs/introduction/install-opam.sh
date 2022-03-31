@@ -25,7 +25,6 @@ source latest-release:version.sh
 opam switch create for_tezos $ocaml_version
 eval $(opam env)
 # [get system dependencies]
-opam install depext
 opam depext tezos
 # [install tezos]
 opam install tezos

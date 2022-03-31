@@ -30,7 +30,6 @@ wget -O latest-release:version.sh https://gitlab.com/tezos/tezos/raw/latest-rele
 opam switch create for_tezos $ocaml_version
 eval $(opam env)
 # [get system dependencies]
-opam install depext
 opam depext tezos
 # [install tezos]
 opam install -y tezos
