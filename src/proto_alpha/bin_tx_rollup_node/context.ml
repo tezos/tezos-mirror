@@ -155,15 +155,17 @@ module Prover_context = Protocol.Tx_rollup_l2_context.Make (Prover_storage)
 
 type 'a produce_proof_result = {tree : tree; result : 'a}
 
+let get_tree ctxt =
+  let open Lwt_result_syntax in
+  let*! tree_opt = find_tree ctxt [] in
+  match tree_opt with
+  | Some tree -> return tree
+  | None -> fail [Error.Tx_rollup_tree_not_found]
+
 let produce_proof ctxt f =
   let open Lwt_result_syntax in
   let index = index ctxt in
-  let* tree =
-    let*! tree_opt = find_tree ctxt [] in
-    match tree_opt with
-    | Some tree -> return tree
-    | None -> fail [Error.Tx_rollup_tree_not_found]
-  in
+  let* tree = get_tree ctxt in
   let* kinded_key =
     match Tree.kinded_key tree with
     | Some kinded_key -> return kinded_key
@@ -177,6 +179,11 @@ let produce_proof ctxt f =
   return (proof, result)
 
 let hash_tree = Tree.hash
+
+let tree_hash_of_context ctxt =
+  let open Lwt_result_syntax in
+  let+ tree = get_tree ctxt in
+  hash_tree tree
 
 let add_tree ctxt tree =
   let open Lwt_syntax in

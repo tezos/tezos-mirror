@@ -2,8 +2,6 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
-(* Copyright (c) 2022 Marigold, <contact@marigold.dev>                       *)
-(* Copyright (c) 2022 Oxhead Alpha <info@oxhead-alpha.com>                   *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -25,41 +23,20 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** A non-compact representation of inboxes that represents complete messages
-    and not their hashes. *)
+(** Error result when the message's application produces a too large proof.
+    It overrides the layer2 apply message result. *)
+type error += Tx_rollup_message_proof_too_large of {limit : int; actual : int}
 
-open Protocol
-open Alpha_context
+(** Interpreting the [messages] in the context.
 
-(** Result of application of an inbox message *)
-type message_result =
-  | Interpreted of Tx_rollup_l2_apply.Message_result.t
-      (** The message was interpreted by the rollup node but may have failed *)
-  | Discarded of tztrace
-      (** The message was discarded because it could not be interpreted *)
-
-type l2_context_hash = {
-  irmin_hash : Tx_rollup_l2_context_hash.t;
-      (** The context hash of the commited context, used for checkout *)
-  tree_hash : Context_hash.t;
-      (** The tree hash is the hash of the underlying tree in the {!Context},
-          used to produce proofs *)
-}
-
-(** Type of inbox message with the context hash resulting from the application
-    of the message *)
-type message = {
-  message : Tx_rollup_message.t;
-  result : message_result;
-  l2_context_hash : l2_context_hash;
-}
-
-(** The type representing an inbox whose contents are the messages and not the
-    hashed messages. *)
-type t = {contents : message list; cumulated_size : int}
-
-(** Encoding for inbox messages *)
-val message_encoding : message Data_encoding.t
-
-(** Encoding for inboxes *)
-val encoding : t Data_encoding.t
+    It uses internally the {!Prover_apply} to produce a proof associated
+    to the interpretation of each message. In the case where the proof is
+    larger than the configuration limit, the message's interpretation is
+    discarded alongside the modified context.
+*)
+val interpret_messages :
+  rejection_max_proof_size:int ->
+  Context.context ->
+  Protocol.Tx_rollup_l2_apply.parameters ->
+  Protocol.Alpha_context.Tx_rollup_message.t trace ->
+  (Context.context * Inbox.message list option) tzresult Lwt.t
