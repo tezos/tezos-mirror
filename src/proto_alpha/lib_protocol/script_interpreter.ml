@@ -1077,27 +1077,18 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
                       >>=? fun ( Typed_view
                                    {
                                      input_ty = input_ty';
-                                     output_ty = _;
-                                     kdescr =
-                                       {
-                                         kloc;
-                                         kaft = Item_t (aft_ty, Bot_t);
-                                         kbef = Item_t (_, Bot_t);
-                                         kinstr;
-                                       };
+                                     output_ty = output_ty';
+                                     kinstr;
                                    },
                                  ctxt ) ->
+                      let loc = Micheline.location view.view_code in
                       let io_ty =
                         let open Gas_monad.Syntax in
                         let* out_eq =
-                          Script_ir_translator.ty_eq
-                            ~error_details:Fast
-                            kloc
-                            aft_ty
-                            output_ty
+                          ty_eq ~error_details:Fast loc output_ty' output_ty
                         in
                         let+ in_eq =
-                          ty_eq ~error_details:Fast kloc input_ty input_ty'
+                          ty_eq ~error_details:Fast loc input_ty input_ty'
                         in
                         (out_eq, in_eq)
                       in

@@ -118,12 +118,12 @@ type 'storage typed_view =
   | Typed_view : {
       input_ty : ('input, _) Script_typed_ir.ty;
       output_ty : ('output, _) Script_typed_ir.ty;
-      kdescr :
+      kinstr :
         ( 'input * 'storage,
           Script_typed_ir.end_of_stack,
           'output,
           Script_typed_ir.end_of_stack )
-        Script_typed_ir.kdescr;
+        Script_typed_ir.kinstr;
     }
       -> 'storage typed_view
 
