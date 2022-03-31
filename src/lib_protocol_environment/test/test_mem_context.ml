@@ -39,6 +39,8 @@
                    \-- block3b
 *)
 
+module Assert = Lib_test.Assert
+
 let create_block2 ctxt =
   let open Lwt_syntax in
   let* ctxt = Context.add ctxt ["a"; "b"] (Bytes.of_string "Novembre") in
@@ -123,7 +125,7 @@ let test_continuation {block3a = ctxt; _} =
   let* version = Context.find ctxt ["version"] in
   Assert.equal_string_option ~msg:__LOC__ (Some "0.0") (c version) ;
   let* novembre = Context.find ctxt ["a"; "b"] in
-  Assert.is_none ~msg:__LOC__ (c novembre) ;
+  Assert.assert_none ~msg:__LOC__ (c novembre) ;
   let* juin = Context.find ctxt ["a"; "c"] in
   Assert.equal_string_option ~msg:__LOC__ (Some "Juin") (c juin) ;
   let* mars = Context.find ctxt ["a"; "d"] in
@@ -145,7 +147,7 @@ let test_fork {block3b = ctxt; _} =
   let* novembre = Context.find ctxt ["a"; "b"] in
   Assert.equal_string_option ~msg:__LOC__ (Some "Novembre") (c novembre) ;
   let* juin = Context.find ctxt ["a"; "c"] in
-  Assert.is_none ~msg:__LOC__ (c juin) ;
+  Assert.assert_none ~msg:__LOC__ (c juin) ;
   let* mars = Context.find ctxt ["a"; "d"] in
   Assert.equal_string_option ~msg:__LOC__ (Some "Février") (c mars) ;
   Lwt.return_unit
