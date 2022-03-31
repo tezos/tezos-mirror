@@ -1820,6 +1820,8 @@ type 'storage typed_view =
       ('input * 'storage, end_of_stack, 'output, end_of_stack) kdescr
       -> 'storage typed_view
 
+type 'storage typed_view_map = (Script_string.t, 'storage typed_view) map
+
 type (_, _) dig_proof_argument =
   | Dig_proof_argument :
       ('x, 'a * 's, 'a, 's, 'b, 't, 'c, 'u) stack_prefix_preservation_witness
@@ -2952,7 +2954,7 @@ let[@coq_axiom_with_reason "gadt"] rec parse_data :
   | (Chest_t, expr) ->
       traced_fail (Invalid_kind (location expr, [Bytes_kind], kind expr))
 
-and parse_view_kdescr :
+and parse_view :
     type storage storagec.
     ?type_logger:type_logger ->
     context ->
@@ -2967,15 +2969,15 @@ and parse_view_kdescr :
       Ill_formed_type
         (Some "arg of view", strip_locations input_ty, input_ty_loc))
     (parse_view_input_ty ctxt ~stack_depth:0 ~legacy input_ty)
-  >>?= fun (Ex_ty input_ty', ctxt) ->
+  >>?= fun (Ex_ty input_ty, ctxt) ->
   let output_ty_loc = location output_ty in
   record_trace_eval
     (fun () ->
       Ill_formed_type
         (Some "return of view", strip_locations output_ty, output_ty_loc))
     (parse_view_output_ty ctxt ~stack_depth:0 ~legacy output_ty)
-  >>?= fun (Ex_ty output_ty', ctxt) ->
-  pair_t input_ty_loc input_ty' storage_type >>?= fun (Ty_ex_c pair_ty) ->
+  >>?= fun (Ex_ty output_ty, ctxt) ->
+  pair_t input_ty_loc input_ty storage_type >>?= fun (Ty_ex_c pair_ty) ->
   parse_instr
     ?type_logger
     ~stack_depth:0
@@ -2989,14 +2991,12 @@ and parse_view_kdescr :
   @@
   match judgement with
   | Failed {descr} ->
-      let cur_view =
-        Typed_view (close_descr (descr (Item_t (output_ty', Bot_t))))
-      in
-      ok (cur_view, ctxt)
+      let kdescr = close_descr (descr (Item_t (output_ty, Bot_t))) in
+      ok (Typed_view kdescr, ctxt)
   | Typed ({loc; aft; _} as descr) -> (
       let ill_type_view loc stack_ty () =
         let actual = serialize_stack_for_error ctxt stack_ty in
-        let expected_stack = Item_t (output_ty', Bot_t) in
+        let expected_stack = Item_t (output_ty, Bot_t) in
         let expected = serialize_stack_for_error ctxt expected_stack in
         Ill_typed_view {loc; actual; expected}
       in
@@ -3006,25 +3006,29 @@ and parse_view_kdescr :
           @@ Gas_monad.record_trace_eval
                ~error_details:Informative
                (ill_type_view loc aft : unit -> _)
-          @@ ty_eq ~error_details:Informative loc ty output_ty'
+          @@ ty_eq ~error_details:Informative loc ty output_ty
           >>? fun (eq, ctxt) ->
-          eq >|? fun Eq -> (Typed_view (close_descr descr), ctxt)
+          eq >|? fun Eq ->
+          let kdescr = close_descr descr in
+          (Typed_view kdescr, ctxt)
       | _ -> error (ill_type_view loc aft ()))
 
-and typecheck_views :
+and parse_views :
     type storage storagec.
     ?type_logger:type_logger ->
     context ->
     legacy:bool ->
     (storage, storagec) ty ->
     view_map ->
-    context tzresult Lwt.t =
+    (storage typed_view_map * context) tzresult Lwt.t =
  fun ?type_logger ctxt ~legacy storage_type views ->
-  let aux _name cur_view ctxt =
-    parse_view_kdescr ?type_logger ctxt ~legacy storage_type cur_view
-    >|=? fun (Typed_view _parsed_view, ctxt) -> ctxt
+  let aux ctxt name cur_view =
+    Gas.consume
+      ctxt
+      (Michelson_v1_gas.Cost_of.Interpreter.view_update name views)
+    >>?= fun ctxt -> parse_view ?type_logger ctxt ~legacy storage_type cur_view
   in
-  Script_map.fold_es aux views ctxt
+  Script_map.map_es_in_context aux ctxt views
 
 and[@coq_axiom_with_reason "gadt"] parse_returning :
     type arg argc ret retc.
@@ -4632,10 +4636,10 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
                      _ ),
                  ctxt ) ->
       let views_result =
-        typecheck_views ctxt ?type_logger ~legacy storage_type views
+        parse_views ctxt ?type_logger ~legacy storage_type views
       in
       trace (Ill_typed_contract (canonical_code, [])) views_result
-      >>=? fun ctxt ->
+      >>=? fun (_typed_views, ctxt) ->
       (Gas_monad.run ctxt
       @@
       let open Gas_monad.Syntax in
@@ -5570,10 +5574,9 @@ let typecheck_code :
       code_field
   in
   trace (Ill_typed_contract (code, !type_map)) result >>=? fun (Lam _, ctxt) ->
-  let views_result =
-    typecheck_views ctxt ?type_logger ~legacy storage_type views
-  in
-  trace (Ill_typed_contract (code, !type_map)) views_result >|=? fun ctxt ->
+  let views_result = parse_views ctxt ?type_logger ~legacy storage_type views in
+  trace (Ill_typed_contract (code, !type_map)) views_result
+  >|=? fun (_typed_views, ctxt) ->
   ( Typechecked_code_internal
       {toplevel; arg_type; storage_type; entrypoints; type_map = !type_map},
     ctxt )

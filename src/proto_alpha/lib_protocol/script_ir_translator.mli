@@ -123,6 +123,9 @@ type 'storage typed_view =
       Script_typed_ir.kdescr
       -> 'storage typed_view
 
+type 'storage typed_view_map =
+  (Script_string.t, 'storage typed_view) Script_typed_ir.map
+
 type ('a, 's, 'b, 'u) cinstr = {
   apply :
     'r 'f.
@@ -297,7 +300,7 @@ val parse_view_output_ty :
   Script.node ->
   (ex_ty * context) tzresult
 
-val parse_view_kdescr :
+val parse_view :
   ?type_logger:type_logger ->
   context ->
   legacy:bool ->
@@ -305,13 +308,13 @@ val parse_view_kdescr :
   Script_typed_ir.view ->
   ('storage typed_view * context) tzresult Lwt.t
 
-val typecheck_views :
+val parse_views :
   ?type_logger:type_logger ->
   context ->
   legacy:bool ->
   ('storage, _) Script_typed_ir.ty ->
   Script_typed_ir.view_map ->
-  context tzresult Lwt.t
+  ('storage typed_view_map * context) tzresult Lwt.t
 
 (**
   [parse_ty] allowing big_map values, operations, contract and tickets.

@@ -1063,7 +1063,7 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
                   | None -> (return_none [@ocaml.tailcall]) ctxt
                   | Some view -> (
                       let view_result =
-                        Script_ir_translator.parse_view_kdescr
+                        Script_ir_translator.parse_view
                           ctxt
                           ~legacy:true
                           storage_type
