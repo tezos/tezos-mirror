@@ -322,7 +322,7 @@ let propose (cctxt : Protocol_client_context.full) ?minimal_fees
               in
               match State_transitions.round_proposer state slotmap round with
               | Some (delegate, _) ->
-                  State_transitions.repropose_block_action
+                  State_transitions.propose_block_action
                     state
                     delegate
                     round

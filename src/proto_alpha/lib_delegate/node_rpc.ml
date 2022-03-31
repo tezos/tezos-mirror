@@ -128,12 +128,21 @@ let info cctxt ~chain ~block () =
    let hash =
      Tezos_base.Block_header.hash {Tezos_base.Block_header.shell; protocol_data}
    in
-   let payload_hash =
-     (* If the protocol is not the same, then we won't need to use
-        the payload_hash *)
-     dummy_payload_hash
+   (* /!\ We decode [protocol_data] with the current protocol's
+      encoding, while we should use the previous protocol's
+      [protocol_data] encoding. For now, this works because the
+      encoding has not changed. *)
+   let (payload_hash, payload_round) =
+     match
+       Data_encoding.Binary.of_bytes_opt
+         Protocol.block_header_data_encoding
+         protocol_data
+     with
+     | Some {contents = {payload_hash; payload_round; _}; _} ->
+         (payload_hash, payload_round)
+     | None -> (dummy_payload_hash, Round.zero)
    in
-   return (hash, shell, payload_hash, Round.zero)
+   return (hash, shell, payload_hash, payload_round)
   else
     Alpha_block_services.header cctxt ~chain ~block ()
     >>=? fun {hash; shell; protocol_data; _} ->
