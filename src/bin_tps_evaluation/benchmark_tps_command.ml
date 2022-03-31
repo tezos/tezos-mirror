@@ -274,19 +274,19 @@ let regression_handling defacto_tps_of_injection empirical_tps
       ~minimum_previous_count:previous_count
       ~stddev:false
       ~repeat:1
-      ~tags:[("lifted_protocol_limits", lifted_protocol_limits_tag)]
+      ~tags:[(Dashboard.Tag.lifted_protocol_limits, lifted_protocol_limits_tag)]
   in
   let* () =
-    save_and_check "defacto_tps_of_injection" @@ fun () ->
+    save_and_check Dashboard.Measurement.defacto_tps_of_injection @@ fun () ->
     defacto_tps_of_injection
   in
-  save_and_check "empirical_tps" @@ fun () -> empirical_tps
+  save_and_check Dashboard.Measurement.empirical_tps @@ fun () -> empirical_tps
 
 let register () =
   Long_test.register
     ~__FILE__
-    ~title:"tezos_tps_benchmark"
-    ~tags:["tezos_tps_benchmark"]
+    ~title:Dashboard.Test.benchmark_tps
+    ~tags:[Dashboard.Test.benchmark_tps]
     ~timeout:(Long_test.Minutes 60)
     ~executors:Long_test.[x86_executor1]
     (fun () ->

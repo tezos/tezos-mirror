@@ -217,8 +217,8 @@ let query_db start_date end_date contract_min_percentage conn_str =
 let register () =
   Long_test.register
     ~__FILE__
-    ~title:"tezos_tps_estimate_average_block"
-    ~tags:["tezos_tps_estimate_average_block"]
+    ~title:Dashboard.Test.estimate_average_block
+    ~tags:[Dashboard.Test.estimate_average_block]
     ~timeout:(Long_test.Minutes 60)
     ~executors:Long_test.[x86_executor1]
     (fun () ->

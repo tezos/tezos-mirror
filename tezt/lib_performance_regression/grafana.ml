@@ -133,6 +133,7 @@ let encode_panel config y panel : JSON.u =
           interval
         |> Option.to_list
       in
+      let unit = match yaxis_1 with None -> "none" | Some x -> x.format in
       `O
         (interval
         @ [
@@ -172,7 +173,7 @@ let encode_panel config y panel : JSON.u =
                               ("fillOpacity", `Float 10.);
                               ("axisSoftMin", `Float 0.);
                             ] );
-                        ("unit", `String "s");
+                        ("unit", `String unit);
                       ] );
                 ] );
           ])

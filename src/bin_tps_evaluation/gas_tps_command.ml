@@ -77,8 +77,8 @@ let estimate_gas_tps ~average_block_path () =
 let register () =
   Long_test.register
     ~__FILE__
-    ~title:"tezos_gas_tps"
-    ~tags:["tezos_gas_tps"]
+    ~title:Dashboard.Test.gas_tps
+    ~tags:[Dashboard.Test.gas_tps]
     ~timeout:(Long_test.Minutes 60)
     ~executors:Long_test.[x86_executor1]
     (fun () ->
@@ -93,7 +93,7 @@ let register () =
         ~minimum_previous_count:previous_count
         ~stddev:false
         ~repeat:1
-        "tps_evaluation"
+        Dashboard.Measurement.gas_tps_evaluation
       @@ fun () ->
       let* x = estimate_gas_tps ~average_block_path () in
       return (float_of_int x.gas_tps))
