@@ -62,7 +62,7 @@ type error += Reconstruction_failure of failure_kind
 type error += Cannot_reconstruct of History_mode.t
 
 (** [reconstruct ?patch_context ~store_dir ~context_dir genesis uau
-    uapo] reconstructs the storage located in [store_dir] and
+    uapo omsl] reconstructs the storage located in [store_dir] and
     [context_dir]. The resulting storage will see its history mode
     changed to archive. *)
 val reconstruct :
@@ -72,4 +72,5 @@ val reconstruct :
   Genesis.t ->
   user_activated_upgrades:User_activated.upgrades ->
   user_activated_protocol_overrides:User_activated.protocol_overrides ->
+  operation_metadata_size_limit:int option ->
   unit tzresult Lwt.t

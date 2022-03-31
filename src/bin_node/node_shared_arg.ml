@@ -62,6 +62,7 @@ type t = {
   synchronisation_threshold : int option;
   latency : int option;
   allow_all_rpc : P2p_point.Id.addr_port_id list;
+  operation_metadata_size_limit : int option option;
 }
 
 type error +=
@@ -141,7 +142,7 @@ let wrap data_dir config_file network connections max_download_speed
     bootstrap_threshold private_mode disable_mempool disable_mempool_precheck
     enable_testchain expected_pow rpc_listen_addrs rpc_tls cors_origins
     cors_headers log_output history_mode synchronisation_threshold latency
-    disable_config_validation allow_all_rpc =
+    disable_config_validation allow_all_rpc operation_metadata_size_limit =
   let actual_data_dir =
     Option.value ~default:Node_config_file.default_data_dir data_dir
   in
@@ -183,6 +184,7 @@ let wrap data_dir config_file network connections max_download_speed
     synchronisation_threshold;
     latency;
     allow_all_rpc;
+    operation_metadata_size_limit;
   }
 
 module Manpage = struct
@@ -362,6 +364,37 @@ module Term = struct
       value
       & opt (some (conv network_parser)) None
       & info ~docs ~doc ~docv:"NETWORK" ["network"])
+
+  let operation_metadata_size_limit =
+    let converter =
+      let parse s =
+        if String.(equal (lowercase_ascii s) "unlimited") then `Ok None
+        else
+          match int_of_string_opt s with
+          | None -> `Error s
+          | Some i -> `Ok (Some i)
+      in
+      let pp fmt = function
+        | None -> Format.fprintf fmt "unlimited"
+        | Some i -> Format.pp_print_int fmt i
+      in
+      ((fun arg -> parse arg), pp)
+    in
+    let doc =
+      let default =
+        match Block_validation.default_operation_metadata_size_limit with
+        | None -> "$(i,unlimited)"
+        | Some i -> Format.sprintf "$(i,%d) bytes" i
+      in
+      Format.sprintf
+        "Size limit (in bytes) for operation's metadata to be stored on disk. \
+         Default limit is %s. Use $(i,unlimited) to disregard this limit."
+        default
+    in
+    Arg.(
+      value
+      & opt (some converter) None
+      & info ~docs ~doc ~docv:"<limit-in-bytes>" ["metadata-size-limit"])
 
   (* P2p args *)
 
@@ -590,7 +623,7 @@ module Term = struct
     $ disable_mempool $ disable_mempool_precheck $ enable_testchain
     $ expected_pow $ rpc_listen_addrs $ rpc_tls $ cors_origins $ cors_headers
     $ log_output $ history_mode $ synchronisation_threshold $ latency
-    $ disable_config_validation $ allow_all_rpc
+    $ disable_config_validation $ allow_all_rpc $ operation_metadata_size_limit
 end
 
 let read_config_file args =
@@ -705,6 +738,7 @@ let read_and_patch_config_file ?(may_override_network = false)
     synchronisation_threshold;
     latency;
     allow_all_rpc;
+    operation_metadata_size_limit;
   } =
     args
   in
@@ -827,6 +861,7 @@ let read_and_patch_config_file ?(may_override_network = false)
     ?discovery_addr
     ~rpc_listen_addrs
     ~allow_all_rpc
+    ?operation_metadata_size_limit
     ~private_mode
     ~disable_mempool
     ~disable_mempool_precheck

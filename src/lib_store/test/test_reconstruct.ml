@@ -73,6 +73,7 @@ let test_from_bootstrapped ~descr (store_dir, context_dir) store
         genesis
         ~user_activated_upgrades:[]
         ~user_activated_protocol_overrides:[]
+        ~operation_metadata_size_limit:None
       >>=? fun () -> return_false)
     ~on_error:(function
       | [Reconstruction.(Reconstruction_failure Nothing_to_reconstruct)] as e ->
@@ -192,6 +193,7 @@ let test_from_snapshot ~descr:_ (store_dir, context_dir) store
         ~chain_name
         ~user_activated_upgrades:[]
         ~user_activated_protocol_overrides:[]
+        ~operation_metadata_size_limit:None
         genesis
       >>=? fun () ->
       Reconstruction.reconstruct
@@ -201,6 +203,7 @@ let test_from_snapshot ~descr:_ (store_dir, context_dir) store
         genesis
         ~user_activated_upgrades:[]
         ~user_activated_protocol_overrides:[]
+        ~operation_metadata_size_limit:None
       >>=? fun () -> return_false)
     ~on_error:(function
       | [Reconstruction.(Reconstruction_failure Nothing_to_reconstruct)] as e ->

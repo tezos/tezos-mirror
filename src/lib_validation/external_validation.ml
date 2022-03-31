@@ -31,6 +31,7 @@ type parameters = {
   sandbox_parameters : Data_encoding.json option;
   user_activated_upgrades : User_activated.upgrades;
   user_activated_protocol_overrides : User_activated.protocol_overrides;
+  operation_metadata_size_limit : int option;
 }
 
 type request =
@@ -122,6 +123,7 @@ let parameters_encoding =
            genesis;
            user_activated_upgrades;
            user_activated_protocol_overrides;
+           operation_metadata_size_limit;
            sandbox_parameters;
          } ->
       ( context_root,
@@ -129,12 +131,14 @@ let parameters_encoding =
         genesis,
         user_activated_upgrades,
         user_activated_protocol_overrides,
+        operation_metadata_size_limit,
         sandbox_parameters ))
     (fun ( context_root,
            protocol_root,
            genesis,
            user_activated_upgrades,
            user_activated_protocol_overrides,
+           operation_metadata_size_limit,
            sandbox_parameters ) ->
       {
         context_root;
@@ -142,9 +146,10 @@ let parameters_encoding =
         genesis;
         user_activated_upgrades;
         user_activated_protocol_overrides;
+        operation_metadata_size_limit;
         sandbox_parameters;
       })
-    (obj6
+    (obj7
        (req "context_root" string)
        (req "protocol_root" string)
        (req "genesis" Genesis.encoding)
@@ -152,6 +157,7 @@ let parameters_encoding =
        (req
           "user_activated_protocol_overrides"
           User_activated.protocol_overrides_encoding)
+       (opt "operation_metadata_size_limit" int31)
        (opt "sandbox_parameters" json))
 
 let case_validate tag =

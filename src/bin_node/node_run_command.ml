@@ -291,6 +291,8 @@ let init_node ?sandbox ?target ~identity ~singleprocess
         config.blockchain_network.user_activated_upgrades;
       user_activated_protocol_overrides =
         config.blockchain_network.user_activated_protocol_overrides;
+      operation_metadata_size_limit =
+        config.shell.block_validator_limits.operation_metadata_size_limit;
       patch_context;
       data_dir = config.data_dir;
       store_root = Node_data_version.store_dir config.data_dir;

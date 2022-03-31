@@ -69,6 +69,7 @@ type t = {
   p2p : Distributed_db.p2p;
   user_activated_upgrades : User_activated.upgrades;
   user_activated_protocol_overrides : User_activated.protocol_overrides;
+  operation_metadata_size_limit : int option;
   (* For P2P RPCs *)
   shutdown : unit -> unit Lwt.t;
 }
@@ -115,6 +116,7 @@ type config = {
   sandboxed_chain_name : Distributed_db_version.Name.t;
   user_activated_upgrades : User_activated.upgrades;
   user_activated_protocol_overrides : User_activated.protocol_overrides;
+  operation_metadata_size_limit : int option;
   data_dir : string;
   store_root : string;
   context_root : string;
@@ -128,7 +130,11 @@ type config = {
 
 let default_block_validator_limits =
   let open Block_validator in
-  {protocol_timeout = Time.System.Span.of_seconds_exn 120.}
+  {
+    protocol_timeout = Time.System.Span.of_seconds_exn 120.;
+    operation_metadata_size_limit =
+      Block_validation.default_operation_metadata_size_limit;
+  }
 
 let default_prevalidator_limits = Prevalidator.default_limits
 
@@ -206,6 +212,7 @@ let create ?(sandboxed = false) ?sandbox_parameters ~singleprocess
       sandboxed_chain_name;
       user_activated_upgrades;
       user_activated_protocol_overrides;
+      operation_metadata_size_limit;
       data_dir;
       store_root;
       context_root;
@@ -229,7 +236,11 @@ let create ?(sandboxed = false) ?sandbox_parameters ~singleprocess
   >>=? fun p2p ->
   (let open Block_validator_process in
   let validator_environment =
-    {user_activated_upgrades; user_activated_protocol_overrides}
+    {
+      user_activated_upgrades;
+      user_activated_protocol_overrides;
+      operation_metadata_size_limit;
+    }
   in
   if singleprocess then
     Store.init
@@ -313,6 +324,7 @@ let create ?(sandboxed = false) ?sandbox_parameters ~singleprocess
       p2p;
       user_activated_upgrades;
       user_activated_protocol_overrides;
+      operation_metadata_size_limit;
       shutdown;
     }
 
