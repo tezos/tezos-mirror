@@ -4,28 +4,31 @@ SPHINXBUILD   = poetry run sphinx-build
 SPHINXPROJ    = Tezos
 SOURCEDIR     = .
 BUILDDIR      = _build
+TOPBUILDDIR   = ../_build/default
 
 DOCGENDIR     = doc_gen
 DOCERRORDIR   = $(DOCGENDIR)/errors
-DOCRPCDIR     = $(DOCGENDIR)/rpcs
+P2PDOCEXE     = $(TOPBUILDDIR)/docs/$(DOCGENDIR)/p2p_doc.exe
+RPCDOCEXE     = $(TOPBUILDDIR)/docs/$(DOCGENDIR)/rpc_doc.exe
+ERRDOCEXE     = $(TOPBUILDDIR)/docs/$(DOCERRORDIR)/error_doc.exe
 
 ALPHA_LONG    = ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 ITHACA_LONG   = Psithaca2MLRFYargivpo7YvUr7wUDqyxrdhC5CQq78mRvimz6A
 HANGZHOU_LONG = PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx
-ACTIVE_LONG = $(HANGZHOU_LONG)
+ACTIVE_LONG   = $(HANGZHOU_LONG)
 
 ALPHA_SHORT    = alpha
 HANGZHOU_SHORT = 011-PtHangz2
 ITHACA_SHORT   = 012-Psithaca
-ACTIVE_SHORT = $(HANGZHOU_SHORT)
+ACTIVE_SHORT   = $(HANGZHOU_SHORT)
 
-SCRIPTSDIR		= scripts
-CHECKXREFS		= $(SCRIPTSDIR)/check_proto_xrefs.py
+SCRIPTSDIR     = scripts
+CHECKXREFS     = $(SCRIPTSDIR)/check_proto_xrefs.py
 
 all: manuals odoc html
 
 main:
-	@${MAKE} -C .. all
+	${MAKE} -C .. all
 
 manuals: main
     # alpha protocol
@@ -47,9 +50,10 @@ manuals: main
 	@../tezos-codec man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/tezos-codec.html
 	@../tezos-snoop man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/tezos-snoop.html
 
+# artificially depend on docexes to avoid concurrent dunes
 .PHONY: odoc
-odoc: main
-	@cd $$(pwd)/.. ; dune build @doc
+odoc: main docexes
+	cd $$(pwd)/.. ; dune build @doc
 	@rm -rf $$(pwd)/_build/api/odoc
 	@mkdir -p $$(pwd)/_build/api
 	@cp -r $$(pwd)/../_build/default/_doc $$(pwd)/_build/api/odoc
@@ -94,31 +98,34 @@ sanitycheck:
 		exit 1;								\
 	fi
 
-api/errors.rst: $(DOCERRORDIR)/error_doc.ml
-	@cd .. && dune build docs/$(DOCERRORDIR)/error_doc.exe
-	../_build/default/docs/$(DOCERRORDIR)/error_doc.exe > api/errors.rst
+# build dune targets together to avoid concurrent dunes
+docexes: main
+	cd .. && dune build docs/$(DOCERRORDIR)/error_doc.exe docs/$(DOCGENDIR)/rpc_doc.exe docs/$(DOCGENDIR)/p2p_doc.exe
 
-developer/metrics.csv:
-	make -C ../ tezos-node
+developer/metrics.csv: main
 	../tezos-node dump-metrics > developer/metrics.csv
 
-$(DOCGENDIR)/rpc_doc.exe:
-	@cd .. && dune build docs/$(DOCGENDIR)/rpc_doc.exe
+$(ERRDOCEXE): docexes
+$(RPCDOCEXE): docexes
+$(P2PDOCEXE): docexes
 
-rpc: $(DOCGENDIR)/rpc_doc.exe
-	@dune exec $(DOCGENDIR)/rpc_doc.exe index "" > active/rpc.rst
-	@dune exec $(DOCGENDIR)/rpc_doc.exe index "ithaca" > ithaca/rpc.rst
-	@dune exec $(DOCGENDIR)/rpc_doc.exe index alpha > alpha/rpc.rst
-	@dune exec $(DOCGENDIR)/rpc_doc.exe index shell > shell/rpc.rst
-	@dune exec $(DOCGENDIR)/rpc_doc.exe acl > user/default-acl.json
+api/errors.rst: $(ERRDOCEXE)
+	$(ERRDOCEXE) > api/errors.rst
 
-$(DOCGENDIR)/p2p_doc.exe:
-	@cd .. && dune build docs/$(DOCGENDIR)/p2p_doc.exe
+active/rpc.rst: $(RPCDOCEXE)
+	$(RPCDOCEXE) index "" > $@
 
-p2p: $(DOCGENDIR)/p2p_doc.exe shell/p2p_usage.rst.inc
-	@dune exec $(DOCGENDIR)/p2p_doc.exe < shell/p2p_usage.rst.inc > shell/p2p_api.rst
+%/rpc.rst: $(RPCDOCEXE)
+	$(RPCDOCEXE) index $(@D) > $@
 
-.PHONY: help Makefile
+user/default-acl.json: $(RPCDOCEXE)
+	$(RPCDOCEXE) acl > $@
+
+rpc: user/default-acl.json shell/rpc.rst \
+			active/rpc.rst ithaca/rpc.rst alpha/rpc.rst
+
+p2p: $(P2PDOCEXE) shell/p2p_usage.rst.inc
+	@$(P2PDOCEXE) < shell/p2p_usage.rst.inc > shell/p2p_api.rst
 
 .PHONY: install-dependencies
 install-dependencies:
@@ -126,7 +133,7 @@ install-dependencies:
 
 # Catch-all target: route all unknown targets to Sphinx using the new
 # "make mode" option.  $(O) is meant as a shortcut for $(SPHINXOPTS).
-html: Makefile api/errors.rst developer/metrics.csv rpc p2p install-dependencies
+html: api/errors.rst developer/metrics.csv rpc p2p install-dependencies
 	(echo ':orphan:'; echo ''; cat ../CHANGES.rst) > CHANGES-dev.rst
 	@$(SPHINXBUILD) -b html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS)
 	@ln -s active "$(BUILDDIR)/hangzhou" || true

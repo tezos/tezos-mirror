@@ -18,7 +18,7 @@ documentation:build:
     # suppress the error sphinx would otherwise throw. Unfortunately, there doesn't
     # seem to be a more elegant way to suppress this warning.
     - "sed -i 's@:file:.*[.]html@:file: /dev/null@' ./docs/*/cli-commands.rst"
-    - make -C docs html
+    - make -C docs -j html
   artifacts:
     expose_as: 'Documentation - excluding odoc and CLI manuals'
     paths:
@@ -36,7 +36,7 @@ documentation:build_all:
   before_script:
     - . $HOME/.venv/bin/activate
   script:
-    - make -C docs all
+    - make -C docs -j all
   artifacts:
     expose_as: 'Full documentation - including odoc and CLI manuals'
     paths:
