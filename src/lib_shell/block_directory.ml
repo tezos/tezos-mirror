@@ -260,15 +260,85 @@ let build_raw_rpc_directory (module Proto : Block_services.PROTO)
           (fun _ ->
             return (List.map (List.map (convert_without_metadata chain_id)) ops))
   in
+  let force_operation_metadata chain_id chain_store block =
+    let block_header = Store.Block.header block in
+    let operations = Store.Block.operations block in
+    let* predecessor_block =
+      Store.Block.read_block chain_store (Store.Block.predecessor block)
+    in
+    let predecessor_header = Store.Block.header predecessor_block in
+    let* context = Store.Block.context chain_store predecessor_block in
+    let* predecessor_context =
+      let*! ctxt =
+        Context.checkout
+          (Context.index context)
+          (Store.Block.context_hash predecessor_block)
+      in
+      match ctxt with Some c -> return c | None -> fail_with_exn Not_found
+    in
+    let predecessor_block_metadata_hash =
+      Store.Block.block_metadata_hash predecessor_block
+    in
+    let predecessor_ops_metadata_hash =
+      Store.Block.all_operations_metadata_hash predecessor_block
+    in
+    let* (_block_metadata, ops_metadata) =
+      Block_validation.recompute_metadata
+        ~chain_id
+        ~predecessor_block_header:predecessor_header
+        ~predecessor_context
+        ~predecessor_block_metadata_hash
+        ~predecessor_ops_metadata_hash
+        ~block_header
+        ~operations
+        ~cache:`Lazy
+    in
+    let ops_metadata =
+      match ops_metadata with
+      | Block_validation.No_metadata_hash ops_metadata -> ops_metadata
+      | Block_validation.Metadata_hash ops_metadata ->
+          List.map (List.map fst) ops_metadata
+    in
+    return ops_metadata
+  in
   (*****************************************************************)
-  register0 S.Operations.operations (fun (chain_store, block) () () ->
-      operations chain_store block) ;
-  register1 S.Operations.operations_in_pass (fun (chain_store, block) i () () ->
+  register0 S.Operations.operations (fun (chain_store, block) q () ->
+      if q#force_metadata then
+        let chain_id = Store.Chain.chain_id chain_store in
+        let ops = Store.Block.operations block in
+        let* metadata = Store.Block.get_block_metadata chain_store block in
+        let ops_metadata = metadata.operations_metadata in
+        let* ops_metadata =
+          (* Iter through the operations metadata to check if some are
+             considered as too large. *)
+          if
+            List.exists
+              (fun v ->
+                List.exists (fun v -> v = Block_validation.Too_large_metadata) v)
+              ops_metadata
+          then
+            (* The metadatas are stored but contains some too large
+               metadata, we need te recompute them *)
+            force_operation_metadata chain_id chain_store block
+          else return ops_metadata
+        in
+        List.map2_e
+          ~when_different_lengths:()
+          (List.map2
+             ~when_different_lengths:()
+             (convert_with_metadata chain_id))
+          ops
+          ops_metadata
+        |> function
+        | Ok v -> return v
+        | Error () -> fail_with_exn Not_found
+      else operations chain_store block) ;
+  register1 S.Operations.operations_in_pass (fun (chain_store, block) i q () ->
       let chain_id = Store.Chain.chain_id chain_store in
-      let (ops, _path) = Store.Block.operations_path block i in
       Lwt.catch
         (fun () ->
           let*! o = Store.Block.get_block_metadata_opt chain_store block in
+          let ops = fst @@ Store.Block.operations_path block i in
           match o with
           | None -> return (List.map (convert_without_metadata chain_id) ops)
           | Some metadata -> (
@@ -277,6 +347,30 @@ let build_raw_rpc_directory (module Proto : Block_services.PROTO)
                 List.nth opss_metadata i
                 |> WithExceptions.Option.to_exn ~none:Not_found
               in
+              let* ops_metadata =
+                if q#force_metadata then
+                  let* ops_metadata =
+                    (* Iter through the operations metadata of the
+                       requested pass to check if some are considered as
+                       too large. *)
+                    if
+                      List.exists
+                        (fun v -> v = Block_validation.Too_large_metadata)
+                        ops_metadata
+                    then
+                      let* opss_metadata =
+                        force_operation_metadata chain_id chain_store block
+                      in
+                      let ops_metadata =
+                        List.nth_opt opss_metadata i
+                        |> WithExceptions.Option.to_exn ~none:Not_found
+                      in
+                      return ops_metadata
+                    else return ops_metadata
+                  in
+                  return ops_metadata
+                else return ops_metadata
+              in
               List.map2
                 ~when_different_lengths:()
                 (convert_with_metadata chain_id)
@@ -284,20 +378,20 @@ let build_raw_rpc_directory (module Proto : Block_services.PROTO)
                 ops_metadata
               |> function
               | Ok x -> return x
-              | _ -> raise Not_found))
-        (fun _ -> Lwt.fail Not_found)) ;
-  register2 S.Operations.operation (fun (chain_store, block) i j () () ->
+              | _ -> fail_with_exn Not_found))
+        (fun _ -> fail_with_exn Not_found)) ;
+  register2 S.Operations.operation (fun (chain_store, block) i j q () ->
       let chain_id = Store.Chain.chain_id chain_store in
       Lwt.catch
         (fun () ->
-          let (ops, _path) = Store.Block.operations_path block i in
+          let ops = fst @@ Store.Block.operations_path block i in
           let op =
             List.nth ops j |> WithExceptions.Option.to_exn ~none:Not_found
           in
           let*! o = Store.Block.get_block_metadata_opt chain_store block in
           match o with
           | None -> return (convert_without_metadata chain_id op)
-          | Some metadata ->
+          | Some metadata -> (
               let opss_metadata = Store.Block.operations_metadata metadata in
               let ops_metadata =
                 List.nth opss_metadata i
@@ -307,8 +401,25 @@ let build_raw_rpc_directory (module Proto : Block_services.PROTO)
                 List.nth ops_metadata j
                 |> WithExceptions.Option.to_exn ~none:Not_found
               in
-              return (convert_with_metadata chain_id op op_metadata))
-        (fun _ -> Lwt.fail Not_found)) ;
+              match op_metadata with
+              | Block_validation.Too_large_metadata ->
+                  if q#force_metadata then
+                    let* opss_metadata =
+                      force_operation_metadata chain_id chain_store block
+                    in
+                    let ops_metadata =
+                      List.nth_opt opss_metadata i
+                      |> WithExceptions.Option.to_exn ~none:Not_found
+                    in
+                    let op_metadata =
+                      List.nth ops_metadata j
+                      |> WithExceptions.Option.to_exn ~none:Not_found
+                    in
+                    return ((convert_with_metadata chain_id) op op_metadata)
+                  else return ((convert_with_metadata chain_id) op op_metadata)
+              | Metadata _ ->
+                  return (convert_with_metadata chain_id op op_metadata)))
+        (fun _ -> fail_with_exn Not_found)) ;
   (* operation_hashes *)
   register0 S.Operation_hashes.operation_hashes (fun (_, block) () () ->
       return (Store.Block.all_operation_hashes block)) ;
@@ -372,7 +483,7 @@ let build_raw_rpc_directory (module Proto : Block_services.PROTO)
           let*! v = Context.merkle_tree context leaf_kind path in
           return_some v) ;
   (* info *)
-  register0 S.info (fun (chain_store, block) () () ->
+  register0 S.info (fun (chain_store, block) q () ->
       let chain_id = Store.Chain.chain_id chain_store in
       let hash = Store.Block.hash block in
       let header = Store.Block.header block in
@@ -386,7 +497,39 @@ let build_raw_rpc_directory (module Proto : Block_services.PROTO)
         let*! metadata = block_metadata chain_store block in
         return (Option.of_result metadata)
       in
-      let* operations = operations chain_store block in
+      let* operations =
+        if q#force_metadata then
+          let ops = Store.Block.operations block in
+          let* metadata = Store.Block.get_block_metadata chain_store block in
+          let ops_metadata = metadata.operations_metadata in
+          let* ops_metadata =
+            (* Iter through the operations metadata to check if some are
+               considered as too large. *)
+            if
+              List.exists
+                (fun v ->
+                  List.exists
+                    (fun v -> v = Block_validation.Too_large_metadata)
+                    v)
+                ops_metadata
+            then
+              (* The metadatas are stored but contains some too large
+                 metadata, we need te recompute them *)
+              force_operation_metadata chain_id chain_store block
+            else return ops_metadata
+          in
+          List.map2_e
+            ~when_different_lengths:()
+            (List.map2
+               ~when_different_lengths:()
+               (convert_with_metadata chain_id))
+            ops
+            ops_metadata
+          |> function
+          | Ok v -> return v
+          | Error () -> fail_with_exn Not_found
+        else operations chain_store block
+      in
       return
         {
           Block_services.hash;
