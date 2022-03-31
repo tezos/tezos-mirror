@@ -10,6 +10,7 @@ __pycache__
 /_opam
 /_docker_build
 /_snoop
+/node_modules
 
 /test_results
 

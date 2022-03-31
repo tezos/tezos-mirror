@@ -297,19 +297,17 @@ module Dune = struct
           acc
       | _ -> go_to_src (Filename.concat ".." acc) (Filename.dirname dir)
     in
-    let (runner, locks) =
+    let runner =
       match node_wrapper_flags with
-      | [] -> (S "node", None)
+      | [] -> S "node"
       | _ ->
           let node = go_to_src "tooling/node_wrapper.exe" dir in
-          ( [S ("%{dep:" ^ node ^ "}"); G (of_atom_list node_wrapper_flags)],
-            Some "npm" )
+          [S ("%{dep:" ^ node ^ "}"); G (of_atom_list node_wrapper_flags)]
     in
     alias_rule
       "runtest_js"
       ~package
       ~deps:dep_files
-      ?locks
       ~action:[S "run"; G runner; S ("%{dep:./" ^ name ^ ".bc.js}")]
 
   let setenv name value followup = [G [S "setenv"; S name; S value]; followup]

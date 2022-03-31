@@ -64,3 +64,5 @@ nvm use --delete-prefix "$NODE_VERSION"
 echo "Check versions"
 node --version
 
+npm install
+

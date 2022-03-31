@@ -27,9 +27,9 @@ open Manifest
 module V = Version
 
 module Node_wrapper_flags = struct
-  let secp256k1 = ["--secp256k1"; "1.1.1"]
+  let secp256k1 = ["--secp256k1"]
 
-  let hacl = ["--hacl"; "1.1.0"]
+  let hacl = ["--hacl"]
 end
 (* EXTERNAL LIBS *)
 

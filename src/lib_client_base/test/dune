@@ -15,17 +15,15 @@
 (rule
  (alias runtest_js)
  (package tezos-client-base)
- (locks npm)
  (action
   (run
-   %{dep:../../tooling/node_wrapper.exe} --secp256k1 1.1.1 --hacl 1.1.0
+   %{dep:../../tooling/node_wrapper.exe} --secp256k1 --hacl
    %{dep:./bip39_tests.bc.js})))
 
 (rule
  (alias runtest_js)
  (package tezos-client-base)
- (locks npm)
  (action
   (run
-   %{dep:../../tooling/node_wrapper.exe} --secp256k1 1.1.1 --hacl 1.1.0
+   %{dep:../../tooling/node_wrapper.exe} --secp256k1 --hacl
    %{dep:./pbkdf_tests.bc.js})))

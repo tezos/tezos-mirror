@@ -14,10 +14,7 @@
  (target api.json.corrected)
  (package tezos-hacl)
  (action
-  (run
-   %{dep:../../tooling/node_wrapper.exe}
-   --hacl 1.1.0
-   %{dep:./check-api.js})))
+  (run %{dep:../../tooling/node_wrapper.exe} --hacl %{dep:./check-api.js})))
 
 (rule
  (alias runtest_js)

@@ -1,15 +1,13 @@
 module Lib = struct
   type version = string
 
-  type t = Hacl of version | Secp256k1 of version
+  type t = Hacl | Secp256k1
 
-  let to_string = function Hacl _ -> "hacl" | Secp256k1 _ -> "secp256k1"
+  let to_string = function Hacl -> "hacl" | Secp256k1 -> "secp256k1"
 
   let to_js_lib = function
-    | Hacl _ -> "hacl-wasm"
-    | Secp256k1 _ -> "@nomadic-labs/secp256k1wasm"
-
-  let version = function Hacl v | Secp256k1 v -> v
+    | Hacl -> "hacl-wasm"
+    | Secp256k1 -> "@nomadic-labs/secp256k1wasm"
 
   let to_load_ident x = Printf.sprintf "load_%s" (to_string x)
 
@@ -17,7 +15,7 @@ module Lib = struct
     let load_ident = to_load_ident x in
     let js_lib = to_js_lib x in
     match x with
-    | Hacl _ ->
+    | Hacl ->
         Printf.sprintf
           {|
 function %s() {
@@ -33,7 +31,7 @@ function %s() {
 |}
           load_ident
           js_lib
-    | Secp256k1 _ ->
+    | Secp256k1 ->
         Printf.sprintf
           {|
 function %s() {
@@ -56,9 +54,9 @@ let args = ref []
 let () =
   Arg.parse
     [
-      ("--hacl", String (fun s -> libs := Lib.Hacl s :: !libs), "Load hacl-wasm");
+      ("--hacl", Unit (fun () -> libs := Lib.Hacl :: !libs), "Load hacl-wasm");
       ( "--secp256k1",
-        String (fun s -> libs := Lib.Secp256k1 s :: !libs),
+        Unit (fun () -> libs := Lib.Secp256k1 :: !libs),
         "Load @nomadic-labs/secp256k1wasm" );
       ( "--",
         Rest_all (fun l -> args := List.rev_append l !args),
@@ -72,41 +70,6 @@ let () =
        "%s [FLAGS] FILE.js -- args"
        (Filename.basename Sys.executable_name))
 
-let setup () =
-  let package_json =
-    {|
-{
-  "private": true,
-  "type": "commonjs",
-  "description": "n/a",
-  "license": "n/a"
-}
-|}
-  in
-  let npmrc =
-    "@nomadic-labs:registry=https://gitlab.com/api/v4/packages/npm/"
-  in
-  let write_file name content =
-    let oc = open_out_bin name in
-    output_string oc content ;
-    close_out oc
-  in
-  write_file "package.json" package_json ;
-  write_file ".npmrc" npmrc
-
-let install x =
-  let cmd =
-    Printf.sprintf "npm install %s@%s" (Lib.to_js_lib x) (Lib.version x)
-  in
-  match Sys.command cmd with
-  | 0 -> ()
-  | _ ->
-      failwith
-        (Printf.sprintf
-           "unable to install %s (%s)"
-           (Lib.to_js_lib x)
-           (Lib.to_string x))
-
 let run i file args =
   let argv = "node" :: file :: args in
   let file =
@@ -117,7 +80,7 @@ let run i file args =
     {|
 function run_%d () {
   console.log('Ready to run %s with argv = [ %s ]');
-  var old_argv = process.argv; 
+  var old_argv = process.argv;
   process.argv = [%s];
   require('%s');
   process.argv = old_argv;
@@ -162,11 +125,6 @@ if(parseInt(major) < minimum_major){
     b
     ".catch(function (e) { console.log(e); process.exit(1) })\n" ;
   print_newline () ;
-  (match libs with
-  | [] -> ()
-  | _ :: _ ->
-      setup () ;
-      List.iter install libs) ;
   let oc = Unix.open_process_out "node" in
   Buffer.output_buffer oc b ;
   flush_all () ;

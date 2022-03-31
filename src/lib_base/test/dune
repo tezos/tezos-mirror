@@ -18,28 +18,25 @@
 (rule
  (alias runtest_js)
  (package tezos-base)
- (locks npm)
  (action
   (run
-   %{dep:../../tooling/node_wrapper.exe} --secp256k1 1.1.1 --hacl 1.1.0
+   %{dep:../../tooling/node_wrapper.exe} --secp256k1 --hacl
    %{dep:./test_bounded.bc.js})))
 
 (rule
  (alias runtest_js)
  (package tezos-base)
- (locks npm)
  (action
   (run
-   %{dep:../../tooling/node_wrapper.exe} --secp256k1 1.1.1 --hacl 1.1.0
+   %{dep:../../tooling/node_wrapper.exe} --secp256k1 --hacl
    %{dep:./test_time.bc.js})))
 
 (rule
  (alias runtest_js)
  (package tezos-base)
- (locks npm)
  (action
   (run
-   %{dep:../../tooling/node_wrapper.exe} --secp256k1 1.1.1 --hacl 1.1.0
+   %{dep:../../tooling/node_wrapper.exe} --secp256k1 --hacl
    %{dep:./test_protocol.bc.js})))
 
 (test
@@ -61,8 +58,7 @@
  (alias runtest_js)
  (package tezos-base)
  (deps points.ok points.ko)
- (locks npm)
  (action
   (run
-   %{dep:../../tooling/node_wrapper.exe} --secp256k1 1.1.1 --hacl 1.1.0
+   %{dep:../../tooling/node_wrapper.exe} --secp256k1 --hacl
    %{dep:./test_p2p_addr.bc.js})))
