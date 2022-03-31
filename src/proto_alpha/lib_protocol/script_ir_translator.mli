@@ -116,7 +116,11 @@ type ex_code = Ex_code : ('a, 'c) code -> ex_code
 
 type 'storage ex_view =
   | Ex_view :
-      ('input * 'storage, 'output) Script_typed_ir.lambda
+      ( 'input * 'storage,
+        Script_typed_ir.end_of_stack,
+        'output,
+        Script_typed_ir.end_of_stack )
+      Script_typed_ir.kdescr
       -> 'storage ex_view
 
 type ('a, 's, 'b, 'u) cinstr = {
@@ -293,7 +297,7 @@ val parse_view_output_ty :
   Script.node ->
   (ex_ty * context) tzresult
 
-val parse_view_returning :
+val parse_view_kdescr :
   ?type_logger:type_logger ->
   context ->
   legacy:bool ->

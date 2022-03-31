@@ -1817,7 +1817,7 @@ type ex_code = Ex_code : ('a, 'c) code -> ex_code
 
 type 'storage ex_view =
   | Ex_view :
-      ('input * 'storage, 'output) Script_typed_ir.lambda
+      ('input * 'storage, end_of_stack, 'output, end_of_stack) kdescr
       -> 'storage ex_view
 
 type (_, _) dig_proof_argument =
@@ -2952,7 +2952,7 @@ let[@coq_axiom_with_reason "gadt"] rec parse_data :
   | (Chest_t, expr) ->
       traced_fail (Invalid_kind (location expr, [Bytes_kind], kind expr))
 
-and parse_view_returning :
+and parse_view_kdescr :
     type storage storagec.
     ?type_logger:type_logger ->
     context ->
@@ -2989,11 +2989,10 @@ and parse_view_returning :
   @@
   match judgement with
   | Failed {descr} ->
-      let cur_view' =
-        Ex_view
-          (Lam (close_descr (descr (Item_t (output_ty', Bot_t))), view_code))
+      let cur_view =
+        Ex_view (close_descr (descr (Item_t (output_ty', Bot_t))))
       in
-      ok (cur_view', ctxt)
+      ok (cur_view, ctxt)
   | Typed ({loc; aft; _} as descr) -> (
       let ill_type_view loc stack_ty () =
         let actual = serialize_stack_for_error ctxt stack_ty in
@@ -3009,7 +3008,7 @@ and parse_view_returning :
                (ill_type_view loc aft : unit -> _)
           @@ ty_eq ~error_details:Informative loc ty output_ty'
           >>? fun (eq, ctxt) ->
-          eq >|? fun Eq -> (Ex_view (Lam (close_descr descr, view_code)), ctxt)
+          eq >|? fun Eq -> (Ex_view (close_descr descr), ctxt)
       | _ -> error (ill_type_view loc aft ()))
 
 and typecheck_views :
@@ -3022,8 +3021,8 @@ and typecheck_views :
     context tzresult Lwt.t =
  fun ?type_logger ctxt ~legacy storage_type views ->
   let aux _name cur_view ctxt =
-    parse_view_returning ?type_logger ctxt ~legacy storage_type cur_view
-    >|=? fun (_parsed_view, ctxt) -> ctxt
+    parse_view_kdescr ?type_logger ctxt ~legacy storage_type cur_view
+    >|=? fun (Ex_view _parsed_view, ctxt) -> ctxt
   in
   Script_map.fold_es aux views ctxt
 
