@@ -107,9 +107,8 @@ module Db = struct
     |}
         [%blob "./sql/get_all_operations.sql"]
     in
-    Caqti_request.collect
-      Caqti_type.(tup3 string string float)
-      Encoding.contract_row
+    Caqti_request.Infix.(
+      Caqti_type.(tup3 string string float) ->! Encoding.contract_row)
       query
 
   let get_top_contracts conn_str start_date end_date limit () =
@@ -145,9 +144,8 @@ module Db = struct
     |}
         [%blob "./sql/get_all_operations.sql"]
     in
-    Caqti_request.collect
-      Caqti_type.(tup2 string string)
-      Encoding.summary_row
+    Caqti_request.Infix.(
+      Caqti_type.(tup2 string string) ->! Encoding.summary_row)
       query
 
   let get_operation_summary conn_str start_date end_date () =
