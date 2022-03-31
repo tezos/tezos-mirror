@@ -218,6 +218,16 @@ let add_commitment ctxt tx_rollup state pkh commitment =
   >>=? fun (ctxt, inbox) ->
   check_commitment_batches_and_merkle_root ctxt state inbox commitment
   >>=? fun (ctxt, state) ->
+  (* De we need to slash someone? *)
+  Storage.Tx_rollup.Commitment.find (ctxt, tx_rollup) commitment.level
+  >>=? fun (ctxt, invalid_commitment) ->
+  Option.map_e
+    (fun x ->
+      let to_slash = x.Submitted_commitment.committer in
+      error_when Signature.Public_key_hash.(pkh = to_slash) Invalid_committer
+      >>? fun () -> ok to_slash)
+    invalid_commitment
+  >>?= fun to_slash ->
   (* Everything has been sorted out, let’s update the storage *)
   Tx_rollup_gas.consume_compact_commitment_cost ctxt inbox.inbox_length
   >>?= fun ctxt ->
@@ -242,7 +252,7 @@ let add_commitment ctxt tx_rollup state pkh commitment =
     commitment_hash
   >>?= fun state ->
   adjust_commitments_count ctxt tx_rollup pkh ~dir:`Incr >>=? fun ctxt ->
-  return (ctxt, state)
+  return (ctxt, state, to_slash)
 
 let pending_bonded_commitments :
     Raw_context.t ->

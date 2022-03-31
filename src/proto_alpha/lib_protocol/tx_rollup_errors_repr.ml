@@ -73,6 +73,7 @@ type error +=
   | Withdraw_already_consumed
   | Withdrawals_invalid_path
   | Withdrawals_already_dispatched
+  | Invalid_committer
   | Commitment_bond_negative of int
   | Cannot_reject_level of {
       provided : Tx_rollup_level_repr.t;
@@ -511,6 +512,18 @@ let () =
     Data_encoding.unit
     (function Withdraw_already_consumed -> Some () | _ -> None)
     (fun () -> Withdraw_already_consumed) ;
+  (* Invalid_committer *)
+  register_error_kind
+    `Temporary
+    ~id:"tx_rollup_invalid_committer"
+    ~title:"Committer cannot propose a commitment for this level"
+    ~description:
+      "The committer is trying to propose a commitment, but their bond is \
+       about to be slashed because a commitment they authored will be \
+       overwritten."
+    Data_encoding.unit
+    (function Invalid_committer -> Some () | _ -> None)
+    (fun () -> Invalid_committer) ;
   register_error_kind
     `Permanent
     ~id:"tx_rollup_commitment_bond_negative"
