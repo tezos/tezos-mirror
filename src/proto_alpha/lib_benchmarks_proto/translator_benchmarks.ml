@@ -579,8 +579,7 @@ module Ty_eq : Benchmark.S = struct
             Lwt.return
               (Gas_monad.run ctxt
               @@ Script_ir_translator.ty_eq
-                   ~error_details:Informative
-                   dummy_loc
+                   ~error_details:(Informative dummy_loc)
                    ty
                    ty)
             >|= Environment.wrap_tzresult
@@ -596,8 +595,7 @@ module Ty_eq : Benchmark.S = struct
               ignore
                 (Gas_monad.run ctxt
                 @@ Script_ir_translator.ty_eq
-                     ~error_details:Informative
-                     dummy_loc
+                     ~error_details:(Informative dummy_loc)
                      ty
                      ty)
             in

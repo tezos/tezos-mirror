@@ -244,7 +244,7 @@ module type TYPE_SIZE = sig
   type 'a t
 
   val check_eq :
-    error_details:'error_trace Script_tc_errors.error_details ->
+    error_details:('error_context, 'error_trace) Script_tc_errors.error_details ->
     'a t ->
     'b t ->
     (unit, 'error_trace) result
@@ -288,7 +288,7 @@ module Type_size : TYPE_SIZE = struct
 
   let check_eq :
       type a b error_trace.
-      error_details:error_trace Script_tc_errors.error_details ->
+      error_details:(_, error_trace) Script_tc_errors.error_details ->
       a t ->
       b t ->
       (unit, error_trace) result =
@@ -298,7 +298,7 @@ module Type_size : TYPE_SIZE = struct
       Error
         (match error_details with
         | Fast -> Inconsistent_types_fast
-        | Informative ->
+        | Informative _ ->
             trace_of_error @@ Script_tc_errors.Inconsistent_type_sizes (x, y))
 
   let of_int loc size =

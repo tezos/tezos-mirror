@@ -1082,14 +1082,13 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
                                      original_code_expr = _;
                                    },
                                  ctxt ) ->
-                      let loc = Micheline.location view.view_code in
                       let io_ty =
                         let open Gas_monad.Syntax in
                         let* out_eq =
-                          ty_eq ~error_details:Fast loc output_ty' output_ty
+                          ty_eq ~error_details:Fast output_ty' output_ty
                         in
                         let+ in_eq =
-                          ty_eq ~error_details:Fast loc input_ty input_ty'
+                          ty_eq ~error_details:Fast input_ty input_ty'
                         in
                         (out_eq, in_eq)
                       in
@@ -1697,8 +1696,7 @@ let lift_execution_arg (type a ac) ctxt ~internal (entrypoint_ty : (a, ac) ty)
       Gas_monad.run
         ctxt
         (Script_ir_translator.ty_eq
-           ~error_details:Informative
-           location
+           ~error_details:(Informative location)
            entrypoint_ty
            parsed_arg_ty)
       >>?= fun (res, ctxt) ->
@@ -1740,7 +1738,11 @@ let execute_any_arg logger ctxt mode step_constants ~entrypoint ~internal
              ctxt ) ->
   Gas_monad.run
     ctxt
-    (find_entrypoint ~error_details:Informative arg_type entrypoints entrypoint)
+    (find_entrypoint
+       ~error_details:(Informative ())
+       arg_type
+       entrypoints
+       entrypoint)
   >>?= fun (r, ctxt) ->
   record_trace (Bad_contract_parameter step_constants.self) r
   >>?= fun (Ex_ty_cstr {ty = entrypoint_ty; construct; original_type_expr = _})

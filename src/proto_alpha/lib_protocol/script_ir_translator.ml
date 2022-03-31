@@ -682,7 +682,7 @@ let check_dupable_ty ctxt loc ty =
 
 let type_metadata_eq :
     type error_trace.
-    error_details:error_trace error_details ->
+    error_details:(_, error_trace) error_details ->
     'a ty_metadata ->
     'b ty_metadata ->
     (unit, error_trace) result =
@@ -696,7 +696,7 @@ let default_ty_eq_error loc ty1 ty2 =
 
 let memo_size_eq :
     type error_trace.
-    error_details:error_trace error_details ->
+    error_details:(_, error_trace) error_details ->
     Sapling.Memo_size.t ->
     Sapling.Memo_size.t ->
     (unit, error_trace) result =
@@ -706,7 +706,7 @@ let memo_size_eq :
     Error
       (match error_details with
       | Fast -> Inconsistent_types_fast
-      | Informative -> trace_of_error @@ Inconsistent_memo_sizes (ms1, ms2))
+      | Informative _ -> trace_of_error @@ Inconsistent_memo_sizes (ms1, ms2))
 
 (* Check that two types are equal.
 
@@ -715,18 +715,15 @@ let memo_size_eq :
  *)
 let rec ty_eq :
     type a ac b bc error_trace.
-    error_details:error_trace error_details ->
-    Script.location ->
+    error_details:(Script.location, error_trace) error_details ->
     (a, ac) ty ->
     (b, bc) ty ->
     (((a, ac) ty, (b, bc) ty) eq, error_trace) Gas_monad.t =
- fun ~error_details loc ty1 ty2 ->
+ fun ~error_details ty1 ty2 ->
   let type_metadata_eq meta1 meta2 =
     Gas_monad.of_result (type_metadata_eq ~error_details meta1 meta2)
-    |> Gas_monad.record_trace_eval ~error_details (fun () ->
-           let ty1 = serialize_ty_for_error ty1 in
-           let ty2 = serialize_ty_for_error ty2 in
-           Inconsistent_types (loc, ty1, ty2))
+    |> Gas_monad.record_trace_eval ~error_details (fun loc ->
+           default_ty_eq_error loc ty1 ty2)
   in
   let memo_size_eq ms1 ms2 =
     Gas_monad.of_result (memo_size_eq ~error_details ms1 ms2)
@@ -738,7 +735,7 @@ let rec ty_eq :
       (((ta, tac) ty, (tb, tbc) ty) eq, error_trace) Gas_monad.t =
    fun ty1 ty2 ->
     help0 ty1 ty2
-    |> Gas_monad.record_trace_eval ~error_details (fun () ->
+    |> Gas_monad.record_trace_eval ~error_details (fun loc ->
            default_ty_eq_error loc ty1 ty2)
   and help0 :
       type ta tac tb tbc.
@@ -753,7 +750,8 @@ let rec ty_eq :
       @@ Error
            (match error_details with
            | Fast -> (Inconsistent_types_fast : error_trace)
-           | Informative -> trace_of_error @@ default_ty_eq_error loc ty1 ty2)
+           | Informative loc ->
+               trace_of_error @@ default_ty_eq_error loc ty1 ty2)
     in
     match (ty1, ty2) with
     | (Unit_t, Unit_t) -> return (Eq : ((ta, tac) ty, (tb, tbc) ty) eq)
@@ -797,23 +795,23 @@ let rec ty_eq :
     | (Map_t (tal, tar, meta1), Map_t (tbl, tbr, meta2)) ->
         let* () = type_metadata_eq meta1 meta2 in
         let* Eq = help tar tbr in
-        let+ Eq = ty_eq ~error_details loc tal tbl in
+        let+ Eq = ty_eq ~error_details tal tbl in
         (Eq : ((ta, tac) ty, (tb, tbc) ty) eq)
     | (Map_t _, _) -> not_equal ()
     | (Big_map_t (tal, tar, meta1), Big_map_t (tbl, tbr, meta2)) ->
         let* () = type_metadata_eq meta1 meta2 in
         let* Eq = help tar tbr in
-        let+ Eq = ty_eq ~error_details loc tal tbl in
+        let+ Eq = ty_eq ~error_details tal tbl in
         (Eq : ((ta, tac) ty, (tb, tbc) ty) eq)
     | (Big_map_t _, _) -> not_equal ()
     | (Set_t (ea, meta1), Set_t (eb, meta2)) ->
         let* () = type_metadata_eq meta1 meta2 in
-        let+ Eq = ty_eq ~error_details loc ea eb in
+        let+ Eq = ty_eq ~error_details ea eb in
         (Eq : ((ta, tac) ty, (tb, tbc) ty) eq)
     | (Set_t _, _) -> not_equal ()
     | (Ticket_t (ea, meta1), Ticket_t (eb, meta2)) ->
         let* () = type_metadata_eq meta1 meta2 in
-        let+ Eq = ty_eq ~error_details loc ea eb in
+        let+ Eq = ty_eq ~error_details ea eb in
         (Eq : ((ta, tac) ty, (tb, tbc) ty) eq)
     | (Ticket_t _, _) -> not_equal ()
     | (Pair_t (tal, tar, meta1, cmp1), Pair_t (tbl, tbr, meta2, cmp2)) ->
@@ -887,7 +885,7 @@ let rec stack_eq :
   match (stack1, stack2) with
   | (Bot_t, Bot_t) -> ok (Eq, ctxt)
   | (Item_t (ty1, rest1), Item_t (ty2, rest2)) ->
-      Gas_monad.run ctxt @@ ty_eq ~error_details:Informative loc ty1 ty2
+      Gas_monad.run ctxt @@ ty_eq ~error_details:(Informative loc) ty1 ty2
       |> record_trace (Bad_stack_item lvl)
       >>? fun (eq, ctxt) ->
       eq >>? fun Eq ->
@@ -1794,9 +1792,9 @@ type 'a ex_ty_cstr =
     }
       -> 'a ex_ty_cstr
 
-let find_entrypoint (type full fullc error_trace)
-    ~(error_details : error_trace error_details) (full : (full, fullc) ty)
-    (entrypoints : full entrypoints) entrypoint :
+let find_entrypoint (type full fullc error_context error_trace)
+    ~(error_details : (error_context, error_trace) error_details)
+    (full : (full, fullc) ty) (entrypoints : full entrypoints) entrypoint :
     (full ex_ty_cstr, error_trace) Gas_monad.t =
   let open Gas_monad.Syntax in
   let rec find_entrypoint :
@@ -1842,11 +1840,11 @@ let find_entrypoint (type full fullc error_trace)
         @@ Error
              (match error_details with
              | Fast -> (Inconsistent_types_fast : error_trace)
-             | Informative -> trace_of_error @@ No_such_entrypoint entrypoint)
+             | Informative _ -> trace_of_error @@ No_such_entrypoint entrypoint)
 
 let find_entrypoint_for_type (type full fullc exp expc error_trace)
     ~error_details ~(full : (full, fullc) ty) ~(expected : (exp, expc) ty)
-    entrypoints entrypoint loc :
+    entrypoints entrypoint :
     (Entrypoint.t * (exp, expc) ty, error_trace) Gas_monad.t =
   let open Gas_monad.Syntax in
   let* res = find_entrypoint ~error_details full entrypoints entrypoint in
@@ -1856,14 +1854,14 @@ let find_entrypoint_for_type (type full fullc exp expc error_trace)
       | Some {name; original_type_expr = _}
         when Entrypoint.is_root name && Entrypoint.is_default entrypoint ->
           Gas_monad.bind_recover
-            (ty_eq ~error_details:Fast loc ty expected)
+            (ty_eq ~error_details:Fast ty expected)
             (function
               | Ok Eq -> return (Entrypoint.default, (ty : (exp, expc) ty))
               | Error Inconsistent_types_fast ->
-                  let+ Eq = ty_eq ~error_details loc full expected in
+                  let+ Eq = ty_eq ~error_details full expected in
                   (Entrypoint.root, (full : (exp, expc) ty)))
       | _ ->
-          let+ Eq = ty_eq ~error_details loc ty expected in
+          let+ Eq = ty_eq ~error_details ty expected in
           (entrypoint, (ty : (exp, expc) ty)))
 
 let well_formed_entrypoints (type full fullc) (full : (full, fullc) ty)
@@ -2688,8 +2686,9 @@ let[@coq_axiom_with_reason "gadt"] rec parse_data :
                     (Gas_monad.run ctxt
                     @@
                     let open Gas_monad.Syntax in
-                    let* Eq = ty_eq ~error_details:Informative loc tk btk in
-                    ty_eq ~error_details:Informative loc tv btv)
+                    let error_details = Informative loc in
+                    let* Eq = ty_eq ~error_details tk btk in
+                    ty_eq ~error_details tv btv)
                     >>? fun (eq, ctxt) ->
                     eq >|? fun Eq -> (Some id, ctxt) )
           else traced_fail (Unexpected_forged_value loc))
@@ -2736,7 +2735,7 @@ let[@coq_axiom_with_reason "gadt"] rec parse_data :
           | Some transac_memo_size ->
               Lwt.return
                 ( memo_size_eq
-                    ~error_details:Informative
+                    ~error_details:(Informative ())
                     memo_size
                     transac_memo_size
                 >|? fun () -> (transaction, ctxt) ))
@@ -2755,7 +2754,7 @@ let[@coq_axiom_with_reason "gadt"] rec parse_data :
           | Some transac_memo_size ->
               Lwt.return
                 ( memo_size_eq
-                    ~error_details:Informative
+                    ~error_details:(Informative ())
                     memo_size
                     transac_memo_size
                 >|? fun () -> (transaction, ctxt) ))
@@ -2769,7 +2768,7 @@ let[@coq_axiom_with_reason "gadt"] rec parse_data :
         Lwt.return
           ( traced_no_lwt
           @@ memo_size_eq
-               ~error_details:Informative
+               ~error_details:(Informative ())
                memo_size
                state.Sapling.memo_size
           >|? fun () -> (state, ctxt) )
@@ -2847,7 +2846,7 @@ and parse_view :
             {input_ty; output_ty; kinstr; original_code_expr = view_code},
           ctxt )
   | Typed ({loc; aft; _} as descr) -> (
-      let ill_type_view loc stack_ty () =
+      let ill_type_view stack_ty loc =
         let actual = serialize_stack_for_error ctxt stack_ty in
         let expected_stack = Item_t (output_ty, Bot_t) in
         let expected = serialize_stack_for_error ctxt expected_stack in
@@ -2855,18 +2854,18 @@ and parse_view :
       in
       match aft with
       | Item_t (ty, Bot_t) ->
+          let error_details = Informative loc in
           Gas_monad.run ctxt
-          @@ Gas_monad.record_trace_eval
-               ~error_details:Informative
-               (ill_type_view loc aft : unit -> _)
-          @@ ty_eq ~error_details:Informative loc ty output_ty
+          @@ Gas_monad.record_trace_eval ~error_details (fun loc ->
+                 ill_type_view aft loc)
+          @@ ty_eq ~error_details ty output_ty
           >>? fun (eq, ctxt) ->
           eq >|? fun Eq ->
           let {kinstr; _} = close_descr descr in
           ( Typed_view
               {input_ty; output_ty; kinstr; original_code_expr = view_code},
             ctxt )
-      | _ -> error (ill_type_view loc aft ()))
+      | _ -> error (ill_type_view aft loc))
 
 and parse_views :
     type storage storagec.
@@ -2908,15 +2907,16 @@ and[@coq_axiom_with_reason "gadt"] parse_returning :
   >>=? function
   | (Typed ({loc; aft = Item_t (ty, Bot_t) as stack_ty; _} as descr), ctxt) ->
       Lwt.return
-        ( Gas_monad.run ctxt
-        @@ Gas_monad.record_trace_eval ~error_details:Informative (fun () ->
-               let ret = serialize_ty_for_error ret in
-               let stack_ty = serialize_stack_for_error ctxt stack_ty in
-               Bad_return (loc, stack_ty, ret))
-        @@ ty_eq ~error_details:Informative loc ty ret
-        >>? fun (eq, ctxt) ->
-          eq >|? fun Eq ->
-          ((Lam (close_descr descr, script_instr) : (arg, ret) lambda), ctxt) )
+        (let error_details = Informative loc in
+         Gas_monad.run ctxt
+         @@ Gas_monad.record_trace_eval ~error_details (fun loc ->
+                let ret = serialize_ty_for_error ret in
+                let stack_ty = serialize_stack_for_error ctxt stack_ty in
+                Bad_return (loc, stack_ty, ret))
+         @@ ty_eq ~error_details ty ret
+         >>? fun (eq, ctxt) ->
+         eq >|? fun Eq ->
+         ((Lam (close_descr descr, script_instr) : (arg, ret) lambda), ctxt))
   | (Typed {loc; aft = stack_ty; _}, ctxt) ->
       let ret = serialize_ty_for_error ret in
       let stack_ty = serialize_stack_for_error ctxt stack_ty in
@@ -2945,7 +2945,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
         Bad_stack (loc, name, m, stack_ty))
     @@ record_trace
          (Bad_stack_item n)
-         ( Gas_monad.run ctxt @@ ty_eq ~error_details:Informative loc exp got
+         ( Gas_monad.run ctxt @@ ty_eq ~error_details:(Informative loc) exp got
          >>? fun (eq, ctxt) ->
            eq >|? fun Eq -> ((Eq : (a, b) eq), ctxt) )
   in
@@ -3719,7 +3719,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
           Item_t ((Sapling_state_t state_memo_size as state_ty), rest) ) ) ->
       if legacy then
         memo_size_eq
-          ~error_details:Informative
+          ~error_details:(Informative ())
           state_memo_size
           transaction_memo_size
         >>?= fun () ->
@@ -3738,7 +3738,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
         ( Sapling_transaction_t transaction_memo_size,
           Item_t ((Sapling_state_t state_memo_size as state_ty), rest) ) ) ->
       memo_size_eq
-        ~error_details:Informative
+        ~error_details:(Informative ())
         state_memo_size
         transaction_memo_size
       >>?= fun () ->
@@ -4344,7 +4344,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       check_var_annot loc annot >>?= fun () ->
       parse_any_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy cast_t
       >>?= fun (Ex_ty cast_t, ctxt) ->
-      Gas_monad.run ctxt @@ ty_eq ~error_details:Informative loc cast_t t
+      Gas_monad.run ctxt @@ ty_eq ~error_details:(Informative loc) cast_t t
       >>?= fun (eq, ctxt) ->
       eq >>?= fun Eq ->
       (* We can reuse [stack] because [a ty = b ty] means [a = b]. *)
@@ -4482,12 +4482,13 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       in
       trace (Ill_typed_contract (canonical_code, [])) views_result
       >>=? fun (_typed_views, ctxt) ->
-      (Gas_monad.run ctxt
-      @@
-      let open Gas_monad.Syntax in
-      let* Eq = ty_eq ~error_details:Informative loc arg arg_type_full in
-      let* Eq = ty_eq ~error_details:Informative loc ret ret_type_full in
-      ty_eq ~error_details:Informative loc storage_type ginit)
+      (let error_details = Informative loc in
+       Gas_monad.run ctxt
+       @@
+       let open Gas_monad.Syntax in
+       let* Eq = ty_eq ~error_details arg arg_type_full in
+       let* Eq = ty_eq ~error_details ret ret_type_full in
+       ty_eq ~error_details storage_type ginit)
       >>?= fun (storage_eq, ctxt) ->
       storage_eq >>?= fun Eq ->
       let instr =
@@ -4570,7 +4571,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
           | Toplevel {param_type; entrypoints; storage_type = _} ->
               Gas_monad.run ctxt
               @@ find_entrypoint
-                   ~error_details:Informative
+                   ~error_details:(Informative ())
                    param_type
                    entrypoints
                    entrypoint
@@ -4739,7 +4740,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
           rest ) ) ->
       check_var_annot loc annot >>?= fun () ->
       Gas_monad.run ctxt
-      @@ ty_eq ~error_details:Informative loc contents_ty_a contents_ty_b
+      @@ ty_eq ~error_details:(Informative loc) contents_ty_a contents_ty_b
       >>?= fun (eq, ctxt) ->
       eq >>?= fun Eq ->
       option_t loc ty_a >>?= fun res_ty ->
@@ -4972,7 +4973,7 @@ and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_contra
             (* An implicit account on the "default" entrypoint always exists and has type unit. *)
             Lwt.return
               ( Gas_monad.run ctxt
-              @@ ty_eq ~error_details:Informative loc arg unit_t
+              @@ ty_eq ~error_details:(Informative loc) arg unit_t
               >>? fun (eq, ctxt) ->
                 eq >|? fun Eq ->
                 let destination : Destination.t = Contract contract in
@@ -5007,12 +5008,11 @@ and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_contra
                   (* we don't check targ size here because it's a legacy contract code *)
                   Gas_monad.run ctxt
                   @@ find_entrypoint_for_type
-                       ~error_details:Informative
+                       ~error_details:(Informative loc)
                        ~full:targ
                        ~expected:arg
                        entrypoints
                        entrypoint
-                       loc
                   >>? fun (entrypoint_arg, ctxt) ->
                   entrypoint_arg >|? fun (entrypoint, arg_ty) ->
                   let address = {destination; entrypoint} in
@@ -5165,7 +5165,7 @@ let parse_contract_for_script :
           if Entrypoint.is_default entrypoint then
             (* An implicit account on the "default" entrypoint always exists and has type unit. *)
             Lwt.return
-              ( Gas_monad.run ctxt @@ ty_eq ~error_details:Fast loc arg unit_t
+              ( Gas_monad.run ctxt @@ ty_eq ~error_details:Fast arg unit_t
               >|? fun (eq, ctxt) ->
                 match eq with
                 | Ok Eq ->
@@ -5218,7 +5218,6 @@ let parse_contract_for_script :
                                ~expected:arg
                                entrypoints
                                entrypoint
-                               loc
                           >|? fun (entrypoint_arg, ctxt) ->
                           match entrypoint_arg with
                           | Ok (entrypoint, arg_ty) ->

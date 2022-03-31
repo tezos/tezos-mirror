@@ -179,8 +179,7 @@ let test_parse_ty (type exp expc) ctxt node
     >>? fun (Script_ir_translator.Ex_ty actual, ctxt) ->
       Gas_monad.run ctxt
       @@ Script_ir_translator.ty_eq
-           ~error_details:Informative
-           (location node)
+           ~error_details:(Informative (location node))
            actual
            expected
       >>? fun (eq, ctxt) ->
