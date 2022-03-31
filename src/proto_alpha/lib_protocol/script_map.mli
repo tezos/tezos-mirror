@@ -54,3 +54,9 @@ val mem : 'key -> ('key, 'value) map -> bool
 val get : 'key -> ('key, 'value) map -> 'value option
 
 val size : ('a, 'b) map -> Script_int.n Script_int.num
+
+val map_es_in_context :
+  ('context -> 'key -> 'value1 -> ('value2 * 'context) tzresult Lwt.t) ->
+  'context ->
+  ('key, 'value1) map ->
+  (('key, 'value2) map * 'context) tzresult Lwt.t

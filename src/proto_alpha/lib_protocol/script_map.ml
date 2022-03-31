@@ -115,3 +115,31 @@ let fold_es :
 
 let size : type key value. (key, value) map -> Script_int.n Script_int.num =
  fun (Map_tag (module Box)) -> Script_int.(abs (of_int Box.size))
+
+let map_es_in_context :
+    type context key value value'.
+    (context -> key -> value -> (value' * context) tzresult Lwt.t) ->
+    context ->
+    (key, value) map ->
+    ((key, value') map * context) tzresult Lwt.t =
+ fun f ctxt (Map_tag (module Box)) ->
+  Box.OPS.fold_es
+    (fun key value (map, ctxt) ->
+      f ctxt key value >|=? fun (value, ctxt) ->
+      (Box.OPS.add key value map, ctxt))
+    Box.boxed
+    (Box.OPS.empty, ctxt)
+  >|=? fun (map, ctxt) ->
+  ( Map_tag
+      (module struct
+        type key = Box.key
+
+        type value = value'
+
+        module OPS = Box.OPS
+
+        let boxed = map
+
+        let size = Box.size
+      end),
+    ctxt )
