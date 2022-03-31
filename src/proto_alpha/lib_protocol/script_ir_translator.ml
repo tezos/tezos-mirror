@@ -1815,10 +1815,10 @@ type ex_script = Ex_script : ('a, 'c) Script_typed_ir.script -> ex_script
 
 type ex_code = Ex_code : ('a, 'c) code -> ex_code
 
-type 'storage ex_view =
-  | Ex_view :
+type 'storage typed_view =
+  | Typed_view :
       ('input * 'storage, end_of_stack, 'output, end_of_stack) kdescr
-      -> 'storage ex_view
+      -> 'storage typed_view
 
 type (_, _) dig_proof_argument =
   | Dig_proof_argument :
@@ -2959,7 +2959,7 @@ and parse_view_kdescr :
     legacy:bool ->
     (storage, storagec) ty ->
     view ->
-    (storage ex_view * context) tzresult Lwt.t =
+    (storage typed_view * context) tzresult Lwt.t =
  fun ?type_logger ctxt ~legacy storage_type {input_ty; output_ty; view_code} ->
   let input_ty_loc = location input_ty in
   record_trace_eval
@@ -2990,7 +2990,7 @@ and parse_view_kdescr :
   match judgement with
   | Failed {descr} ->
       let cur_view =
-        Ex_view (close_descr (descr (Item_t (output_ty', Bot_t))))
+        Typed_view (close_descr (descr (Item_t (output_ty', Bot_t))))
       in
       ok (cur_view, ctxt)
   | Typed ({loc; aft; _} as descr) -> (
@@ -3008,7 +3008,7 @@ and parse_view_kdescr :
                (ill_type_view loc aft : unit -> _)
           @@ ty_eq ~error_details:Informative loc ty output_ty'
           >>? fun (eq, ctxt) ->
-          eq >|? fun Eq -> (Ex_view (close_descr descr), ctxt)
+          eq >|? fun Eq -> (Typed_view (close_descr descr), ctxt)
       | _ -> error (ill_type_view loc aft ()))
 
 and typecheck_views :
@@ -3022,7 +3022,7 @@ and typecheck_views :
  fun ?type_logger ctxt ~legacy storage_type views ->
   let aux _name cur_view ctxt =
     parse_view_kdescr ?type_logger ctxt ~legacy storage_type cur_view
-    >|=? fun (Ex_view _parsed_view, ctxt) -> ctxt
+    >|=? fun (Typed_view _parsed_view, ctxt) -> ctxt
   in
   Script_map.fold_es aux views ctxt
 

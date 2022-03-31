@@ -114,14 +114,14 @@ type ('arg, 'storage) code =
 
 type ex_code = Ex_code : ('a, 'c) code -> ex_code
 
-type 'storage ex_view =
-  | Ex_view :
+type 'storage typed_view =
+  | Typed_view :
       ( 'input * 'storage,
         Script_typed_ir.end_of_stack,
         'output,
         Script_typed_ir.end_of_stack )
       Script_typed_ir.kdescr
-      -> 'storage ex_view
+      -> 'storage typed_view
 
 type ('a, 's, 'b, 'u) cinstr = {
   apply :
@@ -303,7 +303,7 @@ val parse_view_kdescr :
   legacy:bool ->
   ('storage, _) Script_typed_ir.ty ->
   Script_typed_ir.view ->
-  ('storage ex_view * context) tzresult Lwt.t
+  ('storage typed_view * context) tzresult Lwt.t
 
 val typecheck_views :
   ?type_logger:type_logger ->

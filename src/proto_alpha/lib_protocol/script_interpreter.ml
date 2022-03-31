@@ -1074,7 +1074,7 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
                           Script_tc_errors.Ill_typed_contract
                             (Micheline.strip_locations view.view_code, []))
                         view_result
-                      >>=? fun ( Ex_view
+                      >>=? fun ( Typed_view
                                    {
                                      kloc;
                                      kaft = Item_t (aft_ty, Bot_t);
