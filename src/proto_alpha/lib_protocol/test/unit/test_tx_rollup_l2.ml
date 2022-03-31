@@ -317,30 +317,6 @@ module Test_Address_index = Test_index (struct
   let too_many = Too_many_l2_addresses
 end)
 
-(** [make_unit_ticket_key ctxt ticketer tx_rollup] computes the key hash of
-    the unit ticket crafted by [ticketer] and owned by [tx_rollup].
-
-    TODO: extracted from https://gitlab.com/tezos/tezos/-/merge_requests/4017,
-    is there a more convenient way to forge a ticket?
-*)
-let make_unit_ticket_key ctxt ticketer address =
-  let open Tezos_micheline.Micheline in
-  let open Michelson_v1_primitives in
-  let ticketer =
-    Bytes
-      ( 0,
-        Data_encoding.Binary.to_bytes_exn
-          Alpha_context.Contract.encoding
-          ticketer )
-  in
-  let ty = Prim (0, T_unit, [], []) in
-  let contents = Prim (0, D_Unit, [], []) in
-  let owner =
-    String (dummy_location, Tx_rollup_l2_address.to_b58check address)
-  in
-  match Alpha_context.Ticket_hash.make ctxt ~ticketer ~ty ~contents ~owner with
-  | Ok (x, _) -> x
-  | Error _ -> raise (Invalid_argument "make_unit_ticket_key")
 
 (** [gen_n_ticket_hash n] generates [n]  {!Alpha_context.Ticket_hash.t} based on
     {!gen_n_address} and {!make_unit_ticket_key}.
@@ -351,15 +327,13 @@ let make_unit_ticket_key ctxt ticketer address =
 let gen_n_ticket_hash n =
   let x =
     Lwt_main.run
-      ( Context.init n >>=? fun (b, contracts) ->
-        Incremental.begin_construction b >|=? Incremental.alpha_ctxt
-        >>=? fun ctxt ->
+      ( Context.init n >>=? fun (_b, contracts) ->
         let addressess = gen_n_address n in
         let tickets =
           List.map2
             ~when_different_lengths:[]
             (fun contract (_, _, address) ->
-              make_unit_ticket_key ctxt contract address)
+              Tx_rollup_l2_helpers.make_unit_ticket_key contract address)
             contracts
             addressess
         in
