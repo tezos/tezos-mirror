@@ -313,6 +313,7 @@ and perform_plot measure model_name problem solution
         ~problem
         ~solution
         ~plot_target:Display.Show
+        ~options:Display.default_options
     then ()
     else Format.eprintf "Could not plot given data."
   else ()

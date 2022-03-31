@@ -46,8 +46,34 @@
 module Matrix = Pyplot.Matrix
 open Plot
 
-(* Gnuplot interprets by default underscores as subscript symbols *)
-let underscore_to_dash = String.map (fun c -> if c = '_' then '-' else c)
+type options = {
+  point_size : float;
+  qt_target_pixel_size : (int * int) option;
+  pdf_target_cm_size : (float * float) option;
+}
+
+let options_encoding =
+  let open Data_encoding in
+  conv
+    (fun {point_size; qt_target_pixel_size; pdf_target_cm_size} ->
+      (point_size, qt_target_pixel_size, pdf_target_cm_size))
+    (fun (point_size, qt_target_pixel_size, pdf_target_cm_size) ->
+      {point_size; qt_target_pixel_size; pdf_target_cm_size})
+    (obj3
+       (req "point_size" float)
+       (opt "qt_target_pixel_size" (tup2 int31 int31))
+       (opt "pdf_target_cm_size" (tup2 float float)))
+
+let default_options =
+  {point_size = 0.5; qt_target_pixel_size = None; pdf_target_cm_size = None}
+
+let opts = ref default_options
+
+let point_size () = !opts.point_size
+
+let qt_pixel_size () = !opts.qt_target_pixel_size
+
+let pdf_cm_size () = !opts.pdf_target_cm_size
 
 (* A [raw_row] is consists in a list of named values called a workload
    (corresponding to time measurement of events) together with the
@@ -55,23 +81,21 @@ let underscore_to_dash = String.map (fun c -> if c = '_' then '-' else c)
    of the workload, there are [n+1] columns. *)
 type raw_row = {workload : (string * float) list; qty : float}
 
-let convert_workload_data : (Sparse_vec.String.t * float) list -> raw_row list =
- fun workload_data ->
-  List.map
-    (fun (vec, qty) -> {workload = Sparse_vec.String.to_list vec; qty})
-    workload_data
+(* Gnuplot interprets by default underscores as subscript symbols *)
+let underscore_to_dash = String.map (fun c -> if c = '_' then '-' else c)
 
 let style i =
   let open Style in
   match i with
   | 0 ->
       default |> set_color Color.blue
-      |> set_point ~ptyp:Pointtype.disk ~psize:0.5
+      |> set_point ~ptyp:Pointtype.disk ~psize:(point_size ())
   | 1 ->
-      default |> set_color Color.red |> set_point ~ptyp:Pointtype.box ~psize:0.5
+      default |> set_color Color.red
+      |> set_point ~ptyp:Pointtype.box ~psize:(point_size ())
   | 2 ->
       default |> set_color Color.green
-      |> set_point ~ptyp:Pointtype.delta_solid ~psize:0.2
+      |> set_point ~ptyp:Pointtype.delta_solid ~psize:(point_size ())
   | _ -> Stdlib.failwith "Display.style: style overflow"
 
 let scatterplot_2d title (xaxis, input) outputs =
@@ -145,6 +169,12 @@ let plot_scatter title input_columns outputs =
      [ ("Add_int_int1", [| 10 ; 20 |]) ; ("Add_int_int2", [| 3 ; 2 |]) ]
    together with timings:
      [| 2879 ; 768 |] *)
+
+let convert_workload_data : (Sparse_vec.String.t * float) list -> raw_row list =
+ fun workload_data ->
+  List.map
+    (fun (vec, qty) -> {workload = Sparse_vec.String.to_list vec; qty})
+    workload_data
 
 let empirical_data (workload_data : (Sparse_vec.String.t * float) list) =
   let samples = convert_workload_data workload_data in
@@ -290,8 +320,9 @@ type plot_target =
   | Show
   | ShowAndSave of {file : string option}
 
-let perform_plot ~measure ~model_name ~problem ~solution ~plot_target =
+let perform_plot ~measure ~model_name ~problem ~solution ~plot_target ~options =
   let open Result_syntax in
+  opts := options ;
   let (Measure.Measurement ((module Bench), measurement)) = measure in
   let filename kind =
     Format.asprintf "%s_%s_%s.pdf" Bench.name model_name kind
@@ -321,8 +352,8 @@ let perform_plot ~measure ~model_name ~problem ~solution ~plot_target =
           | None -> filename "collected"
           | Some filename -> filename
         in
-        pdf ~pdf_file ()
-    | Show -> qt ~pixel_size:(1920, 1080) ()
+        pdf ?cm_size:(pdf_cm_size ()) ~pdf_file ()
+    | Show -> qt ?pixel_size:(qt_pixel_size ()) ()
     | ShowAndSave {file = _} ->
         Format.eprintf "display: ShowAndSave target deprecated@." ;
         qt ()
@@ -330,8 +361,10 @@ let perform_plot ~measure ~model_name ~problem ~solution ~plot_target =
   Plot.run_matrix ~target exec plot_matrix ;
   return ()
 
-let perform_plot ~measure ~model_name ~problem ~solution ~plot_target =
-  match perform_plot ~measure ~model_name ~problem ~solution ~plot_target with
+let perform_plot ~measure ~model_name ~problem ~solution ~plot_target ~options =
+  match
+    perform_plot ~measure ~model_name ~problem ~solution ~plot_target ~options
+  with
   | Error msg ->
       Format.eprintf "Display: error (%s)@." msg ;
       false
