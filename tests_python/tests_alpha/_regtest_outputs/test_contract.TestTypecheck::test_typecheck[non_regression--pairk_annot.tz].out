@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[non_regression/pairk_annot.tz]
 
 Well typed
-Gas remaining: 1039992.198 units remaining
+Gas remaining: 1039993.318 units remaining
 { parameter unit ;
   storage unit ;
   code { SENDER

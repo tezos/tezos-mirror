@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/self_address_after_nonexistent_view.tz]
 
 Well typed
-Gas remaining: 1039986.090 units remaining
+Gas remaining: 1039987.050 units remaining
 { parameter address ;
   storage address ;
   code { CAR

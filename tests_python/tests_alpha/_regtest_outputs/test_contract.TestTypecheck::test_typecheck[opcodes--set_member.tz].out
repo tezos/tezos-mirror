@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/set_member.tz]
 
 Well typed
-Gas remaining: 1039988.400 units remaining
+Gas remaining: 1039989.840 units remaining
 { parameter string ;
   storage (pair (set string) (option bool)) ;
   code { DUP

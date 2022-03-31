@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[macros/max_in_list.tz]
 
 Well typed
-Gas remaining: 1039985.981 units remaining
+Gas remaining: 1039987.741 units remaining
 { parameter (list int) ;
   storage (option int) ;
   code { CAR

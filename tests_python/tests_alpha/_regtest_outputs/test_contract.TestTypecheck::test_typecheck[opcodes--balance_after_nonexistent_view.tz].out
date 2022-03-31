@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/balance_after_nonexistent_view.tz]
 
 Well typed
-Gas remaining: 1039985.815 units remaining
+Gas remaining: 1039986.775 units remaining
 { parameter address ;
   storage mutez ;
   code { CAR

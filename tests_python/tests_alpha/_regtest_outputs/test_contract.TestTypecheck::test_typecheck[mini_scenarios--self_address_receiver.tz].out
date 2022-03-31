@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[mini_scenarios/self_address_receiver.tz]
 
 Well typed
-Gas remaining: 1039991.719 units remaining
+Gas remaining: 1039992.679 units remaining
 { parameter (lambda unit address) ;
   storage unit ;
   code { UNPAIR

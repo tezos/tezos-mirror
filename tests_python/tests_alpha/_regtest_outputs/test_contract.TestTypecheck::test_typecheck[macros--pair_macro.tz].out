@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[macros/pair_macro.tz]
 
 Well typed
-Gas remaining: 1039988.218 units remaining
+Gas remaining: 1039988.858 units remaining
 { parameter unit ;
   storage unit ;
   code { UNIT

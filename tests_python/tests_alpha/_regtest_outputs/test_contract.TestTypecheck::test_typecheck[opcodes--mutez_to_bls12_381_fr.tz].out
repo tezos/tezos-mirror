@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/mutez_to_bls12_381_fr.tz]
 
 Well typed
-Gas remaining: 1039991.653 units remaining
+Gas remaining: 1039992.323 units remaining
 { parameter mutez ;
   storage bls12_381_fr ;
   code { CAR

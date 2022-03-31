@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/set_cdr.tz]
 
 Well typed
-Gas remaining: 1039991.782 units remaining
+Gas remaining: 1039992.742 units remaining
 { parameter nat ;
   storage (pair (string %s) (nat %n)) ;
   code { DUP

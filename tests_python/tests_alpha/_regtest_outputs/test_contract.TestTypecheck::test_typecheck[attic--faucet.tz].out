@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[attic/faucet.tz]
 
 Well typed
-Gas remaining: 1039986.830 units remaining
+Gas remaining: 1039987.950 units remaining
 { parameter key_hash ;
   storage timestamp ;
   code { UNPAIR

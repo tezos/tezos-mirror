@@ -1,7 +1,7 @@
 tests_alpha/test_liquidity_baking.py::TestTrades::test_buy_tok
 
 Node is bootstrapped.
-Estimated gas: 6207.028 units (will add 100 for safety)
+Estimated gas: 5568.103 units (will add 100 for safety)
 Estimated storage: 326 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[BLOCK_HASH]'
@@ -12,13 +12,13 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [CONTRACT_HASH]
-    Fee to the baker: ꜩ0.000978
+    Fee to the baker: ꜩ0.000914
     Expected counter: [EXPECTED_COUNTER]
-    Gas limit: 6308
+    Gas limit: 5669
     Storage limit: 346 bytes
     Balance updates:
-      [CONTRACT_HASH] ... -ꜩ0.000978
-      payload fees(the block proposer) ....... +ꜩ0.000978
+      [CONTRACT_HASH] ... -ꜩ0.000914
+      payload fees(the block proposer) ....... +ꜩ0.000914
     Transaction:
       Amount: ꜩ9001
       From: [CONTRACT_HASH]
@@ -34,7 +34,7 @@ This sequence of operations was run:
           0x0115eb0104481a6d7921160bc982c5e0a561cd8a3a00 }
       Storage size: 4634 bytes
       Paid storage size diff: 1 bytes
-      Consumed gas: 2407.093
+      Consumed gas: 1750.125
       Balance updates:
         [CONTRACT_HASH] ... -ꜩ0.00025
         storage fees ........................... +ꜩ0.00025
@@ -56,7 +56,7 @@ This sequence of operations was run:
           Set map(0)[0x0000e7670f32038107a59a2b9cfefae36ea21f5aa63c] to 360
         Storage size: 2331 bytes
         Paid storage size diff: 68 bytes
-        Consumed gas: 2379.935
+        Consumed gas: 2367.978
         Balance updates:
           [CONTRACT_HASH] ... -ꜩ0.017
           storage fees ........................... +ꜩ0.017
@@ -65,7 +65,7 @@ This sequence of operations was run:
         From: [CONTRACT_HASH]
         To: [CONTRACT_HASH]
         This transaction was successfully applied
-        Consumed gas: 1420
+        Consumed gas: 1450
         Balance updates:
           [CONTRACT_HASH] ... -ꜩ9.001
           [CONTRACT_HASH] ... +ꜩ9.001

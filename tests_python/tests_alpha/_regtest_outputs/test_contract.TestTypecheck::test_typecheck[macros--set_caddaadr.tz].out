@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[macros/set_caddaadr.tz]
 
 Well typed
-Gas remaining: 1039968.110 units remaining
+Gas remaining: 1039970.670 units remaining
 { parameter mutez ;
   storage (pair (pair nat (pair nat (pair (pair (pair (nat %p) (mutez %value)) nat) nat))) nat) ;
   code { DUP

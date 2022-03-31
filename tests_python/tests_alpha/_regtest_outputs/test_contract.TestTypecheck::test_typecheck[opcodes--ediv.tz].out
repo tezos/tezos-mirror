@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/ediv.tz]
 
 Well typed
-Gas remaining: 1039978.198 units remaining
+Gas remaining: 1039981.718 units remaining
 { parameter (pair int int) ;
   storage
     (pair (option (pair int nat))

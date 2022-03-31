@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[mini_scenarios/replay.tz]
 
 Well typed
-Gas remaining: 1039989.740 units remaining
+Gas remaining: 1039990.860 units remaining
 { parameter unit ;
   storage unit ;
   code { CDR

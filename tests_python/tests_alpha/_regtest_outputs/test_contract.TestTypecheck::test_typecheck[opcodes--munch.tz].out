@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/munch.tz]
 
 Well typed
-Gas remaining: 1039996.425 units remaining
+Gas remaining: 1039997.065 units remaining
 { parameter
     (or (bytes %bytes) (or (lambda %lambda unit unit) (or (nat %nat) (list %list_nat nat)))) ;
   storage unit ;

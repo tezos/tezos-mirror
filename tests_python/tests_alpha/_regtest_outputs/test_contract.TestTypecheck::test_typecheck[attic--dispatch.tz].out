@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[attic/dispatch.tz]
 
 Well typed
-Gas remaining: 1039979.486 units remaining
+Gas remaining: 1039983.006 units remaining
 { parameter (or string (pair string (lambda unit string))) ;
   storage (pair string (map string (lambda unit string))) ;
   code { DUP

@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/hash_consistency_checker.tz]
 
 Well typed
-Gas remaining: 1039995.929 units remaining
+Gas remaining: 1039996.569 units remaining
 { parameter (pair mutez (pair timestamp int)) ;
   storage bytes ;
   code { CAR

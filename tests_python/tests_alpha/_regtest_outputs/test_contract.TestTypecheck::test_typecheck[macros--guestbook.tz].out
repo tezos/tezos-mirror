@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[macros/guestbook.tz]
 
 Well typed
-Gas remaining: 1039986.383 units remaining
+Gas remaining: 1039988.143 units remaining
 { parameter string ;
   storage (map address (option string)) ;
   code { UNPAIR @message @guestbook

@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[mini_scenarios/parameterized_multisig.tz]
 
 Well typed
-Gas remaining: 1039928.103 units remaining
+Gas remaining: 1039940.583 units remaining
 { storage (pair bool (pair (map nat (pair bool bool)) (pair key key))) ;
   parameter (or nat (pair signature nat)) ;
   code { DUP

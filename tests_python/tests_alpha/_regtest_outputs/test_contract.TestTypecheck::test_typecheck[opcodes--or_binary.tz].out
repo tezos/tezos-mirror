@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/or_binary.tz]
 
 Well typed
-Gas remaining: 1039995.329 units remaining
+Gas remaining: 1039996.129 units remaining
 { parameter (pair nat nat) ;
   storage (option nat) ;
   code { CAR

@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[attic/reduce_map.tz]
 
 Well typed
-Gas remaining: 1039975.926 units remaining
+Gas remaining: 1039978.486 units remaining
 { parameter (pair (lambda int int) (list int)) ;
   storage (list int) ;
   code { DIP { NIL int /* [ list int ] */ }

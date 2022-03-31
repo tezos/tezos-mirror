@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[attic/cps_fact.tz]
 
 Well typed
-Gas remaining: 1039973.149 units remaining
+Gas remaining: 1039975.869 units remaining
 { storage nat ;
   parameter nat ;
   code { UNPAIR

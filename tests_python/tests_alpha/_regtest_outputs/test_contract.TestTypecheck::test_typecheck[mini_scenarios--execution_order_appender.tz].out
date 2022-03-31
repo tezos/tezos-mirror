@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[mini_scenarios/execution_order_appender.tz]
 
 Well typed
-Gas remaining: 1039989.364 units remaining
+Gas remaining: 1039990.644 units remaining
 { parameter unit ;
   storage (pair address string) ;
   code { CDR

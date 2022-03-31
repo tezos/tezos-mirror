@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[attic/reentrancy.tz]
 
 Well typed
-Gas remaining: 1039981.752 units remaining
+Gas remaining: 1039983.352 units remaining
 { parameter unit ;
   storage (pair address address) ;
   code { CDR

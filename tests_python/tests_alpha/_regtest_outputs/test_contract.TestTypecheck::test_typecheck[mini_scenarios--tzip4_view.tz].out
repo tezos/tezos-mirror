@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[mini_scenarios/tzip4_view.tz]
 
 Well typed
-Gas remaining: 1039984.179 units remaining
+Gas remaining: 1039986.099 units remaining
 { parameter
     (or (pair %view_const unit (contract nat))
         (pair %view_add (pair int int) (contract int))) ;
