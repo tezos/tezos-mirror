@@ -136,7 +136,6 @@ let get :
  fun ctxt tx_rollup state level ->
   find ctxt tx_rollup state level >>=? fun (ctxt, commitment) ->
   match commitment with
-  (* TODO: why not use directly `.get` and get the default error for a missing key ? *)
   | None -> fail @@ Tx_rollup_errors_repr.Commitment_does_not_exist level
   | Some commitment -> return (ctxt, commitment)
 
