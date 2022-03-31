@@ -183,11 +183,11 @@ migration that should be reverted.
 
 Soon after the injection (during the following days), the documentation has to
 be shifted to reflect the new active protocol and to drop the documentation of
-the previous protocol, see meta-issue :gl:`nomadic-labs/tezos#462`. Also, part
+the previous protocol, see meta-issue :gl:`#2170`. Also, part
 of the code related to the old protocol can now be dropped, see
 :doc:`../developer/howto-freeze-protocols`.
 
 One month after the activation of protocol N, we deactivate the N-1 test
 network. (For example, the Babylon net was deactivated one month after
-Carthage went live on the main network.) This deactivation has been already 
+Carthage went live on the main network.) This deactivation has been already
 announced one month before activation (see above).
