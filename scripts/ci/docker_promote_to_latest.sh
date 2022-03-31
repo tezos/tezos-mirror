@@ -34,6 +34,9 @@ do
     docker pull "${docker_image}:${docker_architecture}_${tag_to_promote}"
     amends="${amends} --amend ${docker_image}:${docker_architecture}_${tag_to_promote}"
   done
+
+  # Because of the variable amends, we use eval here to first construct the command
+  # by concatenating all the arguments together (space separated), then read and execute it
   eval "docker manifest create ${docker_image}:${target_tag}${amends}"
   docker manifest push "${docker_image}:${target_tag}"
 done
