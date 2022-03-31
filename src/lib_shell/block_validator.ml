@@ -278,7 +278,10 @@ let on_validation_request w
       | Error errs ->
           let* () =
             if
-              List.exists (function Invalid_block _ -> true | _ -> false) errs
+              (not precheck_and_notify)
+              && List.exists
+                   (function Invalid_block _ -> true | _ -> false)
+                   errs
             then
               Worker.protect w (fun () ->
                   Distributed_db.commit_invalid_block chain_db hash header errs)
