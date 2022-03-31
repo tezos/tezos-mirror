@@ -198,8 +198,7 @@ let all_parsing_costs =
     ("parse_data_cycle", parse_data_cycle);
     ("bool", bool);
     ("parsing_unit", unit);
-    ("timestamp_readable", timestamp_readable);
-    ("contract", contract);
+    ("timestamp_readable", timestamp_readable "dummy");
     ("contract_exists", contract_exists);
     ("proof_argument", proof_argument 42);
   ]
@@ -224,7 +223,6 @@ let all_unparsing_costs =
     ("unparse_instr_cycle", unparse_instr_cycle);
     ("unparse_data_cycle", unparse_data_cycle);
     ("unparsing_unit", unit);
-    ("contract", contract);
     ("operation", operation dummy_bytes);
   ]
 
