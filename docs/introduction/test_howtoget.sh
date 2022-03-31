@@ -1,4 +1,4 @@
-#! /usr/bin/env bash
+#!/usr/bin/env bash
 # Test the different Tezos installation scenarios documented in howtoget.rst.
 #
 # The scenarios are implemented by separate scripts, which are both:

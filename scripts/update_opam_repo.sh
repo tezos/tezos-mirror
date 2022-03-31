@@ -1,4 +1,4 @@
-#! /bin/sh
+#!/bin/sh
 
 # Update the repository of opam packages used by tezos.  Tezos uses a
 # private, shrunk down, opam repository to store all its
