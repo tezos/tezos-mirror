@@ -135,9 +135,6 @@ let check_chain_liveness chain_db hash (header : Block_header.t) =
       fail (invalid_block hash error)
   | None | Some _ -> return_unit
 
-let is_already_validated chain_store hash =
-  Store.Block.is_known chain_store hash
-
 let precheck_block bvp chain_store ~predecessor block_header block_hash
     operations =
   Block_validator_process.precheck_block
@@ -177,7 +174,7 @@ let on_validation_request w
   let open Lwt_result_syntax in
   let bv = Worker.state w in
   let chain_store = Distributed_db.chain_store chain_db in
-  let*! b = is_already_validated chain_store hash in
+  let*! b = Store.Block.is_known_valid chain_store hash in
   match b with
   | true -> return Already_commited
   | false -> (
@@ -453,7 +450,7 @@ let validate w ?canceler ?peer ?(notify_new_block = fun _ -> ())
     operations : block_validity Lwt.t =
   let open Lwt_tzresult_syntax in
   let chain_store = Distributed_db.chain_store chain_db in
-  let*! b = is_already_validated chain_store hash in
+  let*! b = Store.Block.is_known_valid chain_store hash in
   match b with
   | true ->
       let*! () = Worker.log_event w (Previously_validated hash) in
