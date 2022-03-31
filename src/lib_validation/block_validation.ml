@@ -504,6 +504,10 @@ module Make (Proto : Registered_protocol.T) = struct
     in
     return @@ Shell_context.wrap_disk_context context
 
+  (* FIXME: This code is used by recompute_metadata but emitting time
+     measurement events in proto_apply_operations should not impact
+     current benchmarks.
+     See https://gitlab.com/tezos/tezos/-/issues/2716 *)
   let proto_apply_operations chain_id context cache
       (predecessor_block_header : Block_header.t) block_header block_hash
       operations =
@@ -711,6 +715,50 @@ module Make (Proto : Registered_protocol.T) = struct
         in
         return
           {result = {validation_store; block_metadata; ops_metadata}; cache}
+
+  let recompute_metadata chain_id ~cache
+      ~(predecessor_block_header : Block_header.t)
+      ~predecessor_block_metadata_hash ~predecessor_ops_metadata_hash
+      ~predecessor_context ~(block_header : Block_header.t) operations =
+    let open Lwt_result_syntax in
+    let block_hash = Block_header.hash block_header in
+    (* We assume that the block header and its associated operations
+       have already been checked as valid. *)
+    let* block_header = parse_block_header block_hash block_header in
+    let predecessor_hash = Block_header.hash predecessor_block_header in
+    let* context =
+      prepare_context
+        predecessor_block_metadata_hash
+        predecessor_ops_metadata_hash
+        block_header
+        predecessor_context
+        predecessor_hash
+    in
+    let* operations = parse_operations block_hash operations in
+    let* (validation_result, block_metadata, ops_metadata) =
+      proto_apply_operations
+        chain_id
+        context
+        cache
+        predecessor_block_header
+        block_header
+        block_hash
+        operations
+    in
+    let context = Shell_context.unwrap_disk_context validation_result.context in
+    let*! new_protocol = Context.get_protocol context in
+    let* (_validation_result, new_protocol_env_version) =
+      may_init_new_protocol
+        new_protocol
+        block_header
+        block_hash
+        validation_result
+    in
+    compute_metadata
+      ~operation_metadata_size_limit:None
+      new_protocol_env_version
+      block_metadata
+      ops_metadata
 
   let preapply_operation pv op =
     let open Lwt_syntax in
@@ -1127,6 +1175,52 @@ type apply_environment = {
   user_activated_protocol_overrides : User_activated.protocol_overrides;
   operation_metadata_size_limit : int option;
 }
+
+let recompute_metadata chain_id ~predecessor_block_header ~predecessor_context
+    ~predecessor_block_metadata_hash ~predecessor_ops_metadata_hash ~cache
+    block_hash block_header operations =
+  let open Lwt_result_syntax in
+  let*! pred_protocol_hash = Context.get_protocol predecessor_context in
+  let* (module Proto) =
+    match Registered_protocol.get pred_protocol_hash with
+    | None ->
+        tzfail
+          (Unavailable_protocol
+             {block = block_hash; protocol = pred_protocol_hash})
+    | Some p -> return p
+  in
+  let module Block_validation = Make (Proto) in
+  Block_validation.recompute_metadata
+    chain_id
+    ~predecessor_block_header
+    ~predecessor_block_metadata_hash
+    ~predecessor_ops_metadata_hash
+    ~predecessor_context
+    ~cache
+    ~block_header
+    operations
+
+let recompute_metadata ~chain_id ~predecessor_block_header ~predecessor_context
+    ~predecessor_block_metadata_hash ~predecessor_ops_metadata_hash
+    ~block_header ~operations ~cache =
+  let open Lwt_result_syntax in
+  let block_hash = Block_header.hash block_header in
+  let*! r =
+    recompute_metadata
+      chain_id
+      ~predecessor_block_header
+      ~predecessor_context
+      ~predecessor_block_metadata_hash
+      ~predecessor_ops_metadata_hash
+      ~cache
+      block_hash
+      block_header
+      operations
+  in
+  match r with
+  | Error (Exn (Unix.Unix_error (errno, fn, msg)) :: _) ->
+      tzfail (System_error {errno = Unix.error_message errno; fn; msg})
+  | (Ok _ | Error _) as res -> Lwt.return res
 
 let apply ?cached_result
     {

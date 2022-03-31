@@ -163,3 +163,14 @@ val preapply :
   * (apply_result * Context.t))
   tzresult
   Lwt.t
+
+val recompute_metadata :
+  chain_id:Chain_id.t ->
+  predecessor_block_header:Block_header.t ->
+  predecessor_context:Context.t ->
+  predecessor_block_metadata_hash:Block_metadata_hash.t option ->
+  predecessor_ops_metadata_hash:Operation_metadata_list_list_hash.t option ->
+  block_header:Block_header.t ->
+  operations:Operation.t trace trace ->
+  cache:Environment_context.Context.source_of_cache ->
+  ((bytes * Block_metadata_hash.t option) * ops_metadata) tzresult Lwt.t
