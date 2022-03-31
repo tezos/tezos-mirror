@@ -241,6 +241,9 @@ module Term = struct
                   ~user_activated_protocol_overrides:
                     node_config.blockchain_network
                       .user_activated_protocol_overrides
+                  ~operation_metadata_size_limit:
+                    node_config.shell.block_validator_limits
+                      .operation_metadata_size_limit
                   genesis)
           in
           if reconstruct then
@@ -253,6 +256,9 @@ module Term = struct
                 node_config.blockchain_network.user_activated_upgrades
               ~user_activated_protocol_overrides:
                 node_config.blockchain_network.user_activated_protocol_overrides
+              ~operation_metadata_size_limit:
+                node_config.shell.block_validator_limits
+                  .operation_metadata_size_limit
           else return_unit
       | Info ->
           let* snapshot_path = check_snapshot_path snapshot_path in

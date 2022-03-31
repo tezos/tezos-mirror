@@ -125,6 +125,7 @@ val update :
   ?allow_all_rpc:P2p_point.Id.addr_port_id list ->
   ?media_type:Media_type.Command_line.t ->
   ?metrics_addr:string list ->
+  ?operation_metadata_size_limit:int option ->
   ?private_mode:bool ->
   ?disable_mempool:bool ->
   ?disable_mempool_precheck:bool ->

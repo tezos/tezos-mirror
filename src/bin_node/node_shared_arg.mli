@@ -75,6 +75,8 @@ type t = {
           access should be granted *)
   media_type : Media_type.Command_line.t;
   metrics_addr : string list;
+  operation_metadata_size_limit : int option option;
+      (** maximum operation metadata size allowed to be stored on disk *)
 }
 
 module Term : sig

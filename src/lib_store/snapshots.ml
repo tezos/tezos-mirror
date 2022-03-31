@@ -3247,6 +3247,7 @@ module type Snapshot_importer = sig
     configured_history_mode:History_mode.t option ->
     user_activated_upgrades:User_activated.upgrades ->
     user_activated_protocol_overrides:User_activated.protocol_overrides ->
+    operation_metadata_size_limit:int option ->
     Genesis.t ->
     (unit, error trace) result Lwt.t
 end
@@ -3392,7 +3393,7 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
 
   let restore_and_apply_context snapshot_importer ?user_expected_block
       ~context_index ~user_activated_upgrades ~user_activated_protocol_overrides
-      snapshot_metadata genesis chain_id =
+      ~operation_metadata_size_limit snapshot_metadata genesis chain_id =
     let open Lwt_tzresult_syntax in
     (* Start by committing genesis *)
     let* genesis_ctxt_hash =
@@ -3456,6 +3457,7 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
         predecessor_ops_metadata_hash;
         user_activated_upgrades;
         user_activated_protocol_overrides;
+        operation_metadata_size_limit;
       }
     in
     let* {result = block_validation_result; _} =
@@ -3490,7 +3492,8 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
   let import ~snapshot_path ?patch_context ?block:user_expected_block
       ?(check_consistency = true) ~dst_store_dir ~dst_context_dir ~chain_name
       ~configured_history_mode ~user_activated_upgrades
-      ~user_activated_protocol_overrides (genesis : Genesis.t) =
+      ~user_activated_protocol_overrides ~operation_metadata_size_limit
+      (genesis : Genesis.t) =
     let open Lwt_tzresult_syntax in
     let chain_id = Chain_id.of_block_hash genesis.Genesis.block in
     let*! snapshot_importer = init ~snapshot_path ~dst_store_dir chain_id in
@@ -3561,6 +3564,7 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
         ~context_index
         ~user_activated_upgrades
         ~user_activated_protocol_overrides
+        ~operation_metadata_size_limit
         snapshot_metadata
         genesis
         chain_id
@@ -3719,7 +3723,8 @@ let read_snapshot_header ~snapshot_path =
 
 let import ~snapshot_path ?patch_context ?block ?check_consistency
     ~dst_store_dir ~dst_context_dir ~chain_name ~configured_history_mode
-    ~user_activated_upgrades ~user_activated_protocol_overrides genesis =
+    ~user_activated_upgrades ~user_activated_protocol_overrides
+    ~operation_metadata_size_limit genesis =
   let open Lwt_tzresult_syntax in
   let* kind = snapshot_file_kind ~snapshot_path in
   let (module Importer) =
@@ -3739,4 +3744,5 @@ let import ~snapshot_path ?patch_context ?block ?check_consistency
     ~configured_history_mode
     ~user_activated_upgrades
     ~user_activated_protocol_overrides
+    ~operation_metadata_size_limit
     genesis

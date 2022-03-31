@@ -26,8 +26,8 @@
 (* Testing
    -------
    Components: Client
-   Invocation: dune exec tezt/tests/main.exe -- large_metadata
-   Subject: Test that large block metadata are not stored.
+   Invocation: dune exec tezt/tests/main.exe -- --file large_metadata.ml
+   Subject: Test that large operations metadata are not stored.
 *)
 
 let metadata_is_stored client exponent =
@@ -67,13 +67,11 @@ let large_metadata_is_not_stored client =
       unit
   | None -> Test.fail "metadata should not be stored"
 
-let check_large_metadata =
-  Protocol.register_test
-    ~__FILE__
-    ~title:"Large metadata"
-    ~tags:["large_metadata"]
-  @@ fun protocol ->
-  let* node = Node.init [Synchronisation_threshold 0; Connections 0] in
+let setup_node ~limit protocol =
+  let limit = match limit with None -> [] | Some a -> [a] in
+  let* node =
+    Node.init ([Node.Synchronisation_threshold 0; Connections 0] @ limit)
+  in
   let* client = Client.init ~endpoint:(Node node) () in
   let* () = Client.activate_protocol ~protocol client in
   let* _ = Node.wait_for_level node 1 in
@@ -93,6 +91,67 @@ let check_large_metadata =
       client
   in
   let* () = Client.bake_for client in
+  return (contract_id, client, node)
+
+let check_default_limit_metadata =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"Large metadata with default limit"
+    ~tags:["large_metadata"; "default"]
+  @@ fun protocol ->
+  let* (contract_id, client, _node) = setup_node ~limit:None protocol in
+  let small_exponent = 23 in
+  (* Call the contract with a small exponent to make sure that the
+     metadata is allowed. As the metadata cap is set to 10_000_000 bytes
+     and as 2^23=8_388_608 does not exceed this limit, the metadata should
+     be stored. *)
+  let* () =
+    Client.transfer
+      ~gas_limit:100_000
+      ~fee:Tez.one
+      ~amount:Tez.zero
+      ~burn_cap:Tez.zero
+      ~storage_limit:10000
+      ~giver:"bootstrap1"
+      ~receiver:contract_id
+      ~arg:(string_of_int small_exponent)
+      ~force:true
+      client
+  in
+  let* () = Client.bake_for client in
+  (* All protocols should store the metadata. *)
+  let* () = metadata_is_stored client small_exponent in
+  (* We now call the contract with a bigger exponent to exceed the
+     10_000_000 limit: 2^24=16_777_216. The contract should be
+     sucessfully injected. *)
+  let big_exponent = 24 in
+  let* () =
+    Client.transfer
+      ~gas_limit:100_000
+      ~fee:Tez.one
+      ~amount:Tez.zero
+      ~burn_cap:Tez.zero
+      ~storage_limit:10000
+      ~giver:"bootstrap1"
+      ~receiver:contract_id
+      ~arg:(string_of_int big_exponent)
+      ~force:true
+      client
+  in
+  let* () = Client.bake_for client in
+  (* All protocols should not store the metadata. *)
+  let* () = large_metadata_is_not_stored client in
+  unit
+
+let check_limit_metadata =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"Large metadata with a small limit"
+    ~tags:["large_metadata"; "limit"]
+  @@ fun protocol ->
+  let* (contract_id, client, _node) =
+    setup_node ~limit:(Some (Node.Metadata_size_limit (Some 10_000))) protocol
+  in
   let small_exponent = 13 in
   (* Call the contract with a small exponent to make sure that the
      metadata is allowed. As the metadata cap is set to 10_000 bytes
@@ -112,11 +171,10 @@ let check_large_metadata =
       client
   in
   let* () = Client.bake_for client in
-  (* All protocols should store the metadata. *)
+  (* The metadata should be present. *)
   let* () = metadata_is_stored client small_exponent in
   (* We now call the contract with a bigger exponent to exceed the
-     10_000 limit: 2^14=16_384. The contract should be sucessfully
-     injected. *)
+     10_000 limit: 2^14=16_384. *)
   let big_exponent = 14 in
   let* () =
     Client.transfer
@@ -132,8 +190,41 @@ let check_large_metadata =
       client
   in
   let* () = Client.bake_for client in
-  (* All protocols should not store the metadata. *)
+  (* The metadata shouldn't be present. *)
   let* () = large_metadata_is_not_stored client in
-  return ()
+  unit
 
-let register ~protocols = check_large_metadata protocols
+let check_unlimited_metadata =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"Large metadata without limit"
+    ~tags:["large_metadata"; "unlimited"]
+  @@ fun protocol ->
+  let* (contract_id, client, _node) =
+    setup_node ~limit:(Some (Node.Metadata_size_limit None)) protocol
+  in
+  (* We call the contract with a bigger exponent to exceed the
+     10_000_000 default limit (2^24=16_777_216) *)
+  let big_exponent = 24 in
+  let* () =
+    Client.transfer
+      ~gas_limit:100_000
+      ~fee:Tez.one
+      ~amount:Tez.zero
+      ~burn_cap:Tez.zero
+      ~storage_limit:10000
+      ~giver:"bootstrap1"
+      ~receiver:contract_id
+      ~arg:(string_of_int big_exponent)
+      ~force:true
+      client
+  in
+  let* () = Client.bake_for client in
+  (* The metadata should be present. *)
+  let* () = metadata_is_stored client big_exponent in
+  unit
+
+let register ~protocols =
+  check_default_limit_metadata protocols ;
+  check_limit_metadata protocols ;
+  check_unlimited_metadata protocols

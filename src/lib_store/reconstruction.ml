@@ -191,8 +191,9 @@ let compute_all_operations_metadata_hash block =
       (Block_repr.operations_metadata_hashes block)
 
 let apply_context context_index chain_id ~user_activated_upgrades
-    ~user_activated_protocol_overrides ~predecessor_block_metadata_hash
-    ~predecessor_ops_metadata_hash ~predecessor_block block =
+    ~user_activated_protocol_overrides ~operation_metadata_size_limit
+    ~predecessor_block_metadata_hash ~predecessor_ops_metadata_hash
+    ~predecessor_block block =
   let open Lwt_tzresult_syntax in
   let block_header = Store.Block.header block in
   let operations = Store.Block.operations block in
@@ -218,6 +219,7 @@ let apply_context context_index chain_id ~user_activated_upgrades
       predecessor_ops_metadata_hash;
       user_activated_upgrades;
       user_activated_protocol_overrides;
+      operation_metadata_size_limit;
     }
   in
   let* {
@@ -325,7 +327,8 @@ let reconstruct_genesis_operations_metadata chain_store =
       operations_metadata )
 
 let reconstruct_chunk chain_store context_index ~user_activated_upgrades
-    ~user_activated_protocol_overrides ~start_level ~end_level =
+    ~user_activated_protocol_overrides ~operation_metadata_size_limit
+    ~start_level ~end_level =
   let open Lwt_tzresult_syntax in
   let chain_id = Store.Chain.chain_id chain_store in
   let rec loop level acc =
@@ -379,6 +382,7 @@ let reconstruct_chunk chain_store context_index ~user_activated_upgrades
             chain_id
             ~user_activated_upgrades
             ~user_activated_protocol_overrides
+            ~operation_metadata_size_limit
             ~predecessor_block_metadata_hash
             ~predecessor_ops_metadata_hash
             ~predecessor_block
@@ -485,7 +489,8 @@ let gather_available_metadata chain_store ~start_level ~end_level =
    populated. We assume that committing an existing context is a
    nop. *)
 let reconstruct_cemented chain_store context_index ~user_activated_upgrades
-    ~user_activated_protocol_overrides ~start_block_level =
+    ~user_activated_protocol_overrides ~operation_metadata_size_limit
+    ~start_block_level =
   let open Lwt_tzresult_syntax in
   let block_store = Store.Unsafe.get_block_store chain_store in
   let cemented_block_store = Block_store.cemented_block_store block_store in
@@ -541,6 +546,7 @@ let reconstruct_cemented chain_store context_index ~user_activated_upgrades
                     context_index
                     ~user_activated_upgrades
                     ~user_activated_protocol_overrides
+                    ~operation_metadata_size_limit
                     ~start_level
                     ~end_level:Int32.(pred limit)
                 in
@@ -577,6 +583,7 @@ let reconstruct_cemented chain_store context_index ~user_activated_upgrades
                     context_index
                     ~user_activated_upgrades
                     ~user_activated_protocol_overrides
+                    ~operation_metadata_size_limit
                     ~start_level
                     ~end_level
                 in
@@ -587,7 +594,7 @@ let reconstruct_cemented chain_store context_index ~user_activated_upgrades
       aux cemented_cycles)
 
 let reconstruct_floating chain_store context_index ~user_activated_upgrades
-    ~user_activated_protocol_overrides =
+    ~user_activated_protocol_overrides ~operation_metadata_size_limit =
   let open Lwt_tzresult_syntax in
   let chain_id = Store.Chain.chain_id chain_store in
   let chain_dir = Store.Chain.chain_dir chain_store in
@@ -678,6 +685,7 @@ let reconstruct_floating chain_store context_index ~user_activated_upgrades
                               chain_id
                               ~user_activated_upgrades
                               ~user_activated_protocol_overrides
+                              ~operation_metadata_size_limit
                               ~predecessor_block_metadata_hash:
                                 (Store.Block.block_metadata_hash
                                    predecessor_block)
@@ -865,7 +873,8 @@ let locked chain_dir f =
   return res
 
 let reconstruct ?patch_context ~store_dir ~context_dir genesis
-    ~user_activated_upgrades ~user_activated_protocol_overrides =
+    ~user_activated_upgrades ~user_activated_protocol_overrides
+    ~operation_metadata_size_limit =
   let open Lwt_result_syntax in
   (* We need to inhibit the cache to avoid hitting the cache with
      already loaded blocks with missing metadata. *)
@@ -924,6 +933,7 @@ let reconstruct ?patch_context ~store_dir ~context_dir genesis
                 context_index
                 ~user_activated_upgrades
                 ~user_activated_protocol_overrides
+                ~operation_metadata_size_limit
                 ~start_block_level
             in
             let* () =
@@ -932,6 +942,7 @@ let reconstruct ?patch_context ~store_dir ~context_dir genesis
                 context_index
                 ~user_activated_upgrades
                 ~user_activated_protocol_overrides
+                ~operation_metadata_size_limit
             in
             restore_constants
               chain_store
