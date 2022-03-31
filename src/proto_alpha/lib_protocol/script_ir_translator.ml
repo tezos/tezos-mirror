@@ -5965,6 +5965,13 @@ let parse_and_unparse_script_unaccounted ctxt ~legacy ~allow_forged_in_storage
    >|=? fun (views, ctxt) -> (arg_type, storage_type, views, ctxt)
   else return (original_arg_type_expr, original_storage_type_expr, views, ctxt))
   >>=? fun (arg_type, storage_type, views, ctxt) ->
+  Script_map.map_es_in_context
+    (fun ctxt _name {input_ty; output_ty; view_code} ->
+      unparse_code ctxt ~stack_depth:0 mode view_code
+      >|=? fun (view_code, ctxt) -> ({input_ty; output_ty; view_code}, ctxt))
+    ctxt
+    views
+  >>=? fun (views, ctxt) ->
   let open Micheline in
   let unparse_view_unaccounted name {input_ty; output_ty; view_code} views =
     Prim
