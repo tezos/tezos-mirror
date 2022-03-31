@@ -317,7 +317,6 @@ module Test_Address_index = Test_index (struct
   let too_many = Too_many_l2_addresses
 end)
 
-
 (** [gen_n_ticket_hash n] generates [n]  {!Alpha_context.Ticket_hash.t} based on
     {!gen_n_address} and {!make_unit_ticket_key}.
 

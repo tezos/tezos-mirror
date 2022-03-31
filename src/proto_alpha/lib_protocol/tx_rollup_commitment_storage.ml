@@ -315,8 +315,7 @@ let remove_commitment ctxt rollup state =
           let current_level = (Raw_context.current_level ctxt).level in
           fail_when
             Raw_level_repr.(current_level < add finalized_at withdraw_period)
-            (* FIXME dedicated error *)
-            No_commitment_to_remove
+            Remove_commitment_too_early
       | None ->
           (* unreachable code if the implementation is correct *)
           fail (Internal_error "Missing finalized_at field"))

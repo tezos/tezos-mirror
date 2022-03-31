@@ -213,7 +213,7 @@ let context_init ?(tx_rollup_max_inboxes_count = 2100)
       tx_rollup_enable = true;
       tx_rollup_sunset_level = Int32.max_int;
       tx_rollup_finality_period;
-      tx_rollup_withdraw_period = 1;
+      tx_rollup_withdraw_period = 2;
       tx_rollup_max_commitments_count = 3;
       tx_rollup_origination_size;
       tx_rollup_rejection_max_proof_size;
@@ -3743,6 +3743,15 @@ let test_state_with_deleted () =
   (* Finalize *)
   Op.tx_rollup_finalize (B b) account1 tx_rollup >>=? fun operation ->
   Block.bake b ~operation >>=? fun b ->
+  (* fail to remove too early *)
+  Incremental.begin_construction b >>=? fun i ->
+  Op.tx_rollup_remove_commitment (I i) account1 tx_rollup >>=? fun operation ->
+  Incremental.add_operation
+    i
+    operation
+    ~expect_failure:
+      (check_proto_error Tx_rollup_errors.Remove_commitment_too_early)
+  >>=? fun _ ->
   (* Wait for some blocks, then remove *)
   Block.bake b ~operations:[] >>=? fun b ->
   Block.bake b ~operations:[] >>=? fun b ->
@@ -4794,6 +4803,7 @@ module Withdraw = struct
       WithExceptions.Option.get ~loc:__LOC__
       @@ List.nth context_hash_list message_index
     in
+    Block.bake block >>=? fun block ->
     (* Remove the commitment *)
     Op.tx_rollup_remove_commitment (B block) account1 tx_rollup
     >>=? fun operation ->
