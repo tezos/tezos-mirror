@@ -1,4 +1,4 @@
-Version 12.1
+Version 12.2
 ============
 
 Version 12.0 contains a new version (V4) of the protocol environment,
@@ -23,23 +23,27 @@ Warning: using version 12.1 also automatically upgrades the version
 of the storage backend; as a consequence, your data directory will no longer be
 usable with older versions of Octez.
 
+Version 12.2 increased the size limit for stored metadata and made
+it configurable.
+
 Update Instructions
 -------------------
 
 To update from sources::
 
   git fetch
-  git checkout v12.1
+  git checkout v12.2
   rm -rf _opam _build
   make build-deps
   eval $(opam env)
   make
 
-If you are using Docker instead, use the ``v12.1`` Docker images of Tezos.
+If you are using Docker instead, use the ``v12.2`` Docker images of Tezos.
 
 Changelog
 ---------
 
+- `Version 12.2 <../CHANGES.html#version-12-2>`_
 - `Version 12.1 <../CHANGES.html#version-12-1>`_
 - `Version 12.0 <../CHANGES.html#version-12-0>`_
 - `Version 12.0~rc2 <../CHANGES.html#version-12-0-rc2>`_

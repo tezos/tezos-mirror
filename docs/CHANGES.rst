@@ -3,6 +3,14 @@
 Changelog
 '''''''''
 
+Version 12.2
+============
+
+- Added ``--metadata-size-limit`` option to the node to configure the
+  operation metadata size limit. This defaults to 10MB but can be
+  overridden by providing another value (representing a number of bytes)
+  or the value ``unlimited``.
+
 Version 12.1
 ============
 
@@ -13,12 +21,14 @@ Node
   See more information in the changelog of the protocol:
   :doc:`../protocols/012_ithaca`
 
-- The node no longer stores large metadata. To this end, a new storage
-  version was introduced: 0.0.7 (previously 0.0.6). Upgrading from
-  0.0.6 to 0.0.7 is done automatically by the node the first time you
-  run it. This upgrade is instantaneous. However, be careful that
-  previous versions of Octez will refuse to run on a data directory
-  which was used with Octez 12.1 or later.
+- **Breaking change**: The node no longer stores large metadata.
+  RPC requesting this kind of metadata will return ``"too large"``.
+  To this end, a new storage version was introduced: 0.0.7 (previously
+  0.0.6). Upgrading from 0.0.6 to 0.0.7 is done automatically by the
+  node the first time you run it. This upgrade is
+  instantaneous. However, be careful that previous versions of Octez
+  will refuse to run on a data directory which was used with Octez
+  12.1 or later.
 
 - A new ``--force`` option was added to the ``transfer`` command. It
   makes the client inject the transaction in a node even if the
