@@ -107,6 +107,6 @@ let () =
   Tx_rollup.register ~protocols:[Alpha] ;
   Manager_operations.register ~protocols ;
   Replace_by_fees.register ~protocols:[Alpha] ;
-  Large_metadata.register ~protocols ;
+  Large_metadata.register ~protocols:[Alpha] ;
   (* Test.run () should be the last statement, don't register afterwards! *)
   Test.run ()

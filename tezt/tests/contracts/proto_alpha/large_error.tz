@@ -1,12 +1,12 @@
-# This script always fails with a byte sequence full of zeros. If the
-# parameter n is less than 2 then the length of the error message is 2
-# bytes, otherwise it is 2^n bytes
+# This script always fails with a string full of "a"'s. If the
+# parameter n is less than 2 then the length of the error message is
+# 2, otherwise it is 2^n.
 parameter int;
 storage unit;
 code
   {
     CAR;
-    PUSH bytes 0x00;
+    PUSH string "a";
     SWAP;
     PUSH bool True;
     LOOP
