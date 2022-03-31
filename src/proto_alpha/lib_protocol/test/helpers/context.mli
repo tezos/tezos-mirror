@@ -221,6 +221,7 @@ val init :
   ?blocks_per_cycle:int32 ->
   ?cycles_per_voting_period:int32 ->
   ?tx_rollup_enable:bool ->
+  ?tx_rollup_sunset_level:int32 ->
   ?tx_rollup_origination_size:int ->
   ?sc_rollup_enable:bool ->
   int ->
@@ -244,6 +245,7 @@ val init1 :
   ?blocks_per_cycle:int32 ->
   ?cycles_per_voting_period:int32 ->
   ?tx_rollup_enable:bool ->
+  ?tx_rollup_sunset_level:int32 ->
   ?sc_rollup_enable:bool ->
   unit ->
   (Block.t * Alpha_context.Contract.t) tzresult Lwt.t
@@ -266,6 +268,7 @@ val init2 :
   ?blocks_per_cycle:int32 ->
   ?cycles_per_voting_period:int32 ->
   ?tx_rollup_enable:bool ->
+  ?tx_rollup_sunset_level:int32 ->
   ?sc_rollup_enable:bool ->
   unit ->
   (Block.t * Alpha_context.Contract.t * Alpha_context.Contract.t) tzresult Lwt.t

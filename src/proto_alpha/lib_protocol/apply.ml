@@ -783,6 +783,10 @@ let () =
 open Apply_results
 
 let assert_tx_rollup_feature_enabled ctxt =
+  let level = (Level.current ctxt).level in
+  Raw_level.of_int32 @@ Constants.tx_rollup_sunset_level ctxt >>?= fun sunset ->
+  fail_when Raw_level.(sunset <= level) Tx_rollup_feature_disabled
+  >>=? fun () ->
   fail_unless (Constants.tx_rollup_enable ctxt) Tx_rollup_feature_disabled
 
 let assert_sc_rollup_feature_enabled ctxt =

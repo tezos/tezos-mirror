@@ -150,6 +150,10 @@ let tx_rollup_enable c =
   let constants = Raw_context.constants c in
   constants.tx_rollup_enable
 
+let tx_rollup_sunset_level c =
+  let constants = Raw_context.constants c in
+  constants.tx_rollup_sunset_level
+
 let tx_rollup_origination_size c =
   let constants = Raw_context.constants c in
   constants.tx_rollup_origination_size

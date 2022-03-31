@@ -173,6 +173,7 @@ type parametric = {
   tx_rollup_max_ticket_payload_size : int;
   tx_rollup_max_withdrawals_per_batch : int;
   tx_rollup_rejection_max_proof_size : int;
+  tx_rollup_sunset_level : int32;
   sc_rollup_enable : bool;
   sc_rollup_origination_size : int;
   sc_rollup_challenge_window_in_blocks : int;
@@ -232,7 +233,8 @@ let parametric_encoding =
                     ( c.tx_rollup_max_commitments_count,
                       c.tx_rollup_cost_per_byte_ema_factor,
                       c.tx_rollup_max_ticket_payload_size,
-                      c.tx_rollup_rejection_max_proof_size ) ),
+                      c.tx_rollup_rejection_max_proof_size,
+                      c.tx_rollup_sunset_level ) ),
                   ( c.sc_rollup_enable,
                     c.sc_rollup_origination_size,
                     c.sc_rollup_challenge_window_in_blocks,
@@ -286,7 +288,8 @@ let parametric_encoding =
                        ( tx_rollup_max_commitments_count,
                          tx_rollup_cost_per_byte_ema_factor,
                          tx_rollup_max_ticket_payload_size,
-                         tx_rollup_rejection_max_proof_size ) ),
+                         tx_rollup_rejection_max_proof_size,
+                         tx_rollup_sunset_level ) ),
                      ( sc_rollup_enable,
                        sc_rollup_origination_size,
                        sc_rollup_challenge_window_in_blocks,
@@ -342,6 +345,7 @@ let parametric_encoding =
         tx_rollup_cost_per_byte_ema_factor;
         tx_rollup_max_ticket_payload_size;
         tx_rollup_rejection_max_proof_size;
+        tx_rollup_sunset_level;
         sc_rollup_enable;
         sc_rollup_origination_size;
         sc_rollup_challenge_window_in_blocks;
@@ -412,11 +416,12 @@ let parametric_encoding =
                             (req "tx_rollup_withdraw_period" int31)
                             (req "tx_rollup_max_inboxes_count" int31)
                             (req "tx_rollup_max_messages_per_inbox" int31))
-                         (obj4
+                         (obj5
                             (req "tx_rollup_max_commitments_count" int31)
                             (req "tx_rollup_cost_per_byte_ema_factor" int31)
                             (req "tx_rollup_max_ticket_payload_size" int31)
-                            (req "tx_rollup_rejection_max_proof_size" int31)))
+                            (req "tx_rollup_rejection_max_proof_size" int31)
+                            (req "tx_rollup_sunset_level" int32)))
                       (obj4
                          (req "sc_rollup_enable" bool)
                          (req "sc_rollup_origination_size" int31)
