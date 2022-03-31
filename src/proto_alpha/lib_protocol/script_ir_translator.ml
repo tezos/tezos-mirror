@@ -5938,47 +5938,45 @@ let parse_and_unparse_script_unaccounted ctxt ~legacy ~allow_forged_in_storage
   unparse_code ctxt ~stack_depth:0 mode code_field >>=? fun (code, ctxt) ->
   unparse_data ctxt ~stack_depth:0 mode storage_type storage
   >>=? fun (storage, ctxt) ->
-  Lwt.return
-    (let loc = Micheline.dummy_location in
-     (if normalize_types then
-      unparse_parameter_ty ~loc ctxt arg_type ~entrypoints
-      >>? fun (arg_type, ctxt) ->
-      unparse_ty ~loc ctxt storage_type >|? fun (storage_type, ctxt) ->
-      (arg_type, storage_type, ctxt)
-     else ok (original_arg_type_expr, original_storage_type_expr, ctxt))
-     >|? fun (arg_type, storage_type, ctxt) ->
-     let open Micheline in
-     let unparse_view_unaccounted name {input_ty; output_ty; view_code} views =
-       Prim
-         ( loc,
-           K_view,
-           [
-             String (loc, Script_string.to_string name);
-             input_ty;
-             output_ty;
-             view_code;
-           ],
-           [] )
-       :: views
-     in
-     let views =
-       Script_map.fold unparse_view_unaccounted views [] |> List.rev
-     in
-     let code =
-       Seq
-         ( loc,
-           [
-             Prim (loc, K_parameter, [arg_type], []);
-             Prim (loc, K_storage, [storage_type], []);
-             Prim (loc, K_code, [code], []);
-           ]
-           @ views )
-     in
-     ( {
-         code = lazy_expr (strip_locations code);
-         storage = lazy_expr (strip_locations storage);
-       },
-       ctxt ))
+  let loc = Micheline.dummy_location in
+  (if normalize_types then
+   unparse_parameter_ty ~loc ctxt arg_type ~entrypoints
+   >>?= fun (arg_type, ctxt) ->
+   unparse_ty ~loc ctxt storage_type >>?= fun (storage_type, ctxt) ->
+   return (arg_type, storage_type, ctxt)
+  else return (original_arg_type_expr, original_storage_type_expr, ctxt))
+  >>=? fun (arg_type, storage_type, ctxt) ->
+  let open Micheline in
+  let unparse_view_unaccounted name {input_ty; output_ty; view_code} views =
+    Prim
+      ( loc,
+        K_view,
+        [
+          String (loc, Script_string.to_string name);
+          input_ty;
+          output_ty;
+          view_code;
+        ],
+        [] )
+    :: views
+  in
+  let views = Script_map.fold unparse_view_unaccounted views [] |> List.rev in
+  let code =
+    Seq
+      ( loc,
+        [
+          Prim (loc, K_parameter, [arg_type], []);
+          Prim (loc, K_storage, [storage_type], []);
+          Prim (loc, K_code, [code], []);
+        ]
+        @ views )
+  in
+  return
+    ( {
+        code = lazy_expr (strip_locations code);
+        storage = lazy_expr (strip_locations storage);
+      },
+      ctxt )
 
 let pack_data_with_mode ctxt ty data ~mode =
   unparse_data ~stack_depth:0 ctxt mode ty data >>=? fun (unparsed, ctxt) ->
