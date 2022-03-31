@@ -387,11 +387,15 @@ protocol of light mode unspecified, using the node's protocol: ProtoALphaALphaAL
     { "rem_right": { "prim": "string" }, "rem_left": { "prim": "string" },
       "rem":
         { "prim": "or",
-          "args": [ { "prim": "string" }, { "prim": "string" } ] },
+          "args":
+            [ { "prim": "string", "annots": [ "%rem_left" ] },
+              { "prim": "string", "annots": [ "%rem_right" ] } ] },
       "mem_right": { "prim": "string" }, "mem_left": { "prim": "string" },
       "mem":
         { "prim": "or",
-          "args": [ { "prim": "string" }, { "prim": "string" } ] },
+          "args":
+            [ { "prim": "string", "annots": [ "%mem_left" ] },
+              { "prim": "string", "annots": [ "%mem_right" ] } ] },
       "default": { "prim": "unit" },
       "add_right":
         { "prim": "pair",
@@ -403,9 +407,11 @@ protocol of light mode unspecified, using the node's protocol: ProtoALphaALphaAL
         { "prim": "or",
           "args":
             [ { "prim": "pair",
-                "args": [ { "prim": "string" }, { "prim": "nat" } ] },
+                "args": [ { "prim": "string" }, { "prim": "nat" } ],
+                "annots": [ "%add_left" ] },
               { "prim": "pair",
-                "args": [ { "prim": "string" }, { "prim": "nat" } ] } ] } } }
+                "args": [ { "prim": "string" }, { "prim": "nat" } ],
+                "annots": [ "%add_right" ] } ] } } }
 protocol of light mode unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 
 ./tezos-client --mode light rpc get '/chains/main/blocks/head/context/contracts/[CONTRACT_HASH]/script'

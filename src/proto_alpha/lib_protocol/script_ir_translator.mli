@@ -418,7 +418,12 @@ val parse_contract_for_script :
     existential. Typically, it will be used to go from the type of an
     entry-point to the full type of a contract. *)
 type 'a ex_ty_cstr =
-  | Ex_ty_cstr : ('b, _) Script_typed_ir.ty * ('b -> 'a) -> 'a ex_ty_cstr
+  | Ex_ty_cstr : {
+      ty : ('b, _) Script_typed_ir.ty;
+      construct : 'b -> 'a;
+      original_type_expr : Script.node;
+    }
+      -> 'a ex_ty_cstr
 
 val find_entrypoint :
   error_details:'error_trace error_details ->
@@ -427,14 +432,11 @@ val find_entrypoint :
   Entrypoint.t ->
   ('t ex_ty_cstr, 'error_trace) Gas_monad.t
 
-val list_entrypoints :
-  context ->
+val list_entrypoints_uncarbonated :
   ('t, _) Script_typed_ir.ty ->
   't Script_typed_ir.entrypoints ->
-  (Michelson_v1_primitives.prim list list
-  * (Michelson_v1_primitives.prim list * Script.unlocated_michelson_node)
-    Entrypoint.Map.t)
-  tzresult
+  Michelson_v1_primitives.prim list list
+  * (ex_ty * Script.node) Entrypoint.Map.t
 
 val pack_data :
   context ->

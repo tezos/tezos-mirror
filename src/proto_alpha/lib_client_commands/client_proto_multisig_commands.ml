@@ -153,6 +153,7 @@ let get_parameter_type (cctxt : #Protocol_client_context.full) ~destination
         ~block:cctxt#block
         ~contract:destination
         ~entrypoint
+        ~normalize_types:true
       >>=? function
       | None ->
           cctxt#error

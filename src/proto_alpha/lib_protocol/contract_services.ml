@@ -117,10 +117,23 @@ module S = struct
       ~output:Script.expr_encoding
       RPC_path.(custom_root /: Contract.rpc_arg / "storage")
 
+  type normalize_types_query = {normalize_types : bool}
+
+  let normalize_types_query : normalize_types_query RPC_query.t =
+    let open RPC_query in
+    query (fun normalize_types -> {normalize_types})
+    |+ flag
+         ~descr:
+           "Whether types should be normalized (annotations removed, combs \
+            flattened) or kept as they appeared in the original script."
+         "normalize_types"
+         (fun t -> t.normalize_types)
+    |> seal
+
   let entrypoint_type =
     RPC_service.get_service
       ~description:"Return the type of the given entrypoint of the contract"
-      ~query:RPC_query.empty
+      ~query:normalize_types_query
       ~output:Script.expr_encoding
       RPC_path.(
         custom_root /: Contract.rpc_arg / "entrypoints" /: Entrypoint.rpc_arg)
@@ -128,7 +141,7 @@ module S = struct
   let list_entrypoints =
     RPC_service.get_service
       ~description:"Return the list of entrypoints of the contract"
-      ~query:RPC_query.empty
+      ~query:normalize_types_query
       ~output:
         (obj2
            (dft
@@ -374,7 +387,10 @@ let[@coq_axiom_with_reason "gadt"] register () =
             ctxt
             script.storage
           >>?= fun (storage, _ctxt) -> return_some storage) ;
-  opt_register2 ~chunked:true S.entrypoint_type (fun ctxt v entrypoint () () ->
+  opt_register2
+    ~chunked:true
+    S.entrypoint_type
+    (fun ctxt v entrypoint {normalize_types} () ->
       Contract.get_script_code ctxt v >>=? fun (_, expr) ->
       match expr with
       | None -> return_none
@@ -400,11 +416,16 @@ let[@coq_axiom_with_reason "gadt"] register () =
                    entrypoint
               >>? fun (r, ctxt) ->
               r |> function
-              | Ok (Ex_ty_cstr (ty, _)) ->
-                  unparse_ty ~loc:() ctxt ty >|? fun (ty_node, _) ->
-                  Some (Micheline.strip_locations ty_node)
+              | Ok (Ex_ty_cstr {ty; original_type_expr; _}) ->
+                  if normalize_types then
+                    unparse_ty ~loc:() ctxt ty >|? fun (ty_node, _ctxt) ->
+                    Some (Micheline.strip_locations ty_node)
+                  else ok (Some (Micheline.strip_locations original_type_expr))
               | Error _ -> Result.return_none )) ;
-  opt_register1 ~chunked:true S.list_entrypoints (fun ctxt v () () ->
+  opt_register1
+    ~chunked:true
+    S.list_entrypoints
+    (fun ctxt v {normalize_types} () ->
       Contract.get_script_code ctxt v >>=? fun (_, expr) ->
       match expr with
       | None -> return_none
@@ -419,20 +440,26 @@ let[@coq_axiom_with_reason "gadt"] register () =
           >>?= fun (expr, _) ->
           parse_toplevel ctxt ~legacy expr >>=? fun ({arg_type; _}, ctxt) ->
           Lwt.return
-            ( ( parse_parameter_ty_and_entrypoints ctxt ~legacy arg_type
-              >>? fun ( Ex_parameter_ty_and_entrypoints {arg_type; entrypoints},
-                        _ ) ->
-                Script_ir_translator.list_entrypoints ctxt arg_type entrypoints
-              )
-            >|? fun (unreachable_entrypoint, map) ->
-              Some
-                ( unreachable_entrypoint,
-                  Entrypoint.Map.fold
-                    (fun entry (_, ty) acc ->
-                      (Entrypoint.to_string entry, Micheline.strip_locations ty)
-                      :: acc)
-                    map
-                    [] ) )) ;
+            ( parse_parameter_ty_and_entrypoints ctxt ~legacy arg_type
+            >>? fun (Ex_parameter_ty_and_entrypoints {arg_type; entrypoints}, _)
+              ->
+              let (unreachable_entrypoint, map) =
+                Script_ir_translator.list_entrypoints_uncarbonated
+                  arg_type
+                  entrypoints
+              in
+              Entrypoint.Map.fold_e
+                (fun entry (Ex_ty ty, original_type_expr) (acc, ctxt) ->
+                  (if normalize_types then
+                   unparse_ty ~loc:() ctxt ty >|? fun (ty_node, ctxt) ->
+                   (Micheline.strip_locations ty_node, ctxt)
+                  else ok (Micheline.strip_locations original_type_expr, ctxt))
+                  >|? fun (ty_expr, ctxt) ->
+                  ((Entrypoint.to_string entry, ty_expr) :: acc, ctxt))
+                map
+                ([], ctxt)
+              >|? fun (entrypoint_types, _ctxt) ->
+              Some (unreachable_entrypoint, entrypoint_types) )) ;
   opt_register1
     ~chunked:true
     S.contract_big_map_get_opt
@@ -536,11 +563,24 @@ let script_opt ctxt block contract =
 let storage ctxt block contract =
   RPC_context.make_call1 S.storage ctxt block contract () ()
 
-let entrypoint_type ctxt block contract entrypoint =
-  RPC_context.make_call2 S.entrypoint_type ctxt block contract entrypoint () ()
+let entrypoint_type ctxt block contract entrypoint ~normalize_types =
+  RPC_context.make_call2
+    S.entrypoint_type
+    ctxt
+    block
+    contract
+    entrypoint
+    {normalize_types}
+    ()
 
-let list_entrypoints ctxt block contract =
-  RPC_context.make_call1 S.list_entrypoints ctxt block contract () ()
+let list_entrypoints ctxt block contract ~normalize_types =
+  RPC_context.make_call1
+    S.list_entrypoints
+    ctxt
+    block
+    contract
+    {normalize_types}
+    ()
 
 let storage_opt ctxt block contract =
   RPC_context.make_opt_call1 S.storage ctxt block contract () ()

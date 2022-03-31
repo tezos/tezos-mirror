@@ -199,7 +199,7 @@ let tickets_of_transaction ctxt ~destination ~entrypoint ~location
            entrypoints
            entrypoint)
       >>?= fun (res, ctxt) ->
-      res >>?= fun (Ex_ty_cstr (entry_arg_ty, _f)) ->
+      res >>?= fun (Ex_ty_cstr {ty = entry_arg_ty; _}) ->
       Ticket_scanner.type_has_tickets ctxt entry_arg_ty
       >>?= fun (has_tickets, ctxt) ->
       (* Check that the parameter's type matches that of the entry-point, and

@@ -279,29 +279,36 @@ type view = {
 
 type view_map = (Script_string.t, view) map
 
+type entrypoint_info = {name : Entrypoint.t; original_type_expr : Script.node}
+
 (** ['arg entrypoints] represents the tree of entrypoints of a parameter type
     ['arg].
-    [name] is the name of the entrypoint at that node if it is not [None].
+    [at_node] are entrypoint details at that node if it is not [None].
     [nested] are the entrypoints below the node in the tree.
       It is always [Entrypoints_None] for non-union nodes.
       But it is also ok to have [Entrypoints_None] for a union node, it just
       means that there are no entrypoints below that node in the tree.
 *)
-type 'arg entrypoints = {
-  name : Entrypoint.t option;
+type 'arg entrypoints_node = {
+  at_node : entrypoint_info option;
   nested : 'arg nested_entrypoints;
 }
 
 and 'arg nested_entrypoints =
   | Entrypoints_Union : {
-      left : 'l entrypoints;
-      right : 'r entrypoints;
+      left : 'l entrypoints_node;
+      right : 'r entrypoints_node;
     }
       -> ('l, 'r) union nested_entrypoints
   | Entrypoints_None : _ nested_entrypoints
 
-(** [no_entrypoints] is [{name = None; nested = Entrypoints_None}] *)
-val no_entrypoints : _ entrypoints
+(** [no_entrypoints] is [{at_node = None; nested = Entrypoints_None}] *)
+val no_entrypoints : _ entrypoints_node
+
+type 'arg entrypoints = {
+  root : 'arg entrypoints_node;
+  original_type_expr : Script.node;
+}
 
 type ('arg, 'storage) script =
   | Script : {

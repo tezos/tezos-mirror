@@ -41,6 +41,7 @@ val contract_entrypoint_type :
   block:Block_services.block ->
   contract:Alpha_context.Contract.t ->
   entrypoint:Alpha_context.Entrypoint.t ->
+  normalize_types:bool ->
   Alpha_context.Script.expr option tzresult Lwt.t
 
 val print_entrypoint_type :
@@ -87,6 +88,7 @@ val list_contract_entrypoints :
   chain:Chain_services.chain ->
   block:Block_services.block ->
   contract:Alpha_context.Contract.t ->
+  normalize_types:bool ->
   (string * Alpha_context.Script.expr) list tzresult Lwt.t
 
 (** List the script entrypoints with their types.  *)

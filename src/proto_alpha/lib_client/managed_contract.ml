@@ -110,6 +110,7 @@ let build_delegate_operation (cctxt : #full) ~chain ~block ?fee
      ~block
      ~contract
      ~entrypoint
+     ~normalize_types:true
    >>=? function
    | Some _ ->
        (* their is a "do" entrypoint (we could check its type here)*)
@@ -128,6 +129,7 @@ let build_delegate_operation (cctxt : #full) ~chain ~block ?fee
          ~block
          ~contract
          ~entrypoint
+         ~normalize_types:true
        >>=? function
        | Some _ ->
            (*  their is a "set/remove_delegate" entrypoint *)
@@ -245,6 +247,7 @@ let build_transaction_operation (cctxt : #full) ~chain ~block ~contract
          ~block
          ~contract:destination
          ~entrypoint
+         ~normalize_types:true
        >>=? function
        | None ->
            cctxt#error

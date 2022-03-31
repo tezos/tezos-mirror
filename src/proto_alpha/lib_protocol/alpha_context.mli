@@ -679,8 +679,6 @@ module Script : sig
 
   type 'location michelson_node = ('location, prim) Micheline.node
 
-  type unlocated_michelson_node = unit michelson_node
-
   type node = location michelson_node
 
   type t = {code : lazy_expr; storage : lazy_expr}

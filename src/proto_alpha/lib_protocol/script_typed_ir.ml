@@ -421,20 +421,27 @@ type view = {
 
 type view_map = (Script_string.t, view) map
 
-type 'arg entrypoints = {
-  name : Entrypoint.t option;
+type entrypoint_info = {name : Entrypoint.t; original_type_expr : Script.node}
+
+type 'arg entrypoints_node = {
+  at_node : entrypoint_info option;
   nested : 'arg nested_entrypoints;
 }
 
 and 'arg nested_entrypoints =
   | Entrypoints_Union : {
-      left : 'l entrypoints;
-      right : 'r entrypoints;
+      left : 'l entrypoints_node;
+      right : 'r entrypoints_node;
     }
       -> ('l, 'r) union nested_entrypoints
   | Entrypoints_None : _ nested_entrypoints
 
-let no_entrypoints = {name = None; nested = Entrypoints_None}
+let no_entrypoints = {at_node = None; nested = Entrypoints_None}
+
+type 'arg entrypoints = {
+  root : 'arg entrypoints_node;
+  original_type_expr : Script.node;
+}
 
 type ('arg, 'storage) script =
   | Script : {

@@ -2245,10 +2245,9 @@ module RPC = struct
                  arg_type
                  entrypoints
                  entrypoint
-            >>? fun (r, ctxt) ->
-            r >>? fun (Ex_ty_cstr (ty, _)) ->
-            unparse_ty ~loc:() ctxt ty >|? fun (ty_node, _) ->
-            Micheline.strip_locations ty_node )
+            >>? fun (r, _ctxt) ->
+            r >|? fun (Ex_ty_cstr {original_type_expr; _}) ->
+            Micheline.strip_locations original_type_expr )
       in
       Registration.register0
         ~chunked:true
@@ -2641,14 +2640,18 @@ module RPC = struct
           parse_toplevel ~legacy ctxt expr >>=? fun ({arg_type; _}, ctxt) ->
           Lwt.return
             ( parse_parameter_ty_and_entrypoints ctxt ~legacy arg_type
-            >>? fun (Ex_parameter_ty_and_entrypoints {arg_type; entrypoints}, _)
+            >|? fun (Ex_parameter_ty_and_entrypoints {arg_type; entrypoints}, _)
               ->
-              Script_ir_translator.list_entrypoints ctxt arg_type entrypoints
-              >|? fun (unreachable_entrypoint, map) ->
+              let (unreachable_entrypoint, map) =
+                Script_ir_translator.list_entrypoints_uncarbonated
+                  arg_type
+                  entrypoints
+              in
               ( unreachable_entrypoint,
                 Entrypoint.Map.fold
-                  (fun entry (_, ty) acc ->
-                    (Entrypoint.to_string entry, Micheline.strip_locations ty)
+                  (fun entry (_ex_ty, original_type_expr) acc ->
+                    ( Entrypoint.to_string entry,
+                      Micheline.strip_locations original_type_expr )
                     :: acc)
                   map
                   [] ) ))

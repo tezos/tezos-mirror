@@ -1701,7 +1701,7 @@ type execution_arg =
   | Untyped_arg : Script.expr -> execution_arg
 
 let lift_execution_arg (type a ac) ctxt ~internal (entrypoint_ty : (a, ac) ty)
-    (box : a -> 'b) arg : ('b * context) tzresult Lwt.t =
+    (construct : a -> 'b) arg : ('b * context) tzresult Lwt.t =
   (match arg with
   | Untyped_arg arg ->
       let arg = Micheline.root arg in
@@ -1718,7 +1718,7 @@ let lift_execution_arg (type a ac) ctxt ~internal (entrypoint_ty : (a, ac) ty)
       res >>?= fun Eq ->
       let parsed_arg : a = parsed_arg in
       return (parsed_arg, ctxt))
-  >>=? fun (entrypoint_arg, ctxt) -> return (box entrypoint_arg, ctxt)
+  >>=? fun (entrypoint_arg, ctxt) -> return (construct entrypoint_arg, ctxt)
 
 type execution_result = {
   script : Script_ir_translator.ex_script;
@@ -1756,10 +1756,11 @@ let execute_any_arg logger ctxt mode step_constants ~entrypoint ~internal
     (find_entrypoint ~error_details:Informative arg_type entrypoints entrypoint)
   >>?= fun (r, ctxt) ->
   record_trace (Bad_contract_parameter step_constants.self) r
-  >>?= fun (Ex_ty_cstr (entrypoint_ty, box)) ->
+  >>?= fun (Ex_ty_cstr {ty = entrypoint_ty; construct; original_type_expr = _})
+    ->
   trace
     (Bad_contract_parameter step_constants.self)
-    (lift_execution_arg ctxt ~internal entrypoint_ty box arg)
+    (lift_execution_arg ctxt ~internal entrypoint_ty construct arg)
   >>=? fun (arg, ctxt) ->
   Script_ir_translator.collect_lazy_storage ctxt arg_type arg
   >>?= fun (to_duplicate, ctxt) ->
