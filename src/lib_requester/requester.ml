@@ -629,10 +629,12 @@ module Make
   let clear_or_cancel s k =
     match Memory_table.find s.memory k with
     | None -> ()
-    | Some (Pending {wakener = w; _}) ->
-        Scheduler.notify_cancellation s.scheduler k ;
-        Memory_table.remove s.memory k ;
-        Lwt.wakeup_later w (Result_syntax.tzfail (Canceled k))
+    | Some (Pending status) ->
+        if status.waiters <= 1 then (
+          Scheduler.notify_cancellation s.scheduler k ;
+          Memory_table.remove s.memory k ;
+          Lwt.wakeup_later status.wakener (Result_syntax.tzfail (Canceled k)))
+        else status.waiters <- status.waiters - 1
     | Some (Found _) -> Memory_table.remove s.memory k
 
   let watch s = Lwt_watcher.create_stream s.input

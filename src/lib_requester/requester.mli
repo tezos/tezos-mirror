@@ -116,9 +116,9 @@ module type REQUESTER = sig
     param ->
     value tzresult Lwt.t
 
-  (** Remove the data from the memory table if present. Otherwise cancel all
-      pending requests. Any pending [fetch] promises are resolved with the
-      error [Canceled]. *)
+  (** Remove the data from the memory table if present. Otherwise decrements
+      the number of watcher to this data. If their is only one watcher any
+      pending [fetch] promises are resolved with the error [Canceled]. *)
   val clear_or_cancel : t -> key -> unit
 end
 
