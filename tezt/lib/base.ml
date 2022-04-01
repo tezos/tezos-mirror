@@ -192,7 +192,7 @@ let with_open_in file read_f =
     close_in chan ;
     raise x
 
-let write_file filename contents =
+let write_file filename ~contents =
   with_open_out filename @@ fun ch -> output_string ch contents
 
 let read_file filename =

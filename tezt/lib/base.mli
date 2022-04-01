@@ -200,8 +200,8 @@ val with_open_in : string -> (in_channel -> 'a) -> 'a
 
 (** Write a string into a file, overwriting the file if it already exists.
 
-    Usage: [write_file filename contents] *)
-val write_file : string -> string -> unit
+    Usage: [write_file filename ~contents] *)
+val write_file : string -> contents:string -> unit
 
 (** Read the whole contents of a file. *)
 val read_file : string -> string
