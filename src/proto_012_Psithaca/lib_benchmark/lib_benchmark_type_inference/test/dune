@@ -1,3 +1,6 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
 (tests
  (names test_uf test_inference)
  (package tezos-benchmark-type-inference-012-Psithaca)

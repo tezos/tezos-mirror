@@ -1,3 +1,6 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
 (library
  (name tezos_client_008_PtEdo2Zk)
  (public_name tezos-client-008-PtEdo2Zk)

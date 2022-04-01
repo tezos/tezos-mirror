@@ -1,3 +1,6 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
 (library
  (name tezos_alpha_mockup_simulator)
  (public_name tezos-baking-alpha.mockup-simulator)
