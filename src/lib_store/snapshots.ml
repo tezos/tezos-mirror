@@ -34,14 +34,15 @@ module Version = struct
     let open Data_encoding in
     obj1 (req "version" int31)
 
-  (* Current version of the snapshots, since 0.0.6.
+  (* Current version of the snapshots, since 0.0.7.
    * Previous versions are:
    * - 1: snapshot exported with storage 0.0.1 to 0.0.4
-   * - 2: snapshot exported with storage 0.0.4 to 0.0.6 *)
-  let current_version = 2
+   * - 2: snapshot exported with storage 0.0.4 to 0.0.6
+   * - 3: snapshot exported with storage 0.0.7 to current *)
+  let current_version = 3
 
   (* List of versions that are supported *)
-  let supported_versions = [2]
+  let supported_versions = [2; 3]
 end
 
 let current_version = Version.current_version
