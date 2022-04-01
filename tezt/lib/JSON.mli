@@ -64,6 +64,12 @@ val encode : t -> string
 (** Encode a JSON unannotated AST into a string. *)
 val encode_u : u -> string
 
+(** Encode a JSON annotated AST into a file. *)
+val encode_to_file : string -> t -> unit
+
+(** Encode a JSON unannotated AST into a file. *)
+val encode_to_file_u : string -> u -> unit
+
 (** {2 Decoding} *)
 
 (** Parse a JSON file.

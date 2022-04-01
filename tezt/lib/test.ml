@@ -512,12 +512,7 @@ module Record = struct
     JSON.(json |> as_list |> List.map decode_test)
 
   let output_file (record : t) filename =
-    (* Write to file using Marshal.
-       This is not very robust but enough for the purposes of this file. *)
-    try
-      with_open_out filename @@ fun file ->
-      output_string file (JSON.encode_u (encode record))
-    with Sys_error error -> Log.warn "Failed to write record: %s" error
+    JSON.encode_to_file_u filename (encode record)
 
   let input_file filename : t =
     try decode (JSON.parse_file filename)

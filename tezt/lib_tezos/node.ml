@@ -190,9 +190,7 @@ module Config_file = struct
 
   let read node = JSON.parse_file (filename node)
 
-  let write node config =
-    with_open_out (filename node) @@ fun chan ->
-    output_string chan (JSON.encode config)
+  let write node config = JSON.encode_to_file (filename node) config
 
   let update node update = read node |> update |> write node
 

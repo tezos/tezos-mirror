@@ -201,9 +201,6 @@ end = struct
       JSON.(parse_file config.last_alerts_filename |> load_alerts config)
     else Map.empty
 
-  let write_file file json =
-    with_open_out file @@ fun oc -> output_string oc (JSON.encode json)
-
   let load config = last_messages := read_file config
 
   let dump config =
@@ -214,7 +211,7 @@ end = struct
       |> Map.bindings
     in
     let ja = to_json_array al in
-    write_file config.last_alerts_filename ja
+    JSON.encode_to_file config.last_alerts_filename ja
 end
 
 type category = Alerts.category
