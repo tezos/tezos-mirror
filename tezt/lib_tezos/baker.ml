@@ -25,6 +25,7 @@
 
 module Parameters = struct
   type persistent_state = {
+    protocol : Protocol.t;
     delegates : string list;
     runner : Runner.t option;
     node : Node.t;
@@ -65,7 +66,7 @@ let create ~protocol ?name ?color ?event_pipe ?runner ?(delegates = []) node
       ?color
       ?event_pipe
       ?runner
-      {delegates; runner; node; client; pending_ready = []}
+      {protocol; delegates; runner; node; client; pending_ready = []}
   in
   on_stdout baker (handle_raw_stdout baker) ;
   baker
@@ -92,9 +93,9 @@ let run (baker : t) =
       "local";
       "node";
       Node.data_dir node;
-      "--liquidity-baking-toggle-vote";
-      "pass";
     ]
+    @ (if Protocol.number baker.persistent_state.protocol < 013 then []
+      else ["--liquidity-baking-toggle-vote"; "pass"])
     @ delegates
   in
   let on_terminate _ =
