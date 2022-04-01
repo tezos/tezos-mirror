@@ -11,7 +11,6 @@ depends: [
   "dune" { >= "2.9" }
   "tezos-base"
   "tezos-protocol-012-Psithaca"
-  "tezos-stdlib-unix"
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]
