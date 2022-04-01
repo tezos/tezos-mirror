@@ -405,4 +405,12 @@ module Injector = struct
       ("level", Data_encoding.int32)
       ("operations", Data_encoding.list L1_operation.Hash.encoding)
       ~pp2:pp_operations_hash_list
+
+  let wait =
+    declare_1
+      ~section
+      ~name:"wait"
+      ~msg:"Waiting {delay} seconds to trigger injection"
+      ~level:Notice
+      ("delay", Data_encoding.float)
 end

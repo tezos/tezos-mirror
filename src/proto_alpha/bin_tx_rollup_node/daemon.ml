@@ -332,14 +332,62 @@ let notify_head state head reorg =
   let*! () = Injector.new_tezos_head state.State.injector head reorg in
   return_unit
 
-let process_head state current_hash rollup_id =
+let time_until_next_block state (header : Tezos_base.Block_header.t) =
+  let open Result_syntax in
+  let Constants.{minimal_block_delay; delay_increment_per_round; _} =
+    state.State.constants.parametric
+  in
+  let next_level_timestamp =
+    let* durations =
+      Round.Durations.create
+        ~first_round_duration:minimal_block_delay
+        ~delay_increment_per_round
+    in
+    let* predecessor_round = Fitness.round_from_raw header.shell.fitness in
+    Round.timestamp_of_round
+      durations
+      ~predecessor_timestamp:header.shell.timestamp
+      ~predecessor_round
+      ~round:Round.zero
+  in
+  let next_level_timestamp =
+    Result.value
+      next_level_timestamp
+      ~default:
+        (WithExceptions.Result.get_ok
+           ~loc:__LOC__
+           Timestamp.(header.shell.timestamp +? minimal_block_delay))
+  in
+  Ptime.diff
+    (Time.System.of_protocol_exn next_level_timestamp)
+    (Time.System.now ())
+
+let trigger_injection state header =
+  (* TODO/TORU: delay triggering of injection only for batches *)
+  let open Lwt_syntax in
+  (* Waiting only half the time until next block to allow for propagation *)
+  let promise =
+    let delay =
+      Ptime.Span.to_float_s (time_until_next_block state header) /. 2.
+    in
+    let* () =
+      if delay <= 0. then return_unit
+      else
+        let* () = Event.(emit Injector.wait) delay in
+        Lwt_unix.sleep delay
+    in
+    Injector.inject state.State.injector
+  in
+  ignore promise
+
+let process_head state (current_hash, current_header) rollup_id =
   let open Lwt_result_syntax in
   let*! () = Event.(emit new_block) current_hash in
   let* res = process_block state current_hash rollup_id in
   let* l1_reorg = State.set_tezos_head state current_hash in
   let* () = batch state in
   let* () = notify_head state current_hash l1_reorg in
-  let*! () = Injector.inject state.State.injector in
+  trigger_injection state current_header ;
   return res
 
 let main_exit_callback state exit_status =
@@ -401,8 +449,8 @@ let run configuration cctxt =
           in
           let*! () =
             Lwt_stream.iter_s
-              (fun (current_hash, _header) ->
-                let*! r = process_head state current_hash rollup_id in
+              (fun head ->
+                let*! r = process_head state head rollup_id in
                 match r with
                 | Ok (_, _) -> Lwt.return ()
                 | Error (Tx_rollup_originated_in_fork :: _ as e) ->
