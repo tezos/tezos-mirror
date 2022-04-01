@@ -190,3 +190,7 @@ val pread_block_exn : Lwt_unix.file_descr -> file_offset:int -> (t * int) Lwt.t
     was an error. *)
 val pread_block :
   Lwt_unix.file_descr -> file_offset:int -> (t * int) option Lwt.t
+
+(** [decode_metadata data] decodes metadata from [data] encoded either
+    with the new encoding or the legacy one. *)
+val decode_metadata : string -> metadata option

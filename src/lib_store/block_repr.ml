@@ -313,6 +313,27 @@ let check_block_consistency ?genesis_hash ?pred_block block =
   in
   return_unit
 
+let convert_legacy_metadata (legacy_metadata : legacy_metadata) : metadata =
+  let {
+    legacy_message;
+    legacy_max_operations_ttl;
+    legacy_last_allowed_fork_level;
+    legacy_block_metadata;
+    legacy_operations_metadata;
+  } =
+    legacy_metadata
+  in
+  {
+    message = legacy_message;
+    max_operations_ttl = legacy_max_operations_ttl;
+    last_allowed_fork_level = legacy_last_allowed_fork_level;
+    block_metadata = legacy_block_metadata;
+    operations_metadata =
+      List.map
+        (List.map (fun b -> Block_validation.Metadata b))
+        legacy_operations_metadata;
+  }
+
 let decode_block_repr encoding block_bytes =
   try Data_encoding.Binary.of_bytes_exn encoding block_bytes
   with _ ->
@@ -391,3 +412,11 @@ let pread_block_exn fd ~file_offset =
 
 let pread_block fd ~file_offset =
   Option.catch_s (fun () -> pread_block_exn fd ~file_offset)
+
+let decode_metadata b =
+  Data_encoding.Binary.of_string_opt metadata_encoding b |> function
+  | Some metadata -> Some metadata
+  | None ->
+      Option.map
+        convert_legacy_metadata
+        (Data_encoding.Binary.of_string_opt legacy_metadata_encoding b)
