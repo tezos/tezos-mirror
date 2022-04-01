@@ -62,6 +62,11 @@ Node
   upgrade is instantaneous. However, be careful that previous versions of Octez
   will refuse to run on a data directory which was used with Octez 13.0.
 
+- The snapshot version was increased. The new version 3 was
+  introduced, in place of version 2. The node is still able to import
+  the former version 2. However, only version 3 snapshots can be
+  exported.
+
 Client
 ------
 
