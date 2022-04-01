@@ -222,17 +222,6 @@ let test_tx_node_store_inbox =
            Computed %L" ;
       unit)
 
-(* FIXME/TORU: This is a temporary way of querying the node without
-   tx_rollup_client. This aims to be replaced as soon as possible by
-   the dedicated client's RPC. *)
-let raw_tx_node_rpc node ~url =
-  let* rpc = RPC.Curl.get () in
-  match rpc with
-  | None -> assert false
-  | Some curl ->
-      let url = Printf.sprintf "%s/%s" (Rollup_node.rpc_addr node) url in
-      curl ~url
-
 let raw_tx_node_rpc_post node ~url data =
   let* rpc = RPC.Curl.post () in
   match rpc with
@@ -240,19 +229,6 @@ let raw_tx_node_rpc_post node ~url data =
   | Some curl ->
       let url = Printf.sprintf "%s/%s" (Rollup_node.rpc_addr node) url in
       curl ~url data
-
-(* FIXME/TORU: Must be replaced by the Tx_client.get_balance command *)
-let tx_client_get_balance ~tx_node ~block ~ticket_id ~tz4_address =
-  let* json =
-    raw_tx_node_rpc
-      tx_node
-      ~url:
-        ("context/" ^ block ^ "/tickets/" ^ ticket_id ^ "/balance/"
-       ^ tz4_address)
-  in
-  match JSON.(json |> as_int_opt) with
-  | Some level -> Lwt.return level
-  | None -> Test.fail "Cannot retrieve balance of tz4 address %s" tz4_address
 
 let tx_client_inject_transaction ~tx_node ?failswith transaction signature =
   let open Tezos_protocol_alpha.Protocol in
@@ -288,18 +264,6 @@ let tx_client_inject_transaction ~tx_node ?failswith transaction signature =
       (* Dummy value for operation hash *)
       return ""
 
-let tx_client_get_queue ~tx_node = raw_tx_node_rpc tx_node ~url:"queue"
-
-let tx_client_get_transaction_in_queue ~tx_node txh =
-  raw_tx_node_rpc tx_node ~url:("queue/transaction/" ^ txh)
-
-let tx_client_get_block ~tx_node ~block =
-  raw_tx_node_rpc tx_node ~url:("block/" ^ block)
-
-(* FIXME/TORU: Must be replaced by the Tx_client.get_inbox command *)
-let tx_client_get_inbox ~tx_node ~block =
-  raw_tx_node_rpc tx_node ~url:("block/" ^ block ^ "/inbox")
-
 (* Returns the ticket hash, if any, of a given operation. *)
 let get_ticket_hash_from_op op =
   let metadata = JSON.(op |-> "contents" |=> 0 |-> "metadata") in
@@ -323,8 +287,8 @@ let get_ticket_hash_from_op op =
       JSON.(result |-> "ticket_hash" |> as_string)
   | None | Some _ -> Test.fail "The contract origination failed"
 
-let get_ticket_hash_from_deposit d =
-  JSON.(d |-> "message" |-> "deposit" |-> "ticket_hash" |> as_string)
+let get_ticket_hash_from_deposit (d : Rollup_node.Inbox.message) : string =
+  JSON.(d.message |-> "deposit" |-> "ticket_hash" |> as_string)
 
 (* The contract is expecting a parameter of the form:
    (Pair tx_rollup_txr1_address tx_rollup_tz4_address) *)
@@ -366,7 +330,7 @@ let generate_bls_addr ?alias:_ _client =
 let check_tz4_balance ~tx_node ~block ~ticket_id ~tz4_address ~expected_balance
     =
   let* tz4_balance =
-    tx_client_get_balance ~tx_node ~block ~ticket_id ~tz4_address
+    Rollup_node.Client.get_balance ~tx_node ~block ~ticket_id ~tz4_address
   in
   Check.(
     ( = )
@@ -432,10 +396,8 @@ let test_ticket_deposit_from_l1_to_l2 =
       let* _ = Rollup_node.wait_for_tezos_level tx_node 4 in
       (* Get the operation containing the ticket transfer. We assume
          that only one operation is issued in this block. *)
-      let* inbox = tx_client_get_inbox ~tx_node ~block:"head" in
-      let ticket_id =
-        get_ticket_hash_from_deposit JSON.(inbox |-> "contents" |=> 0)
-      in
+      let* inbox = Rollup_node.Client.get_inbox ~tx_node ~block:"head" in
+      let ticket_id = get_ticket_hash_from_deposit (List.hd inbox.contents) in
       Log.info "Ticket %s was successfully emitted" ticket_id ;
       let* () =
         check_tz4_balance
@@ -557,10 +519,8 @@ let test_l2_to_l2_transaction =
       let* () = Client.bake_for client in
       let* _ = Node.wait_for_level node 4 in
       let* _ = Rollup_node.wait_for_tezos_level tx_node 4 in
-      let* inbox = tx_client_get_inbox ~tx_node ~block:"head" in
-      let ticket_id =
-        get_ticket_hash_from_deposit JSON.(inbox |-> "contents" |=> 0)
-      in
+      let* inbox = Rollup_node.Client.get_inbox ~tx_node ~block:"head" in
+      let ticket_id = get_ticket_hash_from_deposit (List.hd inbox.contents) in
       Log.info "Ticket %s was successfully emitted" ticket_id ;
       let* () =
         check_tz4_balance
@@ -702,10 +662,8 @@ let test_batcher =
       let* () = Client.bake_for client in
       let* _ = Node.wait_for_level node 4 in
       let* _ = Rollup_node.wait_for_tezos_level tx_node 4 in
-      let* inbox = tx_client_get_inbox ~tx_node ~block:"head" in
-      let ticket_id =
-        get_ticket_hash_from_deposit JSON.(inbox |-> "contents" |=> 0)
-      in
+      let* inbox = Rollup_node.Client.get_inbox ~tx_node ~block:"head" in
+      let ticket_id = get_ticket_hash_from_deposit (List.hd inbox.contents) in
       Log.info "Ticket %s was successfully emitted" ticket_id ;
       let* () =
         check_tz4_balance
@@ -832,12 +790,12 @@ let test_batcher =
           signature
       in
       Log.info "Checking rollup node queue" ;
-      let* q = tx_client_get_queue ~tx_node in
+      let* q = Rollup_node.Client.get_queue ~tx_node in
       let len_q = JSON.(q |> as_list |> List.length) in
       Check.((len_q = 2) int) ~error_msg:"Queue length is %L but should be %R" ;
       Log.info "Checking rollup node queue transactions" ;
-      let* _t1 = tx_client_get_transaction_in_queue ~tx_node txh1
-      and* _t2 = tx_client_get_transaction_in_queue ~tx_node txh2 in
+      let* _t1 = Rollup_node.Client.get_transaction_in_queue ~tx_node txh1
+      and* _t2 = Rollup_node.Client.get_transaction_in_queue ~tx_node txh2 in
       let* () = Client.bake_for client in
       let* _ = Node.wait_for_level node 6 in
       let* _ = Rollup_node.wait_for_tezos_level tx_node 6 in
@@ -897,7 +855,7 @@ let test_batcher =
             unit)
           (List.init nbtxs2 (fun i -> Int64.of_int (i + 2)))
       in
-      let* q = tx_client_get_queue ~tx_node in
+      let* q = Rollup_node.Client.get_queue ~tx_node in
       let len_q = JSON.(q |> as_list |> List.length) in
       Check.((len_q = nbtxs1 + nbtxs2) int)
         ~error_msg:"Queue length is %L but should be %R" ;
@@ -988,10 +946,8 @@ let test_reorganization =
       let* () = Client.bake_for client1 in
       let* _ = Node.wait_for_level node1 4 in
       let* _ = Rollup_node.wait_for_tezos_level tx_node 4 in
-      let* inbox = tx_client_get_inbox ~tx_node ~block:"head" in
-      let ticket_id =
-        get_ticket_hash_from_deposit JSON.(inbox |-> "contents" |=> 0)
-      in
+      let* inbox = Rollup_node.Client.get_inbox ~tx_node ~block:"head" in
+      let ticket_id = get_ticket_hash_from_deposit (List.hd inbox.contents) in
       (* Run the node that will be used to forge an alternative branch *)
       let* node2 = Node.init nodes_args in
       let* client2 = Client.init ~endpoint:Client.(Node node2) () in

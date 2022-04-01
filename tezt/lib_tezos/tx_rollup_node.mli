@@ -72,3 +72,38 @@ val terminate : ?kill:bool -> t -> unit Lwt.t
 
 (** Get the RPC address given as [--rpc-addr] to a node. *)
 val rpc_addr : t -> string
+
+module Inbox : sig
+  type l2_context_hash = {irmin_hash : string; tree_hash : string}
+
+  type message = {
+    message : JSON.t;
+    result : JSON.t;
+    l2_context_hash : l2_context_hash;
+  }
+
+  type t = {contents : message list; cumulated_size : int}
+end
+
+(* FIXME/TORU: This is a temporary way of querying the node without
+   tx_rollup_client. This aims to be replaced as soon as possible by
+   the dedicated client's RPC. *)
+module Client : sig
+  val get_inbox : tx_node:t -> block:string -> Inbox.t Lwt.t
+
+  val get_balance :
+    tx_node:t ->
+    block:string ->
+    ticket_id:string ->
+    tz4_address:string ->
+    int Lwt.t
+
+  val get_queue : tx_node:t -> JSON.t Lwt.t
+
+  val get_transaction_in_queue : tx_node:t -> string -> JSON.t Lwt.t
+
+  val get_block : tx_node:t -> block:string -> JSON.t Lwt.t
+
+  val get_merkle_proof :
+    tx_node:t -> block:string -> message_pos:string -> JSON.t Lwt.t
+end
