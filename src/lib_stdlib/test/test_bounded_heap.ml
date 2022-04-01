@@ -29,6 +29,7 @@
     Invocation: dune build @src/lib_stdlib/test/runtest
  *)
 
+module Assert = Lib_test.Assert
 module B = Bounded_heap.Make (Int)
 
 let take_nth_biggest n l =

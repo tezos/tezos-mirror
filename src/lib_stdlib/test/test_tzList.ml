@@ -29,6 +29,7 @@
     Invocation: dune build @src/lib_stdlib/test/runtest
  *)
 
+module Assert = Lib_test.Assert
 open TzList
 
 let test_repeat _ =
