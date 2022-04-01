@@ -414,6 +414,19 @@ module Version = struct
   let or_list = List.fold_left ( || ) False
 end
 
+module Npm = struct
+  type t = {
+    package : string;
+    version : Version.constraints;
+    node_wrapper_flags : string list;
+  }
+
+  let make ~node_wrapper_flags package version =
+    {package; version; node_wrapper_flags}
+
+  let node_wrapper_flags t = t.node_wrapper_flags
+end
+
 (*****************************************************************************)
 (*                                  OPAM                                     *)
 (*****************************************************************************)
@@ -667,14 +680,14 @@ module Target = struct
     opam : string option;
     version : Version.constraints;
     js_compatible : bool;
-    node_wrapper_flags : string list;
+    npm_deps : Npm.t list;
   }
 
   type vendored = {
     name : string;
     main_module : string option;
     js_compatible : bool;
-    node_wrapper_flags : string list;
+    npm_deps : Npm.t list;
   }
 
   type opam_only = {
@@ -738,7 +751,7 @@ module Target = struct
     description : string option;
     warnings : string option;
     wrapped : bool;
-    node_wrapper_flags : string list;
+    npm_deps : Npm.t list;
     cram : bool;
     action : Dune.s_expr option;
   }
@@ -856,7 +869,7 @@ module Target = struct
     ?modes:Dune.mode list ->
     ?modules:string list ->
     ?modules_without_implementation:string list ->
-    ?node_wrapper_flags:string list ->
+    ?npm_deps:Npm.t list ->
     ?nopervasives:bool ->
     ?nostdlib:bool ->
     ?ocaml:Version.constraints ->
@@ -885,7 +898,7 @@ module Target = struct
       ?(conflicts = []) ?(dep_files = []) ?(deps = []) ?(dune = Dune.[])
       ?foreign_stubs ?(inline_tests = false) ?js_compatible ?js_of_ocaml
       ?documentation ?(linkall = false) ?modes ?modules
-      ?(modules_without_implementation = []) ?(node_wrapper_flags = [])
+      ?(modules_without_implementation = []) ?(npm_deps = [])
       ?(nopervasives = false) ?(nostdlib = false) ?ocaml ?opam ?(opaque = false)
       ?(opens = []) ?(preprocess = []) ?(preprocessor_deps = [])
       ?(private_modules = []) ?(opam_only_deps = []) ?release ?static
@@ -995,16 +1008,22 @@ module Target = struct
                   if String_set.mem name seen then (seen, acc)
                   else
                     match dep with
-                    | Internal {deps; node_wrapper_flags; _} ->
-                        let acc = node_wrapper_flags @ acc in
+                    | Internal {deps; npm_deps; _} ->
+                        let acc =
+                          List.concat_map Npm.node_wrapper_flags npm_deps @ acc
+                        in
                         let seen = String_set.add name seen in
                         loops (seen, acc) deps
-                    | External {node_wrapper_flags; _} ->
+                    | External {npm_deps; _} ->
                         let seen = String_set.add name seen in
-                        (seen, node_wrapper_flags @ acc)
-                    | Vendored {node_wrapper_flags; _} ->
+                        ( seen,
+                          List.concat_map Npm.node_wrapper_flags npm_deps @ acc
+                        )
+                    | Vendored {npm_deps; _} ->
                         let seen = String_set.add name seen in
-                        (seen, node_wrapper_flags @ acc)
+                        ( seen,
+                          List.concat_map Npm.node_wrapper_flags npm_deps @ acc
+                        )
                     | Select {package; _} -> loop (seen, acc) package
                     | Opam_only _ -> (seen, acc)
                     | Optional t -> loop (seen, acc) t
@@ -1070,7 +1089,7 @@ module Target = struct
         static_cclibs;
         synopsis;
         description;
-        node_wrapper_flags;
+        npm_deps;
         warnings;
         wrapped;
         cram;
@@ -1142,25 +1161,21 @@ module Target = struct
     | [] -> invalid_arg "Target.test_exes: at least one name must be given"
     | head :: tail -> Test_executable (head, tail)
 
-  let vendored_lib ?main_module ?(js_compatible = false)
-      ?(node_wrapper_flags = []) name =
-    Some (Vendored {name; main_module; js_compatible; node_wrapper_flags})
+  let vendored_lib ?main_module ?(js_compatible = false) ?(npm_deps = []) name =
+    Some (Vendored {name; main_module; js_compatible; npm_deps})
 
-  let external_lib ?main_module ?opam ?(js_compatible = false)
-      ?(node_wrapper_flags = []) name version =
+  let external_lib ?main_module ?opam ?(js_compatible = false) ?(npm_deps = [])
+      name version =
     let opam =
       match opam with None -> Some name | Some "" -> None | Some _ as x -> x
     in
-    Some
-      (External
-         {name; main_module; opam; version; js_compatible; node_wrapper_flags})
+    Some (External {name; main_module; opam; version; js_compatible; npm_deps})
 
-  let rec external_sublib ?main_module ?(js_compatible = false)
-      ?(node_wrapper_flags = []) parent name =
+  let rec external_sublib ?main_module ?(js_compatible = false) ?(npm_deps = [])
+      parent name =
     match parent with
     | External {opam; version; _} ->
-        External
-          {name; main_module; opam; version; js_compatible; node_wrapper_flags}
+        External {name; main_module; opam; version; js_compatible; npm_deps}
     | Opam_only _ ->
         invalid_arg
           "Target.external_sublib: parent must be a non-opam-only external lib"
@@ -1177,18 +1192,11 @@ module Target = struct
     | Open (target, module_name) ->
         Open (external_sublib target name, module_name)
 
-  let external_sublib ?main_module ?js_compatible ?node_wrapper_flags parent
-      name =
+  let external_sublib ?main_module ?js_compatible ?npm_deps parent name =
     match parent with
     | None -> invalid_arg "external_sublib cannot be called with no_target"
     | Some parent ->
-        Some
-          (external_sublib
-             ?main_module
-             ?js_compatible
-             ?node_wrapper_flags
-             parent
-             name)
+        Some (external_sublib ?main_module ?js_compatible ?npm_deps parent name)
 
   let opam_only ?(can_vendor = true) name version =
     Some (Opam_only {name; version; can_vendor})
@@ -1806,6 +1814,89 @@ let generate_dune_project_files () =
       Format.fprintf fmt "; Edit file manifest/manifest.ml instead.@.")
     t
 
+let generate_package_json_file () =
+  let l = ref [] in
+  let add npm = if not (List.mem npm !l) then l := npm :: !l in
+  let rec collect (target : Target.t) =
+    match target with
+    | External {npm_deps; _} | Vendored {npm_deps; _} | Internal {npm_deps; _}
+      ->
+        List.iter add npm_deps
+    | Optional internal -> collect internal
+    | Select {package; _} | Open (package, _) -> collect package
+    | Opam_only _ -> ()
+  in
+  Target.iter_internal_by_path (fun _path internals ->
+      List.iter
+        (fun (internal : Target.internal) ->
+          List.iter add internal.npm_deps ;
+          List.iter collect internal.deps)
+        internals) ;
+  let pp_version_atom fmt = function
+    | Version.V x -> Format.fprintf fmt "%s" x
+    | Version ->
+        invalid_arg "[Version] cannot be used to constrain Npm packages."
+  in
+  let rec pp_version_constraint ~in_and fmt = function
+    | Version.True ->
+        invalid_arg "[True] cannot be used to constrain Npm packages."
+    | False -> invalid_arg "[False] cannot be used to constrain Npm packages."
+    | Not _ -> invalid_arg "[Not] cannot be used to constrain Npm packages."
+    | Exactly version -> Format.fprintf fmt "%a" pp_version_atom version
+    | Different_from version ->
+        Format.fprintf fmt "!= %a" pp_version_atom version
+    | At_least version -> Format.fprintf fmt ">=%a" pp_version_atom version
+    | More_than version -> Format.fprintf fmt ">%a" pp_version_atom version
+    | At_most version -> Format.fprintf fmt "<=%a" pp_version_atom version
+    | Less_than version -> Format.fprintf fmt "<%a" pp_version_atom version
+    | And (a, b) ->
+        Format.fprintf
+          fmt
+          "%a %a"
+          (pp_version_constraint ~in_and:true)
+          a
+          (pp_version_constraint ~in_and:true)
+          b
+    | Or (a, b) ->
+        if in_and then
+          invalid_arg
+            "Npm version constraint don't allow [Or] nested inside [And]" ;
+        Format.fprintf
+          fmt
+          "%a || %a"
+          (pp_version_constraint ~in_and:false)
+          a
+          (pp_version_constraint ~in_and:false)
+          b
+  in
+  let pp_dep fmt (npm : Npm.t) =
+    Format.fprintf
+      fmt
+      {|    "%s": "%a"|}
+      npm.package
+      (pp_version_constraint ~in_and:false)
+      npm.version
+  in
+  write "package.json" @@ fun fmt ->
+  Format.fprintf
+    fmt
+    {|
+{
+  "DO NOT EDIT": "This file was automatically generated, edit file manifest/main.ml instead",
+  "private": true,
+  "type": "commonjs",
+  "description": "n/a",
+  "license": "n/a",
+  "dependencies": {
+%a
+  }
+}
+|}
+    (Format.pp_print_list
+       ~pp_sep:(fun fmt () -> Format.fprintf fmt ",@.")
+       pp_dep)
+    (List.sort compare !l)
+
 let check_for_non_generated_files ?(exclude = fun _ -> false) () =
   let rec find_opam_and_dune_files acc dir =
     let dir_contents = Sys.readdir dir in
@@ -1950,6 +2041,7 @@ let generate ?exclude () =
     generate_dune_files () ;
     generate_opam_files () ;
     generate_dune_project_files () ;
+    generate_package_json_file () ;
     check_for_non_generated_files ?exclude () ;
     check_js_of_ocaml () ;
     Option.iter (generate_opam_files_for_release packages_dir) release
