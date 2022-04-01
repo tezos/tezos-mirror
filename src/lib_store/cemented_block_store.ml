@@ -409,10 +409,7 @@ let read_block_metadata ?location cemented_store block_level =
                       (fun () -> Zip.read_entry in_file entry)
                       ()
                   in
-                  return_some
-                    (Data_encoding.Binary.of_string_exn
-                       Block_repr.metadata_encoding
-                       metadata))
+                  Block_repr.decode_metadata metadata |> return)
                 (fun () -> Lwt_preemptive.detach Zip.close_in in_file))
             (fun _ -> return_none))
 
