@@ -1286,6 +1286,97 @@ let test_rollup_node_uses_boot_sector =
 
       Lwt.return_unit)
 
+(* Initializes a client with an existing account being
+   [Constants.tz4_account]. *)
+let client_with_initial_keys ~protocol =
+  setup ~protocol @@ with_fresh_rollup
+  @@ fun _rollup_address sc_rollup_node _filename ->
+  let sc_client = Sc_rollup_client.create sc_rollup_node in
+  let account = Constant.tz4_account in
+  let* () = Sc_rollup_client.import_secret_key account sc_client in
+  return (sc_client, account)
+
+let test_rollup_client_show_address =
+  test
+    ~__FILE__
+    ~tags:["run"; "client"]
+    "Shows the address of a registered account"
+    (fun protocol ->
+      let* (sc_client, account) = client_with_initial_keys ~protocol in
+      let* shown_account =
+        Sc_rollup_client.show_address
+          ~alias:account.Account.aggregate_alias
+          sc_client
+      in
+      if
+        account.aggregate_public_key_hash
+        <> shown_account.aggregate_public_key_hash
+      then
+        failwith
+          (Printf.sprintf
+             "Expecting %s, got %s as public key hash from the client."
+             account.aggregate_public_key_hash
+             shown_account.aggregate_public_key_hash)
+      else if account.aggregate_public_key <> shown_account.aggregate_public_key
+      then
+        failwith
+          (Printf.sprintf
+             "Expecting %s, got %s as public key from the client."
+             account.aggregate_public_key
+             shown_account.aggregate_public_key)
+      else if account.aggregate_secret_key <> shown_account.aggregate_secret_key
+      then
+        let (Unencrypted sk) = shown_account.aggregate_secret_key in
+        let (Unencrypted expected_sk) = shown_account.aggregate_secret_key in
+        failwith
+          (Printf.sprintf
+             "Expecting %s, got %s as secret key from the client."
+             expected_sk
+             sk)
+      else return ())
+
+let test_rollup_client_generate_keys =
+  test
+    ~__FILE__
+    ~tags:["run"; "client"]
+    "Generates new tz4 keys"
+    (fun protocol ->
+      setup ~protocol @@ with_fresh_rollup
+      @@ fun _rollup_address sc_rollup_node _filename ->
+      let sc_client = Sc_rollup_client.create sc_rollup_node in
+      let alias = "test_key" in
+      let* () = Sc_rollup_client.generate_keys ~alias sc_client in
+      let* _account = Sc_rollup_client.show_address ~alias sc_client in
+      return ())
+
+let test_rollup_client_list_keys =
+  test
+    ~__FILE__
+    ~tags:["run"; "client"]
+    "Lists known aliases in the client"
+    (fun protocol ->
+      let* (sc_client, account) = client_with_initial_keys ~protocol in
+      let* maybe_keys = Sc_rollup_client.list_keys sc_client in
+      let expected_keys =
+        [(account.aggregate_alias, account.aggregate_public_key_hash)]
+      in
+      if List.equal ( = ) expected_keys maybe_keys then return ()
+      else
+        let pp ppf l =
+          Format.pp_print_list
+            ~pp_sep:(fun ppf () -> Format.fprintf ppf "\n")
+            (fun ppf (a, k) -> Format.fprintf ppf "%s: %s" a k)
+            ppf
+            l
+        in
+        Test.fail
+          ~__LOC__
+          "Expecting\n@[%a@]\ngot\n@[%a@]\nas keys from the client."
+          pp
+          expected_keys
+          pp
+          maybe_keys)
+
 let register ~protocols =
   test_origination protocols ;
   test_rollup_node_configuration protocols ;
@@ -1314,4 +1405,7 @@ let register ~protocols =
   test_commitment_scenario "messages_reset" commitments_messages_reset protocols ;
   test_commitment_scenario "handles_chain_reorgs" commitments_reorgs protocols ;
   test_rollup_origination_boot_sector protocols ;
-  test_rollup_node_uses_boot_sector protocols
+  test_rollup_node_uses_boot_sector protocols ;
+  test_rollup_client_show_address protocols ;
+  test_rollup_client_generate_keys protocols ;
+  test_rollup_client_list_keys protocols

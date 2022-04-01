@@ -72,3 +72,29 @@ val last_stored_commitment :
 (** [last_published_commitment client] gets the last commitment published by the rollup node. *)
 val last_published_commitment :
   ?hooks:Process.hooks -> t -> commitment option Lwt.t
+
+(** [generate_keys ~alias client] generates new unencrypted keys for [alias]. *)
+val generate_keys :
+  ?hooks:Process.hooks -> ?force:bool -> alias:string -> t -> unit Lwt.t
+
+(** [list_keys client] returns the known aliases with their public key hash from
+    client.
+
+    Fails if the format isn't in the form `<alias>: <public key hash>`. *)
+val list_keys : ?hooks:Process.hooks -> t -> (string * string) list Lwt.t
+
+(** [show_address ~alias client] returns the BLS account associated with [alias].
+
+    Fails if the output from the client isn't in the expected format (see
+    {!Client.show_address}). *)
+val show_address :
+  ?hooks:Process.hooks -> alias:string -> t -> Account.aggregate_key Lwt.t
+
+(** [import_secret_key account] imports [account.alias] as alias to
+    [account.secret_key] into the client. *)
+val import_secret_key :
+  ?hooks:Process.hooks ->
+  ?force:bool ->
+  Account.aggregate_key ->
+  t ->
+  unit Lwt.t
