@@ -34,10 +34,14 @@ module Version = struct
     let open Data_encoding in
     obj1 (req "version" int31)
 
-  (* Current version of the snapshots, since 0.0.5.
+  (* Current version of the snapshots, since 0.0.6.
    * Previous versions are:
-   * - 1: snapshot exported with storage 0.0.1 to 0.0.4 *)
+   * - 1: snapshot exported with storage 0.0.1 to 0.0.4
+   * - 2: snapshot exported with storage 0.0.4 to 0.0.6 *)
   let current_version = 2
+
+  (* List of versions that are supported *)
+  let supported_versions = [2]
 end
 
 let current_version = Version.current_version
@@ -94,6 +98,7 @@ type error +=
   | Directory_already_exists of string
   | Empty_floating_store
   | Cannot_create_tmp_export_directory of string
+  | Inconsistent_version_import of {expected : int list; got : int}
   | Inconsistent_chain_import of {
       expected : Distributed_db_version.Name.t;
       got : Distributed_db_version.Name.t;
@@ -463,6 +468,27 @@ let () =
     (obj1 (req "message" string))
     (function Cannot_create_tmp_export_directory str -> Some str | _ -> None)
     (fun str -> Cannot_create_tmp_export_directory str) ;
+  register_error_kind
+    `Permanent
+    ~id:"snapshots.inconsistent_version_import"
+    ~title:"Inconsistent version import"
+    ~description:"The imported snapshot's version is not supported."
+    ~pp:(fun ppf (expected, got) ->
+      Format.fprintf
+        ppf
+        "The version of the snapshot file %d is not compatible with the node. \
+         Only the following versions can be imported: %a."
+        got
+        Format.(
+          pp_print_list
+            ~pp_sep:(fun fmt () -> Format.fprintf fmt ", ")
+            pp_print_int)
+        expected)
+    (obj2 (req "expected" (list int31)) (req "got" int31))
+    (function
+      | Inconsistent_version_import {expected; got} -> Some (expected, got)
+      | _ -> None)
+    (fun (expected, got) -> Inconsistent_version_import {expected; got}) ;
   register_error_kind
     `Permanent
     ~id:"snapshots.inconsistent_chain_import"
@@ -3231,7 +3257,12 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
       (Snapshot_file_not_found snapshot_path)
     >>=? fun () ->
     Importer.load_snapshot_header snapshot_importer >>=? fun snapshot_header ->
-    let (_, snapshot_metadata) = snapshot_header in
+    let (snapshot_version, snapshot_metadata) = snapshot_header in
+    fail_unless
+      (List.mem ~equal:( = ) snapshot_version Version.supported_versions)
+      (Inconsistent_version_import
+         {expected = Version.supported_versions; got = snapshot_version})
+    >>=? fun () ->
     fail_unless
       (Distributed_db_version.Name.equal
          chain_name
