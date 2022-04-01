@@ -36,7 +36,7 @@ val init :
   rollup:Tx_rollup.t ->
   signer:string option ->
   Context.index ->
-  Protocol.Tx_rollup_l2_apply.parameters ->
+  Protocol.Alpha_context.Constants.parametric ->
   state option tzresult Lwt.t
 
 (** Updates the incremental context in the batcher's state.

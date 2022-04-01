@@ -51,9 +51,9 @@ type t = private {
   mutable head : L2block.t;
   rollup_info : rollup_info;
   tezos_blocks_cache : Alpha_block_services.block_info Tezos_blocks_cache.t;
-  parameters : Protocol.Tx_rollup_l2_apply.parameters;
   operator : signer option;
   batcher_state : Batcher.state option;
+  l1_constants : Protocol.Alpha_context.Constants.parametric;
 }
 
 (** Type of chain reorganizations. *)

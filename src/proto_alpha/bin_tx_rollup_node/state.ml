@@ -48,9 +48,9 @@ type t = {
   mutable head : L2block.t;
   rollup_info : rollup_info;
   tezos_blocks_cache : Alpha_block_services.block_info Tezos_blocks_cache.t;
-  parameters : Protocol.Tx_rollup_l2_apply.parameters;
   operator : signer option;
   batcher_state : Batcher.state option;
+  l1_constants : Protocol.Alpha_context.Constants.parametric;
 }
 
 type 'block reorg = {
@@ -404,16 +404,12 @@ let init_head (stores : Stores.t) context_index rollup rollup_info =
       let* ctxt = Context.init_context context_index in
       L2block.genesis_block ctxt rollup rollup_info.origination_block
 
-let init_parameters cctxt =
+let init_l1_constants cctxt =
   let open Lwt_result_syntax in
-  let* {parametric; _} =
+  let+ {parametric; _} =
     Protocol.Constants_services.all cctxt (cctxt#chain, cctxt#block)
   in
-  return
-    {
-      Protocol.Tx_rollup_l2_apply.tx_rollup_max_withdrawals_per_batch =
-        parametric.tx_rollup_max_withdrawals_per_batch;
-    }
+  parametric
 
 let init cctxt ~data_dir ?(readonly = false) ?rollup_genesis
     ~l2_blocks_cache_size ~operator rollup =
@@ -428,9 +424,9 @@ let init cctxt ~data_dir ?(readonly = false) ?rollup_genesis
     |> lwt_map_error (function [] -> [] | trace :: _ -> trace)
   in
   let*! head = init_head stores context_index rollup rollup_info in
-  let* parameters = init_parameters cctxt in
+  let* l1_constants = init_l1_constants cctxt in
   let* batcher_state =
-    Batcher.init cctxt ~rollup ~signer:operator context_index parameters
+    Batcher.init cctxt ~rollup ~signer:operator context_index l1_constants
   in
   let* operator = get_signer cctxt operator in
   (* L1 blocks are cached to handle reorganizations efficiently *)
@@ -442,7 +438,7 @@ let init cctxt ~data_dir ?(readonly = false) ?rollup_genesis
       head;
       rollup_info;
       tezos_blocks_cache;
-      parameters;
       operator;
       batcher_state;
+      l1_constants;
     }

@@ -31,11 +31,11 @@ module Tx_queue = Hash_queue.Make (L2_transaction.Hash) (L2_transaction)
 type state = {
   cctxt : Protocol_client_context.full;
   rollup : Tx_rollup.t;
-  parameters : Protocol.Tx_rollup_l2_apply.parameters;
   signer : signer;
   transactions : Tx_queue.t;
   mutable incr_context : Context.t;
   lock : Lwt_mutex.t;
+  l1_constants : Protocol.Alpha_context.Constants.parametric;
 }
 
 (* TODO/TORU Change me to correct value and have a configuration option *)
@@ -177,7 +177,7 @@ let async_batch_and_inject ?at_least_one_full_batch state =
   let* _ = batch_and_inject ?at_least_one_full_batch state in
   return_unit
 
-let init cctxt ~rollup ~signer index parameters =
+let init cctxt ~rollup ~signer index l1_constants =
   let open Lwt_result_syntax in
   let*! incr_context = Context.init_context index in
   let+ signer = get_signer cctxt signer in
@@ -187,10 +187,10 @@ let init cctxt ~rollup ~signer index parameters =
         cctxt = batcher_context cctxt;
         rollup;
         signer;
-        parameters;
         transactions = Tx_queue.create 500_000;
         incr_context;
         lock = Lwt_mutex.create ();
+        l1_constants;
       })
     signer
 
@@ -206,8 +206,15 @@ let register_transaction ?(eager_batch = false) ?(apply = true) state
   let prev_context = context in
   let* context =
     if apply then
+      let l2_parameters =
+        Tx_rollup_l2_apply.
+          {
+            tx_rollup_max_withdrawals_per_batch =
+              state.l1_constants.tx_rollup_max_withdrawals_per_batch;
+          }
+      in
       let* (new_context, result, _) =
-        L2_apply.Batch_V1.apply_batch context state.parameters batch
+        L2_apply.Batch_V1.apply_batch context l2_parameters batch
       in
       let open Tx_rollup_l2_apply.Message_result in
       let+ context =

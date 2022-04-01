@@ -259,8 +259,15 @@ let process_messages_and_inboxes (state : State.t) ~(predecessor : L2block.t)
     | None -> checkout_context state predecessor.header.context
     | Some context -> return context
   in
+  let l2_parameters =
+    Protocol.Tx_rollup_l2_apply.
+      {
+        tx_rollup_max_withdrawals_per_batch =
+          state.l1_constants.tx_rollup_max_withdrawals_per_batch;
+      }
+  in
   let*! (context, inbox) =
-    interp_messages predecessor_context state.parameters messages cumulated_size
+    interp_messages predecessor_context l2_parameters messages cumulated_size
   in
   match inbox with
   | None ->
