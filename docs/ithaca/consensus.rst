@@ -299,7 +299,7 @@ producer and are distributed immediately.
 To encourage fairness and participation, the *block* proposer receives
 a bonus for the extra endorsements it includes in the block.
 The bonus is proportional to the number of
-validator slots above the threshold of :math:`\lceil CONSENSUS\_COMMITTEE\_SIZE \times \frac{2}{3} \rceil` that
+validator slots above the threshold of ``CONSENSUS_COMMITTEE_SIZE * 2 / 3`` that
 the included endorsements represent. The bonus is also distributed
 immediately.
 
