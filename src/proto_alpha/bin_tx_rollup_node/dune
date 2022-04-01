@@ -6,9 +6,7 @@
  (package tezos-tx-rollup-node-alpha)
  (instrumentation (backend bisect_ppx))
  (libraries
-  irmin
-  irmin-pack
-  irmin-pack.unix
+  index
   tezos-base
   tezos-crypto
   tezos-protocol-alpha
@@ -24,7 +22,8 @@
   tezos-rpc
   tezos-rpc-http
   tezos-rpc-http-client-unix
-  tezos-rpc-http-server)
+  tezos-rpc-http-server
+  tezos-store)
  (flags
   (:standard
    -open Tezos_base.TzPervasives

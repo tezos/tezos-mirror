@@ -36,21 +36,6 @@ type error +=
     branch. *)
 type error += Tx_rollup_originated_in_fork
 
-(** Error issued when the daemon attempts to process the operations of a block
-    for which the predecessor has not yet been processed. *)
-type error += Tx_rollup_block_predecessor_not_processed of Block_hash.t
-
-(** Error issued when the encoding of a value, in order to be persisted in the
-    store, fails. *)
-type error +=
-  | Tx_rollup_unable_to_encode_storable_value of string * Data_encoding.Json.t
-
-(** Error issued when decoding a persisted value in the store fails. *)
-type error += Tx_rollup_unable_to_decode_stored_value of string * string
-
-(** Error issued when an error occurs on Irmin side. *)
-type error += Tx_rollup_irmin_error of string
-
 (** Error issued when the configuration file does not exists. *)
 type error += Tx_rollup_configuration_file_does_not_exists of string
 
@@ -72,8 +57,7 @@ type error +=
 
 (** Error issued when the Tx rollup node starts without a rollup origination
     stored on disk and when there is no given rollup genesis. *)
-type error +=
-  | Tx_rollup_no_rollup_origination_on_disk_and_no_rollup_genesis_given
+type error += Tx_rollup_no_rollup_info_on_disk_and_no_rollup_genesis_given
 
 (** Error issued when the Tx rollup node starts with a rollup origination stored on disk
     different from the given rollup genesis. *)
@@ -85,3 +69,9 @@ type error +=
 
 (** Error when operation metadata is not available. *)
 type error += Tx_rollup_no_operation_metadata of Operation_hash.t
+
+(** Error when rollup stored on disk is different from the expected one. *)
+type error += Tx_rollup_mismatch
+
+(** Error when Tezos block cannot be fetched. *)
+type error += Tx_rollup_cannot_fetch_tezos_block of Block_hash.t

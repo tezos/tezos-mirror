@@ -27,78 +27,156 @@
 
 (** Describes the different representations that can be stored persistently. *)
 
-(** Storage. Each "table" is described under a different path. *)
-type t
+(** {2 Indexed stores}  *)
 
-(** [load data_dir] loads the repository (stored in [data_dir]) that persists
-    the various tables. If there no already resgistered store, a new one will
-    be created. *)
-val load : string -> t tzresult Lwt.t
+(** A persistent store on disk for storing L2 blocks. It is composed of an index
+    file and a data file which contains the actual blocks. The keys of the index
+    are the L2 block hashes. *)
+module L2_block_store : sig
+  (** The type of store for L2 blocks *)
+  type t
 
-(** After use [close data_dir], closes the storage. The daemon calls this function
-    during the termination callback.*)
-val close : string -> unit Lwt.t
+  (** Returns [true] if the L2 block hash exists in the index, i.e. if the block
+      exists in the store. *)
+  val mem : t -> L2block.hash -> bool Lwt.t
 
-(** {1 General Interfaces} *)
+  (** Returns the predecessor of the block (by only querying the index, without
+      reading the block data). *)
+  val predecessor : t -> L2block.hash -> L2block.hash option Lwt.t
 
-(** An interface that describes a generic Key-Value storage. *)
-module type MAP = sig
-  type nonrec t = t
+  (** Returns the context hash of the block (by only querying the index, without
+      reading the block data). *)
+  val context :
+    t -> L2block.hash -> Protocol.Tx_rollup_l2_context_hash.t option Lwt.t
 
-  type key
+  (** Read a block from the file on disk, given a L2 block hash. Returns [None]
+      if the block is not stored. *)
+  val read_block : t -> L2block.hash -> L2block.t option Lwt.t
 
-  type value
-
-  val mem : t -> key -> bool Lwt.t
-
-  val find : t -> key -> value option Lwt.t
-
-  val get : t -> key -> value tzresult Lwt.t
-
-  val add : t -> key -> value -> unit tzresult Lwt.t
-
-  val remove : t -> key -> unit tzresult Lwt.t
+  (** [append_block ?flush store block] stores the [block] in [store] updating
+      its index and flushing if [flush] is set to [true] (defaults to [true]).*)
+  val append_block : ?flush:bool -> t -> L2block.t -> unit Lwt.t
 end
 
-(** An interface that describes a generic value reference. *)
-module type REF = sig
-  type nonrec t = t
+(** {2 Pure index stores}  *)
 
-  type value
+(** An index store to map Tezos block hashes to L2 block hashes. It is composed
+    of an index only. This store is used to remember which Tezos blocks have been
+    processed by the Tx rollup node. When there is no inbox for a Tezos block, we
+    associate to it the L2 block of its predecessor. *)
+module Tezos_block_store : sig
+  (** The type of store for Tezos block hashes *)
+  type t
 
-  val find : t -> value option Lwt.t
+  type info = {
+    l2_block : L2block.hash;
+    level : int32;
+    predecessor : Block_hash.t;
+  }
 
-  val get : t -> value tzresult Lwt.t
+  (** Returns [true] if the Tezos block hash has a L2 block hash associated in
+      the store. *)
+  val mem : t -> Block_hash.t -> bool Lwt.t
 
-  val set : t -> value -> unit tzresult Lwt.t
+  (** Returns the L2 block hash associated to a Tezos block hash in the store,
+      or [None] otherwise. *)
+  val find : t -> Block_hash.t -> info option Lwt.t
+
+  (** Add an association from a Tezos block hash to an L2 block hash in the
+      store. If [flush] (default to [true]) is set, the index is written on disk
+      right away. *)
+  val add : ?flush:bool -> t -> Block_hash.t -> info -> unit Lwt.t
 end
 
-(** {1 Storages} *)
+(** An index store to map L2 block level to L2 block hashes. It is composed
+    of an index only. *)
+module Level_store : sig
+  (** The type of store for L2 block levels *)
+  type t
 
-(** {2 References} *)
+  (** Returns [true] if the L2 block level exists in the store. *)
+  val mem : t -> L2block.level -> bool Lwt.t
 
-(** A persistent reference to the rollup origination block (initialized on first
-   run). *)
-module Rollup_origination : REF with type value = Block_hash.t * int32
+  (** Returns the L2 block hash associated to a L2 block level in the store,
+      or [None] otherwise. *)
+  val find : t -> L2block.level -> L2block.hash option Lwt.t
 
-(** A persistent reference cell that stores the header of the head of the
-    rollup. *)
-module L2_head : REF with type value = L2block.header
+  (** Add an association from a L2 block level to an L2 block hash in the
+      store. If [flush] (default to [true]) is set, the index is written on disk
+      right away. *)
+  val add : ?flush:bool -> t -> L2block.level -> L2block.hash -> unit Lwt.t
 
-(** {2 Maps} *)
+  (** Removes a level from the store. Does nothing if the level was not
+      registered. *)
+  val remove : ?flush:bool -> t -> L2block.level -> unit Lwt.t
+end
 
-(** Persistent storage for mapping Tezos blocks to their L2 counterpart. *)
-module Tezos_blocks :
-  MAP with type key = Block_hash.t and type value = L2block.hash
+(** {2 Singleton stores}  *)
 
-(** Persistent storage for inboxes, indexed by an L2 block hash. Each block has
-    a single inbox. *)
-module Inboxes : MAP with type key = L2block.hash and type value = Inbox.t
+(** A store composed of a single file on disk to store the current head *)
+module Head_store : sig
+  (** The type of store for the head. *)
+  type t
 
-(** Persistent storage for transaction L2 block headers. *)
-module L2_blocks :
-  MAP with type key = L2block.hash and type value = L2block.header
+  (** Reads the current L2 head block hash from the disk. Returns [None] if the
+      file does not exist or if it is corrupted. *)
+  val read : t -> L2block.hash option Lwt.t
 
-(** Persistent storage for associating an L2 block hash to each rollup level. *)
-module Rollup_levels :
-  MAP with type key = L2block.level and type value = L2block.hash
+  (** Write the head block hash to disk. *)
+  val write : t -> L2block.hash -> unit tzresult Lwt.t
+end
+
+(** A store composed of a single file on disk to store the current Tezos head *)
+module Tezos_head_store : sig
+  (** The type of store for the Tezos head. *)
+  type t
+
+  (** Reads the current tezos head block hash from the disk. Returns [None] if the
+      file does not exist or if it is corrupted. *)
+  val read : t -> Block_hash.t option Lwt.t
+
+  (** Write the tezos head block hash to disk. *)
+  val write : t -> Block_hash.t -> unit tzresult Lwt.t
+end
+
+(** Type for on disk information about a rollup *)
+type rollup_info = {
+  rollup_id : Protocol.Alpha_context.Tx_rollup.t;
+  origination_block : Block_hash.t;
+  origination_level : int32;
+}
+
+(** A store composed of a single file on disk to store the rollup
+    information. This is used to guarantee consistency between several runs of
+    the Tx rollup node. *)
+module Rollup_info_store : sig
+  (** The type of store for the rollup origination information. *)
+  type t
+
+  (** Reads the current rollup information from disk. Returns [None]
+      if the file does not exist or if it is corrupted. *)
+  val read : t -> rollup_info option Lwt.t
+
+  (** Write the rollup information to disk. *)
+  val write : t -> rollup_info -> unit tzresult Lwt.t
+end
+
+(** The type of all stores of the Tx rollup node. *)
+type t = {
+  blocks : L2_block_store.t;
+  tezos_blocks : Tezos_block_store.t;
+  levels : Level_store.t;
+  head : Head_store.t;
+  tezos_head : Tezos_head_store.t;
+  rollup_info : Rollup_info_store.t;
+}
+
+(** [init ~data_dir ~readonly ~blocks_cache_size] creates or loads existing
+    stores located in the directory [data_dir]. If [readonly] (defaults to
+    [false]) is set, the stores can only be read. An LRU cache of size
+    [blocks_cache_size] is used for reading L2 blocks. *)
+val init : data_dir:string -> readonly:bool -> blocks_cache_size:int -> t Lwt.t
+
+(** [close store] closes all the stores by closing the indexes and the
+    associated opened file descriptors. *)
+val close : t -> unit Lwt.t

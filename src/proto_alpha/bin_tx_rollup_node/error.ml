@@ -65,90 +65,6 @@ let () =
     (function Tx_rollup_originated_in_fork -> Some () | _ -> None)
     (fun () -> Tx_rollup_originated_in_fork)
 
-type error += Tx_rollup_block_predecessor_not_processed of Block_hash.t
-
-let () =
-  register_error_kind
-    ~id:"tx_rollup.node.block_predecessor_not_processed"
-    ~title:"The predecessor of the block was not processed by the node"
-    ~description:"The predecessor of the block was not processed by the node."
-    ~pp:(fun ppf hash ->
-      Format.fprintf
-        ppf
-        "The predecessor (%a) of the block was not processed by the node but \
-         the node still tried to process (%a). This should not have happened \
-         and it is definitely a bug. Please fill an issue at \
-         <https://gitlab.com/tezos/tezos/-/issues>."
-        Block_hash.pp
-        hash
-        Block_hash.pp
-        hash)
-    `Permanent
-    Data_encoding.(obj1 (req "predecessor_hash" Block_hash.encoding))
-    (function
-      | Tx_rollup_block_predecessor_not_processed hash -> Some hash | _ -> None)
-    (fun hash -> Tx_rollup_block_predecessor_not_processed hash)
-
-type error +=
-  | Tx_rollup_unable_to_encode_storable_value of string * Data_encoding.Json.t
-
-let () =
-  register_error_kind
-    ~id:"tx_rollup.node.unable_to_encode_storable_value"
-    ~title:"Cannot encode value"
-    ~description:
-      "Cannot encode value which make it impossible to put it in the storage"
-    ~pp:(fun ppf (key, value) ->
-      Format.fprintf
-        ppf
-        "Cannot encode value (%a) which make it impossible to put it in the \
-         storage at key: %s"
-        Data_encoding.Json.pp
-        value
-        key)
-    `Permanent
-    Data_encoding.(
-      obj2 (req "key" string) (req "value" Data_encoding.Json.encoding))
-    (function
-      | Tx_rollup_unable_to_encode_storable_value (key, value) ->
-          Some (key, value)
-      | _ -> None)
-    (fun (key, value) -> Tx_rollup_unable_to_encode_storable_value (key, value))
-
-type error += Tx_rollup_unable_to_decode_stored_value of string * string
-
-let () =
-  register_error_kind
-    ~id:"tx_rollup.node.unable_to_decode_stored_value"
-    ~title:"Cannot decode value"
-    ~description:"We could not decode a value present in the storage"
-    ~pp:(fun ppf (key, input) ->
-      Format.fprintf
-        ppf
-        "We could not decode a stored value (%s) at key: %s"
-        input
-        key)
-    `Permanent
-    Data_encoding.(obj2 (req "key" string) (req "encoded_value" string))
-    (function
-      | Tx_rollup_unable_to_decode_stored_value (k, v) -> Some (k, v)
-      | _ -> None)
-    (fun (k, v) -> Tx_rollup_unable_to_decode_stored_value (k, v))
-
-type error += Tx_rollup_irmin_error of string
-
-let () =
-  register_error_kind
-    ~id:"tx_rollup.node.irmin_error"
-    ~title:"Irmin error"
-    ~description:"Error on Irmin side"
-    ~pp:(fun ppf message ->
-      Format.fprintf ppf "Error on Irmin side: %s" message)
-    `Permanent
-    Data_encoding.(obj1 (req "message" string))
-    (function Tx_rollup_irmin_error message -> Some message | _ -> None)
-    (fun message -> Tx_rollup_irmin_error message)
-
 type error += Tx_rollup_configuration_file_does_not_exists of string
 
 let () =
@@ -252,26 +168,23 @@ let () =
     (function Tx_rollup_cannot_checkout_context c -> Some c | _ -> None)
     (fun c -> Tx_rollup_cannot_checkout_context c)
 
-type error +=
-  | Tx_rollup_no_rollup_origination_on_disk_and_no_rollup_genesis_given
+type error += Tx_rollup_no_rollup_info_on_disk_and_no_rollup_genesis_given
 
 let () =
   let description =
-    "No rollup origination on disk and no rollup genesis provided"
+    "No rollup information on disk and no rollup genesis provided"
   in
   register_error_kind
-    ~id:"tx_rollup.node.no_rollup_origination_and_no_rollup_genesis_given"
-    ~title:"No rollup origination on disk and none provided"
+    ~id:"tx_rollup.node.no_rollup_info_and_no_rollup_genesis_given"
+    ~title:"No rollup information on disk and none provided"
     ~description
     ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
     `Permanent
     Data_encoding.empty
     (function
-      | Tx_rollup_no_rollup_origination_on_disk_and_no_rollup_genesis_given ->
-          Some ()
+      | Tx_rollup_no_rollup_info_on_disk_and_no_rollup_genesis_given -> Some ()
       | _ -> None)
-    (fun () ->
-      Tx_rollup_no_rollup_origination_on_disk_and_no_rollup_genesis_given)
+    (fun () -> Tx_rollup_no_rollup_info_on_disk_and_no_rollup_genesis_given)
 
 type error +=
   | Tx_rollup_different_disk_stored_origination_rollup_and_given_rollup_genesis of {
@@ -328,3 +241,37 @@ let () =
     Data_encoding.(obj1 (req "context" Operation_hash.encoding))
     (function Tx_rollup_no_operation_metadata o -> Some o | _ -> None)
     (fun o -> Tx_rollup_no_operation_metadata o)
+
+type error += Tx_rollup_mismatch
+
+let () =
+  register_error_kind
+    ~id:"tx_rollup.node.different_disk_stored_rollup"
+    ~title:"Rollup on disk is different from the one provided"
+    ~description:"Rollup on disk is different from the provided rollup"
+    ~pp:(fun ppf () ->
+      Format.fprintf
+        ppf
+        "Rollup origination on disk is different from the provided rollup")
+    `Permanent
+    Data_encoding.unit
+    (function Tx_rollup_mismatch -> Some () | _ -> None)
+    (fun () -> Tx_rollup_mismatch)
+
+type error += Tx_rollup_cannot_fetch_tezos_block of Block_hash.t
+
+let () =
+  register_error_kind
+    ~id:"tx_rollup.node.cannot_fetch_tezos_block"
+    ~title:"A Tezos block cannot be fetched"
+    ~description:"A Tezos block cannot be fetched."
+    ~pp:(fun ppf b ->
+      Format.fprintf
+        ppf
+        "The Tezos block %a cannot be fetched from the node."
+        Block_hash.pp
+        b)
+    `Permanent
+    Data_encoding.(obj1 (req "block" Block_hash.encoding))
+    (function Tx_rollup_cannot_fetch_tezos_block b -> Some b | _ -> None)
+    (fun b -> Tx_rollup_cannot_fetch_tezos_block b)

@@ -36,6 +36,7 @@ type t = {
   rpc_addr : P2p_point.Id.t;
   reconnection_delay : float;
   operator : string option;
+  l2_blocks_cache_size : int;
 }
 
 (** [default_data_dir] is the default value for [data_dir]. *)
@@ -44,8 +45,12 @@ val default_data_dir : Protocol.Alpha_context.Tx_rollup.t -> string
 (** [default_rpc_addr] is the default value for [rpc_addr]. *)
 val default_rpc_addr : P2p_point.Id.t
 
-(** [default_reconnection_delay] is the default value for [reconnection-delay]*)
+(** [default_reconnection_delay] is the default value for [reconnection-delay] *)
 val default_reconnection_delay : float
+
+(** [default_l2_blocks_cache_size] is the default number of L2 blocks that are
+    cached by the rollup node *)
+val default_l2_blocks_cache_size : int
 
 (** [save configuration] overwrites [configuration] file and returns the filename. *)
 val save : t -> string tzresult Lwt.t

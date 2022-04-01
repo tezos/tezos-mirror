@@ -144,6 +144,7 @@ let configuration_init_command =
             rollup_genesis;
             rpc_addr;
             reconnection_delay;
+            l2_blocks_cache_size = default_l2_blocks_cache_size;
           }
       in
       let* file = Configuration.save config in

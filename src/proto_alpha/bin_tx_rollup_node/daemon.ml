@@ -238,20 +238,15 @@ let extract_messages_from_block block_info rollup_id =
       (List.rev rev_messages, cumulated_size)
 
 let create_genesis_block state tezos_block =
-  let open Lwt_result_syntax in
+  let open Lwt_syntax in
   let ctxt = Context.empty state.State.context_index in
-  let*! context_hash = Context.commit ctxt in
-  let header : L2block.header =
-    {
-      level = Genesis;
-      tezos_block;
-      predecessor = L2block.genesis_hash state.rollup;
-      (* Genesis block is its own predecessor *)
-      context = context_hash;
-    }
+  let genesis_block =
+    L2block.genesis_block
+      state.context_index
+      state.rollup_info.rollup_id
+      tezos_block
   in
-  let inbox : Inbox.t = {contents = []; cumulated_size = 0} in
-  let genesis_block = L2block.{header; inbox} in
+  let* _ctxt_hash = Context.commit ctxt in
   let+ _block_hash = State.save_block state genesis_block in
   (genesis_block, ctxt)
 
@@ -291,22 +286,42 @@ let process_messages_and_inboxes (state : State.t) ~(predecessor : L2block.t)
         }
       in
       let block = L2block.{header; inbox} in
-      let* hash = State.save_block state block in
+      let*! hash = State.save_block state block in
       let*! () =
         Event.(emit rollup_block) (header.level, hash, header.tezos_block)
       in
       return (block, context)
 
+let get_tezos_block cctxt state hash =
+  let open Lwt_syntax in
+  let fetch hash =
+    let+ block =
+      Alpha_block_services.info
+        cctxt
+        ~chain:cctxt#chain
+        ~block:(`Hash (hash, 0))
+        ()
+    in
+    Result.to_option block
+  in
+  let+ block =
+    State.Tezos_blocks_cache.find_or_replace
+      state.State.tezos_blocks_cache
+      hash
+      fetch
+  in
+  Result.of_option ~error:[Tx_rollup_cannot_fetch_tezos_block hash] block
+
 let rec process_block cctxt state current_hash rollup_id :
     (L2block.t * Context.context option, tztrace) result Lwt.t =
   let open Lwt_result_syntax in
-  if Block_hash.equal state.State.rollup_origination.block_hash current_hash
+  if Block_hash.equal state.State.rollup_info.origination_block current_hash
   then
     (* This is the rollup origination block, create L2 genesis block *)
-    let+ (genesis_block, genesis_ctxt) =
+    let*! (genesis_block, genesis_ctxt) =
       create_genesis_block state current_hash
     in
-    (genesis_block, Some genesis_ctxt)
+    return (genesis_block, Some genesis_ctxt)
   else
     let*! l2_block = State.get_tezos_l2_block state current_hash in
     match l2_block with
@@ -317,18 +332,12 @@ let rec process_block cctxt state current_hash rollup_id :
         let* _l2_reorg = State.set_head state l2_block context in
         return (l2_block, Some context)
     | None ->
-        let* block_info =
-          Alpha_block_services.info
-            cctxt
-            ~chain:cctxt#chain
-            ~block:(`Hash (current_hash, 0))
-            ()
-        in
+        let* block_info = get_tezos_block cctxt state current_hash in
         let predecessor_hash = block_info.header.shell.predecessor in
         let block_level = block_info.header.shell.level in
         let* () =
           fail_when
-            (block_level < state.State.rollup_origination.block_level)
+            (block_level < state.State.rollup_info.origination_level)
             Tx_rollup_originated_in_fork
         in
         (* Handle predecessor Tezos block first *)
@@ -347,11 +356,13 @@ let rec process_block cctxt state current_hash rollup_id :
             block_info
             rollup_id
         in
-        let* () =
-          State.save_tezos_l2_block_hash
+        let*! () =
+          State.save_tezos_block_info
             state
             current_hash
             (L2block.hash_header l2_block.header)
+            ~level:block_info.header.shell.level
+            ~predecessor:block_info.header.shell.predecessor
         in
         let* _l2_reorg = State.set_head state l2_block context in
         let*! () = Event.(emit new_tezos_head) current_hash in
@@ -366,13 +377,16 @@ let maybe_batch_and_inject state =
 let process_head cctxt state current_hash rollup_id =
   let open Lwt_result_syntax in
   let*! () = Event.(emit new_block) current_hash in
-  let+ res = process_block cctxt state current_hash rollup_id in
+  let* res = process_block cctxt state current_hash rollup_id in
+  let* _l1_reorg = State.set_tezos_head state current_hash in
   maybe_batch_and_inject state ;
-  res
+  (* TODO/TORU: handle new head and reorgs w.r.t. injected operations by the
+     rollup node, like commitments and rejections. *)
+  return res
 
-let main_exit_callback state data_dir exit_status =
+let main_exit_callback state exit_status =
   let open Lwt_syntax in
-  let* () = Stores.close data_dir in
+  let* () = Stores.close state.State.stores in
   let* () = Context.close state.State.context_index in
   let* () = Event.(emit node_is_shutting_down) exit_status in
   Tezos_base_unix.Internal_event_unix.close ()
@@ -398,17 +412,24 @@ let run configuration cctxt =
     rollup_genesis;
     operator;
     reconnection_delay;
+    l2_blocks_cache_size;
     _;
   } =
     configuration
   in
-  let* state = State.init cctxt ~data_dir ~operator ?rollup_genesis rollup_id in
+  let* state =
+    State.init
+      cctxt
+      ~data_dir
+      ~l2_blocks_cache_size
+      ~operator
+      ?rollup_genesis
+      rollup_id
+  in
   let* _rpc_server = RPC.start configuration state in
   let _ =
     (* Register cleaner callback *)
-    Lwt_exit.register_clean_up_callback
-      ~loc:__LOC__
-      (main_exit_callback state data_dir)
+    Lwt_exit.register_clean_up_callback ~loc:__LOC__ (main_exit_callback state)
   in
   let*! () = Event.(emit node_is_ready) () in
   let rec loop () =

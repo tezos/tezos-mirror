@@ -32,6 +32,7 @@ type t = {
   rpc_addr : P2p_point.Id.t;
   reconnection_delay : float;
   operator : string option;
+  l2_blocks_cache_size : int;
 }
 
 let default_data_dir rollup_id =
@@ -46,6 +47,8 @@ let default_rpc_addr = (Ipaddr.V6.localhost, 9999)
 
 let default_reconnection_delay = 2.0
 
+let default_l2_blocks_cache_size = 64
+
 let encoding =
   let open Data_encoding in
   conv
@@ -56,19 +59,22 @@ let encoding =
            rpc_addr;
            reconnection_delay;
            operator;
+           l2_blocks_cache_size;
          } ->
       ( Some data_dir,
         rollup_id,
         rollup_genesis,
         rpc_addr,
         reconnection_delay,
-        operator ))
+        operator,
+        l2_blocks_cache_size ))
     (fun ( data_dir_opt,
            rollup_id,
            rollup_genesis,
            rpc_addr,
            reconnection_delay,
-           operator ) ->
+           operator,
+           l2_blocks_cache_size ) ->
       let data_dir =
         match data_dir_opt with
         | Some dir -> dir
@@ -81,8 +87,9 @@ let encoding =
         rpc_addr;
         reconnection_delay;
         operator;
+        l2_blocks_cache_size;
       })
-  @@ obj6
+  @@ obj7
        (opt
           ~description:
             "Location where the rollup node data (store, context, etc.) is \
@@ -112,6 +119,11 @@ let encoding =
             "The operator of the rollup (alias or public key hash) if any"
           "operator"
           string)
+       (dft
+          ~description:"The size of the L2 block cache in number of blocks"
+          "l2_blocks_cache_size"
+          int31
+          default_l2_blocks_cache_size)
 
 let get_configuration_filename data_dir =
   let filename = "config.json" in
