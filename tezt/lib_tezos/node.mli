@@ -78,6 +78,7 @@ type argument =
   | Disable_operations_precheck  (** [--disable-mempool-precheck] *)
   | Media_type of media_type  (** [--media-type] *)
   | Metadata_size_limit of int option  (** --metadata-size-limit *)
+  | Metrics_addr of string  (** [--metrics-addr] *)
 
 (** Tezos node states. *)
 type t
