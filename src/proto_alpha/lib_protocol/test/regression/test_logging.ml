@@ -40,51 +40,106 @@ module Traced_interpreter = Plugin.RPC.Scripts.Traced_interpreter (struct
   let unparsing_mode = Script_ir_translator.Readable
 end)
 
+type element_kind = Interp | Entry | Exit
+
 type log_element =
   | With_stack :
       context
+      * ('a, 'b, 'c, 'd) Script_typed_ir.kinstr
       * Script.location
-      * ('a * 's)
-      * ('a, 's) Script_typed_ir.stack_ty
-      * int (* indentation change *)
+      * ('e * 'f)
+      * ('e, 'f) Script_typed_ir.stack_ty
+      * element_kind
       -> log_element
+  | Ctrl : ('a, 'b, 'c, 'd) Script_typed_ir.continuation -> log_element
 
 type trace_element =
-  | TInstr : Script.location * Gas.t * Script.expr list -> trace_element
+  | TInstr :
+      Script.location
+      * Gas.t
+      * ('a, 'b, 'c, 'd) Script_typed_ir.kinstr
+      * Script.expr list
+      * element_kind
+      -> trace_element
+  | TCtrl : ('a, 'b, 'c, 'd) Script_typed_ir.continuation -> trace_element
 
-let pp_trace fmt = function
-  | TInstr (loc, gas, stack) ->
+let with_indentation fmt = function
+  | Interp ->
       Format.fprintf
         fmt
-        "- @[<v 0>location: %d (remaining gas: %a)@,[ @[<v 0>%a ]@]@]"
+        "- @[<v 0>%a (interp) @@ location: %d (remaining gas: %a)@,\
+         [ @[<v 0>%a ]@]@]"
+  | Exit ->
+      Format.fprintf
+        fmt
+        "- @[<v 0>%a (exit) @@ location: %d (remaining gas: %a)@,\
+         [ @[<v 0>%a ]@]@]@]"
+  | Entry ->
+      Format.fprintf
+        fmt
+        "@[<v 2>- @[<v 0>%a (entry) @@ location: %d (remaining gas: %a)@,\
+         [ @[<v 0>%a ]@]@]"
+
+let pp_trace fmt = function
+  | TInstr (loc, gas, instr, stack, element_kind) ->
+      with_indentation
+        fmt
+        element_kind
+        Plugin.RPC.Scripts.pp_instr_name
+        instr
         loc
         Gas.pp
         gas
         (Format.pp_print_list (fun ppf e ->
              Format.fprintf ppf "@[<v 0>%a@]" Michelson_v1_printer.print_expr e))
         stack
+  | TCtrl continuation -> (
+      Format.fprintf fmt "- @[<v 0>control: %s@]"
+      @@
+      match continuation with
+      | KNil -> "KNil"
+      | KCons _ -> "KCons"
+      | KReturn _ -> "KReturn"
+      | KView_exit _ -> "KView_exit"
+      | KMap_head _ -> "KMap_head"
+      | KUndip _ -> "KUndip"
+      | KLoop_in _ -> "KLoop_in"
+      | KLoop_in_left _ -> "KLoop_in_left"
+      | KIter _ -> "KIter"
+      | KList_enter_body _ -> "KList_enter_body"
+      | KList_exit_body _ -> "KList_exit_body"
+      | KMap_enter_body _ -> "KMap_enter_body"
+      | KMap_exit_body _ -> "KMap_exit_body"
+      | KLog _ -> "KLog")
 
 let logger () :
     (unit -> trace_element list tzresult Lwt.t) * Script_typed_ir.logger =
+  let open Script_typed_ir in
   let log : log_element list ref = ref [] in
-  let log_interp _ ctxt loc sty stack =
-    log := With_stack (ctxt, loc, stack, sty, 0) :: !log
+  let log_interp : type a s b f c u. (a, s, b, f, c, u) logging_function =
+   fun instr ctxt loc sty stack ->
+    log := With_stack (ctxt, instr, loc, stack, sty, Interp) :: !log
   in
-  let log_entry _ _ctxt _loc _sty _stack = () in
-  let log_exit _ ctxt loc sty stack =
-    log := With_stack (ctxt, loc, stack, sty, 0) :: !log
+  let log_entry instr ctxt loc sty stack =
+    log := With_stack (ctxt, instr, loc, stack, sty, Entry) :: !log
   in
-  let log_control _ = () in
+  let log_exit instr ctxt loc sty stack =
+    log := With_stack (ctxt, instr, loc, stack, sty, Exit) :: !log
+  in
+  let log_control cont = log := Ctrl cont :: !log in
   let get_log () = assert false in
   let assemble_log () =
+    let open Environment.Error_monad in
     let+ l =
       List.map_es
-        (fun (With_stack (ctxt, loc, stack, stack_ty, _)) ->
-          let+ stack =
-            Lwt.map Environment.wrap_tzresult
-            @@ Traced_interpreter.unparse_stack ctxt (stack, stack_ty)
-          in
-          TInstr (loc, Gas.level ctxt, stack))
+        (function
+          | With_stack (ctxt, instr, loc, stack, stack_ty, indent) ->
+              let+ stack =
+                Lwt.map Environment.wrap_tzresult
+                @@ Traced_interpreter.unparse_stack ctxt (stack, stack_ty)
+              in
+              TInstr (loc, Gas.level ctxt, instr, stack, indent)
+          | Ctrl cont -> return @@ TCtrl cont)
         !log
     in
     List.rev l
