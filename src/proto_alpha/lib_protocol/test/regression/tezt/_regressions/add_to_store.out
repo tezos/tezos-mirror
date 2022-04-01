@@ -1,4 +1,4 @@
-test_logging.out
+add_to_store.out
 
 trace
   - UNPAIR (interp) @ location: 7 (remaining gas: unaccounted)
