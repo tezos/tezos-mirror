@@ -36,7 +36,7 @@ val init :
   signer:Signature.public_key_hash ->
   Injector.t ->
   Context.index ->
-  Protocol.Alpha_context.Constants.parametric ->
+  Constants.t ->
   t tzresult Lwt.t
 
 (** Retrieve an L2 transaction from the queue. *)

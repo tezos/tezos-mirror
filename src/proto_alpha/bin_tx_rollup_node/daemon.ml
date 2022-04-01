@@ -28,7 +28,8 @@
 open Protocol.Apply_results
 open Tezos_shell_services
 open Protocol_client_context
-open Protocol.Alpha_context
+open Protocol
+open Alpha_context
 open Error
 
 let parse_tx_rollup_l2_address :
@@ -221,19 +222,19 @@ let process_messages_and_inboxes (state : State.t) ~(predecessor : L2block.t)
     | None -> Context.checkout state.context_index predecessor.header.context
     | Some context -> return context
   in
-  let l2_parameters =
+  let parameters =
     Protocol.Tx_rollup_l2_apply.
       {
         tx_rollup_max_withdrawals_per_batch =
-          state.l1_constants.tx_rollup_max_withdrawals_per_batch;
+          state.constants.parametric.tx_rollup_max_withdrawals_per_batch;
       }
   in
   let* (context, contents) =
     Interpreter.interpret_messages
       predecessor_context
-      l2_parameters
+      parameters
       ~rejection_max_proof_size:
-        state.l1_constants.tx_rollup_rejection_max_proof_size
+        state.constants.parametric.tx_rollup_rejection_max_proof_size
       messages
   in
   match contents with

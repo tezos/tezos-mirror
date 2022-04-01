@@ -49,9 +49,9 @@ type t = {
   mutable head : L2block.t;
   rollup_info : rollup_info;
   tezos_blocks_cache : Alpha_block_services.block_info Tezos_blocks_cache.t;
+  constants : Constants.t;
   operator : signer option;
   batcher : Batcher.t option;
-  l1_constants : Protocol.Alpha_context.Constants.parametric;
   injector : Injector.t;
 }
 
@@ -403,12 +403,8 @@ let init_head (stores : Stores.t) context_index rollup rollup_info =
       let* ctxt = Context.init_context context_index in
       L2block.genesis_block ctxt rollup rollup_info.origination_block
 
-let init_l1_constants cctxt =
-  let open Lwt_result_syntax in
-  let+ {parametric; _} =
-    Protocol.Constants_services.all cctxt (cctxt#chain, cctxt#block)
-  in
-  parametric
+let retrieve_constants cctxt =
+  Protocol.Constants_services.all cctxt (cctxt#chain, cctxt#block)
 
 let init cctxt ~data_dir ?(readonly = false) ?rollup_genesis
     ~l2_blocks_cache_size ~operator ~(signers : Configuration.signers) rollup =
@@ -423,7 +419,7 @@ let init cctxt ~data_dir ?(readonly = false) ?rollup_genesis
     |> lwt_map_error (function [] -> [] | trace :: _ -> trace)
   in
   let*! head = init_head stores context_index rollup rollup_info in
-  let* l1_constants = init_l1_constants cctxt in
+  let* constants = retrieve_constants cctxt in
   let* injector =
     Injector.init
       cctxt
@@ -442,7 +438,7 @@ let init cctxt ~data_dir ?(readonly = false) ?rollup_genesis
   let* batcher =
     Option.map_es
       (fun signer ->
-        Batcher.init ~rollup ~signer injector context_index parameters)
+        Batcher.init ~rollup ~signer injector context_index constants)
       signers.submit_batch
   in
   let* operator = Option.map_es (get_signer cctxt) operator in
@@ -456,8 +452,8 @@ let init cctxt ~data_dir ?(readonly = false) ?rollup_genesis
       head;
       rollup_info;
       tezos_blocks_cache;
+      constants;
       operator;
       batcher;
-      l1_constants;
       injector;
     }

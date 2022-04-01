@@ -49,9 +49,9 @@ type t = private {
   mutable head : L2block.t;
   rollup_info : rollup_info;
   tezos_blocks_cache : Alpha_block_services.block_info Tezos_blocks_cache.t;
+  constants : Constants.t;
   operator : signer option;
   batcher : Batcher.t option;
-  l1_constants : Protocol.Alpha_context.Constants.parametric;
   injector : Injector.t;
 }
 

@@ -243,7 +243,7 @@ module Block = struct
         match block_id with
         | `Tezos_block b when Block_hash.(block.header.tezos_block <> b) ->
             (* Tezos block has no l2 inbox *)
-            failwith "The tezos block (%a) has not l2 inbox" Block_hash.pp b
+            failwith "The tezos block (%a) has not L2 inbox" Block_hash.pp b
         | _ ->
             let open Inbox in
             let inbox = block.inbox in
@@ -296,7 +296,8 @@ module Block = struct
               Protocol.Tx_rollup_l2_apply.
                 {
                   tx_rollup_max_withdrawals_per_batch =
-                    state.l1_constants.tx_rollup_max_withdrawals_per_batch;
+                    state.constants.parametric
+                      .tx_rollup_max_withdrawals_per_batch;
                 }
             in
             let* (proof, _) =

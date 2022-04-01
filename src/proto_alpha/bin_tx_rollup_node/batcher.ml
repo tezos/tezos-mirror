@@ -30,14 +30,13 @@ module Tx_queue = Hash_queue.Make (L2_transaction.Hash) (L2_transaction)
 
 type state = {
   rollup : Tx_rollup.t;
-  parameters : Protocol.Tx_rollup_l2_apply.parameters;
+  constants : Constants.t;
   index : Context.index;
   signer : Signature.public_key_hash;
   injector : Injector.t;
   transactions : Tx_queue.t;
   mutable incr_context : Context.t;
   lock : Lwt_mutex.t;
-  l1_constants : Protocol.Alpha_context.Constants.parametric;
 }
 
 (* TODO/TORU: remove me *)
@@ -74,47 +73,46 @@ let inject_batches state batches =
   let*! () = Injector.add_pending_operations state.injector operations in
   return_unit
 
-(** [is_batch_valid] returns whether the batch is valid or not based on
-    two criterias:
+(** [is_batch_valid] returns whether the batch is valid or not based on two
+    criteria:
 
     The proof produced by the batch interpretation must be smaller than
-    [l1_constants.tx_rollup_rejection_max_proof_size]. Otherwise, the associated
-    commitment can be rejected because of the size.
+    [constants.parametric.tx_rollup_rejection_max_proof_size]. Otherwise, the
+    associated commitment can be rejected because of the size.
 
-    The batch exceeds the [l1_constants.tx_rollup_hard_size_limit_per_message],
-    the submit batch operation will fail.
-*)
-let is_batch_valid ctxt
-    (l1_constants : Protocol.Alpha_context.Constants.parametric) batch =
+    The batch exceeds the
+    [constants.parametric.tx_rollup_hard_size_limit_per_message], the submit
+    batch operation will fail.  *)
+let is_batch_valid ctxt (constants : Constants.t) batch =
   let open Lwt_result_syntax in
   (* The batch is ok if:
      1. The proof is small enough
      2. The batch is small enough *)
   let batch_size_ok =
     let size = Data_encoding.Binary.length Tx_rollup_l2_batch.encoding batch in
-    size <= l1_constants.tx_rollup_hard_size_limit_per_message
+    size <= constants.parametric.tx_rollup_hard_size_limit_per_message
   in
   if batch_size_ok then
-    let l2_parameters =
+    let parameters =
       Tx_rollup_l2_apply.
         {
           tx_rollup_max_withdrawals_per_batch =
-            l1_constants.tx_rollup_max_withdrawals_per_batch;
+            constants.parametric.tx_rollup_max_withdrawals_per_batch;
         }
     in
     let*! res_interp =
       Interpreter.interpret_batch
         ctxt
-        l2_parameters
+        parameters
         ~rejection_max_proof_size:
-          l1_constants.tx_rollup_rejection_max_proof_size
+          constants.parametric.tx_rollup_rejection_max_proof_size
         batch
     in
     let b_proof_size = Result.is_ok res_interp in
     return b_proof_size
   else return_false
 
-let get_batches ctxt l1_constants queue =
+let get_batches ctxt constants queue =
   let open Lwt_result_syntax in
   let exception
     Batches_finished of {
@@ -129,7 +127,7 @@ let get_batches ctxt l1_constants queue =
         (fun tr_hash tr (batches, rev_current_trs, to_remove) ->
           let new_trs = tr :: rev_current_trs in
           let*? batch = L2_transaction.batch (List.rev new_trs) in
-          let* b = is_batch_valid ctxt l1_constants batch in
+          let* b = is_batch_valid ctxt constants batch in
           if b then return (batches, new_trs, tr_hash :: to_remove)
           else
             match rev_current_trs with
@@ -151,7 +149,7 @@ let get_batches ctxt l1_constants queue =
                 else
                   (* We add the batch to the accumulator and we go on. *)
                   let*? batch = L2_transaction.batch [tr] in
-                  let* b = is_batch_valid ctxt l1_constants batch in
+                  let* b = is_batch_valid ctxt constants batch in
                   if b then return (new_batches, [tr], tr_hash :: to_remove)
                   else
                     let*! () = Event.(emit Batcher.invalid_transaction) tr in
@@ -173,7 +171,7 @@ let get_batches ctxt l1_constants queue =
 let on_batch state =
   let open Lwt_result_syntax in
   let* (batches, to_remove) =
-    get_batches state.incr_context state.l1_constants state.transactions
+    get_batches state.incr_context state.constants state.transactions
   in
   match batches with
   | [] -> return_unit
@@ -199,15 +197,15 @@ let on_register state ~apply (tr : L2_transaction.t) =
   let prev_context = context in
   let* context =
     if apply then
-      let l2_parameters =
-        Tx_rollup_l2_apply.
-          {
-            tx_rollup_max_withdrawals_per_batch =
-              state.l1_constants.tx_rollup_max_withdrawals_per_batch;
-          }
-      in
       let* (new_context, result, _withdrawals) =
-        L2_apply.Batch_V1.apply_batch context l2_parameters batch
+        let parameters =
+          Tx_rollup_l2_apply.
+            {
+              tx_rollup_max_withdrawals_per_batch =
+                state.constants.parametric.tx_rollup_max_withdrawals_per_batch;
+            }
+        in
+        L2_apply.Batch_V1.apply_batch context parameters batch
       in
       let open Tx_rollup_l2_apply.Message_result in
       let+ context =
@@ -238,7 +236,7 @@ let on_new_head state head =
      Flush and reapply queue *)
   state.incr_context <- context
 
-let init_batcher_state ~rollup ~signer injector index l1_constants =
+let init_batcher_state ~rollup ~signer injector index constants =
   let open Lwt_result_syntax in
   let+ incr_context = Context.init_context index in
   {
@@ -246,10 +244,10 @@ let init_batcher_state ~rollup ~signer injector index l1_constants =
     index;
     signer;
     injector;
+    constants;
     transactions = Tx_queue.create 500_000;
     incr_context;
     lock = Lwt_mutex.create ();
-    l1_constants;
   }
 
 module Types = struct
@@ -259,7 +257,7 @@ module Types = struct
     signer : Signature.public_key_hash;
     injector : Injector.t;
     index : Context.index;
-    l1_constants : Protocol.Alpha_context.Constants.parametric;
+    constants : Constants.t;
   }
 end
 
@@ -283,9 +281,9 @@ module Handlers = struct
 
   let on_request w r = protect @@ fun () -> on_request w r
 
-  let on_launch _w rollup Types.{signer; injector; index; l1_constants} =
+  let on_launch _w rollup Types.{signer; injector; index; constants} =
     let open Lwt_result_syntax in
-    let*! state = init_batcher_state ~rollup ~signer injector index l1_constants in
+    let*! state = init_batcher_state ~rollup ~signer injector index constants in
     return state
 
   let on_error _w r st errs =
@@ -309,11 +307,11 @@ let table = Worker.create_table Queue
 
 type t = worker
 
-let init ~rollup ~signer injector index l1_constants =
+let init ~rollup ~signer injector index constants =
   Worker.launch
     table
     rollup
-    {signer; injector; index; l1_constants}
+    {signer; injector; index; constants}
     (module Handlers)
 
 let find_transaction w tr_hash =
