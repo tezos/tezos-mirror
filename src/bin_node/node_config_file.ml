@@ -1510,7 +1510,7 @@ let resolve_rpc_listening_addrs listen_addr =
   let open Lwt_tzresult_syntax in
   let+ addrs =
     resolve_addr
-      ~default_addr:"::"
+      ~default_addr:"localhost"
       ~default_port:default_rpc_port
       ~passive:true
       listen_addr
