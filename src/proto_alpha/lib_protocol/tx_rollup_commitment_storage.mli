@@ -29,12 +29,13 @@
     to commitments for transaction rollups. *)
 
 val check_message_result :
+  Raw_context.t ->
   Tx_rollup_commitment_repr.Compact.t ->
   [ `Hash of Tx_rollup_message_result_hash_repr.t
   | `Result of Tx_rollup_message_result_repr.t ] ->
   path:Tx_rollup_commitment_repr.Merkle.path ->
   index:int ->
-  unit tzresult
+  Raw_context.t tzresult
 
 (** [add_commitment context tx_rollup contract commitment] adds a
     commitment to a rollup. It returns the new context, and the new

@@ -1,9 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Marigold <contact@marigold.dev>                        *)
 (* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
-(* Copyright (c) 2022 Oxhead Alpha <info@oxhead-alpha.com>                   *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -25,27 +23,46 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type error += Tx_rollup_negative_input_size
+let message :
+    Raw_context.t ->
+    Tx_rollup_message_repr.t ->
+    (Raw_context.t * Tx_rollup_message_hash_repr.t) tzresult =
+ fun ctxt input ->
+  Tx_rollup_gas.hash
+    ~hash_f:Tx_rollup_message_hash_repr.hash_bytes
+    ctxt
+    Tx_rollup_message_repr.encoding
+    input
 
-(** A generic helper to hash an input *)
-val hash :
-  hash_f:(bytes list -> 'b) ->
-  Raw_context.t ->
-  'a Data_encoding.t ->
-  'a ->
-  (Raw_context.t * 'b) tzresult
+let message_result :
+    Raw_context.t ->
+    Tx_rollup_message_result_repr.t ->
+    (Raw_context.t * Tx_rollup_message_result_hash_repr.t) tzresult =
+ fun ctxt input ->
+  Tx_rollup_gas.hash
+    ~hash_f:Tx_rollup_message_result_hash_repr.hash_bytes
+    ctxt
+    Tx_rollup_message_result_repr.encoding
+    input
 
-(** [hash_cost size] returns the cost of gas for hashing a buffer of
-    [size] bytes.
+let compact_commitment :
+    Raw_context.t ->
+    Tx_rollup_commitment_repr.Compact.t ->
+    (Raw_context.t * Tx_rollup_commitment_repr.Hash.t) tzresult =
+ fun ctxt input ->
+  Tx_rollup_gas.hash
+    ~hash_f:Tx_rollup_commitment_repr.Hash.hash_bytes
+    ctxt
+    Tx_rollup_commitment_repr.Compact.encoding
+    input
 
-    Returns [Tx_rollup_input_message_size] iff [size < 0]. *)
-val hash_cost : int -> Gas_limit_repr.cost tzresult
-
-val consume_check_path_inbox_cost : Raw_context.t -> Raw_context.t tzresult
-
-val consume_check_path_commitment_cost : Raw_context.t -> Raw_context.t tzresult
-
-val consume_add_message_cost : Raw_context.t -> Raw_context.t tzresult
-
-val consume_compact_commitment_cost :
-  Raw_context.t -> int -> Raw_context.t tzresult
+let withdraw_list :
+    Raw_context.t ->
+    Tx_rollup_withdraw_repr.t list ->
+    (Raw_context.t * Tx_rollup_withdraw_list_hash_repr.t) tzresult =
+ fun ctxt input ->
+  Tx_rollup_gas.hash
+    ~hash_f:Tx_rollup_withdraw_list_hash_repr.hash_bytes
+    ctxt
+    (Data_encoding.list Tx_rollup_withdraw_repr.encoding)
+    input

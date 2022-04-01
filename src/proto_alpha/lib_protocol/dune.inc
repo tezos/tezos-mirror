@@ -51,7 +51,6 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    fixed_point_repr.mli fixed_point_repr.ml
    saturation_repr.mli saturation_repr.ml
    gas_limit_repr.mli gas_limit_repr.ml
-   tx_rollup_gas.mli tx_rollup_gas.ml
    constants_repr.mli constants_repr.ml
    raw_level_repr.mli raw_level_repr.ml
    fitness_repr.mli fitness_repr.ml
@@ -83,6 +82,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    tx_rollup_withdraw_list_hash_repr.mli tx_rollup_withdraw_list_hash_repr.ml
    tx_rollup_reveal_repr.mli tx_rollup_reveal_repr.ml
    tx_rollup_message_repr.mli tx_rollup_message_repr.ml
+   tx_rollup_message_hash_repr.mli tx_rollup_message_hash_repr.ml
    tx_rollup_inbox_repr.mli tx_rollup_inbox_repr.ml
    tx_rollup_message_result_repr.mli tx_rollup_message_result_repr.ml
    tx_rollup_message_result_hash_repr.mli tx_rollup_message_result_hash_repr.ml
@@ -108,10 +108,11 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    storage_costs.mli storage_costs.ml
    storage_sigs.ml
    storage_functors.mli storage_functors.ml
-   tx_rollup_message_builder.mli tx_rollup_message_builder.ml
    storage.mli storage.ml
    ticket_hash_builder.mli ticket_hash_builder.ml
    constants_storage.mli constants_storage.ml
+   tx_rollup_gas.mli tx_rollup_gas.ml
+   tx_rollup_hash_builder.ml
    level_storage.mli level_storage.ml
    nonce_storage.mli nonce_storage.ml
    seed_storage.mli seed_storage.ml
@@ -237,7 +238,6 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    fixed_point_repr.mli fixed_point_repr.ml
    saturation_repr.mli saturation_repr.ml
    gas_limit_repr.mli gas_limit_repr.ml
-   tx_rollup_gas.mli tx_rollup_gas.ml
    constants_repr.mli constants_repr.ml
    raw_level_repr.mli raw_level_repr.ml
    fitness_repr.mli fitness_repr.ml
@@ -269,6 +269,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    tx_rollup_withdraw_list_hash_repr.mli tx_rollup_withdraw_list_hash_repr.ml
    tx_rollup_reveal_repr.mli tx_rollup_reveal_repr.ml
    tx_rollup_message_repr.mli tx_rollup_message_repr.ml
+   tx_rollup_message_hash_repr.mli tx_rollup_message_hash_repr.ml
    tx_rollup_inbox_repr.mli tx_rollup_inbox_repr.ml
    tx_rollup_message_result_repr.mli tx_rollup_message_result_repr.ml
    tx_rollup_message_result_hash_repr.mli tx_rollup_message_result_hash_repr.ml
@@ -294,10 +295,11 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    storage_costs.mli storage_costs.ml
    storage_sigs.ml
    storage_functors.mli storage_functors.ml
-   tx_rollup_message_builder.mli tx_rollup_message_builder.ml
    storage.mli storage.ml
    ticket_hash_builder.mli ticket_hash_builder.ml
    constants_storage.mli constants_storage.ml
+   tx_rollup_gas.mli tx_rollup_gas.ml
+   tx_rollup_hash_builder.ml
    level_storage.mli level_storage.ml
    nonce_storage.mli nonce_storage.ml
    seed_storage.mli seed_storage.ml
@@ -423,7 +425,6 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    fixed_point_repr.mli fixed_point_repr.ml
    saturation_repr.mli saturation_repr.ml
    gas_limit_repr.mli gas_limit_repr.ml
-   tx_rollup_gas.mli tx_rollup_gas.ml
    constants_repr.mli constants_repr.ml
    raw_level_repr.mli raw_level_repr.ml
    fitness_repr.mli fitness_repr.ml
@@ -455,6 +456,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    tx_rollup_withdraw_list_hash_repr.mli tx_rollup_withdraw_list_hash_repr.ml
    tx_rollup_reveal_repr.mli tx_rollup_reveal_repr.ml
    tx_rollup_message_repr.mli tx_rollup_message_repr.ml
+   tx_rollup_message_hash_repr.mli tx_rollup_message_hash_repr.ml
    tx_rollup_inbox_repr.mli tx_rollup_inbox_repr.ml
    tx_rollup_message_result_repr.mli tx_rollup_message_result_repr.ml
    tx_rollup_message_result_hash_repr.mli tx_rollup_message_result_hash_repr.ml
@@ -480,10 +482,11 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    storage_costs.mli storage_costs.ml
    storage_sigs.ml
    storage_functors.mli storage_functors.ml
-   tx_rollup_message_builder.mli tx_rollup_message_builder.ml
    storage.mli storage.ml
    ticket_hash_builder.mli ticket_hash_builder.ml
    constants_storage.mli constants_storage.ml
+   tx_rollup_gas.mli tx_rollup_gas.ml
+   tx_rollup_hash_builder.ml
    level_storage.mli level_storage.ml
    nonce_storage.mli nonce_storage.ml
    seed_storage.mli seed_storage.ml
@@ -631,7 +634,6 @@ include Tezos_raw_protocol_alpha.Main
    Fixed_point_repr
    Saturation_repr
    Gas_limit_repr
-   Tx_rollup_gas
    Constants_repr
    Raw_level_repr
    Fitness_repr
@@ -663,6 +665,7 @@ include Tezos_raw_protocol_alpha.Main
    Tx_rollup_withdraw_list_hash_repr
    Tx_rollup_reveal_repr
    Tx_rollup_message_repr
+   Tx_rollup_message_hash_repr
    Tx_rollup_inbox_repr
    Tx_rollup_message_result_repr
    Tx_rollup_message_result_hash_repr
@@ -688,10 +691,11 @@ include Tezos_raw_protocol_alpha.Main
    Storage_costs
    Storage_sigs
    Storage_functors
-   Tx_rollup_message_builder
    Storage
    Ticket_hash_builder
    Constants_storage
+   Tx_rollup_gas
+   Tx_rollup_hash_builder
    Level_storage
    Nonce_storage
    Seed_storage
@@ -858,7 +862,6 @@ include Tezos_raw_protocol_alpha.Main
    fixed_point_repr.mli fixed_point_repr.ml
    saturation_repr.mli saturation_repr.ml
    gas_limit_repr.mli gas_limit_repr.ml
-   tx_rollup_gas.mli tx_rollup_gas.ml
    constants_repr.mli constants_repr.ml
    raw_level_repr.mli raw_level_repr.ml
    fitness_repr.mli fitness_repr.ml
@@ -890,6 +893,7 @@ include Tezos_raw_protocol_alpha.Main
    tx_rollup_withdraw_list_hash_repr.mli tx_rollup_withdraw_list_hash_repr.ml
    tx_rollup_reveal_repr.mli tx_rollup_reveal_repr.ml
    tx_rollup_message_repr.mli tx_rollup_message_repr.ml
+   tx_rollup_message_hash_repr.mli tx_rollup_message_hash_repr.ml
    tx_rollup_inbox_repr.mli tx_rollup_inbox_repr.ml
    tx_rollup_message_result_repr.mli tx_rollup_message_result_repr.ml
    tx_rollup_message_result_hash_repr.mli tx_rollup_message_result_hash_repr.ml
@@ -915,10 +919,11 @@ include Tezos_raw_protocol_alpha.Main
    storage_costs.mli storage_costs.ml
    storage_sigs.ml
    storage_functors.mli storage_functors.ml
-   tx_rollup_message_builder.mli tx_rollup_message_builder.ml
    storage.mli storage.ml
    ticket_hash_builder.mli ticket_hash_builder.ml
    constants_storage.mli constants_storage.ml
+   tx_rollup_gas.mli tx_rollup_gas.ml
+   tx_rollup_hash_builder.ml
    level_storage.mli level_storage.ml
    nonce_storage.mli nonce_storage.ml
    seed_storage.mli seed_storage.ml

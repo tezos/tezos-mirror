@@ -3059,7 +3059,7 @@ module RPC = struct
               ~description:"Compute the hash of a message"
               ~query:RPC_query.empty
               ~input:(obj1 (req "message" Tx_rollup_message.encoding))
-              ~output:(obj1 (req "hash" Tx_rollup_message.hash_encoding))
+              ~output:(obj1 (req "hash" Tx_rollup_message_hash.encoding))
               RPC_path.(path / "message_hash")
 
           let merkle_tree_hash =
@@ -3068,7 +3068,7 @@ module RPC = struct
               ~query:RPC_query.empty
               ~input:
                 (obj1
-                   (req "message_hashes" (list Tx_rollup_message.hash_encoding)))
+                   (req "message_hashes" (list Tx_rollup_message_hash.encoding)))
               ~output:(obj1 (req "hash" Tx_rollup_inbox.Merkle.root_encoding))
               RPC_path.(path / "merkle_tree_hash")
 
@@ -3078,7 +3078,7 @@ module RPC = struct
               ~query:RPC_query.empty
               ~input:
                 (obj2
-                   (req "message_hashes" (list Tx_rollup_message.hash_encoding))
+                   (req "message_hashes" (list Tx_rollup_message_hash.encoding))
                    (req "position" int16))
               ~output:(obj1 (req "path" Tx_rollup_inbox.Merkle.path_encoding))
               RPC_path.(path / "merkle_tree_path")
@@ -3152,7 +3152,8 @@ module RPC = struct
       Registration.register0_noctxt
         ~chunked:true
         S.Tx_rollup.Inbox.message_hash
-        (fun () message -> return (Tx_rollup_message.hash_uncarbonated message)) ;
+        (fun () message ->
+          return (Tx_rollup_message_hash.hash_uncarbonated message)) ;
       Registration.register0_noctxt
         ~chunked:true
         S.Tx_rollup.Inbox.merkle_tree_hash

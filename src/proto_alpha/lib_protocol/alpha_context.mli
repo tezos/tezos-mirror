@@ -1673,7 +1673,7 @@ end
 module Tx_rollup_withdraw_list_hash : sig
   include S.HASH
 
-  val hash : Tx_rollup_withdraw.t list -> t
+  val hash_uncarbonated : Tx_rollup_withdraw.t list -> t
 
   val empty : t
 end
@@ -1694,7 +1694,7 @@ end
 module Tx_rollup_message_result_hash : sig
   include S.HASH
 
-  val hash : Tx_rollup_message_result.t -> t
+  val hash_uncarbonated : Tx_rollup_message_result.t -> t
 
   val init : t
 end
@@ -1836,16 +1836,12 @@ module Tx_rollup_message : sig
   val encoding : t Data_encoding.t
 
   val pp : Format.formatter -> t -> unit
+end
 
-  type hash
+module Tx_rollup_message_hash : sig
+  include S.HASH
 
-  val hash_encoding : hash Data_encoding.t
-
-  val pp_hash : Format.formatter -> hash -> unit
-
-  val hash_uncarbonated : t -> hash
-
-  val hash : context -> t -> (context * hash) tzresult
+  val hash_uncarbonated : Tx_rollup_message.t -> t
 end
 
 (** This module re-exports definitions from {!Tx_rollup_inbox_repr} and
@@ -1862,9 +1858,9 @@ module Tx_rollup_inbox : sig
 
     val root_of_b58check_opt : string -> root option
 
-    val compute_path : Tx_rollup_message.hash list -> int -> path tzresult
+    val compute_path : Tx_rollup_message_hash.t list -> int -> path tzresult
 
-    val merklize_list : Tx_rollup_message.hash list -> root
+    val merklize_list : Tx_rollup_message_hash.t list -> root
 
     val path_depth : path -> int
   end
@@ -1960,12 +1956,13 @@ module Tx_rollup_commitment : sig
   end
 
   val check_message_result :
+    context ->
     Compact.t ->
     [ `Hash of Tx_rollup_message_result_hash.t
     | `Result of Tx_rollup_message_result.t ] ->
     path:Merkle.path ->
     index:int ->
-    unit tzresult
+    context tzresult
 
   val add_commitment :
     context ->
@@ -2050,6 +2047,23 @@ module Tx_rollup_commitment : sig
     Tx_rollup_state.t ->
     Tx_rollup_level.t ->
     (context * Tx_rollup_state.t) tzresult Lwt.t
+end
+
+module Tx_rollup_hash : sig
+  val message_result :
+    context ->
+    Tx_rollup_message_result.t ->
+    (context * Tx_rollup_message_result_hash.t) tzresult
+
+  val compact_commitment :
+    context ->
+    Tx_rollup_commitment.Compact.t ->
+    (context * Tx_rollup_commitment_hash.t) tzresult
+
+  val withdraw_list :
+    context ->
+    Tx_rollup_withdraw.t list ->
+    (context * Tx_rollup_withdraw_list_hash.t) tzresult
 end
 
 module Tx_rollup_errors : sig

@@ -44,11 +44,11 @@ include Path_encoding.Make_hex (H)
 let () =
   Tx_rollup_prefixes.(check_encoding withdraw_list_hash b58check_encoding)
 
-let hash l =
+let hash_uncarbonated l =
   let bytes =
     Data_encoding.(
       Binary.to_bytes_exn (list Tx_rollup_withdraw_repr.encoding) l)
   in
   H.hash_bytes [bytes]
 
-let empty = hash []
+let empty = hash_uncarbonated []

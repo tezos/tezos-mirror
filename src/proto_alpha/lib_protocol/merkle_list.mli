@@ -25,6 +25,10 @@
 
 type error += Merkle_list_invalid_position
 
+(** Given a list of size [count_limit], returns the maximum depth of
+    its merklisation. *)
+val max_depth : count_limit:int -> int
+
 module type T = sig
   (** The type of a Merkle list *)
   type t

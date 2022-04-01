@@ -26,10 +26,10 @@
 (*****************************************************************************)
 
 module El = struct
-  type t = Tx_rollup_message_repr.hash
+  type t = Tx_rollup_message_hash_repr.t
 
   let to_bytes =
-    Data_encoding.Binary.to_bytes_exn Tx_rollup_message_repr.hash_encoding
+    Data_encoding.Binary.to_bytes_exn Tx_rollup_message_hash_repr.encoding
 end
 
 module Prefix = struct

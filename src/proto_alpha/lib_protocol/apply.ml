@@ -1323,15 +1323,15 @@ let apply_external_manager_operation_content :
         ([], [], ctxt)
         tickets_info
       >>=? fun (rev_withdraw_list, rev_ex_token_and_hash_list, ctxt) ->
-      let withdraw_list_hash =
-        Tx_rollup_withdraw_list_hash.hash @@ List.rev rev_withdraw_list
-      in
+      Tx_rollup_hash.withdraw_list ctxt (List.rev rev_withdraw_list)
+      >>?= fun (ctxt, withdraw_list_hash) ->
       Tx_rollup_commitment.check_message_result
+        ctxt
         commitment.commitment
         (`Result {context_hash; withdraw_list_hash})
         ~path:message_result_path
         ~index:message_index
-      >>?= fun () ->
+      >>?= fun ctxt ->
       Tx_rollup_reveal.record
         ctxt
         tx_rollup
@@ -1667,6 +1667,7 @@ let apply_external_manager_operation_content :
           }
       in
       Tx_rollup_l2_verifier.verify_proof
+        ctxt
         parameters
         message
         proof
@@ -1674,7 +1675,7 @@ let apply_external_manager_operation_content :
         ~rejected:message_result_hash
         ~max_proof_size:
           (Alpha_context.Constants.tx_rollup_rejection_max_proof_size ctxt)
-      >>=? fun () ->
+      >>=? fun ctxt ->
       (* Proof is correct, removing *)
       Tx_rollup_commitment.reject_commitment ctxt tx_rollup state level
       >>=? fun (ctxt, state) ->
@@ -1866,7 +1867,7 @@ let precheck_manager_contents (type kind) ctxt (op : kind Kind.manager contents)
       assert_tx_rollup_feature_enabled ctxt >>=? fun () ->
       let size_limit = Constants.tx_rollup_hard_size_limit_per_message ctxt in
       let (_message, message_size) = Tx_rollup_message.make_batch content in
-      Tx_rollup_gas.message_hash_cost message_size >>?= fun cost ->
+      Tx_rollup_gas.hash_cost message_size >>?= fun cost ->
       Gas.consume ctxt cost >>?= fun ctxt ->
       fail_unless
         Compare.Int.(message_size <= size_limit)

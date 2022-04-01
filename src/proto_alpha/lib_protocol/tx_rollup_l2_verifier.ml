@@ -25,6 +25,7 @@
 (*****************************************************************************)
 
 open Tx_rollup_errors_repr
+open Alpha_context
 
 module Verifier_storage :
   Tx_rollup_l2_storage_sig.STORAGE
@@ -60,17 +61,17 @@ end
 module Verifier_context = Tx_rollup_l2_context.Make (Verifier_storage)
 module Verifier_apply = Tx_rollup_l2_apply.Make (Verifier_context)
 
-let hash_message_result after withdraw =
-  Alpha_context.Tx_rollup_message_result_hash.hash
+let hash_message_result ctxt after withdraw =
+  Tx_rollup_hash.message_result
+    ctxt
     {context_hash = after; withdraw_list_hash = withdraw}
 
 (** [after_hash_when_proof_failed before] produces the
     {!Alpha_context.Tx_rollup_message_result_hash} expected if a proof failed.
     That is, the after hash is the same as [before] and it produced zero
     withdrawals. *)
-let after_hash_when_proof_failed before =
-  let open Alpha_context in
-  hash_message_result before Tx_rollup_withdraw_list_hash.empty
+let after_hash_when_proof_failed ctxt before =
+  hash_message_result ctxt before Tx_rollup_withdraw_list_hash.empty
 
 (** [compute_proof_after_hash ~max_proof_size agreed proof message] computes the
     after hash expected while verifying [proof] on [message] starting from
@@ -78,7 +79,8 @@ let after_hash_when_proof_failed before =
 
     Note that if the proof is incorrect this function fails and the commit
     can not be rejected. *)
-let compute_proof_after_hash ~max_proof_size parameters agreed proof message =
+let compute_proof_after_hash ~max_proof_size ctxt parameters agreed proof
+    message =
   let proof_length =
     Data_encoding.Binary.length Tx_rollup_l2_proof.encoding proof
   in
@@ -108,29 +110,28 @@ let compute_proof_after_hash ~max_proof_size parameters agreed proof message =
          "we were not able to apply this message, so after is the same
          as before"
       *)
-      return (after_hash_when_proof_failed agreed)
+      after_hash_when_proof_failed ctxt agreed >>?= fun res -> return res
   | Ok (tree, withdrawals) ->
       (* The proof is small enough, we compare the computed hash with the
          committed one *)
       let tree_hash = Context.Tree.hash tree in
-      return
-        (hash_message_result
-           tree_hash
-           (Alpha_context.Tx_rollup_withdraw_list_hash.hash withdrawals))
+      Tx_rollup_hash.withdraw_list ctxt withdrawals
+      >>?= fun (ctxt, withdrawals) ->
+      hash_message_result ctxt tree_hash withdrawals >>?= fun res -> return res
   | Error _ ->
       (* Finally, the proof verification leads to an internal Irmin error *)
       fail Proof_failed_to_reject
 
-let verify_proof parameters message proof
-    ~(agreed : Alpha_context.Tx_rollup_message_result.t) ~rejected
-    ~max_proof_size =
+let verify_proof ctxt parameters message proof
+    ~(agreed : Tx_rollup_message_result.t) ~rejected ~max_proof_size =
   compute_proof_after_hash
+    ctxt
     parameters
     agreed.context_hash
     ~max_proof_size
     proof
     message
-  >>=? fun computed_result ->
+  >>=? fun (ctxt, computed_result) ->
   if Alpha_context.Tx_rollup_message_result_hash.(computed_result <> rejected)
-  then return_unit
+  then return ctxt
   else fail Proof_produced_rejected_state

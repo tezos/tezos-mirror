@@ -178,12 +178,13 @@ module Full = struct
   let compact full =
     map_template
       (fun list ->
+        let root = Merkle.compute list in
         List.fold_left
-          (fun (acc, tree, _) m -> (acc + 1, Merkle.snoc tree m, m))
-          (0, Merkle.nil, Tx_rollup_message_result_hash_repr.zero)
+          (fun (acc, _) m -> (acc + 1, m))
+          (0, Tx_rollup_message_result_hash_repr.zero)
           list
-        |> fun (count, tree, last_result_message_hash) ->
-        Compact.{count; root = Merkle.root tree; last_result_message_hash})
+        |> fun (count, last_result_message_hash) ->
+        Compact.{count; root; last_result_message_hash})
       full
 end
 

@@ -46,7 +46,7 @@ include Path_encoding.Make_hex (H)
 let () =
   Tx_rollup_prefixes.(check_encoding message_result_hash b58check_encoding)
 
-let hash result =
+let hash_uncarbonated result =
   let bytes =
     Data_encoding.Binary.to_bytes_exn
       Tx_rollup_message_result_repr.encoding
@@ -54,4 +54,4 @@ let hash result =
   in
   H.hash_bytes [bytes]
 
-let init = hash Tx_rollup_message_result_repr.init
+let init = hash_uncarbonated Tx_rollup_message_result_repr.init

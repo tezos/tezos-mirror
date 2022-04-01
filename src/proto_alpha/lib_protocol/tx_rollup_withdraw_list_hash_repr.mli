@@ -25,6 +25,6 @@
 
 include S.HASH
 
-val hash : Tx_rollup_withdraw_repr.t list -> t
+val hash_uncarbonated : Tx_rollup_withdraw_repr.t list -> t
 
 val empty : t

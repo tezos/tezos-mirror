@@ -361,7 +361,7 @@ module Tx_rollup : sig
   val add_message :
     t ->
     Tx_rollup_repr.t ->
-    Tx_rollup_message_repr.hash ->
+    Tx_rollup_message_hash_repr.t ->
     t * Tx_rollup_inbox_repr.Merkle.root
 end
 

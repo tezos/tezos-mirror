@@ -3,7 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Marigold <contact@marigold.dev>                        *)
 (* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
-(* Copyright (c) 2022 Oxhead Alpha <info@oxhead-alpha.com>                   *)
+(* Copyright (c) 2022 Oxhead Alpha <info@oxheadalpha.com>                    *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -25,8 +25,16 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [hash ctxt msg] computes the hash of [msg] to be stored in the inbox. *)
-val hash :
-  Raw_context.t ->
-  Tx_rollup_message_repr.t ->
-  (Raw_context.t * Tx_rollup_message_repr.hash) tzresult
+(** The Blake2B hash of a message.
+
+    To avoid unnecessary storage duplication, the inboxes in the
+    layer-1 do not contain the messages, but their hashes (see
+    {!Tx_rollup_inbox_storage.append_message}). This is possible
+    because the content of the messages can be reconstructed off-chain
+    by looking at the layer-1 operations and their receipt. *)
+
+include S.HASH
+
+(** [hash_uncarbonated msg] computes the hash of the given message
+    without any gas consumption. *)
+val hash_uncarbonated : Tx_rollup_message_repr.t -> t

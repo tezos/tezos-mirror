@@ -32,8 +32,8 @@
 
 include S.HASH
 
-(** [hash result] computes the hash of the given context hash and
-    withdraw list hash. *)
-val hash : Tx_rollup_message_result_repr.t -> t
+(** [hash_uncarbonated result] computes the hash of the given context
+    hash and withdraw list hash without any gas consumption. *)
+val hash_uncarbonated : Tx_rollup_message_result_repr.t -> t
 
 val init : t

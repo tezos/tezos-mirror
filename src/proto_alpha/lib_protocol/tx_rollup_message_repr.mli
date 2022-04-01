@@ -64,21 +64,3 @@ val deposit_encoding : deposit Data_encoding.t
 val encoding : t Data_encoding.t
 
 val pp : Format.formatter -> t -> unit
-
-(** The Blake2B hash of a message.
-
-    To avoid unnecessary storage duplication, the inboxes in the
-    layer-1 do not contain the messages, but their hashes (see
-    {!Tx_rollup_inbox_storage.append_message}). This is possible
-    because the content of the messages can be reconstructed off-chain
-    by looking at the layer-1 operations and their receipt. *)
-type hash
-
-val hash_encoding : hash Data_encoding.t
-
-val pp_hash : Format.formatter -> hash -> unit
-
-(** [hash_uncarbonated msg] computes the hash of [msg] without gas consumption. *)
-val hash_uncarbonated : t -> hash
-
-val hash_equal : hash -> hash -> bool

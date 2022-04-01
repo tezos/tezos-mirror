@@ -50,19 +50,19 @@ module Merkle : sig
 
   val path_encoding : path Data_encoding.t
 
-  val add_message : tree -> Tx_rollup_message_repr.hash -> tree
+  val add_message : tree -> Tx_rollup_message_hash_repr.t -> tree
 
-  val compute_path : Tx_rollup_message_repr.hash list -> int -> path tzresult
+  val compute_path : Tx_rollup_message_hash_repr.t list -> int -> path tzresult
 
   val check_path :
-    path -> int -> Tx_rollup_message_repr.hash -> root -> bool tzresult
+    path -> int -> Tx_rollup_message_hash_repr.t -> root -> bool tzresult
 
   val path_depth : path -> int
 
   (** [merklize_list messages] construct a merkle root by build a
      tree, appending the [messages] one by one in the same order of
      the list and finally computing the root. *)
-  val merklize_list : Tx_rollup_message_repr.hash list -> root
+  val merklize_list : Tx_rollup_message_hash_repr.t list -> root
 end
 
 (** The view of an inbox: stores the [cumulated_size] in bytes for the

@@ -1,9 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Marigold <contact@marigold.dev>                        *)
 (* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
-(* Copyright (c) 2022 Oxhead Alpha <info@oxhead-alpha.com>                   *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -25,12 +23,27 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let hash :
-    Raw_context.t ->
-    Tx_rollup_message_repr.t ->
-    (Raw_context.t * Tx_rollup_message_repr.hash) tzresult =
- fun ctxt msg ->
-  Tx_rollup_gas.message_hash_cost @@ Tx_rollup_message_repr.size msg
-  >>? fun cost ->
-  Raw_context.consume_gas ctxt cost >>? fun ctxt ->
-  ok (ctxt, Tx_rollup_message_repr.hash_uncarbonated msg)
+let hash_size = Tx_rollup_prefixes.message_hash.hash_size
+
+module Message_hash =
+  Blake2B.Make
+    (Base58)
+    (struct
+      let name = "Tx_rollup_inbox_message_hash"
+
+      let title = "The hash of a transaction rollup inbox’s message"
+
+      let b58check_prefix = Tx_rollup_prefixes.message_hash.b58check_prefix
+
+      let size = Some hash_size
+    end)
+
+let () =
+  Tx_rollup_prefixes.(
+    check_encoding message_hash Message_hash.b58check_encoding)
+
+include Message_hash
+
+let hash_uncarbonated msg =
+  Message_hash.hash_bytes
+    [Data_encoding.Binary.to_bytes_exn Tx_rollup_message_repr.encoding msg]

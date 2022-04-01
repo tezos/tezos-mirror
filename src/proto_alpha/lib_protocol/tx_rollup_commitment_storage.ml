@@ -50,12 +50,12 @@ open Tx_rollup_errors_repr
 
  *)
 
-let check_message_result {messages; _} result ~path ~index =
-  let computed =
-    match result with
-    | `Hash hash -> hash
-    | `Result result -> Tx_rollup_message_result_hash_repr.hash result
-  in
+let check_message_result ctxt {messages; _} result ~path ~index =
+  (match result with
+  | `Hash hash -> ok (ctxt, hash)
+  | `Result result -> Tx_rollup_hash_builder.message_result ctxt result)
+  >>? fun (ctxt, computed) ->
+  Tx_rollup_gas.consume_check_path_commitment_cost ctxt >>? fun ctxt ->
   let cond =
     match
       Merkle.check_path
@@ -72,6 +72,7 @@ let check_message_result {messages; _} result ~path ~index =
     Tx_rollup_errors_repr.(
       Wrong_rejection_hash
         {provided = computed; expected = `Valid_path (messages.root, index)})
+  >>? fun () -> ok ctxt
 
 let adjust_commitments_count ctxt tx_rollup pkh ~(dir : [`Incr | `Decr]) =
   let delta = match dir with `Incr -> 1 | `Decr -> -1 in
@@ -189,9 +190,8 @@ let check_commitment_predecessor ctxt state commitment =
   | (None, None) -> return ctxt
   | (provided, expected) -> fail (Wrong_predecessor_hash {provided; expected})
 
-let check_commitment_batches_and_merkle_root ctxt tx_rollup state commitment =
-  Tx_rollup_inbox_storage.get ctxt commitment.level tx_rollup
-  >>=? fun (ctxt, {inbox_length; merkle_root; _}) ->
+let check_commitment_batches_and_merkle_root ctxt state inbox commitment =
+  let Tx_rollup_inbox_repr.{inbox_length; merkle_root; _} = inbox in
   fail_unless
     Compare.List_length_with.(commitment.messages = inbox_length)
     Wrong_batch_count
@@ -214,11 +214,16 @@ let add_commitment ctxt tx_rollup state pkh commitment =
   let current_level = (Raw_context.current_level ctxt).level in
   check_commitment_level current_level state commitment >>?= fun () ->
   check_commitment_predecessor ctxt state commitment >>=? fun ctxt ->
-  check_commitment_batches_and_merkle_root ctxt tx_rollup state commitment
+  Tx_rollup_inbox_storage.get ctxt commitment.level tx_rollup
+  >>=? fun (ctxt, inbox) ->
+  check_commitment_batches_and_merkle_root ctxt state inbox commitment
   >>=? fun (ctxt, state) ->
   (* Everything has been sorted out, let’s update the storage *)
+  Tx_rollup_gas.consume_compact_commitment_cost ctxt inbox.inbox_length
+  >>?= fun ctxt ->
   let commitment = Tx_rollup_commitment_repr.Full.compact commitment in
-  let commitment_hash = Tx_rollup_commitment_repr.Compact.hash commitment in
+  Tx_rollup_hash_builder.compact_commitment ctxt commitment
+  >>?= fun (ctxt, commitment_hash) ->
   let submitted : Tx_rollup_commitment_repr.Submitted_commitment.t =
     {
       commitment;
@@ -333,13 +338,15 @@ let check_agreed_and_disputed_results ctxt tx_rollup state
   Tx_rollup_state_repr.check_level_can_be_rejected state commitment.level
   >>?= fun () ->
   check_message_result
+    ctxt
     commitment
     (`Hash disputed_result)
     ~path:disputed_result_path
     ~index:disputed_position
-  >>?= fun () ->
+  >>?= fun ctxt ->
   if Compare.Int.(disputed_position = 0) then
-    let agreed = Tx_rollup_message_result_hash_repr.hash agreed_result in
+    Tx_rollup_hash_builder.message_result ctxt agreed_result
+    >>?= fun (ctxt, agreed) ->
     match Tx_rollup_level_repr.pred commitment.level with
     | None ->
         let expected = Tx_rollup_message_result_hash_repr.init in
@@ -371,11 +378,12 @@ let check_agreed_and_disputed_results ctxt tx_rollup state
             | None -> fail (Internal_error "Missing commitment predecessor")))
   else
     check_message_result
+      ctxt
       commitment
       (`Result agreed_result)
       ~path:agreed_result_path
       ~index:(disputed_position - 1)
-    >>?= fun () -> return ctxt
+    >>?= fun ctxt -> return ctxt
 
 let reject_commitment ctxt rollup state level =
   Tx_rollup_state_repr.check_level_can_be_rejected state level >>?= fun () ->
@@ -385,8 +393,7 @@ let reject_commitment ctxt rollup state level =
       find ctxt rollup state pred_level >>=? fun (ctxt, pred_commitment) ->
       let pred_hash =
         Option.map
-          (fun (x : Submitted_commitment.t) ->
-            Tx_rollup_commitment_repr.Compact.hash x.commitment)
+          (fun (x : Submitted_commitment.t) -> x.commitment_hash)
           pred_commitment
       in
       return (ctxt, pred_hash)

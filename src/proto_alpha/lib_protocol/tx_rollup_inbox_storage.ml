@@ -174,7 +174,8 @@ let append_message :
       >= Constants_storage.tx_rollup_max_messages_per_inbox ctxt)
     (Inbox_count_would_exceed_limit rollup)
   >>=? fun () ->
-  Tx_rollup_message_builder.hash ctxt message >>?= fun (ctxt, message_hash) ->
+  Tx_rollup_hash_builder.message ctxt message >>?= fun (ctxt, message_hash) ->
+  Tx_rollup_gas.consume_add_message_cost ctxt >>?= fun ctxt ->
   let (ctxt, inbox_merkle_root) =
     Raw_context.Tx_rollup.add_message ctxt rollup message_hash
   in
@@ -218,7 +219,8 @@ let check_message_hash :
     Raw_context.t tzresult Lwt.t =
  fun ctxt level tx_rollup ~position message path ->
   Storage.Tx_rollup.Inbox.get (ctxt, tx_rollup) level >>=? fun (ctxt, inbox) ->
-  let message_hash = Tx_rollup_message_repr.hash_uncarbonated message in
+  Tx_rollup_hash_builder.message ctxt message >>?= fun (ctxt, message_hash) ->
+  Tx_rollup_gas.consume_check_path_inbox_cost ctxt >>?= fun ctxt ->
   Tx_rollup_inbox_repr.Merkle.check_path
     path
     position

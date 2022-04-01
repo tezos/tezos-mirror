@@ -268,7 +268,6 @@ end
 
 module Tx_rollup_message = struct
   include Tx_rollup_message_repr
-  include Tx_rollup_message_builder
 
   let make_message msg = (msg, size msg)
 
@@ -277,6 +276,8 @@ module Tx_rollup_message = struct
   let make_deposit sender destination ticket_hash amount =
     make_message @@ Deposit {sender; destination; ticket_hash; amount}
 end
+
+module Tx_rollup_message_hash = Tx_rollup_message_hash_repr
 
 module Tx_rollup_inbox = struct
   include Tx_rollup_inbox_repr
@@ -288,6 +289,7 @@ module Tx_rollup_commitment = struct
   include Tx_rollup_commitment_storage
 end
 
+module Tx_rollup_hash = Tx_rollup_hash_builder
 module Tx_rollup_errors = Tx_rollup_errors_repr
 module Global_constants_storage = Global_constants_storage
 

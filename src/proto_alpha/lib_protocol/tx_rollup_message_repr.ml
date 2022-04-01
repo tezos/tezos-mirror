@@ -116,33 +116,3 @@ let size = function
       (* [int64] *)
       let amount_size = 8 in
       sender_size + destination_size + key_hash_size + amount_size
-
-let hash_size = Tx_rollup_prefixes.message_hash.hash_size
-
-module Message_hash =
-  Blake2B.Make
-    (Base58)
-    (struct
-      let name = "Tx_rollup_inbox_message_hash"
-
-      let title = "The hash of a transaction rollup inbox’s message"
-
-      let b58check_prefix = Tx_rollup_prefixes.message_hash.b58check_prefix
-
-      let size = Some hash_size
-    end)
-
-let () =
-  Tx_rollup_prefixes.(
-    check_encoding message_hash Message_hash.b58check_encoding)
-
-type hash = Message_hash.t
-
-let pp_hash = Message_hash.pp
-
-let hash_encoding = Message_hash.encoding
-
-let hash_uncarbonated msg =
-  Message_hash.hash_bytes [Data_encoding.Binary.to_bytes_exn encoding msg]
-
-let hash_equal = Message_hash.equal

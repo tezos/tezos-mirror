@@ -92,10 +92,7 @@ type error +=
   | No_withdrawals_to_dispatch
 
 let check_path_depth kind provided ~count_limit =
-  (* We assume that the Merkle_tree implemenation computes a tree in a
-     logarithmic size of the number of leaves. *)
-  let log2 n = Z.numbits (Z.of_int n) in
-  let limit = log2 count_limit in
+  let limit = Merkle_list.max_depth ~count_limit in
   error_when Compare.Int.(limit < provided)
   @@ Wrong_path_depth {kind; provided; limit}
 
