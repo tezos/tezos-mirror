@@ -48,6 +48,8 @@ however ask that a new dedicated machine is created to run your test.
 Please ask on the ``#tests`` Slack channel of ``tezos-dev`` before
 merging.
 
+.. _performance_regression_test_fw:
+
 Performance Regression Test framework: Time Series, Alerts and Graphs
 ---------------------------------------------------------------------
 
@@ -230,4 +232,3 @@ of your local machine.
 To run Tezt long tests, run the following command::
 
     TEZT_CONFIG=tezt/lib_performance_regression/local-sandbox/tezt_config.json dune exec tezt/long_tests/main.exe
-

@@ -187,6 +187,8 @@ The PPX provides the handling of three attributes:
   inside a ``Lwt.t`` monad. So, this attribute must be placed on an expression
   evaluating in a ``Lwt.t`` value in order to compile.
 
+Some of these attributes are used, for instance, in the implementation of the :ref:`performance regression test framework <performance_regression_test_fw>`.
+
 Instrumenting the tezos-node executable
 ---------------------------------------
 
