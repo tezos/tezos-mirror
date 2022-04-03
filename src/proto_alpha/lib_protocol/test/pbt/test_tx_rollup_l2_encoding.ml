@@ -48,8 +48,8 @@ let bls_pk =
     `Hex "8fee216367c463821f82c942a1cee3a01469b1da782736ca269a2accea6e0cc4"
     |> Hex.to_bytes_exn
   in
-  let sk = Bls12_381.Signature.generate_sk ikm in
-  Bls12_381.Signature.MinSig.derive_pk sk
+  let secret_key = Bls12_381.Signature.generate_sk ikm in
+  Bls12_381.Signature.MinPk.derive_pk secret_key
 
 let l2_address = Protocol.Tx_rollup_l2_address.of_bls_pk bls_pk
 
@@ -147,7 +147,7 @@ let v1_batch =
      valid bytes since the signature encoding is "safe" and accept
      only valid signatures. However, it should not impact the
      tests here as the bytes length stays the same. *)
-  let bytes = Bls12_381.G1.(to_compressed_bytes (random ())) in
+  let bytes = Bls12_381.G2.(to_compressed_bytes (random ())) in
   let aggregated_signature =
     Protocol.Environment.Bls_signature.unsafe_signature_of_bytes bytes
   in
