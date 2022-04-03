@@ -74,6 +74,71 @@ let get_balance ctxt ~token ~owner =
   in
   wrap (Ticket_balance.get_balance ctxt key_hash)
 
+let get_used_ticket_storage block =
+  let* incr = Incremental.begin_construction block in
+  wrap
+  @@ Ticket_balance.Internal_for_tests.used_storage_space
+       (Incremental.alpha_ctxt incr)
+
+let get_paid_ticket_storage block =
+  let* incr = Incremental.begin_construction block in
+  wrap
+  @@ Ticket_balance.Internal_for_tests.paid_storage_space
+       (Incremental.alpha_ctxt incr)
+
+let get_used_contract_storage block contract =
+  let* incr = Incremental.begin_construction block in
+  let alpha_ctxt = Incremental.alpha_ctxt incr in
+  wrap @@ Alpha_context.Contract.used_storage_space alpha_ctxt contract
+
+let get_paid_contract_storage block contract =
+  let* incr = Incremental.begin_construction block in
+  let alpha_ctxt = Incremental.alpha_ctxt incr in
+  wrap
+  @@ Alpha_context.Contract.Internal_for_tests.paid_storage_space
+       alpha_ctxt
+       contract
+
+let assert_paid_contract_storage ~loc block contract expected =
+  let* storage = get_paid_contract_storage block contract in
+  Assert.equal
+    ~loc
+    Z.equal
+    "Paid contract storage "
+    Z.pp_print
+    (Z.of_int expected)
+    storage
+
+let assert_used_contract_storage ~loc block contract expected =
+  let* storage = get_used_contract_storage block contract in
+  Assert.equal
+    ~loc
+    Z.equal
+    "Used contract storage "
+    Z.pp_print
+    (Z.of_int expected)
+    storage
+
+let assert_paid_ticket_storage ~loc block expected =
+  let* storage = get_paid_ticket_storage block in
+  Assert.equal
+    ~loc
+    Z.equal
+    "Paid ticket storage "
+    Z.pp_print
+    (Z.of_int expected)
+    storage
+
+let assert_used_ticket_storage ~loc block expected =
+  let* storage = get_used_ticket_storage block in
+  Assert.equal
+    ~loc
+    Z.equal
+    "Used ticket storage "
+    Z.pp_print
+    (Z.of_int expected)
+    storage
+
 let assert_token_balance ~loc block token owner expected =
   let* incr = Incremental.begin_construction block in
   let ctxt = Incremental.alpha_ctxt incr in
@@ -1059,6 +1124,333 @@ let test_ticket_wallet () =
   let* block = send_to_burn block in
   assert_balance block None
 
+(* Test used ticket storage and paid storage. *)
+let test_ticket_storage () =
+  let* {block; baker; contract = source_contract} = init_env () in
+  (* A contract that can receive a ticket and store it. Each new ticket it
+     receives is added to a list. *)
+  let* (ticket_keeper, _script, block) =
+    originate
+      ~baker
+      ~source_contract
+      ~script:
+        {|
+            { parameter (ticket string) ;
+              storage (list (ticket string)) ;
+              code { UNPAIR ; CONS ; NIL operation ; PAIR } }
+          |}
+      ~storage:"{}"
+      block
+  in
+  (* A contract that receives a pair of ticket and address and forwards the
+     ticket to the given address. The contract does not store any tickets. *)
+  let* (ticket_forwarder, _script, block) =
+    originate
+      ~baker
+      ~source_contract
+      ~script:
+        {|
+          { parameter (pair (ticket string) address) ;
+            storage unit ;
+            code { CAR ;
+                   UNPAIR ;
+                   SWAP ;
+                   CONTRACT (ticket string) ;
+                   IF_NONE
+                     { DROP ;
+                       PUSH string "Contract of type `ticket(string)` not found" ;
+                       FAILWITH }
+                     { PUSH mutez 0 ;
+                       DIG 2 ;
+                       TRANSFER_TOKENS ;
+                       PUSH unit Unit ;
+                       NIL operation ;
+                       DIG 2 ;
+                       CONS ;
+                       PAIR } } }
+          |}
+      ~storage:"Unit"
+      block
+  in
+  (* A contract that takes two addresses: one to a ticket-forward contract and
+     one to a ticket-receiver contract, mints and sends the ticket to a
+     ticket-forward address along with the address of the ticket-receiver.
+
+     Altogether we have:
+
+     [ticket_minter] ----> [ticket_forwarder] ----> [ticket_receiver]
+  *)
+  let* (ticket_minter, _script, block) =
+    originate
+      ~baker
+      ~source_contract
+      ~script:
+        {|
+          { parameter (pair address address) ; storage unit ;
+            code { CAR ;
+                  UNPAIR ;
+                  CONTRACT (pair (ticket string) address) ;
+                  IF_NONE
+                    { DROP ;
+                      PUSH string "Contract of type `ticket(string)` not found" ;
+                      FAILWITH }
+                    { PUSH mutez 0 ;
+                      DIG 2 ;
+                      PUSH nat 1 ;
+                      PUSH string "Red" ;
+                      TICKET ;
+                      PAIR ;
+                      TRANSFER_TOKENS ;
+                      PUSH unit Unit ;
+                      NIL operation ;
+                      DIG 2 ;
+                      CONS ;
+                      PAIR } } } |}
+      ~storage:"Unit"
+      block
+  in
+  let mint_and_send block =
+    transaction
+      ~entrypoint:Entrypoint.default
+      ~baker
+      ~sender:source_contract
+      block
+      ~recipient:ticket_minter
+      ~parameters:
+        (Printf.sprintf
+           {|Pair %S %S|}
+           (Contract.to_b58check ticket_forwarder)
+           (Contract.to_b58check ticket_keeper))
+  in
+  let* block = mint_and_send block in
+  let token_red = string_token ~ticketer:ticket_minter "Red" in
+  (* Verify that the ticket is accredited to the ticket keeper and no one else.
+     The ticket table now looks like:
+  *)
+  let* () =
+    assert_token_balance ~loc:__LOC__ block token_red ticket_minter None
+  in
+  let* () =
+    assert_token_balance ~loc:__LOC__ block token_red ticket_forwarder None
+  in
+  let* () =
+    assert_token_balance ~loc:__LOC__ block token_red ticket_keeper (Some 1)
+  in
+  (* Both ticket paid and used storage should now be 65 bytes for the key and
+     one for the value. Ticket table looks like:
+
+     | Owner x Ticket-token     | Amount |
+     |--------------------------|--------|
+     | ticket_keeper x Red      |      1 |
+
+     Used storage: 65 + 1 = 66
+
+     Paid storage: 66
+  *)
+  let* () = assert_used_ticket_storage ~loc:__LOC__ block 66 in
+  let* () = assert_paid_ticket_storage ~loc:__LOC__ block 66 in
+  (* Send another ticket that uses the same slot. That does not increase used
+     storage. The first call from [ticket_minter] to ticket-forwarder results in
+     a table:
+
+     | Owner x Ticket-token     | Amount |
+     |--------------------------|--------|
+     | ticket_forwarder x Red   |      1 |
+     | ticket_keeper x Red      |      1 |
+
+     Used storage: 132
+
+     The call from ticket-forwarder to [ticket_keeper] results in:
+
+     | Owner x Ticket-token     | Amount |
+     |--------------------------|--------|
+     | ticket_keeper x Red      |      2 |
+
+     Used storage: 66
+
+     Noted that the paid-storage "water-marker" was pushed up to 132.
+  *)
+  let* block = mint_and_send block in
+  let* () =
+    assert_token_balance ~loc:__LOC__ block token_red ticket_keeper (Some 2)
+  in
+  let* () = assert_used_ticket_storage ~loc:__LOC__ block 66 in
+  let* () = assert_paid_ticket_storage ~loc:__LOC__ block 132 in
+  (* Send yet another ticket that uses the same slot. That does not increase used
+     storage and it's using already paid storage. The first call from
+     [ticket_minter] to ticket-forwarder results in a table:
+
+     | Owner x Ticket-token     | Amount |
+     |--------------------------|--------|
+     | ticket_forwarder x Red   |      1 |
+     | ticket_keeper x Red      |      2 |
+
+     Used storage: 132
+
+     The call from ticket-forwarder to [ticket_keeper] results in:
+
+     | Owner x Ticket-token     | Amount |
+     |--------------------------|--------|
+     | ticket_keeper x Red      |      3 |
+
+     Used storage: 66
+
+     Here, the paid_storage "water-mark" is not pushed up.
+  *)
+  let* block = mint_and_send block in
+  let* () =
+    assert_token_balance ~loc:__LOC__ block token_red ticket_keeper (Some 3)
+  in
+  let* () = assert_used_ticket_storage ~loc:__LOC__ block 66 in
+  let* () = assert_paid_ticket_storage ~loc:__LOC__ block 132 in
+  return ()
+
+(* Test used ticket storage and paid storage. *)
+let test_storage_for_create_and_remove_tickets () =
+  let* {block; baker; contract = source_contract} = init_env () in
+  (* A contract with two endpoints:
+      - Create n tickets and add to its storage
+      - Remove all tickets
+  *)
+  let* (ticket_manager, _script, block) =
+    originate
+      ~baker
+      ~source_contract
+      ~script:
+        {|
+          { parameter (or (pair %add nat string) (unit %clear)) ;
+            storage (list (ticket string)) ;
+            code { UNPAIR ;
+                   IF_LEFT
+                   { UNPAIR ; DIG 2 ; SWAP ; DIG 2 ; TICKET ; CONS ; NIL operation ; PAIR }
+                   { DROP 2 ; NIL (ticket string) ; NIL operation ; PAIR } } }
+      |}
+      ~storage:"{}"
+      block
+  in
+  let add block n content =
+    transaction
+      ~entrypoint:(Entrypoint.of_string_strict_exn "add")
+      ~baker
+      ~sender:source_contract
+      block
+      ~recipient:ticket_manager
+      ~parameters:(Printf.sprintf "Pair %d %S" n content)
+  in
+  let clear block =
+    transaction
+      ~entrypoint:(Entrypoint.of_string_strict_exn "clear")
+      ~baker
+      ~sender:source_contract
+      block
+      ~recipient:ticket_manager
+      ~parameters:"Unit"
+  in
+  (* Initially the used and paid contract storage size is 115. *)
+  let* () =
+    assert_used_contract_storage ~loc:__LOC__ block ticket_manager 115
+  in
+  let* () =
+    assert_paid_contract_storage ~loc:__LOC__ block ticket_manager 115
+  in
+  (* Add 1000 units of "A" tickets. *)
+  let* block = add block 1000 "A" in
+  (* After adding one block the new used and paid storage grows to accommodate
+     for the new ticket. The size is 115 + 40 (size of ticket) = 155. *)
+  let* () =
+    assert_used_contract_storage ~loc:__LOC__ block ticket_manager 155
+  in
+  let* () =
+    assert_paid_contract_storage ~loc:__LOC__ block ticket_manager 155
+  in
+  (* The size of used and paid-for ticket storage is 67 bytes.  (65 for hash
+     and 2 for amount). *)
+  let* () = assert_used_ticket_storage ~loc:__LOC__ block 67 in
+  let* () = assert_paid_ticket_storage ~loc:__LOC__ block 67 in
+  (* Add 1000 units of "B" tickets. *)
+  let* block = add block 1000 "B" in
+  (* The new used and paid for contract storage grow to 155 + 40 = 195. *)
+  let* () =
+    assert_used_contract_storage ~loc:__LOC__ block ticket_manager 195
+  in
+  let* () =
+    assert_paid_contract_storage ~loc:__LOC__ block ticket_manager 195
+  in
+  (* The new used and paid for ticket storage doubles (2 * 67 = 134). *)
+  let* () = assert_used_ticket_storage ~loc:__LOC__ block 134 in
+  let* () = assert_paid_ticket_storage ~loc:__LOC__ block 134 in
+  (* Clear all tickets. *)
+  let* block = clear block in
+  (* We're back to 115 base-line for the used contract storage and keep 195 for
+     paid. *)
+  let* () =
+    assert_used_contract_storage ~loc:__LOC__ block ticket_manager 115
+  in
+  let* () =
+    assert_paid_contract_storage ~loc:__LOC__ block ticket_manager 195
+  in
+  (* Since the ticket-table is empty it does not take up any space. However,
+     we've already paid for 134 bytes. *)
+  let* () = assert_used_ticket_storage ~loc:__LOC__ block 0 in
+  let* () = assert_paid_ticket_storage ~loc:__LOC__ block 134 in
+  (* Add one unit of "C" tickets. *)
+  let* block = add block 1 "C" in
+  (* The new used storage is 115 + 39 (size of ticket) = 154. The size is 39
+      rather than 40 because it carries a smaller amount payload. *)
+  let* () =
+    assert_used_contract_storage ~loc:__LOC__ block ticket_manager 154
+  in
+  (* We still have paid for 195 contract storage. *)
+  let* () =
+    assert_paid_contract_storage ~loc:__LOC__ block ticket_manager 195
+  in
+  (* There is one row in the ticket table with size 65 (for the hash) + 1
+     (for the amount) = 65 bytes. *)
+  let* () = assert_used_ticket_storage ~loc:__LOC__ block 66 in
+  (* We've still paid for 134 bytes however. *)
+  let* () = assert_paid_ticket_storage ~loc:__LOC__ block 134 in
+  (* Add yet another "C" ticket. *)
+  let* block = add block 1 "C" in
+  (* The new used storage is 154 + 39 (size of ticket) = 193. *)
+  let* () =
+    assert_used_contract_storage ~loc:__LOC__ block ticket_manager 193
+  in
+  (* We still have paid for 195 contract storage. *)
+  let* () =
+    assert_paid_contract_storage ~loc:__LOC__ block ticket_manager 195
+  in
+  (* There is still only one row in the ticket table with size 66. *)
+  let* () = assert_used_ticket_storage ~loc:__LOC__ block 66 in
+  (* And we've still paid for 134 bytes. *)
+  let* () = assert_paid_ticket_storage ~loc:__LOC__ block 134 in
+  (* Add a "D" ticket. *)
+  let* block = add block 1 "D" in
+  (* The new used storage is 193 + 39 (size of ticket) = 193. *)
+  let* () =
+    assert_used_contract_storage ~loc:__LOC__ block ticket_manager 232
+  in
+  (* The paid storage also increases to 232. *)
+  let* () =
+    assert_paid_contract_storage ~loc:__LOC__ block ticket_manager 232
+  in
+  (* There are now two rows in the ticket table: 2 x 66 = 132 *)
+  let* () = assert_used_ticket_storage ~loc:__LOC__ block 132 in
+  (* And we've still paid for 134 bytes. *)
+  let* () = assert_paid_ticket_storage ~loc:__LOC__ block 134 in
+  let* block = add block 1 "E" in
+  (* The new used storage is 232 + 39 (size of ticket) = 193. *)
+  let* () =
+    assert_used_contract_storage ~loc:__LOC__ block ticket_manager 271
+  in
+  (* The paid storage also increases to 271. *)
+  let* () =
+    assert_paid_contract_storage ~loc:__LOC__ block ticket_manager 271
+  in
+  (* There are now three rows in the ticket table: 3 x 66 = 198. *)
+  let* () = assert_used_ticket_storage ~loc:__LOC__ block 198 in
+  (* And the paid storage has increased. *)
+  assert_paid_ticket_storage ~loc:__LOC__ block 198
+
 let tests =
   [
     Tztest.tztest "Test add strict" `Quick test_add_strict;
@@ -1075,4 +1467,9 @@ let tests =
     Tztest.tztest "Test send drop" `Quick test_create_contract_with_ticket;
     Tztest.tztest "Test join" `Quick test_join_tickets;
     Tztest.tztest "Test wallet" `Quick test_ticket_wallet;
+    Tztest.tztest "Test ticket storage" `Quick test_ticket_storage;
+    Tztest.tztest
+      "Test storage for create and remove tickets"
+      `Quick
+      test_storage_for_create_and_remove_tickets;
   ]
