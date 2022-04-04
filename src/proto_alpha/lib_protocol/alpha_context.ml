@@ -222,7 +222,10 @@ module Contract = struct
 
   let get_manager_key = Contract_manager_storage.get_manager_key
 
-  module Internal_for_tests = Contract_repr
+  module Internal_for_tests = struct
+    include Contract_repr
+    include Contract_storage
+  end
 end
 
 module Tx_rollup_level = Tx_rollup_level_repr

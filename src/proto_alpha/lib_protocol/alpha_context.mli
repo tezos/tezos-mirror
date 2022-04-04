@@ -1574,6 +1574,8 @@ module Contract : sig
   module Internal_for_tests : sig
     (** see [Contract_repr.originated_contract] for documentation *)
     val originated_contract : Origination_nonce.Internal_for_tests.t -> contract
+
+    val paid_storage_space : context -> t -> Z.t tzresult Lwt.t
   end
 end
 
