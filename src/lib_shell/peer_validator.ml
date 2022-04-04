@@ -538,3 +538,10 @@ let current_request t = Worker.current_request t
 let pipeline_length w =
   let state = Worker.state w in
   Types.pipeline_length state.pipeline
+
+module Internal_for_tests = struct
+  let validate_new_head (t : t) block_hash block_header =
+    let open Lwt_result_syntax in
+    let* () = validate_new_head t block_hash block_header in
+    return_unit
+end
