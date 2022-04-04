@@ -914,7 +914,7 @@ let spawn_stresstest ?endpoint ?(source_aliases = []) ?(source_pkhs = [])
     in
     let source_objs =
       match source_objs with
-      | [] -> List.map account_to_obj Constant.bootstrap_keys
+      | [] -> Array.map account_to_obj Account.Bootstrap.keys |> Array.to_list
       | _ :: _ -> source_objs
     in
     `A source_objs
@@ -1422,9 +1422,7 @@ let init ?path ?admin_path ?name ?color ?base_dir ?endpoint ?media_type () =
   let client =
     create ?path ?admin_path ?name ?color ?base_dir ?endpoint ?media_type ()
   in
-  let* () =
-    Lwt_list.iter_s (import_secret_key client) Constant.all_secret_keys
-  in
+  Account.write Constant.all_secret_keys ~base_dir:client.base_dir ;
   return client
 
 let init_mockup ?path ?admin_path ?name ?color ?base_dir ?sync_mode
@@ -1502,9 +1500,7 @@ let init_light ?path ?admin_path ?name ?color ?base_dir ?(min_agreement = 0.66)
   let json = JSON.parse_file (sources_file client) in
   Log.info "%s" @@ JSON.encode json ;
   Log.info "Importing keys" ;
-  let* () =
-    Lwt_list.iter_s (import_secret_key client) Constant.all_secret_keys
-  in
+  Account.write Constant.all_secret_keys ~base_dir:client.base_dir ;
   Log.info "Syncing peers" ;
   let* () =
     assert (nodes <> []) ;
@@ -1526,7 +1522,8 @@ let stresstest_gen_keys ?endpoint n client =
   in
   let json = JSON.parse ~origin:"stresstest_gen_keys" output in
   let read_one i json : Account.key =
-    let alias = Account.bootstrap (i + 6) in
+    let bootstrap_accounts = Account.Bootstrap.keys |> Array.length in
+    let alias = Account.Bootstrap.alias (i + bootstrap_accounts + 1) in
     let public_key_hash = JSON.(json |-> "pkh" |> as_string) in
     let public_key = JSON.(json |-> "pk" |> as_string) in
     let secret_key = Account.Unencrypted JSON.(json |-> "sk" |> as_string) in
@@ -1574,7 +1571,7 @@ let init_with_node ?path ?admin_path ?name ?color ?base_dir ?event_level
       let client =
         create_with_mode ?path ?admin_path ?name ?color ?base_dir mode
       in
-      let* () = Lwt_list.iter_s (import_secret_key client) keys in
+      Account.write keys ~base_dir:client.base_dir ;
       return (node, client)
   | `Light ->
       let* (client, node1, _) =

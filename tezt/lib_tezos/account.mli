@@ -58,6 +58,18 @@ val sign_bytes :
   bytes ->
   Tezos_crypto.Signature.t
 
-(** Standard name for a bootstrap accounts parameterised by an
-    integer. *)
-val bootstrap : int -> string
+(** [write keys ~base_dir] writes the keys into the [tezos-client]'s data 
+   directory [base_dir]. This function has the same effect
+   as importing all the keys manually  via [tezos-client] but is
+   faster. *)
+val write : key list -> base_dir:string -> unit
+
+module Bootstrap : sig
+  (** Standard name for a bootstrap account parameterised by an 
+      integer. This alias can be used to name new bootstrap
+      accounts. *)
+  val alias : int -> string
+
+  (** The default bootstrap keys. *)
+  val keys : key array
+end

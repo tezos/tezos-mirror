@@ -127,6 +127,7 @@ let check_peer_option =
   let* () = Node.config_init node_2 [] in
   let* () = Node.add_peer_with_id node_2 node_1 in
   let* () = Node.run node_2 [] in
+  let* () = Node.wait_for_ready node_2 in
   let* () = wait in
   let* _ = Node.wait_for_level node_1 1 and* _ = Node.wait_for_level node_2 1 in
   unit
@@ -155,6 +156,7 @@ let test_one_connection =
   let* () = Node.config_init node_2 [] in
   let* () = Node.add_peer_with_id node_2 node_1 in
   let* () = Node.run node_2 [] in
+  let* () = Node.wait_for_ready node_2 in
   let* () = wait in
   let* _ = Node.wait_for_level node_1 1 and* _ = Node.wait_for_level node_2 1 in
   unit
@@ -297,6 +299,7 @@ let test_advertised_port () =
   let () = Node.add_peer node_2 node_1 in
 
   let* () = Node.run node_2 [] in
+  let* () = Node.wait_for_ready node_2 in
   let* () = maintenance_p in
 
   let wait_for_save_p =

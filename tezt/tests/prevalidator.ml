@@ -159,15 +159,16 @@ module Revamped = struct
     let* () = Node.run node [] in
     let* () = Node.wait_for_ready node in
     let* client = Client.init ~endpoint:(Node node) () in
+    let bootstrap_accounts = Account.Bootstrap.keys |> Array.length in
     let* additional_bootstrap_accounts =
       Lwt_list.map_s
         (fun i ->
-          let alias = Account.bootstrap i in
+          let alias = Account.Bootstrap.alias i in
           let* key = Client.gen_and_show_keys ~alias client in
           return (key, None))
         (range
-           (Constant.default_bootstrap_count + 1)
-           (Constant.default_bootstrap_count + nb_additional_bootstrap_accounts))
+           (1 + bootstrap_accounts)
+           (bootstrap_accounts + nb_additional_bootstrap_accounts))
     in
     let* parameter_file =
       Protocol.write_parameter_file
@@ -2732,6 +2733,7 @@ let refetch_failed_operation =
   let* () =
     Node.run ~event_sections_levels:[("prevalidator", `Debug)] node_2 []
   in
+  let* () = Node.wait_for_ready node_2 in
   let* client_1 = Client.init ~endpoint:(Node node_1) ()
   and* client_2 = Client.init ~endpoint:(Node node_2) () in
   let* () = Client.Admin.trust_address client_1 ~peer:node_2

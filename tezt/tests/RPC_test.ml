@@ -926,6 +926,7 @@ let start_with_acl address acl =
   Node.Config_file.update node (JSON.update "rpc" (JSON.put ("acl", acl))) ;
   let* () = Node.identity_generate node in
   let* () = Node.run node [] in
+  let* () = Node.wait_for_ready node in
   Client.init ~endpoint ()
 
 (* Test access to RPC regulated with an ACL. *)
@@ -983,6 +984,7 @@ let binary_regression_test () =
   let* () = Node.config_init node [] in
   let* () = Node.identity_generate node in
   let* () = Node.run node [] in
+  let* () = Node.wait_for_ready node in
   let* json_client = Client.init ~endpoint ~media_type:Json () in
   let* binary_client = Client.init ~endpoint ~media_type:Binary () in
   let call_rpc client =
@@ -1008,6 +1010,7 @@ let test_node_binary_mode address () =
   let* () = Node.config_init node [] in
   let* () = Node.identity_generate node in
   let* () = Node.run node [Media_type Binary] in
+  let* () = Node.wait_for_ready node in
   let* client = Client.init ~endpoint ~media_type:Json () in
   Client.spawn_rpc GET ["chains"; "main"; "blocks"] client
   |> Process.check_error ~exit_code:1
@@ -1018,6 +1021,7 @@ let test_no_service_at_valid_prefix address () =
   let* () = Node.config_init node [] in
   let* () = Node.identity_generate node in
   let* () = Node.run node [] in
+  let* () = Node.wait_for_ready node in
   let* client = Client.init ~endpoint () in
   let* () =
     Client.spawn_rpc ~better_errors:true GET ["chains"; "main"] client
