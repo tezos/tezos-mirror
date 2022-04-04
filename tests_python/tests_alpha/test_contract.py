@@ -2347,3 +2347,63 @@ class TestOriginateContractFromContract:
             ['--arg', 'Unit', '--burn-cap', '2'],
         )
         utils.bake(client, 'bootstrap5')
+
+
+@pytest.mark.incremental
+@pytest.mark.contract
+@pytest.mark.regression
+class TestCreateRemoveTickets:
+    def test_add_clear_tickets_origination(
+        self, client_regtest_scrubbed, session
+    ):
+        client = client_regtest_scrubbed
+        path = os.path.join(
+            CONTRACT_PATH, 'mini_scenarios', 'add_clear_tickets.tz'
+        )
+        originate(client, session, path, '{}', 200)
+
+    def test_add_clear_tickets_add_first_transfer(
+        self, client_regtest_scrubbed
+    ):
+        client = client_regtest_scrubbed
+        client.transfer(
+            0,
+            'bootstrap2',
+            'add_clear_tickets',
+            ['--entrypoint', 'add', '--arg', 'Pair 1 "A"', '--burn-cap', '2'],
+        )
+        utils.bake(client, 'bootstrap5')
+
+    def test_add_clear_tickets_clear_transfer(self, client_regtest_scrubbed):
+        client = client_regtest_scrubbed
+        client.transfer(
+            0,
+            'bootstrap2',
+            'add_clear_tickets',
+            ['--entrypoint', 'clear', '--arg', 'Unit', '--burn-cap', '2'],
+        )
+        utils.bake(client, 'bootstrap5')
+
+    def test_add_clear_tickets_add_second_transfer(
+        self, client_regtest_scrubbed
+    ):
+        client = client_regtest_scrubbed
+        client.transfer(
+            0,
+            'bootstrap2',
+            'add_clear_tickets',
+            ['--entrypoint', 'add', '--arg', 'Pair 1 "B"', '--burn-cap', '2'],
+        )
+        utils.bake(client, 'bootstrap5')
+
+    def test_add_clear_tickets_add_third_transfer(
+        self, client_regtest_scrubbed
+    ):
+        client = client_regtest_scrubbed
+        client.transfer(
+            0,
+            'bootstrap2',
+            'add_clear_tickets',
+            ['--entrypoint', 'add', '--arg', 'Pair 1 "C"', '--burn-cap', '2'],
+        )
+        utils.bake(client, 'bootstrap5')
