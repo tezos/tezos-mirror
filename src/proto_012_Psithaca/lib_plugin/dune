@@ -4,14 +4,12 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base
-  tezos-protocol-012-Psithaca
-  tezos-stdlib-unix)
+  tezos-protocol-012-Psithaca)
  (flags
   (:standard
    -open Tezos_base.TzPervasives
    -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
-   -open Tezos_protocol_012_Psithaca
-   -open Tezos_stdlib_unix))
+   -open Tezos_protocol_012_Psithaca))
  (modules (:standard \ Plugin_registerer)))
 
 (library

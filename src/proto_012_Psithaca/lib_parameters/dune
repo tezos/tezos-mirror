@@ -4,7 +4,6 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base
-  tezos-base.unix
   tezos-protocol-environment
   tezos-protocol-012-Psithaca)
  (library_flags (:standard -linkall))
