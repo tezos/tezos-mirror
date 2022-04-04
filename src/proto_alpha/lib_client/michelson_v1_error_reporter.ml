@@ -128,6 +128,7 @@ let fetch_script (cctxt : #Protocol_client_context.rpc_context) ~chain ~block
     cctxt
     (chain, block)
     ~unparsing_mode:Readable
+    ~normalize_types:true
     ~contract
   >>=? function
   | None -> fail (Fetch_script_not_found_meta_error contract)

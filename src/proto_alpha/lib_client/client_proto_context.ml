@@ -56,11 +56,13 @@ let get_contract_big_map_value (rpc : #rpc_context) ~chain ~block contract key =
     contract
     key
 
-let get_script (rpc : #rpc_context) ~chain ~block ~unparsing_mode contract =
+let get_script (rpc : #rpc_context) ~chain ~block ~unparsing_mode
+    ~normalize_types contract =
   Plugin.RPC.Contract.get_script_normalized
     rpc
     (chain, block)
     ~unparsing_mode
+    ~normalize_types
     ~contract
 
 let get_script_hash (rpc : #rpc_context) ~chain ~block contract =

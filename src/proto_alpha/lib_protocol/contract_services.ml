@@ -226,7 +226,7 @@ module S = struct
   let info =
     RPC_service.get_service
       ~description:"Access the complete status of a contract."
-      ~query:RPC_query.empty
+      ~query:normalize_types_query
       ~output:info_encoding
       RPC_path.(custom_root /: Contract.rpc_arg)
 
@@ -292,6 +292,12 @@ let[@coq_axiom_with_reason "gadt"] register () =
     opt_register1 ~chunked s (fun ctxt contract () () ->
         Contract.exists ctxt contract >>=? function
         | true -> f ctxt contract >|=? Option.some
+        | false -> return_none)
+  in
+  let register_field_with_query ~chunked s f =
+    opt_register1 ~chunked s (fun ctxt contract query () ->
+        Contract.exists ctxt contract >>=? function
+        | true -> f ctxt contract query >|=? Option.some
         | false -> return_none)
   in
   let register_opt_field ~chunked s f =
@@ -380,13 +386,9 @@ let[@coq_axiom_with_reason "gadt"] register () =
           let ctxt = Gas.set_unlimited ctxt in
           let open Script_ir_translator in
           parse_script ctxt ~legacy:true ~allow_forged_in_storage:true script
-          >>=? fun (ex_script, ctxt) ->
-          unparse_script ctxt Readable ex_script >>=? fun (script, ctxt) ->
-          Script.force_decode_in_context
-            ~consume_deserialization_gas:When_needed
-            ctxt
-            script.storage
-          >>?= fun (storage, _ctxt) -> return_some storage) ;
+          >>=? fun (Ex_script (Script {storage; storage_type; _}), ctxt) ->
+          unparse_data ctxt Readable storage_type storage
+          >|=? fun (storage, _ctxt) -> Some (Micheline.strip_locations storage)) ;
   opt_register2
     ~chunked:true
     S.entrypoint_type
@@ -494,7 +496,10 @@ let[@coq_axiom_with_reason "gadt"] register () =
       do_big_map_get ctxt id key) ;
   register1 ~chunked:true S.big_map_get_all (fun ctxt id {offset; length} () ->
       do_big_map_get_all ?offset ?length ctxt id) ;
-  register_field ~chunked:false S.info (fun ctxt contract ->
+  register_field_with_query
+    ~chunked:false
+    S.info
+    (fun ctxt contract {normalize_types} ->
       Contract.get_balance ctxt contract >>=? fun balance ->
       Delegate.find ctxt contract >>=? fun delegate ->
       (match Contract.is_implicit contract with
@@ -508,18 +513,21 @@ let[@coq_axiom_with_reason "gadt"] register () =
       | None -> return (None, ctxt)
       | Some script ->
           let ctxt = Gas.set_unlimited ctxt in
-          let open Script_ir_translator in
-          parse_script ctxt ~legacy:true ~allow_forged_in_storage:true script
-          >>=? fun (ex_script, ctxt) ->
-          unparse_script ctxt Readable ex_script >|=? fun (script, ctxt) ->
-          (Some script, ctxt))
+          Script_ir_translator.parse_and_unparse_script_unaccounted
+            ctxt
+            ~legacy:true
+            ~allow_forged_in_storage:true
+            Readable
+            ~normalize_types
+            script
+          >|=? fun (script, ctxt) -> (Some script, ctxt))
       >|=? fun (script, _ctxt) -> {balance; delegate; script; counter}) ;
   S.Sapling.register ()
 
 let list ctxt block = RPC_context.make_call0 S.list ctxt block () ()
 
-let info ctxt block contract =
-  RPC_context.make_call1 S.info ctxt block contract () ()
+let info ctxt block contract ~normalize_types =
+  RPC_context.make_call1 S.info ctxt block contract {normalize_types} ()
 
 let balance ctxt block contract =
   RPC_context.make_call1 S.balance ctxt block contract () ()

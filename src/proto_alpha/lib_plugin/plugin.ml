@@ -2804,7 +2804,10 @@ module RPC = struct
           ~description:
             "Access the script of the contract and normalize it using the \
              requested unparsing mode."
-          ~input:(obj1 (req "unparsing_mode" unparsing_mode_encoding))
+          ~input:
+            (obj2
+               (req "unparsing_mode" unparsing_mode_encoding)
+               (dft "normalize_types" bool false))
           ~query:RPC_query.empty
           ~output:(option Script.encoding)
           RPC_path.(path /: Contract.rpc_arg / "script" / "normalized")
@@ -2827,32 +2830,27 @@ module RPC = struct
                 ~legacy:true
                 ~allow_forged_in_storage:true
                 script
-              >>=? fun (ex_script, ctxt) ->
-              unparse_script ctxt unparsing_mode ex_script
-              >>=? fun (script, ctxt) ->
-              Script.force_decode_in_context
-                ~consume_deserialization_gas:When_needed
-                ctxt
-                script.storage
-              >>?= fun (storage, _ctxt) -> return_some storage) ;
+              >>=? fun (Ex_script (Script {storage; storage_type; _}), ctxt) ->
+              unparse_data ctxt unparsing_mode storage_type storage
+              >|=? fun (storage, _ctxt) ->
+              Some (Micheline.strip_locations storage)) ;
       (* Patched RPC: get_script *)
       Registration.register1
         ~chunked:true
         S.get_script_normalized
-        (fun ctxt contract () unparsing_mode ->
+        (fun ctxt contract () (unparsing_mode, normalize_types) ->
           Contract.get_script ctxt contract >>=? fun (ctxt, script) ->
           match script with
           | None -> return_none
           | Some script ->
               let ctxt = Gas.set_unlimited ctxt in
-              let open Script_ir_translator in
-              parse_script
+              Script_ir_translator.parse_and_unparse_script_unaccounted
                 ctxt
                 ~legacy:true
                 ~allow_forged_in_storage:true
+                unparsing_mode
+                ~normalize_types
                 script
-              >>=? fun (ex_script, ctxt) ->
-              unparse_script ctxt unparsing_mode ex_script
               >>=? fun (script, _ctxt) -> return_some script)
 
     let get_storage_normalized ctxt block ~contract ~unparsing_mode =
@@ -2864,14 +2862,15 @@ module RPC = struct
         ()
         unparsing_mode
 
-    let get_script_normalized ctxt block ~contract ~unparsing_mode =
+    let get_script_normalized ctxt block ~contract ~unparsing_mode
+        ~normalize_types =
       RPC_context.make_call1
         S.get_script_normalized
         ctxt
         block
         contract
         ()
-        unparsing_mode
+        (unparsing_mode, normalize_types)
   end
 
   module Big_map = struct

@@ -183,25 +183,34 @@ Michelson
   available in lambdas defined inside a view.
   (MR :gl:`!3737`)
 
-- Stack variable annotations are ignored and not propagated. All contracts that
-  used to typecheck correctly before will still typecheck correctly afterwards.
-  Though more contracts are accepted as branches with different stack variable
-  annotations won't be rejected any more.
-  The special annotation ``%@`` of ``PAIR`` has no effect.
-  RPCs ``typecheck_code``, ``trace_code``, as well as typechecking errors
-  reporting stack types, won't report stack annotations any more.
-  In their output encodings, the objects containing the fields ``item`` and
-  ``annot`` are replaced with the contents of the field ``item``.
-  (MR :gl:`!4139`)
+- Non-entrypoint annotations are ignored by the typechecker and not propagated.
 
-- Variable annotations in pairs are ignored and not propagated.
-  (MR :gl:`!4140`)
+  - All contracts that used to typecheck correctly before will still typecheck
+    correctly afterwards. Though more contracts are accepted as branches with
+    different annotations won't be rejected anymore.
 
-- Type annotations are ignored and not propagated.
-  (MR :gl:`!4141`)
+  - The special annotation ``%@`` of ``PAIR`` has no effect.
 
-- Field annotations are ignored and not propagated.
-  (MR :gl:`!4175`, :gl:`!4311`, :gl:`!4259`)
+  - RPCs
+    ``/chains/<chain_id>/blocks/<block>/context/contracts/<address>/typecheck_code``,
+    ``/chains/<chain_id>/blocks/<block>/context/contracts/<address>/trace_code``,
+    as well as typechecking errors reporting stack types, won't report
+    annotations anymore.
+
+    In their output encodings, the objects containing the fields ``item`` and
+    ``annot`` are replaced with the contents of the field ``item``.
+
+  - RPCs ``/chains/<chain_id>/blocks/<block>/context/contracts/<address>``,
+    ``/chains/<chain_id>/blocks/<block>/context/contracts/<address>/script/normalized``,
+    ``/chains/<chain_id>/blocks/<block>/context/contracts/<address>/entrypoints``,
+    ``/chains/<chain_id>/blocks/<block>/context/contracts/<address>/entrypoints/normalized``,
+    ``/chains/<chain_id>/blocks/<block>/context/contracts/<address>/entrypoints/<entrypoint>``,
+    ``/chains/<chain_id>/blocks/<block>/context/contracts/<address>/entrypoints/<entrypoint>/normalized``
+    accept a new boolean parameter ``normalize_types`` to show types without
+    their annotations.
+
+  - (MRs :gl:`!4139`, :gl:`!4140`, :gl:`!4141`, :gl:`!4175`, :gl:`!4311`,
+    :gl:`!4259`, :gl:`!4844`, :gl:`!4876`, :gl:`!4893`)
 
 - Annotating the parameter toplevel constructor to designate the root entrypoint
   is now forbidden. Put the annotation on the parameter type instead.

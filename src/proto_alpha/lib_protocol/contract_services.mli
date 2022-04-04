@@ -38,7 +38,11 @@ type info = {
 val info_encoding : info Data_encoding.t
 
 val info :
-  'a #RPC_context.simple -> 'a -> Contract.t -> info shell_tzresult Lwt.t
+  'a #RPC_context.simple ->
+  'a ->
+  Contract.t ->
+  normalize_types:bool ->
+  info shell_tzresult Lwt.t
 
 val balance :
   'a #RPC_context.simple -> 'a -> Contract.t -> Tez.t shell_tzresult Lwt.t

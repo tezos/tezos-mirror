@@ -5516,17 +5516,27 @@ let[@coq_axiom_with_reason "gadt"] parse_script :
          {code_size; code; arg_type; storage; storage_type; views; entrypoints}),
     ctxt )
 
+type typechecked_code_internal =
+  | Typechecked_code_internal : {
+      toplevel : toplevel;
+      arg_type : ('arg, _) ty;
+      storage_type : ('storage, _) ty;
+      entrypoints : 'arg entrypoints;
+      type_map : type_map;
+    }
+      -> typechecked_code_internal
+
 let typecheck_code :
     legacy:bool ->
     show_types:bool ->
     context ->
     Script.expr ->
-    (type_map * context) tzresult Lwt.t =
+    (typechecked_code_internal * context) tzresult Lwt.t =
  fun ~legacy ~show_types ctxt code ->
   (* Constants need to be expanded or [parse_toplevel] may fail. *)
   Global_constants_storage.expand ctxt code >>=? fun (ctxt, code) ->
-  parse_toplevel ctxt ~legacy code
-  >>?= fun ({arg_type; storage_type; code_field; views}, ctxt) ->
+  parse_toplevel ctxt ~legacy code >>?= fun (toplevel, ctxt) ->
+  let {arg_type; storage_type; code_field; views} = toplevel in
   let type_map = ref [] in
   let arg_type_loc = location arg_type in
   record_trace
@@ -5537,7 +5547,8 @@ let typecheck_code :
   record_trace
     (Ill_formed_type (Some "storage", code, storage_type_loc))
     (parse_storage_ty ctxt ~stack_depth:0 ~legacy storage_type)
-  >>?= fun (Ex_ty storage_type, ctxt) ->
+  >>?= fun (ex_storage_type, ctxt) ->
+  let (Ex_ty storage_type) = ex_storage_type in
   pair_t storage_type_loc arg_type storage_type
   >>?= fun (Ty_ex_c arg_type_full) ->
   pair_t storage_type_loc list_operation_t storage_type
@@ -5559,16 +5570,12 @@ let typecheck_code :
   in
   trace (Ill_typed_contract (code, !type_map)) result >>=? fun (Lam _, ctxt) ->
   let views_result =
-    typecheck_views
-      ctxt
-      ~type_logger:(fun loc ~stack_ty_before ~stack_ty_after ->
-        type_map := (loc, (stack_ty_before, stack_ty_after)) :: !type_map)
-      ~legacy
-      storage_type
-      views
+    typecheck_views ctxt ?type_logger ~legacy storage_type views
   in
   trace (Ill_typed_contract (code, !type_map)) views_result >|=? fun ctxt ->
-  (!type_map, ctxt)
+  ( Typechecked_code_internal
+      {toplevel; arg_type; storage_type; entrypoints; type_map = !type_map},
+    ctxt )
 
 (* Uncarbonated because used only in RPCs *)
 let list_entrypoints_uncarbonated (type full fullc) (full : (full, fullc) ty)
@@ -5885,21 +5892,48 @@ and[@coq_axiom_with_reason "gadt"] unparse_code ctxt ~stack_depth mode code =
       return (Prim (loc, prim, List.rev items, annot), ctxt)
   | (Int _ | String _ | Bytes _) as atom -> return (atom, ctxt)
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/1688
-   Refactor the sharing part of unparse_script and create_contract *)
-let unparse_script ctxt mode
-    (Ex_script
-      (Script {code; arg_type; storage; storage_type; entrypoints; views; _})) =
-  let (Lam (_, original_code)) = code in
-  Gas.consume ctxt Unparse_costs.unparse_script >>?= fun ctxt ->
-  unparse_code ctxt ~stack_depth:0 mode original_code >>=? fun (code, ctxt) ->
+let parse_and_unparse_script_unaccounted ctxt ~legacy ~allow_forged_in_storage
+    mode ~normalize_types {code; storage} =
+  Script.force_decode_in_context
+    ~consume_deserialization_gas:When_needed
+    ctxt
+    code
+  >>?= fun (code, ctxt) ->
+  typecheck_code ~legacy ~show_types:false ctxt code
+  >>=? fun ( Typechecked_code_internal
+               {
+                 toplevel =
+                   {
+                     code_field;
+                     arg_type = original_arg_type_expr;
+                     storage_type = original_storage_type_expr;
+                     views;
+                   };
+                 arg_type;
+                 storage_type;
+                 entrypoints;
+                 type_map = _;
+               },
+             ctxt ) ->
+  parse_storage
+    ctxt
+    ~legacy
+    ~allow_forged:allow_forged_in_storage
+    storage_type
+    ~storage
+  >>=? fun (storage, ctxt) ->
+  unparse_code ctxt ~stack_depth:0 mode code_field >>=? fun (code, ctxt) ->
   unparse_data ctxt ~stack_depth:0 mode storage_type storage
   >>=? fun (storage, ctxt) ->
   Lwt.return
     (let loc = Micheline.dummy_location in
-     unparse_parameter_ty ~loc ctxt arg_type ~entrypoints
-     >>? fun (arg_type, ctxt) ->
-     unparse_ty ~loc ctxt storage_type >>? fun (storage_type, ctxt) ->
+     (if normalize_types then
+      unparse_parameter_ty ~loc ctxt arg_type ~entrypoints
+      >>? fun (arg_type, ctxt) ->
+      unparse_ty ~loc ctxt storage_type >|? fun (storage_type, ctxt) ->
+      (arg_type, storage_type, ctxt)
+     else ok (original_arg_type_expr, original_storage_type_expr, ctxt))
+     >|? fun (arg_type, storage_type, ctxt) ->
      let open Micheline in
      let unparse_view_unaccounted name {input_ty; output_ty; view_code} views =
        Prim
@@ -5914,14 +5948,9 @@ let unparse_script ctxt mode
            [] )
        :: views
      in
-     let unparse_views views =
-       Gas.consume ctxt (Unparse_costs.unparse_views views) >|? fun ctxt ->
-       let views =
-         Script_map.fold unparse_view_unaccounted views [] |> List.rev
-       in
-       (views, ctxt)
+     let views =
+       Script_map.fold unparse_view_unaccounted views [] |> List.rev
      in
-     unparse_views views >>? fun (views, ctxt) ->
      let code =
        Seq
          ( loc,
@@ -5932,8 +5961,6 @@ let unparse_script ctxt mode
            ]
            @ views )
      in
-     Gas.consume ctxt (Script.strip_locations_cost code) >>? fun ctxt ->
-     Gas.consume ctxt (Script.strip_locations_cost storage) >|? fun ctxt ->
      ( {
          code = lazy_expr (strip_locations code);
          storage = lazy_expr (strip_locations storage);
@@ -6503,3 +6530,7 @@ let script_size
   in
   let cost = Script_typed_ir_size_costs.nodes_cost ~nodes in
   (Saturation_repr.(add code_size storage_size |> to_int), cost)
+
+let typecheck_code ~legacy ~show_types ctxt code =
+  typecheck_code ~legacy ~show_types ctxt code
+  >|=? fun (Typechecked_code_internal {type_map; _}, ctxt) -> (type_map, ctxt)
