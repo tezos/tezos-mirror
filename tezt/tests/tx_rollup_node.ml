@@ -70,9 +70,9 @@ let get_rollup_parameter_file ~protocol =
   let base = Either.right (protocol, None) in
   Protocol.write_parameter_file ~base enable_tx_rollup
 
-(* Wait for the [injection_success] event from the rollup node batcher. *)
-let wait_for_injection_success_event node =
-  Rollup_node.wait_for node "injection_success.v0" (fun _ -> Some ())
+(* Wait for the [batch_success] event from the rollup node batcher. *)
+let wait_for_batch_success_event node =
+  Rollup_node.wait_for node "batch_success.v0" (fun _ -> Some ())
 
 (* Check that all messages in the inbox have been successfully applied. *)
 let check_inbox_success (inbox : Rollup_node.Inbox.t) =
@@ -159,7 +159,8 @@ let test_node_configuration =
       in
       unit)
 
-let init_and_run_rollup_node ~operator node client =
+let init_and_run_rollup_node ~operator ?batch_signer ?finalize_commitment_signer
+    ?remove_commitment_signer ?rejection_signer node client =
   let*! tx_rollup_hash = Client.Tx_rollup.originate ~src:operator client in
   let* () = Client.bake_for client in
   let* _ = Node.wait_for_level node 2 in
@@ -170,6 +171,10 @@ let init_and_run_rollup_node ~operator node client =
       ~rollup_id:tx_rollup_hash
       ~rollup_genesis:block_hash
       ~operator
+      ?batch_signer
+      ?finalize_commitment_signer
+      ?remove_commitment_signer
+      ?rejection_signer
       client
       node
   in
@@ -703,7 +708,11 @@ let test_batcher =
       in
       let operator = Constant.bootstrap1.public_key_hash in
       let* (tx_rollup_hash, tx_node) =
-        init_and_run_rollup_node ~operator node client
+        init_and_run_rollup_node
+          ~operator
+          ~batch_signer:Constant.bootstrap5.public_key_hash
+          node
+          client
       in
       let* contract_id =
         Client.originate_contract
@@ -765,7 +774,7 @@ let test_batcher =
           ~amount:Tez.zero
           ~burn_cap:Tez.one
           ~storage_limit:10_000
-          ~giver:"bootstrap1"
+          ~giver:"bootstrap3"
           ~receiver:contract_id
           ~arg:arg_2
           client
@@ -907,9 +916,7 @@ let test_batcher =
         tx_client_inject_transaction ~tx_node [tx] signature
       in
       let nbtxs1 = 70 in
-      let injection_success_promise =
-        wait_for_injection_success_event tx_node
-      in
+      let batch_success_promise = wait_for_batch_success_event tx_node in
       Log.info "Injecting %d transactions to queue" nbtxs1 ;
       let* () =
         Lwt_list.iter_s
@@ -944,9 +951,9 @@ let test_batcher =
       Check.((len_q = nbtxs1 + nbtxs2) int)
         ~error_msg:"Queue length is %L but should be %R" ;
       let* () = Client.bake_for client in
-      Log.info "Waiting for injection on L1 to succeed" ;
-      let* () = injection_success_promise in
-      Log.info "Injection succeeded" ;
+      Log.info "Waiting for batching on L1 to succeed" ;
+      let* () = batch_success_promise in
+      Log.info "Batching succeeded" ;
       let* () = Client.bake_for client in
       let* _ = Rollup_node.wait_for_tezos_level tx_node 9 in
       let* inbox = Rollup_node.Client.get_inbox ~tx_node ~block:"head" in
