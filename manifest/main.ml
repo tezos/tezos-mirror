@@ -26,13 +26,6 @@
 open Manifest
 module V = Version
 
-module Node_wrapper_flags = struct
-  let secp256k1 = ["--secp256k1"]
-
-  let hacl = ["--hacl"]
-
-  let bls12_381 = ["--bls12-381"]
-end
 (* EXTERNAL LIBS *)
 
 let alcotest = external_lib ~js_compatible:true "alcotest" V.(at_least "1.5.0")
@@ -49,11 +42,18 @@ let bigstringaf =
 let bisect_ppx = opam_only "bisect_ppx" V.(at_least "2.7.0")
 
 let bls12_381 =
+  let version = V.(at_least "3.0.0" && less_than "3.1.0") in
   external_lib
     ~js_compatible:true
-    ~node_wrapper_flags:Node_wrapper_flags.bls12_381
+    ~npm_deps:
+      [
+        Npm.make
+          ~node_wrapper_flags:["--bls12-381"]
+          "@dannywillems/ocaml-bls12-381"
+          version;
+      ]
     "bls12-381"
-    V.(at_least "3.0.0" && less_than "3.1.0")
+    version
 
 let bls12_381_legacy = external_lib "bls12-381-legacy" V.True
 
@@ -111,10 +111,13 @@ let fmt_cli = external_sublib fmt "fmt.cli"
 
 let fmt_tty = external_sublib fmt "fmt.tty"
 
+let hacl_star_npm =
+  Npm.make ~node_wrapper_flags:["--hacl"] "hacl-wasm" V.(exactly "1.1.0")
+
 let hacl_star =
   external_lib
     ~js_compatible:true
-    ~node_wrapper_flags:Node_wrapper_flags.hacl
+    ~npm_deps:[hacl_star_npm]
     "hacl-star"
     V.(at_least "0.4.2" && less_than "0.5")
 
@@ -267,7 +270,13 @@ let ringo_lwt = external_lib "ringo-lwt" V.(exactly "0.8")
 
 let secp256k1_internal =
   external_lib
-    ~node_wrapper_flags:Node_wrapper_flags.secp256k1
+    ~npm_deps:
+      [
+        Npm.make
+          ~node_wrapper_flags:["--secp256k1"]
+          "@nomadic-labs/secp256k1wasm"
+          V.(exactly "1.1.1");
+      ]
     ~js_compatible:true
     "secp256k1-internal"
     V.True
@@ -602,7 +611,7 @@ let _tezos_hacl_gen =
                [
                  S "run";
                  S "%{dep:../../tooling/node_wrapper.exe}";
-                 H (of_atom_list Node_wrapper_flags.hacl);
+                 H (of_atom_list (Npm.node_wrapper_flags hacl_star_npm));
                  S "%{dep:./check-api.js}";
                ];
              ];

@@ -417,6 +417,32 @@ val if_some : target option -> target
     and to [no_target] if [condition] is [false]. *)
 val if_ : bool -> target -> target
 
+module Npm : sig
+  (** Npm package description
+
+     An npm package can be added as a dependency to an OCaml
+     library. For example, to get the wasm equivalent of a C library
+     when targeting JavaScript. *)
+
+  (** Npm package description *)
+  type t
+
+  (** Make a npm package.
+
+    Usage: [Npm.make ~node_wrapper_flags package_name version]
+
+  - [package_name] is the name of the npm package.
+  - [node_wrapper_flags]: flags to add to the [node_wrapper] executable
+    command in [runtest_js] aliases. Only used for test and executable test targets.
+  - [version]: version constraint used by npm when installing dependencies.
+  *)
+  val make :
+    node_wrapper_flags:string list -> string -> Version.constraints -> t
+
+  (** Get the flags given to [make]. *)
+  val node_wrapper_flags : t -> string list
+end
+
 (** Preprocessors. *)
 type preprocessor
 
@@ -493,8 +519,7 @@ val pps : ?args:string list -> target -> preprocessor
 
     - [modules_without_implementation]: list of modules without implementation to include in this target.
 
-    - [node_wrapper_flags]: flags to add to the [node_wrapper] executable
-      command in [runtest_js] aliases. Only used for test and executable test targets.
+    - [npm]: npm dependencies used when targeting JavaScript.
 
     - [nopervasives]: if [true], add [-nopervasives] to the list of flags to
       be passed to the OCaml compiler (in the [(flags ...)] stanza).
@@ -575,7 +600,7 @@ type 'a maker =
   ?modes:Dune.mode list ->
   ?modules:string list ->
   ?modules_without_implementation:string list ->
-  ?node_wrapper_flags:string list ->
+  ?npm_deps:Npm.t list ->
   ?nopervasives:bool ->
   ?nostdlib:bool ->
   ?ocaml:Version.constraints ->
@@ -665,13 +690,12 @@ val test_exes : string list maker
     [js_compatible]: whether the library can be compiled to JavaScript.
     Default value for [js_compatible] is false.
 
-    [node_wrapper_flags]: flags to add to the [node_wrapper] executable
-    command in [runtest_js] aliases. Only used for test and executable test targets.
+    [npm_deps]: npm dependencies used when targeting JavaScript.
  *)
 val vendored_lib :
   ?main_module:string ->
   ?js_compatible:bool ->
-  ?node_wrapper_flags:string list ->
+  ?npm_deps:Npm.t list ->
   string ->
   target
 
@@ -687,14 +711,13 @@ val vendored_lib :
     [js_compatible]: whether the library can be compiled to JavaScript.
     Default value for [js_compatible] is false.
 
-    [node_wrapper_flags]: flags to add to the [node_wrapper] executable
-    command in [runtest_js] aliases. Only used for test and executable test targets.
+    [npm]: npm dependencies used when targeting JavaScript.
   *)
 val external_lib :
   ?main_module:string ->
   ?opam:string ->
   ?js_compatible:bool ->
-  ?node_wrapper_flags:string list ->
+  ?npm_deps:Npm.t list ->
   string ->
   Version.constraints ->
   target
@@ -713,14 +736,13 @@ val external_lib :
     [js_compatible]: whether the library can be compiled to JavaScript.
     Default value for [js_compatible] is false.
 
-    [node_wrapper_flags]: flags to add to the [node_wrapper] executable
-    command in [runtest_js] aliases. Only used for test and executable test targets.
+    [npm_deps]: npm dependencies used when targeting JavaScript.
 
     @raise Invalid_arg if [main_lib] was not built with [external_lib]. *)
 val external_sublib :
   ?main_module:string ->
   ?js_compatible:bool ->
-  ?node_wrapper_flags:string list ->
+  ?npm_deps:Npm.t list ->
   target ->
   string ->
   target
