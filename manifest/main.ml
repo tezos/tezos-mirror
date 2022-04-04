@@ -42,6 +42,7 @@ let bigstringaf =
 let bisect_ppx = opam_only "bisect_ppx" V.(at_least "2.7.0")
 
 let bls12_381 =
+  let version = V.(at_least "3.0.0" && less_than "3.1.0") in
   external_lib
     ~js_compatible:true
     ~npm_deps:
@@ -49,10 +50,10 @@ let bls12_381 =
         Npm.make
           ~node_wrapper_flags:["--bls12-381"]
           "@dannywillems/ocaml-bls12-381"
-          V.(exactly "3.0.1-8-g263549e");
+          version;
       ]
     "bls12-381"
-    V.(at_least "3.0.0" && less_than "3.1.0")
+    version
 
 let bls12_381_legacy = external_lib "bls12-381-legacy" V.True
 
