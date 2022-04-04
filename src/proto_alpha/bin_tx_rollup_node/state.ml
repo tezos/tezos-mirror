@@ -60,6 +60,23 @@ let rollup_operation_index = 3
 
 let get_head state = state.head
 
+let fetch_tezos_block state hash =
+  let open Lwt_syntax in
+  let fetch hash =
+    let+ block =
+      Alpha_block_services.info
+        state.cctxt
+        ~chain:state.cctxt#chain
+        ~block:(`Hash (hash, 0))
+        ()
+    in
+    Result.to_option block
+  in
+  let+ block =
+    Tezos_blocks_cache.find_or_replace state.tezos_blocks_cache hash fetch
+  in
+  Result.of_option ~error:[Error.Tx_rollup_cannot_fetch_tezos_block hash] block
+
 (* Compute the reorganization of L1 blocks from the chain whose head is
    [old_head_hash] and the chain whose head [new_head_hash]. *)
 let tezos_reorg state ~old_head_hash ~new_head_hash =

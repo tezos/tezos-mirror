@@ -148,3 +148,7 @@ val save_tezos_block_info :
     stored into a [Block_info.t]. Currently, the manager operation validation
     pass is used. *)
 val rollup_operation_index : int
+
+(** Fetch a Tezos block from the cache or the node *)
+val fetch_tezos_block :
+  t -> Block_hash.t -> Alpha_block_services.block_info tzresult Lwt.t
