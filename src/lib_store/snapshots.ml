@@ -1827,43 +1827,35 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
                 nb_cycles)
             (fun notify ->
               (* Bound the number of copying threads *)
-              let tasks =
-                let rec loop acc l =
-                  let (l, r) = List.split_n 20 l in
-                  if r = [] then l :: acc else loop (l :: acc) r
-                in
-                loop [] files
-              in
               List.iter_es
-                (List.iter_es
-                   (fun ({start_level; end_level; file} as cemented_file) ->
-                     let* () =
-                       Cemented_block_store.iter_cemented_file
-                         (fun block ->
-                           let hash = Block_repr.hash block in
-                           let level = Block_repr.level block in
-                           Cemented_block_level_index.replace
-                             fresh_level_index
-                             hash
-                             level ;
-                           Cemented_block_hash_index.replace
-                             fresh_hash_index
-                             level
-                             hash ;
-                           Lwt.return_unit)
-                         cemented_file
-                     in
-                     let file_path = Naming.file_path file in
-                     let*! () =
-                       Exporter.copy_cemented_block
-                         snapshot_exporter
-                         ~file:file_path
-                         ~start_level
-                         ~end_level
-                     in
-                     let*! () = notify () in
-                     return_unit))
-                tasks)
+                (fun ({start_level; end_level; file} as cemented_file) ->
+                  let* () =
+                    Cemented_block_store.iter_cemented_file
+                      (fun block ->
+                        let hash = Block_repr.hash block in
+                        let level = Block_repr.level block in
+                        Cemented_block_level_index.replace
+                          fresh_level_index
+                          hash
+                          level ;
+                        Cemented_block_hash_index.replace
+                          fresh_hash_index
+                          level
+                          hash ;
+                        Lwt.return_unit)
+                      cemented_file
+                  in
+                  let file_path = Naming.file_path file in
+                  let*! () =
+                    Exporter.copy_cemented_block
+                      snapshot_exporter
+                      ~file:file_path
+                      ~start_level
+                      ~end_level
+                  in
+                  let*! () = notify () in
+                  return_unit)
+                files)
         in
         Cemented_block_level_index.close fresh_level_index ;
         Cemented_block_hash_index.close fresh_hash_index ;
