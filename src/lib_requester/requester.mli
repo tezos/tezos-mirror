@@ -88,6 +88,11 @@ module type REQUESTER = sig
   (** Same as [read] but returns [None] if not found. *)
   val read_opt : t -> key -> value option Lwt.t
 
+  (** [inject t k v] returns [false] if [k] is already present in the memory
+      table or in the disk, or has already been requested. Otherwise it
+      updates the memory table and return [true] *)
+  val inject : t -> key -> value -> bool Lwt.t
+
   (** [fetch t ?peer ?timeout k param] returns the value when it is known.
       It can fail with [Timeout k] if [timeout] is provided and the value
       isn't know before the timeout expires. It can fail with [Cancel] if
@@ -135,11 +140,6 @@ module type FULL_REQUESTER = sig
   (** Monitor all the fetched data. A given data will appear only
       once. *)
   val watch : t -> (key * value) Lwt_stream.t * Lwt_watcher.stopper
-
-  (** [inject t k v] returns [false] if [k] is already present in the memory
-      table or in the disk, or has already been requested. Otherwise it
-      updates the memory table and return [true] *)
-  val inject : t -> key -> value -> bool Lwt.t
 
   (** [notify t peer k nv] notifies the requester that a value has been
       received for key [k], from peer [peer]. [nv] is a *notified value*. The

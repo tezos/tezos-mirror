@@ -331,6 +331,8 @@ struct
 
   let read_opt t k = Table.read_opt (Kind.proj t) k
 
+  let inject t k v = Table.inject (Kind.proj t) k v
+
   let fetch t ?peer ?timeout k p = Table.fetch (Kind.proj t) ?peer ?timeout k p
 
   let clear_or_cancel t k = Table.clear_or_cancel (Kind.proj t) k

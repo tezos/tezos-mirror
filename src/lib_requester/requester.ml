@@ -45,6 +45,8 @@ module type REQUESTER = sig
 
   val read_opt : t -> key -> value option Lwt.t
 
+  val inject : t -> key -> value -> bool Lwt.t
+
   val fetch :
     t ->
     ?peer:P2p_peer.Id.t ->
@@ -68,8 +70,6 @@ module type FULL_REQUESTER = sig
   val pending : t -> key -> bool
 
   val watch : t -> (key * value) Lwt_stream.t * Lwt_watcher.stopper
-
-  val inject : t -> key -> value -> bool Lwt.t
 
   val notify : t -> P2p_peer.Id.t -> key -> notified_value -> unit Lwt.t
 
