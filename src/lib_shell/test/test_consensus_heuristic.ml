@@ -31,6 +31,7 @@
    Subject:      Test the consensus heuristic
  *)
 
+module Assert = Lib_test.Assert
 open Consensus_heuristic
 
 let prn = function

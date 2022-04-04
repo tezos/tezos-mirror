@@ -31,6 +31,8 @@ depends: [
   "tezos-protocol-alpha-parameters" {with-test}
   "tezos-protocol-plugin-alpha" {with-test}
   "alcotest-lwt" { with-test & >= "1.5.0" }
+  "tezos-test-helpers" {with-test}
+  "tezos-test-helpers-base" {with-test}
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]

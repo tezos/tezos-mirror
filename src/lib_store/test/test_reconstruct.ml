@@ -24,18 +24,19 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Assert_base = Lib_test_base.Assert_base
 open Test_utils
 
 let check_flags descr store expected_head =
   let open Lwt_result_syntax in
   let chain_store = Store.main_chain_store store in
   let*! current_head = Store.Chain.current_head chain_store in
-  Assert.equal_block
+  Assert_base.equal_block
     ~msg:("head consistency: " ^ descr)
     (Store.Block.header expected_head)
     (Store.Block.header current_head) ;
   let history_mode = Store.Chain.history_mode chain_store in
-  Assert.equal_history_mode
+  Assert_base.equal_history_mode
     ~msg:("history mode consistency: " ^ descr)
     history_mode
     History_mode.Archive ;

@@ -48,6 +48,7 @@
    assumes that each unit test takes less than `100` to be
    executed. *)
 
+module Assert = Lib_test.Assert
 open Synchronisation_heuristic
 open Core
 

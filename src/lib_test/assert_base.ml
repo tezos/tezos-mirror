@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2020 Nomadic Labs. <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,40 +23,67 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** [assert_base] contains Alcotest convenience assertions depending on Tezos_base. *)
+
 module Assert = Lib_test.Assert
 
+let equal_operation ?msg op1 op2 =
+  let eq op1 op2 =
+    match (op1, op2) with
+    | (None, None) -> true
+    | (Some op1, Some op2) -> Tezos_base.Operation.equal op1 op2
+    | _ -> false
+  in
+  let prn = function
+    | None -> "none"
+    | Some op ->
+        Tezos_crypto.Operation_hash.to_b58check (Tezos_base.Operation.hash op)
+  in
+  Assert.equal ?msg ~prn ~eq op1 op2
+
 let equal_block ?msg st1 st2 =
-  let eq st1 st2 = Block_header.equal st1 st2 in
+  let eq st1 st2 = Tezos_base.Block_header.equal st1 st2 in
   let prn st =
     Format.asprintf
       "%a (%ld)"
-      Block_hash.pp
-      (Block_header.hash st)
+      Tezos_crypto.Block_hash.pp
+      (Tezos_base.Block_header.hash st)
       st.shell.level
   in
   Assert.equal ?msg ~prn ~eq st1 st2
 
-let () =
-  let speed =
-    try
-      let s = Sys.getenv "SLOW_TEST" in
-      match String.(trim (uncapitalize_ascii s)) with
-      | "true" | "1" | "yes" -> `Slow
-      | _ -> `Quick
-    with Not_found -> `Quick
+let equal_block_set ?msg set1 set2 =
+  let b1 = Tezos_crypto.Block_hash.Set.elements set1
+  and b2 = Tezos_crypto.Block_hash.Set.elements set2 in
+  Assert.make_equal_list
+    ?msg
+    (fun h1 h2 -> Tezos_crypto.Block_hash.equal h1 h2)
+    Tezos_crypto.Block_hash.to_string
+    b1
+    b2
+
+let equal_block_map ?msg ~eq map1 map2 =
+  let b1 = Tezos_crypto.Block_hash.Map.bindings map1
+  and b2 = Tezos_crypto.Block_hash.Map.bindings map2 in
+  Assert.make_equal_list
+    ?msg
+    (fun (h1, b1) (h2, b2) -> Tezos_crypto.Block_hash.equal h1 h2 && eq b1 b2)
+    (fun (h1, _) -> Tezos_crypto.Block_hash.to_string h1)
+    b1
+    b2
+
+let equal_block_hash_list ?msg l1 l2 =
+  let pr_block_hash = Tezos_crypto.Block_hash.to_short_b58check in
+  Assert.make_equal_list ?msg Tezos_crypto.Block_hash.equal pr_block_hash l1 l2
+
+let equal_block_descriptor ?msg bd1 bd2 =
+  let eq (l1, h1) (l2, h2) =
+    Int32.equal l1 l2 && Tezos_crypto.Block_hash.equal h1 h2
   in
-  let open Lwt_syntax in
-  Lwt_main.run
-    (let* () = Tezos_base_unix.Internal_event_unix.init () in
-     Alcotest_lwt.run
-       "tezos-store"
-       [
-         Test_cemented_store.tests;
-         Test_block_store.tests;
-         Test_store.tests;
-         Test_protocol_store.tests;
-         Test_testchain.tests;
-         Test_snapshots.tests speed;
-         Test_reconstruct.tests speed;
-         Test_history_mode_switch.tests speed;
-       ])
+  let prn (l, h) = Format.asprintf "(%ld, %a)" l Tezos_crypto.Block_hash.pp h in
+  Assert.equal ?msg ~prn ~eq bd1 bd2
+
+let equal_history_mode ?msg hm1 hm2 =
+  let eq hm1 hm2 = hm1 = hm2 in
+  let prn = Format.asprintf "%a" Tezos_shell_services.History_mode.pp in
+  Assert.equal ?msg ~prn ~eq hm1 hm2

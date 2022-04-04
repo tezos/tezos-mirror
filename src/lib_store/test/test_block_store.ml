@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Assert = Lib_test.Assert
+module Assert_base = Lib_test_base.Assert_base
 open Test_utils
 open Block_store
 
@@ -58,7 +60,7 @@ let assert_presence_in_block_store ?(with_metadata = false) block_store blocks =
               b' ;
             return_unit)
           else (
-            Assert.equal_block
+            Assert_base.equal_block
               ~msg:"block equality without metadata"
               (Block_repr.header b)
               (Block_repr.header b') ;
@@ -106,7 +108,7 @@ let assert_pruned_blocks_in_block_store block_store blocks =
             pp_raw_block
             b
       | Some ({metadata = None; _} as b') ->
-          Assert.equal_block
+          Assert_base.equal_block
             ~msg:"block equality without metadata"
             (Block_repr.header b)
             (Block_repr.header b') ;
@@ -128,11 +130,11 @@ let assert_cemented_bound block_store (lowest, highest) =
       (Cemented_block_store.get_highest_cemented_level
          (Block_store.cemented_block_store block_store))
   in
-  Assert.is_true
-    ~msg:"is 0 the lowest cemented level?"
+  Assert.assert_true
+    "is 0 the lowest cemented level?"
     Compare.Int32.(lowest_cemented_level = lowest) ;
-  Assert.is_true
-    ~msg:"is head's lafl the lowest cemented level?"
+  Assert.assert_true
+    "is head's lafl the lowest cemented level?"
     Compare.Int32.(highest_cemented_level = highest)
 
 let test_storing_and_access_predecessors block_store =

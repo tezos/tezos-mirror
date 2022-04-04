@@ -32,6 +32,8 @@
 
 (** Basic blocks *)
 
+module Assert = Lib_test.Assert
+
 let genesis_hash =
   Block_hash.of_b58check_exn
     "BLockGenesisGenesisGenesisGenesisGenesisGeneskvg68z"
@@ -438,13 +440,13 @@ let test_protocol_locator base_dir =
                   has_lower_bound :=
                     !has_lower_bound
                     || Int32.to_int (Store.Block.level predecessor) = inf ;
-                  Assert.is_true
-                    ~msg:"same proto_level"
+                  Assert.assert_true
+                    "same proto_level"
                     (Store.Block.proto_level block
                      = Store.Block.proto_level predecessor
                     && Store.Block.proto_level block = proto_level) ;
-                  Assert.is_true
-                    ~msg:"increasing levels"
+                  Assert.assert_true
+                    "increasing levels"
                     Compare.Int32.(
                       Store.Block.level block >= Store.Block.level predecessor
                       && Store.Block.level predecessor >= Int32.of_int inf
@@ -456,8 +458,8 @@ let test_protocol_locator base_dir =
             | Error error ->
                 Format.kasprintf Stdlib.failwith "%a" pp_print_trace error
             | Ok () ->
-                Assert.is_true
-                  ~msg:"locator contains the lower bound block"
+                Assert.assert_true
+                  "locator contains the lower bound block"
                   !has_lower_bound ;
                 Lwt.return_unit))
       fork_points_assoc
@@ -468,10 +470,10 @@ let test_protocol_locator base_dir =
     in
     match o with
     | Some {Block_locator.head_header; history; _} ->
-        Assert.is_true ~msg:"no block in locator" (history = []) ;
+        Assert.assert_true "no block in locator" (history = []) ;
         let* b = Store.Block.read_block chain_store genesis_hash in
-        Assert.is_true
-          ~msg:"single header is genesis"
+        Assert.assert_true
+          "single header is genesis"
           (Block_header.equal (Store.Block.header b) head_header) ;
         return_unit
     | None -> Alcotest.fail "missing genesis locator"
@@ -529,13 +531,13 @@ let test_protocol_locator base_dir =
             has_lower_bound :=
               !has_lower_bound
               || Int32.to_int (Store.Block.level predecessor) = inf ;
-            Assert.is_true
-              ~msg:"same proto_level after pruning"
+            Assert.assert_true
+              "same proto_level after pruning"
               (Store.Block.proto_level block
                = Store.Block.proto_level predecessor
               && Store.Block.proto_level block = 5) ;
-            Assert.is_true
-              ~msg:"increasing levels after pruning"
+            Assert.assert_true
+              "increasing levels after pruning"
               Compare.Int32.(
                 Store.Block.level block >= Store.Block.level predecessor
                 && Store.Block.level predecessor >= Int32.of_int inf
@@ -546,14 +548,14 @@ let test_protocol_locator base_dir =
       let last_hash =
         (WithExceptions.Option.get ~loc:__LOC__ @@ List.hd steps).predecessor
       in
-      Assert.is_true
-        ~msg:"last block in locator is the checkpoint"
+      Assert.assert_true
+        "last block in locator is the checkpoint"
         (Block_hash.equal last_hash caboose_hash) ;
       let first_hash =
         (WithExceptions.Option.get ~loc:__LOC__ @@ List.last_opt steps).block
       in
-      Assert.is_true
-        ~msg:"first block in locator is the head"
+      Assert.assert_true
+        "first block in locator is the head"
         (Block_hash.equal first_hash head_hash) ;
       return_unit
 

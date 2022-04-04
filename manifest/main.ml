@@ -312,6 +312,17 @@ let tezos_test_helpers =
              complains that the alias is empty. *)
           alias_rule "runtest_js" ~action:(S "progn");
         ]
+    ~modules:
+      [
+        "assert";
+        "lwt_assert";
+        "qcheck2_helpers";
+        "qcheck_extra";
+        "qcheck_helpers";
+        "random_pure";
+        "roundtrip";
+        "testable";
+      ]
 
 let tezos_stdlib =
   public_lib
@@ -1815,6 +1826,23 @@ let tezos_store =
         prometheus;
       ]
 
+let tezos_test_helpers_base =
+  public_lib
+    "tezos-test-helpers-base"
+    ~path:"src/lib_test"
+    ~internal_name:"lib_test_base"
+    ~synopsis:"Test helpers dependent on tezos-base"
+    ~deps:[tezos_base; tezos_crypto; tezos_test_helpers; tezos_shell_services]
+    ~ocaml:V.(at_least "4.08")
+    ~dune:
+      Dune.
+        [
+          (* This rule is necessary for `make lint-tests-pkg`, without it dune
+             complains that the alias is empty. *)
+          alias_rule "runtest_js_base" ~action:(S "progn");
+        ]
+    ~modules:["assert_base"]
+
 let tezos_requester =
   public_lib
     "tezos-requester"
@@ -2908,6 +2936,8 @@ let _tezos_store_tests =
         tezos_protocol_alpha_parameters |> open_;
         Protocol.(plugin_exn alpha) |> open_;
         alcotest_lwt;
+        tezos_test_helpers;
+        tezos_test_helpers_base;
       ]
     ~action:Dune.[setenv "SLOW_TEST" "false" @@ run_exe "test" []]
     ~dune:
