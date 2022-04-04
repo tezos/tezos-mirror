@@ -116,12 +116,9 @@ let submit_commitment ?(src = Constant.bootstrap1.public_key_hash) ~level ~roots
   return ()
 
 let submit_return_bond ?(src = Constant.bootstrap1.public_key_hash)
-    {rollup; client; node} =
+    {rollup; client; node = _} =
   let*! () = Client.Tx_rollup.submit_return_bond ~hooks ~rollup ~src client in
-  let current_level = Node.get_level node in
-  let* () = Client.bake_for client in
-  let* _ = Node.wait_for_level node (current_level + 1) in
-  unit
+  Client.bake_for_and_wait client
 
 let submit_finalize_commitment ?(src = Constant.bootstrap1.public_key_hash)
     {rollup; client; node = _} =
@@ -1496,7 +1493,8 @@ let test_rollup_bond_return =
 
       step "3. Repeat bake before finalizing commitment" ;
       let* () =
-        repeat parameters.finality_period (fun () -> Client.bake_for client)
+        repeat parameters.finality_period (fun () ->
+            Client.bake_for_and_wait client)
       in
 
       step "4. Attempt return bond, which should fail" ;
@@ -1516,7 +1514,7 @@ let test_rollup_bond_return =
           let () = step "7. Submit remove_commitment and bake" in
           let*! () = submit_remove_commitment state in
           let* () = check_bond_is ~src client ~expected:commit_bond in
-          Client.bake_for client)
+          Client.bake_for_and_wait client)
   in
   (* 1st scenario: batch; commit; finalize; return bond (OK) *)
   Log.info "1st scenario: batch; commit; finalize; return bond (OK)" ;
