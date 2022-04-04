@@ -51,7 +51,7 @@ let bls12_381 =
 
 let bls12_381_legacy = external_lib "bls12-381-legacy" V.True
 
-let camlzip = external_lib "camlzip" V.(exactly "1.11")
+let camlzip = external_lib "camlzip" V.(at_least "1.11" && less_than "1.12")
 
 let caqti = external_lib "caqti" V.True
 
@@ -259,7 +259,8 @@ let tar = external_lib "tar" V.True
 
 let tar_unix = external_lib "tar-unix" V.(exactly "2.0.0")
 
-let tezos_rust_lib = opam_only "tezos-rust-libs" V.(exactly "1.1")
+let tezos_rust_lib =
+  opam_only ~can_vendor:false "tezos-rust-libs" V.(exactly "1.1")
 
 let tls = external_lib "tls" V.(at_least "0.10")
 

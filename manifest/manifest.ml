@@ -447,6 +447,7 @@ module Opam = struct
     synopsis : string;
     url : url option;
     description : string option;
+    x_opam_monorepo_opam_provided : string list;
   }
 
   let pp fmt
@@ -463,6 +464,7 @@ module Opam = struct
         synopsis;
         url;
         description;
+        x_opam_monorepo_opam_provided;
       } =
     let (depopts, depends) = List.partition (fun dep -> dep.optional) depends in
     let (depopts, conflicts) =
@@ -638,6 +640,11 @@ module Opam = struct
     pp_line "%a" (pp_list ~v:true ~prefix:"depends: " pp_dependency) depends ;
     if depopts <> [] then
       pp_line "%a" (pp_list ~v:true ~prefix:"depopts: " pp_dependency) depopts ;
+    if x_opam_monorepo_opam_provided <> [] then
+      pp_line
+        "%a"
+        (pp_list ~v:true ~prefix:"x-opam-monorepo-opam-provided: " pp_string)
+        x_opam_monorepo_opam_provided ;
     if conflicts <> [] then
       pp_line
         "%a"
@@ -672,7 +679,11 @@ module Target = struct
     node_wrapper_flags : string list;
   }
 
-  type opam_only = {name : string; version : Version.constraints}
+  type opam_only = {
+    name : string;
+    version : Version.constraints;
+    can_vendor : bool;
+  }
 
   type modules =
     | All
@@ -1181,7 +1192,8 @@ module Target = struct
              parent
              name)
 
-  let opam_only name version = Some (Opam_only {name; version})
+  let opam_only ?(can_vendor = true) name version =
+    Some (Opam_only {name; version; can_vendor})
 
   let optional = function None -> None | Some target -> Some (Optional target)
 
@@ -1577,8 +1589,8 @@ let rec as_opam_dependency ~fix_version ~(for_package : string) ~with_test
         Some {Opam.package; version; with_test; optional = false}
   | Vendored {name = package; _} ->
       Some {Opam.package; version = True; with_test; optional = false}
-  | External {opam = Some opam; version; _} | Opam_only {name = opam; version}
-    ->
+  | External {opam = Some opam; version; _}
+  | Opam_only {name = opam; version; _} ->
       let version =
         (* FIXME: https://gitlab.com/tezos/tezos/-/issues/1453
            Remove this once all packages (including protocol packages)
@@ -1598,17 +1610,24 @@ let rec as_opam_dependency ~fix_version ~(for_package : string) ~with_test
   | Open (target, _) ->
       as_opam_dependency ~fix_version ~for_package ~with_test target
 
+let as_opam_monorepo_opam_provided = function
+  | Target.Opam_only {can_vendor = false; name; _} -> Some name
+  | _ -> None
+
 let generate_opam ?release this_package (internals : Target.internal list) :
     Opam.t =
   let for_package = Filename.basename this_package in
   let map l f = List.map f l in
-  let depends =
-    List.flatten @@ map internals
+  let (depends, x_opam_monorepo_opam_provided) =
+    List.split @@ map internals
     @@ fun internal ->
     let with_test =
       match internal.kind with Test _ | Test_executable _ -> true | _ -> false
     in
     let deps = internal.deps @ internal.opam_only_deps in
+    let x_opam_monorepo_opam_provided =
+      List.filter_map as_opam_monorepo_opam_provided deps
+    in
     let deps =
       List.filter_map
         (as_opam_dependency
@@ -1624,7 +1643,12 @@ let generate_opam ?release this_package (internals : Target.internal list) :
         ~with_test
         target
     in
-    List.filter_map get_preprocess_dep internal.preprocess @ deps
+    ( List.filter_map get_preprocess_dep internal.preprocess @ deps,
+      x_opam_monorepo_opam_provided )
+  in
+  let depends = List.flatten depends in
+  let x_opam_monorepo_opam_provided =
+    List.flatten x_opam_monorepo_opam_provided
   in
   let depends =
     match
@@ -1723,6 +1747,7 @@ let generate_opam ?release this_package (internals : Target.internal list) :
     synopsis;
     url = Option.map (fun {url; _} -> url) release;
     description;
+    x_opam_monorepo_opam_provided;
   }
 
 let generate_opam_files () =

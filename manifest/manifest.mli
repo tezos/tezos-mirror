@@ -727,8 +727,11 @@ val external_sublib :
 
 (** Make an external library that is to only appear in [.opam] dependencies.
 
-    This avoids using [~opam_only_deps] each time you declare this dependency. *)
-val opam_only : string -> Version.constraints -> target
+    This avoids using [~opam_only_deps] each time you declare this dependency.
+
+    [can_vendor] specifies whether opam-monorepo should vendor this dependency, defaults
+    to [true]. *)
+val opam_only : ?can_vendor:bool -> string -> Version.constraints -> target
 
 (** Make an optional dependency with a source file to be selected depending on presence.
 
