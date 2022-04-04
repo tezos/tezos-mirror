@@ -50,7 +50,7 @@ let () =
     (fun we -> Encoding_error we) ;
   register_error_kind
     `Permanent
-    ~id:"unexepcted_size_of_encoded_value"
+    ~id:"unexpected_size_of_encoded_value"
     ~title:"Unexpected size of encoded value"
     ~description:"An encoded value is not of the expected size."
     ~pp:(fun ppf () ->
@@ -74,7 +74,7 @@ let () =
     (fun re -> Decoding_error re) ;
   register_error_kind
     `Permanent
-    ~id:"socket.unexepcted_size_of_decoded_value"
+    ~id:"socket.unexpected_size_of_decoded_value"
     ~title:"Unexpected size of decoded value"
     ~description:"A decoded value comes from a buffer of unexpected size."
     ~pp:(fun ppf () ->
