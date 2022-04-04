@@ -32,6 +32,7 @@ type error +=
       provided_hash : Signature.Public_key_hash.t;
     }
   | (* `Branch *) Previously_revealed_key of Contract_repr.t
+  | (* `Branch *) Missing_manager_contract of Contract_repr.t
 
 let () =
   register_error_kind
@@ -89,7 +90,21 @@ let () =
         s)
     Data_encoding.(obj1 (req "contract" Contract_repr.encoding))
     (function Previously_revealed_key s -> Some s | _ -> None)
-    (fun s -> Previously_revealed_key s)
+    (fun s -> Previously_revealed_key s) ;
+  register_error_kind
+    `Branch
+    ~id:"contract.missing_manager_contract"
+    ~title:"Missing manager contract"
+    ~description:"The manager contract is missing from the storage"
+    ~pp:(fun ppf s ->
+      Format.fprintf
+        ppf
+        "The contract %a is missing from the storage."
+        Contract_repr.pp
+        s)
+    Data_encoding.(obj1 (req "contract" Contract_repr.encoding))
+    (function Missing_manager_contract s -> Some s | _ -> None)
+    (fun s -> Missing_manager_contract s)
 
 let init = Storage.Contract.Manager.init
 
@@ -119,7 +134,7 @@ let get_manager_key ?error ctxt pkh =
   Storage.Contract.Manager.find ctxt contract >>=? function
   | None -> (
       match error with
-      | None -> failwith "get_manager_key"
+      | None -> fail (Missing_manager_contract contract)
       | Some error -> fail error)
   | Some (Manager_repr.Hash _) -> (
       match error with

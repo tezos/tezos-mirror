@@ -200,7 +200,7 @@ val check_minimum_endorsements :
     @return [Error Invalid_signature] if the signature check fails
     @return [Error Unrevealed_manager_key] if the manager has not yet been
     revealed
-    @return [Error Failure "get_manager_key"] if the key is not found in the
+    @return [Error Missing_manager_contract] if the key is not found in the
     context
     @return [Error Inconsistent_sources] if the operations in a batch are not
     from the same manager *)

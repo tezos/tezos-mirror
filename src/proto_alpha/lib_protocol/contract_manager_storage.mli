@@ -32,6 +32,7 @@ type error +=
       provided_hash : Signature.Public_key_hash.t;
     }
   | (* `Branch *) Previously_revealed_key of Contract_repr.t
+  | (* `Branch *) Missing_manager_contract of Contract_repr.t
 
 (** [init ctxt contract manager] associates [manager] to [contract]. This
     function is undefined if [contract] has already a manager associated to it.
