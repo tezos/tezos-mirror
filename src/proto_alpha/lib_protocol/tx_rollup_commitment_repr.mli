@@ -27,56 +27,18 @@
 
 (** A specialized Blake2B implementation for hashing commitments with
     "toc1" as a base58 prefix *)
-module Commitment_hash : sig
+module Hash : sig
   val commitment_hash : string
 
   include S.HASH
 end
 
-(** The hash of the result of a layer-2 operation: that is, the hash
-    of [(l2_ctxt_hash ^ withdraw_hash)] where [l2_ctxt_hash] is the Merkle
-    tree root of the L2 context after any message (ie. deposit or batch),
-    and [withdraw_hash] is a [Tx_rollup_withdraw_repr.withdrawals_merkle_root] *)
-module Message_result_hash : S.HASH
+module Merkle_hash : S.HASH
 
-type message_result = {
-  context_hash : Context_hash.t;
-  withdrawals_merkle_root : Tx_rollup_withdraw_repr.Merkle.root;
-}
-
-val message_result_encoding : message_result Data_encoding.t
-
-(** [hash_message_result result] computes the [Message_result_hash.t]
-    of the given context hash and withdraw list hash, that is
-    [hash(result.context_hash @ result.withdrawals_merkle_root))].  *)
-val hash_message_result : message_result -> Message_result_hash.t
-
-val pp_message_result_hash : Format.formatter -> Message_result_hash.t -> unit
-
-(** [empty_l2_context_hash] is the context hash of the layer-2 context
-    just after its origination.
-
-    The empty layer2 context hash is the hash of the underlying Irmin tree.
-    One important note is: an empty tree *must* not be hashed when it's empty.
-    See https://github.com/mirage/irmin/issues/1304.
-
-    Our solution is to write data in the tree to have a non-empty one.
-    We write the {!Tx_rollup_l2_context.Ticket_count} default value (i.e. 0)
-    and the {!Tx_rollup_l2_context.Address_count} as well in the tree. Then
-    we hash the resulting tree to create this constant.
-*)
-val empty_l2_context_hash : Context_hash.t
-
-(** [initial_message_result_hash] is equal to
-
-{[
-hash_message_result
-  {
-    context_hash = empty_l2_context_hash;
-    withdrawals_merkle_root = Tx_rollup_withdraw_repr.empty_withdrawals_merkle_root;
-  }
-]} *)
-val initial_message_result_hash : Message_result_hash.t
+module Merkle :
+  Merkle_list.T
+    with type elt = Tx_rollup_message_result_hash_repr.t
+     and type h = Merkle_hash.t
 
 (** A commitment describes the interpretation of the messages stored in the
     inbox of a particular [level], on top of a particular layer-2 context.
@@ -88,35 +50,48 @@ val initial_message_result_hash : Message_result_hash.t
     [predecessor] is [None], the commitment is for the first inbox
     with messages in this rollup, and the initial Merkle root is the
     empty tree. *)
-type t = {
+type 'a template = {
   level : Tx_rollup_level_repr.t;
-  messages : Message_result_hash.t list;
-  predecessor : Commitment_hash.t option;
+  messages : 'a;
+  predecessor : Hash.t option;
   inbox_merkle_root : Tx_rollup_inbox_repr.Merkle.root;
 }
 
-include Compare.S with type t := t
+module Compact : sig
+  type excerpt = {
+    count : int;
+    root : Merkle.h;
+    last_result_message_hash : Tx_rollup_message_result_hash_repr.t;
+  }
 
-val pp : Format.formatter -> t -> unit
+  type t = excerpt template
 
-val encoding : t Data_encoding.t
+  val pp : Format.formatter -> t -> unit
 
-val hash : t -> Commitment_hash.t
+  val encoding : t Data_encoding.t
 
-(** [check_message_result commitment result message_index] returns true
-    if the message result hash of the batch in [commitment] indexed by
-    [message_index] corresponds to the hash of [result]. *)
-val check_message_result : t -> message_result -> message_index:int -> bool
+  val hash : t -> Hash.t
+end
 
-module Index : Storage_description.INDEX with type t = Commitment_hash.t
+module Full : sig
+  type t = Tx_rollup_message_result_hash_repr.t list template
+
+  val encoding : t Data_encoding.t
+
+  val pp : Format.formatter -> t -> unit
+
+  val compact : t -> Compact.t
+end
+
+module Index : Storage_description.INDEX with type t = Hash.t
 
 module Submitted_commitment : sig
   (** When a commitment is submitted, we store the [committer] and the
       block the commitment was [submitted_at] along with the
       [commitment] itself with its hash. *)
   type nonrec t = {
-    commitment : t;
-    commitment_hash : Commitment_hash.t;
+    commitment : Compact.t;
+    commitment_hash : Hash.t;
     committer : Signature.Public_key_hash.t;
     submitted_at : Raw_level_repr.t;
     finalized_at : Raw_level_repr.t option;

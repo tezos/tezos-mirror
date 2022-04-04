@@ -56,20 +56,6 @@ val append_message :
   Tx_rollup_message_repr.t ->
   (Raw_context.t * Tx_rollup_state_repr.t * Z.t) tzresult Lwt.t
 
-(** [size ctxt level tx_rollup] returns the number of bytes allocated
-    by the messages of the inbox of [tx_rollup] at level [level].
-
-    Returns the errors
-
-    {ul {li [Tx_rollup_does_not_exist] iff [tx_rollup] does not exist}
-        {li [Inbox_does_not_exist] iff [tx_rollup] exists, but does
-            not have an inbox at level [level]. }} *)
-val size :
-  Raw_context.t ->
-  Tx_rollup_level_repr.t ->
-  Tx_rollup_repr.t ->
-  (Raw_context.t * int) tzresult Lwt.t
-
 (** [get ctxt level tx_rollup] returns the inbox of [tx_rollup] at
     level [level].
 
@@ -94,8 +80,12 @@ val find :
   Tx_rollup_repr.t ->
   (Raw_context.t * Tx_rollup_inbox_repr.t option) tzresult Lwt.t
 
-(** [remove ctxt level tx_rollup state] removes from the context the
-    inbox of [level] and adjusts [occupied_storage] in the [state].
+(** [remove ctxt level tx_rollup] removes from the context the inbox
+    of [level].
+
+    It is expected that this function is only called for inboxes that
+    has been “adopted” by a commitment. As a consequence, the storage
+    accounting is not performed by this function.
 
     This function will returns the error [Inbox_does_not_exist] if
     there is no inbox for [level] in the storage. It is the
@@ -105,8 +95,7 @@ val remove :
   Raw_context.t ->
   Tx_rollup_level_repr.t ->
   Tx_rollup_repr.t ->
-  Tx_rollup_state_repr.t ->
-  (Raw_context.t * Tx_rollup_state_repr.t) tzresult Lwt.t
+  Raw_context.t tzresult Lwt.t
 
 (** [check_message_hash ctxt level tx_rollup position message path]
     checks that [message] is part of the [tx_rollup] inbox for [level]

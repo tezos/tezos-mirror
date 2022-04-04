@@ -2610,6 +2610,16 @@ let commands_rw () =
            ~name:"message_path"
            ~desc:"merkle path of the message being rejected in the inbox"
            string_parameter
+      @@ prefixes ["to"; "reject"]
+      @@ Clic.param
+           ~name:"message_result_hash"
+           ~desc:"message result hash being rejected"
+           Client_proto_args.string_parameter
+      @@ prefixes ["with"; "path"]
+      @@ Clic.param
+           ~name:"message_result_path"
+           ~desc:"merkle path of message result hash being rejected"
+           Client_proto_args.string_parameter
       @@ prefix "with" @@ prefix "proof" @@ tx_rollup_proof_param
       @@ prefixes ["with"; "agreed"; "context"; "hash"]
       @@ Clic.param
@@ -2621,6 +2631,11 @@ let commands_rw () =
            ~name:"withdrawals_merkle_root"
            ~desc:"the hash of the merkelised withdraw list"
            Client_proto_args.string_parameter
+      @@ prefixes ["with"; "path"]
+      @@ Clic.param
+           ~name:"message_result_path"
+           ~desc:"merkle path of the message result being rejected in the inbox"
+           string_parameter
       @@ prefix "to" @@ tx_rollup_param @@ prefix "from"
       @@ ContractAlias.destination_param
            ~name:"src"
@@ -2642,9 +2657,12 @@ let commands_rw () =
            message
            message_position
            message_path
+           message_result_hash
+           message_result_path
            proof
-           context_hash
-           withdrawals_merkle_root
+           previous_context_hash
+           previous_withdraw_list_hash
+           previous_message_result_path
            tx_rollup
            (_, source)
            cctxt ->
@@ -2685,9 +2703,12 @@ let commands_rw () =
               ~message
               ~message_position
               ~message_path
+              ~message_result_hash
+              ~message_result_path
               ~proof
-              ~context_hash
-              ~withdrawals_merkle_root
+              ~previous_context_hash
+              ~previous_withdraw_list_hash
+              ~previous_message_result_path
               ()
             >>=? fun _res -> return_unit);
     command

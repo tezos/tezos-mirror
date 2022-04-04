@@ -25,10 +25,27 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type error += Tx_rollup_negative_message_size
+type error += Tx_rollup_negative_input_size
 
-(** [message_hash_cost size] returns the cost of gas for hashing a
-    message of [size] bytes.
+(** A generic helper to hash an input *)
+val hash :
+  hash_f:(bytes list -> 'b) ->
+  Raw_context.t ->
+  'a Data_encoding.t ->
+  'a ->
+  (Raw_context.t * 'b) tzresult
 
-    Returns [Tx_rollup_negative_message_size] iff [size < 0]. *)
-val message_hash_cost : int -> Gas_limit_repr.cost tzresult
+(** [hash_cost size] returns the cost of gas for hashing a buffer of
+    [size] bytes.
+
+    Returns [Tx_rollup_input_message_size] iff [size < 0]. *)
+val hash_cost : int -> Gas_limit_repr.cost tzresult
+
+val consume_check_path_inbox_cost : Raw_context.t -> Raw_context.t tzresult
+
+val consume_check_path_commitment_cost : Raw_context.t -> Raw_context.t tzresult
+
+val consume_add_message_cost : Raw_context.t -> Raw_context.t tzresult
+
+val consume_compact_commitment_cost :
+  Raw_context.t -> int -> Raw_context.t tzresult

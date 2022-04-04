@@ -1,9 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Marigold <contact@marigold.dev>                        *)
 (* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
-(* Copyright (c) 2022 Oxhead Alpha <info@oxhead-alpha.com>                   *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -25,43 +23,23 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [add ctxt state tx_rollup lvl message_index withdraw_position] adds
-    [withdraw_position] to the list of already consumed withdrawawals for
-    [tx_rollup] at [lvl] for the message_result at [message_index].
-    This function occupies storage space so returns a new state to
-    and a storage space diff reflect storage change. *)
-val add :
-  Raw_context.t ->
-  Tx_rollup_state_repr.t ->
-  Tx_rollup_repr.t ->
-  Tx_rollup_level_repr.t ->
-  message_index:int ->
-  withdraw_position:int ->
-  (Raw_context.t * Tx_rollup_state_repr.t * Z.t) tzresult Lwt.t
+(** A bitset is a compact structure to store a set of integers. *)
+type t
 
-(** [mem ctxt tx_rollup lvl message_index withdraw_position] checks if
-    [withdraw_position] has already been consumed for [tx_rollup] at [lvl] for the
-    message_result at [message_index]. This function consumes gas
-    and so returns a new context. *)
-val mem :
-  Raw_context.t ->
-  Tx_rollup_repr.t ->
-  Tx_rollup_level_repr.t ->
-  message_index:int ->
-  withdraw_position:int ->
-  (bool * Raw_context.t) tzresult Lwt.t
+type error += Invalid_position of int
 
-(** [remove ctxt state tx_rollup lvl] removes all withdrawal accounting for
-    [tx_rollup] at [lvl]. This must not be called before the
-    corresponding commitment is deleted. Otherwise, it would be
-    possible to retrieve the same withdrawal multiple times. This
-    function
-     - consumes gas and so returns a new context
-     - frees space from storage so returns a new state *)
-val remove :
-  Raw_context.t ->
-  Tx_rollup_state_repr.t ->
-  Tx_rollup_repr.t ->
-  Tx_rollup_level_repr.t ->
-  inbox_length:int32 ->
-  (Raw_context.t * Tx_rollup_state_repr.t) tzresult Lwt.t
+val encoding : t Data_encoding.t
+
+(** A bitset encoding the empty set. *)
+val empty : t
+
+(** [mem field i] returns [true] iff [i] has been added in [field].
+
+    This functions returns [Invalid_input i] if [i] is negative. *)
+val mem : t -> int -> bool tzresult
+
+(** [add field i] returns a new bitset which contains [i] in
+    addition to the previous integers of [field].
+
+    This functions returns [Invalid_input i] if [i] is negative. *)
+val add : t -> int -> t tzresult

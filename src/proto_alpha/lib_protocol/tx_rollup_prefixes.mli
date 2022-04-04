@@ -48,6 +48,9 @@ val commitment_hash : t
 (** See {!Tx_rollup_commitment_repr}. *)
 val message_result_hash : t
 
+(** See {!Tx_rollup_message_result_repr.Merkle}. *)
+val message_result_list_hash : t
+
 (** See {!Tx_rollup_withdraw_repr}. *)
 val withdraw_list_hash : t
 

@@ -909,7 +909,23 @@ let prepare_first_block ~level ~timestamp ctxt =
             tx_rollup_origination_size = 60_000;
             tx_rollup_hard_size_limit_per_inbox = 100_000;
             tx_rollup_hard_size_limit_per_message = 5_000;
-            tx_rollup_max_withdrawals_per_batch = 255;
+            (* Tickets are transmitted in batches in the
+               [Tx_rollup_dispatch_tickets] operation.
+
+               The semantics is that this operation is used to
+               concretize the withdraw orders emitted by the layer-2,
+               one layer-1 operation per messages of an
+               inbox. Therefore, it is of significant importance that
+               a valid batch does not produce a list of withdraw
+               orders which could not fit in a layer-1 operation.
+
+               With these values, at least 2048 bytes remain available
+               to store the rest of the operands of
+               [Tx_rollup_dispatch_tickets] (in practice, even more,
+               because we overapproximate the size of tickets). So we
+               are safe. *)
+            tx_rollup_max_withdrawals_per_batch = 15;
+            tx_rollup_max_ticket_payload_size = 2_048;
             tx_rollup_commitment_bond = Tez_repr.of_mutez_exn 10_000_000_000L;
             tx_rollup_finality_period;
             tx_rollup_withdraw_period = tx_rollup_finality_period;
@@ -923,7 +939,6 @@ let prepare_first_block ~level ~timestamp ctxt =
               (2 * tx_rollup_finality_period) + 100;
             (* The default ema factor is [120] blocks, so about one hour. *)
             tx_rollup_cost_per_byte_ema_factor = 120;
-            tx_rollup_max_ticket_payload_size = 10_240;
             tx_rollup_rejection_max_proof_size = 30_000;
             sc_rollup_enable = false;
             (* The following value is chosen to prevent spam. *)

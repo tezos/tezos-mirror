@@ -36,6 +36,7 @@ type error +=
   | Message_size_exceeds_limit
   | Too_many_inboxes
   | Too_many_commitments
+  | Too_many_withdrawals
   | Wrong_batch_count
   | Commitment_too_early of {
       provided : Tx_rollup_level_repr.t;
@@ -47,11 +48,10 @@ type error +=
   | Bond_in_use of Signature.public_key_hash
   | No_commitment_to_finalize
   | No_commitment_to_remove
-  | Invalid_rejection_level_argument
   | Commitment_does_not_exist of Tx_rollup_level_repr.t
   | Wrong_predecessor_hash of {
-      provided : Tx_rollup_commitment_repr.Commitment_hash.t option;
-      expected : Tx_rollup_commitment_repr.Commitment_hash.t option;
+      provided : Tx_rollup_commitment_repr.Hash.t option;
+      expected : Tx_rollup_commitment_repr.Hash.t option;
     }
   | Internal_error of string
   | Wrong_message_position of {
@@ -59,8 +59,11 @@ type error +=
       position : int;
       length : int;
     }
-  | Wrong_message_path_depth of {provided : int; limit : int}
-  | Wrong_withdraw_path_depth of {provided : int; limit : int}
+  | Wrong_path_depth of {
+      kind : [`Inbox | `Commitment];
+      provided : int;
+      limit : int;
+    }
   | Wrong_message_path of {expected : Tx_rollup_inbox_repr.Merkle.root}
   | No_finalized_commitment_for_level of {
       level : Tx_rollup_level_repr.t;
@@ -68,22 +71,30 @@ type error +=
     }
   | Withdraw_invalid_path
   | Withdraw_already_consumed
+  | Withdrawals_invalid_path
+  | Withdrawals_already_dispatched
   | Commitment_bond_negative of int
   | Cannot_reject_level of {
       provided : Tx_rollup_level_repr.t;
       accepted_range : (Tx_rollup_level_repr.t * Tx_rollup_level_repr.t) option;
     }
-  | Wrong_rejection_hashes of {
-      provided : Tx_rollup_commitment_repr.message_result;
-      computed : Tx_rollup_commitment_repr.Message_result_hash.t;
-      expected : Tx_rollup_commitment_repr.Message_result_hash.t;
+  | Wrong_rejection_hash of {
+      provided : Tx_rollup_message_result_hash_repr.t;
+      expected :
+        [ `Valid_path of Tx_rollup_commitment_repr.Merkle.h * int
+        | `Hash of Tx_rollup_message_result_hash_repr.t ];
     }
   | Ticket_payload_size_limit_exceeded of {payload_size : int; limit : int}
-  | Deposit_wrong_ticketer of Tx_rollup_repr.t
   | Wrong_deposit_parameters
   | Proof_failed_to_reject
   | Proof_produced_rejected_state
   | Proof_invalid_before of {agreed : Context_hash.t; provided : Context_hash.t}
+  | No_withdrawals_to_dispatch
+
+let check_path_depth kind provided ~count_limit =
+  let limit = Merkle_list.max_depth ~count_limit in
+  error_when Compare.Int.(limit < provided)
+  @@ Wrong_path_depth {kind; provided; limit}
 
 let () =
   let open Data_encoding in
@@ -201,6 +212,15 @@ let () =
     empty
     (function Too_many_commitments -> Some () | _ -> None)
     (fun () -> Too_many_commitments) ;
+  (* Tx_rollup_too_many_withdrawals *)
+  register_error_kind
+    `Temporary
+    ~id:"tx_rollup_too_many_withdrawals"
+    ~title:"Cannot dispatch that many withdrawals"
+    ~description:"Cannot dispatch that many withdrawals"
+    empty
+    (function Too_many_withdrawals -> Some () | _ -> None)
+    (fun () -> Too_many_withdrawals) ;
   (* Wrong_batch_count *)
   register_error_kind
     `Temporary
@@ -279,15 +299,6 @@ let () =
     empty
     (function No_commitment_to_remove -> Some () | _ -> None)
     (fun () -> No_commitment_to_remove) ;
-  (* Invalid_rejection_level_argument *)
-  register_error_kind
-    `Temporary
-    ~id:"tx_rollup_invalid_rejection_level_argument"
-    ~title:"Received a rejection with an incorrect level argument"
-    ~description:"Received a rejection with an incorrect level argument"
-    empty
-    (function Invalid_rejection_level_argument -> Some () | _ -> None)
-    (fun () -> Invalid_rejection_level_argument) ;
   (* Commitment_does_not_exist *)
   register_error_kind
     `Temporary
@@ -305,12 +316,8 @@ let () =
     ~description:
       "The commitment refers to a commitment that is not in the context"
     (obj2
-       (req
-          "provided"
-          (option Tx_rollup_commitment_repr.Commitment_hash.encoding))
-       (req
-          "expected"
-          (option Tx_rollup_commitment_repr.Commitment_hash.encoding)))
+       (req "provided" (option Tx_rollup_commitment_repr.Hash.encoding))
+       (req "expected" (option Tx_rollup_commitment_repr.Hash.encoding)))
     (function
       | Wrong_predecessor_hash {provided; expected} -> Some (provided, expected)
       | _ -> None)
@@ -376,32 +383,38 @@ let () =
       | _ -> None)
     (fun (level, position, length) ->
       Wrong_message_position {level; position; length}) ;
-  (* Wrong_message_path_depth *)
+  (* Wrong_path_depth *)
   register_error_kind
     `Permanent
     ~id:"tx_rollup_wrong_message_path_depth"
     ~title:"Wrong message path depth"
     ~description:
-      "The rejection contains a message path which exceeds the maximum depth \
-       that can be witness for a valid inbox."
-    (obj2 (req "provided" int31) (req "limit" int31))
+      "A path submitted as argument of this operation exceeds the maximum \
+       depth that can be witnessed."
+    (obj3
+       (req
+          "kind"
+          (union
+             [
+               case
+                 (Tag 0)
+                 ~title:"Inbox"
+                 (constant "inbox")
+                 (function `Inbox -> Some () | _ -> None)
+                 (fun () -> `Inbox);
+               case
+                 (Tag 1)
+                 ~title:"Commitment"
+                 (constant "commitment")
+                 (function `Commitment -> Some () | _ -> None)
+                 (fun () -> `Commitment);
+             ]))
+       (req "provided" int31)
+       (req "limit" int31))
     (function
-      | Wrong_message_path_depth {provided; limit} -> Some (provided, limit)
+      | Wrong_path_depth {kind; provided; limit} -> Some (kind, provided, limit)
       | _ -> None)
-    (fun (provided, limit) -> Wrong_message_path_depth {provided; limit}) ;
-  (* Wrong_withdraw_path_depth *)
-  register_error_kind
-    `Permanent
-    ~id:"tx_rollup_wrong_withdraw_path_depth"
-    ~title:"Wrong withdraw path depth"
-    ~description:
-      "The rejection contains a withdraw path which exceeds the maximum depth \
-       that can be witness for a valid message."
-    (obj2 (req "provided" int31) (req "limit" int31))
-    (function
-      | Wrong_withdraw_path_depth {provided; limit} -> Some (provided, limit)
-      | _ -> None)
-    (fun (provided, limit) -> Wrong_withdraw_path_depth {provided; limit}) ;
+    (fun (kind, provided, limit) -> Wrong_path_depth {kind; provided; limit}) ;
   (* Wrong_message_hash *)
   register_error_kind
     `Branch
@@ -463,6 +476,28 @@ let () =
     empty
     (function Withdraw_invalid_path -> Some () | _ -> None)
     (fun () -> Withdraw_invalid_path) ;
+  (* Withdrawals_invalid_path *)
+  register_error_kind
+    `Branch
+    ~id:"tx_rollup_withdrawals_invalid_path"
+    ~title:"The validation path submitted for a withdrawal is invalid"
+    ~description:
+      "The validation path submitted for a withdrawal is not valid for the \
+       given withdrawal and message index"
+    empty
+    (function Withdrawals_invalid_path -> Some () | _ -> None)
+    (fun () -> Withdrawals_invalid_path) ;
+  (* Withdrawals_already_dispatched *)
+  register_error_kind
+    `Branch
+    ~id:"operation.withdrawals_already_dispatched"
+    ~title:"withdrawals already dispatched"
+    ~description:
+      "The withdrawals have already been dispatched to their layer-1 \
+       beneficiary"
+    Data_encoding.unit
+    (function Withdrawals_already_dispatched -> Some () | _ -> None)
+    (fun () -> Withdrawals_already_dispatched) ;
   register_error_kind
     `Temporary
     ~id:"operation.withdraw_already_consumed"
@@ -515,7 +550,7 @@ let () =
       | _ -> None)
     (fun (provided, accepted_range) ->
       Cannot_reject_level {provided; accepted_range}) ;
-  (* Wrong_rejection_hashes *)
+  (* Wrong_rejection_hash *)
   register_error_kind
     `Temporary
     ~id:"tx_rollup_wrong_rejection_hashes"
@@ -525,16 +560,31 @@ let () =
     ~description:
       "The message result hash recomputed from the rejection argument is \
        invalid"
-    (obj3
-       (req "provided" Tx_rollup_commitment_repr.message_result_encoding)
-       (req "computed" Tx_rollup_commitment_repr.Message_result_hash.encoding)
-       (req "expected" Tx_rollup_commitment_repr.Message_result_hash.encoding))
+    (obj2
+       (req "provided" Tx_rollup_message_result_hash_repr.encoding)
+       (req
+          "expected"
+          (union
+             [
+               case
+                 (Tag 0)
+                 ~title:"hash"
+                 Tx_rollup_message_result_hash_repr.encoding
+                 (function `Hash h -> Some h | _ -> None)
+                 (fun h -> `Hash h);
+               case
+                 (Tag 1)
+                 ~title:"valid_path"
+                 (obj2
+                    (req "root" Tx_rollup_commitment_repr.Merkle_hash.encoding)
+                    (req "index" int31))
+                 (function `Valid_path (h, i) -> Some (h, i) | _ -> None)
+                 (fun (h, i) -> `Valid_path (h, i));
+             ])))
     (function
-      | Wrong_rejection_hashes {provided; computed; expected} ->
-          Some (provided, computed, expected)
+      | Wrong_rejection_hash {provided; expected} -> Some (provided, expected)
       | _ -> None)
-    (fun (provided, computed, expected) ->
-      Wrong_rejection_hashes {provided; computed; expected}) ;
+    (fun (provided, expected) -> Wrong_rejection_hash {provided; expected}) ;
   (* ticket_payload_size_limit_exceeded *)
   register_error_kind
     `Permanent
@@ -548,24 +598,6 @@ let () =
       | _ -> None)
     (fun (payload_size, limit) ->
       Ticket_payload_size_limit_exceeded {payload_size; limit}) ;
-  register_error_kind
-    `Permanent
-    ~id:"tx_rollup_deposit_wrong_ticketer"
-    ~title:
-      "The ticketer submitted in the ticket is a tx rollup instead of a \
-       contract."
-    ~description:
-      "The ticketer provided with the ticket on the deposit transaction is a \
-       tx_rollup which is not possible."
-    ~pp:(fun ppf tx_rollup ->
-      Format.fprintf
-        ppf
-        "A tx_rollup (%a) can't be the ticketer of a ticket"
-        Tx_rollup_repr.pp
-        tx_rollup)
-    (obj1 (req "tx_rollup" Tx_rollup_repr.encoding))
-    (function Deposit_wrong_ticketer tx_rollup -> Some tx_rollup | _ -> None)
-    (fun tx_rollup -> Deposit_wrong_ticketer tx_rollup) ;
   (* Proof_failed_to_reject *)
   register_error_kind
     `Temporary
@@ -601,4 +633,12 @@ let () =
     (function
       | Proof_invalid_before {agreed; provided} -> Some (agreed, provided)
       | _ -> None)
-    (fun (agreed, provided) -> Proof_invalid_before {agreed; provided})
+    (fun (agreed, provided) -> Proof_invalid_before {agreed; provided}) ;
+  register_error_kind
+    `Permanent
+    ~id:"tx_rollup_no_withdrawals_to_dispatch"
+    ~title:"Trying to dispatch withdrawals when none happened"
+    ~description:"Cannot dispatch an empty list of withdrawals"
+    empty
+    (function No_withdrawals_to_dispatch -> Some () | _ -> None)
+    (fun () -> No_withdrawals_to_dispatch)

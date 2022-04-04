@@ -28,18 +28,18 @@
 (** This module introduces various functions to manipulate the storage related
     to commitments for transaction rollups. *)
 
-(** [check_commitment_level current_tezos_level state commitment] fails if [commitment]
-    does not target the expected level. *)
-val check_commitment_level :
-  Raw_level_repr.t ->
-  Tx_rollup_state_repr.t ->
-  Tx_rollup_commitment_repr.t ->
-  unit tzresult
-(* FIXME: move in Tx_rollup_commitment_repr *)
+val check_message_result :
+  Raw_context.t ->
+  Tx_rollup_commitment_repr.Compact.t ->
+  [ `Hash of Tx_rollup_message_result_hash_repr.t
+  | `Result of Tx_rollup_message_result_repr.t ] ->
+  path:Tx_rollup_commitment_repr.Merkle.path ->
+  index:int ->
+  Raw_context.t tzresult
 
 (** [add_commitment context tx_rollup contract commitment] adds a
-    commitment to a rollup. It returns the new context, the new
-    state, and the storage size diff.
+    commitment to a rollup. It returns the new context, and the new
+    state.
 
     This function returns the errors
 
@@ -58,8 +58,8 @@ val add_commitment :
   Tx_rollup_repr.t ->
   Tx_rollup_state_repr.t ->
   Signature.Public_key_hash.t ->
-  Tx_rollup_commitment_repr.t ->
-  (Raw_context.t * Tx_rollup_state_repr.t * Z.t) tzresult Lwt.t
+  Tx_rollup_commitment_repr.Full.t ->
+  (Raw_context.t * Tx_rollup_state_repr.t) tzresult Lwt.t
 
 (** [remove_bond context state tx_rollup contract] removes the bond for an
     implicit contract. This will fail if either the bond does not exist,
@@ -113,6 +113,7 @@ val get :
 val get_finalized :
   Raw_context.t ->
   Tx_rollup_repr.t ->
+  Tx_rollup_state_repr.t ->
   Tx_rollup_level_repr.t ->
   (Raw_context.t * Tx_rollup_commitment_repr.Submitted_commitment.t) tzresult
   Lwt.t
@@ -142,14 +143,13 @@ val has_bond :
 
     The state of the rollup is adjusted accordingly, and the finalized
     level is returned. Besides, the inbox at said level is removed
-    from the context. This function returns the new context, the new
-    state, and the storage size diff. *)
+    from the context. This function returns the new context, and the
+    new state. *)
 val finalize_commitment :
   Raw_context.t ->
   Tx_rollup_repr.t ->
   Tx_rollup_state_repr.t ->
-  (Raw_context.t * Tx_rollup_state_repr.t * Tx_rollup_level_repr.t * Z.t)
-  tzresult
+  (Raw_context.t * Tx_rollup_state_repr.t * Tx_rollup_level_repr.t) tzresult
   Lwt.t
 
 (** [remove_commitment ctxt tx_rollup state] tries to remove the
@@ -176,17 +176,14 @@ val reject_commitment :
   Tx_rollup_level_repr.t ->
   (Raw_context.t * Tx_rollup_state_repr.t) tzresult Lwt.t
 
-(** [get_before_and_after_results tx_rollup commitment
-    ~message_position state] returns the before and after roots for a
-    given [message_position], from [commitment] on [tx_rollup]. *)
-val get_before_and_after_results :
+val check_agreed_and_disputed_results :
   Raw_context.t ->
   Tx_rollup_repr.t ->
-  Tx_rollup_commitment_repr.Submitted_commitment.t ->
-  message_position:int ->
   Tx_rollup_state_repr.t ->
-  (Raw_context.t
-  * Tx_rollup_commitment_repr.Message_result_hash.t
-  * Tx_rollup_commitment_repr.Message_result_hash.t)
-  tzresult
-  Lwt.t
+  Tx_rollup_commitment_repr.Submitted_commitment.t ->
+  agreed_result:Tx_rollup_message_result_repr.t ->
+  agreed_result_path:Tx_rollup_commitment_repr.Merkle.path ->
+  disputed_result:Tx_rollup_message_result_hash_repr.t ->
+  disputed_position:int ->
+  disputed_result_path:Tx_rollup_commitment_repr.Merkle.path ->
+  Raw_context.t tzresult Lwt.t

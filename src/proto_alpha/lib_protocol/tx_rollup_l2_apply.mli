@@ -111,7 +111,7 @@ module Message_result : sig
   (* In addition to [message_result] the result contains the list of
      withdrawals that result from failing deposits and layer2-to-layer1
      transfers. *)
-  type t = message_result * Tx_rollup_withdraw.withdrawal list
+  type t = message_result * Tx_rollup_withdraw.t list
 
   val encoding : t Data_encoding.t
 end
@@ -154,7 +154,7 @@ module Make (Context : CONTEXT) : sig
       ctxt ->
       parameters ->
       (Indexable.unknown, Indexable.unknown) t ->
-      (ctxt * Message_result.Batch_V1.t * Tx_rollup_withdraw.withdrawal list) m
+      (ctxt * Message_result.Batch_V1.t * Tx_rollup_withdraw.t list) m
 
     (** [check_signature ctxt batch] asserts that [batch] is correctly signed.
 
@@ -201,10 +201,7 @@ module Make (Context : CONTEXT) : sig
   val apply_deposit :
     ctxt ->
     Tx_rollup_message.deposit ->
-    (ctxt
-    * Message_result.deposit_result
-    * Tx_rollup_withdraw.withdrawal option)
-    m
+    (ctxt * Message_result.deposit_result * Tx_rollup_withdraw.t option) m
 
   (** [apply_message ctxt parameters message] interprets the [message] in the
       [ctxt].

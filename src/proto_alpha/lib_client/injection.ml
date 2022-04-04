@@ -337,7 +337,9 @@ let estimated_gas_single (type kind)
     | Applied (Tx_rollup_remove_commitment_result {consumed_gas; _}) ->
         Ok consumed_gas
     | Applied (Tx_rollup_rejection_result {consumed_gas; _}) -> Ok consumed_gas
-    | Applied (Tx_rollup_withdraw_result {consumed_gas; _}) -> Ok consumed_gas
+    | Applied (Tx_rollup_dispatch_tickets_result {consumed_gas; _}) ->
+        Ok consumed_gas
+    | Applied (Transfer_ticket_result {consumed_gas; _}) -> Ok consumed_gas
     | Applied (Sc_rollup_originate_result {consumed_gas; _}) -> Ok consumed_gas
     | Applied (Sc_rollup_add_messages_result {consumed_gas; _}) ->
         Ok consumed_gas
@@ -383,17 +385,17 @@ let estimated_storage_single (type kind) ~tx_rollup_origination_size
         Ok size_of_constant
     | Applied (Set_deposits_limit_result _) -> Ok Z.zero
     | Applied (Tx_rollup_origination_result _) -> Ok tx_rollup_origination_size
-    | Applied (Tx_rollup_submit_batch_result _) ->
-        (* TODO: https://gitlab.com/tezos/tezos/-/issues/2339
-           We need to charge for newly allocated storage (as we do for
-           Michelson’s big map). *)
-        Ok Z.zero
+    | Applied (Tx_rollup_submit_batch_result {paid_storage_size_diff; _}) ->
+        Ok paid_storage_size_diff
     | Applied (Tx_rollup_commit_result _) -> Ok Z.zero
     | Applied (Tx_rollup_return_bond_result _) -> Ok Z.zero
     | Applied (Tx_rollup_finalize_commitment_result _) -> Ok Z.zero
     | Applied (Tx_rollup_remove_commitment_result _) -> Ok Z.zero
     | Applied (Tx_rollup_rejection_result _) -> Ok Z.zero
-    | Applied (Tx_rollup_withdraw_result _) -> Ok Z.zero
+    | Applied (Tx_rollup_dispatch_tickets_result {paid_storage_size_diff; _}) ->
+        Ok paid_storage_size_diff
+    | Applied (Transfer_ticket_result {paid_storage_size_diff; _}) ->
+        Ok paid_storage_size_diff
     | Applied (Sc_rollup_originate_result {size; _}) -> Ok size
     | Applied (Sc_rollup_add_messages_result _) -> Ok Z.zero
     (* The following Sc_rollup operations have zero storage cost because we
@@ -460,7 +462,8 @@ let originated_contracts_single (type kind)
     | Applied (Tx_rollup_finalize_commitment_result _) -> Ok []
     | Applied (Tx_rollup_remove_commitment_result _) -> Ok []
     | Applied (Tx_rollup_rejection_result _) -> Ok []
-    | Applied (Tx_rollup_withdraw_result _) -> Ok []
+    | Applied (Tx_rollup_dispatch_tickets_result _) -> Ok []
+    | Applied (Transfer_ticket_result _) -> Ok []
     | Applied (Sc_rollup_originate_result _) -> Ok []
     | Applied (Sc_rollup_add_messages_result _) -> Ok []
     | Applied (Sc_rollup_cement_result _) -> Ok []

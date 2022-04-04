@@ -1,7 +1,9 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2022 Marigold <contact@marigold.dev>                        *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 Oxhead Alpha <info@oxheadalpha.com>                    *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,65 +25,16 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Testing
-    -------
-    Component:    Protocol Library
-    Invocation:   dune exec src/proto_alpha/lib_protocol/test/pbt/test_tx_rollup_l2_withdraw_storage.exe
-    Subject:      Tx rollup l2 withdraw storage
-*)
+(** The Blake2B hash of a message.
 
-open Lib_test.Qcheck2_helpers
+    To avoid unnecessary storage duplication, the inboxes in the
+    layer-1 do not contain the messages, but their hashes (see
+    {!Tx_rollup_inbox_storage.append_message}). This is possible
+    because the content of the messages can be reconstructed off-chain
+    by looking at the layer-1 operations and their receipt. *)
 
-open Protocol.Tx_rollup_withdraw_repr.Withdrawal_accounting
+include S.HASH
 
-let gen_ofs = QCheck2.Gen.int_bound (64 * 10)
-
-let gen_storage =
-  let open QCheck2.Gen in
-  let* bool_vector = list bool in
-  match
-    List.fold_left_i_e
-      (fun i storage v -> if v then set storage i else ok storage)
-      empty
-      bool_vector
-  with
-  | Ok v -> return v
-  | Error e ->
-      Alcotest.failf
-        "An unxpected error %a occurred when generating Withdrawal_accounting.t"
-        Protocol.Environment.Error_monad.pp_trace
-        e
-
-let test_get_set (c, ofs) =
-  List.for_all
-    (fun ofs' ->
-      let res =
-        let open Tzresult_syntax in
-        let* c' = set c ofs in
-        let* v = get c ofs' in
-        let* v' = get c' ofs' in
-        return (if ofs = ofs' then v' = true else v = v')
-      in
-      match res with
-      | Error e ->
-          Alcotest.failf
-            "Unexpected error: %a"
-            Protocol.Environment.Error_monad.pp_trace
-            e
-      | Ok res -> res)
-    (0 -- 63)
-
-let () =
-  Alcotest.run
-    "bits"
-    [
-      ( "quantity",
-        qcheck_wrap
-          [
-            QCheck2.Test.make
-              ~count:10000
-              ~name:"get set"
-              QCheck2.Gen.(pair gen_storage gen_ofs)
-              test_get_set;
-          ] );
-    ]
+(** [hash_uncarbonated msg] computes the hash of the given message
+    without any gas consumption. *)
+val hash_uncarbonated : Tx_rollup_message_repr.t -> t

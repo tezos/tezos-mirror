@@ -247,7 +247,7 @@ val tx_rollup_commit :
   Context.t ->
   Contract.t ->
   Tx_rollup.t ->
-  Tx_rollup_commitment.t ->
+  Tx_rollup_commitment.Full.t ->
   Operation.packed tzresult Lwt.t
 
 (** [tx_rollup_return_bond ctxt source tx_rollup] returns a commitment bond. *)
@@ -285,44 +285,56 @@ val tx_rollup_remove_commitment :
   Tx_rollup.t ->
   Operation.packed tzresult Lwt.t
 
-(** [tx_rollup_withdraw] executes a tx rollup withdrawal.
-
-    The arguments are:
-
-    - [Context.t]: the context on which to apply the operation
-    - [source:Contract.t]: the source contract of the operation
-    - [Tx_rollup.t]: the rollup to which the withdrawal pertains
-    - [Tx_rollup_level.t]: the level on which the withdrawal was commited
-    - [context_hash:bytes]: the hash of the context of the rollup when the withdrawal was commited
-    - [message_index:int]: the inbox index of the message that that emitted this withdrawal
-    - [contents:Script.lazy_expr]: the contents of the ticket of the withdrawal
-    - [ty:Script.lazy_expr]: the type of the ticket of the withdrawal
-    - [ticketer:Contract.t]: the ticketer of the ticket of the withdrawal
-    - [Tx_rollup_l2_qty.t]: the qty of the ticket of the withdrawal
-    - [destination:Contract.t]: the destination contract that should received the ticket of the withdrawal
-    - [Tx_rollup_withdraw.merkle_tree_path]: the proof that this withdrawal was contained in the commitment
-    - [Entrypoint_repr.t]: the entrypoint of the destination contract to which the ticket should be sent
-
- *)
-val tx_rollup_withdraw :
+(** [tx_rollup_dispatch_tickets ctxt ~source ~message_index tx_rollup
+    level context_hash tickets_info] sends all tickets from
+    [tickets_info] to the appropriate implicit accounts, as authorized
+    by the [message_index]th hash of the commitment of [tx_rollup]
+    posted for [level]. *)
+val tx_rollup_dispatch_tickets :
   ?counter:counter ->
   ?fee:Tez.t ->
   ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:counter ->
   Context.t ->
   source:Contract.t ->
+  message_index:int ->
+  message_result_path:Tx_rollup_commitment.Merkle.path ->
   Tx_rollup.t ->
   Tx_rollup_level.t ->
-  context_hash:Context_hash.t ->
-  message_index:int ->
+  Context_hash.t ->
+  Tx_rollup_reveal.t list ->
+  (packed_operation, tztrace) result Lwt.t
+
+(** [transfer_ticket] allows an implicit account to transfer tickets they owned.
+
+    The arguments are:
+
+    {ul
+      {li [Context.t]: the context on which to apply the operation}
+      {li [source:Contract.t]: the source contract of the operation}
+      {li [Tx_rollup.t]: the rollup to which the withdrawal pertains}
+      {li [Tx_rollup_level.t]: the level on which the withdrawal was commited}
+      {li [contents:Script.lazy_expr]: the contents of the ticket of
+          the withdrawal}
+      {li [ty:Script.lazy_expr]: the type of the ticket of the withdrawal}
+      {li [ticketer:Contract.t]: the ticketer of the ticket of the withdrawal}
+      {li [Z.t]: the quantity of the ticket of the withdrawal}
+      {li [destination:Contract.t]: the destination contract that
+          should receive the ticket of the withdrawal}
+      {li [Entrypoint_repr.t]: the entrypoint of the destination
+          contract to which the ticket should be sent}} *)
+val transfer_ticket :
+  ?counter:counter ->
+  ?fee:Tez.t ->
+  ?gas_limit:Gas.Arith.integral ->
+  ?storage_limit:counter ->
+  Context.t ->
+  source:Contract.t ->
   contents:Script.lazy_expr ->
   ty:Script.lazy_expr ->
   ticketer:Contract.t ->
-  Tx_rollup_l2_qty.t ->
+  Z.t ->
   destination:Contract.t ->
-  withdraw_position:int ->
-  Tx_rollup_withdraw.Merkle.root ->
-  Tx_rollup_withdraw.Merkle.path ->
   Entrypoint_repr.t ->
   (packed_operation, tztrace) result Lwt.t
 
@@ -340,8 +352,11 @@ val tx_rollup_reject :
   Tx_rollup_message.t ->
   message_position:int ->
   message_path:Tx_rollup_inbox.Merkle.path ->
+  message_result_hash:Tx_rollup_message_result_hash.t ->
+  message_result_path:Tx_rollup_commitment.Merkle.path ->
   proof:Tx_rollup_l2_proof.t ->
-  previous_message_result:Tx_rollup_commitment.message_result ->
+  previous_message_result:Tx_rollup_message_result.t ->
+  previous_message_result_path:Tx_rollup_commitment.Merkle.path ->
   Operation.packed tzresult Lwt.t
 
 (** [sc_rollup_origination ctxt source kind boot_sector] originates a new

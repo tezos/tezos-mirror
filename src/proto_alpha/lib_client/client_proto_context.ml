@@ -880,7 +880,7 @@ let submit_tx_rollup_commitment (cctxt : #full) ~chain ~block ?confirmations
   | Some content -> return content
   | None -> failwith "%s is not a valid inbox merkle root" inbox_merkle_root)
   >>=? fun inbox_merkle_root ->
-  let commitment : Tx_rollup_commitment.t =
+  let commitment : Tx_rollup_commitment.Full.t =
     {level; messages; predecessor; inbox_merkle_root}
   in
   let contents :
@@ -990,28 +990,45 @@ let submit_tx_rollup_remove_commitment (cctxt : #full) ~chain ~block
 let submit_tx_rollup_rejection (cctxt : #full) ~chain ~block ?confirmations
     ?dry_run ?verbose_signing ?simulation ?fee ?gas_limit ?storage_limit
     ?counter ~source ~src_pk ~src_sk ~fee_parameter ~level ~tx_rollup ~message
-    ~message_position ~message_path ~context_hash ~withdrawals_merkle_root
-    ~proof () =
+    ~message_position ~message_path ~message_result_hash ~message_result_path
+    ~previous_context_hash ~previous_withdraw_list_hash
+    ~previous_message_result_path ~proof () =
   (match Data_encoding.Json.from_string message with
   | Ok json -> return json
   | Error err -> failwith "Message is not a valid JSON-encoded message: %s" err)
   >>=? fun json ->
   let message = Data_encoding.Json.(destruct Tx_rollup_message.encoding json) in
   Environment.wrap_tzresult (Tx_rollup_level.of_int32 level) >>?= fun level ->
-  (match Context_hash.of_b58check_opt context_hash with
+  (match Context_hash.of_b58check_opt previous_context_hash with
   | Some hash -> return hash
   | None ->
-      failwith "%s is not a valid notation for a context hash" context_hash)
-  >>=? fun context_hash ->
+      failwith
+        "%s is not a valid notation for a context hash"
+        previous_context_hash)
+  >>=? fun previous_context_hash ->
   (match
-     Tx_rollup_withdraw.Merkle.root_of_b58check_opt withdrawals_merkle_root
+     Tx_rollup_withdraw_list_hash.of_b58check_opt previous_withdraw_list_hash
    with
   | Some hash -> return hash
   | None ->
       failwith
         "%s is not a valid notation for a withdraw list hash"
-        withdrawals_merkle_root)
-  >>=? fun withdrawals_merkle_root ->
+        previous_withdraw_list_hash)
+  >>=? fun previous_withdraw_list_hash ->
+  let previous_message_result =
+    Tx_rollup_message_result.
+      {
+        context_hash = previous_context_hash;
+        withdraw_list_hash = previous_withdraw_list_hash;
+      }
+  in
+  (match Tx_rollup_message_result_hash.of_b58check_opt message_result_hash with
+  | Some x -> return x
+  | _ ->
+      failwith
+        "%s is not a valid notation for a withdraw list hash"
+        message_result_hash)
+  >>=? fun message_result_hash ->
   (match Data_encoding.Json.from_string message_path with
   | Ok json ->
       Data_encoding.Json.destruct Tx_rollup_inbox.Merkle.path_encoding json
@@ -1019,6 +1036,22 @@ let submit_tx_rollup_rejection (cctxt : #full) ~chain ~block ?confirmations
   | Error err ->
       failwith "Message path is not a valid JSON-encoded message: %s" err)
   >>=? fun message_path ->
+  (match Data_encoding.Json.from_string message_result_path with
+  | Ok json ->
+      Data_encoding.Json.destruct Tx_rollup_commitment.Merkle.path_encoding json
+      |> return
+  | Error err ->
+      failwith "Message result path is not a valid JSON-encoded message: %s" err)
+  >>=? fun message_result_path ->
+  (match Data_encoding.Json.from_string previous_message_result_path with
+  | Ok json ->
+      Data_encoding.Json.destruct Tx_rollup_commitment.Merkle.path_encoding json
+      |> return
+  | Error err ->
+      failwith
+        "Previous message result path is not a valid JSON-encoded message: %s"
+        err)
+  >>=? fun previous_message_result_path ->
   (match Data_encoding.Json.from_string proof with
   | Ok json ->
       Data_encoding.Json.destruct Tx_rollup_l2_proof.encoding json |> return
@@ -1038,7 +1071,10 @@ let submit_tx_rollup_rejection (cctxt : #full) ~chain ~block ?confirmations
               message;
               message_position;
               message_path;
-              previous_message_result = {context_hash; withdrawals_merkle_root};
+              message_result_hash;
+              message_result_path;
+              previous_message_result_path;
+              previous_message_result;
               proof;
             }))
   in

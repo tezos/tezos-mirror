@@ -25,6 +25,10 @@
 
 type error += Merkle_list_invalid_position
 
+(** Given a list of size [count_limit], returns the maximum depth of
+    its merklisation. *)
+val max_depth : count_limit:int -> int
+
 module type T = sig
   (** The type of a Merkle list *)
   type t
@@ -38,6 +42,10 @@ module type T = sig
   (** A path, together with an element's position, is the proof of inclusion
       of an element in the Merkle list. *)
   type path
+
+  (** A dummy path that can be used as a placeholder when no path is
+      actually required. *)
+  val dummy_path : path
 
   val pp_path : Format.formatter -> path -> unit
 

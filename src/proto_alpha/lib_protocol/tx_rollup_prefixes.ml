@@ -80,6 +80,14 @@ let message_result_hash =
     b58check_size = 54;
   }
 
+let message_result_list_hash =
+  {
+    b58check_prefix = "\079\146\082";
+    prefix = "txM";
+    hash_size = 32;
+    b58check_size = 53;
+  }
+
 let withdraw_list_hash =
   {
     b58check_prefix = "\079\150\072";

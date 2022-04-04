@@ -1,9 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Marigold <contact@marigold.dev>                        *)
 (* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
-(* Copyright (c) 2022 Oxhead Alpha <info@oxhead-alpha.com>                   *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -25,12 +23,32 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let hash :
-    Raw_context.t ->
-    Tx_rollup_message_repr.t ->
-    (Raw_context.t * Tx_rollup_message_repr.hash) tzresult =
- fun ctxt msg ->
-  Tx_rollup_gas.message_hash_cost @@ Tx_rollup_message_repr.size msg
-  >>? fun cost ->
-  Raw_context.consume_gas ctxt cost >>? fun ctxt ->
-  ok (ctxt, Tx_rollup_message_repr.hash_uncarbonated msg)
+let prefix = Tx_rollup_prefixes.withdraw_list_hash.b58check_prefix
+
+module H =
+  Blake2B.Make
+    (Base58)
+    (struct
+      let name = "Withdraw_list_hash"
+
+      let title = "A list of withdraw orders"
+
+      let b58check_prefix = prefix
+
+      let size = Some Tx_rollup_prefixes.withdraw_list_hash.hash_size
+    end)
+
+include H
+include Path_encoding.Make_hex (H)
+
+let () =
+  Tx_rollup_prefixes.(check_encoding withdraw_list_hash b58check_encoding)
+
+let hash_uncarbonated l =
+  let bytes =
+    Data_encoding.(
+      Binary.to_bytes_exn (list Tx_rollup_withdraw_repr.encoding) l)
+  in
+  H.hash_bytes [bytes]
+
+let empty = hash_uncarbonated []

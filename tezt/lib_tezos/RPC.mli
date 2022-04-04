@@ -950,6 +950,26 @@ module Tx_rollup : sig
         Client.t ->
         JSON.t Process.runnable
     end
+
+    module Commitment : sig
+      val merkle_tree_hash :
+        ?endpoint:Client.endpoint ->
+        ?hooks:Process.hooks ->
+        ?chain:string ->
+        ?block:string ->
+        data:JSON.u ->
+        Client.t ->
+        JSON.t Process.runnable
+
+      val merkle_tree_path :
+        ?endpoint:Client.endpoint ->
+        ?hooks:Process.hooks ->
+        ?chain:string ->
+        ?block:string ->
+        data:JSON.u ->
+        Client.t ->
+        JSON.t Process.runnable
+    end
   end
 end
 
@@ -983,6 +1003,15 @@ module Sc_rollup : sig
     Client.t ->
     JSON.t Lwt.t
 end
+
+val raw_bytes :
+  ?endpoint:Client.endpoint ->
+  ?hooks:Process.hooks ->
+  ?chain:string ->
+  ?block:string ->
+  ?path:string list ->
+  Client.t ->
+  JSON.t Lwt.t
 
 module Curl : sig
   (** [get ()] returns [Some curl] where [curl ~url] returns the raw response obtained

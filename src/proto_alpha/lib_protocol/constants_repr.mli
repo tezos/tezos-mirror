@@ -133,8 +133,6 @@ type parametric = {
   tx_rollup_hard_size_limit_per_inbox : int;
   (* the maximum amount of bytes one batch can allocate in an inbox *)
   tx_rollup_hard_size_limit_per_message : int;
-  (* the maximum number of allowed "L2-to-L1" withdraws per batch *)
-  tx_rollup_max_withdrawals_per_batch : int;
   (* the amount of tez to bond a tx rollup commitment *)
   tx_rollup_commitment_bond : Tez_repr.t;
   (* the number of blocks before a tx rollup block is final *)
@@ -154,8 +152,23 @@ type parametric = {
   (* The number of blocks used to compute the ema factor determining
      the cost per byte for new messages in the inbox. *)
   tx_rollup_cost_per_byte_ema_factor : int;
-  (* maximum size, in bytes, of the contents given in deposited tickets. *)
+  (* Tickets are transmitted in batches in the
+     [Tx_rollup_dispatch_tickets] operation.
+
+     The semantics is that this operation is used to
+     concretize the withdraw orders emitted by the layer-2,
+     one layer-1 operation per messages of an
+     inbox. Therefore, it is of significant importance that
+     a valid batch does not produce a list of withdraw
+     orders which could not fit in a layer-1 operation.
+
+     With these values, at least 2048 bytes remain available
+     to store the rest of the operands of
+     [Tx_rollup_dispatch_tickets] (in practice, even more,
+     because we overapproximate the size of tickets). So we
+     are safe. *)
   tx_rollup_max_ticket_payload_size : int;
+  tx_rollup_max_withdrawals_per_batch : int;
   (* The maximum size, in bytes, of a Merkle proof.  Operations which would
      require proofs larger than this should be no-ops. *)
   tx_rollup_rejection_max_proof_size : int;

@@ -214,7 +214,6 @@ and _ successful_manager_operation_result =
   | Tx_rollup_commit_result : {
       balance_updates : Receipt.balance_updates;
       consumed_gas : Gas.Arith.fp;
-      paid_storage_size_diff : Z.t;
     }
       -> Kind.tx_rollup_commit successful_manager_operation_result
   | Tx_rollup_return_bond_result : {
@@ -226,7 +225,6 @@ and _ successful_manager_operation_result =
       balance_updates : Receipt.balance_updates;
       consumed_gas : Gas.Arith.fp;
       level : Tx_rollup_level.t;
-      paid_storage_size_diff : Z.t;
     }
       -> Kind.tx_rollup_finalize_commitment successful_manager_operation_result
   | Tx_rollup_remove_commitment_result : {
@@ -240,12 +238,18 @@ and _ successful_manager_operation_result =
       consumed_gas : Gas.Arith.fp;
     }
       -> Kind.tx_rollup_rejection successful_manager_operation_result
-  | Tx_rollup_withdraw_result : {
+  | Tx_rollup_dispatch_tickets_result : {
       balance_updates : Receipt.balance_updates;
       consumed_gas : Gas.Arith.fp;
       paid_storage_size_diff : Z.t;
     }
-      -> Kind.tx_rollup_withdraw successful_manager_operation_result
+      -> Kind.tx_rollup_dispatch_tickets successful_manager_operation_result
+  | Transfer_ticket_result : {
+      balance_updates : Receipt.balance_updates;
+      consumed_gas : Gas.Arith.fp;
+      paid_storage_size_diff : Z.t;
+    }
+      -> Kind.transfer_ticket successful_manager_operation_result
   | Sc_rollup_originate_result : {
       balance_updates : Receipt.balance_updates;
       address : Sc_rollup.Address.t;

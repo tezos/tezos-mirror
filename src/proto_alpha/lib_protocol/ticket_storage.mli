@@ -23,6 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type error +=
+  | Negative_ticket_balance of {key : Ticket_hash_repr.t; balance : Z.t}
+  | Used_storage_space_underflow
+
 (** [get_balance ctxt key] receives the ticket balance for the given
     [key] in the context [ctxt]. The [key] represents a ticket content and a
     ticket creator pair. In case there exists no value for the given [key],
@@ -50,3 +54,14 @@ val adjust_balance :
   Ticket_hash_repr.t ->
   delta:Z.t ->
   (Z.t * Raw_context.t) tzresult Lwt.t
+
+(** [adjust_storage_space ctxt ~storage_diff] updates the used storage space
+    for the ticket-table according to [storage_diff]. The additional positive
+    amount of unpaid storage is returned. If no unpaid storage is consumed,
+    this amount is 0.
+
+    Note that when storage space for the ticket table is released we may later
+    use that space for free. For this reason, the amount returned may be less
+    than the given (positive) [storage_diff]. *)
+val adjust_storage_space :
+  Raw_context.t -> storage_diff:Z.t -> (Z.t * Raw_context.t) tzresult Lwt.t

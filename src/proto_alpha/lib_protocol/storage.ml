@@ -1388,24 +1388,39 @@ module Ticket_balance = struct
     let name = ["ticket_balance"]
   end
 
-  module Sub_context = Make_subcontext (Registered) (Raw_context) (Name)
+  module Raw_context = Make_subcontext (Registered) (Raw_context) (Name)
+
+  module Paid_storage_space =
+    Make_single_data_storage (Registered) (Raw_context)
+      (struct
+        let name = ["paid_bytes"]
+      end)
+      (Encoding.Z)
+
+  module Used_storage_space =
+    Make_single_data_storage (Registered) (Raw_context)
+      (struct
+        let name = ["used_bytes"]
+      end)
+      (Encoding.Z)
+
+  module Table_context =
+    Make_subcontext (Registered) (Raw_context)
+      (struct
+        let name = ["table"]
+      end)
+
   module Index = Make_index (Ticket_hash_repr.Index)
   module Table =
-    Make_indexed_carbonated_data_storage (Sub_context) (Index) (Encoding.Z)
+    Make_indexed_carbonated_data_storage (Table_context) (Index) (Encoding.Z)
 end
 
 module Tx_rollup = struct
-  module Raw_context =
-    Make_subcontext (Registered) (Raw_context)
-      (struct
-        let name = ["tx_rollup"]
-      end)
-
   module Indexed_context =
     Make_indexed_subcontext
       (Make_subcontext (Registered) (Raw_context)
          (struct
-           let name = ["index"]
+           let name = ["tx_rollup"]
          end))
          (Make_index (Tx_rollup_repr.Index))
 
@@ -1418,22 +1433,14 @@ module Tx_rollup = struct
 
   module Level_context =
     Make_indexed_subcontext
-      (Make_subcontext (Registered) (Raw_context)
+      (Make_subcontext (Registered) (Indexed_context.Raw_context)
          (struct
            let name = ["tx_level"]
          end))
          (Make_index (Tx_rollup_level_repr.Index))
 
-  module Level_tx_rollup_context =
-    Make_indexed_subcontext
-      (Make_subcontext (Registered) (Level_context.Raw_context)
-         (struct
-           let name = ["tx_rollup_by_level"]
-         end))
-         (Make_index (Tx_rollup_repr.Index))
-
   module Inbox =
-    Level_tx_rollup_context.Make_carbonated_map
+    Level_context.Make_carbonated_map
       (struct
         let name = ["inbox"]
       end)
@@ -1443,46 +1450,15 @@ module Tx_rollup = struct
         let encoding = Tx_rollup_inbox_repr.encoding
       end)
 
-  module Int32_index = struct
-    type t = int32
-
-    let compare = Compare.Int32.compare
-
-    let encoding = Data_encoding.int32
-
-    let rpc_arg = RPC_arg.int32
-
-    let path_length = 1
-
-    let to_path i l = Int32.to_string i :: l
-
-    let of_path = function
-      | [] | _ :: _ :: _ -> None
-      | [i] -> Int32.of_string_opt i
-  end
-
-  module Consumed_withdraw =
-    Make_indexed_carbonated_data_storage
-      (Make_subcontext (Registered) (Level_tx_rollup_context.Raw_context)
-         (struct
-           let name = ["withdraw"]
-         end))
-         (Make_index (Int32_index))
-         (Tx_rollup_withdraw_repr.Withdrawal_accounting)
-
-  module Level_indexed_context =
-    Make_indexed_subcontext
-      (Make_subcontext (Registered) (Raw_context)
-         (struct
-           let name = ["tx_rollup_level"]
-         end))
-         (Pair
-            (Make_index
-               (Tx_rollup_level_repr.Index))
-               (Make_index (Tx_rollup_repr.Index)))
+  module Revealed_withdrawals =
+    Level_context.Make_carbonated_map
+      (struct
+        let name = ["withdrawals"]
+      end)
+      (Bitset)
 
   module Commitment =
-    Level_indexed_context.Make_carbonated_map
+    Level_context.Make_carbonated_map
       (struct
         let name = ["commitment"]
       end)
@@ -1490,16 +1466,16 @@ module Tx_rollup = struct
 
   module Bond_indexed_context =
     Make_indexed_subcontext
-      (Make_subcontext (Registered) (Raw_context)
+      (Make_subcontext (Registered) (Indexed_context.Raw_context)
          (struct
-           let name = ["tx_rollup_bond"]
+           let name = ["bond"]
          end))
-         (Pair (Make_index (Tx_rollup_repr.Index)) (Public_key_hash_index))
+         (Public_key_hash_index)
 
   module Commitment_bond =
     Bond_indexed_context.Make_carbonated_map
       (struct
-        let name = ["commitment_bond"]
+        let name = ["commitment"]
       end)
       (struct
         type t = int

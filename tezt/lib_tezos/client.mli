@@ -999,6 +999,9 @@ module Tx_rollup : sig
     message:string ->
     position:int ->
     path:string ->
+    message_result_hash:string ->
+    rejected_message_result_path:string ->
+    agreed_message_result_path:string ->
     proof:string ->
     context_hash:string ->
     withdraw_list_hash:string ->

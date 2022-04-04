@@ -131,6 +131,38 @@ module Tx_rollup = struct
     RPC.Tx_rollup.Forge.Inbox.merkle_tree_path ?hooks ~data client
     |> map_runnable parse
 
+  let commitment_merkle_tree_hash ?hooks ~message_result_hashes client =
+    let parse json = `Hash JSON.(json |-> "hash" |> as_string) in
+    let make_message (`Hash message) : JSON.u = `String message in
+    let data =
+      `O
+        [
+          ( "message_result_hashes",
+            `A (List.map make_message message_result_hashes) );
+        ]
+    in
+    let runnable =
+      RPC.Tx_rollup.Forge.Commitment.merkle_tree_hash ?hooks ~data client
+    in
+    map_runnable parse runnable
+
+  let commitment_merkle_tree_path ?hooks ~message_result_hashes ~position client
+      =
+    let parse json = JSON.(json |-> "path") in
+    let make_message (`Hash message) : JSON.u = `String message in
+    let data =
+      `O
+        [
+          ( "message_result_hashes",
+            `A (List.map make_message message_result_hashes) );
+          ("position", `Float (float_of_int position));
+        ]
+    in
+    let runnable =
+      RPC.Tx_rollup.Forge.Commitment.merkle_tree_path ?hooks ~data client
+    in
+    map_runnable parse runnable
+
   let compute_inbox_from_messages ?hooks messages client =
     let* message_hashes =
       Lwt_list.map_p

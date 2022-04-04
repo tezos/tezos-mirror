@@ -582,7 +582,7 @@ module Make (Context : CONTEXT) = struct
         indexes ->
         Signer_indexable.index ->
         'content operation_content ->
-        (ctxt * indexes * Tx_rollup_withdraw.withdrawal option) m =
+        (ctxt * indexes * Tx_rollup_withdraw.t option) m =
      fun ctxt indexes source_idx op_content ->
       match op_content with
       | Withdraw {destination = claimer; ticket_hash; qty = amount} ->
@@ -632,7 +632,7 @@ module Make (Context : CONTEXT) = struct
         ctxt ->
         indexes ->
         (Indexable.index_only, Indexable.unknown) operation ->
-        (ctxt * indexes * Tx_rollup_withdraw.withdrawal list) m =
+        (ctxt * indexes * Tx_rollup_withdraw.t list) m =
      fun ctxt indexes {signer; counter; contents} ->
       (* Before applying any operation, we check the counter *)
       let* () = check_counter ctxt signer counter in
@@ -658,11 +658,7 @@ module Make (Context : CONTEXT) = struct
         ctxt ->
         indexes ->
         (Indexable.index_only, Indexable.unknown) transaction ->
-        (ctxt
-        * indexes
-        * transaction_result
-        * Tx_rollup_withdraw.withdrawal list)
-        m =
+        (ctxt * indexes * transaction_result * Tx_rollup_withdraw.t list) m =
      fun initial_ctxt initial_indexes transaction ->
       let rec fold (ctxt, prev_indexes, withdrawals) index ops =
         match ops with
@@ -707,8 +703,7 @@ module Make (Context : CONTEXT) = struct
         ctxt ->
         parameters ->
         (Indexable.unknown, Indexable.unknown) t ->
-        (ctxt * Message_result.Batch_V1.t * Tx_rollup_withdraw.withdrawal list)
-        m =
+        (ctxt * Message_result.Batch_V1.t * Tx_rollup_withdraw.t list) m =
      fun ctxt parameters batch ->
       let* (ctxt, indexes, batch) = check_signature ctxt batch in
       let {contents; _} = batch in
@@ -743,7 +738,7 @@ module Make (Context : CONTEXT) = struct
   let apply_deposit :
       ctxt ->
       Tx_rollup_message.deposit ->
-      (ctxt * deposit_result * Tx_rollup_withdraw.withdrawal option) m =
+      (ctxt * deposit_result * Tx_rollup_withdraw.t option) m =
    fun initial_ctxt Tx_rollup_message.{sender; destination; ticket_hash; amount} ->
     let apply_deposit () =
       let* (ctxt, indexes, aidx) =

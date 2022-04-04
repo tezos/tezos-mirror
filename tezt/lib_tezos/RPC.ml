@@ -649,6 +649,42 @@ module Tx_rollup = struct
         in
         Client.Spawn.rpc ?endpoint ?hooks ~data POST path client
     end
+
+    module Commitment = struct
+      let merkle_tree_hash ?endpoint ?hooks ?(chain = "main") ?(block = "head")
+          ~data client =
+        let path =
+          [
+            "chains";
+            chain;
+            "blocks";
+            block;
+            "helpers";
+            "forge";
+            "tx_rollup";
+            "commitment";
+            "merkle_tree_hash";
+          ]
+        in
+        Client.Spawn.rpc ?endpoint ?hooks ~data POST path client
+
+      let merkle_tree_path ?endpoint ?hooks ?(chain = "main") ?(block = "head")
+          ~data client =
+        let path =
+          [
+            "chains";
+            chain;
+            "blocks";
+            block;
+            "helpers";
+            "forge";
+            "tx_rollup";
+            "commitment";
+            "merkle_tree_path";
+          ]
+        in
+        Client.Spawn.rpc ?endpoint ?hooks ~data POST path client
+    end
   end
 end
 
@@ -673,6 +709,13 @@ module Sc_rollup = struct
     let path = path ~chain ~block ~sc_rollup_address @ ["initial_level"] in
     Client.rpc ?endpoint ?hooks GET path client
 end
+
+let raw_bytes ?endpoint ?hooks ?(chain = "main") ?(block = "head") ?(path = [])
+    client =
+  let path =
+    ["chains"; chain; "blocks"; block; "context"; "raw"; "bytes"] @ path
+  in
+  Client.rpc ?endpoint ?hooks GET path client
 
 module Curl = struct
   let curl_path_cache = ref None

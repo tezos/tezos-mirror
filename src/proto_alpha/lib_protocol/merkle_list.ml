@@ -25,6 +25,12 @@
 
 type error += Merkle_list_invalid_position
 
+let max_depth ~count_limit =
+  (* We assume that the Merkle_tree implemenation computes a tree in a
+     logarithmic size of the number of leaves. *)
+  let log2 n = Z.numbits (Z.of_int n) in
+  log2 count_limit
+
 let _ =
   register_error_kind
     `Temporary
@@ -44,6 +50,8 @@ module type T = sig
   type elt
 
   type path
+
+  val dummy_path : path
 
   val pp_path : Format.formatter -> path -> unit
 
@@ -124,6 +132,8 @@ end)
   type t = {tree : tree; depth : int; next_pos : int}
 
   type path = h list
+
+  let dummy_path = []
 
   let pp_path ppf =
     Format.fprintf

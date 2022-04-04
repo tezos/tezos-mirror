@@ -50,31 +50,31 @@ module Merkle : sig
 
   val path_encoding : path Data_encoding.t
 
-  val add_message : tree -> Tx_rollup_message_repr.hash -> tree
+  val add_message : tree -> Tx_rollup_message_hash_repr.t -> tree
 
-  val compute_path : Tx_rollup_message_repr.hash list -> int -> path tzresult
+  val compute_path : Tx_rollup_message_hash_repr.t list -> int -> path tzresult
 
   val check_path :
-    path -> int -> Tx_rollup_message_repr.hash -> root -> bool tzresult
+    path -> int -> Tx_rollup_message_hash_repr.t -> root -> bool tzresult
 
   val path_depth : path -> int
 
   (** [merklize_list messages] construct a merkle root by build a
      tree, appending the [messages] one by one in the same order of
      the list and finally computing the root. *)
-  val merklize_list : Tx_rollup_message_repr.hash list -> root
+  val merklize_list : Tx_rollup_message_hash_repr.t list -> root
 end
 
-(** [maximum_path_depth ~message_count_limit] returns the maximum
-    depth of a path, depending on the maximimum number of a message in
-    an inbox given by [message_count_limit]. *)
-val maximum_path_depth : message_count_limit:int -> int
-
-(** The view of an inbox: stores the [cumulated_size] in bytes for
-    the inbox, the [inbox_length] ({i i.e.}, the number of messages),
-    and the cumulative [hash] of the inbox contents. For newly created
-    inboxes, the [hash] is initialized as an array 32 null byte. *)
+(** The view of an inbox: stores the [cumulated_size] in bytes for the
+    inbox, the [inbox_length] ({i i.e.}, the number of messages), and
+    the cumulative [hash] of the inbox contents. For newly created
+    inboxes, the [hash] is initialized as an array 32 null
+    byte. *)
 type t = {inbox_length : int; cumulated_size : int; merkle_root : Merkle.root}
+
+(** [size] is the number of bytes necessary to store an inbox in the
+    layer-1 storage. *)
+val size : Z.t
 
 val ( = ) : t -> t -> bool
 

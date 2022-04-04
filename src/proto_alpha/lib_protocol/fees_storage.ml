@@ -67,18 +67,14 @@ let record_global_constant_storage_space context size =
   let to_be_paid = Z.add size cost_of_key in
   (context, to_be_paid)
 
-let record_paid_storage_space ctxt contract ~ticket_table_size_diff =
+let record_paid_storage_space ctxt contract =
   (* Get the new size of the contract's storage. *)
   Contract_storage.used_storage_space ctxt contract >>=? fun new_storage_size ->
-  (* The new total size is the new contract size plus the difference in size
-     of the ticket-balance table. The difference to the ticket balance table
-     may be negative. *)
-  let new_total_size = Z.add new_storage_size ticket_table_size_diff in
   Contract_storage.set_paid_storage_space_and_return_fees_to_pay
     ctxt
     contract
-    new_total_size
-  >>=? fun (to_be_paid, c) -> return (c, new_total_size, to_be_paid)
+    new_storage_size
+  >>=? fun (to_be_paid, c) -> return (c, new_storage_size, to_be_paid)
 
 let source_must_exist c src =
   match src with
