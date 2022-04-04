@@ -210,16 +210,24 @@ let get_delegates (proto : protocol) context
         in
         Lwt.return @@ Environment.wrap_tzresult r
       in
-      let* delegates =
-        Alpha_context.Delegate.fold ctxt ~init:(Ok []) ~f:(fun pkh acc ->
+      (* Loop on delegates to extract keys and compute the total stake. *)
+      let* (delegates, total_stake) =
+        Alpha_context.Delegate.fold
+          ctxt
+          ~init:(Ok ([], Alpha_context.Tez.zero))
+          ~f:(fun pkh acc ->
             let* pk =
               let*! r = Alpha_context.Roll.delegate_pubkey ctxt pkh in
               Lwt.return @@ Environment.wrap_tzresult r
             in
-            let*? acc = acc in
+            let*? (key_list_acc, staking_balance_acc) = acc in
             let* staking_balance =
               let*! r = Alpha_context.Delegate.staking_balance ctxt pkh in
               Lwt.return @@ Environment.wrap_tzresult r
+            in
+            let*? updated_staking_balance_acc =
+              Alpha_context.Tez.(staking_balance_acc +? staking_balance)
+              |> Environment.wrap_tzresult
             in
             (* Filter deactivated bakers if required *)
             if active_bakers_only then
@@ -228,12 +236,23 @@ let get_delegates (proto : protocol) context
                 Lwt.return @@ Environment.wrap_tzresult r
               in
               match b with
-              | true -> return acc
-              | false -> return ((pkh, pk, staking_balance) :: acc)
-            else return ((pkh, pk, staking_balance) :: acc))
+              (* Ignore the baker. *)
+              | true -> return (key_list_acc, staking_balance_acc)
+              (* Consider the baker. *)
+              | false ->
+                  return
+                    ( (pkh, pk, staking_balance) :: key_list_acc,
+                      updated_staking_balance_acc )
+            else
+              return
+                ( (pkh, pk, staking_balance) :: key_list_acc,
+                  updated_staking_balance_acc ))
       in
       return
-      @@ List.map (fun (pkh, pk, _) -> (pkh, pk))
+      @@ filter_up_to_staking_share
+           staking_share_opt
+           total_stake
+           Alpha_context.Tez.to_mutez
       @@ (* By swapping x and y we do a descending sort *)
       List.sort
         (fun (_, _, x) (_, _, y) -> Alpha_context.Tez.compare y x)
@@ -251,16 +270,24 @@ let get_delegates (proto : protocol) context
         in
         Lwt.return @@ Environment.wrap_tzresult r
       in
-      let* delegates =
-        Alpha_context.Delegate.fold ctxt ~init:(Ok []) ~f:(fun pkh acc ->
+      (* Loop on delegates to extract keys and compute the total stake. *)
+      let* (delegates, total_stake) =
+        Alpha_context.Delegate.fold
+          ctxt
+          ~init:(Ok ([], Alpha_context.Tez.zero))
+          ~f:(fun pkh acc ->
             let* pk =
               let*! r = Alpha_context.Roll.delegate_pubkey ctxt pkh in
               Lwt.return @@ Environment.wrap_tzresult r
             in
-            let*? acc = acc in
+            let*? (key_list_acc, staking_balance_acc) = acc in
             let* staking_balance =
               let*! r = Alpha_context.Delegate.staking_balance ctxt pkh in
               Lwt.return @@ Environment.wrap_tzresult r
+            in
+            let*? updated_staking_balance_acc =
+              Alpha_context.Tez.(staking_balance_acc +? staking_balance)
+              |> Environment.wrap_tzresult
             in
             (* Filter deactivated bakers if required *)
             if active_bakers_only then
@@ -269,12 +296,23 @@ let get_delegates (proto : protocol) context
                 Lwt.return @@ Environment.wrap_tzresult r
               in
               match b with
-              | true -> return acc
-              | false -> return ((pkh, pk, staking_balance) :: acc)
-            else return ((pkh, pk, staking_balance) :: acc))
+              (* Ignore the baker. *)
+              | true -> return (key_list_acc, staking_balance_acc)
+              (* Consider the baker. *)
+              | false ->
+                  return
+                    ( (pkh, pk, staking_balance) :: key_list_acc,
+                      updated_staking_balance_acc )
+            else
+              return
+                ( (pkh, pk, staking_balance) :: key_list_acc,
+                  updated_staking_balance_acc ))
       in
       return
-      @@ List.map (fun (pkh, pk, _) -> (pkh, pk))
+      @@ filter_up_to_staking_share
+           staking_share_opt
+           total_stake
+           Alpha_context.Tez.to_mutez
       @@ (* By swapping x and y we do a descending sort *)
       List.sort
         (fun (_, _, x) (_, _, y) -> Alpha_context.Tez.compare y x)
@@ -347,20 +385,25 @@ let get_delegates (proto : protocol) context
         in
         Lwt.return @@ Environment.wrap_tzresult r
       in
-      let* delegates =
+      (* Loop on delegates to extract keys and compute the total stake. *)
+      let* (delegates, total_stake) =
         Alpha_context.Delegate.fold
           ctxt
           ~order:`Sorted
-          ~init:(Ok [])
+          ~init:(Ok ([], Alpha_context.Tez.zero))
           ~f:(fun pkh acc ->
             let* pk =
               let*! r = Alpha_context.Delegate.pubkey ctxt pkh in
               Lwt.return @@ Environment.wrap_tzresult r
             in
-            let*? acc = acc in
+            let*? (key_list_acc, staking_balance_acc) = acc in
             let* staking_balance =
               let*! r = Alpha_context.Delegate.staking_balance ctxt pkh in
               Lwt.return @@ Environment.wrap_tzresult r
+            in
+            let*? updated_staking_balance_acc =
+              Alpha_context.Tez.(staking_balance_acc +? staking_balance)
+              |> Environment.wrap_tzresult
             in
             (* Filter deactivated bakers if required *)
             if active_bakers_only then
@@ -369,12 +412,23 @@ let get_delegates (proto : protocol) context
                 Lwt.return @@ Environment.wrap_tzresult r
               in
               match b with
-              | true -> return acc
-              | false -> return ((pkh, pk, staking_balance) :: acc)
-            else return ((pkh, pk, staking_balance) :: acc))
+              (* Ignore the baker. *)
+              | true -> return (key_list_acc, staking_balance_acc)
+              (* Consider the baker. *)
+              | false ->
+                  return
+                    ( (pkh, pk, staking_balance) :: key_list_acc,
+                      updated_staking_balance_acc )
+            else
+              return
+                ( (pkh, pk, staking_balance) :: key_list_acc,
+                  updated_staking_balance_acc ))
       in
       return
-      @@ List.map (fun (pkh, pk, _) -> (pkh, pk))
+      @@ filter_up_to_staking_share
+           staking_share_opt
+           total_stake
+           Alpha_context.Tez.to_mutez
       @@ (* By swapping x and y we do a descending sort *)
       List.sort
         (fun (_, _, x) (_, _, y) -> Alpha_context.Tez.compare y x)
@@ -387,20 +441,25 @@ let get_delegates (proto : protocol) context
         in
         Lwt.return @@ Environment.wrap_tzresult r
       in
-      let* delegates =
+      (* Loop on delegates to extract keys and compute the total stake. *)
+      let* (delegates, total_stake) =
         Alpha_context.Delegate.fold
           ctxt
           ~order:`Sorted
-          ~init:(Ok [])
+          ~init:(Ok ([], Alpha_context.Tez.zero))
           ~f:(fun pkh acc ->
             let* pk =
               let*! r = Alpha_context.Delegate.pubkey ctxt pkh in
               Lwt.return @@ Environment.wrap_tzresult r
             in
-            let*? acc = acc in
+            let*? (key_list_acc, staking_balance_acc) = acc in
             let* staking_balance =
               let*! r = Alpha_context.Delegate.staking_balance ctxt pkh in
               Lwt.return @@ Environment.wrap_tzresult r
+            in
+            let*? updated_staking_balance_acc =
+              Alpha_context.Tez.(staking_balance_acc +? staking_balance)
+              |> Environment.wrap_tzresult
             in
             (* Filter deactivated bakers if required *)
             if active_bakers_only then
@@ -409,12 +468,23 @@ let get_delegates (proto : protocol) context
                 Lwt.return @@ Environment.wrap_tzresult r
               in
               match b with
-              | true -> return acc
-              | false -> return ((pkh, pk, staking_balance) :: acc)
-            else return ((pkh, pk, staking_balance) :: acc))
+              (* Ignore the baker. *)
+              | true -> return (key_list_acc, staking_balance_acc)
+              (* Consider the baker. *)
+              | false ->
+                  return
+                    ( (pkh, pk, staking_balance) :: key_list_acc,
+                      updated_staking_balance_acc )
+            else
+              return
+                ( (pkh, pk, staking_balance) :: key_list_acc,
+                  updated_staking_balance_acc ))
       in
       return
-      @@ List.map (fun (pkh, pk, _) -> (pkh, pk))
+      @@ filter_up_to_staking_share
+           staking_share_opt
+           total_stake
+           Alpha_context.Tez.to_mutez
       @@ (* By swapping x and y we do a descending sort *)
       List.sort
         (fun (_, _, x) (_, _, y) -> Alpha_context.Tez.compare y x)
