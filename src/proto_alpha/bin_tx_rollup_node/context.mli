@@ -63,13 +63,18 @@ val exists : index -> Protocol.Tx_rollup_l2_context_hash.t -> bool Lwt.t
 (** Checkout the context associated to a context hash. The context must have
     been committed (with {!commit}). Resolves with [None] if there is no such
     commit. *)
-val checkout :
+val checkout_opt :
   index -> Protocol.Tx_rollup_l2_context_hash.t -> context option Lwt.t
 
-(** Same as {!checkout} but resolves with an exception if there is no such
+(** Same as {!checkout_opt} but resolves with an exception if there is no such
     commit. *)
 val checkout_exn :
   index -> Protocol.Tx_rollup_l2_context_hash.t -> context Lwt.t
+
+(** Same as {!checkout_opt} but resolves with an error if there is no such
+    commit. *)
+val checkout :
+  index -> Protocol.Tx_rollup_l2_context_hash.t -> context tzresult Lwt.t
 
 (** Hash a context. The hash can be done with an additional [message]. *)
 val hash : ?message:string -> t -> Protocol.Tx_rollup_l2_context_hash.t

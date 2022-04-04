@@ -31,13 +31,6 @@ open Protocol_client_context
 open Protocol.Alpha_context
 open Error
 
-(* TODO/TORU: Move application logic in other module *)
-
-let checkout_context (state : State.t) ctxt_hash =
-  let open Lwt_syntax in
-  let+ context = Context.checkout state.context_index ctxt_hash in
-  Option.to_result ~none:[Tx_rollup_cannot_checkout_context ctxt_hash] context
-
 let parse_tx_rollup_l2_address :
     Script.node -> Protocol.Tx_rollup_l2_address.Indexable.value tzresult =
   let open Protocol in
@@ -225,7 +218,7 @@ let process_messages_and_inboxes (state : State.t) ~(predecessor : L2block.t)
   let*! () = Event.(emit messages_application) (List.length messages) in
   let* predecessor_context =
     match predecessor_context with
-    | None -> checkout_context state predecessor.header.context
+    | None -> Context.checkout state.context_index predecessor.header.context
     | Some context -> return context
   in
   let l2_parameters =

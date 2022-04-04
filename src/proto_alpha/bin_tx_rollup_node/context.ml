@@ -98,7 +98,7 @@ let commit ?(message = "") context =
     let+ hash = commit ~time:Time.Protocol.epoch ~message context in
     context_hash_to_l2 hash
 
-let checkout index context_hash =
+let checkout_opt index context_hash =
   let open Lwt_syntax in
   let+ context = checkout index (l2_to_context_hash context_hash) in
   match context with
@@ -112,8 +112,13 @@ let checkout index context_hash =
 
 let checkout_exn index hash =
   let open Lwt_syntax in
-  let+ context = checkout index hash in
+  let+ context = checkout_opt index hash in
   match context with None -> raise Not_found | Some context -> context
+
+let checkout index hash =
+  let open Lwt_syntax in
+  let+ context = checkout_opt index hash in
+  Option.to_result ~none:[Error.Tx_rollup_cannot_checkout_context hash] context
 
 (** {2 Prover context} *)
 
