@@ -52,6 +52,94 @@ let bytes_parameter =
       | Some s -> Lwt.return_ok s
       | None -> cctxt#error "Invalid hex string: %s" hex)
 
+let format_arg =
+  default_arg
+    ~doc:"The format to print the output in: json, pretty, or waterfall."
+    ~long:"format"
+    ~placeholder:"FORMAT"
+    ~default:"pretty"
+    (parameter (fun (cctxt : #Client_context.printer) format ->
+         match format with
+         | "json" -> Lwt.return_ok `Json
+         | "pretty" -> Lwt.return_ok `Pp
+         | "waterfall" -> Lwt.return_ok `Waterfall
+         | _ ->
+             cctxt#error
+               "Cannot decode --format argument, use 'json', 'pretty', or \
+                'waterfall'."))
+
+let slices_encoding =
+  let open Data_encoding in
+  list
+    (conv
+       (fun {Binary.Slicer.name; value; pretty_printed} ->
+         let pretty_printed =
+           if pretty_printed = "" then None else Some pretty_printed
+         in
+         let hex_slice = Format.asprintf "%a" Hex.pp (Hex.of_string value) in
+         (name, value, hex_slice, pretty_printed))
+       (fun (name, value, _, pretty_printed) ->
+         let pretty_printed = Option.value ~default:"" pretty_printed in
+         {Binary.Slicer.name; value; pretty_printed})
+       (obj4
+          (req "name" string)
+          (req "raw-slice" string)
+          (req "hex-slice" string)
+          (opt "pretty" string)))
+
+let pp_slices format ppf slices =
+  match format with
+  | `Json ->
+      let j = Data_encoding.Json.construct slices_encoding slices in
+      let () = Data_encoding.Json.pp ppf j in
+      ()
+  | `Pp ->
+      Format.pp_print_list
+        ~pp_sep:Format.pp_print_newline
+        (fun ppf {Data_encoding.Binary.Slicer.name; value; pretty_printed} ->
+          let value = Format.asprintf "%a" Hex.pp (Hex.of_string value) in
+          if String.length value <= 18 then
+            Format.fprintf
+              ppf
+              "%s%s%s%a"
+              value
+              (String.make (20 - String.length value) ' ')
+              name
+              (fun ppf ppv ->
+                if ppv = "" then () else Format.fprintf ppf " = %s" ppv)
+              pretty_printed
+          else
+            Format.fprintf
+              ppf
+              "%s\n%s%s%a"
+              value
+              (String.make 20 ' ')
+              name
+              (fun ppf ppv ->
+                if ppv = "" then () else Format.fprintf ppf " = %s" ppv)
+              pretty_printed)
+        ppf
+        slices
+  | `Waterfall ->
+      let (_ : int) =
+        List.fold_left
+          (fun margin {Data_encoding.Binary.Slicer.name; value; pretty_printed} ->
+            let value = Format.asprintf "%a" Hex.pp (Hex.of_string value) in
+            Format.fprintf
+              ppf
+              "%s%s   %s%a\n"
+              (String.make margin ' ')
+              value
+              name
+              (fun ppf ppv ->
+                if ppv = "" then () else Format.fprintf ppf " = %s" ppv)
+              pretty_printed ;
+            margin + String.length value)
+          0
+          slices
+      in
+      ()
+
 let commands () =
   let open Lwt_syntax in
   [
@@ -233,4 +321,47 @@ let commands () =
         in
         let* () = cctxt#message "%a" Json_schema.pp schema in
         Lwt_result_syntax.return_unit);
+    command
+      ~group
+      ~desc:
+        "Attempts to slice an hex-encoded binary value with all known \
+         encodings."
+      no_options
+      (prefix "slice"
+      @@ param ~name:"hex" ~desc:"Binary encoded data" bytes_parameter
+      @@ stop)
+      (fun () bytes cctxt ->
+        let bytes = Bytes.to_string bytes in
+        let all = Data_encoding.Registration.slice_all bytes in
+        match all with
+        | [] -> cctxt#error "No matching encoding found"
+        | _ ->
+            let* () =
+              List.iter_s
+                (fun (encoding_name, slices) ->
+                  cctxt#message
+                    "%s:\n%a\n\n"
+                    encoding_name
+                    (pp_slices `Pp)
+                    slices)
+                all
+            in
+            Lwt_result_syntax.return_unit);
+    command
+      ~group
+      ~desc:"Slice an hex-encoded binary value with the specified encoding."
+      (args1 format_arg)
+      (prefix "slice"
+      @@ param ~name:"hex" ~desc:"Binary encoded data" bytes_parameter
+      @@ prefixes ["with"; "encoding"]
+      @@ param ~name:"id" ~desc:"Encoding identifier" id_parameter
+      @@ stop)
+      (fun format bytes encoding_id cctxt ->
+        let bytes = Bytes.to_string bytes in
+        match Data_encoding.Registration.slice encoding_id bytes with
+        | Error read_error ->
+            cctxt#error "%a" Data_encoding.Binary.pp_read_error read_error
+        | Ok slices ->
+            let* () = cctxt#message "%a\n" (pp_slices format) slices in
+            Lwt_result_syntax.return_unit);
   ]
