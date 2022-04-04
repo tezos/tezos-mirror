@@ -38,13 +38,19 @@ val check_message_result :
   Raw_context.t tzresult
 
 (** [add_commitment context tx_rollup contract commitment] adds a
-    commitment to a rollup. It returns the new context, and the new
-    state.
+    commitment to a rollup. It returns the new context, the new state,
+    and the committer of the previous commitment stored for this
+    level if any.
+
+    In case this committer exists, then it means its bond needs to be
+    slashed.
 
     This function returns the errors
 
     {ul {li [Level_already_has_commitment] iff there is already a
-            commitment at this level.}
+            valid commitment ({i i.e.}, not orphan) at this level.}
+        {li [Invalid_committer] iff an orphan commitment from the same
+            committer already is in the storage.}
         {li [Missing_commitment_predecessor] iff the predecessor does
             not match the already-stored predecessor commitment.}
         {li [Wrong_commitment_predecessor_level] iff there is no
@@ -59,7 +65,9 @@ val add_commitment :
   Tx_rollup_state_repr.t ->
   Signature.Public_key_hash.t ->
   Tx_rollup_commitment_repr.Full.t ->
-  (Raw_context.t * Tx_rollup_state_repr.t) tzresult Lwt.t
+  (Raw_context.t * Tx_rollup_state_repr.t * Signature.public_key_hash option)
+  tzresult
+  Lwt.t
 
 (** [remove_bond context state tx_rollup contract] removes the bond for an
     implicit contract. This will fail if either the bond does not exist,

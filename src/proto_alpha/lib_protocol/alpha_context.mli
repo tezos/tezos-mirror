@@ -1970,7 +1970,8 @@ module Tx_rollup_commitment : sig
     Tx_rollup_state.t ->
     Signature.public_key_hash ->
     Full.t ->
-    (context * Tx_rollup_state.t) tzresult Lwt.t
+    (context * Tx_rollup_state.t * Signature.public_key_hash option) tzresult
+    Lwt.t
 
   val find :
     context ->
@@ -2090,6 +2091,7 @@ module Tx_rollup_errors : sig
     | No_uncommitted_inbox
     | No_commitment_to_finalize
     | No_commitment_to_remove
+    | Invalid_committer
     | Commitment_does_not_exist of Tx_rollup_level.t
     | Wrong_predecessor_hash of {
         provided : Tx_rollup_commitment_hash.t option;

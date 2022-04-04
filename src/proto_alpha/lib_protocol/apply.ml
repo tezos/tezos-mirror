@@ -1551,13 +1551,30 @@ let apply_external_manager_operation_content :
         else return (ctxt, []) )
       >>=? fun (ctxt, balance_updates) ->
       Tx_rollup_commitment.add_commitment ctxt tx_rollup state source commitment
-      >>=? fun (ctxt, state) ->
+      >>=? fun (ctxt, state, to_slash) ->
+      (match to_slash with
+      | Some pkh ->
+          let committer = Contract.implicit_contract pkh in
+          Tx_rollup_commitment.slash_bond ctxt tx_rollup pkh
+          >>=? fun (ctxt, slashed) ->
+          if slashed then
+            let bid = Bond_id.Tx_rollup_bond_id tx_rollup in
+            Token.balance ctxt (`Frozen_bonds (committer, bid))
+            >>=? fun (ctxt, burn) ->
+            Token.transfer
+              ctxt
+              (`Frozen_bonds (committer, bid))
+              `Tx_rollup_rejection_punishments
+              burn
+          else return (ctxt, [])
+      | None -> return (ctxt, []))
+      >>=? fun (ctxt, burn_update) ->
       Tx_rollup_state.update ctxt tx_rollup state >>=? fun ctxt ->
       let result =
         Tx_rollup_commit_result
           {
             consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
-            balance_updates;
+            balance_updates = burn_update @ balance_updates;
           }
       in
       return (ctxt, result, [])
