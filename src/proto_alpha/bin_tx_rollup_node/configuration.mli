@@ -25,9 +25,19 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* provide a default configuration:
-   https://gitlab.com/tezos/tezos/-/issues/2458
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/2458
+   Provide a default configuration
 *)
+
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/2817
+   Better documentation/semantic for signers + modes
+*)
+type signers = {
+  submit_batch : Signature.public_key_hash option;
+  finalize_commitment : Signature.public_key_hash option;
+  remove_commitment : Signature.public_key_hash option;
+  rejection : Signature.public_key_hash option;
+}
 
 type t = {
   data_dir : string;
@@ -35,7 +45,8 @@ type t = {
   rollup_genesis : Block_hash.t option;
   rpc_addr : P2p_point.Id.t;
   reconnection_delay : float;
-  operator : string option;
+  operator : Signature.public_key_hash option;
+  signers : signers;
   l2_blocks_cache_size : int;
 }
 

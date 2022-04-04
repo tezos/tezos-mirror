@@ -42,9 +42,6 @@ type rollup_info = Stores.rollup_info = {
   origination_level : int32;
 }
 
-(* TODO/TORU: have different operators (for commitments, rejections, batches,
-   etc.) and have multiple injection keys (except for commitments). *)
-
 type t = private {
   stores : Stores.t;
   context_index : Context.index;
@@ -82,7 +79,8 @@ val init :
   ?readonly:bool ->
   ?rollup_genesis:Block_hash.t ->
   l2_blocks_cache_size:int ->
-  operator:string option ->
+  operator:Signature.public_key_hash option ->
+  signers:Configuration.signers ->
   Tx_rollup.t ->
   t tzresult Lwt.t
 

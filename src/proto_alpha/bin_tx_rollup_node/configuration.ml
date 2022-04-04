@@ -25,13 +25,21 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type signers = {
+  submit_batch : Signature.public_key_hash option;
+  finalize_commitment : Signature.public_key_hash option;
+  remove_commitment : Signature.public_key_hash option;
+  rejection : Signature.public_key_hash option;
+}
+
 type t = {
   data_dir : string;
   rollup_id : Protocol.Alpha_context.Tx_rollup.t;
   rollup_genesis : Block_hash.t option;
   rpc_addr : P2p_point.Id.t;
   reconnection_delay : float;
-  operator : string option;
+  operator : Signature.public_key_hash option;
+  signers : signers;
   l2_blocks_cache_size : int;
 }
 
@@ -49,6 +57,33 @@ let default_reconnection_delay = 2.0
 
 let default_l2_blocks_cache_size = 64
 
+let signers_encoding =
+  let open Data_encoding in
+  conv
+    (fun {submit_batch; finalize_commitment; remove_commitment; rejection} ->
+      (submit_batch, finalize_commitment, remove_commitment, rejection))
+    (fun (submit_batch, finalize_commitment, remove_commitment, rejection) ->
+      {submit_batch; finalize_commitment; remove_commitment; rejection})
+  @@ obj4
+       (opt
+          "submit_batch"
+          Signature.Public_key_hash.encoding
+          ~description:"The public key hash of the signer for batch submission")
+       (opt
+          "finalize_commitment"
+          Signature.Public_key_hash.encoding
+          ~description:
+            "The public key hash of the signer for finalization of commitments")
+       (opt
+          "remove_commitment"
+          Signature.Public_key_hash.encoding
+          ~description:
+            "The public key hash of the signer for removals of commitments")
+       (opt
+          "rejection"
+          Signature.Public_key_hash.encoding
+          ~description:"The public key hash of the signer for rejections")
+
 let encoding =
   let open Data_encoding in
   conv
@@ -59,6 +94,7 @@ let encoding =
            rpc_addr;
            reconnection_delay;
            operator;
+           signers;
            l2_blocks_cache_size;
          } ->
       ( Some data_dir,
@@ -67,6 +103,7 @@ let encoding =
         rpc_addr,
         reconnection_delay,
         operator,
+        signers,
         l2_blocks_cache_size ))
     (fun ( data_dir_opt,
            rollup_id,
@@ -74,6 +111,7 @@ let encoding =
            rpc_addr,
            reconnection_delay,
            operator,
+           signers,
            l2_blocks_cache_size ) ->
       let data_dir =
         match data_dir_opt with
@@ -87,9 +125,10 @@ let encoding =
         rpc_addr;
         reconnection_delay;
         operator;
+        signers;
         l2_blocks_cache_size;
       })
-  @@ obj7
+  @@ obj8
        (opt
           ~description:
             "Location where the rollup node data (store, context, etc.) is \
@@ -115,10 +154,14 @@ let encoding =
           float
           default_reconnection_delay)
        (opt
-          ~description:
-            "The operator of the rollup (alias or public key hash) if any"
+          ~description:"The operator of the rollup (public key hash) if any"
           "operator"
-          string)
+          Signature.Public_key_hash.encoding)
+       (req
+          ~description:
+            "The additional signers for the various tx rollup operations"
+          "signers"
+          signers_encoding)
        (dft
           ~description:"The size of the L2 block cache in number of blocks"
           "l2_blocks_cache_size"

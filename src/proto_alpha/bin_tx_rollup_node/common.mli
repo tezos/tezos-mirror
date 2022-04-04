@@ -31,6 +31,6 @@ type signer = {
   sk : Client_keys.sk_uri;
 }
 
-(** Retrieve a signer from the client wallet by alias or public key hash. *)
+(** Retrieve a signer from the client wallet. *)
 val get_signer :
-  #Client_context.wallet -> string option -> signer option tzresult Lwt.t
+  #Client_context.wallet -> Signature.public_key_hash -> signer tzresult Lwt.t

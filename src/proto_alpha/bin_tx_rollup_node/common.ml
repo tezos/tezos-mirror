@@ -30,22 +30,7 @@ type signer = {
   sk : Client_keys.sk_uri;
 }
 
-let get_signer cctxt signer =
+let get_signer cctxt pkh =
   let open Lwt_result_syntax in
-  match signer with
-  | None -> return None
-  | Some operator -> (
-      let*! pkh_err = Client_keys.Public_key_hash.of_source operator in
-      match pkh_err with
-      | Ok pkh ->
-          let* (alias, pk, sk) = Client_keys.get_key cctxt pkh in
-          return_some {alias; pkh; pk; sk}
-      | Error _ -> (
-          (* TODO/TORU: use proper errors *)
-          let* keys = Client_keys.alias_keys cctxt operator in
-          match keys with
-          | None -> failwith "Unknown signer alias %s" operator
-          | Some ((_, None, _) | (_, _, None)) ->
-              failwith "Unknown secret key for signer %s" operator
-          | Some (pkh, Some pk, Some sk) ->
-              return_some {alias = operator; pkh; pk; sk}))
+  let* (alias, pk, sk) = Client_keys.get_key cctxt pkh in
+  return {alias; pkh; pk; sk}

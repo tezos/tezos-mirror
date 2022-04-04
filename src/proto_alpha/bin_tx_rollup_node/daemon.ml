@@ -390,6 +390,7 @@ let run configuration cctxt =
     rollup_id;
     rollup_genesis;
     operator;
+    signers;
     reconnection_delay;
     l2_blocks_cache_size;
     _;
@@ -402,6 +403,7 @@ let run configuration cctxt =
       ~data_dir
       ~l2_blocks_cache_size
       ~operator
+      ~signers
       ?rollup_genesis
       rollup_id
   in
