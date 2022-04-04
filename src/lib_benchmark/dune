@@ -11,7 +11,11 @@
   tezos-micheline
   tezos-clic
   data-encoding
+  prbnmcn-cgrph
+  prbnmcn-dagger
+  prbnmcn-dagger-stats
   prbnmcn-stats
+  pringo
   benchmark-utils
   pyml-plot
   ocaml-migrate-parsetree)

@@ -20,7 +20,7 @@ depends: [
   "hashcons"
   "benchmark-utils"
   "tezos-011-PtHangz2-test-helpers"
-  "prbnmcn-stats" { = "0.0.2" }
+  "prbnmcn-stats" { = "0.0.4" }
   "alcotest-lwt" { with-test & >= "1.5.0" }
 ]
 build: [

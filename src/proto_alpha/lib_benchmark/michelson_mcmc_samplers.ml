@@ -123,9 +123,7 @@ type mc_state = {
   jump : State_space.t Fin.Float.prb Lazy.t;
 }
 
-module State_multiset =
-  Basic_structures.Basic_impl.Free_module.Float_valued.Make_with_map
-    (State_space)
+module State_hashtbl = Hashtbl.Make (State_space)
 
 (** Generic MCMC michelson sampler (can be used for code and data) *)
 module Make_generic (P : Sampler_parameters_sig) = struct
@@ -138,7 +136,7 @@ module Make_generic (P : Sampler_parameters_sig) = struct
     | _ ->
         let arr = Array.of_list l in
         let emp = Emp.of_raw_data arr in
-        Fin.Float.counts_of_empirical (module State_multiset) emp
+        Fin.Float.counts_of_empirical (module State_hashtbl) emp
         |> Fin.Float.normalize
 
   let unrecoverable_failure err current result =
@@ -190,12 +188,13 @@ module Make_generic (P : Sampler_parameters_sig) = struct
 
     let proposal_log_density s1 s2 =
       let jump = Lazy.force s1.jump in
-      Log_space.of_float (Fin.Float.eval_prb jump s2.state)
+      let p = try Fin.Float.eval_prb jump s2.state with Not_found -> 0.0 in
+      Log_space.of_float p
 
     let proposal mcmc_state rng_state =
       trace mcmc_state.state ;
       let dist = Lazy.force mcmc_state.jump in
-      let next = Fin.Float.sample (Fin.as_measure dist) rng_state in
+      let next = Fin.Float.sample (Fin.Float.as_measure dist) rng_state in
       of_state next
 
     let log_weight state = Log_space.unsafe_cast (-.P.energy state.state)

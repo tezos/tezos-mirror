@@ -76,6 +76,8 @@ let compiler_libs_optcomp = external_lib "compiler-libs.optcomp" V.True ~opam:""
 let compiler_libs_toplevel =
   external_lib "compiler-libs.toplevel" V.True ~opam:""
 
+let conf_gnuplot = opam_only "conf-gnuplot" V.(exactly "0.1")
+
 let conf_libev = opam_only "conf-libev" V.True
 
 let conf_rust = opam_only "conf-rust" V.True
@@ -192,7 +194,7 @@ let ocplib_endian_bigstring =
 let ocplib_ocamlres =
   external_lib ~opam:"ocp-ocamlres" "ocplib-ocamlres" V.(at_least "0.4")
 
-let ometrics = opam_only "ometrics" V.(at_least "0.1.1")
+let ometrics = opam_only "ometrics" V.(at_least "0.1.3")
 
 let parsexp = external_lib ~js_compatible:true "parsexp" V.True
 
@@ -211,7 +213,18 @@ let ptime_clock_os = external_sublib ~js_compatible:true ptime "ptime.clock.os"
 let pure_splitmix =
   external_lib ~js_compatible:true "pure-splitmix" V.(exactly "0.3")
 
-let prbnmcn_stats = external_lib "prbnmcn-stats" V.(exactly "0.0.2")
+let prbnmcn_cgrph = external_lib "prbnmcn-cgrph" V.(exactly "0.0.2")
+
+let prbnmcn_dagger = external_lib "prbnmcn-dagger" V.(exactly "0.0.2")
+
+let prbnmcn_dagger_stats =
+  external_lib "prbnmcn-dagger-stats" V.(exactly "0.0.2")
+
+let prbnmcn_gnuplot = external_lib "prbnmcn-gnuplot" V.(exactly "0.0.2")
+
+let prbnmcn_stats = external_lib "prbnmcn-stats" V.(exactly "0.0.4")
+
+let pringo = external_lib "pringo" V.(exactly "1.3")
 
 let prometheus = external_lib "prometheus" V.True
 
@@ -2395,7 +2408,11 @@ let tezos_benchmark =
         tezos_micheline;
         tezos_clic;
         data_encoding;
+        prbnmcn_cgrph;
+        prbnmcn_dagger;
+        prbnmcn_dagger_stats;
         prbnmcn_stats;
+        pringo;
         benchmark_utils;
         pyml_plot;
         ocaml_migrate_parsetree;
@@ -3267,6 +3284,7 @@ let _tezos_snoop =
     ~synopsis:"Tezos: `tezos-snoop` binary"
     ~deps:
       [
+        conf_gnuplot;
         tezos_base |> open_ ~m:"TzPervasives";
         tezos_base_unix;
         tezos_stdlib_unix |> open_;
@@ -3280,6 +3298,7 @@ let _tezos_snoop =
         pyml;
         pyml_plot;
         prbnmcn_stats;
+        prbnmcn_gnuplot;
       ]
     ~linkall:true
 
