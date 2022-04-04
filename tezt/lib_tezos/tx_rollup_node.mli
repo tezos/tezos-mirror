@@ -39,6 +39,10 @@ val create :
   rollup_id:string ->
   rollup_genesis:string ->
   ?operator:string ->
+  ?batch_signer:string ->
+  ?finalize_commitment_signer:string ->
+  ?remove_commitment_signer:string ->
+  ?rejection_signer:string ->
   Client.t ->
   Node.t ->
   t

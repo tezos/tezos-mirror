@@ -35,8 +35,12 @@ module Parameters = struct
     client : Client.t;
     data_dir : string;
     runner : Runner.t option;
-    operator : string option;
     rollup_id : string;
+    operator : string option;
+    batch_signer : string option;
+    finalize_commitment_signer : string option;
+    remove_commitment_signer : string option;
+    rejection_signer : string option;
     rollup_genesis : string;
     rpc_addr : string;
     dormant_mode : bool;
@@ -67,6 +71,9 @@ let operator node = node.persistent_state.operator
 let spawn_command node =
   Process.spawn ~name:node.name ~color:node.color node.path
 
+let add_option flag str_opt command =
+  command @ match str_opt with None -> [] | Some o -> [flag; o]
+
 let spawn_config_init node rollup_id rollup_genesis =
   spawn_command
     node
@@ -83,7 +90,15 @@ let spawn_config_init node rollup_id rollup_genesis =
        "--rpc-addr";
        rpc_addr node;
      ]
-    @ match operator node with None -> [] | Some o -> ["--operator"; o])
+    |> add_option "--operator" @@ operator node
+    |> add_option "--batch-signer" node.persistent_state.batch_signer
+    |> add_option
+         "--finalize-commitment-signer"
+         node.persistent_state.finalize_commitment_signer
+    |> add_option
+         "--remove-commitment-signer"
+         node.persistent_state.remove_commitment_signer
+    |> add_option "--rejection-signer" node.persistent_state.rejection_signer)
 
 let config_init node rollup_id rollup_genesis =
   let process = spawn_config_init node rollup_id rollup_genesis in
@@ -192,7 +207,9 @@ let wait_for ?where node name filter =
 
 let create ?(path = Constant.tx_rollup_node) ?runner ?data_dir
     ?(addr = "127.0.0.1") ?(dormant_mode = false) ?color ?event_pipe ?name
-    ~rollup_id ~rollup_genesis ?operator client tezos_node =
+    ~rollup_id ~rollup_genesis ?operator ?batch_signer
+    ?finalize_commitment_signer ?remove_commitment_signer ?rejection_signer
+    client tezos_node =
   let name = match name with None -> fresh_name () | Some name -> name in
   let rpc_addr =
     match String.rindex_opt addr ':' with
@@ -217,6 +234,10 @@ let create ?(path = Constant.tx_rollup_node) ?runner ?data_dir
         rollup_genesis;
         runner;
         operator;
+        batch_signer;
+        finalize_commitment_signer;
+        remove_commitment_signer;
+        rejection_signer;
         client;
         pending_ready = [];
         pending_level = [];
