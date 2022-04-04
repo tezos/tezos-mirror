@@ -441,15 +441,6 @@ let withdraw_stake ctxt rollup staker =
         modify_staker_count ctxt rollup Int32.pred
       else fail Sc_rollup_not_staked_on_lcc
 
-(* TODO https://gitlab.com/tezos/tezos/-/issues/2548
-   These should be protocol constants. See issue for invariant that should be
-   tested for. *)
-let sc_rollup_max_lookahead = 30_000l
-
-let sc_rollup_commitment_frequency =
-  (* Think twice before changing this. And then avoid doing it. *)
-  20
-
 (* 76 for Commitments entry + 4 for Commitment_stake_count entry + 4 for Commitment_added entry *)
 let sc_rollup_commitment_storage_size_in_bytes = 84
 
@@ -465,6 +456,9 @@ let assert_commitment_not_too_far_ahead ctxt rollup lcc commitment =
   in
   let max_level = Commitment.(commitment.inbox_level) in
   if
+    let sc_rollup_max_lookahead =
+      Constants_storage.sc_rollup_max_lookahead_in_blocks ctxt
+    in
     Compare.Int32.(
       sc_rollup_max_lookahead < Raw_level_repr.diff max_level min_level)
   then fail Sc_rollup_too_far_ahead
@@ -503,6 +497,9 @@ let assert_commitment_frequency ctxt rollup commitment =
      Because [a >= b && a = b] is equivalent to [a = b], we can the latter as
      an optimization.
   *)
+  let sc_rollup_commitment_frequency =
+    Constants_storage.sc_rollup_commitment_frequency_in_blocks ctxt
+  in
   if
     Raw_level_repr.(
       commitment.inbox_level = add pred_level sc_rollup_commitment_frequency)

@@ -674,6 +674,9 @@ def _test_create_mockup_init_show_roundtrip(
                 "sc_rollup_origination_size": 6_314,
                 "sc_rollup_challenge_window_in_blocks": 20_160,
                 "sc_rollup_max_available_messages": 1_000_000,
+                "sc_rollup_stake_amount_in_mutez": 42_000_000,
+                "sc_rollup_commitment_frequency_in_blocks": 40,
+                "sc_rollup_max_lookahead_in_blocks": 10_000,
             }
         ),
     ],

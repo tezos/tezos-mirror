@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 Trilitech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -59,6 +60,39 @@ let test_max_operations_ttl () =
     Alpha_context.Period.one_hour
     result
 
+let test_sc_rollup_challenge_window_lt_max_lookahead () =
+  (* Check that
+     [sc_rollup_challenge_window_in_blocks < sc_rollup_max_lookahead_in_blocks] *)
+  let constants = Default_parameters.constants_mainnet in
+  let max_lookahead = constants.sc_rollup_max_lookahead_in_blocks in
+  let challenge_window =
+    Int32.of_int constants.sc_rollup_challenge_window_in_blocks
+  in
+  Assert.lt_int32 ~loc:__LOC__ challenge_window max_lookahead
+
+let test_sc_rollup_max_commitment_storage_cost_lt_deposit () =
+  (* Check that
+     [commitment_storage_cost * max_lookahead / commitment_frequency < stake_amount] *)
+  let constants = Default_parameters.constants_mainnet in
+  let open Protocol in
+  let cost_per_byte_mutez =
+    Alpha_context.Tez.to_mutez constants.cost_per_byte
+  in
+  let commitment_storage_cost = Int64.mul cost_per_byte_mutez 84L in
+  let max_lookahead =
+    Int64.of_int32 constants.sc_rollup_max_lookahead_in_blocks
+  in
+  let commitment_frequency =
+    Int64.of_int constants.sc_rollup_commitment_frequency_in_blocks
+  in
+  let stake_amount = Int64.of_int constants.sc_rollup_stake_amount_in_mutez in
+  Assert.leq_int64
+    ~loc:__LOC__
+    (Int64.mul
+       commitment_storage_cost
+       (Int64.div max_lookahead commitment_frequency))
+    stake_amount
+
 (** Test that the amount of the liquidity baking subsidy is epsilon smaller than
    1/16th of the maximum reward. *)
 let liquidity_baking_subsidy_param () =
@@ -81,6 +115,14 @@ let tests =
   [
     Tztest.tztest "constants consistency" `Quick test_constants_consistency;
     Tztest.tztest "max_operations_ttl" `Quick test_max_operations_ttl;
+    Tztest.tztest
+      "sc rollup challenge window less than max lookahead"
+      `Quick
+      test_sc_rollup_challenge_window_lt_max_lookahead;
+    Tztest.tztest
+      "sc rollup max commitment storage cost less than deposit"
+      `Quick
+      test_sc_rollup_max_commitment_storage_cost_lt_deposit;
     Tztest.tztest
       "test liquidity_baking_subsidy parameter is 1/16th of total baking \
        rewards"

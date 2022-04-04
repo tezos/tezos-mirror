@@ -44,7 +44,10 @@ rpc/alpha.proxy.others.out
   "tx_rollup_sunset_level": 3473409, "sc_rollup_enable": false,
   "sc_rollup_origination_size": 6314,
   "sc_rollup_challenge_window_in_blocks": 20160,
-  "sc_rollup_max_available_messages": 1000000 }
+  "sc_rollup_max_available_messages": 1000000,
+  "sc_rollup_stake_amount_in_mutez": 32000000,
+  "sc_rollup_commitment_frequency_in_blocks": 20,
+  "sc_rollup_max_lookahead_in_blocks": 30000 }
 protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
 
 ./tezos-client --mode proxy rpc get /chains/main/blocks/head/helpers/baking_rights
