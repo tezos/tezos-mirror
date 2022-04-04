@@ -271,13 +271,13 @@ let process_messages_and_inboxes (state : State.t) ~(predecessor : L2block.t)
       in
       return (block, context)
 
-let get_tezos_block cctxt state hash =
+let get_tezos_block state hash =
   let open Lwt_syntax in
   let fetch hash =
     let+ block =
       Alpha_block_services.info
-        cctxt
-        ~chain:cctxt#chain
+        state.cctxt
+        ~chain:state.cctxt#chain
         ~block:(`Hash (hash, 0))
         ()
     in
@@ -291,7 +291,7 @@ let get_tezos_block cctxt state hash =
   in
   Result.of_option ~error:[Tx_rollup_cannot_fetch_tezos_block hash] block
 
-let rec process_block cctxt state current_hash rollup_id :
+let rec process_block state current_hash rollup_id :
     (L2block.t * Context.context option, tztrace) result Lwt.t =
   let open Lwt_result_syntax in
   if Block_hash.equal state.State.rollup_info.origination_block current_hash
@@ -311,7 +311,7 @@ let rec process_block cctxt state current_hash rollup_id :
         let* _l2_reorg = State.set_head state l2_block context in
         return (l2_block, Some context)
     | None ->
-        let* block_info = get_tezos_block cctxt state current_hash in
+        let* block_info = get_tezos_block state current_hash in
         let predecessor_hash = block_info.header.shell.predecessor in
         let block_level = block_info.header.shell.level in
         let* () =
@@ -322,7 +322,7 @@ let rec process_block cctxt state current_hash rollup_id :
         (* Handle predecessor Tezos block first *)
         let*! () = Event.(emit processing_block_predecessor) predecessor_hash in
         let* (l2_predecessor_header, predecessor_context) =
-          process_block cctxt state predecessor_hash rollup_id
+          process_block state predecessor_hash rollup_id
         in
         let*! () =
           Event.(emit processing_block) (current_hash, predecessor_hash)
@@ -353,10 +353,10 @@ let maybe_batch_and_inject state =
   | None -> ()
   | Some batcher_state -> Batcher.async_batch_and_inject batcher_state
 
-let process_head cctxt state current_hash rollup_id =
+let process_head state current_hash rollup_id =
   let open Lwt_result_syntax in
   let*! () = Event.(emit new_block) current_hash in
-  let* res = process_block cctxt state current_hash rollup_id in
+  let* res = process_block state current_hash rollup_id in
   let* _l1_reorg = State.set_tezos_head state current_hash in
   maybe_batch_and_inject state ;
   (* TODO/TORU: handle new head and reorgs w.r.t. injected operations by the
@@ -423,7 +423,7 @@ let run configuration cctxt =
           let*! () =
             Lwt_stream.iter_s
               (fun (current_hash, _header) ->
-                let*! r = process_head cctxt state current_hash rollup_id in
+                let*! r = process_head state current_hash rollup_id in
                 match r with
                 | Ok (_, _) -> Lwt.return ()
                 | Error (Tx_rollup_originated_in_fork :: _ as e) ->

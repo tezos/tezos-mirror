@@ -44,6 +44,7 @@ type rollup_info = Stores.rollup_info = {
 
 type t = {
   stores : Stores.t;
+  cctxt : Client_context.full;
   context_index : Context.index;
   mutable head : L2block.t;
   rollup_info : rollup_info;
@@ -434,6 +435,7 @@ let init cctxt ~data_dir ?(readonly = false) ?rollup_genesis
   return
     {
       stores;
+      cctxt = (cctxt :> Client_context.full);
       context_index;
       head;
       rollup_info;
