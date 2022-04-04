@@ -291,13 +291,47 @@ let check_sc_rollup_address_exists sc_rollup_address
   in
   return_unit
 
+type info = {origination_level : int32}
+
+let gather_info (cctxt : Protocol_client_context.full) sc_rollup_address =
+  let open Lwt_result_syntax in
+  let* origination_level =
+    RPC.Sc_rollup.initial_level
+      cctxt
+      (cctxt#chain, cctxt#block)
+      sc_rollup_address
+  in
+  return {origination_level = Raw_level.to_int32 origination_level}
+
+(** [discard_pre_origination_blocks info chain_events] filters [chain_events] in order to
+    discard all heads that occur before the SC rollup origination. *)
+let discard_pre_origination_blocks info chain_events =
+  let at_or_after_origination event =
+    match event with
+    | SameBranch {new_head = Head {level; _} as new_head; intermediate_heads}
+      when level >= info.origination_level ->
+        let intermediate_heads =
+          List.filter
+            (fun (Head {level; _}) -> level >= info.origination_level)
+            intermediate_heads
+        in
+        Some (SameBranch {new_head; intermediate_heads})
+    | Rollback {new_head = Head {level; _}} when level >= info.origination_level
+      ->
+        Some event
+    | _ -> None
+  in
+  Lwt_stream.filter_map at_or_after_origination chain_events
+
 let start configuration (cctxt : Protocol_client_context.full) store =
   let open Lwt_result_syntax in
   let*! () = Layer1_event.starting () in
   let* () =
     check_sc_rollup_address_exists configuration.sc_rollup_address cctxt
   in
-  chain_events cctxt store `Main
+  let* event_stream = chain_events cctxt store `Main in
+  let* info = gather_info cctxt configuration.sc_rollup_address in
+  return (discard_pre_origination_blocks info event_stream)
 
 let current_head_hash store =
   let open Lwt_syntax in

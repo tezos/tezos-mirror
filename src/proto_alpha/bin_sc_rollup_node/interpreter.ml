@@ -31,9 +31,6 @@ module type S = sig
   (** [update store event] interprets the messages associated with a chain [event].
       This requires the inbox to be updated beforehand. *)
   val update : Store.t -> Layer1.chain_event -> unit tzresult Lwt.t
-
-  (** [start store] sets up the initial state for the PVM interpreter to work. *)
-  val start : Store.t -> unit tzresult Lwt.t
 end
 
 module Make (PVM : Pvm.S) : S = struct
@@ -68,13 +65,19 @@ module Make (PVM : Pvm.S) : S = struct
     let open Lwt_result_syntax in
     (* Retrieve the previous PVM state from store. *)
     let*! predecessor_state = Store.PVMState.find store predecessor_hash in
-    let* predecessor_state =
+    let*! predecessor_state =
       match predecessor_state with
       | None ->
-          failwith
-            "Missing PVM state for %s"
-            (Block_hash.to_b58check predecessor_hash)
-      | Some predecessor_state -> return predecessor_state
+          (* The predecessor is before the origination. *)
+          PVM.initial_state
+            store
+            (* TODO: #2722
+               This initial state is a stub. We must figure out the bootsector (part of the
+               origination message for a SC rollup) first - only then can the initial state be
+               constructed.
+            *)
+            ""
+      | Some predecessor_state -> Lwt.return predecessor_state
     in
 
     (* Obtain inbox and its messages for this block. *)
@@ -130,28 +133,6 @@ module Make (PVM : Pvm.S) : S = struct
         let* () = List.iter_es (process_head store) intermediate_heads in
         process_head store new_head
     | Layer1.Rollback _new_head -> return_unit
-
-  (** [start store] initializes the [store] with the needed state. *)
-  let start store =
-    let open Lwt_result_syntax in
-    let*! () =
-      Store.PVMState.init_s store Layer1.genesis_hash (fun () ->
-          PVM.initial_state
-            store
-            (* TODO: #2722
-               This initial state is a stub. We must figure out the bootsector (part of the
-               origination message for a SC rollup) first - only then can the initial state be
-               constructed.
-            *)
-            "")
-    in
-    let*! () =
-      Store.StateInfo.set
-        store
-        Layer1.genesis_hash
-        {num_ticks = Z.zero; num_messages = Z.zero}
-    in
-    return_unit
 end
 
 module Arith = Make (Arith_pvm)

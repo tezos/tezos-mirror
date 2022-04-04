@@ -78,13 +78,18 @@ struct
 
   let get store key = IStore.get store (make_key key) >>= decode_value
 
-  let set store key value =
-    let encoded_value =
-      Data_encoding.Binary.to_bytes_exn P.value_encoding value
-    in
-    let full_path = String.concat "/" (P.path @ [P.string_of_key key]) in
-    let info () = info full_path in
-    IStore.set_exn ~info store (make_key key) encoded_value
+  let find store key =
+    let open Lwt_syntax in
+    let* exists = mem store key in
+    if exists then
+      let+ value = get store key in
+      Some value
+    else return_none
+
+  let find_with_default store key ~on_default =
+    let open Lwt_syntax in
+    let* exists = mem store key in
+    if exists then get store key else return (on_default ())
 
   let add store key value =
     let open Lwt_syntax in
@@ -92,7 +97,11 @@ struct
     let full_path = String.concat "/" (P.path @ [P.string_of_key key]) in
     if already_exists then
       Stdlib.failwith (Printf.sprintf "Key %s already exists" full_path) ;
-    set store key value
+    let encoded_value =
+      Data_encoding.Binary.to_bytes_exn P.value_encoding value
+    in
+    let info () = info full_path in
+    IStore.set_exn ~info store (make_key key) encoded_value
 end
 
 module Make_mutable_value (P : sig

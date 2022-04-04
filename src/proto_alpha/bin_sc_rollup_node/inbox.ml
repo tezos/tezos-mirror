@@ -30,6 +30,8 @@ open Protocol
 open Alpha_context
 module Block_services = Block_services.Make (Protocol) (Protocol)
 
+let lift = Lwt.map Environment.wrap_tzresult
+
 let head_processing_failure e =
   Format.eprintf
     "Error during head processing: @[%a@]"
@@ -44,11 +46,22 @@ module State = struct
 
   let add_history = Store.Histories.add
 
-  let inbox_exists = Store.Inboxes.mem
+  let inbox_of_hash node_ctxt store block_hash =
+    let open Lwt_syntax in
+    let open Node_context in
+    let+ possible_inbox = Store.Inboxes.find store block_hash in
+    match possible_inbox with
+    | None ->
+        (* We won't find inboxes for blocks before the rollup origination level.
+           Fortunately this case will only ever be called once when dealing with
+           the rollup origination block. After that we would always find an
+           inbox. *)
+        Sc_rollup.Inbox.empty node_ctxt.rollup_address node_ctxt.initial_level
+    | Some inbox -> inbox
 
-  let inbox_of_hash = Store.Inboxes.get
-
-  let history_of_hash = Store.Histories.get
+  let history_of_hash store block_hash =
+    Store.Histories.find_with_default store block_hash ~on_default:(fun () ->
+        Store.Inbox.history_at_genesis ~bound:(Int64.of_int 60000))
 
   let get_message_tree = Store.MessageTrees.get
 
@@ -78,7 +91,7 @@ let get_messages cctxt head rollup =
   in
   List.concat_map process_operations operations
 
-let process_head {Node_context.cctxt; rollup_address; _} store
+let process_head Node_context.({cctxt; rollup_address; _} as node_ctxt) store
     Layer1.(Head {level; hash = head_hash} as head) =
   let open Lwt_result_syntax in
   let*! res = get_messages cctxt (head_hash, level) rollup_address in
@@ -97,23 +110,22 @@ let process_head {Node_context.cctxt; rollup_address; _} store
 
       *)
       let*! predecessor = Layer1.predecessor store head in
-      let*! inbox = State.inbox_of_hash store predecessor in
-      let*! history = State.history_of_hash store predecessor in
-      let*! messages_tree = State.get_message_tree store predecessor in
-      let*? level = Raw_level.of_int32 level in
-      let* (messages_tree, history, inbox) =
-        Store.Inbox.add_messages history inbox level messages messages_tree
-      in
-      let*! () = State.set_message_tree store head_hash messages_tree in
-      let*! () = State.add_inbox store head_hash inbox in
-      let*! () = State.add_history store head_hash history in
-      return_unit
+      let*! inbox = State.inbox_of_hash node_ctxt store predecessor in
+      lift
+      @@ let*! history = State.history_of_hash store predecessor in
+         let*! messages_tree = State.get_message_tree store predecessor in
+         let*? level = Raw_level.of_int32 level in
+         let* (messages_tree, history, inbox) =
+           Store.Inbox.add_messages history inbox level messages messages_tree
+         in
+         let*! () = State.set_message_tree store head_hash messages_tree in
+         let*! () = State.add_inbox store head_hash inbox in
+         let*! () = State.add_history store head_hash history in
+         return_unit
 
 let update node_ctxt store chain_event =
   let open Lwt_result_syntax in
   let open Layer1 in
-  Lwt.map Environment.wrap_tzresult
-  @@
   match chain_event with
   | SameBranch {new_head; intermediate_heads} ->
       let* () =
@@ -131,19 +143,4 @@ let update node_ctxt store chain_event =
 
 let inbox_of_hash = State.inbox_of_hash
 
-let start store Node_context.{rollup_address; _} =
-  let open Lwt_syntax in
-  let* () = Inbox_event.starting () in
-  let* exists = State.inbox_exists store Layer1.genesis_hash in
-  if exists then return_unit
-  else
-    let* () =
-      State.add_inbox
-        store
-        Layer1.genesis_hash
-        (Sc_rollup.Inbox.empty rollup_address Raw_level.root)
-    in
-    State.add_history
-      store
-      Layer1.genesis_hash
-      (Store.Inbox.history_at_genesis ~bound:(Int64.of_int 60000))
+let start () = Inbox_event.starting ()
