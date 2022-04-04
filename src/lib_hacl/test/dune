@@ -26,28 +26,23 @@
 (rule
  (alias runtest_js)
  (package tezos-hacl)
- (locks npm)
  (action
-  (run
-   %{dep:../../tooling/node_wrapper.exe} --hacl 1.1.0
-   %{dep:./test_hacl.bc.js})))
+  (run %{dep:../../tooling/node_wrapper.exe} --hacl %{dep:./test_hacl.bc.js})))
 
 (rule
  (alias runtest_js)
  (package tezos-hacl)
- (locks npm)
  (action
   (run
-   %{dep:../../tooling/node_wrapper.exe} --hacl 1.1.0
+   %{dep:../../tooling/node_wrapper.exe} --hacl
    %{dep:./test_prop_hacl_hash.bc.js})))
 
 (rule
  (alias runtest_js)
  (package tezos-hacl)
- (locks npm)
  (action
   (run
-   %{dep:../../tooling/node_wrapper.exe} --hacl 1.1.0
+   %{dep:../../tooling/node_wrapper.exe} --hacl
    %{dep:./test_prop_signature_pk.bc.js})))
 
 (test
@@ -69,6 +64,5 @@
 (rule
  (alias runtest_js)
  (package tezos-hacl)
- (locks npm)
  (action
-  (run %{dep:../../tooling/node_wrapper.exe} --hacl 1.1.0 %{dep:./test.bc.js})))
+  (run %{dep:../../tooling/node_wrapper.exe} --hacl %{dep:./test.bc.js})))
