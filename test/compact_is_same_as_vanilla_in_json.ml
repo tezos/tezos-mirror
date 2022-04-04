@@ -25,7 +25,7 @@
 
 open Data_encoding
 
-let rng n = Random.State.make [|231441321234231; n|]
+let rng n = Random.State.make [|231231; n|]
 
 let rec self_zip acc = function
   | [] | [_] -> acc
