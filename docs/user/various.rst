@@ -4,46 +4,9 @@ Various
 Environment for writing Michelson contracts
 -------------------------------------------
 
-Here is how to setup a practical environment for
-writing, editing and debugging Michelson programs.
-
-Install `Emacs <https://www.gnu.org/software/emacs/>`_ and configure
-it to use the `MELPA <https://melpa.org/#/getting-started>`_ package
-repository.
-
-Inside Emacs, install the ``michelson-mode`` package and its
-dependency `deferred <https://github.com/kiwanami/emacs-deferred>`_ by
-running ``M-x package-install-file``; the package file is located in
-the ``emacs`` folder of the Tezos code base.
-
-Set up the `Michelson mode
-<https://gitlab.com/tezos/tezos/tree/master/emacs>`_ to use the Tezos
-client in :doc:`mockup mode <mockup>` (to typecheck Michelson
-scripts without interacting with a Tezos node) by adding in your
-``.emacs`` file:
-
-::
-
-   (setq michelson-client-command "tezos-client --base-dir /tmp/mockup --mode mockup --protocol ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK")
-   (setq michelson-alphanet nil)
-
-Note that the Michelson mode will be chosen automatically by Emacs for
-files with a ``.tz`` or ``.tez`` extension.
-
-We can now open our favourite contract
-:src:`tests_python/contracts_alpha/attic/id.tz` in Emacs
-and, when moving the cursor on
-a Michelson instruction, in the bottom of the windows Emacs should
-display the state of the stack before (left) and after (right) the
-application of the instruction.
-The Emacs mode automatically type-checks your program and reports
-errors; once you are happy with the result you can ask the client to
-run it locally:
-
-::
-
-   tezos-client run script ./tests_python/contracts_alpha/attic/id.tz \
-                on storage '"hello"' and input '"world"'
+`Emacs <https://www.gnu.org/software/emacs/>`_ can be used as a practical environment for writing,
+editing and debugging Michelson programs. `Install it <https://www.gnu.org/software/emacs/>`_ and follow the
+configuration instructions in the Michelson Emacs README `here <https://gitlab.com/tezos/tezos/-/tree/master/emacs>`__.
 
 .. _tezos-admin-client:
 
