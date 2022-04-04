@@ -139,7 +139,8 @@ initialized.
 Adding a JavaScript dependency
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-- Edit ``package.json`` at the root of the repo to add the dependency.
+- Edit ``manifest/main.ml`` to add a ``Npm.t`` dependency to an ocaml library.
+- Update the manifest ``make -C manifest``.
 - Optionally edit ``.npmrc`` at the root of the repo to add a new npm registry.
 - Call ``npm install`` to update ``package-lock.json``
 
@@ -150,11 +151,10 @@ One might need to initialize a JavaScript library before running any
 OCaml code (e.g. to load wasm files). When running JavaScript tests,
 we achieve this by using a wrapper to nodejs called ``node_wrapper``.
 
-- Add the JavaScript dependency as described above
-- Update ``src/tooling/node_wrapper.ml`` to accept a new flag for that
-  library and write the initialization code for it.
-- Update ``manifest/main.ml`` to assign a node_wrapper flag to the
-  corresponding OCaml library.
+- Add the JavaScript dependency as described above and specify a
+  node_wrapper flag.
+- Update ``src/tooling/node_wrapper.ml`` to accept this new flag
+  write the initialization code for the new JavaScript library.
 - Update the manifest ``make -C manifest``.
 
 The manifest will make sure the new flags is given to the ``node_wrapper``
