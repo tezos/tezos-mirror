@@ -3833,6 +3833,7 @@ let _tezos_shell_tests =
       "test_prevalidator_classification";
       "test_prevalidator_classification_operations";
       "test_prevalidator_pending_operations";
+      "test_peer_validator";
     ]
     ~path:"src/lib_shell/test"
     ~opam:"src/lib_shell/tezos-shell"

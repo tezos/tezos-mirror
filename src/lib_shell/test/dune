@@ -10,7 +10,8 @@
   test_prevalidation_t
   test_prevalidator_classification
   test_prevalidator_classification_operations
-  test_prevalidator_pending_operations)
+  test_prevalidator_pending_operations
+  test_peer_validator)
  (libraries
   tezos-base
   tezos-base-test-helpers
@@ -84,6 +85,11 @@
  (alias runtest)
  (package tezos-shell)
  (action (run %{dep:./test_prevalidator_pending_operations.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-shell)
+ (action (run %{dep:./test_peer_validator.exe})))
 
 (rule
  (alias runtest_locator_bench)
