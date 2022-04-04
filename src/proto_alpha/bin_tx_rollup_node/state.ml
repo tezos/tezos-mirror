@@ -54,17 +54,9 @@ type t = {
   l1_constants : Protocol.Alpha_context.Constants.parametric;
 }
 
-type 'block reorg = {
-  ancestor : 'block option;
-  old_chain : 'block list;
-  new_chain : 'block list;
-}
-
 (* Stands for the manager operation pass, in which the rollup transactions are
    stored. *)
 let rollup_operation_index = 3
-
-let no_reorg = {ancestor = None; old_chain = []; new_chain = []}
 
 let get_head state = state.head
 

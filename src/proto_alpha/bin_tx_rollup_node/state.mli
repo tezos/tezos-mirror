@@ -54,18 +54,6 @@ type t = private {
   l1_constants : Protocol.Alpha_context.Constants.parametric;
 }
 
-(** Type of chain reorganizations. *)
-type 'block reorg = {
-  ancestor : 'block option;
-      (** The common ancestor of the two chains. Can be None if the chains have no
-          common ancestor, in which case all the blocks are changed *)
-  old_chain : 'block list;
-      (** The blocks that were in the old chain and which are not in the new one. *)
-  new_chain : 'block list;
-      (** The blocks that are now in the new chain. The length of [old_chain] and
-      [new_chain] may be different. *)
-}
-
 (** [init cctxt ~data_dir ~rollup_genesis ~operator rollup] creates a new state
    for the rollup node with a new store and context.  If the [rollup_genesis]
    block hash is provided, checks that the rollup [rollup_id] is created inside
