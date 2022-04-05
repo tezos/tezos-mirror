@@ -306,16 +306,14 @@ and perform_save_solution (solution : float Free_variable.Map.t)
 and perform_plot measure model_name problem solution
     (infer_opts : Cmdline.infer_parameters_options) =
   if infer_opts.plot then
-    if
-      Display.perform_plot
-        ~measure
-        ~model_name
-        ~problem
-        ~solution
-        ~plot_target:Display.Show
-        ~options:Display.default_options
-    then ()
-    else Format.eprintf "Could not plot given data."
+    ignore
+    @@ Display.perform_plot
+         ~measure
+         ~model_name
+         ~problem
+         ~solution
+         ~plot_target:Display.Show
+         ~options:Display.default_options
   else ()
 
 and get_all_workload_data_files directory =

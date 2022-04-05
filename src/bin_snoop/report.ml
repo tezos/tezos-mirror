@@ -319,7 +319,7 @@ let model_table (type c t) ((module Bench) : (c, t) Benchmark.poly) =
   ([Vbar; L; Vbar], splice Hline rows)
 
 let report ~(measure : Measure.packed_measurement)
-    ~(solution : Inference.solution) ~(figs_file : string option)
+    ~(solution : Inference.solution) ~(figs_files : string list)
     ~(overrides_map : float Free_variable.Map.t) ~short : Latex_syntax.section =
   let (Measure.Measurement ((module Bench), measurement)) = measure in
   let {Measure.bench_opts; workload_data; date = _} = measurement in
@@ -343,14 +343,12 @@ let report ~(measure : Measure.packed_measurement)
     Table (benchmark_options_table bench_opts)
   in
   let figure =
-    match figs_file with
-    | None -> []
-    | Some figs_file ->
-        [
-          Figure
-            ( [normal_text Bench.name],
-              {filename = figs_file; size = Some (Width_cm 17)} );
-        ]
+    List.map
+      (fun figs_file ->
+        Figure
+          ( [normal_text Bench.name],
+            {filename = figs_file; size = Some (Width_cm 17)} ))
+      figs_files
   in
   let model_table : section_content = Table (model_table (module Bench)) in
   let short_table =
@@ -391,65 +389,32 @@ let add_section ~(measure : Measure.packed_measurement) ~(model_name : string)
     ~(problem : Inference.problem) ~(solution : Inference.solution)
     ~overrides_map ~short ?report_folder document =
   let (Measure.Measurement ((module Bench), _)) = measure in
-  let name = Bench.name ^ "_" ^ model_name in
-  let figs_file =
-    match report_folder with
-    | None ->
-        let filename = Filename.temp_file "figure" ".pdf" in
-        let plot_target = Display.Save {file = Some filename} in
-        if
-          Display.perform_plot
-            ~measure
-            ~model_name
-            ~problem
-            ~solution
-            ~plot_target
-            ~options:Display.default_options
-        then Some filename
-        else None
-    | Some folder -> (
-        (match Unix.stat folder with
-        | exception Unix.Unix_error _ ->
-            Format.eprintf "Folder %s does not exist, creating it.\n" folder ;
-            Unix.mkdir folder 0o700
-        | {st_kind = S_DIR; _} -> ()
-        | _ ->
-            Format.eprintf "%s is not a folder, exiting.\n" folder ;
-            exit 1) ;
-        let filename = Filename.Infix.(folder // (name ^ ".pdf")) in
-        Format.eprintf "Saving plot in %s\n" filename ;
-        match Unix.stat filename with
-        | exception Unix.Unix_error _ ->
-            let fd = Unix.openfile filename [O_CREAT; O_EXCL; O_WRONLY] 0o600 in
-            Unix.close fd ;
-            let plot_target = Display.Save {file = Some filename} in
-            if
-              Display.perform_plot
-                ~measure
-                ~model_name
-                ~problem
-                ~solution
-                ~plot_target
-                ~options:Display.default_options
-            then Some (name ^ ".pdf")
-            else None
-        | {st_size; _} when st_size > 0 ->
-            Format.eprintf "Plot exists, skipping.\n" ;
-            Some (name ^ ".pdf")
-        | _ ->
-            let plot_target = Display.Save {file = Some filename} in
-            if
-              Display.perform_plot
-                ~measure
-                ~model_name
-                ~problem
-                ~solution
-                ~plot_target
-                ~options:Display.default_options
-            then Some (name ^ ".pdf")
-            else None)
+  let figs_files =
+    let plot_target = Display.Save in
+    let save_directory =
+      match report_folder with
+      | None -> Filename.get_temp_dir_name ()
+      | Some directory -> directory
+    in
+    (match Unix.stat save_directory with
+    | exception Unix.Unix_error _ ->
+        Format.eprintf "Folder %s does not exist, creating it.@." save_directory ;
+        Unix.mkdir save_directory 0o700
+    | {st_kind = S_DIR; _} -> ()
+    | _ ->
+        Format.eprintf "%s is not a folder, exiting.@." save_directory ;
+        exit 1) ;
+    Format.eprintf "Saving plot in folder %s@." save_directory ;
+    let options = {Display.default_options with save_directory} in
+    Display.perform_plot
+      ~measure
+      ~model_name
+      ~problem
+      ~solution
+      ~plot_target
+      ~options
   in
-  let section = report ~measure ~solution ~figs_file ~overrides_map ~short in
+  let section = report ~measure ~solution ~figs_files ~overrides_map ~short in
   let open Latex_syntax in
   {document with sections = document.sections @ [section]}
 

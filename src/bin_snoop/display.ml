@@ -47,6 +47,7 @@ module Matrix = Pyplot.Matrix
 open Plot
 
 type options = {
+  save_directory : string;
   point_size : float;
   qt_target_pixel_size : (int * int) option;
   pdf_target_cm_size : (float * float) option;
@@ -55,17 +56,23 @@ type options = {
 let options_encoding =
   let open Data_encoding in
   conv
-    (fun {point_size; qt_target_pixel_size; pdf_target_cm_size} ->
-      (point_size, qt_target_pixel_size, pdf_target_cm_size))
-    (fun (point_size, qt_target_pixel_size, pdf_target_cm_size) ->
-      {point_size; qt_target_pixel_size; pdf_target_cm_size})
-    (obj3
+    (fun {save_directory; point_size; qt_target_pixel_size; pdf_target_cm_size} ->
+      (save_directory, point_size, qt_target_pixel_size, pdf_target_cm_size))
+    (fun (save_directory, point_size, qt_target_pixel_size, pdf_target_cm_size) ->
+      {save_directory; point_size; qt_target_pixel_size; pdf_target_cm_size})
+    (obj4
+       (req "save_directory" string)
        (req "point_size" float)
        (opt "qt_target_pixel_size" (tup2 int31 int31))
        (opt "pdf_target_cm_size" (tup2 float float)))
 
 let default_options =
-  {point_size = 0.5; qt_target_pixel_size = None; pdf_target_cm_size = None}
+  {
+    save_directory = Filename.get_temp_dir_name ();
+    point_size = 0.5;
+    qt_target_pixel_size = None;
+    pdf_target_cm_size = None;
+  }
 
 let opts = ref default_options
 
@@ -156,9 +163,16 @@ let plot_scatter title input_columns outputs =
         List.map
           (function
             | [((dim1, _) as col1); ((dim2, _) as col2)] ->
+                let dim1 = underscore_to_dash dim1 in
+                let dim2 = underscore_to_dash dim2 in
                 let title = Format.asprintf "%s (%s, %s)" title dim1 dim2 in
                 scatterplot_3d title col1 col2 outputs
-            | _ -> assert false)
+            | cols ->
+                let len = List.length cols in
+                Format.kasprintf
+                  Stdlib.failwith
+                  "plot_scatter: bug found (got %d columns, expected 2)"
+                  len)
           subsets
       in
       return plots
@@ -245,12 +259,6 @@ let column_to_array (m : Matrix.t) =
   assert (cols = 1) ;
   Array.init rows (fun i -> Matrix.get m i 0)
 
-let row_to_array (m : Matrix.t) =
-  let rows = Matrix.dim1 m in
-  let cols = Matrix.dim2 m in
-  assert (rows = 1) ;
-  Array.init cols (fun i -> Matrix.get m 0 i)
-
 let validator (problem : Inference.problem) (solution : Inference.solution) =
   let open Result_syntax in
   match problem with
@@ -270,14 +278,13 @@ let validator (problem : Inference.problem) (solution : Inference.solution) =
       let* plots =
         plot_scatter "Validation (chosen basis)" columns [timings; predicted]
       in
-      return (List.length plots, plots)
+      return plots
 
 let empirical (workload_data : (Sparse_vec.String.t * float) list) =
   let open Result_syntax in
   let* columns, timings = empirical_data workload_data in
   let* plots = plot_scatter "Empirical" columns [timings] in
-  let nrows = List.length plots in
-  return (nrows, plots)
+  return plots
 
 let eval_mset (mset : Free_variable.Sparse_vec.t)
     (eval : Free_variable.t -> float) =
@@ -299,7 +306,7 @@ let validator_empirical workload_data (problem : Inference.problem)
   in
   let predicted =
     match problem with
-    | Inference.Degenerate {predicted; _} -> row_to_array predicted
+    | Inference.Degenerate {predicted; _} -> column_to_array predicted
     | Inference.Non_degenerate {lines; _} ->
         let predicted_list =
           List.map
@@ -312,60 +319,51 @@ let validator_empirical workload_data (problem : Inference.problem)
   in
   let* columns, timings = empirical_data workload_data in
   let* plots = plot_scatter "Validation (raw)" columns [timings; predicted] in
-  let nrows = List.length plots in
-  return (nrows, plots)
+  return plots
 
-type plot_target =
-  | Save of {file : string option}
-  | Show
-  | ShowAndSave of {file : string option}
+type plot_target = Save | Show | ShowAndSave
 
 let perform_plot ~measure ~model_name ~problem ~solution ~plot_target ~options =
-  let open Result_syntax in
   opts := options ;
   let (Measure.Measurement ((module Bench), measurement)) = measure in
-  let filename kind =
-    Format.asprintf "%s_%s_%s.pdf" Bench.name model_name kind
+  let filename ?index kind =
+    let dir = options.save_directory in
+    let kind =
+      match index with None -> kind | Some i -> Format.asprintf "%s-%d" kind i
+    in
+    Filename.Infix.(
+      dir // Format.asprintf "%s_%s_%s.pdf" Bench.name model_name kind)
   in
   let workload_data =
     List.map
       (fun {Measure.workload; qty} -> (Bench.workload_to_vector workload, qty))
       measurement.workload_data
   in
-  let* rows1, empirical_plots = empirical workload_data in
-  let* rows2, validator_plots = validator problem solution in
-  let* rows3, validator_emp_plots =
-    validator_empirical workload_data problem solution
+  let try_plot kind plot_result =
+    match plot_result with
+    | Ok plots -> (
+        match plot_target with
+        | Save ->
+            List.mapi
+              (fun i plot ->
+                let pdf_file = filename ~index:i kind in
+                let target = pdf ?cm_size:(pdf_cm_size ()) ~pdf_file () in
+                Plot.run ~target exec_detach plot ;
+                pdf_file)
+              plots
+        | Show | ShowAndSave ->
+            if plot_target = ShowAndSave then
+              Format.eprintf
+                "display: ShowAndSave target deprecated, using qt target@." ;
+            let target = qt ?pixel_size:(qt_pixel_size ()) () in
+            let plots = Array.of_list (List.map (fun x -> [|Some x|]) plots) in
+            Plot.run_matrix ~target exec_detach plots ;
+            [])
+    | Error msg ->
+        Format.eprintf "Failed performing plot: %s@." msg ;
+        []
   in
-  let rows = max rows1 (max rows2 rows3) in
-  let plot_matrix = Array.make_matrix rows 3 None in
-  List.iteri (fun i plot -> plot_matrix.(i).(0) <- Some plot) empirical_plots ;
-  List.iteri (fun i plot -> plot_matrix.(i).(1) <- Some plot) validator_plots ;
-  List.iteri
-    (fun i plot -> plot_matrix.(i).(2) <- Some plot)
-    validator_emp_plots ;
-  let target =
-    match plot_target with
-    | Save {file} ->
-        let pdf_file =
-          match file with
-          | None -> filename "collected"
-          | Some filename -> filename
-        in
-        pdf ?cm_size:(pdf_cm_size ()) ~pdf_file ()
-    | Show -> qt ?pixel_size:(qt_pixel_size ()) ()
-    | ShowAndSave {file = _} ->
-        Format.eprintf "display: ShowAndSave target deprecated@." ;
-        qt ()
-  in
-  Plot.run_matrix ~target exec plot_matrix ;
-  return ()
-
-let perform_plot ~measure ~model_name ~problem ~solution ~plot_target ~options =
-  match
-    perform_plot ~measure ~model_name ~problem ~solution ~plot_target ~options
-  with
-  | Error msg ->
-      Format.eprintf "Display: error (%s)@." msg ;
-      false
-  | _ -> true
+  (try_plot "emp" @@ empirical workload_data)
+  @ (try_plot "validation" @@ validator problem solution)
+  @ try_plot "emp-validation"
+  @@ validator_empirical workload_data problem solution
