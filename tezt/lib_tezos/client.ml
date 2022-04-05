@@ -637,6 +637,59 @@ let gen_and_show_keys ?alias client =
   let* alias = gen_keys ?alias client in
   show_address ~alias client
 
+let spawn_bls_gen_keys ?hooks ?(force = false) ~alias client =
+  spawn_command
+    ?hooks
+    client
+    (["bls"; "gen"; "keys"; alias] @ if force then ["--force"] else [])
+
+let bls_gen_keys ?hooks ?force ~alias client =
+  spawn_bls_gen_keys ?hooks ?force ~alias client |> Process.check
+
+let spawn_bls_list_keys ?hooks client =
+  spawn_command ?hooks client ["bls"; "list"; "keys"]
+
+let parse_list_keys output =
+  output |> String.trim |> String.split_on_char '\n'
+  |> List.map (fun s ->
+         match s =~** rex "^(\\w+): (\\w{36})" with
+         | Some s -> s
+         | None ->
+             Test.fail
+               ~__LOC__
+               "Cannot extract `list keys` format from client_output: %s"
+               output)
+
+let bls_list_keys ?hooks client =
+  let* out =
+    spawn_bls_list_keys ?hooks client |> Process.check_and_read_stdout
+  in
+  return (parse_list_keys out)
+
+let spawn_bls_show_address ?hooks ~alias client =
+  spawn_command ?hooks client ["bls"; "show"; "address"; alias]
+
+let bls_show_address ?hooks ~alias client =
+  let* out =
+    spawn_bls_show_address ?hooks ~alias client |> Process.check_and_read_stdout
+  in
+  return (Account.parse_client_output_aggregate ~alias ~client_output:out)
+
+let spawn_bls_import_secret_key ?hooks ?(force = false)
+    (key : Account.aggregate_key) client =
+  let sk_uri =
+    let (Unencrypted sk) = key.aggregate_secret_key in
+    "aggregate_unencrypted:" ^ sk
+  in
+  spawn_command
+    ?hooks
+    client
+    (["bls"; "import"; "secret"; "key"; key.aggregate_alias; sk_uri]
+    @ if force then ["--force"] else [])
+
+let bls_import_secret_key ?hooks ?force key sc_client =
+  spawn_bls_import_secret_key ?hooks ?force key sc_client |> Process.check
+
 let spawn_transfer ?hooks ?log_output ?endpoint ?(wait = "none") ?burn_cap ?fee
     ?gas_limit ?storage_limit ?counter ?arg ?(force = false) ~amount ~giver
     ~receiver client =
