@@ -110,6 +110,14 @@ val tez_param :
   ('a, full) Clic.params ->
   (Tez.t -> 'a, full) Clic.params
 
+val non_negative_z_parameter : (Z.t, full) Clic.parameter
+
+val non_negative_z_param :
+  name:string ->
+  desc:string ->
+  ('a, full) Clic.params ->
+  (Z.t -> 'a, full) Clic.params
+
 val global_constant_param :
   name:string ->
   desc:string ->

@@ -273,6 +273,17 @@ let tez_param ~name ~desc next =
     (tez_parameter name)
     next
 
+let non_negative_z_parameter =
+  parameter (fun _ s ->
+      try
+        let v = Z.of_string s in
+        assert (Compare.Z.(v >= Z.zero)) ;
+        return v
+      with _ -> failwith "Invalid number, must be a non negative number.")
+
+let non_negative_z_param ~name ~desc next =
+  Clic.param ~name ~desc non_negative_z_parameter next
+
 let fee_arg =
   arg
     ~long:"fee"
@@ -388,13 +399,7 @@ let counter_arg =
     ~short:'C'
     ~placeholder:"counter"
     ~doc:"Set the counter to be used by the transaction"
-    (parameter (fun _ s ->
-         try
-           let v = Z.of_string s in
-           assert (Compare.Z.(v >= Z.zero)) ;
-           return v
-         with _ ->
-           failwith "invalid counter (must be a positive number of bytes)"))
+    non_negative_z_parameter
 
 let max_priority_arg =
   arg
