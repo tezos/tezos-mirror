@@ -34,6 +34,7 @@
 
 open Protocol
 open Alpha_context
+open Script_ir_translator
 open Script_typed_ir
 
 (*
@@ -124,7 +125,7 @@ include
 
 let random_state = Random.State.make [|37; 73; 17; 71; 42|]
 
-let sample_ty () = Random_type.m_type ~size:10 random_state
+let sample_ty size = Random_type.m_type ~size random_state
 
 let sample_value ty = Random_value.value ty random_state
 
@@ -619,6 +620,29 @@ let check_value_size () =
     *)
     )
 
+let check_ty_size () =
+  let check () =
+    match (sample_ty (Random.int 10 + 1) : ex_ty) with
+    | Ex_ty ty ->
+        let expected_size = footprint ty in
+        let (_, size) = Script_typed_ir_size.Internal_for_tests.ty_size ty in
+        let size = Saturation_repr.to_int size in
+        let what = "some type" in
+        fail_when
+          (size <> expected_size)
+          (err
+             (Printf.sprintf
+                "%s was expected to have size %d while the size model answered \
+                 %d."
+                what
+                expected_size
+                size))
+  in
+  List.iter_es (fun _ -> check ()) (1 -- nsample)
+
 let tests =
   let open Tztest in
-  [tztest "check value size" `Quick check_value_size]
+  [
+    tztest "check value size" `Quick check_value_size;
+    tztest "check ty size" `Quick check_ty_size;
+  ]
