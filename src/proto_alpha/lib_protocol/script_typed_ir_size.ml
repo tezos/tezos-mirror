@@ -198,7 +198,7 @@ let sapling_state_size {Sapling.id; diff; memo_size = _} =
 
 let chain_id_size = !!16 (* by Obj.reachable_words. *)
 
-(* [contents] is handle by the recursion scheme in [value_size] *)
+(* [contents] is handled by the recursion scheme in [value_size]. *)
 let ticket_size {ticketer; contents = _; amount} =
   h3w +! Contract.in_memory_size ticketer +! script_nat_size amount
 
