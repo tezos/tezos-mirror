@@ -609,7 +609,7 @@ let check_value_size () =
     *)
     @ exs nsample dont_show (is_ok @@ ticket_t dummy_loc bool_t) ": ticket bool"
       (*
-          Missing by lack of fully functional sampler:
+          Missing by lack of fully functional samplers:
           - Sapling_transaction_t ;
           - Sapling_transaction_deprecated_t ;
           - Sapling_state ;
