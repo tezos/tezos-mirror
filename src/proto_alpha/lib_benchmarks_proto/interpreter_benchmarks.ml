@@ -231,7 +231,6 @@ let make_benchmark :
     ?intercept:bool ->
     ?salt:string ->
     ?more_tags:string list ->
-    ?check:(unit -> unit) ->
     name:Interpreter_workload.instruction_name ->
     kinstr_and_stack_sampler:
       (Default_config.config -> Random.State.t -> unit -> ex_stack_and_kinstr) ->
@@ -241,7 +240,6 @@ let make_benchmark :
      ?(intercept = false)
      ?salt
      ?(more_tags = [])
-     ?(check = fun () -> ())
      ~name
      ~kinstr_and_stack_sampler
      () ->
@@ -273,7 +271,6 @@ let make_benchmark :
         stack_instr
 
     let create_benchmarks ~rng_state ~bench_num (config : config) =
-      check () ;
       match Lwt_main.run (Execution_context.make ~rng_state) with
       | Error _errs -> assert false
       | Ok (ctxt, step_constants) ->
@@ -292,12 +289,11 @@ let make_simple_benchmark :
     ?intercept:bool ->
     ?more_tags:string list ->
     ?salt:string ->
-    ?check:(unit -> unit) ->
     name:Interpreter_workload.instruction_name ->
     kinstr:(bef_top, bef, res_top, res) Script_typed_ir.kinstr ->
     unit ->
     Benchmark.t =
- fun ?amplification ?intercept ?more_tags ?salt ?check ~name ~kinstr () ->
+ fun ?amplification ?intercept ?more_tags ?salt ~name ~kinstr () ->
   let kinfo = Script_typed_ir.kinfo_of_kinstr kinstr in
   let stack_ty = kinfo.kstack_ty in
   let kinstr_and_stack_sampler config rng_state =
@@ -313,12 +309,11 @@ let make_simple_benchmark :
     ?intercept
     ?more_tags
     ?salt
-    ?check
     ~name
     ~kinstr_and_stack_sampler
     ()
 
-let benchmark ?amplification ?intercept ?more_tags ?salt ?check ~name
+let benchmark ?amplification ?intercept ?more_tags ?salt ~name
     ~kinstr_and_stack_sampler () =
   let bench =
     make_benchmark
@@ -326,7 +321,6 @@ let benchmark ?amplification ?intercept ?more_tags ?salt ?check ~name
       ?intercept
       ?more_tags
       ?salt
-      ?check
       ~name
       ~kinstr_and_stack_sampler
       ()
@@ -334,7 +328,7 @@ let benchmark ?amplification ?intercept ?more_tags ?salt ?check ~name
   Registration_helpers.register bench
 
 let benchmark_with_stack_sampler ?amplification ?intercept ?more_tags ?salt
-    ?check ~name ~kinstr ~stack_sampler () =
+    ~name ~kinstr ~stack_sampler () =
   let kinstr_and_stack_sampler config rng_state =
     let stack_sampler = stack_sampler config rng_state in
     fun () -> Ex_stack_and_kinstr {stack = stack_sampler (); kinstr}
@@ -345,34 +339,31 @@ let benchmark_with_stack_sampler ?amplification ?intercept ?more_tags ?salt
       ?intercept
       ?more_tags
       ?salt
-      ?check
       ~name
       ~kinstr_and_stack_sampler
       ()
   in
   Registration_helpers.register bench
 
-let benchmark_with_fixed_stack ?amplification ?intercept ?more_tags ?salt ?check
-    ~name ~stack ~kinstr () =
+let benchmark_with_fixed_stack ?amplification ?intercept ?more_tags ?salt ~name
+    ~stack ~kinstr () =
   benchmark_with_stack_sampler
     ?amplification
     ?intercept
     ?more_tags
     ?salt
-    ?check
     ~name
     ~kinstr
     ~stack_sampler:(fun _cfg _rng_state () -> stack)
     ()
 
 let simple_benchmark_with_stack_sampler ?amplification ?intercept_stack ?salt
-    ?more_tags ?check ~name ~kinstr ~stack_sampler () =
+    ?more_tags ~name ~kinstr ~stack_sampler () =
   benchmark_with_stack_sampler
     ?amplification
     ~intercept:false
     ?salt
     ?more_tags
-    ?check
     ~name
     ~kinstr
     ~stack_sampler
@@ -384,22 +375,20 @@ let simple_benchmark_with_stack_sampler ?amplification ?intercept_stack ?salt
         ~intercept:true
         ?more_tags
         ?salt
-        ?check
         ~name
         ~stack
         ~kinstr
         ())
     intercept_stack
 
-let simple_benchmark ?amplification ?intercept_stack ?more_tags ?salt ?check
-    ~name ~kinstr () =
+let simple_benchmark ?amplification ?intercept_stack ?more_tags ?salt ~name
+    ~kinstr () =
   let bench =
     make_simple_benchmark
       ?amplification
       ~intercept:false
       ?more_tags
       ?salt
-      ?check
       ~name
       ~kinstr
       ()
@@ -412,7 +401,6 @@ let simple_benchmark ?amplification ?intercept_stack ?more_tags ?salt ?check
         ~intercept:true
         ?more_tags
         ?salt
-        ?check
         ~name
         ~stack
         ~kinstr
@@ -494,7 +482,6 @@ let make_continuation_benchmark :
     ?intercept:bool ->
     ?salt:string ->
     ?more_tags:string list ->
-    ?check:(unit -> unit) ->
     name:Interpreter_workload.continuation_name ->
     cont_and_stack_sampler:
       (Default_config.config ->
@@ -507,7 +494,6 @@ let make_continuation_benchmark :
      ?(intercept = false)
      ?salt
      ?(more_tags = [])
-     ?(check = fun () -> ())
      ~name
      ~cont_and_stack_sampler
      () ->
@@ -533,7 +519,6 @@ let make_continuation_benchmark :
       benchmark_from_continuation ?amplification ctxt step_constants stack_instr
 
     let create_benchmarks ~rng_state ~bench_num (config : config) =
-      check () ;
       match Lwt_main.run (Execution_context.make ~rng_state) with
       | Error _errs -> assert false
       | Ok (ctxt, step_constants) ->
@@ -546,15 +531,14 @@ let make_continuation_benchmark :
   end in
   (module B : Benchmark.S)
 
-let continuation_benchmark ?amplification ?intercept ?salt ?more_tags ?check
-    ~name ~cont_and_stack_sampler () =
+let continuation_benchmark ?amplification ?intercept ?salt ?more_tags ~name
+    ~cont_and_stack_sampler () =
   let bench =
     make_continuation_benchmark
       ?amplification
       ?intercept
       ?salt
       ?more_tags
-      ?check
       ~name
       ~cont_and_stack_sampler
       ()
@@ -2533,17 +2517,8 @@ module Registration_section = struct
      https://gitlab.com/dannywillems/ocaml-bls12-381/-/blob/71d0b4d467fbfaa6452d702fcc408d7a70916a80/README.md#install
   *)
   module Bls12_381 = struct
-    let check () =
-      if not Bls12_381.built_with_blst_portable then (
-        Format.eprintf
-          "BLS must be built without ADX to run the BLS benchmarks. Try \
-           compiling again after setting the environment variable \
-           BLST_PORTABLE. Aborting.@." ;
-        Stdlib.failwith "bls_not_built_with_blst_portable")
-
     let () =
       simple_benchmark
-        ~check
         ~name:Interpreter_workload.N_IAdd_bls12_381_g1
         ~kinstr:
           (IAdd_bls12_381_g1
@@ -2553,7 +2528,6 @@ module Registration_section = struct
 
     let () =
       simple_benchmark
-        ~check
         ~name:Interpreter_workload.N_IAdd_bls12_381_g2
         ~kinstr:
           (IAdd_bls12_381_g2
@@ -2563,7 +2537,6 @@ module Registration_section = struct
 
     let () =
       simple_benchmark
-        ~check
         ~name:Interpreter_workload.N_IAdd_bls12_381_fr
         ~kinstr:
           (IAdd_bls12_381_fr
@@ -2573,7 +2546,6 @@ module Registration_section = struct
 
     let () =
       simple_benchmark
-        ~check
         ~name:Interpreter_workload.N_IMul_bls12_381_g1
         ~kinstr:
           (IMul_bls12_381_g1
@@ -2583,7 +2555,6 @@ module Registration_section = struct
 
     let () =
       simple_benchmark
-        ~check
         ~name:Interpreter_workload.N_IMul_bls12_381_g2
         ~kinstr:
           (IMul_bls12_381_g2
@@ -2593,7 +2564,6 @@ module Registration_section = struct
 
     let () =
       simple_benchmark
-        ~check
         ~name:Interpreter_workload.N_IMul_bls12_381_fr
         ~kinstr:
           (IMul_bls12_381_fr
@@ -2603,7 +2573,6 @@ module Registration_section = struct
 
     let () =
       simple_benchmark
-        ~check
         ~name:Interpreter_workload.N_IMul_bls12_381_z_fr
         ~kinstr:
           (IMul_bls12_381_z_fr
@@ -2612,7 +2581,6 @@ module Registration_section = struct
 
     let () =
       benchmark_with_stack_sampler
-        ~check
         ~name:Interpreter_workload.N_IMul_bls12_381_z_fr
         ~intercept:true
         ~kinstr:
@@ -2627,7 +2595,6 @@ module Registration_section = struct
 
     let () =
       simple_benchmark
-        ~check
         ~name:Interpreter_workload.N_IMul_bls12_381_fr_z
         ~kinstr:
           (IMul_bls12_381_fr_z
@@ -2636,7 +2603,6 @@ module Registration_section = struct
 
     let () =
       benchmark_with_stack_sampler
-        ~check
         ~name:Interpreter_workload.N_IMul_bls12_381_fr_z
         ~intercept:true
         ~kinstr:
@@ -2651,7 +2617,6 @@ module Registration_section = struct
 
     let () =
       simple_benchmark
-        ~check
         ~name:Interpreter_workload.N_IInt_bls12_381_z_fr
         ~kinstr:
           (IInt_bls12_381_fr (kinfo (bls12_381_fr @$ bot), halt (int @$ bot)))
@@ -2659,7 +2624,6 @@ module Registration_section = struct
 
     let () =
       simple_benchmark
-        ~check
         ~name:Interpreter_workload.N_INeg_bls12_381_g1
         ~kinstr:
           (INeg_bls12_381_g1
@@ -2668,7 +2632,6 @@ module Registration_section = struct
 
     let () =
       simple_benchmark
-        ~check
         ~name:Interpreter_workload.N_INeg_bls12_381_g2
         ~kinstr:
           (INeg_bls12_381_g2
@@ -2677,7 +2640,6 @@ module Registration_section = struct
 
     let () =
       simple_benchmark
-        ~check
         ~name:Interpreter_workload.N_INeg_bls12_381_fr
         ~kinstr:
           (INeg_bls12_381_fr
@@ -2687,7 +2649,6 @@ module Registration_section = struct
     let () =
       let (Ty_ex_c pair_bls12_381_g1_g2) = pair bls12_381_g1 bls12_381_g2 in
       simple_benchmark
-        ~check
         ~name:Interpreter_workload.N_IPairing_check_bls12_381
         ~kinstr:
           (IPairing_check_bls12_381

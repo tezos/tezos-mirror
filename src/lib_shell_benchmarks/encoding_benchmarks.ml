@@ -50,7 +50,6 @@ struct
       ~name:("ENCODING_PUBLIC_KEY_" ^ algo_name)
       ~encoding:Signature.Public_key.encoding
       ~generator:Sampler.pk
-      ()
 
   let () = Registration.register public_key_encoding
 
@@ -59,7 +58,6 @@ struct
       ~name:("B58CHECK_ENCODING_PUBLIC_KEY_" ^ algo_name)
       ~to_string:Signature.Public_key.to_b58check
       ~generator:Sampler.pk
-      ()
 
   let () = Registration.register public_key_to_b58check
 
@@ -68,7 +66,6 @@ struct
       ~name:("ENCODING_PUBLIC_KEY_HASH_" ^ algo_name)
       ~encoding:Signature.Public_key_hash.encoding
       ~generator:Sampler.pkh
-      ()
 
   let () = Registration.register public_key_hash_encoding
 
@@ -77,7 +74,6 @@ struct
       ~name:("B58CHECK_ENCODING_PUBLIC_KEY_HASH_" ^ algo_name)
       ~to_string:Signature.Public_key_hash.to_b58check
       ~generator:Sampler.pkh
-      ()
 
   let () = Registration.register public_key_hash_to_b58check
 
@@ -86,7 +82,6 @@ struct
       ~name:("ENCODING_SECRET_KEY_" ^ algo_name)
       ~encoding:Signature.Public_key_hash.encoding
       ~generator:Sampler.pkh
-      ()
 
   let () = Registration.register secret_key_encoding
 
@@ -95,7 +90,6 @@ struct
       ~name:("B58CHECK_ENCODING_SECRET_KEY_" ^ algo_name)
       ~to_string:Signature.Secret_key.to_b58check
       ~generator:Sampler.sk
-      ()
 
   let () = Registration.register secret_key_to_b58check
 
@@ -104,7 +98,6 @@ struct
       ~name:("ENCODING_SIGNATURE_" ^ algo_name)
       ~encoding:Signature.encoding
       ~generator:(fun _rng_state -> Signature.zero)
-      ()
 
   let () = Registration.register signature_encoding
 
@@ -113,7 +106,6 @@ struct
       ~name:("B58CHECK_ENCODING_SIGNATURE_" ^ algo_name)
       ~to_string:Signature.to_b58check
       ~generator:(fun _rng_state -> Signature.zero)
-      ()
 
   let () = Registration.register signature_to_b58check
 
@@ -124,7 +116,6 @@ struct
       ~name:("DECODING_PUBLIC_KEY_" ^ algo_name)
       ~encoding:Signature.Public_key.encoding
       ~generator:Sampler.pk
-      ()
 
   let () = Registration.register public_key_decoding
 
@@ -134,7 +125,6 @@ struct
       ~to_string:Signature.Public_key.to_b58check
       ~from_string:Signature.Public_key.of_b58check_exn
       ~generator:Sampler.pk
-      ()
 
   let () = Registration.register public_key_from_b58check
 
@@ -143,7 +133,6 @@ struct
       ~name:("DECODING_PUBLIC_KEY_HASH_" ^ algo_name)
       ~encoding:Signature.Public_key_hash.encoding
       ~generator:Sampler.pkh
-      ()
 
   let () = Registration.register public_key_hash_decoding
 
@@ -153,7 +142,6 @@ struct
       ~to_string:Signature.Public_key_hash.to_b58check
       ~from_string:Signature.Public_key_hash.of_b58check_exn
       ~generator:Sampler.pkh
-      ()
 
   let () = Registration.register public_key_hash_from_b58check
 
@@ -162,7 +150,6 @@ struct
       ~name:("DECODING_SECRET_KEY_" ^ algo_name)
       ~encoding:Signature.Secret_key.encoding
       ~generator:Sampler.sk
-      ()
 
   let () = Registration.register secret_key_decoding
 
@@ -172,7 +159,6 @@ struct
       ~to_string:Signature.Secret_key.to_b58check
       ~from_string:Signature.Secret_key.of_b58check_exn
       ~generator:Sampler.sk
-      ()
 
   let () = Registration.register secret_key_from_b58check
 
@@ -181,7 +167,6 @@ struct
       ~name:("DECODING_SIGNATURE_" ^ algo_name)
       ~encoding:Signature.encoding
       ~generator:(fun _rng_state -> Signature.zero)
-      ()
 
   let () = Registration.register signature_decoding
 
@@ -191,7 +176,6 @@ struct
       ~to_string:Signature.to_b58check
       ~from_string:Signature.of_b58check_exn
       ~generator:(fun _rng_state -> Signature.zero)
-      ()
 
   let () = Registration.register signature_from_b58check
 end
@@ -215,7 +199,6 @@ let chain_id_encoding =
     ~generator:(fun rng_state ->
       Chain_id.hash_bytes
         [Base_samplers.bytes ~size:{min = 32; max = 32} rng_state])
-    ()
 
 let () = Registration.register chain_id_encoding
 
@@ -226,7 +209,6 @@ let chain_id_decoding =
     ~generator:(fun rng_state ->
       Chain_id.hash_bytes
         [Base_samplers.bytes ~size:{min = 32; max = 32} rng_state])
-    ()
 
 let () = Registration.register chain_id_decoding
 
@@ -237,7 +219,6 @@ let chain_id_readable_encoding =
     ~generator:(fun rng_state ->
       Chain_id.hash_bytes
         [Base_samplers.bytes ~size:{min = 32; max = 32} rng_state])
-    ()
 
 let () = Registration.register chain_id_readable_encoding
 
@@ -249,6 +230,5 @@ let chain_id_readable_decoding =
     ~generator:(fun rng_state ->
       Chain_id.hash_bytes
         [Base_samplers.bytes ~size:{min = 32; max = 32} rng_state])
-    ()
 
 let () = Registration.register chain_id_readable_decoding

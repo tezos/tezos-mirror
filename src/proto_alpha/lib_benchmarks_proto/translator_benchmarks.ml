@@ -508,7 +508,6 @@ let check_printable_benchmark =
         ignore (check_printable_ascii generated (String.length generated - 1))
       in
       Generator.Plain {workload; closure})
-    ()
 
 let () = Registration_helpers.register check_printable_benchmark
 
