@@ -2900,6 +2900,109 @@ let commands_rw () =
             >>=? fun _res -> return_unit);
     command
       ~group
+      ~desc:"Transfer tickets from an implicit account to a contract."
+      (args12
+         fee_arg
+         dry_run_switch
+         verbose_signing_switch
+         simulate_switch
+         minimal_fees_arg
+         minimal_nanotez_per_byte_arg
+         minimal_nanotez_per_gas_unit_arg
+         storage_limit_arg
+         counter_arg
+         force_low_fee_arg
+         fee_cap_arg
+         burn_cap_arg)
+      (prefix "transfer"
+      @@ non_negative_z_param ~name:"qty" ~desc:"Amount of tickets to transfer."
+      @@ prefixes ["tickets"; "from"]
+      @@ ContractAlias.destination_param
+           ~name:"tickets owner"
+           ~desc:"Implicit account owning the tickets."
+      @@ prefix "to"
+      @@ ContractAlias.destination_param
+           ~name:"recipient contract"
+           ~desc:"Contract receiving the tickets."
+      @@ prefixes ["with"; "entrypoint"]
+      @@ Clic.param
+           ~name:"entrypoint"
+           ~desc:"Entrypoint to use on the receiving contract."
+           entrypoint_parameter
+      @@ prefixes ["and"; "contents"]
+      @@ Clic.param
+           ~name:"tickets content"
+           ~desc:"Content of the tickets."
+           Client_proto_args.string_parameter
+      @@ prefixes ["and"; "type"]
+      @@ Clic.param
+           ~name:"tickets type"
+           ~desc:"Type of the tickets."
+           Client_proto_args.string_parameter
+      @@ prefixes ["and"; "ticketer"]
+      @@ ContractAlias.destination_param
+           ~name:"tickets ticketer"
+           ~desc:"Ticketer contract of the tickets."
+      @@ stop)
+      (fun ( fee,
+             dry_run,
+             verbose_signing,
+             simulation,
+             minimal_fees,
+             minimal_nanotez_per_byte,
+             minimal_nanotez_per_gas_unit,
+             storage_limit,
+             counter,
+             force_low_fee,
+             fee_cap,
+             burn_cap )
+           amount
+           (_, source)
+           (_, destination)
+           entrypoint
+           contents
+           ty
+           (_, ticketer)
+           cctxt ->
+        match Contract.is_implicit source with
+        | None -> failwith "Only implicit accounts can transfer tickets."
+        | Some source ->
+            Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+            let fee_parameter =
+              {
+                Injection.minimal_fees;
+                minimal_nanotez_per_byte;
+                minimal_nanotez_per_gas_unit;
+                force_low_fee;
+                fee_cap;
+                burn_cap;
+              }
+            in
+            transfer_ticket
+              cctxt
+              ~chain:cctxt#chain
+              ~block:cctxt#block
+              ~dry_run
+              ~verbose_signing
+              ?fee
+              ?storage_limit
+              ?counter
+              ?confirmations:cctxt#confirmations
+              ~simulation
+              ~source
+              ~src_pk
+              ~src_sk
+              ~fee_parameter
+              ~contents
+              ~ty
+              ~ticketer
+              ~amount
+              ~destination
+              ~entrypoint
+              ()
+            >>=? fun _res -> return_unit);
+    command
+      ~group
       ~desc:"Originate a new smart-contract rollup."
       (args12
          fee_arg
