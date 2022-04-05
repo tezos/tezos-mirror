@@ -234,6 +234,10 @@ let sc_rollup_commitment_frequency_in_blocks c =
   let constants = Raw_context.constants c in
   constants.sc_rollup_commitment_frequency_in_blocks
 
+let sc_rollup_commitment_storage_size_in_bytes c =
+  let constants = Raw_context.constants c in
+  constants.sc_rollup_commitment_storage_size_in_bytes
+
 let sc_rollup_max_lookahead_in_blocks c =
   let constants = Raw_context.constants c in
   constants.sc_rollup_max_lookahead_in_blocks

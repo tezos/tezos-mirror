@@ -180,6 +180,8 @@ type parametric = {
   sc_rollup_stake_amount_in_mutez : int;
   (* The frequency with which commitments are made. *)
   sc_rollup_commitment_frequency_in_blocks : int;
+  (* The storage size requirement (in bytes) of a commitment *)
+  sc_rollup_commitment_storage_size_in_bytes : int;
   (* The maximum depth of a staker's position - chosen alongside
      [sc_rollup_commitment_frequency_in_blocks] to prevent the cost
      of a staker's commitments' storage being greater than their deposit. *)

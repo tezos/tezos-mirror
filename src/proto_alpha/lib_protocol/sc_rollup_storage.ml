@@ -441,9 +441,6 @@ let withdraw_stake ctxt rollup staker =
         modify_staker_count ctxt rollup Int32.pred
       else fail Sc_rollup_not_staked_on_lcc
 
-(* 76 for Commitments entry + 4 for Commitment_stake_count entry + 4 for Commitment_added entry *)
-let sc_rollup_commitment_storage_size_in_bytes = 84
-
 let assert_commitment_not_too_far_ahead ctxt rollup lcc commitment =
   let open Lwt_tzresult_syntax in
   let* (ctxt, min_level) =
@@ -546,16 +543,20 @@ let refine_stake ctxt rollup staker commitment =
       let* (stake_count_size_diff, ctxt) =
         increase_commitment_stake_count ctxt rollup new_hash
       in
+      (* WARNING: [commitment_storage_size] is a defined constant, and used
+         to set a bound on the relationship between [max_lookahead],
+         [commitment_frequency] and [stake_amount].  Be careful changing this
+         calculation. *)
       let size_diff =
         commitment_size_diff + commitment_added_size_diff
         + stake_count_size_diff + staker_count_diff
       in
+      let expected_size_diff =
+        Constants_storage.sc_rollup_commitment_storage_size_in_bytes ctxt
+      in
       (* First submission adds [sc_rollup_commitment_storage_size_in_bytes] to storage.
          Later submission adds 0 due to content-addressing. *)
-      assert (
-        Compare.Int.(
-          size_diff = 0
-          || size_diff = sc_rollup_commitment_storage_size_in_bytes)) ;
+      assert (Compare.Int.(size_diff = 0 || size_diff = expected_size_diff)) ;
       return (new_hash, ctxt) (* See WARNING above. *))
     else if Commitment_hash.(node = lcc) then
       (* We reached the LCC, but [staker] is not staked directly on it.

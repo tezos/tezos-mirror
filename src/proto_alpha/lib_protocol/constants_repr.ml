@@ -180,6 +180,7 @@ type parametric = {
   sc_rollup_max_available_messages : int;
   sc_rollup_stake_amount_in_mutez : int;
   sc_rollup_commitment_frequency_in_blocks : int;
+  sc_rollup_commitment_storage_size_in_bytes : int;
   sc_rollup_max_lookahead_in_blocks : int32;
 }
 
@@ -244,6 +245,7 @@ let parametric_encoding =
                     c.sc_rollup_max_available_messages,
                     c.sc_rollup_stake_amount_in_mutez,
                     c.sc_rollup_commitment_frequency_in_blocks,
+                    c.sc_rollup_commitment_storage_size_in_bytes,
                     c.sc_rollup_max_lookahead_in_blocks ) ) ) ) ) ) ))
     (fun ( ( preserved_cycles,
              blocks_per_cycle,
@@ -302,6 +304,7 @@ let parametric_encoding =
                        sc_rollup_max_available_messages,
                        sc_rollup_stake_amount_in_mutez,
                        sc_rollup_commitment_frequency_in_blocks,
+                       sc_rollup_commitment_storage_size_in_bytes,
                        sc_rollup_max_lookahead_in_blocks ) ) ) ) ) ) ) ->
       {
         preserved_cycles;
@@ -361,6 +364,7 @@ let parametric_encoding =
         sc_rollup_max_available_messages;
         sc_rollup_stake_amount_in_mutez;
         sc_rollup_commitment_frequency_in_blocks;
+        sc_rollup_commitment_storage_size_in_bytes;
         sc_rollup_max_lookahead_in_blocks;
       })
     (merge_objs
@@ -434,13 +438,16 @@ let parametric_encoding =
                             (req "tx_rollup_max_ticket_payload_size" int31)
                             (req "tx_rollup_rejection_max_proof_size" int31)
                             (req "tx_rollup_sunset_level" int32)))
-                      (obj7
+                      (obj8
                          (req "sc_rollup_enable" bool)
                          (req "sc_rollup_origination_size" int31)
                          (req "sc_rollup_challenge_window_in_blocks" int31)
                          (req "sc_rollup_max_available_messages" int31)
                          (req "sc_rollup_stake_amount_in_mutez" int31)
                          (req "sc_rollup_commitment_frequency_in_blocks" int31)
+                         (req
+                            "sc_rollup_commitment_storage_size_in_bytes"
+                            int31)
                          (req "sc_rollup_max_lookahead_in_blocks" int32))))))))
 
 type t = {fixed : fixed; parametric : parametric}

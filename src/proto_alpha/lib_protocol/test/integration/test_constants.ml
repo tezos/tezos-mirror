@@ -78,7 +78,12 @@ let test_sc_rollup_max_commitment_storage_cost_lt_deposit () =
   let cost_per_byte_mutez =
     Alpha_context.Tez.to_mutez constants.cost_per_byte
   in
-  let commitment_storage_cost = Int64.mul cost_per_byte_mutez 84L in
+  let commitment_storage_size =
+    Int64.of_int constants.sc_rollup_commitment_storage_size_in_bytes
+  in
+  let commitment_storage_cost =
+    Int64.mul cost_per_byte_mutez commitment_storage_size
+  in
   let max_lookahead =
     Int64.of_int32 constants.sc_rollup_max_lookahead_in_blocks
   in
@@ -92,6 +97,56 @@ let test_sc_rollup_max_commitment_storage_cost_lt_deposit () =
        commitment_storage_cost
        (Int64.div max_lookahead commitment_frequency))
     stake_amount
+
+(* Check that
+   [sc_rollup_commitment_storage_size_in_bytes = commitments_entry_size +
+   commitment_stake_count_entry_size + commitment_added_entry_size] 
+   
+   Required to ensure [sc_rollup_stake_amount] and [sc_rollup_max_lookahead] are
+   correctly scaled with respect to each other - see
+   [test_sc_rollup_max_commitment_storage_cost_lt_deposit]
+*)
+let test_sc_rollup_commitment_storage_size () =
+  let constants = Default_parameters.constants_mainnet in
+  let open Protocol in
+  Assert.get_some
+    ~loc:__LOC__
+    (Alpha_context.Sc_rollup.Number_of_messages.of_int32 3l)
+  >>=? fun number_of_messages ->
+  Assert.get_some
+    ~loc:__LOC__
+    (Alpha_context.Sc_rollup.Number_of_ticks.of_int32 1232909l)
+  >>=? fun number_of_ticks ->
+  let commitment =
+    Alpha_context.Sc_rollup.Commitment.
+      {
+        predecessor = Alpha_context.Sc_rollup.Commitment_hash.zero;
+        inbox_level = Alpha_context.Raw_level.of_int32_exn 21l;
+        number_of_messages;
+        number_of_ticks;
+        compressed_state = Alpha_context.Sc_rollup.State_hash.zero;
+      }
+  in
+  let commitment_bytes =
+    Data_encoding.Binary.to_bytes_exn
+      Alpha_context.Sc_rollup.Commitment.encoding
+      commitment
+  in
+  let level = Alpha_context.Raw_level.of_int32_exn 5l in
+  let level_bytes =
+    Data_encoding.Binary.to_bytes_exn Alpha_context.Raw_level.encoding level
+  in
+  (* commitment stake count is encoded in Int32, but is not exposed here *)
+  let commitment_stake_count = 300l in
+  let commitment_stake_count_bytes =
+    Data_encoding.Binary.to_bytes_exn Data_encoding.int32 commitment_stake_count
+  in
+  Assert.equal_int
+    ~loc:__LOC__
+    constants.sc_rollup_commitment_storage_size_in_bytes
+    (Bytes.length commitment_bytes
+    + Bytes.length level_bytes
+    + Bytes.length commitment_stake_count_bytes)
 
 (** Test that the amount of the liquidity baking subsidy is epsilon smaller than
    1/16th of the maximum reward. *)
@@ -123,6 +178,10 @@ let tests =
       "sc rollup max commitment storage cost less than deposit"
       `Quick
       test_sc_rollup_max_commitment_storage_cost_lt_deposit;
+    Tztest.tztest
+      "sc rollup commitment storage size correct"
+      `Quick
+      test_sc_rollup_commitment_storage_size;
     Tztest.tztest
       "test liquidity_baking_subsidy parameter is 1/16th of total baking \
        rewards"
