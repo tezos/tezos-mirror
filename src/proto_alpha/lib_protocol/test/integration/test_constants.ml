@@ -60,9 +60,12 @@ let test_max_operations_ttl () =
     Alpha_context.Period.one_hour
     result
 
+(* Check that
+    [sc_rollup_challenge_window_in_blocks < sc_rollup_max_lookahead_in_blocks]
+
+    Otherwise committers would be forced to commit at an artificially slow rate, affecting
+    the throughput of the rollup. *)
 let test_sc_rollup_challenge_window_lt_max_lookahead () =
-  (* Check that
-     [sc_rollup_challenge_window_in_blocks < sc_rollup_max_lookahead_in_blocks] *)
   let constants = Default_parameters.constants_mainnet in
   let max_lookahead = constants.sc_rollup_max_lookahead_in_blocks in
   let challenge_window =
@@ -70,9 +73,13 @@ let test_sc_rollup_challenge_window_lt_max_lookahead () =
   in
   Assert.lt_int32 ~loc:__LOC__ challenge_window max_lookahead
 
+(* Check that
+    [commitment_storage_cost * max_lookahead / commitment_frequency < stake_amount]
+
+   Otherwise storage could be overallocated - since backtracking is not allowed, a staker
+   can allocated at most [d] nodes (where [d] is the tree depth) - the maximum storage cost
+   of these commitments must be at most the size of the staker's deposit. *)
 let test_sc_rollup_max_commitment_storage_cost_lt_deposit () =
-  (* Check that
-     [commitment_storage_cost * max_lookahead / commitment_frequency < stake_amount] *)
   let constants = Default_parameters.constants_mainnet in
   let open Protocol in
   let cost_per_byte_mutez =
@@ -104,7 +111,7 @@ let test_sc_rollup_max_commitment_storage_cost_lt_deposit () =
    
    Required to ensure [sc_rollup_stake_amount] and [sc_rollup_max_lookahead] are
    correctly scaled with respect to each other - see
-   [test_sc_rollup_max_commitment_storage_cost_lt_deposit]
+   {!test_sc_rollup_max_commitment_storage_cost_lt_deposit}
 *)
 let test_sc_rollup_commitment_storage_size () =
   let constants = Default_parameters.constants_mainnet in

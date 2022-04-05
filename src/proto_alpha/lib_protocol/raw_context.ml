@@ -958,6 +958,8 @@ let prepare_first_block ~level ~timestamp ctxt =
             (* TODO: https://gitlab.com/tezos/tezos/-/issues/2556
                The follow constants need to be refined. *)
             sc_rollup_max_available_messages = 1_000_000;
+            (* TODO: https://gitlab.com/tezos/tezos/-/issues/2756
+               The following constants need to be refined. *)
             sc_rollup_stake_amount_in_mutez = 32_000_000;
             sc_rollup_commitment_frequency_in_blocks = 20;
             (* 76 for Commitments entry + 4 for Commitment_stake_count entry
