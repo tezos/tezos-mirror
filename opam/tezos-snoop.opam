@@ -18,7 +18,6 @@ depends: [
   "tezos-benchmarks-proto-alpha"
   "ocamlgraph"
   "pyml"
-  "pyml-plot"
   "prbnmcn-stats" { = "0.0.4" }
 ]
 build: [

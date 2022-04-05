@@ -16,7 +16,7 @@
   prbnmcn-dagger-stats
   prbnmcn-stats
   pringo
-  pyml-plot
+  pyml
   ocaml-migrate-parsetree)
  (flags (:standard)
         -open Tezos_base.TzPervasives
