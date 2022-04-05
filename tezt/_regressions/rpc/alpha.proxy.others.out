@@ -40,7 +40,8 @@ rpc/alpha.proxy.others.out
   "tx_rollup_max_commitments_count": 120100,
   "tx_rollup_cost_per_byte_ema_factor": 120,
   "tx_rollup_max_ticket_payload_size": 2048,
-  "tx_rollup_rejection_max_proof_size": 30000, "sc_rollup_enable": false,
+  "tx_rollup_rejection_max_proof_size": 30000,
+  "tx_rollup_sunset_level": 3473409, "sc_rollup_enable": false,
   "sc_rollup_origination_size": 6314,
   "sc_rollup_challenge_window_in_blocks": 20160,
   "sc_rollup_max_available_messages": 1000000 }

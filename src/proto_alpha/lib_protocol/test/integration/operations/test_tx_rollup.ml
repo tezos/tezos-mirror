@@ -78,13 +78,36 @@ let test_disable_feature_flag () =
     op
   >>=? fun _i -> return_unit
 
+(** [test_sunset] try to originate a tx rollup after the sunset and check
+    that it fails *)
+let test_sunset () =
+  Context.init_with_constants
+    {
+      Context.default_test_constants with
+      tx_rollup_enable = true;
+      tx_rollup_sunset_level = 0l;
+    }
+    1
+  >>=? fun (b, contracts) ->
+  let contract =
+    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0
+  in
+  Incremental.begin_construction b >>=? fun i ->
+  Op.tx_rollup_origination (I i) contract >>=? fun (op, _tx_rollup) ->
+  Incremental.add_operation
+    ~expect_apply_failure:(check_proto_error Apply.Tx_rollup_feature_disabled)
+    i
+    op
+  >>=? fun _i -> return_unit
+
 (** [parsing_tests] try originating contracts using the
     type [tx_rollup_l2_address], test that it only works
     when rollups are enabled.
  *)
 let parsing_tests =
   let test_origination ~tx_rollup_enable script_path initial_storage =
-    Context.init1 ~tx_rollup_enable () >>=? fun (b, contract) ->
+    Context.init1 ~tx_rollup_enable ~tx_rollup_sunset_level:Int32.max_int ()
+    >>=? fun (b, contract) ->
     Contract_helpers.originate_contract
       script_path
       initial_storage
@@ -187,6 +210,7 @@ let context_init ?(tx_rollup_max_inboxes_count = 2100)
       Context.default_test_constants with
       consensus_threshold = 0;
       tx_rollup_enable = true;
+      tx_rollup_sunset_level = Int32.max_int;
       tx_rollup_finality_period;
       tx_rollup_withdraw_period = 1;
       tx_rollup_max_commitments_count = 3;
@@ -521,7 +545,8 @@ end
 (** [test_origination] originates a transaction rollup and checks that
     it burns the expected quantity of xtz. *)
 let test_origination () =
-  Context.init ~tx_rollup_enable:true 1 >>=? fun (b, contracts) ->
+  Context.init ~tx_rollup_enable:true ~tx_rollup_sunset_level:Int32.max_int 1
+  >>=? fun (b, contracts) ->
   let contract =
     WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0
   in
@@ -544,7 +569,8 @@ let test_origination () =
 (** [test_two_originations] originates two transaction rollups in the
     same operation and checks that they have a different address. *)
 let test_two_originations () =
-  Context.init ~tx_rollup_enable:true 1 >>=? fun (b, contracts) ->
+  Context.init ~tx_rollup_enable:true ~tx_rollup_sunset_level:Int32.max_int 1
+  >>=? fun (b, contracts) ->
   let contract =
     WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0
   in
@@ -1873,6 +1899,7 @@ let test_full_inbox () =
       baking_reward_bonus_per_slot = Tez.zero;
       baking_reward_fixed_portion = Tez.zero;
       tx_rollup_enable = true;
+      tx_rollup_sunset_level = Int32.max_int;
       tx_rollup_max_inboxes_count = 15;
     }
   in
@@ -4912,6 +4939,7 @@ let tests =
       "check feature flag is disabled"
       `Quick
       test_disable_feature_flag;
+    Tztest.tztest "check sunset" `Quick test_sunset;
     Tztest.tztest "check tx rollup origination and burn" `Quick test_origination;
     Tztest.tztest
       "check two originated tx rollup in one operation have different address"

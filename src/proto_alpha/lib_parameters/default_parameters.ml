@@ -138,6 +138,10 @@ let constants_mainnet =
        (minus overhead), since we need to limit our proofs to those
        that can fit in an operation. *)
     tx_rollup_rejection_max_proof_size = 30000;
+    (* This is the first block of cycle 618, which is expected to be
+       about one year after the activation of protocol J.
+       See https://tzstats.com/cycle/618 *)
+    tx_rollup_sunset_level = 3_473_409l;
     sc_rollup_enable = false;
     (* The following value is chosen to prevent spam. *)
     sc_rollup_origination_size = 6_314;

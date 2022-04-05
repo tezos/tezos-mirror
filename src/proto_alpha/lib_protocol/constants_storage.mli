@@ -112,6 +112,8 @@ val tx_rollup_max_ticket_payload_size : Raw_context.t -> int
 
 val tx_rollup_rejection_max_proof_size : Raw_context.t -> int
 
+val tx_rollup_sunset_level : Raw_context.t -> int32
+
 val ratio_of_frozen_deposits_slashed_per_double_endorsement :
   Raw_context.t -> Constants_repr.ratio
 
