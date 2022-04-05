@@ -43,7 +43,7 @@ val inbox :
   'a ->
   Tx_rollup.t ->
   Tx_rollup_level.t ->
-  Tx_rollup_inbox.t shell_tzresult Lwt.t
+  Tx_rollup_inbox.t option shell_tzresult Lwt.t
 
 val commitment :
   'a #RPC_context.simple ->

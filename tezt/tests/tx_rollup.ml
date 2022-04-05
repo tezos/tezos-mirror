@@ -41,6 +41,8 @@ module Parameters = Rollup.Parameters
 
 type t = {node : Node.t; client : Client.t; rollup : string}
 
+let assert_some res = match res with Some r -> r | None -> assert false
+
 let init_with_tx_rollup ?additional_bootstrap_account_count
     ?(parameters = Parameters.default) ~protocol () =
   let* parameter_file = Parameters.parameter_file ~parameters protocol in
@@ -163,7 +165,10 @@ module Regressions = struct
       (* The content of the batch does not matter for the regression test. *)
       let batch = Rollup.make_batch "blob" in
       let* () = submit_batch ~batch state in
-      let*! _inbox = Rollup.get_inbox ~hooks ~rollup ~level:0 client in
+      let*! inbox = Rollup.get_inbox ~hooks ~rollup ~level:0 client in
+      Check.(inbox <> None)
+        (Check.option Rollup.Check.inbox)
+        ~error_msg:"Expected some inbox" ;
       unit
 
     let rpc_inbox_message_hash =
@@ -256,9 +261,13 @@ module Regressions = struct
       let*! commitment =
         Rollup.get_commitment ~hooks ~block:"head" ~level:0 ~rollup client
       in
-      let hash = JSON.(commitment |-> "commitment_hash" |> as_string) in
+      let hash =
+        Option.map
+          (fun (c : Rollup.submitted_commitment) -> c.commitment_hash)
+          commitment
+      in
       let*! state = Rollup.get_state ~hooks ~rollup client in
-      Check.(state.Rollup.commitment_newest_hash = Some hash)
+      Check.(state.Rollup.commitment_newest_hash = hash)
         (Check.option Check.string)
         ~error_msg:"Commitment hash mismatch: %L vs %R" ;
       unit
@@ -333,6 +342,24 @@ module Regressions = struct
           "Batch content in JSON should be a string: %s."
           batch_content_str ;
       unit
+
+    let rpc_inbox_future =
+      Protocol.register_test
+        ~__FILE__
+        ~title:"RPC (tx_rollups, regression) - inbox from the future"
+        ~tags:["tx_rollup"; "rpc"; "inbox"]
+      @@ fun protocol ->
+      let* ({rollup; client; node = _} as state) =
+        init_with_tx_rollup ~protocol ()
+      in
+      (* The content of the batch does not matter for the regression test. *)
+      let batch = Rollup.make_batch "blob" in
+      let* () = submit_batch ~batch state in
+      let*! inbox = Rollup.get_inbox ~hooks ~rollup ~level:1 client in
+      Check.(inbox = None)
+        (Check.option Rollup.Check.inbox)
+        ~error_msg:"Expected no inbox" ;
+      unit
   end
 
   module Limits = struct
@@ -405,10 +432,9 @@ module Regressions = struct
       let current_level = Node.get_level node in
       let* () = Client.bake_for client in
       let* _ = Node.wait_for_level node (current_level + 1) in
-      let*! {inbox_length = _; cumulated_size; merkle_root = _} =
-        Rollup.get_inbox ~hooks ~rollup ~level:0 client
-      in
-      Check.(cumulated_size = inbox_limit)
+      let*! inbox = Rollup.get_inbox ~hooks ~rollup ~level:0 client in
+      let inbox = assert_some inbox in
+      Check.(inbox.cumulated_size = inbox_limit)
         Check.int
         ~error_msg:"Unexpected inbox size. Expected %R. Got %L" ;
       unit
@@ -548,6 +574,7 @@ module Regressions = struct
     RPC.rpc_commitment protocols ;
     RPC.rpc_pending_bonded_commitment protocols ;
     RPC.batch_encoding protocols ;
+    RPC.rpc_inbox_future protocols ;
     Limits.submit_empty_batch protocols ;
     Limits.submit_maximum_size_batch protocols ;
     Limits.inbox_maximum_size protocols ;
@@ -584,9 +611,9 @@ let submit_three_batches_and_check_size ~rollup ~tezos_level ~tx_level node
   in
   let*! inbox = Rollup.get_inbox ~hooks ~rollup ~level:tx_level client in
   Check.(
-    ((inbox = expected_inbox)
+    ((inbox = Some expected_inbox)
        ~error_msg:"Unexpected inbox. Got: %L. Expected: %R.")
-      Rollup.Check.inbox) ;
+      (Check.option Rollup.Check.inbox)) ;
   return ()
 
 let test_submit_batches_in_several_blocks =
@@ -752,7 +779,16 @@ let test_rollup_with_two_commitments =
   let* () =
     repeat parameters.finality_period (fun () -> Client.bake_for client)
   in
-  let* _ = RPC.raw_bytes ~path:[] client in
+  let*! commitment = Rollup.get_commitment ~hooks ~rollup ~level:0 client in
+  let first_commitment_level = (assert_some commitment).commitment.level in
+  Check.(first_commitment_level = 0)
+    Check.int
+    ~error_msg:"First commitment level must be 0" ;
+  (* There is only one commitment, so trying to get level 1 will fail *)
+  let*! commitment = Rollup.get_commitment ~hooks ~rollup ~level:1 client in
+  Check.(commitment = None)
+    (Check.option Rollup.Check.commitment)
+    ~error_msg:"Expected no commitment" ;
   let*! () = submit_finalize_commitment state in
   (* A second submission just to ensure it can be included into a
      block even if it fails. *)
@@ -760,10 +796,10 @@ let test_rollup_with_two_commitments =
     submit_finalize_commitment ~src:Constant.bootstrap2.public_key_hash state
   in
   let* _ = Client.bake_for client in
-  let*? process = Rollup.get_inbox ~hooks ~rollup ~level:0 client in
-  let* () =
-    Process.check_error ~msg:(rex " No service found at this URL") process
-  in
+  let*! inbox = Rollup.get_inbox ~hooks ~rollup ~level:0 client in
+  Check.(inbox = None)
+    (Check.option Rollup.Check.inbox)
+    ~error_msg:"Expected no inbox" ;
   let* json = RPC.get_operations client in
   let manager_operations = JSON.(json |=> 3 |> as_list) in
   Check.(List.length manager_operations = 2)
@@ -801,7 +837,11 @@ let test_rollup_with_two_commitments =
     submit_remove_commitment ~src:Constant.bootstrap2.public_key_hash state
   in
   let* () = Client.bake_for client in
-  let predecessor = Some JSON.(commitment |-> "commitment_hash" |> as_string) in
+  let predecessor =
+    Option.map
+      (fun (c : Rollup.submitted_commitment) -> c.commitment_hash)
+      commitment
+  in
   let inbox_content = `Content [batch] in
   let* () =
     submit_commitment
@@ -817,20 +857,30 @@ let test_rollup_with_two_commitments =
   let*! () =
     submit_finalize_commitment ~src:Constant.bootstrap2.public_key_hash state
   in
-  let*! _inbox = Rollup.get_inbox ~hooks ~rollup ~level:1 client in
+  let*! inbox = Rollup.get_inbox ~hooks ~rollup ~level:1 client in
+  Check.(inbox <> None)
+    (Check.option Rollup.Check.inbox)
+    ~error_msg:"Expected some inbox" ;
   let* () = Client.bake_for client in
-  let*? process = Rollup.get_inbox ~hooks ~rollup ~level:0 client in
-  let* () =
-    Process.check_error ~msg:(rex " No service found at this URL") process
-  in
-  let*! _commitment = Rollup.get_commitment ~hooks ~rollup ~level:0 client in
+  let*! inbox = Rollup.get_inbox ~hooks ~rollup ~level:0 client in
+  Check.(inbox = None)
+    (Check.option Rollup.Check.inbox)
+    ~error_msg:"Expected no inbox" ;
+  let*! _commitment = Rollup.get_commitment ~hooks ~rollup ~level:1 client in
+  let*! commitment = Rollup.get_commitment ~hooks ~rollup ~level:0 client in
+  Check.(commitment = None)
+    (Check.option Rollup.Check.commitment)
+    ~error_msg:"Expected no commitment" ;
   let* () = Client.bake_for client in
   let*! () =
     submit_remove_commitment ~src:Constant.bootstrap2.public_key_hash state
   in
   let* () = Client.bake_for client in
   let*! _commitment = Rollup.get_commitment ~hooks ~rollup ~level:0 client in
-  let*! _commitment = Rollup.get_commitment ~hooks ~rollup ~level:1 client in
+  let*! commitment = Rollup.get_commitment ~hooks ~rollup ~level:1 client in
+  Check.(commitment = None)
+    (Check.option Rollup.Check.commitment)
+    ~error_msg:"Expected no commitment" ;
   let* () = submit_return_bond ~src:Constant.bootstrap1.public_key_hash state in
   let* json = RPC.raw_bytes ~path:["tx_rollup"] client in
   let json_object = JSON.as_object json in
@@ -1075,7 +1125,7 @@ let test_rollup_wrong_path_for_rejection =
 let test_rollup_wrong_rejection_long_path =
   Protocol.register_test
     ~__FILE__
-    ~title:"wrong rejection wtih long path"
+    ~title:"wrong rejection with long path"
     ~tags:["tx_rollup"; "rejection"; "batch"]
   @@ fun protocol ->
   let parameters = Parameters.{finality_period = 1; withdraw_period = 1} in

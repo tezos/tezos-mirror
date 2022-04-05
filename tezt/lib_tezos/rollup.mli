@@ -38,6 +38,27 @@ module Tx_rollup : sig
 
   type inbox = {inbox_length : int; cumulated_size : int; merkle_root : string}
 
+  type messages = {
+    count : int;
+    root : string;
+    last_message_result_hash : string;
+  }
+
+  type commitment = {
+    level : int;
+    messages : messages;
+    predecessor : string option;
+    inbox_merkle_root : string;
+  }
+
+  type submitted_commitment = {
+    commitment : commitment;
+    commitment_hash : string;
+    committer : string;
+    submitted_at : int;
+    finalized_at : int option;
+  }
+
   type message = [`Batch of Hex.t]
 
   val make_batch : string -> message
@@ -50,7 +71,7 @@ module Tx_rollup : sig
     rollup:string ->
     level:int ->
     Client.t ->
-    inbox Process.runnable
+    inbox option Process.runnable
 
   val get_commitment :
     ?hooks:Process.hooks ->
@@ -58,7 +79,7 @@ module Tx_rollup : sig
     rollup:string ->
     level:int ->
     Client.t ->
-    JSON.t Process.runnable
+    submitted_commitment option Process.runnable
 
   val get_pending_bonded_commitments :
     ?hooks:Process.hooks ->
@@ -107,6 +128,8 @@ module Tx_rollup : sig
     val state : state Check.typ
 
     val inbox : inbox Check.typ
+
+    val commitment : submitted_commitment Check.typ
   end
 
   module Parameters : sig

@@ -187,7 +187,10 @@ module Tx_rollup : sig
       transaction rollup at [level]. If the inbox does not exist, the
       function returns an error. *)
   val inbox :
-    t -> Tx_rollup.t -> Tx_rollup_level.t -> Tx_rollup_inbox.t tzresult Lwt.t
+    t ->
+    Tx_rollup.t ->
+    Tx_rollup_level.t ->
+    Tx_rollup_inbox.t option tzresult Lwt.t
 
   (** [commitment ctxt tx_rollup] returns the commitment of this
       transaction rollup at [level]. If the commitment does not exist,

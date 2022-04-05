@@ -50,6 +50,27 @@ module Tx_rollup = struct
 
   type inbox = {inbox_length : int; cumulated_size : int; merkle_root : string}
 
+  type messages = {
+    count : int;
+    root : string;
+    last_message_result_hash : string;
+  }
+
+  type commitment = {
+    level : int;
+    messages : messages;
+    predecessor : string option;
+    inbox_merkle_root : string;
+  }
+
+  type submitted_commitment = {
+    commitment : commitment;
+    commitment_hash : string;
+    committer : string;
+    submitted_at : int;
+    finalized_at : int option;
+  }
+
   type message = [`Batch of Hex.t]
 
   let make_batch batch = `Batch (Hex.of_string batch)
@@ -85,15 +106,44 @@ module Tx_rollup = struct
 
   let get_inbox ?hooks ~rollup ~level client =
     let parse json =
-      let inbox_length = JSON.(json |-> "inbox_length" |> as_int) in
-      let cumulated_size = JSON.(json |-> "cumulated_size" |> as_int) in
-      let merkle_root = JSON.(json |-> "merkle_root" |> as_string) in
-      {inbox_length; cumulated_size; merkle_root}
+      if JSON.is_null json then None
+      else
+        let inbox_length = JSON.(json |-> "inbox_length" |> as_int) in
+        let cumulated_size = JSON.(json |-> "cumulated_size" |> as_int) in
+        let merkle_root = JSON.(json |-> "merkle_root" |> as_string) in
+        Some {inbox_length; cumulated_size; merkle_root}
     in
     RPC.Tx_rollup.get_inbox ?hooks ~rollup ~level client |> map_runnable parse
 
   let get_commitment ?hooks ?block ~rollup ~level client =
+    let parse json =
+      if JSON.is_null json then None
+      else
+        let commitment_json = JSON.(json |-> "commitment") in
+        let level = JSON.(commitment_json |-> "level" |> as_int) in
+        let messages_json = JSON.(commitment_json |-> "messages") in
+        let count = JSON.(messages_json |-> "count" |> as_int) in
+        let root = JSON.(messages_json |-> "root" |> as_string) in
+        let last_message_result_hash =
+          JSON.(messages_json |-> "last_message_result_hash" |> as_string)
+        in
+        let messages = {count; root; last_message_result_hash} in
+        let predecessor =
+          JSON.(commitment_json |-> "predecessor" |> as_string_opt)
+        in
+        let inbox_merkle_root =
+          JSON.(commitment_json |-> "inbox_merkle_root" |> as_string)
+        in
+        let commitment = {level; messages; predecessor; inbox_merkle_root} in
+        let commitment_hash = JSON.(json |-> "commitment_hash" |> as_string) in
+        let committer = JSON.(json |-> "committer" |> as_string) in
+        let submitted_at = JSON.(json |-> "submitted_at" |> as_int) in
+        let finalized_at = JSON.(json |-> "finalized_at" |> as_int_opt) in
+        Some
+          {commitment; commitment_hash; committer; submitted_at; finalized_at}
+    in
     RPC.Tx_rollup.get_commitment ?hooks ?block ~rollup ~level client
+    |> map_runnable parse
 
   let get_pending_bonded_commitments ?hooks ?block ~rollup ~pkh client =
     RPC.Tx_rollup.get_pending_bonded_commitments
@@ -216,6 +266,37 @@ module Tx_rollup = struct
         (fun {inbox_length; cumulated_size; merkle_root} ->
           (inbox_length, cumulated_size, merkle_root))
         (tuple3 int int string)
+
+    let commitment : submitted_commitment Check.typ =
+      let open Check in
+      convert
+        (fun {
+               commitment =
+                 {
+                   level;
+                   messages = {count; root; last_message_result_hash};
+                   predecessor;
+                   inbox_merkle_root;
+                 };
+               commitment_hash;
+               committer;
+               submitted_at;
+               finalized_at;
+             } ->
+          ( ( level,
+              (count, root, last_message_result_hash),
+              predecessor,
+              inbox_merkle_root ),
+            commitment_hash,
+            committer,
+            submitted_at,
+            finalized_at ))
+        (tuple5
+           (tuple4 int (tuple3 int string string) (option string) string)
+           string
+           string
+           int
+           (option int))
   end
 
   module Parameters = struct
