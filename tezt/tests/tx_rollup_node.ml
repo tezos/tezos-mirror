@@ -429,7 +429,7 @@ let test_ticket_deposit_from_l1_to_l2 =
           client
       in
       let* () = Client.bake_for client in
-      let* _ = Node.wait_for_level node 4 in
+      let* _ = Rollup_node.wait_for_tezos_level tx_node 4 in
       (* Get the operation containing the ticket transfer. We assume
          that only one operation is issued in this block. *)
       let* inbox = tx_client_get_inbox ~tx_node ~block:"head" in
@@ -945,8 +945,6 @@ let test_reorganization =
           ~protocol
           ()
       in
-      let* () = Client.bake_for client1 in
-      let* _ = Node.wait_for_level node1 2 in
       let operator = Constant.bootstrap1.public_key_hash in
       let* (tx_rollup_hash, tx_node) =
         init_and_run_rollup_node ~operator node1 client1
@@ -998,7 +996,7 @@ let test_reorganization =
       let* node2 = Node.init nodes_args in
       let* client2 = Client.init ~endpoint:Client.(Node node2) () in
       let* () = Client.Admin.connect_address client2 ~peer:node1 in
-      let* _ = Node.wait_for_level node2 5 in
+      let* _ = Node.wait_for_level node2 4 in
       Log.info "Nodes are synchronized, shutting down node 2" ;
       let* () = Node.terminate node2 in
       Log.info "Check that L2 balance is 10" ;
@@ -1035,8 +1033,8 @@ let test_reorganization =
           client1
       in
       let* () = Client.bake_for client1 in
-      let* _ = Node.wait_for_level node1 6 in
-      let* _ = Rollup_node.wait_for_tezos_level tx_node 6 in
+      let* _ = Node.wait_for_level node1 5 in
+      let* _ = Rollup_node.wait_for_tezos_level tx_node 5 in
       Log.info "Check that L2 balance is now 0" ;
       let* () =
         check_tz4_balance
@@ -1055,12 +1053,12 @@ let test_reorganization =
       let* () =
         Client.bake_for ~keys:[Constant.bootstrap2.public_key_hash] client2
       in
-      let* _ = Node.wait_for_level node2 7 in
+      let* _ = Node.wait_for_level node2 6 in
       Log.info "Reconnecting node 1 and 2" ;
       let* () = Client.Admin.trust_address client2 ~peer:node1 in
       let* () = Client.Admin.connect_address client2 ~peer:node1 in
-      let* _ = Node.wait_for_level node1 7 in
-      let* _ = Rollup_node.wait_for_tezos_level tx_node 7 in
+      let* _ = Node.wait_for_level node1 6 in
+      let* _ = Rollup_node.wait_for_tezos_level tx_node 6 in
       (* Check that the balance is untouched, that is to say that the
          rollup node had backtracked the operation from the
          alternative branch. *)

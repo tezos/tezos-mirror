@@ -411,7 +411,7 @@ module L2_block_store = struct
   let append_block ?(flush = true) store (block : L2block.t) =
     let open Lwt_syntax in
     Lwt_idle_waiter.force_idle store.scheduler @@ fun () ->
-    let hash = L2block.hash_header block.header in
+    let hash = block.hash in
     Cache.replace store.cache hash (return_some block) ;
     let* offset = Lwt_unix.lseek store.fd 0 Unix.SEEK_END in
     let* _written_len = locked_write_block store ~offset ~block ~hash in

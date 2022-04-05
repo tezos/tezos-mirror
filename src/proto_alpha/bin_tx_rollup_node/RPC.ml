@@ -152,12 +152,7 @@ module Block = struct
     RPC_service.get_service
       ~description:"Get the L2 block in the tx-rollup-node"
       ~query:RPC_query.empty
-      ~output:
-        Data_encoding.(
-          option
-          @@ merge_objs
-               (obj1 (req "hash" L2block.Hash.encoding))
-               L2block.encoding)
+      ~output:(Data_encoding.option L2block.encoding)
       path
 
   let header =
@@ -179,16 +174,6 @@ module Block = struct
       ~output:Data_encoding.(option Inbox.encoding)
       RPC_path.(path / "inbox")
 
-  let block_header_of_id state block_id =
-    let open Lwt_syntax in
-    match block_id with
-    | `L2_block b -> State.get_header state b
-    | `Tezos_block b ->
-        let+ b = State.get_tezos_l2_block state b in
-        Option.map (fun b -> b.L2block.header) b
-    | `Head -> return_some (State.get_head state).header
-    | `Level l -> State.get_level_l2_block_header state l
-
   let block_of_id state block_id =
     let open Lwt_syntax in
     match block_id with
@@ -200,16 +185,14 @@ module Block = struct
   let () =
     register block @@ fun (state, block_id) () () ->
     let*! block = block_of_id state block_id in
-    match block with
-    | None -> return None
-    | Some block -> return (Some (L2block.hash_header block.header, block))
+    return block
 
   let () =
     register header @@ fun (state, block_id) () () ->
-    let*! header = block_header_of_id state block_id in
-    match header with
+    let*! block = block_of_id state block_id in
+    match block with
     | None -> return None
-    | Some header -> return (Some (L2block.hash_header header, header))
+    | Some block -> return (Some (block.hash, block.header))
 
   let () =
     register inbox @@ fun (state, block_id) () () ->

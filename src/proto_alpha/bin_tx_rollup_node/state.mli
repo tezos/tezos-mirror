@@ -139,7 +139,7 @@ val set_tezos_head : t -> Block_hash.t -> Block_hash.t reorg tzresult Lwt.t
     - Save both the header and the inbox
     - Make the level point to this block
  *)
-val save_block : t -> L2block.t -> L2block.hash Lwt.t
+val save_block : t -> L2block.t -> unit Lwt.t
 
 (** Make a level point to a given L2 block. If the level already points to a
     block, it is changed. *)
