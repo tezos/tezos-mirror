@@ -1891,9 +1891,17 @@ let precheck_manager_contents (type kind) ctxt (op : kind Kind.manager contents)
         Tx_rollup_errors.Message_size_exceeds_limit
       >>=? fun () -> return ctxt
   | Tx_rollup_commit _ | Tx_rollup_return_bond _
-  | Tx_rollup_finalize_commitment _ | Tx_rollup_remove_commitment _
-  | Transfer_ticket _ ->
+  | Tx_rollup_finalize_commitment _ | Tx_rollup_remove_commitment _ ->
       assert_tx_rollup_feature_enabled ctxt >>=? fun () -> return ctxt
+  | Transfer_ticket {contents; ty; _} ->
+      assert_tx_rollup_feature_enabled ctxt >>=? fun () ->
+      Lwt.return
+      @@ record_trace Gas_quota_exceeded_init_deserialize
+      @@ (* See comment in the Transaction branch *)
+      ( Script.force_decode_in_context ~consume_deserialization_gas ctxt contents
+      >>? fun (_contents, ctxt) ->
+        Script.force_decode_in_context ~consume_deserialization_gas ctxt ty
+        >|? fun (_ty, ctxt) -> ctxt )
   | Tx_rollup_dispatch_tickets {tickets_info; message_result_path; _} ->
       assert_tx_rollup_feature_enabled ctxt >>=? fun () ->
       let Constants.
@@ -1917,7 +1925,21 @@ let precheck_manager_contents (type kind) ctxt (op : kind Kind.manager contents)
         Compare.List_length_with.(
           tickets_info > tx_rollup_max_withdrawals_per_batch)
         Tx_rollup_errors.Too_many_withdrawals
-      >>?= fun () -> return ctxt
+      >>?= fun () ->
+      record_trace Gas_quota_exceeded_init_deserialize
+      @@ (* See comment in the Transaction branch *)
+      List.fold_left_e
+        (fun ctxt Tx_rollup_reveal.{contents; ty; _} ->
+          Script.force_decode_in_context
+            ~consume_deserialization_gas
+            ctxt
+            contents
+          >>? fun (_contents, ctxt) ->
+          Script.force_decode_in_context ~consume_deserialization_gas ctxt ty
+          >|? fun (_ty, ctxt) -> ctxt)
+        ctxt
+        tickets_info
+      >>?= fun ctxt -> return ctxt
   | Tx_rollup_rejection
       {message_path; message_result_path; previous_message_result_path; _} ->
       assert_tx_rollup_feature_enabled ctxt >>=? fun () ->
