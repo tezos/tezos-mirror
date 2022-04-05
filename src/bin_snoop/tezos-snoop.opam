@@ -9,7 +9,6 @@ dev-repo: "git+https://gitlab.com/tezos/tezos.git"
 license: "MIT"
 depends: [
   "dune" { >= "2.9" }
-  "conf-gnuplot" { = "0.1" }
   "tezos-base"
   "tezos-stdlib-unix"
   "tezos-clic"
@@ -21,7 +20,6 @@ depends: [
   "pyml"
   "pyml-plot"
   "prbnmcn-stats" { = "0.0.4" }
-  "prbnmcn-gnuplot" { = "0.0.2" }
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]
