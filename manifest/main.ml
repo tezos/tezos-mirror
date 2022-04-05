@@ -267,17 +267,18 @@ let ringo = external_lib ~js_compatible:true "ringo" V.(exactly "0.8")
 let ringo_lwt = external_lib "ringo-lwt" V.(exactly "0.8")
 
 let secp256k1_internal =
+  let version = V.(at_least "0.3.0") in
   external_lib
     ~npm_deps:
       [
         Npm.make
           ~node_wrapper_flags:["--secp256k1"]
-          "@nomadic-labs/secp256k1wasm"
-          V.(exactly "1.1.1");
+          "@nomadic-labs/secp256k1-wasm"
+          version;
       ]
     ~js_compatible:true
     "secp256k1-internal"
-    V.True
+    version
 
 let str = external_lib ~js_compatible:true "str" ~opam:"" V.True
 
