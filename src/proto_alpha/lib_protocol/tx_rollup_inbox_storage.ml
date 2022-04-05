@@ -77,13 +77,14 @@ let prepare_inbox :
       Storage.Tx_rollup.Inbox.get (ctxt, rollup) tx_lvl
       >>=? fun (ctxt, metadata) -> return (ctxt, state, tx_lvl, metadata, Z.zero)
   | _ ->
-      let pred_level =
-        Option.bind current_levels (fun (tx_level, _) ->
-            Tx_rollup_level_repr.pred tx_level)
+      let pred_level_and_tx_level =
+        Option.bind current_levels (fun (tx_level, tezos_level) ->
+            Option.map (fun pred -> (pred, tezos_level))
+            @@ Tx_rollup_level_repr.pred tx_level)
       in
-      (match pred_level with
+      (match pred_level_and_tx_level with
       | None -> return (ctxt, state)
-      | Some tx_level ->
+      | Some (tx_level, tezos_level) ->
           find ctxt tx_level rollup >>=? fun (ctxt, minbox) ->
           (* If the previous inbox is no longer in the storage, then
              quite some Tezos blocks have been created without any
@@ -98,22 +99,18 @@ let prepare_inbox :
           let factor =
             Constants_storage.tx_rollup_cost_per_byte_ema_factor ctxt
           in
+          let diff = Raw_level_repr.diff level tezos_level in
+          (* Only [diff = Int32.one] should be checked
+             theoretically. If [diff < Int32.one], it likely
+             means there is a problem in the state machine since
+             this function was called twice for the same
+             level. This problem is caught at other
+             places. However, if this assumption is broken, I
+             prefer to consider that it counts as if there was
+             no empty blocks between the first call and the
+             second call to this function. *)
           let elapsed =
-            match current_levels with
-            | None -> 0
-            | Some (_, tezos_level) ->
-                let diff = Raw_level_repr.diff level tezos_level in
-                (* Only [diff = Int32.one] should be checked
-                   theoritically. If [diff < Int32.one], it likely
-                   means there is a problem in the state machine since
-                   this function was called twice for the same
-                   level. This problem is caught at other
-                   places. However, if this assumption is broken, I
-                   prefer to consider that it counts as if there was
-                   no empty blocks between the first call and the
-                   second call to this function. *)
-                if Compare.Int32.(diff <= Int32.one) then 0
-                else Int32.to_int diff
+            if Compare.Int32.(diff <= Int32.one) then 0 else Int32.to_int diff
           in
           let state =
             Tx_rollup_state_repr.update_burn_per_byte
