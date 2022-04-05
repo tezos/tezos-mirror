@@ -109,3 +109,13 @@ let adjust_storage_space ctxt ~storage_diff =
       Storage.Ticket_balance.Paid_storage_space.add ctxt new_used_storage
       >>= fun ctxt -> return (diff, ctxt)
     else return (Z.zero, ctxt)
+
+module Internal_for_tests = struct
+  let used_storage_space c =
+    Storage.Ticket_balance.Used_storage_space.find c
+    >|=? Option.value ~default:Z.zero
+
+  let paid_storage_space c =
+    Storage.Ticket_balance.Paid_storage_space.find c
+    >|=? Option.value ~default:Z.zero
+end

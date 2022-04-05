@@ -65,3 +65,11 @@ val adjust_balance :
     than the given (positive) [storage_diff]. *)
 val adjust_storage_space :
   Raw_context.t -> storage_diff:Z.t -> (Z.t * Raw_context.t) tzresult Lwt.t
+
+module Internal_for_tests : sig
+  (** [used_storage_space ctxt] returns the used ticket storage space. *)
+  val used_storage_space : Raw_context.t -> (Z.t, error trace) result Lwt.t
+
+  (** [paid_storage_space ctxt] returns the paid ticket storage space. *)
+  val paid_storage_space : Raw_context.t -> (Z.t, error trace) result Lwt.t
+end
