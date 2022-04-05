@@ -43,7 +43,6 @@
    of the constant base "functions".
 *)
 
-module Matrix = Pyplot.Matrix
 open Plot
 
 type options = {
