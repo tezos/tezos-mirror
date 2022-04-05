@@ -76,8 +76,6 @@ let compiler_libs_optcomp = external_lib "compiler-libs.optcomp" V.True ~opam:""
 let compiler_libs_toplevel =
   external_lib "compiler-libs.toplevel" V.True ~opam:""
 
-let conf_gnuplot = opam_only "conf-gnuplot" V.(exactly "0.1")
-
 let conf_libev = opam_only "conf-libev" V.True
 
 let conf_rust = opam_only "conf-rust" V.True
@@ -222,8 +220,6 @@ let prbnmcn_dagger = external_lib "prbnmcn-dagger" V.(exactly "0.0.2")
 
 let prbnmcn_dagger_stats =
   external_lib "prbnmcn-dagger-stats" V.(exactly "0.0.2")
-
-let prbnmcn_gnuplot = external_lib "prbnmcn-gnuplot" V.(exactly "0.0.2")
 
 let prbnmcn_stats = external_lib "prbnmcn-stats" V.(exactly "0.0.4")
 
@@ -3293,7 +3289,6 @@ let _tezos_snoop =
     ~synopsis:"Tezos: `tezos-snoop` binary"
     ~deps:
       [
-        conf_gnuplot;
         tezos_base |> open_ ~m:"TzPervasives";
         tezos_base_unix;
         tezos_stdlib_unix |> open_;
@@ -3307,7 +3302,6 @@ let _tezos_snoop =
         pyml;
         pyml_plot;
         prbnmcn_stats;
-        prbnmcn_gnuplot;
       ]
     ~linkall:true
 
