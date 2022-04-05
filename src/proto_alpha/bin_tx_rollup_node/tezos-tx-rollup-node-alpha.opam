@@ -1,3 +1,5 @@
+# This file was automatically generated, do not edit.
+# Edit file manifest/main.ml instead.
 opam-version: "2.0"
 maintainer: "contact@tezos.com"
 authors: ["Tezos devteam"]
@@ -7,7 +9,7 @@ dev-repo: "git+https://gitlab.com/tezos/tezos.git"
 license: "MIT"
 depends: [
   "dune" { >= "2.9" }
-  "index"
+  "index" { >= "1.6.0" & < "1.7.0" }
   "tezos-base"
   "tezos-crypto"
   "tezos-protocol-alpha"
@@ -16,12 +18,13 @@ depends: [
   "tezos-context"
   "tezos-baking-alpha-commands"
   "tezos-stdlib-unix"
+  "tezos-rpc"
+  "tezos-rpc-http"
+  "tezos-rpc-http-client-unix"
+  "tezos-rpc-http-server"
   "tezos-micheline"
   "tezos-client-base"
   "tezos-client-base-unix"
-  "tezos-rpc"
-  "tezos-rpc-http"
-  "tezos-rpc-http-server"
   "tezos-store"
 ]
 build: [

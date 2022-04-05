@@ -1,3 +1,6 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
 (library
  (name tezos_client_009_PsFLoren)
  (public_name tezos-client-009-PsFLoren)

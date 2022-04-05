@@ -1245,6 +1245,9 @@ module Target = struct
 
   let open_ ?m = function None -> None | Some target -> Some (open_ ?m target)
 
+  let open_if ?m condition target =
+    if condition then open_ ?m target else target
+
   let select ~package ~source_if_present ~source_if_absent ~target =
     match package with
     | None -> None

@@ -1,3 +1,6 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
 (library
  (name tezos_client_sapling_011_PtHangz2)
  (public_name tezos-client-sapling-011-PtHangz2)
