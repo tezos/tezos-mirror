@@ -1,8 +1,0 @@
-(executable
- (name plot_test)
- (libraries bigarray pyml-plot))
-
-(alias
- (name runtest)
-  (deps    (:exe plot_test.exe))
-(action (run %{exe})))

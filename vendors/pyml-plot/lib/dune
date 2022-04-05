@@ -1,5 +1,0 @@
-(library
-  (name pyplot)
-  (public_name pyml-plot)
-  (libraries bigarray pyml)
-  (ocamlopt_flags (-warn-error -39)))
