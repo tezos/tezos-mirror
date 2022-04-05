@@ -26,27 +26,6 @@
 open Snapshots_events
 open Store_types
 
-(* This module handles snapshot's versioning system. *)
-module Version = struct
-  type t = int
-
-  let (version_encoding : t Data_encoding.t) =
-    let open Data_encoding in
-    obj1 (req "version" int31)
-
-  (* Current version of the snapshots, since 0.0.7.
-   * Previous versions are:
-   * - 1: snapshot exported with storage 0.0.1 to 0.0.4
-   * - 2: snapshot exported with storage 0.0.4 to 0.0.6
-   * - 3: snapshot exported with storage 0.0.7 to current *)
-  let current_version = 3
-
-  (* List of versions that are supported *)
-  let supported_versions = [2; 3]
-end
-
-let current_version = Version.current_version
-
 type error +=
   | Incompatible_history_mode of {
       requested : History_mode.t;
@@ -597,6 +576,44 @@ let () =
       | _ -> None)
     (fun (chain_id, store_dir) ->
       Invalid_chain_store_export (chain_id, store_dir))
+
+(* This module handles snapshot's versioning system. *)
+module Version = struct
+  type t = int
+
+  let (version_encoding : t Data_encoding.t) =
+    let open Data_encoding in
+    obj1 (req "version" int31)
+
+  (* Current version of the snapshots, since 0.0.7.
+   * Previous versions are:
+   * - 1: snapshot exported with storage 0.0.1 to 0.0.4
+   * - 2: snapshot exported with storage 0.0.4 to 0.0.6
+   * - 3: snapshot exported with storage 0.0.7
+   * - 4: snapshot exported with storage 0.0.8 to current *)
+  let current_version = 4
+
+  (* List of versions that are supported *)
+  let supported_versions = [(2, `Legacy); (3, `Legacy); (4, `Current)]
+
+  let is_supported version =
+    match List.assq_opt version supported_versions with
+    | Some _ -> true
+    | None -> false
+
+  (* Returns true if the given version is considered as legacy. *)
+  let is_legacy version =
+    let open Lwt_tzresult_syntax in
+    match List.assq_opt version supported_versions with
+    | None ->
+        fail
+          (Inconsistent_version_import
+             {expected = List.map fst supported_versions; got = version})
+    | Some `Legacy -> return_true
+    | Some _ -> return_false
+end
+
+let current_version = Version.current_version
 
 type metadata = {
   chain_name : Distributed_db_version.Name.t;
@@ -3547,9 +3564,12 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
     let (snapshot_version, snapshot_metadata) = snapshot_header in
     let* () =
       fail_unless
-        (List.mem ~equal:( = ) snapshot_version Version.supported_versions)
+        (Version.is_supported snapshot_version)
         (Inconsistent_version_import
-           {expected = Version.supported_versions; got = snapshot_version})
+           {
+             expected = List.map fst Version.supported_versions;
+             got = snapshot_version;
+           })
     in
     let* () =
       fail_unless
