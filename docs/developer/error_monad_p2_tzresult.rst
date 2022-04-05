@@ -233,30 +233,29 @@ Exercises
         attempted_insertion: int
       }
 
-The ``Tzresult_syntax`` module
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The ``Result_syntax``'s ``tz`` extensions
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Remember that ``'a tzresult`` is a special case of ``('a, 'e) result``.
 Specifically, a special case where ``'e`` is ``error trace``.
 Consequently, you can handle ``tzresult`` values using the
-``Result_syntax`` module. However, a more specialised module
-``Tzresult_syntax`` is available.
+``Result_syntax`` module.
 
-The ``Tzresult_syntax`` module is identical to the ``Result_syntax``
-module but for the following differences.
+The module ``Result_syntax`` exports a few functions dedicated to handling
+``tzresult``. These functions were omitted from Part 1.
 
--  ``fail: 'e -> ('a, 'e trace) result``: the expression ``fail e``
+-  ``tzfail: 'e -> ('a, 'e trace) result``: the expression ``tzfail e``
    wraps ``e`` in a ``trace`` inside an ``Error``. When ``e`` is of type
-   ``error`` as is the case throughout Octez, ``fail e`` is of type
+   ``error`` as is the case throughout Octez, ``tzfail e`` is of type
    ``'a tzresult``.
 
--  ``and*``: a binding operator alias for ``both`` (see below). You can
+-  ``and*``: a binding operator alias for ``tzboth`` (see below). You can
    use it with ``let*`` the same way you use ``and`` with ``let``.
 
    ::
 
       let apply_triple f (x, y, z) =
-        let open Tzresult_syntax in
+        let open Result_syntax in
         let* u = f x
         and* v = f y
         and* w = f z
@@ -268,24 +267,24 @@ module but for the following differences.
    of the others. The expression which follows the ``in``
    (``return ..``) is evaluated if all the bound results are successful.
 
--  ``both : ('a, 'e trace) result -> ('b, 'e trace) result -> ('a * 'b, 'e trace) result``:
+-  ``tzboth : ('a, 'e trace) result -> ('b, 'e trace) result -> ('a * 'b, 'e trace) result``:
    the expression ``both a b`` is ``Ok`` if both ``a`` and ``b`` are
    ``Ok`` and ``Error`` otherwise`.
 
-   Note that unlike ``Result_syntax.both``, the type of errors
+   Note that unlike ``both``, the type of errors
    (``error trace``) is the same on both the argument and return side of
    this function: the traces are combined automatically. This remark
-   applies to the ``all`` and ``join`` (see below) as well.
+   applies to the ``tzall`` and ``tzjoin`` (see below) as well.
 
    The stability of the return type is what allows this syntax module to
    include an ``and*`` binding operator.
 
--  ``all : ('a, 'e trace) result list -> ('a list, 'e trace) result``:
-   the function ``all`` is a generalisation of ``both`` from tuples to
+-  ``tzall : ('a, 'e trace) result list -> ('a list, 'e trace) result``:
+   the function ``tzall`` is a generalisation of ``tzboth`` from tuples to
    lists.
 
--  ``join : (unit, 'e trace) result list -> (unit, 'e trace) result``:
-   the function ``join`` is a specialisation of ``all`` for list of
+-  ``tzjoin : (unit, 'e trace) result list -> (unit, 'e trace) result``:
+   the function ``tzjoin`` is a specialisation of ``tzall`` for list of
    unit-typed expressions (typically, for side-effects).
 
 -  ``and+`` is a binding operator similar to ``and*`` but for use with
@@ -301,7 +300,7 @@ Exercises
    ::
 
       let twice f =
-        let open Tzresult_syntax in
+        let open Result_syntax in
         let* () = f () in
         let* () = f () in
         return_unit
@@ -309,19 +308,19 @@ Exercises
    ::
 
       let twice f =
-        let open Tzresult_syntax in
+        let open Result_syntax in
         let* () = f ()
         and* () = f ()
         in
         return_unit
 
-The ``Lwt_tzresult_syntax`` module
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The ``Lwt_result_syntax``'s ``tz`` extensions
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 In the same way ``result`` can be combined with Lwt, ``tzresult`` can
-also be combined with Lwt. And in the same way that ``Tzresult_syntax``
-is a small variation of ``Result_syntax``, ``Lwt_tzresult_syntax`` is a
-small variation of ``Lwt_result_syntax``.
+also be combined with Lwt. And in the same way that ``Result_syntax`` exports a
+few ``tz``-specific extensions, ``Lwt_result_syntax`` exports a few Lwt+``tz``
+specific extensions.
 
 There are possibly too many parallels to keep track of, so the diagram
 below might help.
@@ -334,21 +333,21 @@ below might help.
     V                        V                         V
    'a Lwt.t ------> ('a, 'e) result Lwt.t ------> 'a tzresult Lwt.t
 
-Anyway, the ``Lwt_tzresult_syntax`` module is identical to the
-``Lwt_result_syntax`` module but for the following differences.
+Anyway, the ``Lwt_result_syntax`` module exports a few functions dedicated to
+handling Lwt+``tzresult``. These functions were omitted from Part 1.
 
--  ``fail: 'e -> ('a, 'e trace) result Lwt.t``: the expression
-   ``fail e`` wraps ``e`` in a ``trace`` inside an ``Error`` inside a
+-  ``tzfail: 'e -> ('a, 'e trace) result Lwt.t``: the expression
+   ``tzfail e`` wraps ``e`` in a ``trace`` inside an ``Error`` inside a
    promise. When ``e`` is of type ``error`` as is the case throughout
-   Octez, ``fail e`` is of type ``'a tzresult Lwt.t``.
+   Octez, ``tzfail e`` is of type ``'a tzresult Lwt.t``.
 
--  ``and*``: a binding operator alias for ``both``. You can use it with
+-  ``and*``: a binding operator alias for ``tzboth``. You can use it with
    ``let*`` the same way you use ``and`` with ``let``.
 
    ::
 
       let apply_triple f (x, y, z) =
-        let open Lwt_tzresult_syntax in
+        let open Lwt_result_syntax in
         let* u = f x
         and* v = f y
         and* w = f z
@@ -361,32 +360,32 @@ Anyway, the ``Lwt_tzresult_syntax`` module is identical to the
    have all resolved but only if all of them resolve successfully.
 
    Note how this ``and*`` binding operator inherits the properties of
-   both ``Lwt_syntax.( and* )`` and ``Tzresult_syntax.( and* )``.
+   both ``Lwt_syntax.( and* )`` and ``Result_syntax.( and* )``.
    Specifically, the promises are evaluated concurrently and the
    expression which follows the ``in`` is evaluated only if all the
    bound promises have successfully resolved. These two orthogonal
-   properties are combined. This remark also applies to ``both``,
-   ``all``, ``join`` and ``and+`` below.
+   properties are combined. This remark also applies to ``tzboth``,
+   ``tzall``, ``tzjoin`` and ``and+`` below.
 
--  ``both : ('a, 'e trace) result Lwt.t -> ('b, 'e trace) result Lwt.t -> ('a * 'b, 'e trace) result Lwt.t``:
-   the expression ``both p q`` is a promise that resolves once both
+-  ``tzboth : ('a, 'e trace) result Lwt.t -> ('b, 'e trace) result Lwt.t -> ('a * 'b, 'e trace) result Lwt.t``:
+   the expression ``tzboth p q`` is a promise that resolves once both
    ``p`` and ``q`` have resolved. It resolves to ``Ok`` if both ``p``
    and ``q`` do, and to ``Error`` otherwise`.
 
    Note that unlike ``Lwt_result_syntax.both``, the type of errors
    (``error trace``) is the same on both the argument and return side of
    this function: the trace are combined automatically. This remark
-   applies to the ``all`` and ``join`` (see below) as well.
+   applies to the ``tzall`` and ``tzjoin`` (see below) as well.
 
    The stability of the return type is what allows this syntax module to
    include an ``and*`` binding operator.
 
--  ``all : ('a, 'e trace) result Lwt.t list -> ('a list, 'e trace) result Lwt.t``:
-   the function ``all`` is a generalisation of ``both`` from tuples to
+-  ``tzall : ('a, 'e trace) result Lwt.t list -> ('a list, 'e trace) result Lwt.t``:
+   the function ``tzall`` is a generalisation of ``tzboth`` from tuples to
    lists.
 
 -  ``join : (unit, 'e trace) result Lwt.t list -> (unit, 'e trace) result Lwt.t``:
-   the function ``join`` is a specialisation of ``all`` for lists of
+   the function ``tzjoin`` is a specialisation of ``tzall`` for lists of
    unit-typed expressions (typically, for side-effects).
 
 -  ``and+`` is a binding operator similar to ``and*`` but for use with
@@ -397,7 +396,7 @@ Anyway, the ``Lwt_tzresult_syntax`` module is identical to the
 Exercises
 ^^^^^^^^^
 
--  Rewrite this function to use the ``Lwt_tzresult_syntax`` module and
+-  Rewrite this function to use the ``Lwt_result_syntax`` module and
    no other syntax module.
 
    ::
@@ -407,7 +406,7 @@ Exercises
         let* u = f x
         and* v = g y
         in
-        let r = Tzresult_syntax.both u v in
+        let r = Result_syntax.tzboth u v in
         return r
 
 -  Write the implementation for
@@ -416,7 +415,7 @@ Exercises
 
       (** [map f [x1; x2; ..]] is [[y1; y2; ..]] where [y1] is the successful
           result of [f x1], [y2] is the successful result of [f x2], etc. If [f]
-          fails on any of the inputs, returns an `Error` instead. Either way, all
+          fails on any of the inputs, returns an [Error] instead. Either way, all
           the calls to [f] on all the inputs are evaluated concurrently and all
           the calls to [f] have resolved before the whole promise resolves. *)
       val map : ('a -> 'b tzresult Lwt.t) -> 'a list -> 'b list tzresult
@@ -431,9 +430,8 @@ Lwt-``tzresult``), you may occasionally need to call functions that
 return a simple promise (i.e., within Lwt-only) or a simple ``tzresult``
 (i.e., within ``tzresult``-only).
 
-This situation is similar to that of ``Lwt_result_syntax`` and the
-solutions are the same. Specifically, the additional binding operators provided
-by ``Lwt_result_syntax`` are also available in ``Lwt_tzresult_syntax``.
+Because ``tzresult`` is a special case of ``result``, you can use the same
+operators ``let*!`` and ``let*?`` as presented in Part 1.
 
 ::
 
@@ -441,35 +439,6 @@ by ``Lwt_result_syntax`` are also available in ``Lwt_tzresult_syntax``.
    let*? x = plain_result_function foo bar in
    ..
 
-
-Are you kidding me?! there is even more! what module am I supposed to open locally and what operators should I use?
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-You can also use simple guidelines to use these syntax modules
-effectively.
-
--  If your function returns ``_ tzresult Lwt.t`` values, then you start
-   the function with ``let open Lwt_tzresult_syntax in``. Within the
-   function you use
-
-   -  ``let`` for vanilla expressions,
-   -  ``let*`` for Lwt-``tzresult`` expressions,
-   -  ``let*!`` for Lwt-only expressions,
-   -  ``let*?`` for ``tzresult``-only expressions.
-
-   And you end your function with a call to ``return``.
-
--  If your function returns ``_ tzresult`` values, then you start the
-   function with ``let open Tzresult_syntax in``. Within the function
-   you use
-
-   -  ``let`` for vanilla expressions,
-   -  ``let*`` for ``tzresult`` expressions,
-
-   And you end your function with a call to ``return``.
-
-The rest of the guidelines (for ``(_, _) result Lwt.t``,
-``(_, _) result``, and ``_ Lwt.t``) remain valid.
 
 Tracing
 ~~~~~~~
@@ -502,7 +471,7 @@ storage layer) into another (say the shell).
    ::
 
       let check_hashes head block operation =
-        let open Tzresult_syntax in
+        let open Result_syntax in
         let* () =
           record_trace (Invalid_hash { kind: "head"; hash: head}) @@
           check_hash chain
@@ -542,7 +511,7 @@ storage layer) into another (say the shell).
    ::
 
       let get_data_and_gossip_it () =
-        let open Lwt_tzresult_syntax in
+        let open Lwt_result_syntax in
         let* data =
           trace Cannot_get_random_data_from_storage @@
           Storage.get_random_data ()
