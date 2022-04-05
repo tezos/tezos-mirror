@@ -81,53 +81,41 @@ let fetch_tezos_block state hash =
 (* Compute the reorganization of L1 blocks from the chain whose head is
    [old_head_hash] and the chain whose head [new_head_hash]. *)
 let tezos_reorg state ~old_head_hash ~new_head_hash =
-  let open Lwt_syntax in
+  let open Lwt_result_syntax in
   let rec loop old_chain new_chain old_head_hash new_head_hash =
-    let* new_head =
-      Stores.Tezos_block_store.find state.stores.tezos_blocks new_head_hash
-    and* old_head =
-      Stores.Tezos_block_store.find state.stores.tezos_blocks old_head_hash
-    in
-    match (old_head, new_head) with
-    | (None, _) | (_, None) ->
-        return
-          {
-            ancestor = None;
-            old_chain = List.rev old_chain;
-            new_chain = List.rev new_chain;
-          }
-    | (Some old_head, Some new_head) ->
-        if Block_hash.(old_head_hash = new_head_hash) then
-          return
-            {
-              ancestor = Some old_head_hash;
-              old_chain = List.rev old_chain;
-              new_chain = List.rev new_chain;
-            }
+    if Block_hash.(old_head_hash = new_head_hash) then
+      let+ ancestor = fetch_tezos_block state old_head_hash in
+      {
+        ancestor = Some ancestor;
+        old_chain = List.rev old_chain;
+        new_chain = List.rev new_chain;
+      }
+    else
+      let* new_head = fetch_tezos_block state new_head_hash in
+      let* old_head = fetch_tezos_block state old_head_hash in
+      let old_level = old_head.header.shell.level in
+      let new_level = new_head.header.shell.level in
+      let diff = Int32.sub new_level old_level in
+      let (old_chain, new_chain, old, new_) =
+        if diff = 0l then
+          (* Heads at same level *)
+          let new_chain = new_head :: new_chain in
+          let old_chain = old_head :: old_chain in
+          let new_head_hash = new_head.header.shell.predecessor in
+          let old_head_hash = old_head.header.shell.predecessor in
+          (old_chain, new_chain, old_head_hash, new_head_hash)
+        else if diff > 0l then
+          (* New chain is longer *)
+          let new_chain = new_head :: new_chain in
+          let new_head_hash = new_head.header.shell.predecessor in
+          (old_chain, new_chain, old_head_hash, new_head_hash)
         else
-          let old_level = old_head.Stores.Tezos_block_store.level in
-          let new_level = new_head.Stores.Tezos_block_store.level in
-          let diff = Int32.sub new_level old_level in
-          let (old_chain, new_chain, old, new_) =
-            if diff = 0l then
-              (* Heads at same level *)
-              let new_chain = new_head_hash :: new_chain in
-              let old_chain = old_head_hash :: old_chain in
-              let new_head_hash = new_head.predecessor in
-              let old_head_hash = old_head.predecessor in
-              (old_chain, new_chain, old_head_hash, new_head_hash)
-            else if diff > 0l then
-              (* New chain is longer *)
-              let new_chain = new_head_hash :: new_chain in
-              let new_head_hash = new_head.predecessor in
-              (old_chain, new_chain, old_head_hash, new_head_hash)
-            else
-              (* Old chain was longer *)
-              let old_chain = old_head_hash :: old_chain in
-              let old_head_hash = old_head.predecessor in
-              (old_chain, new_chain, old_head_hash, new_head_hash)
-          in
-          loop old_chain new_chain old new_
+          (* Old chain was longer *)
+          let old_chain = old_head :: old_chain in
+          let old_head_hash = old_head.header.shell.predecessor in
+          (old_chain, new_chain, old_head_hash, new_head_hash)
+      in
+      loop old_chain new_chain old new_
   in
   loop [] [] old_head_hash new_head_hash
 
@@ -139,9 +127,7 @@ let set_tezos_head state new_head_hash =
   in
   match old_head_hash with
   | None -> return no_reorg
-  | Some old_head_hash ->
-      let*! reorg = tezos_reorg state ~old_head_hash ~new_head_hash in
-      return reorg
+  | Some old_head_hash -> tezos_reorg state ~old_head_hash ~new_head_hash
 
 let save_tezos_block_info state block l2_block ~level ~predecessor =
   Stores.Tezos_block_store.add
