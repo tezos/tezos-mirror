@@ -1342,7 +1342,7 @@ let apply_external_manager_operation_content :
         level
         ~message_position:message_index
       >>=? fun ctxt ->
-      let adjust_ticket_balance (ctxt, state, acc_diff)
+      let adjust_ticket_balance (ctxt, acc_diff)
           ( Tx_rollup_withdraw.
               {claimer; amount; ticket_hash = tx_rollup_ticket_hash},
             ticket_token ) =
@@ -1357,14 +1357,13 @@ let apply_external_manager_operation_content :
           ~src_hash:tx_rollup_ticket_hash
           ~dst_hash:claimer_ticket_hash
           amount
-        >>=? fun (ctxt, diff) -> return (ctxt, state, Z.(add acc_diff diff))
+        >>=? fun (ctxt, diff) -> return (ctxt, Z.(add acc_diff diff))
       in
       List.fold_left_es
         adjust_ticket_balance
-        (ctxt, state, Z.zero)
+        (ctxt, Z.zero)
         rev_ex_token_and_hash_list
-      >>=? fun (ctxt, state, paid_storage_size_diff) ->
-      Tx_rollup_state.update ctxt tx_rollup state >>=? fun ctxt ->
+      >>=? fun (ctxt, paid_storage_size_diff) ->
       let result =
         Tx_rollup_dispatch_tickets_result
           {
