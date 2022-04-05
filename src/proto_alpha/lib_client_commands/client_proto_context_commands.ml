@@ -3106,7 +3106,7 @@ let commands_rw () =
            ~name:"messages"
            ~desc:
              "the message(s) to be sent to the rollup (syntax: \
-              bin:<path_to_binary_file>|text:<json list of hex \
+              bin:<path_to_binary_file>|text:<json list of string \
               messages>|file:<json_file>)"
            messages_param
       @@ prefixes ["from"]
@@ -3142,11 +3142,11 @@ let commands_rw () =
         (match messages with
         | `Bin message -> return [message]
         | `Json messages -> (
-            match Data_encoding.(Json.destruct (list bytes) messages) with
+            match Data_encoding.(Json.destruct (list string) messages) with
             | exception _ ->
                 failwith
                   "Could not read list of messages (expected list of bytes)"
-            | messages -> return (List.map Bytes.to_string messages)))
+            | messages -> return messages))
         >>=? fun messages ->
         Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
         let fee_parameter =

@@ -43,20 +43,20 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.000453
+    Fee to the baker: ꜩ0.000457
     Expected counter: 2
     Gas limit: 1752
     Storage limit: 0 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.000453
-      payload fees(the block proposer) ....... +ꜩ0.000453
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000457
+      payload fees(the block proposer) ....... +ꜩ0.000457
     Add a message to the inbox of the smart contract rollup at address [SC_ROLLUP_HASH]
       This operation sending a message to a smart contract rollup was successfully applied
       Consumed gas: 1651.152
       Resulting inbox state: 
          rollup = [SC_ROLLUP_HASH]
          level = 3
-         current messages hash  = CoWRmdEAYVrrgP3b41D4JGBBcWE7yAwDUpsmByQkKgrXgGBXa919
+         current messages hash  = CoWCiKBE7uyrqCwVM1ZRQEXatHvkqQU9GPf94ktpjasEgkRgKst3
          nb_available_messages = 1
          message_counter = 1
          old_levels_messages = 
@@ -80,24 +80,24 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.000453
+    Fee to the baker: ꜩ0.000457
     Expected counter: 3
     Gas limit: 1752
     Storage limit: 0 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.000453
-      payload fees(the block proposer) ....... +ꜩ0.000453
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000457
+      payload fees(the block proposer) ....... +ꜩ0.000457
     Add a message to the inbox of the smart contract rollup at address [SC_ROLLUP_HASH]
       This operation sending a message to a smart contract rollup was successfully applied
       Consumed gas: 1651.344
       Resulting inbox state: 
          rollup = [SC_ROLLUP_HASH]
          level = 4
-         current messages hash  = CoWRmdEAYVrrgP3b41D4JGBBcWE7yAwDUpsmByQkKgrXgGBXa919
+         current messages hash  = CoWCiKBE7uyrqCwVM1ZRQEXatHvkqQU9GPf94ktpjasEgkRgKst3
          nb_available_messages = 2
          message_counter = 1
          old_levels_messages = 
-       content = CoWRmdEAYVrrgP3b41D4JGBBcWE7yAwDUpsmByQkKgrXgGBXa919
+       content = CoWCiKBE7uyrqCwVM1ZRQEXatHvkqQU9GPf94ktpjasEgkRgKst3
        index = 2
        back_pointers = CoUmDifn9cHq3g1wRc8ft64oMz7Jha8f4mcUWZd2YRseVae6MQAN
       CoUmDifn9cHq3g1wRc8ft64oMz7Jha8f4mcUWZd2YRseVae6MQAN
@@ -118,24 +118,24 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.000453
+    Fee to the baker: ꜩ0.000457
     Expected counter: 3
     Gas limit: 1752
     Storage limit: 0 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.000453
-      payload fees(the block proposer) ....... +ꜩ0.000453
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000457
+      payload fees(the block proposer) ....... +ꜩ0.000457
     Add a message to the inbox of the smart contract rollup at address [SC_ROLLUP_HASH]
       This operation sending a message to a smart contract rollup was successfully applied
       Consumed gas: 1651.344
       Resulting inbox state: 
          rollup = [SC_ROLLUP_HASH]
          level = 4
-         current messages hash  = CoWRmdEAYVrrgP3b41D4JGBBcWE7yAwDUpsmByQkKgrXgGBXa919
+         current messages hash  = CoWCiKBE7uyrqCwVM1ZRQEXatHvkqQU9GPf94ktpjasEgkRgKst3
          nb_available_messages = 2
          message_counter = 1
          old_levels_messages = 
-       content = CoWRmdEAYVrrgP3b41D4JGBBcWE7yAwDUpsmByQkKgrXgGBXa919
+       content = CoWCiKBE7uyrqCwVM1ZRQEXatHvkqQU9GPf94ktpjasEgkRgKst3
        index = 2
        back_pointers = CoUmDifn9cHq3g1wRc8ft64oMz7Jha8f4mcUWZd2YRseVae6MQAN
       CoUmDifn9cHq3g1wRc8ft64oMz7Jha8f4mcUWZd2YRseVae6MQAN
@@ -156,26 +156,26 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.000453
+    Fee to the baker: ꜩ0.000457
     Expected counter: 4
     Gas limit: 1752
     Storage limit: 0 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.000453
-      payload fees(the block proposer) ....... +ꜩ0.000453
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000457
+      payload fees(the block proposer) ....... +ꜩ0.000457
     Add a message to the inbox of the smart contract rollup at address [SC_ROLLUP_HASH]
       This operation sending a message to a smart contract rollup was successfully applied
       Consumed gas: 1651.408
       Resulting inbox state: 
          rollup = [SC_ROLLUP_HASH]
          level = 5
-         current messages hash  = CoWRmdEAYVrrgP3b41D4JGBBcWE7yAwDUpsmByQkKgrXgGBXa919
+         current messages hash  = CoWCiKBE7uyrqCwVM1ZRQEXatHvkqQU9GPf94ktpjasEgkRgKst3
          nb_available_messages = 3
          message_counter = 1
          old_levels_messages = 
-       content = CoWRmdEAYVrrgP3b41D4JGBBcWE7yAwDUpsmByQkKgrXgGBXa919
+       content = CoWCiKBE7uyrqCwVM1ZRQEXatHvkqQU9GPf94ktpjasEgkRgKst3
        index = 3
-       back_pointers = CoWKpZY8qq5LbUsnCireMyffiZDhvee6xQPXKaRGkuvsoP2eLMQP
+       back_pointers = CoUybFZtfeEftCQTTS5AM8bvPtyikzL1HUdACbgxd9BrKNJboubL
       CoUmDifn9cHq3g1wRc8ft64oMz7Jha8f4mcUWZd2YRseVae6MQAN
     
     
