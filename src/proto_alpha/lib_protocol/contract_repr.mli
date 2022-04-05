@@ -46,8 +46,6 @@ type contract = t
 
 include Compare.S with type t := contract
 
-val public_key_hash_in_memory_size : Cache_memory_helpers.sint
-
 val in_memory_size : t -> Cache_memory_helpers.sint
 
 (** {2 Implicit contracts} *)
