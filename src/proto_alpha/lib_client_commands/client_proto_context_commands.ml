@@ -101,11 +101,73 @@ let tx_rollup_parameter =
       | Some c -> return c
       | None -> failwith "Parameter '%s' is an invalid tx rollup address" s)
 
-let tx_rollup_param =
+let tx_rollup_param next =
   Clic.param
-    ~name:"tx_rollup address"
-    ~desc:"The tx rollup address that we are sending this batch to."
+    ~name:"tx rollup address"
+    ~desc:"Transaction rollup address to use in a transaction rollup command."
     tx_rollup_parameter
+    next
+
+let tx_rollup_level_parameter =
+  Clic.parameter (fun _ s ->
+      match Int32.of_string_opt s with
+      | Some i ->
+          Lwt.return @@ Environment.wrap_tzresult (Tx_rollup_level.of_int32 i)
+      | None ->
+          failwith
+            "'%s' is not a valid transaction rollup level (should be an int32 \
+             value)"
+            s)
+
+let tx_rollup_level_param next =
+  Clic.param
+    ~name:"tx rollup level"
+    ~desc:"Transaction rollup level to use in a transaction rollup command."
+    tx_rollup_level_parameter
+    next
+
+let tx_rollup_context_hash_parameter =
+  Clic.parameter (fun _ s ->
+      match Context_hash.of_b58check_opt s with
+      | Some hash -> return hash
+      | None -> failwith "%s is not a valid notation for a context hash" s)
+
+let tx_rollup_message_result_path_parameter =
+  Clic.parameter (fun _ s ->
+      match Data_encoding.Json.from_string s with
+      | Ok json -> (
+          try
+            return
+              (Data_encoding.Json.destruct
+                 Tx_rollup_commitment.Merkle.path_encoding
+                 json)
+          with Data_encoding.Json.Cannot_destruct (_path, exn) ->
+            failwith
+              "Invalid JSON for a message result path: %a"
+              (fun ppf -> Data_encoding.Json.print_error ppf)
+              exn)
+      | Error err ->
+          failwith
+            "'%s' is not a valid JSON-encoded message result path: %s"
+            s
+            err)
+
+let tx_rollup_tickets_dispatch_info_parameter =
+  Clic.parameter (fun _ s ->
+      match Data_encoding.Json.from_string s with
+      | Ok json -> (
+          try
+            return (Data_encoding.Json.destruct Tx_rollup_reveal.encoding json)
+          with Data_encoding.Json.Cannot_destruct (_path, exn) ->
+            failwith
+              "Invalid JSON for tickets dispatch info: %a"
+              (fun ppf -> Data_encoding.Json.print_error ppf)
+              exn)
+      | Error err ->
+          failwith
+            "'%s' is not a valid JSON-encoded tickets dispatch info: %s"
+            s
+            err)
 
 let tx_rollup_proof_param =
   Clic.param
@@ -2712,6 +2774,128 @@ let commands_rw () =
               ~previous_context_hash
               ~previous_withdraw_list_hash
               ~previous_message_result_path
+              ()
+            >>=? fun _res -> return_unit);
+    command
+      ~group
+      ~desc:
+        "Dispatch tickets withdrawn from a transaction rollup to owners. The \
+         withdrawals are part of a finalized commitment of the transaction \
+         rollup. Owners are implicit accounts who can then transfer the \
+         tickets to smart contracts using the \"transfer tickets\" command. \
+         See transaction rollups documentation for more information.\n\n\
+         The provided list of ticket information must be ordered as in  \
+         withdrawal list computed by the application of the message. "
+      (args12
+         fee_arg
+         dry_run_switch
+         verbose_signing_switch
+         simulate_switch
+         minimal_fees_arg
+         minimal_nanotez_per_byte_arg
+         minimal_nanotez_per_gas_unit_arg
+         storage_limit_arg
+         counter_arg
+         force_low_fee_arg
+         fee_cap_arg
+         burn_cap_arg)
+      (prefixes ["dispatch"; "tickets"; "of"; "tx"; "rollup"]
+      @@ tx_rollup_param @@ prefix "from"
+      @@ ContractAlias.destination_param
+           ~name:"source"
+           ~desc:"Account used to dispatch tickets."
+      @@ prefixes ["at"; "level"]
+      @@ tx_rollup_level_param
+      @@ prefixes ["for"; "the"; "message"; "at"; "index"]
+      @@ Clic.param
+           ~name:"message index"
+           ~desc:"Index of the message whose withdrawals will be dispatched."
+           int_parameter
+      @@ prefixes ["with"; "the"; "context"; "hash"]
+      @@ Clic.param
+           ~name:"context hash"
+           ~desc:
+             "Context hash (base58 encoded) from the message result of the \
+              message producing the withdrawals."
+           tx_rollup_context_hash_parameter
+      @@ prefixes ["and"; "path"]
+      @@ Clic.param
+           ~name:"message result path"
+           ~desc:
+             "Merkle path (JSON encoded) for the message result hash of the \
+              message producing the withdrawals in the commitment.\n\
+              The JSON should be list of base58-encoded message result hashes."
+           tx_rollup_message_result_path_parameter
+      @@ prefixes ["and"; "tickets"; "info"]
+      @@ seq_of_param
+           (Clic.param
+              ~name:"tickets info"
+              ~desc:
+                "Information (JSON encoded) needed to dispatch tickets to its \
+                 owner.\n\
+                 JSON has the following format: {\"contents\": <tickets \
+                 content>,\"ty\": <tickets type>, \"ticketer\": <ticketer \
+                 contract address>, \"amount\": <withdrawn amount>, \
+                 \"\"claimer\": <new owner's public key hash>}"
+              tx_rollup_tickets_dispatch_info_parameter))
+      (fun ( fee,
+             dry_run,
+             verbose_signing,
+             simulation,
+             minimal_fees,
+             minimal_nanotez_per_byte,
+             minimal_nanotez_per_gas_unit,
+             storage_limit,
+             counter,
+             force_low_fee,
+             fee_cap,
+             burn_cap )
+           tx_rollup
+           (_, source)
+           level
+           message_position
+           context_hash
+           message_result_path
+           tickets_info
+           cctxt ->
+        match Contract.is_implicit source with
+        | None ->
+            failwith
+              "Only implicit account can dispatch tickets for a transaction \
+               rollup."
+        | Some source ->
+            Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+            let fee_parameter =
+              {
+                Injection.minimal_fees;
+                minimal_nanotez_per_byte;
+                minimal_nanotez_per_gas_unit;
+                force_low_fee;
+                fee_cap;
+                burn_cap;
+              }
+            in
+            tx_rollup_dispatch_tickets
+              cctxt
+              ~chain:cctxt#chain
+              ~block:cctxt#block
+              ~dry_run
+              ~verbose_signing
+              ?fee
+              ?storage_limit
+              ?counter
+              ?confirmations:cctxt#confirmations
+              ~simulation
+              ~source
+              ~src_pk
+              ~src_sk
+              ~fee_parameter
+              ~level
+              ~context_hash
+              ~message_position
+              ~message_result_path
+              ~tickets_info
+              ~tx_rollup
               ()
             >>=? fun _res -> return_unit);
     command

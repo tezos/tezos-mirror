@@ -604,6 +604,35 @@ val submit_tx_rollup_return_bond :
   tzresult
   Lwt.t
 
+val tx_rollup_dispatch_tickets :
+  #Protocol_client_context.full ->
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
+  ?confirmations:int ->
+  ?dry_run:bool ->
+  ?verbose_signing:bool ->
+  ?simulation:bool ->
+  ?fee:Tez.tez ->
+  ?gas_limit:Gas.Arith.integral ->
+  ?storage_limit:Z.t ->
+  ?counter:Z.t ->
+  source:Signature.public_key_hash ->
+  src_pk:Signature.public_key ->
+  src_sk:Client_keys.sk_uri ->
+  fee_parameter:Injection.fee_parameter ->
+  level:Tx_rollup_level.t ->
+  context_hash:Context_hash.t ->
+  message_position:int ->
+  message_result_path:Tx_rollup_commitment.Merkle.path ->
+  tickets_info:Tx_rollup_reveal.t list ->
+  tx_rollup:Tx_rollup.t ->
+  unit ->
+  (Operation_hash.t
+  * Kind.tx_rollup_dispatch_tickets Kind.manager contents
+  * Kind.tx_rollup_dispatch_tickets Kind.manager Apply_results.contents_result)
+  tzresult
+  Lwt.t
+
 val sc_rollup_originate :
   #Protocol_client_context.full ->
   chain:Chain_services.chain ->
