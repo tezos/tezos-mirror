@@ -3,6 +3,33 @@
 Changelog
 '''''''''
 
+Version 12.3
+============
+
+- Fixed a bug that prevented the store from
+  decoding metadata from previous versions of Octez.
+  This bug caused the store to systematically have to restore
+  its consistency on startup.
+
+- **Breaking change**:
+  Exported snapshots now have version number 3 (previously 2).
+  Snapshots exported by nodes running previous versions of Octez can still be
+  imported by a v12.3 node, but snapshots exported by a v12.3 node cannot
+  be imported by nodes running previous versions.
+
+  Please note that snapshots exported with versions 12.1 and 12.2
+  of Octez cannot be imported with previous versions of Octez either,
+  but their version number was not increased, leading to less clear
+  error messages when trying to import them from previous versions.
+  It is thus recommended to avoid exporting snapshots with versions
+  12.1 or 12.2 of Octez.
+
+- Increased the maximum size of requests to sign a block header with a
+  Ledger in order to take into account Tenderbake block headers which
+  are reproposals of a block at an higher round.
+  Combined with an incoming update of the Ledger baking app,
+  this fixes a case where the Ledger failed to sign blocks.
+
 Version 12.2
 ============
 
