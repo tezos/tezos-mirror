@@ -55,6 +55,10 @@ type options = {
       (** If set (default), the tool will only systematically output validator plots.
           Other kinds of plots will be output conditionally on unspecified
           heuristics. *)
+  plot_raw_workload : bool;
+      (** If set to [true], plots histograms of raw timings for all measurements.
+          Plots are produced in [save_directory].
+          By default, set to [false] *)
 }
 
 (** Encoding for options. *)
