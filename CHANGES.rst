@@ -74,6 +74,14 @@ Node
   Octez can still be imported. Snapshots of version 4 cannot be
   imported with Octez prior to version 13.0.
 
+- Added optional query parameter ``force_metadata`` to the ``GET
+  /chains/<chain>/blocks/<block>/`` and ``GET
+  /chains/<chain>/blocks/<block>/operations/`` RPCs. Passing this
+  parameter forces the re-computation of operation metadata that were
+  considered as too large, even if they exceed the configured limit. The
+  re-computed metadata are not stored on disk after this call, they are
+  just returned.
+
 Client
 ------
 
