@@ -277,6 +277,7 @@ module Timestamp = struct
           ignore (Alpha_context.Script_timestamp.to_string tstamp_string)
         in
         Generator.Plain {workload = (); closure})
+      ()
 
   let () =
     Registration_helpers.register
@@ -298,6 +299,7 @@ module Timestamp = struct
           ignore (Alpha_context.Script_timestamp.of_string tstamp_string)
         in
         Generator.Plain {workload = (); closure})
+      ()
 end
 
 (* when benchmarking, compile bls12-381 without ADX, see
@@ -306,54 +308,75 @@ end
 module BLS = struct
   open Tezos_shell_benchmarks.Encoding_benchmarks_helpers
 
+  let check () =
+    if not Bls12_381.built_with_blst_portable then (
+      Format.eprintf
+        "BLS must be built without ADX to run the BLS benchmarks. Try \
+         compiling again after setting the environment variable BLST_PORTABLE. \
+         Aborting.@." ;
+      Stdlib.failwith "bls_not_built_with_blst_portable")
+
   let () =
     Registration_helpers.register
     @@ make_encode_fixed_size_to_bytes
+         ~check
          ~name:"ENCODING_BLS_FR"
          ~to_bytes:Bls12_381.Fr.to_bytes
          ~generator:(fun rng_state -> Bls12_381.Fr.random ~state:rng_state ())
+         ()
 
   let () =
     Registration_helpers.register
     @@ make_encode_fixed_size_to_bytes
+         ~check
          ~name:"ENCODING_BLS_G1"
          ~to_bytes:Bls12_381.G1.to_bytes
          ~generator:(fun rng_state -> Bls12_381.G1.random ~state:rng_state ())
+         ()
 
   let () =
     Registration_helpers.register
     @@ make_encode_fixed_size_to_bytes
+         ~check
          ~name:"ENCODING_BLS_G2"
          ~to_bytes:Bls12_381.G2.to_bytes
          ~generator:(fun rng_state -> Bls12_381.G2.random ~state:rng_state ())
+         ()
 
   let () =
     Registration_helpers.register
     @@ make_decode_fixed_size_from_bytes
+         ~check
          ~name:"DECODING_BLS_FR"
          ~to_bytes:Bls12_381.Fr.to_bytes
          ~from_bytes:Bls12_381.Fr.of_bytes_exn
          ~generator:(fun rng_state -> Bls12_381.Fr.random ~state:rng_state ())
+         ()
 
   let () =
     Registration_helpers.register
     @@ make_decode_fixed_size_from_bytes
+         ~check
          ~name:"DECODING_BLS_G1"
          ~to_bytes:Bls12_381.G1.to_bytes
          ~from_bytes:Bls12_381.G1.of_bytes_exn
          ~generator:(fun rng_state -> Bls12_381.G1.random ~state:rng_state ())
+         ()
 
   let () =
     Registration_helpers.register
     @@ make_decode_fixed_size_from_bytes
+         ~check
          ~name:"DECODING_BLS_G2"
          ~to_bytes:Bls12_381.G2.to_bytes
          ~from_bytes:Bls12_381.G2.of_bytes_exn
          ~generator:(fun rng_state -> Bls12_381.G2.random ~state:rng_state ())
+         ()
 
   let () =
     Registration_helpers.register
     @@ fixed_size_shared
+         ~check
          ~name:"BLS_FR_FROM_Z"
          ~generator:(fun rng_state -> Bls12_381.Fr.random ~state:rng_state ())
          ~make_bench:(fun generator () ->
@@ -361,16 +384,19 @@ module BLS = struct
            let z = Bls12_381.Fr.to_z generated in
            let closure () = ignore (Bls12_381.Fr.of_z z) in
            Generator.Plain {workload = (); closure})
+         ()
 
   let () =
     Registration_helpers.register
     @@ fixed_size_shared
+         ~check
          ~name:"BLS_FR_TO_Z"
          ~generator:(fun rng_state -> Bls12_381.Fr.random ~state:rng_state ())
          ~make_bench:(fun generator () ->
            let generated = generator () in
            let closure () = ignore (Bls12_381.Fr.to_z generated) in
            Generator.Plain {workload = (); closure})
+         ()
 end
 
 module Timelock = struct
@@ -397,6 +423,7 @@ module Timelock = struct
          ~generator:(fun rng_state ->
            let ((chest, _), plaintext_size) = generator rng_state in
            (chest, {bytes = plaintext_size}))
+         ()
 
   let () =
     Registration_helpers.register
@@ -407,6 +434,7 @@ module Timelock = struct
          ~generator:(fun rng_state ->
            let ((_, chest_key), _w) = generator rng_state in
            chest_key)
+         ()
 
   let () =
     Registration_helpers.register
@@ -420,6 +448,7 @@ module Timelock = struct
              Data_encoding.Binary.to_bytes_exn Timelock.chest_encoding chest
            in
            (chest, {bytes = Bytes.length b}))
+         ()
 
   let () =
     Registration_helpers.register
@@ -432,4 +461,5 @@ module Timelock = struct
          ~generator:(fun rng_state ->
            let ((_, chest_key), _w) = generator rng_state in
            chest_key)
+         ()
 end
