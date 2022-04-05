@@ -52,8 +52,8 @@ let public_key_hash_in_memory_size =
 let in_memory_size =
   let open Cache_memory_helpers in
   function
-  | Implicit _ -> header_size +! word_size +! public_key_hash_in_memory_size
-  | Originated _ -> header_size +! word_size +! blake2b_hash_size
+  | Implicit _ -> h1w +! public_key_hash_in_memory_size
+  | Originated _ -> h1w +! blake2b_hash_size
 
 type error += Invalid_contract_notation of string (* `Permanent *)
 

@@ -114,7 +114,7 @@ let hh8w = (word_size *? 8) +! (header_size *? 2)
 
 let z_size z =
   let numbits = Z.numbits z in
-  if Compare.Int.(numbits <= 62) then !!0 else (word_size *? Z.size z) +? 32
+  if Compare.Int.(numbits <= 62) then !!0 else (word_size *? Z.size z) +? 24
 
 let string_size_gen len = header_size +? (len + (8 - (len mod 8)))
 
