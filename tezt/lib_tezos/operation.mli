@@ -448,4 +448,27 @@ val inject_rejection :
   previous_message_context_hash:string ->
   previous_message_withdraw_list_hash:string ->
   Client.t ->
-  [> `OpHash of string] Lwt.t
+  [`OpHash of string] Lwt.t
+
+(** [inject_transfer_ticket] constructs and injects a mangager operation
+    representing a transfer ticket operation. *)
+val inject_transfer_ticket :
+  ?protocol:Protocol.t ->
+  ?async:bool ->
+  ?force:bool ->
+  ?wait_for_injection:Node.t ->
+  ?branch:string ->
+  source:Account.key ->
+  ?signer:Account.key ->
+  ?counter:int ->
+  ?fee:int ->
+  ?gas_limit:int ->
+  ?storage_limit:int ->
+  contents:micheline ->
+  ty:micheline ->
+  ticketer:string ->
+  amount:int ->
+  destination:string ->
+  entrypoint:string ->
+  Client.t ->
+  [`OpHash of string] Lwt.t

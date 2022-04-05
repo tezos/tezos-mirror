@@ -58,6 +58,14 @@ type manager_op_kind =
       previous_message_withdraw_list_hash : string;
     }
   | Delegation of (* public key hash *) string
+  | Transfer_ticket of {
+      contents : micheline;
+      ty : micheline;
+      ticketer : string;
+      amount : int;
+      destination : string;
+      entrypoint : string;
+    }
 
 (* This is the manager operations' content type *)
 type manager_operation_content = {
@@ -161,6 +169,12 @@ let mk_rejection ~source ?counter ?(fee = 1_000_000) ?(gas_limit = 1_000_000)
          previous_message_withdraw_list_hash;
        }
 
+let mk_transfer_ticket ~source ?counter ?(fee = 1_000_000)
+    ?(gas_limit = 1_000_000) ?(storage_limit = 0) ~contents ~ty ~ticketer
+    ~amount ~destination ~entrypoint client =
+  mk_manager_op ~source ?counter ~fee ~gas_limit ~storage_limit client
+  @@ Transfer_ticket {contents; ty; ticketer; amount; destination; entrypoint}
+
 let mk_origination ~source ?counter ?(fee = 1_000_000) ?(gas_limit = 100_000)
     ?(storage_limit = 10_000) ~code ~init_storage ?(init_balance = 0) client =
   mk_manager_op ~source ?counter ~fee ~gas_limit ~storage_limit client
@@ -176,7 +190,8 @@ let manager_op_content_to_json_string
       ?(message_position = `Null) ?(message_path = `Null) ?(level = `Null)
       ?(previous_message_result = `Null) ?(message_result_hash = `Null)
       ?(message_result_path = `Null) ?(previous_message_result_path = `Null)
-      kind =
+      ?(ticket_contents = `Null) ?(ticket_ty = `Null) ?(ticket_ticketer = `Null)
+      ?(ticket_amount = `Null) ?(entrypoint = `Null) kind =
     let filter = List.filter (fun (_k, v) -> v <> `Null) in
     return
     @@ `O
@@ -200,6 +215,7 @@ let manager_op_content_to_json_string
               (* Smart Contract origination *)
               ("balance", balance);
               ("script", script);
+              (* Rejection *)
               ("proof", proof);
               ("rollup", rollup);
               ("message", message);
@@ -210,6 +226,12 @@ let manager_op_content_to_json_string
               ("message_result_hash", message_result_hash);
               ("message_result_path", message_result_path);
               ("previous_message_result_path", previous_message_result_path);
+              (* Transfer ticket *)
+              ("ticket_contents", ticket_contents);
+              ("ticket_ty", ticket_ty);
+              ("ticket_ticketer", ticket_ticketer);
+              ("ticket_amount", ticket_amount);
+              ("entrypoint", entrypoint);
             ])
   in
   match op_kind with
@@ -278,6 +300,17 @@ let manager_op_content_to_json_string
         ~message_result_path
         ~previous_message_result_path
         "tx_rollup_rejection"
+  | Transfer_ticket {contents; ty; ticketer; amount; destination; entrypoint} ->
+      let* ticket_contents = data_to_json client contents in
+      let* ticket_ty = data_to_json client ty in
+      mk_jsonm
+        ~ticket_amount:(jz_string_of_int amount)
+        ~destination:(Ezjsonm.string destination)
+        ~ticket_contents
+        ~ticket_ty
+        ~ticket_ticketer:(Ezjsonm.string ticketer)
+        ~entrypoint:(Ezjsonm.string entrypoint)
+        "transfer_ticket"
 
 (* construct a JSON operations with contents and branch *)
 let manager_op_to_json_string ~branch operations_json =
@@ -475,6 +508,34 @@ let inject_rejection ?protocol ?async ?force ?wait_for_injection ?branch ~source
       ~previous_message_context_hash
       ~previous_message_withdraw_list_hash
       client
+  in
+  forge_and_inject_operation
+    ?protocol
+    ?async
+    ?force
+    ?wait_for_injection
+    ?branch
+    ~batch:[op]
+    ~signer
+    client
+
+let inject_transfer_ticket ?protocol ?async ?force ?wait_for_injection ?branch
+    ~source ?(signer = source) ?counter ?fee ?gas_limit ?storage_limit ~contents
+    ~ty ~ticketer ~amount ~destination ~entrypoint client =
+  let* op =
+    mk_transfer_ticket
+      ~source
+      ?counter
+      ?fee
+      ?gas_limit
+      ?storage_limit
+      client
+      ~contents
+      ~ty
+      ~ticketer
+      ~amount
+      ~destination
+      ~entrypoint
   in
   forge_and_inject_operation
     ?protocol
