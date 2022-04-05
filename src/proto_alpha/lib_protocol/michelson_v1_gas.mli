@@ -443,8 +443,6 @@ module Cost_of : sig
 
     val timestamp_readable : Gas.cost
 
-    val contract : Gas.cost
-
     val tx_rollup_l2_address : Gas.cost
 
     val contract_exists : Gas.cost
@@ -496,8 +494,6 @@ module Cost_of : sig
     val unparse_data_cycle : Gas.cost
 
     val unit : Gas.cost
-
-    val contract : Gas.cost
 
     val tx_rollup_l2_address : Gas.cost
 

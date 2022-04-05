@@ -1664,7 +1664,7 @@ module Cost_of = struct
     let contract_optimized = key_hash_optimized
 
     (* Reasonable approximation *)
-    let contract_readable = key_hash_readable
+    let contract_readable = Gas.(S.safe_int 2 *@ key_hash_readable)
 
     let bls12_381_g1 = atomic_step_cost cost_DECODING_BLS_G1
 
@@ -1696,9 +1696,6 @@ module Cost_of = struct
     let unit = free
 
     let timestamp_readable = atomic_step_cost cost_TIMESTAMP_READABLE_DECODING
-
-    (* Reasonable estimate. *)
-    let contract = Gas.(S.safe_int 2 *@ public_key_readable)
 
     (** TODO: https://gitlab.com/tezos/tezos/-/issues/2340
         Refine the gas model *)
@@ -1810,9 +1807,6 @@ module Cost_of = struct
     let unparse_data_cycle = atomic_step_cost cost_UNPARSING_DATA
 
     let unit = Gas.free
-
-    (* Reasonable estimate. *)
-    let contract = Gas.(S.safe_int 2 *@ public_key_readable)
 
     (** TODO: https://gitlab.com/tezos/tezos/-/issues/2340
         Refine the gas model *)
