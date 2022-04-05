@@ -77,7 +77,7 @@ end) : Internal_event.SINK with type t = t = struct
     | `Stderr -> "file-descriptor-stderr"
 
   let configure uri =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let fail_parsing fmt =
       Format.kasprintf (failwith "Parsing URI: %s: %s" (Uri.to_string uri)) fmt
     in
@@ -209,7 +209,7 @@ end) : Internal_event.SINK with type t = t = struct
 
   let handle (type a) {output; lwt_bad_citizen_hack; filter; format; _} m
       ?(section = Internal_event.Section.empty) (v : unit -> a) =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let module M = (val m : Internal_event.EVENT_DEFINITION with type t = a) in
     let now = Unix.gettimeofday () in
     let forced_event = v () in
@@ -272,7 +272,7 @@ end) : Internal_event.SINK with type t = t = struct
     else return_unit
 
   let close {lwt_bad_citizen_hack; output; _} =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let* () =
       List.iter_es
         (fun event_string -> output_one output event_string)

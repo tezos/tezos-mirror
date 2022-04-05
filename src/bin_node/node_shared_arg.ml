@@ -108,7 +108,7 @@ let () =
     (fun (status, body) -> Network_http_error (status, body))
 
 let decode_net_config source json =
-  let open Tzresult_syntax in
+  let open Result_syntax in
   match
     Data_encoding.Json.destruct
       Node_config_file.blockchain_network_encoding
@@ -117,16 +117,16 @@ let decode_net_config source json =
   | net_cfg -> return net_cfg
   | exception Json_encoding.Cannot_destruct (path, exn) ->
       let path = Json_query.json_pointer_of_path path in
-      fail (Invalid_network_config (path, Printexc.to_string exn))
+      tzfail (Invalid_network_config (path, Printexc.to_string exn))
   | exception
       (( Json_encoding.Unexpected _ | Json_encoding.No_case_matched _
        | Json_encoding.Bad_array_size _ | Json_encoding.Missing_field _
        | Json_encoding.Unexpected_field _ | Json_encoding.Bad_schema _ ) as exn)
     ->
-      fail (Invalid_network_config (source, Printexc.to_string exn))
+      tzfail (Invalid_network_config (source, Printexc.to_string exn))
 
 let load_net_config =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   function
   | BuiltIn net -> return net
   | Url uri ->
@@ -137,9 +137,9 @@ let load_net_config =
         | `OK -> (
             try return (Ezjsonm.from_string body_str)
             with Ezjsonm.Parse_error (_, msg) ->
-              fail (Invalid_network_config (Uri.to_string uri, msg)))
+              tzfail (Invalid_network_config (Uri.to_string uri, msg)))
         | #Cohttp.Code.status_code ->
-            fail (Network_http_error (resp.status, body_str))
+            tzfail (Network_http_error (resp.status, body_str))
       in
       let*? net_config = decode_net_config (Uri.to_string uri) netconfig in
       return net_config
@@ -668,13 +668,13 @@ module Term = struct
 end
 
 let read_config_file args =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   if Sys.file_exists args.config_file then
     Node_config_file.read args.config_file
   else return Node_config_file.default_config
 
 let read_data_dir args =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let* cfg = read_config_file args in
   let {data_dir; _} = args in
   let data_dir = Option.value ~default:cfg.data_dir data_dir in
@@ -750,7 +750,7 @@ end
 
 let read_and_patch_config_file ?(may_override_network = false)
     ?(ignore_bootstrap_peers = false) args =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let* cfg = read_config_file args in
   let {
     data_dir;
@@ -791,7 +791,7 @@ let read_and_patch_config_file ?(may_override_network = false)
   let* synchronisation_threshold =
     match (bootstrap_threshold, synchronisation_threshold) with
     | (Some _, Some _) ->
-        fail
+        tzfail
           (Invalid_command_line_arguments
              "--bootstrap-threshold is deprecated; use \
               --synchronisation-threshold instead. Do not use both at the same \
@@ -822,7 +822,7 @@ let read_and_patch_config_file ?(may_override_network = false)
             net.chain_name
         then return_unit
         else
-          fail
+          tzfail
             (Network_configuration_mismatch
                {
                  configuration_file_chain_name =

@@ -39,7 +39,7 @@ let operation_param ~name ~desc t =
     t
 
 let commands () =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let open Clic in
   let group =
     {

@@ -122,7 +122,7 @@ let list_blocks chain_store ?(length = 1) ?min_date heads =
   return (List.rev blocks)
 
 let rpc_directory validator =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let dir : Store.chain_store RPC_directory.t ref = ref RPC_directory.empty in
   let register0 s f =
     dir :=

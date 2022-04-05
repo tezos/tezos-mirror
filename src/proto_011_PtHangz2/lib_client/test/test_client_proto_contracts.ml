@@ -57,7 +57,7 @@ class mock_wallet (entities : string) : Tezos_client_base.Client_context.wallet
       fun _alias_name _list _encoding -> failwith "mock_wallet:write"
 
     method last_modification_time : string -> float option tzresult Lwt.t =
-      fun _ -> Lwt_tzresult_syntax.return_none
+      fun _ -> Lwt_result_syntax.return_none
   end
 
 (**

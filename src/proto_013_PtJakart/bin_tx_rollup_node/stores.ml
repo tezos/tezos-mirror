@@ -388,10 +388,10 @@ module L2_block_store = struct
     Cache.find_or_replace store.cache hash read_from_disk
 
   let locked_write_block store ~offset ~block ~hash =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let* block_bytes =
       match Data_encoding.Binary.to_bytes_opt L2_blocks_file.encoding block with
-      | None -> fail (Cannot_encode_block hash)
+      | None -> tzfail (Cannot_encode_block hash)
       | Some bytes -> return bytes
     in
     let block_length = Bytes.length block_bytes in
@@ -562,13 +562,13 @@ struct
           (Bytes.unsafe_of_string bytes)
 
   let write store x =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let*! res =
       Lwt_utils_unix.with_atomic_open_out ~overwrite:true store.file
       @@ fun fd ->
       let* block_bytes =
         match Data_encoding.Binary.to_bytes_opt S.encoding x with
-        | None -> fail (Cannot_encode_data S.name)
+        | None -> tzfail (Cannot_encode_data S.name)
         | Some bytes -> return bytes
       in
       let*! () = Lwt_utils_unix.write_bytes fd block_bytes in
@@ -576,7 +576,7 @@ struct
     in
     match res with
     | Ok res -> Lwt.return res
-    | Error _ -> fail (Cannot_write_file S.name)
+    | Error _ -> tzfail (Cannot_write_file S.name)
 
   let init ~data_dir =
     let file = Filename.Infix.(Node_data.store_dir data_dir // S.name) in

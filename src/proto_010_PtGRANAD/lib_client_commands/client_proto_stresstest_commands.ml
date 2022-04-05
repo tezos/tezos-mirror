@@ -316,7 +316,7 @@ let generate_fresh_source pool rng =
 let heads_iter (cctxt : Protocol_client_context.full)
     (f : Block_hash.t * Tezos_base.Block_header.t -> unit Lwt.t) :
     unit tzresult Lwt.t =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   Error_monad.protect
     (fun () ->
       let* (heads_stream, stopper) = Shell_services.Monitor.heads cctxt `Main in

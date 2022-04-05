@@ -48,7 +48,7 @@ let p2p_peer_id_param ~name ~desc t =
     t
 
 let commands () =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let open Clic in
   [
     command

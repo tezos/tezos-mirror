@@ -39,7 +39,7 @@ include Internal_event.Legacy_logging.Make (struct
 end)
 
 let tzassert b pos =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let p (file, lnum, cnum, _) = (file, lnum, cnum) in
   if b then return_unit else fail_with_exn (Assert_failure (p pos))
 
@@ -129,7 +129,7 @@ module Crypto_test = struct
     tzassert (payload_length = i) __POS__
 
   let read_chunk fd cryptobox_data =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let header_buf = Bytes.create header_length in
     let* i = return (Unix.read fd header_buf 0 header_length) in
     let* () = tzassert (header_length = i) __POS__ in

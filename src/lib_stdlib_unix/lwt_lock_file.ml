@@ -28,7 +28,7 @@ open Error_monad
 
 let try_with_lock ~when_locked ~filename f =
   protect (fun () ->
-      let open Lwt_tzresult_syntax in
+      let open Lwt_result_syntax in
       let flags =
         let open Unix in
         [O_CLOEXEC; O_TRUNC; O_CREAT; O_WRONLY]
@@ -44,7 +44,7 @@ let try_with_lock ~when_locked ~filename f =
               (function
                 | Unix.Unix_error ((EAGAIN | EACCES | EDEADLK), _, _) ->
                     return `Locked
-                | exn -> fail (Exn exn))
+                | exn -> tzfail (Exn exn))
           in
           match lock_status with
           | `Locked -> when_locked ()

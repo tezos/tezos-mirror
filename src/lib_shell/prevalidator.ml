@@ -1124,7 +1124,7 @@ module Make
 
   let build_rpc_directory w =
     lazy
-      (let open Lwt_tzresult_syntax in
+      (let open Lwt_result_syntax in
       let dir : state RPC_directory.t ref = ref RPC_directory.empty in
       let module Proto_services =
         Block_services.Make (Filter.Proto) (Filter.Proto)
@@ -1568,7 +1568,7 @@ module Make
       | View (Notify _) | View Leftover | View (Arrived _) | View Advertise ->
           Event.(emit request_completed_debug) (Request.view r, st)
 
-    let on_no_request _ = Lwt_tzresult_syntax.return_unit
+    let on_no_request _ = Lwt_result_syntax.return_unit
   end
 
   let table = Worker.create_table Queue

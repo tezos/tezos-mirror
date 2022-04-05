@@ -318,7 +318,7 @@ module Make (E : MENV) = struct
   module Trashpool = Rw (Files.Trashpool)
 
   let to_applied (shell_header, operation_data) =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let op =
       {E.Protocol.shell = shell_header; protocol_data = operation_data}
     in
@@ -406,7 +406,7 @@ module Make (E : MENV) = struct
                RPC_answer.return set))
 
   let simulate_operation (validation_state, preapply_result) op =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     match
       Data_encoding.Binary.to_bytes
         E.Protocol.operation_data_encoding
@@ -440,7 +440,7 @@ module Make (E : MENV) = struct
                 } ))
 
   let preapply_block () =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     Directory.prefix
       (Tezos_rpc.RPC_path.prefix
          (* /chains/<chain> *)
@@ -526,7 +526,7 @@ module Make (E : MENV) = struct
                | Ok v -> RPC_answer.return v))
 
   let preapply () =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     Directory.prefix
       (Tezos_rpc.RPC_path.prefix
          (* /chains/<chain> *)
@@ -579,7 +579,7 @@ module Make (E : MENV) = struct
     Stdlib.compare a_operation_data b_operation_data = 0
 
   let need_operation op =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let* mempool_operations = Mempool.read () in
     if List.mem ~equal:equal_op op mempool_operations then return `Equal
     else
@@ -603,7 +603,7 @@ module Make (E : MENV) = struct
     failwith "%s" notification_msg
 
   let inject_operation_with_mempool operation_bytes =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     match Data_encoding.Binary.of_bytes Operation.encoding operation_bytes with
     | Error _ -> RPC_answer.fail [Cannot_parse_op]
     | Ok ({Operation.shell = shell_header; proto} as op) -> (
@@ -675,7 +675,7 @@ module Make (E : MENV) = struct
 
   let inject_block_generic (write_context_callback : callback_writer)
       (update_mempool_callback : Operation.t list list -> unit tzresult Lwt.t) =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let reconstruct (operations : Operation.t list list)
         (block_header : Block_header.t) =
       match
@@ -758,7 +758,7 @@ module Make (E : MENV) = struct
       and uses a mempool. *)
   let inject_block (write_context_callback : callback_writer) =
     inject_block_generic write_context_callback (fun operations ->
-        let open Lwt_tzresult_syntax in
+        let open Lwt_result_syntax in
         let* mempool_operations = Mempool.read () in
         let* mempool_map =
           List.fold_left_es

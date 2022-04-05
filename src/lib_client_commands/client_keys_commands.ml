@@ -32,7 +32,7 @@ let group =
   }
 
 let algo_param () =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   Clic.parameter
     ~autocomplete:(fun _ -> return ["ed25519"; "secp256k1"; "p256"])
     (fun _ name ->
@@ -57,7 +57,7 @@ let sig_algo_arg =
 
 let gen_keys_containing ?(encrypted = false) ?(prefix = false) ?(force = false)
     ~containing ~name (cctxt : #Client_context.io_wallet) =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let unrepresentable =
     List.filter
       (fun s ->
@@ -178,7 +178,7 @@ let gen_keys_containing ?(encrypted = false) ?(prefix = false) ?(force = false)
             return_unit)
 
 let rec input_fundraiser_params (cctxt : #Client_context.io_wallet) =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let rec get_boolean_answer (cctxt : #Client_context.io_wallet) ~default ~msg =
     let prompt = if default then "(Y/n/q)" else "(y/N/q)" in
     let* gen = cctxt#prompt "%s %s: " msg prompt in
@@ -225,7 +225,7 @@ let rec input_fundraiser_params (cctxt : #Client_context.io_wallet) =
       match b with true -> return sk | false -> input_fundraiser_params cctxt)
 
 let fail_if_already_registered cctxt force pk_uri name =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let* o = Public_key.find_opt cctxt name in
   match o with
   | None -> return_unit
@@ -243,7 +243,7 @@ let keys_count_param =
     ~name:"keys_count"
     ~desc:"How many keys to generate"
     (parameter (fun _ s ->
-         let open Lwt_tzresult_syntax in
+         let open Lwt_result_syntax in
          match int_of_string_opt s with
          | None -> failwith "number of keys must be an integer"
          | Some x ->
@@ -309,7 +309,7 @@ let generate_test_keys =
       return_unit)
 
 let aggregate_fail_if_already_registered cctxt force pk_uri name =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let* pk_opt = Aggregate_alias.Public_key.find_opt cctxt name in
   match pk_opt with
   | None -> return_unit
@@ -322,7 +322,7 @@ let aggregate_fail_if_already_registered cctxt force pk_uri name =
            name)
 
 let commands network : Client_context.full Clic.command list =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let open Clic in
   let encrypted_switch () =
     if

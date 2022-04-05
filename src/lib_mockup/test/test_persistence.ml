@@ -41,7 +41,7 @@ let check_base_dir s bd1 bd2 = Alcotest.check base_dir_class_testable s bd1 bd2
 
 (** [classify_base_dir] a non existing directory *)
 let test_classify_does_not_exist =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   Tztest.tztest "Classify a non existing directory" `Quick (fun () ->
       Lwt_utils_unix.with_tempdir "test_persistence" (fun base_dir ->
           let+ bd =
@@ -52,7 +52,7 @@ let test_classify_does_not_exist =
 
 (** [classify_base_dir] a file *)
 let test_classify_is_file =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   Tztest.tztest "Classify a file" `Quick (fun () ->
       let tmp_file = Filename.temp_file "" "" in
       let+ bd = Persistence.classify_base_dir tmp_file in
@@ -60,7 +60,7 @@ let test_classify_is_file =
 
 (** [classify_base_dir] a mockup directory *)
 let test_classify_is_mockup =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   Tztest.tztest "Classify a mockup directory" `Quick (fun () ->
       Lwt_utils_unix.with_tempdir "test_persistence" (fun dirname ->
           let mockup_directory = (Files.get_mockup_directory ~dirname :> string)
@@ -72,7 +72,7 @@ let test_classify_is_mockup =
 
 (** [classify_base_dir] a non empty directory *)
 let test_classify_is_nonempty =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   Tztest.tztest "Classify a non empty directory" `Quick (fun () ->
       Lwt_utils_unix.with_tempdir "test_persistence" (fun temp_dir ->
           let _ = Filename.temp_file ~temp_dir "" "" in
@@ -81,7 +81,7 @@ let test_classify_is_nonempty =
 
 (** [classify_base_dir] an empty directory *)
 let test_classify_is_empty =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   Tztest.tztest "Classify an empty directory" `Quick (fun () ->
       Lwt_utils_unix.with_tempdir "test_persistence" (fun base_dir ->
           let+ bd = Persistence.classify_base_dir base_dir in

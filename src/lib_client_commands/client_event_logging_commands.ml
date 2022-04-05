@@ -32,7 +32,7 @@ let group =
 
 let date_parameter option_name build =
   let open Clic in
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   parameter (fun _ s ->
       let problem fmt = Printf.ksprintf invalid_arg fmt in
       try
@@ -79,7 +79,7 @@ let flat_pp pp o =
       ())
 
 let commands () =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let open Clic in
   let command ~desc = command ~group ~desc in
   [

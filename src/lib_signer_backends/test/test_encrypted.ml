@@ -105,7 +105,7 @@ let fake_ctx () : Client_context.io_wallet =
       fun _ _ _ -> Lwt.return_ok ()
 
     method last_modification_time : string -> float option tzresult Lwt.t =
-      fun _ -> Lwt_tzresult_syntax.return_none
+      fun _ -> Lwt_result_syntax.return_none
   end
 
 let make_sk_uris =

@@ -133,7 +133,7 @@ module Make (Client : Resto_cohttp_client.Client.CALL) = struct
 
   let request_failed meth uri error =
     let meth = (meth : [< RPC_service.meth] :> RPC_service.meth) in
-    Lwt_tzresult_syntax.fail
+    Lwt_result_syntax.tzfail
       (RPC_client_errors.Request_failed {meth; uri; error})
 
   let generic_call ?headers ?accept ?body ?media meth uri :
@@ -304,7 +304,7 @@ module Make (Client : Resto_cohttp_client.Client.CALL) = struct
   (* This function checks that the content type of the answer belongs to accepted ones in [accept]. If not, it is processed as an error. If the answer lacks content-type, the response is decoded as JSON if possible. *)
   let generic_media_type_call ?headers ~accept ?body meth uri :
       RPC_context.generic_call_result tzresult Lwt.t =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let body =
       Option.map
         (fun b -> Cohttp_lwt.Body.of_string (Data_encoding.Json.to_string b))
@@ -342,17 +342,17 @@ module Make (Client : Resto_cohttp_client.Client.CALL) = struct
         | Error _ -> return (`Other (content_type, other_resp)))
 
   let handle accept (meth, uri, ans) =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     match ans with
     | `Ok (Some v) -> return v
     | `Ok None -> request_failed meth uri Empty_answer
-    | `Gone None -> fail (RPC_context.Gone {meth; uri})
+    | `Gone None -> tzfail (RPC_context.Gone {meth; uri})
     | `Not_found None ->
         (* The client's proxy mode matches on the error raised here,
            to detect that a local RPC is unavailable at call_service and
            call_streamed_service, and hence that delegation
            to the endpoint must be done. *)
-        fail (RPC_context.Not_found {meth; uri})
+        tzfail (RPC_context.Not_found {meth; uri})
     | `Conflict (Some err)
     | `Error (Some err)
     | `Forbidden (Some err)
@@ -363,7 +363,7 @@ module Make (Client : Resto_cohttp_client.Client.CALL) = struct
     | `Unauthorized None -> request_failed meth uri Unauthorized_uri
     | `Forbidden None -> request_failed meth uri Forbidden
     | `Conflict None | `Error None ->
-        fail (RPC_context.Generic_error {meth; uri})
+        tzfail (RPC_context.Generic_error {meth; uri})
     | `Unexpected_status_code (code, (content, _, media_type)) ->
         let media_type = Option.map Media_type.name media_type in
         let*! content = Cohttp_lwt.Body.to_string content in

@@ -178,7 +178,7 @@ let compute_predecessors block_store block =
     [distance] from the block with corresponding [hash] by every store
     iteratively. *)
 let get_hash block_store (Block (block_hash, offset)) =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   Lwt_idle_waiter.task block_store.merge_scheduler (fun () ->
       let closest_power_two n =
         if n < 0 then assert false
@@ -188,7 +188,7 @@ let get_hash block_store (Block (block_hash, offset)) =
       in
       (* actual predecessor function *)
       if offset = 0 then return_some block_hash
-      else if offset < 0 then fail (Wrong_predecessor (block_hash, offset))
+      else if offset < 0 then tzfail (Wrong_predecessor (block_hash, offset))
       else
         let rec loop block_hash offset =
           if offset = 1 then
@@ -218,7 +218,7 @@ let get_hash block_store (Block (block_hash, offset)) =
         loop block_hash offset)
 
 let mem block_store key =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   Lwt_idle_waiter.task block_store.merge_scheduler (fun () ->
       let* o = get_hash block_store key in
       match o with
@@ -240,7 +240,7 @@ let mem block_store key =
                  predecessor_hash))
 
 let read_block ~read_metadata block_store key_kind =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   Lwt_idle_waiter.task block_store.merge_scheduler (fun () ->
       (* Resolve the hash *)
       let* o = get_hash block_store key_kind in
@@ -282,7 +282,7 @@ let read_block ~read_metadata block_store key_kind =
             return block)
 
 let read_block_metadata block_store key_kind =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   Lwt_idle_waiter.task block_store.merge_scheduler (fun () ->
       (* Resolve the hash *)
       let* o = get_hash block_store key_kind in
@@ -316,7 +316,7 @@ let read_block_metadata block_store key_kind =
                       level)))
 
 let store_block block_store block =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let* () = fail_when block_store.readonly Cannot_write_in_readonly in
   Lwt_idle_waiter.task block_store.merge_scheduler (fun () ->
       protect (fun () ->
@@ -348,7 +348,7 @@ let check_blocks_consistency blocks =
 let cement_blocks ?(check_consistency = true) ~write_metadata block_store blocks
     =
   (* No need to lock *)
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let*! () = Store_events.(emit start_cementing_blocks) () in
   let {cemented_store; _} = block_store in
   let are_blocks_consistent = check_blocks_consistency blocks in
@@ -396,7 +396,7 @@ let read_predecessor_block_by_level_opt block_store ?(read_metadata = false)
 
 let read_predecessor_block_by_level block_store ?(read_metadata = false) ~head
     level =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let head_level = Block_repr.level head in
   let head_hash = Block_repr.hash head in
   let distance = Int32.(to_int (sub head_level level)) in
@@ -405,15 +405,15 @@ let read_predecessor_block_by_level block_store ?(read_metadata = false) ~head
   in
   match o with
   | None ->
-      if distance < 0 then fail (Bad_level {head_level; given_level = level})
-      else fail (Block_not_found {hash = head_hash; distance})
+      if distance < 0 then tzfail (Bad_level {head_level; given_level = level})
+      else tzfail (Block_not_found {hash = head_hash; distance})
   | Some b -> return b
 
 (* TODO optimize this by reading chunks of contiguous data and
    filtering it afterwards? *)
 let read_block_range_in_floating_stores block_store ~ro_store ~rw_store ~head
     (low, high) =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let* high_block = read_predecessor_block_by_level block_store ~head high in
   let nb_blocks =
     Int32.(add one (sub high low) |> to_int)
@@ -434,7 +434,7 @@ let read_block_range_in_floating_stores block_store ~ro_store ~rw_store ~head
    [target_offset] cannot be satisfied, the previous savepoint is
    returned.*)
 let expected_savepoint block_store ~target_offset =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let cemented_dir = Naming.cemented_blocks_dir block_store.chain_dir in
   let* metadata_table = Cemented_block_store.load_metadata_table cemented_dir in
   match metadata_table with
@@ -465,7 +465,7 @@ let expected_savepoint block_store ~target_offset =
    [savepoint_candidate] block descriptor if it is valid. Returns the
    current savepoint otherwise. *)
 let available_savepoint block_store current_head savepoint_candidate =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let head_hash = Block_repr.hash current_head in
   let*! current_savepoint = savepoint block_store in
   let new_savepoint_level =
@@ -481,7 +481,7 @@ let available_savepoint block_store current_head savepoint_candidate =
     in
     match o with
     | Some b -> return b
-    | None -> fail (Wrong_predecessor (head_hash, distance))
+    | None -> tzfail (Wrong_predecessor (head_hash, distance))
   in
   return (descriptor block)
 
@@ -490,7 +490,7 @@ let available_savepoint block_store current_head savepoint_candidate =
    one needed and maintained available to export snapshot. That is to
    say, the block: lafl(head) - max_op_ttl(lafl). *)
 let preserved_block block_store current_head =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let head_hash = Block_repr.hash current_head in
   let* current_head_metadata_o =
     read_block_metadata block_store (Block (head_hash, 0))
@@ -507,7 +507,7 @@ let preserved_block block_store current_head =
 (* [infer_savepoint block_store current_head ~target_offset] returns
    the savepoint candidate for an history mode switch. *)
 let infer_savepoint block_store current_head ~target_offset =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let* expected_savepoint_level =
     expected_savepoint block_store ~target_offset
   in
@@ -543,12 +543,12 @@ let expected_caboose block_store ~target_offset =
    candidate for an history mode switch. *)
 let infer_caboose block_store savepoint current_head ~target_offset
     ~new_history_mode ~previous_history_mode =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   match previous_history_mode with
   | History_mode.Archive -> (
       match new_history_mode with
       | History_mode.Archive ->
-          fail
+          tzfail
             (Cannot_switch_history_mode
                {
                  previous_mode = previous_history_mode;
@@ -577,7 +577,7 @@ let infer_caboose block_store savepoint current_head ~target_offset
             in
             match o with
             | Some b -> return b
-            | None -> fail (Wrong_predecessor (head_hash, distance))
+            | None -> tzfail (Wrong_predecessor (head_hash, distance))
           in
           return (descriptor block)
       | None -> return savepoint)
@@ -592,7 +592,7 @@ let infer_caboose block_store savepoint current_head ~target_offset
 
 let switch_history_mode block_store ~current_head ~previous_history_mode
     ~new_history_mode =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let open History_mode in
   match (previous_history_mode, new_history_mode) with
   | (Full _, Rolling m) | (Rolling _, Rolling m) ->
@@ -660,13 +660,13 @@ let switch_history_mode block_store ~current_head ~previous_history_mode
       let* () = write_caboose block_store new_caboose in
       return_unit
   | _ ->
-      fail
+      tzfail
         (Cannot_switch_history_mode
            {previous_mode = previous_history_mode; next_mode = new_history_mode})
 
 let compute_new_savepoint block_store history_mode ~new_store
     ~min_level_to_preserve ~new_head ~cycles_to_cement =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   assert (cycles_to_cement <> []) ;
   let*! savepoint = Stored_data.get block_store.savepoint in
   match history_mode with
@@ -771,12 +771,12 @@ let compute_new_savepoint block_store history_mode ~new_store
                 shifted_savepoint_level
             in
             match o with
-            | None -> fail (Cannot_retrieve_savepoint shifted_savepoint_level)
+            | None -> tzfail (Cannot_retrieve_savepoint shifted_savepoint_level)
             | Some savepoint -> return (Block_repr.descriptor savepoint))
 
 let compute_new_caboose block_store history_mode ~new_savepoint
     ~min_level_to_preserve ~new_head =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let*! caboose = Stored_data.get block_store.caboose in
   match history_mode with
   | History_mode.Archive | Full _ ->
@@ -821,7 +821,7 @@ module BlocksLAFL = Set.Make (Int32)
 let update_floating_stores block_store ~history_mode ~ro_store ~rw_store
     ~new_store ~new_head ~new_head_lafl ~lowest_bound_to_preserve_in_floating
     ~cementing_highwatermark =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let*! () = Store_events.(emit start_updating_floating_stores) () in
   let* lafl_block =
     read_predecessor_block_by_level block_store ~head:new_head new_head_lafl
@@ -916,7 +916,7 @@ let update_floating_stores block_store ~history_mode ~ro_store ~rw_store
   in
   (* Return the range of cycles to cement. *)
   let rec loop acc pred = function
-    | [] -> fail (Cannot_cement_blocks `Empty)
+    | [] -> tzfail (Cannot_cement_blocks `Empty)
     | [h] ->
         assert (Compare.Int32.(h = new_head_lafl)) ;
         return (List.rev ((Int32.succ pred, h) :: acc))
@@ -961,7 +961,7 @@ let find_floating_store_by_kind block_store kind =
     (block_store.rw_floating_block_store :: block_store.ro_floating_block_stores)
 
 let move_floating_store block_store ~src:floating_store ~dst_kind =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let src_kind = Floating_block_store.kind floating_store in
   let* () = fail_when (src_kind = dst_kind) Wrong_floating_kind_swap in
   (* If the destination floating store exists, try closing it. *)
@@ -985,7 +985,7 @@ let move_floating_store block_store ~src:floating_store ~dst_kind =
 (* This function must be called after the former [RO] and [RW] were
    merged together and that the new [RW] is in place. *)
 let move_all_floating_stores block_store ~new_ro_store =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let chain_dir = block_store.chain_dir in
   protect
     ~on_error:(fun err ->
@@ -1027,7 +1027,7 @@ let move_all_floating_stores block_store ~new_ro_store =
       return_unit)
 
 let check_store_consistency block_store ~cementing_highwatermark =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   match
     Cemented_block_store.get_highest_cemented_level block_store.cemented_store
   with
@@ -1048,7 +1048,7 @@ let check_store_consistency block_store ~cementing_highwatermark =
    lower bound.*)
 let compute_lowest_bound_to_preserve_in_floating block_store ~new_head
     ~new_head_metadata =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   (* Safety check: is the highwatermark consistent with our highest cemented block *)
   let lafl = Block_repr.last_allowed_fork_level new_head_metadata in
   let* lafl_block =
@@ -1073,7 +1073,7 @@ let compute_lowest_bound_to_preserve_in_floating block_store ~new_head
           | Some metadata -> Block_repr.max_operations_ttl metadata)))
 
 let instanciate_temporary_floating_store block_store =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   protect
     ~on_error:(fun err ->
       (match block_store.ro_floating_block_stores with
@@ -1108,7 +1108,7 @@ let instanciate_temporary_floating_store block_store =
 let create_merging_thread block_store ~history_mode ~old_ro_store ~old_rw_store
     ~new_head ~new_head_lafl ~lowest_bound_to_preserve_in_floating
     ~cementing_highwatermark =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let*! () = Store_events.(emit start_merging_thread) () in
   let*! new_ro_store =
     Floating_block_store.init block_store.chain_dir ~readonly:false RO_TMP
@@ -1216,7 +1216,7 @@ let create_merging_thread block_store ~history_mode ~old_ro_store ~old_rw_store
 let merge_stores block_store ~(on_error : tztrace -> unit tzresult Lwt.t)
     ~finalizer ~history_mode ~new_head ~new_head_metadata
     ~cementing_highwatermark =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let* () = fail_when block_store.readonly Cannot_write_in_readonly in
   (* Do not allow multiple merges: force waiting for a potential
      previous merge. *)
@@ -1333,7 +1333,7 @@ let get_merge_status block_store =
       | Lwt.Fail exn -> Merge_failed [Exn exn])
 
 let merge_temporary_floating block_store =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let chain_dir = block_store.chain_dir in
   let*! () =
     List.iter_s
@@ -1404,7 +1404,7 @@ let may_clean_cementing_artifacts block_store =
   | false -> Lwt.return_unit
 
 let may_recover_merge block_store =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let* () = fail_when block_store.readonly Cannot_write_in_readonly in
   let* () =
     Lwt_idle_waiter.force_idle block_store.merge_scheduler (fun () ->
@@ -1421,7 +1421,7 @@ let may_recover_merge block_store =
   return_unit
 
 let load ?block_cache_limit chain_dir ~genesis_block ~readonly =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let* cemented_store = Cemented_block_store.init chain_dir ~readonly in
   let*! ro_floating_block_store =
     Floating_block_store.init chain_dir ~readonly RO
@@ -1483,7 +1483,7 @@ let load ?block_cache_limit chain_dir ~genesis_block ~readonly =
   return block_store
 
 let create ?block_cache_limit chain_dir ~genesis_block =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let* block_store =
     load chain_dir ?block_cache_limit ~genesis_block ~readonly:false
   in

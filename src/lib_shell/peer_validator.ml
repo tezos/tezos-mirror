@@ -223,7 +223,7 @@ let validate_new_head w hash (header : Block_header.t) =
       return_unit
 
 let assert_acceptable_head w hash (header : Block_header.t) =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let pv = Worker.state w in
   let chain_store = Distributed_db.chain_store pv.parameters.chain_db in
   let*! acceptable =
@@ -234,7 +234,7 @@ let assert_acceptable_head w hash (header : Block_header.t) =
     (Validation_errors.Checkpoint_error (hash, Some pv.peer_id))
 
 let may_validate_new_head w hash (header : Block_header.t) =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let pv = Worker.state w in
   let chain_store = Distributed_db.chain_store pv.parameters.chain_db in
   let*! valid_block = Store.Block.is_known_valid chain_store hash in
@@ -253,7 +253,7 @@ let may_validate_new_head w hash (header : Block_header.t) =
     return_unit
   else if invalid_block then
     let*! () = Worker.log_event w (Ignoring_invalid_block block_received) in
-    fail Validation_errors.Known_invalid
+    tzfail Validation_errors.Known_invalid
   else if invalid_predecessor then
     let*! () = Worker.log_event w (Ignoring_invalid_block block_received) in
     let* _ =
@@ -263,7 +263,7 @@ let may_validate_new_head w hash (header : Block_header.t) =
         header
         [Validation_errors.Known_invalid]
     in
-    fail Validation_errors.Known_invalid
+    tzfail Validation_errors.Known_invalid
   else if not valid_predecessor then (
     let*! () =
       Worker.log_event w (Missing_new_head_predecessor block_received)
@@ -279,7 +279,7 @@ let may_validate_new_head w hash (header : Block_header.t) =
     validate_new_head w hash header
 
 let may_validate_new_branch w locator =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   (* Make sure this is still ok w.r.t @phink fix *)
   let pv = Worker.state w in
   let {Block_locator.head_header = distant_header; head_hash = distant_hash; _}
@@ -312,12 +312,12 @@ let may_validate_new_branch w locator =
           w
           (Ignoring_branch_without_common_ancestor block_received)
       in
-      fail Validation_errors.Unknown_ancestor
+      tzfail Validation_errors.Unknown_ancestor
   | (Known_invalid, _) ->
       let*! () =
         Worker.log_event w (Ignoring_branch_with_invalid_locator block_received)
       in
-      fail (Validation_errors.Invalid_locator (pv.peer_id, locator))
+      tzfail (Validation_errors.Invalid_locator (pv.peer_id, locator))
 
 let on_no_request w =
   let open Lwt_syntax in

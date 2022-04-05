@@ -36,7 +36,7 @@ let handle_literal_ipv6 host =
   | Ok ipaddr -> Ipaddr.to_string ipaddr
 
 let connect ?(timeout = !Lwt_utils_unix.default_net_timeout) =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   function
   | Unix path ->
       let addr = Lwt_unix.ADDR_UNIX path in
@@ -140,7 +140,7 @@ let maximum_length_of_message_payload =
   1 lsl (size_of_length_of_message_payload * 8)
 
 let send fd encoding message =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let length_of_message_payload =
     Data_encoding.Binary.length encoding message
   in
@@ -166,7 +166,7 @@ let send fd encoding message =
   assert (Option.is_some serialisation_state) ;
   let serialisation_state = Stdlib.Option.get serialisation_state in
   match Data_encoding.Binary.write encoding message serialisation_state with
-  | Error we -> fail (Encoding_error we)
+  | Error we -> tzfail (Encoding_error we)
   | Ok last ->
       let* () =
         fail_unless
@@ -183,7 +183,7 @@ let send fd encoding message =
           @@ Lwt_utils_unix.write_bytes fd message_serialisation_buffer)
 
 let recv ?timeout fd encoding =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let header_buf = Bytes.create size_of_length_of_message_payload in
   let* () =
     protect (fun () ->
@@ -203,7 +203,7 @@ let recv ?timeout fd encoding =
   in
   let buf = Bytes.unsafe_to_string buf in
   match Data_encoding.Binary.read encoding buf 0 len with
-  | Error re -> fail (Decoding_error re)
+  | Error re -> tzfail (Decoding_error re)
   | Ok (read_len, message) ->
-      if read_len <> len then fail (Decoding_error Extra_bytes)
+      if read_len <> len then tzfail (Decoding_error Extra_bytes)
       else return message

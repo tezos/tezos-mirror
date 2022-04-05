@@ -58,7 +58,7 @@ let rec worker_loop bv =
           | None ->
               Lwt.wakeup_later
                 wakener
-                (Tzresult_syntax.fail
+                (Result_syntax.tzfail
                    (Invalid_protocol {hash; error = Dynlinking_failed}))) ;
           return_unit)
         else (
@@ -66,7 +66,7 @@ let rec worker_loop bv =
              prevents us from being spammed with protocol validation. *)
           Lwt.wakeup_later
             wakener
-            (Tzresult_syntax.fail
+            (Result_syntax.tzfail
                (Invalid_protocol {hash; error = Compilation_failed})) ;
           return_unit)
   in

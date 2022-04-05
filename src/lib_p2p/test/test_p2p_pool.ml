@@ -313,7 +313,7 @@ module Overcrowded = struct
       and either get a list of pairs or have an established connection.
   *)
   let client_connect connect_handler pool legacy trusted_points all_points =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     debug
       "@[<v 2>client connects to %a in the universe @[%a@]@]@."
       P2p_point.Id.pp_list
@@ -427,7 +427,7 @@ module Overcrowded = struct
       (Advertisement_failure unknowns)
 
   let client legacy (node : Node.t) =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     if Compare.List_length_with.(node.points > 50) then (
       log_error
         "This test only works for less clients than the advertisement list \
@@ -463,7 +463,7 @@ module Overcrowded = struct
 
   (** Code of the target that should be overcrowded by all the clients. *)
   let target (node : Node.t) =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let unknowns_knowns () =
       P2p_pool.Points.fold_known
         node.pool
@@ -625,7 +625,7 @@ module No_common_network = struct
       and either get a list of pairs or have an established connection.
   *)
   let client_connect connect_handler pool trusted_points all_points =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     debug
       "@[<v 2>client connects to %a in the universe @[%a@]@]@."
       P2p_point.Id.pp_list

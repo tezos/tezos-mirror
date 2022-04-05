@@ -138,7 +138,7 @@ class faked_wallet ~base_dir ~filesystem : Client_context.wallet =
         return_unit
 
     method last_modification_time : string -> float option tzresult Lwt.t =
-      let open Lwt_tzresult_syntax in
+      let open Lwt_result_syntax in
       fun alias_name ->
         let filename = self#filename alias_name in
         let file = String.Hashtbl.find_opt filesystem filename in

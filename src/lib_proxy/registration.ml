@@ -28,7 +28,7 @@ open Tezos_shell_services
 let check_client_node_proto_agree (rpc_context : #RPC_context.simple)
     (proto_hash : Protocol_hash.t) (chain : Block_services.chain)
     (block : Block_services.block) : unit tzresult Lwt.t =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let* {current_protocol; _} =
     Block_services.protocols rpc_context ~chain ~block ()
   in
@@ -44,7 +44,7 @@ let check_client_node_proto_agree (rpc_context : #RPC_context.simple)
 let get_node_protocol (rpc_context : #RPC_context.simple)
     (chain : Block_services.chain) (block : Block_services.block) :
     Protocol_hash.t tzresult Lwt.t =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let* {current_protocol; _} =
     Block_services.protocols rpc_context ~chain ~block ()
   in
@@ -105,7 +105,7 @@ let get_registered_proxy (printer : Tezos_client_base.Client_context.printer)
     ?(chain = `Main) ?(block = `Head 0)
     (protocol_hash_opt : Protocol_hash.t option) :
     proxy_environment tzresult Lwt.t =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let mode_str =
     match mode with `Mode_light -> "light mode" | `Mode_proxy -> "proxy"
   in

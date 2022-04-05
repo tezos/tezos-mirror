@@ -288,7 +288,7 @@ module Scheduler (IO : IO) = struct
         in_param;
         out_param;
         current_pop = Lwt.fail Not_found (* dummy *);
-        current_push = Lwt_tzresult_syntax.return_unit;
+        current_push = Lwt_result_syntax.return_unit;
         counter = Moving_average.create st.ma_state ~init:0 ~alpha;
         quota = 0;
       }
@@ -360,18 +360,18 @@ module ReadIO = struct
      Invariant: Given a connection, there is not concurrent call to
      pop. *)
   let pop {fd; maxlen; read_buffer} =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     Lwt.catch
       (fun () ->
         let*! data =
           Circular_buffer.write ~maxlen ~fill_using:(P2p_fd.read fd) read_buffer
         in
         if Circular_buffer.length data = 0 then
-          fail P2p_errors.Connection_closed
+          tzfail P2p_errors.Connection_closed
         else return data)
       (function
         | Unix.Unix_error (Unix.ECONNRESET, _, _) ->
-            fail P2p_errors.Connection_closed
+            tzfail P2p_errors.Connection_closed
         | exn -> fail_with_exn exn)
 
   type out_param = Circular_buffer.data tzresult Lwt_pipe.Maybe_bounded.t
@@ -416,7 +416,7 @@ module WriteIO = struct
 
   (* [push] bytes in the network. *)
   let push fd buf =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     Lwt.catch
       (fun () ->
         let*! () = P2p_fd.write fd buf in
@@ -425,7 +425,7 @@ module WriteIO = struct
         | Unix.Unix_error (Unix.ECONNRESET, _, _)
         | Unix.Unix_error (Unix.EPIPE, _, _)
         | Lwt.Canceled | End_of_file ->
-            fail P2p_errors.Connection_closed
+            tzfail P2p_errors.Connection_closed
         | exn -> fail_with_exn exn)
 
   (* [close] does nothing, it will still be possible to push values to
@@ -642,7 +642,7 @@ let stat {read_conn; write_conn; _} =
 (* [close conn] prevents further data to be pushed to the remote peer
    and start a cascade of effects that should close the connection. *)
 let close ?timeout conn =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let id = P2p_fd.id conn.fd in
   conn.remove_from_connection_table () ;
   Lwt_pipe.Maybe_bounded.close conn.write_queue ;

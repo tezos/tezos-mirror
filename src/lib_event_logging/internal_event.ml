@@ -300,14 +300,14 @@ module All_sinks = struct
       (fun reason -> Activation_error reason)
 
   let activate uri =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     match Uri.scheme uri with
-    | None -> fail (Activation_error (Missing_uri_scheme (Uri.to_string uri)))
+    | None -> tzfail (Activation_error (Missing_uri_scheme (Uri.to_string uri)))
     | Some scheme_to_activate ->
         let* act =
           match find_registered scheme_to_activate with
           | None ->
-              fail
+              tzfail
                 (Activation_error
                    (Uri_scheme_not_registered (Uri.to_string uri)))
           | Some (Registered {scheme; definition}) ->
@@ -344,7 +344,7 @@ module All_sinks = struct
         (fun (Active {sink; definition; _}) -> close_one sink definition)
         to_close_list
     in
-    Tzresult_syntax.join close_results
+    Result_syntax.tzjoin close_results
 
   let handle def section v =
     let handle (type a) sink definition =
@@ -1554,7 +1554,7 @@ module Lwt_log_sink = struct
 
     let uri_scheme = "lwt-log"
 
-    let configure _ = Lwt_tzresult_syntax.return_unit
+    let configure _ = Lwt_result_syntax.return_unit
 
     let handle (type a) () m ?section (v : unit -> a) =
       let open Lwt_syntax in

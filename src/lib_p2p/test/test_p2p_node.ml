@@ -70,14 +70,14 @@ let () =
    In [propagation_tzresult] a random [node] is selected to fail with an error.
    Then it is checked that the result of [Node.detach_nodes] is an error. *)
 let propagation_tzresult points =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let x = Random.int (List.length points) in
   let*! r =
     Node.detach_nodes
-      (fun i _ -> if x = i then fail Some_error else return_unit)
+      (fun i _ -> if x = i then tzfail Some_error else return_unit)
       points
   in
-  match r with Ok () -> fail Invalid_test_result | Error _ -> return_unit
+  match r with Ok () -> tzfail Invalid_test_result | Error _ -> return_unit
 
 let points = ref []
 

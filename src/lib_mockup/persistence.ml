@@ -131,7 +131,7 @@ module Make (Registration : Registration.S) = struct
       (Registration.mockup_environment * Registration.mockup_context) tzresult
       Lwt.t =
    fun cctxt ->
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let* mockup = get_registered_mockup None cctxt in
     let (module Mockup) = mockup in
     let* rpc_context =
@@ -151,7 +151,7 @@ module Make (Registration : Registration.S) = struct
       (Registration.mockup_environment * Registration.mockup_context) tzresult
       Lwt.t =
    fun ~cctxt ~protocol_hash ~constants_overrides_json ~bootstrap_accounts_json ->
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let* mockup = get_registered_mockup (Some protocol_hash) cctxt in
     let (module Mockup) = mockup in
     let* menv =
@@ -167,7 +167,7 @@ module Make (Registration : Registration.S) = struct
       ({protocol_hash; chain_id; rpc_context; protocol_data} :
         Persistent_mockup_environment.t)
       (printer : #Tezos_client_base.Client_context.printer) =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let* mockup = get_registered_mockup (Some protocol_hash) printer in
     return
       ( mockup,
@@ -176,7 +176,7 @@ module Make (Registration : Registration.S) = struct
 
   let get_mockup_context_from_disk ~base_dir ~protocol_hash
       (printer : #Tezos_client_base.Client_context.printer) =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let file = (Files.Context.get ~dirname:base_dir :> string) in
     if not (Sys.file_exists file) then
       failwith "get_mockup_context_from_disk: file %s not found" file
@@ -306,7 +306,7 @@ module Make (Registration : Registration.S) = struct
   let create_mockup ~(cctxt : Tezos_client_base.Client_context.full)
       ~protocol_hash ~constants_overrides_json ~bootstrap_accounts_json
       ~asynchronous =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let base_dir = cctxt#get_base_dir in
     let create_base_dir () =
       let*! () = Tezos_stdlib_unix.Lwt_utils_unix.create_dir base_dir in

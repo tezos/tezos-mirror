@@ -81,14 +81,14 @@ let mk_readable ~read_buffer ~read_queue =
 type buffer = {length_to_copy : int; pos : int; buf : Bytes.t}
 
 let mk_buffer ?pos ?length_to_copy buf : buffer tzresult =
-  let open Tzresult_syntax in
+  let open Result_syntax in
   let buflen = Bytes.length buf in
   let pos = Option.value ~default:0 pos in
   let length_to_copy = Option.value ~default:(buflen - pos) length_to_copy in
   let check cond ~expected =
     if cond then return_unit
     else
-      fail
+      tzfail
         (Invalid_read_request
            {
              expected;
@@ -131,7 +131,7 @@ let read_from readable {pos = offset; length_to_copy; buf} data =
            ~into:buf
            ~offset) ;
       Ok read_len
-  | Error _ -> Tzresult_syntax.fail P2p_errors.Connection_closed
+  | Error _ -> Result_syntax.tzfail P2p_errors.Connection_closed
 
 let read ?canceler readable buffer =
   let open Lwt_syntax in

@@ -152,7 +152,7 @@ let rec worker_loop st =
   | Error err -> Events.(emit unexpected_error) err
 
 let create_listening_socket ~backlog ?(addr = Ipaddr.V6.unspecified) port =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   Lwt.catch
     (fun () ->
       let main_socket = Lwt_unix.(socket PF_INET6 SOCK_STREAM 0) in
@@ -166,13 +166,13 @@ let create_listening_socket ~backlog ?(addr = Ipaddr.V6.unspecified) port =
       return main_socket)
     (function
       | Unix.Unix_error (err, _, _) ->
-          fail
+          tzfail
             (Failed_to_open_listening_socket
                {reason = err; address = addr; port})
       | exn -> Lwt.fail exn)
 
 let create ?addr ~backlog connect_handler port =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   Lwt.catch
     (fun () ->
       let* socket = create_listening_socket ~backlog ?addr port in
@@ -193,7 +193,7 @@ let create ?addr ~backlog connect_handler port =
     (fun exn ->
       let error = error_of_exn exn in
       let*! () = Events.(emit incoming_connection_error) error in
-      fail error)
+      tzfail error)
 
 let activate st =
   st.worker <-

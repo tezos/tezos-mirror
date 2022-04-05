@@ -59,7 +59,7 @@ module Term = struct
 
   let process subcommand args status sandbox_file =
     let run =
-      let open Lwt_tzresult_syntax in
+      let open Lwt_result_syntax in
       let*! () = Tezos_base_unix.Internal_event_unix.init () in
       match subcommand with
       | Storage -> (
@@ -94,7 +94,7 @@ module Term = struct
                         let*! r = Lwt_utils_unix.Json.read_file filename in
                         match r with
                         | Error _err ->
-                            fail
+                            tzfail
                               (Node_run_command.Invalid_sandbox_file filename)
                         | Ok json -> return_some ("sandbox_parameter", json))
                   in
@@ -108,7 +108,7 @@ module Term = struct
           | Error (Exn (Unix.Unix_error (Unix.ENOENT, _, _)) :: _) ->
               (* The provided data directory to upgrade cannot be
                  found. *)
-              fail (Invalid_directory data_dir)
+              tzfail (Invalid_directory data_dir)
           | Ok v -> Lwt.return (Ok v)
           | errs -> Lwt.return errs)
     in

@@ -65,7 +65,7 @@ module Make (PVM : Pvm.S) : S = struct
   (** [transition_pvm store predecessor_hash hash] runs a PVM at the previous state from block
       [predecessor_hash] by consuming as many messages as possible from block [hash]. *)
   let transition_pvm store predecessor_hash hash =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     (* Retrieve the previous PVM state from store. *)
     let*! predecessor_state = Store.PVMState.find store predecessor_hash in
     let* predecessor_state =
@@ -118,13 +118,13 @@ module Make (PVM : Pvm.S) : S = struct
 
   (** [process_head store head] runs the PVM for the given head. *)
   let process_head store (Layer1.Head {hash; _} as head) =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let*! predecessor_hash = Layer1.predecessor store head in
     transition_pvm store predecessor_hash hash
 
   (** [update store chain_event] reacts to an event on the chain. *)
   let update store chain_event =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     match chain_event with
     | Layer1.SameBranch {intermediate_heads; new_head} ->
         let* () = List.iter_es (process_head store) intermediate_heads in
@@ -133,7 +133,7 @@ module Make (PVM : Pvm.S) : S = struct
 
   (** [start store] initializes the [store] with the needed state. *)
   let start store =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let*! () =
       Store.PVMState.init_s store Layer1.genesis_hash (fun () ->
           PVM.initial_state

@@ -90,7 +90,7 @@ module Account = struct
   let activator_account = new_account ()
 
   let find pkh =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     match Signature.Public_key_hash.Table.find known_accounts pkh with
     | Some v -> return v
     | None -> failwith "Missing account: %a" Signature.Public_key_hash.pp pkh
@@ -118,7 +118,7 @@ module Account = struct
     |> WithExceptions.Option.get ~loc:__LOC__
 
   let new_commitment ?seed () =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let (pkh, pk, sk) = Signature.generate_key ?seed ~algo:Ed25519 () in
     let unactivated_account = {pkh; pk; sk} in
     let open Commitment in
@@ -129,7 +129,7 @@ module Account = struct
 end
 
 let make_rpc_context ~chain_id ctxt block =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let header = Store.Block.shell_header block in
   let ({
          timestamp = predecessor_timestamp;
@@ -356,7 +356,7 @@ end
 let protocol_param_key = ["protocol_parameters"]
 
 let check_constants_consistency constants =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let open Constants_repr in
   let {blocks_per_cycle; blocks_per_commitment; blocks_per_stake_snapshot; _} =
     constants
@@ -459,7 +459,7 @@ let empty_operations =
   WithExceptions.List.init ~loc:__LOC__ nb_validation_passes (fun _ -> [])
 
 let apply ctxt chain_id ~policy ?(operations = empty_operations) pred =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let* rpc_ctxt = make_rpc_context ~chain_id ctxt pred in
   let element_of_key ~chain_id ~predecessor_context ~predecessor_timestamp
       ~predecessor_level ~predecessor_fitness ~predecessor ~timestamp =
@@ -594,7 +594,7 @@ let apply ctxt chain_id ~policy ?(operations = empty_operations) pred =
 
 let apply_and_store chain_store ?(synchronous_merge = true) ?policy
     ?(operations = empty_operations) pred =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let* ctxt = Store.Block.context chain_store pred in
   let chain_id = Store.Chain.chain_id chain_store in
   let* ( block_header,

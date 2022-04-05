@@ -120,7 +120,7 @@ module Worker = Worker.Make (Name) (Event) (Request) (Types) (Logger)
 type t = Worker.infinite Worker.queue Worker.t
 
 let check_chain_liveness chain_db hash (header : Block_header.t) =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let chain_store = Distributed_db.chain_store chain_db in
   match Store.Chain.expiration chain_store with
   | Some eol when Time.Protocol.(eol <= header.shell.timestamp) ->
@@ -132,7 +132,7 @@ let check_chain_liveness chain_db hash (header : Block_header.t) =
             timestamp = header.shell.timestamp;
           }
       in
-      fail (invalid_block hash error)
+      tzfail (invalid_block hash error)
   | None | Some _ -> return_unit
 
 let precheck_block bvp chain_store ~predecessor block_header block_hash
@@ -433,7 +433,7 @@ let create limits db validation_process ~start_testchain =
 
     let on_completion = on_completion
 
-    let on_no_request _ = Lwt_tzresult_syntax.return_unit
+    let on_no_request _ = Lwt_result_syntax.return_unit
   end in
   Worker.launch
     table
@@ -451,7 +451,7 @@ type block_validity =
 let validate w ?canceler ?peer ?(notify_new_block = fun _ -> ())
     ?(precheck_and_notify = false) chain_db hash (header : Block_header.t)
     operations : block_validity Lwt.t =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let chain_store = Distributed_db.chain_store chain_db in
   let*! b = Store.Block.is_known_valid chain_store hash in
   match b with

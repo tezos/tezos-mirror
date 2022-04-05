@@ -25,7 +25,7 @@
 
 let build_rpc_directory ~user_activated_upgrades
     ~user_activated_protocol_overrides ~mainchain_validator store =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let register endpoint f directory =
     RPC_directory.register directory endpoint f
   in

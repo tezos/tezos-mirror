@@ -33,7 +33,7 @@ let sc_rollup_address_param =
          | Some addr -> return addr))
 
 let sc_rollup_node_operator_param =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   Clic.param
     ~name:"node-operator"
     ~desc:"Public key hash of the the smart-contract rollup node operator"

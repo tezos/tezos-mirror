@@ -46,14 +46,14 @@ let (set_sc_rollup_node_operator, get_sc_rollup_node_operator) = make_ref ()
 let (set_sc_rollup_initial_level, get_sc_rollup_initial_level) = make_ref ()
 
 let get_operator_keys cctxt =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let pkh = get_sc_rollup_node_operator () in
   let+ (_, pk, sk) = Client_keys.get_key cctxt pkh in
   (pkh, pk, sk)
 
 let init (cctxt : Protocol_client_context.full) sc_rollup_address
     sc_rollup_node_operator =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   set_sc_rollup_address sc_rollup_address ;
   set_sc_rollup_node_operator sc_rollup_node_operator ;
   let+ initial_level =

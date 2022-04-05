@@ -31,7 +31,7 @@ module Configuration = struct
   include Tezos_base.Internal_event_config
 
   let of_file path =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let* json = Lwt_utils_unix.Json.read_file path in
     protect (fun () -> return (Data_encoding.Json.destruct encoding json))
 end
@@ -47,7 +47,7 @@ let init ?lwt_log_sink ?(configuration = Configuration.default) () =
       File_event_sink.Sink_implementation.uri_scheme;
     ]
   in
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let*! r =
     let* () =
       Lwt_result.ok @@ Lwt_log_sink_unix.initialize ?cfg:lwt_log_sink ()

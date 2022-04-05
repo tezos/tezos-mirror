@@ -191,7 +191,7 @@ let filter_up_to_staking_share share total_stake to_mutez keys_list =
 
 let get_delegates (proto : protocol) context
     (header : Block_header.shell_header) active_bakers_only staking_share_opt =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let level = header.Block_header.level in
   let predecessor_timestamp = header.timestamp in
   let timestamp = Time.Protocol.add predecessor_timestamp 10000L in
@@ -517,7 +517,7 @@ let protocol_of_hash protocol_hash =
 *)
 let load_mainnet_bakers_public_keys base_dir active_bakers_only
     staking_share_opt =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let open Tezos_store in
   let mainnet_genesis =
     {

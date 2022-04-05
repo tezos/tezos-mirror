@@ -134,7 +134,7 @@ let make_pk pk =
     (Uri.make ~scheme ~path:(Signature.Public_key.to_b58check pk) ())
 
 let read_base_uri_from_env () =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   match
     ( Sys.getenv_opt "TEZOS_SIGNER_UNIX_PATH",
       Sys.getenv_opt "TEZOS_SIGNER_TCP_HOST",

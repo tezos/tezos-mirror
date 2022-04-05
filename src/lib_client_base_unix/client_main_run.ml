@@ -82,7 +82,7 @@ let setup_remote_signer (module C : M) client_config
     (rpc_config : RPC_client_unix.config) parsed_config_file =
   let module Remote_params = struct
     let authenticate pkhs payload =
-      let open Lwt_tzresult_syntax in
+      let open Lwt_result_syntax in
       let* keys = Client_keys.list_keys client_config in
       match
         List.filter_map
@@ -161,7 +161,7 @@ let warn_if_duplicates_light_sources (printer : unix_logger) uris =
   else Lwt.return_unit
 
 let setup_default_proxy_client_config parsed_args base_dir rpc_config mode =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   (* Make sure that base_dir is not a mockup. *)
   let* () =
     let* b = Tezos_mockup.Persistence.classify_base_dir base_dir in
@@ -315,7 +315,7 @@ let setup_client_config (cctxt : Tezos_client_base.Client_context.printer)
 
 (* Main (lwt) entry *)
 let main (module C : M) ~select_commands =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let global_options = C.global_options () in
   let executable_name = Filename.basename Sys.executable_name in
   let (original_args, autocomplete) =

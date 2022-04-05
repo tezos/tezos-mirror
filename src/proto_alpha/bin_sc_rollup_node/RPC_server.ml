@@ -28,18 +28,18 @@ open Tezos_rpc_http
 open Tezos_rpc_http_server
 
 let get_head_exn store =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let*! head = Layer1.current_head_hash store in
   match head with None -> failwith "No head" | Some head -> return head
 
 let get_state_exn store =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let* head = get_head_exn store in
   let*! state = Store.PVMState.find store head in
   match state with None -> failwith "No state" | Some state -> return state
 
 let get_state_info_exn store =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let* head = get_head_exn store in
   let*! state = Store.StateInfo.get store head in
   return state
@@ -50,7 +50,7 @@ module Common = struct
       dir
       (Sc_rollup_services.current_num_messages ())
       (fun () () ->
-        let open Lwt_tzresult_syntax in
+        let open Lwt_result_syntax in
         let* state_info = get_state_info_exn store in
         return state_info.num_messages)
 
@@ -86,7 +86,7 @@ module Common = struct
       dir
       (Sc_rollup_services.current_ticks ())
       (fun () () ->
-        let open Lwt_tzresult_syntax in
+        let open Lwt_result_syntax in
         let* state = get_state_info_exn store in
         return state.num_ticks)
 
@@ -118,7 +118,7 @@ module Make (PVM : Pvm.S) = struct
       dir
       (Sc_rollup_services.current_total_ticks ())
       (fun () () ->
-        let open Lwt_tzresult_syntax in
+        let open Lwt_result_syntax in
         let* state = get_state_exn store in
         let*! tick = PVM.get_tick state in
         return tick)
@@ -128,7 +128,7 @@ module Make (PVM : Pvm.S) = struct
       dir
       (Sc_rollup_services.current_state_hash ())
       (fun () () ->
-        let open Lwt_tzresult_syntax in
+        let open Lwt_result_syntax in
         let* state = get_state_exn store in
         let*! hash = PVM.state_hash state in
         return hash)
@@ -138,7 +138,7 @@ module Make (PVM : Pvm.S) = struct
       dir
       (Sc_rollup_services.current_status ())
       (fun () () ->
-        let open Lwt_tzresult_syntax in
+        let open Lwt_result_syntax in
         let* state = get_state_exn store in
         let*! status = PVM.get_status state in
         return (PVM.string_of_status status))

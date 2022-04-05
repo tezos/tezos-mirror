@@ -112,7 +112,7 @@ end
 open Filename.Infix
 
 let load_protocol proto protocol_root =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   if Registered_protocol.mem proto then return_unit
   else
     let cmxs_file =
@@ -126,7 +126,7 @@ let load_protocol proto protocol_root =
     | exception Dynlink.Error err ->
         Format.ksprintf
           (fun msg ->
-            fail
+            tzfail
               Block_validator_errors.(
                 Validation_process_failed (Protocol_dynlink_failure msg)))
           "Cannot load file: %s. (Expected location: %s.)"
@@ -192,7 +192,7 @@ let init input =
       operation_metadata_size_limit )
 
 let run input output =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let* () = handshake input output in
   let*! ( context_index,
           protocol_root,
@@ -255,7 +255,7 @@ let run input output =
                 match o with
                 | Some context -> return context
                 | None ->
-                    fail
+                    tzfail
                       (Block_validator_errors.Failed_to_checkout_context
                          pred_context_hash))
           in
@@ -333,7 +333,7 @@ let run input output =
                 match context with
                 | Some context -> return context
                 | None ->
-                    fail
+                    tzfail
                       (Block_validator_errors.Failed_to_checkout_context
                          pred_context_hash))
           in
@@ -400,7 +400,7 @@ let run input output =
                 match o with
                 | Some context -> return context
                 | None ->
-                    fail
+                    tzfail
                       (Block_validator_errors.Failed_to_checkout_context
                          predecessor_block_header.shell.context))
           in
@@ -444,7 +444,7 @@ let run input output =
               External_validation.send
                 output
                 (Error_monad.result_encoding Data_encoding.empty)
-                (Tzresult_syntax.fail
+                (Result_syntax.tzfail
                    (Block_validator_errors.Failed_to_checkout_context
                       context_hash))
         in

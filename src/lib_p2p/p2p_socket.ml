@@ -55,7 +55,7 @@ module Crypto = struct
 
   (* msg is overwritten and should not be used after this invocation *)
   let write_chunk ?canceler fd cryptobox_data msg =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let msg_length = Bytes.length msg in
     let* () =
       fail_unless
@@ -75,7 +75,7 @@ module Crypto = struct
     P2p_io_scheduler.write ?canceler fd payload
 
   let read_chunk ?canceler fd cryptobox_data =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let open P2p_buffer_reader in
     let header_buf = Bytes.create header_length in
     let* () = read_full ?canceler fd @@ mk_buffer_safe header_buf in
@@ -100,7 +100,7 @@ module Crypto = struct
         tag
         msg
     with
-    | false -> fail P2p_errors.Decipher_error
+    | false -> tzfail P2p_errors.Decipher_error
     | true -> return msg
 end
 
@@ -141,7 +141,7 @@ module Connection_message = struct
          (req "version" Network_version.encoding))
 
   let write ~canceler fd message =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let encoded_message_len = Data_encoding.Binary.length encoding message in
     let* () =
       fail_unless
@@ -158,7 +158,7 @@ module Connection_message = struct
            ~allowed_bytes:encoded_message_len
     in
     match Data_encoding.Binary.write encoding message state with
-    | Error we -> fail (Tezos_base.Data_encoding_wrapper.Encoding_error we)
+    | Error we -> tzfail (Tezos_base.Data_encoding_wrapper.Encoding_error we)
     | Ok last ->
         let* () =
           fail_unless
@@ -172,7 +172,7 @@ module Connection_message = struct
         return buf
 
   let read ~canceler fd =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let open P2p_buffer_reader in
     let header_buf = Bytes.create Crypto.header_length in
     let* () = read_full ~canceler fd @@ mk_buffer_safe header_buf in
@@ -193,16 +193,16 @@ module Connection_message = struct
     in
     let buf = Bytes.unsafe_to_string buf in
     match Data_encoding.Binary.read encoding buf pos len with
-    | Error re -> fail (P2p_errors.Decoding_error re)
+    | Error re -> tzfail (P2p_errors.Decoding_error re)
     | Ok (next_pos, message) ->
         if next_pos <> pos + len then
-          fail (P2p_errors.Decoding_error Data_encoding.Binary.Extra_bytes)
+          tzfail (P2p_errors.Decoding_error Data_encoding.Binary.Extra_bytes)
         else return (message, buf)
 end
 
 module Metadata = struct
   let write ~canceler metadata_config cryptobox_data fd message =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let encoded_message_len =
       Data_encoding.Binary.length
         metadata_config.P2p_params.conn_meta_encoding
@@ -222,7 +222,7 @@ module Metadata = struct
         message
         state
     with
-    | Error we -> fail (Tezos_base.Data_encoding_wrapper.Encoding_error we)
+    | Error we -> tzfail (Tezos_base.Data_encoding_wrapper.Encoding_error we)
     | Ok last ->
         let* () =
           fail_unless
@@ -232,16 +232,16 @@ module Metadata = struct
         Crypto.write_chunk ~canceler cryptobox_data fd buf
 
   let read ~canceler metadata_config fd cryptobox_data =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let* buf = Crypto.read_chunk ~canceler fd cryptobox_data in
     let buf = Bytes.unsafe_to_string buf in
     let length = String.length buf in
     let encoding = metadata_config.P2p_params.conn_meta_encoding in
     match Data_encoding.Binary.read encoding buf 0 length with
-    | Error re -> fail (P2p_errors.Decoding_error re)
+    | Error re -> tzfail (P2p_errors.Decoding_error re)
     | Ok (read_len, message) ->
         if read_len <> length then
-          fail (P2p_errors.Decoding_error Data_encoding.Binary.Extra_bytes)
+          tzfail (P2p_errors.Decoding_error Data_encoding.Binary.Extra_bytes)
         else return message
 end
 
@@ -295,7 +295,7 @@ module Ack = struct
     union [ack_case (Tag 0); nack_v_0_case (Tag 255); nack_case (Tag 1)]
 
   let write ?canceler fd cryptobox_data message =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let encoded_message_len = Data_encoding.Binary.length encoding message in
     let buf = Bytes.create encoded_message_len in
     let state =
@@ -306,7 +306,7 @@ module Ack = struct
            ~allowed_bytes:encoded_message_len
     in
     match Data_encoding.Binary.write encoding message state with
-    | Error we -> fail (Tezos_base.Data_encoding_wrapper.Encoding_error we)
+    | Error we -> tzfail (Tezos_base.Data_encoding_wrapper.Encoding_error we)
     | Ok last ->
         let* () =
           fail_unless
@@ -316,15 +316,15 @@ module Ack = struct
         Crypto.write_chunk ?canceler fd cryptobox_data buf
 
   let read ?canceler fd cryptobox_data =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let* buf = Crypto.read_chunk ?canceler fd cryptobox_data in
     let buf = Bytes.unsafe_to_string buf in
     let length = String.length buf in
     match Data_encoding.Binary.read encoding buf 0 length with
-    | Error re -> fail (P2p_errors.Decoding_error re)
+    | Error re -> tzfail (P2p_errors.Decoding_error re)
     | Ok (read_len, message) ->
         if read_len <> length then
-          fail (P2p_errors.Decoding_error Data_encoding.Binary.Extra_bytes)
+          tzfail (P2p_errors.Decoding_error Data_encoding.Binary.Extra_bytes)
         else return message
 end
 
@@ -362,7 +362,7 @@ let nack {scheduled_conn; cryptobox_data; info} motive
 let authenticate ~canceler ~proof_of_work_target ~incoming scheduled_conn
     ((remote_addr, remote_socket_port) as point) ?advertised_port identity
     announced_version metadata_config =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let local_nonce_seed = Crypto_box.random_nonce () in
   let*! () = Events.(emit sending_authentication) point in
   let* sent_msg =
@@ -452,14 +452,14 @@ module Reader = struct
 
   let read_message st init =
     let rec loop status =
-      let open Lwt_tzresult_syntax in
+      let open Lwt_result_syntax in
       let*! () = Lwt.pause () in
       let open Data_encoding.Binary in
       match status with
       | Success {result; size; stream} -> return (result, size, stream)
       | Error err ->
           let*! () = Events.(emit read_error) () in
-          fail (P2p_errors.Decoding_error err)
+          tzfail (P2p_errors.Decoding_error err)
       | Await decode_next_buf ->
           let* buf =
             Crypto.read_chunk
@@ -561,7 +561,7 @@ module Writer = struct
   let encode_message st msg =
     match Data_encoding.Binary.to_bytes st.encoding msg with
     | Error we ->
-        Tzresult_syntax.fail
+        Result_syntax.tzfail
           (Tezos_base.Data_encoding_wrapper.Encoding_error we)
     | Ok bytes -> Ok (Utils.cut st.binary_chunks_size bytes)
 
@@ -589,7 +589,7 @@ module Writer = struct
               (fun u ->
                 Lwt.wakeup_later
                   u
-                  (Tzresult_syntax.fail P2p_errors.Connection_closed))
+                  (Result_syntax.tzfail P2p_errors.Connection_closed))
               wakener ;
             match err with
             | (Canceled | Exn Lwt_pipe.Closed) :: _ ->
@@ -689,7 +689,7 @@ let private_node {conn; _} = conn.info.private_node
 
 let accept ?incoming_message_queue_size ?outgoing_message_queue_size
     ?binary_chunks_size ~canceler conn encoding =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let* ack =
     protect
       (fun () ->
@@ -706,8 +706,8 @@ let accept ?incoming_message_queue_size ?outgoing_message_queue_size
         in
         match err with
         | [P2p_errors.Connection_closed] ->
-            fail P2p_errors.Rejected_socket_connection
-        | [P2p_errors.Decipher_error] -> fail P2p_errors.Invalid_auth
+            tzfail P2p_errors.Rejected_socket_connection
+        | [P2p_errors.Decipher_error] -> tzfail P2p_errors.Invalid_auth
         | err -> Lwt.return_error err)
   in
   match ack with
@@ -732,23 +732,23 @@ let accept ?incoming_message_queue_size ?outgoing_message_queue_size
           Lwt.return_unit) ;
       return conn
   | Nack_v_0 ->
-      fail
+      tzfail
         (P2p_errors.Rejected_by_nack
            {motive = P2p_rejection.No_motive; alternative_points = None})
   | Nack {motive; potential_peers_to_connect} ->
-      fail
+      tzfail
         (P2p_errors.Rejected_by_nack
            {motive; alternative_points = Some potential_peers_to_connect})
 
 let catch_closed_pipe f =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let*! r =
     Lwt.catch f (function
-        | Lwt_pipe.Closed -> fail P2p_errors.Connection_closed
+        | Lwt_pipe.Closed -> tzfail P2p_errors.Connection_closed
         | exn -> fail_with_exn exn)
   in
   match r with
-  | Error (Exn Lwt_pipe.Closed :: _) -> fail P2p_errors.Connection_closed
+  | Error (Exn Lwt_pipe.Closed :: _) -> tzfail P2p_errors.Connection_closed
   | (Error _ | Ok _) as v -> Lwt.return v
 
 let write {writer; _} msg =
@@ -769,10 +769,10 @@ let write_sync {writer; _} msg =
       waiter)
 
 let write_now {writer; _} msg =
-  let open Tzresult_syntax in
+  let open Result_syntax in
   let* buf = Writer.encode_message writer msg in
   try Ok (Lwt_pipe.Maybe_bounded.push_now writer.messages (buf, None))
-  with Lwt_pipe.Closed -> fail P2p_errors.Connection_closed
+  with Lwt_pipe.Closed -> tzfail P2p_errors.Connection_closed
 
 let rec split_bytes size bytes =
   if Bytes.length bytes <= size then [bytes]
@@ -796,7 +796,7 @@ let read {reader; _} =
 let read_now {reader; _} =
   try Lwt_pipe.Maybe_bounded.pop_now reader.messages
   with Lwt_pipe.Closed ->
-    Some (Tzresult_syntax.fail P2p_errors.Connection_closed)
+    Some (Result_syntax.tzfail P2p_errors.Connection_closed)
 
 let stat {conn = {scheduled_conn; _}; _} = P2p_io_scheduler.stat scheduled_conn
 

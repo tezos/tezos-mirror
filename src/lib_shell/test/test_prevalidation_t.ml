@@ -43,7 +43,7 @@ module Mock_protocol :
     (* We need to override this function (so that it's not [assert false]),
        because Prevalidation.create calls this function, so we need it
        to work in all tests below. *)
-    Lwt_tzresult_syntax.return_unit
+    Lwt_result_syntax.return_unit
 end
 
 module Internal_for_tests = Tezos_shell.Prevalidation.Internal_for_tests
@@ -99,7 +99,7 @@ let create_prevalidation
     type chain_store = unit
 
     let context () _block : Tezos_context.Context.t tzresult Lwt.t =
-      Lwt_tzresult_syntax.return ctxt
+      Lwt_result_syntax.return ctxt
 
     let chain_id () = Init.chain_id
   end in

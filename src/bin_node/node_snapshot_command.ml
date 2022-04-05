@@ -114,17 +114,17 @@ module Term = struct
   type subcommand = Export | Import | Info
 
   let check_snapshot_path =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     function
-    | None -> fail Missing_file_argument
+    | None -> tzfail Missing_file_argument
     | Some path ->
         if Sys.file_exists path then return path
-        else fail (Cannot_locate_file path)
+        else tzfail (Cannot_locate_file path)
 
   let process subcommand args snapshot_path block disable_check export_format
       rolling reconstruct in_memory_index on_disk_index sandbox_file =
     let run =
-      let open Lwt_tzresult_syntax in
+      let open Lwt_result_syntax in
       let*! () = Tezos_base_unix.Internal_event_unix.init () in
       match subcommand with
       | Export ->
@@ -203,7 +203,7 @@ module Term = struct
                 let*! r = Lwt_utils_unix.Json.read_file filename in
                 match r with
                 | Error _err ->
-                    fail (Node_run_command.Invalid_sandbox_file filename)
+                    tzfail (Node_run_command.Invalid_sandbox_file filename)
                 | Ok json -> return_some ("sandbox_parameter", json))
           in
           let context_root = Node_data_version.context_dir data_dir in

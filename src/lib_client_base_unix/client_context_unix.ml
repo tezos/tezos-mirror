@@ -104,7 +104,7 @@ class unix_wallet ~base_dir ~password_filename : Client_context.wallet =
     method write : type a.
         string -> a -> a Data_encoding.encoding -> unit tzresult Lwt.t =
       fun alias_name list encoding ->
-        let open Lwt_tzresult_syntax in
+        let open Lwt_result_syntax in
         trace_eval (fun () ->
             error_of_fmt "could not write the %s alias file." alias_name)
         @@ Error_monad.catch_es (fun () ->
@@ -117,7 +117,7 @@ class unix_wallet ~base_dir ~password_filename : Client_context.wallet =
                return_unit)
 
     method last_modification_time : string -> float option tzresult Lwt.t =
-      let open Lwt_tzresult_syntax in
+      let open Lwt_result_syntax in
       fun alias_name ->
         let filename = self#filename alias_name in
         let*! exists = Lwt_unix.file_exists filename in

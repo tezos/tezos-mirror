@@ -765,7 +765,7 @@ let parse_arg :
     ctx ->
     a tzresult Lwt.t =
  fun ?command spec args_dict ctx ->
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   match spec with
   | Arg {label = {long; short = _}; kind = {converter; _}; _} -> (
       match StringMap.find_opt long args_dict with
@@ -776,7 +776,7 @@ let parse_arg :
             @@ converter ctx s
           in
           Some x
-      | Some (_ :: _) -> fail (Multiple_occurrences ("--" ^ long, command)))
+      | Some (_ :: _) -> tzfail (Multiple_occurrences ("--" ^ long, command)))
   | DefArg {label = {long; short = _}; kind = {converter; _}; default; _} -> (
       let*! r = converter ctx default in
       match r with
@@ -791,12 +791,12 @@ let parse_arg :
           | None | Some [] -> return default
           | Some [s] ->
               trace (Bad_option_argument (long, command)) (converter ctx s)
-          | Some (_ :: _) -> fail (Multiple_occurrences (long, command))))
+          | Some (_ :: _) -> tzfail (Multiple_occurrences (long, command))))
   | Switch {label = {long; short = _}; _} -> (
       match StringMap.find_opt long args_dict with
       | None | Some [] -> return_false
       | Some [_] -> return_true
-      | Some (_ :: _) -> fail (Multiple_occurrences (long, command)))
+      | Some (_ :: _) -> tzfail (Multiple_occurrences (long, command)))
   | Constant c -> return c
 
 (* Argument parsing *)
@@ -808,7 +808,7 @@ let rec parse_args :
     ctx ->
     a tzresult Lwt.t =
  fun ?command spec args_dict ctx ->
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   match spec with
   | NoArgs -> return_unit
   | AddArg (arg, rest) ->
@@ -844,14 +844,14 @@ type error += Version : error
 type error += Help : 'a command option -> error
 
 let check_help_flag ?command =
-  let open Lwt_tzresult_syntax in
-  function ("-h" | "--help") :: _ -> fail (Help command) | _ -> return_unit
+  let open Lwt_result_syntax in
+  function ("-h" | "--help") :: _ -> tzfail (Help command) | _ -> return_unit
 
 let check_version_flag =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   function
   (* No "-v", it is taken by man output verbosity *)
-  | "--version" :: _ -> fail Version
+  | "--version" :: _ -> tzfail Version
   | _ -> return_unit
 
 let add_occurrence long value acc =
@@ -860,7 +860,7 @@ let add_occurrence long value acc =
   | None -> StringMap.add long [value] acc
 
 let make_args_dict_consume ?command spec args =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let rec make_args_dict completing arities acc args =
     let* () = check_help_flag ?command args in
     let* () = check_version_flag args in
@@ -885,12 +885,12 @@ let make_args_dict_consume ?command spec args =
                     (add_occurrence long value acc)
                     tl'
               | (1, []) when completing -> return (acc, [])
-              | (1, []) -> fail (Option_expected_argument (arg, None))
+              | (1, []) -> tzfail (Option_expected_argument (arg, None))
               | (_, _) ->
                   Stdlib.failwith
                     "cli_entries: Arguments with arity not equal to 1 or 0 \
                      unsupported")
-          | None -> fail (Unknown_option (arg, None))
+          | None -> tzfail (Unknown_option (arg, None))
         else return (acc, args)
   in
   make_args_dict
@@ -900,7 +900,7 @@ let make_args_dict_consume ?command spec args =
     args
 
 let make_args_dict_filter ?command spec args =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let rec make_args_dict arities (dict, other_args) args =
     let* () = check_help_flag ?command args in
     match args with
@@ -920,7 +920,7 @@ let make_args_dict_filter ?command spec args =
                   arities
                   (add_occurrence long value dict, other_args)
                   tl'
-            | (1, []) -> fail (Option_expected_argument (arg, command))
+            | (1, []) -> tzfail (Option_expected_argument (arg, command))
             | (_, _) ->
                 Stdlib.failwith
                   "cli_entries: Arguments with arity not equal to 1 or 0 \
@@ -1576,7 +1576,7 @@ let exec (type ctx)
          conv;
          _;
        } as command) (ctx : ctx) params args_dict =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let rec exec :
       type ctx a.
       int -> ctx -> (a, ctx) params -> a -> string list -> unit tzresult Lwt.t =
@@ -1769,7 +1769,7 @@ and gather_assoc ?(acc = []) trees =
   List.fold_left (fun acc (_, tree) -> gather_commands tree ~acc) acc trees
 
 let find_command tree initial_arguments =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let rec traverse tree arguments acc =
     match (tree, arguments) with
     | ( ( TStop _ | TSeq _
@@ -1779,8 +1779,8 @@ let find_command tree initial_arguments =
         ("-h" | "--help") :: _ ) -> (
         match gather_commands tree with
         | [] -> assert false
-        | [command] -> fail (Help (Some command))
-        | more -> fail (Unterminated_command (initial_arguments, more)))
+        | [command] -> tzfail (Help (Some command))
+        | more -> tzfail (Unterminated_command (initial_arguments, more)))
     | (TStop c, []) -> return (c, empty_args_dict, initial_arguments)
     | (TStop (Command {options = Argument {spec; _}; _} as command), remaining)
       -> (
@@ -1791,22 +1791,22 @@ let find_command tree initial_arguments =
         | [] -> return (command, args_dict, initial_arguments)
         | hd :: _ ->
             if String.length hd > 0 && hd.[0] = '-' then
-              fail (Unknown_option (hd, Some command))
-            else fail (Extra_arguments (unparsed, command)))
+              tzfail (Unknown_option (hd, Some command))
+            else tzfail (Extra_arguments (unparsed, command)))
     | ( TSeq ((Command {options = Argument {spec; _}; _} as command), _),
         remaining ) ->
         if
           List.exists
             (function "-h" | "--help" -> true | _ -> false)
             remaining
-        then fail (Help (Some command))
+        then tzfail (Help (Some command))
         else
           let+ (dict, remaining) =
             make_args_dict_filter ~command spec remaining
           in
           (command, dict, List.rev_append acc remaining)
     | (TNonTerminalSeq {stop = None; _}, ([] | ("-h" | "--help") :: _)) ->
-        fail (Unterminated_command (initial_arguments, gather_commands tree))
+        tzfail (Unterminated_command (initial_arguments, gather_commands tree))
     | (TNonTerminalSeq {stop = Some c; _}, []) ->
         return (c, empty_args_dict, initial_arguments)
     | ( (TNonTerminalSeq {tree; suffix; _} as nts),
@@ -1830,18 +1830,18 @@ let find_command tree initial_arguments =
     | (TPrefix {stop = Some cmd; _}, []) ->
         return (cmd, empty_args_dict, initial_arguments)
     | (TPrefix {stop = None; prefix}, ([] | ("-h" | "--help") :: _)) ->
-        fail (Unterminated_command (initial_arguments, gather_assoc prefix))
+        tzfail (Unterminated_command (initial_arguments, gather_assoc prefix))
     | (TPrefix {prefix; _}, hd_arg :: tl) -> (
         match List.assoc ~equal:String.equal hd_arg prefix with
-        | None -> fail (Command_not_found (List.rev acc, gather_assoc prefix))
+        | None -> tzfail (Command_not_found (List.rev acc, gather_assoc prefix))
         | Some tree' -> traverse tree' tl (hd_arg :: acc))
     | (TParam {stop = None; _}, ([] | ("-h" | "--help") :: _)) ->
-        fail (Unterminated_command (initial_arguments, gather_commands tree))
+        tzfail (Unterminated_command (initial_arguments, gather_commands tree))
     | (TParam {stop = Some c; _}, []) ->
         return (c, empty_args_dict, initial_arguments)
     | (TParam {tree; _}, parameter :: arguments') ->
         traverse tree arguments' (parameter :: acc)
-    | (TEmpty, _) -> fail (Command_not_found (List.rev acc, []))
+    | (TEmpty, _) -> tzfail (Command_not_found (List.rev acc, []))
   in
   traverse tree initial_arguments []
 
@@ -1864,7 +1864,7 @@ let rec list_args : type arg ctx. (arg, ctx) args -> string list = function
   | AddArg (arg, args) -> get_arg arg @ list_args args
 
 let complete_func autocomplete cctxt =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   match autocomplete with
   | None -> return_nil
   | Some autocomplete -> autocomplete cctxt
@@ -1875,7 +1875,7 @@ let list_command_args (Command {options = Argument {spec; _}; _}) =
 let complete_arg : type a ctx. ctx -> (a, ctx) arg -> string list tzresult Lwt.t
     =
  fun ctx ->
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   function
   | Arg {kind = {autocomplete; _}; _} -> complete_func autocomplete ctx
   | DefArg {kind = {autocomplete; _}; _} -> complete_func autocomplete ctx
@@ -1897,7 +1897,7 @@ let complete_options (type ctx) continuation args args_spec ind (ctx : ctx) =
   let rec complete_spec :
       type a. string -> (a, ctx) args -> string list tzresult Lwt.t =
    fun name ->
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     function
     | NoArgs -> return_nil
     | AddArg (Constant _, rest) -> complete_spec name rest
@@ -1974,7 +1974,7 @@ let rec args_starting_from_suffix original_suffix ind matched_args = function
 
 let complete_tree cctxt tree index args =
   let rec help tree args ind =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     if ind = 0 then complete_next_tree cctxt tree
     else
       match (tree, args) with
@@ -2029,14 +2029,14 @@ let autocompletion ~script ~cur_arg ~prev_arg ~args ~global_options commands
     completions
 
 let parse_global_options global_options ctx args =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let (Argument {spec; converter}) = global_options in
   let* (dict, remaining) = make_args_dict_consume spec args in
   let* nested = parse_args spec dict ctx in
   return (converter nested, remaining)
 
 let dispatch commands ctx args =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let tree = make_dispatch_tree commands in
   match args with
   | []
@@ -2047,8 +2047,8 @@ let dispatch commands ctx args =
          | TSeq (_, _) -> false
          | TNonTerminalSeq {stop; _} -> stop = None
          | TEmpty -> true ->
-      fail (Help None)
-  | [("-h" | "--help")] -> fail (Help None)
+      tzfail (Help None)
+  | [("-h" | "--help")] -> tzfail (Help None)
   | _ ->
       let* (command, args_dict, filtered_args) = find_command tree args in
       exec command ctx filtered_args args_dict
@@ -2084,7 +2084,7 @@ let add_manual ~executable_name ~global_options format ppf commands =
                   (parameter
                      ~autocomplete:(fun _ -> Lwt.return_ok ["0"; "1"; "2"; "3"])
                      (fun _ arg ->
-                       let open Lwt_tzresult_syntax in
+                       let open Lwt_result_syntax in
                        match arg with
                        | "0" -> return Terse
                        | "1" -> return Short
@@ -2104,7 +2104,7 @@ let add_manual ~executable_name ~global_options format ppf commands =
                      ~autocomplete:(fun _ ->
                        Lwt.return_ok ["colors"; "plain"; "html"])
                      (fun _ arg ->
-                       let open Lwt_tzresult_syntax in
+                       let open Lwt_result_syntax in
                        match arg with
                        | "colors" -> return Ansi
                        | "plain" -> return Plain
@@ -2133,9 +2133,9 @@ let add_manual ~executable_name ~global_options format ppf commands =
                 | None when Compare.List_length_with.(commands <= 3) -> Full
                 | None -> Short
               in
-              let open Lwt_tzresult_syntax in
+              let open Lwt_result_syntax in
               match commands with
-              | [] -> fail (No_manual_entry keywords)
+              | [] -> tzfail (No_manual_entry keywords)
               | _ ->
                   let state = setup_formatter ppf format verbosity in
                   let commands = List.map (fun c -> Ex c) commands in

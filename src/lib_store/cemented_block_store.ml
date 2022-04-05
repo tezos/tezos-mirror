@@ -80,7 +80,7 @@ let default_index_log_size = 10_000
 let default_compression_level = 9
 
 let create ~log_size cemented_blocks_dir =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   protect (fun () ->
       let cemented_blocks_dir_path = Naming.dir_path cemented_blocks_dir in
       let cemented_blocks_metadata_dir =
@@ -99,7 +99,7 @@ let create ~log_size cemented_blocks_dir =
             return_unit)
           (function
             | Failure s when s = "Not a directory" ->
-                fail
+                tzfail
                   (Store_errors.Failed_to_init_cemented_block_store
                      cemented_blocks_dir_path)
             | e -> Lwt.fail e)
@@ -138,7 +138,7 @@ let compare_cemented_metadata ({start_level; _} : cemented_metadata_file)
   Compare.Int32.compare start_level start_level'
 
 let load_table cemented_blocks_dir =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   protect (fun () ->
       let cemented_blocks_dir_path = Naming.dir_path cemented_blocks_dir in
       (* No need to check the existence of the cemented block
@@ -183,7 +183,7 @@ let load_table cemented_blocks_dir =
           return_some cemented_files_array)
 
 let load_metadata_table cemented_blocks_dir =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   protect (fun () ->
       let cemented_metadata_dir =
         Naming.cemented_blocks_metadata_dir cemented_blocks_dir
@@ -244,7 +244,7 @@ let cemented_metadata_files cemented_block_store =
   load_metadata_table cemented_block_store.cemented_blocks_dir
 
 let load ~readonly ~log_size cemented_blocks_dir =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let cemented_block_level_index =
     Cemented_block_level_index.v
       ~readonly
@@ -271,7 +271,7 @@ let load ~readonly ~log_size cemented_blocks_dir =
   return cemented_store
 
 let init ?(log_size = default_index_log_size) chain_dir ~readonly =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let cemented_blocks_dir = Naming.cemented_blocks_dir chain_dir in
   let cemented_blocks_dir_path = Naming.dir_path cemented_blocks_dir in
   let*! b = Lwt_unix.file_exists cemented_blocks_dir_path in
@@ -375,7 +375,7 @@ let get_cemented_block_hash cemented_store level =
   with Not_found -> None
 
 let read_block_metadata ?location cemented_store block_level =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let location =
     match location with
     | Some _ -> location
@@ -414,7 +414,7 @@ let read_block_metadata ?location cemented_store block_level =
             (fun _ -> return_none))
 
 let cement_blocks_metadata cemented_store blocks =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let cemented_metadata_dir =
     cemented_store.cemented_blocks_dir |> Naming.cemented_blocks_metadata_dir
   in
@@ -432,7 +432,7 @@ let cement_blocks_metadata cemented_store blocks =
       (Block_repr.level
          (List.hd blocks |> WithExceptions.Option.get ~loc:__LOC__))
   with
-  | None -> fail (Cannot_cement_blocks_metadata `Not_cemented)
+  | None -> tzfail (Cannot_cement_blocks_metadata `Not_cemented)
   | Some {file; _} ->
       let tmp_metadata_file_path =
         Naming.cemented_blocks_tmp_metadata_file cemented_metadata_dir file
@@ -508,7 +508,7 @@ let get_highest_cemented_level cemented_store =
         None
 
 let get_cemented_block_by_level (cemented_store : t) ~read_metadata level =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   match compute_location cemented_store level with
   | None -> return_none
   | Some ((filename, block_number) as location) ->
@@ -530,7 +530,7 @@ let read_block_metadata cemented_store block_level =
   read_block_metadata cemented_store block_level
 
 let get_cemented_block_by_hash ~read_metadata (cemented_store : t) hash =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   match get_cemented_block_level cemented_store hash with
   | None -> return_none
   | Some level ->
@@ -543,7 +543,7 @@ let get_cemented_block_by_hash ~read_metadata (cemented_store : t) hash =
      and all blocks are expected to have metadata. *)
 let cement_blocks ?(check_consistency = true) (cemented_store : t)
     ~write_metadata (blocks : Block_repr.t list) =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let nb_blocks = List.length blocks in
   let preamble_length = nb_blocks * offset_length in
   let* () = fail_when (nb_blocks = 0) (Cannot_cement_blocks `Empty) in
@@ -750,7 +750,7 @@ let trigger_gc cemented_store history_mode =
           trigger_rolling_gc cemented_store cemented_blocks_files offset)
 
 let iter_cemented_file f ({file; _} as cemented_blocks_file) =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   protect (fun () ->
       let file_path = Naming.file_path file in
       Lwt_io.with_file
@@ -789,13 +789,13 @@ let iter_cemented_file f ({file; _} as cemented_blocks_file) =
             (fun exn ->
               Format.kasprintf
                 (fun trace ->
-                  fail (Inconsistent_cemented_file (file_path, trace)))
+                  tzfail (Inconsistent_cemented_file (file_path, trace)))
                 "%s"
                 (Printexc.to_string exn))))
 
 let check_indexes_consistency ?(post_step = fun () -> Lwt.return_unit)
     ?genesis_hash cemented_store =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   match cemented_store.cemented_blocks_files with
   | None -> return_unit
   | Some table ->

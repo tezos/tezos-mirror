@@ -43,7 +43,7 @@ type operation_status =
 
 let wait_for_operation_inclusion (ctxt : #Client_context.full) ~chain
     ?(predecessors = 10) ?(confirmations = 1) ?branch operation_hash =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let exception WrapError of error list in
   let exception Outdated of Operation_hash.t in
   (* Table of known blocks:
@@ -243,7 +243,7 @@ let wait_for_operation_inclusion (ctxt : #Client_context.full) ~chain
       loop block_hook
 
 let lookup_operation_in_previous_block ctxt chain operation_hash i =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let* block = Block_services.Empty.hash ctxt ~block:(`Head i) () in
   let* operations =
     Shell_services.Blocks.Operation_hashes.operation_hashes

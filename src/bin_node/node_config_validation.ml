@@ -454,7 +454,7 @@ let validate_passes config =
 (* Main validation functions. *)
 
 let check config =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   if config.Node_config_file.disable_config_validation then
     let*! () = Event.(emit disabled_event ()) in
     return_unit
@@ -462,7 +462,7 @@ let check config =
     let* t = validate_passes config in
     if has_error t then
       let*! () = Event.report t in
-      fail Invalid_node_configuration
+      tzfail Invalid_node_configuration
     else if has_warning t then
       let*! () = Event.report t in
       return_unit

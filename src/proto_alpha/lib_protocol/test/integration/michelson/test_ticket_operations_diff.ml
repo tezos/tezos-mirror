@@ -283,7 +283,7 @@ let originate block ~src ~baker ~script ~storage ~forges_tickets =
   return (orig_contract, incr)
 
 let transfer_operation ~incr ~src ~destination ~parameters_ty ~parameters =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let ctxt = Incremental.alpha_ctxt incr in
   let* (params_node, ctxt) =
     wrap
@@ -319,7 +319,7 @@ let transfer_operation ~incr ~src ~destination ~parameters_ty ~parameters =
 
 let transfer_operation_to_tx_rollup ~incr ~src ~parameters_ty ~parameters
     ~tx_rollup =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let ctxt = Incremental.alpha_ctxt incr in
   let* (params_node, ctxt) =
     wrap
@@ -393,7 +393,7 @@ let make_tickets ts =
   return {elements; length = List.length elements}
 
 let transfer_tickets_operation ~incr ~src ~destination tickets =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let*? parameters_ty = Environment.wrap_tzresult list_ticket_string_ty in
   let* parameters = wrap @@ make_tickets tickets in
   transfer_operation ~incr ~src ~destination ~parameters_ty ~parameters
@@ -1093,7 +1093,7 @@ let test_transfer_big_map_with_tickets () =
       ~storage:"{}"
       ~forges_tickets:false
   in
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let*? value_type =
     Environment.wrap_tzresult @@ ticket_t Micheline.dummy_location string_t
   in
@@ -1144,7 +1144,7 @@ let test_transfer_big_map_with_tickets () =
 
 (** Test transfer a ticket to a tx_rollup. *)
 let test_tx_rollup_deposit_one_ticket () =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let* (_baker, src, block) = init ~tx_rollup_enable:true () in
   let* ticketer = one_ticketer block in
   let* incr = Incremental.begin_construction block in

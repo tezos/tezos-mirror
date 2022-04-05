@@ -321,7 +321,7 @@ struct
       (function
         | Lwt_dropbox.Closed ->
             let name = Format.asprintf "%a" Name.pp w.name in
-            Lwt_tzresult_syntax.fail (Closed {base = base_name; name})
+            Lwt_result_syntax.tzfail (Closed {base = base_name; name})
         | exn ->
             (* [Lwt_dropbox.put] can only raise [Closed] which is caught above.
                We don't want to catch any other exception but we cannot use an
@@ -385,7 +385,7 @@ struct
             t
           with Lwt_pipe.Closed ->
             let name = Format.asprintf "%a" Name.pp w.name in
-            Lwt_tzresult_syntax.fail (Closed {base = base_name; name}))
+            Lwt_result_syntax.tzfail (Closed {base = base_name; name}))
       | Bounded_buffer message_queue ->
           let (t, u) = Lwt.wait () in
           Lwt.try_bind
@@ -395,7 +395,7 @@ struct
             (function
               | Lwt_pipe.Closed ->
                   let name = Format.asprintf "%a" Name.pp w.name in
-                  Lwt_tzresult_syntax.fail (Closed {base = base_name; name})
+                  Lwt_result_syntax.tzfail (Closed {base = base_name; name})
               | exn -> raise exn)
 
     let pending_requests (type a) (w : a queue t) =
@@ -428,7 +428,7 @@ struct
           let name = Format.asprintf "%a" Name.pp w.name in
           Lwt.wakeup_later
             u
-            (Tzresult_syntax.fail (Closed {base = base_name; name}))
+            (Result_syntax.tzfail (Closed {base = base_name; name}))
       | (_, Message (_, None)) -> ()
     in
     let close_queue message_queue =
@@ -565,7 +565,7 @@ struct
          recursive call to this [loop] at which point this call to [protect]
          fails immediately with [Canceled]. *)
       Lwt.bind
-        Lwt_tzresult_syntax.(
+        Lwt_result_syntax.(
           let* popped =
             protect ~canceler:w.canceler (fun () -> Lwt_result.ok @@ pop w)
           in
@@ -690,7 +690,7 @@ struct
         }
       in
       Nametbl.add table.instances name w ;
-      let open Lwt_tzresult_syntax in
+      let open Lwt_result_syntax in
       let started = if id_name = base_name then None else Some name_s in
       let*! () = lwt_emit w (Started started) in
       let* state = Handlers.on_launch w name parameters in

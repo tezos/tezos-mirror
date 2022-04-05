@@ -212,7 +212,7 @@ let encoding encoder () =
                       (x' :> int)
                       x))))
   in
-  Error_monad.Lwt_tzresult_syntax.join
+  Error_monad.Lwt_result_syntax.tzjoin
     (List.map check_encode_decode [0; 7373737373; max_int - 1])
 
 let tests =

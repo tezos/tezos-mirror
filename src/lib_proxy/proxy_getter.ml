@@ -241,7 +241,7 @@ module Core
 
   let do_rpc : Proxy.proxy_getter_input -> Local.key -> unit tzresult Lwt.t =
    fun pgi key ->
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let* tree = X.do_rpc pgi key in
     let*! current_store = lazy_load_store () in
     (* Update cache with data obtained *)
@@ -259,7 +259,7 @@ module Make (C : Proxy.CORE) (X : Proxy_proto.PROTO_RPC) : M = struct
   (** Handles the application of [X.split_key] to optimize queries. *)
   let do_rpc (pgi : Proxy.proxy_getter_input) (kind : kind)
       (requested_key : Local.key) : unit tzresult Lwt.t =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let (key_to_get, split) =
       match kind with
       | Mem ->
@@ -312,7 +312,7 @@ module Make (C : Proxy.CORE) (X : Proxy_proto.PROTO_RPC) : M = struct
       Local.key ->
       Local.tree option tzresult Lwt.t =
    fun (kind : kind) (pgi : Proxy.proxy_getter_input) (key : Local.key) ->
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let* () =
       if is_all key then
         (* This exact request was done already.
@@ -332,7 +332,7 @@ module Make (C : Proxy.CORE) (X : Proxy_proto.PROTO_RPC) : M = struct
   let proxy_get pgi key = generic_call Get pgi key
 
   let proxy_dir_mem pgi key =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let* tree_opt = generic_call Mem pgi key in
     match tree_opt with
     | None -> return_false
@@ -342,7 +342,7 @@ module Make (C : Proxy.CORE) (X : Proxy_proto.PROTO_RPC) : M = struct
         | `Value -> return_false)
 
   let proxy_mem pgi key =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let* tree_opt = generic_call Mem pgi key in
     match tree_opt with
     | None -> return_false

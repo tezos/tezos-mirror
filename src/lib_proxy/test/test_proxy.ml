@@ -76,7 +76,7 @@ let mock_proto_rpc () =
       in
       (* Remember call *)
       Stack.push k calls ;
-      Lwt_tzresult_syntax.return @@ mock_raw_context k
+      Lwt_result_syntax.return @@ mock_raw_context k
   end : MOCKED_PROTO_RPC)
 
 class mock_rpc_context : RPC_context.simple =

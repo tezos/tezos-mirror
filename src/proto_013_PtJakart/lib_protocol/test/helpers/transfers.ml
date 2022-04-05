@@ -29,7 +29,7 @@ open Test_tez
 
 let transfer_and_check_balances ?(with_burn = false) ~loc b ?(fee = Tez.zero)
     ?expect_failure src dst amount =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let*? amount_fee = fee +? amount in
   let* bal_src = Context.Contract.balance (I b) src in
   let* bal_dst = Context.Contract.balance (I b) dst in

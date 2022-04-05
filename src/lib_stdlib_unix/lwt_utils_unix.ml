@@ -161,12 +161,12 @@ let rec create_dir ?(perm = 0o755) dir =
     | _ -> Stdlib.failwith "Not a directory"
 
 let safe_close fd =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   Lwt.catch
     (fun () ->
       let*! () = Lwt_unix.close fd in
       return_unit)
-    (fun exc -> fail (Exn exc))
+    (fun exc -> tzfail (Exn exc))
 
 let create_file ?(close_on_exec = true) ?(perm = 0o644) name content =
   let open Lwt_syntax in
@@ -360,7 +360,7 @@ let with_open_in file task =
 
 (* This is to avoid file corruption *)
 let with_atomic_open_out ?(overwrite = true) ?temp_dir filename f =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let temp_file =
     Filename.temp_file ?temp_dir (Filename.basename filename) ".tmp"
   in

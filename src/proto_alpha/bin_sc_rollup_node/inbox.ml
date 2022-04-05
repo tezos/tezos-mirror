@@ -57,7 +57,7 @@ module State = struct
 end
 
 let get_messages cctxt head rollup =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let open Block_services in
   let+ operations =
     Operations.operations cctxt ~chain:`Main ~block:(`Level (snd head)) ()
@@ -110,7 +110,7 @@ let process_head cctxt store Layer1.(Head {level; hash = head_hash} as head) =
       return_unit
 
 let update cctxt store chain_event =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let open Layer1 in
   Lwt.map Environment.wrap_tzresult
   @@

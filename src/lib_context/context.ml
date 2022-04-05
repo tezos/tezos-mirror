@@ -311,9 +311,10 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
   let get_hash_version _c = Context_hash.Version.of_int 0
 
   let set_hash_version c v =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     if Context_hash.Version.(of_int 0 = v) then return c
-    else fail (Tezos_context_helpers.Context.Unsupported_context_hash_version v)
+    else
+      tzfail (Tezos_context_helpers.Context.Unsupported_context_hash_version v)
 
   let raw_commit ~time ?(message = "") context =
     let open Lwt_syntax in
@@ -982,7 +983,7 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
       Store.Tree.of_contents bytes
 
     let add_dir batch l =
-      let open Lwt_tzresult_syntax in
+      let open Lwt_result_syntax in
       let add sub_tree (step, hash) =
         match sub_tree with
         | None -> Lwt.return_some (Store.Tree.empty ())
