@@ -768,3 +768,10 @@ let initial_level ctxt rollup =
   match level with
   | None -> fail (Sc_rollup_does_not_exist rollup)
   | Some level -> return level
+
+let get_boot_sector ctxt rollup =
+  let open Lwt_tzresult_syntax in
+  let* boot_sector = Storage.Sc_rollup.Boot_sector.find ctxt rollup in
+  match boot_sector with
+  | None -> fail (Sc_rollup_does_not_exist rollup)
+  | Some boot_sector -> return boot_sector

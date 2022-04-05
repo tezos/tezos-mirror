@@ -409,7 +409,10 @@ val remove_staker :
 (* [list context] returns a list of all rollups that have been originated. *)
 val list : Raw_context.t -> Sc_rollup_repr.t list tzresult Lwt.t
 
-(* [initial_level ctxt sc_rollup] returns the level at which a [sc_rollup] was 
+(* [initial_level ctxt sc_rollup] returns the level at which a [sc_rollup] was
    originated. *)
 val initial_level :
   Raw_context.t -> Sc_rollup_repr.t -> Raw_level_repr.t tzresult Lwt.t
+
+(** [get_boot_sector ctxt sc_rollup] retrieves the boot sector for [sc_rollup]. *)
+val get_boot_sector : Raw_context.t -> Sc_rollup_repr.t -> string tzresult Lwt.t

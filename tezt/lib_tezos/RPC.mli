@@ -1022,6 +1022,16 @@ module Sc_rollup : sig
     sc_rollup_address:string ->
     Client.t ->
     JSON.t Lwt.t
+
+  (** Call RPC /chain/[chain]/blocks/[block]/context/sc_rollup/[rollup_hash]/boot_sector *)
+  val get_boot_sector :
+    ?endpoint:Client.endpoint ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    sc_rollup_address:string ->
+    Client.t ->
+    JSON.t Lwt.t
 end
 
 val raw_bytes :
