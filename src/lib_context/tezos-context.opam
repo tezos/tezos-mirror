@@ -20,7 +20,6 @@ depends: [
   "digestif" { >= "0.7.3" }
   "tezos-stdlib-unix"
   "alcotest-lwt" { with-test & >= "1.5.0" }
-  "vector" {with-test}
   "qcheck-alcotest" { with-test & >= "0.15" }
   "tezos-test-helpers" {with-test}
 ]
