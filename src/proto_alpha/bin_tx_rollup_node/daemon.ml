@@ -326,14 +326,19 @@ let maybe_batch_and_inject state =
   | None -> ()
   | Some batcher_state -> Batcher.async_batch_and_inject batcher_state
 
+let notify_head state head reorg =
+  let open Lwt_result_syntax in
+  let* head = State.fetch_tezos_block state head in
+  let*! () = Injector.new_tezos_head state.State.injector head reorg in
+  return_unit
+
 let process_head state current_hash rollup_id =
   let open Lwt_result_syntax in
   let*! () = Event.(emit new_block) current_hash in
   let* res = process_block state current_hash rollup_id in
-  let* _l1_reorg = State.set_tezos_head state current_hash in
+  let* l1_reorg = State.set_tezos_head state current_hash in
   maybe_batch_and_inject state ;
-  (* TODO/TORU: handle new head and reorgs w.r.t. injected operations by the
-     rollup node, like commitments and rejections. *)
+  let* () = notify_head state current_hash l1_reorg in
   let*! () = Injector.inject state.State.injector in
   return res
 
