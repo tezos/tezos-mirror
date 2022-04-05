@@ -33,6 +33,8 @@
 *)
 
 open Protocol
+open Alpha_context
+open Script_typed_ir
 
 (*
    Helpers
@@ -43,356 +45,580 @@ exception Script_typed_ir_test_error of string
 
 let err x = Exn (Script_typed_ir_test_error x)
 
-let wrap e = Lwt.return (Environment.wrap_tzresult e)
+let dummy_loc = Micheline.dummy_location
 
-let iter_n_es n f =
-  let rec aux k = if k = n then return () else f k >>=? fun () -> aux (k + 1) in
-  aux 0
+let get = Stdlib.Option.get
 
-(*
+let is_ok m = match m with Ok x -> x | _ -> assert false
 
-   We use Snoop's samplers to test that our good approximation of
-   Michelson values' sizes is indeed a good approximation and that it
-   is never too far from the reality.
+let footprint v =
+  (* This is to turn every statically allocated data into
+     heap-allocated data, to consider the worst-case in-memory
+     representation of values. Note that it does NOT remove sharing.*)
+  let v' =
+    try Marshal.(from_bytes (to_bytes v [Closures]) 0)
+    with _ -> (* Custom blocks are problematic. *) v
+  in
+  let size v = Obj.(reachable_words (repr v) * 8) in
+  max (size v) (size v')
 
-   Architecture:
-   -------------
+(** [gen_string s] returns a heap-allocated string. Notice that a
+    string literal ["foo"] written in the code is statically allocated
+    and is therefore not counted by [Obj.reachable_words]. *)
+let gen_string s =
+  let s = Bytes.of_string s |> Bytes.to_string in
+  is_ok @@ Script_string_repr.of_string s
 
-   - module [Samplers] provides samplers for values of type [ty],
-     [comparable_ty], [code] and any value whose types is dynamically
-     representable with a [ty].
+let boxed_set_elements s = Script_set.fold (fun x s -> x :: s) s []
 
-   - module [Tests] defines the actual testing procedures and reports
-     error using [Printers].
+let boxed_map_bindings s = Script_map.fold (fun k v s -> (k, v) :: s) s []
 
-*)
+let big_map_bindings (Big_map s) = Big_map_overlay.bindings s.diff.map
 
-module Samplers = struct
-  let size = {Tezos_benchmark.Base_samplers.min = 4; max = 32}
+let show_script_int fmt x = Z.pp_print fmt (Script_int_repr.to_zint x)
 
-  module Crypto_samplers =
-  Tezos_benchmark.Crypto_samplers.Make_finite_key_pool (struct
-    let size = 10
+let show_bool fmt b = Format.fprintf fmt "%B" b
 
-    let algo = `Default
-  end)
+let show_script_string fmt x =
+  Format.fprintf fmt "%s" (Script_string.to_string x)
 
-  include
-    Michelson_samplers.Make
-      (struct
-        let parameters : Michelson_samplers.parameters =
-          {
-            base_parameters =
-              {
-                Michelson_samplers_base.int_size = size;
-                string_size = size;
-                bytes_size = size;
-              };
-            list_size = size;
-            set_size = size;
-            map_size = size;
-          }
-      end)
-      (Crypto_samplers)
+let show_address fmt Script_typed_ir.{destination; entrypoint} =
+  Format.fprintf
+    fmt
+    "%a(%d):%a(%d)"
+    Destination.pp
+    destination
+    (footprint destination)
+    Entrypoint.pp
+    entrypoint
+    (footprint entrypoint)
 
-  let random_state = Random.State.make [|37; 73; 17; 71; 42|]
+let dont_show _fmt _ = ()
 
-  let sample_ty () = Random_type.m_type ~size:10 random_state
+let size = {Tezos_benchmark.Base_samplers.min = 4; max = 32}
 
-  let sample_cty () = Random_type.m_comparable_type ~size:10 random_state
+module Crypto_samplers =
+Tezos_benchmark.Crypto_samplers.Make_finite_key_pool (struct
+  let size = 10
 
-  let sample_value ty = Random_value.value ty random_state
+  let algo = `Default
+end)
 
-  module Gen =
-    Michelson_mcmc_samplers.Make_code_sampler (Michelson_base) (Crypto_samplers)
-      (struct
-        let rng_state = random_state
+include
+  Michelson_samplers.Make
+    (struct
+      let parameters : Michelson_samplers.parameters =
+        {
+          base_parameters =
+            {
+              Michelson_samplers_base.int_size = size;
+              string_size = size;
+              bytes_size = size;
+            };
+          list_size = size;
+          set_size = size;
+          map_size = size;
+        }
+    end)
+    (Crypto_samplers)
 
-        let target_size = 500
+let random_state = Random.State.make [|37; 73; 17; 71; 42|]
 
-        let verbosity = `Silent
-      end)
+let sample_ty () = Random_type.m_type ~size:10 random_state
 
-  (* Delay and cache the generator as it's expensive to create. *)
-  let generator = lazy (Gen.generator ~burn_in:(500 * 7) random_state)
+let sample_value ty = Random_value.value ty random_state
 
-  type exdescr =
-    | Ex_descr : ('a, 's, 'r, 'f) Script_ir_translator.descr -> exdescr
+type ex = Ex : string * ('a, _) Script_typed_ir.ty * 'a * int -> ex [@@boxed]
 
-  let sample_ir_code () =
-    let Michelson_mcmc_samplers.{term = sample; bef = stack; aft = _} =
-      (Lazy.force generator) random_state
-    in
-    let accounts = Account.generate_accounts 1 in
-    Block.alpha_context accounts >>=? fun ctxt ->
-    let code = Micheline.root sample in
-    let (Ex_stack_ty bef) =
-      Type_helpers.michelson_type_list_to_ex_stack_ty stack ctxt
-    in
-    Script_ir_translator.(
-      parse_instr Script_tc_context.data ctxt ~legacy:true code bef)
-    >>= wrap
-    >>=? fun (ir_code, _) ->
-    match ir_code with
-    | Script_ir_translator.Typed ir_code -> return (sample, Ex_descr ir_code)
-    | _ -> assert false
-end
+let ex ?(error = 0) label ty v = Ex (label, ty, v, error)
 
-module Printers = struct
-  let string_of_something f =
-    Lwt_main.run
-      (let accounts = Account.generate_accounts 1 in
-       Block.alpha_context accounts >>=? fun ctxt ->
-       f ctxt >>= wrap >>=? fun node ->
-       let printable =
-         Micheline_printer.printable
-           Protocol.Michelson_v1_primitives.string_of_prim
-           node
-       in
-       let b = Buffer.create 13 in
-       let fmt = Format.formatter_of_buffer b in
-       Format.fprintf fmt "@[%a@]@." Micheline_printer.print_expr printable ;
-       return @@ Buffer.contents b)
-    |> function
-    | Ok s -> s
-    | Error (errs : tztrace) ->
-        Format.eprintf "@[Error: %a@]" pp_print_trace errs ;
-        exit 1
+let ex_random ?(error = 0) show ty ?(sample = fun () -> sample_value ty) label =
+  let v = sample () in
+  let label = Format.asprintf "@[%a%s@]@." show v label in
+  ex ~error label ty v
 
-  let string_of_value : type a ac. (a, ac) Script_typed_ir.ty -> a -> string =
-   fun ty v ->
-    string_of_something @@ fun ctxt ->
-    Script_ir_translator.(
-      unparse_data ctxt Readable ty v >>=? fun (node, _) ->
-      return @@ Micheline.strip_locations node)
+let exs ?(error = 0) n show ty ?(sample = fun () -> sample_value ty) label =
+  List.map (fun _ -> ex_random ~error show ty label ~sample) (1 -- n)
 
-  let string_of_ty ty =
-    string_of_something @@ fun ctxt ->
-    Lwt.return
-    @@ Script_ir_translator.(
-         unparse_ty ~loc:() ctxt ty >>? fun (node, _) ->
-         Ok (Micheline.strip_locations node))
+let nsample = 100
 
-  let string_of_code code = string_of_something @@ fun _ -> return code
+(** [check_value_size ()] covers a finite number of cases of Michelson
+   values, checking that the cost model is sound with respect to their
+   memory footprint.
 
-  let string_of_comparable_ty cty =
-    string_of_ty (Script_ir_translator.ty_of_comparable_ty cty)
-end
+   One could wonder why we do not simply use a single value generator
+   based on a randomly chosen type. We actually implemented such a
+   strategy in a previous version of this test but this results in a
+   flaky test. Indeed, for some types, the values are overapproximated
+   and it was difficult to correctly handle the accumulation of errors
+   when types were randomly composed.
 
-module Tests = struct
-  let footprint v = 8 * Obj.(reachable_words (repr v))
-
-  let stats = Stdlib.Hashtbl.create 13
-
-  let remember what vsize rsize = Stdlib.Hashtbl.add stats what (vsize, rsize)
-
-  let check_good_approximation kind ratio what vsize x =
-    let rsize = footprint x in
-    let vsize = Saturation_repr.to_int vsize in
-    remember kind vsize rsize ;
-    fail_unless
-      (rsize = 0 || (vsize >= rsize / ratio && vsize <= rsize * ratio))
+   The current strategy requires more code but, in exchange, it
+   provides a finer control over the overapproximation. As a
+   consequence, we can check for example that there is no
+   overapproximation for values for which the model is exact.  We can
+   also check that the overapproximation is at least well understood
+   on the values for which size model is not exact. *)
+let check_value_size () =
+  let check (Ex (what, ty, v, error)) =
+    let expected_size = footprint v in
+    let (_, size) = Script_typed_ir_size.value_size ty v in
+    let size = Saturation_repr.to_int size in
+    fail_when
+      (expected_size + error < size || size < expected_size)
       (err
          (Printf.sprintf
-            "Computed size for %s is not a good approximation (%d ~/~ %d)"
+            "%s was expected to have size %d while the size model answered %d \
+             (with +%d accepted over approximation error)"
             what
-            vsize
-            rsize))
-
-  let check_in_range what w (v, error) =
-    let lower_bound = v -. error and upper_bound = v +. error in
-    fail_unless
-      (lower_bound <= w && w <= upper_bound)
-      (err
-         (Printf.sprintf
-            "For %s: %f not in [%f; %f]"
-            what
-            w
-            lower_bound
-            upper_bound))
-
-  let check_stats what ~expected_mean ~expected_stddev ~expected_ratios =
-    let entries = Stdlib.Hashtbl.find_all stats what in
-    let nb_entries = List.length entries in
-    if nb_entries = 0 then
-      (* TODO break dependency on other test's side effects:
-         this value is 0 if the generator did not load the values *)
-      return_unit
-    else
-      let nentries = float_of_int @@ nb_entries in
-      let ratios =
-        List.map
-          (fun (vsize, rsize) ->
-            (1. +. float_of_int vsize) /. (1. +. float_of_int rsize))
-          entries
-      in
-      let sum = List.fold_left (fun accu r -> accu +. r) 0. ratios in
-      let mean = sum /. nentries in
-      Format.printf "mean: %f@." mean ;
-      let sqr x = x *. x in
-      let stddev =
-        sqrt
-          (List.fold_left (fun accu r -> accu +. sqr (r -. mean)) 0. ratios
-          /. nentries)
-      in
-      let entries_min = List.fold_left min max_float ratios in
-      let entries_max = List.fold_left max min_float ratios in
-      check_in_range (what ^ ":mean") mean expected_mean >>=? fun () ->
-      check_in_range (what ^ ":stddev") stddev expected_stddev >>=? fun () ->
-      check_in_range (what ^ ":min") entries_min expected_ratios >>=? fun () ->
-      check_in_range (what ^ ":max") entries_max expected_ratios
-
-  let ty_size nsamples =
-    iter_n_es nsamples @@ fun i ->
-    match Samplers.sample_ty () with
-    | Ex_ty ty ->
-        check_good_approximation
-          "ty_size"
-          2
-          (Printf.sprintf "type #%d `%s'" i (Printers.string_of_ty ty))
-          (snd (Script_typed_ir_size.Internal_for_tests.ty_size ty))
-          ty
-    | exception _ -> return ()
-
-  let check_ty_size_stats () =
-    check_stats
-      "ty_size"
-      ~expected_mean:(1., 0.01)
-      ~expected_stddev:(0., 0.01)
-      ~expected_ratios:(1., 0.05)
-
-  let comparable_ty_size nsamples =
-    iter_n_es nsamples @@ fun i ->
-    match Samplers.sample_cty () with
-    | Ex_comparable_ty cty ->
-        check_good_approximation
-          "comparable_ty_size"
-          2
-          (Printf.sprintf
-             "comparable type #%d `%s'"
-             i
-             (Printers.string_of_comparable_ty cty))
-          (snd (Script_typed_ir_size.Internal_for_tests.comparable_ty_size cty))
-          cty
-    | exception _ -> return ()
-
-  let check_comparable_ty_size_stats () =
-    check_stats
-      "comparable_ty_size"
-      ~expected_mean:(1., 0.01)
-      ~expected_stddev:(0., 0.01)
-      ~expected_ratios:(1., 0.05)
-
-  let contains_exceptions ty =
-    let apply : type a ac. bool -> (a, ac) Script_typed_ir.ty -> bool =
-     fun accu -> function
-      (* Boxed sets and maps point to a shared first class module.
-         This is an overapproximation that we want to ignore in
-         the tests. *)
-      | Set_t _ | Map_t _
-      (* We also want to avoid interferences between testing
-         [lambda_size] and [value_size]. *)
-      | Lambda_t _ | Contract_t _ ->
-          true
-      | _ -> accu
-    in
-    Script_typed_ir.ty_traverse
-      ty
-      false
-      {apply; apply_comparable = (fun accu _ -> accu)}
-
-  let value_size nsamples =
-    iter_n_es nsamples @@ fun i ->
-    match Samplers.sample_ty () with
-    | Ex_ty ty when not (contains_exceptions ty) -> (
-        match Samplers.sample_value ty with
-        | v ->
-            check_good_approximation
-              "value_size"
-              (* Used to be 3 but leads to flaky tests. Revert when
-                 determinism is restored and the protocol is more precise
-                 about value sizes.
-                 FIXME: https://gitlab.com/tezos/tezos/-/issues/1784
-                 FIXME: https://gitlab.com/tezos/tezos/-/issues/1834 *)
-              10
-              (Printf.sprintf
-                 "value #%d `%s' of type `%s'"
-                 i
-                 (Printers.string_of_value ty v)
-                 (Printers.string_of_ty ty))
-              (snd (Script_typed_ir_size.value_size ty v))
-              v
-        | exception _ -> return ())
-    | _ | (exception _) -> return ()
-
-  let check_value_size_stats () =
-    (* Stddev set to 0.5, used to be 0.2 but leads to flaky tests.
-       Revert when determinism is restored and the protocol is more
-       precise about value sizes.
-
-       FIXME: https://gitlab.com/tezos/tezos/-/issues/1784
-       FIXME: https://gitlab.com/tezos/tezos/-/issues/1834
+            expected_size
+            size
+            error))
+  in
+  List.iter_es
+    check
+    ((*
+        Unit_t
+        ======
+     *)
+     [ex "() : unit" Unit_t ()]
+    (*
+        Int_t
+        =====
     *)
-    check_stats
-      "value_size"
-      ~expected_mean:(1., 0.2)
-      ~expected_stddev:(0., 0.7)
-      ~expected_ratios:(1., 3.)
-
-  let lambda_size nsamples =
-    iter_n_es nsamples @@ fun i ->
-    Samplers.sample_ir_code () >>=? fun (code, Samplers.Ex_descr icode) ->
-    let kinstr = (Script_ir_translator.close_descr icode).kinstr in
-    check_good_approximation
-      "lambda_size"
-      3
-      (Printf.sprintf "code #%d `%s'" i (Printers.string_of_code code))
-      (snd (Script_typed_ir_size.Internal_for_tests.kinstr_size kinstr))
-      kinstr
-
-  let check_lambda_size_stats () =
-    check_stats
-      "lambda_size"
-      ~expected_mean:(1., 0.35)
-      ~expected_stddev:(0., 0.1)
-      ~expected_ratios:(1., 0.4)
-end
+    @ [
+        ex "0 : int" Int_t Script_int_repr.zero;
+        ex "2^63 : int" Int_t (Script_int_repr.of_int max_int);
+        ex "37^73 : int" Int_t (Script_int_repr.of_zint Z.(pow (of_int 37) 73));
+        ex
+          "-37^73 : int"
+          Int_t
+          (Script_int_repr.of_zint Z.(neg (pow (of_int 37) 73)));
+        ex
+          "13270006022583112970 : int"
+          Int_t
+          (get @@ Script_int_repr.of_string "13270006022583112970");
+      ]
+    @ exs nsample show_script_int Int_t ": int"
+    (*
+        Nat_t
+        =====
+    *)
+    @ [
+        ex "0 : nat" Nat_t Script_int_repr.zero_n;
+        ex "2^63 : nat" Nat_t (get Script_int_repr.(is_nat @@ of_int max_int));
+        ex
+          "37^73 : int"
+          Nat_t
+          (get Script_int_repr.(is_nat @@ of_zint Z.(pow (of_int 37) 73)));
+      ]
+    @ exs nsample show_script_int Nat_t ": nat"
+    (*
+       Signature_t
+       ===========
+    *)
+    @ (let show fmt (Script_typed_ir.Script_signature.Signature_tag s) =
+         Signature.pp fmt s
+       in
+       exs ~error:8 nsample show Signature_t ": signature")
+    (*
+       String_t
+       ========
+    *)
+    @ (let show fmt s =
+         Format.fprintf fmt "%s" (Script_string_repr.to_string s)
+       in
+       exs nsample show String_t ": string")
+    (*
+       Bytes_t
+       =======
+    *)
+    @ (let show fmt s = Format.fprintf fmt "%s" (Bytes.to_string s) in
+       exs nsample show Bytes_t ": bytes")
+    (*
+       Mutez_t
+       =======
+    *)
+    @ (let show fmt t = Format.fprintf fmt "%s" (Tez.to_string t) in
+       exs nsample show Mutez_t ": mutez")
+    (*
+       Key_hash_t
+       ==========
+    *)
+    @ (let show = Signature.Public_key_hash.pp in
+       exs nsample show Key_hash_t ": key_hash")
+    (*
+       Key_t
+       =====
+    *)
+    @ (let show = Signature.Public_key.pp in
+       exs nsample show Key_t ": key_t")
+    (*
+       Timestamp_t
+       ===========
+    *)
+    @ (let show fmt s =
+         Format.fprintf fmt "%s" (Script_timestamp.to_string s)
+       in
+       exs nsample show Timestamp_t ": timestamp_t")
+    (*
+       Address_t
+       =========
+    *)
+    @ exs nsample show_address Address_t ": address_t"
+    (*
+       Tx_rollup_l2_address_t
+       ======================
+    *)
+    @ (let show = Indexable.pp Tx_rollup_l2_address.pp in
+       exs nsample show Tx_rollup_l2_address_t ": tx_rollup_l2_t")
+    (*
+       Bool_t
+       ======
+    *)
+    @ [ex "true : bool" Bool_t true; ex "false : bool" Bool_t false]
+    (*
+       Pair_t
+       ======
+    *)
+    @ (let module P = struct
+         type ('a, 'b) f = {apply : 'c. ('a * 'b, 'c) ty -> ex}
+       end in
+      let on_pair : type a b. (a, _) ty -> (b, _) ty -> (a, b) P.f -> ex =
+       fun ty1 ty2 f ->
+        let (Ty_ex_c ty) = is_ok @@ pair_t dummy_loc ty1 ty2 in
+        f.apply ty
+      in
+      let open Script_int_repr in
+      [
+        (* "int * int" *)
+        on_pair
+          int_t
+          int_t
+          {apply = (fun ty -> ex "(0, 0) : int * int" ty (of_int 0, of_int 0))};
+        (* "string * string" *)
+        on_pair
+          string_t
+          string_t
+          {
+            apply =
+              (fun ty ->
+                let foo = gen_string "foo" in
+                let bar = gen_string "bar" in
+                ex "(foo, bar) : string * string" ty (foo, bar));
+          };
+        (* "string * int" *)
+        on_pair
+          string_t
+          int_t
+          {
+            apply =
+              (fun ty ->
+                let foo = gen_string "foo" in
+                ex "(foo, 0) : string * int" ty (foo, of_int 0));
+          };
+        (* "int * int * int" *)
+        on_pair
+          int_t
+          int_t
+          {
+            apply =
+              (fun ty ->
+                on_pair int_t ty
+                @@ {
+                     apply =
+                       (fun ty ->
+                         ex
+                           "(0, (1, 2)) : int * int * int"
+                           ty
+                           (of_int 0, (of_int 1, of_int 2)));
+                   });
+          };
+      ])
+    (*
+        Union_t
+        =======
+    *)
+    @ (let module P = struct
+         type ('a, 'b) f = {apply : 'c. (('a, 'b) union, 'c) ty -> ex}
+       end in
+      let on_union : type a b. (a, _) ty -> (b, _) ty -> (a, b) P.f -> ex =
+       fun ty1 ty2 f ->
+        let (Ty_ex_c ty) = is_ok @@ union_t dummy_loc ty1 ty2 in
+        f.apply ty
+      in
+      let open Script_int_repr in
+      [
+        (* "int + int" *)
+        on_union
+          int_t
+          int_t
+          {apply = (fun ty -> ex "L 0 : int + int" ty (L (of_int 0)))};
+        on_union
+          int_t
+          int_t
+          {apply = (fun ty -> ex "R 0 : int + int" ty (R (of_int 0)))};
+        (* "string + string" *)
+        on_union
+          string_t
+          string_t
+          {
+            apply =
+              (fun ty ->
+                let foo = gen_string "foo" in
+                ex "L foo : string * string" ty (L foo));
+          };
+        on_union
+          string_t
+          string_t
+          {
+            apply =
+              (fun ty ->
+                let foo = gen_string "foo" in
+                ex "R foo : string * string" ty (R foo));
+          };
+        (* "string + int" *)
+        on_union
+          string_t
+          int_t
+          {
+            apply =
+              (fun ty ->
+                let foo = gen_string "foo" in
+                ex "L foo : string * int" ty (L foo));
+          };
+        (* "int + int + int" *)
+        on_union
+          int_t
+          int_t
+          {
+            apply =
+              (fun ty ->
+                on_union
+                  int_t
+                  ty
+                  {
+                    apply =
+                      (fun ty -> ex "L 0 : int + int + int" ty (L (of_int 0)));
+                  });
+          };
+        on_union
+          int_t
+          int_t
+          {
+            apply =
+              (fun ty ->
+                on_union
+                  int_t
+                  ty
+                  {
+                    apply =
+                      (fun ty ->
+                        ex "R (L 0) : int + int + int" ty (R (L (of_int 0))));
+                  });
+          };
+        on_union
+          int_t
+          int_t
+          {
+            apply =
+              (fun ty ->
+                on_union
+                  int_t
+                  ty
+                  {
+                    apply =
+                      (fun ty ->
+                        ex "R (R 0) : int + int + int" ty (R (R (of_int 0))));
+                  });
+          };
+      ])
+    (*
+        Option_t
+        ========
+    *)
+    @ (let module P = struct
+         type 'a f = {apply : 'c. ('a option, 'c) ty -> ex}
+       end in
+      let on_option : type a. (a, _) ty -> a P.f -> ex =
+       fun ty f -> f.apply @@ is_ok @@ option_t dummy_loc ty
+      in
+      let open Script_int_repr in
+      [
+        (* "option int" *)
+        on_option int_t {apply = (fun ty -> ex "None : option int" ty None)};
+        on_option
+          int_t
+          {apply = (fun ty -> ex "Some 0 : option int" ty (Some (of_int 0)))};
+        (* "option string" *)
+        on_option
+          string_t
+          {apply = (fun ty -> ex "None : option string" ty None)};
+        on_option
+          string_t
+          {
+            apply =
+              (fun ty ->
+                ex "Some \"foo\" : option string" ty (Some (gen_string "foo")));
+          };
+      ])
+    (*
+        List_t
+        ======
+    *)
+    @ (let module P = struct
+         type 'a f = {apply : 'c. ('a boxed_list, 'c) ty -> ex list}
+       end in
+      let on_list : type a. (a, _) ty -> a P.f -> ex list =
+       fun ty f -> f.apply @@ is_ok @@ list_t dummy_loc ty
+      in
+      let check ty show_elt =
+        on_list
+          ty
+          {
+            apply =
+              (fun ty ->
+                let show fmt l = Format.pp_print_list show_elt fmt l.elements in
+                exs nsample show ty ": list _");
+          }
+      in
+      check string_t show_script_string)
+    (*
+        Set_t
+        ======
+    *)
+    @ (let module P = struct
+         type 'a f = {apply : 'c. ('a set, 'c) ty -> ex list}
+       end in
+      let on_set : type a. (a, _) ty -> a P.f -> ex list =
+       fun ty f -> f.apply @@ is_ok @@ set_t dummy_loc ty
+      in
+      let check ty show_elt =
+        on_set
+          ty
+          {
+            apply =
+              (fun ty ->
+                let show fmt s =
+                  Format.fprintf
+                    fmt
+                    "%a / %a"
+                    show_script_int
+                    (Script_set.size s)
+                    (Format.pp_print_list show_elt)
+                    (boxed_set_elements s)
+                in
+                exs nsample show ty ": set _");
+          }
+      in
+      check string_t show_script_string)
+    (*
+        Map_t
+        ======
+    *)
+    @ (let module P = struct
+         type ('k, 'v) f = {apply : 'c. (('k, 'v) map, 'c) ty -> ex list}
+       end in
+      let on_map : type k v. (k, _) ty -> (v, _) ty -> (k, v) P.f -> ex list =
+       fun kty vty f -> f.apply @@ is_ok @@ map_t dummy_loc kty vty
+      in
+      let check kty vty show_key show_value =
+        on_map
+          kty
+          vty
+          {
+            apply =
+              (fun ty ->
+                let show_binding fmt (k, v) =
+                  Format.fprintf fmt "(%a -> %a)" show_key k show_value v
+                in
+                let show fmt s =
+                  Format.pp_print_list show_binding fmt (boxed_map_bindings s)
+                in
+                exs nsample show ty ": map _");
+          }
+      in
+      check string_t string_t show_script_string show_script_string)
+    (*
+        Big_map_t
+        ======
+    *)
+    @ (let module P = struct
+         type ('k, 'v) f = {apply : 'c. (('k, 'v) big_map, 'c) ty -> ex list}
+       end in
+      let on_big_map : type k v. (k, _) ty -> (v, _) ty -> (k, v) P.f -> ex list
+          =
+       fun kty vty f -> f.apply @@ is_ok @@ big_map_t dummy_loc kty vty
+      in
+      let check kty vty show_key show_value =
+        on_big_map
+          kty
+          vty
+          {
+            apply =
+              (fun ty ->
+                let show_binding fmt (_, (k, v)) =
+                  match v with
+                  | Some v ->
+                      Format.fprintf fmt "(%a -> %a)" show_key k show_value v
+                  | None -> Format.fprintf fmt "(%a?)" show_key k
+                in
+                let show fmt s =
+                  Format.pp_print_list show_binding fmt (big_map_bindings s)
+                in
+                exs nsample show ty ": big_map _");
+          }
+      in
+      check bool_t bool_t show_bool show_bool)
+    (*
+       Contract_t
+       =========
+    *)
+    @ (let show fmt (Typed_contract {arg_ty = _; address}) =
+         show_address fmt address
+       in
+       exs
+         nsample
+         show
+         (is_ok @@ contract_t dummy_loc string_t)
+         ": contract string")
+    (*
+       Chain_t
+       =========
+    *)
+    @ exs nsample dont_show chain_id_t ": chain_id"
+    (*
+       Bls12_381_g1_t
+       ==============
+    *)
+    @ exs nsample dont_show bls12_381_g1_t ": bls12_381_g1_t"
+    (*
+       Bls12_381_g2_t
+       ==============
+    *)
+    @ exs nsample dont_show bls12_381_g2_t ": bls12_381_g2_t"
+    (*
+       Bls12_381_fr_t
+       ==============
+    *)
+    @ exs nsample dont_show bls12_381_fr_t ": bls12_381_fr_t"
+    (*
+       Ticket_t
+       ========
+    *)
+    @ exs nsample dont_show (is_ok @@ ticket_t dummy_loc bool_t) ": ticket bool"
+      (*
+          Missing by lack of fully functional sampler:
+          - Sapling_transaction_t ;
+          - Sapling_transaction_deprecated_t ;
+          - Sapling_state ;
+          - Operation_t ;
+          - Chest_key_t ;
+          - Chest_t ;
+          - Lambda_t.
+    *)
+    )
 
 let tests =
   let open Tztest in
-  Tests.
-    [
-      tztest "lambda size is a good approximation (fast)" `Quick (fun () ->
-          lambda_size 50);
-      tztest "ty size is a good approximation (fast)" `Quick (fun () ->
-          ty_size 50);
-      tztest "value size is a good approximation (fast)" `Quick (fun () ->
-          value_size 50);
-      tztest
-        "comparable ty size is a good approximation (fast)"
-        `Quick
-        (fun () -> comparable_ty_size 50);
-      tztest "lambda size is a good approximation" `Slow (fun () ->
-          lambda_size 2000);
-      tztest "value size is a good approximation" `Slow (fun () ->
-          value_size 1000);
-      tztest "ty size is a good approximation" `Slow (fun () -> ty_size 1000);
-      tztest "comparable ty size is a good approximation" `Slow (fun () ->
-          comparable_ty_size 1000);
-      tztest
-        "statistics about ty size are satisfying"
-        `Quick
-        check_ty_size_stats;
-      tztest
-        "statistics about comparable ty size are satisfying"
-        `Quick
-        check_comparable_ty_size_stats;
-      tztest
-        "statistics about value size are satisfying"
-        `Quick
-        check_value_size_stats;
-      tztest
-        "statistics about lambda size are satisfying"
-        `Quick
-        check_lambda_size_stats;
-    ]
+  [tztest "check value size" `Quick check_value_size]
