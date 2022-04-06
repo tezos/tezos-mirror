@@ -2614,20 +2614,14 @@ module Rejection = struct
     >>=? fun _ -> return_unit
 
   (** Test the proof production (used in this test file) and the proof
-      verification handles a hard failure. For instance, we try to
-      a proof with a ill-signed batch. *)
-  let test_proof_with_hard_fail_message () =
+      verification handles a hard failure. [make_bad_message] makes a
+      message whose l2 apply will fail in whatever specific way we
+      wish to test. *)
+  let do_test_proof_with_hard_fail_message make_bad_message =
     init_with_deposit ()
-    >>=? fun (b, account, tx_rollup, store, (_sk, pk, addr), ticket_hash) ->
+    >>=? fun (b, account, tx_rollup, store, (sk, pk, addr), ticket_hash) ->
     hash_tree_from_store store >>= fun l2_context_hash ->
-    (* We build a dummy transfer, we don't care about the content, it will hard
-       fail on the check signature. *)
-    let (random_sk, _, _) = gen_l2_account () in
-    let (message, batch_bytes) =
-      make_message_transfer
-        ~signers:[random_sk]
-        [(Bls_pk pk, None, [(addr, ticket_hash, 1L)])]
-    in
+    let (message, batch_bytes) = make_bad_message sk pk addr ticket_hash in
     let message_hash = Tx_rollup_message_hash.hash_uncarbonated message in
     let message_path =
       match Tx_rollup_inbox.Merkle.(compute_path [message_hash] 0) with
@@ -2671,11 +2665,56 @@ module Rejection = struct
     >>=? fun op ->
     Incremental.add_operation i op >>=? fun _ -> return_unit
 
-  (** Test that an empty proof is enough to reject a commitment on an
-      invalid message. The committed message does not change the
-      context at all (i.e. the message can not be decoded). *)
+  (** Test that proof production and verification can handle an invalid
+      signature *)
+  let test_proof_with_invalid_signature () =
+    do_test_proof_with_hard_fail_message (fun _sk pk addr ticket_hash ->
+        (* We build a dummy transfer, we don't care about the content, it will hard
+           fail on the check signature. *)
+        let (random_sk, _, _) = gen_l2_account () in
+        make_message_transfer
+          ~signers:[random_sk]
+          [(Bls_pk pk, None, [(addr, ticket_hash, 1L)])])
+
+  (** Test that proof production and verification can handle an unparseable
+      message *)
+  let test_proof_with_unparsable_batch () =
+    do_test_proof_with_hard_fail_message (fun _sk _pk _addr _ticket_hash ->
+        let message = "wrong" in
+        let (batch, _) = Tx_rollup_message.make_batch message in
+        (batch, message))
+
+  (** Test that proof production and verification can handle an invalid
+      counter *)
+  let test_proof_with_invalid_counter () =
+    do_test_proof_with_hard_fail_message (fun sk pk _addr ticket_hash ->
+        let (_, _, addr) = gen_l2_account () in
+        make_message_transfer
+          ~signers:[sk]
+          [(Bls_pk pk, Some 42L, [(addr, ticket_hash, 1L)])])
+
+  (** Test that proof production and verification can handle an invalid
+      transfer of zero tickets *)
+  let test_proof_with_zero_transfer () =
+    do_test_proof_with_hard_fail_message (fun sk pk addr ticket_hash ->
+        make_message_transfer
+          ~signers:[sk]
+          [(Bls_pk pk, None, [(addr, ticket_hash, 0L)])])
+
+  (** Test that proof production and verification can handle an invalid
+      transfer with multiple operations from the same signer *)
+  let test_proof_with_multiple_operations () =
+    do_test_proof_with_hard_fail_message (fun sk pk addr ticket_hash ->
+        make_message_transfer
+          ~signers:[sk; sk]
+          [
+            (Bls_pk pk, None, [(addr, ticket_hash, 1L)]);
+            (Bls_pk pk, None, [(addr, ticket_hash, 2L)]);
+          ])
+
+  (** Test that an empty proof is not able to reject a valid commitment. *)
   let test_empty_proof_on_invalid_message () =
-    init_with_invalid_commitment ()
+    init_with_valid_commitment ()
     >>=? fun (i, contract, tx_rollup, level, message, commitment) ->
     let (msg, _) = Tx_rollup_message.make_batch message in
     let message_hash = Tx_rollup_message_hash.hash_uncarbonated msg in
@@ -3242,13 +3281,25 @@ module Rejection = struct
         `Quick
         test_valid_proof_on_valid_commitment;
       Tztest.tztest
-        "proof for a hard failing message"
+        "proof for a hard failing message: invalid signature"
         `Quick
-        test_proof_with_hard_fail_message;
+        test_proof_with_invalid_signature;
       Tztest.tztest
-        "empty proof for an invalid message"
+        "proof for a hard failing message: unparseable message"
         `Quick
-        test_empty_proof_on_invalid_message;
+        test_proof_with_unparsable_batch;
+      Tztest.tztest
+        "proof for a hard failing message: invalid counter"
+        `Quick
+        test_proof_with_invalid_counter;
+      Tztest.tztest
+        "proof for a hard failing message: zero-ticket transfer"
+        `Quick
+        test_proof_with_zero_transfer;
+      Tztest.tztest
+        "proof for a hard failing message: multiple ops from one signer"
+        `Quick
+        test_proof_with_multiple_operations;
       Tztest.tztest
         "reject with invalid proof"
         `Quick
