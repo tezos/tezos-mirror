@@ -127,3 +127,6 @@ Docker Images
 
 Miscellaneous
 -------------
+
+- Removed protocol ``genesis-carthagenet``.
+  No live test network uses this protocol anymore.
