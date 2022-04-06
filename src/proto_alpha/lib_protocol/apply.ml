@@ -1955,12 +1955,12 @@ let precheck_manager_contents (type kind) ctxt (op : kind Kind.manager contents)
         ~count_limit:tx_rollup_max_messages_per_inbox
       >>?= fun () ->
       Tx_rollup_errors.check_path_depth
-        `Inbox
+        `Commitment
         (Tx_rollup_commitment.Merkle.path_depth message_result_path)
         ~count_limit:tx_rollup_max_messages_per_inbox
       >>?= fun () ->
       Tx_rollup_errors.check_path_depth
-        `Inbox
+        `Commitment
         (Tx_rollup_commitment.Merkle.path_depth previous_message_result_path)
         ~count_limit:tx_rollup_max_messages_per_inbox
       >>?= fun () -> return ctxt
