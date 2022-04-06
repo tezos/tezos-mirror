@@ -139,19 +139,13 @@ let script_nat_size n = Script_int.to_zint n |> z_size
 
 let script_int_size n = Script_int.to_zint n |> z_size
 
-let signature_size = h3w +? Signature.size
+let signature_size = !!96 (* By Obj.reachable_words. *)
 
-let key_hash_size (x : Signature.public_key_hash) =
-  h1w
-  +? Signature.(
-       match x with
-       | Ed25519 _ -> Ed25519.Public_key_hash.size
-       | Secp256k1 _ -> Secp256k1.Public_key_hash.size
-       | P256 _ -> P256.Public_key_hash.size)
+let key_hash_size (_x : Signature.public_key_hash) = !!64
+(* By Obj.reachable_words. *)
 
 let public_key_size (x : public_key) =
-  let ks = Signature.Public_key.size x in
-  h1w +? ks
+  h1w +? match x with Ed25519 _ -> 64 | Secp256k1 _ -> 72 | P256 _ -> 96
 
 let mutez_size = h2w
 
@@ -172,7 +166,7 @@ let view_signature_size (View_signature {name; input_ty; output_ty}) =
     (ty_size input_ty ++ ty_size output_ty)
     (h3w +! script_string_size name)
 
-let script_expr_hash_size = Script_expr_hash.size
+let script_expr_hash_size = !!64
 
 let peano_shape_proof =
   let scale = header_size +! h1w in
@@ -202,9 +196,9 @@ let sapling_state_size {Sapling.id; diff; memo_size = _} =
   +! Sapling.diff_in_memory_size diff
   +! sapling_memo_size_size
 
-let chain_id_size = h1w +? Chain_id.size
+let chain_id_size = !!16 (* by Obj.reachable_words. *)
 
-(* [contents] is handle by the recursion scheme in [value_size] *)
+(* [contents] is handled by the recursion scheme in [value_size]. *)
 let ticket_size {ticketer; contents = _; amount} =
   h3w +! Contract.in_memory_size ticketer +! script_nat_size amount
 
@@ -271,11 +265,11 @@ let rec value_size :
     | List_t (_, _) -> ret_succ_adding accu (h2w +! (h2w *? x.length))
     | Set_t (_, _) ->
         let module M = (val Script_set.get x) in
-        let boxing_space = !!300 in
+        let boxing_space = !!536 (* By Obj.reachable_words. *) in
         ret_succ_adding accu (boxing_space +! (h4w *? M.size))
     | Map_t (_, _, _) ->
         let module M = (val Script_map.get_module x) in
-        let boxing_space = !!308 in
+        let boxing_space = !!696 (* By Obj.reachable_words. *) in
         ret_succ_adding accu (boxing_space +! (h5w *? M.size))
     | Big_map_t (cty, ty', _) ->
         (big_map_size [@ocaml.tailcall])
@@ -346,7 +340,8 @@ and big_map_size :
     let map_size =
       Big_map_overlay.fold
         (fun _key_hash (key, value) accu ->
-          let accu = ret_succ_adding accu !!script_expr_hash_size in
+          let base = h5w +! (word_size *? 3) +! script_expr_hash_size in
+          let accu = ret_succ_adding accu base in
           (* The following recursive call cannot introduce a stack
              overflow because this would require a key of type
              big_map while big_map is not comparable. *)
@@ -354,6 +349,7 @@ and big_map_size :
           match value with
           | None -> accu
           | Some value ->
+              let accu = ret_succ_adding accu h1w in
               (value_size [@ocaml.tailcall])
                 ~count_lambda_nodes
                 accu
@@ -362,7 +358,6 @@ and big_map_size :
         diff.map
         accu
     in
-
     ret_adding map_size h2w
   in
   let big_map_id_size s = z_size (Big_map.Id.unparse_to_z s) in
