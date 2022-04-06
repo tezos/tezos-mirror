@@ -45,6 +45,8 @@ val consume_check_path_inbox_cost : Raw_context.t -> Raw_context.t tzresult
 
 val consume_check_path_commitment_cost : Raw_context.t -> Raw_context.t tzresult
 
+(** [consume_add_message_cost ctxt] consume the gas cost of adding a
+   message to an inbox and return the new context. *)
 val consume_add_message_cost : Raw_context.t -> Raw_context.t tzresult
 
 val consume_compact_commitment_cost :
