@@ -23,6 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+val parse_alternatives :
+  (string * (string -> 'a tzresult Lwt.t)) list -> string -> 'a tzresult Lwt.t
+
 module type Entity = sig
   type t
 

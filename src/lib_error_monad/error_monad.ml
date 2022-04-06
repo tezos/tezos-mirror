@@ -182,3 +182,12 @@ let catch_es ?catch_only f =
   let+ r = TzLwtreslib.Result.catch_s ?catch_only f in
   let r = Result.map_error trace_of_exn r in
   Result.join r
+
+let either_f (left : 'a tzresult Lwt.t) (right : unit -> 'a tzresult Lwt.t) =
+  let open Lwt_syntax in
+  let* l = left in
+  match l with
+  | Ok x -> return_ok x
+  | Error tr -> (
+      let* r = right () in
+      match r with Ok x -> return_ok x | Error e -> return_error (tr @ e))

@@ -330,3 +330,9 @@ val errs_tag : error trace Tag.def
    and it will be removed once this is done. Use of this function is
    discouraged. *)
 val cancel_with_exceptions : Lwt_canceler.t -> unit Lwt.t
+
+(** [either_f left right] returns [left] if it's a success and [right] is not
+    called. If [left] fails, [right] is evaluated and its result is returned if 
+    it's a success. If both [left] and [right] fail, their traces are merged. *)
+val either_f :
+  'a tzresult Lwt.t -> (unit -> 'a tzresult Lwt.t) -> 'a tzresult Lwt.t
