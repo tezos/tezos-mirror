@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/slices.tz]
 
 Well typed
-Gas remaining: 1039935.257 units remaining
+Gas remaining: 1039936.697 units remaining
 { parameter (pair bytes signature) ;
   storage key ;
   code { DUP

@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[attic/int_publisher.tz]
 
 Well typed
-Gas remaining: 1039967.523 units remaining
+Gas remaining: 1039969.923 units remaining
 { parameter (option (pair signature int)) ;
   storage (pair key int) ;
   code { DUP

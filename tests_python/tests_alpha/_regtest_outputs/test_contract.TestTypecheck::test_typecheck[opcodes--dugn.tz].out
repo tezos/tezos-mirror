@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/dugn.tz]
 
 Well typed
-Gas remaining: 1039992.076 units remaining
+Gas remaining: 1039992.716 units remaining
 { parameter (pair (pair (pair (pair nat nat) nat) nat) nat) ;
   storage nat ;
   code { CAR

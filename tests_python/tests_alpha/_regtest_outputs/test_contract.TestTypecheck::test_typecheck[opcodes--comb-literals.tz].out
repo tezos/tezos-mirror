@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/comb-literals.tz]
 
 Well typed
-Gas remaining: 1039992.630 units remaining
+Gas remaining: 1039993.270 units remaining
 { parameter unit ;
   storage unit ;
   code { PUSH (list (pair nat nat nat nat))

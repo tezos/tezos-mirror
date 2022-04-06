@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/proxy.tz]
 
 Well typed
-Gas remaining: 1039994.321 units remaining
+Gas remaining: 1039995.281 units remaining
 { parameter (contract unit) ;
   storage unit ;
   code { UNPAIR

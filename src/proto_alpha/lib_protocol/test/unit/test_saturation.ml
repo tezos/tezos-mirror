@@ -160,6 +160,23 @@ let shift_left () =
         (ok_int ((1 lsl 62) - 2), 0);
       ])
 
+let sqrt () =
+  Saturation_repr.(
+    fail_unless (sqrt saturated = saturated) (err "sqrt saturated <> saturated")
+    >>=? fun () ->
+    fail_unless (sqrt zero = zero) (err "sqrt zero <> zero") >>=? fun () ->
+    fail_unless (sqrt one = one) (err "sqrt one <> one") >>=? fun () ->
+    fail_unless (sqrt (ok_int 4) = ok_int 2) (err "sqrt 4 <> 2") >>=? fun () ->
+    fail_unless
+      (sqrt (ok_int 5) = ok_int 2)
+      (err "sqrt 5 <> 2 (sqrt should round down)")
+    >>=? fun () ->
+    let safe_squared = ok_int ((1 lsl 31) - 1) in
+    let r = mul safe_squared safe_squared in
+    fail_unless
+      (sqrt r = safe_squared)
+      (err "sqrt (2 ^ 31 - 1) * (2 ^ 31 - 1) <> (2 ^ 31 - 1)"))
+
 let of_z_opt () =
   fail_unless
     (Saturation_repr.(of_z_opt (Z.succ (Z.of_int max_int))) = None)
@@ -206,6 +223,7 @@ let tests =
     Tztest.tztest "Multiplication (fast version)" `Quick mul_fast;
     Tztest.tztest "Shift left" `Quick shift_left;
     Tztest.tztest "Scale fast" `Quick scale_fast;
+    Tztest.tztest "Square root" `Quick sqrt;
     Tztest.tztest "Conversion from Z" `Quick of_z_opt;
     Tztest.tztest
       "Encoding through z"

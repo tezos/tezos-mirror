@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/update_big_map.tz]
 
 Well typed
-Gas remaining: 1039991.231 units remaining
+Gas remaining: 1039993.471 units remaining
 { storage (pair (big_map string string) unit) ;
   parameter (map string (option string)) ;
   code { UNPAPAIR ;

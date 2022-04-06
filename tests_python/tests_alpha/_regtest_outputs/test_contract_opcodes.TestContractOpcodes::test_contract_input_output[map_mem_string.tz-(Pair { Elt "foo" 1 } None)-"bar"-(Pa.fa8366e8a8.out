@@ -7,36 +7,36 @@ emitted operations
 big_map diff
   
 trace
-  - location: 12 (remaining gas: 1039988.095 units remaining)
+  - location: 12 (remaining gas: 1039989.695 units remaining)
     [ (Pair "bar" { Elt "foo" 1 } None) ]
-  - location: 12 (remaining gas: 1039988.085 units remaining)
+  - location: 12 (remaining gas: 1039989.685 units remaining)
     [ "bar"
       (Pair { Elt "foo" 1 } None) ]
-  - location: 13 (remaining gas: 1039988.070 units remaining)
+  - location: 13 (remaining gas: 1039989.675 units remaining)
     [ (Pair { Elt "foo" 1 } None) ]
-  - location: 15 (remaining gas: 1039988.060 units remaining)
+  - location: 15 (remaining gas: 1039989.665 units remaining)
     [ { Elt "foo" 1 } ]
-  - location: 16 (remaining gas: 1039988.050 units remaining)
+  - location: 16 (remaining gas: 1039989.655 units remaining)
     [ { Elt "foo" 1 }
       { Elt "foo" 1 } ]
-  - location: 13 (remaining gas: 1039988.020 units remaining)
+  - location: 13 (remaining gas: 1039989.635 units remaining)
     [ "bar"
       { Elt "foo" 1 }
       { Elt "foo" 1 } ]
-  - location: 17 (remaining gas: 1039987.934 units remaining)
+  - location: 17 (remaining gas: 1039989.549 units remaining)
     [ False
       { Elt "foo" 1 } ]
-  - location: 18 (remaining gas: 1039987.919 units remaining)
+  - location: 18 (remaining gas: 1039989.539 units remaining)
     [ (Some False)
       { Elt "foo" 1 } ]
-  - location: 19 (remaining gas: 1039987.909 units remaining)
+  - location: 19 (remaining gas: 1039989.529 units remaining)
     [ { Elt "foo" 1 }
       (Some False) ]
-  - location: 20 (remaining gas: 1039987.894 units remaining)
+  - location: 20 (remaining gas: 1039989.519 units remaining)
     [ (Pair { Elt "foo" 1 } (Some False)) ]
-  - location: 21 (remaining gas: 1039987.879 units remaining)
+  - location: 21 (remaining gas: 1039989.509 units remaining)
     [ {}
       (Pair { Elt "foo" 1 } (Some False)) ]
-  - location: 23 (remaining gas: 1039987.864 units remaining)
+  - location: 23 (remaining gas: 1039989.499 units remaining)
     [ (Pair {} { Elt "foo" 1 } (Some False)) ]
 

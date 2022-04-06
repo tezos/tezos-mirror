@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[mini_scenarios/fa12_reference.tz]
 
 Well typed
-Gas remaining: 1039229.258 units remaining
+Gas remaining: 1039348.458 units remaining
 { parameter
     (or (or (or (pair %transfer (address :from) (pair (address :to) (nat :value)))
                 (pair %approve (address :spender) (nat :value)))

@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/tez_add_sub.tz]
 
 Well typed
-Gas remaining: 1039986.225 units remaining
+Gas remaining: 1039987.345 units remaining
 { parameter (pair mutez mutez) ;
   storage (option (pair mutez mutez)) ;
   code { CAR

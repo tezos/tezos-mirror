@@ -1,7 +1,7 @@
 tests_alpha/test_contract_onchain_opcodes.py::TestContractOnchainOpcodes::test_set_delegate
 
 Node is bootstrapped.
-Estimated gas: 1412.789 units (will add 100 for safety)
+Estimated gas: 1411.989 units (will add 100 for safety)
 Estimated storage: 308 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[BLOCK_HASH]'
@@ -14,7 +14,7 @@ This sequence of operations was run:
     From: [CONTRACT_HASH]
     Fee to the baker: ꜩ0.000434
     Expected counter: [EXPECTED_COUNTER]
-    Gas limit: 1513
+    Gas limit: 1512
     Storage limit: 328 bytes
     Balance updates:
       [CONTRACT_HASH] ... -ꜩ0.000434
@@ -33,7 +33,7 @@ This sequence of operations was run:
           [CONTRACT_HASH]
         Storage size: 51 bytes
         Paid storage size diff: 51 bytes
-        Consumed gas: 1412.789
+        Consumed gas: 1411.989
         Balance updates:
           [CONTRACT_HASH] ... -ꜩ0.01275
           storage fees ........................... +ꜩ0.01275
@@ -48,7 +48,7 @@ Injected block at minimal timestamp
 Injected block at minimal timestamp
 none
 Node is bootstrapped.
-Estimated gas: 3057.146 units (will add 100 for safety)
+Estimated gas: 3115.714 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[BLOCK_HASH]'
@@ -59,13 +59,13 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [CONTRACT_HASH]
-    Fee to the baker: ꜩ0.000612
+    Fee to the baker: ꜩ0.000618
     Expected counter: [EXPECTED_COUNTER]
-    Gas limit: 3158
+    Gas limit: 3216
     Storage limit: 0 bytes
     Balance updates:
-      [CONTRACT_HASH] ... -ꜩ0.000612
-      payload fees(the block proposer) ....... +ꜩ0.000612
+      [CONTRACT_HASH] ... -ꜩ0.000618
+      payload fees(the block proposer) ....... +ꜩ0.000618
     Transaction:
       Amount: ꜩ0
       From: [CONTRACT_HASH]
@@ -74,7 +74,7 @@ This sequence of operations was run:
       This transaction was successfully applied
       Updated storage: Unit
       Storage size: 51 bytes
-      Consumed gas: 2057.146
+      Consumed gas: 2115.714
     Internal operations:
       Delegation:
         Contract: [CONTRACT_HASH]
@@ -85,7 +85,7 @@ This sequence of operations was run:
 Injected block at minimal timestamp
 [CONTRACT_HASH] (known as bootstrap5)
 Node is bootstrapped.
-Estimated gas: 2203.600 units (will add 100 for safety)
+Estimated gas: 2202.968 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[BLOCK_HASH]'
@@ -98,7 +98,7 @@ This sequence of operations was run:
     From: [CONTRACT_HASH]
     Fee to the baker: ꜩ0.000486
     Expected counter: [EXPECTED_COUNTER]
-    Gas limit: 2304
+    Gas limit: 2303
     Storage limit: 0 bytes
     Balance updates:
       [CONTRACT_HASH] ... -ꜩ0.000486
@@ -111,7 +111,7 @@ This sequence of operations was run:
       This transaction was successfully applied
       Updated storage: Unit
       Storage size: 51 bytes
-      Consumed gas: 1203.600
+      Consumed gas: 1202.968
     Internal operations:
       Delegation:
         Contract: [CONTRACT_HASH]

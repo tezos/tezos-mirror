@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/utxor.tz]
 
 Well typed
-Gas remaining: 1039966.683 units remaining
+Gas remaining: 1039968.923 units remaining
 { parameter (pair address address) ;
   storage nat ;
   code { UNPAIR

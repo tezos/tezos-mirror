@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/bls12_381_fr_push_bytes_not_padded.tz]
 
 Well typed
-Gas remaining: 1039995.606 units remaining
+Gas remaining: 1039996.436 units remaining
 { parameter unit ;
   storage (option bls12_381_fr) ;
   code { DROP

@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[attic/cadr_annotation.tz]
 
 Well typed
-Gas remaining: 1039994.745 units remaining
+Gas remaining: 1039995.385 units remaining
 { parameter (pair (pair %p1 unit (string %no_name)) bool) ;
   storage unit ;
   code { CAR @param

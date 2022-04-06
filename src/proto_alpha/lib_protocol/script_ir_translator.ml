@@ -414,9 +414,9 @@ let unparse_timestamp ~loc ctxt mode t =
       | Some s -> ok (String (loc, s), ctxt))
 
 let unparse_address ~loc ctxt mode {destination; entrypoint} =
-  Gas.consume ctxt Unparse_costs.contract >|? fun ctxt ->
   match mode with
   | Optimized | Optimized_legacy ->
+      Gas.consume ctxt Unparse_costs.contract_optimized >|? fun ctxt ->
       let bytes =
         Data_encoding.Binary.to_bytes_exn
           Data_encoding.(tup2 Destination.encoding Entrypoint.value_encoding)
@@ -424,6 +424,7 @@ let unparse_address ~loc ctxt mode {destination; entrypoint} =
       in
       (Bytes (loc, bytes), ctxt)
   | Readable ->
+      Gas.consume ctxt Unparse_costs.contract_readable >|? fun ctxt ->
       let notation =
         Destination.to_b58check destination
         ^ Entrypoint.to_address_suffix entrypoint
@@ -432,10 +433,10 @@ let unparse_address ~loc ctxt mode {destination; entrypoint} =
 
 let unparse_tx_rollup_l2_address ~loc ctxt mode
     (tx_address : tx_rollup_l2_address) =
-  Gas.consume ctxt Unparse_costs.contract >|? fun ctxt ->
   let tx_address = Indexable.to_value tx_address in
   match mode with
   | Optimized | Optimized_legacy ->
+      Gas.consume ctxt Unparse_costs.contract_optimized >|? fun ctxt ->
       let bytes =
         Data_encoding.Binary.to_bytes_exn
           Tx_rollup_l2_address.encoding
@@ -443,6 +444,7 @@ let unparse_tx_rollup_l2_address ~loc ctxt mode
       in
       (Bytes (loc, bytes), ctxt)
   | Readable ->
+      Gas.consume ctxt Unparse_costs.contract_readable >|? fun ctxt ->
       let b58check = Tx_rollup_l2_address.to_b58check tx_address in
       (String (loc, b58check), ctxt)
 
@@ -2187,7 +2189,7 @@ let parse_timestamp ctxt :
     ->
       ok (Script_timestamp.of_zint v, ctxt)
   | String (loc, s) as expr (* As unparsed with [Readable]. *) -> (
-      Gas.consume ctxt Typecheck_costs.timestamp_readable >>? fun ctxt ->
+      Gas.consume ctxt (Typecheck_costs.timestamp_readable s) >>? fun ctxt ->
       match Script_timestamp.of_string s with
       | Some v -> ok (v, ctxt)
       | None ->
@@ -2305,7 +2307,7 @@ let parse_address ctxt : Script.node -> (address * context) tzresult =
   in
   function
   | Bytes (loc, bytes) as expr (* As unparsed with [Optimized]. *) -> (
-      Gas.consume ctxt Typecheck_costs.contract >>? fun ctxt ->
+      Gas.consume ctxt Typecheck_costs.contract_optimized >>? fun ctxt ->
       match
         Data_encoding.Binary.of_bytes_opt
           Data_encoding.(tup2 Destination.encoding Entrypoint.value_encoding)
@@ -2318,7 +2320,7 @@ let parse_address ctxt : Script.node -> (address * context) tzresult =
           @@ Invalid_syntactic_constant
                (loc, strip_locations expr, "a valid address"))
   | String (loc, s) (* As unparsed with [Readable]. *) ->
-      Gas.consume ctxt Typecheck_costs.contract >>? fun ctxt ->
+      Gas.consume ctxt Typecheck_costs.contract_readable >>? fun ctxt ->
       (match String.index_opt s '%' with
       | None -> ok (s, Entrypoint.default)
       | Some pos ->

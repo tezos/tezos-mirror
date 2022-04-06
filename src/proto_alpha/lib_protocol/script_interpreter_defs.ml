@@ -563,10 +563,10 @@ let transfer (ctxt, sc) gas amount location parameters_ty parameters destination
   >>=? fun (parameters, lazy_storage_diff, ctxt) ->
   unparse_data ctxt Optimized parameters_ty parameters
   >>=? fun (unparsed_parameters, ctxt) ->
-  Gas.consume ctxt (Script.strip_locations_cost unparsed_parameters)
-  >>?= fun ctxt ->
   craft_transfer_parameters ctxt parameters_ty unparsed_parameters destination
   >>?= fun (unparsed_parameters, ctxt) ->
+  Gas.consume ctxt (Script.strip_locations_cost unparsed_parameters)
+  >>?= fun ctxt ->
   let transaction =
     let parameters =
       Script.lazy_expr (Micheline.strip_locations unparsed_parameters)

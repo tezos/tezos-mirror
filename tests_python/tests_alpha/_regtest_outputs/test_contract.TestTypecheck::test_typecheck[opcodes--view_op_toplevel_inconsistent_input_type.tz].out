@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/view_op_toplevel_inconsistent_input_type.tz]
 
 Well typed
-Gas remaining: 1039993.119 units remaining
+Gas remaining: 1039993.919 units remaining
 { parameter (pair int address) ;
   storage nat ;
   code { CAR

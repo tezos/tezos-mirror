@@ -2,7 +2,7 @@ tx_rollup_limit_empty_batch.out
 
 ./tezos-client --wait none originate tx rollup from '[PUBLIC_KEY_HASH]' --burn-cap 9999999 --storage-limit 60000
 Node is bootstrapped.
-Estimated gas: 1410.112 units (will add 100 for safety)
+Estimated gas: 1420.112 units (will add 100 for safety)
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
 NOT waiting for the operation to be included.
@@ -12,26 +12,26 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.000378
+    Fee to the baker: ꜩ0.000379
     Expected counter: 1
-    Gas limit: 1511
+    Gas limit: 1521
     Storage limit: 60000 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.000378
-      payload fees(the block proposer) ....... +ꜩ0.000378
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000379
+      payload fees(the block proposer) ....... +ꜩ0.000379
     Tx rollup origination:
       From: [PUBLIC_KEY_HASH]
       This tx rollup origination operation was successfully applied
       Balance updates:
         [PUBLIC_KEY_HASH] ... -ꜩ15
         storage fees ........................... +ꜩ15
-      Consumed gas: 1410.112
+      Consumed gas: 1420.112
       Originated tx rollup: [TX_ROLLUP_HASH]
 
 
 ./tezos-client --wait none submit tx rollup batch  to '[TX_ROLLUP_HASH]' from '[PUBLIC_KEY_HASH]'
 Node is bootstrapped.
-Estimated gas: 2560.871 units (will add 100 for safety)
+Estimated gas: 2580.871 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -42,16 +42,16 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.000516
+    Fee to the baker: ꜩ0.000518
     Expected counter: 2
-    Gas limit: 2661
+    Gas limit: 2681
     Storage limit: 0 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.000516
-      payload fees(the block proposer) ....... +ꜩ0.000516
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000518
+      payload fees(the block proposer) ....... +ꜩ0.000518
     Tx rollup transaction:[TX_ROLLUP_HASH], 0 bytes, From: [PUBLIC_KEY_HASH]
       This tx rollup submit operation was successfully applied
       Balance updates:
         
-      Consumed gas: 2560.871
+      Consumed gas: 2580.871
 

@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[mini_scenarios/groth16.tz]
 
 Well typed
-Gas remaining: 1039478.027 units remaining
+Gas remaining: 1039536.287 units remaining
 { storage unit ;
   parameter
     (pair (pair (bls12_381_fr %input_x) (bls12_381_fr %input_y))

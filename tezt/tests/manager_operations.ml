@@ -861,7 +861,7 @@ module Deserialisation = struct
   (* Gas to execute call to noop contract without deserialization *)
   let gas_to_execute_rest_noop = function
     | Protocol.Hangzhou | Ithaca -> 2049
-    | Alpha -> 2050
+    | Alpha -> 2109
 
   let inject_call_with_bytes ?(source = Constant.bootstrap5) ?protocol ~contract
       ~size_kB ~gas_limit client =
@@ -935,7 +935,7 @@ module Deserialisation = struct
       ~__FILE__
       ~title:
         "Smart contract call that would succeed if we did not account \
-         deserializtion gas correctly"
+         deserialization gas correctly"
       ~tags:["precheck"; "gas"; "deserialization"; "lazy_expr"]
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in

@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[mini_scenarios/big_map_entrypoints.tz]
 
 Well typed
-Gas remaining: 1039940.196 units remaining
+Gas remaining: 1039953.156 units remaining
 { storage (pair (big_map string nat) (big_map string nat)) ;
   parameter
     (or (unit %default

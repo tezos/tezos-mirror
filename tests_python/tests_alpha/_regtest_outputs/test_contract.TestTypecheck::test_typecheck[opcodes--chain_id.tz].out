@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/chain_id.tz]
 
 Well typed
-Gas remaining: 1039996.340 units remaining
+Gas remaining: 1039996.980 units remaining
 { parameter unit ;
   storage unit ;
   code { CHAIN_ID

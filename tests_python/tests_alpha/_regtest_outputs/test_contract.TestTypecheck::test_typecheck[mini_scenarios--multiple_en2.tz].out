@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[mini_scenarios/multiple_en2.tz]
 
 Well typed
-Gas remaining: 1039921.252 units remaining
+Gas remaining: 1039927.812 units remaining
 { parameter unit ;
   storage (option address) ;
   code { SENDER

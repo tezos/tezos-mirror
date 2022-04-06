@@ -1,7 +1,7 @@
 tests_alpha/test_contract_onchain_opcodes.py::TestContractOnchainLevel::test_level
 
 Node is bootstrapped.
-Estimated gas: 1409.664 units (will add 100 for safety)
+Estimated gas: 1409.024 units (will add 100 for safety)
 Estimated storage: 300 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[BLOCK_HASH]'
@@ -33,7 +33,7 @@ This sequence of operations was run:
           [CONTRACT_HASH]
         Storage size: 43 bytes
         Paid storage size diff: 43 bytes
-        Consumed gas: 1409.664
+        Consumed gas: 1409.024
         Balance updates:
           [CONTRACT_HASH] ... -ꜩ0.01075
           storage fees ........................... +ꜩ0.01075
@@ -47,7 +47,7 @@ Contract memorized as level.
 Injected block at minimal timestamp
 Injected block at minimal timestamp
 Node is bootstrapped.
-Estimated gas: 2050.718 units (will add 100 for safety)
+Estimated gas: 2109.490 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[BLOCK_HASH]'
@@ -58,13 +58,13 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [CONTRACT_HASH]
-    Fee to the baker: ꜩ0.000468
+    Fee to the baker: ꜩ0.000473
     Expected counter: [EXPECTED_COUNTER]
-    Gas limit: 2151
+    Gas limit: 2210
     Storage limit: 0 bytes
     Balance updates:
-      [CONTRACT_HASH] ... -ꜩ0.000468
-      payload fees(the block proposer) ....... +ꜩ0.000468
+      [CONTRACT_HASH] ... -ꜩ0.000473
+      payload fees(the block proposer) ....... +ꜩ0.000473
     Transaction:
       Amount: ꜩ500
       From: [CONTRACT_HASH]
@@ -72,7 +72,7 @@ This sequence of operations was run:
       This transaction was successfully applied
       Updated storage: 4
       Storage size: 40 bytes
-      Consumed gas: 2050.718
+      Consumed gas: 2109.490
       Balance updates:
         [CONTRACT_HASH] ... -ꜩ500
         [CONTRACT_HASH] ... +ꜩ500
@@ -89,7 +89,7 @@ Injected block at minimal timestamp
 Injected block at minimal timestamp
 4
 Node is bootstrapped.
-Estimated gas: 1203.505 units (will add 100 for safety)
+Estimated gas: 1202.917 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[BLOCK_HASH]'
@@ -102,7 +102,7 @@ This sequence of operations was run:
     From: [CONTRACT_HASH]
     Fee to the baker: ꜩ0.000383
     Expected counter: [EXPECTED_COUNTER]
-    Gas limit: 1304
+    Gas limit: 1303
     Storage limit: 0 bytes
     Balance updates:
       [CONTRACT_HASH] ... -ꜩ0.000383
@@ -114,7 +114,7 @@ This sequence of operations was run:
       This transaction was successfully applied
       Updated storage: 7
       Storage size: 40 bytes
-      Consumed gas: 1203.505
+      Consumed gas: 1202.917
       Balance updates:
         [CONTRACT_HASH] ... -ꜩ500
         [CONTRACT_HASH] ... +ꜩ500

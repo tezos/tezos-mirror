@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[mini_scenarios/default_account.tz]
 
 Well typed
-Gas remaining: 1039992.790 units remaining
+Gas remaining: 1039993.750 units remaining
 { parameter key_hash ;
   storage unit ;
   code { DIP { UNIT /* [ unit ] */ }

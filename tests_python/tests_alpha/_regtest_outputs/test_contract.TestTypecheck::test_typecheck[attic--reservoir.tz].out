@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[attic/reservoir.tz]
 
 Well typed
-Gas remaining: 1039963.237 units remaining
+Gas remaining: 1039968.997 units remaining
 { parameter unit ;
   storage (pair (pair (timestamp %T) (mutez %N)) (pair (address %A) (address %B))) ;
   code { CDR

@@ -28,9 +28,7 @@ module S = Saturation_repr
 (** This is a good enough approximation *)
 let log2 x = S.safe_int (1 + S.numbits x)
 
-(** TODO: https://gitlab.com/tezos/tezos/-/issues/2062
-    Plugin benchmarked gas.
-    Collect benchmark from [Carbonated_map_benchmarks.Find_benchmark].
+(** Collect benchmark from [Carbonated_map_benchmarks.Find_benchmark].
 
     The model is similar to the gas model as from [Michelson_v1_gas.map_get].
     The user is responsible for providing the [compare_key_cost] which depends
@@ -43,10 +41,10 @@ let log2 x = S.safe_int (1 + S.numbits x)
  *)
 let find_cost ~compare_key_cost ~size =
   let open Gas in
-  let intercept = S.safe_int 80 in
+  let intercept = S.safe_int 50 in
   let size = S.safe_int size in
   let compare_cost = log2 size *@ compare_key_cost in
-  let traversal_overhead = log2 size *@ S.safe_int 10 in
+  let traversal_overhead = log2 size *@ S.safe_int 2 in
   intercept +@ compare_cost +@ traversal_overhead
 
 (**
@@ -62,11 +60,9 @@ let find_cost ~compare_key_cost ~size =
 let update_cost ~compare_key_cost ~size =
   Gas.(S.safe_int 2 *@ find_cost ~compare_key_cost ~size)
 
-(** TODO: https://gitlab.com/tezos/tezos/-/issues/2062
-    Plugin benchmarked gas.
-    Collect benchmark from [Carbonated_map_benchmarks.Fold_benchmark].
+(** Collect benchmark from [Carbonated_map_benchmarks.Fold_benchmark].
 
     The cost of producing a list of elements is linear in the size of the map
     and does not depend on the size of the elements nor keys.
 *)
-let fold_cost ~size = Gas.(S.safe_int 100 *@ S.safe_int size)
+let fold_cost ~size = Gas.(S.safe_int 50 +@ (S.safe_int 24 *@ S.safe_int size))

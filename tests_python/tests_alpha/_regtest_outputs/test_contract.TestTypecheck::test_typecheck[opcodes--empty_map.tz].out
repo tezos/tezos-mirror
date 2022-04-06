@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/empty_map.tz]
 
 Well typed
-Gas remaining: 1039993.086 units remaining
+Gas remaining: 1039994.366 units remaining
 { storage (map string string) ;
   parameter unit ;
   code { DROP

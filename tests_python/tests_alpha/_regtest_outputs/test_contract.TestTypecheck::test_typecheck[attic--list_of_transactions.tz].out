@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[attic/list_of_transactions.tz]
 
 Well typed
-Gas remaining: 1039982.122 units remaining
+Gas remaining: 1039985.482 units remaining
 { parameter unit ;
   storage (list address) ;
   code { CDR

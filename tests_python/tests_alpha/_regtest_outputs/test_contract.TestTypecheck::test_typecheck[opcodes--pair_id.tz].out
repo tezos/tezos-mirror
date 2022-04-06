@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/pair_id.tz]
 
 Well typed
-Gas remaining: 1039995.649 units remaining
+Gas remaining: 1039996.769 units remaining
 { parameter (pair bool bool) ;
   storage (option (pair bool bool)) ;
   code { CAR

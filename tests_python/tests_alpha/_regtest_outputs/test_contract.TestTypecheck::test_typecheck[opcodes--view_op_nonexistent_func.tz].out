@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/view_op_nonexistent_func.tz]
 
 Well typed
-Gas remaining: 1039993.059 units remaining
+Gas remaining: 1039993.859 units remaining
 { parameter (pair nat address) ;
   storage bool ;
   code { CAR

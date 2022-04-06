@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/add_delta_timestamp.tz]
 
 Well typed
-Gas remaining: 1039993.598 units remaining
+Gas remaining: 1039994.398 units remaining
 { parameter (pair int timestamp) ;
   storage (option timestamp) ;
   code { CAR

@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/split_bytes.tz]
 
 Well typed
-Gas remaining: 1039970.057 units remaining
+Gas remaining: 1039973.097 units remaining
 { parameter bytes ;
   storage (list bytes) ;
   code { UNPAIR

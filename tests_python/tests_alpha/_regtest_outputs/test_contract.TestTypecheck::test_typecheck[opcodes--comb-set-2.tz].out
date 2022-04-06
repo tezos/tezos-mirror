@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/comb-set-2.tz]
 
 Well typed
-Gas remaining: 1039989.821 units remaining
+Gas remaining: 1039991.581 units remaining
 { parameter (pair nat nat nat unit) ;
   storage (option (pair int nat string bytes)) ;
   code { CAR

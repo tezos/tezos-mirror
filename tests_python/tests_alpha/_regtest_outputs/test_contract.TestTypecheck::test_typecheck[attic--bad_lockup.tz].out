@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[attic/bad_lockup.tz]
 
 Well typed
-Gas remaining: 1039972.793 units remaining
+Gas remaining: 1039974.873 units remaining
 { parameter unit ;
   storage (pair timestamp (pair address address)) ;
   code { CDR

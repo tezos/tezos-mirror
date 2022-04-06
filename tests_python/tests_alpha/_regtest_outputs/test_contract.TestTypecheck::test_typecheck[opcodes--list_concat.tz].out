@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/list_concat.tz]
 
 Well typed
-Gas remaining: 1039995.574 units remaining
+Gas remaining: 1039996.374 units remaining
 { parameter (list string) ;
   storage string ;
   code { UNPAIR

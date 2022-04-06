@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/pexec.tz]
 
 Well typed
-Gas remaining: 1039992.874 units remaining
+Gas remaining: 1039993.994 units remaining
 { parameter nat ;
   storage nat ;
   code { LAMBDA

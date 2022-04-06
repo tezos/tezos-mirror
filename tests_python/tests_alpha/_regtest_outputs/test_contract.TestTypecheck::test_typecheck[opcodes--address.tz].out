@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/address.tz]
 
 Well typed
-Gas remaining: 1039995.954 units remaining
+Gas remaining: 1039996.754 units remaining
 { parameter (contract unit) ;
   storage (option address) ;
   code { CAR

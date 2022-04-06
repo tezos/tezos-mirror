@@ -157,6 +157,11 @@ let erem x y = x mod y
 
 let ediv x y = x / y
 
+let sqrt x =
+  of_int_opt x
+  |> Option.map (fun x -> Z.of_int x |> Z.sqrt |> Z.to_int)
+  |> saturate_if_undef
+
 let t_to_z_exn z =
   match of_z_opt z with
   | None ->

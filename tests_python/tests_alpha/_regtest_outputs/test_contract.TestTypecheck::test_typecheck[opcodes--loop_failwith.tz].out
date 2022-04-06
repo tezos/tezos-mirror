@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/loop_failwith.tz]
 
 Well typed
-Gas remaining: 1039996.317 units remaining
+Gas remaining: 1039996.957 units remaining
 { parameter bool ;
   storage unit ;
   code { UNPAIR

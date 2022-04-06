@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[mini_scenarios/vote_for_delegate.tz]
 
 Well typed
-Gas remaining: 1039933.671 units remaining
+Gas remaining: 1039944.871 units remaining
 { parameter (option key_hash) ;
   storage
     (pair (pair %mgr1 (address %addr) (option %key key_hash))

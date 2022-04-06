@@ -1,7 +1,7 @@
 tests_alpha/test_contract_onchain_opcodes.py::TestContractBigMapOrigination::test_big_map_origination_literal
 
 Node is bootstrapped.
-Estimated gas: 1642.832 units (will add 100 for safety)
+Estimated gas: 1641.797 units (will add 100 for safety)
 Estimated storage: 403 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[BLOCK_HASH]'
@@ -14,7 +14,7 @@ This sequence of operations was run:
     From: [CONTRACT_HASH]
     Fee to the baker: ꜩ0.000461
     Expected counter: [EXPECTED_COUNTER]
-    Gas limit: 1743
+    Gas limit: 1742
     Storage limit: 423 bytes
     Balance updates:
       [CONTRACT_HASH] ... -ꜩ0.000461
@@ -36,7 +36,7 @@ This sequence of operations was run:
           New map(4) of type (big_map int int)
           Set map(4)[0] to 0
         Paid storage size diff: 146 bytes
-        Consumed gas: 1642.832
+        Consumed gas: 1641.797
         Balance updates:
           [CONTRACT_HASH] ... -ꜩ0.0365
           storage fees ........................... +ꜩ0.0365

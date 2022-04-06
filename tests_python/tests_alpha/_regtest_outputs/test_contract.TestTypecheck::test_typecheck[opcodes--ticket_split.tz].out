@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/ticket_split.tz]
 
 Well typed
-Gas remaining: 1039978.358 units remaining
+Gas remaining: 1039979.318 units remaining
 { parameter (ticket nat) ;
   storage unit ;
   code { CAR
