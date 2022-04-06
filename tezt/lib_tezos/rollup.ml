@@ -26,6 +26,8 @@
 module Tx_rollup = struct
   type range = Empty of int | Interval of int * int
 
+  type commitments_hashes = {message_hash : string; commitment_hash : string}
+
   let pp_range fmt = function
     | Empty x -> Format.fprintf fmt "next: %d" x
     | Interval (t, h) -> Format.fprintf fmt "oldest: %d newest: %d" t h
@@ -38,6 +40,16 @@ module Tx_rollup = struct
       let head = JSON.(json |-> "newest" |> as_int) in
       Interval (tail, head)
 
+  let commitment_newest_hash_of_json json =
+    let open JSON in
+    if is_null json then None
+    else
+      Some
+        {
+          message_hash = json |-> "last_message_hash" |> as_string;
+          commitment_hash = json |-> "commitment_hash" |> as_string;
+        }
+
   type state = {
     finalized_commitments : range;
     unfinalized_commitments : range;
@@ -46,6 +58,7 @@ module Tx_rollup = struct
     commitment_newest_hash : string option;
     burn_per_byte : int;
     inbox_ema : int;
+    last_removed_commitment_hashes : commitments_hashes option;
   }
 
   type inbox = {inbox_length : int; cumulated_size : int; merkle_root : string}
@@ -92,6 +105,11 @@ module Tx_rollup = struct
       in
       let burn_per_byte = JSON.(json |-> "burn_per_byte" |> as_int) in
       let inbox_ema = JSON.(json |-> "inbox_ema" |> as_int) in
+      let last_removed_commitment_hashes =
+        JSON.(
+          json |-> "last_removed_commitment_hashes"
+          |> commitment_newest_hash_of_json)
+      in
       {
         finalized_commitments;
         unfinalized_commitments;
@@ -100,6 +118,7 @@ module Tx_rollup = struct
         commitment_newest_hash;
         burn_per_byte;
         inbox_ema;
+        last_removed_commitment_hashes;
       }
     in
     RPC.Tx_rollup.get_state ?hooks ~rollup client |> map_runnable parse
@@ -245,11 +264,12 @@ module Tx_rollup = struct
       let open Check in
       convert
         (fun {
+               last_removed_commitment_hashes;
                finalized_commitments;
                unfinalized_commitments;
                uncommitted_inboxes;
-               tezos_head_level;
                commitment_newest_hash;
+               tezos_head_level;
                burn_per_byte;
                inbox_ema;
              } ->
@@ -257,8 +277,21 @@ module Tx_rollup = struct
             unfinalized_commitments,
             uncommitted_inboxes,
             tezos_head_level,
-            (commitment_newest_hash, burn_per_byte, inbox_ema) ))
-        (tuple5 range range range (option int) (tuple3 (option string) int int))
+            commitment_newest_hash,
+            burn_per_byte,
+            inbox_ema,
+            Option.map
+              (function r -> (r.message_hash, r.commitment_hash))
+              last_removed_commitment_hashes ))
+        (tuple8
+           range
+           range
+           range
+           (option int)
+           (option string)
+           int
+           int
+           (option (tuple2 string string)))
 
     let inbox : inbox Check.typ =
       let open Check in
@@ -297,6 +330,12 @@ module Tx_rollup = struct
            string
            int
            (option int))
+
+    let commitments_hashes : commitments_hashes Check.typ =
+      let open Check in
+      convert
+        (fun r -> (r.message_hash, r.commitment_hash))
+        (tuple2 string string)
   end
 
   module Parameters = struct

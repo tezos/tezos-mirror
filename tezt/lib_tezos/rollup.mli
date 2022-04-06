@@ -26,6 +26,8 @@
 module Tx_rollup : sig
   type range = Empty of int | Interval of int * int
 
+  type commitments_hashes = {message_hash : string; commitment_hash : string}
+
   type state = {
     finalized_commitments : range;
     unfinalized_commitments : range;
@@ -34,6 +36,7 @@ module Tx_rollup : sig
     commitment_newest_hash : string option;
     burn_per_byte : int;
     inbox_ema : int;
+    last_removed_commitment_hashes : commitments_hashes option;
   }
 
   type inbox = {inbox_length : int; cumulated_size : int; merkle_root : string}
@@ -130,6 +133,8 @@ module Tx_rollup : sig
     val inbox : inbox Check.typ
 
     val commitment : submitted_commitment Check.typ
+
+    val commitments_hashes : commitments_hashes Check.typ
   end
 
   module Parameters : sig
