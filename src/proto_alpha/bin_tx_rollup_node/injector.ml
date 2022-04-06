@@ -29,9 +29,9 @@ open Alpha_context
 open Common
 open Injector_worker_types
 
-(* TODO/TORU Change me with bound on size and have a configuration option *)
-let max_ops_per_l1_batch = 10
-
+(* This is the Tenderbake finality for blocks. *)
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/2815
+   Centralize this and maybe make it configurable. *)
 let confirmations = 2
 
 module Op_queue = Hash_queue.Make (L1_operation.Hash) (L1_operation)
@@ -290,13 +290,80 @@ let inject_operations state signer (operations : L1_operation.t list) =
   let*! () = Event.(emit Injector.injected) oph in
   return oph
 
-(** [inject_pending_operations_for ~limit state pending] injects up to [limit]
-    operation from the pending queue [pending]. Upon successful injection, the
+let size_l1_batch signer rev_ops =
+  let contents_list =
+    List.map
+      (fun (op : L1_operation.t) ->
+        let (Manager operation) = op.manager_operation in
+        let contents =
+          Manager_operation
+            {
+              source = op.source;
+              operation;
+              (* Below are dummy values that are only used to approximate the
+                 size. It is thus important that they remain above the order the
+                 real values if we want the computed size to be an
+                 over_approximation (without having to do a simulation
+                 first). *)
+              (* TODO: check the size, or compute them wrt operation kind *)
+              fee = Tez.of_mutez_exn 3_000_000L;
+              counter = Z.of_int 500_000;
+              gas_limit = Gas.Arith.integral_of_int_exn 500_000;
+              storage_limit = Z.of_int 500_000;
+            }
+        in
+        Contents contents)
+      rev_ops
+  in
+  let (Contents_list contents) =
+    match Operation.of_list contents_list with
+    | Error _ ->
+        (* Cannot happen: rev_ops is non empty and contains only manager
+           operations *)
+        assert false
+    | Ok packed_contents_list -> packed_contents_list
+  in
+  let signature =
+    match signer.pkh with
+    | Signature.Ed25519 _ -> Signature.of_ed25519 Ed25519.zero
+    | Secp256k1 _ -> Signature.of_secp256k1 Secp256k1.zero
+    | P256 _ -> Signature.of_p256 P256.zero
+  in
+  let branch = Block_hash.zero in
+  let operation =
+    {
+      shell = {branch};
+      protocol_data = Operation_data {contents; signature = Some signature};
+    }
+  in
+  Data_encoding.Binary.length Operation.encoding operation
+
+(* Retrieve as many operations from the queue while remaining below the size
+   limit *)
+let get_operations_from_queue ~size_limit pending =
+  let exception Reached_limit of L1_operation.t list in
+  let rev_ops =
+    try
+      Op_queue.fold
+        (fun _oph op ops ->
+          let new_ops = op :: ops in
+          let new_size = size_l1_batch pending.signer new_ops in
+          if new_size > size_limit then raise (Reached_limit ops) ;
+          new_ops)
+        pending.queue
+        []
+    with Reached_limit ops -> ops
+  in
+  List.rev rev_ops
+
+(** [inject_pending_operations_for ~size_limit state pending] injects
+    operations from the pending queue [pending], whose total size does
+    not exceed [size_limit]. Upon successful injection, the
     operations are removed from the queue and marked as injected. *)
-let inject_pending_operations_for ~limit state pending =
+let inject_pending_operations_for ~size_limit state pending =
   let open Lwt_result_syntax in
   (* Retrieve and remove operations from pending *)
-  let operations_to_inject = Op_queue.peek_at_most pending.queue limit in
+  let operations_to_inject = get_operations_from_queue ~size_limit pending in
   match operations_to_inject with
   | [] -> return_unit
   | _ ->
@@ -311,13 +378,17 @@ let inject_pending_operations_for ~limit state pending =
         operations_to_inject ;
       add_injected_operations state oph operations_to_inject
 
-(** [inject_pending_operations ~limit pending] injects up to [limit]
-    operation from each pending queue [pending]. Upon successful injection, the
+(** [inject_pending_operations ~limit pending] injects
+    operations from each pending queue [pending], where each batch
+    of operations does not exceed [size_limit].
+    Upon successful injection, the
     operations are removed from the queue and marked as injected. *)
-let inject_pending_operations ?(limit = max_ops_per_l1_batch) state =
+let inject_pending_operations
+    ?(size_limit = Constants.max_operation_data_length) state =
   (* TODO: check if iter_ep does not cancel promises *)
   Signature.Public_key_hash.Map.iter_ep
-    (fun _source pending -> inject_pending_operations_for ~limit state pending)
+    (fun _source pending ->
+      inject_pending_operations_for ~size_limit state pending)
     state.pending_queues
 
 (** [register_included_operation state block level oph] marks the manager
