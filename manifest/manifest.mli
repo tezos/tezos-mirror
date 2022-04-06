@@ -672,22 +672,15 @@ val private_exes : string list maker
 
 (** Register and return an internal test.
 
-    Since tests are private, they have no public name: the ['a] argument of [maker]
-    is the internal name. *)
-val test : string maker
+    if [runtest] is true, setup runtest aliases for the given
+   test. If unspecified, [runtest] is set true.
+
+    Since tests are private, they have no public name: the ['a]
+   argument of [maker] is the internal name. *)
+val test : ?runtest:bool -> string maker
 
 (** Same as {!test} but with several names, to define multiple tests at once. *)
-val tests : string list maker
-
-(** Register and return an internal executable that is only used for tests.
-
-    Same as {!private_exe} but the dependencies are only required to run tests:
-    in the [.opam] file, they are marked [with-test] (unless they are also needed
-    by non-test code). *)
-val test_exe : string maker
-
-(** Same as {!test_exe} but with several names, to define multiple tests at once. *)
-val test_exes : string list maker
+val tests : ?runtest:bool -> string list maker
 
 (** Make an external vendored library, for use in internal target dependencies.
 

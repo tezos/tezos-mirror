@@ -1302,25 +1302,15 @@ module Target = struct
     | [] -> invalid_argf "Target.private_exes: at least one name must be given"
     | head :: tail -> Private_executable (head, tail)
 
-  let test =
+  let test ?(runtest = true) =
     internal @@ fun test_name ->
-    Test_executable {names = (test_name, []); run = true}
+    Test_executable {names = (test_name, []); run = runtest}
 
-  let tests =
+  let tests ?(runtest = true) =
     internal @@ fun test_names ->
     match test_names with
     | [] -> invalid_arg "Target.tests: at least one name must be given"
-    | head :: tail -> Test_executable {names = (head, tail); run = true}
-
-  let test_exe =
-    internal @@ fun test_name ->
-    Test_executable {names = (test_name, []); run = false}
-
-  let test_exes =
-    internal @@ fun test_names ->
-    match test_names with
-    | [] -> invalid_arg "Target.test_exes: at least one name must be given"
-    | head :: tail -> Test_executable {names = (head, tail); run = false}
+    | head :: tail -> Test_executable {names = (head, tail); run = runtest}
 
   let vendored_lib ?main_module ?(js_compatible = false) ?(npm_deps = []) name =
     Some (Vendored {name; main_module; js_compatible; npm_deps})

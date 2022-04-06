@@ -1155,8 +1155,9 @@ let tezos_tooling =
         ]
 
 let _tezos_tooling_js_inline_tests =
-  test_exe
+  test
     "run_js_inline_tests"
+    ~runtest:false
     ~path:"src/tooling"
     ~opam:"src/tooling/tezos-tooling"
     ~modules:["run_js_inline_tests"]
@@ -1182,7 +1183,7 @@ let tezos_p2p =
       ]
 
 let _tezos_p2p_tests =
-  test_exes
+  tests
     [
       "test_p2p_socket";
       "test_p2p_pool";
@@ -1215,6 +1216,7 @@ let _tezos_p2p_tests =
     ~opam_only_deps:[tezos_tooling]
     ~linkall:true
     ~preprocess:[pps bisect_ppx ~args:["--bisect-sigterm"]]
+    ~runtest:false
     ~dune:
       Dune.
         [
@@ -3203,8 +3205,9 @@ end = struct
     in
     let _tenderbrute_exe =
       some_if (active && N.(number >= 013)) @@ fun () ->
-      test_exe
+      test
         "tenderbrute_main"
+        ~runtest:false
         ~path:(sf "src/proto_%s/lib_delegate/test/tenderbrute" name_underscore)
         ~opam:
           (sf
@@ -3549,7 +3552,7 @@ end = struct
       (* Note: to enable gprof profiling,
          manually add the following stanza to lib_benchmark/test/dune:
          (ocamlopt_flags (:standard -p -ccopt -no-pie)) *)
-      test_exes
+      tests
         [
           "test_sampling_data";
           "test_sampling_code";
@@ -3577,6 +3580,7 @@ end = struct
             alcotest_lwt;
             prbnmcn_stats;
           ]
+        ~runtest:false
         ~dune:
           Dune.
             [
@@ -3716,7 +3720,7 @@ let _tezos_micheline_rewriting_tests =
       ]
 
 let _tezos_store_tests =
-  test_exe
+  test
     "test"
     ~path:"src/lib_store/test"
     ~opam:"src/lib_store/tezos-store"
@@ -3736,6 +3740,7 @@ let _tezos_store_tests =
         tezos_test_helpers;
         tezos_test_helpers_extra;
       ]
+    ~runtest:false
     ~dune:
       (* [test_slow_manual] is a very long test, running a huge
          combination of tests that are useful for local testing for a
