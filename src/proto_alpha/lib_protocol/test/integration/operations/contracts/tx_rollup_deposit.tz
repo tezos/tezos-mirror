@@ -14,7 +14,7 @@ code {
                  SWAP;
 
                  # create a ticket
-                 PUSH nat 10;
+                 PUSH nat 100000;
                  PUSH unit Unit;
                  TICKET;
 
