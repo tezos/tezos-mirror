@@ -17,7 +17,7 @@
   tezos-protocol-plugin-alpha
   alcotest-lwt
   tezos-test-helpers
-  tezos-test-helpers-base)
+  tezos-test-helpers-extra)
  (flags
   (:standard
    -open Tezos_base.TzPervasives

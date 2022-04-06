@@ -1855,11 +1855,11 @@ let tezos_store =
         prometheus;
       ]
 
-let tezos_test_helpers_base =
+let tezos_test_helpers_extra =
   public_lib
-    "tezos-test-helpers-base"
+    "tezos-test-helpers-extra"
     ~path:"src/lib_test"
-    ~internal_name:"lib_test_base"
+    ~internal_name:"lib_test_extra"
     ~synopsis:"Test helpers dependent on tezos-base"
     ~deps:[tezos_base; tezos_crypto; tezos_test_helpers; tezos_shell_services]
     ~ocaml:V.(at_least "4.08")
@@ -1870,7 +1870,7 @@ let tezos_test_helpers_base =
              complains that the alias is empty. *)
           alias_rule "runtest_js_base" ~action:(S "progn");
         ]
-    ~modules:["assert_base"]
+    ~modules:["assert_lib"]
 
 let tezos_requester =
   public_lib
@@ -3768,7 +3768,7 @@ let _tezos_store_tests =
         Protocol.(plugin_exn alpha) |> open_;
         alcotest_lwt;
         tezos_test_helpers;
-        tezos_test_helpers_base;
+        tezos_test_helpers_extra;
       ]
     ~action:Dune.[setenv "SLOW_TEST" "false" @@ run_exe "test" []]
     ~dune:

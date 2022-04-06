@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 module Assert = Lib_test.Assert
-module Assert_base = Lib_test_base.Assert_base
+module Assert_lib = Lib_test_extra.Assert_lib
 open Test_utils
 open Block_store
 
@@ -60,7 +60,7 @@ let assert_presence_in_block_store ?(with_metadata = false) block_store blocks =
               b' ;
             return_unit)
           else (
-            Assert_base.equal_block
+            Assert_lib.Crypto.equal_block
               ~msg:"block equality without metadata"
               (Block_repr.header b)
               (Block_repr.header b') ;
@@ -108,7 +108,7 @@ let assert_pruned_blocks_in_block_store block_store blocks =
             pp_raw_block
             b
       | Some ({metadata = None; _} as b') ->
-          Assert_base.equal_block
+          Assert_lib.Crypto.equal_block
             ~msg:"block equality without metadata"
             (Block_repr.header b)
             (Block_repr.header b') ;
