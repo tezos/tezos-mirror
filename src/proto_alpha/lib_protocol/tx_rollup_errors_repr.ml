@@ -394,7 +394,7 @@ let () =
        depth that can be witnessed."
     (obj3
        (req
-          "kind"
+          "target"
           (union
              [
                case
