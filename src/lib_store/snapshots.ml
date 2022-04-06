@@ -2701,6 +2701,7 @@ module type IMPORTER = sig
     Context.index ->
     expected_context_hash:Context_hash.t ->
     nb_context_elements:int ->
+    legacy:bool ->
     unit tzresult Lwt.t
 
   val load_protocol_table :
@@ -2771,7 +2772,7 @@ module Raw_importer : IMPORTER = struct
     | None -> fail (Cannot_read {kind = `Block_data; path = file})
 
   let restore_context t context_index ~expected_context_hash
-      ~nb_context_elements =
+      ~nb_context_elements ~legacy =
     let open Lwt_tzresult_syntax in
     let context_file_path =
       Naming.(snapshot_context_file t.snapshot_dir |> file_path)
@@ -2800,6 +2801,7 @@ module Raw_importer : IMPORTER = struct
             ~expected_context_hash
             ~fd
             ~nb_context_elements
+            ~legacy
         in
         (* FIXME: Is this test really usefull? *)
         let*! current = Lwt_unix.lseek fd 0 Lwt_unix.SEEK_CUR in
@@ -3048,7 +3050,7 @@ module Tar_importer : IMPORTER = struct
     | None -> fail (Cannot_read {kind = `Block_data; path = filename})
 
   let restore_context t context_index ~expected_context_hash
-      ~nb_context_elements =
+      ~nb_context_elements ~legacy =
     let open Lwt_tzresult_syntax in
     let filename = Naming.(snapshot_context_file t.snapshot_tar |> file_path) in
     let* header =
@@ -3063,6 +3065,7 @@ module Tar_importer : IMPORTER = struct
       ~expected_context_hash
       ~nb_context_elements
       ~fd
+      ~legacy
 
   let load_protocol_table t =
     let open Lwt_tzresult_syntax in
@@ -3429,7 +3432,8 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
 
   let restore_and_apply_context snapshot_importer ?user_expected_block
       ~context_index ~user_activated_upgrades ~user_activated_protocol_overrides
-      ~operation_metadata_size_limit snapshot_metadata genesis chain_id =
+      ~operation_metadata_size_limit ~legacy snapshot_metadata genesis chain_id
+      =
     let open Lwt_tzresult_syntax in
     (* Start by committing genesis *)
     let* genesis_ctxt_hash =
@@ -3474,6 +3478,7 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
         context_index
         ~expected_context_hash:predecessor_header.Block_header.shell.context
         ~nb_context_elements:snapshot_metadata.context_elements
+        ~legacy
     in
     let pred_context_hash = predecessor_header.shell.context in
     let* predecessor_context =
@@ -3594,10 +3599,12 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
         snapshot_path
         user_expected_block
     in
+    let* legacy = Version.is_legacy snapshot_version in
+    let indexing_strategy = if legacy then `Always else `Minimal in
     let*! context_index =
       Context.init
         ~readonly:false
-        ~indexing_strategy:`Always
+        ~indexing_strategy
         ?patch_context
         dst_context_dir
     in
@@ -3613,6 +3620,7 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
         snapshot_metadata
         genesis
         chain_id
+        ~legacy
     in
     (* Restore store *)
     (* Restore protocols *)
