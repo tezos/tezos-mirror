@@ -28,11 +28,11 @@ workflow:
 # The "manual" stage exists to fix a UI problem that occurs when mixing
 # manual and non-manual jobs.
 stages:
-  - packaging
   - sanity
   - build
   - test
   - test_coverage
+  - packaging
   - doc
   - build_release
   - publish_release

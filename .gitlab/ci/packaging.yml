@@ -7,6 +7,7 @@ opam:create_pipeline:
   script:
     - ./scripts/generate_opam_pipeline.sh
     - cat opam-ci.yml
+  needs: []
   artifacts:
     paths:
       - opam-ci.yml
