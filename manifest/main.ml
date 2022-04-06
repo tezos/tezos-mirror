@@ -1743,6 +1743,8 @@ let tezos_protocol_compiler_registerer =
                   "%{lib:tezos-protocol-environment.sigs:tezos_protocol_environment_sigs__V4.cmi}";
                 S
                   "%{lib:tezos-protocol-environment.sigs:tezos_protocol_environment_sigs__V5.cmi}";
+                S
+                  "%{lib:tezos-protocol-environment.sigs:tezos_protocol_environment_sigs__V6.cmi}";
               ];
         ]
 
