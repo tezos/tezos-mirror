@@ -164,6 +164,8 @@ end = struct
   let to_irmin = function `Always -> I.always | `Minimal -> I.minimal
 end
 
+let on_disk_index = ref `No
+
 let () =
   let verbose_info () =
     Logs.set_level (Some Logs.Info) ;
@@ -184,6 +186,7 @@ let () =
           "Invalid value for TEZOS_CONTEXT environment variable: %s"
           msg
   in
+  let on_disk_index n = on_disk_index := n in
   match Unix.getenv "TEZOS_CONTEXT" with
   | exception Not_found -> ()
   | v ->
@@ -198,6 +201,7 @@ let () =
               | ["auto-flush"; n] -> auto_flush n
               | ["lru-size"; n] -> lru_size n
               | ["indexing-strategy"; x] -> indexing_strategy x
+              | ["on-disk-index"; path] -> on_disk_index (`Yes path)
               | _ -> ()))
         args
 
@@ -841,89 +845,116 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
 
     let context_tree ctxt = ctxt.tree
 
-    type binding = {
-      key : string;
-      value : tree;
-      value_kind : [`Node | `Contents];
-      value_hash : hash;
-    }
+    module Snapshot = struct
+      include Store.Snapshot
 
-    (** Unpack the bindings in a tree node (in lexicographic order) and clear its
-       internal cache. *)
-    let bindings tree : binding list Lwt.t =
-      let open Lwt_syntax in
-      let* keys = Store.Tree.list tree [] in
-      let+ bindings =
-        keys
-        |> List.sort (fun (a, _) (b, _) -> String.compare a b)
-        |> List.map_s (fun (key, value) ->
-               let+ o = Store.Tree.kind value [] in
-               match o with
-               | None ->
-                   (* The value must exist in the tree, because we're
-                       iterating over existing keys *)
-                   assert false
-               | Some value_kind ->
-                   let value_hash = Store.Tree.hash value in
-                   {key; value; value_kind; value_hash})
-      in
-      Store.Tree.clear tree ;
-      bindings
+      let kinded_hash_encoding : kinded_hash Data_encoding.t =
+        let open Data_encoding in
+        let kind_encoding =
+          string_enum [("node", `Node); ("contents", `Contents)]
+        in
+        conv
+          (function
+            | Contents (h, ()) ->
+                (`Contents, Context_hash.to_bytes (Hash.to_context_hash h))
+            | Node h -> (`Node, Context_hash.to_bytes (Hash.to_context_hash h)))
+          (function
+            | (`Contents, h) ->
+                let h = Hash.of_context_hash (Context_hash.of_bytes_exn h) in
+                Contents (h, ())
+            | (`Node, h) ->
+                Node (Hash.of_context_hash (Context_hash.of_bytes_exn h)))
+          (obj2 (req "kind" kind_encoding) (req "value" bytes))
 
-    module Hashset = struct
-      module String_set = Utils.String_set
+      let hash_encoding : hash Data_encoding.t =
+        let open Data_encoding in
+        conv
+          (fun h -> Context_hash.to_bytes (Hash.to_context_hash h))
+          (fun h -> Hash.of_context_hash (Context_hash.of_bytes_exn h))
+          bytes
 
-      let create () =
-        String_set.create ~elt_length:Hash.hash_size ~initial_capacity:100_000
+      let entry_encoding : entry Data_encoding.t =
+        let open Data_encoding in
+        conv
+          (fun {step; hash} -> (step, hash))
+          (fun (step, hash) -> {step; hash})
+          (obj2 (req "name" string) (req "hash" kinded_hash_encoding))
 
-      let mem t h = String_set.mem t (Hash.to_raw_string h)
+      let inode_tree_encoding : inode_tree Data_encoding.t =
+        let open Data_encoding in
+        let pair_encoding =
+          obj2 (req "index" uint16) (req "hash" hash_encoding)
+        in
+        conv
+          (fun {depth; length; pointers} ->
+            (Int32.of_int depth, Int32.of_int length, pointers))
+          (fun (depth, length, pointers) ->
+            {depth = Int32.to_int depth; length = Int32.to_int length; pointers})
+          (obj3
+             (req "depth" int32)
+             (req "length" int32)
+             (req "pointers" (list pair_encoding)))
 
-      let add t h = String_set.add t (Hash.to_raw_string h)
+      let v_encoding : v Data_encoding.t =
+        let open Data_encoding in
+        let inode_tree_case =
+          case
+            ~title:"tree"
+            (Tag (Char.code 't'))
+            inode_tree_encoding
+            (function Inode_tree t -> Some t | _ -> None)
+            (fun t -> Inode_tree t)
+        in
+        let inode_value_case =
+          case
+            ~title:"value"
+            (Tag (Char.code 'v'))
+            (list entry_encoding)
+            (function Inode_value t -> Some t | _ -> None)
+            (fun t -> Inode_value t)
+        in
+        Data_encoding.union ~tag_size:`Uint8 [inode_tree_case; inode_value_case]
+
+      let encoding : inode Data_encoding.t =
+        let open Data_encoding in
+        conv
+          (fun {v; root} -> (v, root))
+          (fun (v, root) -> {v; root})
+          (obj2 (req "v" v_encoding) (req "root" bool))
     end
 
-    let tree_iteri_unique f tree =
+    let tree_iteri_unique index f tree =
+      let root_key =
+        match Store.Tree.key tree with None -> assert false | Some key -> key
+      in
+      let on_disk =
+        match !on_disk_index with `No -> None | `Yes path -> Some (`Path path)
+      in
+      Snapshot.export ?on_disk index.repo f ~root_key
+
+    type import = Snapshot.Import.process
+
+    let v_import idx =
+      let indexing_strategy = Indexing_strategy.get () in
+      let on_disk =
+        match indexing_strategy with
+        | `Always ->
+            Some `Reuse
+            (* reuse index when importing a snaphot with the always indexing
+               strategy. *)
+        | `Minimal -> (
+            match !on_disk_index with
+            | `No -> None
+            | `Yes path -> Some (`Path path))
+      in
+      Snapshot.Import.v ?on_disk idx.repo
+
+    let save_inode idx import snapshot =
       let open Lwt_syntax in
-      let total_visited = ref 0 in
-      (* Noting the visited hashes *)
-      let visited_hash = Hashset.create () in
-      let visited h = Hashset.mem visited_hash h in
-      let set_visit h =
-        incr total_visited ;
-        Hashset.add visited_hash h
-      in
-      let rec aux : type a. tree -> (unit -> a) -> a Lwt.t =
-       fun tree k ->
-        let* bs = bindings tree in
-        let* sub_keys =
-          List.map_s
-            (fun {key; value; value_hash; value_kind} ->
-              let kinded_value_hash =
-                match value_kind with
-                | `Node -> `Node value_hash
-                | `Contents -> `Blob value_hash
-              in
-              let kv = (key, kinded_value_hash) in
-              if visited value_hash then Lwt.return kv
-              else
-                match value_kind with
-                | `Node ->
-                    (* Visit children first, in left-to-right order. *)
-                    (aux [@ocaml.tailcall]) value (fun () ->
-                        (* There cannot be a cycle. *)
-                        set_visit value_hash ;
-                        kv)
-                | `Contents ->
-                    let* data = Store.Tree.get value [] in
-                    let+ () = f (`Leaf data) in
-                    set_visit value_hash ;
-                    kv)
-            bs
-        in
-        let+ v = f (`Branch sub_keys) in
-        k v
-      in
-      let* () = aux tree Fun.id in
-      Lwt.return !total_visited
+      let* key = Snapshot.Import.save_elt import snapshot in
+      Store.Tree.of_key idx.repo (`Node key)
+
+    let close_import import = Snapshot.Import.close import
 
     let make_context index = empty index
 
@@ -1037,6 +1068,7 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
   (* Context dumper *)
 
   module Context_dumper = Context_dump.Make (Dumpable_context)
+  module Context_dumper_legacy = Context_dump.Make_legacy (Dumpable_context)
 
   (* provides functions dump_context and restore_context *)
   let dump_context idx data ~fd =
@@ -1045,10 +1077,18 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
     let* () = Lwt_unix.fsync fd in
     Lwt.return res
 
-  let restore_context idx ~expected_context_hash ~nb_context_elements ~fd =
-    Context_dumper.restore_context_fd
-      idx
-      ~expected_context_hash
-      ~fd
-      ~nb_context_elements
+  let restore_context idx ~expected_context_hash ~nb_context_elements ~fd
+      ~legacy =
+    if legacy then
+      Context_dumper_legacy.restore_context_fd
+        idx
+        ~expected_context_hash
+        ~fd
+        ~nb_context_elements
+    else
+      Context_dumper.restore_context_fd
+        idx
+        ~expected_context_hash
+        ~fd
+        ~nb_context_elements
 end

@@ -113,14 +113,6 @@ module type Dump_interface = sig
   (* for dumping *)
   val context_tree : context -> tree
 
-  (** Visit each branch and leaf of the given tree {i exactly once}, in
-      depth-first post-order traversal. Branch children are visited in ascending
-      key order. Memory usage is linear in the size of the tree. *)
-  val tree_iteri_unique :
-    ([`Branch of (step * Kinded_hash.t) list | `Leaf of contents] -> unit Lwt.t) ->
-    tree ->
-    int Lwt.t
-
   (* for restoring *)
   val make_context : index -> context
 
@@ -132,6 +124,52 @@ module type Dump_interface = sig
     batch ->
     (step * Kinded_hash.t, error trace) Seq_es.t ->
     (tree option, error trace) result Lwt.t
+
+  (** This type exposes the internal nodes used in irmin in order to use them
+      during snapshot import and export. *)
+  module Snapshot : sig
+    type kinded_hash = Contents of hash * unit | Node of hash
+
+    type entry = {step : string; hash : kinded_hash}
+
+    type inode_tree = {depth : int; length : int; pointers : (int * hash) list}
+
+    type v = Inode_tree of inode_tree | Inode_value of entry list
+
+    type inode = {v : v; root : bool}
+
+    type t = Inode of inode | Blob of contents
+
+    val encoding : inode Data_encoding.t
+  end
+
+  (** [tree_iteri_unique index f tree] traverses [tree], applying [f] to all
+      inodes and contents.
+
+      [f] is called in post-order, that is [f] is first called on the leaves,
+      and the last call to [f] is on the root of the tree.
+
+      The traversal order is stable.
+
+      The traversal skips objects that are structurally equal to objects that
+      were already traversed. In other words, [tree_iteri_unique] internally
+      uses a hash set in order to guarantee that all the objects passed to [f]
+      don't hash the same way.
+
+      Returns the total number of elements visited. *)
+  val tree_iteri_unique :
+    index -> (Snapshot.t -> unit Lwt.t) -> tree -> int Lwt.t
+
+  type import
+
+  (** [v_import index] creates an [importer] instance. *)
+  val v_import : index -> import
+
+  (** [save_inode index importer elt] saves [elt] to the store. *)
+  val save_inode : index -> import -> Snapshot.t -> tree option Lwt.t
+
+  (** [close importer] close the [importer] instance.*)
+  val close_import : import -> unit
 end
 
 module type S = sig
@@ -169,6 +207,28 @@ module type Context_dump = sig
        and type context := I.context
        and type block_header := I.Block_header.t
        and type context_hash := I.Commit_hash.t
+
+  (* Preserve a legacy importer for now. *)
+  module Make_legacy (I : Dump_interface) : sig
+    type index
+
+    type context
+
+    type block_header
+
+    type context_hash
+
+    val restore_context_fd :
+      index ->
+      expected_context_hash:context_hash ->
+      fd:Lwt_unix.file_descr ->
+      nb_context_elements:int ->
+      unit tzresult Lwt.t
+  end
+  with type index := I.index
+   and type context := I.context
+   and type block_header := I.Block_header.t
+   and type context_hash := I.Commit_hash.t
 end
 
 (* Legacy *)

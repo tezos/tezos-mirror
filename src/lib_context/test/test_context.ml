@@ -533,7 +533,8 @@ let test_dump {idx; block3b; _} =
               idx2
               ~expected_context_hash:target_context_hash
               ~nb_context_elements
-              ~fd:context_fd)
+              ~fd:context_fd
+              ~legacy:false)
           (fun () -> Lwt_unix.close context_fd))
   in
   Lwt.return_unit
