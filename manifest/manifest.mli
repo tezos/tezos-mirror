@@ -485,10 +485,6 @@ val inline_tests_backend : target -> inline_tests
     - [conflicts]: a list of target; all of their packages will be put in the
       [conflicts] section of the [.opam] file.
 
-    - [dep_files]: a list of files to add as dependencies using [(deps (file ...))]
-      in the [dune] file. A typical use is if you generate code: this tells [dune]
-      to make those files available to your generator.
-
     - [deps]: a list of targets to add as dependencies using [(libraries)]
       in the [dune] file.
 
@@ -595,7 +591,6 @@ type 'a maker =
   ?bisect_ppx:bool ->
   ?c_library_flags:string list ->
   ?conflicts:target list ->
-  ?dep_files:string list ->
   ?deps:target list ->
   ?dune:Dune.s_expr ->
   ?foreign_stubs:Dune.foreign_stubs ->
@@ -672,15 +667,18 @@ val private_exes : string list maker
 
 (** Register and return an internal test.
 
-    if [runtest] is true, setup runtest aliases for the given
-   test. If unspecified, [runtest] is set true.
+    - [runtest]: if true, setup runtest aliases for the given
+      test. If unspecified, [runtest] is set true.
+
+    - [dep_files]: a list of files to add as dependencies using [(deps (file ...))]
+      in the [runtest] alias.
 
     Since tests are private, they have no public name: the ['a]
-   argument of [maker] is the internal name. *)
-val test : ?runtest:bool -> string maker
+    argument of [maker] is the internal name. *)
+val test : ?dep_files:string list -> ?runtest:bool -> string maker
 
 (** Same as {!test} but with several names, to define multiple tests at once. *)
-val tests : ?runtest:bool -> string list maker
+val tests : ?dep_files:string list -> ?runtest:bool -> string list maker
 
 (** Make an external vendored library, for use in internal target dependencies.
 

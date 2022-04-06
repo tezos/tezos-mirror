@@ -995,7 +995,6 @@ module Target = struct
     ?bisect_ppx:bool ->
     ?c_library_flags:string list ->
     ?conflicts:t option list ->
-    ?dep_files:string list ->
     ?deps:t option list ->
     ?dune:Dune.s_expr ->
     ?foreign_stubs:Dune.foreign_stubs ->
@@ -1179,8 +1178,8 @@ module Target = struct
         | None | Some [] -> true
         | Some modes -> List.mem Dune.Native modes
       in
-      match (kind, opam) with
-      | (Test_executable {names; run = true}, Some package) ->
+      match (kind, opam, dep_files) with
+      | (Test_executable {names; run = true}, Some package, _) ->
           let runtest_js_rules =
             if run_js then
               let node_wrapper_flags : string list =
@@ -1208,6 +1207,13 @@ module Target = struct
             else []
           in
           runtest_rules @ runtest_js_rules
+      | (Test_executable {names = (name, _); run = false; _}, _, _ :: _) ->
+          invalid_argf
+            "for targets which provide test executables such as %S, \
+             [~dep_files] is only meaningful for runtest alias. It cannot be \
+             used together with [runtest:false]"
+            name
+      | (_, _, _ :: _) -> assert false
       | _ -> []
     in
     let dune =
@@ -1254,23 +1260,23 @@ module Target = struct
       }
 
   let public_lib ?internal_name =
-    internal @@ fun public_name ->
+    internal ?dep_files:None @@ fun public_name ->
     let internal_name =
       Option.value internal_name ~default:(convert_to_identifier public_name)
     in
     Public_library {internal_name; public_name}
 
-  let private_lib = internal @@ fun name -> Private_library name
+  let private_lib = internal ?dep_files:None @@ fun name -> Private_library name
 
   let public_exe ?internal_name =
-    internal @@ fun public_name ->
+    internal ?dep_files:None @@ fun public_name ->
     let internal_name =
       Option.value internal_name ~default:(convert_to_identifier public_name)
     in
     Public_executable ({internal_name; public_name}, [])
 
   let public_exes ?internal_names =
-    internal @@ fun public_names ->
+    internal ?dep_files:None @@ fun public_names ->
     let names =
       match internal_names with
       | None ->
@@ -1294,20 +1300,21 @@ module Target = struct
     | head :: tail -> Public_executable (head, tail)
 
   let private_exe =
-    internal @@ fun internal_name -> Private_executable (internal_name, [])
+    internal ?dep_files:None @@ fun internal_name ->
+    Private_executable (internal_name, [])
 
   let private_exes =
-    internal @@ fun internal_names ->
+    internal ?dep_files:None @@ fun internal_names ->
     match internal_names with
     | [] -> invalid_argf "Target.private_exes: at least one name must be given"
     | head :: tail -> Private_executable (head, tail)
 
-  let test ?(runtest = true) =
-    internal @@ fun test_name ->
+  let test ?dep_files ?(runtest = true) =
+    internal ?dep_files @@ fun test_name ->
     Test_executable {names = (test_name, []); run = runtest}
 
-  let tests ?(runtest = true) =
-    internal @@ fun test_names ->
+  let tests ?dep_files ?(runtest = true) =
+    internal ?dep_files @@ fun test_names ->
     match test_names with
     | [] -> invalid_arg "Target.tests: at least one name must be given"
     | head :: tail -> Test_executable {names = (head, tail); run = runtest}
