@@ -63,6 +63,7 @@ let main () =
       "cache_model";
       "ir_size_model";
       "carbonated_map";
+      "tx_rollup";
     ]
   in
   Lwt_list.iter_s
