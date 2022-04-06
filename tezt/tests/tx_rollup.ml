@@ -66,7 +66,8 @@ let init_with_tx_rollup ?additional_bootstrap_account_count
   let* _ = Node.wait_for_level node 2 in
   return {node; client; rollup}
 
-let submit_batch ~batch:(`Batch content) {rollup; client; node} =
+let submit_batch ~batch:(`Batch content) ?(batches = []) {rollup; client; node}
+    =
   let*! () =
     Client.Tx_rollup.submit_batch
       ~hooks
@@ -74,6 +75,15 @@ let submit_batch ~batch:(`Batch content) {rollup; client; node} =
       ~rollup
       ~src:Constant.bootstrap1.public_key_hash
       client
+  in
+  let* () =
+    Lwt_list.iter_s
+      (fun (`Batch content, src) ->
+        let*! () =
+          Client.Tx_rollup.submit_batch ~hooks ~content ~rollup ~src client
+        in
+        return ())
+      batches
   in
   let current_level = Node.get_level node in
   let* () = Client.bake_for client in
@@ -962,6 +972,98 @@ let test_rollup_last_commitment_is_rejected =
   let* _ = RPC.get_block client in
   unit
 
+let test_rollup_reject_position_one =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"reject commitment using position one"
+    ~tags:["tx_rollup"; "rejection"; "batch"]
+  @@ fun protocol ->
+  let parameters = Parameters.{finality_period = 1; withdraw_period = 1} in
+  let* ({rollup; client; node = _} as state) =
+    init_with_tx_rollup ~parameters ~protocol ()
+  in
+  let batch = Rollup.make_batch "blob" in
+  let* () =
+    submit_batch
+      ~batch
+      ~batches:[(batch, Constant.bootstrap2.public_key_hash)]
+      state
+  in
+  let* _ = RPC.get_block client in
+
+  let inbox_content = `Content [batch; batch] in
+  let* () =
+    submit_commitment
+      ~level:0
+      ~roots:
+        [
+          Constant.tx_rollup_initial_message_result;
+          "txmr2DouKqJu5o8KEVGe6gLoiw1J3krjsxhf6C2a1kDNTTr8BdKpf2";
+        ]
+      ~inbox_content
+      ~predecessor:None
+      state
+  in
+  let* () =
+    repeat parameters.finality_period (fun () -> Client.bake_for client)
+  in
+  let*! _ = RPC.Tx_rollup.get_state ~rollup client in
+  let*! message_hash =
+    Rollup.message_hash ~message:(Rollup.make_batch "blob") client
+  in
+  let*! path =
+    Rollup.inbox_merkle_tree_path
+      ~message_hashes:[message_hash; message_hash]
+      ~position:1
+      client
+  in
+  (* This is the encoding of [batch]. *)
+  let message =
+    Format.sprintf
+      "{ \"batch\": \"%s\"}"
+      (let (`Hex s) = Hex.of_string "blob" in
+       s)
+  in
+  let*! agreed_message_result_path =
+    Rollup.commitment_merkle_tree_path
+      ~message_result_hashes:
+        [
+          `Hash Constant.tx_rollup_initial_message_result;
+          `Hash "txmr2DouKqJu5o8KEVGe6gLoiw1J3krjsxhf6C2a1kDNTTr8BdKpf2";
+        ]
+      ~position:0
+      client
+  in
+  let*! rejected_message_result_path =
+    Rollup.commitment_merkle_tree_path
+      ~message_result_hashes:
+        [
+          `Hash Constant.tx_rollup_initial_message_result;
+          `Hash "txmr2DouKqJu5o8KEVGe6gLoiw1J3krjsxhf6C2a1kDNTTr8BdKpf2";
+        ]
+      ~position:1
+      client
+  in
+  let*! () =
+    submit_rejection
+      ~level:0
+      ~message
+      ~position:1
+      ~path:(path |> JSON.encode)
+      ~message_result_hash:
+        "txmr2DouKqJu5o8KEVGe6gLoiw1J3krjsxhf6C2a1kDNTTr8BdKpf2"
+      ~rejected_message_result_path:(rejected_message_result_path |> JSON.encode)
+      ~agreed_message_result_path:(agreed_message_result_path |> JSON.encode)
+      ~proof:Constant.tx_rollup_proof_initial_state
+      ~context_hash:Constant.tx_rollup_empty_l2_context
+      ~withdraw_list_hash:Constant.tx_rollup_empty_withdraw_list
+      state
+  in
+  let* () = Client.bake_for client in
+  let*! _ = RPC.Tx_rollup.get_state ~rollup client in
+  let* _ = RPC.get_block client in
+  unit
+
 let test_rollup_wrong_rejection =
   Protocol.register_test
     ~__FILE__
@@ -1331,6 +1433,7 @@ let register ~protocols =
   test_submit_from_originated_source protocols ;
   test_rollup_with_two_commitments protocols ;
   test_rollup_last_commitment_is_rejected protocols ;
+  test_rollup_reject_position_one protocols ;
   test_rollup_wrong_rejection protocols ;
   test_rollup_wrong_path_for_rejection protocols ;
   test_rollup_wrong_rejection_long_path protocols ;
