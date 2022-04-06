@@ -1,9 +1,8 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(test
+(executable
  (name test_crouching)
- (package tezos-signer-backends)
  (libraries
   tezos-error-monad
   tezos-stdlib
@@ -18,3 +17,8 @@
    -open Tezos_crypto
    -open Tezos_client_base
    -open Tezos_signer_backends_unix)))
+
+(rule
+ (alias runtest)
+ (package tezos-signer-backends)
+ (action (run %{dep:./test_crouching.exe})))

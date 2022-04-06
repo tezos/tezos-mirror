@@ -1,9 +1,8 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(test
+(executable
  (name test_rewriting)
- (package tezos-micheline-rewriting)
  (libraries
   tezos-micheline
   tezos-micheline-rewriting
@@ -12,3 +11,8 @@
   tezos-client-alpha
   alcotest-lwt)
  (flags (:standard -open Tezos_micheline)))
+
+(rule
+ (alias runtest)
+ (package tezos-micheline-rewriting)
+ (action (run %{dep:./test_rewriting.exe})))

@@ -1,9 +1,8 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(test
+(executable
  (name test)
- (package tezos-store)
  (libraries
   tezos-base
   tezos-store
@@ -26,7 +25,11 @@
    -open Tezos_stdlib_unix
    -open Tezos_validation
    -open Tezos_protocol_alpha_parameters
-   -open Tezos_protocol_plugin_alpha))
+   -open Tezos_protocol_plugin_alpha)))
+
+(rule
+ (alias runtest)
+ (package tezos-store)
  (action (setenv SLOW_TEST false (run %{exe:test.exe}))))
 
 (rule

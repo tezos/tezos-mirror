@@ -1,9 +1,8 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(tests
+(executables
  (names test_consensus_filter test_filter_state test_plugin)
- (package tezos-protocol-plugin-012-Psithaca-tests)
  (libraries
   tezos-base
   tezos-base-test-helpers
@@ -29,3 +28,18 @@
    -open Tezos_protocol_012_Psithaca.Protocol
    -open Tezos_protocol_012_Psithaca_parameters
    -open Tezos_012_Psithaca_test_helpers)))
+
+(rule
+ (alias runtest)
+ (package tezos-protocol-plugin-012-Psithaca-tests)
+ (action (run %{dep:./test_consensus_filter.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-protocol-plugin-012-Psithaca-tests)
+ (action (run %{dep:./test_filter_state.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-protocol-plugin-012-Psithaca-tests)
+ (action (run %{dep:./test_plugin.exe})))

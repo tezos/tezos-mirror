@@ -1,9 +1,8 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(test
+(executable
  (name test_encrypted)
- (package tezos-signer-backends)
  (libraries
   tezos-base
   tezos-base.unix
@@ -21,3 +20,8 @@
    -open Tezos_crypto
    -open Tezos_client_base
    -open Tezos_signer_backends)))
+
+(rule
+ (alias runtest)
+ (package tezos-signer-backends)
+ (action (run %{dep:./test_encrypted.exe})))

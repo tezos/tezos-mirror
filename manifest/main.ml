@@ -1511,7 +1511,7 @@ let _tezos_sapling_tests =
         ]
 
 let _tezos_sapling_js_tests =
-  test_exe
+  test
     "test_js"
     ~path:"src/lib_sapling/test"
     ~opam:"src/lib_sapling/tezos-sapling"
@@ -3716,7 +3716,7 @@ let _tezos_micheline_rewriting_tests =
       ]
 
 let _tezos_store_tests =
-  test
+  test_exe
     "test"
     ~path:"src/lib_store/test"
     ~opam:"src/lib_store/tezos-store"
@@ -3736,7 +3736,6 @@ let _tezos_store_tests =
         tezos_test_helpers;
         tezos_test_helpers_extra;
       ]
-    ~action:Dune.[setenv "SLOW_TEST" "false" @@ run_exe "test" []]
     ~dune:
       (* [test_slow_manual] is a very long test, running a huge
          combination of tests that are useful for local testing for a
@@ -3746,6 +3745,10 @@ let _tezos_store_tests =
          run these tests in the CI. *)
       Dune.
         [
+          alias_rule
+            "runtest"
+            ~package:"tezos-store"
+            ~action:(setenv "SLOW_TEST" "false" @@ run_exe "test" []);
           alias_rule
             "test_slow_manual"
             ~action:(setenv "SLOW_TEST" "true" @@ run_exe "test" []);

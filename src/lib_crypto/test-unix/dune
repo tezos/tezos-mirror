@@ -1,9 +1,8 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(test
+(executable
  (name test_crypto_box)
- (package tezos-crypto)
  (libraries
   tezos-stdlib
   tezos-crypto
@@ -23,3 +22,8 @@
    -open Tezos_crypto
    -open Tezos_error_monad.TzLwtreslib
    -open Data_encoding)))
+
+(rule
+ (alias runtest)
+ (package tezos-crypto)
+ (action (run %{dep:./test_crypto_box.exe})))

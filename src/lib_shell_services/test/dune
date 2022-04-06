@@ -1,9 +1,8 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(test
+(executable
  (name test)
- (package tezos-shell-services)
  (modes native js)
  (libraries
   tezos-base
@@ -11,6 +10,11 @@
   alcotest)
  (js_of_ocaml)
  (flags (:standard -open Tezos_base.TzPervasives -open Tezos_shell_services)))
+
+(rule
+ (alias runtest)
+ (package tezos-shell-services)
+ (action (run %{dep:./test.exe})))
 
 (rule
  (alias runtest_js)

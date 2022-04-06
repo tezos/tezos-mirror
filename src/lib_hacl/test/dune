@@ -1,9 +1,8 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(tests
+(executables
  (names test_hacl test_prop_hacl_hash test_prop_signature_pk)
- (package tezos-hacl)
  (modes native js)
  (libraries
   tezos-stdlib
@@ -22,6 +21,21 @@
    -open Data_encoding
    -open Tezos_hacl))
  (modules (:standard \ test)))
+
+(rule
+ (alias runtest)
+ (package tezos-hacl)
+ (action (run %{dep:./test_hacl.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-hacl)
+ (action (run %{dep:./test_prop_hacl_hash.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-hacl)
+ (action (run %{dep:./test_prop_signature_pk.exe})))
 
 (rule
  (alias runtest_js)
@@ -45,9 +59,8 @@
    %{dep:../../tooling/node_wrapper.exe} --hacl
    %{dep:./test_prop_signature_pk.bc.js})))
 
-(test
+(executable
  (name test)
- (package tezos-hacl)
  (modes native js)
  (libraries
   tezos-stdlib
@@ -60,6 +73,8 @@
   tezos-test-helpers)
  (js_of_ocaml)
  (modules test))
+
+(rule (alias runtest) (package tezos-hacl) (action (run %{dep:./test.exe})))
 
 (rule
  (alias runtest_js)

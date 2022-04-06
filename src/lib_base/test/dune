@@ -1,9 +1,8 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(tests
+(executables
  (names test_bounded test_time test_protocol)
- (package tezos-base)
  (modes native js)
  (libraries
   tezos-base
@@ -14,6 +13,21 @@
  (js_of_ocaml)
  (flags (:standard -open Tezos_base -open Tezos_error_monad))
  (modules test_bounded test_time test_protocol))
+
+(rule
+ (alias runtest)
+ (package tezos-base)
+ (action (run %{dep:./test_bounded.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-base)
+ (action (run %{dep:./test_time.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-base)
+ (action (run %{dep:./test_protocol.exe})))
 
 (rule
  (alias runtest_js)
@@ -39,9 +53,8 @@
    %{dep:../../tooling/node_wrapper.exe} --bls12-381 --secp256k1 --hacl
    %{dep:./test_protocol.bc.js})))
 
-(test
+(executable
  (name test_p2p_addr)
- (package tezos-base)
  (modes native js)
  (libraries
   tezos-base
@@ -51,8 +64,13 @@
   tezos-test-helpers)
  (js_of_ocaml)
  (flags (:standard -open Tezos_base -open Tezos_error_monad))
- (modules test_p2p_addr)
- (deps (file points.ok) (file points.ko)))
+ (modules test_p2p_addr))
+
+(rule
+ (alias runtest)
+ (package tezos-base)
+ (deps points.ok points.ko)
+ (action (run %{dep:./test_p2p_addr.exe})))
 
 (rule
  (alias runtest_js)

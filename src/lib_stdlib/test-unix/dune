@@ -1,9 +1,8 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(tests
+(executables
  (names test_lwt_pipe test_circular_buffer test_circular_buffer_fuzzy)
- (package tezos-stdlib)
  (libraries
   tezos-stdlib
   alcotest
@@ -14,3 +13,18 @@
   tezos-test-helpers
   qcheck-alcotest)
  (flags (:standard -open Tezos_stdlib)))
+
+(rule
+ (alias runtest)
+ (package tezos-stdlib)
+ (action (run %{dep:./test_lwt_pipe.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-stdlib)
+ (action (run %{dep:./test_circular_buffer.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-stdlib)
+ (action (run %{dep:./test_circular_buffer_fuzzy.exe})))
