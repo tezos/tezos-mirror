@@ -935,7 +935,7 @@ module Deserialisation = struct
       ~__FILE__
       ~title:
         "Smart contract call that would succeed if we did not account \
-         deserializtion gas correctly"
+         deserialization gas correctly"
       ~tags:["precheck"; "gas"; "deserialization"; "lazy_expr"]
     @@ fun protocol ->
     let* nodes = Helpers.init ~protocol () in
