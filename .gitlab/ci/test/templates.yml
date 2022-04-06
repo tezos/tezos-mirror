@@ -24,5 +24,8 @@
     - .test_template
     - .template__coverage_files
   dependencies: ["build_x86_64"]
+  # Start immediately after 'build_x86_64' and don't wait for
+  # intermediate stages to succeeds
+  needs: ["build_x86_64"]
   before_script:
     - if [ ! -f tezos-node ] || [ ! -f tezos-client ] || [ ! -f tezos-codec ] || [ ! -f tezos-sandbox ]; then make; fi

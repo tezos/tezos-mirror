@@ -35,6 +35,8 @@ tezt:static-binaries:
     - .tezt_template
   dependencies:
     - build:static-x86_64-linux-binaries
+  needs:
+    - build:static-x86_64-linux-binaries
   parallel: 2
   variables:
     TESTS: "cli"
