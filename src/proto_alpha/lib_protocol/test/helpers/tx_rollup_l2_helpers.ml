@@ -38,6 +38,8 @@ module Store = struct
     let inode_child_order = `Seeded_hash
 
     let contents_length_header = None
+
+    let forbid_empty_dir_persistence = true
   end
 
   open Irmin_pack_mem.Maker (Conf)

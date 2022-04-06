@@ -35,4 +35,6 @@ module Conf = struct
   let inode_child_order = `Hash_bits
 
   let contents_length_header = Some `Varint
+
+  let forbid_empty_dir_persistence = true
 end
