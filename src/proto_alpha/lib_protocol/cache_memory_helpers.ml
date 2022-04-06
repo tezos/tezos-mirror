@@ -114,7 +114,13 @@ let hh8w = (word_size *? 8) +! (header_size *? 2)
 
 let z_size z =
   let numbits = Z.numbits z in
-  if Compare.Int.(numbits <= 62) then !!0 else (word_size *? Z.size z) +? 24
+  (*
+      Z does not seem to have a canonical representation of numbers.
+      Hence, even though we observed that 24 works in many cases we
+      sometimes meet numbers with a larger size, hence we use 32 instead
+      of 24 in the following formula.
+  *)
+  if Compare.Int.(numbits <= 62) then !!0 else (word_size *? Z.size z) +? 32
 
 let string_size_gen len = header_size +? (len + (8 - (len mod 8)))
 

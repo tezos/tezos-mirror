@@ -187,33 +187,46 @@ let check_value_size () =
         Int_t
         =====
     *)
-    @ [
-        ex "0 : int" Int_t Script_int_repr.zero;
-        ex "2^63 : int" Int_t (Script_int_repr.of_int max_int);
-        ex "37^73 : int" Int_t (Script_int_repr.of_zint Z.(pow (of_int 37) 73));
-        ex
-          "-37^73 : int"
-          Int_t
-          (Script_int_repr.of_zint Z.(neg (pow (of_int 37) 73)));
-        ex
-          "13270006022583112970 : int"
-          Int_t
-          (get @@ Script_int_repr.of_string "13270006022583112970");
-      ]
-    @ exs nsample show_script_int Int_t ": int"
+    @ (let error = 8 in
+       [
+         ex ~error "0 : int" Int_t Script_int_repr.zero;
+         ex ~error "2^63 : int" Int_t (Script_int_repr.of_int max_int);
+         ex
+           ~error
+           "37^73 : int"
+           Int_t
+           (Script_int_repr.of_zint Z.(pow (of_int 37) 73));
+         ex
+           ~error
+           "-37^73 : int"
+           Int_t
+           (Script_int_repr.of_zint Z.(neg (pow (of_int 37) 73)));
+         ex
+           ~error
+           "13270006022583112970 : int"
+           Int_t
+           (get @@ Script_int_repr.of_string "13270006022583112970");
+       ]
+       @ exs ~error nsample show_script_int Int_t ": int")
     (*
         Nat_t
         =====
     *)
-    @ [
-        ex "0 : nat" Nat_t Script_int_repr.zero_n;
-        ex "2^63 : nat" Nat_t (get Script_int_repr.(is_nat @@ of_int max_int));
-        ex
-          "37^73 : int"
-          Nat_t
-          (get Script_int_repr.(is_nat @@ of_zint Z.(pow (of_int 37) 73)));
-      ]
-    @ exs nsample show_script_int Nat_t ": nat"
+    @ (let error = 8 in
+       [
+         ex ~error "0 : nat" Nat_t Script_int_repr.zero_n;
+         ex
+           ~error
+           "2^63 : nat"
+           Nat_t
+           (get Script_int_repr.(is_nat @@ of_int max_int));
+         ex
+           ~error
+           "37^73 : int"
+           Nat_t
+           (get Script_int_repr.(is_nat @@ of_zint Z.(pow (of_int 37) 73)));
+       ]
+       @ exs ~error nsample show_script_int Nat_t ": nat")
     (*
        Signature_t
        ===========
@@ -261,7 +274,7 @@ let check_value_size () =
     @ (let show fmt s =
          Format.fprintf fmt "%s" (Script_timestamp.to_string s)
        in
-       exs nsample show Timestamp_t ": timestamp_t")
+       exs ~error:8 nsample show Timestamp_t ": timestamp_t")
     (*
        Address_t
        =========
@@ -607,7 +620,12 @@ let check_value_size () =
        Ticket_t
        ========
     *)
-    @ exs nsample dont_show (is_ok @@ ticket_t dummy_loc bool_t) ": ticket bool"
+    @ exs
+        ~error:8
+        nsample
+        dont_show
+        (is_ok @@ ticket_t dummy_loc bool_t)
+        ": ticket bool"
       (*
           Missing by lack of fully functional samplers:
           - Sapling_transaction_t ;
