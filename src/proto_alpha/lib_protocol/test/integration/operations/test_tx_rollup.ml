@@ -577,6 +577,27 @@ module Nat_ticket = struct
     (op, block, deposit_contract)
 end
 
+let message_result_hash_in_commitment (commitment : Tx_rollup_commitment.Full.t)
+    ~message_position =
+  WithExceptions.Option.get
+    ~loc:__LOC__
+    (List.nth commitment.messages message_position)
+
+let compute_message_result_path (commitment : Tx_rollup_commitment.Full.t)
+    ~message_position =
+  let tree =
+    List.fold_left
+      (fun tree m -> Tx_rollup_commitment.Merkle.snoc tree m)
+      Tx_rollup_commitment.Merkle.nil
+      commitment.messages
+  in
+  assert_ok @@ Tx_rollup_commitment.Merkle.compute_path tree message_position
+
+let message_result_hash_and_path (commitment : Tx_rollup_commitment.Full.t)
+    ~message_position =
+  ( message_result_hash_in_commitment commitment ~message_position,
+    compute_message_result_path commitment ~message_position )
+
 (** ---- TESTS -------------------------------------------------------------- *)
 
 (** [test_origination] originates a transaction rollup and checks that
@@ -2348,25 +2369,6 @@ module Rejection = struct
     replace_commitment ~l2_parameters ~commitment ~store messages
     >>= fun commitment -> return commitment
 
-  let make_rejection_param (commitment : Tx_rollup_commitment.Full.t) ~index =
-    let message_result_hash =
-      WithExceptions.Option.get
-        ~loc:__LOC__
-        (List.nth commitment.messages index)
-    in
-    let tree =
-      List.fold_left
-        (fun tree m -> Tx_rollup_commitment.Merkle.snoc tree m)
-        Tx_rollup_commitment.Merkle.nil
-        commitment.messages
-    in
-    let path =
-      match Tx_rollup_commitment.Merkle.compute_path tree index with
-      | Ok x -> x
-      | Error _ -> assert false
-    in
-    (message_result_hash, path)
-
   let init_with_deposit ?tx_rollup_hard_size_limit_per_message addr =
     init_l2_store () >>= fun store ->
     context_init1 ?tx_rollup_hard_size_limit_per_message ()
@@ -2398,8 +2400,9 @@ module Rejection = struct
     l2_parameters (I i) >>=? fun l2_parameters ->
     make_proof store l2_parameters deposit >>= fun proof ->
     Incremental.begin_construction b >>=? fun i ->
+    let message_position = 0 in
     let (message_result_hash, message_result_path) =
-      make_rejection_param commitment ~index:0
+      message_result_hash_and_path commitment ~message_position
     in
     Op.tx_rollup_reject
       (I i)
@@ -2407,7 +2410,7 @@ module Rejection = struct
       tx_rollup
       Tx_rollup_level.root
       deposit
-      ~message_position:0
+      ~message_position
       ~message_path
       ~message_result_hash
       ~message_result_path
@@ -2512,8 +2515,9 @@ module Rejection = struct
     (* Now we produce a valid proof rejecting the commitment *)
     l2_parameters (I i) >>=? fun l2_parameters ->
     make_proof store l2_parameters message >>= fun proof ->
+    let message_position = 0 in
     let (message_result_hash, message_result_path) =
-      make_rejection_param commitment ~index:0
+      message_result_hash_and_path commitment ~message_position
     in
     Op.tx_rollup_reject
       (B b)
@@ -2521,7 +2525,7 @@ module Rejection = struct
       tx_rollup
       level
       message
-      ~message_position:0
+      ~message_position
       ~message_path
       ~message_result_hash
       ~message_result_path
@@ -2569,8 +2573,9 @@ module Rejection = struct
     (* Now we produce a valid proof rejecting the commitment *)
     l2_parameters (B b) >>=? fun l2_parameters ->
     make_proof store l2_parameters message >>= fun proof ->
+    let message_position = 0 in
     let (message_result_hash, message_result_path) =
-      make_rejection_param commitment ~index:0
+      message_result_hash_and_path commitment ~message_position
     in
     Op.tx_rollup_reject
       (B b)
@@ -2578,7 +2583,7 @@ module Rejection = struct
       tx_rollup
       level
       message
-      ~message_position:0
+      ~message_position
       ~message_path
       ~message_result_hash
       ~message_result_path
@@ -2629,8 +2634,9 @@ module Rejection = struct
     (* Now we produce a valid proof rejecting the commitment *)
     l2_parameters (B b) >>=? fun l2_parameters ->
     make_proof store l2_parameters message >>= fun proof ->
+    let message_position = 0 in
     let (message_result_hash, message_result_path) =
-      make_rejection_param commitment ~index:0
+      message_result_hash_and_path commitment ~message_position
     in
     Op.tx_rollup_reject
       (B b)
@@ -2638,7 +2644,7 @@ module Rejection = struct
       tx_rollup
       level
       message
-      ~message_position:0
+      ~message_position
       ~message_path
       ~message_result_hash
       ~message_result_path
@@ -2712,8 +2718,9 @@ module Rejection = struct
     in
     l2_parameters (I i) >>=? fun l2_parameters ->
     valid_empty_proof l2_parameters >>= fun proof ->
+    let message_position = 0 in
     let (message_result_hash, message_result_path) =
-      make_rejection_param commitment ~index:0
+      message_result_hash_and_path commitment ~message_position
     in
     Op.tx_rollup_reject
       (I i)
@@ -2721,7 +2728,7 @@ module Rejection = struct
       tx_rollup
       level
       msg
-      ~message_position:0
+      ~message_position
       ~message_path
       ~message_result_hash
       ~message_result_path
@@ -2742,8 +2749,9 @@ module Rejection = struct
       | Error _ -> assert false
       | Ok path -> path
     in
+    let message_position = 0 in
     let (message_result_hash, message_result_path) =
-      make_rejection_param commitment ~index:0
+      message_result_hash_and_path commitment ~message_position
     in
     Op.tx_rollup_reject
       (I i)
@@ -2751,7 +2759,7 @@ module Rejection = struct
       tx_rollup
       level
       msg
-      ~message_position:0
+      ~message_position
       ~message_path
       ~message_result_hash
       ~message_result_path
@@ -2786,8 +2794,9 @@ module Rejection = struct
       | Error _ -> assert false
       | Ok path -> path
     in
+    let message_position = 0 in
     let (message_result_hash, message_result_path) =
-      make_rejection_param commitment ~index:0
+      message_result_hash_and_path commitment ~message_position
     in
     Op.tx_rollup_reject
       (I i)
@@ -2795,7 +2804,7 @@ module Rejection = struct
       tx_rollup
       level
       msg
-      ~message_position:0
+      ~message_position
       ~message_path
       ~proof:invalid_proof (* doesn't matter -- we'll never check it*)
       ~message_result_hash
@@ -2893,8 +2902,9 @@ module Rejection = struct
     in
     l2_parameters (I i) >>=? fun l2_parameters ->
     valid_empty_proof l2_parameters >>= fun proof ->
+    let message_position = 0 in
     let (message_result_hash, message_result_path) =
-      make_rejection_param commitment ~index:0
+      message_result_hash_and_path commitment ~message_position
     in
     Op.tx_rollup_reject
       (I i)
@@ -2902,7 +2912,7 @@ module Rejection = struct
       tx_rollup
       level
       message
-      ~message_position:0
+      ~message_position
       ~message_path
       ~message_result_hash
       ~message_result_path
@@ -2940,8 +2950,9 @@ module Rejection = struct
     in
     l2_parameters (I i) >>=? fun l2_parameters ->
     valid_empty_proof l2_parameters >>= fun proof ->
+    let message_position = 0 in
     let (message_result_hash, message_result_path) =
-      make_rejection_param commitment ~index:0
+      message_result_hash_and_path commitment ~message_position
     in
     Op.tx_rollup_reject
       (I i)
@@ -2949,7 +2960,7 @@ module Rejection = struct
       tx_rollup
       level
       message
-      ~message_position:0
+      ~message_position
       ~message_path
       ~message_result_hash
       ~message_result_path
@@ -3023,8 +3034,9 @@ module Rejection = struct
     Incremental.add_operation i op >>=? fun i ->
     Incremental.finalize_block i >>=? fun b ->
     Incremental.begin_construction b >>=? fun i ->
+    let message_position = 0 in
     let (message_result_hash, message_result_path) =
-      make_rejection_param commitment ~index:0
+      message_result_hash_and_path commitment ~message_position
     in
     Op.tx_rollup_reject
       (I i)
@@ -3032,7 +3044,7 @@ module Rejection = struct
       tx_rollup
       Tx_rollup_level.root
       deposit
-      ~message_position:0
+      ~message_position
       ~message_path
       ~message_result_hash
       ~message_result_path
@@ -3055,7 +3067,7 @@ module Rejection = struct
       tx_rollup
       Tx_rollup_level.root
       deposit
-      ~message_position:0
+      ~message_position
       ~message_path
       ~message_result_hash
       ~message_result_path
@@ -3103,8 +3115,9 @@ module Rejection = struct
     l2_parameters (I i) >>=? fun l2_parameters ->
     make_proof store l2_parameters deposit >>= fun proof ->
     Incremental.begin_construction b >>=? fun i ->
+    let message_position = 0 in
     let (message_result_hash, message_result_path) =
-      make_rejection_param commitment ~index:0
+      message_result_hash_and_path commitment ~message_position
     in
     Op.tx_rollup_reject
       (I i)
@@ -3112,7 +3125,7 @@ module Rejection = struct
       tx_rollup
       Tx_rollup_level.root
       deposit
-      ~message_position:0
+      ~message_position
       ~message_path
       ~message_result_hash
       ~message_result_path
@@ -3179,8 +3192,9 @@ module Rejection = struct
     (* We try to reject with the truncated proof which is already above the
        size limit. *)
     Incremental.begin_construction b >>=? fun i ->
+    let message_position = 0 in
     let (message_result_hash, message_result_path) =
-      make_rejection_param commitment ~index:0
+      message_result_hash_and_path commitment ~message_position
     in
     Op.tx_rollup_reject
       (I i)
@@ -3188,7 +3202,7 @@ module Rejection = struct
       tx_rollup
       Tx_rollup_level.root
       deposit
-      ~message_position:0
+      ~message_position
       ~message_path
       ~message_result_hash
       ~message_result_path
@@ -3285,8 +3299,9 @@ module Rejection = struct
         withdraw_list_hash = Tx_rollup_withdraw_list_hash.empty;
       }
     in
+    let message_position = 0 in
     let (message_result_hash, message_result_path) =
-      make_rejection_param commitment ~index:0
+      message_result_hash_and_path commitment ~message_position
     in
     Op.tx_rollup_reject
       (B b)
@@ -3294,7 +3309,7 @@ module Rejection = struct
       tx_rollup
       level
       message
-      ~message_position:0
+      ~message_position
       ~message_path
       ~message_result_hash
       ~message_result_path
@@ -3408,8 +3423,9 @@ module Single_message_inbox = struct
       (if Option.is_some expect_failure then "x" else "√") ;
     l2_parameters (B b) >>=? fun l2_parameters ->
     Rejection.valid_empty_proof l2_parameters >>= fun proof ->
+    let message_position = 0 in
     let (message_result_hash, message_result_path) =
-      Rejection.make_rejection_param commitment ~index:0
+      message_result_hash_and_path commitment ~message_position
     in
     Op.tx_rollup_reject
       (B b)
@@ -3417,7 +3433,7 @@ module Single_message_inbox = struct
       tx_rollup
       level
       message
-      ~message_position:0
+      ~message_position
       ~message_path
       ~message_result_hash
       ~message_result_path
@@ -3945,8 +3961,8 @@ module Withdraw = struct
     >>=? fun storage_size_before_withdraw ->
     (* -- At this point, everything is in place for the user to execute the
            withdrawal -- *)
-    let (_message_result_hash, message_result_path) =
-      Rejection.make_rejection_param commitment ~index:0
+    let message_result_path =
+      compute_message_result_path commitment ~message_position:message_index
     in
     Op.tx_rollup_dispatch_tickets
       (B block)
@@ -4179,13 +4195,14 @@ module Withdraw = struct
       WithExceptions.Option.get ~loc:__LOC__ @@ List.nth context_hash_list 0
     in
     Incremental.begin_construction block >>=? fun incr ->
-    let (_message_result_hash, message_result_path) =
-      Rejection.make_rejection_param commitment ~index:0
+    let message_index = 0 in
+    let message_result_path =
+      compute_message_result_path commitment ~message_position:message_index
     in
     Op.tx_rollup_dispatch_tickets
       (I incr)
       ~source:account1
-      ~message_index:0
+      ~message_index
       ~message_result_path
       tx_rollup
       committed_level
@@ -4230,8 +4247,8 @@ module Withdraw = struct
     in
     Incremental.begin_construction block >>=? fun incr ->
     (* Try with invalid amounts *)
-    let (_message_result_hash, message_result_path) =
-      Rejection.make_rejection_param commitment ~index:0
+    let message_result_path =
+      compute_message_result_path commitment ~message_position:message_index
     in
     Op.tx_rollup_dispatch_tickets
       (I incr)
@@ -4365,8 +4382,9 @@ module Withdraw = struct
         ~loc:__LOC__
         (List.nth context_hash_list message_index)
     in
-    let (_message_result_hash, message_result_path) =
-      Rejection.make_rejection_param commitment ~index:0
+
+    let message_result_path =
+      compute_message_result_path commitment ~message_position:message_index
     in
     Op.tx_rollup_dispatch_tickets
       (B block)
@@ -4461,11 +4479,15 @@ module Withdraw = struct
         ~loc:__LOC__
         (List.nth context_hash_list second_message_index)
     in
-    let (_message_result_hash, path1) =
-      Rejection.make_rejection_param commitment ~index:first_message_index
+    let path1 =
+      compute_message_result_path
+        commitment
+        ~message_position:first_message_index
     in
-    let (_message_result_hash, path2) =
-      Rejection.make_rejection_param commitment ~index:second_message_index
+    let path2 =
+      compute_message_result_path
+        commitment
+        ~message_position:second_message_index
     in
     Op.tx_rollup_dispatch_tickets
       (B block)
@@ -4589,17 +4611,21 @@ module Withdraw = struct
     in
     Incremental.begin_construction block >>=? fun incr ->
     (* try with wrong context hash *)
-    let (_message_result_hash, path1) =
-      Rejection.make_rejection_param commitment ~index:valid_message_index
+    let valid_path =
+      compute_message_result_path
+        commitment
+        ~message_position:valid_message_index
     in
-    let (_message_result_hash, path2) =
-      Rejection.make_rejection_param commitment ~index:wrong_message_index
+    let wrong_path =
+      compute_message_result_path
+        commitment
+        ~message_position:wrong_message_index
     in
     Op.tx_rollup_dispatch_tickets
       (I incr)
       ~source:account1
       ~message_index:valid_message_index
-      ~message_result_path:path1
+      ~message_result_path:valid_path
       tx_rollup
       Tx_rollup_level.(succ root)
       wrong_context_hash
@@ -4620,7 +4646,7 @@ module Withdraw = struct
       (I incr)
       ~source:account1
       ~message_index:wrong_message_index
-      ~message_result_path:path2
+      ~message_result_path:wrong_path
       tx_rollup
       Tx_rollup_level.(succ root)
       valid_context_hash
@@ -4643,7 +4669,7 @@ module Withdraw = struct
       (I incr)
       ~source:account1
       ~message_index:wrong_message_index
-      ~message_result_path:path2
+      ~message_result_path:wrong_path
       tx_rollup
       Tx_rollup_level.(succ root)
       valid_context_hash
@@ -4664,7 +4690,7 @@ module Withdraw = struct
       (I incr)
       ~source:account1
       ~message_index:valid_message_index
-      ~message_result_path:path1
+      ~message_result_path:valid_path
       tx_rollup
       Tx_rollup_level.(succ root)
       valid_context_hash
@@ -4703,8 +4729,8 @@ module Withdraw = struct
     Block.bake ~operation block >>=? fun block ->
     (* At this point, the reveal can no longer be executed *)
     Incremental.begin_construction block >>=? fun incr ->
-    let (_message_result_hash, message_result_path) =
-      Rejection.make_rejection_param commitment ~index:message_index
+    let message_result_path =
+      compute_message_result_path commitment ~message_position:message_index
     in
     Op.tx_rollup_dispatch_tickets
       (I incr)
@@ -4736,6 +4762,7 @@ module Withdraw = struct
     let open Error_monad_operators in
     context_init1_withdraw ()
     >>=? fun (account1, tx_rollup, deposit_contract, _withdraw_contract, b) ->
+    let message_position = 0 in
     let assert_consumed b ~msg committed_level consumed_expected =
       Incremental.begin_construction b >>=? fun i ->
       let ctxt = Incremental.alpha_ctxt i in
@@ -4743,7 +4770,7 @@ module Withdraw = struct
         ctxt
         tx_rollup
         committed_level
-        ~message_position:0
+        ~message_position
       >>=?? fun (_, consumed_actual) ->
       Alcotest.(check bool msg consumed_expected consumed_actual) ;
       return_unit
@@ -4758,7 +4785,7 @@ module Withdraw = struct
     finalize_all_commitment_with_withdrawals
       ~account:account1
       ~tx_rollup
-      ~withdrawals:[(0, [withdraw])]
+      ~withdrawals:[(message_position, [withdraw])]
       b
     >>=? fun (commitment, context_hash_list, committed_level, b) ->
     let context_hash =
@@ -4772,13 +4799,13 @@ module Withdraw = struct
     >>=? fun () ->
     (* Exexute with withdrawal *)
     Incremental.begin_construction b >>=? fun incr ->
-    let (_message_result_hash, message_result_path) =
-      Rejection.make_rejection_param commitment ~index:0
+    let message_result_path =
+      compute_message_result_path commitment ~message_position
     in
     Op.tx_rollup_dispatch_tickets
       (I incr)
       ~source:account1
-      ~message_index:0
+      ~message_index:message_position
       ~message_result_path
       tx_rollup
       committed_level
@@ -4844,13 +4871,14 @@ module Withdraw = struct
     Incremental.add_operation i operation >>=? fun i ->
     Incremental.finalize_block i >>=? fun b ->
     Incremental.begin_construction b >>=? fun i ->
+    let message_position = 0 in
     let message_path =
       assert_ok
         Tx_rollup_inbox.Merkle.(
           compute_path [Tx_rollup_message_hash.hash_uncarbonated message] 0)
     in
-    let (message_result_hash, message_result_path) =
-      Rejection.make_rejection_param commitment ~index:0
+    let message_result_path =
+      compute_message_result_path commitment ~message_position
     in
     Op.tx_rollup_reject
       (I i)
@@ -4858,7 +4886,7 @@ module Withdraw = struct
       tx_rollup
       level
       message
-      ~message_position:0
+      ~message_position
       ~message_path
       ~message_result_hash
       ~message_result_path
@@ -5144,8 +5172,8 @@ module Withdraw = struct
           ~loc:__LOC__
           (List.nth context_hash_list message_index)
       in
-      let (_message_result_hash, message_result_path) =
-        Rejection.make_rejection_param commitment ~index:message_index
+      let message_result_path =
+        compute_message_result_path commitment ~message_position:message_index
       in
       Op.tx_rollup_dispatch_tickets
         (B block)
