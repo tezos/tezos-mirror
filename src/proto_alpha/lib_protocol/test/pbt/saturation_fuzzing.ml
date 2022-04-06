@@ -162,6 +162,20 @@ let test_leq_saturated =
  *)
 let test_geq_zero = QCheck.Test.make ~name:"t >= 0" t_arb (fun t -> zero <= t)
 
+(* Test.
+ * Tests that [sqrt (t * t) = t]
+ *)
+let test_squared_sqrt =
+  QCheck.Test.make ~name:"sqrt t² = t" t_arb (fun t ->
+      mul t t = saturated || sqrt (mul t t) = t)
+
+(* Test.
+ * Tests that [(sqrt t) * (sqrt t) <= t]
+ *)
+let test_sqrt_squared =
+  QCheck.Test.make ~name:"(sqrt t)² <= t <= (succ (sqrt t))²" t_arb (fun t ->
+      mul (sqrt t) (sqrt t) <= t && t <= mul (succ (sqrt t)) (succ (sqrt t)))
+
 let tests_add = [test_add_commutes; test_add_zero; test_add_neq]
 
 let tests_mul = [test_mul_commutes; test_mul_one; test_mul_zero]
@@ -172,6 +186,8 @@ let tests_add_sub = [test_add_sub; test_sub_add]
 
 let tests_boundaries = [test_leq_saturated; test_geq_zero]
 
+let tests_sqrt = [test_sqrt_squared; test_squared_sqrt]
+
 let () =
   Alcotest.run
     "protocol > pbt > saturation"
@@ -180,5 +196,6 @@ let () =
       ("mul", qcheck_wrap tests_mul);
       ("sub", qcheck_wrap tests_sub);
       ("add and sub", qcheck_wrap tests_add_sub);
+      ("sqrt", qcheck_wrap tests_sqrt);
       ("<= and >=", qcheck_wrap tests_boundaries);
     ]
