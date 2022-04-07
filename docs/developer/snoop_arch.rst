@@ -45,7 +45,7 @@ Using ``tezos-benchmark`` requires to provide, for each benchmark, the following
 
 - a type of execution ``workload``;
 - a statistical model, corresponding to a function which to each ``workload`` associates an expression (possibly with free variables) denoting the predicted execution time for that workload. In simple cases, the model consists in *a single* expression computing a predicted execution time for any given workload.
-- A family of pieces of code (ie closures) to be benchmarked, each associated to its ``workload``. Thus, each closure contains the application of a piece of a code to arguments instantiating a specific workload. We assume that the execution time of each closure has a well-defined distribution. In most cases, these closures correspond to executing *a single* piece of code of interest with different inputs.
+- A family of pieces of code (i.e. closures) to be benchmarked, each associated to its ``workload``. Thus, each closure contains the application of a piece of a code to arguments instantiating a specific workload. We assume that the execution time of each closure has a well-defined distribution. In most cases, these closures correspond to executing *a single* piece of code of interest with different inputs.
 
 From this input, ``tezos-benchmark`` can perform for you the following tasks:
 
@@ -66,6 +66,7 @@ The main items required by this type are:
 The library is meant to be used as follows:
 
 - define a ``Benchmark.S``, which requires
+
   - constructing benchmarks
   - defining models, either pre-built (via the ``Model`` module) or from scratch (using the ``Costlang`` DSL);
 
@@ -73,6 +74,7 @@ The library is meant to be used as follows:
 - given the data generated, infer parameters of the models
   using ``Inference.make_problem`` and ``Inference.solve_problem``;
 - exploit the results:
+
   - input back the result of inference in the model to make it predictive
   - plot the data (``tezos-benchmark`` can generate CSV)
   - generate code from the model (``Codegen`` module)
@@ -86,7 +88,7 @@ Defining benchmarks: the ``Generator`` module
 
 The ``Generator.benchmark`` type defines the interface that each benchmark
 must implement. At the time of writing, this type specifies three ways
-to provide a benchmark (but more could be easily added):
+to provide a benchmark (but more could easily be added):
 
 .. code-block:: ocaml
 
@@ -119,7 +121,7 @@ The ``With_context`` constructor allows to define benchmarks we
 require to set up and cleanup a *context*, shared by all executions of
 the closure. An example (which prompted the addition of this feature)
 is the case of storage benchmarks, where we need to create a directory
-and set up some files before executing a closure containing eg
+and set up some files before executing a closure containing e.g.
 a read or write access, after which the directory must be removed.
 
 With_probe benchmarks
@@ -150,9 +152,9 @@ The intended semantics of each method is as follows:
 
 Note that ``With_probe`` benchmarks do not come with a fixed workload,
 but rather with an aspect-indexed family of workloads. This reflects
-the fact that this kind of benchmark can measure in the same run
-several different pieces of code, each potentially associated to its
-own cost model.
+the fact that this kind of benchmark can measure
+several different pieces of code in the same run,
+each potentially associated to its own cost model.
 
 The function ``Measure.make_timing_probe`` provides a basic probe
 implementation. The unit test in ``src/lib_benchmark/test/test_probe.ml``
@@ -183,7 +185,7 @@ problem.
 
 Note that since :math:`S` is typically not finite, :math:`S \rightarrow \mathbb{R}_{\ge 0}`
 is an infinite-dimensional vector space. We will restrict our search
-to a :math:`n`-dimensional subset of functions :math:`f_\theta, \theta \in \mathbb{R}^n`
+to a :math:`n`-dimensional subset of functions :math:`f_\theta`, with :math:`\theta \in \mathbb{R}^n`,
 of the form
 
 .. math::
@@ -192,11 +194,11 @@ of the form
 
 where the :math:`(g_i)_{i=1}^n` is a **fixed** family of
 functions :math:`g_i : S \rightarrow \mathbb{R}_{\ge 0}`.
-An n-dimensional linear cost model is entirely determined by the :math:`g_i`.
+An :math:`n`-dimensional linear cost model is entirely determined by the :math:`g_i`.
 
 Enumerating the currying isomorphisms, a linear model can be considered as:
 
-1. a **linear** function :math:`\mathbb{R}^n \multimap (S \rightarrow \mathbb{R}_{ge 0})`
+1. a **linear** function :math:`\mathbb{R}^n \multimap (S \rightarrow \mathbb{R}_{\ge 0})`
    from "meta" parameters to cost functions;
 2. a function :math:`S \rightarrow (\mathbb{R}^n \rightarrow \mathbb{R}_{\ge 0})`
    from sizes to linear forms over "meta" parameters;
@@ -251,7 +253,7 @@ type:
    end
 
 In a nutshell, the type of terms is ``type 'a term = \pi (X : S). 'a X.repr``,
-ie terms must be thought of as parametric in their implementation,
+i.e. terms must be thought of as parametric in their implementation,
 provided by a module of type ``S``.
 
 It must be noted that this language does not enforce that built
@@ -271,7 +273,7 @@ terms and printing terms:
 - ``Costlang.Hash_cons`` allows to manipulate hash-consed terms,
 - ``Costlang.Beta_normalize`` allows to beta-normalize...
 
-Other implementations are provided elsewhere, eg for code or
+Other implementations are provided elsewhere, e.g. for code or
 report generation.
 
 Definition of cost models: the ``Model`` module
@@ -290,7 +292,7 @@ The ``Measure`` module
 
 The ``Measure`` module is dedicated to measuring the execution
 time of closures held in ``Generator.benchmark`` values and
-turn these into timed workloads (ie pairs of workload and execution time).
+turn these into timed workloads (i.e. pairs of workload and execution time).
 It also contains routines to remove outliers and to save and load
 workload data together with extra metadata.
 
@@ -305,7 +307,7 @@ function.
    val perform_benchmark :
      Measure.options -> ('c, 't) Tezos_benchmark.Benchmark.poly -> 't workload_data
 
-Before delving in its implementation, let's examine its type.
+Before delving into its implementation, let's examine its type.
 A value of type ``('c, 't) Tezos_benchmark.Benchmark.poly`` is a first
 class module where ``'c`` is a type variable corresponding to the configuration
 of the benchmark and ``'t`` is a variable corresponding to the type
@@ -315,7 +317,7 @@ in these types.
 Under the hood, this functions calls to the ``create_benchmarks``
 function provided by the first class module to create a list of
 ``Generator.benchmark`` values. This might involve loading from
-benchmark-specific parameters from a json file if the benchmark
+benchmark-specific parameters from a JSON file if the benchmark
 so requires. After setting up some benchmark parameters
 (random seed, GC parameters, CPU affinity), the function iterates over the
 list of ``Generator.benchmark`` and calls
@@ -324,7 +326,7 @@ in the ``Generator.benchmark`` value.  This yields an
 empirical distribution of timings which must be determinized: the user
 can pick either a percentile or the mean of this distribution. The
 function then records the execution time together with the workload
-(contained in the ```Generator.benchmark```) in its list of results.
+(contained in the ``Generator.benchmark``) in its list of results.
 
 Loading and saving benchmark results
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -338,7 +340,7 @@ name, benchmark date).
 Removing outliers from benchmark data
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-It can happen that some timing measurement is polluted by eg another
+It can happen that some timing measurement is polluted by e.g. another
 process running in the same machine, or an unlucky scheduling. In this
 case, it is legitimate to remove the tainted data point from the data
 set in order to make fitting cost models easier. The function
@@ -375,7 +377,7 @@ decomposed in the two following steps:
 
 - transform the cost model and the empirical data into a
   matrix equation :math:`A x = T` where the input dimensions of :math:`A`
-  (ie the columns) are indexed by free variables (corresponding to
+  (i.e. the columns) are indexed by free variables (corresponding to
   cost coefficients to be inferred), the output dimensions
   of :math:`A` are indexed by workloads and where :math:`T` is the column
   vector containing execution times for each workload;
@@ -393,7 +395,7 @@ Case study: constructing the matrices
 
 We'd like to model the execution time of an hypothetical piece of code
 sorting an array using merge sort. We *know* that the time complexity of merge sort
-is :math:`O(n log n)` where `n` is the size of the array: we're
+is :math:`O(n \log{n})` where `n` is the size of the array: we're
 interested in predicting the actual execution time as a function of
 :math:`n` for practical values of `n`.
 
@@ -401,7 +403,7 @@ We pick the following cost model:
 
 .. math::
 
-   cost(n) = \theta_0 + \theta_1 \times n log(n)
+   \text{cost}(n) = \theta_0 + \theta_1 \times n \log{n}
 
 Our goal is to determine the parameters :math:`\theta_0`
 and :math:`\theta_1`. Using the :ref:`Costlang DSL<Costlang DSL>`,
@@ -424,10 +426,10 @@ where :math:`n_i` and :math:`t_i` correspond respectively to
 the size of the array and the measured sorting time for the
 :math:`i` th benchmark.
 
-By evaluating the model ``cost`` on each :math:`n_i`, we get a
-family of linear combinations :math:`\theta_0 + \theta_1 \times n_i log(n_i)`.
+By evaluating the model :math:`cost` on each :math:`n_i`, we get a
+family of linear combinations :math:`\theta_0 + \theta_1 \times n_i \log{n_i}`.
 Each such linear combination is isomorphic to the vector
-:math:`(1, n_i log(n_i))`. These vectors correspond to the row vectors of
+:math:`(1, n_i \log{n_i})`. These vectors correspond to the row vectors of
 the matrix :math:`A` and the durations :math:`t_i` form the components of
 the column vector :math:`T`.
 
@@ -568,7 +570,7 @@ one sometimes needs to perform a benchmark for a given piece of code,
 estimate the cost of this piece of code using the inference module
 and then inject the result into another inference problem. For short
 chains of dependencies this is doable by hand, however when dealing with
-eg more than one hundred Michelson instructions it nice to have an
+e.g. more than one hundred Michelson instructions it nice to have an
 automated tool figuring out the dependencies and scheduling the inference
 automatically.
 
