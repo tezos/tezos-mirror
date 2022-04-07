@@ -379,19 +379,22 @@ module Make (P : Sigs.PROTOCOL) : Sigs.MAIN = struct
   let output_contract_results ctxt output_dir hash ctr total_size =
     let open Lwt_result_syntax in
     let hash_string = P.Script.Hash.to_b58check hash in
-    File_helpers.print_expr_file
-      ~dirname:output_dir
-      ~ext:".tz"
-      ~hash_string
-      ctr.script ;
     let filename ~ext =
       Filename.concat output_dir (Format.sprintf "%s.%s" hash_string ext)
     in
-    File_helpers.print_to_file
-      (filename ~ext:"address")
-      "%a"
-      (Format.pp_print_list ~pp_sep:Format.pp_print_newline P.Contract.pp)
-      ctr.addresses ;
+    let () =
+      if Config.print_contracts then
+        File_helpers.print_expr_file
+          ~dirname:output_dir
+          ~ext:".tz"
+          ~hash_string
+          ctr.script ;
+      File_helpers.print_to_file
+        (filename ~ext:"address")
+        "%a"
+        (Format.pp_print_list ~pp_sep:Format.pp_print_newline P.Contract.pp)
+        ctr.addresses
+    in
     let* contract_size =
       if Config.measure_code_size then (
         let* script_code =
@@ -551,14 +554,19 @@ module Make (P : Sigs.PROTOCOL) : Sigs.MAIN = struct
         return lambda_map)
       else return (ExprMap.empty, ExprMap.empty, ExprMap.empty)
     in
-    print_endline "Writing contract files..." ;
     let* total_ir_size =
-      ExprMap.fold_es
-        (output_contract_results ctxt output_dir)
-        contract_map
-        Contract_size.zero
+      if Config.(print_contracts || measure_code_size || collect_storage) then (
+        print_endline "Writing contract files and measuring code size..." ;
+        let+ total_ir_size =
+          ExprMap.fold_es
+            (output_contract_results ctxt output_dir)
+            contract_map
+            Contract_size.zero
+        in
+        print_endline "Done writing contract files." ;
+        total_ir_size)
+      else return Contract_size.zero
     in
-    print_endline "Done writing contract files." ;
     if Config.measure_code_size then
       Format.printf
         "@[<v 2>Total IR size:@;%a@]@."

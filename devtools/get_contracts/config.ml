@@ -31,6 +31,8 @@ let collect_gas = true
 
 let measure_code_size = true
 
+let print_contracts = true
+
 let fatal = true
 
 let mainnet_genesis =
