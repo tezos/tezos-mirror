@@ -44,6 +44,7 @@ type tag =
   | Gtoc
   | Cache
   | Carbonated_map
+  | Tx_rollup
 
 type michelson_term_kind = Data | Code
 
@@ -356,6 +357,7 @@ let string_of_tag (tag : tag) =
   | Gtoc -> "global_constants"
   | Cache -> "cache"
   | Carbonated_map -> "carbonated_map"
+  | Tx_rollup -> "tx_rollup"
 
 let list_benchmarks_command mode tags =
   let tags = List.map string_of_tag tags in

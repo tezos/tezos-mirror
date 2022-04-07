@@ -142,6 +142,7 @@ type tag =
   | Gtoc
   | Cache
   | Carbonated_map
+  | Tx_rollup
 
 type list_mode = All | Any | Exactly
 
