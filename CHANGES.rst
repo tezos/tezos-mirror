@@ -76,6 +76,11 @@ Client
   context. If ``--balance`` wasn't specified, the script also
   inherits the given contract's balance.
 
+- Storage and input parameters given to the ``run script`` command
+  can now be read from a file just like the script itself can.
+  Also like with script, the ``file:`` prefix can be added for
+  disambiguation.
+
 Baker / Endorser / Accuser
 --------------------------
 
