@@ -22,22 +22,16 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
+type public_key_hash = Bls12_381 of Bls.Public_key_hash.t
 
-include Client_keys.SIGNER
+type public_key = Bls12_381 of Bls.Public_key.t
 
-val make_pk : Signature.public_key -> Client_keys.pk_uri tzresult
+type secret_key = Bls12_381 of Bls.Secret_key.t
 
-val make_sk : Signature.secret_key -> Client_keys.sk_uri tzresult
+include
+  S.AGGREGATE_SIGNATURE
+    with type Public_key_hash.t = public_key_hash
+     and type Public_key.t = public_key
+     and type Secret_key.t = secret_key
 
-val make_sapling_key :
-  Tezos_sapling.Core.Wallet.Spending_key.t -> Client_keys.sapling_uri tzresult
-
-module Aggregate : sig
-  include Client_keys.AGGREGATE_SIGNER
-
-  val make_sk :
-    Aggregate_signature.secret_key -> Client_keys.aggregate_sk_uri tzresult
-
-  val make_pk :
-    Aggregate_signature.public_key -> Client_keys.aggregate_pk_uri tzresult
-end
+include S.RAW_DATA with type t := t

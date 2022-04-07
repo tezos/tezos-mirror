@@ -585,14 +585,14 @@ let generate_key_cmd =
     (prefixes ["sapling"; "gen"; "key"] @@ Sapling_key.fresh_alias_param @@ stop)
     (fun (force, unencrypted) name (cctxt : Protocol_client_context.full) ->
       Sapling_key.of_fresh cctxt force name >>=? fun name ->
-      let mnemonic = Wallet.Mnemonic.new_random in
+      let mnemonic = Mnemonic.new_random in
       cctxt#message
         "It is important to save this mnemonic in a secure place:@\n\
          @\n\
          %a@\n\
          @\n\
          The mnemonic can be used to recover your spending key.@."
-        Wallet.Mnemonic.words_pp
+        Mnemonic.words_pp
         (Bip39.to_words mnemonic)
       >>= fun () ->
       Wallet.register cctxt ~force ~unencrypted mnemonic name >>=? fun _vk ->

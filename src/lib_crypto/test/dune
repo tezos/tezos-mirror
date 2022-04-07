@@ -29,7 +29,7 @@
  (package tezos-crypto)
  (action
   (run
-   %{dep:../../tooling/node_wrapper.exe} --secp256k1 --hacl
+   %{dep:../../tooling/node_wrapper.exe} --bls12-381 --secp256k1 --hacl
    %{dep:./test_run.bc.js})))
 
 (rule
@@ -37,5 +37,5 @@
  (package tezos-crypto)
  (action
   (run
-   %{dep:../../tooling/node_wrapper.exe} --secp256k1 --hacl
+   %{dep:../../tooling/node_wrapper.exe} --bls12-381 --secp256k1 --hacl
    %{dep:./test_prop_signature.bc.js})))

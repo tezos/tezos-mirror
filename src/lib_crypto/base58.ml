@@ -368,6 +368,8 @@ module Prefix = struct
 
   let p256_public_key_hash = "\006\161\164" (* tz3(36) *)
 
+  let bls12_381_public_key_hash = "\006\161\166" (* tz4(36) *)
+
   (* 16 *)
   let cryptobox_public_key_hash = "\153\103" (* id(30) *)
 
@@ -418,4 +420,14 @@ module Prefix = struct
 
   (* 43 *)
   let sapling_address = "\018\071\040\223" (* zet1(69) *)
+
+  (* 96 *)
+
+  let generic_aggregate_signature = "\002\075\234\101" (* asig(141) *)
+
+  let bls12_381_signature = "\040\171\064\207" (* BLsig(142) *)
+
+  let bls12_381_public_key = "\006\149\135\204" (* BLpk(76) *)
+
+  let bls12_381_secret_key = "\003\150\192\040" (* BLsk(54) *)
 end

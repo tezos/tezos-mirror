@@ -22,15 +22,6 @@
 
 open Tezos_sapling.Core.Client
 
-(** Mnemonic of 24 common english words from which a key can be derived.
-    The mnemonic follows the BIP-39 spec. *)
-module Mnemonic : sig
-  val new_random : Bip39.t
-
-  (** Pretty printer for printing a list of words of a mnemonic. *)
-  val words_pp : Format.formatter -> string list -> unit
-end
-
 (** Add to the wallet a new spending key derived from a mnemonic and identified
     by an alias. The wallet is updated and the corresponding viewing key is
     returned.

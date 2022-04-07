@@ -17,7 +17,7 @@
  (package tezos-client-base)
  (action
   (run
-   %{dep:../../tooling/node_wrapper.exe} --secp256k1 --hacl
+   %{dep:../../tooling/node_wrapper.exe} --bls12-381 --secp256k1 --hacl
    %{dep:./bip39_tests.bc.js})))
 
 (rule
@@ -25,5 +25,5 @@
  (package tezos-client-base)
  (action
   (run
-   %{dep:../../tooling/node_wrapper.exe} --secp256k1 --hacl
+   %{dep:../../tooling/node_wrapper.exe} --bls12-381 --secp256k1 --hacl
    %{dep:./pbkdf_tests.bc.js})))

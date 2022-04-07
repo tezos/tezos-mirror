@@ -706,6 +706,7 @@ let tezos_crypto =
         ringo;
         zarith;
         zarith_stubs_js;
+        bls12_381;
       ]
     ~js_compatible:true
 

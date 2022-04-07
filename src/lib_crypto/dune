@@ -16,7 +16,8 @@
   tezos-rpc
   ringo
   zarith
-  zarith_stubs_js)
+  zarith_stubs_js
+  bls12-381)
  (js_of_ocaml)
  (flags
   (:standard

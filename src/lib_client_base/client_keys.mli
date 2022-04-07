@@ -35,6 +35,10 @@ type sapling_uri = private Uri.t
 
 type pvss_sk_uri = private Uri.t
 
+type aggregate_pk_uri = private Uri.t
+
+type aggregate_sk_uri = private Uri.t
+
 val pk_uri_parameter : unit -> (pk_uri, 'a) Clic.parameter
 
 val pk_uri_param :
@@ -50,6 +54,14 @@ val sk_uri_param :
   ?desc:string ->
   ('a, 'b) Clic.params ->
   (sk_uri -> 'a, 'b) Clic.params
+
+val aggregate_sk_uri_parameter : unit -> (aggregate_sk_uri, 'a) Clic.parameter
+
+val aggregate_sk_uri_param :
+  ?name:string ->
+  ?desc:string ->
+  ('a, 'b) Clic.params ->
+  (aggregate_sk_uri -> 'a, 'b) Clic.params
 
 type error += Unregistered_key_scheme of string
 
@@ -78,13 +90,48 @@ module PVSS_public_key :
 
 module PVSS_secret_key : Client_aliases.Alias with type t = pvss_sk_uri
 
+(** [Aggregate_alias] contains the implementation needed for the wallet to have
+    the correspondence between aliases and keys. It has three sub-module
+    [Public_key] [Public_key_hash] [Secret_key]. The reason of a sub-module
+   inside a sub-module is not confuse them with the alias module for the
+   standard signature (i.e. [Public_key], [Public_key_hash], and [Secret_key]).
+
+    On possible refactor would be to move the alias definition in
+   [Aggregate_signature] (resp. [Signature]).
+
+    See [Client_aliases] for more information about Aliases.*)
+module Aggregate_alias : sig
+  type pk_uri = private Uri.t
+
+  type sk_uri = private Uri.t
+
+  module Public_key_hash :
+    Client_aliases.Alias with type t = Aggregate_signature.Public_key_hash.t
+
+  module Public_key :
+    Client_aliases.Alias
+      with type t = aggregate_pk_uri * Aggregate_signature.Public_key.t option
+
+  module Secret_key : Client_aliases.Alias with type t = aggregate_sk_uri
+end
+
 module Logging : sig
   val tag : string Tag.def
 end
 
 (** {2 Interface for external signing modules.} *)
 
-module type SIGNER = sig
+module type COMMON_SIGNER = sig
+  type pk_uri = private Uri.t
+
+  type sk_uri = private Uri.t
+
+  type public_key_hash
+
+  type public_key
+
+  type secret_key
+
   (** [scheme] is the name of the scheme implemented by this signer
       module. *)
   val scheme : string
@@ -109,17 +156,52 @@ module type SIGNER = sig
   val import_secret_key :
     io:Client_context.io_wallet ->
     pk_uri ->
-    (Signature.Public_key_hash.t * Signature.Public_key.t option) tzresult Lwt.t
+    (public_key_hash * public_key option) tzresult Lwt.t
 
   (** [public_key pk] is the Ed25519 version of [pk].*)
-  val public_key : pk_uri -> Signature.Public_key.t tzresult Lwt.t
+  val public_key : pk_uri -> public_key tzresult Lwt.t
 
   (** [public_key_hash pk] is the hash of [pk].
       As some signers will query the full public key to obtain the hash,
       it can be optionally returned to reduce the amount of queries. *)
   val public_key_hash :
-    pk_uri ->
-    (Signature.Public_key_hash.t * Signature.Public_key.t option) tzresult Lwt.t
+    pk_uri -> (public_key_hash * public_key option) tzresult Lwt.t
+end
+
+(** [Signature_type] is a small module to be included in signer to conform to
+    the module type [SIGNER] instead of rewriting all type. *)
+module Signature_type : sig
+  type public_key_hash = Signature.Public_key_hash.t
+
+  type public_key = Signature.Public_key.t
+
+  type secret_key = Signature.Secret_key.t
+
+  type nonrec pk_uri = pk_uri
+
+  type nonrec sk_uri = sk_uri
+end
+
+module Aggregate_type : sig
+  type public_key_hash = Aggregate_signature.Public_key_hash.t
+
+  type public_key = Aggregate_signature.Public_key.t
+
+  type secret_key = Aggregate_signature.Secret_key.t
+
+  type pk_uri = aggregate_pk_uri
+
+  type sk_uri = aggregate_sk_uri
+end
+
+module type SIGNER = sig
+  include
+    COMMON_SIGNER
+      with type public_key_hash = Signature.Public_key_hash.t
+       and type public_key = Signature.Public_key.t
+       and type secret_key = Signature.Secret_key.t
+       and type pk_uri = pk_uri
+       and type sk_uri = sk_uri
 
   (** [sign ?watermark sk data] is signature obtained by signing [data] with
         [sk]. *)
@@ -142,11 +224,32 @@ module type SIGNER = sig
   val supports_deterministic_nonces : sk_uri -> bool tzresult Lwt.t
 end
 
+module type AGGREGATE_SIGNER = sig
+  include
+    COMMON_SIGNER
+      with type public_key_hash = Aggregate_signature.Public_key_hash.t
+       and type public_key = Aggregate_signature.Public_key.t
+       and type secret_key = Aggregate_signature.Secret_key.t
+       and type pk_uri = aggregate_pk_uri
+       and type sk_uri = aggregate_sk_uri
+
+  (** [sign sk data] is signature obtained by signing [data] with [sk]. *)
+  val sign : aggregate_sk_uri -> Bytes.t -> Aggregate_signature.t tzresult Lwt.t
+end
+
+type signer =
+  | Simple of (module SIGNER)
+  | Aggregate of (module AGGREGATE_SIGNER)
+
 (** [register_signer signer] registers first-class module [signer] as
     signer for keys with scheme [(val signer : SIGNER).scheme]. *)
 val register_signer : (module SIGNER) -> unit
 
-val registered_signers : unit -> (string * (module SIGNER)) list
+val registered_signers : unit -> (string * signer) list
+
+(** [register_aggregate_signer signer] registers first-class module [signer] as
+    signer for keys with scheme [(val signer : AGGREGATE_SIGNER).scheme]. *)
+val register_aggregate_signer : (module AGGREGATE_SIGNER) -> unit
 
 val import_secret_key :
   io:Client_context.io_wallet ->
@@ -239,12 +342,68 @@ val get_keys :
 
 val force_switch : unit -> (bool, 'ctx) Clic.arg
 
+val aggregate_neuterize : aggregate_sk_uri -> aggregate_pk_uri tzresult Lwt.t
+
+val register_aggregate_key :
+  #Client_context.wallet ->
+  ?force:bool ->
+  Aggregate_signature.Public_key_hash.t * aggregate_pk_uri * aggregate_sk_uri ->
+  ?public_key:Aggregate_signature.Public_key.t ->
+  string ->
+  unit tzresult Lwt.t
+
+val list_aggregate_keys :
+  #Client_context.wallet ->
+  (string
+  * Aggregate_signature.Public_key_hash.t
+  * Aggregate_signature.Public_key.t option
+  * aggregate_sk_uri option)
+  list
+  tzresult
+  Lwt.t
+
+val import_aggregate_secret_key :
+  io:Client_context.io_wallet ->
+  aggregate_pk_uri ->
+  (Aggregate_signature.Public_key_hash.t
+  * Aggregate_signature.Public_key.t option)
+  tzresult
+  Lwt.t
+
+val alias_aggregate_keys :
+  #Client_context.wallet ->
+  string ->
+  (Aggregate_signature.Public_key_hash.t
+  * Aggregate_signature.Public_key.t option
+  * aggregate_sk_uri option)
+  option
+  tzresult
+  Lwt.t
+
 (**/**)
 
 val make_pk_uri : Uri.t -> pk_uri tzresult
 
 val make_sk_uri : Uri.t -> sk_uri tzresult
 
+val make_aggregate_pk_uri : Uri.t -> aggregate_pk_uri tzresult
+
+val make_aggregate_sk_uri : Uri.t -> aggregate_sk_uri tzresult
+
 val make_sapling_uri : Uri.t -> sapling_uri tzresult
 
 val make_pvss_sk_uri : Uri.t -> pvss_sk_uri tzresult
+
+(** Mnemonic of 24 common english words from which a key can be derived.
+    The mnemonic follows the BIP-39 spec. *)
+module Mnemonic : sig
+  val new_random : Bip39.t
+
+  (** [to_32_bytes mmnemonic] is a 32 long bytes. BIP-39 gives 64 bytes of
+      entropy where z-cache or bls needs 32 bytes. We xor the two halves in case
+      the entropy is not well distributed. *)
+  val to_32_bytes : Bip39.t -> bytes
+
+  (** Pretty printer for printing a list of words of a mnemonic. *)
+  val words_pp : Format.formatter -> string list -> unit
+end
