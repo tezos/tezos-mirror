@@ -46,6 +46,23 @@ module Make (P : Sigs.PROTOCOL) : Sigs.MAIN = struct
     storage_costs : serialization_costs;
   }
 
+  let gas_headers, gas_to_list =
+    (* [gas_to_list] returns the field values corresponding to the [gas_headers].
+       Hence it should return lists of the same length as [gas_headers]. *)
+    let headers =
+      List.flatten
+      @@ List.map
+           (fun name -> [name ^ "_decode"; name ^ "_encode"])
+           ["code"; "storage"]
+    in
+    let to_list {code_costs; storage_costs} =
+      List.flatten
+      @@ List.map
+           (fun {decode; encode} -> [decode; encode])
+           [code_costs; storage_costs]
+    in
+    (headers, to_list)
+
   type storage = {
     contract : P.Contract.repr;
     storage : P.Script.expr;
@@ -401,6 +418,45 @@ module Make (P : Sigs.PROTOCOL) : Sigs.MAIN = struct
      File_helpers.print_expr_dir ~dirname ~ext:".storage" storages) ;
     return @@ Contract_size.add contract_size total_size
 
+  let write_gas_file ~output_dir contract_map =
+    let file = Filename.concat output_dir "gas.csv" in
+    Format.printf "Writing gas file %s...\n" file ;
+    let pp_sep fmt () = Format.pp_print_char fmt ',' in
+    let pp_list pp fmt list = Format.pp_print_list ~pp_sep pp fmt list in
+    let pp_contracts_gas fmt =
+      ExprMap.iter
+        (fun hash {script = _; addresses = _; storages} ->
+          let hash_string = P.Script.Hash.to_b58check hash in
+          ExprMap.iter
+            (fun _hash {contract; storage = _; gas} ->
+              match gas with
+              | None -> assert false
+              | Some gas ->
+                  let gas_list = gas_to_list gas in
+                  let total = List.fold_left ( + ) 0 gas_list in
+                  Format.fprintf
+                    fmt
+                    "%a%a%s%a%a\n"
+                    P.Contract.pp
+                    contract
+                    pp_sep
+                    ()
+                    hash_string
+                    pp_sep
+                    ()
+                    (pp_list Format.pp_print_int)
+                    (gas_list @ [total]))
+            storages)
+        contract_map
+    in
+    File_helpers.print_to_file
+      file
+      "%a\n%t"
+      (pp_list Format.pp_print_string)
+      (("address" :: "code_hash" :: gas_headers) @ ["TOTAL"])
+      pp_contracts_gas ;
+    print_endline "Done writing gas file."
+
   let main ~output_dir ctxt ~head : unit tzresult Lwt.t =
     let open Lwt_result_syntax in
     let head_hash, head_level = Tezos_store.Store.Block.descriptor head in
@@ -520,6 +576,9 @@ module Make (P : Sigs.PROTOCOL) : Sigs.MAIN = struct
           lambda_legacy_map ;
         print_endline "Done writing lambda files.")
       else ()
+    in
+    let () =
+      if Config.collect_gas then write_gas_file ~output_dir contract_map
     in
     return ()
 end
