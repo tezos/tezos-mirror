@@ -2745,41 +2745,6 @@ end = struct
          ~client
          ()
 
-  let _genesis_carthagenet =
-    let name_dash = "genesis-carthagenet" in
-    let name_underscore = "genesis_carthagenet" in
-    let main =
-      todo
-        ~main_module:(sf "Tezos_protocol_%s" name_underscore)
-        "tezos-protocol-%s"
-        name_dash
-    in
-    let client =
-      public_lib
-        (sf "tezos-client-%s" name_dash)
-        ~path:(sf "src/proto_%s/lib_client" name_underscore)
-        ~synopsis:"Tezos/Protocol: protocol specific library for `tezos-client`"
-        ~deps:
-          [
-            tezos_base |> open_ ~m:"TzPervasives"
-            |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
-            tezos_shell_services |> open_;
-            tezos_client_base |> open_;
-            tezos_protocol_environment;
-            main |> open_;
-            tezos_client_commands |> open_;
-            tezos_stdlib_unix;
-          ]
-        ~linkall:true
-    in
-    register
-    @@ make
-         ~name:"genesis-carthagenet"
-         ~main:(todo "tezos-protocol-genesis-carthagenet")
-         ~embedded:(todo "tezos-embedded-protocol-genesis-carthagenet")
-         ~client
-         ()
-
   let demo_noops =
     register
     @@ make

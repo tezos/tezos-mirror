@@ -5,7 +5,7 @@ let () =
     Printf.printf
       "Usage: %s <network_name> <genesis_protocol_hash> [bootstrap_peer..]\n\
        Example: %s dalphanet \
-       PtYuensgYBb3G3x1hLLbCmcav8ue8Kyd2khADcL5LsT5R1hcXex \
+       Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P \
        'paris.bootzero.tzalpha.net:19732'\n\
        %!"
       Sys.argv.(0)
@@ -14,8 +14,6 @@ let () =
 
 let network_name = Sys.argv.(1)
 
-(* The genesis protocol of Carthagenet. *)
-(* "PtYuensgYBb3G3x1hLLbCmcav8ue8Kyd2khADcL5LsT5R1hcXex" *)
 let genesis_protocol_hash = Sys.argv.(2)
 
 let default_bootstrap_peers =

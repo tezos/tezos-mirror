@@ -34,9 +34,6 @@
   (select void_for_linking-tezos-embedded-protocol-genesis from
    (tezos-embedded-protocol-genesis -> void_for_linking-tezos-embedded-protocol-genesis.empty)
    (-> void_for_linking-tezos-embedded-protocol-genesis.empty))
-  (select void_for_linking-tezos-embedded-protocol-genesis-carthagenet from
-   (tezos-embedded-protocol-genesis-carthagenet -> void_for_linking-tezos-embedded-protocol-genesis-carthagenet.empty)
-   (-> void_for_linking-tezos-embedded-protocol-genesis-carthagenet.empty))
   (select void_for_linking-tezos-embedded-protocol-demo-noops from
    (tezos-embedded-protocol-demo-noops -> void_for_linking-tezos-embedded-protocol-demo-noops.empty)
    (-> void_for_linking-tezos-embedded-protocol-demo-noops.empty))
@@ -135,7 +132,6 @@
  (action
   (progn
    (write-file void_for_linking-tezos-embedded-protocol-genesis.empty "")
-   (write-file void_for_linking-tezos-embedded-protocol-genesis-carthagenet.empty "")
    (write-file void_for_linking-tezos-embedded-protocol-demo-noops.empty "")
    (write-file void_for_linking-tezos-embedded-protocol-demo-counter.empty "")
    (write-file void_for_linking-tezos-embedded-protocol-000-Ps9mPmXa.empty "")

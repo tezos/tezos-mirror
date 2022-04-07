@@ -25,9 +25,6 @@
   (select void_for_linking-tezos-client-genesis from
    (tezos-client-genesis -> void_for_linking-tezos-client-genesis.empty)
    (-> void_for_linking-tezos-client-genesis.empty))
-  (select void_for_linking-tezos-client-genesis-carthagenet from
-   (tezos-client-genesis-carthagenet -> void_for_linking-tezos-client-genesis-carthagenet.empty)
-   (-> void_for_linking-tezos-client-genesis-carthagenet.empty))
   (select void_for_linking-tezos-client-demo-counter from
    (tezos-client-demo-counter -> void_for_linking-tezos-client-demo-counter.empty)
    (-> void_for_linking-tezos-client-demo-counter.empty))
@@ -105,7 +102,6 @@
  (action
   (progn
    (write-file void_for_linking-tezos-client-genesis.empty "")
-   (write-file void_for_linking-tezos-client-genesis-carthagenet.empty "")
    (write-file void_for_linking-tezos-client-demo-counter.empty "")
    (write-file void_for_linking-tezos-client-000-Ps9mPmXa.empty "")
    (write-file void_for_linking-tezos-client-001-PtCJ7pwo.empty "")

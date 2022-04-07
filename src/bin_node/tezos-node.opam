@@ -32,7 +32,6 @@ depends: [
 ]
 depopts: [
   "tezos-embedded-protocol-genesis"
-  "tezos-embedded-protocol-genesis-carthagenet"
   "tezos-embedded-protocol-demo-noops"
   "tezos-embedded-protocol-demo-counter"
   "tezos-embedded-protocol-000-Ps9mPmXa"
