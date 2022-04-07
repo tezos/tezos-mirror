@@ -54,7 +54,7 @@ functionality is now integrated into the *baker* daemons:
 Changelog
 ---------
 
-- `Version 12.3 <../CHANGES.html#version-12-2>`_
+- `Version 12.3 <../CHANGES.html#version-12-3>`_
 - `Version 12.2 <../CHANGES.html#version-12-2>`_
 - `Version 12.1 <../CHANGES.html#version-12-1>`_
 - `Version 12.0 <../CHANGES.html#version-12-0>`_

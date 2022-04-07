@@ -38,7 +38,7 @@ val hash :
 (** [hash_cost size] returns the cost of gas for hashing a buffer of
     [size] bytes.
 
-    Returns [Tx_rollup_input_message_size] iff [size < 0]. *)
+    Raises [Tx_rollup_negative_input_size] iff [size < 0]. *)
 val hash_cost : int -> Gas_limit_repr.cost tzresult
 
 val consume_check_path_inbox_cost : Raw_context.t -> Raw_context.t tzresult

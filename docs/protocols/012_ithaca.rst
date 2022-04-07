@@ -170,3 +170,4 @@ Minor Changes
   Context entries located in
   ``/chains/main/blocks/<block>/context/raw/bytes/cycle/<cycle>/roll_snapshot``
   are no longer accessible after Tenderbake.
+  As observed in issue `:gl:`#2764`, the RPC is buggy for cycle ``474``: the correct result for that cycle is index 16 (not 4).

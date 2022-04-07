@@ -48,6 +48,8 @@ however ask that a new dedicated machine is created to run your test.
 Please ask on the ``#tests`` Slack channel of ``tezos-dev`` before
 merging.
 
+.. _performance_regression_test_fw:
+
 Performance Regression Test framework: Time Series, Alerts and Graphs
 ---------------------------------------------------------------------
 
@@ -216,9 +218,9 @@ Configuring and Running Tezt Long Tests
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 For more information about how to use the configuration file, please refer
-to the `Long test module API <https://gitlab.com/tezos/tezos/-/blob/master/tezt/long_tests/long_test.mli>`__.
+to the `Long test module API <https://tezos.gitlab.io/api/odoc/_html/tezt-performance-regression/Tezt_performance_regression/>`__.
 
-A predefined configuration has already been shiped in ``tezt/lib_performance_regression/local-sandbox/tezt_config.json``.
+A predefined configuration has already been shiped in :src:`tezt/lib_performance_regression/local-sandbox/tezt_config.json`.
 It allows to use the InfluxDB and Grafana instances set up by the
 Docker compose file presented in the previous section.
 
@@ -230,4 +232,3 @@ of your local machine.
 To run Tezt long tests, run the following command::
 
     TEZT_CONFIG=tezt/lib_performance_regression/local-sandbox/tezt_config.json dune exec tezt/long_tests/main.exe
-

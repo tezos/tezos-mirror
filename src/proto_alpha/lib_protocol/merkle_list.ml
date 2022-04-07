@@ -26,7 +26,7 @@
 type error += Merkle_list_invalid_position
 
 let max_depth ~count_limit =
-  (* We assume that the Merkle_tree implemenation computes a tree in a
+  (* We assume that the Merkle_tree implementation computes a tree in a
      logarithmic size of the number of leaves. *)
   let log2 n = Z.numbits (Z.of_int n) in
   log2 count_limit
