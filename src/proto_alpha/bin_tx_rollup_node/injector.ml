@@ -77,8 +77,9 @@ type included_state = {
 
 (** The type of a queue of pending operation. Each queue has a specific signer
     because each signer can inject at most one L1 batch of operation in each
-    block.  *)
-type pending_queue = {signer : signer; queue : Op_queue.t}
+    block, and has a set of tags for both informative and identification 
+    purposes.   *)
+type pending_queue = {signer : signer; tags : tags; queue : Op_queue.t}
 
 (* TODO/TORU: https://gitlab.com/tezos/tezos/-/issues/2755
    Persist injector data on disk *)
@@ -117,12 +118,17 @@ let init_injector cctxt ~signers =
   let open Lwt_result_syntax in
   let+ pending_queues =
     List.fold_left_es
-      (fun acc source ->
+      (fun acc (source, tags) ->
         let+ signer = get_signer cctxt source in
-        Signature.Public_key_hash.Map.add
-          source
-          {signer; queue = Op_queue.create 50_000}
-          acc)
+        let tags = Tags.of_list tags in
+        let pending_queue =
+          match Signature.Public_key_hash.Map.find_opt source acc with
+          | None -> {signer; tags; queue = Op_queue.create 50_000}
+          | Some {signer; tags = other_tags; queue} ->
+              (* Merge tags *)
+              {signer; tags = Tags.merge other_tags tags; queue}
+        in
+        Signature.Public_key_hash.Map.add source pending_queue acc)
       Signature.Public_key_hash.Map.empty
       signers
   in
@@ -245,7 +251,6 @@ let simulate_operations ~must_succeed state signer
     (operations : L1_operation.t list) =
   let open Lwt_result_syntax in
   let open Annotated_manager_operation in
-  let*! () = Event.(emit Injector.simulating_operations) operations in
   let force =
     match operations with
     | [] -> assert false
@@ -257,6 +262,7 @@ let simulate_operations ~must_succeed state signer
            succeed *)
         match must_succeed with `All -> false | `At_least_one -> true)
   in
+  let*! () = Event.(emit Injector.simulating_operations) (operations, force) in
   let operations =
     List.map
       (fun {L1_operation.manager_operation = Manager operation; _} ->
@@ -271,7 +277,6 @@ let simulate_operations ~must_succeed state signer
   let (Manager_list annot_op) =
     Annotated_manager_operation.manager_of_list operations
   in
-  (* TODO maybe use something else (e.g. inject directly with correct limits) *)
   let* (oph, op, result) =
     Injection.inject_manager_operation
       state.cctxt
@@ -293,6 +298,8 @@ let simulate_operations ~must_succeed state signer
           minimal_nanotez_per_byte = Q.of_int 1000;
           minimal_nanotez_per_gas_unit = Q.of_int 100;
           force_low_fee = false;
+          (* TODO: https://gitlab.com/tezos/tezos/-/issues/2811
+             Use acceptable values wrt operations to inject *)
           fee_cap = Tez.one;
           burn_cap = Tez.one;
         }
@@ -457,7 +464,7 @@ let get_operations_from_queue ~size_limit state =
     operations from the pending queue [pending], whose total size does
     not exceed [size_limit]. Upon successful injection, the
     operations are removed from the queue and marked as injected. *)
-let inject_pending_operations_for ~size_limit state pending =
+let inject_pending_operations_of_queue ~size_limit state pending =
   let open Lwt_result_syntax in
   (* Retrieve and remove operations from pending *)
   let operations_to_inject = get_operations_from_queue ~size_limit pending in
@@ -482,16 +489,26 @@ let inject_pending_operations_for ~size_limit state pending =
         operations_to_inject ;
       add_injected_operations state oph operations_to_inject
 
-(** [inject_pending_operations ~limit pending] injects operations from each
+let has_tag_in ~tags pending =
+  match tags with
+  | None ->
+      (* When no tag provided in the request, inject from all pending queues *)
+      true
+  | Some tags -> not (Tags.disjoint pending.tags tags)
+
+(** [inject_pending_operations ~limit tags pending] injects operations from each
     pending queue [pending], where each batch of operations does not exceed
-    [size_limit]. Upon successful injection, the operations are removed from the
+    [size_limit]. The tags of the queue must intersect with [tags].
+    Upon successful injection, the operations are removed from the
     queue and marked as injected. *)
 let inject_pending_operations
-    ?(size_limit = Constants.max_operation_data_length) state =
+    ?(size_limit = Constants.max_operation_data_length) tags state =
   (* TODO: check if iter_ep does not cancel promises *)
   Signature.Public_key_hash.Map.iter_ep
     (fun _source pending ->
-      inject_pending_operations_for ~size_limit state pending)
+      if has_tag_in ~tags pending then
+        inject_pending_operations_of_queue ~size_limit state pending
+      else return_unit)
     state.pending_queues
 
 (** [register_included_operation state block level oph] marks the manager
@@ -587,14 +604,14 @@ let on_new_tezos_head state (head : Alpha_block_services.block_info)
 
 (* The request {Request.Inject} triggers an injection of the operations in all
    the pending queues. *)
-let on_inject state = inject_pending_operations state
+let on_inject state tags = inject_pending_operations tags state
 
 module Types = struct
   type nonrec state = state
 
   type parameters = {
     cctxt : Client_context.full;
-    signers : public_key_hash list;
+    signers : (public_key_hash * tag list) list;
   }
 end
 
@@ -613,7 +630,7 @@ module Handlers = struct
     match request with
     | Request.Queue_pending op -> add_pending_operation state op
     | Request.New_tezos_head (head, reorg) -> on_new_tezos_head state head reorg
-    | Request.Inject -> on_inject state
+    | Request.Inject tags -> on_inject state tags
 
   let on_request w r =
     (* The execution of the request handler is protected to avoid stopping the
@@ -633,7 +650,7 @@ module Handlers = struct
     match Request.view r with
     | Request.View (Queue_pending _ | New_tezos_head _) ->
         Event.(emit Injector.request_completed_debug) (Request.view r, st)
-    | View Inject ->
+    | View (Inject _) ->
         Event.(emit Injector.request_completed_notice) (Request.view r, st)
 
   let on_no_request _ = return_unit
@@ -662,4 +679,5 @@ let add_pending_operations w ops = List.iter_s (add_pending_operation w) ops
 let new_tezos_head w h reorg =
   Worker.Queue.push_request w (Request.New_tezos_head (h, reorg))
 
-let inject w = Worker.Queue.push_request w Request.Inject
+let inject ?tags w =
+  Worker.Queue.push_request w (Request.Inject (Option.map Tags.of_list tags))

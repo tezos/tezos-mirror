@@ -426,13 +426,13 @@ let init cctxt ~data_dir ?(readonly = false) ?rollup_genesis
       ~rollup
       ~signers:
         (List.filter_map
-           (fun x -> x)
+           (function (None, _) -> None | (Some x, tags) -> Some (x, tags))
            [
-             operator;
-             signers.submit_batch;
-             signers.finalize_commitment;
-             signers.remove_commitment;
-             signers.rejection;
+             (operator, [`Each_block; `Commitment]);
+             (signers.submit_batch, [`Delay_block; `Submit_batch]);
+             (signers.finalize_commitment, [`Each_block; `Finalize_commitment]);
+             (signers.remove_commitment, [`Each_block; `Remove_commitment]);
+             (signers.rejection, [`Each_block; `Rejection]);
            ])
   in
   let* batcher =

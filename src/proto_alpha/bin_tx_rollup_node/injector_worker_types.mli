@@ -28,13 +28,31 @@ open Protocol
 open Alpha_context
 open Common
 
+type tag =
+  [ `Each_block
+  | `Delay_block
+  | `Commitment
+  | `Submit_batch
+  | `Finalize_commitment
+  | `Remove_commitment
+  | `Rejection ]
+
+module Tags : sig
+  include Set.S with type elt = tag
+
+  (* Merge tags, where some can overwrite others *)
+  val merge : t -> t -> t
+end
+
+type tags = Tags.t
+
 module Request : sig
   type 'a t =
     | Add_pending : L1_operation.t -> unit t
     | New_tezos_head :
         Alpha_block_services.block_info * Alpha_block_services.block_info reorg
         -> unit t
-    | Inject : unit t
+    | Inject : tags option -> unit t
 
   type view = View : _ t -> view
 

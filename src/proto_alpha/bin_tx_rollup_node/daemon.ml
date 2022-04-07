@@ -363,8 +363,8 @@ let time_until_next_block state (header : Tezos_base.Block_header.t) =
     (Time.System.now ())
 
 let trigger_injection state header =
-  (* TODO/TORU: delay triggering of injection only for batches *)
   let open Lwt_syntax in
+  (* Queue request for injection of operation that must be delayed *)
   (* Waiting only half the time until next block to allow for propagation *)
   let promise =
     let delay =
@@ -376,9 +376,11 @@ let trigger_injection state header =
         let* () = Event.(emit Injector.wait) delay in
         Lwt_unix.sleep delay
     in
-    Injector.inject state.State.injector
+    Injector.inject ~tags:[`Delay_block] state.State.injector
   in
-  ignore promise
+  ignore promise ;
+  (* Queue request for injection of operation that must be injected each block *)
+  Injector.inject ~tags:[`Each_block] state.State.injector
 
 let process_head state (current_hash, current_header) rollup_id =
   let open Lwt_result_syntax in
@@ -387,7 +389,7 @@ let process_head state (current_hash, current_header) rollup_id =
   let* l1_reorg = State.set_tezos_head state current_hash in
   let* () = batch state in
   let* () = notify_head state current_hash l1_reorg in
-  trigger_injection state current_header ;
+  let*! () = trigger_injection state current_header in
   return res
 
 let main_exit_callback state exit_status =

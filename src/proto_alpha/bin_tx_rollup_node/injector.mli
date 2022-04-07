@@ -36,7 +36,7 @@ type t
 val init :
   #Client_context.full ->
   rollup:Tx_rollup.t ->
-  signers:public_key_hash list ->
+  signers:(public_key_hash * Injector_worker_types.tag list) list ->
   t tzresult Lwt.t
 
 (** Add an operation as pending injection in the injector. *)
@@ -56,4 +56,4 @@ val new_tezos_head :
   unit Lwt.t
 
 (** Trigger an injection of the pending operations. *)
-val inject : t -> unit Lwt.t
+val inject : ?tags:Injector_worker_types.tag list -> t -> unit Lwt.t

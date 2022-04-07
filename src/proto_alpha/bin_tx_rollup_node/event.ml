@@ -352,12 +352,13 @@ module Injector = struct
       ~pp1:pp_operations_list
 
   let simulating_operations =
-    declare_1
+    declare_2
       ~section
       ~name:"simulating_operations"
-      ~msg:"Simulating operations: {operations}"
+      ~msg:"Simulating operations (force = {force}): {operations}"
       ~level:Debug
       ("operations", Data_encoding.list L1_operation.encoding)
+      ("force", Data_encoding.bool)
       ~pp1:pp_operations_list
 
   let dropping_operation =

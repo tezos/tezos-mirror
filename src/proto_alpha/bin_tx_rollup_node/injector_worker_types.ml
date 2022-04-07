@@ -28,13 +28,74 @@ open Protocol
 open Alpha_context
 open Common
 
+type tag =
+  [ `Each_block
+  | `Delay_block
+  | `Submit_batch
+  | `Commitment
+  | `Finalize_commitment
+  | `Remove_commitment
+  | `Rejection ]
+
+module Tags = struct
+  include Set.Make (struct
+    type t = tag
+
+    let compare = Stdlib.compare
+  end)
+
+  let merge tags1 tags2 =
+    let tags = union tags1 tags2 in
+    if mem `Each_block tags && mem `Delay_block tags then
+      (* each U delay = delay *)
+      remove `Each_block tags
+    else tags
+end
+
+type tags = Tags.t
+
+let string_of_tag : tag -> string = function
+  | `Each_block -> "each_block"
+  | `Delay_block -> "delay_block"
+  | `Submit_batch -> "submit_batch"
+  | `Commitment -> "commitment"
+  | `Finalize_commitment -> "finalize_commitment"
+  | `Remove_commitment -> "remove_commitment"
+  | `Rejection -> "rejection"
+
+let pp_tags ppf tags =
+  Format.pp_print_list
+    ~pp_sep:(fun ppf () -> Format.fprintf ppf ",@ ")
+    (fun ppf t -> Format.pp_print_string ppf (string_of_tag t))
+    ppf
+    (Tags.elements tags)
+
+let tag_encoding : tag Data_encoding.t =
+  let open Data_encoding in
+  string_enum
+    (List.map
+       (fun t -> (string_of_tag t, t))
+       [
+         `Each_block;
+         `Delay_block;
+         `Submit_batch;
+         `Commitment;
+         `Finalize_commitment;
+         `Remove_commitment;
+         `Rejection;
+       ])
+
+let tags_encoding : tags Data_encoding.t =
+  let open Data_encoding in
+  conv Tags.elements Tags.of_list (list tag_encoding)
+
 module Request = struct
   type 'a t =
     | Queue_pending : L1_operation.t -> unit t
     | New_tezos_head :
         Alpha_block_services.block_info * Alpha_block_services.block_info reorg
         -> unit t
-    | Inject : unit t
+    | Inject : tags option -> unit t
 
   type view = View : _ t -> view
 
@@ -67,9 +128,9 @@ module Request = struct
         case
           (Tag 2)
           ~title:"Inject"
-          (obj1 (req "request" (constant "inject")))
-          (function View Inject -> Some () | _ -> None)
-          (fun () -> View Inject);
+          (obj2 (req "request" (constant "inject")) (opt "tags" tags_encoding))
+          (function View (Inject tags) -> Some ((), tags) | _ -> None)
+          (fun ((), tags) -> View (Inject tags));
       ]
 
   let pp ppf (View r) =
@@ -94,7 +155,11 @@ module Request = struct
             ", with reorg of -%d +%d"
             (List.length r.old_chain)
             (List.length r.new_chain)
-    | Inject -> Format.fprintf ppf "request injection"
+    | Inject tags -> (
+        Format.fprintf ppf "request injection" ;
+        match tags with
+        | None -> ()
+        | Some tags -> Format.fprintf ppf " [%a]" pp_tags tags)
 end
 
 module Name = struct
