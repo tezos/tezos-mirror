@@ -672,10 +672,11 @@ let gen_and_show_keys ?alias client =
   let* alias = gen_keys ?alias client in
   show_address ~alias client
 
-let spawn_transfer ?hooks ?endpoint ?(wait = "none") ?burn_cap ?fee ?gas_limit
-    ?storage_limit ?counter ?arg ?(force = false) ~amount ~giver ~receiver
-    client =
+let spawn_transfer ?hooks ?log_output ?endpoint ?(wait = "none") ?burn_cap ?fee
+    ?gas_limit ?storage_limit ?counter ?arg ?(force = false) ~amount ~giver
+    ~receiver client =
   spawn_command
+    ?log_output
     ?endpoint
     ?hooks
     client
@@ -692,9 +693,11 @@ let spawn_transfer ?hooks ?endpoint ?(wait = "none") ?burn_cap ?fee ?gas_limit
     @ optional_arg ~name:"arg" Fun.id arg
     @ if force then ["--force"] else [])
 
-let transfer ?hooks ?endpoint ?wait ?burn_cap ?fee ?gas_limit ?storage_limit
-    ?counter ?arg ?force ?expect_failure ~amount ~giver ~receiver client =
+let transfer ?hooks ?log_output ?endpoint ?wait ?burn_cap ?fee ?gas_limit
+    ?storage_limit ?counter ?arg ?force ?expect_failure ~amount ~giver ~receiver
+    client =
   spawn_transfer
+    ?log_output
     ?endpoint
     ?hooks
     ?wait
@@ -711,9 +714,10 @@ let transfer ?hooks ?endpoint ?wait ?burn_cap ?fee ?gas_limit ?storage_limit
     client
   |> Process.check ?expect_failure
 
-let spawn_multiple_transfers ?endpoint ?(wait = "none") ?burn_cap ?fee_cap
-    ?gas_limit ?storage_limit ?counter ?arg ~giver ~json_batch client =
+let spawn_multiple_transfers ?log_output ?endpoint ?(wait = "none") ?burn_cap
+    ?fee_cap ?gas_limit ?storage_limit ?counter ?arg ~giver ~json_batch client =
   spawn_command
+    ?log_output
     ?endpoint
     client
     (["--wait"; wait]
@@ -728,9 +732,10 @@ let spawn_multiple_transfers ?endpoint ?(wait = "none") ?burn_cap ?fee_cap
     @ optional_arg ~name:"counter" string_of_int counter
     @ optional_arg ~name:"arg" Fun.id arg)
 
-let multiple_transfers ?endpoint ?wait ?burn_cap ?fee_cap ?gas_limit
+let multiple_transfers ?log_output ?endpoint ?wait ?burn_cap ?fee_cap ?gas_limit
     ?storage_limit ?counter ?arg ~giver ~json_batch client =
   spawn_multiple_transfers
+    ?log_output
     ?endpoint
     ?wait
     ?burn_cap
@@ -860,10 +865,11 @@ let unset_deposits_limit ?hooks ?endpoint ?(wait = "none") ~src client =
     (["--wait"; wait] @ ["unset"; "deposits"; "limit"; "for"; src])
   |> Process.check_and_read_stdout
 
-let spawn_originate_contract ?hooks ?endpoint ?(wait = "none") ?init ?burn_cap
-    ~alias ~amount ~src ~prg client =
+let spawn_originate_contract ?hooks ?log_output ?endpoint ?(wait = "none") ?init
+    ?burn_cap ~alias ~amount ~src ~prg client =
   spawn_command
     ?hooks
+    ?log_output
     ?endpoint
     client
     (["--wait"; wait]
@@ -897,11 +903,12 @@ let convert_script_to_json ?endpoint ~script client =
 let convert_data_to_json ?endpoint ~data client =
   convert_michelson_to_json ~kind:"data" ?endpoint ~input:data client
 
-let originate_contract ?hooks ?endpoint ?wait ?init ?burn_cap ~alias ~amount
-    ~src ~prg client =
+let originate_contract ?hooks ?log_output ?endpoint ?wait ?init ?burn_cap ~alias
+    ~amount ~src ~prg client =
   let* client_output =
     spawn_originate_contract
       ?endpoint
+      ?log_output
       ?hooks
       ?wait
       ?init
