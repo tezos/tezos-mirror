@@ -15,7 +15,8 @@
   tezos-signer-backends
   tezos-protocol-plugin-012-Psithaca
   tezos-protocol-012-Psithaca-parameters
-  tezos-rpc)
+  tezos-rpc
+  tezos-stdlib-unix)
  (inline_tests (flags -verbose))
  (preprocess (pps ppx_inline_test))
  (library_flags (:standard -linkall))
@@ -28,4 +29,5 @@
    -open Tezos_protocol_012_Psithaca
    -open Tezos_protocol_plugin_012_Psithaca
    -open Tezos_protocol_012_Psithaca_parameters
-   -open Tezos_rpc)))
+   -open Tezos_rpc
+   -open Tezos_stdlib_unix)))
