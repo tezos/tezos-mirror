@@ -48,6 +48,7 @@ end
 type error +=
   | LedgerError of Ledgerwallet.Transport.error
   | Ledger_signing_hash_mismatch of string * string
+  | Ledger_msg_chunk_too_long of string
 
 let error_encoding =
   let open Data_encoding in
@@ -67,6 +68,22 @@ let () =
     error_encoding
     (function LedgerError e -> Some e | _ -> None)
     (fun e -> LedgerError e)
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"signer.ledger.msg-chunk-too-big"
+    ~title:"Too long message chunk sent to a ledger"
+    ~description:"Too long message chunk sent to a ledger."
+    ~pp:(fun ppf msg ->
+      Format.fprintf
+        ppf
+        "Chunk of ledger message %s too long, the ledger app may not be up to \
+         date."
+        msg)
+    Data_encoding.(obj1 (req "msg" string))
+    (function Ledger_msg_chunk_too_long msg -> Some msg | _ -> None)
+    (fun msg -> Ledger_msg_chunk_too_long msg)
 
 let () =
   let description ledger_hash computed_hash =
@@ -109,7 +126,14 @@ module Ledger_commands = struct
         (fun () -> Buffer.clear buf)
     in
     let res = f pp in
-    match res with Error err -> fail (LedgerError err) | Ok v -> return v
+    match res with
+    | Error
+        (Ledgerwallet.Transport.AppError
+          {status = Ledgerwallet.Transport.Status.Incorrect_length_for_ins; msg})
+      ->
+        fail (Ledger_msg_chunk_too_long msg)
+    | Error err -> fail (LedgerError err)
+    | Ok v -> return v
 
   let get_version ~device_info h =
     let buf = Buffer.create 100 in

@@ -21,7 +21,9 @@ type t = {
   data : Cstruct.t ;
 }
 
-let max_data_length = 230
+(* Max value is 235 which corresponds to a block signing request of an
+   encoded unsigned Tenderbake block header *with* a reproposal *)
+let max_data_length = 235
 
 let create ?(p1=0) ?(p2=0) ?(lc=0) ?(le=0) ?(data=Cstruct.create 0) cmd =
   { cmd ; p1 ; p2 ; lc ; le ; data }
