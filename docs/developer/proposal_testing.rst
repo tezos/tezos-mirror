@@ -334,24 +334,10 @@ fake signatures. This can be achieved with a small patch to
 ``src/lib_crypto/signature.ml`` that replaces each signature with a
 concatenation of a public key and a message, such that this fake signature is
 still unique for each key and message. This patch is encoded as the git diff
-contained in the file ``scripts/yes-node.patch``. We can apply such patch by
+contained in the file ``scripts/yes-node.patch``. We can apply this patch by
 invoking::
 
-  $ patch -p1 < scripts/yes-node.patch
-
-If the patch was already applied, for instance if we run the command above twice
-by mistake, then we should answer with the default ``n`` option to the two
-messages that the ``patch`` tool displays, or otherwise the patch would fail or
-we would revert it::
-
-  Reversed (or previously applied) patch detected!  Assume -R? [n] n
-  Apply anyway? [n] n
-
-.. warning::
-  After finishing your migration tests, mind reverting the yes-node patch to obtain a "normal" node; otherwise you may obtain spurious errors.
-  To do this, you may apply the same patch backwards using
-  ``patch -p1 --reverse < scripts/yes-node.patch``.
-  Alternatively, if you are sure that no other changes were done, you can reset the source file using ``git checkout src/lib_crypto/signature.ml``.
+  $ ./scripts/patch-yes_node.sh
 
 5. Compile the Project
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -417,14 +403,27 @@ system's temp directory (in our example, ``/tmp``) as given by the path argument
 ``/tmp/yes-wallet``. If no path argument was given, the command would create the
 yes-wallet folder in the default path ``./yes-wallet``.
 
+The command above will generate a wallet containing approximately 400
+keys. If you wish to restrict to a given percentage of the endorsing
+power by retrieving the first bakers (with the biggest staking
+power), you can also use the ``--staking-share`` option to provide a
+limit. For instance, the first largest bakers with an accumulated
+stake of at least 75 percent can be kept with::
+
+  $ dune exec scripts/yes-wallet/yes_wallet.exe -- create from context /tmp/tezos-node-mainnet in /tmp/yes-wallet --active-bakers-only --staking-share 75
+
 .. note::
-   Prior to switching to the Tenderbake consensus algorithm it was sufficient to
-   create a minimal yes-wallet with 8 Foundation keys. Starting from Protocol I
-   this is no longer the case, because a number of bakers holding at least 2/3rds of the total endorsing power have to endorse a block
-   for it to be considered valid. That's why the wallet needs as many keys as it
-   can get.
+   Prior to switching to the Tenderbake consensus algorithm it was
+   sufficient to create a minimal yes-wallet with 8 Foundation
+   keys. Starting from Protocol I this is no longer the case, because
+   a number of bakers holding at least 2/3rds of the total endorsing
+   power have to endorse a block for it to be considered valid.
 
-
+By restricting the accumulated stake to 75% as in the command above,
+the wallet is both "lighter" (it may contain around 30-40 keys and
+therefore some commands like ``tezos-client bake for`` will execute
+faster) and its keys will represent more than the 2/3rds of the
+endorsing power for any given level.
 
 Batch Steps 1--7 Above
 ~~~~~~~~~~~~~~~~~~~~~~
