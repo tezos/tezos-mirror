@@ -616,7 +616,8 @@ let on_new_tezos_head state (head : Alpha_block_services.block_info)
       (fun added_block -> register_included_operations state added_block)
       reorg.new_chain
   in
-  let*! () = register_included_operations state head in
+  (* Head is already included in the reorganization, so no need to process it
+     separately. *)
   let confirmed_level =
     Int32.sub
       head.Alpha_block_services.header.shell.level
