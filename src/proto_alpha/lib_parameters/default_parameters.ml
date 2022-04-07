@@ -27,7 +27,7 @@
 
 open Protocol.Alpha_context
 
-let tx_rollup_finality_period = 60_000
+let tx_rollup_finality_period = 40_000
 
 let constants_mainnet =
   let consensus_committee_size = 7000 in
@@ -101,12 +101,17 @@ let constants_mainnet =
     (* One for the sampler state for all cycles stored at any moment (as above). *)
     cache_sampler_state_cycles = 8;
     tx_rollup_enable = true;
-    (* TODO: https://gitlab.com/tezos/tezos/-/issues/2152
-       Transaction rollups parameters need to be refined,
-       currently the following values are merely placeholders. *)
-    tx_rollup_origination_size = 60_000;
-    (* Transaction rollup’s size limits are expressed in number of bytes *)
-    tx_rollup_hard_size_limit_per_inbox = 100_000;
+    (* Based on how storage burn is implemented for
+       transaction rollups, this means that a rollup operator
+       can create 100 inboxes (40 bytes per inboxes) before
+       having to pay storage burn. *)
+    tx_rollup_origination_size = 4_000;
+    (* Considering an average size of layer-2 operations of
+       20, this gives a TPS per rollup higher than 400, and
+       the capability to have two rollups at full speed on
+       mainnet (as long as they do not reach scalability
+       issues related to proof size). *)
+    tx_rollup_hard_size_limit_per_inbox = 250_000;
     tx_rollup_hard_size_limit_per_message = 5_000;
     tx_rollup_commitment_bond = Tez.of_mutez_exn 10_000_000_000L;
     tx_rollup_finality_period;

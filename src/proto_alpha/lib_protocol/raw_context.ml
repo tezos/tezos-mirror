@@ -859,7 +859,7 @@ let prepare_first_block ~level ~timestamp ctxt =
         (* Ignore reminder if any *)
         Int32.div c.blocks_per_voting_period c.blocks_per_cycle
       in
-      let tx_rollup_finality_period = 60_000 in
+      let tx_rollup_finality_period = 40_000 in
       let constants =
         Constants_repr.
           {
@@ -902,12 +902,17 @@ let prepare_first_block ~level ~timestamp ctxt =
             cache_stake_distribution_cycles = 8;
             cache_sampler_state_cycles = 8;
             tx_rollup_enable = true;
-            (* TODO: https://gitlab.com/tezos/tezos/-/issues/2152
-               Transaction rollups parameters need to be refined,
-               currently the following values are merely
-               placeholders. *)
-            tx_rollup_origination_size = 60_000;
-            tx_rollup_hard_size_limit_per_inbox = 100_000;
+            (* Based on how storage burn is implemented for
+               transaction rollups, this means that a rollup operator
+               can create 100 inboxes (40 bytes per inboxes) before
+               having to pay storage burn. *)
+            tx_rollup_origination_size = 4_000;
+            (* Considering an average size of layer-2 operations of
+               20, this gives a TPS per rollup higher than 400, and
+               the capability to have two rollups at full speed on
+               mainnet (as long as they do not reach scalability
+               issues related to proof size). *)
+            tx_rollup_hard_size_limit_per_inbox = 250_000;
             tx_rollup_hard_size_limit_per_message = 5_000;
             (* Tickets are transmitted in batches in the
                [Tx_rollup_dispatch_tickets] operation.
