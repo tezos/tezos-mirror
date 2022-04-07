@@ -27,15 +27,16 @@ let mkdir dirname =
   try Unix.mkdir dirname 0o775 with Unix.Unix_error (Unix.EEXIST, _, _) -> ()
 
 module Make (P : Sigs.PROTOCOL) : Sigs.MAIN = struct
+  type serialization_costs = {decode : int; encode : int}
+
   module Storage_helpers = struct
     include Storage_helpers
 
     let get_lazy_expr ~what ~getter ~pp ctxt x =
       let open Lwt_result_syntax in
       let+ _, expr = get_value ~what ~getter ~pp ctxt x in
-      match Data_encoding.force_decode expr with
-      | Some expr -> expr
-      | None -> assert false
+      let expr, decode, encode = P.Script.decode_and_costs expr in
+      (expr, {decode; encode})
   end
 
   module ExprMap = Map.Make (P.Script.Hash)
@@ -296,7 +297,7 @@ module Make (P : Sigs.PROTOCOL) : Sigs.MAIN = struct
         in
         match code_opt with
         | Error `AlreadyWarned -> Lwt.return (m, i)
-        | Ok script ->
+        | Ok (script, _costs) ->
             let+ add_storage =
               if Config.(collect_lambdas || collect_storage) then
                 let+ storage_opt =
@@ -309,7 +310,7 @@ module Make (P : Sigs.PROTOCOL) : Sigs.MAIN = struct
                 in
                 match storage_opt with
                 | Error `AlreadyWarned -> fun x -> x
-                | Ok storage ->
+                | Ok (storage, _costs) ->
                     let key = hash_expr storage in
                     fun storages -> ExprMap.add key {contract; storage} storages
               else Lwt.return (fun x -> x)
