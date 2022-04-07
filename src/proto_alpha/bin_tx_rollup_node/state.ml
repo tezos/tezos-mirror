@@ -51,6 +51,7 @@ type t = {
   tezos_blocks_cache : Alpha_block_services.block_info Tezos_blocks_cache.t;
   constants : Constants.t;
   operator : signer option;
+  signers : Configuration.signers;
   batcher : Batcher.t option;
   injector : Injector.t;
 }
@@ -454,6 +455,7 @@ let init cctxt ~data_dir ?(readonly = false) ?rollup_genesis
       tezos_blocks_cache;
       constants;
       operator;
+      signers;
       batcher;
       injector;
     }

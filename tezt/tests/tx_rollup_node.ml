@@ -711,6 +711,8 @@ let test_batcher =
         init_and_run_rollup_node
           ~operator
           ~batch_signer:Constant.bootstrap5.public_key_hash
+          ~finalize_commitment_signer:Constant.bootstrap4.public_key_hash
+          ~remove_commitment_signer:Constant.bootstrap4.public_key_hash
           node
           client
       in

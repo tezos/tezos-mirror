@@ -51,6 +51,7 @@ type t = private {
   tezos_blocks_cache : Alpha_block_services.block_info Tezos_blocks_cache.t;
   constants : Constants.t;
   operator : signer option;
+  signers : Configuration.signers;
   batcher : Batcher.t option;
   injector : Injector.t;
 }

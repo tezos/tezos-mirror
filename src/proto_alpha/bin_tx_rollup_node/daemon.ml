@@ -332,6 +332,29 @@ let notify_head state head reorg =
   let*! () = Injector.new_tezos_head state.State.injector head reorg in
   return_unit
 
+let queue_gc_operations state =
+  let open Lwt_syntax in
+  let tx_rollup = state.State.rollup_info.rollup_id in
+  let inject source op =
+    let manager_operation = Manager op in
+    let hash = L1_operation.hash_manager_operation manager_operation in
+    Injector.add_pending_operation
+      state.State.injector
+      {L1_operation.hash; source; manager_operation}
+  in
+  let queue_finalize_commitment state =
+    match state.State.signers.finalize_commitment with
+    | None -> return_unit
+    | Some source -> inject source (Tx_rollup_finalize_commitment {tx_rollup})
+  in
+  let queue_remove_commitment state =
+    match state.State.signers.remove_commitment with
+    | None -> return_unit
+    | Some source -> inject source (Tx_rollup_remove_commitment {tx_rollup})
+  in
+  let* () = queue_finalize_commitment state in
+  queue_remove_commitment state
+
 let time_until_next_block state (header : Tezos_base.Block_header.t) =
   let open Result_syntax in
   let Constants.{minimal_block_delay; delay_increment_per_round; _} =
@@ -388,6 +411,7 @@ let process_head state (current_hash, current_header) rollup_id =
   let* res = process_block state current_hash rollup_id in
   let* l1_reorg = State.set_tezos_head state current_hash in
   let* () = batch state in
+  let*! () = queue_gc_operations state in
   let* () = notify_head state current_hash l1_reorg in
   let*! () = trigger_injection state current_header in
   return res

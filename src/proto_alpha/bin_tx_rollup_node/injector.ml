@@ -460,6 +460,24 @@ let get_operations_from_queue ~size_limit state =
   in
   List.rev rev_ops
 
+(* Ignore the failures of finalize and remove commitment operations. These
+   operations fail when there are either no commitment to finalize or to remove
+   (which can happen when there are no inbox for instance). *)
+let ignore_failing_gc_operations operations = function
+  | Ok oph -> Ok (`Injected oph)
+  | Error _ as res ->
+      let only_gc_operations =
+        List.for_all
+          (fun op ->
+            let (Manager op) = op.L1_operation.manager_operation in
+            match op with
+            | Tx_rollup_finalize_commitment _ | Tx_rollup_remove_commitment _ ->
+                true
+            | _ -> false)
+          operations
+      in
+      if only_gc_operations then Ok `Ignored else res
+
 (** [inject_pending_operations_for ~size_limit state pending] injects
     operations from the pending queue [pending], whose total size does
     not exceed [size_limit]. Upon successful injection, the
@@ -470,24 +488,32 @@ let inject_pending_operations_of_queue ~size_limit state pending =
   let operations_to_inject = get_operations_from_queue ~size_limit pending in
   match operations_to_inject with
   | [] -> return_unit
-  | _ ->
+  | _ -> (
       let*! () =
         Event.(emit Injector.injecting_pending)
           (List.length operations_to_inject)
       in
-      (* TODO: decide if some operations must all succeed *)
-      let+ oph =
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/2813
+         Decide if some operations must all succeed *)
+      let*! res =
         inject_operations
           ~must_succeed:`One
           state
           pending.signer
           operations_to_inject
       in
-      (* Injection succeeded, remove from pending and add to injected *)
-      List.iter
-        (fun op -> Op_queue.remove pending.queue op.L1_operation.hash)
-        operations_to_inject ;
-      add_injected_operations state oph operations_to_inject
+      let*? res = ignore_failing_gc_operations operations_to_inject res in
+      match res with
+      | `Injected oph ->
+          (* Injection succeeded, remove from pending and add to injected *)
+          List.iter
+            (fun op -> Op_queue.remove pending.queue op.L1_operation.hash)
+            operations_to_inject ;
+          add_injected_operations state oph operations_to_inject ;
+          return_unit
+      | `Ignored ->
+          (* Injection failed but we ignore the failure *)
+          return_unit)
 
 let has_tag_in ~tags pending =
   match tags with
