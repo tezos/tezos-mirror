@@ -100,6 +100,8 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    receipt_repr.mli receipt_repr.ml
    migration_repr.mli migration_repr.ml
    sc_rollup_tick_repr.mli sc_rollup_tick_repr.ml
+   carbonated_map_costs.mli carbonated_map_costs.ml
+   carbonated_map.mli carbonated_map.ml
    raw_context_intf.ml
    raw_context.mli raw_context.ml
    storage_costs.mli storage_costs.ml
@@ -149,8 +151,6 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    script_string.mli script_string.ml
    script_int.mli script_int.ml
    script_timestamp.mli script_timestamp.ml
-   carbonated_map_costs.mli carbonated_map_costs.ml
-   carbonated_map.mli carbonated_map.ml
    tx_rollup_l2_storage_sig.ml
    tx_rollup_l2_context_sig.ml
    tx_rollup_l2_context.ml
@@ -287,6 +287,8 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    receipt_repr.mli receipt_repr.ml
    migration_repr.mli migration_repr.ml
    sc_rollup_tick_repr.mli sc_rollup_tick_repr.ml
+   carbonated_map_costs.mli carbonated_map_costs.ml
+   carbonated_map.mli carbonated_map.ml
    raw_context_intf.ml
    raw_context.mli raw_context.ml
    storage_costs.mli storage_costs.ml
@@ -336,8 +338,6 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    script_string.mli script_string.ml
    script_int.mli script_int.ml
    script_timestamp.mli script_timestamp.ml
-   carbonated_map_costs.mli carbonated_map_costs.ml
-   carbonated_map.mli carbonated_map.ml
    tx_rollup_l2_storage_sig.ml
    tx_rollup_l2_context_sig.ml
    tx_rollup_l2_context.ml
@@ -474,6 +474,8 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    receipt_repr.mli receipt_repr.ml
    migration_repr.mli migration_repr.ml
    sc_rollup_tick_repr.mli sc_rollup_tick_repr.ml
+   carbonated_map_costs.mli carbonated_map_costs.ml
+   carbonated_map.mli carbonated_map.ml
    raw_context_intf.ml
    raw_context.mli raw_context.ml
    storage_costs.mli storage_costs.ml
@@ -523,8 +525,6 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    script_string.mli script_string.ml
    script_int.mli script_int.ml
    script_timestamp.mli script_timestamp.ml
-   carbonated_map_costs.mli carbonated_map_costs.ml
-   carbonated_map.mli carbonated_map.ml
    tx_rollup_l2_storage_sig.ml
    tx_rollup_l2_context_sig.ml
    tx_rollup_l2_context.ml
@@ -683,6 +683,8 @@ include Tezos_raw_protocol_alpha.Main
    Receipt_repr
    Migration_repr
    Sc_rollup_tick_repr
+   Carbonated_map_costs
+   Carbonated_map
    Raw_context_intf
    Raw_context
    Storage_costs
@@ -732,8 +734,6 @@ include Tezos_raw_protocol_alpha.Main
    Script_string
    Script_int
    Script_timestamp
-   Carbonated_map_costs
-   Carbonated_map
    Tx_rollup_l2_storage_sig
    Tx_rollup_l2_context_sig
    Tx_rollup_l2_context
@@ -911,6 +911,8 @@ include Tezos_raw_protocol_alpha.Main
    receipt_repr.mli receipt_repr.ml
    migration_repr.mli migration_repr.ml
    sc_rollup_tick_repr.mli sc_rollup_tick_repr.ml
+   carbonated_map_costs.mli carbonated_map_costs.ml
+   carbonated_map.mli carbonated_map.ml
    raw_context_intf.ml
    raw_context.mli raw_context.ml
    storage_costs.mli storage_costs.ml
@@ -960,8 +962,6 @@ include Tezos_raw_protocol_alpha.Main
    script_string.mli script_string.ml
    script_int.mli script_int.ml
    script_timestamp.mli script_timestamp.ml
-   carbonated_map_costs.mli carbonated_map_costs.ml
-   carbonated_map.mli carbonated_map.ml
    tx_rollup_l2_storage_sig.ml
    tx_rollup_l2_context_sig.ml
    tx_rollup_l2_context.ml

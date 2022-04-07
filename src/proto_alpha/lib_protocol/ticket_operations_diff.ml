@@ -66,18 +66,25 @@ let () =
     (fun () -> Contract_not_originated)
 
 (** A carbonated map where the keys are destination (contract or tx_rollup). *)
-module Destination_map = Carbonated_map.Make (struct
-  type t = Destination.t
+module Destination_map =
+  Carbonated_map.Make
+    (struct
+      type context = Alpha_context.context
 
-  let compare = Destination.compare
+      let consume = Alpha_context.Gas.consume
+    end)
+    (struct
+      type t = Destination.t
 
-  (* TODO: #2667
-     Change cost-function to one for comparing destinations.
-     Not expected to have any performance impact but we should update for
-     completeness.
-  *)
-  let compare_cost _ = Ticket_costs.Constants.cost_compare_key_contract
-end)
+      let compare = Destination.compare
+
+      (* TODO: #2667
+         Change cost-function to one for comparing destinations.
+         Not expected to have any performance impact but we should update for
+         completeness.
+      *)
+      let compare_cost _ = Ticket_costs.Constants.cost_compare_key_contract
+    end)
 
 (** A module for mapping ticket-tokens to a map of contract destinations and
     amounts. The values specify how to distribute the spending of a ticket-token

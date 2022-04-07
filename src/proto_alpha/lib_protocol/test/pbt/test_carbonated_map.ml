@@ -51,7 +51,14 @@ module Compare_int = struct
   let compare_cost _ = Saturation_repr.safe_int 10
 end
 
-module CM = Carbonated_map.Make (Compare_int)
+module CM =
+  Carbonated_map.Make
+    (struct
+      type context = Alpha_context.context
+
+      let consume = Alpha_context.Gas.consume
+    end)
+    (Compare_int)
 
 let unsafe_new_context () =
   Result.value_f

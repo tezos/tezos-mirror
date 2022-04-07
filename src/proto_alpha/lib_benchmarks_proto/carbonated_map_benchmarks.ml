@@ -60,6 +60,12 @@ let register (module BM : Benchmark.S) =
            BM.name
            (Model.For_codegen model))
 
+module Alpha_context_gas = struct
+  type context = Alpha_context.context
+
+  let consume = Alpha_context.Gas.consume
+end
+
 (**
   Benchmarks the [fold] functions of [Carbonated_map].
   This benchmark does not depend on the size of the keys or types of elements.
@@ -89,7 +95,7 @@ module Fold_benchmark : Benchmark.S = struct
   let models = [("carbonated_map", fold_model)]
 
   let benchmark rng_state config () =
-    let module M = Carbonated_map.Make (Int) in
+    let module M = Carbonated_map.Make (Alpha_context_gas) (Int) in
     let (_, list) =
       let sampler rng_state =
         let key = Base_samplers.int rng_state ~size:{min = 1; max = 5} in
@@ -187,12 +193,15 @@ module Make (CS : COMPARABLE_SAMPLER) = struct
   module Find = struct
     include Config_and_workload
 
-    module M = Carbonated_map.Make (struct
-      include CS
+    module M =
+      Carbonated_map.Make
+        (Alpha_context_gas)
+        (struct
+          include CS
 
-      (** Dummy cost*)
-      let compare_cost _ = Saturation_repr.safe_int 0
-    end)
+          (** Dummy cost*)
+          let compare_cost _ = Saturation_repr.safe_int 0
+        end)
 
     let name = carbonated_map_cost_name "find"
 
@@ -284,12 +293,15 @@ module Make (CS : COMPARABLE_SAMPLER) = struct
 
     let workload_to_vector () = Sparse_vec.String.of_list []
 
-    module M = Carbonated_map.Make (struct
-      include CS
+    module M =
+      Carbonated_map.Make
+        (Alpha_context_gas)
+        (struct
+          include CS
 
-      (** Dummy cost*)
-      let compare_cost _ = Saturation_repr.safe_int 0
-    end)
+          (** Dummy cost*)
+          let compare_cost _ = Saturation_repr.safe_int 0
+        end)
 
     let name = carbonated_map_cost_name "find_intercept"
 

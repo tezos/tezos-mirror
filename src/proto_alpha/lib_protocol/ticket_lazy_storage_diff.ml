@@ -95,13 +95,21 @@ let collect_token_diffs_of_node ctxt has_tickets node ~get_token_and_amount acc
 (** A module for keeping track of script-key-hashes. It's used for looking up
     keys for multiple big-map updates referencing the same key.
   *)
-module Key_hash_map = Carbonated_map.Make (struct
-  type t = Script_expr_hash.t
 
-  let compare = Script_expr_hash.compare
+module Key_hash_map =
+  Carbonated_map.Make
+    (struct
+      type context = Alpha_context.context
 
-  let compare_cost _ = Ticket_costs.Constants.cost_compare_ticket_hash
-end)
+      let consume = Alpha_context.Gas.consume
+    end)
+    (struct
+      type t = Script_expr_hash.t
+
+      let compare = Script_expr_hash.compare
+
+      let compare_cost _ = Ticket_costs.Constants.cost_compare_ticket_hash
+    end)
 
 (** Collects all ticket-token diffs from a big-map update and prepends them
     to the accumulator [acc]. *)
