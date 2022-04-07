@@ -1,4 +1,4 @@
-Version 12.2
+Version 12.3
 ============
 
 Version 12.0 contains a new version (V4) of the protocol environment,
@@ -26,19 +26,23 @@ usable with older versions of Octez.
 Version 12.2 increased the size limit for stored metadata and made
 it configurable.
 
+Version 12.3 fixed some remaining issues related to the storage of metadata.
+**Breaking change:** note that snapshots exported using v12.3 cannot be
+imported by nodes running previous versions of Octez.
+
 Update Instructions
 -------------------
 
 To update from sources::
 
   git fetch
-  git checkout v12.2
+  git checkout v12.3
   rm -rf _opam _build
   make build-deps
   eval $(opam env)
   make
 
-If you are using Docker instead, use the ``v12.2`` Docker images of Tezos.
+If you are using Docker instead, use the ``v12.3`` Docker images of Tezos.
 
 **NB** The `Ithaca2 <../protocols/012_ithaca.html>`_ protocol adopts
 the new `Tenderbake <../protocols/tenderbake.html#daemons>`_ consensus
@@ -50,6 +54,7 @@ functionality is now integrated into the *baker* daemons:
 Changelog
 ---------
 
+- `Version 12.3 <../CHANGES.html#version-12-2>`_
 - `Version 12.2 <../CHANGES.html#version-12-2>`_
 - `Version 12.1 <../CHANGES.html#version-12-1>`_
 - `Version 12.0 <../CHANGES.html#version-12-0>`_
