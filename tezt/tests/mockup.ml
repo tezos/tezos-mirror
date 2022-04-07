@@ -634,6 +634,25 @@ let test_empty_block_baking =
   Log.info "Baking pending operations..." ;
   Client.bake_for ~keys:[giver] client
 
+let test_storage_from_file =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"(Mockup) Load storage and input from file."
+    ~tags:["mockup"; "client"; "run_script"]
+  @@ fun protocol ->
+  Format.printf "%s" @@ Unix.getcwd () ;
+  let* client = Client.init_mockup ~protocol () in
+  Lwt_io.with_temp_file (fun (temp_filename, pipe) ->
+      let* () = Lwt_io.write pipe "Unit" in
+      let* _storage =
+        Client.run_script
+          ~prg:"file:./tezt/tests/contracts/proto_alpha/very_small.tz"
+          ~storage:temp_filename
+          ~input:temp_filename
+          client
+      in
+      unit)
+
 let register ~protocols =
   test_rpc_list protocols ;
   test_same_transfer_twice protocols ;
@@ -644,7 +663,8 @@ let register ~protocols =
   test_multiple_baking protocols ;
   test_rpc_header_shell protocols ;
   test_origination_from_unrevealed_fees protocols ;
-  test_multiple_transfers protocols
+  test_multiple_transfers protocols ;
+  test_storage_from_file protocols
 
 let register_global_constants ~protocols =
   test_register_global_constant_success protocols ;
