@@ -1,13 +1,13 @@
-Protocol Alpha
-==============
+Protocol Jakarta
+==================
 
-This page contains all the relevant information for protocol Alpha
+This page contains all the relevant information for protocol Jakarta
 (see :ref:`naming_convention`).
 
 The code can be found in the :src:`src/proto_013_PtJakart` directory of the
 ``master`` branch of Tezos.
 
-This page documents the changes brought by protocol Alpha with respect
+This page documents the changes brought by protocol Jakarta with respect
 to Protocol I.
 
 .. contents::
