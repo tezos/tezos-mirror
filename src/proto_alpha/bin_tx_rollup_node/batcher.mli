@@ -34,7 +34,6 @@ type t
 val init :
   rollup:Tx_rollup.t ->
   signer:Signature.public_key_hash ->
-  Injector.t ->
   Context.index ->
   Constants.t ->
   t tzresult Lwt.t

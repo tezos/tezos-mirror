@@ -33,7 +33,6 @@ type state = {
   constants : Constants.t;
   index : Context.index;
   signer : Signature.public_key_hash;
-  injector : Injector.t;
   transactions : Tx_queue.t;
   mutable incr_context : Context.t;
   lock : Lwt_mutex.t;
@@ -70,8 +69,7 @@ let inject_batches state batches =
         })
       batches
   in
-  let*! () = Injector.add_pending_operations state.injector operations in
-  return_unit
+  Injector.add_pending_operations operations
 
 (** [is_batch_valid] returns whether the batch is valid or not based on two
     criteria:
@@ -236,14 +234,13 @@ let on_new_head state head =
      Flush and reapply queue *)
   state.incr_context <- context
 
-let init_batcher_state ~rollup ~signer injector index constants =
-  let open Lwt_result_syntax in
+let init_batcher_state ~rollup ~signer index constants =
+  let open Lwt_syntax in
   let+ incr_context = Context.init_context index in
   {
     rollup;
     index;
     signer;
-    injector;
     constants;
     transactions = Tx_queue.create 500_000;
     incr_context;
@@ -255,7 +252,6 @@ module Types = struct
 
   type parameters = {
     signer : Signature.public_key_hash;
-    injector : Injector.t;
     index : Context.index;
     constants : Constants.t;
   }
@@ -281,9 +277,9 @@ module Handlers = struct
 
   let on_request w r = protect @@ fun () -> on_request w r
 
-  let on_launch _w rollup Types.{signer; injector; index; constants} =
+  let on_launch _w rollup Types.{signer; index; constants} =
     let open Lwt_result_syntax in
-    let*! state = init_batcher_state ~rollup ~signer injector index constants in
+    let*! state = init_batcher_state ~rollup ~signer index constants in
     return state
 
   let on_error _w r st errs =
@@ -307,12 +303,8 @@ let table = Worker.create_table Queue
 
 type t = worker
 
-let init ~rollup ~signer injector index constants =
-  Worker.launch
-    table
-    rollup
-    {signer; injector; index; constants}
-    (module Handlers)
+let init ~rollup ~signer index constants =
+  Worker.launch table rollup {signer; index; constants} (module Handlers)
 
 let find_transaction w tr_hash =
   let state = Worker.state w in

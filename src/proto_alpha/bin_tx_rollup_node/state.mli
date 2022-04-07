@@ -53,7 +53,6 @@ type t = private {
   operator : signer option;
   signers : Configuration.signers;
   batcher : Batcher.t option;
-  injector : Injector.t;
 }
 
 (** [init cctxt ~data_dir ~rollup_genesis ~operator rollup] creates a new state

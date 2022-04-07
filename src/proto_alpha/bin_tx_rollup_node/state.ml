@@ -53,7 +53,6 @@ type t = {
   operator : signer option;
   signers : Configuration.signers;
   batcher : Batcher.t option;
-  injector : Injector.t;
 }
 
 (* Stands for the manager operation pass, in which the rollup transactions are
@@ -421,10 +420,9 @@ let init cctxt ~data_dir ?(readonly = false) ?rollup_genesis
   in
   let*! head = init_head stores context_index rollup rollup_info in
   let* constants = retrieve_constants cctxt in
-  let* injector =
+  let* () =
     Injector.init
       cctxt
-      ~rollup
       ~signers:
         (List.filter_map
            (function (None, _) -> None | (Some x, tags) -> Some (x, tags))
@@ -438,8 +436,7 @@ let init cctxt ~data_dir ?(readonly = false) ?rollup_genesis
   in
   let* batcher =
     Option.map_es
-      (fun signer ->
-        Batcher.init ~rollup ~signer injector context_index constants)
+      (fun signer -> Batcher.init ~rollup ~signer context_index constants)
       signers.submit_batch
   in
   let* operator = Option.map_es (get_signer cctxt) operator in
@@ -457,5 +454,4 @@ let init cctxt ~data_dir ?(readonly = false) ?rollup_genesis
       operator;
       signers;
       batcher;
-      injector;
     }

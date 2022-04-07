@@ -95,7 +95,7 @@ module Request = struct
     | New_tezos_head :
         Alpha_block_services.block_info * Alpha_block_services.block_info reorg
         -> unit t
-    | Inject : tags option -> unit t
+    | Inject : unit t
 
   type view = View : _ t -> view
 
@@ -128,9 +128,9 @@ module Request = struct
         case
           (Tag 2)
           ~title:"Inject"
-          (obj2 (req "request" (constant "inject")) (opt "tags" tags_encoding))
-          (function View (Inject tags) -> Some ((), tags) | _ -> None)
-          (fun ((), tags) -> View (Inject tags));
+          (obj1 (req "request" (constant "inject")))
+          (function View Inject -> Some () | _ -> None)
+          (fun () -> View Inject);
       ]
 
   let pp ppf (View r) =
@@ -155,23 +155,19 @@ module Request = struct
             ", with reorg of -%d +%d"
             (List.length r.old_chain)
             (List.length r.new_chain)
-    | Inject tags -> (
-        Format.fprintf ppf "request injection" ;
-        match tags with
-        | None -> ()
-        | Some tags -> Format.fprintf ppf " [%a]" pp_tags tags)
+    | Inject -> Format.fprintf ppf "injection"
 end
 
 module Name = struct
-  type t = Tx_rollup.t
+  type t = public_key_hash
 
-  let encoding = Tx_rollup.encoding
+  let encoding = Signature.Public_key_hash.encoding
 
   let base = ["tx_rollup_injector"]
 
-  let pp = Tx_rollup.pp
+  let pp = Signature.Public_key_hash.pp_short
 
-  let equal = Tx_rollup.equal
+  let equal = Signature.Public_key_hash.equal
 end
 
 module Dummy_event = struct

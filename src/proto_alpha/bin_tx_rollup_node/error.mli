@@ -85,6 +85,6 @@ type error += Tx_rollup_tree_kinded_key_not_found
 (** Error when a message position does not exist in the inbox for the proof RPC *)
 type error += Tx_rollup_invalid_message_position_in_inbox of int
 
-(** Error when injector worker has no queue for operations which must be
-    injected with a given source. *)
-type error += No_queue_for_source of public_key_hash
+(** Error when the injector has no worker for the source which must inject an
+    operation. *)
+type error += No_worker_for_source of Signature.Public_key_hash.t

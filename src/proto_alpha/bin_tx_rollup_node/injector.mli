@@ -28,32 +28,29 @@ open Protocol
 open Alpha_context
 open Common
 
-(** The type of an injector worker *)
-type t
-
-(** Initializes the injector with a client context, for a rollup and a list of
-    signers. Each signer has its own pending queue of operations to inject. *)
+(** Initializes the injector with a client context, for a list of signers. Each
+    signer has its own worker with a queue of operations to inject. *)
 val init :
   #Client_context.full ->
-  rollup:Tx_rollup.t ->
   signers:(public_key_hash * Injector_worker_types.tag list) list ->
-  t tzresult Lwt.t
+  unit tzresult Lwt.t
 
 (** Add an operation as pending injection in the injector. *)
-val add_pending_operation : t -> L1_operation.t -> unit Lwt.t
+val add_pending_operation : L1_operation.t -> unit tzresult Lwt.t
 
 (** Add multiple operations as pending injection in the injector. *)
-val add_pending_operations : t -> L1_operation.t trace -> unit Lwt.t
+val add_pending_operations : L1_operation.t trace -> unit tzresult Lwt.t
 
 (** Notify the injector of a new Tezos head. The injector marks the operations
     appropriately (for instance reverted operations that are part of a
     reorganization are put back in the pending queue). When an operation is
     considered as {e confirmed}, it disappears from the injector. *)
 val new_tezos_head :
-  t ->
   Alpha_block_services.block_info ->
   Alpha_block_services.block_info reorg ->
   unit Lwt.t
 
-(** Trigger an injection of the pending operations. *)
-val inject : ?tags:Injector_worker_types.tag list -> t -> unit Lwt.t
+(** Trigger an injection of the pending operations for all workers. If [tags]
+    is given, only the workers which have a tag in [tags] inject their pending
+    operations. *)
+val inject : ?tags:Injector_worker_types.tag list -> unit -> unit Lwt.t
