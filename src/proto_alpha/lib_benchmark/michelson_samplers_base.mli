@@ -43,19 +43,19 @@ val parameters_encoding : parameters Data_encoding.t
 
 (** A module of type [S] packs samplers used to construct basic Michelson values. *)
 module type S = sig
-  val int : Alpha_context.Script_int.z Alpha_context.Script_int.num sampler
+  val int : Script_int.z Script_int.num sampler
 
-  val nat : Alpha_context.Script_int.n Alpha_context.Script_int.num sampler
+  val nat : Script_int.n Script_int.num sampler
 
   val signature : Tezos_crypto.Signature.t sampler
 
-  val string : Alpha_context.Script_string.t sampler
+  val string : Script_string.t sampler
 
   val bytes : bytes sampler
 
   val tez : Alpha_context.Tez.tez sampler
 
-  val timestamp : Alpha_context.Script_timestamp.t sampler
+  val timestamp : Script_timestamp.t sampler
 end
 
 (** The [Make] functor instantiates a module of type [S], where the

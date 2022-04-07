@@ -60,7 +60,7 @@ let big_map_updates_of_key_values ctxt key_values =
           (Script_ir_translator.hash_comparable_data
              ctxt
              Script_typed_ir.int_key
-             (Script_int_repr.of_int key))
+             (Script_int.of_int key))
       in
       return
         ( {
@@ -173,7 +173,7 @@ let assert_equal_ticket_token_diffs ctxt ~loc ticket_diffs
 let string_token ~ticketer content =
   let contents =
     Result.value_f ~default:(fun _ -> assert false)
-    @@ Alpha_context.Script_string.of_string content
+    @@ Script_string.of_string content
   in
   Ticket_token.Ex_token
     {ticketer; contents_type = Script_typed_ir.string_key; contents}

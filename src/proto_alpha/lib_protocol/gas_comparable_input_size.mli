@@ -58,16 +58,16 @@ val to_int : t -> int
 
 val of_int : int -> t
 
-val integer : 'a Alpha_context.Script_int.num -> t
+val integer : 'a Script_int.num -> t
 
 val string : string -> t
 
-val script_string : Alpha_context.Script_string.t -> t
+val script_string : Script_string.t -> t
 
 val bytes : Bytes.t -> t
 
 val mutez : Alpha_context.Tez.tez -> t
 
-val timestamp : Alpha_context.Script_timestamp.t -> t
+val timestamp : Script_timestamp.t -> t
 
 val size_of_comparable_value : 'a Script_typed_ir.comparable_ty -> 'a -> t

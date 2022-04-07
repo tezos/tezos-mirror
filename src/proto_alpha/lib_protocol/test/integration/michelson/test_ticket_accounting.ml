@@ -468,7 +468,7 @@ let string_ticket ticketer contents amount =
   in
   let contents =
     Result.value_f ~default:(fun _ -> assert false)
-    @@ Script_string_repr.of_string contents
+    @@ Script_string.of_string contents
   in
   Script_typed_ir.{ticketer; contents; amount}
 
@@ -476,7 +476,7 @@ let string_ticket_token ticketer content =
   let open Lwt_tzresult_syntax in
   let contents =
     Result.value_f ~default:(fun _ -> assert false)
-    @@ Alpha_context.Script_string.of_string content
+    @@ Script_string.of_string content
   in
   let*? ticketer = Environment.wrap_tzresult @@ Contract.of_b58check ticketer in
   return
@@ -636,7 +636,7 @@ let test_diffs_lazy_storage_alloc () =
       ~key_type:int_key
       ~value_type:ticket_string_type
       [
-        ( Script_int_repr.of_int 1,
+        ( Script_int.of_int 1,
           string_ticket "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "red" 1 );
       ]
   in
@@ -672,7 +672,7 @@ let test_diffs_remove_from_big_map () =
       ~value_type:ticket_string_type
       ~existing_entries:
         [
-          ( Script_int_repr.of_int 1,
+          ( Script_int.of_int 1,
             string_ticket "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "red" 1 );
         ]
   in
@@ -708,12 +708,12 @@ let test_diffs_copy_big_map () =
       ~value_type:ticket_string_type
       ~existing_entries:
         [
-          ( Script_int_repr.of_int 1,
+          ( Script_int.of_int 1,
             string_ticket "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "red" 1 );
         ]
       ~updates:
         [
-          ( Script_int_repr.of_int 2,
+          ( Script_int.of_int 2,
             Some (string_ticket "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "blue" 1)
           );
         ]
@@ -752,11 +752,11 @@ let test_diffs_add_to_existing_big_map () =
       ~value_type:ticket_string_type
       [
         (* It doesn't matter what the old entries are. They are never traversed *)
-        ( Script_int_repr.of_int 1,
+        ( Script_int.of_int 1,
           string_ticket "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "red" 1 );
-        ( Script_int_repr.of_int 2,
+        ( Script_int.of_int 2,
           string_ticket "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "blue" 1 );
-        ( Script_int_repr.of_int 3,
+        ( Script_int.of_int 3,
           string_ticket "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "green" 1 );
       ]
   in
@@ -769,17 +769,17 @@ let test_diffs_add_to_existing_big_map () =
       ~value_type:ticket_string_type
       ~existing_entries:
         [
-          ( Script_int_repr.of_int 1,
+          ( Script_int.of_int 1,
             string_ticket "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "red" 1 );
         ]
       ~updates:
         [
           (* Add one new ticket to the big-map. *)
-          ( Script_int_repr.of_int 2,
+          ( Script_int.of_int 2,
             Some (string_ticket "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "blue" 2)
           );
           (* Remove a ticket *)
-          (Script_int_repr.of_int 1, None);
+          (Script_int.of_int 1, None);
         ]
   in
   (* Even if the old and the new storage are the same (and contains tickets)
@@ -833,13 +833,13 @@ let test_diffs_args_storage_and_lazy_diffs () =
       ~existing_entries:[]
       ~updates:
         [
-          ( Script_int_repr.of_int 1,
+          ( Script_int.of_int 1,
             Some (string_ticket "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "red" 1)
           );
-          ( Script_int_repr.of_int 2,
+          ( Script_int.of_int 2,
             Some (string_ticket "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "blue" 1)
           );
-          ( Script_int_repr.of_int 3,
+          ( Script_int.of_int 3,
             Some
               (string_ticket "KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq" "green" 1)
           );

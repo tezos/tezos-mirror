@@ -304,7 +304,7 @@ module Data : sig
 
   val map : node list -> node
 
-  val timestamp : Alpha_context.Script_timestamp.t -> node
+  val timestamp : Script_timestamp.t -> node
 
   val mutez : Alpha_context.Tez.t -> node
 

@@ -24,38 +24,52 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type repr = Z.t
+(** Defines the internal Michelson representation for timestamps and basic
+    operations that can be performed on it. *)
 
+open Script_int
+
+type repr
+
+(** Representation of timestamps specific to the Michelson interpreter.
+    A number of seconds since the epoch.
+    [t] is made algebraic in order to distinguish it from the other type
+    parameters of [Script_typed_ir.ty]. *)
 type t = Timestamp_tag of repr [@@ocaml.unboxed]
 
-let compare (Timestamp_tag x) (Timestamp_tag y) = Z.compare x y
+(** Convert a number of seconds since the epoch to a timestamp.*)
+val of_int64 : int64 -> t
 
-let of_int64 i = Timestamp_tag (Z.of_int64 i)
+(** Compare timestamps. Returns [1] if the first timestamp is later than the
+    second one; [0] if they're equal and [-1] othwerwise. *)
+val compare : t -> t -> int
 
-let of_string x =
-  match Time_repr.of_notation x with
-  | None -> Option.catch (fun () -> Timestamp_tag (Z.of_string x))
-  | Some time -> Some (of_int64 (Time_repr.to_seconds time))
+(** Convert a timestamp to RFC3339 notation if possible **)
+val to_notation : t -> string option
 
-let to_notation (Timestamp_tag x) =
-  Option.catch (fun () ->
-      Time_repr.to_notation (Time.of_seconds (Z.to_int64 x)))
+(** Convert a timestamp to a string representation of the seconds *)
+val to_num_str : t -> string
 
-let to_num_str (Timestamp_tag x) = Z.to_string x
+(** Convert to RFC3339 notation if possible, or num if not *)
+val to_string : t -> string
 
-let to_string x = match to_notation x with None -> to_num_str x | Some s -> s
+val of_string : string -> t option
 
-let diff (Timestamp_tag x) (Timestamp_tag y) =
-  Script_int_repr.of_zint @@ Z.sub x y
+(** Returns difference between timestamps as integral number of seconds
+    in Michelson representation of numbers. *)
+val diff : t -> t -> z num
 
-let sub_delta (Timestamp_tag t) delta =
-  Timestamp_tag (Z.sub t (Script_int_repr.to_zint delta))
+(** Add a number of seconds to the timestamp. *)
+val add_delta : t -> z num -> t
 
-let add_delta (Timestamp_tag t) delta =
-  Timestamp_tag (Z.add t (Script_int_repr.to_zint delta))
+(** Subtract a number of seconds from the timestamp. *)
+val sub_delta : t -> z num -> t
 
-let to_zint (Timestamp_tag x) = x
+val to_zint : t -> Z.t
 
-let of_zint x = Timestamp_tag x
+val of_zint : Z.t -> t
 
-let encoding = Data_encoding.(conv to_zint of_zint z)
+(* Timestamps are encoded exactly as Z. *)
+val encoding : t Data_encoding.encoding
+
+val now : Alpha_context.t -> t

@@ -333,9 +333,7 @@ let cost_of_instr : type a s r f. (a, s, r, f) kinstr -> a -> s -> Gas.cost =
   | IRead_ticket _ -> Interp_costs.read_ticket
   | IOpen_chest _ ->
       let _chest_key = accu and (chest, (time, _)) = stack in
-      Interp_costs.open_chest
-        ~chest
-        ~time:(Alpha_context.Script_int.to_zint time)
+      Interp_costs.open_chest ~chest ~time:(Script_int.to_zint time)
   | ILog _ -> Gas.free
  [@@ocaml.inline always]
  [@@coq_axiom_with_reason "unreachable expression `.` not handled"]

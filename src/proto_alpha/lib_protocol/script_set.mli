@@ -24,7 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Alpha_context
 open Script_typed_ir
 
 val make : (module Boxed_set with type elt = 'elt) -> 'elt set

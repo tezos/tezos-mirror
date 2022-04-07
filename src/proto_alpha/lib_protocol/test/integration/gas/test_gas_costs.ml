@@ -39,9 +39,9 @@ module S = Saturation_repr
 
 let dummy_list = Script_list.(cons 42 empty)
 
-let forty_two = Alpha_context.Script_int.of_int 42
+let forty_two = Script_int.of_int 42
 
-let forty_two_n = Alpha_context.Script_int.abs forty_two
+let forty_two_n = Script_int.abs forty_two
 
 let dummy_set =
   let open Script_set in
@@ -51,7 +51,7 @@ let dummy_map =
   let open Script_map in
   update forty_two (Some forty_two) (empty Script_typed_ir.int_key)
 
-let dummy_timestamp = Alpha_context.Script_timestamp.of_zint (Z.of_int 42)
+let dummy_timestamp = Script_timestamp.of_zint (Z.of_int 42)
 
 let dummy_pk =
   Signature.Public_key.of_b58check_exn
@@ -60,7 +60,7 @@ let dummy_pk =
 let dummy_bytes = Bytes.of_string "dummy"
 
 let dummy_string =
-  match Alpha_context.Script_string.of_string "dummy" with
+  match Script_string.of_string "dummy" with
   | Ok s -> s
   | Error _ -> assert false
 
@@ -127,7 +127,7 @@ let all_interpreter_costs =
     ("mul_int", mul_int forty_two forty_two);
     ("ediv_teznat", ediv_teznat Alpha_context.Tez.fifty_cents forty_two);
     ("ediv_tez", ediv_tez);
-    ("ediv_int", ediv_int forty_two (Alpha_context.Script_int.of_int 1));
+    ("ediv_int", ediv_int forty_two (Script_int.of_int 1));
     ("eq", eq);
     ("lsl_nat", lsl_nat forty_two);
     ("lsr_nat", lsr_nat forty_two);

@@ -1502,7 +1502,7 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
              incorrect. Indeed the verification asks for an integer for practical reasons.
              Therefore no proof can be correct.*)
           let accu =
-            match Alpha_context.Script_int.to_int time_z with
+            match Script_int.to_int time_z with
             | None -> R false
             | Some time -> (
                 match Script_timelock.open_chest chest chest_key ~time with

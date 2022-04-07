@@ -112,7 +112,7 @@ let blocks_per_mint_tzbtc = 1L
 
 (** A timestamp “far in the future” which should not be exceeded when
     running tests. *)
-let far_future = Alpha_context.Script_timestamp.of_zint (Z.of_int 42_000)
+let far_future = Script_timestamp.of_zint (Z.of_int 42_000)
 (* Hypothesis: the tests start at timestamp 0, and 42000 is
    “big enough.” *)
 

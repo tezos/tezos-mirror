@@ -270,12 +270,10 @@ module Timestamp = struct
       ~generator:(fun rng_state ->
         let seconds_in_year = 30_000_000 in
         let offset = Random.State.int rng_state seconds_in_year in
-        Alpha_context.Script_timestamp.of_zint (Z.of_int (1597764116 + offset)))
+        Script_timestamp.of_zint (Z.of_int (1597764116 + offset)))
       ~make_bench:(fun generator () ->
         let tstamp_string = generator () in
-        let closure () =
-          ignore (Alpha_context.Script_timestamp.to_string tstamp_string)
-        in
+        let closure () = ignore (Script_timestamp.to_string tstamp_string) in
         Generator.Plain {workload = (); closure})
 
   let () =
@@ -288,15 +286,12 @@ module Timestamp = struct
         let seconds_in_year = 30_000_000 in
         let offset = Random.State.int rng_state seconds_in_year in
         let tstamp =
-          Alpha_context.Script_timestamp.of_zint
-            (Z.of_int (1597764116 + offset))
+          Script_timestamp.of_zint (Z.of_int (1597764116 + offset))
         in
-        Alpha_context.Script_timestamp.to_string tstamp)
+        Script_timestamp.to_string tstamp)
       ~make_bench:(fun generator () ->
         let tstamp_string = generator () in
-        let closure () =
-          ignore (Alpha_context.Script_timestamp.of_string tstamp_string)
-        in
+        let closure () = ignore (Script_timestamp.of_string tstamp_string) in
         Generator.Plain {workload = (); closure})
 end
 

@@ -25,7 +25,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Alpha_context
 open Script_typed_ir
 
 let make x = Map_tag x

@@ -53,8 +53,8 @@ let make ~rng_state =
   context_init_memory ~rng_state >>=? fun context ->
   let amount = Alpha_context.Tez.one in
   let chain_id = Chain_id.zero in
-  let now = Alpha_context.Script_timestamp.of_zint Z.zero in
-  let level = Alpha_context.Script_int.zero_n in
+  let now = Script_timestamp.of_zint Z.zero in
+  let level = Script_int.zero_n in
   let open Script_interpreter in
   (match context with
   | `Mem_block (block, (bs1, bs2, bs3, _, _)) ->
