@@ -389,7 +389,7 @@ module Make (P : Sigs.PROTOCOL) : Sigs.MAIN = struct
         ~f:Michelson_helpers.(add_expr_to_map ctxt)
     in
     print_endline "Listing addresses done." ;
-    let* contract_map, (lambda_map, lambda_ty_map, lambda_legacy_map) =
+    let* lambda_map, lambda_ty_map, lambda_legacy_map =
       if Config.collect_lambdas then (
         let add_typed_expr hash expr ty_hash ty exprs =
           ExprMap.update
@@ -463,8 +463,8 @@ module Make (P : Sigs.PROTOCOL) : Sigs.MAIN = struct
         let*! lambda_map =
           Michelson_helpers.collect_lambdas_in_exprs ctxt exprs unpack_types
         in
-        return (contract_map, lambda_map))
-      else return (contract_map, (ExprMap.empty, ExprMap.empty, ExprMap.empty))
+        return lambda_map)
+      else return (ExprMap.empty, ExprMap.empty, ExprMap.empty)
     in
     print_endline "Writing contract files..." ;
     let* total_ir_size =
