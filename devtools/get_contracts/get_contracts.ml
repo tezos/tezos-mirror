@@ -282,8 +282,8 @@ module Make (P : Sigs.PROTOCOL) : Sigs.MAIN = struct
             contract
         in
         match code_opt with
-        | None -> Lwt.return (m, i) (* Should not happen *)
-        | Some script ->
+        | Error `AlreadyWarned -> Lwt.return (m, i)
+        | Ok script ->
             let+ add_storage =
               if Config.(collect_lambdas || collect_storage) then
                 let+ storage_opt =
@@ -295,8 +295,8 @@ module Make (P : Sigs.PROTOCOL) : Sigs.MAIN = struct
                     contract
                 in
                 match storage_opt with
-                | None -> fun x -> x
-                | Some storage ->
+                | Error `AlreadyWarned -> fun x -> x
+                | Ok storage ->
                     let key = hash_expr storage in
                     fun storages -> ExprMap.add key storage storages
               else Lwt.return (fun x -> x)
@@ -440,8 +440,8 @@ module Make (P : Sigs.PROTOCOL) : Sigs.MAIN = struct
                   id
               in
               match value_opt with
-              | None -> return (exprs, i) (* should not happen *)
-              | Some value_type_expr ->
+              | Error `AlreadyWarned -> return (exprs, i)
+              | Ok value_type_expr ->
                   let ty_hash, ty =
                     Michelson_helpers.parse_ty ctxt value_type_expr
                   in

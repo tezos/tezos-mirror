@@ -29,6 +29,8 @@ let collect_lambdas = true
 
 let measure_code_size = true
 
+let fatal = true
+
 let mainnet_genesis =
   {
     Genesis.time = Time.Protocol.of_notation_exn "2018-06-30T16:07:32Z";

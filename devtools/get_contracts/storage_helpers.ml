@@ -27,18 +27,22 @@ let get_value ~what ~getter ~pp ctxt x =
   let open Lwt_syntax in
   let+ value = getter ctxt x in
   match value with
-  | Ok x -> Some x
-  | Error _ ->
+  | Ok x -> Ok x
+  | Error err ->
       (* Should not happen *)
-      Format.eprintf "Failed getting %s for %a\n" what pp x ;
-      None
+      Format.eprintf
+        "Failed getting %s for %a:\n%a\n"
+        what
+        pp
+        x
+        Error_monad.pp_print_trace
+        err ;
+      assert (not Config.fatal) ;
+      Error `AlreadyWarned
 
 let get_lazy_expr ~what ~getter ~pp ctxt x =
-  let open Lwt_syntax in
-  let+ expr_opt = get_value ~what ~getter ~pp ctxt x in
-  Option.map
-    (fun (_, expr) ->
-      match Data_encoding.force_decode expr with
-      | Some expr -> expr
-      | None -> assert false)
-    expr_opt
+  let open Lwt_result_syntax in
+  let+ _, expr = get_value ~what ~getter ~pp ctxt x in
+  match Data_encoding.force_decode expr with
+  | Some expr -> expr
+  | None -> assert false
