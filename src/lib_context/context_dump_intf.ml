@@ -143,27 +143,32 @@ module type Dump_interface = sig
     val encoding : inode Data_encoding.t
   end
 
-  (** [tree_iteri_unique index f tree] traverses [tree], applying [f] to all
-      inodes and contents.
+  (** [tree_iteri_unique ?on_disk index f tree] traverses
+     [tree], applying [f] to all inodes and contents.
 
-      [f] is called in post-order, that is [f] is first called on the leaves,
-      and the last call to [f] is on the root of the tree.
+     [f] is called in post-order, that is [f] is first called on the
+     leaves, and the last call to [f] is on the root of the tree.
 
-      The traversal order is stable.
+     The traversal order is stable.
 
-      The traversal skips objects that are structurally equal to objects that
-      were already traversed. In other words, [tree_iteri_unique] internally
-      uses a hash set in order to guarantee that all the objects passed to [f]
-      don't hash the same way.
+     The traversal skips objects that are structurally equal to
+     objects that were already traversed. In other words,
+     [tree_iteri_unique] internally uses a hash set in order to
+     guarantee that all the objects passed to [f] don't hash the same
+     way.
 
-      Returns the total number of elements visited. *)
+     If [on_disk] is true (by default its false), it uses an on_disk index.
+
+     Returns the total number of elements visited. *)
   val tree_iteri_unique :
-    index -> (Snapshot.t -> unit Lwt.t) -> tree -> int Lwt.t
+    ?on_disk:bool -> index -> (Snapshot.t -> unit Lwt.t) -> tree -> int Lwt.t
 
   type import
 
-  (** [v_import index] creates an [importer] instance. *)
-  val v_import : index -> import
+  (** [v_import ?in_memory index] creates an [importer] instance. If
+     [in_memory] is true, the import will be fully in memory.
+     [in_memory] is set to false by default. *)
+  val v_import : ?in_memory:bool -> index -> import
 
   (** [save_inode index importer elt] saves [elt] to the store. *)
   val save_inode : index -> import -> Snapshot.t -> tree option Lwt.t
@@ -186,6 +191,7 @@ module type S = sig
     index ->
     context_hash ->
     context_fd:Lwt_unix.file_descr ->
+    on_disk:bool ->
     int tzresult Lwt.t
 
   val restore_context_fd :
@@ -193,6 +199,7 @@ module type S = sig
     expected_context_hash:context_hash ->
     fd:Lwt_unix.file_descr ->
     nb_context_elements:int ->
+    in_memory:bool ->
     unit tzresult Lwt.t
 end
 

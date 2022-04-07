@@ -164,8 +164,6 @@ end = struct
   let to_irmin = function `Always -> I.always | `Minimal -> I.minimal
 end
 
-let on_disk_index = ref `No
-
 let () =
   let verbose_info () =
     Logs.set_level (Some Logs.Info) ;
@@ -186,7 +184,6 @@ let () =
           "Invalid value for TEZOS_CONTEXT environment variable: %s"
           msg
   in
-  let on_disk_index n = on_disk_index := n in
   match Unix.getenv "TEZOS_CONTEXT" with
   | exception Not_found -> ()
   | v ->
@@ -201,7 +198,6 @@ let () =
               | ["auto-flush"; n] -> auto_flush n
               | ["lru-size"; n] -> lru_size n
               | ["indexing-strategy"; x] -> indexing_strategy x
-              | ["on-disk-index"; path] -> on_disk_index (`Yes path)
               | _ -> ()))
         args
 
@@ -660,18 +656,20 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
 
   (*-- Initialisation ----------------------------------------------------------*)
 
-  let init ?patch_context ?(readonly = false) ?indexing_strategy root =
+  let init ?patch_context ?(readonly = false) ?indexing_strategy
+      ?index_log_size:tbl_log_size root =
     let open Lwt_syntax in
     let+ repo =
       let indexing_strategy =
         Option.value_f indexing_strategy ~default:Indexing_strategy.get
         |> Indexing_strategy.to_irmin
       in
+      let index_log_size = Option.value tbl_log_size ~default:!index_log_size in
       Store.Repo.v
         (Irmin_pack.config
            ~readonly
            ~indexing_strategy
-           ~index_log_size:!index_log_size
+           ~index_log_size
            ~lru_size:!lru_size
            root)
     in
@@ -923,18 +921,21 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
           (obj2 (req "v" v_encoding) (req "root" bool))
     end
 
-    let tree_iteri_unique index f tree =
+    let tree_iteri_unique ?(on_disk = false) index f tree =
       let root_key =
         match Store.Tree.key tree with None -> assert false | Some key -> key
       in
       let on_disk =
-        match !on_disk_index with `No -> None | `Yes path -> Some (`Path path)
+        if on_disk then
+          let path = Filename.concat index.path "index_snapshot" in
+          Some (`Path path)
+        else None
       in
       Snapshot.export ?on_disk index.repo f ~root_key
 
     type import = Snapshot.Import.process
 
-    let v_import idx =
+    let v_import ?(in_memory = false) idx =
       let indexing_strategy = Indexing_strategy.get () in
       let on_disk =
         match indexing_strategy with
@@ -942,10 +943,12 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
             Some `Reuse
             (* reuse index when importing a snaphot with the always indexing
                strategy. *)
-        | `Minimal -> (
-            match !on_disk_index with
-            | `No -> None
-            | `Yes path -> Some (`Path path))
+        | `Minimal ->
+            if in_memory then None
+            else
+              (* by default the import is using an on-disk index. *)
+              let index_on_disk = Filename.concat idx.path "index_snapshot" in
+              Some (`Path index_on_disk)
       in
       Snapshot.Import.v ?on_disk idx.repo
 
@@ -1071,14 +1074,16 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
   module Context_dumper_legacy = Context_dump.Make_legacy (Dumpable_context)
 
   (* provides functions dump_context and restore_context *)
-  let dump_context idx data ~fd =
+  let dump_context idx data ~fd ~on_disk =
     let open Lwt_syntax in
-    let* res = Context_dumper.dump_context_fd idx data ~context_fd:fd in
+    let* res =
+      Context_dumper.dump_context_fd idx data ~context_fd:fd ~on_disk
+    in
     let* () = Lwt_unix.fsync fd in
     Lwt.return res
 
   let restore_context idx ~expected_context_hash ~nb_context_elements ~fd
-      ~legacy =
+      ~legacy ~in_memory =
     if legacy then
       Context_dumper_legacy.restore_context_fd
         idx
@@ -1088,6 +1093,7 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
     else
       Context_dumper.restore_context_fd
         idx
+        ~in_memory
         ~expected_context_hash
         ~fd
         ~nb_context_elements

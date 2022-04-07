@@ -163,12 +163,14 @@ val read_snapshot_header :
   snapshot_path:string -> snapshot_header tzresult Lwt.t
 
 (** [export ?snapshot_path snapshot_format ?rolling ~block ~store_dir
-   ~context_dir ~chain_name genesis] reads from the [store_dir] and
-   [context_dir] the current state of the node and produces a
-   snapshot, of the given [snapshot_format], in [snapshot_file] if it
-   is provided. Otherwise, a snapshot file name is automatically
-   generated using the target block as hint. If [rolling] is set, only
-   the necessary blocks will be exported. *)
+   ~context_dir ~chain_name genesis ~on_disk_index] reads from the
+   [store_dir] and [context_dir] the current state of the node and
+   produces a snapshot, of the given [snapshot_format], in
+   [snapshot_file] if it is provided. Otherwise, a snapshot file name
+   is automatically generated using the target block as hint. If
+   [rolling] is set, only the necessary blocks will be exported. If
+   [on_disk] is set, uses an on-disk index to reduce the memory usage of the
+   export.*)
 val export :
   ?snapshot_path:string ->
   snapshot_format ->
@@ -177,20 +179,24 @@ val export :
   store_dir:string ->
   context_dir:string ->
   chain_name:Distributed_db_version.Name.t ->
+  on_disk:bool ->
   Genesis.t ->
   unit tzresult Lwt.t
 
 (** [import ~snapshot_path ?patch_context ?block ?check_consistency
    ~dst_store_dir ~dst_context_dir chain_name ~user_activated_upgrades
-   ~user_activated_protocol_overrides genesis] populates
-   [dst_store_dir] and [dst_context_dir] with the data contained in
-   the [snapshot_file]. If [check_consistency] is unset, less security
-   checks will be made and the import process will be more
-   efficient. If [block] is set, the import process will make sure
-   that the block is the correct one we load. [patch_context],
-   [user_activated_upgrades] and [user_activated_protocol_overrides]
-   are passed to the validator in order to validate the target
-   block. *)
+   ~user_activated_protocol_overrides ~ops_metadata_size_limit
+   ~in_memory genesis] populates [dst_store_dir] and [dst_context_dir]
+   with the data contained in the [snapshot_file]. If
+   [check_consistency] is unset, less security checks will be made and
+   the import process will be more efficient. If [block] is set, the
+   import process will make sure that the block is the correct one we
+   load. [patch_context], [user_activated_upgrades] and
+   [user_activated_protocol_overrides] are passed to the validator in
+   order to validate the target block. [ops_metadata_size_limit]
+   determines the maximal size of the metadata to store while
+   importing a snapshot. [in_memory] states if the import should be
+   all in memory, which is faster but uses more memory. *)
 val import :
   snapshot_path:string ->
   ?patch_context:(Context.t -> Context.t tzresult Lwt.t) ->
@@ -203,6 +209,7 @@ val import :
   user_activated_upgrades:User_activated.upgrades ->
   user_activated_protocol_overrides:User_activated.protocol_overrides ->
   operation_metadata_size_limit:int option ->
+  in_memory:bool ->
   Genesis.t ->
   unit tzresult Lwt.t
 

@@ -615,6 +615,13 @@ end
 
 let current_version = Version.current_version
 
+(* The [default_index_log_size] defines the default maximal value for
+   the log_size, used by the index for storing in memory values, while
+   importing a snapshot. The current limit of 30M aims to target
+   around 1GB of memory usage. Increasing this variable may slightly
+   reduce the import time. *)
+let default_index_log_size = 30_000_000
+
 type metadata = {
   chain_name : Distributed_db_version.Name.t;
   history_mode : History_mode.t;
@@ -1302,7 +1309,8 @@ module type EXPORTER = sig
     export_block:Store.Block.t ->
     unit Lwt.t
 
-  val dump_context : t -> Context.index -> Context_hash.t -> int tzresult Lwt.t
+  val dump_context :
+    t -> Context.index -> Context_hash.t -> on_disk:bool -> int tzresult Lwt.t
 
   val copy_cemented_block :
     t -> file:string -> start_level:int32 -> end_level:int32 -> unit Lwt.t
@@ -1391,7 +1399,7 @@ module Raw_exporter : EXPORTER = struct
       (fun () -> Lwt_utils_unix.write_bytes fd bytes)
       (fun () -> Lwt_unix.close fd)
 
-  let dump_context t context_index context_hash =
+  let dump_context t context_index context_hash ~on_disk =
     let open Lwt_syntax in
     let* fd =
       Lwt_unix.openfile
@@ -1400,7 +1408,7 @@ module Raw_exporter : EXPORTER = struct
         0o444
     in
     Lwt.finalize
-      (fun () -> Context.dump_context context_index context_hash ~fd)
+      (fun () -> Context.dump_context context_index context_hash ~fd ~on_disk)
       (fun () -> Lwt_unix.close fd)
 
   let copy_cemented_block t ~file ~start_level ~end_level =
@@ -1626,11 +1634,11 @@ module Tar_exporter : EXPORTER = struct
       ~f:(fun fd -> Lwt_utils_unix.write_bytes fd bytes)
       ~filename:Naming.(snapshot_block_data_file t.snapshot_tar |> file_path)
 
-  let dump_context t context_index context_hash =
+  let dump_context t context_index context_hash ~on_disk =
     Onthefly.add_raw_and_finalize
       t.tar
       ~f:(fun context_fd ->
-        Context.dump_context context_index context_hash ~fd:context_fd)
+        Context.dump_context context_index context_hash ~fd:context_fd ~on_disk)
       ~filename:Naming.(snapshot_context_file t.snapshot_tar |> file_path)
 
   let copy_cemented_block t ~file ~start_level ~end_level =
@@ -1815,6 +1823,7 @@ module type Snapshot_exporter = sig
     store_dir:string ->
     context_dir:string ->
     chain_name:Distributed_db_version.Name.t ->
+    on_disk:bool ->
     Genesis.t ->
     unit tzresult Lwt.t
 end
@@ -2446,12 +2455,12 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
         fail (Invalid_chain_store_export (chain_id, Naming.dir_path store_dir))
 
   let export ?snapshot_path ?(rolling = false) ~block ~store_dir ~context_dir
-      ~chain_name genesis =
+      ~chain_name ~on_disk genesis =
     let open Lwt_tzresult_syntax in
     let chain_id = Chain_id.of_block_hash genesis.Genesis.block in
     let* () = ensure_valid_export_chain_dir store_dir chain_id in
     let* snapshot_exporter = init snapshot_path in
-    (* Register a clean up callback to prevent export cancelation not
+    (* Register a clean up callback to prevent export cancellation not
        to be correctly cleaned. *)
     let cleaner_id =
       Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _ ->
@@ -2511,6 +2520,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
               snapshot_exporter
               context_index
               (Store.Block.context_hash pred_block)
+              ~on_disk
           in
           let* () =
             export_floating_block_stream snapshot_exporter floating_block_stream
@@ -2702,6 +2712,7 @@ module type IMPORTER = sig
     expected_context_hash:Context_hash.t ->
     nb_context_elements:int ->
     legacy:bool ->
+    in_memory:bool ->
     unit tzresult Lwt.t
 
   val load_protocol_table :
@@ -2772,7 +2783,7 @@ module Raw_importer : IMPORTER = struct
     | None -> fail (Cannot_read {kind = `Block_data; path = file})
 
   let restore_context t context_index ~expected_context_hash
-      ~nb_context_elements ~legacy =
+      ~nb_context_elements ~legacy ~in_memory =
     let open Lwt_tzresult_syntax in
     let context_file_path =
       Naming.(snapshot_context_file t.snapshot_dir |> file_path)
@@ -2802,6 +2813,7 @@ module Raw_importer : IMPORTER = struct
             ~fd
             ~nb_context_elements
             ~legacy
+            ~in_memory
         in
         (* FIXME: Is this test really usefull? *)
         let*! current = Lwt_unix.lseek fd 0 Lwt_unix.SEEK_CUR in
@@ -3050,7 +3062,7 @@ module Tar_importer : IMPORTER = struct
     | None -> fail (Cannot_read {kind = `Block_data; path = filename})
 
   let restore_context t context_index ~expected_context_hash
-      ~nb_context_elements ~legacy =
+      ~nb_context_elements ~legacy ~in_memory =
     let open Lwt_tzresult_syntax in
     let filename = Naming.(snapshot_context_file t.snapshot_tar |> file_path) in
     let* header =
@@ -3066,6 +3078,7 @@ module Tar_importer : IMPORTER = struct
       ~nb_context_elements
       ~fd
       ~legacy
+      ~in_memory
 
   let load_protocol_table t =
     let open Lwt_tzresult_syntax in
@@ -3287,6 +3300,7 @@ module type Snapshot_importer = sig
     user_activated_upgrades:User_activated.upgrades ->
     user_activated_protocol_overrides:User_activated.protocol_overrides ->
     operation_metadata_size_limit:int option ->
+    in_memory:bool ->
     Genesis.t ->
     (unit, error trace) result Lwt.t
 end
@@ -3432,8 +3446,8 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
 
   let restore_and_apply_context snapshot_importer ?user_expected_block
       ~context_index ~user_activated_upgrades ~user_activated_protocol_overrides
-      ~operation_metadata_size_limit ~legacy snapshot_metadata genesis chain_id
-      =
+      ~operation_metadata_size_limit ~legacy ~in_memory snapshot_metadata
+      genesis chain_id =
     let open Lwt_tzresult_syntax in
     (* Start by committing genesis *)
     let* genesis_ctxt_hash =
@@ -3479,6 +3493,7 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
         ~expected_context_hash:predecessor_header.Block_header.shell.context
         ~nb_context_elements:snapshot_metadata.context_elements
         ~legacy
+        ~in_memory
     in
     let pred_context_hash = predecessor_header.shell.context in
     let* predecessor_context =
@@ -3534,7 +3549,7 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
       ?(check_consistency = true) ~dst_store_dir ~dst_context_dir ~chain_name
       ~configured_history_mode ~user_activated_upgrades
       ~user_activated_protocol_overrides ~operation_metadata_size_limit
-      (genesis : Genesis.t) =
+      ~in_memory (genesis : Genesis.t) =
     let open Lwt_tzresult_syntax in
     let chain_id = Chain_id.of_block_hash genesis.Genesis.block in
     let*! snapshot_importer = init ~snapshot_path ~dst_store_dir chain_id in
@@ -3594,6 +3609,10 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
       | None -> return_unit
     in
     let*! () =
+      if not in_memory then Event.(emit import_on_disk_mode) ()
+      else Lwt.return_unit
+    in
+    let*! () =
       import_log_notice
         ~snapshot_header:(Current_header snapshot_header)
         snapshot_path
@@ -3605,6 +3624,7 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
       Context.init
         ~readonly:false
         ~indexing_strategy
+        ~index_log_size:default_index_log_size
         ?patch_context
         dst_context_dir
     in
@@ -3621,6 +3641,7 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
         genesis
         chain_id
         ~legacy
+        ~in_memory
     in
     (* Restore store *)
     (* Restore protocols *)
@@ -3748,7 +3769,7 @@ let snapshot_file_kind ~snapshot_path =
         return Tar)
 
 let export ?snapshot_path export_format ?rolling ~block ~store_dir ~context_dir
-    ~chain_name genesis =
+    ~chain_name ~on_disk genesis =
   let (module Exporter) =
     match export_format with
     | Tar -> (module Make_snapshot_exporter (Tar_exporter) : Snapshot_exporter)
@@ -3761,6 +3782,7 @@ let export ?snapshot_path export_format ?rolling ~block ~store_dir ~context_dir
     ~store_dir
     ~context_dir
     ~chain_name
+    ~on_disk
     genesis
 
 let read_snapshot_header ~snapshot_path =
@@ -3777,7 +3799,7 @@ let read_snapshot_header ~snapshot_path =
 let import ~snapshot_path ?patch_context ?block ?check_consistency
     ~dst_store_dir ~dst_context_dir ~chain_name ~configured_history_mode
     ~user_activated_upgrades ~user_activated_protocol_overrides
-    ~operation_metadata_size_limit genesis =
+    ~operation_metadata_size_limit ~in_memory genesis =
   let open Lwt_tzresult_syntax in
   let* kind = snapshot_file_kind ~snapshot_path in
   let (module Importer) =
@@ -3798,4 +3820,5 @@ let import ~snapshot_path ?patch_context ?block ?check_consistency
     ~user_activated_upgrades
     ~user_activated_protocol_overrides
     ~operation_metadata_size_limit
+    ~in_memory
     genesis

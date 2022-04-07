@@ -119,6 +119,7 @@ let export_import ~test_descr ~previously_baked_blocks ?exported_block_hash
       ~store_dir
       ~context_dir
       ~chain_name
+      ~on_disk:false
       genesis
   in
   let dir = store_dir // "imported_store" in
@@ -135,6 +136,7 @@ let export_import ~test_descr ~previously_baked_blocks ?exported_block_hash
       ~user_activated_upgrades:[]
       ~user_activated_protocol_overrides:[]
       ~operation_metadata_size_limit:None
+      ~in_memory:false
       genesis
   in
   let* store' =
@@ -505,6 +507,7 @@ let test_rolling () =
         ~store_dir
         ~context_dir
         ~chain_name
+        ~on_disk:false
         genesis
     in
     let* () =
@@ -517,6 +520,7 @@ let test_rolling () =
         ~user_activated_upgrades:[]
         ~user_activated_protocol_overrides:[]
         ~operation_metadata_size_limit:None
+        ~in_memory:false
         genesis
     in
     let* store' =
@@ -631,6 +635,7 @@ let test_drag_after_import () =
         ~store_dir
         ~context_dir
         ~chain_name
+        ~on_disk:false
         genesis
     in
     let* () =
@@ -644,6 +649,7 @@ let test_drag_after_import () =
         ~user_activated_protocol_overrides:[]
         ~operation_metadata_size_limit:None
         ~block:export_block_hash
+        ~in_memory:false
         genesis
     in
     let* store' =

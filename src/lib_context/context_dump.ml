@@ -432,13 +432,14 @@ module Make (I : Dump_interface) = struct
     let bytes = Data_encoding.Binary.to_bytes_exn command_encoding Eof in
     set_mbytes written context_fd buf bytes
 
-  let serialize_tree written context_fd ~notify buf tree idx =
+  let serialize_tree written context_fd ~notify ~on_disk buf tree idx =
     I.tree_iteri_unique
+      ~on_disk
       idx
       (fun sub_tree -> set_tree written context_fd ~notify buf sub_tree)
       tree
 
-  let dump_context_fd idx context_hash ~context_fd =
+  let dump_context_fd idx context_hash ~context_fd ~on_disk =
     let open Lwt_tzresult_syntax in
     (* Dumping *)
     let buf = Buffer.create 1_000_000 in
@@ -465,7 +466,14 @@ module Make (I : Dump_interface) = struct
                 let*! () = set_root written context_fd buf in
                 let tree = I.context_tree ctxt in
                 let*! elements =
-                  serialize_tree written context_fd ~notify buf tree idx
+                  serialize_tree
+                    written
+                    context_fd
+                    ~notify
+                    ~on_disk
+                    buf
+                    tree
+                    idx
                 in
                 let parents = I.context_parents ctxt in
                 let*! () =
@@ -481,12 +489,13 @@ module Make (I : Dump_interface) = struct
 
   (* Restoring *)
 
-  let restore_context_fd index ~expected_context_hash ~fd ~nb_context_elements =
+  let restore_context_fd index ~expected_context_hash ~fd ~nb_context_elements
+      ~in_memory =
     let open Lwt_tzresult_syntax in
     let read = ref 0 in
     let rbuf = ref (fd, Bytes.empty, 0, read) in
     (* Editing the repository *)
-    let import_t = I.v_import index in
+    let import_t = I.v_import ~in_memory index in
     let save_inode = I.save_inode index import_t in
     let add_inode i =
       let*! tree = save_inode i in
