@@ -429,7 +429,9 @@ val update_grafana_dashboard : Grafana.dashboard -> unit
             "gitlab_project_url": "https://gitlab.com/org/repo",
             "timeout": 20,
             "rate_limit_per_category": 84600,
-            "last_alerts_filename", "last_alerts.json"
+            "last_alerts_filename", "last_alerts.json",
+            "max_alert_size": 1000,
+            "max_alert_lines": 20
         },
         "influxdb": {
             "url": "https://localhost:8086",
@@ -475,6 +477,12 @@ v}
       - [last_alerts_filename] is the name of the file where to store the
         last time an alert was sent for each category
         (optional, default value is ["last_alerts.json"]);
+      - [max_alert_size] is the maximum length of alert messages, in bytes:
+        messages which are longer are truncated to this size and an ellipsis
+        (["[...]"]) is appended (optional, default value is 1000);
+      - [max_alert_lines] is the maximum number of lines of alert messages:
+        messages with more lines are truncated and an ellipsis is appended
+        (optional, default value is 20);
 
     - [influxdb] configures how to send and query data points
       (optional, data points are not sent nor queried if not specified);
