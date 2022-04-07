@@ -29,10 +29,12 @@ let mkdir dirname =
 module Make (P : Sigs.PROTOCOL) : Sigs.MAIN = struct
   module ExprMap = Map.Make (P.Script.Hash)
 
+  type storage = {contract : P.Contract.repr; storage : P.Script.expr}
+
   type contract = {
     script : P.Script.expr;
     addresses : P.Contract.repr list;
-    storages : P.Script.expr ExprMap.t;
+    storages : storage ExprMap.t;
   }
 
   module File_helpers = struct
@@ -298,7 +300,7 @@ module Make (P : Sigs.PROTOCOL) : Sigs.MAIN = struct
                 | Error `AlreadyWarned -> fun x -> x
                 | Ok storage ->
                     let key = hash_expr storage in
-                    fun storages -> ExprMap.add key storage storages
+                    fun storages -> ExprMap.add key {contract; storage} storages
               else Lwt.return (fun x -> x)
             in
             let key = hash_expr script in
@@ -368,7 +370,8 @@ module Make (P : Sigs.PROTOCOL) : Sigs.MAIN = struct
     in
     (if Config.collect_storage then
      let dirname = Filename.concat output_dir (hash_string ^ ".storage") in
-     File_helpers.print_expr_dir ~dirname ~ext:".storage" ctr.storages) ;
+     let storages = ExprMap.map (fun {storage; _} -> storage) ctr.storages in
+     File_helpers.print_expr_dir ~dirname ~ext:".storage" storages) ;
     return @@ Contract_size.add contract_size total_size
 
   let main ~output_dir ctxt ~head : unit tzresult Lwt.t =
@@ -414,9 +417,8 @@ module Make (P : Sigs.PROTOCOL) : Sigs.MAIN = struct
                 Michelson_helpers.get_script_storage_type ctxt script
               in
               ExprMap.fold_es
-                (fun storage_hash storage_expr exprs ->
-                  return
-                  @@ add_typed_expr storage_hash storage_expr ty_hash ty exprs)
+                (fun storage_hash {contract = _; storage} exprs ->
+                  return @@ add_typed_expr storage_hash storage ty_hash ty exprs)
                 storages
                 exprs)
             contract_map
