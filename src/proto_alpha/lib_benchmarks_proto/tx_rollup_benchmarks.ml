@@ -107,4 +107,79 @@ module Inbox_add_message : Benchmark.S = struct
     Generator.Plain {workload; closure}
 end
 
+module Commitment_full_compact_bench : Benchmark.S = struct
+  open Tx_rollup_commitment_repr
+
+  let name = "Commitment_full_compact_bench"
+
+  let info = "Benchmark for Tx_rollup_commitment_repr.Full.compact"
+
+  let tags = ["tx_rollup"; "merkle"; "commitment"; "compact"]
+
+  type config = {max_messages : int}
+
+  let default_config = {max_messages = 10000}
+
+  let config_encoding =
+    let open Data_encoding in
+    conv
+      (fun {max_messages} -> max_messages)
+      (fun max_messages -> {max_messages})
+      int31
+
+  type workload = Tx_rollup_commitment_repr.Full.t
+
+  let workload_encoding = Tx_rollup_commitment_repr.Full.encoding
+
+  let workload_to_vector {messages; _} =
+    Sparse_vec.String.of_list
+      [("n_messages", float_of_int @@ List.length messages)]
+
+  let models =
+    let conv {messages; _} = (List.length messages, ()) in
+    [
+      ( "tx_rollup",
+        Model.make
+          ~conv
+          ~model:
+            (Model.affine
+               ~intercept:
+                 (Free_variable.of_string "full_compact_bench_intercept")
+               ~coeff:(Free_variable.of_string "n_messages_coeff")) );
+    ]
+
+  let create_benchmarks ~rng_state ~bench_num ({max_messages} : config) =
+    List.repeat bench_num @@ fun () ->
+    let n_messages =
+      Base_samplers.sample_in_interval
+        ~range:{min = 1; max = max_messages}
+        rng_state
+    in
+    let message_result_hash rng_state : Tx_rollup_message_result_hash_repr.t =
+      let size = Tx_rollup_message_result_hash_repr.size in
+      let bytes =
+        Base_samplers.bytes ~size:{min = size; max = size} rng_state
+      in
+      Tx_rollup_message_result_hash_repr.of_bytes_exn bytes
+    in
+    let workload =
+      let level = Tx_rollup_level_repr.root in
+      let predecessor = None in
+      let inbox_merkle_root =
+        Tx_rollup_inbox_repr.Merkle.root Tx_rollup_inbox_repr.Merkle.empty
+      in
+      (* AFAICT, the values above have no influence on the execution time of [compact] *)
+      let messages = List.repeat n_messages (message_result_hash rng_state) in
+      {level; messages; predecessor; inbox_merkle_root}
+    in
+    let closure () =
+      ignore
+        (Tx_rollup_commitment_repr.Full.compact workload
+          : Tx_rollup_commitment_repr.Compact.t)
+    in
+    Generator.Plain {workload; closure}
+end
+
 let () = Registration_helpers.register (module Inbox_add_message)
+
+let () = Registration_helpers.register (module Commitment_full_compact_bench)
