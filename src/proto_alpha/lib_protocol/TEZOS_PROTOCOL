@@ -75,6 +75,8 @@
         "Receipt_repr",
         "Migration_repr",
         "Sc_rollup_tick_repr",
+        "Carbonated_map_costs",
+        "Carbonated_map",
 
         "Raw_context_intf",
         "Raw_context",
@@ -132,8 +134,6 @@
         "Script_string",
         "Script_int",
         "Script_timestamp",
-        "Carbonated_map_costs",
-        "Carbonated_map",
 
         "Tx_rollup_l2_storage_sig",
         "Tx_rollup_l2_context_sig",

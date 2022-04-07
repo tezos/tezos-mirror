@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Trili Tech, <contact@trili.tech>                       *)
+(* Copyright (c) 2021-2022 Trili Tech, <contact@trili.tech>                  *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,24 +23,25 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** The type of the cost.*)
+type cost = Saturation_repr.may_saturate Saturation_repr.t
+
 (** The [Carbonated_map_costs] module contains gas cost functions for
     [Carbonated_map].
-*)
+  *)
 
 (** [find_cost ~compare_key_cost ~size] returns the gas cost for looking up an
     element from a map of size [size]. The user of this function is responsible
     for providing a correct value of [compare_key_cost], representing the cost
     of comparing elements with a given key.
-*)
-val find_cost :
-  compare_key_cost:Alpha_context.Gas.cost -> size:int -> Alpha_context.Gas.cost
+  *)
+val find_cost : compare_key_cost:cost -> size:int -> cost
 
 (** [update_cost ~compare_key_cost ~size] returns the gas cost for updating an
     element in a map of size [size]. The user of this function is responsible
     for providing a correct value of [compare_key_cost], representing the cost
     of comparing elements with a given key. *)
-val update_cost :
-  compare_key_cost:Alpha_context.Gas.cost -> size:int -> Alpha_context.Gas.cost
+val update_cost : compare_key_cost:cost -> size:int -> cost
 
 (** [fold_cost ~size] returns the cost of folding over a list of size [size]. *)
-val fold_cost : size:int -> Alpha_context.Gas.cost
+val fold_cost : size:int -> cost

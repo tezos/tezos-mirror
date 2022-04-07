@@ -26,13 +26,20 @@
 open Alpha_context
 
 (** A carbonated map where the keys are [Ticket_hash.t] values. *)
-module Ticket_token_map = Carbonated_map.Make (struct
-  type t = Ticket_hash.t
+module Ticket_token_map =
+  Carbonated_map.Make
+    (struct
+      type context = Alpha_context.context
 
-  let compare = Ticket_hash.compare
+      let consume = Alpha_context.Gas.consume
+    end)
+    (struct
+      type t = Ticket_hash.t
 
-  let compare_cost _ = Ticket_costs.Constants.cost_compare_ticket_hash
-end)
+      let compare = Ticket_hash.compare
+
+      let compare_cost _ = Ticket_costs.Constants.cost_compare_ticket_hash
+    end)
 
 (** Conceptually a map from [Ticket_token.ex_token] to values. Since
     ticket-tokens are expensive to compare we use [Ticket_hash.t] keys instead,

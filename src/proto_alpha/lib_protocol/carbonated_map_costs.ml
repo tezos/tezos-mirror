@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Trili Tech, <contact@trili.tech>                       *)
+(* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -22,8 +22,11 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
-open Alpha_context
+
 module S = Saturation_repr
+open Gas_limit_repr
+
+type cost = Saturation_repr.may_saturate Saturation_repr.t
 
 (** This is a good enough approximation *)
 let log2 x = S.safe_int (1 + S.numbits x)
@@ -40,7 +43,6 @@ let log2 x = S.safe_int (1 + S.numbits x)
     - [traversal_overhead] is for the overhead of log2 steps walking the tree
  *)
 let find_cost ~compare_key_cost ~size =
-  let open Gas in
   let intercept = S.safe_int 50 in
   let size = S.safe_int size in
   let compare_cost = log2 size *@ compare_key_cost in
@@ -58,11 +60,11 @@ let find_cost ~compare_key_cost ~size =
     providing an overestimate by doubling the cost of [find].
   *)
 let update_cost ~compare_key_cost ~size =
-  Gas.(S.safe_int 2 *@ find_cost ~compare_key_cost ~size)
+  S.safe_int 2 *@ find_cost ~compare_key_cost ~size
 
 (** Collect benchmark from [Carbonated_map_benchmarks.Fold_benchmark].
 
     The cost of producing a list of elements is linear in the size of the map
     and does not depend on the size of the elements nor keys.
 *)
-let fold_cost ~size = Gas.(S.safe_int 50 +@ (S.safe_int 24 *@ S.safe_int size))
+let fold_cost ~size = S.safe_int 50 +@ (S.safe_int 24 *@ S.safe_int size)
