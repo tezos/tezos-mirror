@@ -70,15 +70,6 @@ type step_constants = Script_typed_ir.step_constants = {
   level : Script_int.n Script_int.num;
 }
 
-val step :
-  logger option ->
-  context ->
-  Script_typed_ir.step_constants ->
-  ('a, 's, 'r, 'f) Script_typed_ir.kdescr ->
-  'a ->
-  's ->
-  ('r * 'f * context) tzresult Lwt.t
-
 (** [execute ?logger ctxt ~cached_script mode step_constant ~script
    ~entrypoint ~parameter ~internal] interprets the [script]'s
    [entrypoint] for a given [parameter].
@@ -132,22 +123,6 @@ val execute_with_typed_parameter :
   internal:bool ->
   (execution_result * context) tzresult Lwt.t
 
-(** [kstep logger ctxt step_constants kinstr accu stack] interprets the
-    script represented by [kinstr] under the context [ctxt]. This will
-    turn a stack whose topmost element is [accu] and remaining elements
-    [stack] into a new accumulator and a new stack. This function also
-    returns an updated context. If [logger] is given, [kstep] calls back
-    its functions at specific points of the execution. The execution is
-    parameterized by some [step_constants]. *)
-val kstep :
-  logger option ->
-  context ->
-  step_constants ->
-  ('a, 's, 'r, 'f) Script_typed_ir.kinstr ->
-  'a ->
-  's ->
-  ('r * 'f * context) tzresult Lwt.t
-
 (** Internal interpretation loop
     ============================
 
@@ -193,4 +168,29 @@ module Internals : sig
     * Local_gas_counter.local_gas_counter)
     tzresult
     Lwt.t
+
+  val step_descr :
+    logger option ->
+    context ->
+    Script_typed_ir.step_constants ->
+    ('a, 's, 'r, 'f) Script_typed_ir.kdescr ->
+    'a ->
+    's ->
+    ('r * 'f * context) tzresult Lwt.t
+
+  (** [kstep logger ctxt step_constants kinstr accu stack] interprets the
+      script represented by [kinstr] under the context [ctxt]. This will
+      turn a stack whose topmost element is [accu] and remaining elements
+      [stack] into a new accumulator and a new stack. This function also
+      returns an updated context. If [logger] is given, [kstep] calls back
+      its functions at specific points of the execution. The execution is
+      parameterized by some [step_constants]. *)
+  val kstep :
+    logger option ->
+    context ->
+    step_constants ->
+    ('a, 's, 'r, 'f) Script_typed_ir.kinstr ->
+    'a ->
+    's ->
+    ('r * 'f * context) tzresult Lwt.t
 end
