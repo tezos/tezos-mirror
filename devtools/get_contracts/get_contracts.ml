@@ -41,7 +41,16 @@ module Make (P : Sigs.PROTOCOL) : Sigs.MAIN = struct
 
   module ExprMap = Map.Make (P.Script.Hash)
 
-  type storage = {contract : P.Contract.repr; storage : P.Script.expr}
+  type gas = {
+    code_costs : serialization_costs;
+    storage_costs : serialization_costs;
+  }
+
+  type storage = {
+    contract : P.Contract.repr;
+    storage : P.Script.expr;
+    gas : gas;
+  }
 
   type contract = {
     script : P.Script.expr;
@@ -297,7 +306,7 @@ module Make (P : Sigs.PROTOCOL) : Sigs.MAIN = struct
         in
         match code_opt with
         | Error `AlreadyWarned -> Lwt.return (m, i)
-        | Ok (script, _costs) ->
+        | Ok (script, code_costs) ->
             let+ add_storage =
               if Config.(collect_lambdas || collect_storage) then
                 let+ storage_opt =
@@ -310,9 +319,11 @@ module Make (P : Sigs.PROTOCOL) : Sigs.MAIN = struct
                 in
                 match storage_opt with
                 | Error `AlreadyWarned -> fun x -> x
-                | Ok (storage, _costs) ->
+                | Ok (storage, storage_costs) ->
                     let key = hash_expr storage in
-                    fun storages -> ExprMap.add key {contract; storage} storages
+                    fun storages ->
+                      let gas = {code_costs; storage_costs} in
+                      ExprMap.add key {contract; storage; gas} storages
               else Lwt.return (fun x -> x)
             in
             let key = hash_expr script in
@@ -429,7 +440,7 @@ module Make (P : Sigs.PROTOCOL) : Sigs.MAIN = struct
                 Michelson_helpers.get_script_storage_type ctxt script
               in
               ExprMap.fold_es
-                (fun storage_hash {contract = _; storage} exprs ->
+                (fun storage_hash {contract = _; storage; gas = _} exprs ->
                   return @@ add_typed_expr storage_hash storage ty_hash ty exprs)
                 storages
                 exprs)
