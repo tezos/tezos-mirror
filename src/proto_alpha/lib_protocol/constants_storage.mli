@@ -128,3 +128,11 @@ val sc_rollup_origination_size : Raw_context.t -> int
 val sc_rollup_challenge_window_in_blocks : Raw_context.t -> int
 
 val sc_rollup_max_available_messages : Raw_context.t -> int
+
+val sc_rollup_stake_amount_in_mutez : Raw_context.t -> int
+
+val sc_rollup_commitment_frequency_in_blocks : Raw_context.t -> int
+
+val sc_rollup_commitment_storage_size_in_bytes : Raw_context.t -> int
+
+val sc_rollup_max_lookahead_in_blocks : Raw_context.t -> int32

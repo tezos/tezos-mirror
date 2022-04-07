@@ -441,18 +441,6 @@ let withdraw_stake ctxt rollup staker =
         modify_staker_count ctxt rollup Int32.pred
       else fail Sc_rollup_not_staked_on_lcc
 
-(* TODO https://gitlab.com/tezos/tezos/-/issues/2548
-   These should be protocol constants. See issue for invariant that should be
-   tested for. *)
-let sc_rollup_max_lookahead = 30_000l
-
-let sc_rollup_commitment_frequency =
-  (* Think twice before changing this. And then avoid doing it. *)
-  20
-
-(* 76 for Commitments entry + 4 for Commitment_stake_count entry + 4 for Commitment_added entry *)
-let sc_rollup_commitment_storage_size_in_bytes = 84
-
 let assert_commitment_not_too_far_ahead ctxt rollup lcc commitment =
   let open Lwt_tzresult_syntax in
   let* (ctxt, min_level) =
@@ -465,6 +453,9 @@ let assert_commitment_not_too_far_ahead ctxt rollup lcc commitment =
   in
   let max_level = Commitment.(commitment.inbox_level) in
   if
+    let sc_rollup_max_lookahead =
+      Constants_storage.sc_rollup_max_lookahead_in_blocks ctxt
+    in
     Compare.Int32.(
       sc_rollup_max_lookahead < Raw_level_repr.diff max_level min_level)
   then fail Sc_rollup_too_far_ahead
@@ -503,6 +494,9 @@ let assert_commitment_frequency ctxt rollup commitment =
      Because [a >= b && a = b] is equivalent to [a = b], we can the latter as
      an optimization.
   *)
+  let sc_rollup_commitment_frequency =
+    Constants_storage.sc_rollup_commitment_frequency_in_blocks ctxt
+  in
   if
     Raw_level_repr.(
       commitment.inbox_level = add pred_level sc_rollup_commitment_frequency)
@@ -549,16 +543,20 @@ let refine_stake ctxt rollup staker commitment =
       let* (stake_count_size_diff, ctxt) =
         increase_commitment_stake_count ctxt rollup new_hash
       in
+      (* WARNING: [commitment_storage_size] is a defined constant, and used
+         to set a bound on the relationship between [max_lookahead],
+         [commitment_frequency] and [stake_amount].  Be careful changing this
+         calculation. *)
       let size_diff =
         commitment_size_diff + commitment_added_size_diff
         + stake_count_size_diff + staker_count_diff
       in
+      let expected_size_diff =
+        Constants_storage.sc_rollup_commitment_storage_size_in_bytes ctxt
+      in
       (* First submission adds [sc_rollup_commitment_storage_size_in_bytes] to storage.
          Later submission adds 0 due to content-addressing. *)
-      assert (
-        Compare.Int.(
-          size_diff = 0
-          || size_diff = sc_rollup_commitment_storage_size_in_bytes)) ;
+      assert (Compare.Int.(size_diff = 0 || size_diff = expected_size_diff)) ;
       return (new_hash, ctxt) (* See WARNING above. *))
     else if Commitment_hash.(node = lcc) then
       (* We reached the LCC, but [staker] is not staked directly on it.

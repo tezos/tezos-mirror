@@ -91,6 +91,10 @@ module Protocol_constants_overrides = struct
     sc_rollup_origination_size : int option;
     sc_rollup_challenge_window_in_blocks : int option;
     sc_rollup_max_available_messages : int option;
+    sc_rollup_stake_amount_in_mutez : int option;
+    sc_rollup_commitment_frequency_in_blocks : int option;
+    sc_rollup_commitment_storage_size_in_bytes : int option;
+    sc_rollup_max_lookahead_in_blocks : int32 option;
     (* Additional, "bastard" parameters (they are not protocol constants but partially treated the same way). *)
     chain_id : Chain_id.t option;
     timestamp : Time.Protocol.t option;
@@ -158,7 +162,11 @@ module Protocol_constants_overrides = struct
                     ( c.sc_rollup_enable,
                       c.sc_rollup_origination_size,
                       c.sc_rollup_challenge_window_in_blocks,
-                      c.sc_rollup_max_available_messages ) ) ) ) ) ) ))
+                      c.sc_rollup_max_available_messages,
+                      c.sc_rollup_stake_amount_in_mutez,
+                      c.sc_rollup_commitment_frequency_in_blocks,
+                      c.sc_rollup_commitment_storage_size_in_bytes,
+                      c.sc_rollup_max_lookahead_in_blocks ) ) ) ) ) ) ))
       (fun ( ( preserved_cycles,
                blocks_per_cycle,
                blocks_per_commitment,
@@ -215,7 +223,11 @@ module Protocol_constants_overrides = struct
                        ( sc_rollup_enable,
                          sc_rollup_origination_size,
                          sc_rollup_challenge_window_in_blocks,
-                         sc_rollup_max_available_messages ) ) ) ) ) ) ) ->
+                         sc_rollup_max_available_messages,
+                         sc_rollup_stake_amount_in_mutez,
+                         sc_rollup_commitment_frequency_in_blocks,
+                         sc_rollup_commitment_storage_size_in_bytes,
+                         sc_rollup_max_lookahead_in_blocks ) ) ) ) ) ) ) ->
         {
           preserved_cycles;
           blocks_per_cycle;
@@ -271,6 +283,10 @@ module Protocol_constants_overrides = struct
           sc_rollup_origination_size;
           sc_rollup_challenge_window_in_blocks;
           sc_rollup_max_available_messages;
+          sc_rollup_stake_amount_in_mutez;
+          sc_rollup_commitment_frequency_in_blocks;
+          sc_rollup_commitment_storage_size_in_bytes;
+          sc_rollup_max_lookahead_in_blocks;
           chain_id;
           timestamp;
           initial_seed;
@@ -348,11 +364,19 @@ module Protocol_constants_overrides = struct
                               (opt "tx_rollup_max_ticket_payload_size" int31)
                               (opt "tx_rollup_rejection_max_proof_size" int31)
                               (opt "tx_rollup_sunset_level" int32)))
-                        (obj4
+                        (obj8
                            (opt "sc_rollup_enable" bool)
                            (opt "sc_rollup_origination_size" int31)
                            (opt "sc_rollup_challenge_window_in_blocks" int31)
-                           (opt "sc_rollup_max_available_messages" int31))))))))
+                           (opt "sc_rollup_max_available_messages" int31)
+                           (opt "sc_rollup_stake_amount_in_mutez" int31)
+                           (opt
+                              "sc_rollup_commitment_frequency_in_blocks"
+                              int31)
+                           (opt
+                              "sc_rollup_commitment_storage_size_in_bytes"
+                              int31)
+                           (opt "sc_rollup_max_lookahead_in_blocks" int32))))))))
 
   let default_value (cctxt : Tezos_client_base.Client_context.full) :
       t tzresult Lwt.t =
@@ -445,6 +469,14 @@ module Protocol_constants_overrides = struct
           Some parametric.sc_rollup_challenge_window_in_blocks;
         sc_rollup_max_available_messages =
           Some parametric.sc_rollup_max_available_messages;
+        sc_rollup_stake_amount_in_mutez =
+          Some parametric.sc_rollup_stake_amount_in_mutez;
+        sc_rollup_commitment_frequency_in_blocks =
+          Some parametric.sc_rollup_commitment_frequency_in_blocks;
+        sc_rollup_commitment_storage_size_in_bytes =
+          Some parametric.sc_rollup_commitment_storage_size_in_bytes;
+        sc_rollup_max_lookahead_in_blocks =
+          Some parametric.sc_rollup_max_lookahead_in_blocks;
         (* Bastard additional parameters. *)
         chain_id = to_chain_id_opt cpctxt#chain;
         timestamp = Some header.timestamp;
@@ -509,6 +541,10 @@ module Protocol_constants_overrides = struct
       sc_rollup_origination_size = None;
       sc_rollup_challenge_window_in_blocks = None;
       sc_rollup_max_available_messages = None;
+      sc_rollup_stake_amount_in_mutez = None;
+      sc_rollup_commitment_frequency_in_blocks = None;
+      sc_rollup_commitment_storage_size_in_bytes = None;
+      sc_rollup_max_lookahead_in_blocks = None;
       chain_id = None;
       timestamp = None;
       initial_seed = None;
@@ -997,6 +1033,22 @@ module Protocol_constants_overrides = struct
            Option.value
              ~default:c.sc_rollup_max_available_messages
              o.sc_rollup_max_available_messages;
+         sc_rollup_stake_amount_in_mutez =
+           Option.value
+             ~default:c.sc_rollup_stake_amount_in_mutez
+             o.sc_rollup_stake_amount_in_mutez;
+         sc_rollup_commitment_frequency_in_blocks =
+           Option.value
+             ~default:c.sc_rollup_commitment_frequency_in_blocks
+             o.sc_rollup_commitment_frequency_in_blocks;
+         sc_rollup_commitment_storage_size_in_bytes =
+           Option.value
+             ~default:c.sc_rollup_commitment_storage_size_in_bytes
+             o.sc_rollup_commitment_storage_size_in_bytes;
+         sc_rollup_max_lookahead_in_blocks =
+           Option.value
+             ~default:c.sc_rollup_max_lookahead_in_blocks
+             o.sc_rollup_max_lookahead_in_blocks;
        }
         : Constants.parametric)
 end
