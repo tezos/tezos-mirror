@@ -27,6 +27,48 @@
 open Tx_rollup_errors_repr
 open Alpha_context
 
+(* {{Note}} This model should be part of [Tx_rollup_gas].
+   Unfortunately, this is not possible, because this module is defined
+   on top of [Alpha_context], while [Tx_rollup_gas] is defined on top
+   of [Raw_context]. *)
+
+(** TODO: https://gitlab.com/tezos/tezos/-/issues/2773
+    Merge the benchmark used to compute this model into master and
+    reference it here. *)
+let verify_proof_model message_size proof_size =
+  let open Saturation_repr in
+  (* The cost of verifiying the proof depends bilinearly on the size
+     of the message (that is expected to capture the algoritmic
+     complexity of computation to make) and the size of the proof
+     (that is expected to capture the overhead of the storage). *)
+  let proof_size_coeff = safe_int 152 in
+  let message_size_coeff = safe_int 5_488 in
+
+  let ( * ) = mul in
+  let ( + ) = add in
+
+  (proof_size_coeff * safe_int proof_size)
+  + (message_size_coeff * safe_int message_size)
+
+let consume_verify_proof_cost ctxt ~message_size ~proof_size =
+  let max_proof_size =
+    Alpha_context.Constants.tx_rollup_rejection_max_proof_size ctxt
+  in
+  (* We are interested in having a safe over-approximation of the
+     overhead of the proof interpretation. We have trained the model
+     on data coming from contexts of various “size” (i.e., number of
+     leafs), but there is an edge case when it comes to proof
+     verification that is hard to consider correctly: when the context
+     is empty, the size is ridiculously small, no matter how many
+     transactions are executed.
+
+     As a safety net, we systematically compute a gas cost as if the
+     proof is at least the big enough to declare the message as
+     invalid (using the [tx_rollup_rejection_max_proof_size]
+     parametric constant). *)
+  Gas.consume ctxt
+  @@ verify_proof_model message_size (Compare.Int.max proof_size max_proof_size)
+
 module Verifier_storage :
   Tx_rollup_l2_storage_sig.STORAGE
     with type t = Context.tree
@@ -84,6 +126,9 @@ let compute_proof_after_hash ~max_proof_size ctxt parameters agreed proof
   let proof_length =
     Data_encoding.Binary.length Tx_rollup_l2_proof.encoding proof
   in
+  let message_length =
+    Data_encoding.Binary.length Tx_rollup_message.encoding message
+  in
   let proof_is_too_long = Compare.Int.(proof_length > max_proof_size) in
   let before = match proof.before with `Node x -> x | `Value x -> x in
   let agreed_is_correct = Context_hash.(before = agreed) in
@@ -91,6 +136,11 @@ let compute_proof_after_hash ~max_proof_size ctxt parameters agreed proof
     agreed_is_correct
     (Proof_invalid_before {provided = before; agreed})
   >>=? fun () ->
+  consume_verify_proof_cost
+    ctxt
+    ~message_size:message_length
+    ~proof_size:proof_length
+  >>?= fun ctxt ->
   Context.verify_stream_proof proof (fun tree ->
       Verifier_apply.apply_message tree parameters message >>= function
       | Ok (tree, (_, withdrawals)) -> Lwt.return (tree, withdrawals)

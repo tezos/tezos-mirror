@@ -901,16 +901,18 @@ let test_rollup_with_two_commitments =
   unit
 
 let test_rollup_last_commitment_is_rejected =
-  Protocol.register_test
+  Protocol.register_regression_test
     ~__FILE__
-    ~title:"reject last commitment"
-    ~tags:["tx_rollup"; "rejection"; "batch"]
+    ~output_file:(fun _ -> "tx_rollup_rejection")
+    ~title:"RPC (tx_rollup, regression) - rejection"
+    ~tags:["tx_rollup"; "rejection"]
   @@ fun protocol ->
   let parameters = Parameters.{finality_period = 1; withdraw_period = 1} in
   let* ({rollup; client; node = _} as state) =
     init_with_tx_rollup ~parameters ~protocol ()
   in
-  let batch = Rollup.make_batch "blob" in
+  let content = String.make 5_000 'b' in
+  let batch = Rollup.make_batch content in
   let* () = submit_batch ~batch state in
   let* () = Client.bake_for client in
   let inbox_content = `Content [batch] in
@@ -927,7 +929,7 @@ let test_rollup_last_commitment_is_rejected =
   in
   let*! _ = RPC.Tx_rollup.get_state ~rollup client in
   let*! message_hash =
-    Rollup.message_hash ~message:(Rollup.make_batch "blob") client
+    Rollup.message_hash ~message:(Rollup.make_batch content) client
   in
   let*! path =
     Rollup.inbox_merkle_tree_path
@@ -939,7 +941,7 @@ let test_rollup_last_commitment_is_rejected =
   let message =
     Format.sprintf
       "{ \"batch\": \"%s\"}"
-      (let (`Hex s) = Hex.of_string "blob" in
+      (let (`Hex s) = Hex.of_string content in
        s)
   in
   let message_result_hash =
