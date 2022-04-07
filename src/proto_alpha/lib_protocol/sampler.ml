@@ -205,7 +205,7 @@ module Mass : SMass with type t = int64 = struct
 end
 
 (* This is currently safe to do that since since at this point the values for
-   [total] is 8 * 10^8 * 10^6 and the delgates [n] = 400.
+   [total] is 8 * 10^8 * 10^6 and the delegates [n] = 400.
 
    Therefore [let q = Mass.mul p n ...] in [create] does not overflow since p <
    total.

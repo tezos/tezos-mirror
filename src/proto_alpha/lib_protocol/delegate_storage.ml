@@ -580,46 +580,44 @@ let get_stakes_for_selected_index ctxt index =
     ~index
     ~f:(fun (delegate, staking_balance) (acc, total_stake) ->
       let delegate_contract = Contract_repr.implicit_contract delegate in
-      Storage.Contract.Frozen_deposits_limit.find ctxt delegate_contract
-      >>=? fun frozen_deposits_limit ->
-      Contract_storage.get_balance_and_frozen_bonds ctxt delegate_contract
-      >>=? fun balance_and_frozen_bonds ->
-      Frozen_deposits_storage.get ctxt delegate_contract
-      >>=? fun frozen_deposits ->
-      Tez_repr.(balance_and_frozen_bonds +? frozen_deposits.current_amount)
-      >>?= fun total_balance ->
-      let frozen_deposits_percentage =
-        Constants_storage.frozen_deposits_percentage ctxt
+      let open Tez_repr in
+      let open Lwt_result_syntax in
+      let* frozen_deposits_limit =
+        Storage.Contract.Frozen_deposits_limit.find ctxt delegate_contract
       in
-      let stake_to_consider =
-        match frozen_deposits_limit with
-        | Some frozen_deposits_limit -> (
-            try
-              let open Tez_repr in
-              let max_mutez = of_mutez_exn Int64.max_int in
-              if frozen_deposits_limit > div_exn max_mutez 100 then
-                let frozen_deposits_limit_by_10 =
-                  mul_exn frozen_deposits_limit 10
-                in
-                if frozen_deposits_limit_by_10 < staking_balance then
-                  frozen_deposits_limit_by_10
-                else staking_balance
-              else
-                min
-                  staking_balance
-                  (div_exn
-                     (mul_exn frozen_deposits_limit 100)
-                     frozen_deposits_percentage)
-            with _ -> staking_balance)
-        | None -> staking_balance
+
+      let* balance_and_frozen_bonds =
+        Contract_storage.get_balance_and_frozen_bonds ctxt delegate_contract
       in
-      Tez_repr.(total_balance *? 100L) >>?= fun expanded_balance ->
-      Tez_repr.(expanded_balance /? Int64.of_int frozen_deposits_percentage)
-      >>?= fun max_staking_capacity ->
-      let stake_for_cycle =
-        Tez_repr.min stake_to_consider max_staking_capacity
+      let* frozen_deposits =
+        Frozen_deposits_storage.get ctxt delegate_contract
       in
-      Tez_repr.(total_stake +? stake_for_cycle) >>?= fun total_stake ->
+      let*? total_balance =
+        balance_and_frozen_bonds +? frozen_deposits.current_amount
+      in
+      let* stake_for_cycle =
+        let frozen_deposits_percentage =
+          Int64.of_int @@ Constants_storage.frozen_deposits_percentage ctxt
+        in
+        let max_mutez = of_mutez_exn Int64.max_int in
+        let frozen_deposits_limit =
+          match frozen_deposits_limit with Some fdp -> fdp | None -> max_mutez
+        in
+        let aux = min total_balance frozen_deposits_limit in
+        let*? overflow_bound = max_mutez /? 100L in
+        if aux <= overflow_bound then
+          let*? aux = aux *? 100L in
+          let*? v = aux /? frozen_deposits_percentage in
+          return (min v staking_balance)
+        else
+          let*? sbal = staking_balance /? 100L in
+          let*? a = aux /? frozen_deposits_percentage in
+          if sbal <= a then return staking_balance
+          else
+            let*? r = max_mutez /? frozen_deposits_percentage in
+            return r
+      in
+      let*? total_stake = Tez_repr.(total_stake +? stake_for_cycle) in
       return ((delegate, stake_for_cycle) :: acc, total_stake))
     ~init:([], Tez_repr.zero)
 
