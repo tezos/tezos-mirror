@@ -19,7 +19,7 @@ else
     rm "$BISECT_FILE"*.coverage || true
     echo "Corrupted coverage files were found, please report this in https://gitlab.com/tezos/tezos/-/issues/1529";
     if [ "${SLACK_COVERAGE_TOKEN:-}" != "" ]; then
-        scripts/send_slack_alert_coverage.sh "$SLACK_COVERAGE_TOKEN" "$SLACK_COVERAGE_CHANNEL" "$CI_PIPELINE_URL";
+        scripts/send_slack_alert_coverage.sh "$SLACK_COVERAGE_TOKEN" "$SLACK_COVERAGE_CHANNEL";
     fi
     exit 1
 fi
