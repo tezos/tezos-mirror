@@ -28,7 +28,7 @@
 (** The hash of the result of a layer-2 operation: that is, the hash
     of [(l2_ctxt_hash ^ withdraw_hash)] where [l2_ctxt_hash] is the Merkle
     tree root of the L2 context after any message (ie. deposit or batch),
-    and [withdraw_hash] is a [Tx_rollup_withdraw_repr.withdrawals_merkle_root] *)
+    and [withdraw_hash] is a [Tx_rollup_withdraw_repr.withdraw_list_hash] *)
 
 include S.HASH
 
