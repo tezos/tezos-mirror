@@ -46,6 +46,10 @@ end
 
 type tags = Tags.t
 
+val tags_encoding : tags Data_encoding.t
+
+val pp_tags : Format.formatter -> tags -> unit
+
 module Request : sig
   type 'a t =
     | Add_pending : L1_operation.t -> unit t
