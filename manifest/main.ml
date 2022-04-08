@@ -1910,6 +1910,7 @@ let tezos_shell =
     ~synopsis:
       "Tezos: core of `tezos-node` (gossip, validation scheduling, mempool, \
        ...)"
+    ~documentation:[]
     ~deps:
       [
         lwt_watcher;

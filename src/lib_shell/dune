@@ -41,3 +41,5 @@
    -open Tezos_workers
    -open Tezos_validation
    -open Tezos_version)))
+
+(documentation)
