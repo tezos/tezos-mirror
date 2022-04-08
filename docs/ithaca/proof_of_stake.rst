@@ -51,6 +51,7 @@ from the delegates' own balance.
 Active and passive delegates
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+.. _active_delegate:
 .. _active_delegate_ithaca:
 
 A delegate can be marked as either active or passive. A passive
@@ -69,6 +70,7 @@ Delegates' rights selection
 Tezos being proof-of-stake, the delegates' rights are selected at random based on their
 stake.
 
+.. _random_seed:
 .. _random_seed_ithaca:
 
 Random seed
@@ -95,6 +97,7 @@ wallet activations and denunciations can be contained in any given block.
 The seed for cycle ``n`` is obtained as follows: the seed of cycle ``n-1`` is
 hashed with a constant and then with each nonce revealed in cycle ``n-1``.
 
+.. _rights:
 .. _rights_ithaca:
 
 Slot selection
@@ -120,6 +123,7 @@ The seed of the PRNG is the :ref:`random seed <random_seed_ithaca>` associated w
 The PRNG selects a snapshot from cycle ``n - PRESERVED_CYCLES - 1`` and then it selects a stake in the selected snapshot.
 The slot owner is then the stake owner.
 
+.. _protocol_constants:
 .. _protocol_constants_ithaca:
 
 Protocol constants
@@ -133,6 +137,7 @@ The values of protocol constants can be found using a :ref:`specific RPC call <G
 
 In particular, the protocol constants related to the proof-of-stake mechanism are detailed below.
 
+.. _ps_constants:
 .. _ps_constants_ithaca:
 
 Proof-of-stake parameters

@@ -34,6 +34,7 @@ As a safety precaution, the subsidy expires automatically at a given
 level called the liquidity baking sunset level. The sunset level can
 be renewed periodically by protocol amendment.
 
+.. _esc_hatch:
 .. _esc_hatch_ithaca:
 
 Escape hatch

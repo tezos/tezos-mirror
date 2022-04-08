@@ -29,8 +29,8 @@ After a successful compilation, you should have the following binaries:
 
 The daemons other than the node are suffixed with the name of the protocol they are
 bound to, and up to some version, also by its number.
-For instance, ``tezos-baker-011-PtHangz2`` is the baker
-for the Hangzhou protocol, and ``tezos-baker-alpha`` is the baker
+For instance, ``tezos-baker-012-Psithaca`` is the baker
+for the Ithaca protocol, and ``tezos-baker-alpha`` is the baker
 of the development protocol.
 The ``tezos-node`` daemon is not suffixed by any protocol name, because it is independent of the economic protocol. See also the `Node Protocol`_ section below.
 
@@ -277,11 +277,11 @@ command::
 
     tezos-client activate account alice with "tz1__xxxxxxxxx__.json"
 
-If you run Tezos using Docker images (via the ``tezos-docker-manager.sh`` script, renamed as ``hangzhounet.sh``
-to run the Hangzhounet test network for instance), you should prefix the file
+If you run Tezos using Docker images (via the ``tezos-docker-manager.sh`` script, renamed as ``ithacanet.sh``
+to run the Ithacanet test network for instance), you should prefix the file
 with ``container:`` in order to copy it into the Docker image::
 
-    ./hangzhounet.sh client activate account alice with "container:tz1__xxxxxxxxx__.json"
+    ./ithacanet.sh client activate account alice with "container:tz1__xxxxxxxxx__.json"
 
 Let's check the balance of the new account with::
 

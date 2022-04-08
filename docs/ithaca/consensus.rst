@@ -110,6 +110,7 @@ the same *payload* as
 the initial block. We talk about a *re-proposal* in this case.
 
 
+.. _finality:
 .. _finality_ithaca:
 
 Transaction and block finality
@@ -362,6 +363,7 @@ included during that cycle has been ``3,123,456`` slots. Given that this number 
 bigger than the minimum required (``2,867,200 * 2 / 3``), it receives an endorsing
 reward of ``2,867,200 * 0.002857 = 8191.59`` tez for that cycle.
 
+.. _slashing:
 .. _slashing_ithaca:
 
 Slashing
@@ -389,6 +391,7 @@ correct validators have more than two thirds of the total stake, these correct
 validators have sufficient power for agreement to be reached, thus the lack of
 participation of a selfish baker does not have an impact.
 
+.. _cs_constants:
 .. _cs_constants_ithaca:
 
 Consensus related protocol parameters
@@ -426,6 +429,7 @@ Consensus related protocol parameters
      - ``endorsing_reward / CONSENSUS_COMMITTEE_SIZE`` = 0.002857 tez
 
 
+.. _shell_proto_revisit:
 .. _shell_proto_revisit_ithaca:
 
 Shell-protocol interaction revisited
@@ -442,6 +446,7 @@ As in Emmy*, the protocol-specific header contains the fields:
 
 There are two additional fields: ``payload_hash`` and ``payload_round`` which are needed for establishing if a block is :ref:`final<finality_ithaca>`.
 
+.. _fitness:
 .. _fitness_ithaca:
 
 The fitness is given by the tuple ``(version, level, locked_round, - predecessor_round - 1, round)``.
