@@ -17,7 +17,7 @@
   tezos-protocol-011-PtHangz2-parameters
   tezos-rpc
   tezos-stdlib-unix)
- (inline_tests (flags -verbose))
+ (inline_tests (flags -verbose) (modes native))
  (preprocess (pps ppx_inline_test))
  (library_flags (:standard -linkall))
  (flags

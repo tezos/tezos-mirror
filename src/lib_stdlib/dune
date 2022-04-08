@@ -10,6 +10,6 @@
   zarith
   zarith_stubs_js
   lwt)
- (inline_tests (flags -verbose))
+ (inline_tests (flags -verbose) (modes native))
  (preprocess (pps ppx_inline_test))
  (js_of_ocaml))
