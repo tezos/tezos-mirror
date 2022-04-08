@@ -1389,7 +1389,7 @@ and 'kind manager_operation =
       -> Kind.delegation manager_operation
 
 and 'kind internal_operation = {
-  source : Contract.contract;
+  source : Contract.t;
   operation : 'kind manager_operation;
   nonce : int;
 }

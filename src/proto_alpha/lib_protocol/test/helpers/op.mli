@@ -125,10 +125,10 @@ val contract_origination :
   ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
   Context.t ->
-  Contract.contract ->
-  (Operation.packed * Contract.contract) tzresult Lwt.t
+  Contract.t ->
+  (Operation.packed * Contract.t) tzresult Lwt.t
 
-val originated_contract : Operation.packed -> Contract.contract
+val originated_contract : Operation.packed -> Contract.t
 
 val register_global_constant :
   ?counter:Z.t ->

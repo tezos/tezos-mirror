@@ -65,7 +65,7 @@ type packed_internal_manager_operation =
       -> packed_internal_manager_operation
 
 type 'kind internal_contents = {
-  source : Contract.contract;
+  source : Contract.t;
   operation : 'kind internal_manager_operation;
   nonce : int;
 }
