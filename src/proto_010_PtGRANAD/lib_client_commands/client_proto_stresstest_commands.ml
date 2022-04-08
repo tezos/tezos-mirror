@@ -54,7 +54,8 @@ type parameters = {
           improve the chance for the injected operations to be included in the
           next block *)
   level_limit : limit option;
-      (** total number of levels during which the stresstest is run; unbounded if None *)
+      (** total number of levels during which the stresstest is run;
+          unbounded if None *)
 }
 
 type origin = Explicit | Wallet_pkh | Wallet_alias of string
@@ -310,13 +311,71 @@ let generate_fresh_source pool rng =
   pool.pool_size <- pool.pool_size + 1 ;
   fresh.source
 
-(* [on_new_head cctxt f] calls [f head] each time there is a new head
+(* [heads_iter cctxt f] calls [f head] each time there is a new head
    received by the streamed RPC /monitor/heads/main *)
-let on_new_head (cctxt : Protocol_client_context.full) f =
-  Shell_services.Monitor.heads cctxt `Main >>=? fun (heads_stream, stopper) ->
-  Lwt_stream.iter_s f heads_stream >>= fun () ->
-  stopper () ;
-  return_unit
+let heads_iter (cctxt : Protocol_client_context.full)
+    (f : Block_hash.t * Tezos_base.Block_header.t -> unit Lwt.t) :
+    unit tzresult Lwt.t =
+  let open Lwt_tzresult_syntax in
+  Error_monad.protect
+    (fun () ->
+      let* (heads_stream, stopper) = Shell_services.Monitor.heads cctxt `Main in
+      let rec loop () : unit tzresult Lwt.t =
+        let*! block_hash_and_header = Lwt_stream.get heads_stream in
+        match block_hash_and_header with
+        | None -> Error_monad.failwith "unexpected end of block stream@."
+        | Some ((new_block_hash, _block_header) as block_hash_and_header) ->
+            Lwt.catch
+              (fun () ->
+                let*! () =
+                  debug_msg (fun () ->
+                      cctxt#message
+                        "heads_iter: new block received %a@."
+                        Block_hash.pp
+                        new_block_hash)
+                in
+                let* protocols =
+                  Shell_services.Blocks.protocols
+                    cctxt
+                    ~block:(`Hash (new_block_hash, 0))
+                    ()
+                in
+                if Protocol_hash.(protocols.current_protocol = Protocol.hash)
+                then
+                  let*! () = f block_hash_and_header in
+                  loop ()
+                else
+                  let*! () =
+                    debug_msg (fun () ->
+                        cctxt#message
+                          "heads_iter: new block on protocol %a. Stopping \
+                           iteration.@."
+                          Protocol_hash.pp
+                          protocols.current_protocol)
+                  in
+                  return_unit)
+              (fun exn ->
+                Error_monad.failwith
+                  "An exception occured on a function bound on new heads : %s@."
+                  (Printexc.to_string exn))
+      in
+      let* () = loop () in
+      stopper () ;
+      let*! () =
+        debug_msg (fun () ->
+            cctxt#message
+              "head iteration for proto %a stopped@."
+              Protocol_hash.pp
+              Protocol.hash)
+      in
+      return_unit)
+    ~on_error:(fun trace ->
+      cctxt#error
+        "An error while monitoring the new heads for proto %a occured: %a@."
+        Protocol_hash.pp
+        Protocol.hash
+        Error_monad.pp_print_trace
+        trace)
 
 (* We perform rejection sampling of valid sources.
    We could maintain a local cache of existing contracts with sufficient balance. *)
@@ -697,33 +756,28 @@ let launch (cctxt : Protocol_client_context.full) (parameters : parameters)
       else Lwt_unix.sleep remaining)
       >>= loop
   in
-  (* True, if and only if [single_op_per_pkh_per_block] is true. *)
-  if Option.is_some state.shuffled_pool then
-    dont_wait
-      (fun () ->
-        on_new_head cctxt (fun (block, new_block_header) ->
-            if not (Block_hash.equal block state.last_block) then (
-              state.last_block <- block ;
-              state.last_level <- Int32.to_int new_block_header.shell.level ;
-              state.shuffled_pool <-
-                Some
-                  (List.shuffle
-                     ~rng
-                     (List.map (fun src_org -> src_org.source) state.pool))) ;
-            Lwt_condition.broadcast state.new_block_condition () ;
-            Lwt.return_unit))
-      (fun trace ->
-        ignore
-          (cctxt#error
-             "an error while getting the new head has been returned: %a"
-             Error_monad.pp_print_trace
-             trace))
-      (fun exn ->
-        ignore
-          (cctxt#error
-             "an exception while getting the new head has been raised: %s"
-             (Printexc.to_string exn))) ;
-  loop ()
+  let on_new_head : Block_hash.t * Tezos_base.Block_header.t -> unit Lwt.t =
+    match state.shuffled_pool with
+    (* Some _ if and only if [single_op_per_pkh_per_block] is true. *)
+    | Some _ ->
+        fun (new_block_hash, new_block_header) ->
+          if not (Block_hash.equal new_block_hash state.last_block) then (
+            state.last_block <- new_block_hash ;
+            state.last_level <- Int32.to_int new_block_header.shell.level ;
+            state.shuffled_pool <-
+              Some
+                (List.shuffle
+                   ~rng
+                   (List.map (fun src_org -> src_org.source) state.pool))) ;
+          Lwt_condition.broadcast state.new_block_condition () ;
+          Lwt.return_unit
+    | None ->
+        (* only wait for the end of the head stream; don't act on heads *)
+        fun _ -> Lwt.return_unit
+  in
+  let heads_iteration = heads_iter cctxt on_new_head in
+  (* The head iteration stops at protocol change. *)
+  Lwt.pick [loop (); heads_iteration]
 
 let group =
   Clic.{name = "stresstest"; title = "Commands for stress-testing the network"}

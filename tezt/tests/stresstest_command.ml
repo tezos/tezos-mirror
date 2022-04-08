@@ -151,6 +151,9 @@ let test_stresstest_sources_format =
       ()
   in
   (* Prepare sources for stresstest *)
+  let* () = Client.bake_for client in
+  let* () = Client.bake_for client in
+  let* _ = Node.wait_for_level node 3 in
   let* bootstraps_to_use =
     (* Note that bootstrap indices start at 1; we keep the ones with
        an even index. *)
@@ -282,7 +285,7 @@ let test_stresstest_n_transfers =
   let additional_bootstrap_account_count =
     max 0 (n_bootstraps - (Account.Bootstrap.keys |> Array.length))
   in
-  let* (_node, client) =
+  let* (node, client) =
     Client.init_with_protocol
       ~nodes_args:[Synchronisation_threshold 0; Connections 0]
       ~additional_bootstrap_account_count
@@ -290,6 +293,9 @@ let test_stresstest_n_transfers =
       ~protocol
       ()
   in
+  let* () = Client.bake_for client in
+  let* () = Client.bake_for client in
+  let* _ = Node.wait_for_level node 3 in
   let source_aliases =
     List.map (fun i -> sf "bootstrap%d" i) (range 1 n_bootstraps)
   in
@@ -355,6 +361,9 @@ let test_stresstest_multiple_nodes =
       ~protocol
       ()
   in
+  let* () = Client.bake_for central_client in
+  let* () = Client.bake_for central_client in
+  let* _ = Node.wait_for_level central_node 3 in
   let get_accounts_from_num_range (num_range : int list) =
     let aliases = List.map (sf "bootstrap%d") num_range in
     Lwt_list.map_p
