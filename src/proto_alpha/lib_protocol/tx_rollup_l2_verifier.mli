@@ -55,3 +55,18 @@ val verify_proof :
   rejected:Tx_rollup_message_result_hash.t ->
   max_proof_size:int ->
   Alpha_context.t tzresult Lwt.t
+
+(**/**)
+
+module Internal_for_tests : sig
+  val verify_l2_proof :
+    Context.Proof.stream Context.Proof.t ->
+    Tx_rollup_l2_apply.parameters ->
+    Tx_rollup_message.t ->
+    ( Context.tree * Tx_rollup_withdraw.order list,
+      [ `Proof_mismatch of string
+      | `Stream_too_long of string
+      | `Stream_too_short of string ] )
+    result
+    Lwt.t
+end
