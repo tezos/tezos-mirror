@@ -23,6 +23,47 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module type PROTOCOL_SERVICES = sig
+  val hash : Protocol_hash.t
+
+  type wrap_full
+
+  val wrap_full : Tezos_client_base.Client_context.full -> wrap_full
+
+  type endorsing_rights
+
+  val endorsing_rights :
+    wrap_full -> Block_hash.t -> endorsing_rights tzresult Lwt.t
+
+  val couple_ops_to_rights :
+    (error trace option * Ptime.t * int) list ->
+    endorsing_rights ->
+    (Signature.public_key_hash * error trace option * Ptime.t option) list
+    * Signature.public_key_hash list
+
+  val consensus_operation_stream :
+    wrap_full ->
+    (((Operation_hash.t * ((Block_hash.t * int32 * int32 option) * int))
+     * error trace option)
+     Lwt_stream.t
+    * RPC_context.stopper)
+    tzresult
+    Lwt.t
+
+  val baking_right :
+    wrap_full ->
+    Block_hash.t ->
+    int ->
+    (Signature.public_key_hash * Time.Protocol.t option) tzresult Lwt.t
+
+  val block_round : Block_header.t -> (int, tztrace) result
+
+  val consensus_op_participants_of_block :
+    wrap_full -> Block_hash.t -> Signature.public_key_hash list tzresult Lwt.t
+end
+
 module type S = sig
   val register_commands : unit -> unit
 end
+
+module Make (Protocol_services : PROTOCOL_SERVICES) : S
