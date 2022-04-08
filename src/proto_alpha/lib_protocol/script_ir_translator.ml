@@ -222,7 +222,7 @@ let unparse_memo_size ~loc memo_size =
   let z = Sapling.Memo_size.unparse_to_z memo_size in
   Int (loc, z)
 
-let rec unparse_ty_entrypoints_uncarbonated :
+let rec unparse_ty_and_entrypoints_uncarbonated :
     type a ac loc.
     loc:loc -> (a, ac) ty -> a entrypoints_node -> loc Script.michelson_node =
  fun ~loc ty {nested = nested_entrypoints; at_node} ->
@@ -248,11 +248,17 @@ let rec unparse_ty_entrypoints_uncarbonated :
     | Bls12_381_g2_t -> (T_bls12_381_g2, [])
     | Bls12_381_fr_t -> (T_bls12_381_fr, [])
     | Contract_t (ut, _meta) ->
-        let t = unparse_ty_entrypoints_uncarbonated ~loc ut no_entrypoints in
+        let t =
+          unparse_ty_and_entrypoints_uncarbonated ~loc ut no_entrypoints
+        in
         (T_contract, [t])
     | Pair_t (utl, utr, _meta, _) -> (
-        let tl = unparse_ty_entrypoints_uncarbonated ~loc utl no_entrypoints in
-        let tr = unparse_ty_entrypoints_uncarbonated ~loc utr no_entrypoints in
+        let tl =
+          unparse_ty_and_entrypoints_uncarbonated ~loc utl no_entrypoints
+        in
+        let tr =
+          unparse_ty_and_entrypoints_uncarbonated ~loc utr no_entrypoints
+        in
         (* Fold [pair a1 (pair ... (pair an-1 an))] into [pair a1 ... an] *)
         (* Note that the folding does not happen if the pair on the right has an
            annotation because this annotation would be lost *)
@@ -265,18 +271,30 @@ let rec unparse_ty_entrypoints_uncarbonated :
           | Entrypoints_None -> (no_entrypoints, no_entrypoints)
           | Entrypoints_Union {left; right} -> (left, right)
         in
-        let tl = unparse_ty_entrypoints_uncarbonated ~loc utl entrypoints_l in
-        let tr = unparse_ty_entrypoints_uncarbonated ~loc utr entrypoints_r in
+        let tl =
+          unparse_ty_and_entrypoints_uncarbonated ~loc utl entrypoints_l
+        in
+        let tr =
+          unparse_ty_and_entrypoints_uncarbonated ~loc utr entrypoints_r
+        in
         (T_or, [tl; tr])
     | Lambda_t (uta, utr, _meta) ->
-        let ta = unparse_ty_entrypoints_uncarbonated ~loc uta no_entrypoints in
-        let tr = unparse_ty_entrypoints_uncarbonated ~loc utr no_entrypoints in
+        let ta =
+          unparse_ty_and_entrypoints_uncarbonated ~loc uta no_entrypoints
+        in
+        let tr =
+          unparse_ty_and_entrypoints_uncarbonated ~loc utr no_entrypoints
+        in
         (T_lambda, [ta; tr])
     | Option_t (ut, _meta, _) ->
-        let ut = unparse_ty_entrypoints_uncarbonated ~loc ut no_entrypoints in
+        let ut =
+          unparse_ty_and_entrypoints_uncarbonated ~loc ut no_entrypoints
+        in
         (T_option, [ut])
     | List_t (ut, _meta) ->
-        let t = unparse_ty_entrypoints_uncarbonated ~loc ut no_entrypoints in
+        let t =
+          unparse_ty_and_entrypoints_uncarbonated ~loc ut no_entrypoints
+        in
         (T_list, [t])
     | Ticket_t (ut, _meta) ->
         let t = unparse_comparable_ty_uncarbonated ~loc ut in
@@ -286,11 +304,15 @@ let rec unparse_ty_entrypoints_uncarbonated :
         (T_set, [t])
     | Map_t (uta, utr, _meta) ->
         let ta = unparse_comparable_ty_uncarbonated ~loc uta in
-        let tr = unparse_ty_entrypoints_uncarbonated ~loc utr no_entrypoints in
+        let tr =
+          unparse_ty_and_entrypoints_uncarbonated ~loc utr no_entrypoints
+        in
         (T_map, [ta; tr])
     | Big_map_t (uta, utr, _meta) ->
         let ta = unparse_comparable_ty_uncarbonated ~loc uta in
-        let tr = unparse_ty_entrypoints_uncarbonated ~loc utr no_entrypoints in
+        let tr =
+          unparse_ty_and_entrypoints_uncarbonated ~loc utr no_entrypoints
+        in
         (T_big_map, [ta; tr])
     | Sapling_transaction_t memo_size ->
         (T_sapling_transaction, [unparse_memo_size ~loc memo_size])
@@ -310,7 +332,7 @@ let rec unparse_ty_entrypoints_uncarbonated :
   Prim (loc, name, args, annot)
 
 let unparse_ty_uncarbonated ~loc ty =
-  unparse_ty_entrypoints_uncarbonated ~loc ty no_entrypoints
+  unparse_ty_and_entrypoints_uncarbonated ~loc ty no_entrypoints
 
 let unparse_ty ~loc ctxt ty =
   Gas.consume ctxt (Unparse_costs.unparse_type ty) >|? fun ctxt ->
@@ -322,7 +344,7 @@ let unparse_comparable_ty ~loc ctxt comp_ty =
 
 let unparse_parameter_ty ~loc ctxt ty ~entrypoints =
   Gas.consume ctxt (Unparse_costs.unparse_type ty) >|? fun ctxt ->
-  (unparse_ty_entrypoints_uncarbonated ~loc ty entrypoints.root, ctxt)
+  (unparse_ty_and_entrypoints_uncarbonated ~loc ty entrypoints.root, ctxt)
 
 let serialize_ty_for_error ty =
   (*
