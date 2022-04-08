@@ -137,6 +137,20 @@ val tuple4 : 'a typ -> 'b typ -> 'c typ -> 'd typ -> ('a * 'b * 'c * 'd) typ
 val tuple5 :
   'a typ -> 'b typ -> 'c typ -> 'd typ -> 'e typ -> ('a * 'b * 'c * 'd * 'e) typ
 
+(** Make a 8-tuple type.
+
+    If all item types are comparable, the result is comparable in lexicographic order. *)
+val tuple8 :
+  'a1 typ ->
+  'a2 typ ->
+  'a3 typ ->
+  'a4 typ ->
+  'a5 typ ->
+  'a6 typ ->
+  'a7 typ ->
+  'a8 typ ->
+  ('a1 * 'a2 * 'a3 * 'a4 * 'a5 * 'a6 * 'a7 * 'a8) typ
+
 (** Make a type by encoding to another.
 
     Usage: [convert encode typ]

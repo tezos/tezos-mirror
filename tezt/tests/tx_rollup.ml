@@ -146,6 +146,13 @@ let submit_rejection ?(src = Constant.bootstrap1.public_key_hash) ~level
     ~withdraw_list_hash
     client
 
+let bake_and_wait ?(nb = 1) client node =
+  repeat nb (fun () ->
+      let current_level = Node.get_level node in
+      let* () = Client.bake_for client in
+      let* _n = Node.wait_for_level node (current_level + 1) in
+      unit)
+
 (* This module only registers regressions tests. Those regressions
    tests should be used to ensure there is no regressions with the
    various RPCs exported by the tx_rollups. *)
@@ -245,16 +252,13 @@ module Regressions = struct
       in
       Process.check_error ~msg:(rex "Merkle_list_invalid_positio") process
 
-    let rpc_commitment =
-      Protocol.register_regression_test
-        ~__FILE__
-        ~output_file:(fun _ -> "tx_rollup_rpc_commitment")
-        ~title:"RPC (tx_rollups, regression) - commitment"
-        ~tags:["tx_rollup"; "rpc"; "commitment"]
-      @@ fun protocol ->
-      let* ({rollup; client; node = _} as state) =
-        init_with_tx_rollup ~protocol ()
-      in
+    (** This function allows to:
+        - submit a batch to the rollup
+        - submit a commitment for the latest inbox (containing the batch)
+        - retrieve the latest commitment that have been submitted
+        - compare its hash to the latest commitment hash stored in the rollup's
+        state. *)
+    let submit_a_batch_and_commit_helper ({rollup; client; node = _} as state) =
       (* The content of the batch does not matter for the regression test. *)
       let batch = Rollup.make_batch "blob" in
       let* () = submit_batch ~batch state in
@@ -280,6 +284,109 @@ module Regressions = struct
       Check.(state.Rollup.commitment_newest_hash = hash)
         (Check.option Check.string)
         ~error_msg:"Commitment hash mismatch: %L vs %R" ;
+      unit
+
+    (** This function tests the RPC that allows to retrieve a commitment. For
+        that, it initializes a network with a tx_rollup, and calls the helper
+        function {submit_a_batch_and_commit_helper} *)
+    let rpc_commitment =
+      Protocol.register_regression_test
+        ~__FILE__
+        ~output_file:(fun _ -> "tx_rollup_rpc_commitment")
+        ~title:"RPC (tx_rollups, regression) - commitment"
+        ~tags:["tx_rollup"; "rpc"; "commitment"]
+      @@ fun protocol ->
+      let* state = init_with_tx_rollup ~protocol () in
+      submit_a_batch_and_commit_helper state
+
+    (** This function tests the commitment removal operation. For that, it:
+        - originates a rollup
+        - submits a batch to it
+        - send a commitment for the batch
+        - finalizes the commitment once sufficiently many blocks are baked
+        - removes the commitment once sufficiently many blocks are baked
+
+        Some checks related to commitment removal are done (in particular, the
+        value of field last_removed_commitments_hashes in the rollup's state).
+    *)
+    let rpc_commitment_remove =
+      Protocol.register_regression_test
+        ~__FILE__
+        ~output_file:(fun _ -> "tx_rollup_rpc_commitment_remove")
+        ~title:"RPC (tx_rollups, regression) - commitment remove"
+        ~tags:["tx_rollup"; "rpc"; "commitment"]
+      @@ fun protocol ->
+      let parameters = Parameters.{finality_period = 2; withdraw_period = 2} in
+      let* ({rollup; client; node} as state) =
+        init_with_tx_rollup ~protocol ~parameters ()
+      in
+      let src = Constant.bootstrap1.public_key_hash in
+      Log.info "Step 1. Submit a batch and its commitment" ;
+      let* () = submit_a_batch_and_commit_helper state in
+
+      Log.info "Step 2. Bake before finalizing. But one block is missing" ;
+      let* () =
+        bake_and_wait ~nb:(parameters.finality_period - 1) client node
+      in
+
+      Log.info "Step 3. Submit finalize commitment that should fail" ;
+      let*? p =
+        Client.Tx_rollup.submit_finalize_commitment ~hooks ~rollup ~src client
+      in
+      let* () =
+        Process.check_error ~msg:(rex "tx_rollup_no_commitment_to_finalize") p
+      in
+
+      Log.info "Step 4. Bake the missing level to be able to finalize" ;
+      let* () = bake_and_wait ~nb:1 client node in
+
+      Log.info "Step 5. Submit finalize commitment and bake" ;
+      let*! () = submit_finalize_commitment state in
+      let* () = bake_and_wait client node in
+
+      Log.info
+        "Step 6. Bake before removing the commitment. But one block is missing" ;
+      let* () =
+        bake_and_wait ~nb:(parameters.withdraw_period - 1) client node
+      in
+
+      Log.info "Step 7. Submit remove commitment that should fail" ;
+      let*? p =
+        submit_remove_commitment ~src:Constant.bootstrap2.public_key_hash state
+      in
+      let* () =
+        Process.check_error ~msg:(rex "tx_rollup_no_commitment_to_remove") p
+      in
+
+      Log.info "Step 8. Last_removed_commitments_hashes is None before removing" ;
+      let*! r_state = Rollup.get_state ~hooks ~rollup client in
+      Check.(r_state.Rollup.last_removed_commitment_hashes = None)
+        (Check.option Rollup.Check.commitments_hashes)
+        ~error_msg:
+          "last_removed_commitments_hashes mismatch. Expected %R, but got %L" ;
+
+      Log.info "Step 9. Bake the missing level to be able to remove commit." ;
+      let* () = bake_and_wait ~nb:1 client node in
+
+      Log.info "Step 10. Submit remove commitment and bake" ;
+      let*! () =
+        submit_remove_commitment ~src:Constant.bootstrap2.public_key_hash state
+      in
+      let* () = bake_and_wait client node in
+
+      Log.info "Step 11. Check the new value of last_removed_commitments_hashes" ;
+      let*! r_state = Rollup.get_state ~hooks ~rollup client in
+      let expected_last =
+        {
+          Rollup.message_hash = Constant.tx_rollup_initial_message_result;
+          Rollup.commitment_hash =
+            assert_some r_state.Rollup.commitment_newest_hash;
+        }
+      in
+      Check.(r_state.Rollup.last_removed_commitment_hashes = Some expected_last)
+        (Check.option Rollup.Check.commitments_hashes)
+        ~error_msg:
+          "Last_removed_commitments_hashes mismatch. Expected %R, but got %L" ;
       unit
 
     let rpc_pending_bonded_commitment =
@@ -582,6 +689,7 @@ module Regressions = struct
     RPC.rpc_inbox_merkle_tree_hash protocols ;
     RPC.rpc_inbox_merkle_tree_path protocols ;
     RPC.rpc_commitment protocols ;
+    RPC.rpc_commitment_remove protocols ;
     RPC.rpc_pending_bonded_commitment protocols ;
     RPC.batch_encoding protocols ;
     RPC.rpc_inbox_future protocols ;
@@ -658,6 +766,7 @@ let test_submit_batches_in_several_blocks =
         commitment_newest_hash = None;
         burn_per_byte = 0;
         inbox_ema = 0;
+        last_removed_commitment_hashes = None;
       }
   in
   Check.(state = expected_state)

@@ -236,6 +236,19 @@ let tuple5 a b c d e =
       Item (e, fun (_, _, _, _, x) -> x);
     ]
 
+let tuple8 a1 a2 a3 a4 a5 a6 a7 a8 =
+  tuple
+    [
+      Item (a1, fun (x, _, _, _, _, _, _, _) -> x);
+      Item (a2, fun (_, x, _, _, _, _, _, _) -> x);
+      Item (a3, fun (_, _, x, _, _, _, _, _) -> x);
+      Item (a4, fun (_, _, _, x, _, _, _, _) -> x);
+      Item (a5, fun (_, _, _, _, x, _, _, _) -> x);
+      Item (a6, fun (_, _, _, _, _, x, _, _) -> x);
+      Item (a7, fun (_, _, _, _, _, _, x, _) -> x);
+      Item (a8, fun (_, _, _, _, _, _, _, x) -> x);
+    ]
+
 let convert encode = function
   | E {pp; equal} ->
       let pp fmt x = pp fmt (encode x) in
