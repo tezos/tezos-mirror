@@ -667,6 +667,112 @@ module Opam = struct
     Option.iter (pp_line "description: %a" pp_string) description
 end
 
+module Env : sig
+  (** [env] stanza *)
+  type t
+
+  (** profile selector for the env stanza. A profile name or Any (_) *)
+  type profile = Profile of string | Any
+
+  (** The empty env *)
+  val empty : t
+
+  (** [to_s_expr env] converts an env into a s_expr *)
+  val to_s_expr : t -> Dune.s_expr
+
+  (** [add profile ~key payload] adds a [key] entry with its [payload]
+      to the given [profile].  Adding an entry to [Any] profile means
+      that it will apply regardless of the profile. In practice, it
+      means that the entry can end up being duplicated in the resulting
+      [s_expr].
+    {[
+      Env.empty
+      |> Env.add Any ~key:"flags" Dune.[S "-flag"]
+      |> Env.add (Profile "static") ~key:"link_flags" Dune.[S "-link-flag"]
+    ]}
+
+    will generate
+
+    {v
+      (env
+        (_
+          (flags (-flag))
+        )
+        (static
+          (flags (-flag))
+          (link_flags (-link_flag))
+        )
+      )
+    v}
+
+    Also note that [Profile "_"] is not allowed. One should use [Any] instead.
+ *)
+  val add : profile -> key:string -> Dune.s_expr -> t -> t
+end = struct
+  type entry = string * Dune.s_expr
+
+  type profile = Profile of string | Any
+
+  type t = (profile * entry) list
+
+  let empty = []
+
+  let add profile ~key payload env =
+    (match profile with
+    | Profile "_" ->
+        invalid_arg "Env.add: [Provide \"_\"] is not allowed. Use [Any]."
+    | Profile _ | Any -> ()) ;
+    (profile, (key, payload)) :: env
+
+  let s_expr_of_entry (name, payload) = Dune.[S name; payload]
+
+  let to_s_expr (t : t) =
+    let (any, names) =
+      List.partition_map
+        (function
+          | (Any, entry) -> Left entry
+          | (Profile name, entry) -> Right (name, entry))
+        t
+    in
+    let names =
+      List.fold_left
+        (fun names (n, entry) ->
+          String_map.update
+            n
+            (function
+              | None -> Some [entry] | Some prev -> Some (entry :: prev))
+            names)
+        String_map.empty
+        names
+    in
+    let names =
+      match any with
+      | [] -> names
+      | _ -> String_map.add "_" any (String_map.map (fun x -> any @ x) names)
+    in
+    String_map.iter
+      (fun name entries ->
+        let entry_names = List.map fst entries in
+        if
+          List.length (List.sort_uniq compare entry_names)
+          <> List.length entry_names
+        then invalid_arg ("Env.to_s_expr: duplicated entry in env " ^ name))
+      names ;
+    if String_map.is_empty names then Dune.E
+    else
+      let compare_key ((a : string), _) (b, _) = compare a b in
+      let l : Dune.s_expr list =
+        List.map
+          (fun (name, entries) ->
+            Dune.(
+              S name
+              ::
+              of_list (List.map s_expr_of_entry (List.sort compare_key entries))))
+          (List.sort compare_key (String_map.bindings names))
+      in
+      Dune.(S "env" :: of_list l)
+end
+
 (*****************************************************************************)
 (*                                 TARGETS                                   *)
 (*****************************************************************************)
@@ -1495,24 +1601,21 @@ let generate_dune ~dune_file_has_static_profile (internal : Target.internal) =
     :: documentation :: create_empty_files :: internal.dune)
 
 let static_profile (cclibs : string list) =
-  Dune.
-    [
-      S "static";
+  Env.add
+    (Profile "static")
+    ~key:"flags"
+    Dune.
       [
-        S "flags";
-        [
-          S ":standard";
-          G [S "-ccopt"; S "-static"];
-          (match cclibs with
-          | [] -> E
-          | _ :: _ ->
-              let arg =
-                List.map (fun lib -> "-l" ^ lib) cclibs |> String.concat " "
-              in
-              G [S "-cclib"; S arg]);
-        ];
-      ];
-    ]
+        S ":standard";
+        G [S "-ccopt"; S "-static"];
+        (match cclibs with
+        | [] -> E
+        | _ :: _ ->
+            let arg =
+              List.map (fun lib -> "-l" ^ lib) cclibs |> String.concat " "
+            in
+            G [S "-cclib"; S arg]);
+      ]
 
 (* Remove duplicates from a list.
    Items that are not removed are kept in their original order.
@@ -1551,6 +1654,7 @@ let generate_dune_files () =
     fmt
     "; This file was automatically generated, do not edit.@.; Edit file \
      manifest/main.ml instead.@.@." ;
+  let env = Env.empty in
   let env =
     if has_static then
       let cclibs =
@@ -1559,19 +1663,15 @@ let generate_dune_files () =
           internals
         |> List.flatten |> deduplicate_list Fun.id
       in
-      [static_profile cclibs]
-    else []
+      static_profile cclibs env
+    else env
   in
-  (match env with
-  | [] -> ()
-  | _ :: _ ->
-      let env_stanza = Dune.[S "env" :: of_list env] in
-      Format.fprintf fmt "%a@." Dune.pp env_stanza) ;
+  let dunes = Dune.[Env.to_s_expr env] :: dunes in
   List.iteri
     (fun i dune ->
-      if i <> 0 || has_static then Format.fprintf fmt "@." ;
+      if i <> 0 then Format.fprintf fmt "@." ;
       Format.fprintf fmt "%a@." Dune.pp dune)
-    dunes
+    (List.filter (fun x -> not (Dune.is_empty x)) dunes)
 
 (* Convert [target] into an opam dependency so that it can be added as a dependency
    in packages that depend on it.
