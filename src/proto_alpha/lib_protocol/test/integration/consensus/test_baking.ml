@@ -154,7 +154,7 @@ let test_voting_power_cache () =
 let test_basic_baking_reward () =
   Context.init1 ~consensus_threshold:0 () >>=? fun (genesis, baker) ->
   Block.bake genesis >>=? fun b ->
-  Context.Contract.pkh baker >>=? fun baker_pkh ->
+  let baker_pkh = Context.Contract.pkh baker in
   Context.Contract.balance (B b) baker >>=? fun bal ->
   Context.Delegate.current_frozen_deposits (B b) baker_pkh
   >>=? fun frozen_deposit ->
@@ -170,7 +170,7 @@ let get_contract_for_pkh contracts pkh =
   let rec find_contract = function
     | [] -> assert false
     | c :: t ->
-        Context.Contract.pkh c >>=? fun c_pkh ->
+        let c_pkh = Context.Contract.pkh c in
         if Signature.Public_key_hash.equal c_pkh pkh then return c
         else find_contract t
   in
@@ -313,7 +313,7 @@ let test_enough_active_stake_to_bake ~has_active_stake () =
   let initial_bal1 = if has_active_stake then tpr else Int64.sub tpr 1L in
   Context.init2 ~initial_balances:[initial_bal1; tpr] ~consensus_threshold:0 ()
   >>=? fun (b0, (account1, _account2)) ->
-  Context.Contract.pkh account1 >>=? fun pkh1 ->
+  let pkh1 = Context.Contract.pkh account1 in
   Context.get_constants (B b0)
   >>=? fun Constants.{parametric = {baking_reward_fixed_portion; _}; _} ->
   Block.bake ~policy:(By_account pkh1) b0 >>= fun b1 ->

@@ -140,7 +140,7 @@ let test_transfer_to_originate_with_fee () =
 (** Transfer from balance. *)
 let test_transfer_amount_of_contract_balance () =
   Context.init2 () >>=? fun (b, (contract_1, contract_2)) ->
-  Context.Contract.pkh contract_1 >>=? fun pkh1 ->
+  let pkh1 = Context.Contract.pkh contract_1 in
   (* given that contract_1 no longer has a sufficient balance to bake,
      make sure it cannot be chosen as baker *)
   Incremental.begin_construction b ~policy:(Block.Excluding [pkh1])
@@ -169,7 +169,7 @@ let test_missing_transaction () =
   Context.init2 () >>=? fun (b, (contract_1, contract_2)) ->
   (* given that contract_1 no longer has a sufficient balance to bake,
      make sure it cannot be chosen as baker *)
-  Context.Contract.pkh contract_1 >>=? fun pkh1 ->
+  let pkh1 = Context.Contract.pkh contract_1 in
   Incremental.begin_construction b ~policy:(Block.Excluding [pkh1])
   >>=? fun b ->
   two_over_n_of_balance b contract_1 6L >>=? fun amount ->
@@ -521,7 +521,7 @@ let test_random_transfer () =
   let contracts = Array.of_list contracts in
   let source = random_contract contracts in
   let dest = random_contract contracts in
-  Context.Contract.pkh source >>=? fun source_pkh ->
+  let source_pkh = Context.Contract.pkh source in
   (* given that source may not have a sufficient balance for the transfer + to bake,
      make sure it cannot be chosen as baker *)
   Incremental.begin_construction b ~policy:(Block.Excluding [source_pkh])

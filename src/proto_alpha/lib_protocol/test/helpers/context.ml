@@ -258,9 +258,9 @@ module Contract = struct
   let equal a b = Alpha_context.Contract.compare a b = 0
 
   let pkh c =
-    Alpha_context.Contract.is_implicit c |> function
-    | Some p -> return p
-    | None -> failwith "pkh: only for implicit contracts"
+    match Alpha_context.Contract.is_implicit c with
+    | Some p -> p
+    | None -> Stdlib.failwith "pkh: only for implicit contracts"
 
   let balance ctxt contract =
     Alpha_services.Contract.balance rpc_ctxt ctxt contract

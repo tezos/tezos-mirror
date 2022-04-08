@@ -117,7 +117,7 @@ module Contract : sig
 
   val equal : Contract.t -> Contract.t -> bool
 
-  val pkh : Contract.t -> public_key_hash tzresult Lwt.t
+  val pkh : Contract.t -> public_key_hash
 
   (** Returns the balance of a contract, by default the main balance.
       If the contract is implicit the frozen balances are available too:

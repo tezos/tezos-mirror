@@ -58,7 +58,7 @@ let test_multiple_transfers () =
     (1 -- 10)
   >>=? fun ops ->
   Op.combine_operations ~source:c1 (B blk) ops >>=? fun operation ->
-  Context.Contract.pkh c3 >>=? fun baker_pkh ->
+  let baker_pkh = Context.Contract.pkh c3 in
   Incremental.begin_construction ~policy:(By_account baker_pkh) blk
   >>=? fun inc ->
   Context.Contract.balance (I inc) c1 >>=? fun c1_old_balance ->
@@ -85,7 +85,7 @@ let test_multiple_origination_and_delegation () =
   let n = 10 in
   Context.get_constants (B blk)
   >>=? fun {parametric = {origination_size; cost_per_byte; _}; _} ->
-  Context.Contract.pkh c2 >>=? fun delegate_pkh ->
+  let delegate_pkh = Context.Contract.pkh c2 in
   (* Deploy n smart contracts with dummy scripts from c1 *)
   List.map_es
     (fun i ->

@@ -212,7 +212,7 @@ let get_power b delegates loc =
   Context.Vote.get_listings (B b) >>=? fun l ->
   List.map_es
     (fun delegate ->
-      Context.Contract.pkh delegate >>=? fun pkh ->
+      let pkh = Context.Contract.pkh delegate in
       match List.find_opt (fun (del, _) -> del = pkh) l with
       | None -> failwith "%s - Missing delegate" loc
       | Some (_, power) -> return power)
@@ -358,7 +358,7 @@ let test_successful_vote num_delegates () =
    | l ->
        List.iter_es
          (fun delegate ->
-           Context.Contract.pkh delegate >>=? fun pkh ->
+           let pkh = Context.Contract.pkh delegate in
            match List.find_opt (fun (del, _) -> del = pkh) l with
            | None -> failwith "%s - Missing delegate" __LOC__
            | Some (_, Vote.Yay) -> return_unit
@@ -413,7 +413,7 @@ let test_successful_vote num_delegates () =
    | l ->
        List.iter_es
          (fun delegate ->
-           Context.Contract.pkh delegate >>=? fun pkh ->
+           let pkh = Context.Contract.pkh delegate in
            match List.find_opt (fun (del, _) -> del = pkh) l with
            | None -> failwith "%s - Missing delegate" __LOC__
            | Some (_, Vote.Yay) -> return_unit
@@ -621,7 +621,7 @@ let test_multiple_identical_proposals_count_as_one () =
   (* compute the weight of proposals *)
   Context.Vote.get_proposals (B b) >>=? fun ps ->
   (* compute the voting power of proposer *)
-  Context.Contract.pkh proposer >>=? fun pkh ->
+  let pkh = Context.Contract.pkh proposer in
   Context.Vote.get_listings (B b) >>=? fun l ->
   (match List.find_opt (fun (del, _) -> del = pkh) l with
   | None -> failwith "%s - Missing delegate" __LOC__
@@ -655,8 +655,9 @@ let test_supermajority_in_proposal there_is_a_winner () =
   let del1 = WithExceptions.Option.get ~loc:__LOC__ @@ List.nth delegates 0 in
   let del2 = WithExceptions.Option.get ~loc:__LOC__ @@ List.nth delegates 1 in
   let del3 = WithExceptions.Option.get ~loc:__LOC__ @@ List.nth delegates 2 in
-  List.map_es (fun del -> Context.Contract.pkh del) [del1; del2; del3]
-  >>=? fun pkhs ->
+  let pkhs =
+    List.map (fun del -> Context.Contract.pkh del) [del1; del2; del3]
+  in
   let policy = Block.Excluding pkhs in
   Op.transaction
     (B b)
@@ -707,8 +708,7 @@ let test_quorum_in_proposal has_quorum () =
   >>=? fun {parametric = {min_proposal_quorum; _}; _} ->
   let del1 = WithExceptions.Option.get ~loc:__LOC__ @@ List.nth delegates 0 in
   let del2 = WithExceptions.Option.get ~loc:__LOC__ @@ List.nth delegates 1 in
-  List.map_es (fun del -> Context.Contract.pkh del) [del1; del2]
-  >>=? fun pkhs ->
+  let pkhs = List.map (fun del -> Context.Contract.pkh del) [del1; del2] in
   let policy = Block.Excluding pkhs in
   let quorum =
     if has_quorum then Int64.of_int32 min_proposal_quorum
@@ -895,9 +895,9 @@ let test_voting_power_updated_each_voting_period () =
   let con2 = WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 1 in
   let con3 = WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 2 in
   (* Get the key hashes of the bakers *)
-  Context.Contract.pkh con1 >>=? fun baker1 ->
-  Context.Contract.pkh con2 >>=? fun baker2 ->
-  Context.Contract.pkh con3 >>=? fun baker3 ->
+  let baker1 = Context.Contract.pkh con1 in
+  let baker2 = Context.Contract.pkh con2 in
+  let baker3 = Context.Contract.pkh con3 in
   (* Retrieve balance of con1 *)
   let open Test_tez in
   Context.Contract.balance (B genesis) con1 >>=? fun balance1 ->

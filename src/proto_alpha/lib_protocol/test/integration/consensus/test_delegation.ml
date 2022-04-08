@@ -79,7 +79,7 @@ let bootstrap_manager_is_bootstrap_delegate () =
 (** Bootstrap contracts cannot change their delegate. *)
 let bootstrap_delegate_cannot_change ~fee () =
   Context.init2 () >>=? fun (b, (bootstrap0, bootstrap1)) ->
-  Context.Contract.pkh bootstrap0 >>=? fun pkh1 ->
+  let pkh1 = Context.Contract.pkh bootstrap0 in
   Incremental.begin_construction b ~policy:(Block.Excluding [pkh1])
   >>=? fun i ->
   Context.Contract.manager (I i) bootstrap1 >>=? fun manager1 ->

@@ -66,8 +66,8 @@ let total_fees_for_origination ?(fee = Tez.zero) ?(credit = Tez.zero) b =
      the bake is done by another delegated. *)
 let test_origination_balances ~loc:_ ?(fee = Tez.zero) ?(credit = Tez.zero) () =
   Context.init2 () >>=? fun (b, (source, contract_for_bake)) ->
-  Context.Contract.pkh source >>=? fun pkh_for_orig ->
-  Context.Contract.pkh contract_for_bake >>=? fun pkh_for_bake ->
+  let pkh_for_orig = Context.Contract.pkh source in
+  let pkh_for_bake = Context.Contract.pkh contract_for_bake in
   Op.contract_origination (B b) source ~fee ~credit ~script:Op.dummy_script
   >>=? fun (operation, new_contract) ->
   total_fees_for_origination ~fee ~credit b >>=? fun total_fee ->
@@ -95,8 +95,8 @@ let test_origination_balances ~loc:_ ?(fee = Tez.zero) ?(credit = Tez.zero) () =
     set to true meaning that this contract is able to delegate. *)
 let register_origination ?(fee = Tez.zero) ?(credit = Tez.zero) () =
   Context.init2 () >>=? fun (b, (source, contract_for_bake)) ->
-  Context.Contract.pkh source >>=? fun source_pkh ->
-  Context.Contract.pkh contract_for_bake >>=? fun pkh_for_bake ->
+  let source_pkh = Context.Contract.pkh source in
+  let pkh_for_bake = Context.Contract.pkh contract_for_bake in
   Op.contract_origination (B b) source ~fee ~credit ~script:Op.dummy_script
   >>=? fun (operation, originated) ->
   Block.bake ~operation ~policy:(By_account pkh_for_bake) b >>=? fun b ->
