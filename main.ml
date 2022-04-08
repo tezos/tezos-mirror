@@ -22,6 +22,8 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
+open Lwt_result_syntax
+
 let select_commands ctxt Client_config.{protocol; chain; block; _} =
   match protocol with
   | Some protocol ->
@@ -30,7 +32,8 @@ let select_commands ctxt Client_config.{protocol; chain; block; _} =
            protocol
            None)
   | None -> (
-      Shell_services.Blocks.protocols ctxt ~chain ~block () >>= function
+      let*! protocol = Shell_services.Blocks.protocols ctxt ~chain ~block () in
+      match protocol with
       | Ok {next_protocol; _} ->
           return
             (Tezos_client_commands.Client_commands.commands_for_version

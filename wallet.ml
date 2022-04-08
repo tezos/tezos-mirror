@@ -22,7 +22,7 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
-
+open Lwt_result_syntax
 module Map = Signature.Public_key_hash.Map
 
 type t = string Map.t
@@ -34,7 +34,7 @@ let empty = Map.empty
 
 (** Load a public key hash map from the client context  *)
 let of_context (wallet : #Tezos_client_base.Client_context.wallet) =
-  Client_keys.Public_key_hash.load wallet >>=? fun aliases ->
+  let* aliases = Client_keys.Public_key_hash.load wallet in
   return
   @@ List.fold_left
        (fun acc (alias, key) -> Map.add key alias acc)

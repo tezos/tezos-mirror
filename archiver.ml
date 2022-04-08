@@ -22,6 +22,7 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
+open Lwt_result_syntax
 
 let levels_per_folder = 4096l
 
@@ -153,15 +154,15 @@ let filename_of_level prefix level =
     (Int32.to_string level ^ ".json")
 
 let load filename encoding empty =
-  Lwt_unix.file_exists filename >>= function
-  | false -> return empty
-  | true -> (
-      Lwt_utils_unix.Json.read_file filename >>=? fun json ->
-      try return (Data_encoding.Json.destruct encoding json)
-      with exn -> Lwt.return (Error_monad.error_with_exn exn))
+  let*! exists = Lwt_unix.file_exists filename in
+  if exists then
+    let* json = Lwt_utils_unix.Json.read_file filename in
+    try return (Data_encoding.Json.destruct encoding json)
+    with exn -> Lwt.return (Error_monad.error_with_exn exn)
+  else return empty
 
 let write filename encoding value =
-  Lwt_utils_unix.create_dir (Filename.dirname filename) >>= fun () ->
+  let*! () = Lwt_utils_unix.create_dir (Filename.dirname filename) in
   Lwt_utils_unix.Json.write_file
     filename
     (Data_encoding.Json.construct encoding value)
@@ -193,18 +194,19 @@ let dump_anomalies path level anomalies =
     Filename.concat (dirname_of_level path level) "anomalies.json"
   in
   let mutex = get_file_mutex filename in
-  Lwt_mutex.with_lock mutex (fun () ->
-      load filename (Data_encoding.list Anomaly.encoding) [] >>=? fun known ->
-      write
-        filename
-        (Data_encoding.list Anomaly.encoding)
-        (List.fold_left
-           (fun x y -> Anomaly.insert_in_ordered_list y x)
-           known
-           anomalies))
-  >|= fun out ->
+  let*! out =
+    Lwt_mutex.with_lock mutex (fun () ->
+        let* known = load filename (Data_encoding.list Anomaly.encoding) [] in
+        write
+          filename
+          (Data_encoding.list Anomaly.encoding)
+          (List.fold_left
+             (fun x y -> Anomaly.insert_in_ordered_list y x)
+             known
+             anomalies))
+  in
   let () = drop_file_mutex filename in
-  out
+  Lwt.return out
 
 let extract_anomalies path level infos =
   if infos.unaccurate then return_unit
@@ -272,7 +274,7 @@ let dump_included_in_block cctxt path block_level block_hash timestamp
    let filename = filename_of_level path endorsements_level in
    let mutex = get_file_mutex filename in
    Lwt_mutex.with_lock mutex (fun () ->
-       load filename encoding empty >>=? fun infos ->
+       let* infos = load filename encoding empty in
        let (updated_known, unknown) =
          List.fold_left
            (fun (acc, missing)
@@ -325,7 +327,7 @@ let dump_included_in_block cctxt path block_level block_hash timestamp
        let out_infos =
          {blocks = infos.blocks; endorsements; unaccurate = infos.unaccurate}
        in
-       write filename encoding out_infos >>=? fun () ->
+       let* () = write filename encoding out_infos in
        extract_anomalies path endorsements_level out_infos)
    >>= fun out ->
    let () = drop_file_mutex filename in
@@ -344,7 +346,7 @@ let dump_included_in_block cctxt path block_level block_hash timestamp
   let filename = filename_of_level path block_level in
   let mutex = get_file_mutex filename in
   Lwt_mutex.with_lock mutex (fun () ->
-      load filename encoding empty >>=? fun infos ->
+      let* infos = load filename encoding empty in
       let blocks =
         Block.
           {
@@ -382,73 +384,75 @@ let dump_included_in_block cctxt path block_level block_hash timestamp
 let dump_received cctxt path ?unaccurate level items =
   let filename = filename_of_level path level in
   let mutex = get_file_mutex filename in
-  Lwt_mutex.with_lock mutex (fun () ->
-      load filename encoding empty >>=? fun infos ->
-      let (updated_known, unknown) =
-        List.fold_left
-          (fun (acc, missing)
-               Endorsement.(
-                 {
-                   delegate;
-                   delegate_alias;
-                   reception_time;
-                   errors;
-                   block_inclusion;
-                 } as en) ->
-            match
-              List.partition
-                (fun (pkh, _, _) ->
-                  Signature.Public_key_hash.equal pkh delegate)
-                missing
-            with
-            | ((_, err, time) :: _, missing') ->
-                let (reception_time, errors) =
-                  match reception_time with
-                  | Some _ -> (reception_time, errors)
-                  | None -> (time, err)
-                in
-                ( Endorsement.
-                    {
-                      delegate;
-                      delegate_alias;
-                      reception_time;
-                      errors;
-                      block_inclusion;
-                    }
-                  :: acc,
-                  missing' )
-            | ([], _) -> (en :: acc, missing))
-          ([], items)
-          infos.endorsements
-      in
-      (match unknown with
-      | [] -> return updated_known
-      | _ :: _ ->
-          Wallet.of_context cctxt >>=? fun aliases ->
-          (* let aliases = match out with
-             | Ok aliases -> aliases
-              | Error _err -> StringMap.empty in*)
-          return
-            (List.fold_left
-               (fun acc (delegate, errors, reception_time) ->
-                 Endorsement.
+  let*! out =
+    Lwt_mutex.with_lock mutex (fun () ->
+        let* infos = load filename encoding empty in
+        let (updated_known, unknown) =
+          List.fold_left
+            (fun (acc, missing)
+                 Endorsement.(
                    {
                      delegate;
-                     delegate_alias = Wallet.alias_of_pkh aliases delegate;
+                     delegate_alias;
                      reception_time;
                      errors;
-                     block_inclusion = [];
-                   }
-                 :: acc)
-               updated_known
-               unknown))
-      >>=? fun endorsements ->
-      let unaccurate = Option.value ~default:infos.unaccurate unaccurate in
-      let out_infos = {blocks = infos.blocks; endorsements; unaccurate} in
-      write filename encoding out_infos >>=? fun () ->
-      if infos.unaccurate then return_unit
-      else extract_anomalies path level out_infos)
-  >>= fun out ->
+                     block_inclusion;
+                   } as en) ->
+              match
+                List.partition
+                  (fun (pkh, _, _) ->
+                    Signature.Public_key_hash.equal pkh delegate)
+                  missing
+              with
+              | ((_, err, time) :: _, missing') ->
+                  let (reception_time, errors) =
+                    match reception_time with
+                    | Some _ -> (reception_time, errors)
+                    | None -> (time, err)
+                  in
+                  ( Endorsement.
+                      {
+                        delegate;
+                        delegate_alias;
+                        reception_time;
+                        errors;
+                        block_inclusion;
+                      }
+                    :: acc,
+                    missing' )
+              | ([], _) -> (en :: acc, missing))
+            ([], items)
+            infos.endorsements
+        in
+        let* endorsements =
+          match unknown with
+          | [] -> return updated_known
+          | _ :: _ ->
+              let* aliases = Wallet.of_context cctxt in
+              (* let aliases = match out with
+                 | Ok aliases -> aliases
+                  | Error _err -> StringMap.empty in*)
+              return
+                (List.fold_left
+                   (fun acc (delegate, errors, reception_time) ->
+                     Endorsement.
+                       {
+                         delegate;
+                         delegate_alias = Wallet.alias_of_pkh aliases delegate;
+                         reception_time;
+                         errors;
+                         block_inclusion = [];
+                       }
+                     :: acc)
+                   updated_known
+                   unknown)
+        in
+        let unaccurate = Option.value ~default:infos.unaccurate unaccurate in
+        let out_infos = {blocks = infos.blocks; endorsements; unaccurate} in
+        let* () = write filename encoding out_infos in
+        if infos.unaccurate then return_unit
+        else extract_anomalies path level out_infos)
+  in
   let () = drop_file_mutex filename in
   match out with
   | Ok () -> Lwt.return_unit
@@ -471,7 +475,8 @@ type chunk =
   | Mempool of
       bool option
       * Int32.t
-      * (Signature.Public_key_hash.t * error list option * Time.System.t option) list
+      * (Signature.Public_key_hash.t * error list option * Time.System.t option)
+        list
 
 let (chunk_stream, chunk_feeder) = Lwt_stream.create ()
 

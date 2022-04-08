@@ -26,18 +26,23 @@
 module Block_services =
   Tezos_client_010_PtGRANAD.Protocol_client_context.Alpha_block_services
 
+open Lwt_tzresult_syntax
 open Tezos_protocol_010_PtGRANAD
 
 let print_failures f =
-  f >|= function
-  | Ok () -> ()
-  | Error e -> Error_monad.pp_print_trace Format.err_formatter e
+  let*! o = f in
+  match o with
+  | Ok () -> Lwt.return_unit
+  | Error e ->
+      let () = Error_monad.pp_print_trace Format.err_formatter e in
+      Lwt.return_unit
 
 let dump_my_current_endorsements cctxt ~full block level ops =
-  Protocol.Delegate_services.Endorsing_rights.get
-    cctxt
-    (cctxt#chain, `Hash (block, 0))
-  >>=? fun rights ->
+  let* rights =
+    Protocol.Delegate_services.Endorsing_rights.get
+      cctxt
+      (cctxt#chain, `Hash (block, 0))
+  in
   let (items, missing) =
     List.fold_left
       Protocol.Delegate_services.Endorsing_rights.(
@@ -57,7 +62,9 @@ let dump_my_current_endorsements cctxt ~full block level ops =
     if full then
       List.fold_left
         (fun acc right ->
-          (right.Protocol.Delegate_services.Endorsing_rights.delegate, None, None)
+          ( right.Protocol.Delegate_services.Endorsing_rights.delegate,
+            None,
+            None )
           :: acc)
         items
         missing
@@ -94,31 +101,33 @@ let extract_endorsement
   | _ -> None
 
 let endorsements_recorder cctxt current_level =
-  Block_services.Mempool.monitor_operations
-    cctxt
-    ~chain:cctxt#chain
-    ~applied:true
-    ~refused:false
-    ~branch_delayed:true
-    ~branch_refused:true
-    ()
-  >>=? fun (ops_stream, _stopper) ->
+  let* (ops_stream, _stopper) =
+    Block_services.Mempool.monitor_operations
+      cctxt
+      ~chain:cctxt#chain
+      ~applied:true
+      ~refused:false
+      ~branch_delayed:true
+      ~branch_refused:true
+      ()
+  in
   let op_stream = Lwt_stream.flatten ops_stream in
-  Lwt_stream.fold
-    (fun ((_hash, op), errors) acc ->
-      let delay = Systime_os.now () in
-      match extract_endorsement op with
-      | None -> acc
-      | Some ((block, level), news) ->
-          Block_hash.Map.update
-            block
-            (function
-              | Some (_, l) -> Some (level, (errors, delay, news) :: l)
-              | None -> Some (level, [(errors, delay, news)]))
-            acc)
-    op_stream
-    Block_hash.Map.empty
-  >>= fun out ->
+  let*! out =
+    Lwt_stream.fold
+      (fun ((_hash, op), errors) acc ->
+        let delay = Time.System.now () in
+        match extract_endorsement op with
+        | None -> acc
+        | Some ((block, level), news) ->
+            Block_hash.Map.update
+              block
+              (function
+                | Some (_, l) -> Some (level, (errors, delay, news) :: l)
+                | None -> Some (level, [(errors, delay, news)]))
+              acc)
+      op_stream
+      Block_hash.Map.empty
+  in
   Block_hash.Map.iter_ep
     (fun block (level, endorsements) ->
       let level = Protocol.Alpha_context.Raw_level.to_int32 level in
@@ -127,15 +136,17 @@ let endorsements_recorder cctxt current_level =
     out
 
 let blocks_loop cctxt =
-  Shell_services.Monitor.valid_blocks cctxt ~chains:[cctxt#chain] ()
-  >>= function
+  let*! block_stream =
+    Shell_services.Monitor.valid_blocks cctxt ~chains:[cctxt#chain] ()
+  in
+  match block_stream with
   | Error e ->
       let () = Error_monad.pp_print_trace Format.err_formatter e in
       Lwt.return_unit
   | Ok (block_stream, _stopper) ->
       Lwt_stream.iter_p
         (fun ((chain_id, hash), header) ->
-          let reception_time = Systime_os.now () in
+          let reception_time = Time.System.now () in
           let block_level = header.Block_header.shell.Block_header.level in
           match
             Data_encoding.Binary.of_bytes
@@ -149,12 +160,14 @@ let blocks_loop cctxt =
               Lwt.return_unit
           | Ok {contents = {priority; seed_nonce_hash = _; _}; signature = _}
             -> (
-              Block_services.Operations.operations_in_pass
-                cctxt
-                ~chain:(`Hash chain_id)
-                ~block:(`Hash (hash, 0))
-                0
-              >>= function
+              let*! ops =
+                Block_services.Operations.operations_in_pass
+                  cctxt
+                  ~chain:(`Hash chain_id)
+                  ~block:(`Hash (hash, 0))
+                  0
+              in
+              match ops with
               | Error e ->
                   Lwt.return (Error_monad.pp_print_trace Format.err_formatter e)
               | Ok ops -> (
@@ -167,17 +180,20 @@ let blocks_loop cctxt =
                            Format.err_formatter
                            x)
                   | Ok level -> (
-                      Protocol.Delegate_services.Baking_rights.get
-                        ~levels:[level]
-                        ~max_priority:priority
-                        cctxt
-                        (cctxt#chain, `Hash (hash, 0))
-                      >|= function
+                      let*! baking_rights =
+                        Protocol.Delegate_services.Baking_rights.get
+                          ~levels:[level]
+                          ~max_priority:priority
+                          cctxt
+                          (cctxt#chain, `Hash (hash, 0))
+                      in
+                      match baking_rights with
                       | Error e ->
-                          Error_monad.pp_print_trace Format.err_formatter e
+                          Error_monad.pp_print_trace Format.err_formatter e ;
+                          Lwt.return_unit
                       | Ok baking_rights -> (
                           match List.last_opt baking_rights with
-                          | None -> ()
+                          | None -> Lwt.return_unit
                           | Some {level = l; delegate; priority = p; _} ->
                               let () =
                                 assert (
@@ -191,7 +207,7 @@ let blocks_loop cctxt =
                                 List.filter_map
                                   (fun Block_services.{receipt; _} ->
                                     match receipt with
-                                    | Some
+                                    | Receipt
                                         (Protocol.Apply_results
                                          .Operation_metadata
                                           {
@@ -214,11 +230,13 @@ let blocks_loop cctxt =
                                 timestamp
                                 reception_time
                                 delegate
-                                pks)))))
+                                pks ;
+                              Lwt.return_unit)))))
         block_stream
 
 let endorsements_loop cctxt =
-  Shell_services.Monitor.heads cctxt cctxt#chain >>= function
+  let*! head_stream = Shell_services.Monitor.heads cctxt cctxt#chain in
+  match head_stream with
   | Error e ->
       let () = Error_monad.pp_print_trace Format.err_formatter e in
       Lwt.return_unit
@@ -235,11 +253,12 @@ let main cctxt prefix =
     new Tezos_client_010_PtGRANAD.Protocol_client_context.wrap_full cctxt
   in
   let main =
-    Lwt.Infix.(blocks_loop cctxt <&> endorsements_loop cctxt) >>= fun () ->
+    let*! () = Lwt.Infix.(blocks_loop cctxt <&> endorsements_loop cctxt) in
     let () = Archiver.stop () in
     Lwt.return_unit
   in
-  Lwt.join [dumper; main] >>= return
+  let*! out = Lwt.join [dumper; main] in
+  return out
 
 let group = {Clic.name = "teztale"; Clic.title = "A delegate operation monitor"}
 
