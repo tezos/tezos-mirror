@@ -54,13 +54,13 @@ module ContractAlias = struct
     Client_keys.Public_key_hash.find cctxt name >>=? fun v ->
     return (name, Contract.implicit_contract v)
 
-  let rev_find cctxt c =
-    match Contract.is_implicit c with
-    | Some hash -> (
+  let rev_find cctxt (c : Contract.t) =
+    match c with
+    | Implicit hash -> (
         Client_keys.Public_key_hash.rev_find cctxt hash >>=? function
         | Some name -> return_some ("key:" ^ name)
         | None -> return_none)
-    | None -> RawContractAlias.rev_find cctxt c
+    | Originated _ -> RawContractAlias.rev_find cctxt c
 
   let get_contract cctxt s =
     match String.split ~limit:1 ':' s with

@@ -140,13 +140,13 @@ let prepare_command_display prepared_command bytes_only =
              Signature.Public_key.pp))
       prepared_command.Client_proto_multisig.keys
 
-let get_parameter_type (cctxt : #Protocol_client_context.full) ~destination
-    ~entrypoint =
-  match Contract.is_implicit destination with
-  | Some _ ->
+let get_parameter_type (cctxt : #Protocol_client_context.full)
+    ~(destination : Contract.t) ~entrypoint =
+  match destination with
+  | Implicit _ ->
       let open Micheline in
       return @@ strip_locations @@ Prim (0, Script.T_unit, [], [])
-  | None -> (
+  | Originated _ -> (
       Michelson_v1_entrypoints.contract_entrypoint_type
         cctxt
         ~chain:cctxt#chain
@@ -254,11 +254,11 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
             force
             alias_name
           >>=? fun alias_name ->
-          match Contract.is_implicit source with
-          | None ->
+          match source with
+          | Originated _ ->
               failwith
                 "only implicit accounts can be the source of an origination"
-          | Some source -> (
+          | Implicit source -> (
               Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
               let fee_parameter =
                 {
@@ -527,11 +527,11 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
           >>=? fun {expanded = parameter; _} ->
           get_parameter_type cctxt ~destination ~entrypoint
           >>=? fun parameter_type ->
-          match Contract.is_implicit source with
-          | None ->
+          match source with
+          | Originated _ ->
               failwith
                 "only implicit accounts can be the source of a contract call"
-          | Some source -> (
+          | Implicit source -> (
               Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
               let fee_parameter =
                 {
@@ -612,11 +612,11 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
              (_, source)
              signatures
              (cctxt : #Protocol_client_context.full) ->
-          match Contract.is_implicit source with
-          | None ->
+          match source with
+          | Originated _ ->
               failwith
                 "only implicit accounts can be the source of a contract call"
-          | Some source -> (
+          | Implicit source -> (
               Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
               let fee_parameter =
                 {
@@ -694,11 +694,11 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
              (_, source)
              signatures
              (cctxt : #Protocol_client_context.full) ->
-          match Contract.is_implicit source with
-          | None ->
+          match source with
+          | Originated _ ->
               failwith
                 "only implicit accounts can be the source of a contract call"
-          | Some source -> (
+          | Implicit source -> (
               Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
               let fee_parameter =
                 {
@@ -768,11 +768,11 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
              (_, source)
              signatures
              (cctxt : #Protocol_client_context.full) ->
-          match Contract.is_implicit source with
-          | None ->
+          match source with
+          | Originated _ ->
               failwith
                 "only implicit accounts can be the source of a contract call"
-          | Some source -> (
+          | Implicit source -> (
               Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
               let fee_parameter =
                 {
@@ -847,11 +847,11 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
              (_, source)
              signatures
              (cctxt : #Protocol_client_context.full) ->
-          match Contract.is_implicit source with
-          | None ->
+          match source with
+          | Originated _ ->
               failwith
                 "only implicit accounts can be the source of a contract call"
-          | Some source -> (
+          | Implicit source -> (
               Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
               List.map_es
                 (fun (pk_uri, _) -> Client_keys.public_key pk_uri)
@@ -939,11 +939,11 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
              (_, source)
              signatures
              (cctxt : #Protocol_client_context.full) ->
-          match Contract.is_implicit source with
-          | None ->
+          match source with
+          | Originated _ ->
               failwith
                 "only implicit accounts can be the source of a contract call"
-          | Some source -> (
+          | Implicit source -> (
               Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
               let fee_parameter =
                 {

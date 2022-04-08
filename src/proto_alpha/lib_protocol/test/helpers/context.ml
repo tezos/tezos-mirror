@@ -264,10 +264,9 @@ module Contract = struct
 
   let equal a b = Alpha_context.Contract.compare a b = 0
 
-  let pkh c =
-    match Alpha_context.Contract.is_implicit c with
-    | Some p -> p
-    | None -> Stdlib.failwith "pkh: only for implicit contracts"
+  let pkh = function
+    | Contract.Implicit p -> p
+    | Originated _ -> Stdlib.failwith "pkh: only for implicit contracts"
 
   let balance ctxt contract =
     Alpha_services.Contract.balance rpc_ctxt ctxt contract
@@ -278,20 +277,20 @@ module Contract = struct
   let balance_and_frozen_bonds ctxt contract =
     Alpha_services.Contract.balance_and_frozen_bonds rpc_ctxt ctxt contract
 
-  let counter ctxt contract =
-    match Contract.is_implicit contract with
-    | None -> invalid_arg "Helpers.Context.counter"
-    | Some mgr -> Alpha_services.Contract.counter rpc_ctxt ctxt mgr
+  let counter ctxt (contract : Contract.t) =
+    match contract with
+    | Originated _ -> invalid_arg "Helpers.Context.counter"
+    | Implicit mgr -> Alpha_services.Contract.counter rpc_ctxt ctxt mgr
 
-  let manager _ contract =
-    match Contract.is_implicit contract with
-    | None -> invalid_arg "Helpers.Context.manager"
-    | Some pkh -> Account.find pkh
+  let manager _ (contract : Contract.t) =
+    match contract with
+    | Originated _ -> invalid_arg "Helpers.Context.manager"
+    | Implicit pkh -> Account.find pkh
 
-  let is_manager_key_revealed ctxt contract =
-    match Contract.is_implicit contract with
-    | None -> invalid_arg "Helpers.Context.is_manager_key_revealed"
-    | Some mgr ->
+  let is_manager_key_revealed ctxt (contract : Contract.t) =
+    match contract with
+    | Originated _ -> invalid_arg "Helpers.Context.is_manager_key_revealed"
+    | Implicit mgr ->
         Alpha_services.Contract.manager_key rpc_ctxt ctxt mgr >|=? fun res ->
         res <> None
 

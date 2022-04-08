@@ -32,9 +32,7 @@ open Error_monad_operators
 let init () =
   Context.init3 ~consensus_threshold:0 () >|=? fun (b, (src0, src1, src2)) ->
   let baker =
-    match Alpha_context.Contract.is_implicit src0 with
-    | Some v -> v
-    | None -> assert false
+    match src0 with Implicit v -> v | Originated _ -> assert false
   in
   (b, baker, src1, src2)
 

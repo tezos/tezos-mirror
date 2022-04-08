@@ -363,18 +363,18 @@ let[@coq_axiom_with_reason "gadt"] register () =
     S.balance_and_frozen_bonds
     Contract.get_balance_and_frozen_bonds ;
   opt_register1 ~chunked:false S.manager_key (fun ctxt contract () () ->
-      match Contract.is_implicit contract with
-      | None -> return_none
-      | Some mgr -> (
+      match contract with
+      | Originated _ -> return_none
+      | Implicit mgr -> (
           Contract.is_manager_key_revealed ctxt mgr >>=? function
           | false -> return_some None
           | true ->
               Contract.get_manager_key ctxt mgr >|=? fun key -> Some (Some key))) ;
   register_opt_field ~chunked:false S.delegate Delegate.find ;
   opt_register1 ~chunked:false S.counter (fun ctxt contract () () ->
-      match Contract.is_implicit contract with
-      | None -> return_none
-      | Some mgr ->
+      match contract with
+      | Originated _ -> return_none
+      | Implicit mgr ->
           Contract.get_counter ctxt mgr >|=? fun counter -> Some counter) ;
   register_opt_field ~chunked:true S.script (fun c v ->
       Contract.get_script c v >|=? fun (_, v) -> v) ;
@@ -502,11 +502,11 @@ let[@coq_axiom_with_reason "gadt"] register () =
     (fun ctxt contract {normalize_types} ->
       Contract.get_balance ctxt contract >>=? fun balance ->
       Delegate.find ctxt contract >>=? fun delegate ->
-      (match Contract.is_implicit contract with
-      | Some manager ->
+      (match contract with
+      | Implicit manager ->
           Contract.get_counter ctxt manager >>=? fun counter ->
           return_some counter
-      | None -> return_none)
+      | Originated _ -> return_none)
       >>=? fun counter ->
       Contract.get_script ctxt contract >>=? fun (ctxt, script) ->
       (match script with

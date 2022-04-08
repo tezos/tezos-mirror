@@ -121,11 +121,11 @@ let view_options =
 
 let dummy_callback = Contract.implicit_contract Signature.Public_key_hash.zero
 
-let get_contract_caller_keys cctxt caller =
-  match Contract.is_implicit caller with
-  | None ->
+let get_contract_caller_keys cctxt (caller : Contract.t) =
+  match caller with
+  | Originated _ ->
       failwith "only implicit accounts can be the source of a contract call"
-  | Some source ->
+  | Implicit source ->
       Client_keys.get_key cctxt source >>=? fun (_, caller_pk, caller_sk) ->
       return (source, caller_pk, caller_sk)
 

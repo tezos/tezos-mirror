@@ -939,10 +939,10 @@ let apply_transaction_to_smart_contract ~ctxt ~source ~contract ~amount
       in
       (ctxt, result, operations) )
 
-let apply_transaction ~ctxt ~parameter ~source ~contract ~amount ~entrypoint
-    ~before_operation ~payer ~chain_id ~mode ~internal =
-  (match Contract.is_implicit contract with
-  | None ->
+let apply_transaction ~ctxt ~parameter ~source ~(contract : Contract.t) ~amount
+    ~entrypoint ~before_operation ~payer ~chain_id ~mode ~internal =
+  (match contract with
+  | Originated _ ->
       (if Tez.(amount = zero) then
        (* Detect potential call to non existent contract. *)
        Contract.must_exist ctxt contract
@@ -951,7 +951,7 @@ let apply_transaction ~ctxt ~parameter ~source ~contract ~amount ~entrypoint
       (* Since the contract is originated, nothing will be allocated
          or the next transfer of tokens will fail. *)
       return_false
-  | Some _ ->
+  | Implicit _ ->
       (* Transfers of zero to implicit accounts are forbidden. *)
       error_when Tez.(amount = zero) (Empty_transaction contract) >>?= fun () ->
       (* If the implicit contract is not yet allocated at this point then
@@ -1401,7 +1401,7 @@ let apply_external_manager_operation_content :
       error_when Compare.Z.(amount <= Z.zero) Forbidden_zero_ticket_quantity
       >>?= fun () ->
       error_when
-        (Option.is_some @@ Contract.is_implicit destination)
+        (match destination with Implicit _ -> true | Originated _ -> false)
         Cannot_transfer_ticket_to_implicit
       >>?= fun () ->
       Tx_rollup_ticket.parse_ticket_and_operation

@@ -1489,8 +1489,6 @@ module Contract : sig
 
   val implicit_contract : public_key_hash -> t
 
-  val is_implicit : t -> public_key_hash option
-
   val is_originated : t -> Contract_hash.t option
 
   val exists : context -> t -> bool Lwt.t

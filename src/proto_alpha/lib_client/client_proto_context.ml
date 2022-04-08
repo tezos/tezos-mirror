@@ -257,21 +257,21 @@ let list_contract_labels cctxt ~chain ~block =
   Alpha_services.Contract.list cctxt (chain, block) >>=? fun contracts ->
   List.rev_map_es
     (fun h ->
-      (match Contract.is_implicit h with
-      | Some m -> (
+      (match (h : Contract.t) with
+      | Implicit m -> (
           Public_key_hash.rev_find cctxt m >>=? function
           | None -> return ""
           | Some nm -> (
               RawContractAlias.find_opt cctxt nm >>=? function
               | None -> return (" (known as " ^ nm ^ ")")
               | Some _ -> return (" (known as key:" ^ nm ^ ")")))
-      | None -> (
+      | Originated _ -> (
           RawContractAlias.rev_find cctxt h >>=? function
           | None -> return ""
           | Some nm -> return (" (known as " ^ nm ^ ")")))
       >>=? fun nm ->
       let kind =
-        match Contract.is_implicit h with Some _ -> " (implicit)" | None -> ""
+        match h with Implicit _ -> " (implicit)" | Originated _ -> ""
       in
       let h_b58 = Contract.to_b58check h in
       return (nm, h_b58, kind))

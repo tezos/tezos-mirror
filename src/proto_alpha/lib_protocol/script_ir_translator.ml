@@ -4806,8 +4806,8 @@ and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_contra
  fun ~stack_depth ctxt loc arg destination ~entrypoint ->
   match destination with
   | Contract contract -> (
-      match Contract.is_implicit contract with
-      | Some _ ->
+      match contract with
+      | Implicit _ ->
           if Entrypoint.is_default entrypoint then
             (* An implicit account on the "default" entrypoint always exists and has type unit. *)
             Lwt.return
@@ -4819,8 +4819,7 @@ and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_contra
                 let address = {destination; entrypoint} in
                 (ctxt, Typed_contract {arg_ty = arg; address}) )
           else fail (No_such_entrypoint entrypoint)
-      | None -> (
-          (* Originated account *)
+      | Originated _ -> (
           trace (Invalid_contract (loc, contract))
           @@ Contract.get_script_code ctxt contract
           >>=? fun (ctxt, code) ->
@@ -4999,8 +4998,8 @@ let parse_contract_for_script :
  fun ctxt loc arg contract ~entrypoint ->
   match contract with
   | Contract contract -> (
-      match Contract.is_implicit contract with
-      | Some _ ->
+      match contract with
+      | Implicit _ ->
           if Entrypoint.is_default entrypoint then
             (* An implicit account on the "default" entrypoint always exists and has type unit. *)
             Lwt.return
@@ -5019,7 +5018,7 @@ let parse_contract_for_script :
               >|? fun ctxt ->
                 (* An implicit account on any other entrypoint is not a valid contract. *)
                 (ctxt, None) )
-      | None -> (
+      | Originated _ -> (
           (* Originated account *)
           trace (Invalid_contract (loc, contract))
           @@ Contract.get_script_code ctxt contract

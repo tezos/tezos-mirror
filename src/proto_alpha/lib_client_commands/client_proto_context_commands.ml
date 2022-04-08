@@ -593,14 +593,14 @@ let commands_ro () =
       @@ ContractAlias.destination_param ~name:"src" ~desc:"source delegate"
       @@ stop)
       (fun () (_, contract) (cctxt : Protocol_client_context.full) ->
-        match Contract.is_implicit contract with
-        | None ->
+        match contract with
+        | Originated _ ->
             cctxt#error
               "Cannot change deposits limit on contract %a. This operation is \
                invalid on originated contracts."
               Contract.pp
               contract
-        | Some delegate -> (
+        | Implicit delegate -> (
             get_frozen_deposits_limit
               cctxt
               ~chain:cctxt#chain
@@ -666,7 +666,8 @@ let force_switch =
        switch requires --gas-limit, --storage-limit, and --fee."
     ()
 
-let transfer_command amount source destination (cctxt : #Client_context.printer)
+let transfer_command amount (source : Contract.t) destination
+    (cctxt : #Client_context.printer)
     ( fee,
       dry_run,
       verbose_signing,
@@ -712,8 +713,8 @@ let transfer_command amount source destination (cctxt : #Client_context.printer)
    check_force_dependency "--fee" fee
   else Lwt.return_unit)
   >>= fun () ->
-  (match Contract.is_implicit source with
-  | None ->
+  (match source with
+  | Originated _ ->
       let contract = source in
       Managed_contract.get_contract_manager cctxt source >>=? fun source ->
       Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
@@ -740,7 +741,7 @@ let transfer_command amount source destination (cctxt : #Client_context.printer)
         ?storage_limit
         ?counter
         ()
-  | Some source ->
+  | Implicit source ->
       Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
       let destination : Alpha_context.Destination.t = Contract destination in
       transfer
@@ -776,7 +777,7 @@ let transfer_command amount source destination (cctxt : #Client_context.printer)
   | Some (_res, _contracts) -> return_unit
 
 let prepare_batch_operation cctxt ?arg ?fee ?gas_limit ?storage_limit
-    ?entrypoint source index batch =
+    ?entrypoint (source : Contract.t) index batch =
   Client_proto_contracts.ContractAlias.find_destination cctxt batch.destination
   >>=? fun (_, destination) ->
   tez_of_string_exn index "amount" batch.amount >>=? fun amount ->
@@ -787,8 +788,8 @@ let prepare_batch_operation cctxt ?arg ?fee ?gas_limit ?storage_limit
   let storage_limit = Option.either batch.storage_limit storage_limit in
   let entrypoint = Option.either batch.entrypoint entrypoint in
   parse_arg_transfer arg >>=? fun parameters ->
-  (match Contract.is_implicit source with
-  | None ->
+  (match source with
+  | Originated _ ->
       Managed_contract.build_transaction_operation
         cctxt
         ~chain:cctxt#chain
@@ -802,7 +803,7 @@ let prepare_batch_operation cctxt ?arg ?fee ?gas_limit ?storage_limit
         ?gas_limit
         ?storage_limit
         ()
-  | Some _ ->
+  | Implicit _ ->
       return
         (build_transaction_operation
            ~amount
@@ -941,8 +942,8 @@ let commands_rw () =
             burn_cap;
           }
         in
-        match Contract.is_implicit contract with
-        | None ->
+        match contract with
+        | Originated _ ->
             Managed_contract.get_contract_manager cctxt contract
             >>=? fun source ->
             Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
@@ -968,7 +969,7 @@ let commands_rw () =
               cctxt
               errors
             >>= fun _ -> return_unit
-        | Some mgr ->
+        | Implicit mgr ->
             Client_keys.get_key cctxt mgr >>=? fun (_, src_pk, manager_sk) ->
             set_delegate
               cctxt
@@ -1022,8 +1023,8 @@ let commands_rw () =
             burn_cap;
           }
         in
-        match Contract.is_implicit contract with
-        | None ->
+        match contract with
+        | Originated _ ->
             Managed_contract.get_contract_manager cctxt contract
             >>=? fun source ->
             Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
@@ -1048,7 +1049,7 @@ let commands_rw () =
               cctxt
               errors
             >>= fun _ -> return_unit
-        | Some mgr ->
+        | Implicit mgr ->
             Client_keys.get_key cctxt mgr >>=? fun (_, src_pk, manager_sk) ->
             set_delegate
               cctxt
@@ -1123,11 +1124,11 @@ let commands_rw () =
         RawContractAlias.of_fresh cctxt force alias_name >>=? fun alias_name ->
         Lwt.return (Micheline_parser.no_parsing_error program)
         >>=? fun {expanded = code; _} ->
-        match Contract.is_implicit source with
-        | None ->
+        match source with
+        | Originated _ ->
             failwith
               "only implicit accounts can be the source of an origination"
-        | Some source -> (
+        | Implicit source -> (
             Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
             let fee_parameter =
               {
@@ -1259,13 +1260,13 @@ let commands_rw () =
         with
         | [] -> failwith "Empty operation list"
         | operations ->
-            (match Contract.is_implicit source with
-            | None ->
+            (match source with
+            | Originated _ ->
                 Managed_contract.get_contract_manager cctxt source
                 >>=? fun source ->
                 Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
                 return (source, src_pk, src_sk)
-            | Some source ->
+            | Implicit source ->
                 Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
                 return (source, src_pk, src_sk))
             >>=? fun (source, src_pk, src_sk) ->
@@ -1445,10 +1446,10 @@ let commands_rw () =
            global_constant_str
            (_, source)
            cctxt ->
-        match Contract.is_implicit source with
-        | None ->
+        match source with
+        | Originated _ ->
             failwith "Only implicit accounts can register global constants"
-        | Some source ->
+        | Implicit source ->
             Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
             let fee_parameter =
               {
@@ -1590,11 +1591,11 @@ let commands_rw () =
              force_low_fee,
              fee_cap,
              burn_cap )
-           (_, source)
+           (_, (source : Contract.t))
            cctxt ->
-        match Contract.is_implicit source with
-        | None -> failwith "only implicit accounts can be revealed"
-        | Some source ->
+        match source with
+        | Originated _ -> failwith "only implicit accounts can be revealed"
+        | Implicit source ->
             Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
             let fee_parameter =
               {
@@ -1749,9 +1750,9 @@ let commands_rw () =
            (_name, source)
            proposals
            (cctxt : Protocol_client_context.full) ->
-        match Contract.is_implicit source with
-        | None -> failwith "only implicit accounts can submit proposals"
-        | Some src_pkh -> (
+        match source with
+        | Originated _ -> failwith "only implicit accounts can submit proposals"
+        | Implicit src_pkh -> (
             Client_keys.get_key cctxt src_pkh
             >>=? fun (src_name, _src_pk, src_sk) ->
             get_period_info
@@ -1932,9 +1933,9 @@ let commands_rw () =
            proposal
            ballot
            (cctxt : Protocol_client_context.full) ->
-        match Contract.is_implicit source with
-        | None -> failwith "only implicit accounts can submit ballot"
-        | Some src_pkh ->
+        match source with
+        | Originated _ -> failwith "only implicit accounts can submit ballot"
+        | Implicit src_pkh ->
             Client_keys.get_key cctxt src_pkh
             >>=? fun (src_name, _src_pk, src_sk) ->
             get_period_info
@@ -2040,15 +2041,15 @@ let commands_rw () =
             burn_cap;
           }
         in
-        match Contract.is_implicit contract with
-        | None ->
+        match contract with
+        | Originated _ ->
             cctxt#error
               "Cannot change deposits limit on contract %a. This operation is \
                invalid on originated contracts or unregistered delegate \
                contracts."
               Contract.pp
               contract
-        | Some mgr ->
+        | Implicit mgr ->
             Client_keys.get_key cctxt mgr >>=? fun (_, src_pk, manager_sk) ->
             set_deposits_limit
               cctxt
@@ -2104,15 +2105,15 @@ let commands_rw () =
             burn_cap;
           }
         in
-        match Contract.is_implicit contract with
-        | None ->
+        match contract with
+        | Originated _ ->
             cctxt#error
               "Cannot change deposits limit on contract %a. This operation is \
                invalid on originated contracts or unregistered delegate \
                contracts."
               Contract.pp
               contract
-        | Some mgr ->
+        | Implicit mgr ->
             Client_keys.get_key cctxt mgr >>=? fun (_, src_pk, manager_sk) ->
             set_deposits_limit
               cctxt
@@ -2165,10 +2166,10 @@ let commands_rw () =
              burn_cap )
            (_, source)
            cctxt ->
-        match Contract.is_implicit source with
-        | None ->
+        match source with
+        | Originated _ ->
             failwith "Only implicit accounts can originate transaction rollups"
-        | Some source ->
+        | Implicit source ->
             Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
             let fee_parameter =
               {
@@ -2244,11 +2245,11 @@ let commands_rw () =
            tx_rollup
            (_, source)
            cctxt ->
-        match Contract.is_implicit source with
-        | None ->
+        match source with
+        | Originated _ ->
             failwith
               "Only implicit accounts can submit transaction rollup batches"
-        | Some source ->
+        | Implicit source ->
             Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
             let fee_parameter =
               {
@@ -2339,11 +2340,11 @@ let commands_rw () =
            inbox_merkle_root
            messages
            cctxt ->
-        match Contract.is_implicit source with
-        | None ->
+        match source with
+        | Originated _ ->
             failwith
               "Only implicit accounts can submit transaction rollup commitments"
-        | Some source ->
+        | Implicit source ->
             Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
             let fee_parameter =
               {
@@ -2416,9 +2417,10 @@ let commands_rw () =
            tx_rollup
            (_, source)
            cctxt ->
-        match Contract.is_implicit source with
-        | None -> failwith "Only implicit accounts can finalize commitments"
-        | Some source ->
+        match source with
+        | Originated _ ->
+            failwith "Only implicit accounts can finalize commitments"
+        | Implicit source ->
             Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
             let fee_parameter =
               {
@@ -2486,9 +2488,10 @@ let commands_rw () =
            (_, source)
            tx_rollup
            cctxt ->
-        match Contract.is_implicit source with
-        | None -> failwith "Only implicit accounts can deposit/recover bonds"
-        | Some source ->
+        match source with
+        | Originated _ ->
+            failwith "Only implicit accounts can deposit/recover bonds"
+        | Implicit source ->
             Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
             let fee_parameter =
               {
@@ -2557,9 +2560,10 @@ let commands_rw () =
            tx_rollup
            (_, source)
            cctxt ->
-        match Contract.is_implicit source with
-        | None -> failwith "Only implicit accounts can remove commitments."
-        | Some source ->
+        match source with
+        | Originated _ ->
+            failwith "Only implicit accounts can remove commitments."
+        | Implicit source ->
             Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
             let fee_parameter =
               {
@@ -2682,12 +2686,12 @@ let commands_rw () =
            proof
            (_, source)
            cctxt ->
-        match Contract.is_implicit source with
-        | None ->
+        match source with
+        | Originated _ ->
             failwith
               "Only implicit accounts can reject transaction rollup \
                commitments."
-        | Some source ->
+        | Implicit source ->
             Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
             let fee_parameter =
               {
@@ -2800,12 +2804,12 @@ let commands_rw () =
            message_result_path
            tickets_info
            cctxt ->
-        match Contract.is_implicit source with
-        | None ->
+        match source with
+        | Originated _ ->
             failwith
               "Only implicit account can dispatch tickets for a transaction \
                rollup."
-        | Some source ->
+        | Implicit source ->
             Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
             let fee_parameter =
               {
@@ -2906,9 +2910,10 @@ let commands_rw () =
            ty
            (_, ticketer)
            cctxt ->
-        match Contract.is_implicit source with
-        | None -> failwith "Only implicit accounts can transfer tickets."
-        | Some source ->
+        match source with
+        | Originated _ ->
+            failwith "Only implicit accounts can transfer tickets."
+        | Implicit source ->
             Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
             let fee_parameter =
               {
@@ -2990,11 +2995,11 @@ let commands_rw () =
            pvm
            boot_sector
            cctxt ->
-        match Contract.is_implicit source with
-        | None ->
+        match source with
+        | Originated _ ->
             failwith
               "Only implicit accounts can originate smart-contract rollups"
-        | Some source ->
+        | Implicit source ->
             Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
             let fee_parameter =
               {
@@ -3077,9 +3082,10 @@ let commands_rw () =
            (_, source)
            rollup
            cctxt ->
-        (match Contract.is_implicit source with
-        | None -> failwith "Only implicit accounts can send messages to rollups"
-        | Some source -> return source)
+        (match source with
+        | Originated _ ->
+            failwith "Only implicit accounts can send messages to rollups"
+        | Implicit source -> return source)
         >>=? fun source ->
         (match messages with
         | `Bin message -> return [message]

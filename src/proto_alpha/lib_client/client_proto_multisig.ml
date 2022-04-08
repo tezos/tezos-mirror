@@ -614,14 +614,14 @@ type multisig_action =
 
 let action_to_expr_generic ~loc = function
   | Transfer {amount; destination; entrypoint; parameter_type; parameter} -> (
-      match Contract.is_implicit destination with
-      | Some destination ->
+      match destination with
+      | Implicit destination ->
           lambda_from_string
           @@ Managed_contract.build_lambda_for_transfer_to_implicit
                ~destination
                ~amount
           >|? left ~loc
-      | None ->
+      | Originated _ ->
           lambda_from_string
           @@ Managed_contract.build_lambda_for_transfer_to_originated
                ~destination

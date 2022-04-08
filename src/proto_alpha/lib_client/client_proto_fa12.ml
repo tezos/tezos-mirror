@@ -717,9 +717,9 @@ let contract_has_fa12_interface :
     unit ->
     unit tzresult Lwt.t =
  fun cctxt ~chain ~block ~contract () ->
-  match Contract.is_implicit contract with
-  | Some _ -> fail (Contract_has_no_script contract)
-  | None ->
+  match contract with
+  | Implicit _ -> fail (Contract_has_no_script contract)
+  | Originated _ ->
       Michelson_v1_entrypoints.list_contract_entrypoints
         cctxt
         ~chain
