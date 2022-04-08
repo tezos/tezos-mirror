@@ -304,74 +304,66 @@ module BLS = struct
     Registration_helpers.register
     @@ make_encode_fixed_size_to_bytes
          ~name:"ENCODING_BLS_FR"
-         ~to_bytes:Bls12_381_legacy.Fr.to_bytes
-         ~generator:(fun rng_state ->
-           Bls12_381_legacy.Fr.random ~state:rng_state ())
+         ~to_bytes:Bls12_381.Fr.to_bytes
+         ~generator:(fun rng_state -> Bls12_381.Fr.random ~state:rng_state ())
 
   let () =
     Registration_helpers.register
     @@ make_encode_fixed_size_to_bytes
          ~name:"ENCODING_BLS_G1"
-         ~to_bytes:Bls12_381_legacy.G1.Uncompressed.to_bytes
-         ~generator:(fun rng_state ->
-           Bls12_381_legacy.G1.Uncompressed.random ~state:rng_state ())
+         ~to_bytes:Bls12_381.G1.to_bytes
+         ~generator:(fun rng_state -> Bls12_381.G1.random ~state:rng_state ())
 
   let () =
     Registration_helpers.register
     @@ make_encode_fixed_size_to_bytes
          ~name:"ENCODING_BLS_G2"
-         ~to_bytes:Bls12_381_legacy.G2.Uncompressed.to_bytes
-         ~generator:(fun rng_state ->
-           Bls12_381_legacy.G2.Uncompressed.random ~state:rng_state ())
+         ~to_bytes:Bls12_381.G2.to_bytes
+         ~generator:(fun rng_state -> Bls12_381.G2.random ~state:rng_state ())
 
   let () =
     Registration_helpers.register
     @@ make_decode_fixed_size_from_bytes
          ~name:"DECODING_BLS_FR"
-         ~to_bytes:Bls12_381_legacy.Fr.to_bytes
-         ~from_bytes:Bls12_381_legacy.Fr.of_bytes_exn
-         ~generator:(fun rng_state ->
-           Bls12_381_legacy.Fr.random ~state:rng_state ())
+         ~to_bytes:Bls12_381.Fr.to_bytes
+         ~from_bytes:Bls12_381.Fr.of_bytes_exn
+         ~generator:(fun rng_state -> Bls12_381.Fr.random ~state:rng_state ())
 
   let () =
     Registration_helpers.register
     @@ make_decode_fixed_size_from_bytes
          ~name:"DECODING_BLS_G1"
-         ~to_bytes:Bls12_381_legacy.G1.Uncompressed.to_bytes
-         ~from_bytes:Bls12_381_legacy.G1.Uncompressed.of_bytes_exn
-         ~generator:(fun rng_state ->
-           Bls12_381_legacy.G1.Uncompressed.random ~state:rng_state ())
+         ~to_bytes:Bls12_381.G1.to_bytes
+         ~from_bytes:Bls12_381.G1.of_bytes_exn
+         ~generator:(fun rng_state -> Bls12_381.G1.random ~state:rng_state ())
 
   let () =
     Registration_helpers.register
     @@ make_decode_fixed_size_from_bytes
          ~name:"DECODING_BLS_G2"
-         ~to_bytes:Bls12_381_legacy.G2.Uncompressed.to_bytes
-         ~from_bytes:Bls12_381_legacy.G2.Uncompressed.of_bytes_exn
-         ~generator:(fun rng_state ->
-           Bls12_381_legacy.G2.Uncompressed.random ~state:rng_state ())
+         ~to_bytes:Bls12_381.G2.to_bytes
+         ~from_bytes:Bls12_381.G2.of_bytes_exn
+         ~generator:(fun rng_state -> Bls12_381.G2.random ~state:rng_state ())
 
   let () =
     Registration_helpers.register
     @@ fixed_size_shared
          ~name:"BLS_FR_FROM_Z"
-         ~generator:(fun rng_state ->
-           Bls12_381_legacy.Fr.random ~state:rng_state ())
+         ~generator:(fun rng_state -> Bls12_381.Fr.random ~state:rng_state ())
          ~make_bench:(fun generator () ->
            let generated = generator () in
-           let z = Bls12_381_legacy.Fr.to_z generated in
-           let closure () = ignore (Bls12_381_legacy.Fr.of_z z) in
+           let z = Bls12_381.Fr.to_z generated in
+           let closure () = ignore (Bls12_381.Fr.of_z z) in
            Generator.Plain {workload = (); closure})
 
   let () =
     Registration_helpers.register
     @@ fixed_size_shared
          ~name:"BLS_FR_TO_Z"
-         ~generator:(fun rng_state ->
-           Bls12_381_legacy.Fr.random ~state:rng_state ())
+         ~generator:(fun rng_state -> Bls12_381.Fr.random ~state:rng_state ())
          ~make_bench:(fun generator () ->
            let generated = generator () in
-           let closure () = ignore (Bls12_381_legacy.Fr.to_z generated) in
+           let closure () = ignore (Bls12_381.Fr.to_z generated) in
            Generator.Plain {workload = (); closure})
 end
 

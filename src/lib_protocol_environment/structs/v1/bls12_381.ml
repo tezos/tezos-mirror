@@ -31,16 +31,53 @@
    changes, changing Fq12 signature to a group. Functions like
    check_bytes, add, one, negate and order have been removed from the API
    (https://gitlab.com/dannywillems/ocaml-bls12-381/-/commit/1dfb8bd813d12539b4007af095f3125646477319).
-   A package bls12-381-legacy.0.4.3 (version used up to v3) has been released
-   without depending on the virtual package bls12-381 to be used in Tezos in
-   harmony with the new implementations of bls12-381-unix.
-   The content of this file is simply the content of Tezos_crypto.BLS12_381
-   using bls12-381-legacy instead of the virtual package and its implementation.
+
+   Removed values cited above can be mocked with anything because it was not
+   used in the environment. Only Fq12.eq and Fq12.one is required to be
+   correctly implemented. Therefore, the implementation is replaced with a
+   `failwith "Not implemented".
+
+   Also, bls12-381.1.0.0 added Bls12_381.Pairing.pairing_check which does
+   exactly the same job than the Michelson instruction IPairing_check_bls12_381
+   is expected to do. Therefore, the complete module Pairing is not required
+   anymore in Tezos_crypto.
 *)
 
-module Fr = Bls12_381_legacy.Fr
-module Fq12 = Bls12_381_legacy.Fq12
-module Gt = Bls12_381_legacy.Fq12
-module G1 = Bls12_381_legacy.G1.Uncompressed
-module G2 = Bls12_381_legacy.G2.Uncompressed
-include Bls12_381_legacy.Pairing
+module Fr = Bls12_381.Fr
+module G1 = Bls12_381.G1
+module G2 = Bls12_381.G2
+
+module Fq12 = struct
+  include Bls12_381.Fq12
+
+  let check_bytes _x = failwith "Not implemented"
+
+  let add _x _y = failwith "Not implemented"
+
+  let negate _x = failwith "Not implemented"
+end
+
+(* bls12-381.3.0.0 introduces GT as the prime subgroup of Fq12 of order
+   Fr.order. These two modules are algebraically different. However, in
+   environments < V4, GT was considered to be Fq12, and the implementation of
+   pairing was returning a point in Fq12, which is not algebraically strict
+   enough. It should be in GT.
+   Therefore, we must serialize a point in GT and deserialize it in Fq12.
+
+   The conversions are not required for further environments as
+   Bls12_381.Pairing.pairing_check is used and abstract the algebraic
+   structures.
+   Using F12.of_bytes_exn is not problematic as GT is a subgroup of Fq12.
+   Therefore any serialized value of GT will give a valid point by
+   Fq12.of_bytes_exn, supposing they follow the same serialisation rules.
+*)
+module Gt = Fq12
+
+let gt_to_fq12 x = Bls12_381.GT.to_bytes x |> Fq12.of_bytes_exn
+
+let final_exponentiation_opt x =
+  Bls12_381.Pairing.final_exponentiation_opt x |> Option.map gt_to_fq12
+
+let pairing g1 g2 = Bls12_381.Pairing.pairing g1 g2 |> gt_to_fq12
+
+let miller_loop = Bls12_381.Pairing.miller_loop
