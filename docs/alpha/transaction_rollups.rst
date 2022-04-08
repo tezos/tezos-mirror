@@ -88,7 +88,7 @@ Tezos. They are identified with **transaction rollup addresses**,
 assigned by the layer-1 at their respective creation (called
 origination in Tezos to mimic the terminology used for smart
 contract).  They are prefixed by ``txr1`` when encoded in a base58
-alphabet (see also the :ref:`kinds of address prefixes in Tezos <address_prefixes>`).
+alphabet (see also the :ref:`kinds of address prefixes in Tezos <address_prefixes_alpha>`).
 
 Workflow Overview
 -----------------

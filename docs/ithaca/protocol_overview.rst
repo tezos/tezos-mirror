@@ -61,6 +61,7 @@ information to determine the validity of a block. Given a context and a block,
 the ``apply`` function returns the updated context if the block is valid and has
 a higher :ref:`fitness<fitness_ithaca>`. The fitness determines a total ordering between blocks.
 
+.. _shell_proto_interact:
 .. _shell_proto_interact_ithaca:
 
 Shell-protocol interaction
@@ -81,6 +82,7 @@ and :ref:`the protocol-specific part<shell_proto_revisit_ithaca>`.
 This separation enables the shell to interact with different
 protocols.
 
+.. _validation_passes_proto:
 .. _validation_passes_proto_ithaca:
 
 Operations & Validation Passes

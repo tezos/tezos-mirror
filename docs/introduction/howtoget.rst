@@ -153,12 +153,12 @@ with architecture **x86_64**.  Although we only officially support
 Linux, the script has been tested with success in the past on
 Windows, OS X, and Linux.
 
-The same script can be used to run Tezos on Mainnet, on Hangzhounet, or on other network: it
+The same script can be used to run Tezos on Mainnet, on Ithacanet, or on other network: it
 suffices to rename it as it downloads a different image based on its
 name.
-For example, to run Tezos on the Hangzhounet test network with the latest release:
+For example, to run Tezos on the Ithacanet test network with the latest release:
 
-.. literalinclude:: use-docker-hangzhounet.sh
+.. literalinclude:: use-docker-ithacanet.sh
    :language: shell
    :start-after: [get testnet]
    :end-before: [start testnet]
@@ -168,10 +168,10 @@ Alternatively, to run on Mainnet::
    wget -O mainnet.sh https://gitlab.com/tezos/tezos/raw/latest-release/scripts/tezos-docker-manager.sh
    chmod +x mainnet.sh
 
-In the following we assume you are running on the Hangzhounet test network.
+In the following we assume you are running on the Ithacanet test network.
 You are now one step away from a working node:
 
-.. literalinclude:: use-docker-hangzhounet.sh
+.. literalinclude:: use-docker-ithacanet.sh
    :language: shell
    :start-after: [start testnet]
 
@@ -182,23 +182,23 @@ synchronize the chain. This can be *lengthy* on the first launch
 considering that the chain takes up several gigabytes of data. See
 :ref:`how to use Tezos<howtouse>` for more details.
 
-Every call to ``hangzhounet.sh`` will check for updates of the node and
+Every call to ``ithacanet.sh`` will check for updates of the node and
 will fail if your node is not up-to-date. For updating the node, simply
 run::
 
-    ./hangzhounet.sh restart
+    ./ithacanet.sh restart
 
 If you prefer to temporarily disable automatic updates, you just have to
 set an environment variable::
 
    export TEZOS_ALPHANET_DO_NOT_PULL=yes
 
-See ``./hangzhounet.sh --help`` for more information about the
-script. In particular see ``./hangzhounet.sh client --help`` or the
+See ``./ithacanet.sh --help`` for more information about the
+script. In particular see ``./ithacanet.sh client --help`` or the
 :ref:`online manual<client_manual>` for more information about
 the client. Every command to the ``tezos-client`` can be equivalently
-executed by using ``./hangzhounet.sh client``, passing the needed arguments. Similarly, ``tezos-admin-client``
-can be executed using ``./hangzhounet.sh admin-client``.
+executed by using ``./ithacanet.sh client``, passing the needed arguments. Similarly, ``tezos-admin-client``
+can be executed using ``./ithacanet.sh admin-client``.
 
 
 .. _building_with_opam:

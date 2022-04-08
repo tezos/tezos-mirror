@@ -29,7 +29,7 @@ the specification. The document also starts with a less formal
 explanation of the context: how Michelson code interacts with the
 blockchain.
 
-.. _address_prefixes:
+.. _address_prefixes_alpha:
 
 Semantics of smart contracts and transactions
 ---------------------------------------------

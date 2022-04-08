@@ -34,10 +34,6 @@ let protocols =
       "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK" );
     (* TODO tezos/tezos#2170: adapt rest of this list *)
     ( "",
-      "Hangzhou",
-      Some "/include/rpc_introduction.rst.inc",
-      "PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx" );
-    ( "ithaca",
       "Ithaca",
       Some "/include/rpc_introduction.rst.inc",
       "Psithaca2MLRFYargivpo7YvUr7wUDqyxrdhC5CQq78mRvimz6A" );

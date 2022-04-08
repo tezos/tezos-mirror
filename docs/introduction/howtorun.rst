@@ -223,6 +223,12 @@ and bakes blocks.
 Note that the baker needs direct access to
 the node data directory for performance reasons (to avoid RPC calls to the node).
 
+It also  computes the endorsing rights for that account and, upon reception of a new
+block, verifies the validity of the block and emits an endorsement
+operation. It can endorse for a specific account or if not specified it endorses for
+all known accounts.
+
+
 Let's launch the daemon pointing to the standard node directory and
 baking for user *bob*::
 
@@ -234,23 +240,11 @@ baking for user *bob*::
     If you are worried about the availability of your node when it is its turn to bake/endorse, there are other ways than duplicating your credentials (see the discussion in section :ref:`inactive_delegates`).
     **Never** use the same account on two daemons.
 
-Endorser
-~~~~~~~~
-
-The endorser is a daemon that, once connected to an account, computes
-the endorsing rights for that account and, upon reception of a new
-block, verifies the validity of the block and emits an endorsement
-operation.
-It can endorse for a specific account or if omitted it endorses for
-all known accounts.
 
 .. note::
 
-   In the Alpha protocol, the endorser daemon no longer exists, its role being
-   played by the baker daemon in the corresponding consensus algorithm.
-   Therefore, there is no ``tezos-endorser-alpha`` executable, but endorser
-   executables ``tezos-endorser-NNN-*`` exist for protocols up to 011
-   (Hangzhou).
+   In protocols before Ithaca, the endorser runs as a separate daemon.
+   Therefore, one needs to run the daemon ``tezos-endorser-NNN-*`` to endorse.
 
 Accuser
 ~~~~~~~
@@ -275,12 +269,11 @@ Docker
 ~~~~~~
 
 The docker image runs the daemons by default for all your keys.
-Assuming you run on Hangzhounet, to know if you baked, just run::
+Assuming you run on Ithacanet, to know if you baked, just run::
 
-    ./hangzhounet.sh baker log
-    ./hangzhounet.sh endorser log
+    ./ithacanet.sh baker log
 
-(replace ``hangzhounet.sh`` with ``mainnet.sh`` for Mainnet).
+(replace ``ithacanet.sh`` with ``mainnet.sh`` for Mainnet).
 You should see lines such as::
 
     Injected block BLxzbB7PBW1axq for bootstrap5 after BLSrg4dXzL2aqq  (level 1381, slot 0, fitness 00::0000000000005441, operations 21)

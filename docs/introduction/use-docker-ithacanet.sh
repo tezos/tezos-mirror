@@ -9,7 +9,7 @@ apt-get update
 apt-get install -y docker.io docker-compose kmod wget
 dockerd &
 # [get testnet]
-wget -O hangzhounet.sh https://gitlab.com/tezos/tezos/raw/latest-release/scripts/tezos-docker-manager.sh
-chmod +x hangzhounet.sh
+wget -O ithacanet.sh https://gitlab.com/tezos/tezos/raw/latest-release/scripts/tezos-docker-manager.sh
+chmod +x ithacanet.sh
 # [start testnet]
-./hangzhounet.sh start
+./ithacanet.sh start

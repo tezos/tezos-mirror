@@ -148,28 +148,12 @@ in the :ref:`introduction <howtoget>`.
 
 .. toctree::
    :maxdepth: 2
-   :caption: Hangzhou Protocol doc:
+   :caption: Ithaca Protocol doc:
 
-   active/michelson
-   active/proof_of_stake
-   active/consensus
-   active/sapling
-   active/voting
-   active/liquidity_baking
-   active/timelock
-   active/plugins
+   active/protocol
    active/glossary
    active/cli-commands
    active/rpc
-
-.. toctree::
-   :maxdepth: 2
-   :caption: Ithaca Protocol doc:
-
-   ithaca/protocol
-   ithaca/glossary
-   ithaca/cli-commands
-   ithaca/rpc
 
 .. toctree::
    :maxdepth: 2

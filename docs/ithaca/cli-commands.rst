@@ -14,6 +14,7 @@ The rest of this page documents the protocol-dependent tools.
 The protocol-independent tools are documented :doc:`here <../shell/cli-commands>`.
 
 
+.. _client_manual:
 .. _client_manual_ithaca:
 
 Client manual
@@ -23,6 +24,7 @@ Client manual
          :file: tezos-client.html
 
 
+.. _baker_manual:
 .. _baker_manual_ithaca:
 
 Baker manual
@@ -32,6 +34,7 @@ Baker manual
          :file: tezos-baker.html
 
 
+.. _accuser_manual:
 .. _accuser_manual_ithaca:
 
 Accuser manual
