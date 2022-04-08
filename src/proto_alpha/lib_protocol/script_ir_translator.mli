@@ -114,10 +114,22 @@ type ('arg, 'storage) code =
 
 type ex_code = Ex_code : ('a, 'c) code -> ex_code
 
-type 'storage ex_view =
-  | Ex_view :
-      ('input * 'storage, 'output) Script_typed_ir.lambda
-      -> 'storage ex_view
+type 'storage typed_view =
+  | Typed_view : {
+      input_ty : ('input, _) Script_typed_ir.ty;
+      output_ty : ('output, _) Script_typed_ir.ty;
+      kinstr :
+        ( 'input * 'storage,
+          Script_typed_ir.end_of_stack,
+          'output,
+          Script_typed_ir.end_of_stack )
+        Script_typed_ir.kinstr;
+      original_code_expr : Script.node;
+    }
+      -> 'storage typed_view
+
+type 'storage typed_view_map =
+  (Script_string.t, 'storage typed_view) Script_typed_ir.map
 
 type ('a, 's, 'b, 'u) cinstr = {
   apply :
@@ -293,21 +305,21 @@ val parse_view_output_ty :
   Script.node ->
   (ex_ty * context) tzresult
 
-val parse_view_returning :
+val parse_view :
   ?type_logger:type_logger ->
   context ->
   legacy:bool ->
   ('storage, _) Script_typed_ir.ty ->
   Script_typed_ir.view ->
-  ('storage ex_view * context) tzresult Lwt.t
+  ('storage typed_view * context) tzresult Lwt.t
 
-val typecheck_views :
+val parse_views :
   ?type_logger:type_logger ->
   context ->
   legacy:bool ->
   ('storage, _) Script_typed_ir.ty ->
   Script_typed_ir.view_map ->
-  context tzresult Lwt.t
+  ('storage typed_view_map * context) tzresult Lwt.t
 
 (**
   [parse_ty] allowing big_map values, operations, contract and tickets.

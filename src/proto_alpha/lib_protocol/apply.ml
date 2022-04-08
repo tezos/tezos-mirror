@@ -1429,16 +1429,12 @@ let apply_external_manager_operation_content :
       >>?= fun (unparsed_code, ctxt) ->
       let (Script {storage_type; views; storage; _}) = parsed_script in
       let views_result =
-        Script_ir_translator.typecheck_views
-          ctxt
-          ~legacy:false
-          storage_type
-          views
+        Script_ir_translator.parse_views ctxt ~legacy:false storage_type views
       in
       trace
         (Script_tc_errors.Ill_typed_contract (unparsed_code, []))
         views_result
-      >>=? fun ctxt ->
+      >>=? fun (_typed_views, ctxt) ->
       apply_origination
         ~ctxt
         ~storage_type
