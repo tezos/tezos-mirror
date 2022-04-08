@@ -926,7 +926,7 @@ let fill_inbox b tx_rollup contract contents k =
        consumed by an operation. We set a lower (arbitrary) limit to
        be able to reach the size limit of an operation. *)
     Op.tx_rollup_submit_batch
-      ~gas_limit:(Gas.Arith.integral_of_int_exn 100_000)
+      ~gas_limit:(Gas.Arith.integral_of_int_exn 20_000)
       ~counter
       (I i)
       contract
