@@ -28,9 +28,9 @@
 
 type error +=
   | (* `Branch *)
-      Counter_in_the_future of Contract_repr.contract * Z.t * Z.t
+      Counter_in_the_future of Contract_repr.t * Z.t * Z.t
   | (* `Temporary *)
-      Non_existing_contract of Contract_repr.contract
+      Non_existing_contract of Contract_repr.t
   | (* `Permanent *)
       Inconsistent_public_key of
       Signature.Public_key.t * Signature.Public_key.t
