@@ -354,12 +354,34 @@ module Tx_rollup = struct
     Tx_rollup_services.commitment rpc_ctxt ctxt tx_rollup
 end
 
-let init_gen n get ?rng_state ?commitments ?(initial_balances = [])
+type (_, _) tup =
+  | T1 : ('a, 'a) tup
+  | T2 : ('a, 'a * 'a) tup
+  | T3 : ('a, 'a * 'a * 'a) tup
+  | TList : int -> ('a, 'a list) tup
+
+let tup_n : type a r. (a, r) tup -> int = function
+  | T1 -> 1
+  | T2 -> 2
+  | T3 -> 3
+  | TList n -> n
+
+let tup_get : type a r. (a, r) tup -> a list -> r =
+ fun tup list ->
+  match (tup, list) with
+  | (T1, [v]) -> v
+  | (T2, [v1; v2]) -> (v1, v2)
+  | (T3, [v1; v2; v3]) -> (v1, v2, v3)
+  | (TList _, l) -> l
+  | _ -> assert false
+
+let init_gen tup ?rng_state ?commitments ?(initial_balances = [])
     ?consensus_threshold ?min_proposal_quorum ?bootstrap_contracts ?level
     ?cost_per_byte ?liquidity_baking_subsidy ?endorsing_reward_per_slot
     ?baking_reward_bonus_per_slot ?baking_reward_fixed_portion ?origination_size
     ?blocks_per_cycle ?cycles_per_voting_period ?tx_rollup_enable
     ?tx_rollup_sunset_level ?tx_rollup_origination_size ?sc_rollup_enable () =
+  let n = tup_n tup in
   let accounts = Account.generate_accounts ?rng_state ~initial_balances n in
   let contracts =
     List.map
@@ -385,20 +407,15 @@ let init_gen n get ?rng_state ?commitments ?(initial_balances = [])
     ?tx_rollup_origination_size
     ?sc_rollup_enable
     accounts
-  >|=? fun blk -> (blk, get contracts)
+  >|=? fun blk -> (blk, tup_get tup contracts)
 
-let init_n n = init_gen n (fun cs -> cs)
+let init_n n = init_gen (TList n)
 
-let init1 =
-  init_gen 1 (function [contract_1] -> contract_1 | _ -> assert false)
+let init1 = init_gen T1
 
-let init2 =
-  init_gen 2 (function
-      | [contract_1; contract_2] -> (contract_1, contract_2)
-      | _ -> assert false)
+let init2 = init_gen T2
 
-let init3 =
-  init_gen 3 (function [c1; c2; c3] -> (c1, c2, c3) | _ -> assert false)
+let init3 = init_gen T3
 
 let init_with_constants constants n =
   let accounts = Account.generate_accounts n in
