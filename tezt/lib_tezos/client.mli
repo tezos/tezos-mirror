@@ -343,7 +343,10 @@ val empty_mempool_file : ?filename:string -> unit -> string
 
 (** Run [tezos-client bake for].
 
-    Default [key] is {!Constant.bootstrap1.alias}. *)
+    Default [key] is {!Constant.bootstrap1.alias}.
+
+    If you want to wait until the node switches its head to the baked block,
+    consider using {!bake_for_and_wait} below. *)
 val bake_for :
   ?endpoint:endpoint ->
   ?protocol:Protocol.t ->
