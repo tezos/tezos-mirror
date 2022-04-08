@@ -79,7 +79,7 @@ let two_over_n_of_balance incr contract n =
 (********************)
 
 let single_transfer ?fee ?expect_failure amount =
-  Context.init2 () >>=? fun (b, contract_1, contract_2) ->
+  Context.init2 () >>=? fun (b, (contract_1, contract_2)) ->
   Incremental.begin_construction b >>=? fun b ->
   transfer_and_check_balances
     ~loc:__LOC__
@@ -143,7 +143,7 @@ let test_transfer_to_originate_with_fee () =
 
 (** Transfer from balance. *)
 let test_transfer_amount_of_contract_balance () =
-  Context.init2 () >>=? fun (b, contract_1, contract_2) ->
+  Context.init2 () >>=? fun (b, (contract_1, contract_2)) ->
   Context.Contract.pkh contract_1 >>=? fun pkh1 ->
   (* given that contract_1 no longer has a sufficient balance to bake,
      make sure it cannot be chosen as baker *)
@@ -173,7 +173,7 @@ let test_transfers_to_self () =
 
 (** Forgot to add the valid transaction into the block. *)
 let test_missing_transaction () =
-  Context.init2 () >>=? fun (b, contract_1, contract_2) ->
+  Context.init2 () >>=? fun (b, (contract_1, contract_2)) ->
   (* given that contract_1 no longer has a sufficient balance to bake,
      make sure it cannot be chosen as baker *)
   Context.Contract.pkh contract_1 >>=? fun pkh1 ->
@@ -318,7 +318,7 @@ let test_transfer_from_implicit_to_originated_contract () =
 (********************)
 
 let multiple_transfer n ?fee amount =
-  Context.init2 () >>=? fun (b, contract_1, contract_2) ->
+  Context.init2 () >>=? fun (b, (contract_1, contract_2)) ->
   Incremental.begin_construction b >>=? fun b ->
   n_transactions n b ?fee contract_1 contract_2 amount >>=? fun b ->
   Incremental.finalize_block b >>=? fun _ -> return_unit
@@ -366,7 +366,7 @@ let test_block_with_multiple_transfers_with_without_fee () =
 (** Build a chain that has 10 blocks. *)
 let test_build_a_chain () =
   Context.init2 ~consensus_threshold:0 ()
-  >>=? fun (b, contract_1, contract_2) ->
+  >>=? fun (b, (contract_1, contract_2)) ->
   let ten = of_int 10 in
   List.fold_left_es
     (fun b _ ->
@@ -396,7 +396,7 @@ let test_empty_implicit () =
 
 (** Balance is too low to transfer. *)
 let test_balance_too_low fee () =
-  Context.init2 () >>=? fun (b, contract_1, contract_2) ->
+  Context.init2 () >>=? fun (b, (contract_1, contract_2)) ->
   Incremental.begin_construction b >>=? fun i ->
   Context.Contract.balance (I i) contract_1 >>=? fun balance1 ->
   Context.Contract.balance (I i) contract_2 >>=? fun balance2 ->
@@ -475,7 +475,7 @@ let test_balance_too_low_two_transfers fee () =
 
 (** The counter is already used for the previous operation. *)
 let invalid_counter () =
-  Context.init2 () >>=? fun (b, contract_1, contract_2) ->
+  Context.init2 () >>=? fun (b, (contract_1, contract_2)) ->
   Incremental.begin_construction b >>=? fun b ->
   Op.transaction (I b) contract_1 contract_2 Tez.one >>=? fun op1 ->
   Op.transaction (I b) contract_1 contract_2 Tez.one >>=? fun op2 ->
@@ -489,7 +489,7 @@ let invalid_counter () =
 (** Same as before but through a different way to perform this
     error. *)
 let test_add_the_same_operation_twice () =
-  Context.init2 () >>=? fun (b, contract_1, contract_2) ->
+  Context.init2 () >>=? fun (b, (contract_1, contract_2)) ->
   Incremental.begin_construction b >>=? fun b ->
   transfer_and_check_balances ~loc:__LOC__ b contract_1 contract_2 ten_tez
   >>=? fun (b, op_transfer) ->
@@ -502,7 +502,7 @@ let test_add_the_same_operation_twice () =
 
 (** The counter is in the future *)
 let invalid_counter_in_the_future () =
-  Context.init2 () >>=? fun (b, contract_1, contract_2) ->
+  Context.init2 () >>=? fun (b, (contract_1, contract_2)) ->
   Incremental.begin_construction b >>=? fun b ->
   Context.Contract.counter (I b) contract_1 >>=? fun cpt ->
   let counter = Z.add cpt (Z.of_int 10) in
@@ -515,7 +515,7 @@ let invalid_counter_in_the_future () =
 
 (** Check ownership. *)
 let test_ownership_sender () =
-  Context.init2 () >>=? fun (b, contract_1, contract_2) ->
+  Context.init2 () >>=? fun (b, (contract_1, contract_2)) ->
   Incremental.begin_construction b >>=? fun b ->
   (* get the manager of the contract_1 as a sender *)
   Context.Contract.manager (I b) contract_1 >>=? fun manager ->

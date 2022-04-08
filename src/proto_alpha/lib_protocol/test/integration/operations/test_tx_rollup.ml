@@ -257,7 +257,7 @@ let context_init2 ?tx_rollup_max_inboxes_count
     ?tx_rollup_hard_size_limit_per_message
     2
   >|=? function
-  | (b, contract_1 :: contract_2 :: _) -> (b, contract_1, contract_2)
+  | (b, contract_1 :: contract_2 :: _) -> (b, (contract_1, contract_2))
   | (_, _) -> assert false
 
 (** [originate b contract] originates a tx_rollup from [contract],
@@ -1558,7 +1558,7 @@ let test_finalization () =
     level, and ensures that this fails.  It adds a commitment with
     the wrong batch count and ensures that that fails. *)
 let test_commitment_duplication () =
-  context_init2 () >>=? fun (b, contract1, contract2) ->
+  context_init2 () >>=? fun (b, (contract1, contract2)) ->
   let pkh1 = is_implicit_exn contract1 in
   originate b contract1 >>=? fun (b, tx_rollup) ->
   Context.Contract.balance (B b) contract1 >>=? fun balance ->
@@ -1647,7 +1647,7 @@ let test_commitment_duplication () =
   return ()
 
 let test_commit_current_inbox () =
-  context_init2 () >>=? fun (b, contract1, contract2) ->
+  context_init2 () >>=? fun (b, (contract1, contract2)) ->
   originate b contract1 >>=? fun (b, tx_rollup) ->
   (* In order to have a permissible commitment, we need a transaction. *)
   Incremental.begin_construction b >>=? fun i ->
@@ -2378,7 +2378,7 @@ module Rejection = struct
   let init_with_deposit ?tx_rollup_hard_size_limit_per_message addr =
     init_l2_store () >>= fun store ->
     context_init2 ?tx_rollup_hard_size_limit_per_message ()
-    >>=? fun (b, account, account2) ->
+    >>=? fun (b, (account, account2)) ->
     originate b account >>=? fun (b, tx_rollup) ->
     make_deposit b tx_rollup account addr
     >>=? fun (b, (deposit, _), ticket_hash) ->
@@ -2607,7 +2607,7 @@ module Rejection = struct
     let open Error_monad_operators in
     let (_, _, addr) = gen_l2_account () in
     init_l2_store () >>= fun store ->
-    context_init2 () >>=? fun (b, contract1, contract2) ->
+    context_init2 () >>=? fun (b, (contract1, contract2)) ->
     originate b contract1 >>=? fun (b, tx_rollup) ->
     make_deposit b tx_rollup contract1 addr
     >>=? fun (b, (deposit_message, _), _ticket_hash) ->
@@ -3558,7 +3558,7 @@ end
     rejecting commitments. *)
 let test_state () =
   let open Single_message_inbox in
-  context_init2 () >>=? fun (b, account1, account2) ->
+  context_init2 () >>=? fun (b, (account1, account2)) ->
   originate b account1 >>=? fun (b, tx_rollup) ->
   (* Submit bogus message three time to have three inboxes *)
   submit b tx_rollup account1 >>=? fun b ->

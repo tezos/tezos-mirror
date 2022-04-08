@@ -60,7 +60,7 @@ let expr_to_hash expr =
    that values written to the global table of constants persist across
    blocks. *)
 let get_happy_path () =
-  Context.init2 () >>=? fun (b, alice, bob) ->
+  Context.init2 () >>=? fun (b, (alice, bob)) ->
   Incremental.begin_construction b >>=? fun b ->
   let expr_str = "Pair 3 7" in
   let expr = Expr.from_string expr_str in

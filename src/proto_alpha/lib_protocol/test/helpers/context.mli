@@ -271,7 +271,8 @@ val init2 :
   ?tx_rollup_sunset_level:int32 ->
   ?sc_rollup_enable:bool ->
   unit ->
-  (Block.t * Alpha_context.Contract.t * Alpha_context.Contract.t) tzresult Lwt.t
+  (Block.t * (Alpha_context.Contract.t * Alpha_context.Contract.t)) tzresult
+  Lwt.t
 
 val init_with_constants :
   Constants.parametric ->

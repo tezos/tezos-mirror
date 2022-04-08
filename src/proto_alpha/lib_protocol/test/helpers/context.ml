@@ -443,7 +443,7 @@ let init2 ?rng_state ?commitments ?(initial_balances = []) ?consensus_threshold
     2
   >|=? function
   | (_, []) | (_, [_]) -> assert false
-  | (b, contract_1 :: contract_2 :: _) -> (b, contract_1, contract_2)
+  | (b, contract_1 :: contract_2 :: _) -> (b, (contract_1, contract_2))
 
 let init_with_constants constants n =
   let accounts = Account.generate_accounts n in
