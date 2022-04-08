@@ -143,9 +143,22 @@ let bytes_of_prefixed_string s =
 let bytes_parameter = parameter (fun _ s -> bytes_of_prefixed_string s)
 
 let data_parameter =
-  parameter (fun _ data ->
-      Lwt.return @@ Tezos_micheline.Micheline_parser.no_parsing_error
-      @@ Michelson_v1_parser.parse_expression data)
+  let parse input =
+    Lwt.return @@ Tezos_micheline.Micheline_parser.no_parsing_error
+    @@ Michelson_v1_parser.parse_expression input
+  in
+  parameter (fun _ctxt ->
+      Client_aliases.parse_alternatives
+        [
+          ( "file",
+            fun filename ->
+              let open Lwt_result_syntax in
+              let* input =
+                catch_s (fun () -> Lwt_utils_unix.read_file filename)
+              in
+              parse input );
+          ("text", parse);
+        ])
 
 let init_arg =
   default_arg

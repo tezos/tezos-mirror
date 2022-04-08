@@ -23,6 +23,21 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Allows to parse an argument taking one of many forms. Accepts a
+    list of alternative parsers and an input string. Each alternative
+    consists of a string being the name of the format and a function
+    for parsing the input.
+
+    If the input string has form 'format:argument', where 'format'
+    appears among alternative names, then the parser associated with that
+    name is run against the argument and its result is returned.
+    Otherwise, each parser is tried against the whole input in
+    turn. If any of them succeeds, no further parsers are tried and
+    the successful result is returned. If none succeeds, their error
+    traces are combined into an error which is returned. *)
+val parse_alternatives :
+  (string * (string -> 'a tzresult Lwt.t)) list -> string -> 'a tzresult Lwt.t
+
 module type Entity = sig
   type t
 

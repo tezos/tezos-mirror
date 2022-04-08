@@ -15,7 +15,8 @@
   tezos-signer-backends
   tezos-protocol-plugin-alpha
   tezos-protocol-alpha-parameters
-  tezos-rpc)
+  tezos-rpc
+  tezos-stdlib-unix)
  (inline_tests (flags -verbose))
  (preprocess (pps ppx_inline_test))
  (library_flags (:standard -linkall))
@@ -28,4 +29,5 @@
    -open Tezos_protocol_alpha
    -open Tezos_protocol_plugin_alpha
    -open Tezos_protocol_alpha_parameters
-   -open Tezos_rpc)))
+   -open Tezos_rpc
+   -open Tezos_stdlib_unix)))

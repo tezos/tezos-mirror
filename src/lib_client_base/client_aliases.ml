@@ -25,6 +25,20 @@
 
 (* Tezos Command line interface - Local Storage for Configuration *)
 
+let rec try_alternatives input = function
+  | [] -> failwith "Could not parse input."
+  | (_, f) :: alts -> either_f (f input) (fun () -> try_alternatives input alts)
+
+let parse_alternatives alts input =
+  match String.split ~limit:1 ':' input with
+  | [] | [_] -> try_alternatives input alts
+  | [format; value] -> (
+      match List.assoc_opt ~equal:String.equal format alts with
+      | Some f -> f value
+      | None -> try_alternatives input alts)
+  | _ -> assert false
+(* cannot happen due to String.split's implementation. *)
+
 open Clic
 
 module type Entity = sig
@@ -373,31 +387,17 @@ module Alias (Entity : Entity) = struct
       next
 
   let parse_source_string cctxt s =
-    let open Lwt_tzresult_syntax in
-    match String.split ~limit:1 ':' s with
-    | ["alias"; alias] -> find cctxt alias
-    | ["text"; text] -> of_source text
-    | ["file"; path] ->
-        let* s = cctxt#read_file path in
-        of_source s
-    | _ -> (
-        let*! r = find cctxt s in
-        match r with
-        | Ok v -> return v
-        | Error a_errs -> (
-            let*! r =
-              let* s = cctxt#read_file s in
-              of_source s
-            in
-            match r with
-            | Ok v -> return v
-            | Error r_errs -> (
-                let*! r = of_source s in
-                match r with
-                | Ok v -> return v
-                | Error s_errs ->
-                    let all_errs = List.flatten [a_errs; r_errs; s_errs] in
-                    Lwt.return_error all_errs)))
+    let open Lwt_result_syntax in
+    parse_alternatives
+      [
+        ("alias", fun alias -> find cctxt alias);
+        ( "file",
+          fun path ->
+            let* input = cctxt#read_file path in
+            of_source input );
+        ("text", of_source);
+      ]
+      s
 
   let source_param ?(name = "src") ?(desc = "source " ^ Entity.name) next =
     let desc =
