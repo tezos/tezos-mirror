@@ -209,12 +209,12 @@ module State_transitions = struct
       ~msg:"different branch proposal has the same prequorum"
       ()
 
-  let preendorsing_proposal =
+  let attempting_preendorse_proposal =
     declare_1
       ~section
-      ~name:"preendorsing_proposal"
+      ~name:"attempting_preendorsing_proposal"
       ~level:Info
-      ~msg:"preendorsing proposal {block_hash}"
+      ~msg:"attempting to preendorse proposal {block_hash}"
       ~pp1:Block_hash.pp
       ("block_hash", Block_hash.encoding)
 
@@ -469,21 +469,21 @@ module Lib = struct
 
   let section = section @ ["lib"]
 
-  let preendorsing_proposal =
+  let attempting_preendorse_proposal =
     declare_1
       ~section
-      ~name:"preendorsing_proposal"
+      ~name:"attempting_preendorsing_proposal"
       ~level:Debug
-      ~msg:"preendorsing proposal {proposal}"
+      ~msg:"attempting to preendorse proposal {proposal}"
       ~pp1:Baking_state.pp_proposal
       ("proposal", Baking_state.proposal_encoding)
 
-  let endorsing_proposal =
+  let attempting_endorse_proposal =
     declare_1
       ~section
-      ~name:"endorsing_proposal"
+      ~name:"attempting_endorsing_proposal"
       ~level:Debug
-      ~msg:"endorsing proposal {proposal}"
+      ~msg:"attempting to endorse proposal {proposal}"
       ~pp1:Baking_state.pp_proposal
       ("proposal", Baking_state.proposal_encoding)
 end
