@@ -170,11 +170,7 @@ let init () =
 (** Initializes one address for operations and one baker. *)
 let init_for_operation () =
   Context.init2 ~consensus_threshold:0 () >|=? fun (block, (src0, src1)) ->
-  let baker =
-    match Alpha_context.Contract.is_implicit src0 with
-    | Some v -> v
-    | None -> assert false
-  in
+  let baker = Context.Contract.pkh src0 in
   (baker, src1, block)
 
 let two_ticketers block =

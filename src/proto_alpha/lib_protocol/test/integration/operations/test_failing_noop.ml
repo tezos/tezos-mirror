@@ -37,21 +37,16 @@
                   applied.
  *)
 
-open Protocol
-open Alpha_context
-
 (** try to apply a failing_noop and assert that the operation fails *)
 let failing_noop_must_fail_when_injected () =
   Context.init1 () >>=? fun (blk, contract) ->
-  Contract.is_implicit contract |> function
-  | None -> Alcotest.fail "only implicit accounts can sign"
-  | Some source ->
-      Op.failing_noop (B blk) source "tezos" >>=? fun operation ->
-      Block.bake ~operation blk >>= fun res ->
-      Assert.proto_error_with_info
-        ~loc:__LOC__
-        res
-        "Failing_noop operations are not executed by the protocol"
+  let source = Context.Contract.pkh contract in
+  Op.failing_noop (B blk) source "tezos" >>=? fun operation ->
+  Block.bake ~operation blk >>= fun res ->
+  Assert.proto_error_with_info
+    ~loc:__LOC__
+    res
+    "Failing_noop operations are not executed by the protocol"
 
 let tests =
   [Tztest.tztest "injection fails" `Quick failing_noop_must_fail_when_injected]

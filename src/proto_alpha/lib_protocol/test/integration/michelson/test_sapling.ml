@@ -642,10 +642,7 @@ module Interpreter_tests = struct
         (fun addr -> Tezos_sapling.Forge.make_output addr 1L (Bytes.create 8))
         list_addr
     in
-    (let pkh =
-       Alpha_context.Contract.is_implicit src1
-       |> WithExceptions.Option.get ~loc:__LOC__
-     in
+    (let pkh = Context.Contract.pkh src1 in
      (* dummy context used only for pack_data *)
      Block.alpha_context
        [(Account.activator_account, Tez.of_mutez_exn 100_000_000_000L)]
@@ -914,10 +911,7 @@ module Interpreter_tests = struct
     Incremental.add_operation incr operation >>=? fun incr ->
     (* We need to manually get the counter here *)
     let ctx = Incremental.alpha_ctxt incr in
-    let pkh =
-      Alpha_context.Contract.is_implicit src
-      |> WithExceptions.Option.get ~loc:__LOC__
-    in
+    let pkh = Context.Contract.pkh src in
     Alpha_context.Contract.get_counter ctx pkh >>= wrap >>=? fun counter ->
     Op.transaction
       ~counter

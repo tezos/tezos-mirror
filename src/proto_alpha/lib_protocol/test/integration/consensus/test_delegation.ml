@@ -501,9 +501,7 @@ let test_unregistered_delegate_key_init_delegation ~fee () =
 let test_unregistered_delegate_key_switch_delegation ~fee () =
   Context.init1 () >>=? fun (b, bootstrap) ->
   Incremental.begin_construction b >>=? fun i ->
-  let bootstrap_pkh =
-    Contract.is_implicit bootstrap |> WithExceptions.Option.get ~loc:__LOC__
-  in
+  let bootstrap_pkh = Context.Contract.pkh bootstrap in
   let unregistered_account = Account.new_account () in
   let unregistered_pkh = Account.(unregistered_account.pkh) in
   let impl_contract = Contract.implicit_contract unregistered_pkh in
@@ -620,9 +618,7 @@ let test_unregistered_delegate_key_init_delegation_credit ~fee ~amount () =
 let test_unregistered_delegate_key_switch_delegation_credit ~fee ~amount () =
   Context.init1 () >>=? fun (b, bootstrap) ->
   Incremental.begin_construction b >>=? fun i ->
-  let bootstrap_pkh =
-    Contract.is_implicit bootstrap |> WithExceptions.Option.get ~loc:__LOC__
-  in
+  let bootstrap_pkh = Context.Contract.pkh bootstrap in
   let unregistered_account = Account.new_account () in
   let unregistered_pkh = Account.(unregistered_account.pkh) in
   let impl_contract = Contract.implicit_contract unregistered_pkh in
@@ -756,9 +752,7 @@ let test_unregistered_delegate_key_switch_delegation_credit_debit ~fee ~amount
     () =
   Context.init1 () >>=? fun (b, bootstrap) ->
   Incremental.begin_construction b >>=? fun i ->
-  let bootstrap_pkh =
-    Contract.is_implicit bootstrap |> WithExceptions.Option.get ~loc:__LOC__
-  in
+  let bootstrap_pkh = Context.Contract.pkh bootstrap in
   let unregistered_account = Account.new_account () in
   let unregistered_pkh = Account.(unregistered_account.pkh) in
   let impl_contract = Contract.implicit_contract unregistered_pkh in

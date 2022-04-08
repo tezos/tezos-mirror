@@ -56,11 +56,6 @@ let check_proto_error_f f t =
     equals [e]. *)
 let check_proto_error e t = check_proto_error_f (( = ) e) t
 
-let is_implicit_exn x =
-  match Alpha_context.Contract.is_implicit x with
-  | Some x -> x
-  | None -> raise (Invalid_argument "is_implicit_exn")
-
 (** [test_disable_feature_flag] try to originate a tx rollup with the feature
     flag is deactivated and check it fails *)
 let test_disable_feature_flag () =
@@ -106,7 +101,7 @@ let parsing_tests =
       initial_storage
       contract
       b
-      (is_implicit_exn contract)
+      (Context.Contract.pkh contract)
     >>= fun res ->
     if not tx_rollup_enable then
       Assert.error ~loc:__LOC__ res (function
@@ -352,7 +347,7 @@ let make_deposit b tx_rollup l1_src addr =
     "Unit"
     l1_src
     b
-    (is_implicit_exn l1_src)
+    (Context.Contract.pkh l1_src)
   >>=? fun (contract, b) ->
   let parameters = print_deposit_arg (`Typed tx_rollup) (`Hash addr) in
   let fee = Test_tez.of_int 10 in
@@ -370,7 +365,7 @@ let make_deposit b tx_rollup l1_src addr =
   >>=? fun ticket_hash ->
   let (deposit, cumulated_size) =
     Tx_rollup_message.make_deposit
-      (is_implicit_exn l1_src)
+      (Context.Contract.pkh l1_src)
       (Tx_rollup_l2_address.Indexable.value addr)
       ticket_hash
       (Tx_rollup_l2_qty.of_int64_exn 100_000L)
@@ -422,7 +417,7 @@ let make_incomplete_commitment_for_batch context level tx_rollup withdraw_list =
 
 (** Check that the given contract has [count] pending bonded commitments *)
 let check_bond ctxt tx_rollup contract count =
-  let pkh = is_implicit_exn contract in
+  let pkh = Context.Contract.pkh contract in
   Tx_rollup_commitment.pending_bonded_commitments ctxt tx_rollup pkh
   >>=?? fun (_, pending) ->
   Alcotest.(check int "Pending bonded commitment count correct" count pending) ;
@@ -484,14 +479,15 @@ module Nat_ticket = struct
   let withdrawal ctxt ~ticketer ?(claimer = ticketer) ?(amount = amount)
       tx_rollup : (Tx_rollup_withdraw.t * Tx_rollup_reveal.t) tzresult Lwt.t =
     ticket_hash ctxt ~ticketer ~tx_rollup >|=? fun ticket_hash ->
-    ( Tx_rollup_withdraw.{claimer = is_implicit_exn claimer; ticket_hash; amount},
+    let claimer = Context.Contract.pkh claimer in
+    ( Tx_rollup_withdraw.{claimer; ticket_hash; amount},
       Tx_rollup_reveal.
         {
           contents = Script.lazy_expr contents;
           ty = Script.lazy_expr ty;
           ticketer;
           amount;
-          claimer = is_implicit_exn claimer;
+          claimer;
         } )
 
   let init_deposit_contract amount block account =
@@ -525,7 +521,7 @@ module Nat_ticket = struct
         contents_nat
     in
     Contract_helpers.originate_contract_from_string
-      ~baker:(is_implicit_exn account)
+      ~baker:(Context.Contract.pkh account)
       ~source_contract:account
       ~script
       ~storage:"Unit"
@@ -955,7 +951,7 @@ let test_inbox_count_too_big () =
     "Unit"
     contract
     b
-    (is_implicit_exn contract)
+    (Context.Contract.pkh contract)
   >>=? fun (deposit_contract, b) ->
   Incremental.begin_construction b >>=? fun i ->
   let rec fill_inbox i counter n =
@@ -1055,7 +1051,7 @@ let test_additional_space_allocation_for_valid_deposit () =
     "Unit"
     account
     b
-    (is_implicit_exn account)
+    (Context.Contract.pkh account)
   >>=? fun (contract, b) ->
   let parameters = print_deposit_arg (`Typed tx_rollup) (`Hash pkh) in
   let fee = Test_tez.of_int 10 in
@@ -1086,7 +1082,7 @@ let test_valid_deposit_inexistant_rollup () =
     "Unit"
     account
     b
-    (is_implicit_exn account)
+    (Context.Contract.pkh account)
   >>=? fun (contract, b) ->
   Incremental.begin_construction b >>=? fun i ->
   let parameters =
@@ -1115,7 +1111,7 @@ let test_invalid_deposit_not_ticket () =
     "Unit"
     account
     b
-    (is_implicit_exn account)
+    (Context.Contract.pkh account)
   >>=? fun (contract, b) ->
   Incremental.begin_construction b >>=? fun i ->
   let parameters = print_deposit_arg (`Typed tx_rollup) (`Hash pkh) in
@@ -1185,7 +1181,7 @@ let test_invalid_deposit_too_big_ticket () =
     "Unit"
     account
     b
-    (is_implicit_exn account)
+    (Context.Contract.pkh account)
   >>=? fun (contract, b) ->
   Incremental.begin_construction b >>=? fun i ->
   let ticket_contents =
@@ -1236,7 +1232,7 @@ let test_invalid_deposit_too_big_ticket_type () =
     "Unit"
     account
     b
-    (is_implicit_exn account)
+    (Context.Contract.pkh account)
   >>=? fun (contract, b) ->
   Incremental.begin_construction b >>=? fun i ->
   let ticket_contents =
@@ -1293,7 +1289,7 @@ let test_valid_deposit_big_ticket () =
     "Unit"
     account
     b
-    (is_implicit_exn account)
+    (Context.Contract.pkh account)
   >>=? fun (contract, b) ->
   Incremental.begin_construction b >>=? fun i ->
   let ticket_contents =
@@ -1333,7 +1329,7 @@ let test_invalid_entrypoint () =
     "Unit"
     account
     b
-    (is_implicit_exn account)
+    (Context.Contract.pkh account)
   >>=? fun (contract, b) ->
   Incremental.begin_construction b >>=? fun i ->
   let parameters = print_deposit_arg (`Typed tx_rollup) (`Hash pkh) in
@@ -1358,7 +1354,7 @@ let test_invalid_l2_address () =
     "Unit"
     account
     b
-    (is_implicit_exn account)
+    (Context.Contract.pkh account)
   >>=? fun (contract, b) ->
   Incremental.begin_construction b >>=? fun i ->
   let parameters =
@@ -1386,7 +1382,7 @@ let test_valid_deposit_invalid_amount () =
     "Unit"
     account
     b
-    (is_implicit_exn account)
+    (Context.Contract.pkh account)
   >>=? fun (contract, b) ->
   Incremental.begin_construction b >>=? fun i ->
   let parameters = print_deposit_arg (`Typed tx_rollup) (`Hash pkh) in
@@ -1529,7 +1525,7 @@ let test_finalization () =
     the wrong batch count and ensures that that fails. *)
 let test_commitment_duplication () =
   context_init2 () >>=? fun (b, (contract1, contract2)) ->
-  let pkh1 = is_implicit_exn contract1 in
+  let pkh1 = Context.Contract.pkh contract1 in
   originate b contract1 >>=? fun (b, tx_rollup) ->
   Context.Contract.balance (B b) contract1 >>=? fun balance ->
   Context.Contract.balance (B b) contract2 >>=? fun balance2 ->
@@ -1934,7 +1930,7 @@ let test_full_inbox () =
     allows bonds to be returned. *)
 let test_bond_finalization () =
   context_init1 () >>=? fun (b, contract1) ->
-  let pkh1 = is_implicit_exn contract1 in
+  let pkh1 = Context.Contract.pkh contract1 in
   originate b contract1 >>=? fun (b, tx_rollup) ->
   Context.Contract.balance (B b) contract1 >>=? fun balance ->
   (* Transactions in block 2, 3, 4 *)
@@ -3270,7 +3266,7 @@ module Rejection = struct
     >>=? fun (b, account, _, tx_rollup, store, ticket_hash) ->
     hash_tree_from_store store >>= fun l2_context_hash ->
     (* 1. Create a batch with [n_withdraw] withdrawals. *)
-    let destination = is_implicit_exn account in
+    let destination = Context.Contract.pkh account in
     let qty = Tx_rollup_l2_qty.one in
     let operation =
       let open Tx_rollup_l2_batch.V1 in
@@ -3968,7 +3964,7 @@ module Withdraw = struct
            Nat_ticket.ty_str)
       ~storage:"None"
       ~source_contract:account1
-      ~baker:(is_implicit_exn account1)
+      ~baker:(Context.Contract.pkh account1)
       block
     >>=? fun (withdraw_contract, _script, block) ->
     return
@@ -4049,7 +4045,7 @@ module Withdraw = struct
              } |}
       ~storage:"{}"
       ~source_contract:account
-      ~baker:(is_implicit_exn account)
+      ~baker:(Context.Contract.pkh account)
       block
     >>=? fun (forge_withdraw_deposit_contract, _script, block) ->
     return (forge_withdraw_deposit_contract, block)
@@ -4141,7 +4137,7 @@ module Withdraw = struct
            Nat_ticket.ty_str)
       ~storage:"Unit"
       ~source_contract:account1
-      ~baker:(is_implicit_exn account1)
+      ~baker:(Context.Contract.pkh account1)
       block
     >>=? fun (withdraw_dropping_contract, _script, block) ->
     let token_one = Nat_ticket.ex_token ~ticketer:deposit_contract in
@@ -5172,7 +5168,7 @@ module Withdraw = struct
     let pkh_str = Tx_rollup_l2_address.to_b58check pkh in
     Nat_ticket.init_deposit_contract (Z.of_int64 max) b account1
     >>=? fun (deposit_contract, _script, b) ->
-    let deposit_pkh = assert_some @@ Contract.is_implicit account1 in
+    let deposit_pkh = Context.Contract.pkh account1 in
     let deposit b =
       Nat_ticket.deposit_op b tx_rollup pkh_str account1 deposit_contract
       >>=? fun operation -> Block.bake ~operation b
@@ -5251,7 +5247,7 @@ module Withdraw = struct
     originate b account1 >>=? fun (b, tx_rollup) ->
     Nat_ticket.init_deposit_contract (Z.of_int64 max) b account1
     >>=? fun (deposit_contract, _script, b) ->
-    let deposit_pkh = assert_some @@ Contract.is_implicit account1 in
+    let deposit_pkh = Context.Contract.pkh account1 in
     let deposit b pkh =
       let pkh_str = Tx_rollup_l2_address.to_b58check pkh in
       Nat_ticket.deposit_op b tx_rollup pkh_str account1 deposit_contract

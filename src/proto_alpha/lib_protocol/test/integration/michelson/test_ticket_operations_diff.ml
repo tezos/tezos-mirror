@@ -182,11 +182,7 @@ let string_token ~ticketer content =
 let init ?tx_rollup_enable () =
   Context.init2 ?tx_rollup_enable ~consensus_threshold:0 ()
   >|=? fun (block, (src0, src1)) ->
-  let baker =
-    match Alpha_context.Contract.is_implicit src0 with
-    | Some v -> v
-    | None -> assert false
-  in
+  let baker = Context.Contract.pkh src0 in
   (baker, src1, block)
 
 let originate block ~script ~storage ~src ~baker ~forges_tickets =
