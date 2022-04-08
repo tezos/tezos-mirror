@@ -29,10 +29,12 @@ open Baking_state
 
 let create_state cctxt ?synchronize ?monitor_node_mempool ~config
     ~current_proposal delegates =
+  let open Lwt_result_syntax in
   let chain = cctxt#chain in
   let monitor_node_operations = monitor_node_mempool in
-  Operation_worker.create ?monitor_node_operations cctxt
-  >>= fun operation_worker ->
+  let*! operation_worker =
+    Operation_worker.create ?monitor_node_operations cctxt
+  in
   Baking_scheduling.create_initial_state
     cctxt
     ?synchronize
@@ -43,8 +45,10 @@ let create_state cctxt ?synchronize ?monitor_node_mempool ~config
     delegates
 
 let get_current_proposal cctxt =
-  Node_rpc.monitor_proposals cctxt ~chain:cctxt#chain ()
-  >>=? fun (block_stream, _block_stream_stopper) ->
+  let open Lwt_result_syntax in
+  let* (block_stream, _block_stream_stopper) =
+    Node_rpc.monitor_proposals cctxt ~chain:cctxt#chain ()
+  in
   Lwt_stream.peek block_stream >>= function
   | Some current_head -> return (block_stream, current_head)
   | None -> failwith "head stream unexpectedly ended"
@@ -54,83 +58,100 @@ module Events = Baking_events.Lib
 let preendorse (cctxt : Protocol_client_context.full) ?(force = false) delegates
     =
   let open State_transitions in
-  get_current_proposal cctxt >>=? fun (_, current_proposal) ->
+  let open Lwt_result_syntax in
+  let* (_, current_proposal) = get_current_proposal cctxt in
   let config = Baking_configuration.make ~force () in
-  create_state cctxt ~config ~current_proposal delegates >>=? fun state ->
+  let* state = create_state cctxt ~config ~current_proposal delegates in
   let proposal = state.level_state.latest_proposal in
-  Events.(emit attempting_preendorse_proposal state.level_state.latest_proposal)
-  >>= fun () ->
-  (if force then return_unit
-  else
-    is_acceptable_proposal_for_current_level state proposal >>= function
-    | Invalid -> cctxt#error "Cannot preendorse an invalid proposal"
-    | Outdated_proposal -> cctxt#error "Cannot preendorse an outdated proposal"
-    | Valid_proposal -> return_unit)
-  >>=? fun () ->
+  let*! () =
+    Events.(
+      emit attempting_preendorse_proposal state.level_state.latest_proposal)
+  in
+  let* () =
+    if force then return_unit
+    else
+      is_acceptable_proposal_for_current_level state proposal >>= function
+      | Invalid -> cctxt#error "Cannot preendorse an invalid proposal"
+      | Outdated_proposal ->
+          cctxt#error "Cannot preendorse an outdated proposal"
+      | Valid_proposal -> return_unit
+  in
   let consensus_list = make_consensus_list state proposal in
-  cctxt#message
-    "@[<v 2>Preendorsing for:@ %a@]"
-    Format.(pp_print_list ~pp_sep:pp_print_space Baking_state.pp_delegate)
-    (List.map fst consensus_list)
-  >>= fun () ->
+  let*! () =
+    cctxt#message
+      "@[<v 2>Preendorsing for:@ %a@]"
+      Format.(pp_print_list ~pp_sep:pp_print_space Baking_state.pp_delegate)
+      (List.map fst consensus_list)
+  in
   let state_recorder ~new_state =
     Baking_state.may_record_new_state ~previous_state:state ~new_state
   in
-  Baking_actions.inject_preendorsements
-    ~state_recorder
-    state
-    ~preendorsements:consensus_list
-    ~updated_state:state
-  >>=? fun _ -> return_unit
+  let* _ =
+    Baking_actions.inject_preendorsements
+      ~state_recorder
+      state
+      ~preendorsements:consensus_list
+      ~updated_state:state
+  in
+  return_unit
 
 let endorse (cctxt : Protocol_client_context.full) ?(force = false) delegates =
   let open State_transitions in
-  get_current_proposal cctxt >>=? fun (_, current_proposal) ->
+  let open Lwt_result_syntax in
+  let* (_, current_proposal) = get_current_proposal cctxt in
   let config = Baking_configuration.make ~force () in
   create_state cctxt ~config ~current_proposal delegates >>=? fun state ->
   let proposal = state.level_state.latest_proposal in
-  Events.(emit attempting_endorse_proposal state.level_state.latest_proposal)
-  >>= fun () ->
-  (if force then return_unit
-  else
-    is_acceptable_proposal_for_current_level state proposal >>= function
-    | Invalid -> cctxt#error "Cannot endorse an invalid proposal"
-    | Outdated_proposal -> cctxt#error "Cannot endorse an outdated proposal"
-    | Valid_proposal -> return_unit)
-  >>=? fun () ->
+  let*! () =
+    Events.(emit attempting_endorse_proposal state.level_state.latest_proposal)
+  in
+  let* () =
+    if force then return_unit
+    else
+      is_acceptable_proposal_for_current_level state proposal >>= function
+      | Invalid -> cctxt#error "Cannot endorse an invalid proposal"
+      | Outdated_proposal -> cctxt#error "Cannot endorse an outdated proposal"
+      | Valid_proposal -> return_unit
+  in
   let consensus_list = make_consensus_list state proposal in
-  cctxt#message
-    "@[<v 2>Endorsing for:@ %a@]"
-    Format.(pp_print_list ~pp_sep:pp_print_space Baking_state.pp_delegate)
-    (List.map fst consensus_list)
-  >>= fun () ->
+  let*! () =
+    cctxt#message
+      "@[<v 2>Endorsing for:@ %a@]"
+      Format.(pp_print_list ~pp_sep:pp_print_space Baking_state.pp_delegate)
+      (List.map fst consensus_list)
+  in
   let state_recorder ~new_state =
     Baking_state.may_record_new_state ~previous_state:state ~new_state
   in
-  Baking_actions.inject_endorsements
-    ~state_recorder
-    state
-    ~endorsements:consensus_list
-    ~updated_state:state
-  >>=? fun _ -> return_unit
+  let* _ =
+    Baking_actions.inject_endorsements
+      ~state_recorder
+      state
+      ~endorsements:consensus_list
+      ~updated_state:state
+  in
+  return_unit
 
 let bake_at_next_level state =
+  let open Lwt_result_syntax in
   let cctxt = state.global_state.cctxt in
   Baking_scheduling.compute_next_potential_baking_time_at_next_level state
   >>= function
   | None -> cctxt#error "No baking slot found for the delegates"
   | Some (timestamp, round) ->
-      cctxt#message
-        "Waiting until %a for round %a"
-        Timestamp.pp
-        timestamp
-        Round.pp
-        round
-      >>= fun () ->
-      Option.value
-        ~default:Lwt.return_unit
-        (Baking_scheduling.sleep_until timestamp)
-      >>= fun () ->
+      let*! () =
+        cctxt#message
+          "Waiting until %a for round %a"
+          Timestamp.pp
+          timestamp
+          Round.pp
+          round
+      in
+      let*! () =
+        Option.value
+          ~default:Lwt.return_unit
+          (Baking_scheduling.sleep_until timestamp)
+      in
       return (Baking_state.Timeout (Time_to_bake_next_level {at_round = round}))
 
 (* Simulate the end of the current round to bootstrap the automaton
@@ -201,17 +222,19 @@ let do_action (state, action) =
   Baking_actions.perform_action ~state_recorder state action
 
 let propose_at_next_level ~minimal_timestamp state =
+  let open Lwt_result_syntax in
   let cctxt = state.global_state.cctxt in
   assert (Option.is_some state.level_state.elected_block) ;
   if minimal_timestamp then
-    (match
-       Baking_scheduling.first_potential_round_at_next_level
-         state
-         ~earliest_round:Round.zero
-     with
-    | None -> cctxt#error "No potential baking slot for the given delegates."
-    | Some first_potential_round -> return first_potential_round)
-    >>=? fun (minimal_round, delegate) ->
+    let* (minimal_round, delegate) =
+      match
+        Baking_scheduling.first_potential_round_at_next_level
+          state
+          ~earliest_round:Round.zero
+      with
+      | None -> cctxt#error "No potential baking slot for the given delegates."
+      | Some first_potential_round -> return first_potential_round
+    in
     let pool =
       Operation_worker.get_current_operations
         state.global_state.operation_worker
@@ -228,21 +251,24 @@ let propose_at_next_level ~minimal_timestamp state =
     let state_recorder ~new_state =
       Baking_state.may_record_new_state ~previous_state:state ~new_state
     in
-    Baking_actions.perform_action
-      ~state_recorder
-      state
-      (Inject_block {block_to_bake; updated_state = state})
-    >>=? fun state ->
-    cctxt#message
-      "Proposed block at round %a on top of %a "
-      Round.pp
-      block_to_bake.round
-      Block_hash.pp
-      block_to_bake.predecessor.hash
-    >>= fun () -> return state
+    let* state =
+      Baking_actions.perform_action
+        ~state_recorder
+        state
+        (Inject_block {block_to_bake; updated_state = state})
+    in
+    let*! () =
+      cctxt#message
+        "Proposed block at round %a on top of %a "
+        Round.pp
+        block_to_bake.round
+        Block_hash.pp
+        block_to_bake.predecessor.hash
+    in
+    return state
   else
-    bake_at_next_level state >>=? fun event ->
-    State_transitions.step state event >>= do_action >>=? fun state ->
+    let* event = bake_at_next_level state in
+    let* state = State_transitions.step state event >>= do_action in
     cctxt#message "Proposal injected" >>= fun () -> return state
 
 let endorsement_quorum state =
@@ -266,7 +292,8 @@ let endorsement_quorum state =
 let propose (cctxt : Protocol_client_context.full) ?minimal_fees
     ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte ?force
     ?(minimal_timestamp = false) ?extra_operations ?context_path delegates =
-  get_current_proposal cctxt >>=? fun (_block_stream, current_proposal) ->
+  let open Lwt_result_syntax in
+  let* (_block_stream, current_proposal) = get_current_proposal cctxt in
   let config =
     Baking_configuration.make
       ?minimal_fees
@@ -277,76 +304,84 @@ let propose (cctxt : Protocol_client_context.full) ?minimal_fees
       ?extra_operations
       ()
   in
-  create_state cctxt ~config ~current_proposal delegates >>=? fun state ->
-  (match state.level_state.elected_block with
-  | Some _ -> propose_at_next_level ~minimal_timestamp state
-  | None -> (
-      match endorsement_quorum state with
-      | Some (voting_power, endorsement_qc) ->
-          let state =
-            {
-              state with
-              round_state =
-                {
-                  state.round_state with
-                  current_phase = Baking_state.Awaiting_endorsements;
-                };
-            }
-          in
-          let latest_proposal = state.level_state.latest_proposal.block in
-          let candidate =
-            {
-              Operation_worker.hash = latest_proposal.hash;
-              round_watched = latest_proposal.round;
-              payload_hash_watched = latest_proposal.payload_hash;
-            }
-          in
-          State_transitions.step
-            state
-            (Baking_state.Quorum_reached
-               (candidate, voting_power, endorsement_qc))
-          >>= do_action
-          (* this will register the elected block *)
-          >>=? fun state -> propose_at_next_level ~minimal_timestamp state
-      | None -> (
-          Baking_scheduling.compute_bootstrap_event state >>?= fun event ->
-          State_transitions.step state event >>= fun (state, _action) ->
-          let latest_proposal = state.level_state.latest_proposal in
-          let open State_transitions in
-          let round = state.round_state.current_round in
-          is_acceptable_proposal_for_current_level state latest_proposal
-          >>= function
-          | Invalid | Outdated_proposal -> (
-              let slotmap =
-                state.level_state.delegate_slots.own_delegate_slots
-              in
-              match State_transitions.round_proposer state slotmap round with
-              | Some (delegate, _) ->
-                  State_transitions.propose_block_action
-                    state
-                    delegate
-                    round
-                    state.level_state.latest_proposal
-                  >>= fun action ->
-                  do_action (state, action) >>=? fun state ->
-                  cctxt#message
-                    "Reproposed block at level %ld on round %a"
-                    state.level_state.current_level
-                    Round.pp
-                    state.round_state.current_round
-                  >>= fun () -> return state
-              | None -> cctxt#error "No slots for current round")
-          | Valid_proposal ->
-              cctxt#error
-                "Cannot propose: there's already a valid proposal for the \
-                 current round %a"
-                Round.pp
-                round)))
-  >>=? fun _ -> return_unit
+  let* state = create_state cctxt ~config ~current_proposal delegates in
+  let* _ =
+    match state.level_state.elected_block with
+    | Some _ -> propose_at_next_level ~minimal_timestamp state
+    | None -> (
+        match endorsement_quorum state with
+        | Some (voting_power, endorsement_qc) ->
+            let state =
+              {
+                state with
+                round_state =
+                  {
+                    state.round_state with
+                    current_phase = Baking_state.Awaiting_endorsements;
+                  };
+              }
+            in
+            let latest_proposal = state.level_state.latest_proposal.block in
+            let candidate =
+              {
+                Operation_worker.hash = latest_proposal.hash;
+                round_watched = latest_proposal.round;
+                payload_hash_watched = latest_proposal.payload_hash;
+              }
+            in
+            let* state =
+              State_transitions.step
+                state
+                (Baking_state.Quorum_reached
+                   (candidate, voting_power, endorsement_qc))
+              >>= do_action
+              (* this will register the elected block *)
+            in
+            propose_at_next_level ~minimal_timestamp state
+        | None -> (
+            Baking_scheduling.compute_bootstrap_event state >>?= fun event ->
+            let*! (state, _action) = State_transitions.step state event in
+            let latest_proposal = state.level_state.latest_proposal in
+            let open State_transitions in
+            let round = state.round_state.current_round in
+            is_acceptable_proposal_for_current_level state latest_proposal
+            >>= function
+            | Invalid | Outdated_proposal -> (
+                let slotmap =
+                  state.level_state.delegate_slots.own_delegate_slots
+                in
+                match State_transitions.round_proposer state slotmap round with
+                | Some (delegate, _) ->
+                    let*! action =
+                      State_transitions.propose_block_action
+                        state
+                        delegate
+                        round
+                        state.level_state.latest_proposal
+                    in
+                    do_action (state, action) >>=? fun state ->
+                    let*! () =
+                      cctxt#message
+                        "Reproposed block at level %ld on round %a"
+                        state.level_state.current_level
+                        Round.pp
+                        state.round_state.current_round
+                    in
+                    return state
+                | None -> cctxt#error "No slots for current round")
+            | Valid_proposal ->
+                cctxt#error
+                  "Cannot propose: there's already a valid proposal for the \
+                   current round %a"
+                  Round.pp
+                  round))
+  in
+  return_unit
 
 let bake_using_automaton config state block_stream =
+  let open Lwt_result_syntax in
   let cctxt = state.global_state.cctxt in
-  first_automaton_event state >>=? fun initial_event ->
+  let* initial_event = first_automaton_event state in
   let current_level = state.level_state.latest_proposal.block.shell.level in
   let loop_state =
     Baking_scheduling.create_loop_state
@@ -367,16 +402,19 @@ let bake_using_automaton config state block_stream =
     initial_event
   >>=? function
   | Some (New_proposal proposal) ->
-      cctxt#message
-        "Block %a (%ld) injected"
-        Block_hash.pp
-        proposal.block.hash
-        proposal.block.shell.level
-      >>= fun () -> return_unit
+      let*! () =
+        cctxt#message
+          "Block %a (%ld) injected"
+          Block_hash.pp
+          proposal.block.hash
+          proposal.block.shell.level
+      in
+      return_unit
   | _ -> cctxt#error "Baking loop unexpectedly ended"
 
 (* endorse the latest proposal and bake with it *)
 let baking_minimal_timestamp state =
+  let open Lwt_result_syntax in
   let cctxt = state.global_state.cctxt in
   let latest_proposal = state.level_state.latest_proposal in
   let own_endorsements =
@@ -415,24 +453,27 @@ let baking_minimal_timestamp state =
   let consensus_threshold =
     state.global_state.constants.parametric.consensus_threshold
   in
-  (if Compare.Int.(total_voting_power < consensus_threshold) then
-   cctxt#error
-     "Delegates do not have enough voting power. Only %d is available while %d \
-      is required."
-     total_voting_power
-     consensus_threshold
-  else return_unit)
-  >>=? fun () ->
-  (match
-     Baking_scheduling.first_potential_round_at_next_level
-       state
-       ~earliest_round:Round.zero
-   with
-  | None -> cctxt#error "No potential baking slot for the given delegates."
-  | Some first_potential_round -> return first_potential_round)
-  >>=? fun (minimal_round, delegate) ->
-  Baking_actions.sign_endorsements state own_endorsements
-  >>=? fun signed_endorsements ->
+  let* () =
+    if Compare.Int.(total_voting_power < consensus_threshold) then
+      cctxt#error
+        "Delegates do not have enough voting power. Only %d is available while \
+         %d is required."
+        total_voting_power
+        consensus_threshold
+    else return_unit
+  in
+  let* (minimal_round, delegate) =
+    match
+      Baking_scheduling.first_potential_round_at_next_level
+        state
+        ~earliest_round:Round.zero
+    with
+    | None -> cctxt#error "No potential baking slot for the given delegates."
+    | Some first_potential_round -> return first_potential_round
+  in
+  let* signed_endorsements =
+    Baking_actions.sign_endorsements state own_endorsements
+  in
   let pool =
     Operation_pool.add_operations
       current_mempool
@@ -450,17 +491,20 @@ let baking_minimal_timestamp state =
   let state_recorder ~new_state =
     Baking_state.may_record_new_state ~previous_state:state ~new_state
   in
-  Baking_actions.perform_action
-    ~state_recorder
-    state
-    (Inject_block {block_to_bake; updated_state = state})
-  >>=? fun _ ->
-  cctxt#message "Injected block at minimal timestamp" >>= fun () -> return_unit
+  let* _ =
+    Baking_actions.perform_action
+      ~state_recorder
+      state
+      (Inject_block {block_to_bake; updated_state = state})
+  in
+  let*! () = cctxt#message "Injected block at minimal timestamp" in
+  return_unit
 
 let bake (cctxt : Protocol_client_context.full) ?minimal_fees
     ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte ?force
     ?(minimal_timestamp = false) ?extra_operations ?monitor_node_mempool
     ?context_path delegates =
+  let open Lwt_result_syntax in
   let config =
     Baking_configuration.make
       ?minimal_fees
@@ -471,14 +515,15 @@ let bake (cctxt : Protocol_client_context.full) ?minimal_fees
       ?extra_operations
       ()
   in
-  get_current_proposal cctxt >>=? fun (block_stream, current_proposal) ->
-  create_state
-    cctxt
-    ?monitor_node_mempool
-    ~synchronize:(not minimal_timestamp)
-    ~config
-    ~current_proposal
-    delegates
-  >>=? fun state ->
+  let* (block_stream, current_proposal) = get_current_proposal cctxt in
+  let* state =
+    create_state
+      cctxt
+      ?monitor_node_mempool
+      ~synchronize:(not minimal_timestamp)
+      ~config
+      ~current_proposal
+      delegates
+  in
   if not minimal_timestamp then bake_using_automaton config state block_stream
   else baking_minimal_timestamp state
