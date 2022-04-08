@@ -864,6 +864,8 @@ module Target = struct
 
   and preprocessor = PPS of t * string list
 
+  and inline_tests = Inline_tests_backend of t
+
   and select = {
     package : t;
     source_if_present : string;
@@ -883,6 +885,12 @@ module Target = struct
   let pps ?(args = []) = function
     | None -> invalid_arg "Manifest.Target.pps cannot be given no_target"
     | Some target -> PPS (target, args)
+
+  let inline_tests_backend = function
+    | None ->
+        invalid_arg
+          "Manifest.Target.inline_tests_backend cannot be given no_target"
+    | Some target -> Inline_tests_backend target
 
   let convert_to_identifier = String.map @@ function '-' | '.' -> '_' | c -> c
 
@@ -967,7 +975,7 @@ module Target = struct
     ?deps:t option list ->
     ?dune:Dune.s_expr ->
     ?foreign_stubs:Dune.foreign_stubs ->
-    ?inline_tests:bool ->
+    ?inline_tests:inline_tests ->
     ?js_compatible:bool ->
     ?js_of_ocaml:Dune.s_expr ->
     ?documentation:Dune.s_expr ->
@@ -1002,14 +1010,14 @@ module Target = struct
 
   let internal make_kind ?all_modules_except ?bisect_ppx ?c_library_flags
       ?(conflicts = []) ?(dep_files = []) ?(deps = []) ?(dune = Dune.[])
-      ?foreign_stubs ?(inline_tests = false) ?js_compatible ?js_of_ocaml
-      ?documentation ?(linkall = false) ?modes ?modules
-      ?(modules_without_implementation = []) ?(npm_deps = [])
-      ?(nopervasives = false) ?(nostdlib = false) ?ocaml ?opam ?(opaque = false)
-      ?(opens = []) ?(preprocess = []) ?(preprocessor_deps = [])
-      ?(private_modules = []) ?(opam_only_deps = []) ?release ?static
-      ?static_cclibs ?synopsis ?description ?(time_measurement_ppx = false)
-      ?warnings ?(wrapped = true) ?(cram = false) ?action ~path names =
+      ?foreign_stubs ?inline_tests ?js_compatible ?js_of_ocaml ?documentation
+      ?(linkall = false) ?modes ?modules ?(modules_without_implementation = [])
+      ?(npm_deps = []) ?(nopervasives = false) ?(nostdlib = false) ?ocaml ?opam
+      ?(opaque = false) ?(opens = []) ?(preprocess = [])
+      ?(preprocessor_deps = []) ?(private_modules = []) ?(opam_only_deps = [])
+      ?release ?static ?static_cclibs ?synopsis ?description
+      ?(time_measurement_ppx = false) ?warnings ?(wrapped = true)
+      ?(cram = false) ?action ~path names =
     let conflicts = List.filter_map Fun.id conflicts in
     let deps = List.filter_map Fun.id deps in
     let opam_only_deps = List.filter_map Fun.id opam_only_deps in
@@ -1033,6 +1041,19 @@ module Target = struct
       | (Some false, None) | (None, None) -> (false, None)
     in
     let kind = make_kind names in
+    let (preprocess, inline_tests) =
+      match inline_tests with
+      | None -> (preprocess, false)
+      | Some (Inline_tests_backend target) -> (
+          match kind with
+          | Public_library _ | Private_library _ ->
+              (PPS (target, []) :: preprocess, true)
+          | Public_executable _ | Private_executable _ | Test _
+          | Test_executable _ ->
+              invalid_arg
+                "Target.internal: cannot specify `inline_tests` for \
+                 executables and tests")
+    in
     let opam =
       match opam with
       | Some "" -> None
