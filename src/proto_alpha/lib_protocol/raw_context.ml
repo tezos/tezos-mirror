@@ -912,7 +912,7 @@ let prepare_first_block ~level ~timestamp ctxt =
                the capability to have two rollups at full speed on
                mainnet (as long as they do not reach scalability
                issues related to proof size). *)
-            tx_rollup_hard_size_limit_per_inbox = 250_000;
+            tx_rollup_hard_size_limit_per_inbox = 500_000;
             tx_rollup_hard_size_limit_per_message = 5_000;
             (* Tickets are transmitted in batches in the
                [Tx_rollup_dispatch_tickets] operation.

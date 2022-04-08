@@ -111,7 +111,7 @@ let constants_mainnet =
        the capability to have two rollups at full speed on
        mainnet (as long as they do not reach scalability
        issues related to proof size). *)
-    tx_rollup_hard_size_limit_per_inbox = 250_000;
+    tx_rollup_hard_size_limit_per_inbox = 500_000;
     tx_rollup_hard_size_limit_per_message = 5_000;
     tx_rollup_commitment_bond = Tez.of_mutez_exn 10_000_000_000L;
     tx_rollup_finality_period;
