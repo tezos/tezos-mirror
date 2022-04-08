@@ -1473,7 +1473,11 @@ module Ticket_hash : sig
 end
 
 module Contract : sig
-  include BASIC_DATA
+  type t = private
+    | Implicit of Signature.Public_key_hash.t
+    | Originated of Contract_hash.t
+
+  include BASIC_DATA with type t := t
 
   val in_memory_size : t -> Cache_memory_helpers.sint
 
