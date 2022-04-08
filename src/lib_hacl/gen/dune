@@ -13,8 +13,7 @@
  (alias runtest_js)
  (target api.json.corrected)
  (package tezos-hacl)
- (action
-  (run %{dep:../../tooling/node_wrapper.exe} --hacl %{dep:./check-api.js})))
+ (action (setenv NODE_PRELOAD hacl-wasm (run node %{dep:./check-api.js}))))
 
 (rule
  (alias runtest_js)

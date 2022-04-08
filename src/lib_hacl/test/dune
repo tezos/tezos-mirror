@@ -1,6 +1,8 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
+(env (_ (env-vars (NODE_PRELOAD hacl-wasm))))
+
 (executables
  (names test_hacl test_prop_hacl_hash test_prop_signature_pk)
  (modes native js)
@@ -40,24 +42,17 @@
 (rule
  (alias runtest_js)
  (package tezos-hacl)
- (action
-  (run %{dep:../../tooling/node_wrapper.exe} --hacl %{dep:./test_hacl.bc.js})))
+ (action (run node %{dep:./test_hacl.bc.js})))
 
 (rule
  (alias runtest_js)
  (package tezos-hacl)
- (action
-  (run
-   %{dep:../../tooling/node_wrapper.exe} --hacl
-   %{dep:./test_prop_hacl_hash.bc.js})))
+ (action (run node %{dep:./test_prop_hacl_hash.bc.js})))
 
 (rule
  (alias runtest_js)
  (package tezos-hacl)
- (action
-  (run
-   %{dep:../../tooling/node_wrapper.exe} --hacl
-   %{dep:./test_prop_signature_pk.bc.js})))
+ (action (run node %{dep:./test_prop_signature_pk.bc.js})))
 
 (executable
  (name test)
@@ -79,5 +74,4 @@
 (rule
  (alias runtest_js)
  (package tezos-hacl)
- (action
-  (run %{dep:../../tooling/node_wrapper.exe} --hacl %{dep:./test.bc.js})))
+ (action (run node %{dep:./test.bc.js})))
