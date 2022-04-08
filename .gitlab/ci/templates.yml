@@ -328,6 +328,8 @@ variables:
     - opam depext --yes ${package}
     - opam install --yes ${package}
     - opam reinstall --yes --with-test ${package}
+  # Start immediately, don't wait for previous stages to succeeds
+  needs: []
   after_script:
     # Stores logs in opam_logs/ for artifacts and outputs an excerpt on failure.
     - OPAM_LOGS=opam_logs/ ./scripts/ci/opam_handle_output.sh
