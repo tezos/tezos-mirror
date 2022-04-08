@@ -612,11 +612,8 @@ let message_result context_hash withdraws =
 (** [test_origination] originates a transaction rollup and checks that
     it burns the expected quantity of xtz. *)
 let test_origination () =
-  Context.init ~tx_rollup_enable:true ~tx_rollup_sunset_level:Int32.max_int 1
-  >>=? fun (b, contracts) ->
-  let contract =
-    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0
-  in
+  Context.init1 ~tx_rollup_enable:true ~tx_rollup_sunset_level:Int32.max_int ()
+  >>=? fun (b, contract) ->
   Context.get_constants (B b)
   >>=? fun {parametric = {tx_rollup_origination_size; cost_per_byte; _}; _} ->
   Context.Contract.balance (B b) contract >>=? fun balance ->
@@ -636,11 +633,8 @@ let test_origination () =
 (** [test_two_originations] originates two transaction rollups in the
     same operation and checks that they have a different address. *)
 let test_two_originations () =
-  Context.init ~tx_rollup_enable:true ~tx_rollup_sunset_level:Int32.max_int 1
-  >>=? fun (b, contracts) ->
-  let contract =
-    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0
-  in
+  Context.init1 ~tx_rollup_enable:true ~tx_rollup_sunset_level:Int32.max_int ()
+  >>=? fun (b, contract) ->
   Incremental.begin_construction b >>=? fun i ->
   Op.tx_rollup_origination (I i) contract >>=? fun (op1, _false_tx_rollup1) ->
   (* tx_rollup1 and tx_rollup2 are equal and both are false. The addresses are

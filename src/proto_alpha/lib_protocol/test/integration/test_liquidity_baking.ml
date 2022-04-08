@@ -71,7 +71,7 @@ let expected_lqt_hash =
 
 (* Test that the scripts of the Liquidity Baking contracts (CPMM and LQT) have the expected hashes. *)
 let liquidity_baking_origination () =
-  Context.init 1 >>=? fun (blk, _contracts) ->
+  Context.init1 () >>=? fun (blk, _contract) ->
   Context.get_liquidity_baking_cpmm_address (B blk) >>=? fun cpmm_address ->
   Context.Contract.script_hash (B blk) cpmm_address >>=? fun cpmm_hash ->
   Lwt.return @@ Environment.wrap_tzresult
@@ -97,7 +97,7 @@ let liquidity_baking_origination () =
 
 (* Test that the CPMM address in storage is correct *)
 let liquidity_baking_cpmm_address () =
-  Context.init 1 >>=? fun (blk, _contracts) ->
+  Context.init1 () >>=? fun (blk, _contract) ->
   Context.get_liquidity_baking_cpmm_address (B blk) >>=? fun liquidity_baking ->
   Assert.equal
     ~loc:__LOC__
@@ -110,7 +110,7 @@ let liquidity_baking_cpmm_address () =
 
 (* Test that after [n] blocks, the liquidity baking CPMM contract is credited [n] times the subsidy amount. *)
 let liquidity_baking_subsidies n () =
-  Context.init ~consensus_threshold:0 1 >>=? fun (blk, _contracts) ->
+  Context.init1 ~consensus_threshold:0 () >>=? fun (blk, _contract) ->
   Context.get_liquidity_baking_cpmm_address (B blk) >>=? fun liquidity_baking ->
   Context.Contract.balance (B blk) liquidity_baking >>=? fun old_balance ->
   Block.bake_n n blk >>=? fun blk ->
@@ -129,7 +129,7 @@ let liquidity_baking_subsidies n () =
    More precisely, after the sunset, the total amount credited to the subsidy is only proportional
    to the sunset level and in particular it does not depend on [n]. *)
 let liquidity_baking_sunset_level n () =
-  Context.init ~consensus_threshold:0 1 >>=? fun (blk, _contracts) ->
+  Context.init1 ~consensus_threshold:0 () >>=? fun (blk, _contract) ->
   Context.get_liquidity_baking_cpmm_address (B blk) >>=? fun liquidity_baking ->
   Context.get_constants (B blk) >>=? fun csts ->
   let sunset = csts.parametric.liquidity_baking_sunset_level in
@@ -152,7 +152,7 @@ let liquidity_baking_sunset_level n () =
 (* Expected level is roughly 2*(log(1-1/(2*p)) / log(0.999)) where [p] is the proportion [LB_off / (LB_on + LB_off)]. *)
 let liquidity_baking_toggle ~n_vote_on ~n_vote_off ~n_vote_pass expected_level
     bake_after () =
-  Context.init ~consensus_threshold:0 1 >>=? fun (blk, _contracts) ->
+  Context.init1 ~consensus_threshold:0 () >>=? fun (blk, _contract) ->
   Context.get_liquidity_baking_cpmm_address (B blk) >>=? fun liquidity_baking ->
   Context.Contract.balance (B blk) liquidity_baking >>=? fun old_balance ->
   Context.get_liquidity_baking_subsidy (B blk)
@@ -198,7 +198,7 @@ let liquidity_baking_toggle_60 n () =
 (* 50% of blocks have liquidity_baking_toggle_vote = LB_off.
    Subsidy should not be stopped. *)
 let liquidity_baking_toggle_50 n () =
-  Context.init ~consensus_threshold:0 1 >>=? fun (blk, _contracts) ->
+  Context.init1 ~consensus_threshold:0 () >>=? fun (blk, _contract) ->
   Context.get_liquidity_baking_cpmm_address (B blk) >>=? fun liquidity_baking ->
   Context.get_constants (B blk) >>=? fun csts ->
   let sunset = csts.parametric.liquidity_baking_sunset_level in
@@ -228,7 +228,7 @@ let liquidity_baking_toggle_50 n () =
    n_votes with LB_on, check that the subsidy flows.
  *)
 let liquidity_baking_restart n_votes n () =
-  Context.init ~consensus_threshold:0 1 >>=? fun (blk, _contracts) ->
+  Context.init1 ~consensus_threshold:0 () >>=? fun (blk, _contract) ->
   Context.get_liquidity_baking_cpmm_address (B blk) >>=? fun liquidity_baking ->
   Block.bake_n ~liquidity_baking_toggle_vote:LB_off n_votes blk >>=? fun blk ->
   Context.Contract.balance (B blk) liquidity_baking
@@ -254,7 +254,7 @@ let liquidity_baking_restart n_votes n () =
 (* Test that the toggle EMA in block metadata is correct. *)
 let liquidity_baking_toggle_ema n_vote_on n_vote_off level bake_after
     expected_toggle_ema () =
-  Context.init ~consensus_threshold:0 1 >>=? fun (blk, _contracts) ->
+  Context.init1 ~consensus_threshold:0 () >>=? fun (blk, _contract) ->
   let rec bake_escaping blk i =
     if i < level then
       Block.bake_n ~liquidity_baking_toggle_vote:LB_on n_vote_on blk
@@ -283,7 +283,7 @@ let liquidity_baking_toggle_ema_threshold () =
   liquidity_baking_toggle_ema 0 1 1386 1 1_001_000_000 ()
 
 let liquidity_baking_storage n () =
-  Context.init ~consensus_threshold:0 1 >>=? fun (blk, _contracts) ->
+  Context.init1 ~consensus_threshold:0 () >>=? fun (blk, _contract) ->
   Context.get_liquidity_baking_cpmm_address (B blk) >>=? fun liquidity_baking ->
   Context.get_liquidity_baking_subsidy (B blk) >>=? fun subsidy ->
   let expected_storage =
@@ -311,7 +311,7 @@ let liquidity_baking_storage n () =
   >>=? fun () -> return_unit
 
 let liquidity_baking_balance_update () =
-  Context.init ~consensus_threshold:0 1 >>=? fun (blk, _contracts) ->
+  Context.init1 ~consensus_threshold:0 () >>=? fun (blk, _contract) ->
   Context.get_liquidity_baking_cpmm_address (B blk) >>=? fun liquidity_baking ->
   Context.get_constants (B blk) >>=? fun csts ->
   let sunset = csts.parametric.liquidity_baking_sunset_level in
@@ -370,7 +370,7 @@ let get_balance_update_in_result result =
   | _ -> assert false
 
 let liquidity_baking_origination_result_cpmm_address () =
-  Context.init 1 >>=? fun (blk, _contracts) ->
+  Context.init1 () >>=? fun (blk, _contract) ->
   Context.get_liquidity_baking_cpmm_address (B blk)
   >>=? fun cpmm_address_in_storage ->
   Block.bake_n_with_origination_results 1 blk
@@ -387,7 +387,7 @@ let liquidity_baking_origination_result_cpmm_address () =
   >>=? fun () -> return_unit
 
 let liquidity_baking_origination_result_cpmm_balance () =
-  Context.init 1 >>=? fun (blk, _contracts) ->
+  Context.init1 () >>=? fun (blk, _contract) ->
   Block.bake_n_with_origination_results 1 blk
   >>=? fun (_blk, origination_results) ->
   let result = get_cpmm_result origination_results in
@@ -396,7 +396,7 @@ let liquidity_baking_origination_result_cpmm_balance () =
   >>=? fun () -> return_unit
 
 let liquidity_baking_origination_result_lqt_address () =
-  Context.init 1 >>=? fun (blk, _contracts) ->
+  Context.init1 () >>=? fun (blk, _contract) ->
   Block.bake_n_with_origination_results 1 blk
   >>=? fun (_blk, origination_results) ->
   let result = get_lqt_result origination_results in
@@ -411,7 +411,7 @@ let liquidity_baking_origination_result_lqt_address () =
   >>=? fun () -> return_unit
 
 let liquidity_baking_origination_result_lqt_balance () =
-  Context.init 1 >>=? fun (blk, _contracts) ->
+  Context.init1 () >>=? fun (blk, _contract) ->
   Block.bake_n_with_origination_results 1 blk
   >>=? fun (_blk, origination_results) ->
   let result = get_lqt_result origination_results in
@@ -431,7 +431,7 @@ let liquidity_baking_origination_result_lqt_balance () =
 
 (* Test that with no contract at the tzBTC address and the level low enough to indicate we're not on mainnet, three contracts are originated in stitching. *)
 let liquidity_baking_origination_test_migration () =
-  Context.init 1 >>=? fun (blk, _contracts) ->
+  Context.init1 () >>=? fun (blk, _contract) ->
   Block.bake_n_with_origination_results 1 blk
   >>=? fun (_blk, origination_results) ->
   let num_results = List.length origination_results in
@@ -439,8 +439,8 @@ let liquidity_baking_origination_test_migration () =
 
 (* Test that with no contract at the tzBTC address and the level high enough to indicate we could be on mainnet, no contracts are originated in stitching. *)
 let liquidity_baking_origination_no_tzBTC_mainnet_migration () =
-  Context.init ~consensus_threshold:0 ~level:1_437_862l 1
-  >>=? fun (blk, _contracts) ->
+  Context.init1 ~consensus_threshold:0 ~level:1_437_862l ()
+  >>=? fun (blk, _contract) ->
   (* By baking a bit we also check that the subsidy application with no CPMM present does nothing rather than stopping the chain.*)
   Block.bake_n_with_origination_results 64 blk
   >>=? fun (_blk, origination_results) ->

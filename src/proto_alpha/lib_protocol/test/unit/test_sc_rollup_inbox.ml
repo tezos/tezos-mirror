@@ -45,7 +45,7 @@ let level =
   Raw_level_repr.of_int32 0l |> function Ok x -> x | _ -> assert false
 
 let create_context () =
-  Context.init 1 >>=? fun (block, _) -> return block.context
+  Context.init1 () >>=? fun (block, _contract) -> return block.context
 
 let test_empty () =
   let inbox = empty rollup level in

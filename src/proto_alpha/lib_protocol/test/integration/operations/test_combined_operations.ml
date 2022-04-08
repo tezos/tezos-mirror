@@ -52,10 +52,7 @@ let gas_limit = Alpha_context.Gas.Arith.integral_of_int_exn 3000
 
 (** Groups ten transactions between the same parties. *)
 let test_multiple_transfers () =
-  Context.init 3 >>=? fun (blk, contracts) ->
-  let (c1, c2, c3) =
-    match contracts with [c1; c2; c3] -> (c1, c2, c3) | _ -> assert false
-  in
+  Context.init3 () >>=? fun (blk, (c1, c2, c3)) ->
   List.map_es
     (fun _ -> Op.transaction ~gas_limit (B blk) c1 c2 Tez.one)
     (1 -- 10)
@@ -84,10 +81,7 @@ let test_multiple_transfers () =
 
 (** Groups ten delegated originations. *)
 let test_multiple_origination_and_delegation () =
-  Context.init 2 >>=? fun (blk, contracts) ->
-  let (c1, c2) =
-    match contracts with [c1; c2] -> (c1, c2) | _ -> assert false
-  in
+  Context.init2 () >>=? fun (blk, (c1, c2)) ->
   let n = 10 in
   Context.get_constants (B blk)
   >>=? fun {parametric = {origination_size; cost_per_byte; _}; _} ->
@@ -172,10 +166,7 @@ let expect_failure = function
     Checks that the receipt is consistent.
     Variant without fees. *)
 let test_failing_operation_in_the_middle () =
-  Context.init 2 >>=? fun (blk, contracts) ->
-  let (c1, c2) =
-    match contracts with [c1; c2] -> (c1, c2) | _ -> assert false
-  in
+  Context.init2 () >>=? fun (blk, (c1, c2)) ->
   Op.transaction ~gas_limit ~fee:Tez.zero (B blk) c1 c2 Tez.one >>=? fun op1 ->
   Op.transaction ~gas_limit ~fee:Tez.zero (B blk) c1 c2 Test_tez.max_tez
   >>=? fun op2 ->
@@ -221,10 +212,7 @@ let test_failing_operation_in_the_middle () =
     Checks that the receipt is consistent.
     Variant with fees, that should be spent even in case of failure. *)
 let test_failing_operation_in_the_middle_with_fees () =
-  Context.init 2 >>=? fun (blk, contracts) ->
-  let (c1, c2) =
-    match contracts with [c1; c2] -> (c1, c2) | _ -> assert false
-  in
+  Context.init2 () >>=? fun (blk, (c1, c2)) ->
   Op.transaction ~fee:Tez.one (B blk) c1 c2 Tez.one >>=? fun op1 ->
   Op.transaction ~fee:Tez.one (B blk) c1 c2 Test_tez.max_tez >>=? fun op2 ->
   Op.transaction ~fee:Tez.one (B blk) c1 c2 Tez.one >>=? fun op3 ->
@@ -273,55 +261,45 @@ let test_failing_operation_in_the_middle_with_fees () =
   return_unit
 
 let test_wrong_signature_in_the_middle () =
-  Context.init 2 >>=? function
-  | (_, []) | (_, [_]) -> assert false
-  | (blk, c1 :: c2 :: _) ->
-      Op.transaction ~gas_limit ~fee:Tez.one (B blk) c1 c2 Tez.one
-      >>=? fun op1 ->
-      Op.transaction ~gas_limit ~fee:Tez.one (B blk) c2 c1 Tez.one
-      >>=? fun op2 ->
-      Incremental.begin_construction blk >>=? fun inc ->
-      (* Make legit transfers, performing reveals *)
-      Incremental.add_operation inc op1 >>=? fun inc ->
-      Incremental.add_operation inc op2 >>=? fun inc ->
-      (* Make c2 reach counter 5 *)
-      Op.transaction ~gas_limit ~fee:Tez.one (I inc) c2 c1 Tez.one
-      >>=? fun op ->
-      Incremental.add_operation inc op >>=? fun inc ->
-      Op.transaction ~gas_limit ~fee:Tez.one (I inc) c2 c1 Tez.one
-      >>=? fun op ->
-      Incremental.add_operation inc op >>=? fun inc ->
-      Op.transaction ~gas_limit ~fee:Tez.one (I inc) c2 c1 Tez.one
-      >>=? fun op ->
-      Incremental.add_operation inc op >>=? fun inc ->
-      (* Cook transactions for actual test *)
-      Op.transaction ~gas_limit ~fee:Tez.one (I inc) c1 c2 Tez.one
-      >>=? fun op1 ->
-      Op.transaction ~gas_limit ~fee:Tez.one (I inc) c1 c2 Tez.one
-      >>=? fun op2 ->
-      Op.transaction ~gas_limit ~fee:Tez.one (I inc) c1 c2 Tez.one
-      >>=? fun op3 ->
-      Op.transaction ~gas_limit ~fee:Tez.one (I inc) c2 c1 Tez.one
-      >>=? fun spurious_operation ->
-      let operations = [op1; op2; op3] in
-      Op.combine_operations ~spurious_operation ~source:c1 (I inc) operations
-      >>=? fun operation ->
-      let expect_apply_failure = function
-        | Environment.Ecoproto_error err :: _ ->
-            Assert.test_error_encodings err ;
-            let error_info =
-              Error_monad.find_info_of_error (Environment.wrap_tzerror err)
-            in
-            if error_info.title = "Inconsistent sources in operation pack" then
-              return_unit
-            else failwith "unexpected error"
-        | _ ->
-            failwith
-              "Packed operation has invalid source in the middle : operation \
-               expected to fail."
-      in
-      Incremental.add_operation ~expect_apply_failure inc operation
-      >>=? fun _inc -> return_unit
+  Context.init2 () >>=? fun (blk, (c1, c2)) ->
+  Op.transaction ~gas_limit ~fee:Tez.one (B blk) c1 c2 Tez.one >>=? fun op1 ->
+  Op.transaction ~gas_limit ~fee:Tez.one (B blk) c2 c1 Tez.one >>=? fun op2 ->
+  Incremental.begin_construction blk >>=? fun inc ->
+  (* Make legit transfers, performing reveals *)
+  Incremental.add_operation inc op1 >>=? fun inc ->
+  Incremental.add_operation inc op2 >>=? fun inc ->
+  (* Make c2 reach counter 5 *)
+  Op.transaction ~gas_limit ~fee:Tez.one (I inc) c2 c1 Tez.one >>=? fun op ->
+  Incremental.add_operation inc op >>=? fun inc ->
+  Op.transaction ~gas_limit ~fee:Tez.one (I inc) c2 c1 Tez.one >>=? fun op ->
+  Incremental.add_operation inc op >>=? fun inc ->
+  Op.transaction ~gas_limit ~fee:Tez.one (I inc) c2 c1 Tez.one >>=? fun op ->
+  Incremental.add_operation inc op >>=? fun inc ->
+  (* Cook transactions for actual test *)
+  Op.transaction ~gas_limit ~fee:Tez.one (I inc) c1 c2 Tez.one >>=? fun op1 ->
+  Op.transaction ~gas_limit ~fee:Tez.one (I inc) c1 c2 Tez.one >>=? fun op2 ->
+  Op.transaction ~gas_limit ~fee:Tez.one (I inc) c1 c2 Tez.one >>=? fun op3 ->
+  Op.transaction ~gas_limit ~fee:Tez.one (I inc) c2 c1 Tez.one
+  >>=? fun spurious_operation ->
+  let operations = [op1; op2; op3] in
+  Op.combine_operations ~spurious_operation ~source:c1 (I inc) operations
+  >>=? fun operation ->
+  let expect_apply_failure = function
+    | Environment.Ecoproto_error err :: _ ->
+        Assert.test_error_encodings err ;
+        let error_info =
+          Error_monad.find_info_of_error (Environment.wrap_tzerror err)
+        in
+        if error_info.title = "Inconsistent sources in operation pack" then
+          return_unit
+        else failwith "unexpected error"
+    | _ ->
+        failwith
+          "Packed operation has invalid source in the middle : operation \
+           expected to fail."
+  in
+  Incremental.add_operation ~expect_apply_failure inc operation >>=? fun _inc ->
+  return_unit
 
 let expect_inconsistent_counters list =
   if
@@ -339,10 +317,7 @@ let expect_inconsistent_counters list =
       list
 
 let test_inconsistent_counters () =
-  Context.init 2 >>=? fun (blk, contracts) ->
-  let (c1, c2) =
-    match contracts with [c1; c2] -> (c1, c2) | _ -> assert false
-  in
+  Context.init2 () >>=? fun (blk, (c1, c2)) ->
   Op.transaction ~gas_limit ~fee:Tez.one (B blk) c1 c2 Tez.one >>=? fun op1 ->
   Op.transaction ~gas_limit ~fee:Tez.one (B blk) c2 c1 Tez.one >>=? fun op2 ->
   Incremental.begin_construction blk >>=? fun inc ->

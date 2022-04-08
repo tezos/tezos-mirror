@@ -38,7 +38,7 @@ open Protocol
 open Alpha_context
 
 let init_genesis ?policy () =
-  Context.init ~consensus_threshold:0 5 >>=? fun (genesis, _) ->
+  Context.init_n ~consensus_threshold:0 5 () >>=? fun (genesis, _contracts) ->
   Block.bake ?policy genesis >>=? fun b -> return (genesis, b)
 
 (** inject an endorsement and return the block with the endorsement and its
@@ -62,7 +62,7 @@ let test_simple_endorsement () =
 
 (** Apply an endorsement with a negative slot. *)
 let test_negative_slot () =
-  Context.init 5 >>=? fun (genesis, _) ->
+  Context.init_n 5 () >>=? fun (genesis, _contracts) ->
   Block.bake genesis >>=? fun b ->
   Context.get_endorser (B b) >>=? fun (delegate, _slots) ->
   Lwt.catch
@@ -80,7 +80,7 @@ let test_negative_slot () =
 (** Apply an endorsement with a non-normalized slot (that is, not the smallest
    possible). *)
 let test_non_normalized_slot () =
-  Context.init 5 >>=? fun (genesis, _) ->
+  Context.init_n 5 () >>=? fun (genesis, _contracts) ->
   Block.bake genesis >>=? fun b ->
   Context.get_endorsers (B b) >>=? fun endorsers_list ->
   (* find an endorsers with more than 1 slot *)
@@ -312,7 +312,7 @@ let test_endorsement_threshold ~sufficient_threshold () =
      about 1 slot so we can get closer to the limit of [consensus_threshold]: we
      check that a block with endorsing power [consensus_threshold - 1] won't be
      baked. *)
-  Context.init 10 >>=? fun (genesis, _contracts) ->
+  Context.init_n 10 () >>=? fun (genesis, _contracts) ->
   Block.bake genesis >>=? fun b ->
   Context.get_constants (B b)
   >>=? fun {parametric = {consensus_threshold; _}; _} ->
@@ -362,7 +362,7 @@ let test_fitness_gap () =
   Assert.equal_int32 ~loc:__LOC__ level_diff 1l
 
 let test_preendorsement_endorsement_same_level () =
-  Context.init ~consensus_threshold:0 1 >>=? fun (genesis, _) ->
+  Context.init1 ~consensus_threshold:0 () >>=? fun (genesis, _contract) ->
   Block.bake genesis >>=? fun b1 ->
   Incremental.begin_construction ~mempool_mode:true ~policy:(By_round 2) b1
   >>=? fun i ->
@@ -376,7 +376,7 @@ let test_preendorsement_endorsement_same_level () =
 (** Test for endorsement injection with wrong slot in mempool mode. This
     test is expected to fail *)
 let test_wrong_endorsement_slot_in_mempool_mode () =
-  Context.init ~consensus_threshold:1 5 >>=? fun (genesis, _) ->
+  Context.init_n ~consensus_threshold:1 5 () >>=? fun (genesis, _) ->
   Block.bake genesis >>=? fun b1 ->
   let module V = Plugin.RPC.Validators in
   (Context.get_endorsers (B b1) >>=? function
@@ -409,7 +409,7 @@ let test_endorsement_for_next_round () =
 
 (** Endorsement of grandparent  *)
 let test_endorsement_grandparent () =
-  Context.init ~consensus_threshold:0 1 >>=? fun (genesis, _) ->
+  Context.init1 ~consensus_threshold:0 () >>=? fun (genesis, _contract) ->
   Block.bake genesis >>=? fun b_gp ->
   Block.bake b_gp >>=? fun b ->
   Incremental.begin_construction ~mempool_mode:true b >>=? fun i ->
@@ -425,7 +425,7 @@ let test_endorsement_grandparent () =
 
 (** Double inclusion of grandparent endorsement *)
 let test_double_endorsement_grandparent () =
-  Context.init ~consensus_threshold:0 1 >>=? fun (genesis, _) ->
+  Context.init1 ~consensus_threshold:0 () >>=? fun (genesis, _contract) ->
   Block.bake genesis >>=? fun b_gp ->
   Block.bake b_gp >>=? fun b ->
   Incremental.begin_construction ~mempool_mode:true b >>=? fun i ->
@@ -448,7 +448,7 @@ let test_double_endorsement_grandparent () =
 
 (** Endorsement of grandparent on same slot as parent *)
 let test_endorsement_grandparent_same_slot () =
-  Context.init ~consensus_threshold:0 1 >>=? fun (genesis, _) ->
+  Context.init1 ~consensus_threshold:0 () >>=? fun (genesis, _contract) ->
   Block.bake genesis >>=? fun b_gp ->
   Block.bake b_gp >>=? fun b ->
   Incremental.begin_construction ~mempool_mode:true b >>=? fun i ->
@@ -466,7 +466,7 @@ let test_endorsement_grandparent_same_slot () =
 
 (** Endorsement of grandparent in application mode should be rejected *)
 let test_endorsement_grandparent_application () =
-  Context.init ~consensus_threshold:0 1 >>=? fun (genesis, _) ->
+  Context.init1 ~consensus_threshold:0 () >>=? fun (genesis, _contract) ->
   Block.bake genesis >>=? fun b_gp ->
   Block.bake b_gp >>=? fun b ->
   Op.endorsement ~endorsed_block:b_gp (B genesis) () >>=? fun op ->
@@ -478,7 +478,7 @@ let test_endorsement_grandparent_application () =
 
 (** Endorsement of grandparent in full construction mode should be rejected *)
 let test_endorsement_grandparent_full_construction () =
-  Context.init ~consensus_threshold:0 1 >>=? fun (genesis, _) ->
+  Context.init1 ~consensus_threshold:0 () >>=? fun (genesis, _contract) ->
   Block.bake genesis >>=? fun b_gp ->
   Block.bake b_gp >>=? fun b ->
   Incremental.begin_construction b >>=? fun i ->

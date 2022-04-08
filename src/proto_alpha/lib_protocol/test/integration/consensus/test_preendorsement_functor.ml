@@ -57,7 +57,7 @@ end = struct
       ?(get_delegate_and_slot =
         fun _predpred _pred _curr -> return (None, None))
       ?(post_process = Ok (fun _ -> return_unit)) ~loc () =
-    Context.init ~consensus_threshold:1 5 >>=? fun (genesis, _) ->
+    Context.init_n ~consensus_threshold:1 5 () >>=? fun (genesis, _contracts) ->
     bake genesis >>=? fun b1 ->
     Op.endorsement ~endorsed_block:b1 (B genesis) () >>=? fun endo ->
     let endo = Operation.pack endo in

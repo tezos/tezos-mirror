@@ -354,12 +354,12 @@ module Tx_rollup = struct
     Tx_rollup_services.commitment rpc_ctxt ctxt tx_rollup
 end
 
-let init ?rng_state ?commitments ?(initial_balances = []) ?consensus_threshold
-    ?min_proposal_quorum ?bootstrap_contracts ?level ?cost_per_byte
-    ?liquidity_baking_subsidy ?endorsing_reward_per_slot
+let init_gen n get ?rng_state ?commitments ?(initial_balances = [])
+    ?consensus_threshold ?min_proposal_quorum ?bootstrap_contracts ?level
+    ?cost_per_byte ?liquidity_baking_subsidy ?endorsing_reward_per_slot
     ?baking_reward_bonus_per_slot ?baking_reward_fixed_portion ?origination_size
     ?blocks_per_cycle ?cycles_per_voting_period ?tx_rollup_enable
-    ?tx_rollup_sunset_level ?tx_rollup_origination_size ?sc_rollup_enable n =
+    ?tx_rollup_sunset_level ?tx_rollup_origination_size ?sc_rollup_enable () =
   let accounts = Account.generate_accounts ?rng_state ~initial_balances n in
   let contracts =
     List.map
@@ -385,65 +385,20 @@ let init ?rng_state ?commitments ?(initial_balances = []) ?consensus_threshold
     ?tx_rollup_origination_size
     ?sc_rollup_enable
     accounts
-  >|=? fun blk -> (blk, contracts)
+  >|=? fun blk -> (blk, get contracts)
 
-let init1 ?rng_state ?commitments ?(initial_balances = []) ?consensus_threshold
-    ?min_proposal_quorum ?level ?cost_per_byte ?liquidity_baking_subsidy
-    ?endorsing_reward_per_slot ?baking_reward_bonus_per_slot
-    ?baking_reward_fixed_portion ?origination_size ?blocks_per_cycle
-    ?cycles_per_voting_period ?tx_rollup_enable ?tx_rollup_sunset_level
-    ?sc_rollup_enable () =
-  init
-    ?rng_state
-    ?commitments
-    ~initial_balances
-    ?consensus_threshold
-    ?min_proposal_quorum
-    ?level
-    ?cost_per_byte
-    ?liquidity_baking_subsidy
-    ?endorsing_reward_per_slot
-    ?baking_reward_bonus_per_slot
-    ?baking_reward_fixed_portion
-    ?origination_size
-    ?blocks_per_cycle
-    ?cycles_per_voting_period
-    ?tx_rollup_enable
-    ?tx_rollup_sunset_level
-    ?sc_rollup_enable
-    1
-  >|=? function
-  | (_, []) -> assert false
-  | (b, contract_1 :: _) -> (b, contract_1)
+let init_n n = init_gen n (fun cs -> cs)
 
-let init2 ?rng_state ?commitments ?(initial_balances = []) ?consensus_threshold
-    ?min_proposal_quorum ?level ?cost_per_byte ?liquidity_baking_subsidy
-    ?endorsing_reward_per_slot ?baking_reward_bonus_per_slot
-    ?baking_reward_fixed_portion ?origination_size ?blocks_per_cycle
-    ?cycles_per_voting_period ?tx_rollup_enable ?tx_rollup_sunset_level
-    ?sc_rollup_enable () =
-  init
-    ?rng_state
-    ?commitments
-    ~initial_balances
-    ?consensus_threshold
-    ?min_proposal_quorum
-    ?level
-    ?cost_per_byte
-    ?liquidity_baking_subsidy
-    ?endorsing_reward_per_slot
-    ?baking_reward_bonus_per_slot
-    ?baking_reward_fixed_portion
-    ?origination_size
-    ?blocks_per_cycle
-    ?cycles_per_voting_period
-    ?tx_rollup_enable
-    ?tx_rollup_sunset_level
-    ?sc_rollup_enable
-    2
-  >|=? function
-  | (_, []) | (_, [_]) -> assert false
-  | (b, contract_1 :: contract_2 :: _) -> (b, (contract_1, contract_2))
+let init1 =
+  init_gen 1 (function [contract_1] -> contract_1 | _ -> assert false)
+
+let init2 =
+  init_gen 2 (function
+      | [contract_1; contract_2] -> (contract_1, contract_2)
+      | _ -> assert false)
+
+let init3 =
+  init_gen 3 (function [c1; c2; c3] -> (c1, c2, c3) | _ -> assert false)
 
 let init_with_constants constants n =
   let accounts = Account.generate_accounts n in

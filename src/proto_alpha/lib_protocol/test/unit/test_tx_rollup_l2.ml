@@ -326,7 +326,7 @@ end)
 let gen_n_ticket_hash n =
   let x =
     Lwt_main.run
-      ( Context.init n >>=? fun (_b, contracts) ->
+      ( Context.init_n n () >>=? fun (_b, contracts) ->
         let addressess = gen_n_address n in
         let tickets =
           List.map2

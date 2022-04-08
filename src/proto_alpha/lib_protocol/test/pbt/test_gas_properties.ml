@@ -91,7 +91,7 @@ let test_consume_commutes (start, cost1, cost2) =
 let context_arb : Alpha_context.t QCheck.arbitrary =
   QCheck.always
     (Lwt_main.run
-       ( Context.init 1 >>=? fun (b, _contracts) ->
+       ( Context.init1 () >>=? fun (b, _contract) ->
          Incremental.begin_construction b >|=? fun inc ->
          let state = Incremental.validation_state inc in
          Alpha_context.Gas.set_limit

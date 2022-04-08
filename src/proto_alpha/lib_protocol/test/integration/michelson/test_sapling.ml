@@ -47,7 +47,7 @@ module Raw_context_tests = struct
      constant value `uncommitted` for which we know the corresponding root and
      tests that the returned root is as expected. *)
   let commitments_add_uncommitted () =
-    Context.init 1 >>=? fun (b, _) ->
+    Context.init1 () >>=? fun (b, _contract) ->
     Raw_context.prepare
       b.context
       ~level:b.header.shell.level
@@ -86,7 +86,7 @@ module Raw_context_tests = struct
      however committing to disk twice the same nf causes a storage error by
      trying to initialize the same key twice. *)
   let nullifier_double () =
-    Context.init 1 >>=? fun (b, _) ->
+    Context.init1 () >>=? fun (b, _contract) ->
     Raw_context.prepare
       b.context
       ~level:b.header.shell.level
@@ -115,7 +115,7 @@ module Raw_context_tests = struct
      memory). We then check that nullifier_mem answers true for those two lists
      and false for a third one. *)
   let nullifier_test () =
-    Context.init 1 >>=? fun (b, _) ->
+    Context.init1 () >>=? fun (b, _contract) ->
     Raw_context.prepare
       b.context
       ~level:b.header.shell.level
@@ -170,7 +170,7 @@ module Raw_context_tests = struct
   let cm_cipher_test () =
     Random.self_init () ;
     let memo_size = Random.int 200 in
-    Context.init 1 >>=? fun (b, _) ->
+    Context.init1 () >>=? fun (b, _contract) ->
     Raw_context.prepare
       b.context
       ~level:b.header.shell.level
@@ -212,7 +212,7 @@ module Raw_context_tests = struct
   let list_insertion_test () =
     Random.self_init () ;
     let memo_size = Random.int 200 in
-    Context.init 1 >>=? fun (b, _) ->
+    Context.init1 () >>=? fun (b, _contract) ->
     Raw_context.prepare
       b.context
       ~level:b.header.shell.level
@@ -287,7 +287,7 @@ module Raw_context_tests = struct
         (Int32.to_int Sapling_storage.Roots.size + 10)
         (fun _ -> gen_root ())
     in
-    Context.init 1 >>=? fun (b, _) ->
+    Context.init1 () >>=? fun (b, _contract) ->
     Raw_context.prepare
       b.context
       ~level:b.header.shell.level
@@ -347,7 +347,7 @@ module Raw_context_tests = struct
     >>=? fun _ -> return_unit
 
   let test_get_memo_size () =
-    Context.init 1 >>=? fun (b, _) ->
+    Context.init1 () >>=? fun (b, _contract) ->
     Raw_context.prepare
       b.context
       ~level:b.header.shell.level

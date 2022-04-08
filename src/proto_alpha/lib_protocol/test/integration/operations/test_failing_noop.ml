@@ -40,16 +40,9 @@
 open Protocol
 open Alpha_context
 
-let register_one_contract () =
-  Context.init 1 >>=? fun (b, contracts) ->
-  let contract =
-    List.nth contracts 0 |> WithExceptions.Option.get ~loc:__LOC__
-  in
-  return (b, contract)
-
 (** try to apply a failing_noop and assert that the operation fails *)
 let failing_noop_must_fail_when_injected () =
-  register_one_contract () >>=? fun (blk, contract) ->
+  Context.init1 () >>=? fun (blk, contract) ->
   Contract.is_implicit contract |> function
   | None -> Alcotest.fail "only implicit accounts can sign"
   | Some source ->

@@ -57,10 +57,7 @@ let context_init n =
    rollup when the feature flag is deactivated and checks that it
    fails. *)
 let test_disable_feature_flag () =
-  let* (b, contracts) = Context.init 1 in
-  let contract =
-    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0
-  in
+  let* (b, contract) = Context.init1 () in
   let* i = Incremental.begin_construction b in
   let kind = Sc_rollup.Kind.Example_arith in
   let* (op, _) = Op.sc_rollup_origination (I i) contract kind "" in

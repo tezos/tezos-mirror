@@ -39,7 +39,7 @@ open Alpha_context
    Future levels or cycles are not tested because it's hard in this framework,
    using only RPCs, to fabricate them. *)
 let test_baking_rights () =
-  Context.init 2 >>=? fun (b, contracts) ->
+  Context.init2 () >>=? fun (b, (c1, _c2)) ->
   let open Plugin.RPC.Baking_rights in
   (* default max_round returns 65 results *)
   get Block.rpc_ctxt b ~all:true >>=? fun rights ->
@@ -49,10 +49,7 @@ let test_baking_rights () =
   get Block.rpc_ctxt b ~all:true ~max_round >>=? fun rights ->
   assert (Compare.List_length_with.(rights = max_round + 1)) ;
   (* filtering by delegate *)
-  let d =
-    Option.bind (List.nth contracts 0) Contract.is_implicit
-    |> WithExceptions.Option.get ~loc:__LOC__
-  in
+  let d = Contract.is_implicit c1 |> WithExceptions.Option.get ~loc:__LOC__ in
   get Block.rpc_ctxt b ~all:true ~delegates:[d] >>=? fun rights ->
   assert (List.for_all (fun {delegate; _} -> delegate = d) rights) ;
   (* filtering by cycle *)

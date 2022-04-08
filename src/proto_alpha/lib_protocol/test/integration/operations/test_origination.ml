@@ -65,11 +65,7 @@ let total_fees_for_origination ?(fee = Tez.zero) ?(credit = Tez.zero) b =
      fees instantaneously. So to see that the fees are subtracted, we need that
      the bake is done by another delegated. *)
 let test_origination_balances ~loc:_ ?(fee = Tez.zero) ?(credit = Tez.zero) () =
-  Context.init 2 >>=? fun (b, contracts) ->
-  let source = WithExceptions.Option.get ~loc:__LOC__ @@ List.hd contracts in
-  let contract_for_bake =
-    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 1
-  in
+  Context.init2 () >>=? fun (b, (source, contract_for_bake)) ->
   Context.Contract.pkh source >>=? fun pkh_for_orig ->
   Context.Contract.pkh contract_for_bake >>=? fun pkh_for_bake ->
   Op.contract_origination (B b) source ~fee ~credit ~script:Op.dummy_script
@@ -98,11 +94,7 @@ let test_origination_balances ~loc:_ ?(fee = Tez.zero) ?(credit = Tez.zero) () =
     meaning that this contract is spendable; delegatable default is
     set to true meaning that this contract is able to delegate. *)
 let register_origination ?(fee = Tez.zero) ?(credit = Tez.zero) () =
-  Context.init 2 >>=? fun (b, contracts) ->
-  let source = WithExceptions.Option.get ~loc:__LOC__ @@ List.hd contracts in
-  let contract_for_bake =
-    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 1
-  in
+  Context.init2 () >>=? fun (b, (source, contract_for_bake)) ->
   Context.Contract.pkh source >>=? fun source_pkh ->
   Context.Contract.pkh contract_for_bake >>=? fun pkh_for_bake ->
   Op.contract_origination (B b) source ~fee ~credit ~script:Op.dummy_script
@@ -158,13 +150,7 @@ let test_pay_fee () =
 (** Create an originate contract where the contract does not have
     enough tez to pay for the fee. *)
 let test_not_tez_in_contract_to_pay_fee () =
-  Context.init 2 >>=? fun (b, contracts) ->
-  let contract_1 =
-    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0
-  in
-  let contract_2 =
-    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 1
-  in
+  Context.init2 () >>=? fun (b, (contract_1, contract_2)) ->
   Incremental.begin_construction b >>=? fun inc ->
   (* transfer everything but one tez from 1 to 2 and check balance of 1 *)
   Context.Contract.balance (I inc) contract_1 >>=? fun balance ->
@@ -188,8 +174,7 @@ let test_not_tez_in_contract_to_pay_fee () =
 (* Set the endorser of the block as manager/delegate of the originated
    account. *)
 let register_contract_get_endorser () =
-  Context.init 1 >>=? fun (b, contracts) ->
-  let contract = WithExceptions.Option.get ~loc:__LOC__ @@ List.hd contracts in
+  Context.init1 () >>=? fun (b, contract) ->
   Incremental.begin_construction b >>=? fun inc ->
   Context.get_endorser (I inc) >|=? fun (account_endorser, _slots) ->
   (inc, contract, account_endorser)
@@ -210,8 +195,7 @@ let test_multiple_originations () =
 
 (** Cannot originate two contracts with the same context's counter. *)
 let test_counter () =
-  Context.init 1 >>=? fun (b, contracts) ->
-  let contract = WithExceptions.Option.get ~loc:__LOC__ @@ List.hd contracts in
+  Context.init1 () >>=? fun (b, contract) ->
   Incremental.begin_construction b >>=? fun inc ->
   Op.contract_origination
     (I inc)

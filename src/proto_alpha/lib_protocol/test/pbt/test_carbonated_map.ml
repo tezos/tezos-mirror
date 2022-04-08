@@ -39,7 +39,7 @@ let wrap m = m >|= Environment.wrap_tzresult
 
 let new_ctxt () =
   let ( let* ) m f = m >>=? f in
-  let* (block, _) = Context.init 1 in
+  let* (block, _contract) = Context.init1 () in
   let* incr = Incremental.begin_construction block in
   return @@ Incremental.alpha_ctxt incr
 

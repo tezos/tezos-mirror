@@ -51,7 +51,7 @@ let test_unparse_view () =
   let script =
     Script.{code = lazy_expr contract_expr; storage = lazy_expr storage_expr}
   in
-  Context.init 3 >>=? fun (b, _cs) ->
+  Context.init3 () >>=? fun (b, _cs) ->
   Incremental.begin_construction b >>=? fun v ->
   let ctx = Incremental.alpha_ctxt v in
   Script_ir_translator.parse_and_unparse_script_unaccounted
@@ -66,13 +66,12 @@ let test_unparse_view () =
   Alcotest.(check bytes) "didn't match" bef aft |> return
 
 let test_context () =
-  Context.init ~consensus_threshold:0 3 >>=? fun (b, _cs) ->
+  Context.init3 ~consensus_threshold:0 () >>=? fun (b, _cs) ->
   Incremental.begin_construction b >>=? fun v ->
   return (Incremental.alpha_ctxt v)
 
 let test_context_with_nat_nat_big_map () =
-  Context.init 3 >>=? fun (b, contracts) ->
-  let source = WithExceptions.Option.get ~loc:__LOC__ @@ List.hd contracts in
+  Context.init3 () >>=? fun (b, (source, _c2, _c3)) ->
   Op.contract_origination (B b) source ~script:Op.dummy_script
   >>=? fun (operation, originated) ->
   Block.bake ~operation b >>=? fun b ->

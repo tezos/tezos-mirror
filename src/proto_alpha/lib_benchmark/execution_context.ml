@@ -30,7 +30,7 @@ type context = Alpha_context.context * Script_interpreter.step_constants
 let initial_balance = 4_000_000_000_000L
 
 let context_init_memory ~rng_state =
-  Context.init
+  Context.init_n
     ~rng_state
     ~initial_balances:
       [
@@ -41,6 +41,7 @@ let context_init_memory ~rng_state =
         initial_balance;
       ]
     5
+    ()
   >>=? fun (block, accounts) ->
   match accounts with
   | [bs1; bs2; bs3; bs4; bs5] ->

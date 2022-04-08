@@ -36,7 +36,7 @@ open Sc_rollup_arith.ProtocolImplementation
 open Alpha_context
 
 let create_context () =
-  Context.init 1 >>=? fun (block, _) -> return block.context
+  Context.init1 () >>=? fun (block, _contract) -> return block.context
 
 let setup boot_sector f =
   create_context () >>=? fun ctxt ->
