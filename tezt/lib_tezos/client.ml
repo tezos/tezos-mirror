@@ -508,6 +508,45 @@ let bake_for ?endpoint ?protocol ?keys ?minimal_fees
     client
   |> Process.check
 
+let node_of_endpoint = function Node n -> Some n | Proxy_server _ -> None
+
+let node_of_client_mode = function
+  | Client (Some endpoint, _) -> node_of_endpoint endpoint
+  | Proxy endpoint -> node_of_endpoint endpoint
+  | Light (_, endpoints) -> List.find_map node_of_endpoint endpoints
+  | Client (None, _) -> None
+  | Mockup -> None
+
+let bake_for_and_wait ?endpoint ?protocol ?keys ?minimal_fees
+    ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte ?minimal_timestamp
+    ?mempool ?ignore_node_mempool ?force ?context_path ?node client =
+  let node =
+    match node with
+    | Some n -> n
+    | None -> (
+        match node_of_client_mode client.mode with
+        | Some n -> n
+        | None -> Test.fail "No node found for bake_for_and_wait")
+  in
+  let level_before = Node.get_level node in
+  let* () =
+    bake_for
+      ?endpoint
+      ?protocol
+      ?keys
+      ?minimal_fees
+      ?minimal_nanotez_per_gas_unit
+      ?minimal_nanotez_per_byte
+      ?minimal_timestamp
+      ?mempool
+      ?ignore_node_mempool
+      ?force
+      ?context_path
+      client
+  in
+  let* _lvl = Node.wait_for_level node (level_before + 1) in
+  unit
+
 (* Handle endorsing and preendorsing similarly *)
 type tenderbake_action = Preendorse | Endorse | Propose
 

@@ -351,6 +351,26 @@ val bake_for :
   t ->
   unit Lwt.t
 
+(** Same as {!bake_for}, but bakes a block and waits until the level of the
+    blockchain in the node increases by 1. It uses the node provided via argument
+    [node] if any. Otherwise, it searches for a node in the client's mode, and
+    fails if no node is found. *)
+val bake_for_and_wait :
+  ?endpoint:endpoint ->
+  ?protocol:Protocol.t ->
+  ?keys:string list ->
+  ?minimal_fees:int ->
+  ?minimal_nanotez_per_gas_unit:int ->
+  ?minimal_nanotez_per_byte:int ->
+  ?minimal_timestamp:bool ->
+  ?mempool:string ->
+  ?ignore_node_mempool:bool ->
+  ?force:bool ->
+  ?context_path:string ->
+  ?node:Node.t ->
+  t ->
+  unit Lwt.t
+
 (** Same as [bake_for], but do not wait for the process to exit. *)
 val spawn_bake_for :
   ?endpoint:endpoint ->
