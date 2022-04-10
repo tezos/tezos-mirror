@@ -1,0 +1,73 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_client_013_PtJakart_commands)
+ (public_name tezos-client-013-PtJakart-commands)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  tezos-protocol-013-PtJakart
+  tezos-protocol-013-PtJakart-parameters
+  tezos-stdlib-unix
+  tezos-protocol-environment
+  tezos-shell-services
+  tezos-mockup
+  tezos-mockup-registration
+  tezos-mockup-commands
+  tezos-client-base
+  tezos-client-013-PtJakart
+  tezos-client-commands
+  tezos-rpc
+  tezos-client-base-unix
+  tezos-protocol-plugin-013-PtJakart)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard
+   -open Tezos_base.TzPervasives
+   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+   -open Tezos_protocol_013_PtJakart
+   -open Tezos_protocol_013_PtJakart_parameters
+   -open Tezos_stdlib_unix
+   -open Tezos_shell_services
+   -open Tezos_client_base
+   -open Tezos_client_013_PtJakart
+   -open Tezos_client_commands
+   -open Tezos_rpc
+   -open Tezos_client_base_unix
+   -open Tezos_protocol_plugin_013_PtJakart))
+ (modules (:standard \ alpha_commands_registration)))
+
+(library
+ (name tezos_client_013_PtJakart_commands_registration)
+ (public_name tezos-client-013-PtJakart-commands-registration)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  tezos-protocol-013-PtJakart
+  tezos-protocol-013-PtJakart-parameters
+  tezos-protocol-environment
+  tezos-shell-services
+  tezos-client-base
+  tezos-client-013-PtJakart
+  tezos-client-commands
+  tezos-client-013-PtJakart-commands
+  tezos-client-sapling-013-PtJakart
+  tezos-rpc
+  tezos-protocol-plugin-013-PtJakart)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard
+   -open Tezos_base.TzPervasives
+   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+   -open Tezos_protocol_013_PtJakart
+   -open Tezos_protocol_013_PtJakart_parameters
+   -open Tezos_shell_services
+   -open Tezos_client_base
+   -open Tezos_client_013_PtJakart
+   -open Tezos_client_commands
+   -open Tezos_client_013_PtJakart_commands
+   -open Tezos_client_sapling_013_PtJakart
+   -open Tezos_rpc
+   -open Tezos_protocol_plugin_013_PtJakart))
+ (modules alpha_commands_registration))

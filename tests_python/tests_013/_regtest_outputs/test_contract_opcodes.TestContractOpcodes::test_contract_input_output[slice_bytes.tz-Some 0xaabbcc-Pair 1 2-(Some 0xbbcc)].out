@@ -1,0 +1,37 @@
+tests_013/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[slice_bytes.tz-Some 0xaabbcc-Pair 1 2-(Some 0xbbcc)]
+
+storage
+  (Some 0xbbcc)
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 10 (remaining gas: 1039990.207 units remaining)
+    [ (Pair (Pair 1 2) (Some 0xaabbcc)) ]
+  - location: 10 (remaining gas: 1039990.197 units remaining)
+    [ (Pair 1 2)
+      (Some 0xaabbcc) ]
+  - location: 11 (remaining gas: 1039990.187 units remaining)
+    [ (Some 0xaabbcc)
+      (Pair 1 2) ]
+  - location: 13 (remaining gas: 1039990.177 units remaining)
+    [ 0xaabbcc
+      (Pair 1 2) ]
+  - location: 19 (remaining gas: 1039990.167 units remaining)
+    [ (Pair 1 2)
+      0xaabbcc ]
+  - location: 20 (remaining gas: 1039990.157 units remaining)
+    [ 1
+      2
+      0xaabbcc ]
+  - location: 21 (remaining gas: 1039990.132 units remaining)
+    [ (Some 0xbbcc) ]
+  - location: 13 (remaining gas: 1039990.122 units remaining)
+    [ (Some 0xbbcc) ]
+  - location: 22 (remaining gas: 1039990.112 units remaining)
+    [ {}
+      (Some 0xbbcc) ]
+  - location: 24 (remaining gas: 1039990.102 units remaining)
+    [ (Pair {} (Some 0xbbcc)) ]
+

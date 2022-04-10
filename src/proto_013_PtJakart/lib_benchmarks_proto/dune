@@ -1,0 +1,43 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_benchmarks_proto_013_PtJakart)
+ (public_name tezos-benchmarks-proto-013-PtJakart)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  str
+  tezos-stdlib
+  tezos-base
+  tezos-error-monad
+  tezos-protocol-013-PtJakart-parameters
+  tezos-benchmark
+  tezos-benchmark-013-PtJakart
+  tezos-benchmark-type-inference-013-PtJakart
+  tezos-protocol-013-PtJakart
+  tezos-protocol-013-PtJakart.raw
+  tezos-crypto
+  tezos-shell-benchmarks
+  tezos-micheline
+  tezos-013-PtJakart-test-helpers
+  tezos-sapling
+  tezos-client-013-PtJakart
+  tezos-tooling
+  tezos-protocol-environment)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard
+   -open Tezos_stdlib
+   -open Tezos_base
+   -open Tezos_base.TzPervasives
+   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+   -open Tezos_error_monad
+   -open Tezos_benchmark
+   -open Tezos_benchmark_013_PtJakart
+   -open Tezos_benchmark_type_inference_013_PtJakart
+   -open Tezos_protocol_013_PtJakart
+   -open Tezos_raw_protocol_013_PtJakart
+   -open Tezos_crypto
+   -open Tezos_micheline
+   -open Tezos_013_PtJakart_test_helpers
+   -open Tezos_client_013_PtJakart)))

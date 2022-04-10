@@ -1,0 +1,131 @@
+tests_013/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[reverse_loop.tz-{""}-{ "c" ; "b" ; "a" }-{ "a" ; "b" ; "c" }]
+
+storage
+  { "a" ; "b" ; "c" }
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 9 (remaining gas: 1039985.212 units remaining)
+    [ (Pair { "c" ; "b" ; "a" } { "" }) ]
+  - location: 9 (remaining gas: 1039985.202 units remaining)
+    [ { "c" ; "b" ; "a" } ]
+  - location: 10 (remaining gas: 1039985.192 units remaining)
+    [ {}
+      { "c" ; "b" ; "a" } ]
+  - location: 12 (remaining gas: 1039985.182 units remaining)
+    [ { "c" ; "b" ; "a" }
+      {} ]
+  - location: 13 (remaining gas: 1039985.172 units remaining)
+    [ True
+      { "c" ; "b" ; "a" }
+      {} ]
+  - location: 16 (remaining gas: 1039985.172 units remaining)
+    [ { "c" ; "b" ; "a" }
+      {} ]
+  - location: 18 (remaining gas: 1039985.162 units remaining)
+    [ "c"
+      { "b" ; "a" }
+      {} ]
+  - location: 20 (remaining gas: 1039985.152 units remaining)
+    [ { "b" ; "a" }
+      "c"
+      {} ]
+  - location: 21 (remaining gas: 1039985.142 units remaining)
+    [ "c"
+      {} ]
+  - location: 23 (remaining gas: 1039985.132 units remaining)
+    [ { "c" } ]
+  - location: 21 (remaining gas: 1039985.112 units remaining)
+    [ { "b" ; "a" }
+      { "c" } ]
+  - location: 24 (remaining gas: 1039985.102 units remaining)
+    [ True
+      { "b" ; "a" }
+      { "c" } ]
+  - location: 18 (remaining gas: 1039985.092 units remaining)
+    [ True
+      { "b" ; "a" }
+      { "c" } ]
+  - location: 16 (remaining gas: 1039985.082 units remaining)
+    [ { "b" ; "a" }
+      { "c" } ]
+  - location: 18 (remaining gas: 1039985.072 units remaining)
+    [ "b"
+      { "a" }
+      { "c" } ]
+  - location: 20 (remaining gas: 1039985.062 units remaining)
+    [ { "a" }
+      "b"
+      { "c" } ]
+  - location: 21 (remaining gas: 1039985.052 units remaining)
+    [ "b"
+      { "c" } ]
+  - location: 23 (remaining gas: 1039985.042 units remaining)
+    [ { "b" ; "c" } ]
+  - location: 21 (remaining gas: 1039985.022 units remaining)
+    [ { "a" }
+      { "b" ; "c" } ]
+  - location: 24 (remaining gas: 1039985.012 units remaining)
+    [ True
+      { "a" }
+      { "b" ; "c" } ]
+  - location: 18 (remaining gas: 1039985.002 units remaining)
+    [ True
+      { "a" }
+      { "b" ; "c" } ]
+  - location: 16 (remaining gas: 1039984.992 units remaining)
+    [ { "a" }
+      { "b" ; "c" } ]
+  - location: 18 (remaining gas: 1039984.982 units remaining)
+    [ "a"
+      {}
+      { "b" ; "c" } ]
+  - location: 20 (remaining gas: 1039984.972 units remaining)
+    [ {}
+      "a"
+      { "b" ; "c" } ]
+  - location: 21 (remaining gas: 1039984.962 units remaining)
+    [ "a"
+      { "b" ; "c" } ]
+  - location: 23 (remaining gas: 1039984.952 units remaining)
+    [ { "a" ; "b" ; "c" } ]
+  - location: 21 (remaining gas: 1039984.932 units remaining)
+    [ {}
+      { "a" ; "b" ; "c" } ]
+  - location: 24 (remaining gas: 1039984.922 units remaining)
+    [ True
+      {}
+      { "a" ; "b" ; "c" } ]
+  - location: 18 (remaining gas: 1039984.912 units remaining)
+    [ True
+      {}
+      { "a" ; "b" ; "c" } ]
+  - location: 16 (remaining gas: 1039984.902 units remaining)
+    [ {}
+      { "a" ; "b" ; "c" } ]
+  - location: 18 (remaining gas: 1039984.892 units remaining)
+    [ { "a" ; "b" ; "c" } ]
+  - location: 28 (remaining gas: 1039984.882 units remaining)
+    [ {}
+      { "a" ; "b" ; "c" } ]
+  - location: 30 (remaining gas: 1039984.872 units remaining)
+    [ False
+      {}
+      { "a" ; "b" ; "c" } ]
+  - location: 18 (remaining gas: 1039984.862 units remaining)
+    [ False
+      {}
+      { "a" ; "b" ; "c" } ]
+  - location: 16 (remaining gas: 1039984.852 units remaining)
+    [ {}
+      { "a" ; "b" ; "c" } ]
+  - location: 33 (remaining gas: 1039984.842 units remaining)
+    [ { "a" ; "b" ; "c" } ]
+  - location: 34 (remaining gas: 1039984.832 units remaining)
+    [ {}
+      { "a" ; "b" ; "c" } ]
+  - location: 36 (remaining gas: 1039984.822 units remaining)
+    [ (Pair {} { "a" ; "b" ; "c" }) ]
+

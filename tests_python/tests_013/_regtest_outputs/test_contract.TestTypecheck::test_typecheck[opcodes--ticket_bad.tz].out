@@ -1,0 +1,12 @@
+tests_013/test_contract.py::TestTypecheck::test_typecheck[opcodes/ticket_bad.tz]
+
+Well typed
+Gas remaining: 1039997.763 units remaining
+{ parameter unit ;
+  storage (ticket nat) ;
+  code { CDR
+         /* [ ticket nat ] */ ;
+         NIL operation
+         /* [ list operation : ticket nat ] */ ;
+         PAIR
+         /* [ pair (list operation) (ticket nat) ] */ } }

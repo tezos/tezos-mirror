@@ -1,0 +1,23 @@
+tests_013/test_contract.py::TestTypecheck::test_typecheck[opcodes/abs.tz]
+
+Well typed
+Gas remaining: 1039992.594 units remaining
+{ parameter nat ;
+  storage unit ;
+  code { CAR
+         /* [ nat ] */ ;
+         DUP
+         /* [ nat : nat ] */ ;
+         NEG
+         /* [ int : nat ] */ ;
+         ABS
+         /* [ nat : nat ] */ ;
+         COMPARE
+         /* [ int ] */ ;
+         ASSERT_EQ ;
+         UNIT
+         /* [ unit ] */ ;
+         NIL operation
+         /* [ list operation : unit ] */ ;
+         PAIR
+         /* [ pair (list operation) unit ] */ } }

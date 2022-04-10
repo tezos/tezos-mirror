@@ -1,0 +1,18 @@
+tests_013/test_contract.py::TestTypecheck::test_typecheck[non_regression/bug_262.tz]
+
+Well typed
+Gas remaining: 1039995.909 units remaining
+{ parameter unit ;
+  storage unit ;
+  code { DROP
+         /* [] */ ;
+         LAMBDA unit unit { /* [ unit ] */ }
+         /* [ lambda unit unit ] */ ;
+         UNIT
+         /* [ unit : lambda unit unit ] */ ;
+         EXEC
+         /* [ unit ] */ ;
+         NIL operation
+         /* [ list operation : unit ] */ ;
+         PAIR
+         /* [ pair (list operation) unit ] */ } }

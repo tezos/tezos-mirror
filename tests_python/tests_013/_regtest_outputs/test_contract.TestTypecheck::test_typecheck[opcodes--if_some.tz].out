@@ -1,0 +1,13 @@
+tests_013/test_contract.py::TestTypecheck::test_typecheck[opcodes/if_some.tz]
+
+Well typed
+Gas remaining: 1039996.019 units remaining
+{ parameter (option string) ;
+  storage string ;
+  code { CAR
+         /* [ option string ] */ ;
+         IF_SOME { /* [ string ] */ } { PUSH string "" /* [ string ] */ } ;
+         NIL operation
+         /* [ list operation : string ] */ ;
+         PAIR
+         /* [ pair (list operation) string ] */ } }

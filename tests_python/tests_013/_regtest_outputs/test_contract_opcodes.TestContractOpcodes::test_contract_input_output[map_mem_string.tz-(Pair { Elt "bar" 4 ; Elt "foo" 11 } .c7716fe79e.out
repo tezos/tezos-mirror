@@ -1,0 +1,42 @@
+tests_013/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[map_mem_string.tz-(Pair { Elt "bar" 4 ; Elt "foo" 11 } None)-"baz"-(Pair { Elt "bar" 4 ; Elt "foo" 11 } (Some False))]
+
+storage
+  (Pair { Elt "bar" 4 ; Elt "foo" 11 } (Some False))
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 12 (remaining gas: 1039989.324 units remaining)
+    [ (Pair "baz" { Elt "bar" 4 ; Elt "foo" 11 } None) ]
+  - location: 12 (remaining gas: 1039989.314 units remaining)
+    [ "baz"
+      (Pair { Elt "bar" 4 ; Elt "foo" 11 } None) ]
+  - location: 13 (remaining gas: 1039989.304 units remaining)
+    [ (Pair { Elt "bar" 4 ; Elt "foo" 11 } None) ]
+  - location: 15 (remaining gas: 1039989.294 units remaining)
+    [ { Elt "bar" 4 ; Elt "foo" 11 } ]
+  - location: 16 (remaining gas: 1039989.284 units remaining)
+    [ { Elt "bar" 4 ; Elt "foo" 11 }
+      { Elt "bar" 4 ; Elt "foo" 11 } ]
+  - location: 13 (remaining gas: 1039989.264 units remaining)
+    [ "baz"
+      { Elt "bar" 4 ; Elt "foo" 11 }
+      { Elt "bar" 4 ; Elt "foo" 11 } ]
+  - location: 17 (remaining gas: 1039989.175 units remaining)
+    [ False
+      { Elt "bar" 4 ; Elt "foo" 11 } ]
+  - location: 18 (remaining gas: 1039989.165 units remaining)
+    [ (Some False)
+      { Elt "bar" 4 ; Elt "foo" 11 } ]
+  - location: 19 (remaining gas: 1039989.155 units remaining)
+    [ { Elt "bar" 4 ; Elt "foo" 11 }
+      (Some False) ]
+  - location: 20 (remaining gas: 1039989.145 units remaining)
+    [ (Pair { Elt "bar" 4 ; Elt "foo" 11 } (Some False)) ]
+  - location: 21 (remaining gas: 1039989.135 units remaining)
+    [ {}
+      (Pair { Elt "bar" 4 ; Elt "foo" 11 } (Some False)) ]
+  - location: 23 (remaining gas: 1039989.125 units remaining)
+    [ (Pair {} { Elt "bar" 4 ; Elt "foo" 11 } (Some False)) ]
+

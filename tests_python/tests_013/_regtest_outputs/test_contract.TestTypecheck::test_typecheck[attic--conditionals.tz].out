@@ -1,0 +1,20 @@
+tests_013/test_contract.py::TestTypecheck::test_typecheck[attic/conditionals.tz]
+
+Well typed
+Gas remaining: 1039990.456 units remaining
+{ parameter (or string (option int)) ;
+  storage string ;
+  code { CAR
+         /* [ or string (option int) ] */ ;
+         IF_LEFT
+           { /* [ string ] */ }
+           { IF_NONE
+               { FAIL }
+               { PUSH int 0
+                 /* [ int : int ] */ ;
+                 CMPGT ;
+                 IF { FAIL } { PUSH string "" /* [ string ] */ } } } ;
+         NIL operation
+         /* [ list operation : string ] */ ;
+         PAIR
+         /* [ pair (list operation) string ] */ } }

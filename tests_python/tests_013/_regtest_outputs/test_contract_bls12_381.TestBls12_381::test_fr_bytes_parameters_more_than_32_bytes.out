@@ -1,0 +1,8 @@
+tests_013/test_contract_bls12_381.py::TestBls12_381::test_fr_bytes_parameters_more_than_32_bytes
+
+Invalid argument passed to contract KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi.
+At (unshown) location 0, value
+  0xf7ef66f95c90b2f953eb0555af65f22095d4f54b40ea8c6dcc2014740e8662c16bb8786723
+is invalid for type bls12_381_fr.
+Fatal error:
+  error running script

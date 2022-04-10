@@ -1,0 +1,14 @@
+tests_013/test_contract.py::TestTypecheck::test_typecheck[opcodes/iter_fail.tz]
+
+Well typed
+Gas remaining: 1039996.874 units remaining
+{ parameter (set nat) ;
+  storage unit ;
+  code { UNPAIR
+         /* [ set nat : unit ] */ ;
+         ITER { FAILWITH /* [] */ }
+         /* [ unit ] */ ;
+         NIL operation
+         /* [ list operation : unit ] */ ;
+         PAIR
+         /* [ pair (list operation) unit ] */ } }

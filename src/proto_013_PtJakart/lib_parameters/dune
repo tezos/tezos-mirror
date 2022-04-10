@@ -1,0 +1,47 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_protocol_013_PtJakart_parameters)
+ (public_name tezos-protocol-013-PtJakart-parameters)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  tezos-protocol-environment
+  tezos-protocol-013-PtJakart)
+ (library_flags (:standard -linkall))
+ (flags (:standard -open Tezos_base.TzPervasives -open Tezos_protocol_013_PtJakart))
+ (modules (:standard \ gen)))
+
+(executable
+ (name gen)
+ (libraries
+  tezos-base
+  tezos-protocol-013-PtJakart-parameters
+  tezos-protocol-013-PtJakart)
+ (link_flags (:standard -linkall))
+ (flags
+  (:standard
+   -open Tezos_base.TzPervasives
+   -open Tezos_protocol_013_PtJakart_parameters
+   -open Tezos_protocol_013_PtJakart))
+ (modules gen))
+
+(rule
+ (targets sandbox-parameters.json)
+ (deps gen.exe)
+ (action (run %{deps} --sandbox)))
+
+(rule
+ (targets test-parameters.json)
+ (deps gen.exe)
+ (action (run %{deps} --test)))
+
+(rule
+ (targets mainnet-parameters.json)
+ (deps gen.exe)
+ (action (run %{deps} --mainnet)))
+
+(install
+ (section lib)
+ (files sandbox-parameters.json test-parameters.json mainnet-parameters.json))

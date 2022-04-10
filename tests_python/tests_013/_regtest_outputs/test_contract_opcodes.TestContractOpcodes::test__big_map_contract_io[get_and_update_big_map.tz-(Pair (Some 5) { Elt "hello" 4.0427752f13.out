@@ -1,0 +1,35 @@
+tests_013/test_contract_opcodes.py::TestContractOpcodes::test__big_map_contract_io[get_and_update_big_map.tz-(Pair (Some 5) { Elt "hello" 4 })-"hello"-(Pair (Some 4) 4)-big_map_diff12]
+
+storage
+  (Pair (Some 4) 4)
+emitted operations
+  
+big_map diff
+  New map(4) of type (big_map string nat)
+  Set map(4)["hello"] to 5
+trace
+  - location: 13 (remaining gas: 1039989.806 units remaining)
+    [ (Pair "hello" (Some 5) { Elt "hello" 4 }) ]
+  - location: 13 (remaining gas: 1039989.796 units remaining)
+    [ "hello"
+      (Pair (Some 5) { Elt "hello" 4 }) ]
+  - location: 14 (remaining gas: 1039989.786 units remaining)
+    [ (Pair (Some 5) { Elt "hello" 4 }) ]
+  - location: 16 (remaining gas: 1039989.776 units remaining)
+    [ (Some 5)
+      { Elt "hello" 4 } ]
+  - location: 14 (remaining gas: 1039989.756 units remaining)
+    [ "hello"
+      (Some 5)
+      { Elt "hello" 4 } ]
+  - location: 17 (remaining gas: 1039988.739 units remaining)
+    [ (Some 4)
+      { Elt "hello" 5 } ]
+  - location: 18 (remaining gas: 1039988.729 units remaining)
+    [ (Pair (Some 4) { Elt "hello" 5 }) ]
+  - location: 19 (remaining gas: 1039988.719 units remaining)
+    [ {}
+      (Pair (Some 4) { Elt "hello" 5 }) ]
+  - location: 21 (remaining gas: 1039988.709 units remaining)
+    [ (Pair {} (Some 4) { Elt "hello" 5 }) ]
+

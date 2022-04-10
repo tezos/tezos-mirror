@@ -1,0 +1,21 @@
+tests_013/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[cdr.tz-0-(Pair 34 17)-17]
+
+storage
+  17
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 9 (remaining gas: 1039995.097 units remaining)
+    [ (Pair (Pair 34 17) 0) ]
+  - location: 9 (remaining gas: 1039995.087 units remaining)
+    [ (Pair 34 17) ]
+  - location: 10 (remaining gas: 1039995.077 units remaining)
+    [ 17 ]
+  - location: 11 (remaining gas: 1039995.067 units remaining)
+    [ {}
+      17 ]
+  - location: 13 (remaining gas: 1039995.057 units remaining)
+    [ (Pair {} 17) ]
+

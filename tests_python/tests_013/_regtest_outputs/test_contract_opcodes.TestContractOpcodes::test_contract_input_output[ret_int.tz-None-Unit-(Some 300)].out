@@ -1,0 +1,23 @@
+tests_013/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[ret_int.tz-None-Unit-(Some 300)]
+
+storage
+  (Some 300)
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 8 (remaining gas: 1039994.306 units remaining)
+    [ (Pair Unit None) ]
+  - location: 8 (remaining gas: 1039994.296 units remaining)
+    [  ]
+  - location: 9 (remaining gas: 1039994.286 units remaining)
+    [ 300 ]
+  - location: 12 (remaining gas: 1039994.276 units remaining)
+    [ (Some 300) ]
+  - location: 13 (remaining gas: 1039994.266 units remaining)
+    [ {}
+      (Some 300) ]
+  - location: 15 (remaining gas: 1039994.256 units remaining)
+    [ (Pair {} (Some 300)) ]
+
