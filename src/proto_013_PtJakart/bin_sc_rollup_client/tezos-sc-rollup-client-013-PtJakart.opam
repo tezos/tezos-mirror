@@ -24,4 +24,4 @@ build: [
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Tezos/Protocol: `tezos-sc-rollup-client-013-PtJakart` client binary"
+synopsis: "Tezos/Protocol: `tezos-sc-rollup-client-alpha` client binary"

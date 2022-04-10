@@ -12,4 +12,6 @@
   tezos-error-monad
   tezos-client-013-PtJakart)
  (flags
-  (:standard -open Tezos_micheline -open Tezos_benchmark_type_inference_013_PtJakart)))
+  (:standard
+   -open Tezos_micheline
+   -open Tezos_benchmark_type_inference_013_PtJakart)))

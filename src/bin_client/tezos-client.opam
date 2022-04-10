@@ -36,9 +36,11 @@ depopts: [
   "tezos-client-010-PtGRANAD-commands-registration"
   "tezos-client-011-PtHangz2-commands-registration"
   "tezos-client-012-Psithaca-commands-registration"
+  "tezos-client-013-PtJakart-commands-registration"
   "tezos-client-alpha-commands-registration"
   "tezos-baking-011-PtHangz2-commands"
   "tezos-baking-012-Psithaca-commands"
+  "tezos-baking-013-PtJakart-commands"
   "tezos-baking-alpha-commands"
   "tezos-protocol-plugin-007-PsDELPH1"
   "tezos-protocol-plugin-008-PtEdo2Zk"
@@ -46,6 +48,7 @@ depopts: [
   "tezos-protocol-plugin-010-PtGRANAD"
   "tezos-protocol-plugin-011-PtHangz2"
   "tezos-protocol-plugin-012-Psithaca"
+  "tezos-protocol-plugin-013-PtJakart"
   "tezos-protocol-plugin-alpha"
 ]
 build: [
