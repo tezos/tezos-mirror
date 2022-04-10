@@ -224,11 +224,14 @@ let rpc_path_query_to_string ?(query_string = []) path =
 
 module Spawn = struct
   let rpc ?log_command ?log_status_on_exit ?log_output ?(better_errors = false)
-      ?endpoint ?hooks ?env ?data ?query_string meth path client :
+      ?endpoint ?hooks ?env ?data ?filename ?query_string meth path client :
       JSON.t Runnable.process =
     let process =
       let data =
         Option.fold ~none:[] ~some:(fun x -> ["with"; JSON.encode_u x]) data
+      in
+      let filename =
+        Option.fold ~none:[] ~some:(fun x -> ["with"; "file:" ^ x]) filename
       in
       let query_string =
         Option.fold ~none:"" ~some:string_of_query_string query_string
@@ -244,7 +247,9 @@ module Spawn = struct
         ?hooks
         ?env
         client
-        (better_error @ ["rpc"; string_of_meth meth; full_path] @ data)
+        (better_error
+        @ ["rpc"; string_of_meth meth; full_path]
+        @ data @ filename)
     in
     let parse process =
       let* output = Process.check_and_read_stdout process in
@@ -254,7 +259,7 @@ module Spawn = struct
 end
 
 let spawn_rpc ?log_command ?log_status_on_exit ?log_output ?better_errors
-    ?endpoint ?hooks ?env ?data ?query_string meth path client =
+    ?endpoint ?hooks ?env ?data ?filename ?query_string meth path client =
   let*? res =
     Spawn.rpc
       ?log_command
@@ -265,6 +270,7 @@ let spawn_rpc ?log_command ?log_status_on_exit ?log_output ?better_errors
       ?hooks
       ?env
       ?data
+      ?filename
       ?query_string
       meth
       path
@@ -273,7 +279,7 @@ let spawn_rpc ?log_command ?log_status_on_exit ?log_output ?better_errors
   res
 
 let rpc ?log_command ?log_status_on_exit ?log_output ?better_errors ?endpoint
-    ?hooks ?env ?data ?query_string meth path client =
+    ?hooks ?env ?data ?filename ?query_string meth path client =
   let*! res =
     Spawn.rpc
       ?log_command
@@ -284,6 +290,7 @@ let rpc ?log_command ?log_status_on_exit ?log_output ?better_errors ?endpoint
       ?hooks
       ?env
       ?data
+      ?filename
       ?query_string
       meth
       path
