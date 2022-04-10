@@ -574,7 +574,7 @@ let test_delegates protocol ?endpoint client =
   let* contracts = get_contracts ?endpoint client in
   let* () =
     match protocol with
-    | Protocol.Ithaca | Protocol.Alpha ->
+    | Protocol.Ithaca | Protocol.Jakarta | Protocol.Alpha ->
         let* () =
           test_delegates_on_registered_alpha ~contracts ?endpoint client
         in

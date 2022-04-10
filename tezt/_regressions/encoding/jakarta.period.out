@@ -1,0 +1,13 @@
+encoding/jakarta.period.out
+
+./tezos-codec encode 013-PtJakart.period from '"2789"'
+0000000000000ae5
+
+./tezos-codec decode 013-PtJakart.period from 0000000000000ae5
+"2789"
+
+./tezos-codec encode 013-PtJakart.period from '"0"'
+0000000000000000
+
+./tezos-codec decode 013-PtJakart.period from 0000000000000000
+"0"

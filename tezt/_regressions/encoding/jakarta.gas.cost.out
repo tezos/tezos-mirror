@@ -1,0 +1,13 @@
+encoding/jakarta.gas.cost.out
+
+./tezos-codec encode 013-PtJakart.gas.cost from '"8920392083423078"'
+a6fd9d9694c3d81f
+
+./tezos-codec decode 013-PtJakart.gas.cost from a6fd9d9694c3d81f
+"8920392083423078"
+
+./tezos-codec encode 013-PtJakart.gas.cost from '"0"'
+00
+
+./tezos-codec decode 013-PtJakart.gas.cost from 00
+"0"

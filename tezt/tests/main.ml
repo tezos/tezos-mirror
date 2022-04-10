@@ -32,7 +32,8 @@
             other files.
  *)
 
-let protocols = [Protocol.Alpha; Protocol.Ithaca; Protocol.Hangzhou]
+let protocols =
+  [Protocol.Alpha; Protocol.Jakarta; Protocol.Ithaca; Protocol.Hangzhou]
 
 let migrate_from = Protocol.Ithaca
 
@@ -55,7 +56,7 @@ let () =
   Normalize.register ~protocols:[Alpha] ;
   Double_bake.register ~protocols:[Alpha] ;
   Light.register ~protocols:[Alpha] ;
-  Mockup.register ~protocols:[Hangzhou; Ithaca; Alpha] ;
+  Mockup.register ~protocols:[Hangzhou; Ithaca; Jakarta; Alpha] ;
   Mockup.register_constant_migration ~migrate_from ~migrate_to ;
   Mockup.register_migration_ticket_balance ~migrate_from ~migrate_to ;
   Mockup.register_global_constants ~protocols:[Alpha] ;
@@ -75,13 +76,13 @@ let () =
      test since it requires Alpha) or about baking (which would make it possible to run
      on previous protocols, if not for a problem that was introduced in
      Client.bake_for which causes the default key to be a baking account key). *)
-  Baking.register ~protocols:[Ithaca; Alpha] ;
-  Prevalidator.register ~protocols:[Ithaca; Alpha] ;
+  Baking.register ~protocols:[Ithaca; Jakarta; Alpha] ;
+  Prevalidator.register ~protocols:[Ithaca; Jakarta; Alpha] ;
   Monitor_operations.register ~protocols:[Alpha] ;
   Stresstest_command.register ~protocols:[Alpha] ;
   (* Adding a new protocol would require adding samples at ./tezt/tests/encoding_samples directory*)
   Encoding.register ~protocols ;
-  Precheck.register ~protocols:[Ithaca; Alpha] ;
+  Precheck.register ~protocols:[Ithaca; Jakarta; Alpha] ;
   Tenderbake.register ~protocols:[Alpha] ;
   (* Tests that are protocol-independent.
      They do not take a protocol as a parameter and thus need to be registered only once. *)
@@ -116,11 +117,11 @@ let () =
   Tx_rollup.register ~protocols:[Alpha] ;
   Tx_rollup_node.register ~protocols:[Alpha] ;
   Manager_operations.register ~protocols ;
-  Replace_by_fees.register ~protocols:[Ithaca; Alpha] ;
+  Replace_by_fees.register ~protocols:[Ithaca; Jakarta; Alpha] ;
   Sc_rollup.register ~protocols:[Alpha] ;
   Views.register [Alpha] ;
   Runtime_script_failure.register ~protocols ;
-  Deposits_limit.register ~protocols:[Ithaca; Alpha] ;
+  Deposits_limit.register ~protocols:[Ithaca; Jakarta; Alpha] ;
   Large_metadata.register ~protocols:[Alpha] ;
   (* Relies on a feature only available since J. *)
   Run_script.register ~protocols:[Alpha] ;

@@ -482,7 +482,7 @@ let spawn_bake_for ?endpoint ?protocol ?(keys = [Constant.bootstrap1.alias])
         minimal_nanotez_per_byte
     @ optional_arg ~name:"operations-pool" Fun.id mempool
     @ (match protocol with
-      | Some (Ithaca | Alpha) ->
+      | Some (Ithaca | Jakarta | Alpha) ->
           (* Only Alpha/Tenderbake supports this switch *)
           if ignore_node_mempool then ["--ignore-node-mempool"] else []
       | None | Some Hangzhou -> [])
@@ -571,7 +571,9 @@ let spawn_tenderbake_action_for ~tenderbake_action ?endpoint ?protocol
       @
       match (force, protocol) with
       | (None, _) | (Some false, _) -> []
-      | (Some true, Some Protocol.Ithaca) | (Some true, Some Protocol.Alpha) ->
+      | (Some true, Some Protocol.Ithaca)
+      | (Some true, Some Protocol.Jakarta)
+      | (Some true, Some Protocol.Alpha) ->
           ["--force"]
       | (Some true, Some Protocol.Hangzhou) | (Some true, None) -> []
       (* --force is not supported prior to Tenderbake *))
