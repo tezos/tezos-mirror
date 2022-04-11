@@ -29,11 +29,15 @@ type identifier = string
 
 let identifier_of_contract addr = Contract_hash.to_b58check addr
 
-let contract_of_identifier identifier = Contract.of_b58check identifier
+let contract_of_identifier identifier =
+  match Contract_hash.of_b58check_opt identifier with
+  | Some addr -> Ok addr
+  | None -> error (Contract_repr.Invalid_contract_notation identifier)
 
 type cached_contract = Script.t * Script_ir_translator.ex_script
 
 let load_and_elaborate ctxt addr =
+  let addr = Contract.Originated addr in
   Contract.get_script ctxt addr >>=? fun (ctxt, script) ->
   match script with
   | None -> return (ctxt, None)
@@ -84,7 +88,6 @@ let find ctxt addr =
   | Some (unparsed_script, ex_script) ->
       return (ctxt, identifier, Some (unparsed_script, ex_script))
   | None -> (
-      let addr = Contract.Originated addr in
       load_and_elaborate ctxt addr >>=? function
       | ctxt, None -> return (ctxt, identifier, None)
       | ctxt, Some (unparsed_script, script_ir, size) ->
@@ -100,7 +103,9 @@ let update ctxt identifier updated_script approx_size =
 let entries ctxt =
   Cache.list_identifiers ctxt
   |> List.map_e @@ fun (identifier, age) ->
-     contract_of_identifier identifier >|? fun contract -> (contract, age)
+     contract_of_identifier identifier >|? fun contract ->
+     let contract = Contract.Originated contract in
+     (contract, age)
 
 let contract_rank ctxt addr =
   Cache.identifier_rank ctxt (identifier_of_contract addr)
