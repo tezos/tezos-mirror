@@ -1473,7 +1473,7 @@ module Ticket_hash : sig
 end
 
 module Contract : sig
-  type t = private
+  type t =
     | Implicit of Signature.Public_key_hash.t
     | Originated of Contract_hash.t
 

@@ -38,7 +38,7 @@
     used to create it. The owner of the corresponding private key is the
     holder of the account. An originated contract's hash is derived from its
     origination nonce (see below). *)
-type t = private
+type t =
   | Implicit of Signature.Public_key_hash.t
   | Originated of Contract_hash.t
 
