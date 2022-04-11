@@ -64,6 +64,16 @@ module Make
       of [q]. The elements are iterated from oldest to newest. *)
   val fold : (K.t -> V.t -> 'a -> 'a) -> t -> 'a -> 'a
 
+  (** Folding in the Lwt monad, from oldest to newest. *)
+  val fold_s : (K.t -> V.t -> 'a -> 'a Lwt.t) -> t -> 'a -> 'a Lwt.t
+
+  (** Folding in the Lwt monad, from oldest to newest. *)
+  val fold_es :
+    (K.t -> V.t -> 'a -> ('a, 'error) result Lwt.t) ->
+    t ->
+    'a ->
+    ('a, 'error) result Lwt.t
+
   (** Returns the first element of the queue when not empty. Returns [None] when
       empty.  *)
   val peek : t -> V.t option
