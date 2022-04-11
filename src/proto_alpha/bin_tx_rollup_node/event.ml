@@ -351,6 +351,26 @@ module Injector = struct
       ("operations", Data_encoding.list L1_operation.encoding)
       ~pp1:pp_operations_list
 
+  let simulating_operations =
+    declare_1
+      ~section
+      ~name:"simulating_operations"
+      ~msg:"Simulating operations: {operations}"
+      ~level:Debug
+      ("operations", Data_encoding.list L1_operation.encoding)
+      ~pp1:pp_operations_list
+
+  let dropping_operation =
+    declare_2
+      ~section
+      ~name:"dropping_operation"
+      ~msg:"Dropping failing operation {operation} failing with {error}"
+      ~level:Notice
+      ("operation", L1_operation.encoding)
+      ~pp1:L1_operation.pp
+      ("error", Environment.Error_monad.trace_encoding)
+      ~pp2:Environment.Error_monad.pp_trace
+
   let injected =
     declare_1
       ~section

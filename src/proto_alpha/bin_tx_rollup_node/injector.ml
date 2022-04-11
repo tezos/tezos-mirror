@@ -97,9 +97,9 @@ type state = {
           anymore. *)
 }
 
-(* Builds an client context from another client context but uses logging instead
-   of printing on stdout directly. This client context cannot make the injector
-   exit. *)
+(** Builds a client context from another client context but uses logging instead
+    of printing on stdout directly. This client context cannot make the injector
+    exit. *)
 let injector_context (cctxt : #Client_context.full) =
   let log _channel msg = Logs_lwt.info (fun m -> m "%s" msg) in
   object
@@ -239,33 +239,44 @@ let remove_included_operation state block =
         []
         mophs
 
-(** Inject the given [operations] (to be signed by [signer]) in an L1 batch. *)
-let inject_operations state signer (operations : L1_operation.t list) =
+(** Simulate the injection of [operations]. See {!inject_operations} for the
+    specification of [must_succeed]. *)
+let simulate_operations ~must_succeed state signer
+    (operations : L1_operation.t list) =
   let open Lwt_result_syntax in
   let open Annotated_manager_operation in
-  let*! () = Event.(emit Injector.injecting_operations) operations in
+  let*! () = Event.(emit Injector.simulating_operations) operations in
+  let force =
+    match operations with
+    | [] -> assert false
+    | [_] ->
+        (* If there is only one operation, fail when simulation fails *)
+        false
+    | _ -> (
+        (* We want to see which operation failed in the batch if not all must
+           succeed *)
+        match must_succeed with `All -> false | `At_least_one -> true)
+  in
   let operations =
     List.map
       (fun {L1_operation.manager_operation = Manager operation; _} ->
         Annotated_manager_operation
-          (Manager_info
-             {
-               source = None;
-               fee = Limit.unknown;
-               gas_limit = Limit.unknown;
-               storage_limit = Limit.unknown;
-               counter = None;
-               operation;
-             }))
+          (Injection.prepare_manager_operation
+             ~fee:Limit.unknown
+             ~gas_limit:Limit.unknown
+             ~storage_limit:Limit.unknown
+             operation))
       operations
   in
   let (Manager_list annot_op) =
     Annotated_manager_operation.manager_of_list operations
   in
   (* TODO maybe use something else (e.g. inject directly with correct limits) *)
-  let* (oph, _, _) =
+  let* (oph, op, result) =
     Injection.inject_manager_operation
       state.cctxt
+      ~simulation:true (* Only simulation here *)
+      ~force
       ~chain:state.cctxt#chain
       ~block:(`Head 0)
       ~source:signer.pkh
@@ -287,9 +298,95 @@ let inject_operations state signer (operations : L1_operation.t list) =
         }
       annot_op
   in
-  let*! () = Event.(emit Injector.injected) oph in
-  return oph
+  return (oph, Contents_list op, Apply_results.Contents_result_list result)
 
+(** Inject the given [operations] (to be signed by [signer]) in an L1 batch. If
+    [must_succeed] is [`All] then all the operations must succeed in the
+    simulation of injection. If [must_succeed] is [`One] at least one operation
+    in the list [operations] must be successful in the simulation. In any case,
+    only operations which are known as successful will be included in the
+    injected L1 batch. {b Note}: [must_succeed = `One] allows to incrementally
+    build "or-batches" by iteratively removing operations that fail from the
+    desired batch. *)
+let rec inject_operations ~must_succeed state signer
+    (operations : L1_operation.t list) =
+  let open Lwt_result_syntax in
+  let* (_oph, packed_contents, result) =
+    simulate_operations ~must_succeed state state.signer operations
+  in
+  let results = Apply_results.to_list result in
+  let failure = ref false in
+  let* rev_non_failing_operations =
+    List.fold_left2_s
+      ~when_different_lengths:
+        [
+          Exn
+            (Failure
+               "Unexpected error: length of operations and result differ in \
+                simulation");
+        ]
+      (fun acc op (Apply_results.Contents_result result) ->
+        match result with
+        | Apply_results.Manager_operation_result
+            {operation_result = Failed (_, error); _} ->
+            let*! () = Event.(emit Injector.dropping_operation) (op, error) in
+            failure := true ;
+            Lwt.return acc
+        | Apply_results.Manager_operation_result
+            {operation_result = Applied _ | Backtracked _ | Skipped _; _} ->
+            (* Not known to be failing *)
+            Lwt.return (op :: acc)
+        | _ ->
+            (* Only manager operations *)
+            assert false)
+      []
+      operations
+      results
+  in
+  if !failure then
+    (* Invariant: must_succeed = `At_least_one, otherwise the simulation would have
+       returned an error. We try to inject without the failing operation. *)
+    let operations = List.rev rev_non_failing_operations in
+    inject_operations ~must_succeed state signer operations
+  else
+    (* Inject on node for real *)
+    (* Branch to head - 2 for tenderbake *)
+    let* branch =
+      Tezos_shell_services.Shell_services.Blocks.hash
+        state.cctxt
+        ~chain:state.cctxt#chain
+        ~block:(`Head 2)
+        ()
+    in
+    let unsigned_op_bytes =
+      Data_encoding.Binary.to_bytes_exn
+        Operation.unsigned_encoding
+        ({branch}, packed_contents)
+    in
+    let* signature =
+      Client_keys.sign
+        state.cctxt
+        ~watermark:Signature.Generic_operation
+        signer.sk
+        unsigned_op_bytes
+    in
+    let (Contents_list contents) = packed_contents in
+    let op : _ Operation.t =
+      {shell = {branch}; protocol_data = {contents; signature = Some signature}}
+    in
+    let op_bytes =
+      Data_encoding.Binary.to_bytes_exn Operation.encoding (Operation.pack op)
+    in
+    Tezos_shell_services.Shell_services.Injection.operation
+      state.cctxt
+      ~chain:state.cctxt#chain
+      op_bytes
+    >>=? fun oph ->
+    let*! () = Event.(emit Injector.injected) oph in
+    return oph
+
+(** Returns the (upper bound on) the size of an L1 batch of operations composed
+    of the manager operations [rev_ops]. *)
 let size_l1_batch signer rev_ops =
   let contents_list =
     List.map
@@ -301,11 +398,11 @@ let size_l1_batch signer rev_ops =
               source = op.source;
               operation;
               (* Below are dummy values that are only used to approximate the
-                 size. It is thus important that they remain above the order the
-                 real values if we want the computed size to be an
-                 over_approximation (without having to do a simulation
-                 first). *)
-              (* TODO: check the size, or compute them wrt operation kind *)
+                 size. It is thus important that they remain above the real
+                 values if we want the computed size to be an over_approximation
+                 (without having to do a simulation first). *)
+              (* TODO: https://gitlab.com/tezos/tezos/-/issues/2812
+                 check the size, or compute them wrt operation kind *)
               fee = Tez.of_mutez_exn 3_000_000L;
               counter = Z.of_int 500_000;
               gas_limit = Gas.Arith.integral_of_int_exn 500_000;
@@ -338,9 +435,9 @@ let size_l1_batch signer rev_ops =
   in
   Data_encoding.Binary.length Operation.encoding operation
 
-(* Retrieve as many operations from the queue while remaining below the size
-   limit *)
-let get_operations_from_queue ~size_limit pending =
+(** Retrieve as many operations from the queue while remaining below the size
+    limit. *)
+let get_operations_from_queue ~size_limit state =
   let exception Reached_limit of L1_operation.t list in
   let rev_ops =
     try
@@ -371,18 +468,24 @@ let inject_pending_operations_for ~size_limit state pending =
         Event.(emit Injector.injecting_pending)
           (List.length operations_to_inject)
       in
-      let+ oph = inject_operations state pending.signer operations_to_inject in
+      (* TODO: decide if some operations must all succeed *)
+      let+ oph =
+        inject_operations
+          ~must_succeed:`One
+          state
+          pending.signer
+          operations_to_inject
+      in
       (* Injection succeeded, remove from pending and add to injected *)
       List.iter
         (fun op -> Op_queue.remove pending.queue op.L1_operation.hash)
         operations_to_inject ;
       add_injected_operations state oph operations_to_inject
 
-(** [inject_pending_operations ~limit pending] injects
-    operations from each pending queue [pending], where each batch
-    of operations does not exceed [size_limit].
-    Upon successful injection, the
-    operations are removed from the queue and marked as injected. *)
+(** [inject_pending_operations ~limit pending] injects operations from each
+    pending queue [pending], where each batch of operations does not exceed
+    [size_limit]. Upon successful injection, the operations are removed from the
+    queue and marked as injected. *)
 let inject_pending_operations
     ?(size_limit = Constants.max_operation_data_length) state =
   (* TODO: check if iter_ep does not cancel promises *)
