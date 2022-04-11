@@ -245,10 +245,18 @@ val init3 :
   * Alpha_context.Contract.t)
   init
 
-val init_with_constants :
+val init_with_constants_n :
   Constants.parametric ->
   int ->
   (Block.t * Alpha_context.Contract.t list) tzresult Lwt.t
+
+val init_with_constants1 :
+  Constants.parametric -> (Block.t * Alpha_context.Contract.t) tzresult Lwt.t
+
+val init_with_constants2 :
+  Constants.parametric ->
+  (Block.t * (Alpha_context.Contract.t * Alpha_context.Contract.t)) tzresult
+  Lwt.t
 
 (** [default_raw_context] returns a [Raw_context.t] for use in tests
     below [Alpha_context] *)

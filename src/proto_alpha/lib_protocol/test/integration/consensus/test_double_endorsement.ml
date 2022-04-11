@@ -49,22 +49,6 @@ let block_fork b =
 (*                        Tests                                 *)
 (****************************************************************)
 
-let get_first_2_accounts_contracts contracts =
-  let ((contract1, account1), (contract2, account2)) =
-    match contracts with
-    | [a1; a2] ->
-        ( ( a1,
-            Contract.is_implicit a1 |> function
-            | None -> assert false
-            | Some pkh -> pkh ),
-          ( a2,
-            Contract.is_implicit a2 |> function
-            | None -> assert false
-            | Some pkh -> pkh ) )
-    | _ -> assert false
-  in
-  ((contract1, account1), (contract2, account2))
-
 let order_endorsements ~correct_order op1 op2 =
   let oph1 = Operation.hash op1 in
   let oph2 = Operation.hash op2 in
@@ -362,10 +346,9 @@ let test_freeze_more_with_low_balance =
           {numerator = 1; denominator = 2};
       }
     in
-    Context.init_with_constants constants 2 >>=? fun (genesis, contracts) ->
-    let ((_contract1, account1), (_contract2, account2)) =
-      get_first_2_accounts_contracts contracts
-    in
+    Context.init_with_constants2 constants >>=? fun (genesis, (c1, c2)) ->
+    let account1 = Context.Contract.pkh c1 in
+    let account2 = Context.Contract.pkh c2 in
     (* we empty the available balance of [account1]. *)
     Context.Delegate.info (B genesis) account1 >>=? fun info1 ->
     Op.transaction

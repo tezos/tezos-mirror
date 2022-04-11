@@ -64,13 +64,9 @@ let is_implicit_exn x =
 (** [test_disable_feature_flag] try to originate a tx rollup with the feature
     flag is deactivated and check it fails *)
 let test_disable_feature_flag () =
-  Context.init_with_constants
+  Context.init_with_constants1
     {Context.default_test_constants with tx_rollup_enable = false}
-    1
-  >>=? fun (b, contracts) ->
-  let contract =
-    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0
-  in
+  >>=? fun (b, contract) ->
   Incremental.begin_construction b >>=? fun i ->
   Op.tx_rollup_origination (I i) contract >>=? fun (op, _tx_rollup) ->
   Incremental.add_operation
@@ -82,17 +78,13 @@ let test_disable_feature_flag () =
 (** [test_sunset] try to originate a tx rollup after the sunset and check
     that it fails *)
 let test_sunset () =
-  Context.init_with_constants
+  Context.init_with_constants1
     {
       Context.default_test_constants with
       tx_rollup_enable = true;
       tx_rollup_sunset_level = 0l;
     }
-    1
-  >>=? fun (b, contracts) ->
-  let contract =
-    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0
-  in
+  >>=? fun (b, contract) ->
   Incremental.begin_construction b >>=? fun i ->
   Op.tx_rollup_origination (I i) contract >>=? fun (op, _tx_rollup) ->
   Incremental.add_operation
@@ -203,7 +195,7 @@ let context_init ?(tx_rollup_max_inboxes_count = 2100)
     ?(tx_rollup_finality_period = 1) ?(tx_rollup_origination_size = 60_000)
     ?(cost_per_byte = Tez.zero) ?(tx_rollup_hard_size_limit_per_message = 5_000)
     n =
-  Context.init_with_constants
+  Context.init_with_constants_n
     {
       Context.default_test_constants with
       consensus_threshold = 0;
@@ -1936,10 +1928,7 @@ let test_full_inbox () =
       tx_rollup_max_inboxes_count = 15;
     }
   in
-  Context.init_with_constants constants 1 >>=? fun (b, contracts) ->
-  let contract =
-    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0
-  in
+  Context.init_with_constants1 constants >>=? fun (b, contract) ->
   originate b contract >>=? fun (b, tx_rollup) ->
   let range start top =
     let rec aux n acc = if n < start then acc else aux (n - 1) (n :: acc) in

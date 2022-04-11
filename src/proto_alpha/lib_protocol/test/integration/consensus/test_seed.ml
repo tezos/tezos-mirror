@@ -188,15 +188,8 @@ let test_unrevealed () =
       minimal_participation_ratio = Constants.{numerator = 0; denominator = 1};
     }
   in
-  Context.init_with_constants constants 2 >>=? fun (b, accounts) ->
-  let (account1, account2) =
-    match accounts with a1 :: a2 :: _ -> (a1, a2) | _ -> assert false
-  in
-  let (_delegate1, delegate2) =
-    match (Contract.is_implicit account1, Contract.is_implicit account2) with
-    | (Some d, Some d') -> (d, d')
-    | _ -> assert false
-  in
+  Context.init_with_constants2 constants >>=? fun (b, (_account1, account2)) ->
+  let delegate2 = Context.Contract.pkh account2 in
   (* Delegate 2 will add a nonce but never reveals it *)
   Context.get_constants (B b) >>=? fun csts ->
   let blocks_per_commitment =

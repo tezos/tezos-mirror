@@ -417,7 +417,8 @@ let init2 = init_gen T2
 
 let init3 = init_gen T3
 
-let init_with_constants constants n =
+let init_with_constants_gen tup constants =
+  let n = tup_n tup in
   let accounts = Account.generate_accounts n in
   let contracts =
     List.map
@@ -435,7 +436,14 @@ let init_with_constants constants n =
   let parameters =
     Default_parameters.parameters_of_constants ~bootstrap_accounts constants
   in
-  Block.genesis_with_parameters parameters >|=? fun blk -> (blk, contracts)
+  Block.genesis_with_parameters parameters >|=? fun blk ->
+  (blk, tup_get tup contracts)
+
+let init_with_constants_n consts n = init_with_constants_gen (TList n) consts
+
+let init_with_constants1 = init_with_constants_gen T1
+
+let init_with_constants2 = init_with_constants_gen T2
 
 let default_raw_context () =
   let initial_accounts =

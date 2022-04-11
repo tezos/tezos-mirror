@@ -37,7 +37,7 @@ open Alpha_context
 
 let context_with_constants constants =
   let open Lwt_result_syntax in
-  let* (block, _contracts) = Context.init_with_constants constants 1 in
+  let* (block, _contracts) = Context.init_with_constants1 constants in
   let+ incremental = Incremental.begin_construction block in
   Incremental.alpha_ctxt incremental
 

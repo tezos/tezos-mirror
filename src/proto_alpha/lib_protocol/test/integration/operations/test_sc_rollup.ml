@@ -44,7 +44,7 @@ let err x = Exn (Sc_rollup_test_error x)
   [sc_rollup_enable] constant is set to true. It returns the created
   context and [n] contracts. *)
 let context_init n =
-  Context.init_with_constants
+  Context.init_with_constants_n
     {
       Context.default_test_constants with
       sc_rollup_enable = true;
