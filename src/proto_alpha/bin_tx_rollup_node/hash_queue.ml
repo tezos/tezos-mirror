@@ -42,29 +42,24 @@ struct
       queue and calls [f] on the bindings for these elements. The elements are
       returned from oldest to newest. *)
   let oldest_elements q n action =
-    (* FIXME: https://gitlab.com/nomadic-labs/ringo/-/issues/5 *)
-    (* Ring.fold is from newest to oldest elements. So we iterate on the
-       elements until we reach the [n] ones at the end, i.e. the elements we
-       want to "take". *)
-    let first_index = Ring.length q - n in
-    Ring.fold
-      (fun k v (count, acc) ->
-        let acc =
-          if count >= first_index then (
-            action k v q ;
-            v :: acc)
-          else acc
-        in
-        (count + 1, acc))
-      q
-      (0, [])
-    |> snd
+    let exception Elements of V.t list in
+    let rev_elts =
+      try
+        Ring.fold_oldest_first
+          (fun k v (count, acc) ->
+            if count >= n then raise (Elements acc)
+            else (
+              action k v q ;
+              (count + 1, v :: acc)))
+          q
+          (0, [])
+        |> snd
+      with Elements acc -> acc
+    in
+    List.rev rev_elts
 
   (* Redefining fold to have elements treated in order of oldest to newest *)
-  (* FIXME: https://gitlab.com/nomadic-labs/ringo/-/issues/5 *)
-  let fold f q acc =
-    let bindings = fold (fun k v acc -> (k, v) :: acc) q [] in
-    List.fold_left (fun acc (k, v) -> f k v acc) acc bindings
+  let fold f q acc = Ring.fold_oldest_first f q acc
 
   let peek q =
     match oldest_elements q 1 (fun _ _ _ -> ()) with
