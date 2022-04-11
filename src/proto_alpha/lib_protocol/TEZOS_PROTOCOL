@@ -69,7 +69,8 @@
         "Tx_rollup_state_repr",
 
 	"Dal_slot_repr",
-
+	"Dal_endorsement_repr",
+	
         "Bond_id_repr",
         "Vote_repr",
         "Liquidity_baking_repr",
