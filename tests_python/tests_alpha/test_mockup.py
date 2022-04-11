@@ -670,6 +670,13 @@ def _test_create_mockup_init_show_roundtrip(
                 "tx_rollup_max_ticket_payload_size": 10_240,
                 "tx_rollup_rejection_max_proof_size": 30_000,
                 "tx_rollup_sunset_level": 3_473_409,
+                "dal_parametric": {
+                    "feature_enable": True,
+                    "number_of_slots": 64,
+                    "number_of_shards": 1024,
+                    "endorsement_lag": 1,
+                    "availability_threshold": 25,
+                },
                 "sc_rollup_enable": False,
                 "sc_rollup_origination_size": 6_314,
                 "sc_rollup_challenge_window_in_blocks": 20_160,

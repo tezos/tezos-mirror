@@ -721,6 +721,16 @@ module Constants : sig
 
   (** Constants parameterized by context *)
   module Parametric : sig
+    type dal = {
+      feature_enable : bool;
+      number_of_slots : int;
+      number_of_shards : int;
+      endorsement_lag : int;
+      availability_threshold : int;
+    }
+
+    val dal_encoding : dal Data_encoding.t
+
     type t = {
       preserved_cycles : int;
       blocks_per_cycle : int32;
@@ -773,6 +783,7 @@ module Constants : sig
       tx_rollup_max_withdrawals_per_batch : int;
       tx_rollup_rejection_max_proof_size : int;
       tx_rollup_sunset_level : int32;
+      dal : dal;
       sc_rollup_enable : bool;
       sc_rollup_origination_size : int;
       sc_rollup_challenge_window_in_blocks : int;

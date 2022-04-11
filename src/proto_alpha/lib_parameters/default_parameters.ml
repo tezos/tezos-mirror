@@ -48,6 +48,17 @@ let sc_rollup_max_active_outbox_levels =
     pay for at origination time. *)
 let sc_rollup_max_outbox_messages_per_level = 100
 
+(* DAL/FIXME: Think harder about those values. *)
+let default_dal =
+  Constants.Parametric.
+    {
+      feature_enable = false;
+      number_of_slots = 256;
+      number_of_shards = 2048;
+      endorsement_lag = 2;
+      availability_threshold = 50;
+    }
+
 let constants_mainnet =
   let consensus_committee_size = 7000 in
   let block_time = 30 in
@@ -166,6 +177,7 @@ let constants_mainnet =
        about one year after the activation of protocol J.
        See https://tzstats.com/cycle/618 *)
     tx_rollup_sunset_level = 3_473_409l;
+    dal = default_dal;
     sc_rollup_enable = false;
     (* The following value is chosen to prevent spam. *)
     sc_rollup_origination_size = 6_314;

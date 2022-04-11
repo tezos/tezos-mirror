@@ -73,7 +73,11 @@ This sequence of operations was run:
   "tx_rollup_cost_per_byte_ema_factor": 120,
   "tx_rollup_max_ticket_payload_size": 2048,
   "tx_rollup_rejection_max_proof_size": 30000,
-  "tx_rollup_sunset_level": 3473409, "sc_rollup_enable": true,
+  "tx_rollup_sunset_level": 3473409,
+  "dal_parametric":
+    { "feature_enable": false, "number_of_slots": 256,
+      "number_of_shards": 2048, "endorsement_lag": 2,
+      "availability_threshold": 50 }, "sc_rollup_enable": true,
   "sc_rollup_origination_size": 6314,
   "sc_rollup_challenge_window_in_blocks": 20160,
   "sc_rollup_max_available_messages": 1000000,

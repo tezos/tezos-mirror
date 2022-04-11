@@ -25,6 +25,48 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type dal = {
+  feature_enable : bool;
+  number_of_slots : int;
+  number_of_shards : int;
+  endorsement_lag : int;
+  availability_threshold : int;
+}
+
+let dal_encoding =
+  let open Data_encoding in
+  conv
+    (fun {
+           feature_enable;
+           number_of_slots;
+           number_of_shards;
+           endorsement_lag;
+           availability_threshold;
+         } ->
+      ( feature_enable,
+        number_of_slots,
+        number_of_shards,
+        endorsement_lag,
+        availability_threshold ))
+    (fun ( feature_enable,
+           number_of_slots,
+           number_of_shards,
+           endorsement_lag,
+           availability_threshold ) ->
+      {
+        feature_enable;
+        number_of_slots;
+        number_of_shards;
+        endorsement_lag;
+        availability_threshold;
+      })
+    (obj5
+       (req "feature_enable" Data_encoding.bool)
+       (req "number_of_slots" Data_encoding.int16)
+       (req "number_of_shards" Data_encoding.int16)
+       (req "endorsement_lag" Data_encoding.int16)
+       (req "availability_threshold" Data_encoding.int16))
+
 (* The encoded representation of this type is stored in the context as
    bytes. Changing the encoding, or the value of these constants from
    the previous protocol may break the context migration, or (even
@@ -87,6 +129,7 @@ type t = {
   tx_rollup_max_withdrawals_per_batch : int;
   tx_rollup_rejection_max_proof_size : int;
   tx_rollup_sunset_level : int32;
+  dal : dal;
   sc_rollup_enable : bool;
   sc_rollup_origination_size : int;
   sc_rollup_challenge_window_in_blocks : int;
@@ -154,16 +197,17 @@ let encoding =
                       c.tx_rollup_max_ticket_payload_size,
                       c.tx_rollup_rejection_max_proof_size,
                       c.tx_rollup_sunset_level ) ),
-                  ( c.sc_rollup_enable,
-                    c.sc_rollup_origination_size,
-                    c.sc_rollup_challenge_window_in_blocks,
-                    c.sc_rollup_max_available_messages,
-                    c.sc_rollup_stake_amount_in_mutez,
-                    c.sc_rollup_commitment_period_in_blocks,
-                    c.sc_rollup_commitment_storage_size_in_bytes,
-                    c.sc_rollup_max_lookahead_in_blocks,
-                    c.sc_rollup_max_active_outbox_levels,
-                    c.sc_rollup_max_outbox_messages_per_level ) ) ) ) ) ) ))
+                  ( c.dal,
+                    ( c.sc_rollup_enable,
+                      c.sc_rollup_origination_size,
+                      c.sc_rollup_challenge_window_in_blocks,
+                      c.sc_rollup_max_available_messages,
+                      c.sc_rollup_stake_amount_in_mutez,
+                      c.sc_rollup_commitment_period_in_blocks,
+                      c.sc_rollup_commitment_storage_size_in_bytes,
+                      c.sc_rollup_max_lookahead_in_blocks,
+                      c.sc_rollup_max_active_outbox_levels,
+                      c.sc_rollup_max_outbox_messages_per_level ) ) ) ) ) ) ) ))
     (fun ( ( preserved_cycles,
              blocks_per_cycle,
              blocks_per_commitment,
@@ -215,16 +259,18 @@ let encoding =
                          tx_rollup_max_ticket_payload_size,
                          tx_rollup_rejection_max_proof_size,
                          tx_rollup_sunset_level ) ),
-                     ( sc_rollup_enable,
-                       sc_rollup_origination_size,
-                       sc_rollup_challenge_window_in_blocks,
-                       sc_rollup_max_available_messages,
-                       sc_rollup_stake_amount_in_mutez,
-                       sc_rollup_commitment_period_in_blocks,
-                       sc_rollup_commitment_storage_size_in_bytes,
-                       sc_rollup_max_lookahead_in_blocks,
-                       sc_rollup_max_active_outbox_levels,
-                       sc_rollup_max_outbox_messages_per_level ) ) ) ) ) ) ) ->
+                     ( dal,
+                       ( sc_rollup_enable,
+                         sc_rollup_origination_size,
+                         sc_rollup_challenge_window_in_blocks,
+                         sc_rollup_max_available_messages,
+                         sc_rollup_stake_amount_in_mutez,
+                         sc_rollup_commitment_period_in_blocks,
+                         sc_rollup_commitment_storage_size_in_bytes,
+                         sc_rollup_max_lookahead_in_blocks,
+                         sc_rollup_max_active_outbox_levels,
+                         sc_rollup_max_outbox_messages_per_level ) ) ) ) ) ) )
+         ) ->
       {
         preserved_cycles;
         blocks_per_cycle;
@@ -277,6 +323,7 @@ let encoding =
         tx_rollup_max_ticket_payload_size;
         tx_rollup_rejection_max_proof_size;
         tx_rollup_sunset_level;
+        dal;
         sc_rollup_enable;
         sc_rollup_origination_size;
         sc_rollup_challenge_window_in_blocks;
@@ -359,16 +406,20 @@ let encoding =
                             (req "tx_rollup_max_ticket_payload_size" int31)
                             (req "tx_rollup_rejection_max_proof_size" int31)
                             (req "tx_rollup_sunset_level" int32)))
-                      (obj10
-                         (req "sc_rollup_enable" bool)
-                         (req "sc_rollup_origination_size" int31)
-                         (req "sc_rollup_challenge_window_in_blocks" int31)
-                         (req "sc_rollup_max_available_messages" int31)
-                         (req "sc_rollup_stake_amount_in_mutez" int31)
-                         (req "sc_rollup_commitment_period_in_blocks" int31)
-                         (req
-                            "sc_rollup_commitment_storage_size_in_bytes"
-                            int31)
-                         (req "sc_rollup_max_lookahead_in_blocks" int32)
-                         (req "sc_rollup_max_active_outbox_levels" int32)
-                         (req "sc_rollup_max_outbox_messages_per_level" int31))))))))
+                      (merge_objs
+                         (obj1 (req "dal_parametric" dal_encoding))
+                         (obj10
+                            (req "sc_rollup_enable" bool)
+                            (req "sc_rollup_origination_size" int31)
+                            (req "sc_rollup_challenge_window_in_blocks" int31)
+                            (req "sc_rollup_max_available_messages" int31)
+                            (req "sc_rollup_stake_amount_in_mutez" int31)
+                            (req "sc_rollup_commitment_period_in_blocks" int31)
+                            (req
+                               "sc_rollup_commitment_storage_size_in_bytes"
+                               int31)
+                            (req "sc_rollup_max_lookahead_in_blocks" int32)
+                            (req "sc_rollup_max_active_outbox_levels" int32)
+                            (req
+                               "sc_rollup_max_outbox_messages_per_level"
+                               int31)))))))))
