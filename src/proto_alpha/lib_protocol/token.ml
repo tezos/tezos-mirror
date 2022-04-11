@@ -58,15 +58,15 @@ type sink = [infinite_sink | container]
 let allocated ctxt stored =
   match stored with
   | `Contract contract ->
-      Contract_storage.allocated ctxt contract >|=? fun allocated ->
-      (ctxt, allocated)
+      Contract_storage.allocated ctxt contract >|= fun allocated ->
+      ok (ctxt, allocated)
   | `Collected_commitments bpkh ->
-      Commitment_storage.exists ctxt bpkh >|= ok >|=? fun allocated ->
-      (ctxt, allocated)
+      Commitment_storage.exists ctxt bpkh >|= fun allocated ->
+      ok (ctxt, allocated)
   | `Delegate_balance delegate ->
       let contract = Contract_repr.implicit_contract delegate in
-      Contract_storage.allocated ctxt contract >|=? fun allocated ->
-      (ctxt, allocated)
+      Contract_storage.allocated ctxt contract >|= fun allocated ->
+      ok (ctxt, allocated)
   | `Frozen_deposits delegate ->
       let contract = Contract_repr.implicit_contract delegate in
       Frozen_deposits_storage.allocated ctxt contract >|= fun allocated ->

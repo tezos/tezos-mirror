@@ -1493,7 +1493,7 @@ module Contract : sig
 
   val must_exist : context -> t -> unit tzresult Lwt.t
 
-  val allocated : context -> t -> bool tzresult Lwt.t
+  val allocated : context -> t -> bool Lwt.t
 
   val must_be_allocated : context -> t -> unit tzresult Lwt.t
 

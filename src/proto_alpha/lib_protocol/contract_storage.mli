@@ -38,7 +38,7 @@ type error +=
 
 (** [allocated ctxt contract] returns [true] if and only if the
    contract is stored in [Storage.Contract.Balance]. *)
-val allocated : Raw_context.t -> Contract_repr.t -> bool tzresult Lwt.t
+val allocated : Raw_context.t -> Contract_repr.t -> bool Lwt.t
 
 (** [exists ctxt contract] returns [true] if and only if either the
    contract is originated or it is (implicit and) "allocated". *)

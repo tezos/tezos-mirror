@@ -478,15 +478,12 @@ let delete c contract =
       Storage.Contract.Paid_storage_space.remove c contract >>= fun c ->
       Storage.Contract.Used_storage_space.remove c contract >|= ok
 
-let allocated c contract =
-  Storage.Contract.Spendable_balance.find c contract >>=? function
-  | None -> return_false
-  | Some _ -> return_true
+let allocated c contract = Storage.Contract.Spendable_balance.mem c contract
 
 let exists c contract =
   match Contract_repr.is_implicit contract with
   | Some _ -> return_true
-  | None -> allocated c contract
+  | None -> allocated c contract >|= ok
 
 let must_exist c contract =
   exists c contract >>=? function
@@ -494,7 +491,7 @@ let must_exist c contract =
   | false -> fail (Non_existing_contract contract)
 
 let must_be_allocated c contract =
-  allocated c contract >>=? function
+  allocated c contract >>= function
   | true -> return_unit
   | false -> (
       match Contract_repr.is_implicit contract with
