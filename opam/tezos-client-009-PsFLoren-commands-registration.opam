@@ -17,7 +17,6 @@ depends: [
   "tezos-client-009-PsFLoren"
   "tezos-client-commands"
   "tezos-client-009-PsFLoren-commands"
-  "tezos-client-sapling-009-PsFLoren"
   "tezos-rpc"
   "tezos-protocol-plugin-009-PsFLoren"
 ]
