@@ -128,6 +128,7 @@ let originate_contract prefix contract =
   fun client storage ->
     let* contract_id =
       Client.originate_contract
+        ~log_output:false
         ~alias:(fresh ())
         ~amount:Tez.zero
         ~src:"bootstrap1"
@@ -177,6 +178,7 @@ let originate_very_small_contracts client n =
 let call_contract contract_id k client =
   let* () =
     Client.transfer
+      ~log_output:false
       ~amount:Tez.(of_int 100)
       ~burn_cap:Tez.(of_int 999999999)
       ~storage_limit:100000
@@ -194,6 +196,7 @@ let call_contract contract_id k client =
 let call_contracts calls client =
   let* () =
     Client.multiple_transfers
+      ~log_output:false
       ~fee_cap:Tez.(of_int 9999999)
       ~burn_cap:Tez.(of_int 9999999)
       ~giver:"bootstrap1"

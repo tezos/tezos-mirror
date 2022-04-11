@@ -486,6 +486,7 @@ val gen_and_show_keys : ?alias:string -> t -> Account.key Lwt.t
 (** Run [tezos-client transfer amount from giver to receiver]. *)
 val transfer :
   ?hooks:Process.hooks ->
+  ?log_output:bool ->
   ?endpoint:endpoint ->
   ?wait:string ->
   ?burn_cap:Tez.t ->
@@ -505,6 +506,7 @@ val transfer :
 (** Same as [transfer], but do not wait for the process to exit. *)
 val spawn_transfer :
   ?hooks:Process.hooks ->
+  ?log_output:bool ->
   ?endpoint:endpoint ->
   ?wait:string ->
   ?burn_cap:Tez.t ->
@@ -522,6 +524,7 @@ val spawn_transfer :
 
 (** Run [tezos-client multiple transfers from giver using json_batch]. *)
 val multiple_transfers :
+  ?log_output:bool ->
   ?endpoint:endpoint ->
   ?wait:string ->
   ?burn_cap:Tez.t ->
@@ -537,6 +540,7 @@ val multiple_transfers :
 
 (** Same as [multiple_transfers], but do not wait for the process to exit. *)
 val spawn_multiple_transfers :
+  ?log_output:bool ->
   ?endpoint:endpoint ->
   ?wait:string ->
   ?burn_cap:Tez.t ->
@@ -671,6 +675,7 @@ val unset_deposits_limit :
     running prg]. Returns the originated contract hash *)
 val originate_contract :
   ?hooks:Process.hooks ->
+  ?log_output:bool ->
   ?endpoint:endpoint ->
   ?wait:string ->
   ?init:string ->
@@ -685,6 +690,7 @@ val originate_contract :
 (** Same as [originate_contract], but do not wait for the process to exit. *)
 val spawn_originate_contract :
   ?hooks:Process.hooks ->
+  ?log_output:bool ->
   ?endpoint:endpoint ->
   ?wait:string ->
   ?init:string ->
