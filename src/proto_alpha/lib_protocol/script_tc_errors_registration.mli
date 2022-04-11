@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2020-2021 Nomadic Labs <contact@nomadic-labs.com>           *)
+(* Copyright (c) 2020-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,10 +24,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** This module registers all the errors from [Script_tc_errors] as a top-level
+    effect. *)
+
 open Alpha_context
 open Script
 
 val type_map_enc :
   (location * (expr list * expr list)) list Data_encoding.encoding
-
-val stack_ty_enc : expr list Data_encoding.encoding
