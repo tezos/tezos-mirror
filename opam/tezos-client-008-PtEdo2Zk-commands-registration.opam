@@ -17,7 +17,6 @@ depends: [
   "tezos-client-008-PtEdo2Zk"
   "tezos-client-commands"
   "tezos-client-008-PtEdo2Zk-commands"
-  "tezos-client-sapling-008-PtEdo2Zk"
   "tezos-rpc"
   "tezos-protocol-plugin-008-PtEdo2Zk"
 ]

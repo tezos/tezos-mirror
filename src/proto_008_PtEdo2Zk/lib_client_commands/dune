@@ -11,9 +11,6 @@
   tezos-stdlib-unix
   tezos-protocol-environment
   tezos-shell-services
-  tezos-mockup
-  tezos-mockup-registration
-  tezos-mockup-commands
   tezos-client-base
   tezos-client-008-PtEdo2Zk
   tezos-client-commands
@@ -47,7 +44,6 @@
   tezos-client-008-PtEdo2Zk
   tezos-client-commands
   tezos-client-008-PtEdo2Zk-commands
-  tezos-client-sapling-008-PtEdo2Zk
   tezos-rpc
   tezos-protocol-plugin-008-PtEdo2Zk)
  (library_flags (:standard -linkall))
@@ -61,7 +57,6 @@
    -open Tezos_client_008_PtEdo2Zk
    -open Tezos_client_commands
    -open Tezos_client_008_PtEdo2Zk_commands
-   -open Tezos_client_sapling_008_PtEdo2Zk
    -open Tezos_rpc
    -open Tezos_protocol_plugin_008_PtEdo2Zk))
  (modules alpha_commands_registration))

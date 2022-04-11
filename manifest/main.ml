@@ -3508,7 +3508,7 @@ include Tezos_raw_protocol_%s.Main
       Lib_protocol.make ~template_version ~name_dash ~name_underscore ~number ()
     in
     let parameters =
-      some_if (N.(number >= 008) && not_overridden) @@ fun () ->
+      some_if (N.(number >= 009) && not_overridden) @@ fun () ->
       public_lib
         (sf "tezos-protocol-%s.parameters" name_dash)
         ~path:(sf "src/proto_%s/lib_parameters" name_underscore)
@@ -3604,11 +3604,11 @@ include Tezos_raw_protocol_%s.Main
             tezos_shell_services |> open_;
             tezos_client_base |> open_;
             main |> open_;
-            tezos_mockup_registration |> if_ N.(number >= 007);
-            tezos_proxy |> if_ N.(number >= 007);
+            tezos_mockup_registration |> if_ N.(number >= 009);
+            tezos_proxy |> if_ N.(number >= 009);
             tezos_signer_backends |> if_ N.(number >= 001);
             plugin |> if_some |> open_if N.(number >= 008);
-            parameters |> if_some |> if_ N.(number >= 008) |> open_;
+            parameters |> if_some |> if_ N.(number >= 009) |> open_;
             tezos_rpc |> if_ N.(number >= 001) |> open_;
             tezos_client_commands |> if_ N.(number == 000) |> open_;
             tezos_stdlib_unix |> if_ N.(number == 000);
@@ -3715,9 +3715,9 @@ include Tezos_raw_protocol_%s.Main
             tezos_stdlib_unix |> open_;
             tezos_protocol_environment;
             tezos_shell_services |> open_;
-            tezos_mockup |> if_ N.(number >= 007);
-            tezos_mockup_registration |> if_ N.(number >= 007);
-            tezos_mockup_commands |> if_ N.(number >= 007);
+            tezos_mockup |> if_ N.(number >= 009);
+            tezos_mockup_registration |> if_ N.(number >= 009);
+            tezos_mockup_commands |> if_ N.(number >= 009);
             tezos_client_base |> open_;
             client |> if_some |> open_;
             tezos_client_commands |> open_;
@@ -3730,7 +3730,7 @@ include Tezos_raw_protocol_%s.Main
         ~all_modules_except:["alpha_commands_registration"]
     in
     let client_sapling =
-      some_if (N.(number >= 008) && not_overridden) @@ fun () ->
+      some_if (N.(number >= 009) && not_overridden) @@ fun () ->
       public_lib
         (sf "tezos-client-sapling-%s" name_dash)
         ~path:(sf "src/proto_%s/lib_client_sapling" name_underscore)

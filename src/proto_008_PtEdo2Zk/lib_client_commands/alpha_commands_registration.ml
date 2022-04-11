@@ -30,7 +30,4 @@ let () =
   @@ Client_proto_programs_commands.commands ()
   @ Client_proto_contracts_commands.commands ()
   @ Client_proto_context_commands.commands network ()
-  @ Client_proto_multisig_commands.commands ()
-  @ Client_proto_mockup_commands.commands ()
-  @ Client_sapling_commands.commands ()
   @ Client_proto_fa12_commands.commands ()
