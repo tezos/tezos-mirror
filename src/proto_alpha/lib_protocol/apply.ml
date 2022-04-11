@@ -942,21 +942,22 @@ let apply_transaction ~ctxt ~parameter ~source ~(contract : Contract.t) ~amount
   | Originated _ ->
       (if Tez.(amount = zero) then
        (* Detect potential call to non existent contract. *)
-       Contract.must_exist ctxt contract
-      else return_unit)
-      >>=? fun () ->
-      (* Since the contract is originated, nothing will be allocated
-         or the next transfer of tokens will fail. *)
-      return_false
+       Contract.must_exist ctxt contract >|=? fun () -> (ctxt, [])
+      else
+        (* Since the contract is originated, nothing will be allocated
+           or this transfer of tokens will fail. *)
+        Token.transfer ctxt (`Contract source) (`Contract contract) amount)
+      >|=? fun (ctxt, balance_updates) -> (false, ctxt, balance_updates)
   | Implicit _ ->
       (* Transfers of zero to implicit accounts are forbidden. *)
       error_when Tez.(amount = zero) (Empty_transaction contract) >>?= fun () ->
       (* If the implicit contract is not yet allocated at this point then
          the next transfer of tokens will allocate it. *)
-      Contract.allocated ctxt contract >|= ok >|=? not)
-  >>=? fun allocated_destination_contract ->
-  Token.transfer ctxt (`Contract source) (`Contract contract) amount
-  >>=? fun (ctxt, balance_updates) ->
+      Contract.allocated ctxt contract >>= fun already_allocated ->
+      Token.transfer ctxt (`Contract source) (`Contract contract) amount
+      >|=? fun (ctxt, balance_updates) ->
+      (not already_allocated, ctxt, balance_updates))
+  >>=? fun (allocated_destination_contract, ctxt, balance_updates) ->
   Script_cache.find ctxt contract >>=? fun (ctxt, cache_key, script) ->
   match script with
   | None ->
