@@ -202,6 +202,14 @@ module Tx_rollup : sig
     Tx_rollup_commitment.Submitted_commitment.t option tzresult Lwt.t
 end
 
+type (_, _) tup =
+  | T1 : ('a, 'a) tup
+  | T2 : ('a, 'a * 'a) tup
+  | T3 : ('a, 'a * 'a * 'a) tup
+  | TList : int -> ('a, 'a list) tup
+
+val tup_hd : ('a, 'elts) tup -> 'elts -> 'a
+
 type 'accounts init :=
   ?rng_state:Random.State.t ->
   ?commitments:Commitment.t list ->
@@ -244,6 +252,11 @@ val init3 :
   * Alpha_context.Contract.t
   * Alpha_context.Contract.t)
   init
+
+val init_with_constants_gen :
+  (Alpha_context.Contract.t, 'contracts) tup ->
+  Constants.parametric ->
+  (Block.t * 'contracts) tzresult Lwt.t
 
 val init_with_constants_n :
   Constants.parametric ->

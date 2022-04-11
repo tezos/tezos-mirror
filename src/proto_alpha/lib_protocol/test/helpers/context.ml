@@ -360,6 +360,15 @@ type (_, _) tup =
   | T3 : ('a, 'a * 'a * 'a) tup
   | TList : int -> ('a, 'a list) tup
 
+let tup_hd : type a r. (a, r) tup -> r -> a =
+ fun tup elts ->
+  match (tup, elts) with
+  | (T1, v) -> v
+  | (T2, (v, _)) -> v
+  | (T3, (v, _, _)) -> v
+  | (TList _, v :: _) -> v
+  | (TList _, []) -> assert false
+
 let tup_n : type a r. (a, r) tup -> int = function
   | T1 -> 1
   | T2 -> 2
