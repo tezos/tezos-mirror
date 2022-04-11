@@ -143,8 +143,7 @@ module Ticket_token_map = struct
 end
 
 let parse_and_cache_script ctxt ~destination ~get_non_cached_script =
-  Script_cache.find ctxt (Contract.Originated destination)
-  >>=? fun (ctxt, _cache_key, cached) ->
+  Script_cache.find ctxt destination >>=? fun (ctxt, _cache_key, cached) ->
   match cached with
   | Some (_script, ex_script) -> return (ex_script, ctxt)
   | None ->

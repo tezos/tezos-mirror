@@ -49,9 +49,7 @@ let err x = Exn (Script_cache_test_error x)
 let liquidity_baking_contract_size = 267304
 
 let liquidity_baking_contract =
-  Contract.of_b58check "KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5" |> function
-  | Ok x -> x
-  | _ -> assert false
+  Contract_hash.of_b58check_exn "KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5"
 
 let make_block block f =
   Incremental.begin_construction block >>=? fun incr ->
@@ -96,7 +94,7 @@ let add_some_contracts k src block baker =
   >>=? fun (liquidity_baking_contract_id, block) ->
   List.fold_left_es
     (fun (rev_contracts, block) _ ->
-      originate_contract "contracts/int-store.tz" "31" src block baker
+      originate_contract_hash "contracts/int-store.tz" "31" src block baker
       >>=? fun (addr, block) ->
       Block.bake block >>=? fun block ->
       make_block block @@ fun ctxt ->
@@ -143,7 +141,7 @@ let test_size_of_liquidity_baking_contract () =
 
 let test_size_of_int_store_contract () =
   init () >>=? fun (block, baker, src, _) ->
-  originate_contract "contracts/int-store.tz" "31" src block baker
+  originate_contract_hash "contracts/int-store.tz" "31" src block baker
   >>=? fun (addr, block) ->
   ( make_block block @! fun ctxt ->
     Script_cache.find ctxt addr >|= Environment.wrap_tzresult
@@ -160,7 +158,7 @@ let test_size_of_int_store_contract () =
 *)
 let test_find_correctly_looks_up () =
   init () >>=? fun (block, baker, src, _) ->
-  originate_contract "contracts/sapling_contract.tz" "{ }" src block baker
+  originate_contract_hash "contracts/sapling_contract.tz" "{ }" src block baker
   >>=? fun (addr, block) ->
   ( make_block block @! fun ctxt ->
     (*
@@ -168,7 +166,8 @@ let test_find_correctly_looks_up () =
     *)
     Script_cache.find ctxt addr >|= Environment.wrap_tzresult
     >>=? fun (_, _, result) ->
-    Contract.get_script ctxt addr >|= Environment.wrap_tzresult
+    Contract.get_script ctxt (Contract.Originated addr)
+    >|= Environment.wrap_tzresult
     >>=? fun (ctxt, script) ->
     (match (result, script) with
     | None, _ -> ok false
@@ -185,7 +184,6 @@ let test_find_correctly_looks_up () =
     *)
     >>=? fun () ->
     let addr = Contract_helpers.fake_KT1 in
-    let addr = Contract.Originated addr in
     Script_cache.find ctxt addr >|= Environment.wrap_tzresult
     >>=? fun (_, _, cached_contract) ->
     fail_unless
@@ -200,7 +198,7 @@ let test_find_correctly_looks_up () =
 *)
 let test_update_modifies_cached_contract () =
   init () >>=? fun (block, baker, src, _) ->
-  originate_contract "contracts/int-store.tz" "36" src block baker
+  originate_contract_hash "contracts/int-store.tz" "36" src block baker
   >>=? fun (addr, block) ->
   ( make_block block @! fun ctxt ->
     find ctxt addr >>=? fun (ctxt, identifier, script, Ex_script (Script ir)) ->
@@ -241,6 +239,7 @@ let test_entries_returns_the_list_in_correct_order () =
   ( make_block block @! fun ctxt ->
     Script_cache.entries ctxt |> Environment.wrap_tzresult >>?= fun entries ->
     let cached_contracts = fst (List.split entries) in
+    let addrs = List.map (fun c -> Contract.Originated c) addrs in
     fail_unless
       (addrs = cached_contracts)
       (err "entries must return cached contracts in order") )
@@ -260,6 +259,7 @@ let test_contract_rank_is_lru_rank () =
     let rec check_rank k = function
       | [] -> return ()
       | addr :: addrs -> (
+          let addr = Contract.Originated addr in
           match Script_cache.contract_rank ctxt addr with
           | None -> fail (err "Contract rank should find a cached contract")
           | Some rank ->
@@ -367,7 +367,8 @@ let test_entries_shows_lru () =
                   (ncontracts / 2)))
       | (contract, size) :: rev_entries, (_, contract') :: rev_contracts ->
           fail_unless
-            (size = new_size || contract = liquidity_baking_contract)
+            (size = new_size
+            || contract = Contract.Originated liquidity_baking_contract)
             (err
                (Printf.sprintf
                   "A contract in the cache has not the right size, expecting \
@@ -376,7 +377,7 @@ let test_entries_shows_lru () =
                   size))
           >>=? fun () ->
           fail_unless
-            (contract = contract')
+            (contract = Contract.Originated contract')
             (err
                (Printf.sprintf
                   "entries do not return cached contracts in right order"))

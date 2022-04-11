@@ -54,7 +54,7 @@ type cached_contract = Script.t * Script_ir_translator.ex_script
    and [Script_ir_translator.parse_script]. *)
 val find :
   context ->
-  Contract.t ->
+  Contract_hash.t ->
   (context * identifier * cached_contract option) tzresult Lwt.t
 
 (** [update ctxt identifier unparsed_script ir_script size] refreshes the

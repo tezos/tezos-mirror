@@ -79,6 +79,7 @@ end
 module Cache = (val Cache.register_exn (module Client))
 
 let find ctxt addr =
+  let addr = Contract.Originated addr in
   let identifier = identifier_of_contract addr in
   Cache.find ctxt identifier >>=? function
   | Some (unparsed_script, ex_script) ->
