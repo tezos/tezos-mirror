@@ -247,6 +247,21 @@ type back = {
   tx_rollup_current_messages :
     Tx_rollup_inbox_repr.Merkle.tree Tx_rollup_repr.Map.t;
   sc_rollup_current_messages : Context.tree Sc_rollup_address_map_builder.t;
+  dal_slot_fee_market : Dal_slot_repr.Slot_market.t;
+  (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3105
+
+     We associate to a slot header some fees. This enable the use
+     of a fee market for slot publication. However, this is not
+     resilient from the game theory point of view. Probably we can find
+     better incentives here. In any case, because we want the following
+     invariant:
+
+         - For each level and for each slot there is at most one slot
+     header.
+
+         - We need to provide an incentive to avoid byzantines to post
+     dummy slot headers. *)
+  dal_endorsement_slot_accountability : Dal_endorsement_repr.Accountability.t;
 }
 
 (*
@@ -817,6 +832,12 @@ let prepare ~level ~predecessor_timestamp ~timestamp ctxt =
         stake_distribution_for_current_cycle = None;
         tx_rollup_current_messages = Tx_rollup_repr.Map.empty;
         sc_rollup_current_messages = Sc_rollup_carbonated_map.empty;
+        dal_slot_fee_market =
+          Dal_slot_repr.Slot_market.init
+            ~length:constants.Constants_parametric_repr.dal.number_of_slots;
+        dal_endorsement_slot_accountability =
+          Dal_endorsement_repr.Accountability.init
+            ~length:constants.Constants_parametric_repr.dal.number_of_slots;
       };
   }
 
@@ -1442,4 +1463,56 @@ module Sc_rollup_in_memory_inbox = struct
     in
     let back = {ctxt.back with sc_rollup_current_messages} in
     {ctxt with back}
+end
+
+module Dal = struct
+  let record_available_shards ctxt slots shards =
+    let dal_endorsement_slot_accountability =
+      Dal_endorsement_repr.Accountability.record_shards_availability
+        ctxt.back.dal_endorsement_slot_accountability
+        slots
+        shards
+    in
+    {ctxt with back = {ctxt.back with dal_endorsement_slot_accountability}}
+
+  let current_slot_fees ctxt Dal_slot_repr.{index; _} =
+    Dal_slot_repr.Slot_market.current_fees ctxt.back.dal_slot_fee_market index
+
+  let update_slot_fees ctxt slot fees =
+    let dal_slot_fee_market, updated =
+      Dal_slot_repr.Slot_market.update ctxt.back.dal_slot_fee_market slot fees
+    in
+    ({ctxt with back = {ctxt.back with dal_slot_fee_market}}, updated)
+
+  let candidates ctxt =
+    Dal_slot_repr.Slot_market.candidates ctxt.back.dal_slot_fee_market
+
+  let is_slot_available ctxt =
+    let threshold =
+      ctxt.back.constants.Constants_parametric_repr.dal.availability_threshold
+    in
+    Dal_endorsement_repr.Accountability.is_slot_available
+      ctxt.back.dal_endorsement_slot_accountability
+      ~threshold
+
+  (* DAL/FIXME https://gitlab.com/tezos/tezos/-/issues/3110
+
+     We have to choose for the sampling. Here we use the one used by
+     the consensus which is hackish and probably not what we want at
+     the end. However, it should be enough for a prototype. This has a
+     very bad complexity too. *)
+  let shards ctxt ~endorser =
+    let max_shards = ctxt.back.constants.dal.number_of_shards in
+    Slot_repr.Map.fold_e
+      (fun slot (_, public_key_hash, _) shards ->
+        (* Early fail because 2048 < 7000 *)
+        if Compare.Int.(Slot_repr.to_int slot >= max_shards) then Error shards
+        else if Signature.Public_key_hash.(public_key_hash = endorser) then
+          Ok (Slot_repr.to_int slot :: shards)
+        else Ok shards)
+      ctxt.back.consensus.allowed_endorsements
+      []
+    |> function
+    | Ok shards -> shards
+    | Error shards -> shards
 end
