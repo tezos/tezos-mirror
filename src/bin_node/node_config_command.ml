@@ -189,7 +189,7 @@ module Manpage = struct
   let options =
     let schema = Data_encoding.Json.schema Node_config_file.encoding in
     let schema = Format.asprintf "@[%a@]" Json_schema.pp schema in
-    let schema = String.concat "\\$" (String.split '$' schema) in
+    let schema = String.concat "\\$" (String.split_no_empty '$' schema) in
     [`S "OPTIONS"; `P "All options available in the config file"; `Pre schema]
 
   let man =

@@ -70,7 +70,7 @@ let parse_file parse path =
 let file_or_text_parameter ~from_text
     ?(from_path = parse_file (from_text ~heuristic:false)) () =
   Clic.parameter @@ fun _ p ->
-  match String.split ~limit:1 ':' p with
+  match String.split_exact ~limit:1 ':' p with
   | ["text"; text] -> from_text ~heuristic:false text
   | ["file"; path] -> from_path path
   | _ -> if Sys.file_exists p then from_path p else from_text ~heuristic:true p
@@ -142,7 +142,7 @@ let messages_param =
       failwith "Given text is not valid JSON: '%s'" text
   in
   Clic.parameter @@ fun _ p ->
-  match String.split ~limit:1 ':' p with
+  match String.split_exact ~limit:1 ':' p with
   | ["bin"; path] ->
       Lwt_utils_unix.read_file path >>= fun bin -> return (`Bin bin)
   | ["text"; text] -> from_text text

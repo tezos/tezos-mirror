@@ -13,7 +13,8 @@ let test_split_duplicated_separator () =
     ]
   in
   List.iter
-    (fun s -> assert (TzString.split ' ' s = TzString.split ' ' s))
+    (fun s ->
+      assert (TzString.split_no_empty ' ' s = TzString.split_no_empty ' ' s))
     inputs
 
 let test_split_exact =
@@ -30,7 +31,7 @@ let test_split_exact =
     gen
     (fun (string, sep, limit) ->
       let split = TzString.split_exact sep ?limit string in
-      String.concat (String.init 1 (fun _ -> sep)) split = string)
+      String.concat (String.make 1 sep) split = string)
 
 let split_tests =
   [("handles a duplicated separator", `Quick, test_split_duplicated_separator)]

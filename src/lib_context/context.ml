@@ -187,13 +187,13 @@ let () =
   match Unix.getenv "TEZOS_CONTEXT" with
   | exception Not_found -> ()
   | v ->
-      let args = String.split ',' v in
+      let args = String.split_no_empty ',' v in
       List.iter
         (function
           | "v" | "verbose" -> verbose_info ()
           | "vv" -> verbose_debug ()
           | v -> (
-              match String.split '=' v with
+              match String.split_no_empty '=' v with
               | ["index-log-size"; n] -> index_log_size n
               | ["auto-flush"; n] -> auto_flush n
               | ["lru-size"; n] -> lru_size n

@@ -69,7 +69,7 @@ module ContractAlias = struct
     | None -> RawContractAlias.rev_find cctxt c
 
   let get_contract cctxt s =
-    match String.split ~limit:1 ':' s with
+    match String.split_exact ~limit:1 ':' s with
     | ["key"; key] -> find_key cctxt key
     | _ -> find cctxt s
 
@@ -107,7 +107,7 @@ module ContractAlias = struct
              Client_keys.Public_key_hash.autocomplete cctxt >>=? fun list2 ->
              return (list1 @ list2))
            (fun cctxt s ->
-             match String.split ~limit:1 ':' s with
+             match String.split_exact ~limit:1 ':' s with
              | ["alias"; alias] -> find cctxt alias
              | ["key"; text] ->
                  Client_keys.Public_key_hash.find cctxt text >>=? fun v ->

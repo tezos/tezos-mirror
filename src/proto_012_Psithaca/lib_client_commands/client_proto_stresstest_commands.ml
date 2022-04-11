@@ -160,7 +160,7 @@ let injected_operations_encoding =
        (req "operation_hashes" (list Operation_hash.encoding)))
 
 let parse_strategy s =
-  match String.split ~limit:1 ':' s with
+  match String.split_exact ~limit:1 ':' s with
   | ["fixed"; parameter] -> (
       match int_of_string parameter with
       | exception _ -> Error "invalid integer literal"
@@ -791,7 +791,7 @@ let json_of_pool_source = function
 
 let json_file_or_text_parameter =
   Clic.parameter (fun _ p ->
-      match String.split ~limit:1 ':' p with
+      match String.split_exact ~limit:1 ':' p with
       | ["text"; text] -> return (From_string {json = Ezjsonm.from_string text})
       | ["file"; path] ->
           Lwt_utils_unix.Json.read_file path >|=? fun json ->

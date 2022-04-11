@@ -75,7 +75,7 @@ let magic_bytes_arg =
                     error_with
                       "Bad format for magic bytes, a series of numbers is \
                        expected, separated by commas.")
-              (String.split ',' s))))
+              (String.split_no_empty ',' s))))
 
 let high_watermark_switch =
   Clic.switch

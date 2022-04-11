@@ -150,7 +150,7 @@ type error += Extra_arguments : string list * 'ctx command -> error
 
 let trim s =
   (* config-file workaround *)
-  TzString.split '\n' s |> List.map String.trim |> String.concat "\n"
+  TzString.split_no_empty '\n' s |> List.map String.trim |> String.concat "\n"
 
 let print_desc ppf doc =
   let (short, long) =

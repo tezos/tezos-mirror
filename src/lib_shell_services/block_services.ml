@@ -74,7 +74,7 @@ let parse_block s =
           WithExceptions.Option.get ~loc:__LOC__
           @@ List.assoc ~equal:Int.equal 1 counts
         in
-        (String.split delim s, delim)
+        (String.split_no_empty delim s, delim)
     | _ -> raise Exit
   in
   (* Converts a string representing a block level into a Int32. Fails

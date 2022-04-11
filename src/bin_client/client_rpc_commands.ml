@@ -229,7 +229,7 @@ let rec count =
 
 let list url (cctxt : #Client_context.full) =
   let open Lwt_result_syntax in
-  let args = String.split '/' url in
+  let args = String.split_no_empty '/' url in
   let* tree = RPC_description.describe cctxt ~recurse:true args in
   let open RPC_description in
   let collected_args = ref [] in
@@ -245,7 +245,7 @@ let list url (cctxt : #Client_context.full) =
       ppf
       "@,    @[%a@]"
       (fun ppf words -> List.iter (Format.fprintf ppf "%s@ ") words)
-      (String.split ' ' description)
+      (String.split_no_empty ' ' description)
   in
   let display_arg ppf arg =
     match arg.RPC_arg.descr with
@@ -346,7 +346,7 @@ let list url (cctxt : #Client_context.full) =
 
 let schema meth url (cctxt : #Client_context.full) =
   let open Lwt_result_syntax in
-  let args = String.split '/' url in
+  let args = String.split_no_empty '/' url in
   let open RPC_description in
   let* s = RPC_description.describe cctxt ~recurse:false args in
   match s with
@@ -373,7 +373,7 @@ let schema meth url (cctxt : #Client_context.full) =
 
 let format binary meth url (cctxt : #Client_context.io_rpcs) =
   let open Lwt_result_syntax in
-  let args = String.split '/' url in
+  let args = String.split_no_empty '/' url in
   let open RPC_description in
   let pp =
     if binary then fun ppf (_, schema) ->
@@ -455,7 +455,7 @@ let display_answer (cctxt : #Client_context.full) :
 let call ?body meth raw_url (cctxt : #Client_context.full) =
   let open Lwt_result_syntax in
   let uri = Uri.of_string raw_url in
-  let args = String.split '/' (Uri.path uri) in
+  let args = String.split_no_empty '/' (Uri.path uri) in
   if not cctxt#verbose_rpc_error_diagnostics then
     let body =
       (* This code is similar to a piece of code in [fill_in]
@@ -513,7 +513,7 @@ let call_with_json meth raw_url json (cctxt : #Client_context.full) =
 let call_with_file_or_json meth url maybe_file (cctxt : #Client_context.full) =
   let open Lwt_result_syntax in
   let* json =
-    match TzString.split ':' ~limit:1 maybe_file with
+    match TzString.split_exact ':' ~limit:1 maybe_file with
     | ["file"; filename] ->
         Lwt.catch
           (fun () ->

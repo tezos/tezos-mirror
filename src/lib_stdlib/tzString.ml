@@ -39,7 +39,7 @@ let split_exact delim ?(limit = max_int) str =
   in
   mark_delims limit [] 0 |> split_by_index 0 []
 
-let split delim ?(limit = max_int) path =
+let split_no_empty delim ?(limit = max_int) path =
   let l = String.length path in
   let rec do_slashes acc limit i =
     if i >= l then List.rev acc
