@@ -14,8 +14,6 @@ depends: [
   "tezos-shell-services"
   "tezos-client-base"
   "tezos-protocol-010-PtGRANAD"
-  "tezos-mockup-registration"
-  "tezos-proxy"
   "tezos-signer-backends"
   "tezos-protocol-plugin-010-PtGRANAD"
   "tezos-rpc"

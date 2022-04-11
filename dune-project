@@ -75,7 +75,6 @@
 (package (name tezos-client-commands))
 (package (name tezos-client-demo-counter))
 (package (name tezos-client-genesis))
-(package (name tezos-client-sapling-010-PtGRANAD))
 (package (name tezos-client-sapling-011-PtHangz2))
 (package (name tezos-client-sapling-012-Psithaca))
 (package (name tezos-client-sapling-013-PtJakart))

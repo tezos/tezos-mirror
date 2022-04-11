@@ -11,9 +11,6 @@
   tezos-stdlib-unix
   tezos-protocol-environment
   tezos-shell-services
-  tezos-mockup
-  tezos-mockup-registration
-  tezos-mockup-commands
   tezos-client-base
   tezos-client-010-PtGRANAD
   tezos-client-commands
@@ -49,7 +46,6 @@
   tezos-client-010-PtGRANAD
   tezos-client-commands
   tezos-client-010-PtGRANAD-commands
-  tezos-client-sapling-010-PtGRANAD
   tezos-rpc
   tezos-protocol-plugin-010-PtGRANAD)
  (library_flags (:standard -linkall))
@@ -63,7 +59,6 @@
    -open Tezos_client_010_PtGRANAD
    -open Tezos_client_commands
    -open Tezos_client_010_PtGRANAD_commands
-   -open Tezos_client_sapling_010_PtGRANAD
    -open Tezos_rpc
    -open Tezos_protocol_plugin_010_PtGRANAD))
  (modules alpha_commands_registration))
