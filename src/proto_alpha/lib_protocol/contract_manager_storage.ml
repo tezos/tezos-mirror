@@ -109,14 +109,14 @@ let () =
 let init = Storage.Contract.Manager.init
 
 let is_manager_key_revealed c manager =
-  let contract = Contract_repr.implicit_contract manager in
+  let contract = Contract_repr.Implicit manager in
   Storage.Contract.Manager.find c contract >>=? function
   | None -> return_false
   | Some (Manager_repr.Hash _) -> return_false
   | Some (Manager_repr.Public_key _) -> return_true
 
 let reveal_manager_key c manager public_key =
-  let contract = Contract_repr.implicit_contract manager in
+  let contract = Contract_repr.Implicit manager in
   Storage.Contract.Manager.get c contract >>=? function
   | Public_key _ -> fail (Previously_revealed_key contract)
   | Hash v ->
@@ -130,7 +130,7 @@ let reveal_manager_key c manager public_key =
              {public_key; expected_hash = v; provided_hash = actual_hash})
 
 let get_manager_key ?error ctxt pkh =
-  let contract = Contract_repr.implicit_contract pkh in
+  let contract = Contract_repr.Implicit pkh in
   Storage.Contract.Manager.find ctxt contract >>=? function
   | None -> (
       match error with

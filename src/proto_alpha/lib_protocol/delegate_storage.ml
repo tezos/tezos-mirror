@@ -273,12 +273,12 @@ let set c contract delegate =
 let frozen_deposits_limit ctxt delegate =
   Storage.Contract.Frozen_deposits_limit.find
     ctxt
-    (Contract_repr.implicit_contract delegate)
+    (Contract_repr.Implicit delegate)
 
 let set_frozen_deposits_limit ctxt delegate limit =
   Storage.Contract.Frozen_deposits_limit.add_or_remove
     ctxt
-    (Contract_repr.implicit_contract delegate)
+    (Contract_repr.Implicit delegate)
     limit
 
 let update_activity ctxt last_cycle =
@@ -346,7 +346,7 @@ let distribute_endorsing_rewards ctxt last_cycle unrevealed_nonces =
   Stake_storage.get_selected_distribution ctxt last_cycle >>=? fun delegates ->
   List.fold_left_es
     (fun (ctxt, balance_updates) (delegate, active_stake) ->
-      let delegate_contract = Contract_repr.implicit_contract delegate in
+      let delegate_contract = Contract_repr.Implicit delegate in
       delegate_participated_enough ctxt delegate_contract
       >>=? fun sufficient_participation ->
       let has_revealed_nonces =
@@ -463,7 +463,7 @@ let freeze_deposits ?(origin = Receipt_repr.Block_application) ctxt ~new_cycle
       (* Here we make sure to preserve the following invariant :
          maximum_stake_to_be_deposited <= frozen_deposits + balance
          See select_distribution_for_cycle *)
-      let delegate_contract = Contract_repr.implicit_contract delegate in
+      let delegate_contract = Contract_repr.Implicit delegate in
       Frozen_deposits_storage.update_initial_amount
         ctxt
         delegate_contract
@@ -513,7 +513,7 @@ let freeze_deposits ?(origin = Receipt_repr.Block_application) ctxt ~new_cycle
      and therefore it should have no frozen deposits. *)
   Signature.Public_key_hash.Set.fold_es
     (fun delegate (ctxt, balance_updates) ->
-      let delegate_contract = Contract_repr.implicit_contract delegate in
+      let delegate_contract = Contract_repr.Implicit delegate in
       Frozen_deposits_storage.update_initial_amount
         ctxt
         delegate_contract
@@ -579,7 +579,7 @@ let get_stakes_for_selected_index ctxt index =
     ctxt
     ~index
     ~f:(fun (delegate, staking_balance) (acc, total_stake) ->
-      let delegate_contract = Contract_repr.implicit_contract delegate in
+      let delegate_contract = Contract_repr.Implicit delegate in
       let open Tez_repr in
       let open Lwt_result_syntax in
       let* frozen_deposits_limit =
@@ -683,15 +683,15 @@ let cycle_end ctxt last_cycle unrevealed_nonces =
   return (ctxt, balance_updates, deactivated_delagates)
 
 let balance ctxt delegate =
-  let contract = Contract_repr.implicit_contract delegate in
+  let contract = Contract_repr.Implicit delegate in
   Storage.Contract.Spendable_balance.get ctxt contract
 
 let frozen_deposits ctxt delegate =
-  Frozen_deposits_storage.get ctxt (Contract_repr.implicit_contract delegate)
+  Frozen_deposits_storage.get ctxt (Contract_repr.Implicit delegate)
 
 let full_balance ctxt delegate =
   frozen_deposits ctxt delegate >>=? fun frozen_deposits ->
-  let delegate_contract = Contract_repr.implicit_contract delegate in
+  let delegate_contract = Contract_repr.Implicit delegate in
   Contract_storage.get_balance_and_frozen_bonds ctxt delegate_contract
   >>=? fun balance_and_frozen_bonds ->
   Lwt.return
@@ -813,7 +813,7 @@ let already_slashed_for_double_baking ctxt delegate (level : Level_repr.t) =
   | Some slashed -> return slashed.for_double_baking
 
 let punish_double_endorsing ctxt delegate (level : Level_repr.t) =
-  let delegate_contract = Contract_repr.implicit_contract delegate in
+  let delegate_contract = Contract_repr.Implicit delegate in
   Frozen_deposits_storage.get ctxt delegate_contract >>=? fun frozen_deposits ->
   let slashing_ratio : Ratio_repr.t =
     Constants_storage.ratio_of_frozen_deposits_slashed_per_double_endorsement
@@ -851,7 +851,7 @@ let punish_double_endorsing ctxt delegate (level : Level_repr.t) =
   >>= fun ctxt -> return (ctxt, amount_to_burn, balance_updates)
 
 let punish_double_baking ctxt delegate (level : Level_repr.t) =
-  let delegate_contract = Contract_repr.implicit_contract delegate in
+  let delegate_contract = Contract_repr.Implicit delegate in
   Frozen_deposits_storage.get ctxt delegate_contract >>=? fun frozen_deposits ->
   let slashing_for_one_block =
     Constants_storage.double_baking_punishment ctxt
@@ -890,7 +890,7 @@ let record_endorsing_participation ctxt ~delegate ~participation
   match participation with
   | Participated -> set_active ctxt delegate
   | Didn't_participate -> (
-      let contract = Contract_repr.implicit_contract delegate in
+      let contract = Contract_repr.Implicit delegate in
       Storage.Contract.Missed_endorsements.find ctxt contract >>=? function
       | Some {remaining_slots; missed_levels} ->
           let remaining_slots = remaining_slots - endorsing_power in
@@ -940,7 +940,7 @@ let record_baking_activity_and_pay_rewards_and_fees ctxt ~payload_producer
   else return ctxt)
   >>=? fun ctxt ->
   let pay_payload_producer ctxt delegate =
-    let contract = Contract_repr.implicit_contract delegate in
+    let contract = Contract_repr.Implicit delegate in
     Token.balance ctxt `Block_fees >>=? fun (ctxt, block_fees) ->
     Token.transfer_n
       ctxt
@@ -948,7 +948,7 @@ let record_baking_activity_and_pay_rewards_and_fees ctxt ~payload_producer
       (`Contract contract)
   in
   let pay_block_producer ctxt delegate bonus =
-    let contract = Contract_repr.implicit_contract delegate in
+    let contract = Contract_repr.Implicit delegate in
     Token.transfer ctxt `Baking_bonuses (`Contract contract) bonus
   in
   pay_payload_producer ctxt payload_producer
@@ -1014,7 +1014,7 @@ let delegate_participation_info ctxt delegate =
       let expected_endorsing_rewards =
         Tez_repr.mul_exn endorsing_reward_per_slot expected_cycle_activity
       in
-      let contract = Contract_repr.implicit_contract delegate in
+      let contract = Contract_repr.Implicit delegate in
       Storage.Contract.Missed_endorsements.find ctxt contract
       >>=? fun missed_endorsements ->
       let (missed_slots, missed_levels, remaining_allowed_missed_slots) =

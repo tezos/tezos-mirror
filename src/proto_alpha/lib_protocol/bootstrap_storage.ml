@@ -26,7 +26,7 @@
 let init_account (ctxt, balance_updates)
     ({public_key_hash; public_key; amount} : Parameters_repr.bootstrap_account)
     =
-  let contract = Contract_repr.implicit_contract public_key_hash in
+  let contract = Contract_repr.Implicit public_key_hash in
   Token.transfer
     ~origin:Protocol_migration
     ctxt

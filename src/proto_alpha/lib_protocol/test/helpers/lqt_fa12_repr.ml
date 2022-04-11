@@ -135,7 +135,7 @@ module Storage = struct
     {
       tokens = Big_map.Id.parse_z Z.zero;
       allowances = Big_map.Id.parse_z Z.one;
-      admin = Contract.implicit_contract Signature.Public_key_hash.zero;
+      admin = Contract.Implicit Signature.Public_key_hash.zero;
       totalSupply = Z.zero;
     }
 

@@ -571,7 +571,7 @@ let inject_activate_operation cctxt ~chain ~block ?confirmations ?dry_run alias
       Alpha_services.Contract.balance
         cctxt
         (chain, block)
-        (Contract.implicit_contract (Ed25519 pkh))
+        (Contract.Implicit (Ed25519 pkh))
       >>=? fun balance ->
       cctxt#message
         "Account %s (%a) activated with %s%a."

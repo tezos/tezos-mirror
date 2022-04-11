@@ -46,10 +46,6 @@ include Compare.S with type t := t
 
 val in_memory_size : t -> Cache_memory_helpers.sint
 
-(** {2 Implicit contracts} *)
-
-val implicit_contract : Signature.Public_key_hash.t -> t
-
 (** {2 Originated contracts} *)
 
 (** [originated_contract nonce] is the contract address originated from [nonce].

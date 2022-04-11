@@ -539,13 +539,7 @@ let balance_and_frozen_bonds ctxt block contract =
   RPC_context.make_call1 S.balance_and_frozen_bonds ctxt block contract () ()
 
 let manager_key ctxt block mgr =
-  RPC_context.make_call1
-    S.manager_key
-    ctxt
-    block
-    (Contract.implicit_contract mgr)
-    ()
-    ()
+  RPC_context.make_call1 S.manager_key ctxt block (Contract.Implicit mgr) () ()
 
 let delegate ctxt block contract =
   RPC_context.make_call1 S.delegate ctxt block contract () ()
@@ -554,13 +548,7 @@ let delegate_opt ctxt block contract =
   RPC_context.make_opt_call1 S.delegate ctxt block contract () ()
 
 let counter ctxt block mgr =
-  RPC_context.make_call1
-    S.counter
-    ctxt
-    block
-    (Contract.implicit_contract mgr)
-    ()
-    ()
+  RPC_context.make_call1 S.counter ctxt block (Contract.Implicit mgr) () ()
 
 let script ctxt block contract =
   RPC_context.make_call1 S.script ctxt block contract () ()

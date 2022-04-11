@@ -353,8 +353,8 @@ let test_freeze_more_with_low_balance =
     Context.Delegate.info (B genesis) account1 >>=? fun info1 ->
     Op.transaction
       (B genesis)
-      (Contract.implicit_contract account1)
-      (Contract.implicit_contract account2)
+      (Contract.Implicit account1)
+      (Contract.Implicit account2)
       Test_tez.(info1.full_balance -! info1.frozen_deposits)
     >>=? fun op ->
     Block.bake ~policy:(Block.By_account account2) genesis ~operations:[op]

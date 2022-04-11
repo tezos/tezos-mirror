@@ -1092,7 +1092,7 @@ module Parsed_account = struct
     List.iter_s
       (function
         | (name, pkh, _pk_opt, Some sk_uri) -> (
-            let contract = Contract.implicit_contract pkh in
+            let contract = Contract.Implicit pkh in
             Client_proto_context.get_balance
               rpc_context
               ~chain:cctxt#chain

@@ -69,7 +69,7 @@ let test_encodings balance =
 let test_encodings () =
   let open Receipt in
   let pkh = Signature.Public_key_hash.zero in
-  test_encodings (Contract (Contract.implicit_contract pkh)) >>=? fun () ->
+  test_encodings (Contract (Contract.Implicit pkh)) >>=? fun () ->
   test_encodings Block_fees >>=? fun () ->
   test_encodings (Deposits pkh) >>=? fun () ->
   test_encodings Nonce_revelation_rewards >>=? fun () ->
@@ -93,8 +93,7 @@ let test_encodings () =
   in
   let tx_rollup = Tx_rollup.Internal_for_tests.originated_tx_rollup nonce in
   let bond_id = Bond_id.Tx_rollup_bond_id tx_rollup in
-  test_encodings (Frozen_bonds (Contract.implicit_contract pkh, bond_id))
-  >>=? fun () ->
+  test_encodings (Frozen_bonds (Contract.Implicit pkh, bond_id)) >>=? fun () ->
   test_encodings Tx_rollup_rejection_punishments >>=? fun () ->
   test_encodings Tx_rollup_rejection_rewards
 

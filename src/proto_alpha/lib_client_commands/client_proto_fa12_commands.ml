@@ -119,7 +119,7 @@ let view_options =
     payer_arg
     (unparsing_mode_arg ~default:"Readable")
 
-let dummy_callback = Contract.implicit_contract Signature.Public_key_hash.zero
+let dummy_callback = Contract.Implicit Signature.Public_key_hash.zero
 
 let get_contract_caller_keys cctxt (caller : Contract.t) =
   match caller with

@@ -493,8 +493,7 @@ end)
     let address rng_state =
       if Base_samplers.uniform_bool rng_state then
         let contract =
-          Alpha_context.Contract.implicit_contract
-            (Crypto_samplers.pkh rng_state)
+          Alpha_context.Contract.Implicit (Crypto_samplers.pkh rng_state)
         in
         {
           destination = Contract contract;
@@ -723,7 +722,7 @@ end)
      fun ty rng_state ->
       let contents = value ty rng_state in
       let ticketer =
-        Alpha_context.Contract.implicit_contract (Crypto_samplers.pkh rng_state)
+        Alpha_context.Contract.Implicit (Crypto_samplers.pkh rng_state)
       in
       let amount = Michelson_base.nat rng_state in
       Script_typed_ir.{ticketer; contents; amount}

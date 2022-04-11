@@ -210,7 +210,7 @@ let test_deactivation_then_empty_then_self_delegation () =
   (* empty the contract *)
   Context.Contract.balance (B b) deactivated_contract >>=? fun balance ->
   let sink_account = Account.new_account () in
-  let sink_contract = Contract.implicit_contract sink_account.pkh in
+  let sink_contract = Contract.Implicit sink_account.pkh in
   Context.get_constants (B b)
   >>=? fun {parametric = {origination_size; cost_per_byte; _}; _} ->
   cost_per_byte *? Int64.of_int origination_size >>?= fun origination_burn ->
@@ -249,7 +249,7 @@ let test_deactivation_then_empty_then_self_delegation_then_recredit () =
   (* empty the contract *)
   Context.Contract.balance (B b) deactivated_contract >>=? fun balance ->
   let sink_account = Account.new_account () in
-  let sink_contract = Contract.implicit_contract sink_account.pkh in
+  let sink_contract = Contract.Implicit sink_account.pkh in
   Context.get_constants (B b)
   >>=? fun {parametric = {origination_size; cost_per_byte; _}; _} ->
   cost_per_byte *? Int64.of_int origination_size >>?= fun origination_burn ->
@@ -297,7 +297,7 @@ let test_delegation () =
   Account.add_account m3 ;
   Context.Contract.manager (B b) a1 >>=? fun m1 ->
   Context.Contract.manager (B b) a2 >>=? fun m2 ->
-  let a3 = Contract.implicit_contract m3.pkh in
+  let a3 = Contract.Implicit m3.pkh in
   Context.Contract.delegate_opt (B b) a1 >>=? fun delegate ->
   (match delegate with
   | None -> assert false

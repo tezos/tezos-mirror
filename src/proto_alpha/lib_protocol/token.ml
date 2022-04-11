@@ -64,11 +64,11 @@ let allocated ctxt stored =
       Commitment_storage.exists ctxt bpkh >|= fun allocated ->
       ok (ctxt, allocated)
   | `Delegate_balance delegate ->
-      let contract = Contract_repr.implicit_contract delegate in
+      let contract = Contract_repr.Implicit delegate in
       Contract_storage.allocated ctxt contract >|= fun allocated ->
       ok (ctxt, allocated)
   | `Frozen_deposits delegate ->
-      let contract = Contract_repr.implicit_contract delegate in
+      let contract = Contract_repr.Implicit delegate in
       Frozen_deposits_storage.allocated ctxt contract >|= fun allocated ->
       ok (ctxt, allocated)
   | `Block_fees -> return (ctxt, true)
@@ -84,11 +84,11 @@ let balance ctxt stored =
       Commitment_storage.committed_amount ctxt bpkh >|=? fun balance ->
       (ctxt, balance)
   | `Delegate_balance delegate ->
-      let contract = Contract_repr.implicit_contract delegate in
+      let contract = Contract_repr.Implicit delegate in
       Storage.Contract.Spendable_balance.get ctxt contract >|=? fun balance ->
       (ctxt, balance)
   | `Frozen_deposits delegate ->
-      let contract = Contract_repr.implicit_contract delegate in
+      let contract = Contract_repr.Implicit delegate in
       Frozen_deposits_storage.find ctxt contract >|=? fun frozen_deposits ->
       let balance =
         match frozen_deposits with
@@ -127,7 +127,7 @@ let credit ctxt dest amount origin =
             amount
           >|=? fun ctxt -> (ctxt, Commitments bpkh)
       | `Delegate_balance delegate ->
-          let contract = Contract_repr.implicit_contract delegate in
+          let contract = Contract_repr.Implicit delegate in
           Contract_storage.increase_balance_only_call_from_token
             ctxt
             contract
@@ -186,7 +186,7 @@ let spend ctxt src amount origin =
             amount
           >|=? fun ctxt -> (ctxt, Commitments bpkh)
       | `Delegate_balance delegate ->
-          let contract = Contract_repr.implicit_contract delegate in
+          let contract = Contract_repr.Implicit delegate in
           Contract_storage.decrease_balance_only_call_from_token
             ctxt
             contract

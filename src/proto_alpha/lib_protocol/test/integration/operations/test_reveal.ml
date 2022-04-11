@@ -43,7 +43,7 @@ let ten_tez = of_int 10
 let test_simple_reveal () =
   Context.init1 ~consensus_threshold:0 () >>=? fun (blk, c) ->
   let new_c = Account.new_account () in
-  let new_contract = Alpha_context.Contract.implicit_contract new_c.pkh in
+  let new_contract = Alpha_context.Contract.Implicit new_c.pkh in
   (* Create the contract *)
   Op.transaction (B blk) c new_contract Tez.one >>=? fun operation ->
   Block.bake blk ~operation >>=? fun blk ->
@@ -61,7 +61,7 @@ let test_simple_reveal () =
 let test_empty_account_on_reveal () =
   Context.init1 ~consensus_threshold:0 () >>=? fun (blk, c) ->
   let new_c = Account.new_account () in
-  let new_contract = Alpha_context.Contract.implicit_contract new_c.pkh in
+  let new_contract = Alpha_context.Contract.Implicit new_c.pkh in
   let amount = Tez.one_mutez in
   (* Create the contract *)
   Op.transaction (B blk) c new_contract amount >>=? fun operation ->
@@ -82,7 +82,7 @@ let test_empty_account_on_reveal () =
 let test_not_enough_found_for_reveal () =
   Context.init1 () >>=? fun (blk, c) ->
   let new_c = Account.new_account () in
-  let new_contract = Alpha_context.Contract.implicit_contract new_c.pkh in
+  let new_contract = Alpha_context.Contract.Implicit new_c.pkh in
   (* Create the contract *)
   Op.transaction (B blk) c new_contract Tez.one_mutez >>=? fun operation ->
   Block.bake blk ~operation >>=? fun blk ->
@@ -98,7 +98,7 @@ let test_not_enough_found_for_reveal () =
 let test_transfer_fees_emptying_after_reveal_batched () =
   Context.init1 () >>=? fun (blk, c) ->
   let new_c = Account.new_account () in
-  let new_contract = Alpha_context.Contract.implicit_contract new_c.pkh in
+  let new_contract = Alpha_context.Contract.Implicit new_c.pkh in
   (* Create the contract *)
   Op.transaction (B blk) c new_contract Tez.one >>=? fun operation ->
   Block.bake blk ~operation >>=? fun blk ->

@@ -456,7 +456,7 @@ let create_implicit c manager ~balance =
   create_base
     c
     ~prepaid_bootstrap_storage:false
-    (Contract_repr.implicit_contract manager)
+    (Contract_repr.Implicit manager)
     ~balance
     ~manager:(Some manager)
     ?script:None
@@ -513,7 +513,7 @@ let originated_from_current_nonce ~since:ctxt_since ~until:ctxt_until =
   >|= ok
 
 let check_counter_increment c manager counter =
-  let contract = Contract_repr.implicit_contract manager in
+  let contract = Contract_repr.Implicit manager in
   Storage.Contract.Counter.get c contract >>=? fun contract_counter ->
   let expected = Z.succ contract_counter in
   if Compare.Z.(expected = counter) then return_unit
@@ -522,7 +522,7 @@ let check_counter_increment c manager counter =
   else fail (Counter_in_the_future (contract, expected, counter))
 
 let increment_counter c manager =
-  let contract = Contract_repr.implicit_contract manager in
+  let contract = Contract_repr.Implicit manager in
   Storage.Contract.Global_counter.get c >>=? fun global_counter ->
   Storage.Contract.Global_counter.update c (Z.succ global_counter) >>=? fun c ->
   Storage.Contract.Counter.get c contract >>=? fun contract_counter ->
@@ -548,7 +548,7 @@ let get_storage ctxt contract =
       return (ctxt, Some storage)
 
 let get_counter c manager =
-  let contract = Contract_repr.implicit_contract manager in
+  let contract = Contract_repr.Implicit manager in
   Storage.Contract.Counter.find c contract >>=? function
   | None -> (
       match contract with

@@ -57,7 +57,7 @@ let originate_contract file storage src b baker =
   Incremental.add_operation incr operation >>=? fun incr ->
   Incremental.finalize_block incr >|=? fun b -> (dst, b)
 
-let default_source = Contract.implicit_contract Signature.Public_key_hash.zero
+let default_source = Contract.Implicit Signature.Public_key_hash.zero
 
 let default_step_constants =
   Script_interpreter.

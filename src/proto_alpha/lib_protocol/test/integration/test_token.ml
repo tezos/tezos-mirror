@@ -60,9 +60,9 @@ let mk_rollup () = Tx_rollup.Internal_for_tests.originated_tx_rollup nonce
 let test_simple_balances () =
   Random.init 0 ;
   create_context () >>=? fun (ctxt, pkh) ->
-  let src = `Contract (Contract.implicit_contract pkh) in
+  let src = `Contract (Contract.Implicit pkh) in
   let (pkh, _pk, _sk) = Signature.generate_key () in
-  let dest = `Contract (Contract.implicit_contract pkh) in
+  let dest = `Contract (Contract.Implicit pkh) in
   let amount = Tez.one in
   wrap (Token.transfer ctxt src dest amount) >>=? fun (ctxt', _) ->
   wrap (Token.balance ctxt src) >>=? fun (ctxt, bal_src) ->
@@ -79,9 +79,9 @@ let test_simple_balances () =
 let test_simple_balance_updates () =
   Random.init 0 ;
   create_context () >>=? fun (ctxt, pkh) ->
-  let src = Contract.implicit_contract pkh in
+  let src = Contract.Implicit pkh in
   let (pkh, _pk, _sk) = Signature.generate_key () in
-  let dest = Contract.implicit_contract pkh in
+  let dest = Contract.Implicit pkh in
   let amount = Tez.one in
   wrap (Token.transfer ctxt (`Contract src) (`Contract dest) amount)
   >>=? fun (_, bal_updates) ->
@@ -130,7 +130,7 @@ let test_allocated () =
   let dest = `Delegate_balance pkh in
   test_allocated_and_still_allocated_when_empty ctxt dest true >>=? fun _ ->
   let (pkh, _pk, _sk) = Signature.generate_key () in
-  let dest = `Contract (Contract.implicit_contract pkh) in
+  let dest = `Contract (Contract.Implicit pkh) in
   test_allocated_and_deallocated_when_empty ctxt dest >>=? fun _ ->
   let dest = `Collected_commitments Blinded_public_key_hash.zero in
   test_allocated_and_deallocated_when_empty ctxt dest >>=? fun _ ->
@@ -140,7 +140,7 @@ let test_allocated () =
   test_allocated_and_still_allocated_when_empty ctxt dest true >>=? fun _ ->
   let dest =
     let bond_id = Bond_id.Tx_rollup_bond_id (mk_rollup ()) in
-    `Frozen_bonds (Contract.implicit_contract pkh, bond_id)
+    `Frozen_bonds (Contract.Implicit pkh, bond_id)
   in
   test_allocated_and_deallocated_when_empty ctxt dest
 
@@ -156,7 +156,7 @@ let check_sink_balances ctxt ctxt' dest amount =
 let force_allocation_if_need_be ctxt account =
   match account with
   | `Delegate_balance pkh ->
-      let account = `Contract (Contract.implicit_contract pkh) in
+      let account = `Contract (Contract.Implicit pkh) in
       wrap (Token.transfer ctxt `Minted account Tez.one_mutez) >|=? fst
   | _ -> return ctxt
 
@@ -183,7 +183,7 @@ let test_transferring_to_sink ctxt sink amount expected_bupds =
 
 let test_transferring_to_contract ctxt =
   let (pkh, _pk, _sk) = Signature.generate_key () in
-  let dest = Contract.implicit_contract pkh in
+  let dest = Contract.Implicit pkh in
   let amount = random_amount () in
   test_transferring_to_sink
     ctxt
@@ -202,7 +202,7 @@ let test_transferring_to_collected_commitments ctxt =
 
 let test_transferring_to_delegate_balance ctxt =
   let (pkh, _pk, _sk) = Signature.generate_key () in
-  let dest = Contract.implicit_contract pkh in
+  let dest = Contract.Implicit pkh in
   let amount = random_amount () in
   test_transferring_to_sink
     ctxt
@@ -269,7 +269,7 @@ let test_transferring_to_burned ctxt =
 
 let test_transferring_to_frozen_bonds ctxt =
   let (pkh, _pk, _sk) = Signature.generate_key () in
-  let contract = Contract.implicit_contract pkh in
+  let contract = Contract.Implicit pkh in
   let tx_rollup = mk_rollup () in
   let bond_id = Bond_id.Tx_rollup_bond_id tx_rollup in
   let amount = random_amount () in
@@ -369,7 +369,7 @@ let test_transferring_from_bounded_source ctxt src amount expected_bupds =
 
 let test_transferring_from_contract ctxt =
   let (pkh, _pk, _sk) = Signature.generate_key () in
-  let src = Contract.implicit_contract pkh in
+  let src = Contract.Implicit pkh in
   let amount = random_amount () in
   test_transferring_from_bounded_source
     ctxt
@@ -389,7 +389,7 @@ let test_transferring_from_collected_commitments ctxt =
 let test_transferring_from_delegate_balance ctxt =
   let (pkh, _pk, _sk) = Signature.generate_key () in
   let amount = random_amount () in
-  let src = Contract.implicit_contract pkh in
+  let src = Contract.Implicit pkh in
   test_transferring_from_bounded_source
     ctxt
     (`Delegate_balance pkh)
@@ -415,7 +415,7 @@ let test_transferring_from_collected_fees ctxt =
 
 let test_transferring_from_frozen_bonds ctxt =
   let (pkh, _pk, _sk) = Signature.generate_key () in
-  let contract = Contract.implicit_contract pkh in
+  let contract = Contract.Implicit pkh in
   let tx_rollup = mk_rollup () in
   let bond_id = Bond_id.Tx_rollup_bond_id tx_rollup in
   let amount = random_amount () in
@@ -484,15 +484,15 @@ let cast_to_container_type x =
 (** Generates all combinations of constructors. *)
 let build_test_cases () =
   create_context () >>=? fun (ctxt, pkh) ->
-  let origin = `Contract (Contract.implicit_contract pkh) in
+  let origin = `Contract (Contract.Implicit pkh) in
   let (user1, _, _) = Signature.generate_key () in
-  let user1c = `Contract (Contract.implicit_contract user1) in
+  let user1c = `Contract (Contract.Implicit user1) in
   let (user2, _, _) = Signature.generate_key () in
-  let user2c = `Contract (Contract.implicit_contract user2) in
+  let user2c = `Contract (Contract.Implicit user2) in
   let (baker1, baker1_pk, _) = Signature.generate_key () in
-  let baker1c = `Contract (Contract.implicit_contract baker1) in
+  let baker1c = `Contract (Contract.Implicit baker1) in
   let (baker2, baker2_pk, _) = Signature.generate_key () in
-  let baker2c = `Contract (Contract.implicit_contract baker2) in
+  let baker2c = `Contract (Contract.Implicit baker2) in
   (* Allocate contracts for user1, user2, baker1, and baker2. *)
   wrap (Token.transfer ctxt origin user1c (random_amount ()))
   >>=? fun (ctxt, _) ->
@@ -505,20 +505,20 @@ let build_test_cases () =
   (* Configure baker1, and baker2 as delegates by self-delegation, for which
      revealing their manager key is a prerequisite. *)
   wrap (Contract.reveal_manager_key ctxt baker1 baker1_pk) >>=? fun ctxt ->
-  wrap (Delegate.set ctxt (Contract.implicit_contract baker1) (Some baker1))
+  wrap (Delegate.set ctxt (Contract.Implicit baker1) (Some baker1))
   >>=? fun ctxt ->
   wrap (Contract.reveal_manager_key ctxt baker2 baker2_pk) >>=? fun ctxt ->
-  wrap (Delegate.set ctxt (Contract.implicit_contract baker2) (Some baker2))
+  wrap (Delegate.set ctxt (Contract.Implicit baker2) (Some baker2))
   (* Let user1 delegate to baker2. *)
   >>=? fun ctxt ->
-  wrap (Delegate.set ctxt (Contract.implicit_contract user1) (Some baker2))
+  wrap (Delegate.set ctxt (Contract.Implicit user1) (Some baker2))
   >>=? fun ctxt ->
   let tx_rollup1 = mk_rollup () in
   let bond_id1 = Bond_id.Tx_rollup_bond_id tx_rollup1 in
   let tx_rollup2 = mk_rollup () in
   let bond_id2 = Bond_id.Tx_rollup_bond_id tx_rollup2 in
-  let user1ic = Contract.implicit_contract user1 in
-  let baker2ic = Contract.implicit_contract baker2 in
+  let user1ic = Contract.Implicit user1 in
+  let baker2ic = Contract.Implicit baker2 in
   let src_list =
     [
       (`Invoice, random_amount ());
@@ -568,12 +568,11 @@ let check_sink_balances ctxt ctxt' dest amount =
 let rec check_balances ctxt ctxt' src dest amount =
   match (cast_to_container_type src, cast_to_container_type dest) with
   | (None, None) -> return_unit
-  | (Some (`Delegate_balance d), Some (`Contract c as contract))
-    when Contract.implicit_contract d = c ->
-      (* src and dest are in fact referring to the same contract *)
-      check_balances ctxt ctxt' contract contract amount
-  | (Some (`Contract c as contract), Some (`Delegate_balance d))
-    when Contract.implicit_contract d = c ->
+  | ( Some (`Delegate_balance d),
+      Some (`Contract (Contract.Implicit c) as contract) )
+  | ( Some (`Contract (Contract.Implicit c) as contract),
+      Some (`Delegate_balance d) )
+    when d = c ->
       (* src and dest are in fact referring to the same contract *)
       check_balances ctxt ctxt' contract contract amount
   | (Some src, Some dest) when src = dest ->
@@ -694,15 +693,15 @@ let test_transfer_n_with_empty_source () =
 let test_transfer_n_with_non_empty_source () =
   Random.init 0 ;
   create_context () >>=? fun (ctxt, pkh) ->
-  let origin = `Contract (Contract.implicit_contract pkh) in
+  let origin = `Contract (Contract.Implicit pkh) in
   let (user1, _, _) = Signature.generate_key () in
-  let user1c = `Contract (Contract.implicit_contract user1) in
+  let user1c = `Contract (Contract.Implicit user1) in
   let (user2, _, _) = Signature.generate_key () in
-  let user2c = `Contract (Contract.implicit_contract user2) in
+  let user2c = `Contract (Contract.Implicit user2) in
   let (user3, _, _) = Signature.generate_key () in
-  let user3c = `Contract (Contract.implicit_contract user3) in
+  let user3c = `Contract (Contract.Implicit user3) in
   let (user4, _, _) = Signature.generate_key () in
-  let user4c = `Contract (Contract.implicit_contract user4) in
+  let user4c = `Contract (Contract.Implicit user4) in
   (* Allocate contracts for user1, user2, user3, and user4. *)
   let amount =
     match Tez.of_mutez 1000L with None -> assert false | Some x -> x

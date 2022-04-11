@@ -24,15 +24,13 @@
 (*****************************************************************************)
 
 let is_inactive ctxt delegate =
-  Storage.Contract.Inactive_delegate.mem
-    ctxt
-    (Contract_repr.implicit_contract delegate)
+  Storage.Contract.Inactive_delegate.mem ctxt (Contract_repr.Implicit delegate)
   >>= fun inactive ->
   if inactive then return inactive
   else
     Storage.Contract.Delegate_last_cycle_before_deactivation.find
       ctxt
-      (Contract_repr.implicit_contract delegate)
+      (Contract_repr.Implicit delegate)
     >|=? function
     | Some last_active_cycle ->
         let ({Level_repr.cycle = current_cycle; _} : Level_repr.t) =
@@ -45,13 +43,11 @@ let is_inactive ctxt delegate =
         false
 
 let last_cycle_before_deactivation ctxt delegate =
-  let contract = Contract_repr.implicit_contract delegate in
+  let contract = Contract_repr.Implicit delegate in
   Storage.Contract.Delegate_last_cycle_before_deactivation.get ctxt contract
 
 let set_inactive ctxt delegate =
-  Storage.Contract.Inactive_delegate.add
-    ctxt
-    (Contract_repr.implicit_contract delegate)
+  Storage.Contract.Inactive_delegate.add ctxt (Contract_repr.Implicit delegate)
 
 let set_active ctxt delegate =
   is_inactive ctxt delegate >>=? fun inactive ->
@@ -63,7 +59,7 @@ let set_active ctxt delegate =
      - if the delegate is new or inactive, we give it additionally
      `preserved_cycles` because the delegate needs this number of cycles to
      receive rights, so `1 + 2 * preserved_cycles` in total. *)
-  let delegate_contract = Contract_repr.implicit_contract delegate in
+  let delegate_contract = Contract_repr.Implicit delegate in
   Storage.Contract.Delegate_last_cycle_before_deactivation.find
     ctxt
     delegate_contract

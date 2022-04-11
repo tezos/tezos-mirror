@@ -279,7 +279,7 @@ let manager_operation ?counter ?(fee = Tez.zero) ?gas_limit ?storage_limit
 
 let revelation ?(fee = Tez.zero) ctxt public_key =
   let pkh = Signature.Public_key.hash public_key in
-  let source = Contract.implicit_contract pkh in
+  let source = Contract.Implicit pkh in
   Context.Contract.counter ctxt source >>=? fun counter ->
   Context.Contract.manager ctxt source >|=? fun account ->
   let counter = Z.succ counter in

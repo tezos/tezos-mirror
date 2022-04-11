@@ -352,11 +352,7 @@ let test_single_activation () =
     WithExceptions.Option.get ~loc:__LOC__ @@ List.hd secrets
   in
   (* Contract does not exist *)
-  Assert.balance_is
-    ~loc:__LOC__
-    (B blk)
-    (Contract.implicit_contract account)
-    Tez.zero
+  Assert.balance_is ~loc:__LOC__ (B blk) (Contract.Implicit account) Tez.zero
   >>=? fun () ->
   Op.activation (B blk) account activation_code >>=? fun operation ->
   Block.bake ~operation blk >>=? fun blk ->
@@ -364,7 +360,7 @@ let test_single_activation () =
   Assert.balance_is
     ~loc:__LOC__
     (B blk)
-    (Contract.implicit_contract account)
+    (Contract.Implicit account)
     expected_amount
 
 (** 10 activations, one per bake. *)
@@ -377,7 +373,7 @@ let test_multi_activation_1 () =
       Assert.balance_is
         ~loc:__LOC__
         (B blk)
-        (Contract.implicit_contract account)
+        (Contract.Implicit account)
         expected_amount
       >|=? fun () -> blk)
     blk
@@ -400,7 +396,7 @@ let test_multi_activation_2 () =
       Assert.balance_is
         ~loc:__LOC__
         (B blk)
-        (Contract.implicit_contract account)
+        (Contract.Implicit account)
         expected_amount)
     secrets
 
@@ -410,7 +406,7 @@ let test_activation_and_transfer () =
   let ({account; activation_code; _} as _first_one) =
     WithExceptions.Option.get ~loc:__LOC__ @@ List.hd secrets
   in
-  let first_contract = Contract.implicit_contract account in
+  let first_contract = Contract.Implicit account in
   Op.activation (B blk) account activation_code >>=? fun operation ->
   Block.bake ~operation blk >>=? fun blk ->
   Context.Contract.balance (B blk) bootstrap_contract >>=? fun amount ->
@@ -423,7 +419,7 @@ let test_activation_and_transfer () =
   Assert.balance_was_credited
     ~loc:__LOC__
     (B blk)
-    (Contract.implicit_contract account)
+    (Contract.Implicit account)
     activated_amount_before
     half_amount
 
@@ -433,7 +429,7 @@ let test_transfer_to_unactivated_then_activate () =
   let ({account; activation_code; amount} as _first_one) =
     WithExceptions.Option.get ~loc:__LOC__ @@ List.hd secrets
   in
-  let unactivated_commitment_contract = Contract.implicit_contract account in
+  let unactivated_commitment_contract = Contract.Implicit account in
   Context.Contract.balance (B blk) bootstrap_contract >>=? fun b_amount ->
   b_amount /? 2L >>?= fun b_half_amount ->
   Incremental.begin_construction blk >>=? fun inc ->
@@ -450,7 +446,7 @@ let test_transfer_to_unactivated_then_activate () =
   Assert.balance_was_credited
     ~loc:__LOC__
     (B blk2)
-    (Contract.implicit_contract account)
+    (Contract.Implicit account)
     amount
     b_half_amount
 
@@ -518,7 +514,7 @@ let test_invalid_transfer_from_unactivated_account () =
   let ({account; _} as _first_one) =
     WithExceptions.Option.get ~loc:__LOC__ @@ List.hd secrets
   in
-  let unactivated_commitment_contract = Contract.implicit_contract account in
+  let unactivated_commitment_contract = Contract.Implicit account in
   (* No activation *)
   Op.transaction
     (B blk)

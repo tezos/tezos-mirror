@@ -27,7 +27,7 @@ let find = Storage.Contract.Delegate.find
 
 (* A delegate is registered if its "implicit account" delegates to itself. *)
 let registered c delegate =
-  Storage.Contract.Delegate.find c (Contract_repr.implicit_contract delegate)
+  Storage.Contract.Delegate.find c (Contract_repr.Implicit delegate)
   >|=? function
   | Some current_delegate ->
       Signature.Public_key_hash.equal delegate current_delegate
@@ -35,14 +35,14 @@ let registered c delegate =
 
 let init ctxt contract delegate =
   Storage.Contract.Delegate.init ctxt contract delegate >>=? fun ctxt ->
-  let delegate_contract = Contract_repr.implicit_contract delegate in
+  let delegate_contract = Contract_repr.Implicit delegate in
   Storage.Contract.Delegated.add (ctxt, delegate_contract) contract >|= ok
 
 let unlink ctxt contract =
   Storage.Contract.Delegate.find ctxt contract >>=? function
   | None -> return ctxt
   | Some delegate ->
-      let delegate_contract = Contract_repr.implicit_contract delegate in
+      let delegate_contract = Contract_repr.Implicit delegate in
       Storage.Contract.Delegated.remove (ctxt, delegate_contract) contract
       >|= ok
 
@@ -53,9 +53,9 @@ let delete ctxt contract =
 let set ctxt contract delegate =
   unlink ctxt contract >>=? fun ctxt ->
   Storage.Contract.Delegate.add ctxt contract delegate >>= fun ctxt ->
-  let delegate_contract = Contract_repr.implicit_contract delegate in
+  let delegate_contract = Contract_repr.Implicit delegate in
   Storage.Contract.Delegated.add (ctxt, delegate_contract) contract >|= ok
 
 let delegated_contracts ctxt delegate =
-  let contract = Contract_repr.implicit_contract delegate in
+  let contract = Contract_repr.Implicit delegate in
   Storage.Contract.Delegated.elements (ctxt, contract)

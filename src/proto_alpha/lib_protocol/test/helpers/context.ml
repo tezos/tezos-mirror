@@ -402,7 +402,7 @@ let init_gen tup ?rng_state ?commitments ?(initial_balances = [])
   let accounts = Account.generate_accounts ?rng_state ~initial_balances n in
   let contracts =
     List.map
-      (fun (a, _) -> Alpha_context.Contract.implicit_contract Account.(a.pkh))
+      (fun (a, _) -> Alpha_context.Contract.Implicit Account.(a.pkh))
       accounts
   in
   Block.genesis
@@ -439,7 +439,7 @@ let init_with_constants_gen tup constants =
   let accounts = Account.generate_accounts n in
   let contracts =
     List.map
-      (fun (a, _) -> Alpha_context.Contract.implicit_contract Account.(a.pkh))
+      (fun (a, _) -> Alpha_context.Contract.Implicit Account.(a.pkh))
       accounts
   in
   let open Tezos_protocol_alpha_parameters in

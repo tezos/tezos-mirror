@@ -1487,8 +1487,6 @@ module Contract : sig
 
   val of_b58check : string -> t tzresult
 
-  val implicit_contract : public_key_hash -> t
-
   val exists : context -> t -> bool Lwt.t
 
   val must_exist : context -> t -> unit tzresult Lwt.t

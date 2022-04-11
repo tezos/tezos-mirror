@@ -899,10 +899,7 @@ let pp_manager_operation_contents_and_result ppf
   Format.fprintf
     ppf
     "@,%a"
-    (pp_manager_operation_content
-       (Contract.implicit_contract source)
-       false
-       pp_result)
+    (pp_manager_operation_content (Contract.Implicit source) false pp_result)
     (operation, operation_result) ;
   (match internal_operation_results with
   | [] -> ()

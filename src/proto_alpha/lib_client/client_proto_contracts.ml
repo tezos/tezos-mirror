@@ -47,12 +47,12 @@ module ContractAlias = struct
     | Some v -> return (s, v)
     | None -> (
         Client_keys.Public_key_hash.find_opt cctxt s >>=? function
-        | Some v -> return (s, Contract.implicit_contract v)
+        | Some v -> return (s, Contract.Implicit v)
         | None -> failwith "no contract or key named %s" s)
 
   let find_key cctxt name =
     Client_keys.Public_key_hash.find cctxt name >>=? fun v ->
-    return (name, Contract.implicit_contract v)
+    return (name, Contract.Implicit v)
 
   let rev_find cctxt (c : Contract.t) =
     match c with
@@ -90,7 +90,7 @@ module ContractAlias = struct
     | ["alias"; alias] -> find cctxt alias
     | ["key"; text] ->
         Client_keys.Public_key_hash.find cctxt text >>=? fun v ->
-        return (s, Contract.implicit_contract v)
+        return (s, Contract.Implicit v)
     | _ -> (
         find cctxt s >>= function
         | Ok v -> return v
@@ -147,7 +147,7 @@ let list_contracts cctxt =
     (fun (n, v) ->
       RawContractAlias.mem cctxt n >>=? fun mem ->
       let p = if mem then "key:" else "" in
-      let v' = Contract.implicit_contract v in
+      let v' = Contract.Implicit v in
       return (p, n, v'))
     keys
   >>=? fun accounts -> return (contracts @ accounts)

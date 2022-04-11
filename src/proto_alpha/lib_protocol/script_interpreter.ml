@@ -1029,7 +1029,7 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
           let arg_ty = unit_t in
           let address =
             {
-              destination = Contract (Contract.implicit_contract key);
+              destination = Contract (Contract.Implicit key);
               entrypoint = Entrypoint.default;
             }
           in
