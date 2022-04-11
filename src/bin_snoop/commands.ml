@@ -295,6 +295,20 @@ module Infer_cmd = struct
     Printf.eprintf "lasso --lasso-alpha=<float> --lasso-positive\n" ;
     Printf.eprintf "nnls\n%!"
 
+  let set_plot_raw_workload plot_raw_workload options =
+    match plot_raw_workload with
+    | None ->
+        {
+          options with
+          display = {options.display with plot_raw_workload = false};
+        }
+    | Some save_directory ->
+        {
+          options with
+          display =
+            {options.display with plot_raw_workload = true; save_directory};
+        }
+
   let infer_handler
       ( print_problem,
         csv,
@@ -306,7 +320,8 @@ module Infer_cmd = struct
         override_files,
         save_solution,
         dot_file,
-        full_plot_verbosity ) model_name workload_data solver () =
+        full_plot_verbosity,
+        plot_raw_workload ) model_name workload_data solver () =
     let options =
       default_infer_parameters_options
       |> set_print_problem print_problem
@@ -319,6 +334,7 @@ module Infer_cmd = struct
       |> set_save_solution save_solution
       |> set_dot_file dot_file
       |> set_full_plot_verbosity full_plot_verbosity
+      |> set_plot_raw_workload plot_raw_workload
     in
     commandline_outcome_ref :=
       Some (Infer {model_name; workload_data; solver; infer_opts = options}) ;
@@ -430,11 +446,23 @@ module Infer_cmd = struct
         ~doc:"Produces all (possibly redundant) plots"
         ~long:"full-plot-verbosity"
         ()
+
+    let plot_raw_workload =
+      let raw_workload_directory_param =
+        Clic.parameter (fun (_ : unit) parsed -> Lwt.return_ok parsed)
+      in
+      Clic.arg
+        ~doc:
+          "For each workload, produces a file containing the plot of the raw \
+           data, in the specified directory"
+        ~long:"plot-raw-workload"
+        ~placeholder:"directory"
+        raw_workload_directory_param
   end
 
   let options =
     let open Options in
-    Clic.args11
+    Clic.args12
       print_problem
       dump_csv_arg
       plot_arg
@@ -446,6 +474,7 @@ module Infer_cmd = struct
       save_solution_arg
       dot_file_arg
       full_plot_verbosity_arg
+      plot_raw_workload
 
   let model_param =
     Clic.param
