@@ -8,6 +8,7 @@
   tezos-base.unix
   tezos-context
   tezos-stdlib-unix
+  tezos-test-helpers
   alcotest-lwt)
  (flags
   (:standard

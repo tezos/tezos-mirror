@@ -1409,6 +1409,7 @@ let _tezos_context_tests =
         tezos_base_unix;
         tezos_context |> open_;
         tezos_stdlib_unix |> open_;
+        tezos_test_helpers;
         alcotest_lwt;
       ]
     ~modules:["assert"; "test_context"; "test"]
