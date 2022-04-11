@@ -30,7 +30,7 @@ let rec try_alternatives input = function
   | (_, f) :: alts -> either_f (f input) (fun () -> try_alternatives input alts)
 
 let parse_alternatives alts input =
-  match String.split_exact ~limit:1 ':' input with
+  match String.split ~limit:1 ':' input with
   | [_] -> try_alternatives input alts
   | [format; value] -> (
       match List.assoc_opt ~equal:String.equal format alts with

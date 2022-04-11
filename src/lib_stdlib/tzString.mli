@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [split_exact delim ~limit str] splits [str] into a list of strings.
+(** [split delim ~limit str] splits [str] into a list of strings.
     Splitting occurs on [delim] characters (which are removed from output)
     at most [limit] times. Remaining [delim] characters are included in the
     last element of the resulting list.
@@ -31,8 +31,8 @@
     [limit] defaults to [max_int].
 
     This function obeys the invariant that for all [limit]s, [delim]s and [str]s:
-    [String.concat (String.init 1 (fun _ -> delim)) (Split_exact delim ~limit str) = str].*)
-val split_exact : char -> ?limit:int -> string -> string list
+    [String.concat (String.init 1 (fun _ -> delim)) (split delim ~limit str) = str].*)
+val split : char -> ?limit:int -> string -> string list
 
 (** Splits a string on a delimiter character. It strips delimiters at the
     beginning and at the end. It considers groups of delimiters as one. If

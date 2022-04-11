@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let split_exact delim ?(limit = max_int) str =
+let split delim ?(limit = max_int) str =
   let len = String.length str in
   let take start finish = String.sub str start (finish - start) in
   let rec mark_delims limit acc = function

@@ -17,7 +17,7 @@ let test_split_duplicated_separator () =
       assert (TzString.split_no_empty ' ' s = TzString.split_no_empty ' ' s))
     inputs
 
-let test_split_exact =
+let test_split =
   let open QCheck2 in
   let gen =
     let open Gen in
@@ -27,14 +27,14 @@ let test_split_exact =
     return (str, sep, lim)
   in
   Test.make
-    ~name:"TzString.split_exact is reversed by String.concat"
+    ~name:"TzString.split is reversed by String.concat"
     gen
     (fun (string, sep, limit) ->
-      let split = TzString.split_exact sep ?limit string in
+      let split = TzString.split sep ?limit string in
       String.concat (String.make 1 sep) split = string)
 
 let split_tests =
   [("handles a duplicated separator", `Quick, test_split_duplicated_separator)]
-  @ Lib_test.Qcheck2_helpers.qcheck_wrap [test_split_exact]
+  @ Lib_test.Qcheck2_helpers.qcheck_wrap [test_split]
 
 let () = Alcotest.run "TzString" [("split", split_tests)]

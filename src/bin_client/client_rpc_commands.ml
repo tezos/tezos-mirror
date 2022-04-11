@@ -513,7 +513,7 @@ let call_with_json meth raw_url json (cctxt : #Client_context.full) =
 let call_with_file_or_json meth url maybe_file (cctxt : #Client_context.full) =
   let open Lwt_result_syntax in
   let* json =
-    match TzString.split_exact ':' ~limit:1 maybe_file with
+    match TzString.split ':' ~limit:1 maybe_file with
     | ["file"; filename] ->
         Lwt.catch
           (fun () ->

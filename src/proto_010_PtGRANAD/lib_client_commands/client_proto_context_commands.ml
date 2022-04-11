@@ -72,7 +72,7 @@ let report_michelson_errors ?(no_print_source = false) ~msg
 
 let json_file_or_text_parameter =
   Clic.parameter (fun _ p ->
-      match String.split_exact ~limit:1 ':' p with
+      match String.split ~limit:1 ':' p with
       | ["text"; text] -> return (Ezjsonm.from_string text)
       | ["file"; path] -> Lwt_utils_unix.Json.read_file path
       | _ -> (
