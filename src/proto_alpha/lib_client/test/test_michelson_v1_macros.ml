@@ -33,25 +33,27 @@
 *)
 
 open Protocol
+module Assert = Lib_test.Assert
 
-let print expr : string =
+let pp ppf expr =
   expr
   |> Micheline_printer.printable (fun s -> s)
-  |> Format.asprintf "%a" Micheline_printer.print_expr
+  |> Format.fprintf ppf "%a" Micheline_printer.print_expr
 
+let to_string e = Format.asprintf "%a" pp e
 (* expands : expression with macros fully expanded *)
 
 let assert_expands
     (original : (Micheline_parser.location, string) Micheline.node)
     (expanded : (Micheline_parser.location, string) Micheline.node) =
   let ({Michelson_v1_parser.expanded = expansion; _}, errors) =
-    let source = print (Micheline.strip_locations original) in
+    let source = to_string (Micheline.strip_locations original) in
     Michelson_v1_parser.expand_all ~source ~original
   in
   match errors with
   | [] ->
       Assert.equal
-        ~print
+        ~pp
         (Michelson_v1_primitives.strings_of_prims expansion)
         (Micheline.strip_locations expanded) ;
       ok ()
@@ -692,14 +694,14 @@ let test_map_cdadr () =
     expression with macros *)
 let assert_unexpansion original ex =
   let ({Michelson_v1_parser.expanded; _}, errors) =
-    let source = print (Micheline.strip_locations original) in
+    let source = to_string (Micheline.strip_locations original) in
     Michelson_v1_parser.expand_all ~source ~original
   in
   let unparse = Michelson_v1_printer.unparse_expression expanded in
   match errors with
   | [] ->
       Assert.equal
-        ~print
+        ~pp
         unparse.Michelson_v1_parser.unexpanded
         (Micheline.strip_locations ex) ;
       ok ()
