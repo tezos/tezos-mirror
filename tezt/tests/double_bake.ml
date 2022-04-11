@@ -107,7 +107,7 @@ let wait_for_denunciation_injection node client accuser =
 
    3. Then, restart Node 2 and bake 2 blocks from level 1, the
    first one with bootstrap2 key and the second one with
-   bootstrap1 key. 
+   bootstrap1 key.
    Thus, the block at level 3 is double baked (and we
    ensure that the double baked blocks are different as they emanate
    from 2 distinct branches),
@@ -119,7 +119,7 @@ let wait_for_denunciation_injection node client accuser =
    accuser has seen 1 block at level 3 baked by bootstrap1.
 
    6. Run Node 1 and connect to Node 3. Wait for Node 3 to
-   catch up. 
+   catch up.
    Because the branch on Node 1 is longer, Node 3 needs to switch
    from its current branch to Node 1's branch. This way, we ensure
    that Node 3 will revalidate a block at level 3 from Node 1's
@@ -174,11 +174,13 @@ let double_bake =
   let* () =
     (* Base branch is baked by bootstrap1. *)
     repeat base_branch_size (fun () ->
-        Client.bake_for ~keys:[bootstrap1_key] client_1)
+        Client.bake_for_and_wait ~keys:[bootstrap1_key] client_1)
   in
-  let* () = Client.bake_for ~keys:[bootstrap1_key] client_1 in
-  (* Another bake to make this branch longer than Node 2's one. *)
-  let* () = Client.bake_for ~keys:[bootstrap1_key] client_1 in
+  (* Two other bake to make this branch longer than Node 2's one. *)
+  let* () =
+    repeat 2 (fun () ->
+        Client.bake_for_and_wait ~keys:[bootstrap1_key] client_1)
+  in
   let* _ = Node.wait_for_level node_1 (common_ancestor + node_1_branch_size) in
   let* () = Node.terminate node_1 in
 
@@ -190,11 +192,11 @@ let double_bake =
   let* () =
     (* Base branch is baked by bootstrap2. *)
     repeat base_branch_size (fun () ->
-        Client.bake_for ~keys:[bootstrap2_key] client_2)
+        Client.bake_for_and_wait ~keys:[bootstrap2_key] client_2)
   in
   (* The second block is baked by bootstrap1 to simulate a
      double bake. *)
-  let* () = Client.bake_for ~keys:[bootstrap1_key] client_2 in
+  let* () = Client.bake_for_and_wait ~keys:[bootstrap1_key] client_2 in
   let* _ = Node.wait_for_level node_2 (common_ancestor + node_2_branch_size) in
 
   log_step 4 "Run Node 3, bake one block and wait for the accuser to be ready." ;
@@ -222,7 +224,7 @@ let double_bake =
   let* denunciation_oph = denunciation_injection in
 
   log_step 7 "Bake a block on Node 3 and wait for everybody to catch up." ;
-  let* () = Client.bake_for ~keys:[bootstrap1_key] client_3 in
+  let* () = Client.bake_for_and_wait ~keys:[bootstrap1_key] client_3 in
   let* _ = Node.wait_for_level node_1 node_3_final_level
   and* _ = Node.wait_for_level node_2 node_3_final_level
   and* _ = Node.wait_for_level node_3 node_3_final_level in

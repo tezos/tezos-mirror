@@ -43,7 +43,7 @@ module Revamped = struct
     let prefix = "step" ^ string_of_int counter in
     Log.info ~color ~prefix msg
 
-  (* We override the default [bake_for] comment to wait on the next level
+  (* We override the default [bake_for] command to wait on the next level
      incremented after the new block. If [wait_for_flush] is set we wait on
      a [flush] event from the mempool because the [set_head] event used by the
      default [bake_for] functions happens before a flush of the mempool.
@@ -342,7 +342,9 @@ module Revamped = struct
     log_step 8 "Bake on node1 (head increment)." ;
     let bake_waiter1 = wait_for_operations_not_flushed_event node1 in
     let* () =
-      Client.bake_for ~keys:[Constant.bootstrap4.public_key_hash] client1
+      Client.bake_for_and_wait
+        ~keys:[Constant.bootstrap4.public_key_hash]
+        client1
     in
     let* pending = bake_waiter1 in
 
@@ -1456,7 +1458,7 @@ module Revamped = struct
       "Bake and check %s was not included and is not in node2's mempool either."
       oph1 ;
     let baking = Node.wait_for_request ~request:`Flush node2 in
-    let* () = Client.bake_for client2 in
+    let* () = Client.bake_for_and_wait client2 in
     let* _ = baking in
     (* empty mempool *)
     let* () = check_mempool client2 in
@@ -2160,7 +2162,7 @@ let forge_and_inject_n_operations ~branch ~fee ~gas_limit ~source ~destination
 (** Bakes with an empty mempool to force synchronisation between nodes. *)
 let bake_empty_block ?endpoint ~protocol client =
   let mempool = Client.empty_mempool_file () in
-  Client.bake_for ~protocol ?endpoint ~mempool client
+  Client.bake_for_and_wait ~protocol ?endpoint ~mempool client
 
 (** [bake_empty_mempool_and_wait_for_flush client node] bakes for [client]
     with an empty mempool, then waits for a [flush] event on [node] (which
@@ -2611,7 +2613,7 @@ let forge_pre_filtered_operation =
   Log.info "Op forged and injected" ;
   (* Step 4 *)
   (* Bake 1 block *)
-  let* () = Client.bake_for client_2 in
+  let* () = Client.bake_for_and_wait client_2 in
   (* Step 5 *)
   (* Get client_2 ddb and check that it contains no operation *)
   let* ddb2 = RPC.get_ddb client_2 in
@@ -2762,7 +2764,12 @@ let check_op_removed client op =
 (** Bakes with an empty mempool to force synchronisation between nodes. *)
 let bake_empty_block ?endpoint ?protocol client =
   let mempool = Client.empty_mempool_file () in
-  Client.bake_for ?protocol ?endpoint ~mempool ~ignore_node_mempool:true client
+  Client.bake_for_and_wait
+    ?protocol
+    ?endpoint
+    ~mempool
+    ~ignore_node_mempool:true
+    client
 
 (** [bake_empty_block_and_wait_for_flush client node] bakes for [client]
     with an empty mempool, then waits for a [flush] event on [node] (which
@@ -3441,7 +3448,7 @@ let injecting_old_operation_fails =
   let blocks_to_bake = 2 in
   let* () =
     repeat (max_operations_ttl + blocks_to_bake) (fun () ->
-        Client.bake_for client)
+        Client.bake_for_and_wait client)
   in
   (* + 1 for the activation block *)
   let* _ = Node.wait_for_level node (max_operations_ttl + blocks_to_bake + 1) in

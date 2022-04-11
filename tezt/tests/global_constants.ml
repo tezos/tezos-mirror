@@ -44,7 +44,7 @@ let test_large_flat_contract =
       ~burn_cap:Tez.(of_int 9999999)
       client
   in
-  let* () = Client.bake_for client in
+  let* () = Client.bake_for_and_wait client in
   return ()
 
 (* To ensure a billion-laughs style attack is not possible,
@@ -74,7 +74,7 @@ let test_billion_laughs_contract =
       ?burn_cap:(Some (Tez.of_int 100))
       client
   in
-  let* () = Client.bake_for client in
+  let* () = Client.bake_for_and_wait client in
   let value =
     repeat_n_times 10 (Format.sprintf "constant \"%s\";" hash) "{" "}"
   in
@@ -85,7 +85,7 @@ let test_billion_laughs_contract =
       ?burn_cap:(Some (Tez.of_int 100))
       client
   in
-  let* () = Client.bake_for client in
+  let* () = Client.bake_for_and_wait client in
   let value =
     repeat_n_times 10 (Format.sprintf "constant \"%s\";" hash) "{" "}"
   in
@@ -99,7 +99,7 @@ let test_billion_laughs_contract =
   let* _ =
     Process.check_error ~msg:(rex "larger than the expression size limit") proc
   in
-  let* _ = Client.bake_for client in
+  let* _ = Client.bake_for_and_wait client in
   (* Same test but for a contract
 
      Note the contract is ill-typed, having a extra CDR command.
@@ -122,7 +122,7 @@ let test_billion_laughs_contract =
   let* _ =
     Process.check_error ~msg:(rex "larger than the expression size limit") proc
   in
-  Client.bake_for client
+  Client.bake_for_and_wait client
 
 let test_entrypoint_expansion =
   Protocol.register_test
@@ -139,7 +139,7 @@ let test_entrypoint_expansion =
       ?burn_cap:(Some (Tez.of_int 100))
       client
   in
-  let* () = Client.bake_for client in
+  let* () = Client.bake_for_and_wait client in
   (* Register a contract that uses the expression. *)
   let* contract =
     Client.originate_contract
@@ -151,7 +151,7 @@ let test_entrypoint_expansion =
       ~burn_cap:Tez.(of_int 9999999)
       client
   in
-  let* () = Client.bake_for client in
+  let* () = Client.bake_for_and_wait client in
   (* Get the entrypoints. *)
   let* result =
     Client.rpc

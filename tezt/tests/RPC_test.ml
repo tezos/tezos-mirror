@@ -43,30 +43,6 @@
    regression testing *)
 let hooks = Tezos_regression.hooks
 
-(** This test file is factored out on the Client mode. In Light mode we need some special care regarding waiting for all the nodes to be in sync, otherwise the commands fail as it looks like some nodes are rogue. *)
-let node_wait_for_level level client =
-  match Client.get_mode client with
-  | Light (_min_agreement, nodes) ->
-      Lwt_list.iter_p
-        (function
-          | Client.Node node ->
-              Lwt.map (Fun.const ()) @@ Node.wait_for_level node level
-          | _ -> Lwt.return_unit)
-        nodes
-  | Mockup -> assert false (* This file does not use Mockup mode *)
-  | Client (Some (Client.Node node), _) | Proxy (Client.Node node) ->
-      let* _ = Node.wait_for_level node level in
-      Lwt.return_unit
-  | Client _ | Proxy _ -> Lwt.return_unit
-
-(** [make_client_bake_for ()] returns a function similar to {!Client.bake_for} which additionally keeps track of the current level, and in Light mode, waits for all nodes to be in sync after baking. *)
-let make_client_bake_for () =
-  let current_level = ref 1 in
-  fun client ->
-    let* () = Client.bake_for client in
-    current_level := !current_level + 1 ;
-    node_wait_for_level !current_level client
-
 (* A helper to register a RPC test environment with a node and a client for the
    given protocol version.
    - [test_mode_tag] specifies the client mode ([`Client], [`Light] or [`Proxy]).
@@ -123,7 +99,7 @@ let check_rpc ~test_mode_tag ~test_function ?parameter_overrides
       client_mode_tag
       ()
   in
-  let* () = if bake then Client.bake_for client else Lwt.return_unit in
+  let* () = if bake then Client.bake_for_and_wait client else Lwt.return_unit in
   let* endpoint =
     match test_mode_tag with
     | `Client | `Light | `Proxy -> return Client.(Node node)
@@ -143,7 +119,6 @@ let check_rpc ~test_mode_tag ~test_function ?parameter_overrides
 
 (* Test the contracts RPC. *)
 let test_contracts _protocol ?endpoint client =
-  let client_bake_for = make_client_bake_for () in
   let test_implicit_contract contract_id =
     let*! _ = RPC.Contracts.get ?endpoint ~hooks ~contract_id client in
     let*! _ = RPC.Contracts.get_balance ?endpoint ~hooks ~contract_id client in
@@ -181,7 +156,7 @@ let test_contracts _protocol ?endpoint client =
       ~burn_cap:Constant.implicit_account_burn
       client
   in
-  let* () = client_bake_for client in
+  let* () = Client.bake_for_and_wait client in
   let* () = test_implicit_contract simple_implicit_key.public_key_hash in
   let* () =
     Lwt_list.iter_s
@@ -216,11 +191,11 @@ let test_contracts _protocol ?endpoint client =
       ~burn_cap:Constant.implicit_account_burn
       client
   in
-  let* () = client_bake_for client in
+  let* () = Client.bake_for_and_wait client in
   let*! () =
     Client.set_delegate ~src:delegated_implicit ~delegate:bootstrap1 client
   in
-  let* () = client_bake_for client in
+  let* () = Client.bake_for_and_wait client in
   let* () = test_implicit_contract delegated_implicit_key.public_key_hash in
   let*! _ =
     RPC.Contracts.get_delegate
@@ -290,7 +265,7 @@ let test_contracts _protocol ?endpoint client =
       ~burn_cap:Tez.(of_int 3)
       client
   in
-  let* () = client_bake_for client in
+  let* () = Client.bake_for_and_wait client in
   let* () = test_originated_contract originated_contract_simple in
   (* A smart contract with a big map and entrypoints *)
   Log.info "Test advanced originated contract" ;
@@ -304,7 +279,7 @@ let test_contracts _protocol ?endpoint client =
       ~burn_cap:Tez.(of_int 3)
       client
   in
-  let* () = client_bake_for client in
+  let* () = Client.bake_for_and_wait client in
   let* () = test_originated_contract originated_contract_advanced in
   let unique_big_map_key =
     Ezjsonm.value_from_string
@@ -577,11 +552,10 @@ let test_delegates _protocol ?endpoint client =
 
 (* Test the votes RPC. *)
 let test_votes _protocol ?endpoint client =
-  let client_bake_for = make_client_bake_for () in
   (* initialize data *)
   let proto_hash = "ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp" in
   let* () = Client.submit_proposals ~proto_hash client in
-  let* () = client_bake_for client in
+  let* () = Client.bake_for_and_wait client in
   (* RPC calls *)
   let* _ = RPC.Votes.get_ballot_list ?endpoint ~hooks client in
   let* _ = RPC.Votes.get_ballots ?endpoint ~hooks client in
@@ -593,12 +567,11 @@ let test_votes _protocol ?endpoint client =
   let* _ = RPC.Votes.get_successor_period ?endpoint ~hooks client in
   let* _ = RPC.Votes.get_total_voting_power ?endpoint ~hooks client in
   (* bake to testing vote period and submit some ballots *)
-  let* () = client_bake_for client in
-  let* () = client_bake_for client in
+  let* () = repeat 2 (fun () -> Client.bake_for_and_wait client) in
   let* () = Client.submit_ballot ~key:"bootstrap1" ~proto_hash Yay client in
   let* () = Client.submit_ballot ~key:"bootstrap2" ~proto_hash Nay client in
   let* () = Client.submit_ballot ~key:"bootstrap3" ~proto_hash Pass client in
-  let* () = client_bake_for client in
+  let* () = Client.bake_for_and_wait client in
   (* RPC calls again *)
   let* _ = RPC.Votes.get_ballot_list ?endpoint ~hooks client in
   let* _ = RPC.Votes.get_ballots ?endpoint ~hooks client in
@@ -727,7 +700,7 @@ let test_mempool protocol ?endpoint client =
       ~dest:Constant.bootstrap2
       client
   in
-  let* _ = Client.bake_for ?endpoint client in
+  let* _ = Client.bake_for_and_wait ?endpoint client in
 
   let* _ = bake_empty_block ?endpoint client in
 

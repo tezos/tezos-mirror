@@ -48,7 +48,9 @@ let test_metadata_consistency ~migrate_from ~migrate_to =
   let* () = Node.wait_for_ready node in
   let* client = Client.(init ~endpoint:(Node node) ()) in
   let* () = Client.activate_protocol ~protocol:migrate_from client in
-  let* () = repeat (migration_level - 1) (fun () -> Client.bake_for client) in
+  let* () =
+    repeat (migration_level - 1) (fun () -> Client.bake_for_and_wait client)
+  in
   let* non_migration_block =
     RPC.get_block_metadata ~block:(string_of_int (migration_level - 1)) client
   in

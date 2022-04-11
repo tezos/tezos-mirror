@@ -103,7 +103,9 @@ let transfer_and_wait_for_injection node client amount_int giver_key
 *)
 let bake_wait_log ?level ?protocol ?mempool ?ignore_node_mempool node client =
   let baked = wait_for_flush node in
-  let* () = Client.bake_for ?protocol ?mempool ?ignore_node_mempool client in
+  let* () =
+    Client.bake_for_and_wait ?protocol ?mempool ?ignore_node_mempool client
+  in
   let* _ = baked in
   Log.info "Baked." ;
   match level with
@@ -372,7 +374,7 @@ let test_event_levels =
   let wait3b = wait_for_flush node_3 in
   let wait1c = wait_for_set_head node_1 in
   let wait2c = wait_for_set_head node_2 in
-  let* () = Client.bake_for client_3 in
+  let* () = Client.bake_for_and_wait client_3 in
   let* () = wait1b in
   let* () = wait2b in
   let* () = wait3b in

@@ -226,7 +226,9 @@ let check_bootstrap_with_history_modes hmode1 hmode2 =
   in
   let* () = Client.activate_protocol ~protocol client ~parameter_file in
   Log.info "Activated protocol." ;
-  let* () = repeat bakes_before_kill (fun () -> Client.bake_for client) in
+  let* () =
+    repeat bakes_before_kill (fun () -> Client.bake_for_and_wait client)
+  in
   let* _ = Node.wait_for_level node_1 (bakes_before_kill + 1)
   and* _ = Node.wait_for_level node_2 (bakes_before_kill + 1) in
   Log.info "Both nodes are at level %d." (bakes_before_kill + 1) ;
@@ -236,7 +238,9 @@ let check_bootstrap_with_history_modes hmode1 hmode2 =
   in
   (* Kill node 2 and continue baking without it. *)
   let* () = Node.terminate node_2 in
-  let* () = repeat bakes_during_kill (fun () -> Client.bake_for client) in
+  let* () =
+    repeat bakes_during_kill (fun () -> Client.bake_for_and_wait client)
+  in
   (* Restart node 2 and let it catch up. *)
   Log.info "Baked %d times with node_2 down, restart node_2." bakes_during_kill ;
   let final_level = 1 + bakes_before_kill + bakes_during_kill in
