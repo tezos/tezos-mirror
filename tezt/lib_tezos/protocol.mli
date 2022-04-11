@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 (** Protocols we may want to test with. *)
-type t = Hangzhou | Ithaca | Jakarta | Alpha
+type t = Ithaca | Jakarta | Alpha
 
 (** Protocol parameters.
 

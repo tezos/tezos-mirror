@@ -96,23 +96,6 @@ let register =
       client
   in
   let* () = wait_injection in
-  let last_bake () =
-    if protocol = Protocol.Hangzhou then
-      let p =
-        Client.spawn_bake_for
-          ~context_path:(data_dir // "context")
-          ~keys:[Constant.bootstrap1.alias]
-          client
-      in
-      let* _error_output =
-        Process.check_and_read_stderr ~expect_failure:true p
-      in
-      Client.bake_for
-        ~context_path:(data_dir // "context")
-        ~keys:[Constant.bootstrap2.alias]
-        client
-    else Client.bake_for ~context_path:(data_dir // "context") client
-  in
-  let* () = last_bake () in
+  let* () = Client.bake_for ~context_path:(data_dir // "context") client in
   let* _ = Node.wait_for_level node 4 in
   unit

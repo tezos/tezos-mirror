@@ -25,25 +25,19 @@
 (*****************************************************************************)
 
 (* Declaration order must respect the version order. *)
-type t = Hangzhou | Ithaca | Jakarta | Alpha
+type t = Ithaca | Jakarta | Alpha
 
 type constants = Constants_sandbox | Constants_mainnet | Constants_test
 
 let name = function
   | Alpha -> "Alpha"
-  | Hangzhou -> "Hangzhou"
   | Ithaca -> "Ithaca"
   | Jakarta -> "Jakarta"
 
-let number = function
-  | Hangzhou -> 011
-  | Ithaca -> 012
-  | Jakarta -> 013
-  | Alpha -> 014
+let number = function Ithaca -> 012 | Jakarta -> 013 | Alpha -> 014
 
 let directory = function
   | Alpha -> "proto_alpha"
-  | Hangzhou -> "proto_011_PtHangz2"
   | Ithaca -> "proto_012_Psithaca"
   | Jakarta -> "proto_013_PtJakart"
 
@@ -52,7 +46,6 @@ let tag protocol = String.lowercase_ascii (name protocol)
 
 let hash = function
   | Alpha -> "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
-  | Hangzhou -> "PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx"
   | Ithaca -> "Psithaca2MLRFYargivpo7YvUr7wUDqyxrdhC5CQq78mRvimz6A"
   | Jakarta -> "PtJakartaiDz69SfDDLXJSiuZqTSeSKRDbKVZC8MNzJnvRjvnGw"
 
@@ -71,7 +64,6 @@ let parameter_file ?(constants = default_constants) protocol =
 
 let daemon_name = function
   | Alpha -> "alpha"
-  | Hangzhou -> "011-PtHangz2"
   | Ithaca -> "012-Psithaca"
   | Jakarta -> "013-PtJakart"
 
@@ -134,18 +126,16 @@ let write_parameter_file :
   Lwt.return overriden_parameters
 
 let next_protocol = function
-  | Hangzhou -> Some Ithaca
-  | Ithaca -> None
+  | Ithaca -> Some Jakarta
   | Jakarta -> None
   | Alpha -> None
 
 let previous_protocol = function
-  | Alpha -> Some Hangzhou
-  | Jakarta -> Some Hangzhou
-  | Ithaca -> Some Hangzhou
-  | Hangzhou -> None
+  | Alpha -> Some Jakarta
+  | Jakarta -> Some Ithaca
+  | Ithaca -> None
 
-let all = [Alpha; Hangzhou; Ithaca]
+let all = [Alpha; Ithaca; Jakarta]
 
 type supported_protocols =
   | Any_protocol

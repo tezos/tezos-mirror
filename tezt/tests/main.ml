@@ -32,8 +32,7 @@
             other files.
  *)
 
-let protocols =
-  [Protocol.Alpha; Protocol.Jakarta; Protocol.Ithaca; Protocol.Hangzhou]
+let protocols = [Protocol.Alpha; Protocol.Jakarta; Protocol.Ithaca]
 
 let migrate_from = Protocol.Ithaca
 
@@ -56,7 +55,7 @@ let () =
   Normalize.register ~protocols:[Alpha] ;
   Double_bake.register ~protocols:[Alpha] ;
   Light.register ~protocols:[Alpha] ;
-  Mockup.register ~protocols:[Hangzhou; Ithaca; Jakarta; Alpha] ;
+  Mockup.register ~protocols:[Ithaca; Jakarta; Alpha] ;
   Mockup.register_constant_migration ~migrate_from ~migrate_to ;
   Mockup.register_migration_ticket_balance ~migrate_from ~migrate_to ;
   Mockup.register_global_constants ~protocols:[Alpha] ;
@@ -69,7 +68,7 @@ let () =
   User_activated_upgrade.register ~migrate_from ~migrate_to ;
   Rpc_config_logging.register ~protocols:[Alpha] ;
   Protocol_table_update.register ~migrate_from ~migrate_to ;
-  Cache_cache.register [Hangzhou; Alpha] ;
+  Cache_cache.register [Ithaca; Jakarta; Alpha] ;
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/1823
      the "Baking" test does not have a documentation.
      I don't know if it is about baking accounts (and thus it is not a protocol-agnostic
@@ -94,23 +93,21 @@ let () =
   Cli_tezos.register_protocol_independent () ;
   (* Tests that are heavily protocol-dependent.
      Those modules define different tests for different protocols in their [register]. *)
-  RPC_test.register [Hangzhou; Alpha] ;
-  Voting.register
-    ~from_protocol:Hangzhou
-    ~to_protocol:(Known Ithaca)
-    ~loser_protocols:[Alpha] ;
-  Voting.register
-    ~from_protocol:Hangzhou
-    ~to_protocol:Injected_test
-    ~loser_protocols:[Alpha; Hangzhou] ;
+  RPC_test.register [Ithaca; Jakarta; Alpha] ;
+  (* Alpha cannot stitch from Jakarta yet, but when it can, we can
+     add a voting test from Jakarta to Alpha. *)
   Voting.register
     ~from_protocol:Ithaca
-    ~to_protocol:(Known Alpha)
-    ~loser_protocols:[Ithaca; Hangzhou] ;
+    ~to_protocol:(Known Jakarta)
+    ~loser_protocols:[Alpha] ;
+  Voting.register
+    ~from_protocol:Ithaca
+    ~to_protocol:Injected_test
+    ~loser_protocols:[Alpha; Ithaca] ;
   Voting.register
     ~from_protocol:Alpha
     ~to_protocol:Injected_test
-    ~loser_protocols:[Ithaca] ;
+    ~loser_protocols:[Jakarta] ;
   (* This file tests an RPC added in protocol G *)
   Big_map_all.register () ;
   Reject_malformed_micheline.register ~protocols:[Alpha] ;

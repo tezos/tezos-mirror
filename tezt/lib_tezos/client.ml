@@ -481,11 +481,7 @@ let spawn_bake_for ?endpoint ?protocol ?(keys = [Constant.bootstrap1.alias])
         string_of_int
         minimal_nanotez_per_byte
     @ optional_arg ~name:"operations-pool" Fun.id mempool
-    @ (match protocol with
-      | Some (Ithaca | Jakarta | Alpha) ->
-          (* Only Alpha/Tenderbake supports this switch *)
-          if ignore_node_mempool then ["--ignore-node-mempool"] else []
-      | None | Some Hangzhou -> [])
+    @ (if ignore_node_mempool then ["--ignore-node-mempool"] else [])
     @ (if minimal_timestamp then ["--minimal-timestamp"] else [])
     @ (match force with None | Some false -> [] | Some true -> ["--force"])
     @ optional_arg ~name:"context" Fun.id context_path)
@@ -556,27 +552,16 @@ let tenderbake_action_to_string = function
   | Propose -> "propose"
 
 let spawn_tenderbake_action_for ~tenderbake_action ?endpoint ?protocol
-    ?(key = [Constant.bootstrap1.alias]) ?(minimal_timestamp = false) ?force
-    client =
+    ?(key = [Constant.bootstrap1.alias]) ?(minimal_timestamp = false)
+    ?(force = false) client =
   spawn_command
     ?endpoint
     client
     (optional_arg ~name:"protocol" Protocol.hash protocol
     @ [tenderbake_action_to_string tenderbake_action; "for"]
     @ key
-    @
-    if minimal_timestamp then ["--minimal-timestamp"]
-    else
-      []
-      @
-      match (force, protocol) with
-      | (None, _) | (Some false, _) -> []
-      | (Some true, Some Protocol.Ithaca)
-      | (Some true, Some Protocol.Jakarta)
-      | (Some true, Some Protocol.Alpha) ->
-          ["--force"]
-      | (Some true, Some Protocol.Hangzhou) | (Some true, None) -> []
-      (* --force is not supported prior to Tenderbake *))
+    @ (if minimal_timestamp then ["--minimal-timestamp"] else [])
+    @ if force then ["--force"] else [])
 
 let spawn_endorse_for ?endpoint ?protocol ?key ?force client =
   spawn_tenderbake_action_for

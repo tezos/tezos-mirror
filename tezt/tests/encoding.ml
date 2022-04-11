@@ -113,8 +113,6 @@ let check_samples protocols =
   sample "block_header.unsigned" ;
   sample "contract" ;
   sample "cycle" ;
-  sample "delegate.frozen_balance" ~supports:(Until_protocol 011) ;
-  sample "delegate.frozen_balance_by_cycles" ~supports:(Until_protocol 011) ;
   sample "fitness" ;
   sample "gas.cost" ;
   sample "gas" ;
@@ -126,7 +124,6 @@ let check_samples protocols =
   sample "operation.unsigned" ;
   sample "period" ;
   sample "raw_level" ;
-  sample "roll" ~supports:(Until_protocol 011) ;
   sample "seed" ;
   sample "tez" ;
   sample "timestamp" ;

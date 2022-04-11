@@ -120,7 +120,7 @@ let precheck_block =
     Test.fail "prechecking of block did not executed as expected"
   else return ()
 
-let forge_block ~protocol ?client node ~key ~with_op =
+let forge_block ?client node ~key ~with_op =
   Log.info "Creating another node to forge a block" ;
   let* client =
     match client with
@@ -149,12 +149,9 @@ let forge_block ~protocol ?client node ~key ~with_op =
     else unit
   in
   let* () =
-    let open Protocol in
-    if protocol = Hangzhou then Client.bake_for ~keys:[key] client2
-    else
-      (* We want an empty block, in tenderbake, we can simply propose
-         so that there is no endorsement operations. *)
-      Client.propose_for ~key:[key] ~force:true client2
+    (* We want an empty block, in tenderbake, we can simply propose
+       so that there is no endorsement operations. *)
+    Client.propose_for ~key:[key] ~force:true client2
   in
   let* shell =
     Client.shell_header client2 >>= fun shell ->
@@ -215,9 +212,7 @@ let propagate_precheckable_bad_block =
            let* () = Client.bake_for ~keys:[bootstrap1] client in
            wait_for_cluster_at_level cluster i)
   in
-  let* block_header =
-    forge_block ~protocol ~client n1 ~key:bootstrap1 ~with_op:false
-  in
+  let* block_header = forge_block ~client n1 ~key:bootstrap1 ~with_op:false in
   (* Put a bad context *)
   Log.info "Crafting a block header with a bad context hash" ;
   let dummy_context_hash =
@@ -341,12 +336,8 @@ let propagate_precheckable_bad_block_signature =
            let* () = Client.bake_for ~keys:[bootstrap1] client in
            wait_for_cluster_at_level cluster i)
   in
-  let* op_block_header =
-    forge_block ~protocol ~client n1 ~key:bootstrap1 ~with_op:true
-  in
-  let* block_header =
-    forge_block ~protocol ~client n1 ~key:bootstrap1 ~with_op:false
-  in
+  let* op_block_header = forge_block ~client n1 ~key:bootstrap1 ~with_op:true in
+  let* block_header = forge_block ~client n1 ~key:bootstrap1 ~with_op:false in
   (* Put a bad context *)
   Log.info "Crafting a block header with a bad context hash" ;
   let bad_block_header =
