@@ -43,9 +43,9 @@ let take_nth_biggest n l =
    *)
 let list_size = QCheck.Gen.int_range 2 1000
 
-(* Checks whether using inserting the elementes of list [l] of size [2 * n]
-   inside a bounded heap of size [n], and getting its list view gives the same
-   result as sorting list [l] and taking the first [n] elements *)
+(* Checks whether inserting the elements of list [l] of size [2 * n] inside a
+   bounded heap of size [n], and getting its list view gives the same result as
+   sorting list [l] and taking the first [n] elements. *)
 let test_bounded_heap =
   QCheck.Test.make
     ~name:"bounded_heap (qcheck)"
