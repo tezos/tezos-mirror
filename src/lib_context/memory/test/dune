@@ -1,9 +1,8 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(test
+(executable
  (name test)
- (package tezos-context)
  (libraries
   tezos-base
   tezos-base.unix
@@ -12,3 +11,8 @@
   tezos-stdlib-unix
   alcotest-lwt)
  (flags (:standard -open Tezos_base.TzPervasives -open Tezos_stdlib_unix)))
+
+(rule
+ (alias runtest)
+ (package tezos-context)
+ (action (run %{dep:./test.exe})))

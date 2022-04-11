@@ -1,9 +1,8 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(test
+(executable
  (name main)
- (package tezos-baking-013-PtJakart)
  (libraries
   tezos-base
   tezos-micheline
@@ -27,3 +26,8 @@
    -open Tezos_base_test_helpers
    -open Tezos_013_PtJakart_mockup_simulator
    -open Tezos_baking_013_PtJakart)))
+
+(rule
+ (alias runtest)
+ (package tezos-baking-013-PtJakart)
+ (action (run %{dep:./main.exe})))

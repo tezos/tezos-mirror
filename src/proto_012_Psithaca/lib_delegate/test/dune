@@ -1,9 +1,8 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(test
+(executable
  (name main)
- (package tezos-baking-012-Psithaca)
  (libraries
   tezos-base
   tezos-micheline
@@ -27,3 +26,8 @@
    -open Tezos_base_test_helpers
    -open Tezos_012_Psithaca_mockup_simulator
    -open Tezos_baking_012_Psithaca)))
+
+(rule
+ (alias runtest)
+ (package tezos-baking-012-Psithaca)
+ (action (run %{dep:./main.exe})))

@@ -1,9 +1,8 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(test
+(executable
  (name test_proxy_context)
- (package tezos-shell-context-test)
  (libraries
   tezos-shell-context
   alcotest-lwt
@@ -15,3 +14,8 @@
    -open Lib_test
    -open Tezos_base.TzPervasives
    -open Tezos_protocol_environment)))
+
+(rule
+ (alias runtest)
+ (package tezos-shell-context-test)
+ (action (run %{dep:./test_proxy_context.exe})))

@@ -1,9 +1,8 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(test
+(executable
  (name main)
- (package tezos-baking-alpha)
  (libraries
   tezos-base
   tezos-micheline
@@ -27,3 +26,8 @@
    -open Tezos_base_test_helpers
    -open Tezos_alpha_mockup_simulator
    -open Tezos_baking_alpha)))
+
+(rule
+ (alias runtest)
+ (package tezos-baking-alpha)
+ (action (run %{dep:./main.exe})))

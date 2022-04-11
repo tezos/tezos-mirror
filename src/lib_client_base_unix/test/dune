@@ -1,9 +1,8 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(test
+(executable
  (name test_mockup_wallet)
- (package tezos-client-base-unix)
  (libraries
   tezos-base
   tezos-mockup-commands
@@ -13,3 +12,8 @@
   alcotest-lwt)
  (flags
   (:standard -open Tezos_base.TzPervasives -open Tezos_base_test_helpers)))
+
+(rule
+ (alias runtest)
+ (package tezos-client-base-unix)
+ (action (run %{dep:./test_mockup_wallet.exe})))

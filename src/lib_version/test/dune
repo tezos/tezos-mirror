@@ -1,9 +1,8 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(test
+(executable
  (name test_parser)
- (package tezos-version)
  (modes native js)
  (libraries
   tezos-version
@@ -11,6 +10,11 @@
   alcotest)
  (js_of_ocaml)
  (flags (:standard -open Tezos_version)))
+
+(rule
+ (alias runtest)
+ (package tezos-version)
+ (action (run %{dep:./test_parser.exe})))
 
 (rule
  (alias runtest_js)

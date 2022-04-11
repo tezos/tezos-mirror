@@ -1,13 +1,12 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(tests
+(executables
  (names
   test_michelson_v1_macros
   test_client_proto_contracts
   test_client_proto_context
   test_proxy)
- (package tezos-client-012-Psithaca)
  (libraries
   tezos-base
   tezos-micheline
@@ -26,3 +25,23 @@
    -open Tezos_protocol_012_Psithaca
    -open Tezos_base_test_helpers
    -open Lib_test)))
+
+(rule
+ (alias runtest)
+ (package tezos-client-012-Psithaca)
+ (action (run %{dep:./test_michelson_v1_macros.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-client-012-Psithaca)
+ (action (run %{dep:./test_client_proto_contracts.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-client-012-Psithaca)
+ (action (run %{dep:./test_client_proto_context.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-client-012-Psithaca)
+ (action (run %{dep:./test_proxy.exe})))

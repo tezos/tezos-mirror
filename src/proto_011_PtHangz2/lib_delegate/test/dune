@@ -1,9 +1,8 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(test
+(executable
  (name main)
- (package tezos-baking-011-PtHangz2)
  (libraries
   tezos-base
   tezos-protocol-environment
@@ -28,3 +27,8 @@
    -open Tezos_011_PtHangz2_test_helpers
    -open Tezos_base_test_helpers
    -open Tezos_baking_011_PtHangz2)))
+
+(rule
+ (alias runtest)
+ (package tezos-baking-011-PtHangz2)
+ (action (run %{dep:./main.exe})))

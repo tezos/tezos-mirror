@@ -1,9 +1,8 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(tests
+(executables
  (names test_requester test_fuzzing_requester)
- (package tezos-requester)
  (libraries
   tezos-base
   tezos-base.unix
@@ -20,3 +19,13 @@
    -open Tezos_base_test_helpers
    -open Tezos_stdlib
    -open Tezos_requester)))
+
+(rule
+ (alias runtest)
+ (package tezos-requester)
+ (action (run %{dep:./test_requester.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-requester)
+ (action (run %{dep:./test_fuzzing_requester.exe})))

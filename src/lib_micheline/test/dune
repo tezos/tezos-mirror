@@ -1,15 +1,24 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(tests
+(executables
  (names test_parser test_diff)
- (package tezos-micheline)
  (modes native js)
  (libraries
   tezos-micheline
   alcotest)
  (js_of_ocaml)
  (flags (:standard -open Tezos_micheline)))
+
+(rule
+ (alias runtest)
+ (package tezos-micheline)
+ (action (run %{dep:./test_parser.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-micheline)
+ (action (run %{dep:./test_diff.exe})))
 
 (rule
  (alias runtest_js)

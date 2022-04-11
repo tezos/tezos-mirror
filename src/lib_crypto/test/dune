@@ -1,9 +1,8 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(tests
+(executables
  (names test_run test_prop_signature)
- (package tezos-crypto)
  (modes native js)
  (libraries
   tezos-stdlib
@@ -23,6 +22,16 @@
    -open Tezos_crypto
    -open Tezos_error_monad.TzLwtreslib
    -open Data_encoding)))
+
+(rule
+ (alias runtest)
+ (package tezos-crypto)
+ (action (run %{dep:./test_run.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-crypto)
+ (action (run %{dep:./test_prop_signature.exe})))
 
 (rule
  (alias runtest_js)

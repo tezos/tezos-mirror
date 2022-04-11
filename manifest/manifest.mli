@@ -485,10 +485,6 @@ val inline_tests_backend : target -> inline_tests
     - [conflicts]: a list of target; all of their packages will be put in the
       [conflicts] section of the [.opam] file.
 
-    - [dep_files]: a list of files to add as dependencies using [(deps (file ...))]
-      in the [dune] file. A typical use is if you generate code: this tells [dune]
-      to make those files available to your generator.
-
     - [deps]: a list of targets to add as dependencies using [(libraries)]
       in the [dune] file.
 
@@ -589,15 +585,12 @@ val inline_tests_backend : target -> inline_tests
       This causes the library to not come with a toplevel module with aliases to
       all other modules. Not recommended (according to the dune documentation).
 
-    - [action]: how to run this target. Only useful for test targets.
-
     - [path]: the path to the directory of the [dune] file that will define this target. *)
 type 'a maker =
   ?all_modules_except:string list ->
   ?bisect_ppx:bool ->
   ?c_library_flags:string list ->
   ?conflicts:target list ->
-  ?dep_files:string list ->
   ?deps:target list ->
   ?dune:Dune.s_expr ->
   ?foreign_stubs:Dune.foreign_stubs ->
@@ -629,7 +622,6 @@ type 'a maker =
   ?warnings:string ->
   ?wrapped:bool ->
   ?cram:bool ->
-  ?action:Dune.s_expr ->
   path:string ->
   'a ->
   target
@@ -675,22 +667,18 @@ val private_exes : string list maker
 
 (** Register and return an internal test.
 
-    Since tests are private, they have no public name: the ['a] argument of [maker]
-    is the internal name. *)
-val test : string maker
+    - [runtest]: if true, setup runtest aliases for the given
+      test. If unspecified, [runtest] is set true.
+
+    - [dep_files]: a list of files to add as dependencies using [(deps (file ...))]
+      in the [runtest] alias.
+
+    Since tests are private, they have no public name: the ['a]
+    argument of [maker] is the internal name. *)
+val test : ?dep_files:string list -> ?runtest:bool -> string maker
 
 (** Same as {!test} but with several names, to define multiple tests at once. *)
-val tests : string list maker
-
-(** Register and return an internal executable that is only used for tests.
-
-    Same as {!private_exe} but the dependencies are only required to run tests:
-    in the [.opam] file, they are marked [with-test] (unless they are also needed
-    by non-test code). *)
-val test_exe : string maker
-
-(** Same as {!test_exe} but with several names, to define multiple tests at once. *)
-val test_exes : string list maker
+val tests : ?dep_files:string list -> ?runtest:bool -> string list maker
 
 (** Make an external vendored library, for use in internal target dependencies.
 

@@ -1,9 +1,8 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(test
+(executable
  (name main_ci)
- (package tezos-benchmark-tests)
  (libraries
   alcotest-lwt
   tezos-base
@@ -14,3 +13,8 @@
   tezos-benchmark
   tezos-benchmark-examples)
  (flags (:standard -open Tezos_base.TzPervasives)))
+
+(rule
+ (alias runtest)
+ (package tezos-benchmark-tests)
+ (action (run %{dep:./main_ci.exe})))

@@ -1,7 +1,7 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(tests
+(executables
  (names
   test_shell
   test_locator
@@ -11,7 +11,6 @@
   test_prevalidator_classification
   test_prevalidator_classification_operations
   test_prevalidator_pending_operations)
- (package tezos-shell)
  (libraries
   tezos-base
   tezos-base-test-helpers
@@ -45,6 +44,46 @@
    -open Tezos_stdlib_unix
    -open Tezos_validation
    -open Tezos_event_logging_test_helpers)))
+
+(rule
+ (alias runtest)
+ (package tezos-shell)
+ (action (run %{dep:./test_shell.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-shell)
+ (action (run %{dep:./test_locator.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-shell)
+ (action (run %{dep:./test_synchronisation_heuristic_fuzzy.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-shell)
+ (action (run %{dep:./test_prevalidation.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-shell)
+ (action (run %{dep:./test_prevalidation_t.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-shell)
+ (action (run %{dep:./test_prevalidator_classification.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-shell)
+ (action (run %{dep:./test_prevalidator_classification_operations.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-shell)
+ (action (run %{dep:./test_prevalidator_pending_operations.exe})))
 
 (rule
  (alias runtest_locator_bench)
