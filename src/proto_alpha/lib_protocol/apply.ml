@@ -818,8 +818,16 @@ type execution_arg =
       -> execution_arg
   | Untyped_arg : Script.expr -> execution_arg
 
-let apply_transaction_to_implicit ~ctxt ~contract ~parameter ~entrypoint
-    ~before_operation ~balance_updates ~allocated_destination_contract =
+let apply_transaction_to_implicit ~ctxt ~source ~amount ~pkh ~parameter
+    ~entrypoint ~before_operation =
+  let contract = Contract.Implicit pkh in
+  (* Transfers of zero to implicit accounts are forbidden. *)
+  error_when Tez.(amount = zero) (Empty_transaction contract) >>?= fun () ->
+  (* If the implicit contract is not yet allocated at this point then
+     the next transfer of tokens will allocate it. *)
+  Contract.allocated ctxt contract >>= fun already_allocated ->
+  Token.transfer ctxt (`Contract source) (`Contract contract) amount
+  >>=? fun (ctxt, balance_updates) ->
   let is_unit =
     match parameter with
     | Typed_arg (_, Unit_t, ()) -> true
@@ -829,29 +837,30 @@ let apply_transaction_to_implicit ~ctxt ~contract ~parameter ~entrypoint
         | Prim (_, Michelson_v1_primitives.D_Unit, [], _) -> true
         | _ -> false)
   in
-  ( (if Entrypoint.is_default entrypoint then Result.return_unit
-    else error (Script_tc_errors.No_such_entrypoint entrypoint))
-  >>? fun () ->
-    if is_unit then
-      (* Only allow [Unit] parameter to implicit accounts. *)
-      ok ctxt
-    else error (Script_interpreter.Bad_contract_parameter contract) )
-  >|? fun ctxt ->
-  let result =
-    Transaction_result
-      (Transaction_to_contract_result
-         {
-           storage = None;
-           lazy_storage_diff = None;
-           balance_updates;
-           originated_contracts = [];
-           consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
-           storage_size = Z.zero;
-           paid_storage_size_diff = Z.zero;
-           allocated_destination_contract;
-         })
-  in
-  (ctxt, result)
+  Lwt.return
+    ( ( (if Entrypoint.is_default entrypoint then Result.return_unit
+        else error (Script_tc_errors.No_such_entrypoint entrypoint))
+      >>? fun () ->
+        if is_unit then
+          (* Only allow [Unit] parameter to implicit accounts. *)
+          ok ctxt
+        else error (Script_interpreter.Bad_contract_parameter contract) )
+    >|? fun ctxt ->
+      let result =
+        Transaction_result
+          (Transaction_to_contract_result
+             {
+               storage = None;
+               lazy_storage_diff = None;
+               balance_updates;
+               originated_contracts = [];
+               consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
+               storage_size = Z.zero;
+               paid_storage_size_diff = Z.zero;
+               allocated_destination_contract = not already_allocated;
+             })
+      in
+      (ctxt, result, []) )
 
 let apply_transaction_to_smart_contract ~ctxt ~source ~contract ~amount
     ~entrypoint ~before_operation ~payer ~chain_id ~mode ~internal ~script_ir
@@ -967,24 +976,15 @@ let apply_transaction ~ctxt ~parameter ~source ~(contract : Contract.t) ~amount
             ~parameter
             ~cache_key
             ~balance_updates)
-  | Implicit _ ->
-      (* Transfers of zero to implicit accounts are forbidden. *)
-      error_when Tez.(amount = zero) (Empty_transaction contract) >>?= fun () ->
-      (* If the implicit contract is not yet allocated at this point then
-         the next transfer of tokens will allocate it. *)
-      Contract.allocated ctxt contract >>= fun already_allocated ->
-      Token.transfer ctxt (`Contract source) (`Contract contract) amount
-      >>=? fun (ctxt, balance_updates) ->
-      let allocated_destination_contract = not already_allocated in
+  | Implicit pkh ->
       apply_transaction_to_implicit
         ~ctxt
-        ~contract
+        ~source
+        ~amount
+        ~pkh
         ~parameter
         ~entrypoint
         ~before_operation
-        ~balance_updates
-        ~allocated_destination_contract
-      >>?= fun (ctxt, result) -> return (ctxt, result, [])
 
 let ex_ticket_size :
     context -> Ticket_scanner.ex_ticket -> (context * int) tzresult Lwt.t =
