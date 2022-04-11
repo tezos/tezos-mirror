@@ -969,32 +969,6 @@ let apply_transaction_to_smart_contract ~ctxt ~source ~contract_hash ~amount
           in
           (ctxt, result, operations) )
 
-let apply_transaction ~ctxt ~parameter ~source ~(contract : Contract.t) ~amount
-    ~entrypoint ~before_operation ~payer ~chain_id ~mode ~internal =
-  match contract with
-  | Originated contract_hash ->
-      apply_transaction_to_smart_contract
-        ~ctxt
-        ~source
-        ~contract_hash
-        ~amount
-        ~entrypoint
-        ~before_operation
-        ~payer
-        ~chain_id
-        ~mode
-        ~internal
-        ~parameter
-  | Implicit pkh ->
-      apply_transaction_to_implicit
-        ~ctxt
-        ~source
-        ~amount
-        ~pkh
-        ~parameter
-        ~entrypoint
-        ~before_operation
-
 let ex_ticket_size :
     context -> Ticket_scanner.ex_ticket -> (context * int) tzresult Lwt.t =
  fun ctxt (Ex_ticket (ty, ticket)) ->
@@ -1179,7 +1153,7 @@ let apply_internal_manager_operation_content :
   match operation with
   | Transaction_to_contract
       {
-        destination;
+        destination = Implicit pkh;
         amount;
         unparsed_parameters = _;
         entrypoint;
@@ -1187,19 +1161,37 @@ let apply_internal_manager_operation_content :
         parameters_ty;
         parameters = typed_parameters;
       } ->
-      (apply_transaction
+      (apply_transaction_to_implicit
          ~ctxt
          ~parameter:(Typed_arg (location, parameters_ty, typed_parameters))
          ~source
-         ~contract:destination
+         ~pkh
          ~amount
          ~entrypoint
          ~before_operation
-         ~payer
-         ~chain_id
-         ~mode
-         ~internal:true
         : (_ * kind successful_manager_operation_result * _) tzresult Lwt.t)
+  | Transaction_to_contract
+      {
+        amount;
+        destination = Originated contract_hash;
+        entrypoint;
+        location;
+        parameters_ty;
+        parameters = typed_parameters;
+        unparsed_parameters = _;
+      } ->
+      apply_transaction_to_smart_contract
+        ~ctxt
+        ~source
+        ~contract_hash
+        ~amount
+        ~entrypoint
+        ~before_operation
+        ~payer
+        ~chain_id
+        ~mode
+        ~internal:true
+        ~parameter:(Typed_arg (location, parameters_ty, typed_parameters))
   | Transaction_to_tx_rollup
       {destination; unparsed_parameters = _; parameters_ty; parameters} ->
       apply_transaction_to_tx_rollup
@@ -1264,17 +1256,36 @@ let apply_external_manager_operation_content :
             : kind successful_manager_operation_result),
           [] )
   | Transaction
-      {amount; parameters; destination = Contract contract; entrypoint} ->
+      {amount; parameters; destination = Contract (Implicit pkh); entrypoint} ->
       Script.force_decode_in_context
         ~consume_deserialization_gas
         ctxt
         parameters
       >>?= fun (parameters, ctxt) ->
-      apply_transaction
+      apply_transaction_to_implicit
         ~ctxt
-        ~parameter:(Untyped_arg parameters)
         ~source:source_contract
-        ~contract
+        ~amount
+        ~pkh
+        ~parameter:(Untyped_arg parameters)
+        ~entrypoint
+        ~before_operation
+  | Transaction
+      {
+        amount;
+        parameters;
+        destination = Contract (Originated contract_hash);
+        entrypoint;
+      } ->
+      Script.force_decode_in_context
+        ~consume_deserialization_gas
+        ctxt
+        parameters
+      >>?= fun (parameters, ctxt) ->
+      apply_transaction_to_smart_contract
+        ~ctxt
+        ~source:source_contract
+        ~contract_hash
         ~amount
         ~entrypoint
         ~before_operation
@@ -1282,6 +1293,7 @@ let apply_external_manager_operation_content :
         ~chain_id
         ~mode
         ~internal:false
+        ~parameter:(Untyped_arg parameters)
   | Transaction {destination = Tx_rollup _; _} ->
       fail Tx_rollup_non_internal_transaction
   | Tx_rollup_dispatch_tickets
