@@ -36,6 +36,12 @@ type plot_target =
             predicted execution time. *)
   | Show  (** Display to screen (requires Qt) *)
 
+type empirical_plot =
+  | Empirical_plot_full  (** Plots the full empirical data *)
+  | Empirical_plot_quantiles of float list
+      (** Plots the specified quantiles.
+          Quantiles must be included in the [[0;1]] interval. *)
+
 (** [options] specifies some display parameters. *)
 type options = {
   save_directory : string;
@@ -59,6 +65,8 @@ type options = {
       (** If set to [true], plots histograms of raw timings for all measurements.
           Plots are produced in [save_directory].
           By default, set to [false] *)
+  empirical_plot : empirical_plot;
+      (** Specifies how to plot the empirical data *)
 }
 
 (** Encoding for options. *)

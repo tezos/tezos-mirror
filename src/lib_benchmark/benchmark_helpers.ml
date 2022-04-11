@@ -55,3 +55,73 @@ and enumerate_picks n l current_pick acc =
       enumerate_picks n tl current_pick acc
 
 let enumerate_subsets n l = enumerate_injections n l [] []
+
+(* -------------------------------------------------------------------------- *)
+(* Seq helpers *)
+
+let seq_progress fmtr msg seq =
+  let c = ref 1 in
+  Seq.map
+    (fun x ->
+      Format.fprintf fmtr "\r%s (%d)%!" msg !c ;
+      incr c ;
+      x)
+    seq
+
+(* To be removed when in OCaml stdlib. The code below this line is under the
+   following license: *)
+
+(**************************************************************************)
+(*                                                                        *)
+(*                                 OCaml                                  *)
+(*                                                                        *)
+(*                 Simon Cruanes                                          *)
+(*                                                                        *)
+(*   Copyright 2017 Institut National de Recherche en Informatique et     *)
+(*     en Automatique.                                                    *)
+(*                                                                        *)
+(*   All rights reserved.  This file is distributed under the terms of    *)
+(*   the GNU Lesser General Public License version 2.1, with the          *)
+(*   special exception on linking described in the file LICENSE.          *)
+(*                                                                        *)
+(**************************************************************************)
+
+let rec take_aux n xs =
+  if n = 0 then Seq.empty
+  else fun () ->
+    match xs () with
+    | Seq.Nil -> Nil
+    | Cons (x, xs) -> Cons (x, take_aux (n - 1) xs)
+
+let take n xs =
+  if n < 0 then invalid_arg "Seq.take" ;
+  take_aux n xs
+
+let rec force_drop n xs =
+  match xs () with
+  | Seq.Nil -> Seq.Nil
+  | Cons (_, xs) ->
+      let n = n - 1 in
+      if n = 0 then xs () else force_drop n xs
+
+let drop n xs =
+  if n < 0 then invalid_arg "Seq.drop"
+  else if n = 0 then xs
+  else fun () -> force_drop n xs
+
+let rec iteri_aux f i xs =
+  match xs () with
+  | Seq.Nil -> ()
+  | Cons (x, xs) ->
+      f i x ;
+      iteri_aux f (i + 1) xs
+
+let[@inline] iteri f xs = iteri_aux f 0 xs
+
+let rec map2 f xs ys () =
+  match xs () with
+  | Seq.Nil -> Seq.Nil
+  | Cons (x, xs) -> (
+      match ys () with
+      | Seq.Nil -> Nil
+      | Cons (y, ys) -> Cons (f x y, map2 f xs ys))
