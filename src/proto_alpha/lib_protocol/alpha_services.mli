@@ -81,7 +81,7 @@ module Cache : sig
   val contract_rank :
     'a #RPC_context.simple ->
     'a ->
-    Alpha_context.Contract.t ->
+    Contract_hash.t ->
     int option shell_tzresult Lwt.t
 end
 

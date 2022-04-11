@@ -222,7 +222,7 @@ module Cache = struct
           "Return the number of cached contracts older than the provided \
            contract"
         ~query:RPC_query.empty
-        ~input:Alpha_context.Contract.encoding
+        ~input:Alpha_context.Contract.originated_encoding
         ~output:Data_encoding.(option int31)
         RPC_path.(custom_root / "context" / "cache" / "contracts" / "rank")
   end

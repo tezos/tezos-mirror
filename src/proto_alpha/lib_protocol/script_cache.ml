@@ -103,6 +103,7 @@ let entries ctxt =
      contract_of_identifier identifier >|? fun contract -> (contract, age)
 
 let contract_rank ctxt addr =
+  let addr = Contract.Originated addr in
   Cache.identifier_rank ctxt (identifier_of_contract addr)
 
 let size = Cache.size

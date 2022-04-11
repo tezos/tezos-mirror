@@ -405,7 +405,7 @@ val contract_rank :
   #Protocol_client_context.full ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
-  Contract.t ->
+  Contract_hash.t ->
   int option tzresult Lwt.t
 
 val contract_cache_size :

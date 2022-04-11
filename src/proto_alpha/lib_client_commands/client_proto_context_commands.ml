@@ -213,15 +213,11 @@ let commands_ro () =
       @@ OriginatedContractAlias.destination_param ~name:"src" ~desc:"contract"
       @@ stop)
       (fun () contract (cctxt : Protocol_client_context.full) ->
-        let contract = Contract.Originated contract in
         contract_rank cctxt ~chain:cctxt#chain ~block:cctxt#block contract
         >>=? fun rank ->
         match rank with
         | None ->
-            cctxt#error
-              "Invalid contract: %a"
-              Alpha_context.Contract.pp
-              contract
+            cctxt#error "Invalid contract: %a" Contract_hash.pp contract
             >>= fun () -> return_unit
         | Some rank -> cctxt#message "%d" rank >>= fun () -> return_unit);
     command

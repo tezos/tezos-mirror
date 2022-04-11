@@ -259,7 +259,6 @@ let test_contract_rank_is_lru_rank () =
     let rec check_rank k = function
       | [] -> return ()
       | addr :: addrs -> (
-          let addr = Contract.Originated addr in
           match Script_cache.contract_rank ctxt addr with
           | None -> fail (err "Contract rank should find a cached contract")
           | Some rank ->

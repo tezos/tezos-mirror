@@ -71,7 +71,7 @@ val entries : context -> (Contract.t * int) list tzresult
     older than [contract] in the cache of [ctxt]. This function
     returns [None] if [contract] does not exist in the cache of
     [ctxt]. *)
-val contract_rank : context -> Contract.t -> int option
+val contract_rank : context -> Contract_hash.t -> int option
 
 (** [size ctxt] is an overapproximation of the cache size in
    memory (in bytes). *)
