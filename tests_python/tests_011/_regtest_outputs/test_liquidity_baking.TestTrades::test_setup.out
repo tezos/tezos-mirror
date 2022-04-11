@@ -1,8 +1,0 @@
-tests_011/test_liquidity_baking.py::TestTrades::test_setup
-
-"[CONTRACT_HASH]"
-Pair 1
-     100
-     100
-     "[CONTRACT_HASH]"
-     "[CONTRACT_HASH]"
