@@ -137,3 +137,6 @@ Miscellaneous
 
 - Removed protocol ``genesis-carthagenet``.
   No live test network uses this protocol anymore.
+
+- Removed delegates for protocol Hangzhou, since it was replaced by Ithaca
+  as the active protocol on Mainnet.
