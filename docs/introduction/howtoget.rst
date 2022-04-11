@@ -8,8 +8,8 @@ How to get Tezos
 In this how-to we explain how to get up-to-date binaries to run Tezos
 (more precisely, the "Octez" implementation of Tezos software)
 on any network (either on the mainnet or on one of the test networks).
-Tezos consists of :ref:`several binaries <tezos_binaries>` (i.e., executable files),
-including: a client, a node, and a baker.
+Tezos consists of :ref:`several binaries <tezos_binaries>` (i.e., executable files), including: a client, a node, and a baker.
+(Before the :doc:`Ithaca protocol<../protocols/012_ithaca>` it also included an endorser.)
 
 There are several options for getting the binaries, depending on how you plan to use Tezos:
 
