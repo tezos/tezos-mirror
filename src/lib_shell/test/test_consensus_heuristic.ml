@@ -34,10 +34,10 @@
 module Assert = Lib_test.Assert
 open Consensus_heuristic
 
-let prn = function
-  | Consensus hash -> Format.asprintf "Consensus with %a" Block_hash.pp hash
-  | No_consensus _ -> "No consensus"
-  | Need_more_candidates -> "Synchronised (not stuck)"
+let pp ppf = function
+  | Consensus hash -> Format.fprintf ppf "Consensus with %a" Block_hash.pp hash
+  | No_consensus _ -> Format.fprintf ppf "No consensus"
+  | Need_more_candidates -> Format.fprintf ppf "Synchronised (not stuck)"
 
 let forge_peer_id () =
   let identity = P2p_identity.generate_with_pow_target_0 () in
@@ -67,7 +67,7 @@ let create_consensus () =
   let peer_id = forge_peer_id () in
   let zero = Block_hash.zero in
   update h (peer_id, zero) ;
-  Assert.equal ~prn (get_state h) (Consensus zero)
+  Assert.equal ~pp (get_state h) (Consensus zero)
 
 let create_no_consensus () =
   let h = create ~expected:3 ~threshold:3 () in
@@ -79,7 +79,7 @@ let create_no_consensus () =
   update h (peer_1, hash_1) ;
   update h (peer_2, hash_2) ;
   update h (peer_3, hash_2) ;
-  Assert.equal ~prn (get_state h) (No_consensus [(hash_1, 1); (hash_2, 2)])
+  Assert.equal ~pp (get_state h) (No_consensus [(hash_1, 1); (hash_2, 2)])
 
 let tests_raw : (string * (unit -> unit)) list =
   [
@@ -90,10 +90,10 @@ let tests_raw : (string * (unit -> unit)) list =
     ("create_no_consensus", create_no_consensus);
   ]
 
-let prn = function
-  | Lwt.Fail exn -> Format.asprintf "fail: %s@." (Printexc.to_string exn)
-  | Lwt.Sleep -> "sleep"
-  | Lwt.Return _ -> "return"
+let pp ppf = function
+  | Lwt.Fail exn -> Format.fprintf ppf "fail: %s" (Printexc.to_string exn)
+  | Lwt.Sleep -> Format.fprintf ppf "sleep"
+  | Lwt.Return _ -> Format.fprintf ppf "return"
 
 let job_failed () =
   let worker =
@@ -103,7 +103,7 @@ let job_failed () =
       ~job:(fun () -> Lwt.fail_with "failed")
   in
   let p = Worker.wait worker in
-  Assert.equal ~prn (Lwt.state p) (Lwt.state (Lwt.fail_with "failed"))
+  Assert.equal ~pp (Lwt.state p) (Lwt.state (Lwt.fail_with "failed"))
 
 let job_canceled () =
   let worker =
@@ -113,7 +113,7 @@ let job_canceled () =
       ~job:(fun () -> Lwt.fail Lwt.Canceled)
   in
   let p = Worker.wait worker in
-  Assert.equal ~prn (Lwt.state p) (Lwt.state (Lwt.fail Lwt.Canceled))
+  Assert.equal ~pp (Lwt.state p) (Lwt.state (Lwt.fail Lwt.Canceled))
 
 let job_return_hash () =
   let worker =
@@ -123,7 +123,7 @@ let job_return_hash () =
       ~job:(fun () -> Lwt.return (Consensus Block_hash.zero))
   in
   let p = Worker.wait worker in
-  Assert.equal ~prn (Lwt.state p) (Lwt.state (Lwt.return Block_hash.zero))
+  Assert.equal ~pp (Lwt.state p) (Lwt.state (Lwt.return Block_hash.zero))
 
 let job_sleep () =
   let worker =
@@ -133,9 +133,9 @@ let job_sleep () =
       ~job:(fun () -> fst @@ Lwt.task ())
   in
   let p = Worker.wait worker in
-  Assert.equal ~prn (Lwt.state p) Lwt.Sleep ;
+  Assert.equal ~pp (Lwt.state p) Lwt.Sleep ;
   let p = Worker.wait worker in
-  Assert.equal ~prn (Lwt.state p) Lwt.Sleep
+  Assert.equal ~pp (Lwt.state p) Lwt.Sleep
 
 let job_protected () =
   let (t, u) = Lwt.task () in
@@ -146,11 +146,11 @@ let job_protected () =
       ~job:(fun () -> t)
   in
   let p = Worker.wait worker in
-  Assert.equal ~prn (Lwt.state p) Lwt.Sleep ;
+  Assert.equal ~pp (Lwt.state p) Lwt.Sleep ;
   Lwt.cancel p ;
   Lwt.wakeup u (Consensus Block_hash.zero) ;
   let p' = Worker.wait worker in
-  Assert.equal ~prn (Lwt.state p') (Lwt.state (Lwt.return Block_hash.zero))
+  Assert.equal ~pp (Lwt.state p') (Lwt.state (Lwt.return Block_hash.zero))
 
 let worker_canceled () =
   let (t, _) = Lwt.task () in
@@ -161,9 +161,9 @@ let worker_canceled () =
       ~job:(fun () -> t)
   in
   let p = Worker.wait worker in
-  Assert.equal ~prn (Lwt.state p) Lwt.Sleep ;
+  Assert.equal ~pp (Lwt.state p) Lwt.Sleep ;
   Worker.cancel worker ;
-  Assert.equal ~prn (Lwt.state p) (Lwt.state (Lwt.fail Lwt.Canceled))
+  Assert.equal ~pp (Lwt.state p) (Lwt.state (Lwt.fail Lwt.Canceled))
 
 let tests_worker_raw : (string * (unit -> unit)) list =
   [
