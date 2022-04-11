@@ -6,15 +6,13 @@ let test_split_duplicated_separator () =
     [
       "Hello World";
       "Hello  World";
-      "HelloWorld";
       "Hello                       World  ";
       "  Hello                       World  ";
       "  Hello                       World";
     ]
   in
   List.iter
-    (fun s ->
-      assert (TzString.split_no_empty ' ' s = TzString.split_no_empty ' ' s))
+    (fun s -> assert (TzString.split_no_empty ' ' s = ["Hello"; "World"]))
     inputs
 
 let test_split =
