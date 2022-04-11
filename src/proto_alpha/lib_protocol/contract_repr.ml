@@ -132,8 +132,6 @@ let () =
 
 let implicit_contract id = Implicit id
 
-let is_originated = function Implicit _ -> None | Originated h -> Some h
-
 let originated_contract nonce =
   let data =
     Data_encoding.Binary.to_bytes_exn Origination_nonce.encoding nonce

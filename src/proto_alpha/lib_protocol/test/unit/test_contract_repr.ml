@@ -65,19 +65,6 @@ module Test_contract_repr = struct
 
   let dummy_originated_contract = originated_contract @@ dummy_origination_nonce
 
-  let test_originated () =
-    match is_originated dummy_originated_contract with
-    | Some _ -> return_unit
-    | None ->
-        failwith
-          "must have returned the origination nonce correctly. Instead \
-           returned None."
-
-  let test_not_originated () =
-    match is_originated dummy_implicit_contract with
-    | None -> return_unit
-    | Some _ -> failwith "must have returned the None. Instead, returned Some _"
-
   let test_to_b58check_implicit () =
     Assert.equal
       ~loc:__LOC__
@@ -114,16 +101,6 @@ end
 
 let tests =
   [
-    tztest
-      "Contract_repr.is_originated: must correctly return operation hash of \
-       the originated contract"
-      `Quick
-      Test_contract_repr.test_originated;
-    tztest
-      "Contract_repr.is_originated: must correctly return None for an implicit \
-       contract contract"
-      `Quick
-      Test_contract_repr.test_not_originated;
     tztest
       "Contract_repr.to_b58check: must correctly stringify, b58check encoded, \
        an implicit contract"

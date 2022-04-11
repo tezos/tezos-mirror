@@ -63,8 +63,6 @@ val originated_contract : Origination_nonce.t -> t
 val originated_contracts :
   since:Origination_nonce.t -> until:Origination_nonce.t -> t list
 
-val is_originated : t -> Contract_hash.t option
-
 (** {2 Human readable notation} *)
 
 type error += Invalid_contract_notation of string (* `Permanent *)
