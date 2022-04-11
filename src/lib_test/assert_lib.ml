@@ -28,73 +28,69 @@
 module Assert = Lib_test.Assert
 
 module Crypto = struct
-  let equal_operation ?msg op1 op2 =
-    let eq op1 op2 =
-      match (op1, op2) with
-      | (None, None) -> true
-      | (Some op1, Some op2) -> Tezos_base.Operation.equal op1 op2
-      | _ -> false
-    in
-    let prn = function
-      | None -> "none"
+  let equal_operation ?loc ?msg op1 op2 =
+    let eq = Option.equal Tezos_base.Operation.equal in
+    let pp ppf = function
+      | None -> Format.pp_print_string ppf "none"
       | Some op ->
-          Tezos_crypto.Operation_hash.to_b58check (Tezos_base.Operation.hash op)
+          Format.pp_print_string ppf
+          @@ Tezos_crypto.Operation_hash.to_b58check
+               (Tezos_base.Operation.hash op)
     in
-    Assert.equal ?msg ~prn ~eq op1 op2
+    Assert.equal ?loc ?msg ~pp ~eq op1 op2
 
-  let equal_block ?msg st1 st2 =
+  let equal_block ?loc ?msg st1 st2 =
     let eq st1 st2 = Tezos_base.Block_header.equal st1 st2 in
-    let prn st =
-      Format.asprintf
+    let pp ppf st =
+      Format.fprintf
+        ppf
         "%a (%ld)"
         Tezos_crypto.Block_hash.pp
         (Tezos_base.Block_header.hash st)
         st.shell.level
     in
-    Assert.equal ?msg ~prn ~eq st1 st2
+    Assert.equal ?loc ?msg ~pp ~eq st1 st2
 
-  let equal_block_set ?msg set1 set2 =
+  let equal_block_set ?loc ?msg set1 set2 =
     let b1 = Tezos_crypto.Block_hash.Set.elements set1
     and b2 = Tezos_crypto.Block_hash.Set.elements set2 in
-    Assert.make_equal_list
+    Assert.equal_list
+      ?loc
       ?msg
-      Tezos_crypto.Block_hash.equal
-      Tezos_crypto.Block_hash.to_string
+      ~eq:Tezos_crypto.Block_hash.equal
+      ~pp:Tezos_crypto.Block_hash.pp
       b1
       b2
 
-  let equal_block_map ?msg ~eq map1 map2 =
+  let equal_block_map ~eq ?loc ?msg map1 map2 =
     let b1 = Tezos_crypto.Block_hash.Map.bindings map1
     and b2 = Tezos_crypto.Block_hash.Map.bindings map2 in
-    Assert.make_equal_list
+    Assert.equal_list
+      ?loc
       ?msg
-      (fun (h1, b1) (h2, b2) -> Tezos_crypto.Block_hash.equal h1 h2 && eq b1 b2)
-      (fun (h1, _) -> Tezos_crypto.Block_hash.to_string h1)
+      ~eq:(fun (h1, b1) (h2, b2) ->
+        Tezos_crypto.Block_hash.equal h1 h2 && eq b1 b2)
+      ~pp:(fun ppf (h, _) -> Tezos_crypto.Block_hash.pp ppf h)
       b1
       b2
 
-  let equal_block_hash_list ?msg l1 l2 =
-    let pr_block_hash = Tezos_crypto.Block_hash.to_short_b58check in
-    Assert.make_equal_list
-      ?msg
-      Tezos_crypto.Block_hash.equal
-      pr_block_hash
-      l1
-      l2
+  let equal_block_hash_list ?loc ?msg l1 l2 =
+    let pp = Tezos_crypto.Block_hash.pp_short in
+    Assert.equal_list ?loc ?msg ~eq:Tezos_crypto.Block_hash.equal ~pp l1 l2
 
-  let equal_block_descriptor ?msg bd1 bd2 =
+  let equal_block_descriptor ?loc ?msg bd1 bd2 =
     let eq (l1, h1) (l2, h2) =
       Int32.equal l1 l2 && Tezos_crypto.Block_hash.equal h1 h2
     in
-    let prn (l, h) =
-      Format.asprintf "(%ld, %a)" l Tezos_crypto.Block_hash.pp h
+    let pp ppf (l, h) =
+      Format.fprintf ppf "(%ld, %a)" l Tezos_crypto.Block_hash.pp h
     in
-    Assert.equal ?msg ~prn ~eq bd1 bd2
+    Assert.equal ?loc ?msg ~pp ~eq bd1 bd2
 end
 
 module Shell_services = struct
-  let equal_history_mode ?msg hm1 hm2 =
-    let eq hm1 hm2 = hm1 = hm2 in
-    let prn = Format.asprintf "%a" Tezos_shell_services.History_mode.pp in
-    Assert.equal ?msg ~prn ~eq hm1 hm2
+  let equal_history_mode ?loc ?msg hm1 hm2 =
+    let eq = ( = ) in
+    let pp = Tezos_shell_services.History_mode.pp in
+    Assert.equal ?loc ?msg ~pp ~eq hm1 hm2
 end
