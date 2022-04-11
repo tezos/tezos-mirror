@@ -1179,22 +1179,19 @@ let apply_internal_manager_operation_content :
         parameters_ty;
         parameters = typed_parameters;
       } ->
-      apply_transaction
-        ~ctxt
-        ~parameter:(Typed_arg (location, parameters_ty, typed_parameters))
-        ~source
-        ~contract:destination
-        ~amount
-        ~entrypoint
-        ~before_operation
-        ~payer
-        ~chain_id
-        ~mode
-        ~internal:true
-      >|=? fun (ctxt, manager_result, operations) ->
-      ( ctxt,
-        (manager_result : kind successful_manager_operation_result),
-        operations )
+      (apply_transaction
+         ~ctxt
+         ~parameter:(Typed_arg (location, parameters_ty, typed_parameters))
+         ~source
+         ~contract:destination
+         ~amount
+         ~entrypoint
+         ~before_operation
+         ~payer
+         ~chain_id
+         ~mode
+         ~internal:true
+        : (_ * kind successful_manager_operation_result * _) tzresult Lwt.t)
   | Transaction_to_tx_rollup
       {destination; unparsed_parameters = _; parameters_ty; parameters} ->
       apply_transaction_to_tx_rollup
