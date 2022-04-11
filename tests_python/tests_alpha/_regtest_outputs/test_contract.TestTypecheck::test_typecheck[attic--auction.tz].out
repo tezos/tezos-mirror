@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[attic/auction.tz]
 
 Well typed
-Gas remaining: 1039974.178 units remaining
+Gas remaining: 1039974.418 units remaining
 { parameter key_hash ;
   storage (pair timestamp (pair mutez key_hash)) ;
   code { DUP

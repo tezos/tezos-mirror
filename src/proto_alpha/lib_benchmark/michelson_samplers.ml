@@ -49,11 +49,6 @@ let parameters_encoding =
           (req "map_size" range_encoding)))
 
 (* ------------------------------------------------------------------------- *)
-(* Helpers. *)
-
-let comparable_downcast = Script_ir_translator.ty_of_comparable_ty
-
-(* ------------------------------------------------------------------------- *)
 (* Type names. *)
 
 (* We only want to generated inhabited types, hence Never is not included. *)
@@ -581,9 +576,7 @@ end)
         | Bls12_381_g1_t -> generate_bls12_381_g1
         | Bls12_381_g2_t -> generate_bls12_381_g2
         | Bls12_381_fr_t -> generate_bls12_381_fr
-        | Ticket_t (contents_ty, _) ->
-            let ty = comparable_downcast contents_ty in
-            generate_ticket ty
+        | Ticket_t (contents_ty, _) -> generate_ticket contents_ty
         | Sapling_transaction_t _ ->
             fail_sampling
               "Michelson_samplers: sapling transactions not handled yet"
@@ -624,11 +617,10 @@ end)
         elt Script_typed_ir.comparable_ty -> elt Script_typed_ir.set sampler =
      fun elt_ty ->
       let open M in
-      let ety = comparable_downcast elt_ty in
       let* (_, elements) =
         Structure_samplers.list
           ~range:P.parameters.set_size
-          ~sampler:(value ety)
+          ~sampler:(value elt_ty)
       in
       return
       @@ List.fold_left
@@ -645,8 +637,7 @@ end)
       let size =
         Base_samplers.sample_in_interval rng_state ~range:P.parameters.map_size
       in
-      let kty = comparable_downcast key_ty in
-      let keys = List.init size (fun _ -> value kty rng_state) in
+      let keys = List.init size (fun _ -> value key_ty rng_state) in
       let elts = List.init size (fun _ -> value elt_ty rng_state) in
       List.fold_left2
         (fun map key elt -> Script_map.update key (Some elt) map)
@@ -738,7 +729,7 @@ end)
       let amount = Michelson_base.nat rng_state in
       Script_typed_ir.{ticketer; contents; amount}
 
-    let comparable ty = value (comparable_downcast ty)
+    let comparable ty = value ty
 
     (* Random stack generation. *)
     let rec stack : type a b. (a, b) Script_typed_ir.stack_ty -> (a * b) sampler

@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[attic/forward.tz]
 
 Well typed
-Gas remaining: 1039668.732 units remaining
+Gas remaining: 1039670.292 units remaining
 { parameter (or string nat) ;
   storage
     (pair (pair nat (pair mutez mutez))

@@ -531,10 +531,7 @@ let transfer (ctxt, sc) gas amount location parameters_ty parameters destination
         let open Micheline in
         match tp with
         | Pair_t (Ticket_t (tp, _), _, _, _) ->
-            Script_ir_translator.unparse_comparable_ty
-              ~loc:dummy_location
-              ctxt
-              tp
+            Script_ir_translator.unparse_ty ~loc:dummy_location ctxt tp
             >|? fun (ty, ctxt) -> (Seq (dummy_location, [p; ty]), ctxt)
         | _ ->
             (* TODO: https://gitlab.com/tezos/tezos/-/issues/2455

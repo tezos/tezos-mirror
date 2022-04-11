@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[mini_scenarios/reveal_signed_preimage.tz]
 
 Well typed
-Gas remaining: 1039978.776 units remaining
+Gas remaining: 1039978.896 units remaining
 { parameter (pair bytes signature) ;
   storage (pair bytes key) ;
   code { DUP

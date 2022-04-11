@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[attic/insertion_sort.tz]
 
 Well typed
-Gas remaining: 1039976.625 units remaining
+Gas remaining: 1039976.745 units remaining
 { parameter (list int) ;
   storage (list int) ;
   code { CAR

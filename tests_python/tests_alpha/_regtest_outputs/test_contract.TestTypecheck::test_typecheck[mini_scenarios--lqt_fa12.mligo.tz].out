@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[mini_scenarios/lqt_fa12.mligo.tz]
 
 Well typed
-Gas remaining: 1039737.442 units remaining
+Gas remaining: 1039738.642 units remaining
 { parameter
     (or (or (or (pair %approve (address %spender) (nat %value))
                 (pair %getAllowance

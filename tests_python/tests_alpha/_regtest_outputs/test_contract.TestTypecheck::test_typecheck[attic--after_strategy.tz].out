@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[attic/after_strategy.tz]
 
 Well typed
-Gas remaining: 1039991.083 units remaining
+Gas remaining: 1039991.203 units remaining
 { parameter nat ;
   storage (pair (pair nat bool) timestamp) ;
   code { DUP

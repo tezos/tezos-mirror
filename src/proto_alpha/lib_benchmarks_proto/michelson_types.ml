@@ -98,7 +98,7 @@ let pair k1 k2 =
 
 (* comparable pair type constructor *)
 let cpair k1 k2 =
-  match comparable_pair_t (-1) k1 k2 with Error _ -> assert false | Ok t -> t
+  match pair_key (-1) k1 k2 with Error _ -> assert false | Ok t -> t
 
 (* union type constructor*)
 let union k1 k2 =
@@ -106,7 +106,7 @@ let union k1 k2 =
 
 (* comparable union type constructor *)
 let cunion k1 k2 =
-  match comparable_union_t (-1) k1 k2 with Error _ -> assert false | Ok t -> t
+  match union_key (-1) k1 k2 with Error _ -> assert false | Ok t -> t
 
 let lambda x y =
   match lambda_t (-1) x y with Error _ -> assert false | Ok t -> t

@@ -1550,8 +1550,6 @@ val kinstr_rewritek :
 
 val ty_size : ('a, _) ty -> 'a Type_size.t
 
-val comparable_ty_size : 'a comparable_ty -> 'a Type_size.t
-
 val is_comparable : ('v, 'c) ty -> 'c dbool
 
 type 'v ty_ex_c = Ty_ex_c : ('v, _) ty -> 'v ty_ex_c [@@ocaml.unboxed]
@@ -1637,20 +1635,8 @@ val bool_t : bool comparable_ty
 val pair_t :
   Script.location -> ('a, _) ty -> ('b, _) ty -> ('a, 'b) pair ty_ex_c tzresult
 
-val comparable_pair_t :
-  Script.location ->
-  ('a, yes) ty ->
-  ('b, yes) ty ->
-  (('a, 'b) pair, yes) ty tzresult
-
 val union_t :
   Script.location -> ('a, _) ty -> ('b, _) ty -> ('a, 'b) union ty_ex_c tzresult
-
-val comparable_union_t :
-  Script.location ->
-  ('a, yes) ty ->
-  ('b, yes) ty ->
-  ('a, 'b) union comparable_ty tzresult
 
 val union_bytes_bool_t : (Bytes.t, bool) union comparable_ty
 
@@ -1754,12 +1740,7 @@ type 'a kinstr_traverse = {
 val kinstr_traverse :
   ('a, 'b, 'c, 'd) kinstr -> 'ret -> 'ret kinstr_traverse -> 'ret
 
-type 'a ty_traverse = {
-  apply : 't 'tc. 'a -> ('t, 'tc) ty -> 'a;
-  apply_comparable : 't. 'a -> 't comparable_ty -> 'a;
-}
-
-val comparable_ty_traverse : 'a comparable_ty -> 'r -> 'r ty_traverse -> 'r
+type 'a ty_traverse = {apply : 't 'tc. 'a -> ('t, 'tc) ty -> 'a}
 
 val ty_traverse : ('a, _) ty -> 'r -> 'r ty_traverse -> 'r
 
@@ -1769,12 +1750,8 @@ type 'accu stack_ty_traverse = {
 
 val stack_ty_traverse : ('a, 's) stack_ty -> 'r -> 'r stack_ty_traverse -> 'r
 
-type 'a value_traverse = {
-  apply : 't 'tc. 'a -> ('t, 'tc) ty -> 't -> 'a;
-  apply_comparable : 't. 'a -> 't comparable_ty -> 't -> 'a;
-}
+type 'a value_traverse = {apply : 't 'tc. 'a -> ('t, 'tc) ty -> 't -> 'a}
 
-val value_traverse :
-  (('t, _) ty, 't comparable_ty) union -> 't -> 'r -> 'r value_traverse -> 'r
+val value_traverse : ('t, _) ty -> 't -> 'r -> 'r value_traverse -> 'r
 
 val stack_top_ty : ('a, 'b * 's) stack_ty -> 'a ty_ex_c

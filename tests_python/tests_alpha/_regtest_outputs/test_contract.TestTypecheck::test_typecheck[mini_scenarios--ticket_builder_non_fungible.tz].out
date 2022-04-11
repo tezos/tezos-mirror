@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[mini_scenarios/ticket_builder_non_fungible.tz]
 
 Well typed
-Gas remaining: 1039973.278 units remaining
+Gas remaining: 1039973.758 units remaining
 { parameter (or (ticket %burn nat) (contract %mint_destination (ticket nat))) ;
   storage (pair (address %manager) (nat %counter)) ;
   code { AMOUNT

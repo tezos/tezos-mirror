@@ -425,8 +425,6 @@ module Cost_of : sig
 
     val parse_data_cycle : Gas.cost
 
-    val comparable_ty_of_ty_cycle : Gas.cost
-
     val check_dupable_cycle : Gas.cost
 
     val find_entrypoint_cycle : Gas.cost
@@ -480,8 +478,6 @@ module Cost_of : sig
     val bls12_381_fr : Gas.cost
 
     val unparse_type : ('a, _) Script_typed_ir.ty -> Gas.cost
-
-    val unparse_comparable_type : 'a Script_typed_ir.comparable_ty -> Gas.cost
 
     val unparse_instr_cycle : Gas.cost
 

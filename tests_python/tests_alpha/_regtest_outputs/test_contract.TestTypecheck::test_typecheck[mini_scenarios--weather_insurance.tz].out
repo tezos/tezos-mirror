@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[mini_scenarios/weather_insurance.tz]
 
 Well typed
-Gas remaining: 1039963.560 units remaining
+Gas remaining: 1039963.680 units remaining
 { parameter (pair (signature %signed_weather_data) (nat :rain %actual_level)) ;
   storage
     (pair (pair (address %under_key) (address %over_key))

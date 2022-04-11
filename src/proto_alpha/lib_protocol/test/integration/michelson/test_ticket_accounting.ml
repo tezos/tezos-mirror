@@ -208,7 +208,7 @@ let setup ctxt ~key_type ~value_type entries =
   in
   let*? (key_type_node, ctxt) =
     Environment.wrap_tzresult
-    @@ Script_ir_translator.unparse_comparable_ty
+    @@ Script_ir_translator.unparse_ty
          ~loc:Micheline.dummy_location
          ctxt
          key_type

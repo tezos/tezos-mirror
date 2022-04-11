@@ -2087,13 +2087,12 @@ module Registration_section = struct
                 rng_state
                 ~range:cfg.compare.type_size
             in
-            let (Script_ir_translator.Ex_comparable_ty cmp_ty) =
+            let (Script_ir_translator.Ex_comparable_ty ty) =
               Samplers.Random_type.m_comparable_type ~size rng_state
             in
-            let ty = Script_ir_translator.ty_of_comparable_ty cmp_ty in
-            let value = Samplers.Random_value.comparable cmp_ty rng_state in
+            let value = Samplers.Random_value.comparable ty rng_state in
             let kinstr =
-              ICompare (kinfo (ty @$ ty @$ bot), cmp_ty, halt (int @$ bot))
+              ICompare (kinfo (ty @$ ty @$ bot), ty, halt (int @$ bot))
             in
             Ex_stack_and_kinstr {stack = (value, (value, eos)); kinstr})
         ()

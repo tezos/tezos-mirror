@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[attic/scrutable_reservoir.tz]
 
 Well typed
-Gas remaining: 1039888.691 units remaining
+Gas remaining: 1039889.171 units remaining
 { parameter unit ;
   storage
     (pair string

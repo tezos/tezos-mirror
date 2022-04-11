@@ -948,12 +948,6 @@ module Cost_of = struct
        parameter fit for the UNPARSE_TYPE benchmark. *)
     let cost_UNPARSE_TYPE type_size = S.mul (S.safe_int 20) type_size
 
-    (* TODO: Add benchmarked value from [Unparse_comparable_type_benchmark]. *)
-    let cost_UNPARSE_COMPARABLE_TYPE type_size = S.mul (S.safe_int 20) type_size
-
-    (* TODO: benchmark *)
-    let cost_COMPARABLE_TY_OF_TY = S.safe_int 120
-
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/2264
        Benchmark.
        Currently approximated by 2 comparisons of the longest entrypoint. *)
@@ -1679,8 +1673,6 @@ module Cost_of = struct
 
     let parse_data_cycle = atomic_step_cost cost_TYPECHECKING_DATA
 
-    let comparable_ty_of_ty_cycle = atomic_step_cost cost_COMPARABLE_TY_OF_TY
-
     (* Cost of a cycle of checking that a type is dupable *)
     (* TODO: bench *)
     let check_dupable_cycle = atomic_step_cost cost_TYPECHECKING_DATA
@@ -1794,11 +1786,6 @@ module Cost_of = struct
     let unparse_type ty =
       atomic_step_cost
       @@ cost_UNPARSE_TYPE Script_typed_ir.(ty_size ty |> Type_size.to_int)
-
-    let unparse_comparable_type comp_ty =
-      atomic_step_cost
-      @@ cost_UNPARSE_COMPARABLE_TYPE
-           Script_typed_ir.(comparable_ty_size comp_ty |> Type_size.to_int)
 
     let unparse_instr_cycle = atomic_step_cost cost_UNPARSING_CODE
 
