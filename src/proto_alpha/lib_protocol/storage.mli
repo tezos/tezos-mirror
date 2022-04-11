@@ -824,3 +824,11 @@ module Sc_rollup : sig
        and type key = int32
        and type value = Raw_level_repr.t * Bitset.t
 end
+
+module Dal : sig
+  module Slot_headers :
+    Non_iterable_indexed_data_storage
+      with type t = Raw_context.t
+       and type key = Raw_level_repr.t
+       and type value = Dal_slot_repr.slot list
+end
