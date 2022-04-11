@@ -29,6 +29,15 @@ open Clic
 
 module RawContractAlias : Client_aliases.Alias with type t = Contract.t
 
+(** Like [ContractAlias] below but restricted to originated contracts. *)
+module OriginatedContractAlias : sig
+  val destination_param :
+    ?name:string ->
+    ?desc:string ->
+    ('a, (#Client_context.wallet as 'wallet)) params ->
+    (Contract_hash.t -> 'a, 'wallet) params
+end
+
 module ContractAlias : sig
   val get_contract :
     #Client_context.wallet -> string -> Contract.t tzresult Lwt.t

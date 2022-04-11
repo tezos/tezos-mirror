@@ -204,9 +204,10 @@ let commands_ro () =
       ~desc:"Get the key rank of a cache key."
       no_options
       (prefixes ["get"; "cached"; "contract"; "rank"; "for"]
-      @@ ContractAlias.destination_param ~name:"src" ~desc:"contract"
+      @@ OriginatedContractAlias.destination_param ~name:"src" ~desc:"contract"
       @@ stop)
       (fun () contract (cctxt : Protocol_client_context.full) ->
+        let contract = Contract.Originated contract in
         contract_rank cctxt ~chain:cctxt#chain ~block:cctxt#block contract
         >>=? fun rank ->
         match rank with
