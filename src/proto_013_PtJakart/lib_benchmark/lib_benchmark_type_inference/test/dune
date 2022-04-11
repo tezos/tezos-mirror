@@ -1,0 +1,17 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(tests
+ (names test_uf test_inference)
+ (package tezos-benchmark-type-inference-013-PtJakart)
+ (libraries
+  tezos-micheline
+  tezos-micheline-rewriting
+  tezos-benchmark-type-inference-013-PtJakart
+  tezos-protocol-013-PtJakart
+  tezos-error-monad
+  tezos-client-013-PtJakart)
+ (flags
+  (:standard
+   -open Tezos_micheline
+   -open Tezos_benchmark_type_inference_013_PtJakart)))

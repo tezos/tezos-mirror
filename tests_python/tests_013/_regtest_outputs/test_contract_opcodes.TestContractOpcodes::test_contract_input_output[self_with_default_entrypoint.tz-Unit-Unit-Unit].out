@@ -1,0 +1,47 @@
+tests_013/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[self_with_default_entrypoint.tz-Unit-Unit-Unit]
+
+storage
+  Unit
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 13 (remaining gas: 1039983.600 units remaining)
+    [ (Pair (Right (Left Unit)) Unit) ]
+  - location: 13 (remaining gas: 1039983.590 units remaining)
+    [  ]
+  - location: 14 (remaining gas: 1039983.580 units remaining)
+    [ "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi" ]
+  - location: 15 (remaining gas: 1039983.570 units remaining)
+    [  ]
+  - location: 16 (remaining gas: 1039983.560 units remaining)
+    [ "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi%A" ]
+  - location: 17 (remaining gas: 1039983.550 units remaining)
+    [  ]
+  - location: 18 (remaining gas: 1039983.540 units remaining)
+    [ "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi" ]
+  - location: 19 (remaining gas: 1039982.417 units remaining)
+    [ 0x050a00000016011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600 ]
+  - location: 20 (remaining gas: 1039982.407 units remaining)
+    [ "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi"
+      0x050a00000016011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600 ]
+  - location: 21 (remaining gas: 1039981.284 units remaining)
+    [ 0x050a00000016011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600
+      0x050a00000016011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600 ]
+  - location: 24 (remaining gas: 1039981.249 units remaining)
+    [ 0 ]
+  - location: 25 (remaining gas: 1039981.239 units remaining)
+    [ True ]
+  - location: 26 (remaining gas: 1039981.229 units remaining)
+    [  ]
+  - location: 26 (remaining gas: 1039981.219 units remaining)
+    [  ]
+  - location: 32 (remaining gas: 1039981.209 units remaining)
+    [ Unit ]
+  - location: 33 (remaining gas: 1039981.199 units remaining)
+    [ {}
+      Unit ]
+  - location: 35 (remaining gas: 1039981.189 units remaining)
+    [ (Pair {} Unit) ]
+

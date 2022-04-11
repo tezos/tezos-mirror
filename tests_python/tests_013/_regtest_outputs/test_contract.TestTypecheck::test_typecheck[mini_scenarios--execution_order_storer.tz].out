@@ -1,0 +1,16 @@
+tests_013/test_contract.py::TestTypecheck::test_typecheck[mini_scenarios/execution_order_storer.tz]
+
+Well typed
+Gas remaining: 1039996.980 units remaining
+{ parameter string ;
+  storage string ;
+  code { UNPAIR
+         /* [ string : string ] */ ;
+         SWAP
+         /* [ string : string ] */ ;
+         CONCAT
+         /* [ string ] */ ;
+         NIL operation
+         /* [ list operation : string ] */ ;
+         PAIR
+         /* [ pair (list operation) string ] */ } }

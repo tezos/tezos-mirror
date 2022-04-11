@@ -99,6 +99,11 @@ ITHACA_DAEMON = "012-Psithaca"
 ITHACA_FOLDER = "proto_012_Psithaca"
 ITHACA_PARAMETERS = get_parameters(ITHACA_FOLDER)
 
+JAKARTA = "PtJakartaiDz69SfDDLXJSiuZqTSeSKRDbKVZC8MNzJnvRjvnGw"
+JAKARTA_DAEMON = "013-PtJakart"
+JAKARTA_FOLDER = "proto_013_PtJakart"
+JAKARTA_PARAMETERS = get_parameters(JAKARTA_FOLDER)
+
 TEZOS_CRT = """
 Certificate:
     Data:

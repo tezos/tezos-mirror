@@ -1,0 +1,24 @@
+tests_013/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[bls12_381_fr_push_nat.tz-None-Unit-(Some 0x1000000000000000000000000000000000000000000000000000000000000000)]
+
+storage
+  (Some 0x1000000000000000000000000000000000000000000000000000000000000000)
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 8 (remaining gas: 1039994.186 units remaining)
+    [ (Pair Unit None) ]
+  - location: 8 (remaining gas: 1039994.176 units remaining)
+    [  ]
+  - location: 9 (remaining gas: 1039994.166 units remaining)
+    [ 0x1000000000000000000000000000000000000000000000000000000000000000 ]
+  - location: 12 (remaining gas: 1039994.156 units remaining)
+    [ (Some 0x1000000000000000000000000000000000000000000000000000000000000000) ]
+  - location: 13 (remaining gas: 1039994.146 units remaining)
+    [ {}
+      (Some 0x1000000000000000000000000000000000000000000000000000000000000000) ]
+  - location: 15 (remaining gas: 1039994.136 units remaining)
+    [ (Pair {}
+            (Some 0x1000000000000000000000000000000000000000000000000000000000000000)) ]
+

@@ -1,0 +1,32 @@
+tests_013/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[voting_power.tz-(Pair 0 0)-"edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"-(Pair 4000000000000 20000000000000)]
+
+storage
+  (Pair 4000000000000 20000000000000)
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 9 (remaining gas: 1039667.248 units remaining)
+    [ (Pair "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav" 0 0) ]
+  - location: 9 (remaining gas: 1039667.238 units remaining)
+    [ "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav" ]
+  - location: 10 (remaining gas: 1039666.633 units remaining)
+    [ "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" ]
+  - location: 11 (remaining gas: 1039446.087 units remaining)
+    [ 4000000000000 ]
+  - location: 12 (remaining gas: 1039446.077 units remaining)
+    [  ]
+  - location: 14 (remaining gas: 1039235.691 units remaining)
+    [ 20000000000000 ]
+  - location: 12 (remaining gas: 1039235.671 units remaining)
+    [ 4000000000000
+      20000000000000 ]
+  - location: 15 (remaining gas: 1039235.661 units remaining)
+    [ (Pair 4000000000000 20000000000000) ]
+  - location: 16 (remaining gas: 1039235.651 units remaining)
+    [ {}
+      (Pair 4000000000000 20000000000000) ]
+  - location: 18 (remaining gas: 1039235.641 units remaining)
+    [ (Pair {} 4000000000000 20000000000000) ]
+

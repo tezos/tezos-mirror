@@ -13,11 +13,13 @@ RPCDOCEXE     = $(TOPBUILDDIR)/docs/$(DOCGENDIR)/rpc_doc.exe
 ERRDOCEXE     = $(TOPBUILDDIR)/docs/$(DOCERRORDIR)/error_doc.exe
 
 ALPHA_LONG    = ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
+JAKARTA_LONG  = PtJakartaiDz69SfDDLXJSiuZqTSeSKRDbKVZC8MNzJnvRjvnGw
 ITHACA_LONG   = Psithaca2MLRFYargivpo7YvUr7wUDqyxrdhC5CQq78mRvimz6A
 ACTIVE_LONG   = $(ITHACA_LONG)
 
 ALPHA_SHORT    = alpha
 ITHACA_SHORT   = 012-Psithaca
+JAKARTA_SHORT  = 013-PtJakart
 ACTIVE_SHORT   = $(ITHACA_SHORT)
 
 SCRIPTSDIR     = scripts
@@ -33,6 +35,10 @@ manuals: main
 	@../tezos-client -protocol $(ALPHA_LONG) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > alpha/tezos-client.html
 	@../tezos-baker-$(ALPHA_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > alpha/tezos-baker.html
 	@../tezos-accuser-$(ALPHA_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > alpha/tezos-accuser.html
+    # Jakarta protocol
+	@../tezos-client -protocol $(JAKARTA_LONG) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > jakarta/tezos-client.html
+	@../tezos-baker-$(JAKARTA_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > jakarta/tezos-baker.html
+	@../tezos-accuser-$(JAKARTA_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > jakarta/tezos-accuser.html
     # Ithaca protocol
 	@../tezos-client -protocol $(ITHACA_LONG) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > ithaca/tezos-client.html
 	@../tezos-baker-$(ITHACA_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > ithaca/tezos-baker.html
@@ -68,6 +74,7 @@ redirectcheck:
 # - on each other protocol including alpha, also checking label defs (option -l)
 xrefscheck:
 	$(CHECKXREFS) ithaca
+	$(CHECKXREFS) -l jakarta
 	$(CHECKXREFS) -l alpha
 
 scriptsindoccheck:
@@ -114,7 +121,7 @@ user/default-acl.json: $(RPCDOCEXE)
 	$(RPCDOCEXE) acl > $@
 
 rpc: user/default-acl.json shell/rpc.rst \
-			active/rpc.rst alpha/rpc.rst
+			active/rpc.rst jakarta/rpc.rst alpha/rpc.rst
 
 p2p: $(P2PDOCEXE) shell/p2p_usage.rst.inc
 	@$(P2PDOCEXE) < shell/p2p_usage.rst.inc > shell/p2p_api.rst
@@ -171,5 +178,5 @@ lint: pylint pycodestyle lint_black
 
 clean:
 	@-rm -Rf "$(BUILDDIR)"
-	@-rm -Rf api/errors.rst developer/metrics.csv ithaca/rpc.rst alpha/rpc.rst shell/rpc.rst shell/p2p_api.rst user/default-acl.json CHANGES-dev.rst
-	@-rm -Rf api/tezos-*.html api/tezos-*.txt ithaca/tezos-*.html alpha/tezos-*.html
+	@-rm -Rf api/errors.rst developer/metrics.csv active/rpc.rst ithaca/rpc.rst jakarta/rpc.rst alpha/rpc.rst shell/rpc.rst shell/p2p_api.rst user/default-acl.json CHANGES-dev.rst
+	@-rm -Rf api/tezos-*.html api/tezos-*.txt active/tezos-*.html ithaca/tezos-*.html jakarta/tezos-*.html alpha/tezos-*.html

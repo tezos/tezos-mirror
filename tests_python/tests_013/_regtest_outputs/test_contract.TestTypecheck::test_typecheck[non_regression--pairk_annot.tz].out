@@ -1,0 +1,28 @@
+tests_013/test_contract.py::TestTypecheck::test_typecheck[non_regression/pairk_annot.tz]
+
+Well typed
+Gas remaining: 1039993.318 units remaining
+{ parameter unit ;
+  storage unit ;
+  code { SENDER
+         /* [ address : pair unit unit ] */ ;
+         SOURCE
+         /* [ address : address : pair unit unit ] */ ;
+         PAIR 2
+         /* [ pair address address : pair unit unit ] */ ;
+         SOURCE
+         /* [ address : pair address address : pair unit unit ] */ ;
+         SENDER
+         /* [ address : address : pair address address : pair unit unit ] */ ;
+         PAIR 2
+         /* [ pair address address : pair address address : pair unit unit ] */ ;
+         COMPARE
+         /* [ int : pair unit unit ] */ ;
+         DROP
+         /* [ pair unit unit ] */ ;
+         CDR
+         /* [ unit ] */ ;
+         NIL operation
+         /* [ list operation : unit ] */ ;
+         PAIR
+         /* [ pair (list operation) unit ] */ } }

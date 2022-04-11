@@ -1,0 +1,47 @@
+tests_013/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[pexec.tz-14-38-52]
+
+storage
+  52
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 7 (remaining gas: 1039990.439 units remaining)
+    [ (Pair 38 14) ]
+  - location: 7 (remaining gas: 1039990.429 units remaining)
+    [ { UNPAIR ; ADD }
+      (Pair 38 14) ]
+  - location: 15 (remaining gas: 1039990.419 units remaining)
+    [ (Pair 38 14)
+      { UNPAIR ; ADD } ]
+  - location: 16 (remaining gas: 1039990.409 units remaining)
+    [ 38
+      14
+      { UNPAIR ; ADD } ]
+  - location: 17 (remaining gas: 1039990.399 units remaining)
+    [ 14
+      { UNPAIR ; ADD } ]
+  - location: 19 (remaining gas: 1039990.194 units remaining)
+    [ { PUSH nat 14 ; PAIR ; { UNPAIR ; ADD } } ]
+  - location: 17 (remaining gas: 1039990.174 units remaining)
+    [ 38
+      { PUSH nat 14 ; PAIR ; { UNPAIR ; ADD } } ]
+  - location: 12 (remaining gas: 1039990.164 units remaining)
+    [ 14
+      38 ]
+  - location: 12 (remaining gas: 1039990.154 units remaining)
+    [ (Pair 14 38) ]
+  - location: 13 (remaining gas: 1039990.144 units remaining)
+    [ 14
+      38 ]
+  - location: 14 (remaining gas: 1039990.109 units remaining)
+    [ 52 ]
+  - location: 20 (remaining gas: 1039990.089 units remaining)
+    [ 52 ]
+  - location: 21 (remaining gas: 1039990.079 units remaining)
+    [ {}
+      52 ]
+  - location: 23 (remaining gas: 1039990.069 units remaining)
+    [ (Pair {} 52) ]
+

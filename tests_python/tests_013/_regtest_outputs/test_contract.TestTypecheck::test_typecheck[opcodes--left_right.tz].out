@@ -1,0 +1,15 @@
+tests_013/test_contract.py::TestTypecheck::test_typecheck[opcodes/left_right.tz]
+
+Well typed
+Gas remaining: 1039995.570 units remaining
+{ parameter (or bool string) ;
+  storage (or string bool) ;
+  code { CAR
+         /* [ or bool string ] */ ;
+         IF_LEFT
+           { RIGHT string /* [ or string bool ] */ }
+           { LEFT bool /* [ or string bool ] */ } ;
+         NIL operation
+         /* [ list operation : or string bool ] */ ;
+         PAIR
+         /* [ pair (list operation) (or string bool) ] */ } }

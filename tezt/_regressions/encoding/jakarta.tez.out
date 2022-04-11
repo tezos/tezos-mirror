@@ -1,0 +1,13 @@
+encoding/jakarta.tez.out
+
+./tezos-codec encode 013-PtJakart.tez from '"7322135"'
+97f4be03
+
+./tezos-codec decode 013-PtJakart.tez from 97f4be03
+"7322135"
+
+./tezos-codec encode 013-PtJakart.tez from '"0"'
+00
+
+./tezos-codec decode 013-PtJakart.tez from 00
+"0"

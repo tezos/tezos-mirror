@@ -1,0 +1,18 @@
+tests_013/test_contract.py::TestTypecheck::test_typecheck[attic/always.tz]
+
+Well typed
+Gas remaining: 1039995.941 units remaining
+{ parameter nat ;
+  storage (pair nat bool) ;
+  code { CAR
+         /* [ nat ] */ ;
+         PUSH bool True
+         /* [ bool : nat ] */ ;
+         SWAP
+         /* [ nat : bool ] */ ;
+         PAIR
+         /* [ pair nat bool ] */ ;
+         NIL operation
+         /* [ list operation : pair nat bool ] */ ;
+         PAIR
+         /* [ pair (list operation) nat bool ] */ } }

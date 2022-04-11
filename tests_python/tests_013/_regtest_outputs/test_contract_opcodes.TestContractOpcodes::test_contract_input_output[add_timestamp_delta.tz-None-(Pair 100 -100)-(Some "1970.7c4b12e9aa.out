@@ -1,0 +1,36 @@
+tests_013/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[add_timestamp_delta.tz-None-(Pair 100 -100)-(Some "1970-01-01T00:00:00Z")]
+
+storage
+  (Some "1970-01-01T00:00:00Z")
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 10 (remaining gas: 1039991.318 units remaining)
+    [ (Pair (Pair "1970-01-01T00:01:40Z" -100) None) ]
+  - location: 10 (remaining gas: 1039991.308 units remaining)
+    [ (Pair "1970-01-01T00:01:40Z" -100) ]
+  - location: 11 (remaining gas: 1039991.298 units remaining)
+    [ (Pair "1970-01-01T00:01:40Z" -100)
+      (Pair "1970-01-01T00:01:40Z" -100) ]
+  - location: 12 (remaining gas: 1039991.288 units remaining)
+    [ "1970-01-01T00:01:40Z"
+      (Pair "1970-01-01T00:01:40Z" -100) ]
+  - location: 13 (remaining gas: 1039991.278 units remaining)
+    [ (Pair "1970-01-01T00:01:40Z" -100) ]
+  - location: 15 (remaining gas: 1039991.268 units remaining)
+    [ -100 ]
+  - location: 13 (remaining gas: 1039991.248 units remaining)
+    [ "1970-01-01T00:01:40Z"
+      -100 ]
+  - location: 16 (remaining gas: 1039991.213 units remaining)
+    [ "1970-01-01T00:00:00Z" ]
+  - location: 17 (remaining gas: 1039991.203 units remaining)
+    [ (Some "1970-01-01T00:00:00Z") ]
+  - location: 18 (remaining gas: 1039991.193 units remaining)
+    [ {}
+      (Some "1970-01-01T00:00:00Z") ]
+  - location: 20 (remaining gas: 1039991.183 units remaining)
+    [ (Pair {} (Some "1970-01-01T00:00:00Z")) ]
+

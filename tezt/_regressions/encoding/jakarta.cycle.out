@@ -1,0 +1,13 @@
+encoding/jakarta.cycle.out
+
+./tezos-codec encode 013-PtJakart.cycle from 2147483647
+7fffffff
+
+./tezos-codec decode 013-PtJakart.cycle from 7fffffff
+2147483647
+
+./tezos-codec encode 013-PtJakart.cycle from 0
+00000000
+
+./tezos-codec decode 013-PtJakart.cycle from 00000000
+0

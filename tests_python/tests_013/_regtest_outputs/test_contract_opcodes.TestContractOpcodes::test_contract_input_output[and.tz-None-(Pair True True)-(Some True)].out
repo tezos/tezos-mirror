@@ -1,0 +1,31 @@
+tests_013/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[and.tz-None-(Pair True True)-(Some True)]
+
+storage
+  (Some True)
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 10 (remaining gas: 1039992.068 units remaining)
+    [ (Pair (Pair True True) None) ]
+  - location: 10 (remaining gas: 1039992.058 units remaining)
+    [ (Pair True True) ]
+  - location: 11 (remaining gas: 1039992.048 units remaining)
+    [ True
+      True ]
+  - location: 12 (remaining gas: 1039992.038 units remaining)
+    [ True ]
+  - location: 13 (remaining gas: 1039992.028 units remaining)
+    [ (Some True) ]
+  - location: 14 (remaining gas: 1039992.018 units remaining)
+    [ {}
+      (Some True) ]
+  - location: 16 (remaining gas: 1039992.008 units remaining)
+    [ (Pair {} (Some True)) ]
+  - location: 17 (remaining gas: 1039991.998 units remaining)
+    [ {}
+      (Some True) ]
+  - location: 18 (remaining gas: 1039991.988 units remaining)
+    [ (Pair {} (Some True)) ]
+

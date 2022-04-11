@@ -1,0 +1,19 @@
+--- patched_contracts/expruwujdJkc5y4iPzr83Sd3KrJhzxSUb67JdCZmXNKiTTNvEkMrRU.original.tz
++++ patched_contracts/expruwujdJkc5y4iPzr83Sd3KrJhzxSUb67JdCZmXNKiTTNvEkMrRU.patched.tz
+@@ -1,6 +1,6 @@
+ { parameter (or (lambda %do unit (list operation)) (list %default (list (list nat)))) ;
+   storage
+-    (pair key_hash (contract (list (pair (pair nat nat) (pair nat (pair nat (pair nat nat))))))) ;
++    (pair key_hash address) ;
+   code { DUP ;
+          CAR ;
+          IF_LEFT
+@@ -215,6 +215,8 @@
+                RENAME @__pt_parameter ;
+                DIP { DROP } ;
+                { DIP { DUP } ; SWAP } ;
++               CONTRACT (list (pair (pair nat nat) (pair nat (pair nat (pair nat nat)))));
++               IF_SOME {} {PUSH string "Bad contract in storage"; FAILWITH};
+                AMOUNT ;
+                { DIP { DIP { DUP } ; SWAP } ; SWAP } ;
+                { DIP { DIP { DIP { DROP } } } } ;

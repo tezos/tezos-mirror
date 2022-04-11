@@ -1,0 +1,49 @@
+tests_013/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[set_car.tz-(Pair "hello" 0)-"abc"-(Pair "abc" 0)]
+
+storage
+  (Pair "abc" 0)
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 9 (remaining gas: 1039988.456 units remaining)
+    [ (Pair "abc" "hello" 0) ]
+  - location: 9 (remaining gas: 1039988.446 units remaining)
+    [ (Pair "abc" "hello" 0)
+      (Pair "abc" "hello" 0) ]
+  - location: 10 (remaining gas: 1039988.436 units remaining)
+    [ (Pair "hello" 0)
+      (Pair "abc" "hello" 0) ]
+  - location: 11 (remaining gas: 1039988.426 units remaining)
+    [ (Pair "abc" "hello" 0) ]
+  - location: 13 (remaining gas: 1039988.416 units remaining)
+    [ "abc" ]
+  - location: 11 (remaining gas: 1039988.396 units remaining)
+    [ (Pair "hello" 0)
+      "abc" ]
+  - location: 15 (remaining gas: 1039988.386 units remaining)
+    [ (Pair "hello" 0)
+      (Pair "hello" 0)
+      "abc" ]
+  - location: 16 (remaining gas: 1039988.376 units remaining)
+    [ "hello"
+      (Pair "hello" 0)
+      "abc" ]
+  - location: 17 (remaining gas: 1039988.366 units remaining)
+    [ (Pair "hello" 0)
+      "abc" ]
+  - location: 18 (remaining gas: 1039988.356 units remaining)
+    [ 0
+      "abc" ]
+  - location: 19 (remaining gas: 1039988.346 units remaining)
+    [ "abc"
+      0 ]
+  - location: 20 (remaining gas: 1039988.336 units remaining)
+    [ (Pair "abc" 0) ]
+  - location: 21 (remaining gas: 1039988.326 units remaining)
+    [ {}
+      (Pair "abc" 0) ]
+  - location: 23 (remaining gas: 1039988.316 units remaining)
+    [ (Pair {} "abc" 0) ]
+

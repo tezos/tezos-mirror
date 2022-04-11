@@ -1,0 +1,41 @@
+{ parameter (or (lambda %do unit (list operation)) (unit %default)) ;
+  storage (pair key_hash address) ;
+  code { DUP ;
+         CAR ;
+         IF_LEFT
+           { PUSH mutez 0 ;
+             AMOUNT ;
+             { { COMPARE ; EQ } ; IF {} { { UNIT ; FAILWITH } } } ;
+             { DIP { DUP } ; SWAP } ;
+             CDR ;
+             CAR ;
+             IMPLICIT_ACCOUNT ;
+             ADDRESS ;
+             SENDER ;
+             { COMPARE ;
+               NEQ ;
+               IF { SENDER ; PUSH string "Only the owner can operate." ; PAIR ; FAILWITH }
+                  { UNIT ; EXEC ; DIP { CDR } ; PAIR } } }
+           { DIP { CDR ; DUP ; CDR } ;
+             PAIR ;
+             { CDR ;
+               DUP ;
+               NIL operation ;
+               { DIP { DIP { DUP } ; SWAP } ; SWAP } ;
+               { DIP { DIP { DIP { DROP } } } } ;
+               CONTRACT (or (option address) (or (pair (option address) (option mutez)) (or mutez (or (pair (option address) (option mutez)) address))));
+               IF_SOME {} {PUSH string "Bad contract in storage"; FAILWITH};
+               AMOUNT ;
+               SENDER ;
+               SOME ;
+               LEFT (or (pair (option address) (option mutez))
+                        (or mutez (or (pair (option address) (option mutez)) address))) ;
+               TRANSFER_TOKENS ;
+               CONS ;
+               PAIR } ;
+             SWAP ;
+             CAR ;
+             SWAP ;
+             { { DUP ; CAR ; DIP { CDR } } } ;
+             DIP { SWAP ; PAIR } ;
+             PAIR } } }

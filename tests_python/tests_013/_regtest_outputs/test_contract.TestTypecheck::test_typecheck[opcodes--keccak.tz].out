@@ -1,0 +1,16 @@
+tests_013/test_contract.py::TestTypecheck::test_typecheck[opcodes/keccak.tz]
+
+Well typed
+Gas remaining: 1039996.837 units remaining
+{ storage (option bytes) ;
+  parameter bytes ;
+  code { CAR
+         /* [ bytes ] */ ;
+         KECCAK
+         /* [ bytes ] */ ;
+         SOME
+         /* [ option bytes ] */ ;
+         NIL operation
+         /* [ list operation : option bytes ] */ ;
+         PAIR
+         /* [ pair (list operation) (option bytes) ] */ } }

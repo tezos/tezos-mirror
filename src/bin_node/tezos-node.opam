@@ -49,6 +49,7 @@ depopts: [
   "tezos-embedded-protocol-010-PtGRANAD"
   "tezos-embedded-protocol-011-PtHangz2"
   "tezos-embedded-protocol-012-Psithaca"
+  "tezos-embedded-protocol-013-PtJakart"
   "tezos-embedded-protocol-alpha"
   "tezos-protocol-plugin-007-PsDELPH1-registerer"
   "tezos-protocol-plugin-008-PtEdo2Zk-registerer"
@@ -56,6 +57,7 @@ depopts: [
   "tezos-protocol-plugin-010-PtGRANAD-registerer"
   "tezos-protocol-plugin-011-PtHangz2-registerer"
   "tezos-protocol-plugin-012-Psithaca-registerer"
+  "tezos-protocol-plugin-013-PtJakart-registerer"
   "tezos-protocol-plugin-alpha-registerer"
 ]
 build: [

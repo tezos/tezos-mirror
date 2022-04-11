@@ -1,0 +1,46 @@
+tests_013/test_contract_opcodes.py::TestContractOpcodes::test__big_map_contract_io[get_big_map_value.tz-(Pair { Elt "1" "one" ; Elt "2" "two" } None)-"1"-(Pair 4 (Some "one"))-big_map_diff2]
+
+storage
+  (Pair 4 (Some "one"))
+emitted operations
+  
+big_map diff
+  New map(4) of type (big_map string string)
+  Set map(4)["2"] to "two"
+  Set map(4)["1"] to "one"
+trace
+  - location: 12 (remaining gas: 1039985.668 units remaining)
+    [ (Pair "1" { Elt "1" "one" ; Elt "2" "two" } None) ]
+  - location: 12 (remaining gas: 1039985.658 units remaining)
+    [ (Pair "1" { Elt "1" "one" ; Elt "2" "two" } None)
+      (Pair "1" { Elt "1" "one" ; Elt "2" "two" } None) ]
+  - location: 13 (remaining gas: 1039985.648 units remaining)
+    [ "1"
+      (Pair "1" { Elt "1" "one" ; Elt "2" "two" } None) ]
+  - location: 14 (remaining gas: 1039985.638 units remaining)
+    [ (Pair "1" { Elt "1" "one" ; Elt "2" "two" } None) ]
+  - location: 17 (remaining gas: 1039985.628 units remaining)
+    [ (Pair { Elt "1" "one" ; Elt "2" "two" } None) ]
+  - location: 18 (remaining gas: 1039985.618 units remaining)
+    [ { Elt "1" "one" ; Elt "2" "two" } ]
+  - location: 19 (remaining gas: 1039985.608 units remaining)
+    [ { Elt "1" "one" ; Elt "2" "two" }
+      { Elt "1" "one" ; Elt "2" "two" } ]
+  - location: 14 (remaining gas: 1039985.588 units remaining)
+    [ "1"
+      { Elt "1" "one" ; Elt "2" "two" }
+      { Elt "1" "one" ; Elt "2" "two" } ]
+  - location: 20 (remaining gas: 1039984.743 units remaining)
+    [ (Some "one")
+      { Elt "1" "one" ; Elt "2" "two" } ]
+  - location: 21 (remaining gas: 1039984.733 units remaining)
+    [ { Elt "1" "one" ; Elt "2" "two" }
+      (Some "one") ]
+  - location: 22 (remaining gas: 1039984.723 units remaining)
+    [ (Pair { Elt "1" "one" ; Elt "2" "two" } (Some "one")) ]
+  - location: 23 (remaining gas: 1039984.713 units remaining)
+    [ {}
+      (Pair { Elt "1" "one" ; Elt "2" "two" } (Some "one")) ]
+  - location: 25 (remaining gas: 1039984.703 units remaining)
+    [ (Pair {} { Elt "1" "one" ; Elt "2" "two" } (Some "one")) ]
+

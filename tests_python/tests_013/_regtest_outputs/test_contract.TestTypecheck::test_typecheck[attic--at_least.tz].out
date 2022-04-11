@@ -1,0 +1,18 @@
+tests_013/test_contract.py::TestTypecheck::test_typecheck[attic/at_least.tz]
+
+Well typed
+Gas remaining: 1039993.750 units remaining
+{ parameter unit ;
+  storage mutez ;
+  code { CDR
+         /* [ mutez ] */ ;
+         DUP
+         /* [ mutez : mutez ] */ ;
+         AMOUNT
+         /* [ mutez : mutez : mutez ] */ ;
+         CMPLT ;
+         IF { FAIL }
+            { NIL operation
+              /* [ list operation : mutez ] */ ;
+              PAIR
+              /* [ pair (list operation) mutez ] */ } } }

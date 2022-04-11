@@ -1,0 +1,23 @@
+tests_013/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[address.tz-None-"tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"-(Some "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5")]
+
+storage
+  (Some "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5")
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 9 (remaining gas: 1039987.934 units remaining)
+    [ (Pair "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5" None) ]
+  - location: 9 (remaining gas: 1039987.924 units remaining)
+    [ "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5" ]
+  - location: 10 (remaining gas: 1039987.914 units remaining)
+    [ "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5" ]
+  - location: 11 (remaining gas: 1039987.904 units remaining)
+    [ (Some "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 12 (remaining gas: 1039987.894 units remaining)
+    [ {}
+      (Some "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5") ]
+  - location: 14 (remaining gas: 1039987.884 units remaining)
+    [ (Pair {} (Some "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5")) ]
+

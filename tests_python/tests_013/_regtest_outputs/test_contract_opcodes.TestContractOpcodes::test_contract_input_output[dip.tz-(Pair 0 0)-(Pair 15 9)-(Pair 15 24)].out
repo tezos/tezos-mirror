@@ -1,0 +1,36 @@
+tests_013/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[dip.tz-(Pair 0 0)-(Pair 15 9)-(Pair 15 24)]
+
+storage
+  (Pair 15 24)
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 11 (remaining gas: 1039991.683 units remaining)
+    [ (Pair (Pair 15 9) 0 0) ]
+  - location: 11 (remaining gas: 1039991.673 units remaining)
+    [ (Pair 15 9) ]
+  - location: 12 (remaining gas: 1039991.663 units remaining)
+    [ 15
+      9 ]
+  - location: 13 (remaining gas: 1039991.653 units remaining)
+    [ 15
+      15
+      9 ]
+  - location: 14 (remaining gas: 1039991.643 units remaining)
+    [ 15
+      9 ]
+  - location: 16 (remaining gas: 1039991.608 units remaining)
+    [ 24 ]
+  - location: 14 (remaining gas: 1039991.588 units remaining)
+    [ 15
+      24 ]
+  - location: 17 (remaining gas: 1039991.578 units remaining)
+    [ (Pair 15 24) ]
+  - location: 18 (remaining gas: 1039991.568 units remaining)
+    [ {}
+      (Pair 15 24) ]
+  - location: 20 (remaining gas: 1039991.558 units remaining)
+    [ (Pair {} 15 24) ]
+

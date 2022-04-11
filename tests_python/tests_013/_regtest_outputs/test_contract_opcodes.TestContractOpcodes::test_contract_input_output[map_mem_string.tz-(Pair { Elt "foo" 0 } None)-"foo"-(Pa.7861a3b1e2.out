@@ -1,0 +1,42 @@
+tests_013/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[map_mem_string.tz-(Pair { Elt "foo" 0 } None)-"foo"-(Pair { Elt "foo" 0 } (Some True))]
+
+storage
+  (Pair { Elt "foo" 0 } (Some True))
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 12 (remaining gas: 1039989.695 units remaining)
+    [ (Pair "foo" { Elt "foo" 0 } None) ]
+  - location: 12 (remaining gas: 1039989.685 units remaining)
+    [ "foo"
+      (Pair { Elt "foo" 0 } None) ]
+  - location: 13 (remaining gas: 1039989.675 units remaining)
+    [ (Pair { Elt "foo" 0 } None) ]
+  - location: 15 (remaining gas: 1039989.665 units remaining)
+    [ { Elt "foo" 0 } ]
+  - location: 16 (remaining gas: 1039989.655 units remaining)
+    [ { Elt "foo" 0 }
+      { Elt "foo" 0 } ]
+  - location: 13 (remaining gas: 1039989.635 units remaining)
+    [ "foo"
+      { Elt "foo" 0 }
+      { Elt "foo" 0 } ]
+  - location: 17 (remaining gas: 1039989.549 units remaining)
+    [ True
+      { Elt "foo" 0 } ]
+  - location: 18 (remaining gas: 1039989.539 units remaining)
+    [ (Some True)
+      { Elt "foo" 0 } ]
+  - location: 19 (remaining gas: 1039989.529 units remaining)
+    [ { Elt "foo" 0 }
+      (Some True) ]
+  - location: 20 (remaining gas: 1039989.519 units remaining)
+    [ (Pair { Elt "foo" 0 } (Some True)) ]
+  - location: 21 (remaining gas: 1039989.509 units remaining)
+    [ {}
+      (Pair { Elt "foo" 0 } (Some True)) ]
+  - location: 23 (remaining gas: 1039989.499 units remaining)
+    [ (Pair {} { Elt "foo" 0 } (Some True)) ]
+

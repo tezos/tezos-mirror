@@ -1,0 +1,57 @@
+tests_013/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[dugn.tz-0-(Pair (Pair (Pair (Pair 1 2) 3) 4) 5)-1]
+
+storage
+  1
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 15 (remaining gas: 1039988.541 units remaining)
+    [ (Pair (Pair (Pair (Pair (Pair 1 2) 3) 4) 5) 0) ]
+  - location: 15 (remaining gas: 1039988.531 units remaining)
+    [ (Pair (Pair (Pair (Pair 1 2) 3) 4) 5) ]
+  - location: 16 (remaining gas: 1039988.521 units remaining)
+    [ (Pair (Pair (Pair 1 2) 3) 4)
+      5 ]
+  - location: 17 (remaining gas: 1039988.511 units remaining)
+    [ (Pair (Pair 1 2) 3)
+      4
+      5 ]
+  - location: 18 (remaining gas: 1039988.501 units remaining)
+    [ (Pair 1 2)
+      3
+      4
+      5 ]
+  - location: 19 (remaining gas: 1039988.491 units remaining)
+    [ 1
+      2
+      3
+      4
+      5 ]
+  - location: 20 (remaining gas: 1039988.429 units remaining)
+    [ 2
+      3
+      4
+      5
+      1 ]
+  - location: 22 (remaining gas: 1039988.419 units remaining)
+    [ 3
+      4
+      5
+      1 ]
+  - location: 23 (remaining gas: 1039988.409 units remaining)
+    [ 4
+      5
+      1 ]
+  - location: 24 (remaining gas: 1039988.399 units remaining)
+    [ 5
+      1 ]
+  - location: 25 (remaining gas: 1039988.389 units remaining)
+    [ 1 ]
+  - location: 26 (remaining gas: 1039988.379 units remaining)
+    [ {}
+      1 ]
+  - location: 28 (remaining gas: 1039988.369 units remaining)
+    [ (Pair {} 1) ]
+

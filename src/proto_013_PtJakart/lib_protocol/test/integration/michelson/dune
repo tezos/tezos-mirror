@@ -1,0 +1,26 @@
+(test
+ (name main)
+ (package tezos-protocol-013-PtJakart-tests)
+ (deps (glob_files contracts/*)
+       (glob_files patched_contracts/*))
+ (libraries alcotest-lwt
+            tezos-base
+            tezos-protocol-013-PtJakart
+            tezos-protocol-013-PtJakart-parameters
+            tezos-base-test-helpers
+            tezos-013-PtJakart-test-helpers
+
+            tezos-client-013-PtJakart
+            tezos-micheline
+            tezos-benchmark
+            tezos-benchmark-013-PtJakart)
+ (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
+                   -open Tezos_protocol_013_PtJakart
+                   -open Tezos_013_PtJakart_test_helpers
+                   -open Tezos_base_test_helpers
+
+                   -open Tezos_client_013_PtJakart
+                   -open Tezos_micheline
+                   -open Tezos_benchmark_013_PtJakart
+                   -open Tezos_benchmark_type_inference_013_PtJakart)))
