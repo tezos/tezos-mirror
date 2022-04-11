@@ -334,6 +334,7 @@ let process_head state current_hash rollup_id =
   maybe_batch_and_inject state ;
   (* TODO/TORU: handle new head and reorgs w.r.t. injected operations by the
      rollup node, like commitments and rejections. *)
+  let*! () = Injector.inject state.State.injector in
   return res
 
 let main_exit_callback state exit_status =

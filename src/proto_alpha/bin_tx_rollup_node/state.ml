@@ -52,6 +52,7 @@ type t = {
   operator : signer option;
   batcher_state : Batcher.state option;
   l1_constants : Protocol.Alpha_context.Constants.parametric;
+  injector : Injector.t;
 }
 
 (* Stands for the manager operation pass, in which the rollup transactions are
@@ -437,6 +438,21 @@ let init cctxt ~data_dir ?(readonly = false) ?rollup_genesis
   let* l1_constants = init_l1_constants cctxt in
   let* batcher_state =
     Batcher.init cctxt ~rollup ~signer:operator context_index l1_constants
+  let* injector =
+    Injector.init
+      cctxt
+      ~rollup
+      ~signers:
+        (List.filter_map
+           (fun x -> x)
+           [
+             operator;
+             signers.submit_batch;
+             signers.finalize_commitment;
+             signers.remove_commitment;
+             signers.rejection;
+           ])
+  in
   in
   let* operator = Option.map_es (get_signer cctxt) operator in
   (* L1 blocks are cached to handle reorganizations efficiently *)
@@ -452,4 +468,5 @@ let init cctxt ~data_dir ?(readonly = false) ?rollup_genesis
       operator;
       batcher_state;
       l1_constants;
+      injector;
     }

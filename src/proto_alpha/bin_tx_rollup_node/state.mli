@@ -52,6 +52,7 @@ type t = private {
   operator : signer option;
   batcher_state : Batcher.state option;
   l1_constants : Protocol.Alpha_context.Constants.parametric;
+  injector : Injector.t;
 }
 
 (** [init cctxt ~data_dir ~rollup_genesis ~operator rollup] creates a new state

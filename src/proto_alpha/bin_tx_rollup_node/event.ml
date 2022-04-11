@@ -237,4 +237,138 @@ module Batcher = struct
       ~name:"invalid_transaction"
       ~msg:"a batch with this only transaction is invalid: {tr}"
       ("tr", L2_transaction.encoding)
+
+module Injector = struct
+  open Injector_worker_types
+
+  let section = section @ ["injector"]
+
+  let request_failed =
+    declare_3
+      ~section
+      ~name:"request_failed"
+      ~msg:"request {view} failed ({worker_status}): {errors}"
+      ~level:Warning
+      ("view", Request.encoding)
+      ~pp1:Request.pp
+      ("worker_status", Worker_types.request_status_encoding)
+      ~pp2:Worker_types.pp_status
+      ("errors", Error_monad.trace_encoding)
+      ~pp3:Error_monad.pp_print_trace
+
+  let request_completed_notice =
+    declare_2
+      ~section
+      ~name:"request_completed_notice"
+      ~msg:"{view} {worker_status}"
+      ~level:Notice
+      ("view", Request.encoding)
+      ("worker_status", Worker_types.request_status_encoding)
+      ~pp1:Request.pp
+      ~pp2:Worker_types.pp_status
+
+  let request_completed_debug =
+    declare_2
+      ~section
+      ~name:"request_completed_debug"
+      ~msg:"{view} {worker_status}"
+      ~level:Debug
+      ("view", Request.encoding)
+      ("worker_status", Worker_types.request_status_encoding)
+      ~pp1:Request.pp
+      ~pp2:Worker_types.pp_status
+
+  let new_tezos_head =
+    declare_1
+      ~section
+      ~name:"new_tezos_head"
+      ~msg:"processing new Tezos head {head}"
+      ~level:Debug
+      ("head", Block_hash.encoding)
+
+  let injecting_pending =
+    declare_1
+      ~section
+      ~name:"injecting_pending"
+      ~msg:"Injecting {count} pending operations"
+      ~level:Notice
+      ("count", Data_encoding.int31)
+
+  let pp_operations_list ppf operations =
+    Format.fprintf
+      ppf
+      "@[%a@]"
+      (Format.pp_print_list L1_operation.pp)
+      operations
+
+  let pp_operations_hash_list ppf operations =
+    Format.fprintf
+      ppf
+      "@[%a@]"
+      (Format.pp_print_list L1_operation.Hash.pp)
+      operations
+
+  let injecting_operations =
+    declare_1
+      ~section
+      ~name:"injecting_operations"
+      ~msg:"Injecting operations: {operations}"
+      ~level:Notice
+      ("operations", Data_encoding.list L1_operation.encoding)
+      ~pp1:pp_operations_list
+
+  let injected =
+    declare_1
+      ~section
+      ~name:"injected"
+      ~msg:"Injected in {oph}"
+      ~level:Notice
+      ("oph", Operation_hash.encoding)
+
+  let add_pending =
+    declare_1
+      ~section
+      ~name:"add_pending"
+      ~msg:"Add {operation} to pending"
+      ~level:Notice
+      ("operation", L1_operation.encoding)
+      ~pp1:L1_operation.pp
+
+  let included =
+    declare_3
+      ~section
+      ~name:"included"
+      ~msg:"Included operations of {block} at level {level}: {operations}"
+      ~level:Notice
+      ("block", Block_hash.encoding)
+      ("level", Data_encoding.int32)
+      ("operations", Data_encoding.list L1_operation.Hash.encoding)
+      ~pp3:pp_operations_hash_list
+
+  let revert_operations =
+    declare_1
+      ~section
+      ~name:"revert_operations"
+      ~msg:"Reverting operations: {operations}"
+      ~level:Notice
+      ("operations", Data_encoding.list L1_operation.Hash.encoding)
+      ~pp1:pp_operations_hash_list
+
+  let confirmed_level =
+    declare_1
+      ~section
+      ~name:"confirmed_level"
+      ~msg:"Confirmed Tezos level {level}"
+      ~level:Notice
+      ("level", Data_encoding.int32)
+
+  let confirmed_operations =
+    declare_2
+      ~section
+      ~name:"confirmed_operations"
+      ~msg:"Confirmed operations of level {level}: {operations}"
+      ~level:Notice
+      ("level", Data_encoding.int32)
+      ("operations", Data_encoding.list L1_operation.Hash.encoding)
+      ~pp2:pp_operations_hash_list
 end

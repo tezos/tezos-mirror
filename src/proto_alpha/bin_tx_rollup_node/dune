@@ -26,7 +26,9 @@
   tezos-micheline
   tezos-client-base
   tezos-client-base-unix
-  tezos-store)
+  tezos-shell
+  tezos-store
+  tezos-workers)
  (flags
   (:standard
    -open Tezos_base.TzPervasives
@@ -45,4 +47,5 @@
    -open Tezos_rpc_http_server
    -open Tezos_micheline
    -open Tezos_client_base
-   -open Tezos_client_base_unix)))
+   -open Tezos_client_base_unix
+   -open Tezos_workers)))
