@@ -406,9 +406,9 @@ let update_script_lazy_storage c = function
 let create_base c ~prepaid_bootstrap_storage
     (* Free space for bootstrap contracts *)
       contract ~balance ~manager ?script () =
-  (match Contract_repr.is_implicit contract with
-  | None -> return c
-  | Some _ ->
+  (match contract with
+  | Contract_repr.Originated _ -> return c
+  | Implicit _ ->
       Storage.Contract.Global_counter.get c >>=? fun counter ->
       Storage.Contract.Counter.init c contract counter)
   >>=? fun c ->
@@ -463,11 +463,11 @@ let create_implicit c manager ~balance =
     ()
 
 let delete c contract =
-  match Contract_repr.is_implicit contract with
-  | None ->
+  match contract with
+  | Contract_repr.Originated _ ->
       (* For non implicit contract Big_map should be cleared *)
       failwith "Non implicit contracts cannot be removed"
-  | Some _ ->
+  | Implicit _ ->
       Contract_delegate_storage.unlink c contract >>=? fun c ->
       Storage.Contract.Spendable_balance.remove_existing c contract
       >>=? fun c ->
@@ -481,9 +481,9 @@ let delete c contract =
 let allocated c contract = Storage.Contract.Spendable_balance.mem c contract
 
 let exists c contract =
-  match Contract_repr.is_implicit contract with
-  | Some _ -> Lwt.return_true
-  | None -> allocated c contract
+  match contract with
+  | Contract_repr.Implicit _ -> Lwt.return_true
+  | Originated _ -> allocated c contract
 
 let must_exist c contract =
   exists c contract >>= function
@@ -494,9 +494,9 @@ let must_be_allocated c contract =
   allocated c contract >>= function
   | true -> return_unit
   | false -> (
-      match Contract_repr.is_implicit contract with
-      | Some pkh -> fail (Empty_implicit_contract pkh)
-      | None -> fail (Non_existing_contract contract))
+      match contract with
+      | Implicit pkh -> fail (Empty_implicit_contract pkh)
+      | Originated _ -> fail (Non_existing_contract contract))
 
 let list c = Storage.Contract.list c
 
@@ -551,17 +551,17 @@ let get_counter c manager =
   let contract = Contract_repr.implicit_contract manager in
   Storage.Contract.Counter.find c contract >>=? function
   | None -> (
-      match Contract_repr.is_implicit contract with
-      | Some _ -> Storage.Contract.Global_counter.get c
-      | None -> failwith "get_counter")
+      match contract with
+      | Contract_repr.Implicit _ -> Storage.Contract.Global_counter.get c
+      | Originated _ -> failwith "get_counter")
   | Some v -> return v
 
 let get_balance c contract =
   Storage.Contract.Spendable_balance.find c contract >>=? function
   | None -> (
-      match Contract_repr.is_implicit contract with
-      | Some _ -> return Tez_repr.zero
-      | None -> failwith "get_balance")
+      match contract with
+      | Implicit _ -> return Tez_repr.zero
+      | Originated _ -> failwith "get_balance")
   | Some v -> return v
 
 let get_balance_carbonated c contract =
@@ -594,9 +594,9 @@ let spend_only_call_from_token c contract amount =
       Stake_storage.remove_contract_stake c contract amount >>=? fun c ->
       if Tez_repr.(new_balance > Tez_repr.zero) then return c
       else
-        match Contract_repr.is_implicit contract with
-        | None -> return c
-        | Some pkh -> (
+        match contract with
+        | Originated _ -> return c
+        | Implicit pkh -> (
             Contract_delegate_storage.find c contract >>=? function
             | Some pkh' ->
                 if Signature.Public_key_hash.equal pkh pkh' then return c
@@ -611,9 +611,9 @@ let spend_only_call_from_token c contract amount =
 let credit_only_call_from_token c contract amount =
   Storage.Contract.Spendable_balance.find c contract >>=? function
   | None -> (
-      match Contract_repr.is_implicit contract with
-      | None -> fail (Non_existing_contract contract)
-      | Some manager -> create_implicit c manager ~balance:amount)
+      match contract with
+      | Originated _ -> fail (Non_existing_contract contract)
+      | Implicit manager -> create_implicit c manager ~balance:amount)
   | Some balance ->
       Tez_repr.(amount +? balance) >>?= fun balance ->
       Storage.Contract.Spendable_balance.update c contract balance >>=? fun c ->
@@ -712,9 +712,10 @@ let fold_on_bond_ids ctxt contract =
   Storage.Contract.fold_bond_ids (ctxt, contract)
 
 let ensure_deallocated_if_empty ctxt contract =
-  match Contract_repr.is_implicit contract with
-  | None -> return ctxt (* Never delete originated contracts *)
-  | Some _ -> (
+  match contract with
+  | Contract_repr.Originated _ ->
+      return ctxt (* Never delete originated contracts *)
+  | Implicit _ -> (
       Storage.Contract.Spendable_balance.find ctxt contract
       >>=? fun balance_opt ->
       match balance_opt with

@@ -132,8 +132,6 @@ let () =
 
 let implicit_contract id = Implicit id
 
-let is_implicit = function Implicit m -> Some m | Originated _ -> None
-
 let is_originated = function Implicit _ -> None | Originated h -> Some h
 
 let originated_contract nonce =

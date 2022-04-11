@@ -206,11 +206,11 @@ let set c contract delegate =
   match delegate with
   | None -> (
       (* check if contract is a registered delegate *)
-      (match Contract_repr.is_implicit contract with
-      | Some pkh ->
+      (match contract with
+      | Contract_repr.Implicit pkh ->
           Contract_delegate_storage.registered c pkh >>=? fun is_registered ->
           fail_when is_registered (No_deletion pkh)
-      | None -> return_unit)
+      | Originated _ -> return_unit)
       >>=? fun () ->
       Contract_delegate_storage.find c contract >>=? function
       | None -> return c
@@ -226,9 +226,9 @@ let set c contract delegate =
       Contract_delegate_storage.registered c delegate
       >>=? fun registered_delegate ->
       let self_delegation =
-        match Contract_repr.is_implicit contract with
-        | Some pkh -> Signature.Public_key_hash.equal pkh delegate
-        | None -> false
+        match contract with
+        | Implicit pkh -> Signature.Public_key_hash.equal pkh delegate
+        | Originated _ -> false
       in
       if (not known_delegate) || not (registered_delegate || self_delegation)
       then fail (Unregistered_delegate delegate)
@@ -245,14 +245,14 @@ let set c contract delegate =
         | None | Some _ -> return_unit)
         >>=? fun () ->
         (* check if contract is a registered delegate *)
-        (match Contract_repr.is_implicit contract with
-        | Some pkh ->
+        (match contract with
+        | Contract_repr.Implicit pkh ->
             Contract_delegate_storage.registered c pkh >>=? fun is_registered ->
             (* allow self-delegation to re-activate *)
             if (not self_delegation) && is_registered then
               fail (No_deletion pkh)
             else return_unit
-        | None -> return_unit)
+        | Originated _ -> return_unit)
         >>=? fun () ->
         Storage.Contract.Spendable_balance.mem c contract >>= fun exists ->
         error_when

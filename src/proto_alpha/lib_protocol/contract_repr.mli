@@ -50,8 +50,6 @@ val in_memory_size : t -> Cache_memory_helpers.sint
 
 val implicit_contract : Signature.Public_key_hash.t -> t
 
-val is_implicit : t -> Signature.Public_key_hash.t option
-
 (** {2 Originated contracts} *)
 
 (** [originated_contract nonce] is the contract address originated from [nonce].
