@@ -7,7 +7,7 @@
   "license": "n/a",
   "dependencies": {
     "@dannywillems/ocaml-bls12-381": ">=3.0.0 <3.1.0",
-    "@nomadic-labs/secp256k1wasm": "1.1.1",
+    "@nomadic-labs/secp256k1-wasm": ">=0.3.0",
     "hacl-wasm": "1.1.0"
   }
 }

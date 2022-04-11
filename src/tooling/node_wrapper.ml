@@ -10,7 +10,7 @@ module Lib = struct
 
   let to_js_lib = function
     | Hacl -> "hacl-wasm"
-    | Secp256k1 -> "@nomadic-labs/secp256k1wasm"
+    | Secp256k1 -> "@nomadic-labs/secp256k1-wasm"
     | Bls12_381 -> "@dannywillems/ocaml-bls12-381"
 
   let to_load_ident x = Printf.sprintf "load_%s" (to_string x)
@@ -73,7 +73,7 @@ let () =
       ("--hacl", Unit (fun () -> libs := Lib.Hacl :: !libs), "Load hacl-wasm");
       ( "--secp256k1",
         Unit (fun () -> libs := Lib.Secp256k1 :: !libs),
-        "Load @nomadic-labs/secp256k1wasm" );
+        "Load @nomadic-labs/secp256k1-wasm" );
       ( "--bls12-381",
         Unit (fun () -> libs := Lib.Bls12_381 :: !libs),
         "Load @dannywillems/ocaml-bls12-381" );
