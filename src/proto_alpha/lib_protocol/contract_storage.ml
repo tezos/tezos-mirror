@@ -482,11 +482,11 @@ let allocated c contract = Storage.Contract.Spendable_balance.mem c contract
 
 let exists c contract =
   match Contract_repr.is_implicit contract with
-  | Some _ -> return_true
-  | None -> allocated c contract >|= ok
+  | Some _ -> Lwt.return_true
+  | None -> allocated c contract
 
 let must_exist c contract =
-  exists c contract >>=? function
+  exists c contract >>= function
   | true -> return_unit
   | false -> fail (Non_existing_contract contract)
 
@@ -507,9 +507,10 @@ let fresh_contract_from_current_nonce c =
 let originated_from_current_nonce ~since:ctxt_since ~until:ctxt_until =
   Raw_context.get_origination_nonce ctxt_since >>?= fun since ->
   Raw_context.get_origination_nonce ctxt_until >>?= fun until ->
-  List.filter_es
+  List.filter_s
     (fun contract -> exists ctxt_until contract)
     (Contract_repr.originated_contracts ~since ~until)
+  >|= ok
 
 let check_counter_increment c manager counter =
   let contract = Contract_repr.implicit_contract manager in

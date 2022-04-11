@@ -1489,7 +1489,7 @@ module Contract : sig
 
   val is_originated : t -> Contract_hash.t option
 
-  val exists : context -> t -> bool tzresult Lwt.t
+  val exists : context -> t -> bool Lwt.t
 
   val must_exist : context -> t -> unit tzresult Lwt.t
 

@@ -42,7 +42,7 @@ val allocated : Raw_context.t -> Contract_repr.t -> bool Lwt.t
 
 (** [exists ctxt contract] returns [true] if and only if either the
    contract is originated or it is (implicit and) "allocated". *)
-val exists : Raw_context.t -> Contract_repr.t -> bool tzresult Lwt.t
+val exists : Raw_context.t -> Contract_repr.t -> bool Lwt.t
 
 (** [must_exist ctxt contract] fails with the [Non_existing_contract] error if
     [exists ctxt contract] returns [false]. Even though this function is
