@@ -1,16 +1,13 @@
-#!/usr/bin/env bash
+#!/usr/bin/env sh
 
 set -eu
 
 script_dir="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"
-
-#shellcheck disable=SC1090
-. "$script_dir"opam-pin.sh
+src_dir="$(dirname "$script_dir")"
 
 #shellcheck disable=SC2154
-PACKAGES=$(echo "$packages" | tr '\n' ' ')
+opams=$(find "$src_dir/vendors" "$src_dir/src" "$src_dir/tezt" -name \*.opam -print)
 
-{
 cat <<EOF
 include: ".gitlab/ci/templates.yml"
 
@@ -18,16 +15,16 @@ stages:
   - packaging
 
 EOF
-} > opam-ci.yml
 
-for PKG in $PACKAGES; do
-{
+for opam in $opams; do
+  file=$(basename "$opam")
+  pkg=${file%.opam}
+
   cat <<EOF
 
-opam:$PKG:
+opam:${pkg}:
   extends: .opam_template
   variables:
-    package: ${PKG}
+    package: ${pkg}
 EOF
-} >> opam-ci.yml
 done

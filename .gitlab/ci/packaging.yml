@@ -1,12 +1,11 @@
 opam:create_pipeline:
   extends:
     - .default_settings_template
-    - .image_template__runtime_build_test_dependencies_template
+    - .image_template__alpine
     - .rules_template__trigger_opam_pipeline
   stage: packaging
   script:
-    - ./scripts/generate_opam_pipeline.sh
-    - cat opam-ci.yml
+    - ./scripts/generate_opam_pipeline.sh | tee opam-ci.yml
   needs: []
   artifacts:
     paths:
