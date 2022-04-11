@@ -29,34 +29,21 @@ open Alpha_context
 open Common
 
 type tag =
-  [ `Each_block
-  | `Delay_block
+  [ `Commitment
   | `Submit_batch
-  | `Commitment
   | `Finalize_commitment
   | `Remove_commitment
   | `Rejection ]
 
-module Tags = struct
-  include Set.Make (struct
-    type t = tag
+module Tags = Set.Make (struct
+  type t = tag
 
-    let compare = Stdlib.compare
-  end)
-
-  let merge tags1 tags2 =
-    let tags = union tags1 tags2 in
-    if mem `Each_block tags && mem `Delay_block tags then
-      (* each U delay = delay *)
-      remove `Each_block tags
-    else tags
-end
+  let compare = Stdlib.compare
+end)
 
 type tags = Tags.t
 
 let string_of_tag : tag -> string = function
-  | `Each_block -> "each_block"
-  | `Delay_block -> "delay_block"
   | `Submit_batch -> "submit_batch"
   | `Commitment -> "commitment"
   | `Finalize_commitment -> "finalize_commitment"
@@ -76,8 +63,6 @@ let tag_encoding : tag Data_encoding.t =
     (List.map
        (fun t -> (string_of_tag t, t))
        [
-         `Each_block;
-         `Delay_block;
          `Submit_batch;
          `Commitment;
          `Finalize_commitment;
@@ -91,7 +76,7 @@ let tags_encoding : tags Data_encoding.t =
 
 module Request = struct
   type 'a t =
-    | Queue_pending : L1_operation.t -> unit t
+    | Add_pending : L1_operation.t -> unit t
     | New_tezos_head :
         Alpha_block_services.block_info * Alpha_block_services.block_info reorg
         -> unit t

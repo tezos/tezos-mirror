@@ -425,13 +425,18 @@ let init cctxt ~data_dir ?(readonly = false) ?rollup_genesis
       cctxt
       ~signers:
         (List.filter_map
-           (function (None, _) -> None | (Some x, tags) -> Some (x, tags))
+           (function
+             | (None, _, _) -> None
+             | (Some x, strategy, tags) -> Some (x, strategy, tags))
            [
-             (operator, [`Each_block; `Commitment]);
-             (signers.submit_batch, [`Delay_block; `Submit_batch]);
-             (signers.finalize_commitment, [`Each_block; `Finalize_commitment]);
-             (signers.remove_commitment, [`Each_block; `Remove_commitment]);
-             (signers.rejection, [`Each_block; `Rejection]);
+             (operator, Injector.Each_block, [`Commitment]);
+             (* Batches of L2 operations are submitted with a delay after each
+                block, to allow for more operations to arrive and be included in
+                the following block. *)
+             (signers.submit_batch, Delay_block, [`Submit_batch]);
+             (signers.finalize_commitment, Each_block, [`Finalize_commitment]);
+             (signers.remove_commitment, Each_block, [`Remove_commitment]);
+             (signers.rejection, Each_block, [`Rejection]);
            ])
   in
   let* batcher =

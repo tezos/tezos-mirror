@@ -398,11 +398,11 @@ let trigger_injection state header =
         let* () = Event.(emit Injector.wait) delay in
         Lwt_unix.sleep delay
     in
-    Injector.inject ~tags:[`Delay_block] ()
+    Injector.inject ~strategy:Injector.Delay_block ()
   in
   ignore promise ;
   (* Queue request for injection of operation that must be injected each block *)
-  Injector.inject ~tags:[`Each_block] ()
+  Injector.inject ~strategy:Injector.Each_block ()
 
 let process_head state (current_hash, current_header) rollup_id =
   let open Lwt_result_syntax in

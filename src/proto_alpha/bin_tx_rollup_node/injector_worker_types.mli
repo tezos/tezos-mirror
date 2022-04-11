@@ -29,20 +29,13 @@ open Alpha_context
 open Common
 
 type tag =
-  [ `Each_block
-  | `Delay_block
-  | `Commitment
+  [ `Commitment
   | `Submit_batch
   | `Finalize_commitment
   | `Remove_commitment
   | `Rejection ]
 
-module Tags : sig
-  include Set.S with type elt = tag
-
-  (* Merge tags, where some can overwrite others *)
-  val merge : t -> t -> t
-end
+module Tags : Set.S with type elt = tag
 
 type tags = Tags.t
 

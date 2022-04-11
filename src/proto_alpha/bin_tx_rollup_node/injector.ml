@@ -36,6 +36,8 @@ let confirmations = 2
 
 module Op_queue = Hash_queue.Make (L1_operation.Hash) (L1_operation)
 
+type injection_strategy = Each_block | Delay_block
+
 (** Information stored about an L1 operation that was injected on a Tezos
     node. *)
 type injected_info = {
@@ -86,6 +88,8 @@ type state = {
   tags : tags;
       (** The tags of this worker, for both informative and identification
           purposes. *)
+  strategy : injection_strategy;
+      (** The strategy of this worker for injecting the pending operations. *)
   queue : Op_queue.t;  (** The queue of pending operations for this injector. *)
   injected : injected_state;  (** The information about injected operations. *)
   included : included_state;
@@ -110,7 +114,7 @@ let injector_context (cctxt : #Client_context.full) =
       Format.ksprintf Stdlib.failwith "Injector client wants to exit %d" code
   end
 
-let init_injector cctxt ~signer tags =
+let init_injector cctxt ~signer strategy tags =
   let open Lwt_result_syntax in
   let+ signer = get_signer cctxt signer in
   let queue = Op_queue.create 50_000 in
@@ -134,6 +138,7 @@ let init_injector cctxt ~signer tags =
     cctxt = injector_context cctxt;
     signer;
     tags;
+    strategy;
     queue;
     injected =
       {
@@ -632,7 +637,11 @@ let on_inject state = inject_pending_operations state
 module Types = struct
   type nonrec state = state
 
-  type parameters = {cctxt : Client_context.full; tags : Tags.t}
+  type parameters = {
+    cctxt : Client_context.full;
+    strategy : injection_strategy;
+    tags : Tags.t;
+  }
 end
 
 (* The worker for the injector. *)
@@ -660,7 +669,8 @@ module Handlers = struct
        worker in case of an exception. *)
     protect @@ fun () -> on_request w r
 
-  let on_launch _w signer Types.{cctxt; tags} = init_injector cctxt ~signer tags
+  let on_launch _w signer Types.{cctxt; strategy; tags} =
+    init_injector cctxt ~signer strategy tags
 
   let on_error w r st errs =
     let open Lwt_result_syntax in
@@ -693,24 +703,34 @@ let init cctxt ~signers =
   let open Lwt_result_syntax in
   let signers_map =
     List.fold_left
-      (fun acc (signer, tags) ->
+      (fun acc (signer, strategy, tags) ->
         let tags = Tags.of_list tags in
-        let tags =
+        let (strategy, tags) =
           match Signature.Public_key_hash.Map.find_opt signer acc with
-          | None -> tags
-          | Some other_tags -> Tags.merge other_tags tags
+          | None -> (strategy, tags)
+          | Some (other_strategy, other_tags) ->
+              let strategy =
+                match (strategy, other_strategy) with
+                | (Each_block, Each_block) -> Each_block
+                | (Delay_block, _) | (_, Delay_block) ->
+                    (* Delay_block strategy takes over because we can always wait a
+                       little bit more to inject operation which are to be injected
+                       "each block". *)
+                    Delay_block
+              in
+              (strategy, Tags.union other_tags tags)
         in
-        Signature.Public_key_hash.Map.add signer tags acc)
+        Signature.Public_key_hash.Map.add signer (strategy, tags) acc)
       Signature.Public_key_hash.Map.empty
       signers
   in
   Signature.Public_key_hash.Map.iter_es
-    (fun signer tags ->
+    (fun signer (strategy, tags) ->
       let+ worker =
         Worker.launch
           table
           signer
-          {cctxt = (cctxt :> Client_context.full); tags}
+          {cctxt = (cctxt :> Client_context.full); strategy; tags}
           (module Handlers)
       in
       ignore worker)
@@ -742,17 +762,24 @@ let new_tezos_head h reorg =
 let has_tag_in ~tags state =
   match tags with
   | None ->
-      (* When no tag provided in the request, inject from all workers *)
+      (* Not filtering on tags *)
       true
   | Some tags -> not (Tags.disjoint state.tags tags)
 
-let inject ?tags () =
+let has_strategy ~strategy state =
+  match strategy with
+  | None ->
+      (* Not filtering on strategy *)
+      true
+  | Some strategy -> state.strategy = strategy
+
+let inject ?tags ?strategy () =
   let workers = Worker.list table in
   let tags = Option.map Tags.of_list tags in
   List.iter_p
     (fun (_signer, w) ->
       let worker_state = Worker.state w in
-      if has_tag_in ~tags worker_state then
-        Worker.Queue.push_request w Request.Inject
+      if has_tag_in ~tags worker_state && has_strategy ~strategy worker_state
+      then Worker.Queue.push_request w Request.Inject
       else Lwt.return_unit)
     workers

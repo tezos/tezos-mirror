@@ -28,11 +28,19 @@ open Protocol
 open Alpha_context
 open Common
 
+type injection_strategy =
+  | Each_block  (** Inject pending operations after each new L1 block *)
+  | Delay_block
+      (** Wait for some time after the L1 block is produced to inject pending
+          operations. This strategy allows for maximizing the number of the same
+          kind of operations to include in a block. *)
+
 (** Initializes the injector with a client context, for a list of signers. Each
     signer has its own worker with a queue of operations to inject. *)
 val init :
   #Client_context.full ->
-  signers:(public_key_hash * Injector_worker_types.tag list) list ->
+  signers:
+    (public_key_hash * injection_strategy * Injector_worker_types.tag list) list ->
   unit tzresult Lwt.t
 
 (** Add an operation as pending injection in the injector. *)
@@ -52,5 +60,10 @@ val new_tezos_head :
 
 (** Trigger an injection of the pending operations for all workers. If [tags]
     is given, only the workers which have a tag in [tags] inject their pending
-    operations. *)
-val inject : ?tags:Injector_worker_types.tag list -> unit -> unit Lwt.t
+    operations. If [strategy] is given, only workers which have this strategy
+    inject their pending operations. *)
+val inject :
+  ?tags:Injector_worker_types.tag list ->
+  ?strategy:injection_strategy ->
+  unit ->
+  unit Lwt.t
