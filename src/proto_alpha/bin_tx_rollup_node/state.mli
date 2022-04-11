@@ -50,7 +50,7 @@ type t = private {
   rollup_info : rollup_info;
   tezos_blocks_cache : Alpha_block_services.block_info Tezos_blocks_cache.t;
   operator : signer option;
-  batcher_state : Batcher.state option;
+  batcher : Batcher.t option;
   l1_constants : Protocol.Alpha_context.Constants.parametric;
   injector : Injector.t;
 }
@@ -115,10 +115,9 @@ val tezos_block_already_processed : t -> Block_hash.t -> bool Lwt.t
 
 (** {2 Saving the state to disk}  *)
 
-(** Set the current head of the rollup with its context and return the blocks
-    (hashes) that were reorganized. *)
-val set_head :
-  t -> L2block.t -> Context.t -> (L2block.t * L2block.hash) reorg tzresult Lwt.t
+(** Set the current head of the rollup and return the blocks (hashes) that were
+    reorganized. *)
+val set_head : t -> L2block.t -> (L2block.t * L2block.hash) reorg tzresult Lwt.t
 
 (** Set the Tezos head. Returns the reorganization of L1 blocks (if any). *)
 val set_tezos_head :

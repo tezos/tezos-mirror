@@ -280,9 +280,8 @@ let rec process_block state current_hash rollup_id :
     | Some l2_block ->
         (* Already processed *)
         let*! () = Event.(emit block_already_processed) current_hash in
-        let* context = checkout_context state l2_block.header.context in
-        let* _l2_reorg = State.set_head state l2_block context in
-        return (l2_block, Some context)
+        let* _l2_reorg = State.set_head state l2_block in
+        return (l2_block, None)
     | None ->
         let* block_info = State.fetch_tezos_block state current_hash in
         let predecessor_hash = block_info.header.shell.predecessor in
@@ -316,15 +315,15 @@ let rec process_block state current_hash rollup_id :
             ~level:block_info.header.shell.level
             ~predecessor:block_info.header.shell.predecessor
         in
-        let* _l2_reorg = State.set_head state l2_block context in
+        let* _l2_reorg = State.set_head state l2_block in
         let*! () = Event.(emit new_tezos_head) current_hash in
         let*! () = Event.(emit block_processed) (current_hash, block_level) in
         return (l2_block, Some context)
 
-let maybe_batch_and_inject state =
-  match state.State.batcher_state with
-  | None -> ()
-  | Some batcher_state -> Batcher.async_batch_and_inject batcher_state
+let batch state =
+  match state.State.batcher with
+  | None -> return_unit
+  | Some batcher -> Batcher.batch batcher
 
 let notify_head state head reorg =
   let open Lwt_result_syntax in
@@ -337,7 +336,7 @@ let process_head state current_hash rollup_id =
   let*! () = Event.(emit new_block) current_hash in
   let* res = process_block state current_hash rollup_id in
   let* l1_reorg = State.set_tezos_head state current_hash in
-  maybe_batch_and_inject state ;
+  let* () = batch state in
   let* () = notify_head state current_hash l1_reorg in
   let*! () = Injector.inject state.State.injector in
   return res

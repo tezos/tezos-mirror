@@ -50,7 +50,7 @@ type t = {
   rollup_info : rollup_info;
   tezos_blocks_cache : Alpha_block_services.block_info Tezos_blocks_cache.t;
   operator : signer option;
-  batcher_state : Batcher.state option;
+  batcher : Batcher.t option;
   l1_constants : Protocol.Alpha_context.Constants.parametric;
   injector : Injector.t;
 }
@@ -274,11 +274,13 @@ let patch_l2_levels state (reorg : (L2block.t * L2block.hash) reorg) =
       save_level state new_.L2block.header.level new_hash)
     reorg.new_chain
 
-let set_head state head context =
+let set_head state head =
   let open Lwt_result_syntax in
-  (match state.batcher_state with
-  | None -> ()
-  | Some batcher_state -> Batcher.update_incr_context batcher_state context) ;
+  let*! () =
+    match state.batcher with
+    | None -> Lwt.return_unit
+    | Some batcher -> Batcher.new_head batcher head
+  in
   state.head <- head ;
   let*! old_head = Stores.Head_store.read state.stores.head in
   let hash = head.L2block.hash in
@@ -422,8 +424,6 @@ let init cctxt ~data_dir ?(readonly = false) ?rollup_genesis
   in
   let*! head = init_head stores context_index rollup rollup_info in
   let* l1_constants = init_l1_constants cctxt in
-  let* batcher_state =
-    Batcher.init cctxt ~rollup ~signer:operator context_index l1_constants
   let* injector =
     Injector.init
       cctxt
@@ -439,6 +439,11 @@ let init cctxt ~data_dir ?(readonly = false) ?rollup_genesis
              signers.rejection;
            ])
   in
+  let* batcher =
+    Option.map_es
+      (fun signer ->
+        Batcher.init ~rollup ~signer injector context_index parameters)
+      signers.submit_batch
   in
   let* operator = Option.map_es (get_signer cctxt) operator in
   (* L1 blocks are cached to handle reorganizations efficiently *)
@@ -452,7 +457,7 @@ let init cctxt ~data_dir ?(readonly = false) ?rollup_genesis
       rollup_info;
       tezos_blocks_cache;
       operator;
-      batcher_state;
+      batcher;
       l1_constants;
       injector;
     }

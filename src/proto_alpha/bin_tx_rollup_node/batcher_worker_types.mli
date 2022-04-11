@@ -22,47 +22,31 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
+
 open Protocol
 open Alpha_context
 
-(** The type of a batcher worker. In particular, the batcher maintains an
-    incremental context on top of the current head to apply incoming
-    transactions. *)
-type t
+module Request : sig
+  type 'a t =
+    | Register : {
+        tr : L2_transaction.t;
+        apply : bool;
+        eager_batch : bool;
+      }
+        -> L2_transaction.hash t
+    | New_head : L2block.t -> unit t
+    | Batch : unit t
 
-(** Initialize the internal state of the batcher. *)
-val init :
-  rollup:Tx_rollup.t ->
-  signer:Signature.public_key_hash ->
-  Injector.t ->
-  Context.index ->
-  Protocol.Alpha_context.Constants.parametric ->
-  t tzresult Lwt.t
+  type view = View : _ t -> view
 
-(** Retrieve an L2 transaction from the queue. *)
-val find_transaction : t -> L2_transaction.hash -> L2_transaction.t option
+  include Worker_intf.REQUEST with type 'a t := 'a t and type view := view
+end
 
-(** List all queued transactions in the order they appear in the queue, i.e. the
-    message that were added first to the queue are at the end of list. *)
-val get_queue : t -> L2_transaction.t list
+module Name : Worker_intf.NAME with type t = Tx_rollup.t
 
-(** [register_transaction ?apply state tx] registers a new L2 transaction [tx]
-    in the queue of the batcher for future injection on L1. If [apply] is [true]
-    (defaults to [true]), the transaction is applied on the batcher's incremental
-    context. In this case, when the application fails, the transaction is not
-    queued. A batch is injected asynchronously if a full batch can be constructed
-    and [eager_batch] is [true]. *)
-val register_transaction :
-  ?eager_batch:bool ->
-  ?apply:bool ->
-  t ->
-  L2_transaction.t ->
-  L2_transaction.hash tzresult Lwt.t
+module Dummy_event : Worker_intf.EVENT with type t = unit
 
-(** Create L2 batches of operations from the queue and pack them in an L1 batch
-    operation. The batch operation is queued in the injector for injection on the
-    Tezos node. *)
-val batch : t -> unit tzresult Lwt.t
-
-(** Notifies a new L2 head to the batcher worker. *)
-val new_head : t -> L2block.t -> unit Lwt.t
+module Logger :
+  Worker_intf.LOGGER
+    with module Event = Dummy_event
+     and type Request.view = Request.view

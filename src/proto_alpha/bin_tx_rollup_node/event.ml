@@ -215,21 +215,13 @@ module Batcher = struct
       ~level:Info
       ()
 
-  let inject =
+  let batch_success =
     declare_0
       ~section
-      ~name:"inject"
-      ~msg:"Injecting batches on Tezos node"
+      ~name:"batch_success"
+      ~msg:"transactions were successfully batched"
       ~level:Notice
       ()
-
-  let injection_success =
-    declare_1
-      ~section
-      ~name:"injection_success"
-      ~msg:"batches were successfully injected in operation {oph}"
-      ~level:Notice
-      ("oph", Operation_hash.encoding)
 
   let invalid_transaction =
     declare_1
@@ -237,6 +229,48 @@ module Batcher = struct
       ~name:"invalid_transaction"
       ~msg:"a batch with this only transaction is invalid: {tr}"
       ("tr", L2_transaction.encoding)
+
+  module Worker = struct
+    open Batcher_worker_types
+
+    let section = section @ ["worker"]
+
+    let request_failed =
+      declare_3
+        ~section
+        ~name:"request_failed"
+        ~msg:"request {view} failed ({worker_status}): {errors}"
+        ~level:Warning
+        ("view", Request.encoding)
+        ~pp1:Request.pp
+        ("worker_status", Worker_types.request_status_encoding)
+        ~pp2:Worker_types.pp_status
+        ("errors", Error_monad.trace_encoding)
+        ~pp3:Error_monad.pp_print_trace
+
+    let request_completed_notice =
+      declare_2
+        ~section
+        ~name:"request_completed_notice"
+        ~msg:"{view} {worker_status}"
+        ~level:Notice
+        ("view", Request.encoding)
+        ("worker_status", Worker_types.request_status_encoding)
+        ~pp1:Request.pp
+        ~pp2:Worker_types.pp_status
+
+    let request_completed_debug =
+      declare_2
+        ~section
+        ~name:"request_completed_debug"
+        ~msg:"{view} {worker_status}"
+        ~level:Debug
+        ("view", Request.encoding)
+        ("worker_status", Worker_types.request_status_encoding)
+        ~pp1:Request.pp
+        ~pp2:Worker_types.pp_status
+  end
+end
 
 module Injector = struct
   open Injector_worker_types

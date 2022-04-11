@@ -25,94 +25,27 @@
 
 open Protocol
 open Alpha_context
-open Common
+open Batcher_worker_types
 module Tx_queue = Hash_queue.Make (L2_transaction.Hash) (L2_transaction)
 
 type state = {
-  cctxt : Protocol_client_context.full;
   rollup : Tx_rollup.t;
-  signer : signer;
+  parameters : Protocol.Tx_rollup_l2_apply.parameters;
+  index : Context.index;
+  signer : Signature.public_key_hash;
+  injector : Injector.t;
   transactions : Tx_queue.t;
   mutable incr_context : Context.t;
   lock : Lwt_mutex.t;
   l1_constants : Protocol.Alpha_context.Constants.parametric;
 }
 
-(* TODO/TORU Change me with bound on size and have a configuration option *)
+(* TODO/TORU: remove me *)
 let max_number_of_batches = 10
-
-let batcher_context (cctxt : #Client_context.full) =
-  let log _channel msg = Logs_lwt.info (fun m -> m "%s" msg) in
-  object
-    inherit
-      Protocol_client_context.wrap_full
-        (new Client_context.proxy_context (cctxt :> Client_context.full))
-
-    inherit! Client_context.simple_printer log
-
-    method! exit code =
-      Format.ksprintf Stdlib.failwith "Batching client wants to exit %d" code
-  end
 
 let encode_batch batch =
   Data_encoding.Binary.to_string Tx_rollup_l2_batch.encoding batch
   |> Result.map_error (fun err -> [Data_encoding_wrapper.Encoding_error err])
-
-let update_incr_context state context = state.incr_context <- context
-
-let find_transaction state tr_hash =
-  Tx_queue.find_opt state.transactions tr_hash
-
-let get_queue state = Tx_queue.elements state.transactions
-
-let inject_operations (type kind) state
-    (operations : kind manager_operation list) =
-  let open Lwt_result_syntax in
-  let open Annotated_manager_operation in
-  let operations =
-    List.map
-      (fun operation ->
-        Annotated_manager_operation
-          (Manager_info
-             {
-               source = None;
-               fee = Limit.unknown;
-               gas_limit = Limit.unknown;
-               storage_limit = Limit.unknown;
-               counter = None;
-               operation;
-             }))
-      operations
-  in
-  let (Manager_list annot_op) =
-    Annotated_manager_operation.manager_of_list operations
-  in
-  (* TODO maybe use something else (e.g. inject directly with correct limits) *)
-  let+ (oph, _, _) =
-    Injection.inject_manager_operation
-      state.cctxt
-      ~chain:state.cctxt#chain
-      ~block:(`Head 0)
-      ~source:state.signer.pkh
-      ~src_pk:state.signer.pk
-      ~src_sk:state.signer.sk
-      ~successor_level:
-        true (* Needed to simulate tx_rollup operations in the next block *)
-      ~fee:Limit.unknown
-      ~gas_limit:Limit.unknown
-      ~storage_limit:Limit.unknown
-      ~fee_parameter:
-        {
-          minimal_fees = Tez.of_mutez_exn 100L;
-          minimal_nanotez_per_byte = Q.of_int 1000;
-          minimal_nanotez_per_gas_unit = Q.of_int 100;
-          force_low_fee = false;
-          fee_cap = Tez.one;
-          burn_cap = Tez.one;
-        }
-      annot_op
-  in
-  oph
 
 let inject_batches state batches =
   let open Lwt_result_syntax in
@@ -121,11 +54,25 @@ let inject_batches state batches =
       (fun batch ->
         let open Result_syntax in
         let+ batch_content = encode_batch batch in
-        Tx_rollup_submit_batch
-          {tx_rollup = state.rollup; content = batch_content; burn_limit = None})
+        let manager_operation =
+          Manager
+            (Tx_rollup_submit_batch
+               {
+                 tx_rollup = state.rollup;
+                 content = batch_content;
+                 burn_limit = None;
+               })
+        in
+        {
+          L1_operation.hash =
+            L1_operation.hash_manager_operation manager_operation;
+          source = state.signer;
+          manager_operation;
+        })
       batches
   in
-  inject_operations state operations
+  let*! () = Injector.add_pending_operations state.injector operations in
+  return_unit
 
 (** [is_batch_valid] returns whether the batch is valid or not based on
     two criterias:
@@ -223,51 +170,25 @@ let get_batches ctxt l1_constants queue =
   with Batches_finished {rev_batches; to_remove} ->
     return (List.rev rev_batches, to_remove)
 
-let batch_and_inject state =
+let on_batch state =
   let open Lwt_result_syntax in
   let* (batches, to_remove) =
     get_batches state.incr_context state.l1_constants state.transactions
   in
   match batches with
-  | [] -> return_none
+  | [] -> return_unit
   | _ ->
       let*! () =
         Event.(emit Batcher.batch) (List.length batches, List.length to_remove)
       in
-      let*! () = Event.(emit Batcher.inject) () in
-      let* oph = inject_batches state batches in
-      let*! () = Event.(emit Batcher.injection_success) oph in
+      let* () = inject_batches state batches in
+      let*! () = Event.(emit Batcher.batch_success) () in
       List.iter
         (fun tr_hash -> Tx_queue.remove state.transactions tr_hash)
         to_remove ;
-      return_some oph
+      return_unit
 
-let async_batch_and_inject state =
-  Lwt.async @@ fun () ->
-  let open Lwt_syntax in
-  (* let* _ = Lwt_unix.sleep 2. in *)
-  let* _ = batch_and_inject state in
-  return_unit
-
-let init cctxt ~rollup ~signer index l1_constants =
-  let open Lwt_result_syntax in
-  let*! incr_context = Context.init_context index in
-  let+ signer = get_signer cctxt signer in
-  Option.map
-    (fun signer ->
-      {
-        cctxt = batcher_context cctxt;
-        rollup;
-        signer;
-        transactions = Tx_queue.create 500_000;
-        incr_context;
-        lock = Lwt_mutex.create ();
-        l1_constants;
-      })
-    signer
-
-let register_transaction ?(eager_batch = false) ?(apply = true) state
-    (tr : L2_transaction.t) =
+let on_register state ~apply (tr : L2_transaction.t) =
   let open Lwt_tzresult_syntax in
   Lwt_mutex.with_lock state.lock @@ fun () ->
   let batch =
@@ -285,7 +206,7 @@ let register_transaction ?(eager_batch = false) ?(apply = true) state
               state.l1_constants.tx_rollup_max_withdrawals_per_batch;
           }
       in
-      let* (new_context, result, _) =
+      let* (new_context, result, _withdrawals) =
         L2_apply.Batch_V1.apply_batch context l2_parameters batch
       in
       let open Tx_rollup_l2_apply.Message_result in
@@ -308,8 +229,106 @@ let register_transaction ?(eager_batch = false) ?(apply = true) state
     (* Only update internal context if it was not changed due to a head block
        change in the meantime. *)
     state.incr_context <- context ;
-  if eager_batch then
-    (* TODO/TORU: find better solution as this reduces throughput when we have a
-       single key to sign/inject. *)
-    async_batch_and_inject state ;
   return tr_hash
+
+let on_new_head state head =
+  let open Lwt_result_syntax in
+  let+ context = Context.checkout state.index head.L2block.header.context in
+  (* TODO/TORU: https://gitlab.com/tezos/tezos/-/issues/2816
+     Flush and reapply queue *)
+  state.incr_context <- context
+
+let init_batcher_state ~rollup ~signer injector index l1_constants =
+  let open Lwt_result_syntax in
+  let+ incr_context = Context.init_context index in
+  {
+    rollup;
+    index;
+    signer;
+    injector;
+    transactions = Tx_queue.create 500_000;
+    incr_context;
+    lock = Lwt_mutex.create ();
+    l1_constants;
+  }
+
+module Types = struct
+  type nonrec state = state
+
+  type parameters = {
+    signer : Signature.public_key_hash;
+    injector : Injector.t;
+    index : Context.index;
+    l1_constants : Protocol.Alpha_context.Constants.parametric;
+  }
+end
+
+module Worker = Worker.Make (Name) (Dummy_event) (Request) (Types) (Logger)
+
+type worker = Worker.infinite Worker.queue Worker.t
+
+module Handlers = struct
+  type self = worker
+
+  let on_request : type r. worker -> r Request.t -> r tzresult Lwt.t =
+   fun w request ->
+    let open Lwt_result_syntax in
+    let state = Worker.state w in
+    match request with
+    | Request.Register {tr; apply; eager_batch = _} ->
+        let* tr_hash = on_register state ~apply tr in
+        return tr_hash
+    | Request.Batch -> on_batch state
+    | Request.New_head head -> on_new_head state head
+
+  let on_request w r = protect @@ fun () -> on_request w r
+
+  let on_launch _w rollup Types.{signer; injector; index; l1_constants} =
+    let open Lwt_result_syntax in
+    let*! state = init_batcher_state ~rollup ~signer injector index l1_constants in
+    return state
+
+  let on_error _w r st errs =
+    let open Lwt_result_syntax in
+    let*! () = Event.(emit Batcher.Worker.request_failed) (r, st, errs) in
+    return_unit
+
+  let on_completion _w r _ st =
+    match Request.view r with
+    | Request.View (Register _ | New_head _) ->
+        Event.(emit Batcher.Worker.request_completed_debug) (Request.view r, st)
+    | View Batch ->
+        Event.(emit Batcher.Worker.request_completed_notice) (Request.view r, st)
+
+  let on_no_request _ = return_unit
+
+  let on_close _w = Lwt.return_unit
+end
+
+let table = Worker.create_table Queue
+
+type t = worker
+
+let init ~rollup ~signer injector index l1_constants =
+  Worker.launch
+    table
+    rollup
+    {signer; injector; index; l1_constants}
+    (module Handlers)
+
+let find_transaction w tr_hash =
+  let state = Worker.state w in
+  Tx_queue.find_opt state.transactions tr_hash
+
+let get_queue w =
+  let state = Worker.state w in
+  Tx_queue.elements state.transactions
+
+let register_transaction ?(eager_batch = false) ?(apply = true) w tr =
+  Worker.Queue.push_request_and_wait
+    w
+    (Request.Register {tr; apply; eager_batch})
+
+let batch w = Worker.Queue.push_request_and_wait w Request.Batch
+
+let new_head w b = Worker.Queue.push_request w (Request.New_head b)
