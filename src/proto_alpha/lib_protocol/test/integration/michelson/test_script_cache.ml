@@ -239,7 +239,6 @@ let test_entries_returns_the_list_in_correct_order () =
   ( make_block block @! fun ctxt ->
     Script_cache.entries ctxt |> Environment.wrap_tzresult >>?= fun entries ->
     let cached_contracts = fst (List.split entries) in
-    let addrs = List.map (fun c -> Contract.Originated c) addrs in
     fail_unless
       (addrs = cached_contracts)
       (err "entries must return cached contracts in order") )
@@ -366,8 +365,7 @@ let test_entries_shows_lru () =
                   (ncontracts / 2)))
       | (contract, size) :: rev_entries, (_, contract') :: rev_contracts ->
           fail_unless
-            (size = new_size
-            || contract = Contract.Originated liquidity_baking_contract)
+            (size = new_size || contract = liquidity_baking_contract)
             (err
                (Printf.sprintf
                   "A contract in the cache has not the right size, expecting \
@@ -376,7 +374,7 @@ let test_entries_shows_lru () =
                   size))
           >>=? fun () ->
           fail_unless
-            (contract = Contract.Originated contract')
+            (contract = contract')
             (err
                (Printf.sprintf
                   "entries do not return cached contracts in right order"))

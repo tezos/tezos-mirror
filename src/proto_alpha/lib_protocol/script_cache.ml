@@ -103,9 +103,7 @@ let update ctxt identifier updated_script approx_size =
 let entries ctxt =
   Cache.list_identifiers ctxt
   |> List.map_e @@ fun (identifier, age) ->
-     contract_of_identifier identifier >|? fun contract ->
-     let contract = Contract.Originated contract in
-     (contract, age)
+     contract_of_identifier identifier >|? fun contract -> (contract, age)
 
 let contract_rank ctxt addr =
   Cache.identifier_rank ctxt (identifier_of_contract addr)

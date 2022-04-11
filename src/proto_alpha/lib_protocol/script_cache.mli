@@ -65,7 +65,7 @@ val update : context -> identifier -> cached_contract -> int -> context tzresult
 (** [entries ctxt] returns the contracts in the cache as well as their
    respective size. The list is sorted by date of last modification:
    the least recently updated entry comes first. *)
-val entries : context -> (Contract.t * int) list tzresult
+val entries : context -> (Contract_hash.t * int) list tzresult
 
 (** [contract_rank ctxt contract] returns the number of contracts
     older than [contract] in the cache of [ctxt]. This function

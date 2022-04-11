@@ -201,8 +201,7 @@ let commands_ro () =
         cached_contracts cctxt ~chain:cctxt#chain ~block:cctxt#block
         >>=? fun keys ->
         List.iter_s
-          (fun (key, size) ->
-            cctxt#message "%a %d" Alpha_context.Contract.pp key size)
+          (fun (key, size) -> cctxt#message "%a %d" Contract_hash.pp key size)
           keys
         >>= fun () -> return_unit);
     command

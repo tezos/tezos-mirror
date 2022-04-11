@@ -70,7 +70,7 @@ module Cache : sig
   val cached_contracts :
     'a #RPC_context.simple ->
     'a ->
-    (Alpha_context.Contract.t * int) list shell_tzresult Lwt.t
+    (Contract_hash.t * int) list shell_tzresult Lwt.t
 
   val contract_cache_size :
     'a #RPC_context.simple -> 'a -> int shell_tzresult Lwt.t
