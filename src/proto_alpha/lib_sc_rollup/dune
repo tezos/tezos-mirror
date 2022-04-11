@@ -11,7 +11,7 @@
   tezos-protocol-plugin-alpha
   tezos-protocol-alpha-parameters
   tezos-rpc)
- (inline_tests (flags -verbose))
+ (inline_tests (flags -verbose) (modes native))
  (preprocess (pps ppx_inline_test))
  (library_flags (:standard -linkall))
  (flags

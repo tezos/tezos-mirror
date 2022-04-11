@@ -203,7 +203,8 @@ let parsexp = external_lib ~js_compatible:true "parsexp" V.True
 
 let ppx_blob = external_lib "ppx_blob" V.True
 
-let ppx_inline_test = external_lib "ppx_inline_test" V.True
+let ppx_inline_test =
+  inline_tests_backend (external_lib "ppx_inline_test" V.True)
 
 let ptime = external_lib ~js_compatible:true "ptime" V.(at_least "1.0.0")
 
@@ -360,8 +361,7 @@ let tezos_stdlib =
     ~deps:[hex; zarith; zarith_stubs_js; lwt]
     ~ocaml:V.(at_least "4.08")
     ~js_compatible:true
-    ~inline_tests:true
-    ~preprocess:[pps ppx_inline_test]
+    ~inline_tests:ppx_inline_test
 
 let _tezos_stdlib_tests =
   tests
@@ -872,8 +872,7 @@ let tezos_micheline =
         data_encoding |> open_;
       ]
     ~js_compatible:true
-    ~inline_tests:true
-    ~preprocess:[pps ppx_inline_test]
+    ~inline_tests:ppx_inline_test
 
 let _tezos_micheline_tests =
   tests
@@ -3015,8 +3014,7 @@ end = struct
             tezos_stdlib_unix |> open_ |> if_ N.(number >= 011);
           ]
         ~bisect_ppx:N.(number >= 008)
-        ~inline_tests:N.(number >= 009)
-        ~preprocess:(if N.(number >= 009) then [pps ppx_inline_test] else [])
+        ?inline_tests:(if N.(number >= 009) then Some ppx_inline_test else None)
         ~linkall:true
         ?warnings
     in
@@ -3383,8 +3381,7 @@ end = struct
             parameters |> if_some |> open_;
             tezos_rpc |> open_;
           ]
-        ~inline_tests:true
-        ~preprocess:[pps ppx_inline_test]
+        ~inline_tests:ppx_inline_test
         ~linkall:true
     in
     let _sc_rollup_client =

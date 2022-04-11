@@ -452,6 +452,15 @@ type preprocessor
     The target's package is also added as a dependency in the [.opam] file. *)
 val pps : ?args:string list -> target -> preprocessor
 
+(** Inline_tests backend.
+
+    Can be used when declaring a library to enable inline_tests with the given backend.
+*)
+type inline_tests
+
+(** Declare an inline_tests backend. *)
+val inline_tests_backend : target -> inline_tests
+
 (** Functions that build internal targets.
 
     The ['a] argument is instantiated by the relevant type for the name(s)
@@ -488,8 +497,8 @@ val pps : ?args:string list -> target -> preprocessor
 
     - [foreign_stubs]: specifies a [(foreign_stubs)] stanza for the [dune] target.
 
-    - [inline_tests]: if [true], add [(inline_tests)] to the [dune] target.
-      This does NOT add [ppx_inline_test] to [preprocess].
+    - [inline_tests]: specifies an inline_tests backend. Can only be used when constructing a library.
+      If used, will add [(inline_tests)] and the corresponding preprocessor in the dune stanza.
 
     - [js_compatible]: whether the target can be compiled to JavaScript.
       Default value for [js_compatible] is
@@ -592,7 +601,7 @@ type 'a maker =
   ?deps:target list ->
   ?dune:Dune.s_expr ->
   ?foreign_stubs:Dune.foreign_stubs ->
-  ?inline_tests:bool ->
+  ?inline_tests:inline_tests ->
   ?js_compatible:bool ->
   ?js_of_ocaml:Dune.s_expr ->
   ?documentation:Dune.s_expr ->
