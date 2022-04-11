@@ -25,9 +25,15 @@
 
 open Protocol.Alpha_context
 module Maker = Irmin_pack_unix.Maker (Tezos_context_encoding.Context.Conf)
-module IStore = Maker.Make (Tezos_context_encoding.Context.Schema)
+
+module IStore = struct
+  include Maker.Make (Tezos_context_encoding.Context.Schema)
+  module Schema = Tezos_context_encoding.Context.Schema
+end
 
 type t = IStore.t
+
+type tree = IStore.tree
 
 type path = string list
 
@@ -72,15 +78,21 @@ struct
 
   let get store key = IStore.get store (make_key key) >>= decode_value
 
-  let add store key value =
-    let open Lwt_syntax in
-    let* already_exists = mem store key in
-    assert (not already_exists) ;
+  let set store key value =
     let encoded_value =
       Data_encoding.Binary.to_bytes_exn P.value_encoding value
     in
-    let info () = info (String.concat "/" P.path ^ P.string_of_key key) in
+    let full_path = String.concat "/" (P.path @ [P.string_of_key key]) in
+    let info () = info full_path in
     IStore.set_exn ~info store (make_key key) encoded_value
+
+  let add store key value =
+    let open Lwt_syntax in
+    let* already_exists = mem store key in
+    let full_path = String.concat "/" (P.path @ [P.string_of_key key]) in
+    if already_exists then
+      Stdlib.failwith (Printf.sprintf "Key %s already exists" full_path) ;
+    set store key value
 end
 
 module Make_mutable_value (P : sig
@@ -116,10 +128,7 @@ module IStoreTree = struct
   include
     Tezos_context_helpers.Context.Make_tree
       (Tezos_context_encoding.Context.Conf)
-      (struct
-        include IStore
-        module Schema = Tezos_context_encoding.Context.Schema
-      end)
+      (IStore)
 
   type t = IStore.t
 
@@ -130,10 +139,44 @@ module IStoreTree = struct
   type value = bytes
 end
 
-module Inbox = Sc_rollup.Inbox.MakeHashingScheme (IStoreTree)
+module IStoreProof =
+  Tezos_context_helpers.Context.Make_proof
+    (IStore)
+    (Tezos_context_encoding.Context.Conf)
 
+module Inbox = struct
+  include Sc_rollup.Inbox
+  include Sc_rollup.Inbox.MakeHashingScheme (IStoreTree)
+end
+
+(** State of the PVM that this rollup node deals with *)
+module PVMState = struct
+  let[@inline] key block_hash = ["pvm_state"; Block_hash.to_b58check block_hash]
+
+  let find store block_hash = IStore.find_tree store (key block_hash)
+
+  let exists store block_hash = IStore.mem store (key block_hash)
+
+  let set store block_hash state =
+    IStore.set_tree_exn
+      ~info:(fun () -> info "Update PVM state")
+      store
+      (key block_hash)
+      state
+
+  let init_s store block_hash make_state =
+    let open Lwt_syntax in
+    let* exists = exists store block_hash in
+    if exists then return_unit
+    else
+      let* state = make_state () in
+      set store block_hash state
+end
+
+(** Aggregated collection of messages from the L1 inbox *)
 module MessageTrees = struct
-  let key block_hash = ["message_tree"; Block_hash.to_b58check block_hash]
+  let[@inline] key block_hash =
+    ["message_tree"; Block_hash.to_b58check block_hash]
 
   (** [get store block_hash] retrieves the message tree for [block_hash]. If it is not present, an empty
       tree is returned. *)
@@ -151,6 +194,31 @@ module MessageTrees = struct
       message_tree
 end
 
+type state_info = {num_messages : Z.t; num_ticks : Z.t}
+
+(** Extraneous state information for the PVM *)
+module StateInfo = Make_append_only_map (struct
+  let path = ["state_info"]
+
+  let keep_last_n_entries_in_memory = 6000
+
+  type key = Block_hash.t
+
+  let string_of_key = Block_hash.to_b58check
+
+  type value = state_info
+
+  let value_encoding =
+    let open Data_encoding in
+    conv
+      (fun {num_messages; num_ticks} -> (num_messages, num_ticks))
+      (fun (num_messages, num_ticks) -> {num_messages; num_ticks})
+      (obj2
+         (req "num_messages" Data_encoding.z)
+         (req "num_ticks" Data_encoding.z))
+end)
+
+(** Unaggregated messages per block *)
 module Messages = Make_append_only_map (struct
   let path = ["messages"]
 
@@ -165,6 +233,7 @@ module Messages = Make_append_only_map (struct
   let value_encoding = Data_encoding.(list string)
 end)
 
+(** Inbox state for each block *)
 module Inboxes = Make_append_only_map (struct
   let path = ["inboxes"]
 
@@ -179,6 +248,7 @@ module Inboxes = Make_append_only_map (struct
   let value_encoding = Sc_rollup.Inbox.encoding
 end)
 
+(** Message history for the inbox at a given block *)
 module Histories = Make_append_only_map (struct
   let path = ["histories"]
 

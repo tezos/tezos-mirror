@@ -69,3 +69,30 @@ let sc_rollup_address sc_client =
     |> Process.check_and_read_stdout
   in
   return (String.trim out)
+
+let rpc_get ?hooks sc_client path =
+  let process =
+    spawn_command ?hooks sc_client ["rpc"; "get"; Client.string_of_path path]
+  in
+  let* output = Process.check_and_read_stdout process in
+  return (JSON.parse ~origin:(Client.string_of_path path ^ " response") output)
+
+let ticks ?hooks sc_client =
+  let open Lwt.Syntax in
+  let+ res = rpc_get ?hooks sc_client ["ticks"] in
+  JSON.as_int res
+
+let total_ticks ?hooks sc_client =
+  let open Lwt.Syntax in
+  let+ res = rpc_get ?hooks sc_client ["total_ticks"] in
+  JSON.as_int res
+
+let state_hash ?hooks sc_client =
+  let open Lwt.Syntax in
+  let+ res = rpc_get ?hooks sc_client ["state_hash"] in
+  JSON.as_string res
+
+let status ?hooks sc_client =
+  let open Lwt.Syntax in
+  let+ res = rpc_get ?hooks sc_client ["status"] in
+  JSON.as_string res

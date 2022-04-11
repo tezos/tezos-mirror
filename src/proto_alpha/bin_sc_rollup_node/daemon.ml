@@ -26,6 +26,7 @@
 let on_layer_1_chain_event cctxt store chain_event =
   let open Lwt_tzresult_syntax in
   let* () = Inbox.update cctxt store chain_event in
+  let* () = Interpreter.Arith.update store chain_event in
   let*! () = Layer1.processed chain_event in
   return ()
 
@@ -46,7 +47,7 @@ let daemonize cctxt store layer_1_chain_events =
 let install_finalizer store rpc_server =
   let open Lwt_syntax in
   Lwt_exit.register_clean_up_callback ~loc:__LOC__ @@ fun exit_status ->
-  let* () = RPC_server.shutdown rpc_server in
+  let* () = RPC_server.Arith.shutdown rpc_server in
   let* () = Store.close store in
   let* () = Event.shutdown_node exit_status in
   Tezos_base_unix.Internal_event_unix.close ()
@@ -61,7 +62,8 @@ let run ~data_dir (cctxt : Protocol_client_context.full) =
     let*! store = Store.load configuration in
     let* tezos_heads = Layer1.start configuration cctxt store in
     let*! () = Inbox.start store sc_rollup_address in
-    let* rpc_server = RPC_server.start store configuration in
+    let* () = Interpreter.Arith.start store in
+    let* rpc_server = RPC_server.Arith.start store configuration in
     let _ = install_finalizer store rpc_server in
     let*! () = Event.node_is_ready ~rpc_addr ~rpc_port in
     daemonize cctxt store tezos_heads

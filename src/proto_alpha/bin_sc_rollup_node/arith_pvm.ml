@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,36 +23,52 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Smart-Contract Rollup client state *)
-type t
+open Protocol
+open Alpha_context
 
-(** [create ?name ?path ?base_dir ?path node] returns a fresh client
-   identified by a specified [name], logging in [color], executing the
-   program at [path], storing local information in [base_dir], and
-   communicating with the specified [node]. *)
-val create :
-  ?name:string ->
-  ?path:string ->
-  ?base_dir:string ->
-  ?color:Log.Color.t ->
-  Sc_rollup_node.t ->
-  t
+(** This module manifests the proof format used by the Arith PVM as defined by
+    the Layer 1 implementation for it.
 
-(** [sc_rollup_address client] returns the smart contract rollup
-   address of the node associated to the [client]. *)
-val sc_rollup_address : t -> string Lwt.t
+    It is imperative that this is aligned with the protocol's implementation.
+*)
+module Arith_proof_format = struct
+  open Store
 
-(** [rpc_get client path] issues a GET request for [path]. *)
-val rpc_get : ?hooks:Process.hooks -> t -> Client.path -> JSON.t Lwt.t
+  type proof = IStoreProof.Proof.tree IStoreProof.Proof.t
 
-(** [total_ticks client] gets the total number of ticks for the PVM. *)
-val total_ticks : ?hooks:Process.hooks -> t -> int Lwt.t
+  let verify_proof = IStoreProof.verify_tree_proof
 
-(** [ticks client] gets the number of ticks for the PVM for the current head. *)
-val ticks : ?hooks:Process.hooks -> t -> int Lwt.t
+  let kinded_hash_to_state_hash :
+      IStoreProof.Proof.kinded_hash -> Sc_rollup.State_hash.t = function
+    | `Value hash | `Node hash ->
+        Sc_rollup.State_hash.hash_bytes [Context_hash.to_bytes hash]
 
-(** [state_hash client] gets the corresponding PVM state hash for the current head block. *)
-val state_hash : ?hooks:Process.hooks -> t -> string Lwt.t
+  let proof_start_state proof =
+    kinded_hash_to_state_hash proof.IStoreProof.Proof.before
 
-(** [status client] gets the corresponding PVM status for the current head block. *)
-val status : ?hooks:Process.hooks -> t -> string Lwt.t
+  let proof_stop_state proof =
+    kinded_hash_to_state_hash proof.IStoreProof.Proof.after
+
+  let proof_encoding =
+    Tezos_context_helpers.Merkle_proof_encoding.V2.Tree32.tree_proof_encoding
+end
+
+module Impl : Pvm.S = struct
+  include Sc_rollup_arith.Make (struct
+    open Store
+    module Tree = IStoreTree
+
+    type tree = IStoreTree.tree
+
+    include Arith_proof_format
+  end)
+
+  let string_of_status status =
+    match status with
+    | Halted -> "Halted"
+    | WaitingForInputMessage -> "WaitingForInputMessage"
+    | Parsing -> "Parsing"
+    | Evaluating -> "Evaluating"
+end
+
+include Impl

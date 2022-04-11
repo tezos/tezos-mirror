@@ -283,18 +283,18 @@ let test_rollup_get_initial_level =
    the Tezos node. Then we can observe that the messages are included in the
    inbox.
 *)
-let send_messages n sc_rollup_address client =
-  let send msg =
-    let* () =
-      Client.Sc_rollup.send_message
-        ~hooks
-        ~src:"bootstrap1"
-        ~dst:sc_rollup_address
-        ~msg
-        client
-    in
-    Client.bake_for client
+let send_message client sc_rollup_address msg =
+  let* () =
+    Client.Sc_rollup.send_message
+      ~hooks
+      ~src:"bootstrap1"
+      ~dst:sc_rollup_address
+      ~msg
+      client
   in
+  Client.bake_for client
+
+let send_messages n sc_rollup_address client =
   let messages =
     range 1 n |> fun is ->
     List.map
@@ -303,7 +303,19 @@ let send_messages n sc_rollup_address client =
         @@ List.map (fun _ -> Printf.sprintf "\"CAFEBABE\"") (range 1 i))
       is
   in
-  Lwt_list.iter_s send messages
+  Lwt_list.iter_s
+    (fun msg -> send_message client sc_rollup_address msg)
+    messages
+
+let to_text_messages_arg msgs =
+  let text_messages =
+    List.map (fun msg -> Hex.of_string msg |> Hex.show) msgs
+  in
+  let json = Ezjsonm.list Ezjsonm.string text_messages in
+  "text:" ^ Ezjsonm.to_string ~minify:true json
+
+let send_text_messages client sc_rollup_address msgs =
+  send_message client sc_rollup_address (to_text_messages_arg msgs)
 
 let parse_inbox json =
   let go () =
@@ -506,6 +518,118 @@ let test_rollup_list =
     "list originated rollups"
     (fun protocol -> setup ~protocol go)
 
+(* Make sure the rollup node boots into the initial state.
+   -------------------------------------------------------
+
+   When a rollup node starts, we want to make sure that in the absence of
+   messages it will boot into the initial state.
+
+*)
+let test_rollup_node_boots_into_initial_state =
+  let go client sc_rollup_address sc_rollup_node =
+    let* init_level =
+      RPC.Sc_rollup.get_initial_level ~hooks ~sc_rollup_address client
+    in
+    let init_level = init_level |> JSON.as_int in
+
+    let* () = Sc_rollup_node.run sc_rollup_node in
+    let sc_rollup_client = Sc_rollup_client.create sc_rollup_node in
+
+    let* level = Sc_rollup_node.wait_for_level sc_rollup_node init_level in
+    Check.(level = init_level)
+      Check.int
+      ~error_msg:"Current level has moved past origination level (%L = %R)" ;
+
+    let* ticks = Sc_rollup_client.total_ticks ~hooks sc_rollup_client in
+    Check.(ticks = 0)
+      Check.int
+      ~error_msg:"Unexpected initial tick count (%L = %R)" ;
+
+    let* status = Sc_rollup_client.status ~hooks sc_rollup_client in
+    Check.(status = "Halted")
+      Check.string
+      ~error_msg:"Unexpected PVM status (%L = %R)" ;
+
+    Lwt.return_unit
+  in
+
+  let output_file _ = "sc_rollup_node_boots_into_initial_state" in
+  test
+    ~__FILE__
+    ~output_file
+    ~tags:["run"; "node"]
+    "node boots into the initial state"
+    (fun protocol ->
+      setup ~protocol @@ fun node client ->
+      with_fresh_rollup
+        (fun sc_rollup_address sc_rollup_node _filename ->
+          go client sc_rollup_address sc_rollup_node)
+        node
+        client)
+
+(* Ensure the PVM is transitioning upon incoming messages.
+   -------------------------------------------------------
+
+   When the rollup node receives messages, we like to see evidence that the PVM
+   has advanced.
+
+*)
+let test_rollup_node_advances_pvm_state =
+  let go client sc_rollup_address sc_rollup_node =
+    let* init_level =
+      RPC.Sc_rollup.get_initial_level ~hooks ~sc_rollup_address client
+    in
+    let init_level = init_level |> JSON.as_int in
+
+    let* () = Sc_rollup_node.run sc_rollup_node in
+    let sc_rollup_client = Sc_rollup_client.create sc_rollup_node in
+
+    let* level = Sc_rollup_node.wait_for_level sc_rollup_node init_level in
+    Check.(level = init_level)
+      Check.int
+      ~error_msg:"Current level has moved past origination level (%L = %R)" ;
+
+    let test_message i =
+      let* prev_state_hash =
+        Sc_rollup_client.state_hash ~hooks sc_rollup_client
+      in
+      let* prev_ticks = Sc_rollup_client.total_ticks ~hooks sc_rollup_client in
+
+      let x = Int.to_string i in
+      let y = Int.to_string ((i + 2) * 2) in
+      let* () = send_text_messages client sc_rollup_address [x; y; "+"] in
+      let* _ = Sc_rollup_node.wait_for_level sc_rollup_node (level + i) in
+
+      let* state_hash = Sc_rollup_client.state_hash ~hooks sc_rollup_client in
+      Check.(state_hash <> prev_state_hash)
+        Check.string
+        ~error_msg:"State hash has not changed (%L <> %R)" ;
+
+      let* ticks = Sc_rollup_client.total_ticks ~hooks sc_rollup_client in
+      Check.(ticks >= prev_ticks)
+        Check.int
+        ~error_msg:"Tick counter did not advance (%L >= %R)" ;
+      Lwt.return_unit
+    in
+    let* () = Lwt_list.iter_s test_message (range 1 10) in
+
+    Lwt.return_unit
+  in
+
+  let output_file _ = "sc_rollup_node_advances_pvm_state" in
+  test
+    ~__FILE__
+    ~output_file
+    ~tags:["run"; "node"]
+    "node advances PVM state with messages"
+    (fun protocol ->
+      setup ~protocol @@ fun node client ->
+      with_fresh_rollup
+        (fun sc_rollup_address sc_rollup_node _filename ->
+          go client sc_rollup_address sc_rollup_node)
+        node
+        client)
+
 let register ~protocols =
   test_origination protocols ;
   test_rollup_node_configuration protocols ;
@@ -522,4 +646,6 @@ let register ~protocols =
   test_rollup_inbox_of_rollup_node
     "handles_chain_reorg"
     sc_rollup_node_handles_chain_reorg
-    protocols
+    protocols ;
+  test_rollup_node_boots_into_initial_state protocols ;
+  test_rollup_node_advances_pvm_state protocols

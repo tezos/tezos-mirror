@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,36 +23,28 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Smart-Contract Rollup client state *)
-type t
+open Protocol.Alpha_context.Sc_rollup
 
-(** [create ?name ?path ?base_dir ?path node] returns a fresh client
-   identified by a specified [name], logging in [color], executing the
-   program at [path], storing local information in [base_dir], and
-   communicating with the specified [node]. *)
-val create :
-  ?name:string ->
-  ?path:string ->
-  ?base_dir:string ->
-  ?color:Log.Color.t ->
-  Sc_rollup_node.t ->
-  t
+module Simple = struct
+  include Internal_event.Simple
 
-(** [sc_rollup_address client] returns the smart contract rollup
-   address of the node associated to the [client]. *)
-val sc_rollup_address : t -> string Lwt.t
+  let section = ["sc_rollup_node"; "interpreter"]
 
-(** [rpc_get client path] issues a GET request for [path]. *)
-val rpc_get : ?hooks:Process.hooks -> t -> Client.path -> JSON.t Lwt.t
+  let transitioned_pvm =
+    declare_3
+      ~section
+      ~name:"sc_rollup_node_interpreter_transitioned_pvm"
+      ~msg:
+        "Transitioned PVM to {state_hash} at tick {ticks} with {num_messages} \
+         messages"
+      ~level:Notice
+      ("state_hash", State_hash.encoding)
+      ("ticks", Tick.encoding)
+      ("num_messages", Data_encoding.z)
+end
 
-(** [total_ticks client] gets the total number of ticks for the PVM. *)
-val total_ticks : ?hooks:Process.hooks -> t -> int Lwt.t
-
-(** [ticks client] gets the number of ticks for the PVM for the current head. *)
-val ticks : ?hooks:Process.hooks -> t -> int Lwt.t
-
-(** [state_hash client] gets the corresponding PVM state hash for the current head block. *)
-val state_hash : ?hooks:Process.hooks -> t -> string Lwt.t
-
-(** [status client] gets the corresponding PVM status for the current head block. *)
-val status : ?hooks:Process.hooks -> t -> string Lwt.t
+let transitioned_pvm state num_messages =
+  let open Lwt_syntax in
+  let* hash = Arith_pvm.state_hash state in
+  let* ticks = Arith_pvm.get_tick state in
+  Simple.(emit transitioned_pvm (hash, ticks, num_messages))
