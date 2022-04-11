@@ -938,8 +938,8 @@ let apply_transaction_to_smart_contract ~ctxt ~source ~contract ~amount
 
 let apply_transaction ~ctxt ~parameter ~source ~(contract : Contract.t) ~amount
     ~entrypoint ~before_operation ~payer ~chain_id ~mode ~internal =
-  (match contract with
-  | Originated _ ->
+  match contract with
+  | Originated _ -> (
       (if Tez.(amount = zero) then
        (* Detect potential call to non existent contract. *)
        Contract.must_exist ctxt contract >|=? fun () -> (ctxt, [])
@@ -947,7 +947,28 @@ let apply_transaction ~ctxt ~parameter ~source ~(contract : Contract.t) ~amount
         (* Since the contract is originated, nothing will be allocated
            or this transfer of tokens will fail. *)
         Token.transfer ctxt (`Contract source) (`Contract contract) amount)
-      >|=? fun (ctxt, balance_updates) -> (false, ctxt, balance_updates)
+      >>=? fun (ctxt, balance_updates) ->
+      Script_cache.find ctxt contract >>=? fun (ctxt, cache_key, script) ->
+      match script with
+      | None -> fail (Contract.Non_existing_contract contract)
+      | Some (script, script_ir) ->
+          apply_transaction_to_smart_contract
+            ~ctxt
+            ~source
+            ~contract
+            ~amount
+            ~entrypoint
+            ~before_operation
+            ~payer
+            ~chain_id
+            ~mode
+            ~internal
+            ~script_ir
+            ~script
+            ~parameter
+            ~cache_key
+            ~balance_updates
+            ~allocated_destination_contract:false)
   | Implicit _ ->
       (* Transfers of zero to implicit accounts are forbidden. *)
       error_when Tez.(amount = zero) (Empty_transaction contract) >>?= fun () ->
@@ -955,12 +976,8 @@ let apply_transaction ~ctxt ~parameter ~source ~(contract : Contract.t) ~amount
          the next transfer of tokens will allocate it. *)
       Contract.allocated ctxt contract >>= fun already_allocated ->
       Token.transfer ctxt (`Contract source) (`Contract contract) amount
-      >|=? fun (ctxt, balance_updates) ->
-      (not already_allocated, ctxt, balance_updates))
-  >>=? fun (allocated_destination_contract, ctxt, balance_updates) ->
-  Script_cache.find ctxt contract >>=? fun (ctxt, cache_key, script) ->
-  match script with
-  | None ->
+      >>=? fun (ctxt, balance_updates) ->
+      let allocated_destination_contract = not already_allocated in
       apply_transaction_to_implicit
         ~ctxt
         ~contract
@@ -970,24 +987,6 @@ let apply_transaction ~ctxt ~parameter ~source ~(contract : Contract.t) ~amount
         ~balance_updates
         ~allocated_destination_contract
       >>?= fun (ctxt, result) -> return (ctxt, result, [])
-  | Some (script, script_ir) ->
-      apply_transaction_to_smart_contract
-        ~ctxt
-        ~source
-        ~contract
-        ~amount
-        ~entrypoint
-        ~before_operation
-        ~payer
-        ~chain_id
-        ~mode
-        ~internal
-        ~script_ir
-        ~script
-        ~parameter
-        ~cache_key
-        ~balance_updates
-        ~allocated_destination_contract
 
 let ex_ticket_size :
     context -> Ticket_scanner.ex_ticket -> (context * int) tzresult Lwt.t =
