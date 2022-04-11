@@ -92,7 +92,7 @@ let check_import_invariants ~test_descr ~rolling
       Assert.equal
         ~msg:("caboose consistency: " ^ __LOC__)
         ~eq:Int32.equal
-        ~prn:Int32.to_string
+        ~pp:(fun ppf -> Format.fprintf ppf "%ld")
         expected_caboose_level
         (snd caboose) ;
       return_unit)
@@ -252,8 +252,8 @@ let check_baking_continuity ~test_descr ~exported_chain_store
   let*! checkpoint' = Store.Chain.checkpoint imported_chain_store in
   Assert.equal
     ~msg:("checkpoint equality: " ^ test_descr)
-    ~prn:(fun (hash, level) ->
-      Format.asprintf "%a (%ld)" Block_hash.pp hash level)
+    ~pp:(fun ppf (hash, level) ->
+      Format.fprintf ppf "%a (%ld)" Block_hash.pp hash level)
     checkpoint
     checkpoint' ;
   return_unit
@@ -536,7 +536,6 @@ let test_rolling () =
     let chain_store' = Store.main_chain_store store' in
     let* _head = Alpha_utils.bake_until_n_cycle_end chain_store' 4 head in
     let*! checkpoint = Store.Chain.checkpoint chain_store' in
-    let prn i = Format.sprintf "%ld" i in
     let* checkpoint_block =
       Store.Block.read_block chain_store' (fst checkpoint)
     in
@@ -548,12 +547,7 @@ let test_rolling () =
         sub (snd checkpoint) (of_int (Store.Block.max_operations_ttl metadata)))
     in
     let*! caboose = Store.Chain.caboose chain_store' in
-    Assert.equal
-      ~prn
-      ~msg:__LOC__
-      ~eq:Compare.Int32.equal
-      max_op_ttl_cp
-      (snd caboose) ;
+    Assert.Int32.equal ~msg:__LOC__ max_op_ttl_cp (snd caboose) ;
     let*! () = Store.close_store store' in
     return_unit
   in
@@ -676,13 +670,7 @@ let test_drag_after_import () =
         sub savepoint_level (of_int (Store.Block.max_operations_ttl metadata)))
     in
     let*! (_, caboose_level) = Store.Chain.caboose chain_store' in
-    let prn i = Format.sprintf "%ld" i in
-    Assert.equal
-      ~prn
-      ~msg:__LOC__
-      ~eq:Compare.Int32.equal
-      caboose_level
-      expected_caboose ;
+    Assert.Int32.equal ~msg:__LOC__ caboose_level expected_caboose ;
     let block_store = Store.Unsafe.get_block_store chain_store' in
     let rec restart n head =
       if n = 0 then return head

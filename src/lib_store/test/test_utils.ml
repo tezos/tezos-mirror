@@ -35,17 +35,15 @@ let equal_metadata ?msg m1 m2 =
     | (Some m1, Some m2) -> m1 = m2
     | _ -> false
   in
-  let prn (md : Tezos_store.Store.Block.metadata option) =
-    let option_pp ~default pp fmt = function
-      | None -> Format.fprintf fmt "%s" default
-      | Some x -> Format.fprintf fmt "%a" pp x
-    in
-    Format.asprintf
+  let pp ppf (md : Tezos_store.Store.Block.metadata option) =
+    let none ppf () = Format.pp_print_string ppf "none" in
+    Format.fprintf
+      ppf
       "%a"
-      (option_pp
-         ~default:"None"
+      (Format.pp_print_option
+         ~none
          (fun
-           fmt
+           ppf
            ({
               message;
               max_operations_ttl;
@@ -56,16 +54,16 @@ let equal_metadata ?msg m1 m2 =
              Store.Block.metadata)
          ->
            Format.fprintf
-             fmt
+             ppf
              "message: %a@.max_operations_ttl: %d@. last_allowed_fork_level: \
               %ld@."
-             (option_pp ~default:"None" Format.pp_print_string)
+             (Format.pp_print_option ~none Format.pp_print_string)
              message
              max_operations_ttl
              last_allowed_fork_level))
       md
   in
-  Assert.equal ?msg ~prn ~eq m1 m2
+  Assert.equal ?msg ~pp ~eq m1 m2
 
 let genesis_hash =
   Block_hash.of_b58check_exn

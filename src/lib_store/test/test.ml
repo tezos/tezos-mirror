@@ -27,14 +27,15 @@ module Assert = Lib_test.Assert
 
 let equal_block ?msg st1 st2 =
   let eq st1 st2 = Block_header.equal st1 st2 in
-  let prn st =
-    Format.asprintf
+  let pp ppf st =
+    Format.fprintf
+      ppf
       "%a (%ld)"
       Block_hash.pp
       (Block_header.hash st)
       st.shell.level
   in
-  Assert.equal ?msg ~prn ~eq st1 st2
+  Assert.equal ?msg ~pp ~eq st1 st2
 
 let () =
   let speed =

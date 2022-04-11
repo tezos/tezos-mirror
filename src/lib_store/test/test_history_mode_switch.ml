@@ -225,7 +225,7 @@ let check_consistency_after_switch descr chain_store ~previous_mode ~target_mode
   let stored_history_mode = Store.Chain.history_mode chain_store in
   Assert.equal
     ~eq:History_mode.equal
-    ~prn:(Format.asprintf "%a" History_mode.pp)
+    ~pp:History_mode.pp
     ~msg:("expected history mode: " ^ descr)
     stored_history_mode
     target_mode ;
@@ -247,8 +247,7 @@ let check_consistency_after_switch descr chain_store ~previous_mode ~target_mode
             ~previous_mode
             ~target_mode
         in
-        Assert.equal
-          ~prn:(Format.sprintf "%ld")
+        Assert.Int32.equal
           ~msg:"savepoint consistency: "
           expected_savepoint_level
           savepoint_level ;
@@ -261,8 +260,7 @@ let check_consistency_after_switch descr chain_store ~previous_mode ~target_mode
             ~target_mode
             expected_savepoint_level
         in
-        Assert.equal
-          ~prn:(Format.sprintf "%ld")
+        Assert.Int32.equal
           ~msg:"caboose consistency: "
           expected_caboose_level
           caboose_level ;

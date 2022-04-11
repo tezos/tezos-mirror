@@ -54,7 +54,7 @@ let assert_presence_in_block_store ?(with_metadata = false) block_store blocks =
       | Some b' ->
           if with_metadata then (
             Assert.equal
-              ~prn:(Format.asprintf "%a" Block_repr.pp_json)
+              ~pp:Block_repr.pp_json
               ~msg:"block equality with metadata"
               b
               b' ;
@@ -465,9 +465,9 @@ let test_archive_merge block_store =
       (List.concat cycles)
   in
   let*! savepoint = Block_store.savepoint block_store in
-  Assert.equal ~prn:Int32.to_string ~msg:"savepoint" 0l (snd savepoint) ;
+  Assert.Int32.equal ~msg:"savepoint" 0l (snd savepoint) ;
   let*! caboose = Block_store.caboose block_store in
-  Assert.equal ~prn:Int32.to_string ~msg:"caboose" 0l (snd caboose) ;
+  Assert.Int32.equal ~msg:"caboose" 0l (snd caboose) ;
   return_unit
 
 let test_full_0_merge block_store =
@@ -512,13 +512,12 @@ let test_full_0_merge block_store =
     assert_pruned_blocks_in_block_store block_store expected_pruned_blocks
   in
   let*! savepoint = Block_store.savepoint block_store in
-  Assert.equal
-    ~prn:Int32.to_string
+  Assert.Int32.equal
     ~msg:"savepoint"
     (Int32.of_int expected_savepoint_level)
     (snd savepoint) ;
   let*! caboose = Block_store.caboose block_store in
-  Assert.equal ~prn:Int32.to_string ~msg:"caboose" 0l (snd caboose) ;
+  Assert.Int32.equal ~msg:"caboose" 0l (snd caboose) ;
   return_unit
 
 let test_full_2_merge block_store =
@@ -564,13 +563,9 @@ let test_full_2_merge block_store =
     |> WithExceptions.Option.get ~loc:__LOC__
     |> Block_repr.level
   in
-  Assert.equal
-    ~prn:Int32.to_string
-    ~msg:"savepoint"
-    expected_savepoint
-    (snd savepoint) ;
+  Assert.Int32.equal ~msg:"savepoint" expected_savepoint (snd savepoint) ;
   let*! caboose = Block_store.caboose block_store in
-  Assert.equal ~prn:Int32.to_string ~msg:"caboose" 0l (snd caboose) ;
+  Assert.Int32.equal ~msg:"caboose" 0l (snd caboose) ;
   return_unit
 
 let test_rolling_0_merge block_store =
@@ -606,14 +601,12 @@ let test_rolling_0_merge block_store =
       expected_preserved_blocks
   in
   let*! savepoint = Block_store.savepoint block_store in
-  Assert.equal
-    ~prn:Int32.to_string
+  Assert.Int32.equal
     ~msg:"savepoint"
     (Int32.of_int expected_savepoint_level)
     (snd savepoint) ;
   let*! caboose = Block_store.caboose block_store in
-  Assert.equal
-    ~prn:Int32.to_string
+  Assert.Int32.equal
     ~msg:"caboose"
     (Int32.of_int expected_savepoint_level)
     (snd caboose) ;
@@ -653,17 +646,9 @@ let test_rolling_2_merge block_store =
     |> WithExceptions.Option.get ~loc:__LOC__
     |> Block_repr.level
   in
-  Assert.equal
-    ~prn:Int32.to_string
-    ~msg:"savepoint"
-    expected_savepoint
-    (snd savepoint) ;
+  Assert.Int32.equal ~msg:"savepoint" expected_savepoint (snd savepoint) ;
   let*! caboose = Block_store.caboose block_store in
-  Assert.equal
-    ~prn:Int32.to_string
-    ~msg:"caboose"
-    expected_savepoint
-    (snd caboose) ;
+  Assert.Int32.equal ~msg:"caboose" expected_savepoint (snd caboose) ;
   return_unit
 
 let wrap_test ?(keep_dir = false) (name, g) =
