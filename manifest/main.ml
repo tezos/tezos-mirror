@@ -1503,14 +1503,6 @@ let _tezos_sapling_tests =
         alcotest_lwt;
       ]
     ~all_modules_except:["test_js"]
-    ~dune:
-      Dune.
-        [
-          [
-            S "env";
-            [S "dev"; [S "flags"; [S ":standard"; S "-warn-error"; S "-A"]]];
-          ];
-        ]
 
 let _tezos_sapling_js_tests =
   test

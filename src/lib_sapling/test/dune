@@ -53,8 +53,6 @@
  (deps vectors.csv vectors-zip32.csv)
  (action (run %{dep:./test_sapling.exe})))
 
-(env (dev (flags (:standard -warn-error -A))))
-
 (executable
  (name test_js)
  (modes js)
