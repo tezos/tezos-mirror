@@ -359,10 +359,11 @@ let with_open_in file task =
   with_open_file ~flags:[O_RDONLY; O_CLOEXEC] file task
 
 (* This is to avoid file corruption *)
-let with_atomic_open_out ?(overwrite = true) ?temp_dir filename f =
+let with_atomic_open_out ?(overwrite = true) filename
+    ?(temp_dir = Filename.dirname filename) f =
   let open Lwt_result_syntax in
   let temp_file =
-    Filename.temp_file ?temp_dir (Filename.basename filename) ".tmp"
+    Filename.temp_file ~temp_dir (Filename.basename filename) ".tmp"
   in
   let* res = with_open_out ~overwrite temp_file f in
   Lwt.catch

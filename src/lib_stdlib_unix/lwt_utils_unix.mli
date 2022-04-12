@@ -169,7 +169,7 @@ val with_open_out :
   (Lwt_unix.file_descr -> 'a Lwt.t) ->
   ('a, [`Open | `Close] io_error) result Lwt.t
 
-(** [with_atomic_open_out ?overwrite ?temp_dir filename f] is a
+(** [with_atomic_open_out ?overwrite filename ?temp_dir f] is a
    wrapper around [with_open_out] were it ensures that the data are
    written onto [filename] in an atomic way.
 
@@ -187,8 +187,8 @@ val with_open_out :
    [Filename.temp_file]. *)
 val with_atomic_open_out :
   ?overwrite:bool ->
-  ?temp_dir:string ->
   string ->
+  ?temp_dir:string ->
   (Lwt_unix.file_descr -> 'a Lwt.t) ->
   ('a, [`Open | `Close | `Rename] io_error) result Lwt.t
 
