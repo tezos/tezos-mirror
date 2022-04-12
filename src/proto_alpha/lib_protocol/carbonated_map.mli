@@ -136,6 +136,19 @@ module type COMPARABLE = sig
   val compare_cost : t -> Saturation_repr.may_saturate Saturation_repr.t
 end
 
+(** A functor for exposing the type of a carbonated map before 
+    the carbonated make is created. This is useful in scenarios where 
+    the map that will need to be carbonated is defined before the 
+    gas consuming functions for the carbonation are available. 
+    See for example [Raw_context].
+*)
+module Make_builder (C : COMPARABLE) : sig
+  type 'a t
+
+  module Make (G : GAS) :
+    S with type key = C.t and type context = G.context and type 'a t := 'a t
+end
+
 (** A functor for building gas metered maps. When building a gas metered map via
     [Make(G)(C)], [C] is a [COMPARABLE] required to construct a the map while
     [G] is a module providing the gas consuming functions. The type of the

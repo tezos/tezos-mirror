@@ -91,112 +91,128 @@ module type COMPARABLE = sig
   val compare_cost : t -> Saturation_repr.may_saturate Saturation_repr.t
 end
 
-module Make (G : GAS) (C : COMPARABLE) = struct
+module Make_builder (C : COMPARABLE) = struct
   module M = Map.Make (C)
-
-  type context = G.context
-
-  type key = C.t
 
   type 'a t = {map : 'a M.t; size : int}
 
-  let empty = {map = M.empty; size = 0}
+  module Make (G : GAS) :
+    S with type key = C.t and type context = G.context and type 'a t := 'a t =
+  struct
+    type key = C.t
 
-  let singleton key value = {map = M.singleton key value; size = 1}
+    type context = G.context
 
-  let size {size; _} = size
+    let empty = {map = M.empty; size = 0}
 
-  let find_cost ~key ~size =
-    Carbonated_map_costs.find_cost ~compare_key_cost:(C.compare_cost key) ~size
+    let singleton key value = {map = M.singleton key value; size = 1}
 
-  let update_cost ~key ~size =
-    Carbonated_map_costs.update_cost
-      ~compare_key_cost:(C.compare_cost key)
-      ~size
+    let size {size; _} = size
 
-  let find ctxt key {map; size} =
-    G.consume ctxt (find_cost ~key ~size) >|? fun ctxt -> (M.find key map, ctxt)
+    let find_cost ~key ~size =
+      Carbonated_map_costs.find_cost
+        ~compare_key_cost:(C.compare_cost key)
+        ~size
 
-  let update ctxt key f {map; size} =
-    let find_cost = find_cost ~key ~size in
-    let update_cost = update_cost ~key ~size in
-    (* Consume gas for looking up the old value *)
-    G.consume ctxt find_cost >>? fun ctxt ->
-    let old_val_opt = M.find key map in
-    (* The call to [f] must also account for gas *)
-    f ctxt old_val_opt >>? fun (new_val_opt, ctxt) ->
-    match (old_val_opt, new_val_opt) with
-    | (Some _, Some new_val) ->
-        (* Consume gas for adding to the map *)
-        G.consume ctxt update_cost >|? fun ctxt ->
-        ({map = M.add key new_val map; size}, ctxt)
-    | (Some _, None) ->
-        (* Consume gas for removing from the map *)
-        G.consume ctxt update_cost >|? fun ctxt ->
-        ({map = M.remove key map; size = size - 1}, ctxt)
-    | (None, Some new_val) ->
-        (* Consume gas for adding to the map *)
-        G.consume ctxt update_cost >|? fun ctxt ->
-        ({map = M.add key new_val map; size = size + 1}, ctxt)
-    | (None, None) -> ok ({map; size}, ctxt)
+    let update_cost ~key ~size =
+      Carbonated_map_costs.update_cost
+        ~compare_key_cost:(C.compare_cost key)
+        ~size
 
-  let to_list ctxt {map; size} =
-    G.consume ctxt (Carbonated_map_costs.fold_cost ~size) >|? fun ctxt ->
-    (M.bindings map, ctxt)
+    let find ctxt key {map; size} =
+      G.consume ctxt (find_cost ~key ~size) >|? fun ctxt ->
+      (M.find key map, ctxt)
 
-  let add ctxt ~merge_overlap key value {map; size} =
-    (* Consume gas for looking up the element *)
-    G.consume ctxt (find_cost ~key ~size) >>? fun ctxt ->
-    (* Consume gas for adding the element *)
-    G.consume ctxt (update_cost ~key ~size) >>? fun ctxt ->
-    match M.find key map with
-    | Some old_val ->
-        (* Invoking [merge_overlap] must also account for gas *)
-        merge_overlap ctxt old_val value >|? fun (new_value, ctxt) ->
-        ({map = M.add key new_value map; size}, ctxt)
-    | None -> Ok ({map = M.add key value map; size = size + 1}, ctxt)
+    let update ctxt key f {map; size} =
+      let find_cost = find_cost ~key ~size in
+      let update_cost = update_cost ~key ~size in
+      (* Consume gas for looking up the old value *)
+      G.consume ctxt find_cost >>? fun ctxt ->
+      let old_val_opt = M.find key map in
+      (* The call to [f] must also account for gas *)
+      f ctxt old_val_opt >>? fun (new_val_opt, ctxt) ->
+      match (old_val_opt, new_val_opt) with
+      | (Some _, Some new_val) ->
+          (* Consume gas for adding to the map *)
+          G.consume ctxt update_cost >|? fun ctxt ->
+          ({map = M.add key new_val map; size}, ctxt)
+      | (Some _, None) ->
+          (* Consume gas for removing from the map *)
+          G.consume ctxt update_cost >|? fun ctxt ->
+          ({map = M.remove key map; size = size - 1}, ctxt)
+      | (None, Some new_val) ->
+          (* Consume gas for adding to the map *)
+          G.consume ctxt update_cost >|? fun ctxt ->
+          ({map = M.add key new_val map; size = size + 1}, ctxt)
+      | (None, None) -> ok ({map; size}, ctxt)
 
-  let add_key_values_to_map ctxt ~merge_overlap map key_values =
-    let accum (map, ctxt) (key, value) =
-      add ctxt ~merge_overlap key value map
-    in
-    (* Gas is paid at each step of the fold. *)
-    List.fold_left_e accum (map, ctxt) key_values
+    let to_list ctxt {map; size} =
+      G.consume ctxt (Carbonated_map_costs.fold_cost ~size) >|? fun ctxt ->
+      (M.bindings map, ctxt)
 
-  let of_list ctxt ~merge_overlap =
-    add_key_values_to_map ctxt ~merge_overlap empty
+    let add ctxt ~merge_overlap key value {map; size} =
+      (* Consume gas for looking up the element *)
+      G.consume ctxt (find_cost ~key ~size) >>? fun ctxt ->
+      (* Consume gas for adding the element *)
+      G.consume ctxt (update_cost ~key ~size) >>? fun ctxt ->
+      match M.find key map with
+      | Some old_val ->
+          (* Invoking [merge_overlap] must also account for gas *)
+          merge_overlap ctxt old_val value >|? fun (new_value, ctxt) ->
+          ({map = M.add key new_value map; size}, ctxt)
+      | None -> Ok ({map = M.add key value map; size = size + 1}, ctxt)
 
-  let merge ctxt ~merge_overlap map1 {map; size} =
-    (* To be on the safe side, pay an upfront gas cost for traversing the
-       map. Each step of the fold is accounted for separately.
-    *)
-    G.consume ctxt (Carbonated_map_costs.fold_cost ~size) >>? fun ctxt ->
-    M.fold_e
-      (fun key value (map, ctxt) -> add ctxt ~merge_overlap key value map)
-      map
-      (map1, ctxt)
+    let add_key_values_to_map ctxt ~merge_overlap map key_values =
+      let accum (map, ctxt) (key, value) =
+        add ctxt ~merge_overlap key value map
+      in
+      (* Gas is paid at each step of the fold. *)
+      List.fold_left_e accum (map, ctxt) key_values
 
-  let fold ctxt f empty {map; size} =
-    G.consume ctxt (Carbonated_map_costs.fold_cost ~size) >>? fun ctxt ->
-    M.fold_e
-      (fun key value (acc, ctxt) ->
-        (* Invoking [f] must also account for gas. *)
-        f ctxt acc key value)
-      map
-      (empty, ctxt)
+    let of_list ctxt ~merge_overlap =
+      add_key_values_to_map ctxt ~merge_overlap empty
 
-  let map ctxt f {map; size} =
-    (* We cannot use the standard map function because [f] also meters the gas
-       cost at each invocation. *)
-    fold
-      ctxt
-      (fun ctxt map key value ->
-        (* Invoking [f] must also account for gas. *)
-        f ctxt key value >>? fun (value, ctxt) ->
-        (* Consume gas for adding the element. *)
-        G.consume ctxt (update_cost ~key ~size) >|? fun ctxt ->
-        (M.add key value map, ctxt))
-      M.empty
-      {map; size}
-    >|? fun (map, ctxt) -> ({map; size}, ctxt)
+    let merge ctxt ~merge_overlap map1 {map; size} =
+      (* To be on the safe side, pay an upfront gas cost for traversing the
+         map. Each step of the fold is accounted for separately.
+      *)
+      G.consume ctxt (Carbonated_map_costs.fold_cost ~size) >>? fun ctxt ->
+      M.fold_e
+        (fun key value (map, ctxt) -> add ctxt ~merge_overlap key value map)
+        map
+        (map1, ctxt)
+
+    let fold ctxt f empty {map; size} =
+      G.consume ctxt (Carbonated_map_costs.fold_cost ~size) >>? fun ctxt ->
+      M.fold_e
+        (fun key value (acc, ctxt) ->
+          (* Invoking [f] must also account for gas. *)
+          f ctxt acc key value)
+        map
+        (empty, ctxt)
+
+    let map ctxt f {map; size} =
+      (* We cannot use the standard map function because [f] also meters the gas
+         cost at each invocation. *)
+      fold
+        ctxt
+        (fun ctxt map key value ->
+          (* Invoking [f] must also account for gas. *)
+          f ctxt key value >>? fun (value, ctxt) ->
+          (* Consume gas for adding the element. *)
+          G.consume ctxt (update_cost ~key ~size) >|? fun ctxt ->
+          (M.add key value map, ctxt))
+        M.empty
+        {map; size}
+      >|? fun (map, ctxt) -> ({map; size}, ctxt)
+  end
+end
+
+module Make (G : GAS) (C : COMPARABLE) :
+  S with type key = C.t and type context = G.context = struct
+  module M = Make_builder (C)
+
+  type 'a t = 'a M.t
+
+  include M.Make (G)
 end
