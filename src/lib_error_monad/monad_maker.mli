@@ -266,12 +266,9 @@ p >>= function
 end
 
 module Make (Error : sig
-  type error_category
-
   type error = ..
 
-  include
-    Sig.CORE with type error := error and type error_category := error_category
+  include Sig.CORE with type error := error
 end)
 (Trace : Sig.TRACE)
 (Monad : Tezos_lwt_result_stdlib.Lwtreslib.TRACED_MONAD
