@@ -31,15 +31,12 @@ module Tx_queue = Hash_queue.Make (L2_transaction.Hash) (L2_transaction)
 type state = {
   cctxt : Protocol_client_context.full;
   rollup : Tx_rollup.t;
-  parameters : Protocol.Tx_rollup_l2_apply.parameters;
   signer : signer;
   transactions : Tx_queue.t;
   mutable incr_context : Context.t;
   lock : Lwt_mutex.t;
+  l1_constants : Protocol.Alpha_context.Constants.parametric;
 }
-
-(* TODO/TORU Change me to correct value and have a configuration option *)
-let max_batch_transactions = 10
 
 (* TODO/TORU Change me with bound on size and have a configuration option *)
 let max_number_of_batches = 10
@@ -130,55 +127,131 @@ let inject_batches state batches =
   in
   inject_operations state operations
 
-let get_batches state =
-  let open Result_syntax in
-  let transactions =
-    Tx_queue.peek_at_most
-      state.transactions
-      (max_batch_transactions * max_number_of_batches)
-  in
-  let rec loop acc = function
-    | [] -> ok (List.rev acc)
-    | trs ->
-        let (trs, rest) = List.split_n max_batch_transactions trs in
-        let* batch = L2_transaction.batch trs in
-        loop (batch :: acc) rest
-  in
-  let+ batches = loop [] transactions in
-  (batches, transactions)
+(** [is_batch_valid] returns whether the batch is valid or not based on
+    two criterias:
 
-let batch_and_inject ?(at_least_one_full_batch = false) state =
+    The proof produced by the batch interpretation must be smaller than
+    [l1_constants.tx_rollup_rejection_max_proof_size]. Otherwise, the associated
+    commitment can be rejected because of the size.
+
+    The batch exceeds the [l1_constants.tx_rollup_hard_size_limit_per_message],
+    the submit batch operation will fail.
+*)
+let is_batch_valid ctxt
+    (l1_constants : Protocol.Alpha_context.Constants.parametric) batch =
   let open Lwt_result_syntax in
-  let*? (batches, to_remove) = get_batches state in
-  let*! () =
-    Event.(emit Batcher.batch) (List.length batches, List.length to_remove)
+  (* The batch is ok if:
+     1. The proof is small enough
+     2. The batch is small enough *)
+  let batch_size_ok =
+    let size = Data_encoding.Binary.length Tx_rollup_l2_batch.encoding batch in
+    size <= l1_constants.tx_rollup_hard_size_limit_per_message
+  in
+  if batch_size_ok then
+    let l2_parameters =
+      Tx_rollup_l2_apply.
+        {
+          tx_rollup_max_withdrawals_per_batch =
+            l1_constants.tx_rollup_max_withdrawals_per_batch;
+        }
+    in
+    let*! res_interp =
+      Interpreter.interpret_batch
+        ctxt
+        l2_parameters
+        ~rejection_max_proof_size:
+          l1_constants.tx_rollup_rejection_max_proof_size
+        batch
+    in
+    let b_proof_size = Result.is_ok res_interp in
+    return b_proof_size
+  else return_false
+
+let get_batches ctxt l1_constants queue =
+  let open Lwt_result_syntax in
+  let exception
+    Batches_finished of {
+      rev_batches :
+        (Indexable.unknown, Indexable.unknown) Tx_rollup_l2_batch.t list;
+      to_remove : L2_transaction.hash list;
+    }
+  in
+  try
+    let* (rev_batches, rev_current_trs, to_remove) =
+      Tx_queue.fold_es
+        (fun tr_hash tr (batches, rev_current_trs, to_remove) ->
+          let new_trs = tr :: rev_current_trs in
+          let*? batch = L2_transaction.batch (List.rev new_trs) in
+          let* b = is_batch_valid ctxt l1_constants batch in
+          if b then return (batches, new_trs, tr_hash :: to_remove)
+          else
+            match rev_current_trs with
+            | [_] ->
+                (* If only one transaction makes the batch invalid, we remove it
+                   from the current transactions and it'll be removed later. *)
+                let*! () = Event.(emit Batcher.invalid_transaction) tr in
+                return (batches, [], tr_hash :: to_remove)
+            | _ ->
+                let*? batch = L2_transaction.batch (List.rev rev_current_trs) in
+                let new_batches = batch :: batches in
+                if
+                  List.compare_length_with new_batches max_number_of_batches
+                  >= 0
+                then
+                  (* We created enough batches, we exit the loop *)
+                  raise
+                    (Batches_finished {rev_batches = new_batches; to_remove})
+                else
+                  (* We add the batch to the accumulator and we go on. *)
+                  let*? batch = L2_transaction.batch [tr] in
+                  let* b = is_batch_valid ctxt l1_constants batch in
+                  if b then return (new_batches, [tr], tr_hash :: to_remove)
+                  else
+                    let*! () = Event.(emit Batcher.invalid_transaction) tr in
+                    return (new_batches, [], tr_hash :: to_remove))
+        queue
+        ([], [], [])
+    in
+    let*? batches =
+      let open Result_syntax in
+      if rev_current_trs <> [] then
+        let+ last_batch = L2_transaction.batch (List.rev rev_current_trs) in
+        List.rev (last_batch :: rev_batches)
+      else return (List.rev rev_batches)
+    in
+    return (batches, to_remove)
+  with Batches_finished {rev_batches; to_remove} ->
+    return (List.rev rev_batches, to_remove)
+
+let batch_and_inject state =
+  let open Lwt_result_syntax in
+  let* (batches, to_remove) =
+    get_batches state.incr_context state.l1_constants state.transactions
   in
   match batches with
   | [] -> return_none
-  | Tx_rollup_l2_batch.(V1 {V1.contents; _}) :: _
-    when at_least_one_full_batch
-         && List.compare_length_with contents max_batch_transactions < 0 ->
-      (* The first batch is not full, and we requested it to be *)
-      let*! () = Event.(emit Batcher.no_full_batch) () in
-      return_none
   | _ ->
+      let*! () =
+        Event.(emit Batcher.batch) (List.length batches, List.length to_remove)
+      in
       let*! () = Event.(emit Batcher.inject) () in
       let* oph = inject_batches state batches in
       let*! () = Event.(emit Batcher.injection_success) oph in
       List.iter
-        (fun tr -> Tx_queue.remove state.transactions (L2_transaction.hash tr))
+        (fun tr_hash -> Tx_queue.remove state.transactions tr_hash)
         to_remove ;
       return_some oph
 
-let async_batch_and_inject ?at_least_one_full_batch state =
+let async_batch_and_inject state =
   Lwt.async @@ fun () ->
   let open Lwt_syntax in
   (* let* _ = Lwt_unix.sleep 2. in *)
-  let* _ = batch_and_inject ?at_least_one_full_batch state in
+  let* _ = batch_and_inject state in
   return_unit
 
-let init cctxt ~rollup ~signer index parameters =
+let init cctxt ~rollup ~signer index l1_constants =
   let open Lwt_result_syntax in
+  let*! incr_context = Context.init_context index in
   let+ signer = get_signer cctxt signer in
   Option.map
     (fun signer ->
@@ -186,10 +259,10 @@ let init cctxt ~rollup ~signer index parameters =
         cctxt = batcher_context cctxt;
         rollup;
         signer;
-        parameters;
         transactions = Tx_queue.create 500_000;
-        incr_context = Context.empty index;
+        incr_context;
         lock = Lwt_mutex.create ();
+        l1_constants;
       })
     signer
 
@@ -205,8 +278,15 @@ let register_transaction ?(eager_batch = false) ?(apply = true) state
   let prev_context = context in
   let* context =
     if apply then
+      let l2_parameters =
+        Tx_rollup_l2_apply.
+          {
+            tx_rollup_max_withdrawals_per_batch =
+              state.l1_constants.tx_rollup_max_withdrawals_per_batch;
+          }
+      in
       let* (new_context, result, _) =
-        L2_apply.Batch_V1.apply_batch context state.parameters batch
+        L2_apply.Batch_V1.apply_batch context l2_parameters batch
       in
       let open Tx_rollup_l2_apply.Message_result in
       let+ context =
@@ -231,5 +311,5 @@ let register_transaction ?(eager_batch = false) ?(apply = true) state
   if eager_batch then
     (* TODO/TORU: find better solution as this reduces throughput when we have a
        single key to sign/inject. *)
-    async_batch_and_inject ~at_least_one_full_batch:true state ;
+    async_batch_and_inject state ;
   return tr_hash

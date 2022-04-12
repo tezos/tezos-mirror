@@ -2631,8 +2631,8 @@ let commands_rw () =
            Client_proto_args.string_parameter
       @@ prefixes ["and"; "withdraw"; "list"]
       @@ Clic.param
-           ~name:"withdrawals_merkle_root"
-           ~desc:"the hash of the merkelised withdraw list"
+           ~name:"withdraw_list_hash"
+           ~desc:"the hash of the withdraw list"
            Client_proto_args.string_parameter
       @@ prefixes ["with"; "path"]
       @@ Clic.param

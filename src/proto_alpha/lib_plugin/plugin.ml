@@ -3083,6 +3083,32 @@ module RPC = struct
               ~output:
                 (obj1 (req "path" Tx_rollup_commitment.Merkle.path_encoding))
               RPC_path.(path / "merkle_tree_path")
+
+          let message_result_hash =
+            RPC_service.post_service
+              ~description:"Compute the message result hash"
+              ~query:RPC_query.empty
+              ~input:
+                (obj2
+                   (req "context_hash" Context_hash.encoding)
+                   (req
+                      "withdraw_list_hash"
+                      Tx_rollup_withdraw_list_hash.encoding))
+              ~output:(obj1 (req "hash" Tx_rollup_message_result_hash.encoding))
+              RPC_path.(path / "message_result_hash")
+        end
+
+        module Withdraw = struct
+          let path = RPC_path.(path / "withdraw")
+
+          let withdraw_list_hash =
+            RPC_service.post_service
+              ~description:"Compute the hash of a withdraw list"
+              ~query:RPC_query.empty
+              ~input:
+                (obj1 (req "withdraw_list" (list Tx_rollup_withdraw.encoding)))
+              ~output:(obj1 (req "hash" Tx_rollup_withdraw_list_hash.encoding))
+              RPC_path.(path / "withdraw_list_hash")
         end
       end
     end
@@ -3146,7 +3172,19 @@ module RPC = struct
         (fun () (message_result_hashes, position) ->
           let open Tx_rollup_commitment.Merkle in
           let tree = List.fold_left snoc nil message_result_hashes in
-          Lwt.return (compute_path tree position))
+          Lwt.return (compute_path tree position)) ;
+      Registration.register0_noctxt
+        ~chunked:true
+        S.Tx_rollup.Commitment.message_result_hash
+        (fun () (context_hash, withdraw_list_hash) ->
+          return
+            (Tx_rollup_message_result_hash.hash_uncarbonated
+               {context_hash; withdraw_list_hash})) ;
+      Registration.register0_noctxt
+        ~chunked:true
+        S.Tx_rollup.Withdraw.withdraw_list_hash
+        (fun () withdrawals ->
+          return (Tx_rollup_withdraw_list_hash.hash_uncarbonated withdrawals))
 
     module Manager = struct
       let[@coq_axiom_with_reason "cast on e"] operations ctxt block ~branch

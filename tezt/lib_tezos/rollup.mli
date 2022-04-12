@@ -124,6 +124,19 @@ module Tx_rollup : sig
     Client.t ->
     JSON.t Process.runnable
 
+  val withdraw_list_hash :
+    ?hooks:Process.hooks ->
+    withdrawals:string list ->
+    Client.t ->
+    string Process.runnable
+
+  val message_result_hash :
+    ?hooks:Process.hooks ->
+    context_hash:string ->
+    withdraw_list_hash:string ->
+    Client.t ->
+    string Process.runnable
+
   val compute_inbox_from_messages :
     ?hooks:Process.hooks -> message list -> Client.t -> inbox Lwt.t
 

@@ -969,6 +969,26 @@ module Tx_rollup : sig
         data:JSON.u ->
         Client.t ->
         JSON.t Process.runnable
+
+      val message_result_hash :
+        ?endpoint:Client.endpoint ->
+        ?hooks:Process.hooks ->
+        ?chain:string ->
+        ?block:string ->
+        data:JSON.u ->
+        Client.t ->
+        JSON.t Process.runnable
+    end
+
+    module Withdraw : sig
+      val withdraw_list_hash :
+        ?endpoint:Client.endpoint ->
+        ?hooks:Process.hooks ->
+        ?chain:string ->
+        ?block:string ->
+        data:JSON.u ->
+        Client.t ->
+        JSON.t Process.runnable
     end
   end
 end

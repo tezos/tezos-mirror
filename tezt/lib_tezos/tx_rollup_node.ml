@@ -162,6 +162,34 @@ let wait_for_tezos_level node level =
         ~where:("level >= " ^ string_of_int level)
         promise
 
+let wait_for_full ?where node name filter =
+  let (promise, resolver) = Lwt.task () in
+  let current_events =
+    String_map.find_opt name node.one_shot_event_handlers
+    |> Option.value ~default:[]
+  in
+  node.one_shot_event_handlers <-
+    String_map.add
+      name
+      (Event_handler {filter; resolver} :: current_events)
+      node.one_shot_event_handlers ;
+  let* result = promise in
+  match result with
+  | None ->
+      raise (Terminated_before_event {daemon = node.name; event = name; where})
+  | Some x -> return x
+
+let event_from_full_event_filter filter json =
+  let raw = get_event_from_full_event json in
+  (* If [json] does not match the correct JSON structure, it
+     will be filtered out, which will result in ignoring
+     the current event.
+     @see raw_event_from_event *)
+  Option.bind raw (fun {value; _} -> filter value)
+
+let wait_for ?where node name filter =
+  wait_for_full ?where node name (event_from_full_event_filter filter)
+
 let create ?(path = Constant.tx_rollup_node) ?runner ?data_dir
     ?(addr = "127.0.0.1") ?(dormant_mode = false) ?color ?event_pipe ?name
     ~rollup_id ~rollup_genesis ?operator client tezos_node =
@@ -227,3 +255,77 @@ let run node =
       "--data-dir";
       node.persistent_state.data_dir;
     ]
+
+module Inbox = struct
+  type l2_context_hash = {irmin_hash : string; tree_hash : string}
+
+  type message = {
+    message : JSON.t;
+    result : JSON.t;
+    l2_context_hash : l2_context_hash;
+  }
+
+  type t = {contents : message list; cumulated_size : int}
+end
+
+module Client = struct
+  let raw_tx_node_rpc node ~url =
+    let* rpc = RPC.Curl.get () in
+    match rpc with
+    | None -> assert false
+    | Some curl ->
+        let url = Printf.sprintf "%s/%s" (rpc_addr node) url in
+        curl ~url
+
+  let get_inbox ~tx_node ~block =
+    let parse_l2_context_hash json =
+      let irmin_hash = JSON.(json |-> "irmin_hash" |> as_string) in
+      let tree_hash = JSON.(json |-> "tree_hash" |> as_string) in
+      Inbox.{irmin_hash; tree_hash}
+    in
+    let parse_message json =
+      let message = JSON.(json |-> "message") in
+      let result = JSON.(json |-> "result") in
+      let l2_context_hash =
+        parse_l2_context_hash JSON.(json |-> "l2_context_hash")
+      in
+      Inbox.{message; result; l2_context_hash}
+    in
+    let parse_json json =
+      let cumulated_size = JSON.(json |-> "cumulated_size" |> as_int) in
+      let contents =
+        JSON.(json |-> "contents" |> as_list) |> List.map parse_message
+      in
+      Inbox.{cumulated_size; contents}
+    in
+    let* json = raw_tx_node_rpc tx_node ~url:("block/" ^ block ^ "/inbox") in
+    return (parse_json json)
+
+  let get_balance ~tx_node ~block ~ticket_id ~tz4_address =
+    let parse_json json =
+      match JSON.(json |> as_int_opt) with
+      | Some level -> level
+      | None ->
+          Test.fail "Cannot retrieve balance of tz4 address %s" tz4_address
+    in
+    let* json =
+      raw_tx_node_rpc
+        tx_node
+        ~url:
+          ("context/" ^ block ^ "/tickets/" ^ ticket_id ^ "/balance/"
+         ^ tz4_address)
+    in
+    return (parse_json json)
+
+  let get_queue ~tx_node = raw_tx_node_rpc tx_node ~url:"queue"
+
+  let get_transaction_in_queue ~tx_node txh =
+    raw_tx_node_rpc tx_node ~url:("queue/transaction/" ^ txh)
+
+  let get_block ~tx_node ~block = raw_tx_node_rpc tx_node ~url:("block/" ^ block)
+
+  let get_merkle_proof ~tx_node ~block ~message_pos =
+    raw_tx_node_rpc
+      tx_node
+      ~url:("block/" ^ block ^ "/proof/message/" ^ message_pos)
+end

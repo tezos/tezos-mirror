@@ -38,37 +38,6 @@ let checkout_context (state : State.t) ctxt_hash =
   let+ context = Context.checkout state.context_index ctxt_hash in
   Option.to_result ~none:[Tx_rollup_cannot_checkout_context ctxt_hash] context
 
-let interp_messages ctxt parameters messages cumulated_size =
-  let open Lwt_syntax in
-  let+ (ctxt, _ctxt_hash, rev_contents) =
-    List.fold_left_s
-      (fun (ctxt, ctxt_hash, acc) message ->
-        let+ apply_res = L2_apply.apply_message ctxt parameters message in
-        let (ctxt, ctxt_hash, result) =
-          match apply_res with
-          | Ok (ctxt, result) ->
-              (* The message was successfully interpreted but the status in
-                 [result] may indicate that the application failed. The context
-                 may have been modified with e.g. updated counters. *)
-              (ctxt, Context.hash ctxt, Inbox.Interpreted result)
-          | Error err ->
-              (* The message was discarded before attempting to interpret it. The
-                 context is not modified. For instance if a batch is unparsable,
-                 or the BLS signature is incorrect, or a counter is wrong, etc. *)
-              (ctxt, ctxt_hash, Inbox.Discarded err)
-        in
-        let inbox_message = {Inbox.message; result; context_hash = ctxt_hash} in
-        (ctxt, ctxt_hash, inbox_message :: acc))
-      (ctxt, Context.hash ctxt, [])
-      messages
-  in
-  match rev_contents with
-  | [] -> (ctxt, None)
-  | _ ->
-      let contents = List.rev rev_contents in
-      let inbox = Inbox.{contents; cumulated_size} in
-      (ctxt, Some inbox)
-
 let parse_tx_rollup_l2_address :
     Script.node -> Protocol.Tx_rollup_l2_address.Indexable.value tzresult =
   let open Protocol in
@@ -239,12 +208,9 @@ let extract_messages_from_block block_info rollup_id =
 
 let create_genesis_block state tezos_block =
   let open Lwt_syntax in
-  let ctxt = Context.empty state.State.context_index in
-  let genesis_block =
-    L2block.genesis_block
-      state.context_index
-      state.rollup_info.rollup_id
-      tezos_block
+  let* ctxt = Context.init_context state.State.context_index in
+  let* genesis_block =
+    L2block.genesis_block ctxt state.rollup_info.rollup_id tezos_block
   in
   let+ _block_hash = State.save_block state genesis_block in
   (genesis_block, ctxt)
@@ -262,14 +228,27 @@ let process_messages_and_inboxes (state : State.t) ~(predecessor : L2block.t)
     | None -> checkout_context state predecessor.header.context
     | Some context -> return context
   in
-  let*! (context, inbox) =
-    interp_messages predecessor_context state.parameters messages cumulated_size
+  let l2_parameters =
+    Protocol.Tx_rollup_l2_apply.
+      {
+        tx_rollup_max_withdrawals_per_batch =
+          state.l1_constants.tx_rollup_max_withdrawals_per_batch;
+      }
   in
-  match inbox with
+  let* (context, contents) =
+    Interpreter.interpret_messages
+      predecessor_context
+      l2_parameters
+      ~rejection_max_proof_size:
+        state.l1_constants.tx_rollup_rejection_max_proof_size
+      messages
+  in
+  match contents with
   | None ->
       (* No inbox at this block *)
       return (predecessor, predecessor_context)
-  | Some inbox ->
+  | Some contents ->
+      let inbox = Inbox.{contents; cumulated_size} in
       let*! context_hash = Context.commit context in
       let level =
         match predecessor.header.level with

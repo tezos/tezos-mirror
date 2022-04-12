@@ -220,7 +220,7 @@ module Batcher = struct
       ~section
       ~name:"inject"
       ~msg:"Injecting batches on Tezos node"
-      ~level:Info
+      ~level:Notice
       ()
 
   let injection_success =
@@ -230,4 +230,11 @@ module Batcher = struct
       ~msg:"batches were successfully injected in operation {oph}"
       ~level:Notice
       ("oph", Operation_hash.encoding)
+
+  let invalid_transaction =
+    declare_1
+      ~section
+      ~name:"invalid_transaction"
+      ~msg:"a batch with this only transaction is invalid: {tr}"
+      ("tr", L2_transaction.encoding)
 end

@@ -114,3 +114,99 @@ let checkout_exn index hash =
   let open Lwt_syntax in
   let+ context = checkout index hash in
   match context with None -> raise Not_found | Some context -> context
+
+(** {2 Prover context} *)
+
+exception Error of Environment.Error_monad.error
+
+module Prover_storage :
+  Protocol.Tx_rollup_l2_storage_sig.STORAGE
+    with type t = tree
+     and type 'a m = 'a Lwt.t = struct
+  type t = tree
+
+  type 'a m = 'a Lwt.t
+
+  module Syntax = struct
+    include Lwt.Syntax
+
+    let return = Lwt.return
+
+    let fail e = Lwt.fail (Error e)
+
+    let catch (m : 'a m) k h =
+      Lwt.catch
+        (fun () -> m >>= k)
+        (function Error e -> h e | e -> Lwt.fail e)
+
+    let list_fold_left_m = Lwt_list.fold_left_s
+  end
+
+  let path k = [Bytes.to_string k]
+
+  let get store key = Tree.find store (path key)
+
+  let set store key value = Tree.add store (path key) value
+
+  let remove store key = Tree.remove store (path key)
+end
+
+module Prover_context = Protocol.Tx_rollup_l2_context.Make (Prover_storage)
+
+type 'a produce_proof_result = {tree : tree; result : 'a}
+
+let get_tree ctxt =
+  let open Lwt_result_syntax in
+  let*! tree_opt = find_tree ctxt [] in
+  match tree_opt with
+  | Some tree -> return tree
+  | None -> fail [Error.Tx_rollup_tree_not_found]
+
+let produce_proof ctxt f =
+  let open Lwt_result_syntax in
+  let index = index ctxt in
+  let* tree = get_tree ctxt in
+  let* kinded_key =
+    match Tree.kinded_key tree with
+    | Some kinded_key -> return kinded_key
+    | None -> fail [Error.Tx_rollup_tree_kinded_key_not_found]
+  in
+  let*! (proof, result) =
+    produce_stream_proof index kinded_key (fun tree ->
+        let*! res = f tree in
+        Lwt.return (res.tree, res))
+  in
+  return (proof, result)
+
+let hash_tree = Tree.hash
+
+let tree_hash_of_context ctxt =
+  let open Lwt_result_syntax in
+  let+ tree = get_tree ctxt in
+  hash_tree tree
+
+let add_tree ctxt tree =
+  let open Lwt_syntax in
+  let* ctxt = add_tree ctxt [] tree in
+  (* Irmin requires that we commit the context before generating the proof. *)
+  let* ctxt_hash = commit ctxt in
+  return (ctxt, ctxt_hash)
+
+(** The initial context must be constructed using the internal empty tree.
+    This tree however, *needs* to be non-empty. Otherwise, its hash will
+    be inconsistent.
+    See {!Protocol.Tx_rollup_commitment_repr.empty_l2_context_hash} for more
+    context.
+*)
+let init_context index =
+  let open Prover_context.Syntax in
+  let ctxt = empty index in
+  let tree = Tree.empty ctxt in
+  let* tree = Prover_context.Address_index.init_counter tree in
+  let* tree = Prover_context.Ticket_index.init_counter tree in
+  let tree_hash = hash_tree tree in
+  assert (
+    Context_hash.(
+      tree_hash = Protocol.Tx_rollup_message_result_repr.empty_l2_context_hash)) ;
+  let* (ctxt, _) = add_tree ctxt tree in
+  return ctxt

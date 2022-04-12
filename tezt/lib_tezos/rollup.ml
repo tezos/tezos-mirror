@@ -232,6 +232,26 @@ module Tx_rollup = struct
     in
     map_runnable parse runnable
 
+  let withdraw_list_hash ?hooks ~withdrawals client =
+    let parse json = JSON.(json |-> "hash" |> as_string) in
+    let data =
+      `O [("withdraw_list", `A (List.map (fun x -> `String x) withdrawals))]
+    in
+    RPC.Tx_rollup.Forge.Withdraw.withdraw_list_hash ?hooks ~data client
+    |> map_runnable parse
+
+  let message_result_hash ?hooks ~context_hash ~withdraw_list_hash client =
+    let parse json = JSON.(json |-> "hash" |> as_string) in
+    let data =
+      `O
+        [
+          ("context_hash", `String context_hash);
+          ("withdraw_list_hash", `String withdraw_list_hash);
+        ]
+    in
+    RPC.Tx_rollup.Forge.Commitment.message_result_hash ?hooks ~data client
+    |> map_runnable parse
+
   let compute_inbox_from_messages ?hooks messages client =
     let* message_hashes =
       Lwt_list.map_p

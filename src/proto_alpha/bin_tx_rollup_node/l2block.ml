@@ -126,9 +126,9 @@ let hash_header h =
   | Rollup_level _ ->
       Hash.hash_bytes [Data_encoding.Binary.to_bytes_exn header_encoding h]
 
-let genesis_block index rollup tezos_block =
-  let ctxt = Context.empty index in
-  let context_hash = Context.hash ctxt in
+let genesis_block ctxt rollup tezos_block =
+  let open Lwt_syntax in
+  let* context_hash = Context.commit ctxt in
   let hash = genesis_hash rollup in
   let header =
     {
@@ -140,4 +140,4 @@ let genesis_block index rollup tezos_block =
     }
   in
   let inbox : Inbox.t = {contents = []; cumulated_size = 0} in
-  {hash; header; inbox}
+  return {hash; header; inbox}

@@ -60,6 +60,46 @@ val wait_for_ready : t -> unit Lwt.t
     If such an event already occurred, return immediately. *)
 val wait_for_tezos_level : t -> int -> int Lwt.t
 
+(** Wait for a custom event to occur.
+
+      Usage: [wait_for_full daemon name filter]
+
+      If an event named [name] occurs, apply [filter] to its
+      whole json, which is of the form:
+      {[{
+        "fd-sink-item.v0": {
+          "hostname": "...",
+                      "time_stamp": ...,
+                      "section": [ ... ],
+                      "event": { <name>: ... }
+                               }
+        }]}
+      If [filter] returns [None], continue waiting.
+      If [filter] returns [Some x], return [x].
+
+      [where] is used as the [where] field of the [Terminated_before_event] exception
+      if the daemon terminates. It should describe the constraint that [filter] applies,
+      such as ["field level exists"].
+
+      It is advised to register such event handlers before starting the daemon,
+      as if they occur before being registered, they will not trigger your handler.
+      For instance, you can define a promise with
+      [let x_event = wait_for daemon "x" (fun x -> Some x)]
+      and bind it later with [let* x = x_event]. *)
+val wait_for_full :
+  ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
+
+(** Same as [wait_for_full] but ignore metadata from the file descriptor sink.
+
+      More precisely, [filter] is applied to the value of field
+      ["fd-sink-item.v0"."event".<name>].
+
+      If the daemon receives a JSON value that does not match the right
+      JSON structure, it is not given to [filter] and the event is
+      ignored. See [wait_for_full] to know what the JSON value must
+      look like. *)
+val wait_for : ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
+
 (** Connected to a tezos node.
     Returns the name of the configuration file. *)
 val config_init : t -> string -> string -> string Lwt.t
@@ -72,3 +112,38 @@ val terminate : ?kill:bool -> t -> unit Lwt.t
 
 (** Get the RPC address given as [--rpc-addr] to a node. *)
 val rpc_addr : t -> string
+
+module Inbox : sig
+  type l2_context_hash = {irmin_hash : string; tree_hash : string}
+
+  type message = {
+    message : JSON.t;
+    result : JSON.t;
+    l2_context_hash : l2_context_hash;
+  }
+
+  type t = {contents : message list; cumulated_size : int}
+end
+
+(* FIXME/TORU: This is a temporary way of querying the node without
+   tx_rollup_client. This aims to be replaced as soon as possible by
+   the dedicated client's RPC. *)
+module Client : sig
+  val get_inbox : tx_node:t -> block:string -> Inbox.t Lwt.t
+
+  val get_balance :
+    tx_node:t ->
+    block:string ->
+    ticket_id:string ->
+    tz4_address:string ->
+    int Lwt.t
+
+  val get_queue : tx_node:t -> JSON.t Lwt.t
+
+  val get_transaction_in_queue : tx_node:t -> string -> JSON.t Lwt.t
+
+  val get_block : tx_node:t -> block:string -> JSON.t Lwt.t
+
+  val get_merkle_proof :
+    tx_node:t -> block:string -> message_pos:string -> JSON.t Lwt.t
+end

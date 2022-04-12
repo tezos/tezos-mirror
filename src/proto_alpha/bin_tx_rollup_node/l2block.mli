@@ -58,7 +58,7 @@ type header = {
 type t = {hash : hash; header : header; inbox : Inbox.t}
 
 (** Build the genesis block  *)
-val genesis_block : Context.index -> Tx_rollup.t -> Block_hash.t -> t
+val genesis_block : Context.t -> Tx_rollup.t -> Block_hash.t -> t Lwt.t
 
 (**  {2 Encoding} *)
 

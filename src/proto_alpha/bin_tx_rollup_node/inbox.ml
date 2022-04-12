@@ -32,10 +32,15 @@ type message_result =
   | Interpreted of Tx_rollup_l2_apply.Message_result.t
   | Discarded of tztrace
 
+type l2_context_hash = {
+  irmin_hash : Tx_rollup_l2_context_hash.t;
+  tree_hash : Context_hash.t;
+}
+
 type message = {
   message : Tx_rollup_message.t;
   result : message_result;
-  context_hash : Tx_rollup_l2_context_hash.t;
+  l2_context_hash : l2_context_hash;
 }
 
 type t = {contents : message list; cumulated_size : int}
@@ -59,15 +64,26 @@ let message_result_encoding =
         (fun e -> Discarded e);
     ]
 
+let l2_context_hash_encoding =
+  let open Data_encoding in
+  conv
+    (fun {irmin_hash; tree_hash} -> (irmin_hash, tree_hash))
+    (fun (irmin_hash, tree_hash) -> {irmin_hash; tree_hash})
+    (obj2
+       (req "irmin_hash" Tx_rollup_l2_context_hash.encoding)
+       (req "tree_hash" Context_hash.encoding))
+
 let message_encoding =
   let open Data_encoding in
   conv
-    (fun {message; result; context_hash} -> (message, result, context_hash))
-    (fun (message, result, context_hash) -> {message; result; context_hash})
+    (fun {message; result; l2_context_hash} ->
+      (message, result, l2_context_hash))
+    (fun (message, result, l2_context_hash) ->
+      {message; result; l2_context_hash})
     (obj3
        (req "message" Tx_rollup_message.encoding)
        (req "result" message_result_encoding)
-       (req "context_hash" Tx_rollup_l2_context_hash.encoding))
+       (req "l2_context_hash" l2_context_hash_encoding))
 
 let encoding =
   let open Data_encoding in
