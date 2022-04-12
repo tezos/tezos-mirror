@@ -262,6 +262,40 @@ let test_clear_or_cancel_cancels _ () =
     res ;
   Lwt.return_unit
 
+(** Creates a requester. Key "foo" is unknown yet. It is fetched two times,
+    thereby pending. It is cancelled one time, thereby still pending. After
+    the second cancelation it is no longer pending. As of now, "foo" still
+    remains unknown. The fetch operation itself  indicates that is has been
+    cancelled.
+*)
+let test_clear_or_cancel_decrements _ () =
+  let open Lwt_syntax in
+  let requester = init_full_requester () in
+  (* request "foo" *)
+  let* b = Test_Requester.known requester "foo" in
+  let* () = lwt_assert_false "injected value is not known" b in
+  let f1 = Test_Requester.fetch requester "foo" precheck_pass in
+  assert_true "value is now pending" (Test_Requester.pending requester "foo") ;
+  let _f2 = Test_Requester.fetch requester "foo" precheck_pass in
+  assert_true "value is now pending" (Test_Requester.pending requester "foo") ;
+  Test_Requester.clear_or_cancel requester "foo" ;
+  assert_true
+    "value should still be pending after cancellation"
+    (Test_Requester.pending requester "foo") ;
+  Test_Requester.clear_or_cancel requester "foo" ;
+  assert_false
+    "value is no longer pending after cancellation"
+    (Test_Requester.pending requester "foo") ;
+  let* r = Test_Requester.known requester "foo" in
+  assert_false "injected value is cleared" r ;
+  let* res = f1 in
+  check
+    (tzresults testable_test_value)
+    "fetch returns cancellation"
+    (Error [Test_Requester.Canceled "foo"])
+    res ;
+  Lwt.return_unit
+
 (** Test pending *)
 
 (** Creates a requester. Initially, no key "foo" is pending. After
@@ -628,6 +662,10 @@ let () =
             "test clear_or_cancel: removes"
             `Quick
             test_clear_or_cancel_removes;
+          Alcotest_lwt.test_case
+            "test clear_or_cancel: decrements pending"
+            `Quick
+            test_clear_or_cancel_decrements;
           Alcotest_lwt.test_case
             "test clear_or_cancel: cancels"
             `Quick
