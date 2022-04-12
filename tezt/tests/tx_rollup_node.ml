@@ -70,7 +70,52 @@ let get_rollup_parameter_file ~protocol =
   let base = Either.right (protocol, None) in
   Protocol.write_parameter_file ~base enable_tx_rollup
 
-(* Checks that the configuration is stored and that the required
+(* Wait for the [injection_success] event from the rollup node batcher. *)
+let wait_for_injection_success_event node =
+  Rollup_node.wait_for node "injection_success.v0" (fun _ -> Some ())
+
+(* Check that all messages in the inbox have been successfully applied. *)
+let check_inbox_success (inbox : Rollup_node.Inbox.t) =
+  let ( |->? ) json field =
+    let res = JSON.(json |-> field) in
+    match JSON.unannotate res with `Null -> None | _ -> Some res
+  in
+  List.iteri
+    (fun i msg ->
+      let result =
+        (* Pair of result and withdraws *)
+        JSON.(msg.Rollup_node.Inbox.result |=> 0)
+      in
+      match result |->? "deposit_result" with
+      | None ->
+          (* Not a deposit, must be a batch *)
+          let results =
+            JSON.(
+              result |->? "batch_v1_result" |> Option.get |-> "results"
+              |> as_list)
+          in
+          List.iteri
+            (fun j tr_json ->
+              match JSON.(tr_json |=> 1 |> as_string_opt) with
+              | Some "transaction_success" -> (* OK *) ()
+              | _ ->
+                  Test.fail
+                    "Transaction at position %d of batch %d failed: %s"
+                    j
+                    i
+                    (JSON.encode tr_json))
+            results
+      | Some result -> (
+          match result |->? "deposit_success" with
+          | Some _ -> (* OK *) ()
+          | None ->
+              Test.fail
+                "Deposit at position %d failed: %s"
+                i
+                (JSON.encode result)))
+    inbox.contents
+
+(* Checks that the configuration is stored and that the  required
    fields are present. *)
 let test_node_configuration =
   Protocol.register_test
@@ -834,11 +879,10 @@ let test_batcher =
       let* _t1 = Rollup_node.Client.get_transaction_in_queue ~tx_node txh1
       and* _t2 = Rollup_node.Client.get_transaction_in_queue ~tx_node txh2 in
       let* () = Client.bake_for client in
-      let* _ = Node.wait_for_level node 6 in
-      let* _ = Rollup_node.wait_for_tezos_level tx_node 6 in
       let* () = Client.bake_for client in
-      let* _ = Node.wait_for_level node 7 in
       let* _ = Rollup_node.wait_for_tezos_level tx_node 7 in
+      let* inbox = Rollup_node.Client.get_inbox ~tx_node ~block:"head" in
+      check_inbox_success inbox ;
       let* () =
         check_tz4_balance
           ~tx_node
@@ -862,7 +906,10 @@ let test_batcher =
         let signature = sign_one_transaction sk [tx] in
         tx_client_inject_transaction ~tx_node [tx] signature
       in
-      let nbtxs1 = 13 in
+      let nbtxs1 = 70 in
+      let injection_success_promise =
+        wait_for_injection_success_event tx_node
+      in
       Log.info "Injecting %d transactions to queue" nbtxs1 ;
       let* () =
         Lwt_list.iter_s
@@ -877,7 +924,7 @@ let test_batcher =
             unit)
           (List.init nbtxs1 (fun i -> Int64.of_int (i + 2)))
       in
-      let nbtxs2 = 6 in
+      let nbtxs2 = 30 in
       Log.info "Injecting %d transactions to queue" nbtxs2 ;
       let* () =
         Lwt_list.iter_s
@@ -897,23 +944,27 @@ let test_batcher =
       Check.((len_q = nbtxs1 + nbtxs2) int)
         ~error_msg:"Queue length is %L but should be %R" ;
       let* () = Client.bake_for client in
-      let* _ = Rollup_node.wait_for_tezos_level tx_node 8 in
+      Log.info "Waiting for injection on L1 to succeed" ;
+      let* () = injection_success_promise in
+      Log.info "Injection succeeded" ;
       let* () = Client.bake_for client in
       let* _ = Rollup_node.wait_for_tezos_level tx_node 9 in
+      let* inbox = Rollup_node.Client.get_inbox ~tx_node ~block:"head" in
+      check_inbox_success inbox ;
       let* () =
         check_tz4_balance
           ~tx_node
           ~block:"head"
           ~ticket_id
           ~tz4_address:bls_pkh_1_str
-          ~expected_balance:99_997
+          ~expected_balance:(100_004 - nbtxs1 + nbtxs2)
       and* () =
         check_tz4_balance
           ~tx_node
           ~block:"head"
           ~ticket_id
           ~tz4_address:bls_pkh_2_str
-          ~expected_balance:100_003
+          ~expected_balance:(99_996 + nbtxs1 - nbtxs2)
       in
       unit)
 

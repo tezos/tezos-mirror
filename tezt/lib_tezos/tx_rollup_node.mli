@@ -60,6 +60,46 @@ val wait_for_ready : t -> unit Lwt.t
     If such an event already occurred, return immediately. *)
 val wait_for_tezos_level : t -> int -> int Lwt.t
 
+(** Wait for a custom event to occur.
+
+      Usage: [wait_for_full daemon name filter]
+
+      If an event named [name] occurs, apply [filter] to its
+      whole json, which is of the form:
+      {[{
+        "fd-sink-item.v0": {
+          "hostname": "...",
+                      "time_stamp": ...,
+                      "section": [ ... ],
+                      "event": { <name>: ... }
+                               }
+        }]}
+      If [filter] returns [None], continue waiting.
+      If [filter] returns [Some x], return [x].
+
+      [where] is used as the [where] field of the [Terminated_before_event] exception
+      if the daemon terminates. It should describe the constraint that [filter] applies,
+      such as ["field level exists"].
+
+      It is advised to register such event handlers before starting the daemon,
+      as if they occur before being registered, they will not trigger your handler.
+      For instance, you can define a promise with
+      [let x_event = wait_for daemon "x" (fun x -> Some x)]
+      and bind it later with [let* x = x_event]. *)
+val wait_for_full :
+  ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
+
+(** Same as [wait_for_full] but ignore metadata from the file descriptor sink.
+
+      More precisely, [filter] is applied to the value of field
+      ["fd-sink-item.v0"."event".<name>].
+
+      If the daemon receives a JSON value that does not match the right
+      JSON structure, it is not given to [filter] and the event is
+      ignored. See [wait_for_full] to know what the JSON value must
+      look like. *)
+val wait_for : ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
+
 (** Connected to a tezos node.
     Returns the name of the configuration file. *)
 val config_init : t -> string -> string -> string Lwt.t
