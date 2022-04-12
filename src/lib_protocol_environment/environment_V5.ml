@@ -734,11 +734,11 @@ struct
       let+ r = Result.catch_s ?catch_only f in
       Result.map_error (fun e -> error_of_exn e) r
 
-    let both_e = Tzresult_syntax.both
+    let both_e = Tezos_error_monad.TzLwtreslib.Monad.Traced_result_syntax.both
 
-    let join_e = Tzresult_syntax.join
+    let join_e = Tezos_error_monad.TzLwtreslib.Monad.Traced_result_syntax.join
 
-    let all_e = Tzresult_syntax.all
+    let all_e = Tezos_error_monad.TzLwtreslib.Monad.Traced_result_syntax.all
   end
 
   let () =

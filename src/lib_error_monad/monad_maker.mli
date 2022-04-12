@@ -44,55 +44,36 @@ module type S = sig
   module Result_syntax : sig
     include module type of TzLwtreslib.Monad.Result_syntax
 
-    val tzfail : 'error -> ('a, 'error trace) result
+    val tzfail : error -> 'a tzresult
 
-    val ( and* ) :
-      ('a, 'error trace) result ->
-      ('b, 'error trace) result ->
-      ('a * 'b, 'error trace) result
+    val ( and* ) : 'a tzresult -> 'b tzresult -> ('a * 'b) tzresult
 
-    val ( and+ ) :
-      ('a, 'error trace) result ->
-      ('b, 'error trace) result ->
-      ('a * 'b, 'error trace) result
+    val ( and+ ) : 'a tzresult -> 'b tzresult -> ('a * 'b) tzresult
 
-    val tzjoin : (unit, 'error trace) result list -> (unit, 'error trace) result
+    val tzjoin : unit tzresult list -> unit tzresult
 
-    val tzall : ('a, 'error trace) result list -> ('a list, 'error trace) result
+    val tzall : 'a tzresult list -> 'a list tzresult
 
-    val tzboth :
-      ('a, 'error trace) result ->
-      ('b, 'error trace) result ->
-      ('a * 'b, 'error trace) result
+    val tzboth : 'a tzresult -> 'b tzresult -> ('a * 'b) tzresult
   end
 
   module Lwt_result_syntax : sig
     include module type of TzLwtreslib.Monad.Lwt_result_syntax
 
-    val tzfail : 'error -> ('a, 'error trace) result Lwt.t
+    val tzfail : error -> 'a tzresult Lwt.t
 
     val ( and* ) :
-      ('a, 'error trace) result Lwt.t ->
-      ('b, 'error trace) result Lwt.t ->
-      ('a * 'b, 'error trace) result Lwt.t
+      'a tzresult Lwt.t -> 'b tzresult Lwt.t -> ('a * 'b) tzresult Lwt.t
 
     val ( and+ ) :
-      ('a, 'error trace) result Lwt.t ->
-      ('b, 'error trace) result Lwt.t ->
-      ('a * 'b, 'error trace) result Lwt.t
+      'a tzresult Lwt.t -> 'b tzresult Lwt.t -> ('a * 'b) tzresult Lwt.t
 
-    val tzjoin :
-      (unit, 'error trace) result Lwt.t list ->
-      (unit, 'error trace) result Lwt.t
+    val tzjoin : unit tzresult Lwt.t list -> unit tzresult Lwt.t
 
-    val tzall :
-      ('a, 'error trace) result Lwt.t list ->
-      ('a list, 'error trace) result Lwt.t
+    val tzall : 'a tzresult Lwt.t list -> 'a list tzresult Lwt.t
 
     val tzboth :
-      ('a, 'error trace) result Lwt.t ->
-      ('b, 'error trace) result Lwt.t ->
-      ('a * 'b, 'error trace) result Lwt.t
+      'a tzresult Lwt.t -> 'b tzresult Lwt.t -> ('a * 'b) tzresult Lwt.t
   end
 
   val classify_trace : tztrace -> Error_classification.t

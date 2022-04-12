@@ -34,60 +34,63 @@ module type S = sig
 
   type 'a tzresult = ('a, tztrace) result
 
+  (** You can find a lot of information about the [Lwt_syntax] module in the
+      error monad tutorial: https://tezos.gitlab.io/developer/error_monad.html
+  *)
   module Lwt_syntax : module type of TzLwtreslib.Monad.Lwt_syntax
 
+  (** You can find a lot of information about the [Result_syntax] module in the
+      error monad tutorial: https://tezos.gitlab.io/developer/error_monad.html
+  *)
   module Result_syntax : sig
     include module type of TzLwtreslib.Monad.Result_syntax
 
-    val tzfail : 'error -> ('a, 'error trace) result
+    (* NOTE: the [tzfail] functions is over-specialised. It could have the more
+       general type ['e -> ('a, 'e trace) result]. In practice no part of the
+       code uses that generalisation. In the future, it might be worth
+       generalising if we start using traces to carry other things than just
+       [error]. The same remark applies to the other [val] below and to the
+       [Lwt_result_syntax] [val]s too. *)
 
-    val ( and* ) :
-      ('a, 'error trace) result ->
-      ('b, 'error trace) result ->
-      ('a * 'b, 'error trace) result
+    (** [tzfail e] is for failing into the [tzresult] type. It wraps the given
+        error in a trace. This is meant as syntactic sugar for a very common
+        pattern that is otherwise written [fail (TzTrace.make e)]. *)
+    val tzfail : error -> 'a tzresult
 
-    val ( and+ ) :
-      ('a, 'error trace) result ->
-      ('b, 'error trace) result ->
-      ('a * 'b, 'error trace) result
+    val ( and* ) : 'a tzresult -> 'b tzresult -> ('a * 'b) tzresult
 
-    val tzjoin : (unit, 'error trace) result list -> (unit, 'error trace) result
+    val ( and+ ) : 'a tzresult -> 'b tzresult -> ('a * 'b) tzresult
 
-    val tzall : ('a, 'error trace) result list -> ('a list, 'error trace) result
+    val tzjoin : unit tzresult list -> unit tzresult
 
-    val tzboth :
-      ('a, 'error trace) result ->
-      ('b, 'error trace) result ->
-      ('a * 'b, 'error trace) result
+    val tzall : 'a tzresult list -> 'a list tzresult
+
+    val tzboth : 'a tzresult -> 'b tzresult -> ('a * 'b) tzresult
   end
 
+  (** You can find a lot of information about the [Lwt_result_syntax] module in the
+      error monad tutorial: https://tezos.gitlab.io/developer/error_monad.html
+  *)
   module Lwt_result_syntax : sig
     include module type of TzLwtreslib.Monad.Lwt_result_syntax
 
-    val tzfail : 'error -> ('a, 'error trace) result Lwt.t
+    (** [tzfail e] is for failing into the [tzresult Lwt.t] type. It wraps the
+        given error in a trace. This is meant as syntactic sugar for a very
+        common pattern that is otherwise written [fail (TzTrace.make e)]. *)
+    val tzfail : error -> 'a tzresult Lwt.t
 
     val ( and* ) :
-      ('a, 'error trace) result Lwt.t ->
-      ('b, 'error trace) result Lwt.t ->
-      ('a * 'b, 'error trace) result Lwt.t
+      'a tzresult Lwt.t -> 'b tzresult Lwt.t -> ('a * 'b) tzresult Lwt.t
 
     val ( and+ ) :
-      ('a, 'error trace) result Lwt.t ->
-      ('b, 'error trace) result Lwt.t ->
-      ('a * 'b, 'error trace) result Lwt.t
+      'a tzresult Lwt.t -> 'b tzresult Lwt.t -> ('a * 'b) tzresult Lwt.t
 
-    val tzjoin :
-      (unit, 'error trace) result Lwt.t list ->
-      (unit, 'error trace) result Lwt.t
+    val tzjoin : unit tzresult Lwt.t list -> unit tzresult Lwt.t
 
-    val tzall :
-      ('a, 'error trace) result Lwt.t list ->
-      ('a list, 'error trace) result Lwt.t
+    val tzall : 'a tzresult Lwt.t list -> 'a list tzresult Lwt.t
 
     val tzboth :
-      ('a, 'error trace) result Lwt.t ->
-      ('b, 'error trace) result Lwt.t ->
-      ('a * 'b, 'error trace) result Lwt.t
+      'a tzresult Lwt.t -> 'b tzresult Lwt.t -> ('a * 'b) tzresult Lwt.t
   end
 
   val classify_trace : tztrace -> Error_classification.t
