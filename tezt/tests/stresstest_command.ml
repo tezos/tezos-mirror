@@ -226,6 +226,10 @@ let test_stresstest_sources_format =
     let waiter = wait_for_n_injections n_bootstraps_to_use node in
     let* () =
       if first_iteration then (
+        (* Bake some blocks to reach required level for stresstest command. *)
+        let* () = Client.bake_for client in
+        let* () = Client.bake_for client in
+        let* _ = Node.wait_for_level node 3 in
         non_terminating_process
         @@ Client.spawn_stresstest
              ~source_aliases
@@ -299,6 +303,10 @@ let test_stresstest_n_transfers =
   let source_aliases =
     List.map (fun i -> sf "bootstrap%d" i) (range 1 n_bootstraps)
   in
+  (* Bake some blocks to reach required level for stresstest command. *)
+  let* () = Client.bake_for client in
+  let* () = Client.bake_for client in
+  let* _ = Node.wait_for_level node 3 in
   let* () =
     Client.stresstest
       ~transfers:n_transfers
@@ -361,6 +369,7 @@ let test_stresstest_multiple_nodes =
       ~protocol
       ()
   in
+  (* Bake some blocks to reach required level for stresstest command. *)
   let* () = Client.bake_for central_client in
   let* () = Client.bake_for central_client in
   let* _ = Node.wait_for_level central_node 3 in
@@ -390,7 +399,7 @@ let test_stresstest_multiple_nodes =
             ()
         in
         let* () = Client.Admin.connect_address central_client ~peer:node in
-        let* _ = Node.wait_for_level node 1 in
+        let* _ = Node.wait_for_level node 3 in
         return (node, client, accounts))
       (List.init (n_nodes - 1) Fun.id)
   in
