@@ -20,7 +20,6 @@ depends: [
   "tezos-protocol-plugin-alpha"
   "tezos-protocol-alpha-parameters"
   "tezos-rpc"
-  "tezos-stdlib-unix"
   "tezos-micheline" {with-test}
   "tezos-base-test-helpers" {with-test}
   "tezos-test-helpers" {with-test}

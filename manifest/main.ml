@@ -3013,7 +3013,6 @@ end = struct
             tezos_rpc |> if_ N.(number >= 001) |> open_;
             tezos_client_commands |> if_ N.(number == 000) |> open_;
             tezos_stdlib_unix |> if_ N.(number == 000);
-            tezos_stdlib_unix |> open_ |> if_ N.(number >= 011);
           ]
         ~bisect_ppx:N.(number >= 008)
         ?inline_tests:(if N.(number >= 009) then Some ppx_inline_test else None)
