@@ -117,14 +117,15 @@ let may_update_proposal state (proposal : proposal) =
   else Lwt.return state
 
 let preendorse state proposal =
-  Events.(emit preendorsing_proposal proposal.block.hash) >>= fun () ->
   if Protocol_hash.(proposal.block.protocol <> proposal.block.next_protocol)
   then
-    (* We do not endorse the first transition block *)
+    (* We do not preendorse the first transition block *)
     let new_round_state = {state.round_state with current_phase = Idle} in
     let new_state = {state with round_state = new_round_state} in
     Lwt.return (new_state, Do_nothing)
-  else Lwt.return (state, make_preendorse_action state proposal)
+  else
+    Events.(emit attempting_preendorse_proposal proposal.block.hash)
+    >>= fun () -> Lwt.return (state, make_preendorse_action state proposal)
 
 let extract_pqc state (new_proposal : proposal) =
   match new_proposal.block.prequorum with

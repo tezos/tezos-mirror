@@ -58,7 +58,7 @@ let preendorse (cctxt : Protocol_client_context.full) ?(force = false) delegates
   let config = Baking_configuration.make ~force () in
   create_state cctxt ~config ~current_proposal delegates >>=? fun state ->
   let proposal = state.level_state.latest_proposal in
-  Events.(emit preendorsing_proposal state.level_state.latest_proposal)
+  Events.(emit attempting_preendorse_proposal state.level_state.latest_proposal)
   >>= fun () ->
   (if force then return_unit
   else
@@ -89,7 +89,7 @@ let endorse (cctxt : Protocol_client_context.full) ?(force = false) delegates =
   let config = Baking_configuration.make ~force () in
   create_state cctxt ~config ~current_proposal delegates >>=? fun state ->
   let proposal = state.level_state.latest_proposal in
-  Events.(emit endorsing_proposal state.level_state.latest_proposal)
+  Events.(emit attempting_endorse_proposal state.level_state.latest_proposal)
   >>= fun () ->
   (if force then return_unit
   else
