@@ -307,9 +307,9 @@ let test_unparse_comb_comparable_type () =
   let open Script in
   let open Script_typed_ir in
   let nat_prim = Prim ((), T_nat, [], []) in
-  let nat_ty = nat_key in
+  let nat_ty = nat_t in
   let pair_prim l = Prim ((), T_pair, l, []) in
-  let pair_ty ty1 ty2 = pair_key (-1) ty1 ty2 in
+  let pair_ty ty1 ty2 = comparable_pair_t (-1) ty1 ty2 in
   let pair_prim2 a b = pair_prim [a; b] in
   let pair_nat_nat_prim = pair_prim2 nat_prim nat_prim in
   pair_ty nat_ty nat_ty >>??= fun pair_nat_nat_ty ->
@@ -381,7 +381,7 @@ let test_parse_comb_data () =
   let pair_prim2 a b = pair_prim [a; b] in
   let pair_z_z_prim = pair_prim2 z_prim z_prim in
   list_t (-1) nat_ty >>??= fun list_nat_ty ->
-  big_map_t (-1) nat_key nat_ty >>??= fun big_map_nat_nat_ty ->
+  big_map_t (-1) nat_ty nat_ty >>??= fun big_map_nat_nat_ty ->
   test_context_with_nat_nat_big_map () >>=? fun (ctxt, big_map_id) ->
   (* Pair 0 0 *)
   test_parse_data __LOC__ ctxt pair_nat_nat_ty pair_z_z_prim (z, z)
@@ -452,9 +452,7 @@ let test_parse_comb_data () =
   let expected_big_map =
     let open Script_typed_ir in
     let diff = {map = Big_map_overlay.empty; size = 0} in
-    let nat_key_ty = nat_key in
-    Big_map
-      {id = Some big_map_id; diff; key_type = nat_key_ty; value_type = nat_ty}
+    Big_map {id = Some big_map_id; diff; key_type = nat_ty; value_type = nat_ty}
   in
   let ty_equal :
       type a ac1 ac2.

@@ -169,7 +169,7 @@ let () = Registration_helpers.register (module Compare_key_contract_benchmark)
 (* A simple ticket type for use in the benchmarks. *)
 let ticket_ty =
   let open Script_typed_ir in
-  WithExceptions.Result.get_ok ~loc:__LOC__ (ticket_t (-1) int_key)
+  WithExceptions.Result.get_ok ~loc:__LOC__ (ticket_t (-1) int_t)
 
 (* A dummy type generator, sampling linear terms of a given size.
    The generator always returns types of the shape:

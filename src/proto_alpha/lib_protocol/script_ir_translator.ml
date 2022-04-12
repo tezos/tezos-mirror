@@ -1039,48 +1039,43 @@ let[@coq_struct "ty"] rec parse_comparable_ty :
   else
     match ty with
     | Prim (loc, T_unit, [], annot) ->
-        check_type_annot loc annot >|? fun () ->
-        (Ex_comparable_ty unit_key, ctxt)
+        check_type_annot loc annot >|? fun () -> (Ex_comparable_ty unit_t, ctxt)
     | Prim (loc, T_never, [], annot) ->
-        check_type_annot loc annot >|? fun () ->
-        (Ex_comparable_ty never_key, ctxt)
+        check_type_annot loc annot >|? fun () -> (Ex_comparable_ty never_t, ctxt)
     | Prim (loc, T_int, [], annot) ->
-        check_type_annot loc annot >|? fun () -> (Ex_comparable_ty int_key, ctxt)
+        check_type_annot loc annot >|? fun () -> (Ex_comparable_ty int_t, ctxt)
     | Prim (loc, T_nat, [], annot) ->
-        check_type_annot loc annot >|? fun () -> (Ex_comparable_ty nat_key, ctxt)
+        check_type_annot loc annot >|? fun () -> (Ex_comparable_ty nat_t, ctxt)
     | Prim (loc, T_signature, [], annot) ->
         check_type_annot loc annot >|? fun () ->
-        (Ex_comparable_ty signature_key, ctxt)
+        (Ex_comparable_ty signature_t, ctxt)
     | Prim (loc, T_string, [], annot) ->
         check_type_annot loc annot >|? fun () ->
-        (Ex_comparable_ty string_key, ctxt)
+        (Ex_comparable_ty string_t, ctxt)
     | Prim (loc, T_bytes, [], annot) ->
-        check_type_annot loc annot >|? fun () ->
-        (Ex_comparable_ty bytes_key, ctxt)
+        check_type_annot loc annot >|? fun () -> (Ex_comparable_ty bytes_t, ctxt)
     | Prim (loc, T_mutez, [], annot) ->
-        check_type_annot loc annot >|? fun () ->
-        (Ex_comparable_ty mutez_key, ctxt)
+        check_type_annot loc annot >|? fun () -> (Ex_comparable_ty mutez_t, ctxt)
     | Prim (loc, T_bool, [], annot) ->
-        check_type_annot loc annot >|? fun () ->
-        (Ex_comparable_ty bool_key, ctxt)
+        check_type_annot loc annot >|? fun () -> (Ex_comparable_ty bool_t, ctxt)
     | Prim (loc, T_key_hash, [], annot) ->
         check_type_annot loc annot >|? fun () ->
-        (Ex_comparable_ty key_hash_key, ctxt)
+        (Ex_comparable_ty key_hash_t, ctxt)
     | Prim (loc, T_key, [], annot) ->
-        check_type_annot loc annot >|? fun () -> (Ex_comparable_ty key_key, ctxt)
+        check_type_annot loc annot >|? fun () -> (Ex_comparable_ty key_t, ctxt)
     | Prim (loc, T_timestamp, [], annot) ->
         check_type_annot loc annot >|? fun () ->
-        (Ex_comparable_ty timestamp_key, ctxt)
+        (Ex_comparable_ty timestamp_t, ctxt)
     | Prim (loc, T_chain_id, [], annot) ->
         check_type_annot loc annot >|? fun () ->
-        (Ex_comparable_ty chain_id_key, ctxt)
+        (Ex_comparable_ty chain_id_t, ctxt)
     | Prim (loc, T_address, [], annot) ->
         check_type_annot loc annot >|? fun () ->
-        (Ex_comparable_ty address_key, ctxt)
+        (Ex_comparable_ty address_t, ctxt)
     | Prim (loc, T_tx_rollup_l2_address, [], annot) ->
         if Constants.tx_rollup_enable ctxt then
           check_type_annot loc annot >|? fun () ->
-          (Ex_comparable_ty tx_rollup_l2_address_key, ctxt)
+          (Ex_comparable_ty tx_rollup_l2_address_t, ctxt)
         else error @@ Tx_rollup_addresses_disabled loc
     | Prim
         ( loc,
@@ -1103,7 +1098,8 @@ let[@coq_struct "ty"] rec parse_comparable_ty :
         >>? fun (Ex_comparable_ty right, ctxt) ->
         parse_comparable_ty ~stack_depth:(stack_depth + 1) ctxt left
         >>? fun (Ex_comparable_ty left, ctxt) ->
-        pair_key loc left right >|? fun ty -> (Ex_comparable_ty ty, ctxt)
+        comparable_pair_t loc left right >|? fun ty ->
+        (Ex_comparable_ty ty, ctxt)
     | Prim (loc, T_or, [left; right], annot) ->
         check_type_annot loc annot >>? fun () ->
         remove_field_annot left >>? fun left ->
@@ -1112,14 +1108,15 @@ let[@coq_struct "ty"] rec parse_comparable_ty :
         >>? fun (Ex_comparable_ty right, ctxt) ->
         parse_comparable_ty ~stack_depth:(stack_depth + 1) ctxt left
         >>? fun (Ex_comparable_ty left, ctxt) ->
-        union_key loc left right >|? fun ty -> (Ex_comparable_ty ty, ctxt)
+        comparable_union_t loc left right >|? fun ty ->
+        (Ex_comparable_ty ty, ctxt)
     | Prim (loc, ((T_pair | T_or) as prim), l, _) ->
         error (Invalid_arity (loc, prim, 2, List.length l))
     | Prim (loc, T_option, [t], annot) ->
         check_type_annot loc annot >>? fun () ->
         parse_comparable_ty ~stack_depth:(stack_depth + 1) ctxt t
         >>? fun (Ex_comparable_ty t, ctxt) ->
-        option_key loc t >|? fun ty -> (Ex_comparable_ty ty, ctxt)
+        comparable_option_t loc t >|? fun ty -> (Ex_comparable_ty ty, ctxt)
     | Prim (loc, T_option, l, _) ->
         error (Invalid_arity (loc, T_option, 1, List.length l))
     | Prim
@@ -2048,7 +2045,7 @@ let parse_uint11 = parse_uint ~nb_bits:11
 (* This type is used to:
    - serialize and deserialize tickets when they are stored or transferred,
    - type the READ_TICKET instruction. *)
-let opened_ticket_type loc ty = pair_3_key loc address_key ty nat_key
+let opened_ticket_type loc ty = comparable_pair_3_t loc address_t ty nat_t
 
 (* -- parse data of primitive types -- *)
 
@@ -5192,7 +5189,7 @@ and parse_toplevel :
             let allowed = [K_parameter; K_storage; K_code; K_view] in
             error (Invalid_primitive (loc, allowed, name))
       in
-      find_fields ctxt None None None (Script_map.empty string_key) fields
+      find_fields ctxt None None None (Script_map.empty string_t) fields
       >>? fun (ctxt, toplevel) ->
       match toplevel with
       | (None, _, _, _) -> error (Missing_field K_parameter)

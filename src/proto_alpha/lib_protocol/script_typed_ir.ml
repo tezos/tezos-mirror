@@ -1842,55 +1842,29 @@ type 'v ty_ex_c = Ty_ex_c : ('v, _) ty -> 'v ty_ex_c [@@ocaml.unboxed]
 
 let unit_t = Unit_t
 
-let unit_key = unit_t
-
 let int_t = Int_t
-
-let int_key = int_t
 
 let nat_t = Nat_t
 
-let nat_key = nat_t
-
 let signature_t = Signature_t
-
-let signature_key = signature_t
 
 let string_t = String_t
 
-let string_key = string_t
-
 let bytes_t = Bytes_t
-
-let bytes_key = bytes_t
 
 let mutez_t = Mutez_t
 
-let mutez_key = mutez_t
-
 let key_hash_t = Key_hash_t
-
-let key_hash_key = key_hash_t
 
 let key_t = Key_t
 
-let key_key = key_t
-
 let timestamp_t = Timestamp_t
-
-let timestamp_key = timestamp_t
 
 let address_t = Address_t
 
-let address_key = address_t
-
 let bool_t = Bool_t
 
-let bool_key = bool_t
-
 let tx_rollup_l2_address_t = Tx_rollup_l2_address_t
-
-let tx_rollup_l2_address_key = tx_rollup_l2_address_t
 
 let pair_t :
     type a ac b bc.
@@ -1901,11 +1875,12 @@ let pair_t :
   let (Ex_dand cmp) = dand (is_comparable l) (is_comparable r) in
   Ty_ex_c (Pair_t (l, r, {size}, cmp))
 
-let pair_key loc l r =
+let comparable_pair_t loc l r =
   Type_size.compound2 loc (ty_size l) (ty_size r) >|? fun size ->
   Pair_t (l, r, {size}, YesYes)
 
-let pair_3_key loc l m r = pair_key loc m r >>? fun r -> pair_key loc l r
+let comparable_pair_3_t loc l m r =
+  comparable_pair_t loc m r >>? fun r -> comparable_pair_t loc l r
 
 let union_t :
     type a ac b bc.
@@ -1919,7 +1894,7 @@ let union_t :
 let union_bytes_bool_t =
   Union_t (bytes_t, bool_t, {size = Type_size.three}, YesYes)
 
-let union_key loc l r =
+let comparable_union_t loc l r =
   Type_size.compound2 loc (ty_size l) (ty_size r) >|? fun size ->
   Union_t (l, r, {size}, YesYes)
 
@@ -1964,7 +1939,7 @@ let option_pair_int_nat_t =
       {size = Type_size.four},
       Yes )
 
-let option_key loc t =
+let comparable_option_t loc t =
   Type_size.compound1 loc (ty_size t) >|? fun size -> Option_t (t, {size}, Yes)
 
 let list_t loc t =
@@ -1999,11 +1974,7 @@ let sapling_state_t ~memo_size = Sapling_state_t memo_size
 
 let chain_id_t = Chain_id_t
 
-let chain_id_key = chain_id_t
-
 let never_t = Never_t
-
-let never_key = never_t
 
 let bls12_381_g1_t = Bls12_381_g1_t
 

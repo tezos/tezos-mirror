@@ -318,20 +318,20 @@ end)
         (cmp_tn : 'a comparable_and_atomic) :
         Script_ir_translator.ex_comparable_ty =
       match cmp_tn with
-      | `TString -> Ex_comparable_ty string_key
-      | `TNat -> Ex_comparable_ty nat_key
-      | `TBytes -> Ex_comparable_ty bytes_key
-      | `TBool -> Ex_comparable_ty bool_key
-      | `TAddress -> Ex_comparable_ty address_key
-      | `TTx_rollup_l2_address -> Ex_comparable_ty tx_rollup_l2_address_key
-      | `TTimestamp -> Ex_comparable_ty timestamp_key
-      | `TKey_hash -> Ex_comparable_ty key_hash_key
-      | `TMutez -> Ex_comparable_ty mutez_key
-      | `TInt -> Ex_comparable_ty int_key
-      | `TUnit -> Ex_comparable_ty unit_key
-      | `TSignature -> Ex_comparable_ty signature_key
-      | `TKey -> Ex_comparable_ty key_key
-      | `TChain_id -> Ex_comparable_ty chain_id_key
+      | `TString -> Ex_comparable_ty string_t
+      | `TNat -> Ex_comparable_ty nat_t
+      | `TBytes -> Ex_comparable_ty bytes_t
+      | `TBool -> Ex_comparable_ty bool_t
+      | `TAddress -> Ex_comparable_ty address_t
+      | `TTx_rollup_l2_address -> Ex_comparable_ty tx_rollup_l2_address_t
+      | `TTimestamp -> Ex_comparable_ty timestamp_t
+      | `TKey_hash -> Ex_comparable_ty key_hash_t
+      | `TMutez -> Ex_comparable_ty mutez_t
+      | `TInt -> Ex_comparable_ty int_t
+      | `TUnit -> Ex_comparable_ty unit_t
+      | `TSignature -> Ex_comparable_ty signature_t
+      | `TKey -> Ex_comparable_ty key_t
+      | `TChain_id -> Ex_comparable_ty chain_id_t
 
     let rec m_type ~size : Script_ir_translator.ex_ty sampler =
       let open Script_ir_translator in
@@ -443,7 +443,7 @@ end)
       let option_case size =
         let size = size - 1 in
         let* (Ex_comparable_ty t) = m_comparable_type ~size in
-        match option_key (-1) t with
+        match comparable_option_t (-1) t with
         | Error _ -> (* what should be done here? *) assert false
         | Ok res_ty -> return @@ Ex_comparable_ty res_ty
       in
@@ -455,7 +455,7 @@ end)
         let size_right = size - size_left in
         let* (Ex_comparable_ty l) = m_comparable_type ~size:size_left in
         let* (Ex_comparable_ty r) = m_comparable_type ~size:size_right in
-        match pair_key (-1) l r with
+        match comparable_pair_t (-1) l r with
         | Error _ -> assert false
         | Ok res_ty -> return @@ Ex_comparable_ty res_ty
       in
@@ -467,7 +467,7 @@ end)
         let size_right = size - size_left in
         let* (Ex_comparable_ty l) = m_comparable_type ~size:size_left in
         let* (Ex_comparable_ty r) = m_comparable_type ~size:size_right in
-        match union_key (-1) l r with
+        match comparable_union_t (-1) l r with
         | Error _ -> assert false
         | Ok res_ty -> return @@ Ex_comparable_ty res_ty
       in

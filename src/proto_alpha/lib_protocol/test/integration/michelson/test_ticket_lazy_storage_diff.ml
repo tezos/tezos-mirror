@@ -112,7 +112,7 @@ let updates_of_key_values ctxt key_values =
         wrap
           (Script_ir_translator.hash_comparable_data
              ctxt
-             Script_typed_ir.int_key
+             Script_typed_ir.int_t
              (Script_int.of_int key))
       in
       return

@@ -491,7 +491,7 @@ module Nat_ticket = struct
       @@ Script_int.(of_int contents_nat |> is_nat)
     in
     Ticket_token.Ex_token
-      {ticketer; contents_type = Script_typed_ir.nat_key; contents}
+      {ticketer; contents_type = Script_typed_ir.nat_t; contents}
 
   let contents = Expr.from_string (string_of_int contents_nat)
 
