@@ -170,7 +170,7 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
   let list ctxt ?offset ?length key =
     Tree.list ctxt.tree ?offset ?length (data_key key)
 
-  let length ctxt key = Tree.length ctxt.tree key
+  let length ctxt key = Tree.length ctxt.tree (data_key key)
 
   let find ctxt key = Tree.find ctxt.tree (data_key key)
 
