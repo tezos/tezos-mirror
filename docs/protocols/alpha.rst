@@ -12,6 +12,11 @@ to Protocol J.
 
 .. contents::
 
+Smart Contract Optimistic Rollups
+---------------------------------
+
+Rollups supporting execution of smart contracts. (MRs :gl:`!4933`, :gl:`!4812`)
+
 Breaking Changes
 ----------------
 
@@ -28,3 +33,12 @@ Internal
 --------
 
 - Make carbonated maps available to the Raw context (MRs :gl:`!4815`, `!4891`)
+
+- Move Michelson representation modules above the Alpha_context abstraction
+  barrier. (MR :gl:`!4418`)
+
+- Further cleanup on Tenderbake code. (MR :gl:`!4513`)
+
+- Add Raw_carbonated_map. (MR :gl:`!4815`)
+
+- Other internal refactorings or documentation. (MRs :gl:`!4890`, :gl:`!4721`)
