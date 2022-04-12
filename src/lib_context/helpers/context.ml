@@ -199,6 +199,11 @@ module Make_tree (Conf : Conf) (Store : DB) = struct
     in
     Store.Tree.shallow repo kinded_hash
 
+  let kinded_key t =
+    match Store.Tree.key t with
+    | (None | Some (`Node _)) as r -> r
+    | Some (`Contents (v, ())) -> Some (`Value v)
+
   let is_shallow tree =
     match Store.Tree.inspect tree with
     | `Node `Key -> true

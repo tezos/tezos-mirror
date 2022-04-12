@@ -72,6 +72,8 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) : sig
     Does not fail when the context is not in read-only mode. *)
   val sync : index -> unit Lwt.t
 
+  val flush : t -> t Lwt.t
+
   val compute_testchain_chain_id : Block_hash.t -> Chain_id.t
 
   val compute_testchain_genesis : Block_hash.t -> Block_hash.t
