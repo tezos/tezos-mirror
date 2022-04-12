@@ -29,17 +29,17 @@ Node
   Transaction Optimistic Rollups, Tickets Hardening and Liquidity Baking Toggle.
 
 - **Breaking change**:
-  restored the encoding of events corresponding to "completed
+  Restored the encoding of events corresponding to "completed
   requests" (block validation, head switch, ...) to pre v11. They only
-  contains absolute timestamp.
+  contain absolute timestamps.
 
 - Add optional query parameters ``applied``, ``refused``, ``outdated``,
   ``branch_refused``, and ``branch_delayed`` to RPC
   ``GET /chains/main/mempool/pending_operations``.
-  These new parameters indicate the classifications for which the RPC should
-  or shouldn't return the corresponding operations. If no option is given, all
+  These new parameters filter the operations returned based on their
+  classifications. If no option is given, all
   the parameters are assumed to be ``true``, making this extension
-  backward-compatible (i.e. and all operations are returned).
+  backward-compatible (i.e. all operations are returned).
 
 - Added optional parameter ``--media-type`` and its corresponding field
   in the configuration file. It defines which format of data serialisation
@@ -52,8 +52,8 @@ Node
 - Adds ``tezos-node storage head-commmit`` command to print the current
   context head commit hash to stdout.
 
-- Added a check to ensure the consistency between the imported
-  snapshot history mode and the one stored in the targeted data
+- Added a history mode check when importing a snapshot to ensure the consistency between the
+  history mode of the snapshot and the one stored in the targeted data
   directory configuration file.
 
 - Fixed a wrong behavior that could cause the savepoint to be dragged
@@ -64,9 +64,11 @@ Node
   the node changed his head.
 
 - The node context storage format was upgraded. To this end, a new storage
-  version was introduced: 0.0.8 (previously 0.0.7). Upgrading from 0.0.7 to
+  version was introduced: 0.0.8 (previously 0.0.7). Backward compatibility is
+  preserved: upgrading from 0.0.7 to
   0.0.8 is done automatically by the node the first time you run it. This
-  upgrade is instantaneous. However, be careful that previous versions of Octez
+  upgrade is instantaneous. However, be careful that there is no forward
+  compatibility: previous versions of Octez
   will refuse to run on a data directory which was used with Octez 13.0.
 
 - Validation errors are flatter. Instead of the ``economic_protocol_error``
@@ -101,13 +103,12 @@ Client
 - A new ``--self-address`` option was added to the ``run script``
   command. It makes the given address be considered the address of
   the contract being run. The address must actually exist in the
-  context. If ``--balance`` wasn't specified, the script also
+  context. Unless ``--balance`` is specified, the script also
   inherits the given contract's balance.
 
 - Storage and input parameters given to the ``run script`` command
-  can now be read from a file just like the script itself can.
-  Also like with script, the ``file:`` prefix can be added for
-  disambiguation.
+  can now be read from a file just like the script itself.
+  The ``file:`` prefix can be added for disambiguation, like for a script.
 
 - Add option ``--force`` to the command ``submit ballots``. This is
   mostly for testing purposes: it disables all checks and allows to
