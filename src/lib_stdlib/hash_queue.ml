@@ -99,5 +99,11 @@ struct
 
   let peek_at_most q n = oldest_elements q n (fun _ _ _ -> ())
 
-  let take_at_most q n = oldest_elements q n (fun k _ q -> remove q k)
+  let take_at_most q n =
+    (* Removing the keys during the fold does not work, accumulating the keys
+       then removing them does the trick. *)
+    let keys = ref [] in
+    let values = oldest_elements q n (fun k _ _ -> keys := k :: !keys) in
+    List.iter (remove q) !keys ;
+    values
 end
