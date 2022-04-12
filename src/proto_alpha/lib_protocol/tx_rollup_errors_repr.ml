@@ -48,6 +48,7 @@ type error +=
   | Bond_in_use of Signature.public_key_hash
   | No_commitment_to_finalize
   | No_commitment_to_remove
+  | Remove_commitment_too_early
   | Commitment_does_not_exist of Tx_rollup_level_repr.t
   | Wrong_predecessor_hash of {
       provided : Tx_rollup_commitment_repr.Hash.t option;
@@ -300,6 +301,15 @@ let () =
     empty
     (function No_commitment_to_remove -> Some () | _ -> None)
     (fun () -> No_commitment_to_remove) ;
+  (* Remove_commitment_too_early *)
+  register_error_kind
+    `Temporary
+    ~id:"tx_rollup_remove_commitment_too_early"
+    ~title:"It's too early to try to remove a commitment"
+    ~description:"It's too early to try to remove the oldest final commitment"
+    empty
+    (function Remove_commitment_too_early -> Some () | _ -> None)
+    (fun () -> Remove_commitment_too_early) ;
   (* Commitment_does_not_exist *)
   register_error_kind
     `Temporary

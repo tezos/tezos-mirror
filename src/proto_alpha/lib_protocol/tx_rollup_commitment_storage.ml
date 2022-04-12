@@ -136,7 +136,6 @@ let get :
  fun ctxt tx_rollup state level ->
   find ctxt tx_rollup state level >>=? fun (ctxt, commitment) ->
   match commitment with
-  (* TODO: why not use directly `.get` and get the default error for a missing key ? *)
   | None -> fail @@ Tx_rollup_errors_repr.Commitment_does_not_exist level
   | Some commitment -> return (ctxt, commitment)
 
@@ -315,8 +314,7 @@ let remove_commitment ctxt rollup state =
           let current_level = (Raw_context.current_level ctxt).level in
           fail_when
             Raw_level_repr.(current_level < add finalized_at withdraw_period)
-            (* FIXME dedicated error *)
-            No_commitment_to_remove
+            Remove_commitment_too_early
       | None ->
           (* unreachable code if the implementation is correct *)
           fail (Internal_error "Missing finalized_at field"))

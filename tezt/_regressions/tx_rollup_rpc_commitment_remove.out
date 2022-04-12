@@ -169,8 +169,10 @@ This simulation failed:
       This operation FAILED.
 
 Error:
-  { "id": "proto.alpha.tx_rollup_no_commitment_to_remove",
-  "description": "There is no commitment to remove", "data": {} }
+  { "id": "proto.alpha.tx_rollup_remove_commitment_too_early",
+  "description":
+    "It's too early to try to remove the oldest final commitment",
+  "data": {} }
 
 ./tezos-client rpc get '/chains/main/blocks/head/context/tx_rollup/[TX_ROLLUP_HASH]/state'
 { "last_removed_commitment_hashes": null,
