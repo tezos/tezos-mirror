@@ -474,7 +474,7 @@ module Infer_cmd = struct
     let override_arg =
       let override_file_param =
         Clic.parameter (fun (_ : unit) parsed ->
-            let files = String.split ',' parsed in
+            let files = String.split_no_empty ',' parsed in
             Lwt.return_ok files)
       in
       Clic.arg

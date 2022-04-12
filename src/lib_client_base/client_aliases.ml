@@ -31,7 +31,7 @@ let rec try_alternatives input = function
 
 let parse_alternatives alts input =
   match String.split ~limit:1 ':' input with
-  | [] | [_] -> try_alternatives input alts
+  | [_] -> try_alternatives input alts
   | [format; value] -> (
       match List.assoc_opt ~equal:String.equal format alts with
       | Some f -> f value
@@ -345,7 +345,7 @@ module Alias (Entity : Entity) = struct
   let aliases_parameter () =
     let open Lwt_tzresult_syntax in
     parameter ~autocomplete (fun cctxt s ->
-        String.split ',' s
+        String.split_no_empty ',' s
         |> List.map_es (fun s ->
                let* pkh = find cctxt s in
                return (s, pkh)))

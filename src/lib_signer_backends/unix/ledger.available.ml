@@ -429,7 +429,7 @@ module Ledger_uri = struct
             x
 
   let parse_animals animals =
-    match String.split '-' animals with
+    match String.split_no_empty '-' animals with
     | [c; t; h; d] -> Some {Ledger_names.c; t; h; d}
     | _ -> None
 
@@ -450,7 +450,7 @@ module Ledger_uri = struct
           | Some animals -> return (Ledger_id.Animals animals)
           | None -> failwith "Cannot parse host of URI: %s" (Uri.to_string uri))
     in
-    let components = String.split '/' (Uri.path uri) in
+    let components = String.split_no_empty '/' (Uri.path uri) in
     match components with
     | s :: tl ->
         let (curve, more_path) =
