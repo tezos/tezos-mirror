@@ -12,3 +12,8 @@ dnf install -y tezos-client
 dnf install -y tezos-node
 dnf install -y tezos-baker-012-Psithaca
 dnf install -y tezos-accuser-012-Psithaca
+# [test executables]
+tezos-client --version
+tezos-node --version
+tezos-baker-012-Psithaca --version
+tezos-accuser-012-Psithaca --version

@@ -14,3 +14,8 @@ sudo apt-get install -y tezos-client
 sudo apt-get install -y tezos-node
 sudo apt-get install -y tezos-baker-012-psithaca
 sudo apt-get install -y tezos-accuser-012-psithaca
+# [test executables]
+tezos-client --version
+tezos-node --version
+tezos-baker-012-Psithaca --version
+tezos-accuser-012-Psithaca --version

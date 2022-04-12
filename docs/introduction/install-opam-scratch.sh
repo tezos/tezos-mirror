@@ -34,3 +34,5 @@ eval $(opam env)
 opam depext tezos
 # [install tezos]
 opam install -y tezos
+# [test executables]
+tezos-client --version

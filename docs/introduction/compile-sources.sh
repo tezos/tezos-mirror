@@ -33,9 +33,11 @@ make build-deps
 eval $(opam env)
 make
 # [optional setup]
-export PATH=~/tezos:$PATH
+export PATH=$HOME/tezos:$PATH
 # if using bash: source ./src/bin_client/bash-completion.sh
 export TEZOS_CLIENT_UNSAFE_DISABLE_DISCLAIMER=Y
-# [test executable]
-./tezos-client
-./tezos-node config --help
+# [test executables]
+tezos-client --version
+tezos-node --version
+tezos-baker-alpha --version
+tezos-accuser-alpha --version
