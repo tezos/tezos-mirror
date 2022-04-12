@@ -30,7 +30,7 @@ def setup(app):
             parts = re.match("^([^/]*)[.]opam$", file)
             if parts:
                 name = parts.group(1)
-                OPAM_CACHE[name] = path
+                OPAM_CACHE[name] = path.lstrip('../')
     print("package_role: cached", len(OPAM_CACHE), "opam packages")
     return {'parallel_read_safe': True}
 
@@ -77,7 +77,7 @@ def package_role(
             )
         ):
             lib = lib + '/' + lib.replace('-', '_').capitalize()
-        url = "api/api-inline.html#" + lib + '/index.html'
+        url = "api/odoc/_html/" + lib + '/index.html'
         for _ in range(1, rel_lvl):
             url = '../' + url
     else:
