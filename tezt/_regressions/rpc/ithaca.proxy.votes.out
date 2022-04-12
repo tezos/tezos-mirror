@@ -1,0 +1,87 @@
+rpc/ithaca.proxy.votes.out
+
+./tezos-client --mode proxy rpc get /chains/main/blocks/head/votes/ballot_list
+[]
+protocol of proxy unspecified, using the node's protocol: Psithaca2MLRFYargivpo7YvUr7wUDqyxrdhC5CQq78mRvimz6A
+
+./tezos-client --mode proxy rpc get /chains/main/blocks/head/votes/ballots
+{ "yay": 0, "nay": 0, "pass": 0 }
+protocol of proxy unspecified, using the node's protocol: Psithaca2MLRFYargivpo7YvUr7wUDqyxrdhC5CQq78mRvimz6A
+
+./tezos-client --mode proxy rpc get /chains/main/blocks/head/votes/current_period
+{ "voting_period": { "index": 0, "kind": "proposal", "start_position": 0 },
+  "position": 1, "remaining": 2 }
+protocol of proxy unspecified, using the node's protocol: Psithaca2MLRFYargivpo7YvUr7wUDqyxrdhC5CQq78mRvimz6A
+
+./tezos-client --mode proxy rpc get /chains/main/blocks/head/votes/current_proposal
+null
+protocol of proxy unspecified, using the node's protocol: Psithaca2MLRFYargivpo7YvUr7wUDqyxrdhC5CQq78mRvimz6A
+
+./tezos-client --mode proxy rpc get /chains/main/blocks/head/votes/current_quorum
+5500
+protocol of proxy unspecified, using the node's protocol: Psithaca2MLRFYargivpo7YvUr7wUDqyxrdhC5CQq78mRvimz6A
+
+./tezos-client --mode proxy rpc get /chains/main/blocks/head/votes/listings
+[ { "pkh": "[PUBLIC_KEY_HASH]", "rolls": 666 },
+  { "pkh": "[PUBLIC_KEY_HASH]", "rolls": 666 },
+  { "pkh": "[PUBLIC_KEY_HASH]", "rolls": 666 },
+  { "pkh": "[PUBLIC_KEY_HASH]", "rolls": 666 },
+  { "pkh": "[PUBLIC_KEY_HASH]", "rolls": 666 } ]
+protocol of proxy unspecified, using the node's protocol: Psithaca2MLRFYargivpo7YvUr7wUDqyxrdhC5CQq78mRvimz6A
+
+./tezos-client --mode proxy rpc get /chains/main/blocks/head/votes/proposals
+[ [ "ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp", 666 ] ]
+protocol of proxy unspecified, using the node's protocol: Psithaca2MLRFYargivpo7YvUr7wUDqyxrdhC5CQq78mRvimz6A
+
+./tezos-client --mode proxy rpc get /chains/main/blocks/head/votes/successor_period
+{ "voting_period": { "index": 0, "kind": "proposal", "start_position": 0 },
+  "position": 2, "remaining": 1 }
+protocol of proxy unspecified, using the node's protocol: Psithaca2MLRFYargivpo7YvUr7wUDqyxrdhC5CQq78mRvimz6A
+
+./tezos-client --mode proxy rpc get /chains/main/blocks/head/votes/total_voting_power
+3330
+protocol of proxy unspecified, using the node's protocol: Psithaca2MLRFYargivpo7YvUr7wUDqyxrdhC5CQq78mRvimz6A
+
+./tezos-client --mode proxy rpc get /chains/main/blocks/head/votes/ballot_list
+[ { "pkh": "[PUBLIC_KEY_HASH]", "ballot": "nay" },
+  { "pkh": "[PUBLIC_KEY_HASH]", "ballot": "pass" },
+  { "pkh": "[PUBLIC_KEY_HASH]", "ballot": "yay" } ]
+protocol of proxy unspecified, using the node's protocol: Psithaca2MLRFYargivpo7YvUr7wUDqyxrdhC5CQq78mRvimz6A
+
+./tezos-client --mode proxy rpc get /chains/main/blocks/head/votes/ballots
+{ "yay": 666, "nay": 666, "pass": 666 }
+protocol of proxy unspecified, using the node's protocol: Psithaca2MLRFYargivpo7YvUr7wUDqyxrdhC5CQq78mRvimz6A
+
+./tezos-client --mode proxy rpc get /chains/main/blocks/head/votes/current_period
+{ "voting_period": { "index": 1, "kind": "exploration", "start_position": 4 },
+  "position": 0, "remaining": 3 }
+protocol of proxy unspecified, using the node's protocol: Psithaca2MLRFYargivpo7YvUr7wUDqyxrdhC5CQq78mRvimz6A
+
+./tezos-client --mode proxy rpc get /chains/main/blocks/head/votes/current_proposal
+"ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp"
+protocol of proxy unspecified, using the node's protocol: Psithaca2MLRFYargivpo7YvUr7wUDqyxrdhC5CQq78mRvimz6A
+
+./tezos-client --mode proxy rpc get /chains/main/blocks/head/votes/current_quorum
+5500
+protocol of proxy unspecified, using the node's protocol: Psithaca2MLRFYargivpo7YvUr7wUDqyxrdhC5CQq78mRvimz6A
+
+./tezos-client --mode proxy rpc get /chains/main/blocks/head/votes/listings
+[ { "pkh": "[PUBLIC_KEY_HASH]", "rolls": 666 },
+  { "pkh": "[PUBLIC_KEY_HASH]", "rolls": 666 },
+  { "pkh": "[PUBLIC_KEY_HASH]", "rolls": 666 },
+  { "pkh": "[PUBLIC_KEY_HASH]", "rolls": 666 },
+  { "pkh": "[PUBLIC_KEY_HASH]", "rolls": 666 } ]
+protocol of proxy unspecified, using the node's protocol: Psithaca2MLRFYargivpo7YvUr7wUDqyxrdhC5CQq78mRvimz6A
+
+./tezos-client --mode proxy rpc get /chains/main/blocks/head/votes/proposals
+[]
+protocol of proxy unspecified, using the node's protocol: Psithaca2MLRFYargivpo7YvUr7wUDqyxrdhC5CQq78mRvimz6A
+
+./tezos-client --mode proxy rpc get /chains/main/blocks/head/votes/successor_period
+{ "voting_period": { "index": 1, "kind": "exploration", "start_position": 4 },
+  "position": 1, "remaining": 2 }
+protocol of proxy unspecified, using the node's protocol: Psithaca2MLRFYargivpo7YvUr7wUDqyxrdhC5CQq78mRvimz6A
+
+./tezos-client --mode proxy rpc get /chains/main/blocks/head/votes/total_voting_power
+3330
+protocol of proxy unspecified, using the node's protocol: Psithaca2MLRFYargivpo7YvUr7wUDqyxrdhC5CQq78mRvimz6A
