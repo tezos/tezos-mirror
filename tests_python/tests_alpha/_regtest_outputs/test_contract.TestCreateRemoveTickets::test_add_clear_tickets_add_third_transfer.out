@@ -1,0 +1,39 @@
+tests_alpha/test_contract.py::TestCreateRemoveTickets::test_add_clear_tickets_add_third_transfer
+
+Node is bootstrapped.
+Estimated gas: 2333.061 units (will add 100 for safety)
+Estimated storage: 105 bytes added (will add 20 for safety)
+Operation successfully injected in the node.
+Operation hash is '[BLOCK_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  tezos-client wait for [BLOCK_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [CONTRACT_HASH]
+    Fee to the baker: ꜩ0.000511
+    Expected counter: [EXPECTED_COUNTER]
+    Gas limit: 2434
+    Storage limit: 125 bytes
+    Balance updates:
+      [CONTRACT_HASH] ... -ꜩ0.000511
+      payload fees(the block proposer) ....... +ꜩ0.000511
+    Transaction:
+      Amount: ꜩ0
+      From: [CONTRACT_HASH]
+      To: [CONTRACT_HASH]
+      Entrypoint: add
+      Parameter: (Pair 1 "C")
+      This transaction was successfully applied
+      Updated storage:
+        { Pair 0x0134d794a355dbb7027075d278a68494e91c6709ed00 (Pair "C" 1) ;
+          Pair 0x0134d794a355dbb7027075d278a68494e91c6709ed00 (Pair "B" 1) }
+      Storage size: 193 bytes
+      Paid storage size diff: 105 bytes
+      Consumed gas: 2333.061
+      Balance updates:
+        [CONTRACT_HASH] ... -ꜩ0.02625
+        storage fees ........................... +ꜩ0.02625
+
+Injected block at minimal timestamp

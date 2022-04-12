@@ -1,0 +1,33 @@
+tests_alpha/test_contract.py::TestTypecheck::test_typecheck[mini_scenarios/add_clear_tickets.tz]
+
+Well typed
+Gas remaining: 1039990.715 units remaining
+{ parameter (or (pair %add nat string) (unit %clear)) ;
+  storage (list (ticket string)) ;
+  code { UNPAIR
+         /* [ or (pair nat string) unit : list (ticket string) ] */ ;
+         IF_LEFT
+           { UNPAIR
+             /* [ nat : string : list (ticket string) ] */ ;
+             DIG 2
+             /* [ list (ticket string) : nat : string ] */ ;
+             SWAP
+             /* [ nat : list (ticket string) : string ] */ ;
+             DIG 2
+             /* [ string : nat : list (ticket string) ] */ ;
+             TICKET
+             /* [ ticket string : list (ticket string) ] */ ;
+             CONS
+             /* [ list (ticket string) ] */ ;
+             NIL operation
+             /* [ list operation : list (ticket string) ] */ ;
+             PAIR
+             /* [ pair (list operation) (list (ticket string)) ] */ }
+           { DROP 2
+             /* [] */ ;
+             NIL (ticket string)
+             /* [ list (ticket string) ] */ ;
+             NIL operation
+             /* [ list operation : list (ticket string) ] */ ;
+             PAIR
+             /* [ pair (list operation) (list (ticket string)) ] */ } } }

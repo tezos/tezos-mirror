@@ -1574,6 +1574,8 @@ module Contract : sig
   module Internal_for_tests : sig
     (** see [Contract_repr.originated_contract] for documentation *)
     val originated_contract : Origination_nonce.Internal_for_tests.t -> contract
+
+    val paid_storage_space : context -> t -> Z.t tzresult Lwt.t
   end
 end
 
@@ -3406,6 +3408,12 @@ module Ticket_balance : sig
 
   val get_balance :
     context -> Ticket_hash.t -> (Z.t option * context) tzresult Lwt.t
+
+  module Internal_for_tests : sig
+    val used_storage_space : context -> Z.t tzresult Lwt.t
+
+    val paid_storage_space : context -> Z.t tzresult Lwt.t
+  end
 end
 
 module First_level_of_protocol : sig
