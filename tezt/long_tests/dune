@@ -15,6 +15,7 @@
  (flags (:standard
           -open Tezt
           -open Tezt_tezos
+          -open Tezt_tezos.Runnable.Syntax
           -open Tezt.Base
           -open Tezt_performance_regression
           -open Tezos_lwt_result_stdlib

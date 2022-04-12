@@ -8,4 +8,9 @@
             tezos-stdlib-unix
             tezos-protocol-alpha
             tezos-protocol-010-PtGRANAD)
- (flags (:standard -open Tezt -open Tezt_tezos -open Tezt.Base)))
+ (flags
+  (:standard
+   -open Tezt
+   -open Tezt_tezos
+   -open Tezt_tezos.Runnable.Syntax
+   -open Tezt.Base)))

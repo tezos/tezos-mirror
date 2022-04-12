@@ -67,14 +67,14 @@ module Tx_rollup : sig
   val make_batch : string -> message
 
   val get_state :
-    ?hooks:Process.hooks -> rollup:string -> Client.t -> state Process.runnable
+    ?hooks:Process.hooks -> rollup:string -> Client.t -> state Runnable.process
 
   val get_inbox :
     ?hooks:Process.hooks ->
     rollup:string ->
     level:int ->
     Client.t ->
-    inbox option Process.runnable
+    inbox option Runnable.process
 
   val get_commitment :
     ?hooks:Process.hooks ->
@@ -82,7 +82,7 @@ module Tx_rollup : sig
     rollup:string ->
     level:int ->
     Client.t ->
-    submitted_commitment option Process.runnable
+    submitted_commitment option Runnable.process
 
   val get_pending_bonded_commitments :
     ?hooks:Process.hooks ->
@@ -90,52 +90,52 @@ module Tx_rollup : sig
     rollup:string ->
     pkh:string ->
     Client.t ->
-    JSON.t Process.runnable
+    JSON.t Runnable.process
 
   val message_hash :
     ?hooks:Process.hooks ->
     message:message ->
     Client.t ->
-    [> `Hash of string] Process.runnable
+    [> `Hash of string] Runnable.process
 
   val inbox_merkle_tree_hash :
     ?hooks:Process.hooks ->
     message_hashes:[`Hash of string] list ->
     Client.t ->
-    [> `Hash of string] Process.runnable
+    [> `Hash of string] Runnable.process
 
   val inbox_merkle_tree_path :
     ?hooks:Process.hooks ->
     message_hashes:[`Hash of string] list ->
     position:int ->
     Client.t ->
-    JSON.t Process.runnable
+    JSON.t Runnable.process
 
   val commitment_merkle_tree_hash :
     ?hooks:Process.hooks ->
     message_result_hashes:[`Hash of string] list ->
     Client.t ->
-    [> `Hash of string] Process.runnable
+    [> `Hash of string] Runnable.process
 
   val commitment_merkle_tree_path :
     ?hooks:Process.hooks ->
     message_result_hashes:[`Hash of string] list ->
     position:int ->
     Client.t ->
-    JSON.t Process.runnable
+    JSON.t Runnable.process
 
   val withdraw_list_hash :
     ?hooks:Process.hooks ->
     withdrawals:string list ->
     Client.t ->
-    string Process.runnable
+    string Runnable.process
 
   val message_result_hash :
     ?hooks:Process.hooks ->
     context_hash:string ->
     withdraw_list_hash:string ->
     Client.t ->
-    string Process.runnable
+    string Runnable.process
 
   val compute_inbox_from_messages :
     ?hooks:Process.hooks -> message list -> Client.t -> inbox Lwt.t

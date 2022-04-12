@@ -209,7 +209,7 @@ module Spawn : sig
     meth ->
     path ->
     t ->
-    JSON.t Process.runnable
+    JSON.t Runnable.process
 end
 
 (** Run [tezos-client rpc list]. *)
@@ -568,7 +568,7 @@ val set_delegate :
   src:string ->
   delegate:string ->
   t ->
-  unit Process.runnable
+  unit Runnable.process
 
 (** Run [tezos-client reveal key for <src>]. *)
 val reveal :
@@ -579,7 +579,7 @@ val reveal :
   ?force_low_fee:bool ->
   src:string ->
   t ->
-  unit Process.runnable
+  unit Runnable.process
 
 (** Run [tezos-client withdraw delegate from <src>]. *)
 val withdraw_delegate :
@@ -961,7 +961,7 @@ module Tx_rollup : sig
     ?hooks:Process.hooks ->
     src:string ->
     t ->
-    string Process.runnable
+    string Runnable.process
 
   (** Run [tezos-client submit tx rollup batch <batch_content> to <tx_rollup> from <src>]. *)
   val submit_batch :
@@ -973,7 +973,7 @@ module Tx_rollup : sig
     rollup:string ->
     src:string ->
     t ->
-    unit Process.runnable
+    unit Runnable.process
 
   (** Run [tezos-client submit tx rollup commitment <content> to <tx_rollup> from <src>]. *)
   val submit_commitment :
@@ -988,7 +988,7 @@ module Tx_rollup : sig
     rollup:string ->
     src:string ->
     t ->
-    unit Process.runnable
+    unit Runnable.process
 
   (** Run [tezos-client submit tx rollup finalize commitment to <tx_rollup> from <src>]. *)
   val submit_finalize_commitment :
@@ -999,7 +999,7 @@ module Tx_rollup : sig
     rollup:string ->
     src:string ->
     t ->
-    unit Process.runnable
+    unit Runnable.process
 
   (** Run [tezos-client submit tx rollup remove commitment to <tx_rollup> from <src>]. *)
   val submit_remove_commitment :
@@ -1010,7 +1010,7 @@ module Tx_rollup : sig
     rollup:string ->
     src:string ->
     t ->
-    unit Process.runnable
+    unit Runnable.process
 
   (** Run [tezos-client submit tx rollup rejection commitment at level
      <level> message <message> at <position> with <proof> with agreed
@@ -1034,7 +1034,7 @@ module Tx_rollup : sig
     rollup:string ->
     src:string ->
     t ->
-    unit Process.runnable
+    unit Runnable.process
 
   (** Run [tezos-client submit tx rollup return bond to <tx_rollup> from <src>]. *)
   val submit_return_bond :
@@ -1045,7 +1045,7 @@ module Tx_rollup : sig
     rollup:string ->
     src:string ->
     t ->
-    unit Process.runnable
+    unit Runnable.process
 end
 
 (** Run [tezos-client show voting period] and return the period name. *)
