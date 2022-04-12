@@ -370,6 +370,7 @@ let _tezos_stdlib_tests =
       "test_tzString";
       "test_fallbackArray";
       "test_functionalArray";
+      "test_hash_queue";
     ]
     ~path:"src/lib_stdlib/test"
     ~opam:"src/lib_stdlib/tezos-stdlib"
@@ -386,7 +387,12 @@ let _tezos_stdlib_tests =
 
 let _tezos_stdlib_unix_tests =
   tests
-    ["test_lwt_pipe"; "test_circular_buffer"; "test_circular_buffer_fuzzy"]
+    [
+      "test_lwt_pipe";
+      "test_circular_buffer";
+      "test_circular_buffer_fuzzy";
+      "test_hash_queue_lwt";
+    ]
     ~path:"src/lib_stdlib/test-unix"
     ~opam:"src/lib_stdlib/tezos-stdlib"
     ~deps:
