@@ -122,6 +122,9 @@ Protocol Compiler And Environment
 Codec
 -----
 
+- Added command ``slice`` which splits a binary, hex-encoded blob into its
+  different constituents. This command is useful to understand what a binary message means.
+
 Docker Images
 -------------
 
