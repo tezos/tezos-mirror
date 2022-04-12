@@ -21,6 +21,7 @@ module Circular_buffer = Circular_buffer
 module Compare = Compare
 module FallbackArray = FallbackArray
 module FunctionalArray = FunctionalArray
+module Hash_queue = Hash_queue
 module Hex = TzHex
 module Lwt_dropbox = Lwt_dropbox
 module Lwt_idle_waiter = Lwt_idle_waiter

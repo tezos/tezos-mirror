@@ -27,7 +27,7 @@ module RingoMaker : Ringo.MAP_MAKER =
 (val Ringo.(map_maker ~replacement:FIFO ~overflow:Strong ~accounting:Precise))
 
 module Make
-    (K : Stdlib.Hashtbl.HashedType) (V : sig
+    (K : Hashtbl.HashedType) (V : sig
       type t
     end) =
 struct
@@ -62,16 +62,16 @@ struct
   let fold f q acc = Ring.fold_oldest_first f q acc
 
   let fold_s f q acc =
-    let open Lwt_syntax in
+    let open Lwt.Syntax in
     fold
       (fun k v acc ->
         let* acc = acc in
         f k v acc)
       q
-      (return acc)
+      (Lwt.return acc)
 
   let fold_es (type error) f q acc : (_, error) result Lwt.t =
-    let open Lwt_syntax in
+    let open Lwt.Syntax in
     let exception Error of error in
     try
       let+ res =
@@ -83,7 +83,7 @@ struct
           acc
       in
       Ok res
-    with Error e -> return_error e
+    with Error e -> Lwt.return_error e
 
   let peek q =
     match oldest_elements q 1 (fun _ _ _ -> ()) with

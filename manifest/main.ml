@@ -356,7 +356,7 @@ let tezos_stdlib =
     "tezos-stdlib"
     ~path:"src/lib_stdlib"
     ~synopsis:"Tezos: yet-another local-extension of the OCaml standard library"
-    ~deps:[hex; zarith; zarith_stubs_js; lwt]
+    ~deps:[hex; zarith; zarith_stubs_js; lwt; ringo]
     ~ocaml:V.(at_least "4.08")
     ~js_compatible:true
     ~inline_tests:ppx_inline_test

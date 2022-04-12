@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 module Make
-    (K : Stdlib.Hashtbl.HashedType) (V : sig
+    (K : Hashtbl.HashedType) (V : sig
       type t
     end) : sig
   (** The type of hash queues holding bindings from [K.t] to [V.t] *)
