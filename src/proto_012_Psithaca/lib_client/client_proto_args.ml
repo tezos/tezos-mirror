@@ -147,15 +147,13 @@ let data_parameter =
     Lwt.return @@ Tezos_micheline.Micheline_parser.no_parsing_error
     @@ Michelson_v1_parser.parse_expression input
   in
-  parameter (fun _ctxt ->
+  parameter (fun (cctxt : #Client_context.full) ->
       Client_aliases.parse_alternatives
         [
           ( "file",
             fun filename ->
               let open Lwt_result_syntax in
-              let* input =
-                catch_s (fun () -> Lwt_utils_unix.read_file filename)
-              in
+              let* input = catch_es (fun () -> cctxt#read_file filename) in
               parse input );
           ("text", parse);
         ])

@@ -20,7 +20,6 @@ depends: [
   "tezos-protocol-plugin-013-PtJakart"
   "tezos-protocol-013-PtJakart-parameters"
   "tezos-rpc"
-  "tezos-stdlib-unix"
   "tezos-micheline" {with-test}
   "tezos-base-test-helpers" {with-test}
   "tezos-test-helpers" {with-test}

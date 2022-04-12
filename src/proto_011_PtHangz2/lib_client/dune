@@ -15,8 +15,7 @@
   tezos-signer-backends
   tezos-protocol-plugin-011-PtHangz2
   tezos-protocol-011-PtHangz2-parameters
-  tezos-rpc
-  tezos-stdlib-unix)
+  tezos-rpc)
  (inline_tests (flags -verbose) (modes native))
  (preprocess (pps ppx_inline_test))
  (library_flags (:standard -linkall))
@@ -29,5 +28,4 @@
    -open Tezos_protocol_011_PtHangz2
    -open Tezos_protocol_plugin_011_PtHangz2
    -open Tezos_protocol_011_PtHangz2_parameters
-   -open Tezos_rpc
-   -open Tezos_stdlib_unix)))
+   -open Tezos_rpc)))
