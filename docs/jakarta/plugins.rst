@@ -111,7 +111,7 @@ The detailed description of this feature is given in
 fully executed to decide their propagation (see :doc:`../shell/prevalidation`).
 
 
-One operation manager per manager per block
+One manager operation per manager per block
 ...........................................
 
 The mempool filters, ``prefilter``, ``precheck`` and ``postfilter``
