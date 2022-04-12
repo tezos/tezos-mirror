@@ -26,6 +26,23 @@
 
 module Int_set = Set.Make (Compare.Int)
 
+module Sc_rollup_address_comparable = struct
+  include Sc_rollup_repr.Address
+
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/2648
+     Fill in real benchmarked values.
+     Need to create benchmark and fill in values.
+  *)
+  let compare_cost _rollup = Saturation_repr.safe_int 15
+end
+
+(* This will not create the map yet, as functions to consume gas have not 
+   been defined yet. However, it will make the type of the carbonated map 
+   available to be used in the definition of type back.
+*)
+module Sc_rollup_address_map_builder =
+  Carbonated_map.Make_builder (Sc_rollup_address_comparable)
+
 (*
 
    Gas levels maintenance
@@ -229,7 +246,7 @@ type back = {
     Tez_repr.t Signature.Public_key_hash.Map.t option;
   tx_rollup_current_messages :
     Tx_rollup_inbox_repr.Merkle.tree Tx_rollup_repr.Map.t;
-  sc_rollup_current_messages : Context.tree Sc_rollup_repr.Address.Map.t;
+  sc_rollup_current_messages : Context.tree Sc_rollup_address_map_builder.t;
 }
 
 (*
@@ -523,6 +540,19 @@ let gas_consumed ~since ~until =
       Gas_limit_repr.Arith.sub before after
   | (_, _) -> Gas_limit_repr.Arith.zero
 
+(* Once gas consuming functions have been defined, 
+   we can instantiate the carbonated map. 
+   See [Sc_rollup_carbonated_map_maker] above.
+ *)
+
+module Gas = struct
+  type context = t
+
+  let consume = consume_gas
+end
+
+module Sc_rollup_carbonated_map = Sc_rollup_address_map_builder.Make (Gas)
+
 type missing_key_kind = Get | Set | Del | Copy
 
 type storage_error =
@@ -786,7 +816,7 @@ let prepare ~level ~predecessor_timestamp ~timestamp ctxt =
         sampler_state = Cycle_repr.Map.empty;
         stake_distribution_for_current_cycle = None;
         tx_rollup_current_messages = Tx_rollup_repr.Map.empty;
-        sc_rollup_current_messages = Sc_rollup_repr.Address.Map.empty;
+        sc_rollup_current_messages = Sc_rollup_carbonated_map.empty;
       };
   }
 
@@ -1399,16 +1429,24 @@ end
 *)
 module Sc_rollup_in_memory_inbox = struct
   let current_messages ctxt rollup =
-    Sc_rollup_repr.Address.Map.find rollup ctxt.back.sc_rollup_current_messages
-    |> function
-    | None -> Tree.empty ctxt
-    | Some tree -> tree
+    let open Tzresult_syntax in
+    let+ (messages, ctxt) =
+      Sc_rollup_carbonated_map.find
+        ctxt
+        rollup
+        ctxt.back.sc_rollup_current_messages
+    in
+    match messages with
+    | None -> (Tree.empty ctxt, ctxt)
+    | Some tree -> (tree, ctxt)
 
   let set_current_messages ctxt rollup tree =
-    let sc_rollup_current_messages =
-      Sc_rollup_repr.Address.Map.add
+    let open Tzresult_syntax in
+    let+ (sc_rollup_current_messages, ctxt) =
+      Sc_rollup_carbonated_map.update
+        ctxt
         rollup
-        tree
+        (fun ctxt _prev_tree -> return (Some tree, ctxt))
         ctxt.back.sc_rollup_current_messages
     in
     let back = {ctxt.back with sc_rollup_current_messages} in

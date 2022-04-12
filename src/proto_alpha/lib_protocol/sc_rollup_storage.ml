@@ -209,13 +209,6 @@ let () =
     (fun () -> Sc_rollup_bad_inbox_level) ;
   ()
 
-(** To be removed once [Lwt_tzresult_syntax] is in the environment. *)
-module Lwt_tzresult_syntax = struct
-  let ( let* ) = ( >>=? )
-
-  let return = return
-end
-
 module Store = Storage.Sc_rollup
 module Commitment = Sc_rollup_repr.Commitment
 module Commitment_hash = Sc_rollup_repr.Commitment_hash
@@ -283,6 +276,7 @@ let assert_inbox_size_ok ctxt next_size =
     Sc_rollup_max_number_of_available_messages_reached
 
 let add_messages ctxt rollup messages =
+  let open Lwt_tzresult_syntax in
   let open Raw_context in
   inbox ctxt rollup >>=? fun (inbox, ctxt) ->
   let next_size =
@@ -291,19 +285,22 @@ let add_messages ctxt rollup messages =
       (Z.of_int (List.length messages))
   in
   assert_inbox_size_ok ctxt next_size >>=? fun () ->
-  Sc_rollup_in_memory_inbox.current_messages ctxt rollup
-  |> fun current_messages ->
+  let*? (current_messages, ctxt) =
+    Sc_rollup_in_memory_inbox.current_messages ctxt rollup
+  in
   let {Level_repr.level; _} = Raw_context.current_level ctxt in
   (*
       Notice that the protocol is forgetful: it throws away the inbox
       history. On the contrary, the history is stored by the rollup
       node to produce inclusion proofs when needed.
     *)
-  Sc_rollup_inbox_repr.(
-    add_messages_no_history inbox level messages current_messages)
-  >>=? fun (current_messages, inbox) ->
-  Sc_rollup_in_memory_inbox.set_current_messages ctxt rollup current_messages
-  |> fun ctxt ->
+  let* (current_messages, inbox) =
+    Sc_rollup_inbox_repr.(
+      add_messages_no_history inbox level messages current_messages)
+  in
+  let*? ctxt =
+    Sc_rollup_in_memory_inbox.set_current_messages ctxt rollup current_messages
+  in
   Storage.Sc_rollup.Inbox.update ctxt rollup inbox >>=? fun (ctxt, size) ->
   return (inbox, Z.of_int size, ctxt)
 

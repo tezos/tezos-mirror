@@ -26,3 +26,5 @@ Minor Changes
 
 Internal
 --------
+
+- Make carbonated maps available to the Raw context (MRs :gl:`!4815`, `!4891`)
