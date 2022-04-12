@@ -163,7 +163,7 @@ let run_view (cctxt : #Protocol_client_context.rpc_context)
     params
   in
   Chain_services.chain_id cctxt ~chain () >>=? fun chain_id ->
-  Plugin.RPC.Scripts.run_view
+  Plugin.RPC.Scripts.run_tzip4_view
     cctxt
     (chain, block)
     ?gas

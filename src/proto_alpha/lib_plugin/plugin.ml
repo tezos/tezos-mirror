@@ -1434,7 +1434,7 @@ module View_helpers = struct
   (* This script is actually never run, its usage is to ensure a
      contract that has the type `contract <ty>` is originated, which
      will be required as callback of the view. *)
-  let make_viewer_script ty : Script.t =
+  let make_tzip4_viewer_script ty : Script.t =
     let loc = 0 in
     let ty = Micheline.root ty in
     let code =
@@ -1738,7 +1738,7 @@ module RPC = struct
              (req "trace" trace_encoding)
              (opt "lazy_storage_diff" Lazy_storage.encoding))
 
-      let run_view_encoding =
+      let run_tzip4_view_encoding =
         let open Data_encoding in
         obj10
           (req "contract" Contract.encoding)
@@ -1785,14 +1785,15 @@ module RPC = struct
           ~output:trace_code_output_encoding
           RPC_path.(path / "trace_code")
 
-      let run_view =
+      let run_tzip4_view =
         RPC_service.post_service
           ~description:
             "Simulate a call to a view following the TZIP-4 standard. See \
              https://gitlab.com/tzip/tzip/-/blob/master/proposals/tzip-4/tzip-4.md#view-entrypoints."
-          ~input:run_view_encoding
+          ~input:run_tzip4_view_encoding
           ~output:(obj1 (req "data" Script.expr_encoding))
           ~query:RPC_query.empty
+          (* This path should be deprecated in the future *)
           RPC_path.(path / "run_view")
 
       let run_script_view =
@@ -2483,7 +2484,7 @@ module RPC = struct
             lazy_storage_diff )) ;
       Registration.register0
         ~chunked:true
-        S.run_view
+        S.run_tzip4_view
         (fun
           ctxt
           ()
@@ -2513,7 +2514,7 @@ module RPC = struct
           Error_monad.trace View_helpers.View_callback_origination_failed
           @@ originate_dummy_contract
                ctxt
-               (View_helpers.make_viewer_script ty)
+               (View_helpers.make_tzip4_viewer_script ty)
                Tez.zero
           >>=? fun (ctxt, viewer_contract) ->
           let (source, payer) =
@@ -2888,10 +2889,10 @@ module RPC = struct
             entrypoint ),
           (unparsing_mode, gas, now, level) )
 
-    let run_view ?gas ~contract ~entrypoint ~input ~chain_id ~now ~level ?source
-        ?payer ~unparsing_mode ctxt block =
+    let run_tzip4_view ?gas ~contract ~entrypoint ~input ~chain_id ~now ~level
+        ?source ?payer ~unparsing_mode ctxt block =
       RPC_context.make_call0
-        S.run_view
+        S.run_tzip4_view
         ctxt
         block
         ()
