@@ -21,7 +21,7 @@
     # build artifacts.
     - dune build $COVERAGE_OPTIONS @runtest_dune_template
     # 2. Actually build
-    - make all build-sandbox
+    - make all build-sandbox build-unreleased
     # 3. Also build the tps evaluation tool which is not part of the default build.
     - dune build $COVERAGE_OPTIONS src/bin_tps_evaluation
     # 4. clean-up caches before uploading the cache

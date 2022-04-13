@@ -1,6 +1,8 @@
 PACKAGES:=$(patsubst %.opam,%,$(notdir $(shell find src vendors -name \*.opam -print)))
 
 active_protocol_versions := $(shell cat active_protocol_versions)
+tx_rollup_protocol_versions := $(shell cat tx_rollup_protocol_versions)
+sc_rollup_protocol_versions := $(shell cat sc_rollup_protocol_versions)
 
 define directory_of_version
 src/proto_$(shell echo $1 | tr -- - _)
@@ -32,14 +34,10 @@ TEZOS_BIN=tezos-node tezos-validator tezos-client tezos-admin-client tezos-signe
     $(foreach p, $(active_protocol_versions), \
 		  $(shell if [ -f $(call directory_of_version,$p)/bin_endorser/dune ]; then \
 		             echo tezos-endorser-$(p); fi)) \
-    $(shell if [ ${PROFILE} = "dev" ]; then echo \
-  tezos-sc-rollup-node-alpha \
-  tezos-sc-rollup-client-alpha \
-  tezos-tx-rollup-node-alpha; \
-    fi)
-    # TODO: <https://gitlab.com/tezos/tezos/-/issues/2305>
-    # Build sc rollup binaries for all the active protocols, not just alpha,
-    # and for every profile.
+
+UNRELEASED_TEZOS_BIN=$(foreach p, $(tx_rollup_protocol_versions), tezos-tx-rollup-node-$p) \
+   $(foreach p, $(sc_rollup_protocol_versions), tezos-sc-rollup-node-$p) \
+   $(foreach p, $(sc_rollup_protocol_versions), tezos-sc-rollup-client-$p)
 
 ifeq ($(filter ${opam_version}.%,${current_opam_version}),)
 $(error Unexpected opam version (found: ${current_opam_version}, expected: ${opam_version}.*))
@@ -67,6 +65,11 @@ build-parameters:
 $(TEZOS_BIN): generate_dune
 	dune build $(COVERAGE_OPTIONS) --profile=$(PROFILE) _build/install/default/bin/$@
 	cp -f _build/install/default/bin/$@ ./
+
+.PHONY: $(UNRELEASED_TEZOS_BIN)
+$(UNRELEASED_TEZOS_BIN): generate_dune
+	@dune build $(COVERAGE_OPTIONS) --profile=$(PROFILE) _build/install/default/bin/$@
+	@cp -f _build/install/default/bin/$@ ./
 
 build: generate_dune
 ifneq (${current_ocaml_version},${ocaml_version})
@@ -313,6 +316,9 @@ build-tps: lift-protocol-limits-patch build build-tezt
 	@cp -f ./src/bin_tps_evaluation/tezos-tps-evaluation-estimate-average-block .
 	@cp -f ./src/bin_tps_evaluation/tezos-tps-evaluation-gas-tps .
 
+.PHONY: build-unreleased
+build-unreleased: build $(UNRELEASED_TEZOS_BIN)
+
 .PHONY: docker-image-build
 docker-image-build:
 	@docker build \
@@ -375,7 +381,7 @@ coverage-clean:
 .PHONY: clean
 clean: coverage-clean
 	@-dune clean
-	@-rm -f ${TEZOS_BIN} tezos-sandbox
+	@-rm -f ${TEZOS_BIN} ${UNRELEASED_TEZOS_BIN} tezos-sandbox
 	@-${MAKE} -C docs clean
 	@-${MAKE} -C tests_python clean
 	@-rm -f docs/api/tezos-{baker,endorser,accuser}-alpha.html docs/api/tezos-{admin-,}client.html docs/api/tezos-signer.html
