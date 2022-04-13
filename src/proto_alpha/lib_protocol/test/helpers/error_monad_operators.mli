@@ -23,16 +23,17 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol
+val ( >>=?? ) :
+  ('a, Environment.Error_monad.error Environment.Error_monad.trace) result Lwt.t ->
+  ('a -> ('b, error trace) result Lwt.t) ->
+  ('b, error trace) result Lwt.t
 
-let ( >>=?? ) x y =
-  x >>= function
-  | Ok s -> y s
-  | Error err -> Lwt.return @@ Error (Environment.wrap_tztrace err)
+val ( >|=?? ) :
+  ('a, Environment.Error_monad.error Environment.Error_monad.trace) result Lwt.t ->
+  ('a -> 'b) ->
+  ('b, error trace) result Lwt.t
 
-let ( >|=?? ) m f = m >>=?? fun x -> return (f x)
-
-let ( >>??= ) x y =
-  match x with
-  | Ok s -> y s
-  | Error err -> Lwt.return @@ Error (Environment.wrap_tztrace err)
+val ( >>??= ) :
+  ('a, Environment.Error_monad.error Environment.Error_monad.trace) result ->
+  ('a -> ('b, error trace) result Lwt.t) ->
+  ('b, error trace) result Lwt.t

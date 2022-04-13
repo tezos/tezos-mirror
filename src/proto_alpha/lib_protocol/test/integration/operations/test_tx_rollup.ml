@@ -36,6 +36,7 @@
 open Protocol
 open Alpha_context
 open Test_tez
+open Error_monad_operators
 
 (** [check_tx_rollup_exists ctxt tx_rollup] returns [()] iff [tx_rollup]
     is a valid address for a transaction rollup. Otherwise, it fails. *)
@@ -178,10 +179,6 @@ let tx_rollup_state_testable_no_storage : Tx_rollup_state.t Alcotest.testable =
   in
   Alcotest.testable Tx_rollup_state.pp (fun a b ->
       a = copy_storage ~state_from:a b)
-
-let wrap = Environment.wrap_tzresult
-
-let wrap_lwt m = m >|= wrap
 
 (** [occupied_storage_size ctxt tx_rollup] returns occupied storage size *)
 let occupied_storage_size ctxt tx_rollup =
@@ -327,17 +324,15 @@ let make_ticket_key ctxt ~ty ~contents ~ticketer tx_rollup =
   | Context.I incr -> return incr)
   >>=? fun incr ->
   let ctxt = Incremental.alpha_ctxt incr in
-  Environment.wrap_tzresult @@ Script_ir_translator.parse_comparable_ty ctxt ty
-  >>?= fun (Ex_comparable_ty contents_type, ctxt) ->
-  wrap_lwt
-  @@ Script_ir_translator.parse_comparable_data ctxt contents_type contents
-  >>=? fun (contents, ctxt) ->
-  wrap_lwt
-  @@ Ticket_balance_key.of_ex_token
-       ctxt
-       ~owner:(Tx_rollup tx_rollup)
-       (Ticket_token.Ex_token {ticketer; contents_type; contents})
-  >|=? fst
+  Script_ir_translator.parse_comparable_ty ctxt ty
+  >>??= fun (Ex_comparable_ty contents_type, ctxt) ->
+  Script_ir_translator.parse_comparable_data ctxt contents_type contents
+  >>=?? fun (contents, ctxt) ->
+  Ticket_balance_key.of_ex_token
+    ctxt
+    ~owner:(Tx_rollup tx_rollup)
+    (Ticket_token.Ex_token {ticketer; contents_type; contents})
+  >|=?? fst
 
 (** [make_unit_ticket_key ticketer tx_rollup] computes the ticket hash of
     the unit ticket crafted by [ticketer] and owned by [tx_rollup]. *)
@@ -447,8 +442,8 @@ let make_incomplete_commitment_for_batch context level tx_rollup withdraw_list =
 (** Check that the given contract has [count] pending bonded commitments *)
 let check_bond ctxt tx_rollup contract count =
   let pkh = is_implicit_exn contract in
-  wrap_lwt (Tx_rollup_commitment.pending_bonded_commitments ctxt tx_rollup pkh)
-  >>=? fun (_, pending) ->
+  Tx_rollup_commitment.pending_bonded_commitments ctxt tx_rollup pkh
+  >>=?? fun (_, pending) ->
   Alcotest.(check int "Pending bonded commitment count correct" count pending) ;
   return ()
 
@@ -467,9 +462,8 @@ let assert_retired retired =
 let assert_ticket_balance ~loc block token owner expected =
   Incremental.begin_construction block >>=? fun incr ->
   let ctxt = Incremental.alpha_ctxt incr in
-  wrap_lwt @@ Ticket_balance_key.of_ex_token ctxt ~owner token
-  >>=? fun (key_hash, ctxt) ->
-  wrap_lwt (Ticket_balance.get_balance ctxt key_hash) >>=? fun (balance, _) ->
+  Ticket_balance_key.of_ex_token ctxt ~owner token >>=?? fun (key_hash, ctxt) ->
+  Ticket_balance.get_balance ctxt key_hash >>=?? fun (balance, _) ->
   match (balance, expected) with
   | (Some b, Some e) -> Assert.equal_int ~loc (Z.to_int b) e
   | (Some b, None) ->
@@ -1621,8 +1615,8 @@ let test_commitment_duplication () =
   >>=? fun () ->
   Context.Tx_rollup.state (I i) tx_rollup >>=? fun state ->
   let ctxt = Incremental.alpha_ctxt i in
-  wrap_lwt (Tx_rollup_commitment.find ctxt tx_rollup state Tx_rollup_level.root)
-  >>=? fun (_, commitment_opt) ->
+  Tx_rollup_commitment.find ctxt tx_rollup state Tx_rollup_level.root
+  >>=?? fun (_, commitment_opt) ->
   (match commitment_opt with
   | None -> raise (Invalid_argument "No commitment")
   | Some
@@ -3767,7 +3761,6 @@ let test_state_with_deleted () =
 (** [test_state_message_storage_preallocation] verifies that message
    commitment burn is charged upfront. *)
 let test_state_message_storage_preallocation () =
-  let open Error_monad_operators in
   context_init1 () >>=? fun (b, account1) ->
   originate b account1 >>=? fun (b, tx_rollup) ->
   Incremental.begin_construction b >>=? fun i ->
@@ -3893,11 +3886,10 @@ module Withdraw = struct
     >>=? fun b ->
     Context.get_level (B b) >>?= fun current_level ->
     Context.Tx_rollup.state (B b) tx_rollup >>=? fun state ->
-    wrap
-    @@ Alpha_context.Tx_rollup_state.Internal_for_tests.next_commitment_level
-         state
-         current_level
-    >>?= fun next_commitment_level ->
+    Alpha_context.Tx_rollup_state.Internal_for_tests.next_commitment_level
+      state
+      current_level
+    >>??= fun next_commitment_level ->
     let uncommitted_inboxes =
       Alpha_context.Tx_rollup_state.Internal_for_tests.uncommitted_inboxes_count
         state
@@ -4120,8 +4112,8 @@ module Withdraw = struct
     assert (extra_storage_space = Z.zero) ;
     Incremental.begin_construction block >>=? fun i ->
     let ctxt = Incremental.alpha_ctxt i in
-    wrap_lwt @@ Contract.get_storage ctxt withdraw_contract
-    >>=? fun (_ctxt, found_storage) ->
+    Contract.get_storage ctxt withdraw_contract
+    >>=?? fun (_ctxt, found_storage) ->
     let expected_storage =
       Format.sprintf
         "(Some (Pair 0x%s (Pair %d %s)))"
@@ -4185,8 +4177,8 @@ module Withdraw = struct
        expected *)
     Incremental.begin_construction block >>=? fun i ->
     let ctxt = Incremental.alpha_ctxt i in
-    wrap_lwt @@ Contract.get_storage ctxt withdraw_dropping_contract
-    >>=? fun (_ctxt, found_storage) ->
+    Contract.get_storage ctxt withdraw_dropping_contract
+    >>=?? fun (_ctxt, found_storage) ->
     let expected_storage = "Unit" |> Expr.from_string |> Option.some in
     (if expected_storage = found_storage then return_unit
     else Alcotest.fail "Storage didn't match")
@@ -4840,7 +4832,6 @@ module Withdraw = struct
       up along with the commitment.
    *)
   let test_withdrawal_accounting_is_cleaned_up_after_removal () =
-    let open Error_monad_operators in
     context_init1_withdraw ()
     >>=? fun (account1, tx_rollup, deposit_contract, _withdraw_contract, b) ->
     let message_position = 0 in
