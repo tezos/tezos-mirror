@@ -239,7 +239,7 @@ val runnable_inject_operation :
   unsigned_op:Hex.t ->
   signature:Hex.t ->
   Client.t ->
-  JSON.t Process.runnable
+  JSON.t Runnable.process
 
 (** [forge_and_inject_operation] allows to forge, sign and inject to a
     node, via the provided [client], the list [batch] of managed operations.
@@ -278,7 +278,7 @@ val runnable_forge_and_inject_operation :
   batch:manager_operation_content list ->
   signer:Account.key ->
   Client.t ->
-  JSON.t Process.runnable Lwt.t
+  JSON.t Runnable.process Lwt.t
 
 (** {2 High-level injection functions} *)
 

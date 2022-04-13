@@ -124,7 +124,7 @@ val inject_operation :
   ?async:bool ->
   data:JSON.u ->
   Client.t ->
-  JSON.t Process.runnable
+  JSON.t Runnable.process
 
 (** Call RPC /private/injection/operation *)
 val private_inject_operation :
@@ -133,7 +133,7 @@ val private_inject_operation :
   ?async:bool ->
   data:JSON.u ->
   Client.t ->
-  JSON.t Process.runnable
+  JSON.t Runnable.process
 
 (** Call RPC /injection/block *)
 val inject_block :
@@ -383,7 +383,7 @@ module Big_maps : sig
     ?offset:int ->
     ?length:int ->
     Client.t ->
-    JSON.t Process.runnable
+    JSON.t Runnable.process
 end
 
 module Contracts : sig
@@ -396,7 +396,7 @@ module Contracts : sig
     ?chain:string ->
     ?block:string ->
     Client.t ->
-    JSON.t Process.runnable
+    JSON.t Runnable.process
 
   (** Call RPC /chain/[chain]/blocks/[block]/context/delegates *)
   val get_all_delegates :
@@ -415,7 +415,7 @@ module Contracts : sig
     ?block:string ->
     contract_id:string ->
     Client.t ->
-    JSON.t Process.runnable
+    JSON.t Runnable.process
 
   (** Call RPC /chain/[chain]/blocks/[block]/context/contracts/[contract_id]/balance *)
   val get_balance :
@@ -425,7 +425,7 @@ module Contracts : sig
     ?block:string ->
     contract_id:string ->
     Client.t ->
-    JSON.t Process.runnable
+    JSON.t Runnable.process
 
   (** Call RPC /chain/[chain]/blocks/[block]/context/contracts/[contract_id]/frozen_bonds *)
   val get_frozen_bonds :
@@ -435,7 +435,7 @@ module Contracts : sig
     ?block:string ->
     contract_id:string ->
     Client.t ->
-    JSON.t Process.runnable
+    JSON.t Runnable.process
 
   (** Call RPC /chain/[chain]/blocks/[block]/context/contracts/[contract_id]/balance_and_frozen_bonds *)
   val get_balance_and_frozen_bonds :
@@ -445,7 +445,7 @@ module Contracts : sig
     ?block:string ->
     contract_id:string ->
     Client.t ->
-    JSON.t Process.runnable
+    JSON.t Runnable.process
 
   (** Call RPC /chain/[chain]/blocks/[block]/context/contracts/[contract_id]/big_map_get *)
   val big_map_get :
@@ -456,7 +456,7 @@ module Contracts : sig
     contract_id:string ->
     data:JSON.u ->
     Client.t ->
-    JSON.t Process.runnable
+    JSON.t Runnable.process
 
   (** Call RPC /chain/[chain]/blocks/[block]/context/contracts/[contract_id]/counter *)
   val get_counter :
@@ -466,7 +466,7 @@ module Contracts : sig
     ?block:string ->
     contract_id:string ->
     Client.t ->
-    JSON.t Process.runnable
+    JSON.t Runnable.process
 
   (** Call RPC /chain/[chain]/blocks/[block]/context/contracts/[contract_id]/delegate *)
   val get_delegate :
@@ -476,7 +476,7 @@ module Contracts : sig
     ?block:string ->
     contract_id:string ->
     Client.t ->
-    JSON.t Process.runnable
+    JSON.t Runnable.process
 
   (** Call RPC /chain/[chain]/blocks/[block]/context/contracts/[contract_id]/entrypoints *)
   val get_entrypoints :
@@ -486,7 +486,7 @@ module Contracts : sig
     ?block:string ->
     contract_id:string ->
     Client.t ->
-    JSON.t Process.runnable
+    JSON.t Runnable.process
 
   (** Call RPC /chain/[chain]/blocks/[block]/context/contracts/[contract_id]/manager_key *)
   val get_manager_key :
@@ -496,7 +496,7 @@ module Contracts : sig
     ?block:string ->
     contract_id:string ->
     Client.t ->
-    JSON.t Process.runnable
+    JSON.t Runnable.process
 
   (** Call RPC /chain/[chain]/blocks/[block]/context/contracts/[contract_id]/script *)
   val get_script :
@@ -506,7 +506,7 @@ module Contracts : sig
     ?block:string ->
     contract_id:string ->
     Client.t ->
-    JSON.t Process.runnable
+    JSON.t Runnable.process
 
   (** Call RPC /chain/[chain]/blocks/[block]/context/contracts/[contract_id]/storage *)
   val get_storage :
@@ -516,7 +516,7 @@ module Contracts : sig
     ?block:string ->
     contract_id:string ->
     Client.t ->
-    JSON.t Process.runnable
+    JSON.t Runnable.process
 end
 
 module Delegates : sig
@@ -886,7 +886,7 @@ module Tx_rollup : sig
     ?block:string ->
     rollup:string ->
     Client.t ->
-    JSON.t Process.runnable
+    JSON.t Runnable.process
 
   (** Call RPC /chain/[chain]/blocks/[block]/context/tx_rollup/[tx_rollup_id]/inbox/[level] *)
   val get_inbox :
@@ -897,7 +897,7 @@ module Tx_rollup : sig
     rollup:string ->
     level:int ->
     Client.t ->
-    JSON.t Process.runnable
+    JSON.t Runnable.process
 
   (** Call RPC /chain/[chain]/blocks/[block]/context/tx_rollup/[rollup_hash]/commitment/[level] *)
   val get_commitment :
@@ -908,7 +908,7 @@ module Tx_rollup : sig
     rollup:string ->
     level:int ->
     Client.t ->
-    JSON.t Process.runnable
+    JSON.t Runnable.process
 
   (** Call RPC /chain/[chain]/blocks/[block]/context/[rollup_hash]/pending_bonded_commitments *)
   val get_pending_bonded_commitments :
@@ -919,7 +919,7 @@ module Tx_rollup : sig
     rollup:string ->
     pkh:string ->
     Client.t ->
-    JSON.t Process.runnable
+    JSON.t Runnable.process
 
   module Forge : sig
     module Inbox : sig
@@ -930,7 +930,7 @@ module Tx_rollup : sig
         ?block:string ->
         data:JSON.u ->
         Client.t ->
-        JSON.t Process.runnable
+        JSON.t Runnable.process
 
       val merkle_tree_hash :
         ?endpoint:Client.endpoint ->
@@ -939,7 +939,7 @@ module Tx_rollup : sig
         ?block:string ->
         data:JSON.u ->
         Client.t ->
-        JSON.t Process.runnable
+        JSON.t Runnable.process
 
       val merkle_tree_path :
         ?endpoint:Client.endpoint ->
@@ -948,7 +948,7 @@ module Tx_rollup : sig
         ?block:string ->
         data:JSON.u ->
         Client.t ->
-        JSON.t Process.runnable
+        JSON.t Runnable.process
     end
 
     module Commitment : sig
@@ -959,7 +959,7 @@ module Tx_rollup : sig
         ?block:string ->
         data:JSON.u ->
         Client.t ->
-        JSON.t Process.runnable
+        JSON.t Runnable.process
 
       val merkle_tree_path :
         ?endpoint:Client.endpoint ->
@@ -968,7 +968,7 @@ module Tx_rollup : sig
         ?block:string ->
         data:JSON.u ->
         Client.t ->
-        JSON.t Process.runnable
+        JSON.t Runnable.process
 
       val message_result_hash :
         ?endpoint:Client.endpoint ->
@@ -977,7 +977,7 @@ module Tx_rollup : sig
         ?block:string ->
         data:JSON.u ->
         Client.t ->
-        JSON.t Process.runnable
+        JSON.t Runnable.process
     end
 
     module Withdraw : sig
@@ -988,7 +988,7 @@ module Tx_rollup : sig
         ?block:string ->
         data:JSON.u ->
         Client.t ->
-        JSON.t Process.runnable
+        JSON.t Runnable.process
     end
   end
 end

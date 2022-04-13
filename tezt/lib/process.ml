@@ -551,5 +551,3 @@ let program_path program =
       let* path = run_and_read_stdout "sh" ["-c"; "command -v " ^ program] in
       return (Some (String.trim path)))
     (fun _ -> return None)
-
-type nonrec 'a runnable = (t, 'a) runnable

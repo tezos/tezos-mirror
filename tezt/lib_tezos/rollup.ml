@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Runnable.Syntax
+
 module Tx_rollup = struct
   type range = Empty of int | Interval of int * int
 
@@ -121,7 +123,7 @@ module Tx_rollup = struct
         last_removed_commitment_hashes;
       }
     in
-    RPC.Tx_rollup.get_state ?hooks ~rollup client |> map_runnable parse
+    RPC.Tx_rollup.get_state ?hooks ~rollup client |> Runnable.map parse
 
   let get_inbox ?hooks ~rollup ~level client =
     let parse json =
@@ -132,7 +134,7 @@ module Tx_rollup = struct
         let merkle_root = JSON.(json |-> "merkle_root" |> as_string) in
         Some {inbox_length; cumulated_size; merkle_root}
     in
-    RPC.Tx_rollup.get_inbox ?hooks ~rollup ~level client |> map_runnable parse
+    RPC.Tx_rollup.get_inbox ?hooks ~rollup ~level client |> Runnable.map parse
 
   let get_commitment ?hooks ?block ~rollup ~level client =
     let parse json =
@@ -162,7 +164,7 @@ module Tx_rollup = struct
           {commitment; commitment_hash; committer; submitted_at; finalized_at}
     in
     RPC.Tx_rollup.get_commitment ?hooks ?block ~rollup ~level client
-    |> map_runnable parse
+    |> Runnable.map parse
 
   let get_pending_bonded_commitments ?hooks ?block ~rollup ~pkh client =
     RPC.Tx_rollup.get_pending_bonded_commitments
@@ -176,7 +178,7 @@ module Tx_rollup = struct
     let parse json = `Hash JSON.(json |-> "hash" |> as_string) in
     let data : JSON.u = `O [("message", `O [("batch", `String message)])] in
     RPC.Tx_rollup.Forge.Inbox.message_hash ?hooks ~data client
-    |> map_runnable parse
+    |> Runnable.map parse
 
   let inbox_merkle_tree_hash ?hooks ~message_hashes client =
     let parse json = `Hash JSON.(json |-> "hash" |> as_string) in
@@ -185,7 +187,7 @@ module Tx_rollup = struct
       `O [("message_hashes", `A (List.map make_message message_hashes))]
     in
     RPC.Tx_rollup.Forge.Inbox.merkle_tree_hash ?hooks ~data client
-    |> map_runnable parse
+    |> Runnable.map parse
 
   let inbox_merkle_tree_path ?hooks ~message_hashes ~position client =
     let parse json = JSON.(json |-> "path") in
@@ -198,7 +200,7 @@ module Tx_rollup = struct
         ]
     in
     RPC.Tx_rollup.Forge.Inbox.merkle_tree_path ?hooks ~data client
-    |> map_runnable parse
+    |> Runnable.map parse
 
   let commitment_merkle_tree_hash ?hooks ~message_result_hashes client =
     let parse json = `Hash JSON.(json |-> "hash" |> as_string) in
@@ -213,7 +215,7 @@ module Tx_rollup = struct
     let runnable =
       RPC.Tx_rollup.Forge.Commitment.merkle_tree_hash ?hooks ~data client
     in
-    map_runnable parse runnable
+    Runnable.map parse runnable
 
   let commitment_merkle_tree_path ?hooks ~message_result_hashes ~position client
       =
@@ -230,7 +232,7 @@ module Tx_rollup = struct
     let runnable =
       RPC.Tx_rollup.Forge.Commitment.merkle_tree_path ?hooks ~data client
     in
-    map_runnable parse runnable
+    Runnable.map parse runnable
 
   let withdraw_list_hash ?hooks ~withdrawals client =
     let parse json = JSON.(json |-> "hash" |> as_string) in
@@ -238,7 +240,7 @@ module Tx_rollup = struct
       `O [("withdraw_list", `A (List.map (fun x -> `String x) withdrawals))]
     in
     RPC.Tx_rollup.Forge.Withdraw.withdraw_list_hash ?hooks ~data client
-    |> map_runnable parse
+    |> Runnable.map parse
 
   let message_result_hash ?hooks ~context_hash ~withdraw_list_hash client =
     let parse json = JSON.(json |-> "hash" |> as_string) in
@@ -250,7 +252,7 @@ module Tx_rollup = struct
         ]
     in
     RPC.Tx_rollup.Forge.Commitment.message_result_hash ?hooks ~data client
-    |> map_runnable parse
+    |> Runnable.map parse
 
   let compute_inbox_from_messages ?hooks messages client =
     let* message_hashes =

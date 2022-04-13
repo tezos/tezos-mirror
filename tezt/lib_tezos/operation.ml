@@ -24,6 +24,7 @@
 (*****************************************************************************)
 
 open Lwt.Infix
+open Runnable.Syntax
 
 (* For Smart contracts' script, initial storage and arguments, we offer
    several syntaxes, depending on the test context *)

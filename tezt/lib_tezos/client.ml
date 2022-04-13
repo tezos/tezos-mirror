@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Runnable.Syntax
+
 type endpoint = Node of Node.t | Proxy_server of Proxy_server.t
 
 type media_type = Json | Binary | Any
@@ -221,7 +223,7 @@ let rpc_path_query_to_string ?(query_string = []) path =
 module Spawn = struct
   let rpc ?log_command ?log_status_on_exit ?log_output ?(better_errors = false)
       ?endpoint ?hooks ?env ?data ?query_string meth path client :
-      JSON.t Process.runnable =
+      JSON.t Runnable.process =
     let process =
       let data =
         Option.fold ~none:[] ~some:(fun x -> ["with"; JSON.encode_u x]) data
