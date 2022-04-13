@@ -450,8 +450,9 @@ let chain_arg () =
     ~long:"chain"
     ~placeholder:"hash|tag"
     ~doc:
-      "chain on which to apply contextual commands (possible tags are 'main' \
-       and 'test')"
+      "chain on which to apply contextual commands (commands dependent on the \
+       context associated with the specified chain). Possible tags are 'main' \
+       and 'test'."
     ~default:(Chain_services.to_string default_cli_args.chain)
     (chain_parameter ())
 
@@ -459,10 +460,13 @@ let block_arg () =
   default_arg
     ~long:"block"
     ~short:'b'
-    ~placeholder:"hash|tag"
+    ~placeholder:"hash|level|tag"
     ~doc:
-      "block on which to apply contextual commands (possible tags are 'head' \
-       and 'genesis')"
+      "block on which to apply contextual commands (commands dependent on the \
+       context associated with the specified block). Possible tags include \
+       'head' and 'genesis' +/- an optional offset (e.g. \"tezos-client -b \
+       head-1 get timestamp\"). Note that block queried must exist in node's \
+       storage."
     ~default:(Block_services.to_string default_cli_args.block)
     (block_parameter ())
 
@@ -472,7 +476,8 @@ let wait_arg () =
     ~short:'w'
     ~placeholder:"none|<int>"
     ~doc:
-      "how many confirmation blocks before to consider an operation as included"
+      "how many confirmation blocks are needed before an operation is \
+       considered included"
     (wait_parameter ())
 
 let protocol_arg () =

@@ -19,9 +19,9 @@ Global options (must come before the command):
   -d --base-dir <path>: client data directory (absent: TEZOS_CLIENT_DIR env)
   -c --config-file <path>: configuration file
   -t --timings: show RPC request times
-  --chain <hash|tag>: chain on which to apply contextual commands (possible tags are 'main' and 'test')
-  -b --block <hash|tag>: block on which to apply contextual commands (possible tags are 'head' and 'genesis')
-  -w --wait <none|<int>>: how many confirmation blocks before to consider an operation as included
+  --chain <hash|tag>: chain on which to apply contextual commands (commands dependent on the context associated with the specified chain). Possible tags are 'main' and 'test'.
+  -b --block <hash|level|tag>: block on which to apply contextual commands (commands dependent on the context associated with the specified block). Possible tags include 'head' and 'genesis' +/- an optional offset (e.g. "tezos-client -b head-1 get timestamp"). Note that block queried must exist in node's storage.
+  -w --wait <none|<int>>: how many confirmation blocks are needed before an operation is considered included
   -p --protocol <hash>: use commands of a specific protocol
   -l --log-requests: log all requests to the node
   --better-errors: Error reporting is more detailed. Can be used if a call to an RPC fails or if you don't know the input accepted by the RPC. It may happen that the RPC calls take more time however.
