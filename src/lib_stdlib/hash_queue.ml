@@ -73,17 +73,18 @@ struct
   let fold_es (type error) f q acc : (_, error) result Lwt.t =
     let open Lwt.Syntax in
     let exception Error of error in
-    try
-      let+ res =
+    Lwt.try_bind
+      (fun () ->
         fold_s
           (fun k v acc ->
-            let+ res = f k v acc in
-            match res with Ok acc -> acc | Error e -> raise (Error e))
+            let* res = f k v acc in
+            match res with
+            | Ok acc -> Lwt.return acc
+            | Error e -> Lwt.fail (Error e))
           q
-          acc
-      in
-      Ok res
-    with Error e -> Lwt.return_error e
+          acc)
+      Lwt.return_ok
+      (function Error e -> Lwt.return_error e | e -> Lwt.fail e)
 
   let peek q =
     match oldest_elements q 1 (fun _ _ _ -> ()) with
