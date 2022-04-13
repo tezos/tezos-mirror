@@ -25,6 +25,9 @@ be documented here either.
 Node
 ----
 
+- Added Jakarta, a protocol proposal for Mainnet featuring, among others,
+  Transaction Optimistic Rollups, Tickets Hardening and Liquidity Baking Toggle.
+
 - **Breaking change**:
   restored the encoding of events corresponding to "completed
   requests" (block validation, head switch, ...) to pre v11. They only

@@ -95,7 +95,9 @@ details. (MRs :gl:`!3915`, :gl:`!4198`, :gl:`!4200`, :gl:`!4203`, :gl:`!4332`,
 :gl:`!4703`, :gl:`!4739`, :gl:`!4702`, :gl:`!4755`, :gl:`!4756`, :gl:`!4768`,
 :gl:`!4750`, :gl:`!4733`, :gl:`!4726`, :gl:`!4780`, :gl:`!4779`, :gl:`!4784`,
 :gl:`!4772`, :gl:`!4782`, :gl:`!4790`, :gl:`!4801`, :gl:`!4740`, :gl:`!4376`,
-:gl:`!4793`)
+:gl:`!4793`, :gl:`!4841`, :gl:`!4930`, :gl:`!4917`, :gl:`!4835`, :gl:`!4951`,
+:gl:`!4878`, :gl:`!4913`, :gl:`!4956`, :gl:`!4963`, :gl:`!4965`, :gl:`!4972`,
+:gl:`!4976`, :gl:`!4984`, :gl:`!4999`)
 
 Smart Contract Optimistic Rollups (ongoing)
 -------------------------------------------
@@ -221,6 +223,9 @@ Minor Changes
   (MR :gl:`!3842`)
 
 - Retrieve a contract's public key before prechecking an operation. (MR :gl:`!4877`)
+
+- Normalize types and code of views in RPCs and client commands.
+  (MR :gl:`!4911`)
 
 Michelson
 ---------
@@ -362,6 +367,10 @@ improvements of the codebase.
 - Stakable frozen bonds. (MR :gl:`!4437`)
 
 - Rename first_level_of_Tenderbake for consistency. (MR :gl:`!4825`)
+
+- Update gas cost model. (MR :gl:`!4840`)
+
+- Update size cost model. (MR :gl:`!4948`)
 
 - Internal refactorings in Michelson typechecker and interpreter. (MRs
   :gl:`!4502`, :gl:`!4693`, :gl:`!4692`, :gl:`!4658`, :gl:`!4507`, :gl:`!4578`,
