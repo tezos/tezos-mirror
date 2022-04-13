@@ -1496,9 +1496,9 @@ module View_helpers = struct
      Script_typed_ir.Internal_operation
        {
          operation =
-           Transaction
+           Transaction_to_contract
              {
-               destination = Contract destination;
+               destination;
                unparsed_parameters;
                entrypoint = _;
                amount = _;

@@ -78,7 +78,7 @@ let parse_ticket_and_operation ~consume_deserialization_gas ~ticketer ~contents
         source;
         nonce;
         operation =
-          Transaction
+          Transaction_to_contract
             {
               amount = Tez.zero;
               unparsed_parameters;

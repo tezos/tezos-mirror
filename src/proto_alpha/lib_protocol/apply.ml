@@ -1179,11 +1179,11 @@ let apply_internal_manager_operation_content :
     ~gas_consumed_in_precheck
   >>=? fun (ctxt, before_operation, consume_deserialization_gas) ->
   match operation with
-  | Transaction
+  | Transaction_to_contract
       {
+        destination;
         amount;
         unparsed_parameters = _;
-        destination = Contract contract;
         entrypoint;
         location;
         parameters_ty;
@@ -1193,7 +1193,7 @@ let apply_internal_manager_operation_content :
         ~ctxt
         ~parameter:(Typed_arg (location, parameters_ty, typed_parameters))
         ~source
-        ~contract
+        ~contract:destination
         ~amount
         ~entrypoint
         ~before_operation
@@ -1205,10 +1205,10 @@ let apply_internal_manager_operation_content :
       ( ctxt,
         (manager_result : kind successful_manager_operation_result),
         operations )
-  | Transaction
+  | Transaction_to_tx_rollup
       {
+        destination;
         amount;
-        destination = Tx_rollup dst;
         entrypoint;
         unparsed_parameters = _;
         location = _;
@@ -1222,7 +1222,7 @@ let apply_internal_manager_operation_content :
         ~amount
         ~entrypoint
         ~payer
-        ~dst_rollup:dst
+        ~dst_rollup:destination
         ~since:before_operation
   | Origination
       {
@@ -1406,7 +1406,7 @@ let apply_external_manager_operation_content :
         ~contents
         ~ty
         ~source:source_contract
-        ~destination:(Contract destination)
+        ~destination
         ~entrypoint
         ~amount
         ctxt
