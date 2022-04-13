@@ -154,7 +154,6 @@ let perform_benchmarks (patches : patch_rule list) snoop benchmarks =
               ~save_to:
                 Files.(
                   working_dir // benchmark_results_dir // workload bench_name)
-              ~determinizer:(Snoop.Percentile 50)
               ?config_dir
               ~csv_dump:
                 Files.(working_dir // benchmark_results_dir // csv bench_name)
