@@ -195,7 +195,7 @@ let check_unknown_output_files () =
   browse Cli.options.regression_dir ;
   if !found_unknown then (
     Log.warn
-      "Use --delete-unknown-regression-files to delete those files and/or \
+      "Use --on-unknown-regression-files delete to delete those files and/or \
        directories." ;
     if mode = Fail then exit 1) ;
   if mode = Delete then exit 0
