@@ -95,7 +95,7 @@ type error +=
   | Set_deposits_limit_too_high of {limit : Tez.t; max_limit : Tez.t}
   | Empty_transaction of Contract.t
   | Tx_rollup_feature_disabled
-  | Tx_rollup_invalid_transaction_amount
+  | Tx_rollup_invalid_transaction_ticket_amount
   | Tx_rollup_non_internal_transaction
   | Cannot_transfer_ticket_to_implicit
   | Sc_rollup_feature_disabled
@@ -502,19 +502,17 @@ let () =
 
   register_error_kind
     `Permanent
-    ~id:"operation.tx_rollup_invalid_transaction_amount"
-    ~title:"Transaction amount to a transaction rollup must be zero"
+    ~id:"operation.tx_rollup_invalid_transaction_ticket_amount"
+    ~title:"Amount of transferred ticket is too high"
     ~description:
-      "Because transaction rollups are outside of the delegation mechanism of \
-       Tezos, they cannot own Tez, and therefore transactions targeting a \
-       transaction rollup must have its amount field set to zero."
+      "The ticket amount of a rollup transaction must fit in a signed 64-bit \
+       integer."
     ~pp:(fun ppf () ->
-      Format.fprintf
-        ppf
-        "Transaction amount to a transaction rollup must be zero.")
+      Format.fprintf ppf "Amount of transferred ticket is too high.")
     Data_encoding.unit
-    (function Tx_rollup_invalid_transaction_amount -> Some () | _ -> None)
-    (fun () -> Tx_rollup_invalid_transaction_amount) ;
+    (function
+      | Tx_rollup_invalid_transaction_ticket_amount -> Some () | _ -> None)
+    (fun () -> Tx_rollup_invalid_transaction_ticket_amount) ;
 
   register_error_kind
     `Permanent
@@ -1013,7 +1011,9 @@ let ex_ticket_size :
 let apply_transaction_to_tx_rollup ~ctxt ~parameters_ty ~parameters ~amount
     ~entrypoint ~payer ~dst_rollup ~since =
   assert_tx_rollup_feature_enabled ctxt >>=? fun () ->
-  fail_unless Tez.(amount = zero) Tx_rollup_invalid_transaction_amount
+  fail_unless
+    Tez.(amount = zero)
+    Script_interpreter_defs.Tx_rollup_invalid_transaction_amount
   >>=? fun () ->
   if Entrypoint.(entrypoint = Tx_rollup.deposit_entrypoint) then
     (* If the ticket deposit fails on L2 for some reason
@@ -1038,7 +1038,8 @@ let apply_transaction_to_tx_rollup ~ctxt ~parameters_ty ~parameters ~amount
     Ticket_balance_key.of_ex_token ctxt ~owner:(Tx_rollup dst_rollup) ex_token
     >>=? fun (ticket_hash, ctxt) ->
     Option.value_e
-      ~error:(Error_monad.trace_of_error Tx_rollup_invalid_transaction_amount)
+      ~error:
+        (Error_monad.trace_of_error Tx_rollup_invalid_transaction_ticket_amount)
       (Option.bind
          (Script_int.to_int64 ticket_amount)
          Tx_rollup_l2_qty.of_int64)

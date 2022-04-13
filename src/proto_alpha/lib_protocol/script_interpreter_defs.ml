@@ -38,6 +38,25 @@ open Script_typed_ir
 open Script_ir_translator
 open Local_gas_counter
 
+type error += Tx_rollup_invalid_transaction_amount
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"operation.tx_rollup_invalid_transaction_amount"
+    ~title:"Transaction amount to a transaction rollup must be zero"
+    ~description:
+      "Because transaction rollups are outside of the delegation mechanism of \
+       Tezos, they cannot own Tez, and therefore transactions targeting a \
+       transaction rollup must have its amount field set to zero."
+    ~pp:(fun ppf () ->
+      Format.pp_print_string
+        ppf
+        "Transaction amount to a transaction rollup must be zero.")
+    Data_encoding.unit
+    (function Tx_rollup_invalid_transaction_amount -> Some () | _ -> None)
+    (fun () -> Tx_rollup_invalid_transaction_amount)
+
 (*
 
    Computing the cost of Michelson instructions

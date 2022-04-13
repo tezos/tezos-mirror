@@ -1398,7 +1398,8 @@ let test_valid_deposit_invalid_amount () =
     i
     op
     ~expect_failure:
-      (check_proto_error Apply.Tx_rollup_invalid_transaction_amount)
+      (check_proto_error
+         Script_interpreter_defs.Tx_rollup_invalid_transaction_amount)
   >>=? fun _ -> return_unit
 
 (** [test_deposit_too_many_tickets] checks that a deposit of
@@ -1420,7 +1421,7 @@ let test_deposit_too_many_tickets () =
     i
     operation
     ~expect_failure:
-      (check_proto_error Apply.Tx_rollup_invalid_transaction_amount)
+      (check_proto_error Apply.Tx_rollup_invalid_transaction_ticket_amount)
   >>=? fun i ->
   ignore i ;
   return_unit
