@@ -3088,12 +3088,7 @@ module RPC = struct
             RPC_service.post_service
               ~description:"Compute the message result hash"
               ~query:RPC_query.empty
-              ~input:
-                (obj2
-                   (req "context_hash" Context_hash.encoding)
-                   (req
-                      "withdraw_list_hash"
-                      Tx_rollup_withdraw_list_hash.encoding))
+              ~input:Tx_rollup_message_result.encoding
               ~output:(obj1 (req "hash" Tx_rollup_message_result_hash.encoding))
               RPC_path.(path / "message_result_hash")
         end
@@ -3176,10 +3171,9 @@ module RPC = struct
       Registration.register0_noctxt
         ~chunked:true
         S.Tx_rollup.Commitment.message_result_hash
-        (fun () (context_hash, withdraw_list_hash) ->
+        (fun () message_result ->
           return
-            (Tx_rollup_message_result_hash.hash_uncarbonated
-               {context_hash; withdraw_list_hash})) ;
+            (Tx_rollup_message_result_hash.hash_uncarbonated message_result)) ;
       Registration.register0_noctxt
         ~chunked:true
         S.Tx_rollup.Withdraw.withdraw_list_hash
