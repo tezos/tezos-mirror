@@ -30,16 +30,11 @@ an addition. Indeed, we can also find several lines being deleted and then,
 after this batch, the corresponding added lines.
 *)
 
-let ( let* ) opt f = match opt with None -> None | Some a -> f a
+let ( let* ) = Option.bind
 
-let ( let+ ) opt f =
-  let* a = opt in
-  Some (f a)
+let ( let+ ) f opt = Option.map opt f
 
-let rec either l a =
-  match l with
-  | [] -> None
-  | f :: l -> ( match f a with None -> either l a | Some _ as res -> res)
+let either l a = List.find_map (fun f -> f a) l
 
 module Decimal = struct
   module Big_int = struct
@@ -107,7 +102,7 @@ module Decimal = struct
     Big_int.gt_big_int value1 value2
 
   let of_string s =
-    let dot_index = try Some (String.index s '.') with Not_found -> None in
+    let dot_index = String.index_opt s '.' in
     let sint_part, sdec_part, decimals =
       match dot_index with
       | None -> (s, "0", 0)
