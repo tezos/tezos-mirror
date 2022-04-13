@@ -86,9 +86,42 @@ module Tx_rollup = struct
     finalized_at : int option;
   }
 
-  type message = [`Batch of Hex.t]
+  type deposit_content = {
+    sender : string;
+    destination : string;
+    ticket_hash : string;
+    amount : int64;
+  }
+
+  type deposit = [`Deposit of deposit_content]
+
+  type batch = [`Batch of Hex.t]
+
+  type message = [deposit | batch]
 
   let make_batch batch = `Batch (Hex.of_string batch)
+
+  let make_deposit ~sender ~destination ~ticket_hash ~amount =
+    `Deposit {sender; destination; ticket_hash; amount}
+
+  let json_of_batch (`Hex message) = `O [("batch", `String message)]
+
+  let json_of_deposit {sender; destination; ticket_hash; amount} =
+    `O
+      [
+        ( "deposit",
+          `O
+            [
+              ("sender", `String sender);
+              ("destination", `String destination);
+              ("ticket_hash", `String ticket_hash);
+              ("amount", `String (Int64.to_string amount));
+            ] );
+      ]
+
+  let json_of_message = function
+    | `Batch batch -> json_of_batch batch
+    | `Deposit deposit -> json_of_deposit deposit
 
   let get_state ?hooks ~rollup client =
     let parse json =
@@ -174,9 +207,9 @@ module Tx_rollup = struct
       ~pkh
       client
 
-  let message_hash ?hooks ~message:(`Batch (`Hex message) : message) client =
+  let message_hash ?hooks ~message client =
     let parse json = `Hash JSON.(json |-> "hash" |> as_string) in
-    let data : JSON.u = `O [("message", `O [("batch", `String message)])] in
+    let data : JSON.u = `O [("message", json_of_message message)] in
     RPC.Tx_rollup.Forge.Inbox.message_hash ?hooks ~data client
     |> Runnable.map parse
 
@@ -270,10 +303,18 @@ module Tx_rollup = struct
         inbox_length = List.length messages;
         cumulated_size =
           List.map
-            (fun (`Batch (`Hex message)) ->
-              (* In the Hex reprensatated as a string, a byte is
-                 encoded using two characters. *)
-              String.length message / 2)
+            (function
+              | `Batch (`Hex message) ->
+                  (* In the Hex represented as a string, a byte is
+                     encoded using two characters. *)
+                  String.length message / 2
+              | `Deposit _ ->
+                  let sender_pkh_size = 65 in
+                  let destination_bls_pkh_size = 36 in
+                  let ticket_hash_size = 32 in
+                  let amount_size = 8 in
+                  sender_pkh_size + destination_bls_pkh_size + ticket_hash_size
+                  + amount_size)
             messages
           |> List.fold_left ( + ) 0;
         merkle_root;

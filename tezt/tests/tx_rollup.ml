@@ -66,8 +66,12 @@ let init_with_tx_rollup ?additional_bootstrap_account_count
   let* _ = Node.wait_for_level node 2 in
   return {node; client; rollup}
 
-let submit_batch ~batch:(`Batch content) ?(batches = []) {rollup; client; node}
-    =
+let submit_batch :
+    batch:[> `Batch of Hex.t] ->
+    ?batches:([> `Batch of Hex.t] * string) list ->
+    t ->
+    unit Lwt.t =
+ fun ~batch:(`Batch content) ?(batches = []) {rollup; client; node} ->
   let*! () =
     Client.Tx_rollup.submit_batch
       ~hooks
@@ -722,7 +726,10 @@ let submit_three_batches_and_check_size ~rollup ~tezos_level ~tx_level node
   let* _ = Node.wait_for_level node tezos_level in
   (* Check the inbox has been created, with the expected cumulated size. *)
   let* expected_inbox =
-    Rollup.compute_inbox_from_messages ~hooks messages client
+    Rollup.compute_inbox_from_messages
+      ~hooks
+      (messages :> Rollup.message list)
+      client
   in
   let*! inbox = Rollup.get_inbox ~hooks ~rollup ~level:tx_level client in
   Check.(
