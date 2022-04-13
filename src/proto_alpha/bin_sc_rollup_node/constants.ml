@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,30 +23,43 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = {
-  data_dir : string;
-  sc_rollup_address : Protocol.Alpha_context.Sc_rollup.t;
-  sc_rollup_node_operator : Signature.Public_key_hash.t;
-  rpc_addr : string;
-  rpc_port : int;
-}
+(* TODO:https://gitlab.com/tezos/tezos/-/issues/2791 
+   This module should be deprecated in favour of a data structure that 
+   contains rollup address, rollup node operator address, and rollup 
+   origination level.
+*)
 
-(** [default_data_dir] is the default value for [data_dir]. *)
-val default_data_dir : string
+let unstarted_failure () =
+  Format.eprintf "Sc rollup state is not initialised.\n" ;
+  Lwt_exit.exit_and_raise 1
 
-(** [default_rpc_addr] is the default value for [rpc_addr]. *)
-val default_rpc_addr : string
+let make_ref () =
+  let reference = ref None in
+  ( (fun x -> reference := Some x),
+    fun () -> match !reference with None -> unstarted_failure () | Some a -> a
+  )
 
-(** [default_rpc_port] is the default value for [rpc_port]. *)
-val default_rpc_port : int
+let (set_sc_rollup_address, get_sc_rollup_address) = make_ref ()
 
-val default_fee_parameter : Injection.fee_parameter
+let (set_sc_rollup_node_operator, get_sc_rollup_node_operator) = make_ref ()
 
-(** [filename configuration] returns the [configuration] filename. *)
-val filename : t -> string
+let (set_sc_rollup_initial_level, get_sc_rollup_initial_level) = make_ref ()
 
-(** [save configuration] overwrites [configuration] file. *)
-val save : t -> unit tzresult Lwt.t
+let get_operator_keys cctxt =
+  let open Lwt_tzresult_syntax in
+  let pkh = get_sc_rollup_node_operator () in
+  let+ (_, pk, sk) = Client_keys.get_key cctxt pkh in
+  (pkh, pk, sk)
 
-(** [load ~data_dir] loads a configuration stored in [data_dir]. *)
-val load : data_dir:string -> t tzresult Lwt.t
+let init (cctxt : Protocol_client_context.full) sc_rollup_address
+    sc_rollup_node_operator =
+  let open Lwt_tzresult_syntax in
+  set_sc_rollup_address sc_rollup_address ;
+  set_sc_rollup_node_operator sc_rollup_node_operator ;
+  let+ initial_level =
+    Plugin.RPC.Sc_rollup.initial_level
+      cctxt
+      (cctxt#chain, cctxt#block)
+      sc_rollup_address
+  in
+  set_sc_rollup_initial_level initial_level

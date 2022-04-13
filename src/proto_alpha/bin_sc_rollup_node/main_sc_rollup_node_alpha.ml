@@ -32,11 +32,22 @@ let sc_rollup_address_param =
          | None -> failwith "Invalid smart-contract rollup address"
          | Some addr -> return addr))
 
+let sc_rollup_node_operator_param =
+  let open Lwt_tzresult_syntax in
+  Clic.param
+    ~name:"node-operator"
+    ~desc:"Public key hash of the the smart-contract rollup node operator"
+    (Clic.parameter (fun _ s ->
+         match Signature.Public_key_hash.of_b58check_opt s with
+         | None ->
+             failwith "Could not read public key hash for rollup node operator"
+         | Some pkh -> return pkh))
+
 let rpc_addr_arg =
   let default = Configuration.default_rpc_addr in
   Clic.default_arg
     ~long:"rpc-addr"
-    ~placeholder:"address|ip"
+    ~placeholder:"rpc-address|ip"
     ~doc:
       (Format.sprintf
          "The address the smart-contract rollup node listens to. Default value \
@@ -49,7 +60,7 @@ let rpc_port_arg =
   let default = Configuration.default_rpc_port |> string_of_int in
   Clic.default_arg
     ~long:"rpc-port"
-    ~placeholder:"port"
+    ~placeholder:"rpc-port"
     ~doc:
       (Format.sprintf
          "The port the smart-contract rollup node listens to. Default value is \
@@ -83,10 +94,24 @@ let config_init_command =
     ~group
     ~desc:"Configure the smart-contract rollup node."
     (args3 data_dir_arg rpc_addr_arg rpc_port_arg)
-    (prefixes ["config"; "init"; "on"] @@ sc_rollup_address_param @@ stop)
-    (fun (data_dir, rpc_addr, rpc_port) sc_rollup_address cctxt ->
+    (prefixes ["config"; "init"; "on"]
+    @@ sc_rollup_address_param
+    @@ prefixes ["with"; "operator"]
+    @@ sc_rollup_node_operator_param stop)
+    (fun (data_dir, rpc_addr, rpc_port)
+         sc_rollup_address
+         sc_rollup_node_operator
+         cctxt ->
       let open Configuration in
-      let config = {data_dir; sc_rollup_address; rpc_addr; rpc_port} in
+      let config =
+        {
+          data_dir;
+          sc_rollup_address;
+          sc_rollup_node_operator;
+          rpc_addr;
+          rpc_port;
+        }
+      in
       save config >>=? fun () ->
       cctxt#message
         "Smart-contract rollup node configuration written in %s"
@@ -109,5 +134,7 @@ let sc_rollup_commands () =
 
 let select_commands _ _ =
   return (sc_rollup_commands () @ Client_helpers_commands.commands ())
+
+let main () = ()
 
 let () = Client_main_run.run (module Client_config) ~select_commands
