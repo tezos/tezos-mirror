@@ -570,38 +570,8 @@ let make_transaction_to_tx_rollup (type t tc) ctxt ~destination ~amount
    creates an operation that transfers an amount of [tez] to
    a contract determined by [(destination, entrypoint)]
    instantiated with argument [parameters] of type [parameters_ty]. *)
-let transfer (ctxt, sc) gas amount location parameters_ty parameters destination
-    entrypoint =
-  (* [craft_transfer_operation ctxt tp p] reorganizes, if need be, the
-     parameters submitted by the interpreter to prepare them for the
-     [Transaction] operation and build the operation. *)
-  let craft_transfer_operation :
-      type a ac.
-      context ->
-      (a, ac) ty ->
-      a ->
-      Destination.t ->
-      (Kind.transaction manager_operation * context) tzresult Lwt.t =
-   fun ctxt parameters_ty parameters -> function
-    | Contract destination ->
-        make_transaction_to_contract
-          ctxt
-          ~destination
-          ~amount
-          ~entrypoint
-          ~location
-          ~parameters_ty
-          ~parameters
-    | Tx_rollup destination ->
-        make_transaction_to_tx_rollup
-          ctxt
-          ~destination
-          ~amount
-          ~entrypoint
-          ~location
-          ~parameters_ty
-          ~parameters
-  in
+let transfer (ctxt, sc) gas amount location parameters_ty parameters
+    (destination : Destination.t) entrypoint =
   let ctxt = update_context gas ctxt in
   collect_lazy_storage ctxt parameters_ty parameters
   >>?= fun (to_duplicate, ctxt) ->
@@ -615,7 +585,25 @@ let transfer (ctxt, sc) gas amount location parameters_ty parameters destination
     ~to_update
     ~temporary:true
   >>=? fun (parameters, lazy_storage_diff, ctxt) ->
-  craft_transfer_operation ctxt parameters_ty parameters destination
+  (match destination with
+  | Contract destination ->
+      make_transaction_to_contract
+        ctxt
+        ~destination
+        ~amount
+        ~entrypoint
+        ~location
+        ~parameters_ty
+        ~parameters
+  | Tx_rollup destination ->
+      make_transaction_to_tx_rollup
+        ctxt
+        ~destination
+        ~amount
+        ~entrypoint
+        ~location
+        ~parameters_ty
+        ~parameters)
   >>=? fun (operation, ctxt) ->
   fresh_internal_nonce ctxt >>?= fun (ctxt, nonce) ->
   let iop = {source = sc.self; operation; nonce} in
