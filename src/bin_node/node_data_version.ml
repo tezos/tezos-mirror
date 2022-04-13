@@ -138,11 +138,15 @@ let () =
     ~pp:(fun ppf (exp, got) ->
       Format.fprintf
         ppf
-        "Invalid data directory version '%s' (expected '%s').@,\
-         Your data directory is incompatible and cannot be automatically \
-         upgraded."
+        "Invalid data directory version '%a' (expected '%a').@,\
+         Your data directory is %s"
+        Version.pp
         got
-        exp)
+        Version.pp
+        exp
+        (if Version.compare got exp < 0 then
+         "incompatible and cannot be automatically upgraded."
+        else "too recent for this node version."))
     Data_encoding.(
       obj2
         (req "expected_version" Version.encoding)
