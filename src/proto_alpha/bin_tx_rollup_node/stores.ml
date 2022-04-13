@@ -176,7 +176,6 @@ module L2_block_info = struct
   type t = {
     offset : int;
     (* subset of L2 block header for efficiency *)
-    (* TODO decide if we want more or less *)
     predecessor : L2block.hash;
     context : Protocol.Tx_rollup_l2_context_hash.t;
   }
