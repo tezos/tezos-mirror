@@ -1786,8 +1786,8 @@ let apply_internal_manager_operations ctxt mode ~payer ~chain_id ops =
     | [] -> Lwt.return (Success ctxt, List.rev applied)
     | Script_typed_ir.Internal_operation ({source; operation; nonce} as op)
       :: rest -> (
-        let op_res = Apply_results.contents_of_internal_operation op in
         (if internal_nonce_already_recorded ctxt nonce then
+         let op_res = Apply_results.contents_of_internal_operation op in
          fail (Internal_operation_replay (Internal_contents op_res))
         else
           let ctxt = record_internal_nonce ctxt nonce in
