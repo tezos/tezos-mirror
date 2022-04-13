@@ -26,7 +26,6 @@
 (* module Constants will be shadowed by Alpha_context.Constansts
    once we open Alpha_context, hence we we alias it to Rollup_node_constants
 *)
-module Rollup_node_constants = Constants
 open Protocol
 open Alpha_context
 module Block_services = Block_services.Make (Protocol) (Protocol)
@@ -79,10 +78,11 @@ let get_messages cctxt head rollup =
   in
   List.concat_map process_operations operations
 
-let process_head cctxt store Layer1.(Head {level; hash = head_hash} as head) =
-  let rollup = Rollup_node_constants.get_sc_rollup_address () in
+let process_head {Node_context.cctxt; rollup_address; _} store
+    Layer1.(Head {level; hash = head_hash} as head) =
   let open Lwt_result_syntax in
-  get_messages cctxt (head_hash, level) rollup >>= function
+  let*! res = get_messages cctxt (head_hash, level) rollup_address in
+  match res with
   | Error e -> head_processing_failure e
   | Ok messages ->
       let*! () =
@@ -109,15 +109,17 @@ let process_head cctxt store Layer1.(Head {level; hash = head_hash} as head) =
       let*! () = State.add_history store head_hash history in
       return_unit
 
-let update cctxt store chain_event =
+let update node_ctxt store chain_event =
   let open Lwt_result_syntax in
   let open Layer1 in
   Lwt.map Environment.wrap_tzresult
   @@
   match chain_event with
   | SameBranch {new_head; intermediate_heads} ->
-      let* () = List.iter_es (process_head cctxt store) intermediate_heads in
-      process_head cctxt store new_head
+      let* () =
+        List.iter_es (process_head node_ctxt store) intermediate_heads
+      in
+      process_head node_ctxt store new_head
   | Rollback {new_head = _} ->
       (*
 
@@ -129,19 +131,19 @@ let update cctxt store chain_event =
 
 let inbox_of_hash = State.inbox_of_hash
 
-let start store sc_rollup_address =
+let start store Node_context.{rollup_address; _} =
   let open Lwt_syntax in
-  Inbox_event.starting () >>= fun () ->
-  State.inbox_exists store Layer1.genesis_hash >>= function
-  | false ->
-      let* () =
-        State.add_inbox
-          store
-          Layer1.genesis_hash
-          (Sc_rollup.Inbox.empty sc_rollup_address Raw_level.root)
-      in
-      State.add_history
+  let* () = Inbox_event.starting () in
+  let* exists = State.inbox_exists store Layer1.genesis_hash in
+  if exists then return_unit
+  else
+    let* () =
+      State.add_inbox
         store
         Layer1.genesis_hash
-        (Store.Inbox.history_at_genesis ~bound:(Int64.of_int 60000))
-  | true -> Lwt.return ()
+        (Sc_rollup.Inbox.empty rollup_address Raw_level.root)
+    in
+    State.add_history
+      store
+      Layer1.genesis_hash
+      (Store.Inbox.history_at_genesis ~bound:(Int64.of_int 60000))
