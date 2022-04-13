@@ -570,23 +570,10 @@ let get_contracts ?endpoint client =
   Lwt.return contracts
 
 (* Test the delegates RPC for the specified protocol. *)
-let test_delegates protocol ?endpoint client =
+let test_delegates _protocol ?endpoint client =
   let* contracts = get_contracts ?endpoint client in
-  let* () =
-    match protocol with
-    | Protocol.Ithaca | Protocol.Jakarta | Protocol.Alpha ->
-        let* () =
-          test_delegates_on_registered_alpha ~contracts ?endpoint client
-        in
-        test_delegates_on_unregistered_alpha ~contracts ?endpoint client
-    | Protocol.Hangzhou ->
-        let* () =
-          test_delegates_on_registered_hangzhou ~contracts ?endpoint client
-        in
-        test_delegates_on_unregistered_hangzhou ~contracts ?endpoint client
-  in
-
-  unit
+  let* () = test_delegates_on_registered_alpha ~contracts ?endpoint client in
+  test_delegates_on_unregistered_alpha ~contracts ?endpoint client
 
 (* Test the votes RPC. *)
 let test_votes _protocol ?endpoint client =

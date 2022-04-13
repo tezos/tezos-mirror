@@ -81,14 +81,8 @@ let check_client_force =
   let first_failed_script =
     JSON.(first_operation_result |-> "errors" |=> 0 |-> "contract_code")
   in
-  (match protocol with
-  | Alpha | Ithaca | Jakarta ->
-      (* In Alpha and Ithaca this field is deprecated *)
-      assert (JSON.(first_failed_script |> as_string = "Deprecated"))
-  | Hangzhou ->
-      (* In Hangzhou this field contains the failed script, it
-         is a sequence of length 3 (parameter, storage, and code). *)
-      assert (JSON.(first_failed_script |> as_list |> List.length = 3))) ;
+  (* This field is deprecated since Ithaca. *)
+  assert (JSON.(first_failed_script |> as_string = "Deprecated")) ;
   return ()
 
 let register ~protocols = check_client_force protocols

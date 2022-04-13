@@ -38,7 +38,6 @@ depopts: [
   "tezos-client-012-Psithaca-commands-registration"
   "tezos-client-013-PtJakart-commands-registration"
   "tezos-client-alpha-commands-registration"
-  "tezos-baking-011-PtHangz2-commands"
   "tezos-baking-012-Psithaca-commands"
   "tezos-baking-013-PtJakart-commands"
   "tezos-baking-alpha-commands"

@@ -1,7 +1,0 @@
-tests_011/test_liquidity_baking.py::TestAddApproveTransferRemove::test_dex_storage
-
-Pair 712
-     8895894353
-     71107
-     "[CONTRACT_HASH]"
-     "[CONTRACT_HASH]"

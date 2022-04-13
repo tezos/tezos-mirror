@@ -282,12 +282,12 @@ let prepare_migration ?yes_node_path ?yes_wallet context protocol
    (https://gitlab.com/tezos/tezos/-/merge_requests/2531). *)
 let migration ?yes_node_path ?yes_wallet context protocol levels_till_migration
     expected_period_kind =
-  Test.register
+  Protocol.register_test
     ~__FILE__
-    ~title:"migration voting test"
+    ~title:"migration voting test to Alpha"
     ~tags:
       ["node"; "activate"; "user_activated"; "protocol"; "migration"; "voting"]
-  @@ fun () ->
+  @@ fun from_protocol ->
   let* (node, client, level) =
     prepare_migration
       ?yes_node_path
@@ -311,15 +311,15 @@ let migration ?yes_node_path ?yes_wallet context protocol levels_till_migration
   let blocks_per_commitment_alpha =
     JSON.(parameters_alpha |-> "blocks_per_commitment" |> as_int)
   in
-  let parameters_hangzhou =
+  let parameters_from_protocol =
     JSON.parse_file
-    @@ Protocol.parameter_file ~constants:Constants_mainnet Protocol.Hangzhou
+    @@ Protocol.parameter_file ~constants:Constants_mainnet from_protocol
   in
-  let blocks_per_cycle_hangzhou =
-    JSON.(parameters_hangzhou |-> "blocks_per_cycle" |> as_int)
+  let blocks_per_cycle_from_protocol =
+    JSON.(parameters_from_protocol |-> "blocks_per_cycle" |> as_int)
   in
-  let blocks_per_voting_period_hangzhou =
-    JSON.(parameters_hangzhou |-> "blocks_per_voting_period" |> as_int)
+  let blocks_per_voting_period_from_protocol =
+    JSON.(parameters_from_protocol |-> "blocks_per_voting_period" |> as_int)
   in
   let* voting_period_info =
     Client.rpc
@@ -355,10 +355,11 @@ let migration ?yes_node_path ?yes_wallet context protocol levels_till_migration
           (level + i)
           (if edo then "Edo" else "Alpha")
           (if edo_cycle then
-           blocks_per_cycle_hangzhou - levels_till_migration + i - 2
+           blocks_per_cycle_from_protocol - levels_till_migration + i - 2
           else (i - 2 - levels_till_migration) mod blocks_per_cycle_alpha)
           (if edo then
-           blocks_per_voting_period_hangzhou - levels_till_migration + i - 1
+           blocks_per_voting_period_from_protocol - levels_till_migration + i
+           - 1
           else
             (i - 2 - levels_till_migration) mod blocks_per_voting_period_alpha)
           (if check_rpcs_flag then "*" else "") ;
@@ -412,5 +413,10 @@ let levels_till_migration = 2
 
 (* It is recommended that the test is run with the option '--log-level
    info'. *)
-let register () =
-  migration context protocol levels_till_migration expected_period_kind
+let register protocols =
+  migration
+    context
+    protocol
+    levels_till_migration
+    expected_period_kind
+    protocols

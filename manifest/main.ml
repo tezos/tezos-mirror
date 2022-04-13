@@ -3671,7 +3671,7 @@ end = struct
 
   let _010_PtGRANAD = frozen (V 010) "PtGRANAD"
 
-  let _011_PtHangz2 = active (V 011) "PtHangz2"
+  let _011_PtHangz2 = frozen (V 011) "PtHangz2"
 
   let _012_Psithaca = active (V 012) "Psithaca"
 

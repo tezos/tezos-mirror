@@ -71,9 +71,6 @@
   (select void_for_linking-tezos-client-alpha-commands-registration from
    (tezos-client-alpha-commands-registration -> void_for_linking-tezos-client-alpha-commands-registration.empty)
    (-> void_for_linking-tezos-client-alpha-commands-registration.empty))
-  (select void_for_linking-tezos-baking-011-PtHangz2-commands-registration from
-   (tezos-baking-011-PtHangz2-commands.registration -> void_for_linking-tezos-baking-011-PtHangz2-commands-registration.empty)
-   (-> void_for_linking-tezos-baking-011-PtHangz2-commands-registration.empty))
   (select void_for_linking-tezos-baking-012-Psithaca-commands-registration from
    (tezos-baking-012-Psithaca-commands.registration -> void_for_linking-tezos-baking-012-Psithaca-commands-registration.empty)
    (-> void_for_linking-tezos-baking-012-Psithaca-commands-registration.empty))
@@ -139,7 +136,6 @@
    (write-file void_for_linking-tezos-client-012-Psithaca-commands-registration.empty "")
    (write-file void_for_linking-tezos-client-013-PtJakart-commands-registration.empty "")
    (write-file void_for_linking-tezos-client-alpha-commands-registration.empty "")
-   (write-file void_for_linking-tezos-baking-011-PtHangz2-commands-registration.empty "")
    (write-file void_for_linking-tezos-baking-012-Psithaca-commands-registration.empty "")
    (write-file void_for_linking-tezos-baking-013-PtJakart-commands-registration.empty "")
    (write-file void_for_linking-tezos-baking-alpha-commands-registration.empty "")

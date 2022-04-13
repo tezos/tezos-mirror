@@ -2408,51 +2408,6 @@ let get_endorsement_has_bytes ~protocol client =
         Data_encoding.Binary.to_bytes_exn
           Tezos_protocol_alpha.Protocol.Operation_repr.encoding
           wrapped
-    | Protocol.Hangzhou ->
-        let endorsement = JSON.get "endorsement" contents in
-        let signature = get_signature endorsement in
-        let level =
-          Tezos_protocol_010_PtGRANAD.Protocol.Raw_level_repr.of_int32_exn
-            (Int32.of_int
-               (JSON.get "operations" endorsement
-               |> JSON.get "level" |> JSON.as_int))
-        in
-        let wrapped =
-          Tezos_protocol_010_PtGRANAD.Protocol.Operation_repr.
-            {
-              shell;
-              protocol_data =
-                Operation_data
-                  {
-                    contents =
-                      Single
-                        (Endorsement_with_slot
-                           {
-                             endorsement =
-                               {
-                                 shell;
-                                 protocol_data =
-                                   {
-                                     contents =
-                                       Single
-                                         (Tezos_protocol_010_PtGRANAD.Protocol
-                                          .Operation_repr
-                                          .Endorsement
-                                            {level});
-                                     signature = Some signature;
-                                   };
-                               };
-                             slot =
-                               Tezos_protocol_alpha.Protocol.Slot_repr.to_int
-                                 slot;
-                           });
-                    signature = None;
-                  };
-            }
-        in
-        Data_encoding.Binary.to_bytes_exn
-          Tezos_protocol_010_PtGRANAD.Protocol.Operation_repr.encoding
-          wrapped
   in
   Lwt.return (wrapped_bytes, hash)
 

@@ -41,36 +41,6 @@
   tags:
     - arm64
 
-unit:011_PtHangz2:
-  extends:
-  - .unit_test_template_x86_64_coverage
-  # We use an extra level of indirection for TEST_TARGETS, to avoid
-  # overly long job names causing GitLab CI to silently fail.
-  variables:
-    # Note the use of @ resp. @@ to select tests recursively resp. non-recursively
-    proto_011_PtHangz2__lib_protocol__1: >
-      @@src/proto_011_PtHangz2/lib_protocol/test/integration/runtest
-      @src/proto_011_PtHangz2/lib_protocol/test/integration/consensus/runtest
-      @src/proto_011_PtHangz2/lib_protocol/test/integration/gas/runtest
-    proto_011_PtHangz2__lib_protocol__2: >
-      @src/proto_011_PtHangz2/lib_protocol/test/integration/michelson/runtest
-      @src/proto_011_PtHangz2/lib_protocol/test/integration/operations/runtest
-    proto_011_PtHangz2__lib_protocol__3: >
-      @src/proto_011_PtHangz2/lib_protocol/test/pbt/runtest
-      @src/proto_011_PtHangz2/lib_protocol/test/unit/runtest
-    proto_011_PtHangz2: >
-      @src/proto_011_PtHangz2/lib_benchmark/runtest
-      @src/proto_011_PtHangz2/lib_client/runtest
-  parallel:
-    matrix:
-      - TEST_TARGETS:
-          - proto_011_PtHangz2__lib_protocol__1
-          - proto_011_PtHangz2__lib_protocol__2
-          - proto_011_PtHangz2__lib_protocol__3
-          - proto_011_PtHangz2
-  script:
-    - scripts/test_wrapper.sh $TEST_TARGETS ${!TEST_TARGETS}
-
 unit:012_Psithaca:
   extends:
   - .unit_test_template_x86_64_coverage

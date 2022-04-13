@@ -1,13 +1,7 @@
 TMP=/tmp
 
-CURRENT_PROTO=011-PtHangz2
-CURRENT_PROTO_HASH=PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx
-CURRENT_PROTO_NAME=Hangzhou
-NEXT_PROTO=012-Psithaca
-NEXT_PROTO_HASH=Psithaca2MLRFYargivpo7YvUr7wUDqyxrdhC5CQq78mRvimz6A
-NEXT_PROTO_NAME=Ithaca
-ALPHA_PROTO=alpha
-ALPHA_PROTO_HASH=ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
+CURRENT_PROTO_HASH=Psithaca2MLRFYargivpo7YvUr7wUDqyxrdhC5CQq78mRvimz6A
+CURRENT_PROTO_NAME=Ithaca
 
 .PHONY: all
 all: accusations_simple_double_endorsing
