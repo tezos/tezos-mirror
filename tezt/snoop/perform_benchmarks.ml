@@ -30,7 +30,7 @@ let bench_config name = Files.working_dir // sf "%s.json" name
 
 let default_bench_num = 300
 
-let default_nsamples = 3000
+let default_nsamples = 500
 
 (* ------------------------------------------------------------------------- *)
 (* Helpers *)
