@@ -1136,6 +1136,92 @@ let submit_tx_rollup_return_bond (cctxt : #full) ~chain ~block ?confirmations
   | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
       return (oph, op, result)
 
+let tx_rollup_dispatch_tickets (cctxt : #full) ~chain ~block ?confirmations
+    ?dry_run ?verbose_signing ?simulation ?fee ?gas_limit ?storage_limit
+    ?counter ~source ~src_pk ~src_sk ~fee_parameter ~level ~context_hash
+    ~message_position ~message_result_path ~tickets_info ~tx_rollup () =
+  let contents :
+      Kind.tx_rollup_dispatch_tickets Annotated_manager_operation.annotated_list
+      =
+    Annotated_manager_operation.Single_manager
+      (Injection.prepare_manager_operation
+         ~fee:(Limit.of_option fee)
+         ~gas_limit:(Limit.of_option gas_limit)
+         ~storage_limit:(Limit.of_option storage_limit)
+         (Tx_rollup_dispatch_tickets
+            {
+              tx_rollup;
+              level;
+              context_hash;
+              message_index = message_position;
+              message_result_path;
+              tickets_info;
+            }))
+  in
+  Injection.inject_manager_operation
+    cctxt
+    ~chain
+    ~block
+    ?confirmations
+    ?dry_run
+    ?verbose_signing
+    ?simulation
+    ?counter
+    ~source
+    ~successor_level:true
+    ~fee:(Limit.of_option fee)
+    ~storage_limit:(Limit.of_option storage_limit)
+    ~gas_limit:(Limit.of_option gas_limit)
+    ~src_pk
+    ~src_sk
+    ~fee_parameter
+    contents
+  >>=? fun (oph, op, result) ->
+  match Apply_results.pack_contents_list op result with
+  | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
+      return (oph, op, result)
+
+let transfer_ticket (cctxt : #full) ~chain ~block ?confirmations ?dry_run
+    ?verbose_signing ?simulation ?fee ?gas_limit ?storage_limit ?counter ~source
+    ~src_pk ~src_sk ~fee_parameter ~contents ~ty ~ticketer ~amount ~destination
+    ~entrypoint () =
+  parse_expression contents >>=? fun {expanded; _} ->
+  let contents = Script.lazy_expr expanded in
+  parse_expression ty >>=? fun {expanded; _} ->
+  let ty = Script.lazy_expr expanded in
+  let operation :
+      Kind.transfer_ticket Annotated_manager_operation.annotated_list =
+    Annotated_manager_operation.Single_manager
+      (Injection.prepare_manager_operation
+         ~fee:(Limit.of_option fee)
+         ~gas_limit:(Limit.of_option gas_limit)
+         ~storage_limit:(Limit.of_option storage_limit)
+         (Transfer_ticket
+            {contents; ty; ticketer; amount; destination; entrypoint}))
+  in
+  Injection.inject_manager_operation
+    cctxt
+    ~chain
+    ~block
+    ?confirmations
+    ?dry_run
+    ?verbose_signing
+    ?simulation
+    ?counter
+    ~source
+    ~successor_level:true
+    ~fee:(Limit.of_option fee)
+    ~storage_limit:(Limit.of_option storage_limit)
+    ~gas_limit:(Limit.of_option gas_limit)
+    ~src_pk
+    ~src_sk
+    ~fee_parameter
+    operation
+  >>=? fun (oph, op, result) ->
+  match Apply_results.pack_contents_list op result with
+  | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
+      return (oph, op, result)
+
 let sc_rollup_originate (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ?verbose_signing ?simulation ?fee ?gas_limit ?storage_limit ?counter ~source
     ~kind ~boot_sector ~src_pk ~src_sk ~fee_parameter () =
