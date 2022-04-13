@@ -102,6 +102,7 @@ type _ ty =
   | Mu_matching : 'a ty -> 'a list ty
   | Check_size : 'a ty -> 'a ty
   | StringEnum : int ty
+  | Add_padding : 'a ty * int -> 'a ty
   | CompactMake : 'a compactty -> 'a ty
   | CompactMake16 : 'a compactty -> 'a ty
 
@@ -187,6 +188,7 @@ let rec pp_ty : type a. a ty Crowbar.printer =
   | Mu_matching ty -> Crowbar.pp ppf "mu_matching(%a)" pp_ty ty
   | Check_size ty -> Crowbar.pp ppf "check_size(%a)" pp_ty ty
   | StringEnum -> Crowbar.pp ppf "string_enum"
+  | Add_padding (ty, n) -> Crowbar.pp ppf "add_padding(%a)(%d)" pp_ty ty n
   | CompactMake cty -> Crowbar.pp ppf "compact_make(%a)" pp_cty cty
   | CompactMake16 cty -> Crowbar.pp ppf "compact_make16(%a)" pp_cty cty
 
@@ -340,6 +342,9 @@ let any_ty_fix g =
         map [g] (fun (AnyTy ty_both) -> AnyTy (Matching2 (ty_both, ty_both)));
         map [g] (fun (AnyTy ty) -> AnyTy (Mu_matching ty));
         map [g] (fun (AnyTy ty) -> AnyTy (Check_size ty));
+        map
+          [g; range ~min:1 10]
+          (fun (AnyTy ty) n -> AnyTy (Add_padding (ty, n)));
       ]
   in
   with_printer pp_any_ty g
@@ -1100,6 +1105,22 @@ let full_string_enum : int full =
          ("seven", 7);
        ])
 
+let full_add_padding : type a. a full -> int -> a full =
+ fun full n ->
+  let module Full = (val full) in
+  match Data_encoding.classify Full.encoding with
+  | `Variable | `Dynamic -> Crowbar.bad_test ()
+  | `Fixed _ ->
+      (module struct
+        include Full
+
+        let ty = Add_padding (Full.ty, n)
+
+        let encoding = Data_encoding.Fixed.add_padding Full.encoding n
+
+        let pp ppf x = Crowbar.pp ppf "add_padding(%a)(%d)" Full.pp x n
+      end)
+
 module type COMPACTFULL = sig
   type t
 
@@ -1840,6 +1861,7 @@ let rec full_of_ty : type a. a ty -> a full = function
   | Mu_matching ty -> full_mu_matching (full_of_ty ty)
   | Check_size ty -> full_check_size (full_of_ty ty)
   | StringEnum -> full_string_enum
+  | Add_padding (ty, n) -> full_add_padding (full_of_ty ty) n
   | CompactMake cty -> full_make_compact (compactfull_of_compactty cty)
   | CompactMake16 cty -> full_make_compact16 (compactfull_of_compactty cty)
 
