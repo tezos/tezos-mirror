@@ -89,7 +89,12 @@ let contents_of_internal_operation (type kind)
     match operation with
     | Transaction {destination; amount; entrypoint; unparsed_parameters; _} ->
         Transaction
-          {destination; amount; entrypoint; parameters = unparsed_parameters}
+          {
+            destination;
+            amount;
+            entrypoint;
+            parameters = Script.lazy_expr unparsed_parameters;
+          }
     | Origination {origination; _} -> Origination origination
     | Delegation delegate -> Delegation delegate
   in

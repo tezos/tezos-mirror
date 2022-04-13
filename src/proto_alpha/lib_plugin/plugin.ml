@@ -2576,11 +2576,11 @@ module RPC = struct
                        ticket_diffs = _;
                      },
                      _ctxt ) ->
-          View_helpers.extract_parameter_from_operations
-            entrypoint
-            operations
-            viewer_contract
-          >>?= fun parameter -> Lwt.return (Script_repr.force_decode parameter)) ;
+          Lwt.return
+            (View_helpers.extract_parameter_from_operations
+               entrypoint
+               operations
+               viewer_contract)) ;
       Registration.register0
         ~chunked:true
         S.run_script_view

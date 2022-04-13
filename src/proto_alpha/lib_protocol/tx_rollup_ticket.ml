@@ -70,9 +70,7 @@ let parse_ticket_and_operation ~consume_deserialization_gas ~ticketer ~contents
   >>=? fun (parameters_expr, ctxt) ->
   Gas.consume ctxt (Script.strip_locations_cost parameters_expr)
   >>?= fun ctxt ->
-  let unparsed_parameters =
-    Script.lazy_expr (Micheline.strip_locations parameters_expr)
-  in
+  let unparsed_parameters = Micheline.strip_locations parameters_expr in
   fresh_internal_nonce ctxt >>?= fun (ctxt, nonce) ->
   let op =
     Script_typed_ir.Internal_operation

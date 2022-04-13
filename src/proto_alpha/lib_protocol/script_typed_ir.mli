@@ -1507,7 +1507,7 @@ and 'kind manager_operation =
       location : Script.location;
       parameters_ty : ('a, _) ty;
       parameters : 'a;
-      unparsed_parameters : Script.lazy_expr;
+      unparsed_parameters : Script.expr;
     }
       -> Kind.transaction manager_operation
   | Origination : {
