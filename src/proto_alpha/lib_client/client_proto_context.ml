@@ -871,7 +871,7 @@ let submit_tx_rollup_commitment (cctxt : #full) ~chain ~block ?confirmations
       with
       | Some content -> return content
       | None -> failwith "%s is not a valid message result hash notation" root)
-    (String.split_on_char '!' batches)
+    batches
   >>=? fun messages ->
   let predecessor =
     Option.map

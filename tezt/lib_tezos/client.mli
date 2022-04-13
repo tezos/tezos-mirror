@@ -1023,9 +1023,9 @@ module Tx_rollup : sig
     ?burn_cap:Tez.t ->
     ?storage_limit:int ->
     ?hooks:Process.hooks ->
+    ?predecessor:string ->
     level:int ->
     roots:string list ->
-    predecessor:string option ->
     inbox_merkle_root:string ->
     rollup:string ->
     src:string ->

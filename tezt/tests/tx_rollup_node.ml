@@ -1166,7 +1166,6 @@ let test_l2_proofs =
           ~level:0
           ~roots:[deposit_result_hash]
           ~inbox_merkle_root
-          ~predecessor:None
           ~rollup:tx_rollup_hash
           ~src:Constant.bootstrap3.public_key_hash
           client
@@ -1260,13 +1259,12 @@ let test_l2_proofs =
         Rollup.get_commitment ~rollup:tx_rollup_hash ~level:0 client
       in
       let prev_commitment = Option.get prev_commitment_opt in
-      let predecessor = Option.some prev_commitment.commitment_hash in
       let*! () =
         Client.Tx_rollup.submit_commitment
           ~level:1
           ~roots
           ~inbox_merkle_root
-          ~predecessor
+          ~predecessor:prev_commitment.commitment_hash
           ~rollup:tx_rollup_hash
           ~src:operator
           client

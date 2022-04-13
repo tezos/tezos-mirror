@@ -94,8 +94,8 @@ let submit_batch :
   let* _ = Node.wait_for_level node (current_level + 1) in
   return ()
 
-let submit_commitment ?(src = Constant.bootstrap1.public_key_hash) ~level ~roots
-    ~inbox_content ~predecessor {rollup; client; node} =
+let submit_commitment ?(src = Constant.bootstrap1.public_key_hash) ?predecessor
+    ~level ~roots ~inbox_content {rollup; client; node} =
   let* inbox_merkle_root =
     match inbox_content with
     | `Root inbox_merkle_root -> inbox_merkle_root
@@ -106,10 +106,10 @@ let submit_commitment ?(src = Constant.bootstrap1.public_key_hash) ~level ~roots
   let*! () =
     Client.Tx_rollup.submit_commitment
       ~hooks
+      ?predecessor
       ~level
       ~roots
       ~inbox_merkle_root
-      ~predecessor
       ~rollup
       ~src
       client
@@ -270,7 +270,6 @@ module Regressions = struct
           ~level:0
           ~roots:[Constant.tx_rollup_initial_message_result]
           ~inbox_content
-          ~predecessor:None
           state
       in
       let*! commitment =
@@ -410,7 +409,6 @@ module Regressions = struct
           ~level:0
           ~roots:[Constant.tx_rollup_initial_message_result]
           ~inbox_content
-          ~predecessor:None
           state
       in
       let*! _commitment =
@@ -672,7 +670,6 @@ module Regressions = struct
           ~level:0
           ~roots:[Constant.tx_rollup_initial_message_result]
           ~inbox_content
-          ~predecessor:None
           state
       in
       let* () = Client.bake_for client in
@@ -896,7 +893,6 @@ let test_rollup_with_two_commitments =
       ~level:0
       ~roots:[Constant.tx_rollup_initial_message_result]
       ~inbox_content
-      ~predecessor:None
       state
   in
   let* () =
@@ -971,7 +967,7 @@ let test_rollup_with_two_commitments =
       ~level:1
       ~roots:[Constant.tx_rollup_initial_message_result]
       ~inbox_content
-      ~predecessor
+      ?predecessor
       state
   in
   let* () =
@@ -1034,7 +1030,6 @@ let test_rollup_last_commitment_is_rejected =
       ~level:0
       ~roots:["txmr2DouKqJu5o8KEVGe6gLoiw1J3krjsxhf6C2a1kDNTTr8BdKpf2"]
       ~inbox_content
-      ~predecessor:None
       state
   in
   let* () =
@@ -1116,7 +1111,6 @@ let test_rollup_reject_position_one =
           "txmr2DouKqJu5o8KEVGe6gLoiw1J3krjsxhf6C2a1kDNTTr8BdKpf2";
         ]
       ~inbox_content
-      ~predecessor:None
       state
   in
   let* () =
@@ -1198,7 +1192,6 @@ let test_rollup_wrong_rejection =
       ~level:0
       ~roots:[Constant.tx_rollup_initial_message_result]
       ~inbox_content
-      ~predecessor:None
       state
   in
   let* () =
@@ -1289,7 +1282,6 @@ let test_rollup_wrong_path_for_rejection =
       ~level:0
       ~roots:[Constant.tx_rollup_initial_message_result]
       ~inbox_content
-      ~predecessor:None
       state
   in
   let* () =
@@ -1358,7 +1350,6 @@ let test_rollup_wrong_rejection_long_path =
       ~level:0
       ~roots:[Constant.tx_rollup_initial_message_result]
       ~inbox_content
-      ~predecessor:None
       state
   in
   let* () =
@@ -1493,7 +1484,7 @@ let test_rollup_bond_return =
           ~src
           ~level:rollup_level
           ~roots:[Constant.tx_rollup_initial_message_result]
-          ~predecessor:s.Rollup.commitment_newest_hash
+          ?predecessor:s.Rollup.commitment_newest_hash
           ~inbox_content:(`Content [batch])
           state
       in
@@ -1674,7 +1665,7 @@ let test_deposit_withdraw_max_big_tickets =
       ~src:account
       ~level:tx_rollup_level
       ~roots:[message_result_hash]
-      ~predecessor:tx_rollup_state.commitment_newest_hash
+      ?predecessor:tx_rollup_state.commitment_newest_hash
       ~inbox_content:(`Content [deposit])
       state
   in

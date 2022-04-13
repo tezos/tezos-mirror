@@ -2327,7 +2327,7 @@ let commands_rw () =
     command
       ~group
       ~desc:"Submit an optimistic transaction rollup commitment operation."
-      (args12
+      (args13
          fee_arg
          dry_run_switch
          verbose_signing_switch
@@ -2339,33 +2339,35 @@ let commands_rw () =
          counter_arg
          force_low_fee_arg
          fee_cap_arg
-         burn_cap_arg)
-      (prefixes ["submit"; "tx"; "rollup"; "commitment"]
+         burn_cap_arg
+         (arg
+            ~long:"predecessor-hash"
+            ~doc:
+              "a bytes representation of the predecessor commitment in \
+               hexadecimal form, or empty for no predecessor."
+            ~placeholder:"predecessor commitment hash"
+            string_parameter))
+      (prefixes ["commit"; "to"; "tx"; "rollup"]
+      @@ tx_rollup_param @@ prefix "from"
+      @@ ContractAlias.destination_param
+           ~name:"src"
+           ~desc:"name of the account submitting the commitment."
+      @@ prefixes ["for"; "level"]
       @@ Clic.param
            ~name:"level"
            ~desc:"The level"
            Client_proto_args.int_parameter
+      @@ prefixes ["with"; "inbox"; "hash"]
       @@ Clic.param
            ~name:"inbox_merkle_root"
            ~desc:"the inbox merkle root to commit to in b58check notation."
            Client_proto_args.string_parameter
-      @@ Clic.param
-           ~name:"predecessor"
-           ~desc:
-             "a bytes representation of the predecessor commitment in \
-              hexadecimal form, or empty for no predecessor."
-           Client_proto_args.string_parameter
-      @@ Clic.param
-           ~name:"batches"
-           ~desc:
-             "a bytes representation of the commitment roots in hex and, \
-              separated by !."
-           Client_proto_args.string_parameter
-      @@ prefix "to" @@ tx_rollup_param @@ prefix "from"
-      @@ ContractAlias.destination_param
-           ~name:"src"
-           ~desc:"name of the account submitting the commitment."
-      @@ stop)
+      @@ prefixes ["and"; "messages"; "result"; "hash"]
+      @@ seq_of_param
+           (Clic.param
+              ~name:"batches"
+              ~desc:"a bytes representation of a message result hash in hex"
+              Client_proto_args.string_parameter))
       (fun ( fee,
              dry_run,
              verbose_signing,
@@ -2377,13 +2379,13 @@ let commands_rw () =
              counter,
              force_low_fee,
              fee_cap,
-             burn_cap )
-           level
-           inbox_merkle_root
-           predecessor
-           batches
+             burn_cap,
+             predecessor )
            tx_rollup
            (_, source)
+           level
+           inbox_merkle_root
+           batches
            cctxt ->
         let level = Int32.of_int level in
         match Contract.is_implicit source with
@@ -2401,9 +2403,6 @@ let commands_rw () =
                 fee_cap;
                 burn_cap;
               }
-            in
-            let predecessor =
-              if String.equal predecessor "" then None else Some predecessor
             in
             submit_tx_rollup_commitment
               cctxt

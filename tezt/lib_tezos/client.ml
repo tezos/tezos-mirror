@@ -1311,25 +1311,19 @@ module Tx_rollup = struct
     let parse process = Process.check process in
     {value = process; run = parse}
 
-  let submit_commitment ?(wait = "none") ?burn_cap ?storage_limit ?hooks ~level
-      ~roots ~predecessor ~inbox_merkle_root ~rollup ~src client =
+  let submit_commitment ?(wait = "none") ?burn_cap ?storage_limit ?hooks
+      ?predecessor ~level ~roots ~inbox_merkle_root ~rollup ~src client =
     let process =
-      let predecessor = Option.value ~default:"" predecessor in
       spawn_command
         ?hooks
         client
         (["--wait"; wait]
-        @ [
-            "submit";
-            "tx";
-            "rollup";
-            "commitment";
-            Int.to_string level;
-            inbox_merkle_root;
-            predecessor;
-          ]
-        @ [String.concat "!" roots]
-        @ ["to"; rollup; "from"; src]
+        @ ["commit"; "to"; "tx"; "rollup"; rollup; "from"; src]
+        @ ["for"; "level"; Int.to_string level]
+        @ ["with"; "inbox"; "hash"; inbox_merkle_root]
+        @ ["and"; "messages"; "result"; "hash"]
+        @ roots
+        @ optional_arg ~name:"predecessor-hash" (fun s -> s) predecessor
         @ optional_arg ~name:"burn-cap" Tez.to_string burn_cap
         @ optional_arg ~name:"storage-limit" string_of_int storage_limit)
     in

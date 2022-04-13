@@ -487,7 +487,7 @@ val submit_tx_rollup_commitment :
   fee_parameter:Injection.fee_parameter ->
   level:int32 ->
   inbox_merkle_root:string ->
-  batches:string ->
+  batches:string list ->
   predecessor:string option ->
   tx_rollup:Tx_rollup.t ->
   unit ->
