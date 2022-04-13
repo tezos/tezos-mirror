@@ -504,18 +504,34 @@ let apply ctxt gas capture_ty capture lam =
    instantiated with argument [parameters] of type [parameters_ty]. *)
 let transfer (ctxt, sc) gas amount location parameters_ty parameters destination
     entrypoint =
-  (* [craft_transfer_parameters ctxt tp p] reorganizes, if need be, the
+  (* [craft_transfer_operation ctxt tp p] reorganizes, if need be, the
      parameters submitted by the interpreter to prepare them for the
-     [Transaction] operation. *)
-  let craft_transfer_parameters :
+     [Transaction] operation and build the operation. *)
+  let craft_transfer_operation :
       type a ac.
       context ->
       (a, ac) ty ->
       (location, prim) Micheline.node ->
       Destination.t ->
-      ((location, prim) Micheline.node * context) tzresult =
-   fun ctxt tp p -> function
-    | Contract _ -> ok (p, ctxt)
+      (Kind.transaction manager_operation * context) tzresult =
+   fun ctxt tp unparsed_parameters -> function
+    | Contract _ ->
+        Gas.consume ctxt (Script.strip_locations_cost unparsed_parameters)
+        >|? fun ctxt ->
+        let unparsed_parameters =
+          Micheline.strip_locations unparsed_parameters
+        in
+        ( Transaction
+            {
+              destination;
+              amount;
+              entrypoint;
+              location;
+              parameters_ty;
+              parameters;
+              unparsed_parameters;
+            },
+          ctxt )
     (* The entrypoints of a transaction rollup are polymorphic wrt. the
        tickets it can process. However, two Michelson values can have
        the same Micheline representation, but different types. What
@@ -528,11 +544,32 @@ let transfer (ctxt, sc) gas amount location parameters_ty parameters destination
        the smart contract. This allows the transaction rollup to extract
        the type of the ticket. *)
     | Tx_rollup _ -> (
-        let open Micheline in
         match tp with
         | Pair_t (Ticket_t (tp, _), _, _, _) ->
-            Script_ir_translator.unparse_ty ~loc:dummy_location ctxt tp
-            >|? fun (ty, ctxt) -> (Seq (dummy_location, [p; ty]), ctxt)
+            Script_ir_translator.unparse_ty
+              ~loc:Micheline.dummy_location
+              ctxt
+              tp
+            >>? fun (ty, ctxt) ->
+            let unparsed_parameters =
+              Micheline.Seq (Micheline.dummy_location, [unparsed_parameters; ty])
+            in
+            Gas.consume ctxt (Script.strip_locations_cost unparsed_parameters)
+            >|? fun ctxt ->
+            let unparsed_parameters =
+              Micheline.strip_locations unparsed_parameters
+            in
+            ( Transaction
+                {
+                  destination;
+                  amount;
+                  entrypoint;
+                  location;
+                  parameters_ty;
+                  parameters;
+                  unparsed_parameters;
+                },
+              ctxt )
         | _ ->
             (* TODO: https://gitlab.com/tezos/tezos/-/issues/2455
                Refute this branch thanks to the type system.
@@ -542,7 +579,6 @@ let transfer (ctxt, sc) gas amount location parameters_ty parameters destination
                refactoring away to reach it. *)
             assert false)
   in
-
   let ctxt = update_context gas ctxt in
   collect_lazy_storage ctxt parameters_ty parameters
   >>?= fun (to_duplicate, ctxt) ->
@@ -558,23 +594,8 @@ let transfer (ctxt, sc) gas amount location parameters_ty parameters destination
   >>=? fun (parameters, lazy_storage_diff, ctxt) ->
   unparse_data ctxt Optimized parameters_ty parameters
   >>=? fun (unparsed_parameters, ctxt) ->
-  craft_transfer_parameters ctxt parameters_ty unparsed_parameters destination
-  >>?= fun (unparsed_parameters, ctxt) ->
-  Gas.consume ctxt (Script.strip_locations_cost unparsed_parameters)
-  >>?= fun ctxt ->
-  let unparsed_parameters = Micheline.strip_locations unparsed_parameters in
-  let operation =
-    Transaction
-      {
-        destination;
-        amount;
-        entrypoint;
-        location;
-        parameters_ty;
-        parameters;
-        unparsed_parameters;
-      }
-  in
+  craft_transfer_operation ctxt parameters_ty unparsed_parameters destination
+  >>?= fun (operation, ctxt) ->
   fresh_internal_nonce ctxt >>?= fun (ctxt, nonce) ->
   let iop = {source = sc.self; operation; nonce} in
   let res = {piop = Internal_operation iop; lazy_storage_diff} in
