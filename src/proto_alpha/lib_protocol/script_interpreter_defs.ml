@@ -562,14 +562,20 @@ let transfer (ctxt, sc) gas amount location parameters_ty parameters destination
   >>?= fun (unparsed_parameters, ctxt) ->
   Gas.consume ctxt (Script.strip_locations_cost unparsed_parameters)
   >>?= fun ctxt ->
-  let transaction =
-    let parameters =
-      Script.lazy_expr (Micheline.strip_locations unparsed_parameters)
-    in
-    {amount; destination; entrypoint; parameters}
+  let unparsed_parameters =
+    Script.lazy_expr (Micheline.strip_locations unparsed_parameters)
   in
   let operation =
-    Transaction {transaction; location; parameters_ty; parameters}
+    Transaction
+      {
+        destination;
+        amount;
+        entrypoint;
+        location;
+        parameters_ty;
+        parameters;
+        unparsed_parameters;
+      }
   in
   fresh_internal_nonce ctxt >>?= fun (ctxt, nonce) ->
   let iop = {source = sc.self; operation; nonce} in

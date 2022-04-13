@@ -391,14 +391,11 @@ let transfer_operation ctxt ~src ~destination ~arg_type ~arg =
           operation =
             Transaction
               {
-                transaction =
-                  {
-                    amount = Tez.zero;
-                    parameters =
-                      Script.lazy_expr @@ Micheline.strip_locations params_node;
-                    entrypoint = Entrypoint.default;
-                    destination = Destination.Contract destination;
-                  };
+                amount = Tez.zero;
+                unparsed_parameters =
+                  Script.lazy_expr @@ Micheline.strip_locations params_node;
+                entrypoint = Entrypoint.default;
+                destination = Destination.Contract destination;
                 location = Micheline.dummy_location;
                 parameters_ty = arg_type;
                 parameters = arg;

@@ -1468,13 +1468,10 @@ module View_helpers = struct
          operation =
            Transaction
              {
-               transaction =
-                 {
-                   destination = Contract destination;
-                   parameters;
-                   entrypoint = _;
-                   amount = _;
-                 };
+               destination = Contract destination;
+               unparsed_parameters;
+               entrypoint = _;
+               amount = _;
                parameters = _;
                parameters_ty = _;
                location = _;
@@ -1484,7 +1481,7 @@ module View_helpers = struct
        };
     ]
       when Contract.equal destination callback ->
-        ok parameters
+        ok unparsed_parameters
     | [] ->
         Environment.Error_monad.error
           (View_never_returns (entrypoint, callback))

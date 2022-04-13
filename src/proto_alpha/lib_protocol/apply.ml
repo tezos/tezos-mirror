@@ -1185,8 +1185,10 @@ let apply_internal_manager_operation_content :
   match operation with
   | Transaction
       {
-        transaction =
-          {amount; parameters = _; destination = Contract contract; entrypoint};
+        amount;
+        unparsed_parameters = _;
+        destination = Contract contract;
+        entrypoint;
         location;
         parameters_ty;
         parameters = typed_parameters;
@@ -1209,8 +1211,10 @@ let apply_internal_manager_operation_content :
         operations )
   | Transaction
       {
-        transaction =
-          {amount; destination = Tx_rollup dst; entrypoint; parameters = _};
+        amount;
+        destination = Tx_rollup dst;
+        entrypoint;
+        unparsed_parameters = _;
         location = _;
         parameters_ty;
         parameters;

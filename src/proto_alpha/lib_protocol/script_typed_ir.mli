@@ -1496,15 +1496,18 @@ and ('input, 'output) view_signature =
 
 and 'kind manager_operation =
   | Transaction : {
-      (* The [transaction.parameters] field may seem useless since we have
+      (* The [unparsed_parameters] field may seem useless since we have
          access to a typed version of the field (with [parameters_ty] and
          [parameters]), but we keep it so that we do not have to unparse the
          typed version in order to produce the receipt
          ([Apply_results.internal_manager_operation]). *)
-      transaction : Alpha_context.transaction;
+      destination : Destination.t;
+      amount : Tez.tez;
+      entrypoint : Entrypoint.t;
       location : Script.location;
       parameters_ty : ('a, _) ty;
       parameters : 'a;
+      unparsed_parameters : Script.lazy_expr;
     }
       -> Kind.transaction manager_operation
   | Origination : {

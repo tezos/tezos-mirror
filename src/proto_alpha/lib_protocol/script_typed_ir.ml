@@ -1368,10 +1368,13 @@ and ('input, 'output) view_signature =
 
 and 'kind manager_operation =
   | Transaction : {
-      transaction : Alpha_context.transaction;
+      destination : Destination.t;
+      amount : Tez.tez;
+      entrypoint : Entrypoint.t;
       location : Script.location;
       parameters_ty : ('a, _) ty;
       parameters : 'a;
+      unparsed_parameters : Script.lazy_expr;
     }
       -> Kind.transaction manager_operation
   | Origination : {
