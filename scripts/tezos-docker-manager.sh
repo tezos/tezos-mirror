@@ -637,13 +637,6 @@ command="$1"
 if [ "$#" -eq 0 ] ; then usage ; exit 1;  else shift ; fi
 
 case $(basename "$0") in
-    hangzhounet.sh)
-        docker_base_dir="$HOME/.tezos-hangzhounet"
-        docker_image=tezos/tezos:master
-        docker_compose_base_name=hangzhounet
-        default_port=9732
-        network=hangzhounet
-        ;;
     ithacanet.sh)
         docker_base_dir="$HOME/.tezos-ithacanet"
         docker_image=tezos/tezos:master
