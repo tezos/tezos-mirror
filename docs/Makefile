@@ -25,7 +25,8 @@ ACTIVE_SHORT   = $(ITHACA_SHORT)
 SCRIPTSDIR     = scripts
 CHECKXREFS     = $(SCRIPTSDIR)/check_proto_xrefs.py
 
-all: manuals odoc html
+all: manuals odoc
+	${MAKE} html
 
 main:
 	${MAKE} -C .. all
