@@ -28,8 +28,10 @@ type 'a known = Unknown | Known of 'a
 module Parameters = struct
   type persistent_state = {
     data_dir : string;
+    operator_pkh : string;
     rpc_host : string;
     rpc_port : int;
+    client : Client.t;
     node : Node.t;
     mutable pending_ready : unit option Lwt.u list;
     mutable pending_level : (int * int option Lwt.u) list;
@@ -73,6 +75,14 @@ let endpoint sc_node =
 
 let data_dir sc_node = sc_node.persistent_state.data_dir
 
+let base_dir sc_node = Client.base_dir sc_node.persistent_state.client
+
+let operator_pkh sc_node = sc_node.persistent_state.operator_pkh
+
+let layer1_addr sc_node = Node.rpc_host sc_node.persistent_state.node
+
+let layer1_port sc_node = Node.rpc_port sc_node.persistent_state.node
+
 let spawn_command sc_node =
   Process.spawn ~name:sc_node.name ~color:sc_node.color sc_node.path
 
@@ -84,6 +94,9 @@ let spawn_config_init sc_node rollup_address =
       "init";
       "on";
       rollup_address;
+      "with";
+      "operator";
+      operator_pkh sc_node;
       "--data-dir";
       data_dir sc_node;
       "--rpc-addr";
@@ -184,7 +197,8 @@ let handle_event sc_node {name; value} =
   | _ -> ()
 
 let create ?(path = Constant.sc_rollup_node) ?name ?color ?data_dir ?event_pipe
-    ?(rpc_host = "127.0.0.1") ?rpc_port (node : Node.t) =
+    ?(rpc_host = "127.0.0.1") ?rpc_port ~operator_pkh (node : Node.t)
+    (client : Client.t) =
   let name = match name with None -> fresh_name () | Some name -> name in
   let data_dir =
     match data_dir with None -> Temp.dir name | Some dir -> dir
@@ -202,7 +216,9 @@ let create ?(path = Constant.sc_rollup_node) ?name ?color ?data_dir ?event_pipe
         data_dir;
         rpc_host;
         rpc_port;
+        operator_pkh;
         node;
+        client;
         pending_ready = [];
         pending_level = [];
       }
@@ -213,10 +229,9 @@ let create ?(path = Constant.sc_rollup_node) ?name ?color ?data_dir ?event_pipe
 let make_arguments node =
   [
     "--endpoint";
-    Printf.sprintf
-      "http://%s:%d"
-      (Node.rpc_host node.persistent_state.node)
-      (Node.rpc_port node.persistent_state.node);
+    Printf.sprintf "http://%s:%d" (layer1_addr node) (layer1_port node);
+    "--base-dir";
+    base_dir node;
   ]
 
 let do_runlike_command node arguments =

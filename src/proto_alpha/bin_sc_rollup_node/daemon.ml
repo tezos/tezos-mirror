@@ -58,12 +58,27 @@ let run ~data_dir (cctxt : Protocol_client_context.full) =
     let*! () = Event.starting_node () in
     let* configuration = Configuration.load ~data_dir in
     let open Configuration in
-    let {rpc_addr; rpc_port; sc_rollup_address; _} = configuration in
+    let {rpc_addr; rpc_port; sc_rollup_address; sc_rollup_node_operator; _} =
+      configuration
+    in
     let*! store = Store.load configuration in
+    let* rpc_server = RPC_server.Arith.start store configuration in
+    (* TODO:https://gitlab.com/tezos/tezos/-/issues/2791
+       The Constants module should be deprecated in favour of a data
+       structure that contains rollup address, rollup node operator
+       address, and rollup origination level.
+    *)
+    let* () = Constants.init cctxt sc_rollup_address sc_rollup_node_operator in
+    (* Check that the public key hash is valid *)
+    let* (_pkh, _pk, _skh) = Constants.get_operator_keys cctxt in
+    (* Do not reorder the operations above this one, as
+        State depends on the RPC server to fetch the initial
+        rollup level, and modules below depend on State
+        to fetch in-memory variables
+    *)
     let* tezos_heads = Layer1.start configuration cctxt store in
     let*! () = Inbox.start store sc_rollup_address in
     let* () = Interpreter.Arith.start store in
-    let* rpc_server = RPC_server.Arith.start store configuration in
     let _ = install_finalizer store rpc_server in
     let*! () = Event.node_is_ready ~rpc_addr ~rpc_port in
     daemonize cctxt store tezos_heads

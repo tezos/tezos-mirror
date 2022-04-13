@@ -23,6 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* module Constants will be shadowed by Alpha_context.Constansts
+   once we open Alpha_context, hence we we alias it to Rollup_node_constants
+*)
+module Rollup_node_constants = Constants
 open Protocol
 open Alpha_context
 module Block_services = Block_services.Make (Protocol) (Protocol)
@@ -32,10 +36,6 @@ let head_processing_failure e =
     "Error during head processing: @[%a@]"
     Error_monad.(TzTrace.pp_print_top pp)
     e ;
-  Lwt_exit.exit_and_raise 1
-
-let unstarted_failure () =
-  Format.eprintf "Sc rollup node inbox is not started.\n" ;
   Lwt_exit.exit_and_raise 1
 
 module State = struct
@@ -50,14 +50,6 @@ module State = struct
   let inbox_of_hash = Store.Inboxes.get
 
   let history_of_hash = Store.Histories.get
-
-  let (set_sc_rollup_address, get_sc_rollup_address) =
-    let sc_rollup_address = ref None in
-    ( (fun x -> sc_rollup_address := Some x),
-      fun () ->
-        match !sc_rollup_address with
-        | None -> unstarted_failure ()
-        | Some a -> a )
 
   let get_message_tree = Store.MessageTrees.get
 
@@ -88,7 +80,7 @@ let get_messages cctxt head rollup =
   List.concat_map process_operations operations
 
 let process_head cctxt store Layer1.(Head {level; hash = head_hash} as head) =
-  let rollup = State.get_sc_rollup_address () in
+  let rollup = Rollup_node_constants.get_sc_rollup_address () in
   let open Lwt_result_syntax in
   get_messages cctxt (head_hash, level) rollup >>= function
   | Error e -> head_processing_failure e
@@ -139,7 +131,6 @@ let inbox_of_hash = State.inbox_of_hash
 
 let start store sc_rollup_address =
   let open Lwt_syntax in
-  State.set_sc_rollup_address sc_rollup_address ;
   Inbox_event.starting () >>= fun () ->
   State.inbox_exists store Layer1.genesis_hash >>= function
   | false ->
