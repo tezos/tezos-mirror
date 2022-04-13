@@ -21,10 +21,10 @@ or added in the diff is also recognized.
 The deleted lines are added in a queue. When an added line is found, it is
 compared with the oldest line in the queue. If they match (meaning that they
 concern the same kind of gas change; both lines contain "Estimated gas: " for
-example), then the synthesis ([Synth.synth]) for this kind are updated
+example), then the synthesis ([Synth.synth]) for this kind is updated
 ([Synths.update]).
 
-The reason for a queue of deleted lines instead of a just a single deleted line
+The reason for a queue of deleted lines instead of just a single deleted line
 is that [git diff] does not always produce a sequence of a deletion followed by
 an addition. Indeed, we can also find several lines being deleted and then,
 after this batch, the corresponding added lines.
@@ -190,9 +190,9 @@ module Synth = struct
   (* The synthesis associated to a kind that has an amount for parameter. *)
   type synth = {
     old : Decimal.t;
-    (* The accumalated amount from deleted lines. *)
+    (* The accumulated amount from deleted lines. *)
     new_ : Decimal.t;
-    (* The accumalated amount from added lines. *)
+    (* The accumulated amount from added lines. *)
     (* The maximum amount loss on a line (with regards to [dir] below). *)
     max_loss : Decimal.t;
     (* The maximum amount loss in percentage on a line (with regards to [dir]
