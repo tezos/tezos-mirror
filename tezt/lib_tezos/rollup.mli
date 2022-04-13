@@ -86,6 +86,21 @@ module Tx_rollup : sig
     amount:int64 ->
     [> deposit]
 
+  type withdraw = {claimer : string; ticket_hash : string; amount : int64}
+
+  val json_of_withdraw : withdraw -> JSON.u
+
+  type ticket_dispatch_info = {
+    contents : string;
+    ty : string;
+    ticketer : string;
+    amount : int64;
+    claimer : string;
+  }
+
+  val get_json_of_ticket_dispatch_info :
+    ticket_dispatch_info -> Client.t -> JSON.u Lwt.t
+
   val get_state :
     ?hooks:Process.hooks -> rollup:string -> Client.t -> state Runnable.process
 
@@ -146,7 +161,7 @@ module Tx_rollup : sig
 
   val withdraw_list_hash :
     ?hooks:Process.hooks ->
-    withdrawals:string list ->
+    withdrawals:withdraw list ->
     Client.t ->
     string Runnable.process
 

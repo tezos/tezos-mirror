@@ -123,6 +123,38 @@ module Tx_rollup = struct
     | `Batch batch -> json_of_batch batch
     | `Deposit deposit -> json_of_deposit deposit
 
+  type withdraw = {claimer : string; ticket_hash : string; amount : int64}
+
+  let json_of_withdraw {claimer; ticket_hash; amount} =
+    `O
+      [
+        ("claimer", `String claimer);
+        ("ticket_hash", `String ticket_hash);
+        ("amount", `String (Int64.to_string amount));
+      ]
+
+  type ticket_dispatch_info = {
+    contents : string;
+    ty : string;
+    ticketer : string;
+    amount : int64;
+    claimer : string;
+  }
+
+  let get_json_of_ticket_dispatch_info {contents; ty; ticketer; amount; claimer}
+      client =
+    let* contents_json = Client.convert_data_to_json ~data:contents client in
+    let* ty_json = Client.convert_data_to_json ~data:ty client in
+    return
+      (`O
+        [
+          ("contents", contents_json);
+          ("ty", ty_json);
+          ("ticketer", `String ticketer);
+          ("amount", `String (Int64.to_string amount));
+          ("claimer", `String claimer);
+        ])
+
   let get_state ?hooks ~rollup client =
     let parse json =
       let finalized_commitments =
@@ -270,7 +302,7 @@ module Tx_rollup = struct
   let withdraw_list_hash ?hooks ~withdrawals client =
     let parse json = JSON.(json |-> "hash" |> as_string) in
     let data =
-      `O [("withdraw_list", `A (List.map (fun x -> `String x) withdrawals))]
+      `O [("withdraw_list", `A (List.map json_of_withdraw withdrawals))]
     in
     RPC.Tx_rollup.Forge.Withdraw.withdraw_list_hash ?hooks ~data client
     |> Runnable.map parse
