@@ -106,23 +106,6 @@ module type CORE = sig
     ('err -> error) ->
     unit
 
-  (** Same as [register_error_kind] but allow errors to wrap other errors.
-
-      The encoding argument is a function which will be given the encoding of
-      errors as argument so that you can encode errors in errors using a fixpoint.
-
-      Another difference with [register_error_kind] is that [pp] is mandatory. *)
-  val register_recursive_error_kind :
-    error_category ->
-    id:string ->
-    title:string ->
-    description:string ->
-    pp:(Format.formatter -> 'err -> unit) ->
-    (error Data_encoding.t -> 'err Data_encoding.t) ->
-    (error -> 'err option) ->
-    ('err -> error) ->
-    unit
-
   (** Classify an error using the registered kinds *)
   val classify_error : error -> Error_classification.t
 

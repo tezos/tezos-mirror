@@ -404,32 +404,6 @@ let receive {channel; _} = Channel.pop channel
 
 let wait_result {termination; _} : 'result tzresult Lwt.t = termination
 
-type error += Par of (int * string * error) list
-
-let pp_par_error ppf plist =
-  pp_grouped ppf plist (fun plural ppf err -> pp_trace plural ppf [err])
-
-let () =
-  register_recursive_error_kind
-    `Temporary
-    ~id:"parallel_errors"
-    ~title:"Parallel errors"
-    ~description:
-      "An error occured in at least one thread of a paralle\n  execution."
-    ~pp:(fun ppf s -> Format.fprintf ppf "@[%a@]@." pp_par_error s)
-    Data_encoding.(
-      fun error_encoding ->
-        obj1
-          (req
-             "error_list"
-             (list
-                (obj3
-                   (req "processor" int16)
-                   (req "prefix" string)
-                   (req "error" error_encoding)))))
-    (function Par lst -> Some lst | _ -> None)
-    (fun lst -> Par lst)
-
 let join_process (plist : ('a, 'b, 'c) t list) =
   let open Lwt_syntax in
   List.map_p
@@ -473,7 +447,7 @@ let wait_all_results (processes : ('a, 'b, 'c) t list) =
       match List.partition_result terminated with
       | (_, _ :: _) -> assert false
       | (terminated, []) -> return_ok terminated)
-  | Some (_err, remaining) ->
+  | Some (_err, remaining) -> (
       let* () = lwt_log_error "Early error! Canceling remaining process." in
       List.iter Lwt.cancel remaining ;
       let* terminated = join_process processes in
@@ -484,18 +458,28 @@ let wait_all_results (processes : ('a, 'b, 'c) t list) =
         List.filter_map
           (function
             | (_, _, Ok _) -> None
-            | (i, prefix, Error (err :: _)) -> Some (i, prefix, err)
             | (i, prefix, Error []) ->
                 Some
-                  ( i,
-                    prefix,
-                    Exn
-                      (Invalid_argument "process returned an empty error trace")
-                  ))
+                  (TzTrace.make
+                     (Exn
+                        (Invalid_argument
+                           (Format.asprintf
+                              "process %d(%s) returned an empty error trace"
+                              i
+                              (String.trim prefix)))))
+            | (i, prefix, Error trace) ->
+                Some
+                  (TzTrace.cons
+                     (Exn
+                        (Failure
+                           (Format.asprintf "%d(%s)" i (String.trim prefix))))
+                     trace))
           terminated
       in
       let* _ = print_results terminated in
-      Lwt_tzresult_syntax.fail (Par errors)
+      match errors with
+      | [] -> assert false
+      | err :: errs -> Lwt.return_error (TzTrace.conp_list err errs))
 
 let wait_all pl =
   let open Lwt_result_syntax in

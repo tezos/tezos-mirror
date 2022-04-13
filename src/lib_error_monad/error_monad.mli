@@ -41,8 +41,7 @@ type error_category =
 (** The main error type.
 
     Whenever you add a variant to this type (with [type Error_monad.error += …])
-    you must also register the error with {!register_error_kind} (or
-    {!register_recursive_error_kind} if the error payload contains errors).
+    you must also register the error with {!register_error_kind}.
 
     These errors are not meant to be inspected in general. Meaning that they
     should not be matched upon. Consequently it is acceptable to register an
