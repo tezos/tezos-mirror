@@ -155,7 +155,7 @@ This sequence of operations was run:
       0
 
 
-./tezos-client --wait none submit tx rollup remove commitment to '[TX_ROLLUP_HASH]' from '[PUBLIC_KEY_HASH]'
+./tezos-client --wait none remove commitment of tx rollup '[TX_ROLLUP_HASH]' from '[PUBLIC_KEY_HASH]'
 Node is bootstrapped.
 This simulation failed:
   Manager signed operations:
@@ -184,7 +184,7 @@ Error:
   "tezos_head_level": 3, "burn_per_byte": "0", "allocated_storage": "4000",
   "occupied_storage": "0", "inbox_ema": 0, "commitments_watermark": 0 }
 
-./tezos-client --wait none submit tx rollup remove commitment to '[TX_ROLLUP_HASH]' from '[PUBLIC_KEY_HASH]'
+./tezos-client --wait none remove commitment of tx rollup '[TX_ROLLUP_HASH]' from '[PUBLIC_KEY_HASH]'
 Node is bootstrapped.
 Estimated gas: 3171.024 units (will add 100 for safety)
 Estimated storage: no bytes added

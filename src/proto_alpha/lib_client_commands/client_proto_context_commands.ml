@@ -2582,8 +2582,8 @@ let commands_rw () =
          force_low_fee_arg
          fee_cap_arg
          burn_cap_arg)
-      (prefixes ["submit"; "tx"; "rollup"; "remove"; "commitment"]
-      @@ prefix "to" @@ tx_rollup_param @@ prefix "from"
+      (prefixes ["remove"; "commitment"; "of"; "tx"; "rollup"]
+      @@ tx_rollup_param @@ prefix "from"
       @@ ContractAlias.destination_param
            ~name:"src"
            ~desc:"name of the account removing the commitment."
