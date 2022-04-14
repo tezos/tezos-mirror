@@ -1,0 +1,22 @@
+view_toplevel_lib.out
+
+trace
+  - CAR (interp) @ location: 7 (remaining gas: unaccounted)
+    [ (Pair 5 3) ]
+  - CAR (entry) @ location: 7 (remaining gas: unaccounted)
+    [ (Pair 5 3) ]
+    - [log] (exit) @ location: 7 (remaining gas: unaccounted)
+      [ 5 ]
+  - NIL (entry) @ location: 8 (remaining gas: unaccounted)
+    [ 5 ]
+    - [log] (exit) @ location: 8 (remaining gas: unaccounted)
+      [ {}
+        5 ]
+  - PAIR (entry) @ location: 10 (remaining gas: unaccounted)
+    [ {}
+      5 ]
+    - [log] (exit) @ location: 10 (remaining gas: unaccounted)
+      [ (Pair {} 5) ]
+  - [halt] (entry) @ location: 6 (remaining gas: unaccounted)
+    [ (Pair {} 5) ]
+    - control: KNil

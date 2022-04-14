@@ -1,0 +1,235 @@
+comb-get.out
+
+trace
+  - CAR (interp) @ location: 11 (remaining gas: unaccounted)
+    [ (Pair (Pair 1 4 2 Unit) Unit) ]
+  - CAR (entry) @ location: 11 (remaining gas: unaccounted)
+    [ (Pair (Pair 1 4 2 Unit) Unit) ]
+    - [log] (exit) @ location: 11 (remaining gas: unaccounted)
+      [ (Pair 1 4 2 Unit) ]
+  - DUP (entry) @ location: 12 (remaining gas: unaccounted)
+    [ (Pair 1 4 2 Unit) ]
+    - [log] (exit) @ location: 12 (remaining gas: unaccounted)
+      [ (Pair 1 4 2 Unit)
+        (Pair 1 4 2 Unit) ]
+  - CAR (entry) @ location: 13 (remaining gas: unaccounted)
+    [ (Pair 1 4 2 Unit)
+      (Pair 1 4 2 Unit) ]
+    - [log] (exit) @ location: 13 (remaining gas: unaccounted)
+      [ 1
+        (Pair 1 4 2 Unit) ]
+  - CONST (entry) @ location: 14 (remaining gas: unaccounted)
+    [ 1
+      (Pair 1 4 2 Unit) ]
+    - [log] (exit) @ location: 14 (remaining gas: unaccounted)
+      [ 1
+        1
+        (Pair 1 4 2 Unit) ]
+  - COMPARE (entry) @ location: 19 (remaining gas: unaccounted)
+    [ 1
+      1
+      (Pair 1 4 2 Unit) ]
+    - [log] (exit) @ location: 19 (remaining gas: unaccounted)
+      [ 0
+        (Pair 1 4 2 Unit) ]
+  - EQ (entry) @ location: 20 (remaining gas: unaccounted)
+    [ 0
+      (Pair 1 4 2 Unit) ]
+    - [log] (exit) @ location: 20 (remaining gas: unaccounted)
+      [ True
+        (Pair 1 4 2 Unit) ]
+  - IF (entry) @ location: 21 (remaining gas: unaccounted)
+    [ True
+      (Pair 1 4 2 Unit) ]
+    - [log] (exit) @ location: 21 (remaining gas: unaccounted)
+      [ (Pair 1 4 2 Unit) ]
+  - [halt] (entry) @ location: 27 (remaining gas: unaccounted)
+    [ (Pair 1 4 2 Unit) ]
+    - control: KCons
+    - [log] (exit) @ location: 21 (remaining gas: unaccounted)
+      [ (Pair 1 4 2 Unit) ]
+  - DUP (entry) @ location: 27 (remaining gas: unaccounted)
+    [ (Pair 1 4 2 Unit) ]
+    - [log] (exit) @ location: 27 (remaining gas: unaccounted)
+      [ (Pair 1 4 2 Unit)
+        (Pair 1 4 2 Unit) ]
+  - GET (entry) @ location: 28 (remaining gas: unaccounted)
+    [ (Pair 1 4 2 Unit)
+      (Pair 1 4 2 Unit) ]
+    - [log] (exit) @ location: 28 (remaining gas: unaccounted)
+      [ 1
+        (Pair 1 4 2 Unit) ]
+  - CONST (entry) @ location: 30 (remaining gas: unaccounted)
+    [ 1
+      (Pair 1 4 2 Unit) ]
+    - [log] (exit) @ location: 30 (remaining gas: unaccounted)
+      [ 1
+        1
+        (Pair 1 4 2 Unit) ]
+  - COMPARE (entry) @ location: 35 (remaining gas: unaccounted)
+    [ 1
+      1
+      (Pair 1 4 2 Unit) ]
+    - [log] (exit) @ location: 35 (remaining gas: unaccounted)
+      [ 0
+        (Pair 1 4 2 Unit) ]
+  - EQ (entry) @ location: 36 (remaining gas: unaccounted)
+    [ 0
+      (Pair 1 4 2 Unit) ]
+    - [log] (exit) @ location: 36 (remaining gas: unaccounted)
+      [ True
+        (Pair 1 4 2 Unit) ]
+  - IF (entry) @ location: 37 (remaining gas: unaccounted)
+    [ True
+      (Pair 1 4 2 Unit) ]
+    - [log] (exit) @ location: 37 (remaining gas: unaccounted)
+      [ (Pair 1 4 2 Unit) ]
+  - [halt] (entry) @ location: 43 (remaining gas: unaccounted)
+    [ (Pair 1 4 2 Unit) ]
+    - control: KCons
+    - [log] (exit) @ location: 37 (remaining gas: unaccounted)
+      [ (Pair 1 4 2 Unit) ]
+  - DUP (entry) @ location: 43 (remaining gas: unaccounted)
+    [ (Pair 1 4 2 Unit) ]
+    - [log] (exit) @ location: 43 (remaining gas: unaccounted)
+      [ (Pair 1 4 2 Unit)
+        (Pair 1 4 2 Unit) ]
+  - GET (entry) @ location: 44 (remaining gas: unaccounted)
+    [ (Pair 1 4 2 Unit)
+      (Pair 1 4 2 Unit) ]
+    - [log] (exit) @ location: 44 (remaining gas: unaccounted)
+      [ 4
+        (Pair 1 4 2 Unit) ]
+  - CONST (entry) @ location: 46 (remaining gas: unaccounted)
+    [ 4
+      (Pair 1 4 2 Unit) ]
+    - [log] (exit) @ location: 46 (remaining gas: unaccounted)
+      [ 4
+        4
+        (Pair 1 4 2 Unit) ]
+  - COMPARE (entry) @ location: 51 (remaining gas: unaccounted)
+    [ 4
+      4
+      (Pair 1 4 2 Unit) ]
+    - [log] (exit) @ location: 51 (remaining gas: unaccounted)
+      [ 0
+        (Pair 1 4 2 Unit) ]
+  - EQ (entry) @ location: 52 (remaining gas: unaccounted)
+    [ 0
+      (Pair 1 4 2 Unit) ]
+    - [log] (exit) @ location: 52 (remaining gas: unaccounted)
+      [ True
+        (Pair 1 4 2 Unit) ]
+  - IF (entry) @ location: 53 (remaining gas: unaccounted)
+    [ True
+      (Pair 1 4 2 Unit) ]
+    - [log] (exit) @ location: 53 (remaining gas: unaccounted)
+      [ (Pair 1 4 2 Unit) ]
+  - [halt] (entry) @ location: 59 (remaining gas: unaccounted)
+    [ (Pair 1 4 2 Unit) ]
+    - control: KCons
+    - [log] (exit) @ location: 53 (remaining gas: unaccounted)
+      [ (Pair 1 4 2 Unit) ]
+  - DUP (entry) @ location: 59 (remaining gas: unaccounted)
+    [ (Pair 1 4 2 Unit) ]
+    - [log] (exit) @ location: 59 (remaining gas: unaccounted)
+      [ (Pair 1 4 2 Unit)
+        (Pair 1 4 2 Unit) ]
+  - GET (entry) @ location: 60 (remaining gas: unaccounted)
+    [ (Pair 1 4 2 Unit)
+      (Pair 1 4 2 Unit) ]
+    - [log] (exit) @ location: 60 (remaining gas: unaccounted)
+      [ 2
+        (Pair 1 4 2 Unit) ]
+  - CONST (entry) @ location: 62 (remaining gas: unaccounted)
+    [ 2
+      (Pair 1 4 2 Unit) ]
+    - [log] (exit) @ location: 62 (remaining gas: unaccounted)
+      [ 2
+        2
+        (Pair 1 4 2 Unit) ]
+  - COMPARE (entry) @ location: 67 (remaining gas: unaccounted)
+    [ 2
+      2
+      (Pair 1 4 2 Unit) ]
+    - [log] (exit) @ location: 67 (remaining gas: unaccounted)
+      [ 0
+        (Pair 1 4 2 Unit) ]
+  - EQ (entry) @ location: 68 (remaining gas: unaccounted)
+    [ 0
+      (Pair 1 4 2 Unit) ]
+    - [log] (exit) @ location: 68 (remaining gas: unaccounted)
+      [ True
+        (Pair 1 4 2 Unit) ]
+  - IF (entry) @ location: 69 (remaining gas: unaccounted)
+    [ True
+      (Pair 1 4 2 Unit) ]
+    - [log] (exit) @ location: 69 (remaining gas: unaccounted)
+      [ (Pair 1 4 2 Unit) ]
+  - [halt] (entry) @ location: 75 (remaining gas: unaccounted)
+    [ (Pair 1 4 2 Unit) ]
+    - control: KCons
+    - [log] (exit) @ location: 69 (remaining gas: unaccounted)
+      [ (Pair 1 4 2 Unit) ]
+  - DUP (entry) @ location: 75 (remaining gas: unaccounted)
+    [ (Pair 1 4 2 Unit) ]
+    - [log] (exit) @ location: 75 (remaining gas: unaccounted)
+      [ (Pair 1 4 2 Unit)
+        (Pair 1 4 2 Unit) ]
+  - GET (entry) @ location: 76 (remaining gas: unaccounted)
+    [ (Pair 1 4 2 Unit)
+      (Pair 1 4 2 Unit) ]
+    - [log] (exit) @ location: 76 (remaining gas: unaccounted)
+      [ Unit
+        (Pair 1 4 2 Unit) ]
+  - CONST (entry) @ location: 78 (remaining gas: unaccounted)
+    [ Unit
+      (Pair 1 4 2 Unit) ]
+    - [log] (exit) @ location: 78 (remaining gas: unaccounted)
+      [ Unit
+        Unit
+        (Pair 1 4 2 Unit) ]
+  - COMPARE (entry) @ location: 81 (remaining gas: unaccounted)
+    [ Unit
+      Unit
+      (Pair 1 4 2 Unit) ]
+    - [log] (exit) @ location: 81 (remaining gas: unaccounted)
+      [ 0
+        (Pair 1 4 2 Unit) ]
+  - EQ (entry) @ location: 82 (remaining gas: unaccounted)
+    [ 0
+      (Pair 1 4 2 Unit) ]
+    - [log] (exit) @ location: 82 (remaining gas: unaccounted)
+      [ True
+        (Pair 1 4 2 Unit) ]
+  - IF (entry) @ location: 83 (remaining gas: unaccounted)
+    [ True
+      (Pair 1 4 2 Unit) ]
+    - [log] (exit) @ location: 83 (remaining gas: unaccounted)
+      [ (Pair 1 4 2 Unit) ]
+  - [halt] (entry) @ location: 89 (remaining gas: unaccounted)
+    [ (Pair 1 4 2 Unit) ]
+    - control: KCons
+    - [log] (exit) @ location: 83 (remaining gas: unaccounted)
+      [ (Pair 1 4 2 Unit) ]
+  - DROP (entry) @ location: 89 (remaining gas: unaccounted)
+    [ (Pair 1 4 2 Unit) ]
+    - [log] (exit) @ location: 89 (remaining gas: unaccounted)
+      [  ]
+  - CONST (entry) @ location: 90 (remaining gas: unaccounted)
+    [  ]
+    - [log] (exit) @ location: 90 (remaining gas: unaccounted)
+      [ Unit ]
+  - NIL (entry) @ location: 91 (remaining gas: unaccounted)
+    [ Unit ]
+    - [log] (exit) @ location: 91 (remaining gas: unaccounted)
+      [ {}
+        Unit ]
+  - PAIR (entry) @ location: 93 (remaining gas: unaccounted)
+    [ {}
+      Unit ]
+    - [log] (exit) @ location: 93 (remaining gas: unaccounted)
+      [ (Pair {} Unit) ]
+  - [halt] (entry) @ location: 10 (remaining gas: unaccounted)
+    [ (Pair {} Unit) ]
+    - control: KNil

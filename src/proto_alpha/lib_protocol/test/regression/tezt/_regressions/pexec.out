@@ -1,0 +1,84 @@
+pexec.out
+
+trace
+  - LAMBDA (interp) @ location: 7 (remaining gas: unaccounted)
+    [ (Pair 7 77) ]
+  - LAMBDA (entry) @ location: 7 (remaining gas: unaccounted)
+    [ (Pair 7 77) ]
+    - [log] (exit) @ location: 7 (remaining gas: unaccounted)
+      [ { UNPAIR ; ADD }
+        (Pair 7 77) ]
+  - SWAP (entry) @ location: 15 (remaining gas: unaccounted)
+    [ { UNPAIR ; ADD }
+      (Pair 7 77) ]
+    - [log] (exit) @ location: 15 (remaining gas: unaccounted)
+      [ (Pair 7 77)
+        { UNPAIR ; ADD } ]
+  - UNPAIR (entry) @ location: 16 (remaining gas: unaccounted)
+    [ (Pair 7 77)
+      { UNPAIR ; ADD } ]
+    - [log] (exit) @ location: 16 (remaining gas: unaccounted)
+      [ 7
+        77
+        { UNPAIR ; ADD } ]
+  - DIP (entry) @ location: 17 (remaining gas: unaccounted)
+    [ 7
+      77
+      { UNPAIR ; ADD } ]
+    - [log] (exit) @ location: 17 (remaining gas: unaccounted)
+      [ 77
+        { UNPAIR ; ADD } ]
+  - APPLY (entry) @ location: 19 (remaining gas: unaccounted)
+    [ 77
+      { UNPAIR ; ADD } ]
+    - [log] (exit) @ location: 19 (remaining gas: unaccounted)
+      [ { PUSH nat 77 ; PAIR ; { UNPAIR ; ADD } } ]
+  - [halt] (entry) @ location: 19 (remaining gas: unaccounted)
+    [ { PUSH nat 77 ; PAIR ; { UNPAIR ; ADD } } ]
+    - control: KUndip
+    - control: KCons
+    - [log] (exit) @ location: 17 (remaining gas: unaccounted)
+      [ 7
+        { PUSH nat 77 ; PAIR ; { UNPAIR ; ADD } } ]
+  - EXEC (entry) @ location: 20 (remaining gas: unaccounted)
+    [ 7
+      { PUSH nat 77 ; PAIR ; { UNPAIR ; ADD } } ]
+    - CONST (entry) @ location: 12 (remaining gas: unaccounted)
+      [ 7 ]
+      - [log] (exit) @ location: 12 (remaining gas: unaccounted)
+        [ 77
+          7 ]
+    - PAIR (entry) @ location: 12 (remaining gas: unaccounted)
+      [ 77
+        7 ]
+      - [log] (exit) @ location: 12 (remaining gas: unaccounted)
+        [ (Pair 77 7) ]
+    - UNPAIR (entry) @ location: 13 (remaining gas: unaccounted)
+      [ (Pair 77 7) ]
+      - [log] (exit) @ location: 13 (remaining gas: unaccounted)
+        [ 77
+          7 ]
+    - ADD (entry) @ location: 14 (remaining gas: unaccounted)
+      [ 77
+        7 ]
+      - [log] (exit) @ location: 14 (remaining gas: unaccounted)
+        [ 84 ]
+    - [halt] (entry) @ location: 12 (remaining gas: unaccounted)
+      [ 84 ]
+      - control: KReturn
+      - control: KCons
+      - [log] (exit) @ location: 20 (remaining gas: unaccounted)
+        [ 84 ]
+    - NIL (entry) @ location: 21 (remaining gas: unaccounted)
+      [ 84 ]
+      - [log] (exit) @ location: 21 (remaining gas: unaccounted)
+        [ {}
+          84 ]
+    - PAIR (entry) @ location: 23 (remaining gas: unaccounted)
+      [ {}
+        84 ]
+      - [log] (exit) @ location: 23 (remaining gas: unaccounted)
+        [ (Pair {} 84) ]
+    - [halt] (entry) @ location: 6 (remaining gas: unaccounted)
+      [ (Pair {} 84) ]
+      - control: KNil

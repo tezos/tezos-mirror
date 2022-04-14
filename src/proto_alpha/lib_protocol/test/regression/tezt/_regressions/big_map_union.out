@@ -1,0 +1,500 @@
+big_map_union.out
+
+trace
+  - UNPAIR (interp) @ location: 15 (remaining gas: unaccounted)
+    [ (Pair { Pair "string" 12 ; Pair "abc" 99 ; Pair "def" 3 } { Elt "123" 123 } Unit) ]
+  - UNPAIR (entry) @ location: 15 (remaining gas: unaccounted)
+    [ (Pair { Pair "string" 12 ; Pair "abc" 99 ; Pair "def" 3 } { Elt "123" 123 } Unit) ]
+    - [log] (exit) @ location: 15 (remaining gas: unaccounted)
+      [ { Pair "string" 12 ; Pair "abc" 99 ; Pair "def" 3 }
+        (Pair { Elt "123" 123 } Unit) ]
+  - DIP (entry) @ location: 16 (remaining gas: unaccounted)
+    [ { Pair "string" 12 ; Pair "abc" 99 ; Pair "def" 3 }
+      (Pair { Elt "123" 123 } Unit) ]
+    - [log] (exit) @ location: 16 (remaining gas: unaccounted)
+      [ (Pair { Elt "123" 123 } Unit) ]
+  - UNPAIR (entry) @ location: 18 (remaining gas: unaccounted)
+    [ (Pair { Elt "123" 123 } Unit) ]
+    - [log] (exit) @ location: 18 (remaining gas: unaccounted)
+      [ { Elt "123" 123 }
+        Unit ]
+  - [halt] (entry) @ location: 18 (remaining gas: unaccounted)
+    [ { Elt "123" 123 }
+      Unit ]
+    - control: KUndip
+    - control: KCons
+    - [log] (exit) @ location: 16 (remaining gas: unaccounted)
+      [ { Pair "string" 12 ; Pair "abc" 99 ; Pair "def" 3 }
+        { Elt "123" 123 }
+        Unit ]
+  - ITER (entry) @ location: 19 (remaining gas: unaccounted)
+    [ { Pair "string" 12 ; Pair "abc" 99 ; Pair "def" 3 }
+      { Elt "123" 123 }
+      Unit ]
+    - control: KIter
+    - [log] (exit) @ location: 19 (remaining gas: unaccounted)
+      [ (Pair "string" 12)
+        { Elt "123" 123 }
+        Unit ]
+  - UNPAIR (entry) @ location: 21 (remaining gas: unaccounted)
+    [ (Pair "string" 12)
+      { Elt "123" 123 }
+      Unit ]
+    - [log] (exit) @ location: 21 (remaining gas: unaccounted)
+      [ "string"
+        12
+        { Elt "123" 123 }
+        Unit ]
+  - DUP (entry) @ location: 22 (remaining gas: unaccounted)
+    [ "string"
+      12
+      { Elt "123" 123 }
+      Unit ]
+    - [log] (exit) @ location: 22 (remaining gas: unaccounted)
+      [ { Elt "123" 123 }
+        "string"
+        12
+        { Elt "123" 123 }
+        Unit ]
+  - DUP (entry) @ location: 24 (remaining gas: unaccounted)
+    [ { Elt "123" 123 }
+      "string"
+      12
+      { Elt "123" 123 }
+      Unit ]
+    - [log] (exit) @ location: 24 (remaining gas: unaccounted)
+      [ "string"
+        { Elt "123" 123 }
+        "string"
+        12
+        { Elt "123" 123 }
+        Unit ]
+  - GET (entry) @ location: 26 (remaining gas: unaccounted)
+    [ "string"
+      { Elt "123" 123 }
+      "string"
+      12
+      { Elt "123" 123 }
+      Unit ]
+    - [log] (exit) @ location: 26 (remaining gas: unaccounted)
+      [ None
+        "string"
+        12
+        { Elt "123" 123 }
+        Unit ]
+  - IF_NONE (entry) @ location: 27 (remaining gas: unaccounted)
+    [ None
+      "string"
+      12
+      { Elt "123" 123 }
+      Unit ]
+    - [log] (exit) @ location: 27 (remaining gas: unaccounted)
+      [ "string"
+        12
+        { Elt "123" 123 }
+        Unit ]
+  - CONST (entry) @ location: 29 (remaining gas: unaccounted)
+    [ "string"
+      12
+      { Elt "123" 123 }
+      Unit ]
+    - [log] (exit) @ location: 29 (remaining gas: unaccounted)
+      [ 0
+        "string"
+        12
+        { Elt "123" 123 }
+        Unit ]
+  - [halt] (entry) @ location: 33 (remaining gas: unaccounted)
+    [ 0
+      "string"
+      12
+      { Elt "123" 123 }
+      Unit ]
+    - control: KCons
+    - [log] (exit) @ location: 27 (remaining gas: unaccounted)
+      [ 0
+        "string"
+        12
+        { Elt "123" 123 }
+        Unit ]
+  - SWAP (entry) @ location: 33 (remaining gas: unaccounted)
+    [ 0
+      "string"
+      12
+      { Elt "123" 123 }
+      Unit ]
+    - [log] (exit) @ location: 33 (remaining gas: unaccounted)
+      [ "string"
+        0
+        12
+        { Elt "123" 123 }
+        Unit ]
+  - DIP (entry) @ location: 34 (remaining gas: unaccounted)
+    [ "string"
+      0
+      12
+      { Elt "123" 123 }
+      Unit ]
+    - [log] (exit) @ location: 34 (remaining gas: unaccounted)
+      [ 0
+        12
+        { Elt "123" 123 }
+        Unit ]
+  - ADD (entry) @ location: 36 (remaining gas: unaccounted)
+    [ 0
+      12
+      { Elt "123" 123 }
+      Unit ]
+    - [log] (exit) @ location: 36 (remaining gas: unaccounted)
+      [ 12
+        { Elt "123" 123 }
+        Unit ]
+  - SOME (entry) @ location: 37 (remaining gas: unaccounted)
+    [ 12
+      { Elt "123" 123 }
+      Unit ]
+    - [log] (exit) @ location: 37 (remaining gas: unaccounted)
+      [ (Some 12)
+        { Elt "123" 123 }
+        Unit ]
+  - [halt] (entry) @ location: 35 (remaining gas: unaccounted)
+    [ (Some 12)
+      { Elt "123" 123 }
+      Unit ]
+    - control: KUndip
+    - control: KCons
+    - [log] (exit) @ location: 34 (remaining gas: unaccounted)
+      [ "string"
+        (Some 12)
+        { Elt "123" 123 }
+        Unit ]
+  - UPDATE (entry) @ location: 38 (remaining gas: unaccounted)
+    [ "string"
+      (Some 12)
+      { Elt "123" 123 }
+      Unit ]
+    - [log] (exit) @ location: 38 (remaining gas: unaccounted)
+      [ { Elt "123" 123 ; Elt "string" 12 }
+        Unit ]
+  - [halt] (entry) @ location: 19 (remaining gas: unaccounted)
+    [ { Elt "123" 123 ; Elt "string" 12 }
+      Unit ]
+    - control: KIter
+    - [log] (exit) @ location: 19 (remaining gas: unaccounted)
+      [ (Pair "abc" 99)
+        { Elt "123" 123 ; Elt "string" 12 }
+        Unit ]
+  - UNPAIR (entry) @ location: 21 (remaining gas: unaccounted)
+    [ (Pair "abc" 99)
+      { Elt "123" 123 ; Elt "string" 12 }
+      Unit ]
+    - [log] (exit) @ location: 21 (remaining gas: unaccounted)
+      [ "abc"
+        99
+        { Elt "123" 123 ; Elt "string" 12 }
+        Unit ]
+  - DUP (entry) @ location: 22 (remaining gas: unaccounted)
+    [ "abc"
+      99
+      { Elt "123" 123 ; Elt "string" 12 }
+      Unit ]
+    - [log] (exit) @ location: 22 (remaining gas: unaccounted)
+      [ { Elt "123" 123 ; Elt "string" 12 }
+        "abc"
+        99
+        { Elt "123" 123 ; Elt "string" 12 }
+        Unit ]
+  - DUP (entry) @ location: 24 (remaining gas: unaccounted)
+    [ { Elt "123" 123 ; Elt "string" 12 }
+      "abc"
+      99
+      { Elt "123" 123 ; Elt "string" 12 }
+      Unit ]
+    - [log] (exit) @ location: 24 (remaining gas: unaccounted)
+      [ "abc"
+        { Elt "123" 123 ; Elt "string" 12 }
+        "abc"
+        99
+        { Elt "123" 123 ; Elt "string" 12 }
+        Unit ]
+  - GET (entry) @ location: 26 (remaining gas: unaccounted)
+    [ "abc"
+      { Elt "123" 123 ; Elt "string" 12 }
+      "abc"
+      99
+      { Elt "123" 123 ; Elt "string" 12 }
+      Unit ]
+    - [log] (exit) @ location: 26 (remaining gas: unaccounted)
+      [ None
+        "abc"
+        99
+        { Elt "123" 123 ; Elt "string" 12 }
+        Unit ]
+  - IF_NONE (entry) @ location: 27 (remaining gas: unaccounted)
+    [ None
+      "abc"
+      99
+      { Elt "123" 123 ; Elt "string" 12 }
+      Unit ]
+    - [log] (exit) @ location: 27 (remaining gas: unaccounted)
+      [ "abc"
+        99
+        { Elt "123" 123 ; Elt "string" 12 }
+        Unit ]
+  - CONST (entry) @ location: 29 (remaining gas: unaccounted)
+    [ "abc"
+      99
+      { Elt "123" 123 ; Elt "string" 12 }
+      Unit ]
+    - [log] (exit) @ location: 29 (remaining gas: unaccounted)
+      [ 0
+        "abc"
+        99
+        { Elt "123" 123 ; Elt "string" 12 }
+        Unit ]
+  - [halt] (entry) @ location: 33 (remaining gas: unaccounted)
+    [ 0
+      "abc"
+      99
+      { Elt "123" 123 ; Elt "string" 12 }
+      Unit ]
+    - control: KCons
+    - [log] (exit) @ location: 27 (remaining gas: unaccounted)
+      [ 0
+        "abc"
+        99
+        { Elt "123" 123 ; Elt "string" 12 }
+        Unit ]
+  - SWAP (entry) @ location: 33 (remaining gas: unaccounted)
+    [ 0
+      "abc"
+      99
+      { Elt "123" 123 ; Elt "string" 12 }
+      Unit ]
+    - [log] (exit) @ location: 33 (remaining gas: unaccounted)
+      [ "abc"
+        0
+        99
+        { Elt "123" 123 ; Elt "string" 12 }
+        Unit ]
+  - DIP (entry) @ location: 34 (remaining gas: unaccounted)
+    [ "abc"
+      0
+      99
+      { Elt "123" 123 ; Elt "string" 12 }
+      Unit ]
+    - [log] (exit) @ location: 34 (remaining gas: unaccounted)
+      [ 0
+        99
+        { Elt "123" 123 ; Elt "string" 12 }
+        Unit ]
+  - ADD (entry) @ location: 36 (remaining gas: unaccounted)
+    [ 0
+      99
+      { Elt "123" 123 ; Elt "string" 12 }
+      Unit ]
+    - [log] (exit) @ location: 36 (remaining gas: unaccounted)
+      [ 99
+        { Elt "123" 123 ; Elt "string" 12 }
+        Unit ]
+  - SOME (entry) @ location: 37 (remaining gas: unaccounted)
+    [ 99
+      { Elt "123" 123 ; Elt "string" 12 }
+      Unit ]
+    - [log] (exit) @ location: 37 (remaining gas: unaccounted)
+      [ (Some 99)
+        { Elt "123" 123 ; Elt "string" 12 }
+        Unit ]
+  - [halt] (entry) @ location: 35 (remaining gas: unaccounted)
+    [ (Some 99)
+      { Elt "123" 123 ; Elt "string" 12 }
+      Unit ]
+    - control: KUndip
+    - control: KCons
+    - [log] (exit) @ location: 34 (remaining gas: unaccounted)
+      [ "abc"
+        (Some 99)
+        { Elt "123" 123 ; Elt "string" 12 }
+        Unit ]
+  - UPDATE (entry) @ location: 38 (remaining gas: unaccounted)
+    [ "abc"
+      (Some 99)
+      { Elt "123" 123 ; Elt "string" 12 }
+      Unit ]
+    - [log] (exit) @ location: 38 (remaining gas: unaccounted)
+      [ { Elt "123" 123 ; Elt "abc" 99 ; Elt "string" 12 }
+        Unit ]
+  - [halt] (entry) @ location: 19 (remaining gas: unaccounted)
+    [ { Elt "123" 123 ; Elt "abc" 99 ; Elt "string" 12 }
+      Unit ]
+    - control: KIter
+    - [log] (exit) @ location: 19 (remaining gas: unaccounted)
+      [ (Pair "def" 3)
+        { Elt "123" 123 ; Elt "abc" 99 ; Elt "string" 12 }
+        Unit ]
+  - UNPAIR (entry) @ location: 21 (remaining gas: unaccounted)
+    [ (Pair "def" 3)
+      { Elt "123" 123 ; Elt "abc" 99 ; Elt "string" 12 }
+      Unit ]
+    - [log] (exit) @ location: 21 (remaining gas: unaccounted)
+      [ "def"
+        3
+        { Elt "123" 123 ; Elt "abc" 99 ; Elt "string" 12 }
+        Unit ]
+  - DUP (entry) @ location: 22 (remaining gas: unaccounted)
+    [ "def"
+      3
+      { Elt "123" 123 ; Elt "abc" 99 ; Elt "string" 12 }
+      Unit ]
+    - [log] (exit) @ location: 22 (remaining gas: unaccounted)
+      [ { Elt "123" 123 ; Elt "abc" 99 ; Elt "string" 12 }
+        "def"
+        3
+        { Elt "123" 123 ; Elt "abc" 99 ; Elt "string" 12 }
+        Unit ]
+  - DUP (entry) @ location: 24 (remaining gas: unaccounted)
+    [ { Elt "123" 123 ; Elt "abc" 99 ; Elt "string" 12 }
+      "def"
+      3
+      { Elt "123" 123 ; Elt "abc" 99 ; Elt "string" 12 }
+      Unit ]
+    - [log] (exit) @ location: 24 (remaining gas: unaccounted)
+      [ "def"
+        { Elt "123" 123 ; Elt "abc" 99 ; Elt "string" 12 }
+        "def"
+        3
+        { Elt "123" 123 ; Elt "abc" 99 ; Elt "string" 12 }
+        Unit ]
+  - GET (entry) @ location: 26 (remaining gas: unaccounted)
+    [ "def"
+      { Elt "123" 123 ; Elt "abc" 99 ; Elt "string" 12 }
+      "def"
+      3
+      { Elt "123" 123 ; Elt "abc" 99 ; Elt "string" 12 }
+      Unit ]
+    - [log] (exit) @ location: 26 (remaining gas: unaccounted)
+      [ None
+        "def"
+        3
+        { Elt "123" 123 ; Elt "abc" 99 ; Elt "string" 12 }
+        Unit ]
+  - IF_NONE (entry) @ location: 27 (remaining gas: unaccounted)
+    [ None
+      "def"
+      3
+      { Elt "123" 123 ; Elt "abc" 99 ; Elt "string" 12 }
+      Unit ]
+    - [log] (exit) @ location: 27 (remaining gas: unaccounted)
+      [ "def"
+        3
+        { Elt "123" 123 ; Elt "abc" 99 ; Elt "string" 12 }
+        Unit ]
+  - CONST (entry) @ location: 29 (remaining gas: unaccounted)
+    [ "def"
+      3
+      { Elt "123" 123 ; Elt "abc" 99 ; Elt "string" 12 }
+      Unit ]
+    - [log] (exit) @ location: 29 (remaining gas: unaccounted)
+      [ 0
+        "def"
+        3
+        { Elt "123" 123 ; Elt "abc" 99 ; Elt "string" 12 }
+        Unit ]
+  - [halt] (entry) @ location: 33 (remaining gas: unaccounted)
+    [ 0
+      "def"
+      3
+      { Elt "123" 123 ; Elt "abc" 99 ; Elt "string" 12 }
+      Unit ]
+    - control: KCons
+    - [log] (exit) @ location: 27 (remaining gas: unaccounted)
+      [ 0
+        "def"
+        3
+        { Elt "123" 123 ; Elt "abc" 99 ; Elt "string" 12 }
+        Unit ]
+  - SWAP (entry) @ location: 33 (remaining gas: unaccounted)
+    [ 0
+      "def"
+      3
+      { Elt "123" 123 ; Elt "abc" 99 ; Elt "string" 12 }
+      Unit ]
+    - [log] (exit) @ location: 33 (remaining gas: unaccounted)
+      [ "def"
+        0
+        3
+        { Elt "123" 123 ; Elt "abc" 99 ; Elt "string" 12 }
+        Unit ]
+  - DIP (entry) @ location: 34 (remaining gas: unaccounted)
+    [ "def"
+      0
+      3
+      { Elt "123" 123 ; Elt "abc" 99 ; Elt "string" 12 }
+      Unit ]
+    - [log] (exit) @ location: 34 (remaining gas: unaccounted)
+      [ 0
+        3
+        { Elt "123" 123 ; Elt "abc" 99 ; Elt "string" 12 }
+        Unit ]
+  - ADD (entry) @ location: 36 (remaining gas: unaccounted)
+    [ 0
+      3
+      { Elt "123" 123 ; Elt "abc" 99 ; Elt "string" 12 }
+      Unit ]
+    - [log] (exit) @ location: 36 (remaining gas: unaccounted)
+      [ 3
+        { Elt "123" 123 ; Elt "abc" 99 ; Elt "string" 12 }
+        Unit ]
+  - SOME (entry) @ location: 37 (remaining gas: unaccounted)
+    [ 3
+      { Elt "123" 123 ; Elt "abc" 99 ; Elt "string" 12 }
+      Unit ]
+    - [log] (exit) @ location: 37 (remaining gas: unaccounted)
+      [ (Some 3)
+        { Elt "123" 123 ; Elt "abc" 99 ; Elt "string" 12 }
+        Unit ]
+  - [halt] (entry) @ location: 35 (remaining gas: unaccounted)
+    [ (Some 3)
+      { Elt "123" 123 ; Elt "abc" 99 ; Elt "string" 12 }
+      Unit ]
+    - control: KUndip
+    - control: KCons
+    - [log] (exit) @ location: 34 (remaining gas: unaccounted)
+      [ "def"
+        (Some 3)
+        { Elt "123" 123 ; Elt "abc" 99 ; Elt "string" 12 }
+        Unit ]
+  - UPDATE (entry) @ location: 38 (remaining gas: unaccounted)
+    [ "def"
+      (Some 3)
+      { Elt "123" 123 ; Elt "abc" 99 ; Elt "string" 12 }
+      Unit ]
+    - [log] (exit) @ location: 38 (remaining gas: unaccounted)
+      [ { Elt "123" 123 ; Elt "abc" 99 ; Elt "def" 3 ; Elt "string" 12 }
+        Unit ]
+  - [halt] (entry) @ location: 19 (remaining gas: unaccounted)
+    [ { Elt "123" 123 ; Elt "abc" 99 ; Elt "def" 3 ; Elt "string" 12 }
+      Unit ]
+    - control: KIter
+    - control: KCons
+    - [log] (exit) @ location: 19 (remaining gas: unaccounted)
+      [ { Elt "123" 123 ; Elt "abc" 99 ; Elt "def" 3 ; Elt "string" 12 }
+        Unit ]
+  - PAIR (entry) @ location: 39 (remaining gas: unaccounted)
+    [ { Elt "123" 123 ; Elt "abc" 99 ; Elt "def" 3 ; Elt "string" 12 }
+      Unit ]
+    - [log] (exit) @ location: 39 (remaining gas: unaccounted)
+      [ (Pair { Elt "123" 123 ; Elt "abc" 99 ; Elt "def" 3 ; Elt "string" 12 } Unit) ]
+  - NIL (entry) @ location: 40 (remaining gas: unaccounted)
+    [ (Pair { Elt "123" 123 ; Elt "abc" 99 ; Elt "def" 3 ; Elt "string" 12 } Unit) ]
+    - [log] (exit) @ location: 40 (remaining gas: unaccounted)
+      [ {}
+        (Pair { Elt "123" 123 ; Elt "abc" 99 ; Elt "def" 3 ; Elt "string" 12 } Unit) ]
+  - PAIR (entry) @ location: 42 (remaining gas: unaccounted)
+    [ {}
+      (Pair { Elt "123" 123 ; Elt "abc" 99 ; Elt "def" 3 ; Elt "string" 12 } Unit) ]
+    - [log] (exit) @ location: 42 (remaining gas: unaccounted)
+      [ (Pair {} { Elt "123" 123 ; Elt "abc" 99 ; Elt "def" 3 ; Elt "string" 12 } Unit) ]
+  - [halt] (entry) @ location: 13 (remaining gas: unaccounted)
+    [ (Pair {} { Elt "123" 123 ; Elt "abc" 99 ; Elt "def" 3 ; Elt "string" 12 } Unit) ]
+    - control: KNil

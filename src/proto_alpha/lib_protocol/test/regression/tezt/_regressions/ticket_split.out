@@ -1,0 +1,181 @@
+ticket_split.out
+
+trace
+  - CAR (interp) @ location: 8 (remaining gas: unaccounted)
+    [ (Pair (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 3) Unit) ]
+  - CAR (entry) @ location: 8 (remaining gas: unaccounted)
+    [ (Pair (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 3) Unit) ]
+    - [log] (exit) @ location: 8 (remaining gas: unaccounted)
+      [ (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 3) ]
+  - CONST (entry) @ location: 9 (remaining gas: unaccounted)
+    [ (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 3) ]
+    - [log] (exit) @ location: 9 (remaining gas: unaccounted)
+      [ (Pair 1 2)
+        (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 3) ]
+  - SWAP (entry) @ location: 16 (remaining gas: unaccounted)
+    [ (Pair 1 2)
+      (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 3) ]
+    - [log] (exit) @ location: 16 (remaining gas: unaccounted)
+      [ (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 3)
+        (Pair 1 2) ]
+  - SPLIT_TICKET (entry) @ location: 17 (remaining gas: unaccounted)
+    [ (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 3)
+      (Pair 1 2) ]
+    - [log] (exit) @ location: 17 (remaining gas: unaccounted)
+      [ (Some (Pair (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 1)
+                    (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 2))) ]
+  - IF_NONE (entry) @ location: 19 (remaining gas: unaccounted)
+    [ (Some (Pair (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 1)
+                  (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 2))) ]
+    - [log] (exit) @ location: 19 (remaining gas: unaccounted)
+      [ (Pair (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 1)
+              (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 2)) ]
+  - [halt] (entry) @ location: 25 (remaining gas: unaccounted)
+    [ (Pair (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 1)
+            (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 2)) ]
+    - control: KCons
+    - [log] (exit) @ location: 19 (remaining gas: unaccounted)
+      [ (Pair (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 1)
+              (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 2)) ]
+  - UNPAIR (entry) @ location: 25 (remaining gas: unaccounted)
+    [ (Pair (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 1)
+            (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 2)) ]
+    - [log] (exit) @ location: 25 (remaining gas: unaccounted)
+      [ (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 1)
+        (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 2) ]
+  - READ_TICKET (entry) @ location: 26 (remaining gas: unaccounted)
+    [ (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 1)
+      (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 2) ]
+    - [log] (exit) @ location: 26 (remaining gas: unaccounted)
+      [ (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 1)
+        (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 1)
+        (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 2) ]
+  - CDR (entry) @ location: 28 (remaining gas: unaccounted)
+    [ (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 1)
+      (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 1)
+      (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 2) ]
+    - [log] (exit) @ location: 28 (remaining gas: unaccounted)
+      [ (Pair 17 1)
+        (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 1)
+        (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 2) ]
+  - CDR (entry) @ location: 29 (remaining gas: unaccounted)
+    [ (Pair 17 1)
+      (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 1)
+      (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 2) ]
+    - [log] (exit) @ location: 29 (remaining gas: unaccounted)
+      [ 1
+        (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 1)
+        (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 2) ]
+  - CONST (entry) @ location: 30 (remaining gas: unaccounted)
+    [ 1
+      (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 1)
+      (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 2) ]
+    - [log] (exit) @ location: 30 (remaining gas: unaccounted)
+      [ 1
+        1
+        (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 1)
+        (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 2) ]
+  - COMPARE (entry) @ location: 35 (remaining gas: unaccounted)
+    [ 1
+      1
+      (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 1)
+      (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 2) ]
+    - [log] (exit) @ location: 35 (remaining gas: unaccounted)
+      [ 0
+        (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 1)
+        (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 2) ]
+  - EQ (entry) @ location: 36 (remaining gas: unaccounted)
+    [ 0
+      (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 1)
+      (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 2) ]
+    - [log] (exit) @ location: 36 (remaining gas: unaccounted)
+      [ True
+        (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 1)
+        (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 2) ]
+  - IF (entry) @ location: 37 (remaining gas: unaccounted)
+    [ True
+      (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 1)
+      (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 2) ]
+    - [log] (exit) @ location: 37 (remaining gas: unaccounted)
+      [ (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 1)
+        (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 2) ]
+  - [halt] (entry) @ location: 43 (remaining gas: unaccounted)
+    [ (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 1)
+      (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 2) ]
+    - control: KCons
+    - [log] (exit) @ location: 37 (remaining gas: unaccounted)
+      [ (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 1)
+        (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 2) ]
+  - DROP (entry) @ location: 43 (remaining gas: unaccounted)
+    [ (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 1)
+      (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 2) ]
+    - [log] (exit) @ location: 43 (remaining gas: unaccounted)
+      [ (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 2) ]
+  - READ_TICKET (entry) @ location: 44 (remaining gas: unaccounted)
+    [ (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 2) ]
+    - [log] (exit) @ location: 44 (remaining gas: unaccounted)
+      [ (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 2)
+        (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 2) ]
+  - CDR (entry) @ location: 46 (remaining gas: unaccounted)
+    [ (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 2)
+      (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 2) ]
+    - [log] (exit) @ location: 46 (remaining gas: unaccounted)
+      [ (Pair 17 2)
+        (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 2) ]
+  - CDR (entry) @ location: 47 (remaining gas: unaccounted)
+    [ (Pair 17 2)
+      (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 2) ]
+    - [log] (exit) @ location: 47 (remaining gas: unaccounted)
+      [ 2
+        (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 2) ]
+  - CONST (entry) @ location: 48 (remaining gas: unaccounted)
+    [ 2
+      (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 2) ]
+    - [log] (exit) @ location: 48 (remaining gas: unaccounted)
+      [ 2
+        2
+        (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 2) ]
+  - COMPARE (entry) @ location: 53 (remaining gas: unaccounted)
+    [ 2
+      2
+      (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 2) ]
+    - [log] (exit) @ location: 53 (remaining gas: unaccounted)
+      [ 0
+        (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 2) ]
+  - EQ (entry) @ location: 54 (remaining gas: unaccounted)
+    [ 0
+      (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 2) ]
+    - [log] (exit) @ location: 54 (remaining gas: unaccounted)
+      [ True
+        (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 2) ]
+  - IF (entry) @ location: 55 (remaining gas: unaccounted)
+    [ True
+      (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 2) ]
+    - [log] (exit) @ location: 55 (remaining gas: unaccounted)
+      [ (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 2) ]
+  - [halt] (entry) @ location: 61 (remaining gas: unaccounted)
+    [ (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 2) ]
+    - control: KCons
+    - [log] (exit) @ location: 55 (remaining gas: unaccounted)
+      [ (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 2) ]
+  - DROP (entry) @ location: 61 (remaining gas: unaccounted)
+    [ (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 2) ]
+    - [log] (exit) @ location: 61 (remaining gas: unaccounted)
+      [  ]
+  - CONST (entry) @ location: 62 (remaining gas: unaccounted)
+    [  ]
+    - [log] (exit) @ location: 62 (remaining gas: unaccounted)
+      [ Unit ]
+  - NIL (entry) @ location: 63 (remaining gas: unaccounted)
+    [ Unit ]
+    - [log] (exit) @ location: 63 (remaining gas: unaccounted)
+      [ {}
+        Unit ]
+  - PAIR (entry) @ location: 65 (remaining gas: unaccounted)
+    [ {}
+      Unit ]
+    - [log] (exit) @ location: 65 (remaining gas: unaccounted)
+      [ (Pair {} Unit) ]
+  - [halt] (entry) @ location: 7 (remaining gas: unaccounted)
+    [ (Pair {} Unit) ]
+    - control: KNil

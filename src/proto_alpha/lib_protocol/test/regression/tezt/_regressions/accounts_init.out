@@ -1,0 +1,167 @@
+accounts_init.out
+
+trace
+  - DUP (interp) @ location: 15 (remaining gas: unaccounted)
+    [ (Pair (Left "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx") {}) ]
+  - DUP (entry) @ location: 15 (remaining gas: unaccounted)
+    [ (Pair (Left "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx") {}) ]
+    - [log] (exit) @ location: 15 (remaining gas: unaccounted)
+      [ (Pair (Left "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx") {})
+        (Pair (Left "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx") {}) ]
+  - CAR (entry) @ location: 16 (remaining gas: unaccounted)
+    [ (Pair (Left "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx") {})
+      (Pair (Left "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx") {}) ]
+    - [log] (exit) @ location: 16 (remaining gas: unaccounted)
+      [ (Left "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")
+        (Pair (Left "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx") {}) ]
+  - IF_LEFT (entry) @ location: 17 (remaining gas: unaccounted)
+    [ (Left "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")
+      (Pair (Left "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx") {}) ]
+    - [log] (exit) @ location: 17 (remaining gas: unaccounted)
+      [ "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+        (Pair (Left "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx") {}) ]
+  - DUP (entry) @ location: 19 (remaining gas: unaccounted)
+    [ "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+      (Pair (Left "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx") {}) ]
+    - [log] (exit) @ location: 19 (remaining gas: unaccounted)
+      [ "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+        "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+        (Pair (Left "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx") {}) ]
+  - DIP (entry) @ location: 20 (remaining gas: unaccounted)
+    [ "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+      "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+      (Pair (Left "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx") {}) ]
+    - [log] (exit) @ location: 20 (remaining gas: unaccounted)
+      [ (Pair (Left "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx") {}) ]
+  - CDR (entry) @ location: 23 (remaining gas: unaccounted)
+    [ (Pair (Left "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx") {}) ]
+    - [log] (exit) @ location: 23 (remaining gas: unaccounted)
+      [ {} ]
+  - DUP (entry) @ location: 24 (remaining gas: unaccounted)
+    [ {} ]
+    - [log] (exit) @ location: 24 (remaining gas: unaccounted)
+      [ {}
+        {} ]
+  - [halt] (entry) @ location: 22 (remaining gas: unaccounted)
+    [ {}
+      {} ]
+    - control: KCons
+    - CONST (entry) @ location: 20 (remaining gas: unaccounted)
+      [ {}
+        {} ]
+      - [log] (exit) @ location: 20 (remaining gas: unaccounted)
+        [ "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+          {}
+          {} ]
+    - CONST (entry) @ location: 20 (remaining gas: unaccounted)
+      [ "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+        {}
+        {} ]
+      - [log] (exit) @ location: 20 (remaining gas: unaccounted)
+        [ "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+          "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+          {}
+          {} ]
+    - [log] (exit) @ location: 20 (remaining gas: unaccounted)
+      [ "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+        "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+        {}
+        {} ]
+  - DIP (entry) @ location: 25 (remaining gas: unaccounted)
+    [ "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+      "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+      {}
+      {} ]
+    - [log] (exit) @ location: 25 (remaining gas: unaccounted)
+      [ "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+        {}
+        {} ]
+  - SWAP (entry) @ location: 27 (remaining gas: unaccounted)
+    [ "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+      {}
+      {} ]
+    - [log] (exit) @ location: 27 (remaining gas: unaccounted)
+      [ {}
+        "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+        {} ]
+  - [halt] (entry) @ location: 27 (remaining gas: unaccounted)
+    [ {}
+      "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+      {} ]
+    - control: KUndip
+    - control: KCons
+    - [log] (exit) @ location: 25 (remaining gas: unaccounted)
+      [ "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+        {}
+        "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+        {} ]
+  - GET (entry) @ location: 28 (remaining gas: unaccounted)
+    [ "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+      {}
+      "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+      {} ]
+    - [log] (exit) @ location: 28 (remaining gas: unaccounted)
+      [ None
+        "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+        {} ]
+  - IF_NONE (entry) @ location: 30 (remaining gas: unaccounted)
+    [ None
+      "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+      {} ]
+    - [log] (exit) @ location: 30 (remaining gas: unaccounted)
+      [ "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+        {} ]
+  - DIP (entry) @ location: 32 (remaining gas: unaccounted)
+    [ "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+      {} ]
+    - [log] (exit) @ location: 32 (remaining gas: unaccounted)
+      [ {} ]
+  - AMOUNT (entry) @ location: 34 (remaining gas: unaccounted)
+    [ {} ]
+    - [log] (exit) @ location: 34 (remaining gas: unaccounted)
+      [ 0
+        {} ]
+  - SOME (entry) @ location: 35 (remaining gas: unaccounted)
+    [ 0
+      {} ]
+    - [log] (exit) @ location: 35 (remaining gas: unaccounted)
+      [ (Some 0)
+        {} ]
+  - [halt] (entry) @ location: 33 (remaining gas: unaccounted)
+    [ (Some 0)
+      {} ]
+    - control: KUndip
+    - control: KCons
+    - [log] (exit) @ location: 32 (remaining gas: unaccounted)
+      [ "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+        (Some 0)
+        {} ]
+  - UPDATE (entry) @ location: 36 (remaining gas: unaccounted)
+    [ "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"
+      (Some 0)
+      {} ]
+    - [log] (exit) @ location: 36 (remaining gas: unaccounted)
+      [ { Elt "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" 0 } ]
+  - NIL (entry) @ location: 37 (remaining gas: unaccounted)
+    [ { Elt "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" 0 } ]
+    - [log] (exit) @ location: 37 (remaining gas: unaccounted)
+      [ {}
+        { Elt "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" 0 } ]
+  - PAIR (entry) @ location: 39 (remaining gas: unaccounted)
+    [ {}
+      { Elt "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" 0 } ]
+    - [log] (exit) @ location: 39 (remaining gas: unaccounted)
+      [ (Pair {} { Elt "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" 0 }) ]
+  - [halt] (entry) @ location: 14 (remaining gas: unaccounted)
+    [ (Pair {} { Elt "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" 0 }) ]
+    - control: KCons
+    - [log] (exit) @ location: 30 (remaining gas: unaccounted)
+      [ (Pair {} { Elt "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" 0 }) ]
+  - [halt] (entry) @ location: 14 (remaining gas: unaccounted)
+    [ (Pair {} { Elt "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" 0 }) ]
+    - control: KCons
+    - [log] (exit) @ location: 17 (remaining gas: unaccounted)
+      [ (Pair {} { Elt "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" 0 }) ]
+  - [halt] (entry) @ location: 14 (remaining gas: unaccounted)
+    [ (Pair {} { Elt "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" 0 }) ]
+    - control: KNil

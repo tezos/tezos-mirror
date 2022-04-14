@@ -1,0 +1,166 @@
+dipn.out
+
+trace
+  - CAR (interp) @ location: 15 (remaining gas: unaccounted)
+    [ (Pair (Pair (Pair (Pair (Pair 0 1) 2) 3) 4) 7) ]
+  - CAR (entry) @ location: 15 (remaining gas: unaccounted)
+    [ (Pair (Pair (Pair (Pair (Pair 0 1) 2) 3) 4) 7) ]
+    - [log] (exit) @ location: 15 (remaining gas: unaccounted)
+      [ (Pair (Pair (Pair (Pair 0 1) 2) 3) 4) ]
+  - UNPAIR (entry) @ location: 16 (remaining gas: unaccounted)
+    [ (Pair (Pair (Pair (Pair 0 1) 2) 3) 4) ]
+    - [log] (exit) @ location: 16 (remaining gas: unaccounted)
+      [ (Pair (Pair (Pair 0 1) 2) 3)
+        4 ]
+  - UNPAIR (entry) @ location: 17 (remaining gas: unaccounted)
+    [ (Pair (Pair (Pair 0 1) 2) 3)
+      4 ]
+    - [log] (exit) @ location: 17 (remaining gas: unaccounted)
+      [ (Pair (Pair 0 1) 2)
+        3
+        4 ]
+  - UNPAIR (entry) @ location: 18 (remaining gas: unaccounted)
+    [ (Pair (Pair 0 1) 2)
+      3
+      4 ]
+    - [log] (exit) @ location: 18 (remaining gas: unaccounted)
+      [ (Pair 0 1)
+        2
+        3
+        4 ]
+  - UNPAIR (entry) @ location: 19 (remaining gas: unaccounted)
+    [ (Pair 0 1)
+      2
+      3
+      4 ]
+    - [log] (exit) @ location: 19 (remaining gas: unaccounted)
+      [ 0
+        1
+        2
+        3
+        4 ]
+  - DIP (entry) @ location: 20 (remaining gas: unaccounted)
+    [ 0
+      1
+      2
+      3
+      4 ]
+    - [log] (exit) @ location: 20 (remaining gas: unaccounted)
+      [  ]
+  - CONST (entry) @ location: 23 (remaining gas: unaccounted)
+    [  ]
+    - [log] (exit) @ location: 23 (remaining gas: unaccounted)
+      [ 6 ]
+  - [halt] (entry) @ location: 23 (remaining gas: unaccounted)
+    [ 6 ]
+    - control: KCons
+    - CONST (entry) @ location: 20 (remaining gas: unaccounted)
+      [ 6 ]
+      - [log] (exit) @ location: 20 (remaining gas: unaccounted)
+        [ 4
+          6 ]
+    - CONST (entry) @ location: 20 (remaining gas: unaccounted)
+      [ 4
+        6 ]
+      - [log] (exit) @ location: 20 (remaining gas: unaccounted)
+        [ 3
+          4
+          6 ]
+    - CONST (entry) @ location: 20 (remaining gas: unaccounted)
+      [ 3
+        4
+        6 ]
+      - [log] (exit) @ location: 20 (remaining gas: unaccounted)
+        [ 2
+          3
+          4
+          6 ]
+    - CONST (entry) @ location: 20 (remaining gas: unaccounted)
+      [ 2
+        3
+        4
+        6 ]
+      - [log] (exit) @ location: 20 (remaining gas: unaccounted)
+        [ 1
+          2
+          3
+          4
+          6 ]
+    - CONST (entry) @ location: 20 (remaining gas: unaccounted)
+      [ 1
+        2
+        3
+        4
+        6 ]
+      - [log] (exit) @ location: 20 (remaining gas: unaccounted)
+        [ 0
+          1
+          2
+          3
+          4
+          6 ]
+    - [log] (exit) @ location: 20 (remaining gas: unaccounted)
+      [ 0
+        1
+        2
+        3
+        4
+        6 ]
+  - DROP (entry) @ location: 26 (remaining gas: unaccounted)
+    [ 0
+      1
+      2
+      3
+      4
+      6 ]
+    - [log] (exit) @ location: 26 (remaining gas: unaccounted)
+      [ 1
+        2
+        3
+        4
+        6 ]
+  - DROP (entry) @ location: 27 (remaining gas: unaccounted)
+    [ 1
+      2
+      3
+      4
+      6 ]
+    - [log] (exit) @ location: 27 (remaining gas: unaccounted)
+      [ 2
+        3
+        4
+        6 ]
+  - DROP (entry) @ location: 28 (remaining gas: unaccounted)
+    [ 2
+      3
+      4
+      6 ]
+    - [log] (exit) @ location: 28 (remaining gas: unaccounted)
+      [ 3
+        4
+        6 ]
+  - DROP (entry) @ location: 29 (remaining gas: unaccounted)
+    [ 3
+      4
+      6 ]
+    - [log] (exit) @ location: 29 (remaining gas: unaccounted)
+      [ 4
+        6 ]
+  - DROP (entry) @ location: 30 (remaining gas: unaccounted)
+    [ 4
+      6 ]
+    - [log] (exit) @ location: 30 (remaining gas: unaccounted)
+      [ 6 ]
+  - NIL (entry) @ location: 31 (remaining gas: unaccounted)
+    [ 6 ]
+    - [log] (exit) @ location: 31 (remaining gas: unaccounted)
+      [ {}
+        6 ]
+  - PAIR (entry) @ location: 33 (remaining gas: unaccounted)
+    [ {}
+      6 ]
+    - [log] (exit) @ location: 33 (remaining gas: unaccounted)
+      [ (Pair {} 6) ]
+  - [halt] (entry) @ location: 14 (remaining gas: unaccounted)
+    [ (Pair {} 6) ]
+    - control: KNil

@@ -1,0 +1,54 @@
+get_and_update_map.out
+
+trace
+  - UNPAIR (interp) @ location: 13 (remaining gas: unaccounted)
+    [ (Pair "abc" (Some 321) { Elt "def" 123 }) ]
+  - UNPAIR (entry) @ location: 13 (remaining gas: unaccounted)
+    [ (Pair "abc" (Some 321) { Elt "def" 123 }) ]
+    - [log] (exit) @ location: 13 (remaining gas: unaccounted)
+      [ "abc"
+        (Pair (Some 321) { Elt "def" 123 }) ]
+  - DIP (entry) @ location: 14 (remaining gas: unaccounted)
+    [ "abc"
+      (Pair (Some 321) { Elt "def" 123 }) ]
+    - [log] (exit) @ location: 14 (remaining gas: unaccounted)
+      [ (Pair (Some 321) { Elt "def" 123 }) ]
+  - UNPAIR (entry) @ location: 16 (remaining gas: unaccounted)
+    [ (Pair (Some 321) { Elt "def" 123 }) ]
+    - [log] (exit) @ location: 16 (remaining gas: unaccounted)
+      [ (Some 321)
+        { Elt "def" 123 } ]
+  - [halt] (entry) @ location: 16 (remaining gas: unaccounted)
+    [ (Some 321)
+      { Elt "def" 123 } ]
+    - control: KUndip
+    - control: KCons
+    - [log] (exit) @ location: 14 (remaining gas: unaccounted)
+      [ "abc"
+        (Some 321)
+        { Elt "def" 123 } ]
+  - GET_AND_UPDATE (entry) @ location: 17 (remaining gas: unaccounted)
+    [ "abc"
+      (Some 321)
+      { Elt "def" 123 } ]
+    - [log] (exit) @ location: 17 (remaining gas: unaccounted)
+      [ None
+        { Elt "abc" 321 ; Elt "def" 123 } ]
+  - PAIR (entry) @ location: 18 (remaining gas: unaccounted)
+    [ None
+      { Elt "abc" 321 ; Elt "def" 123 } ]
+    - [log] (exit) @ location: 18 (remaining gas: unaccounted)
+      [ (Pair None { Elt "abc" 321 ; Elt "def" 123 }) ]
+  - NIL (entry) @ location: 19 (remaining gas: unaccounted)
+    [ (Pair None { Elt "abc" 321 ; Elt "def" 123 }) ]
+    - [log] (exit) @ location: 19 (remaining gas: unaccounted)
+      [ {}
+        (Pair None { Elt "abc" 321 ; Elt "def" 123 }) ]
+  - PAIR (entry) @ location: 21 (remaining gas: unaccounted)
+    [ {}
+      (Pair None { Elt "abc" 321 ; Elt "def" 123 }) ]
+    - [log] (exit) @ location: 21 (remaining gas: unaccounted)
+      [ (Pair {} None { Elt "abc" 321 ; Elt "def" 123 }) ]
+  - [halt] (entry) @ location: 11 (remaining gas: unaccounted)
+    [ (Pair {} None { Elt "abc" 321 ; Elt "def" 123 }) ]
+    - control: KNil

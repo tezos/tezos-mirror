@@ -1,0 +1,123 @@
+faucet.out
+
+trace
+  - UNPAIR (interp) @ location: 7 (remaining gas: unaccounted)
+    [ (Pair "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU" "2020-01-01T00:00:00Z") ]
+  - UNPAIR (entry) @ location: 7 (remaining gas: unaccounted)
+    [ (Pair "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU" "2020-01-01T00:00:00Z") ]
+    - [log] (exit) @ location: 7 (remaining gas: unaccounted)
+      [ "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU"
+        "2020-01-01T00:00:00Z" ]
+  - SWAP (entry) @ location: 8 (remaining gas: unaccounted)
+    [ "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU"
+      "2020-01-01T00:00:00Z" ]
+    - [log] (exit) @ location: 8 (remaining gas: unaccounted)
+      [ "2020-01-01T00:00:00Z"
+        "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU" ]
+  - CONST (entry) @ location: 9 (remaining gas: unaccounted)
+    [ "2020-01-01T00:00:00Z"
+      "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU" ]
+    - [log] (exit) @ location: 9 (remaining gas: unaccounted)
+      [ 300
+        "2020-01-01T00:00:00Z"
+        "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU" ]
+  - ADD (entry) @ location: 12 (remaining gas: unaccounted)
+    [ 300
+      "2020-01-01T00:00:00Z"
+      "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU" ]
+    - [log] (exit) @ location: 12 (remaining gas: unaccounted)
+      [ "2020-01-01T00:05:00Z"
+        "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU" ]
+  - NOW (entry) @ location: 13 (remaining gas: unaccounted)
+    [ "2020-01-01T00:05:00Z"
+      "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU" ]
+    - [log] (exit) @ location: 13 (remaining gas: unaccounted)
+      [ "2022-04-14T12:32:39Z"
+        "2020-01-01T00:05:00Z"
+        "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU" ]
+  - COMPARE (entry) @ location: 16 (remaining gas: unaccounted)
+    [ "2022-04-14T12:32:39Z"
+      "2020-01-01T00:05:00Z"
+      "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU" ]
+    - [log] (exit) @ location: 16 (remaining gas: unaccounted)
+      [ 1
+        "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU" ]
+  - GE (entry) @ location: 17 (remaining gas: unaccounted)
+    [ 1
+      "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU" ]
+    - [log] (exit) @ location: 17 (remaining gas: unaccounted)
+      [ True
+        "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU" ]
+  - IF (entry) @ location: 18 (remaining gas: unaccounted)
+    [ True
+      "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU" ]
+    - [log] (exit) @ location: 18 (remaining gas: unaccounted)
+      [ "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU" ]
+  - [halt] (entry) @ location: 24 (remaining gas: unaccounted)
+    [ "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU" ]
+    - control: KCons
+    - [log] (exit) @ location: 18 (remaining gas: unaccounted)
+      [ "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU" ]
+  - IMPLICIT_ACCOUNT (entry) @ location: 24 (remaining gas: unaccounted)
+    [ "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU" ]
+    - [log] (exit) @ location: 24 (remaining gas: unaccounted)
+      [ "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU" ]
+  - CONST (entry) @ location: 25 (remaining gas: unaccounted)
+    [ "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU" ]
+    - [log] (exit) @ location: 25 (remaining gas: unaccounted)
+      [ 1000000
+        "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU" ]
+  - CONST (entry) @ location: 28 (remaining gas: unaccounted)
+    [ 1000000
+      "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU" ]
+    - [log] (exit) @ location: 28 (remaining gas: unaccounted)
+      [ Unit
+        1000000
+        "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU" ]
+  - TRANSFER_TOKENS (entry) @ location: 29 (remaining gas: unaccounted)
+    [ Unit
+      1000000
+      "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU" ]
+    - [log] (exit) @ location: 29 (remaining gas: unaccounted)
+      [ 0x00000000000000000000000000000000000000000000000001c0843d0000dac9f52543da1aed0bc1d6b46bf7c10db7014cd600 ]
+  - NIL (entry) @ location: 30 (remaining gas: unaccounted)
+    [ 0x00000000000000000000000000000000000000000000000001c0843d0000dac9f52543da1aed0bc1d6b46bf7c10db7014cd600 ]
+    - [log] (exit) @ location: 30 (remaining gas: unaccounted)
+      [ {}
+        0x00000000000000000000000000000000000000000000000001c0843d0000dac9f52543da1aed0bc1d6b46bf7c10db7014cd600 ]
+  - SWAP (entry) @ location: 32 (remaining gas: unaccounted)
+    [ {}
+      0x00000000000000000000000000000000000000000000000001c0843d0000dac9f52543da1aed0bc1d6b46bf7c10db7014cd600 ]
+    - [log] (exit) @ location: 32 (remaining gas: unaccounted)
+      [ 0x00000000000000000000000000000000000000000000000001c0843d0000dac9f52543da1aed0bc1d6b46bf7c10db7014cd600
+        {} ]
+  - CONS (entry) @ location: 33 (remaining gas: unaccounted)
+    [ 0x00000000000000000000000000000000000000000000000001c0843d0000dac9f52543da1aed0bc1d6b46bf7c10db7014cd600
+      {} ]
+    - [log] (exit) @ location: 33 (remaining gas: unaccounted)
+      [ { 0x00000000000000000000000000000000000000000000000001c0843d0000dac9f52543da1aed0bc1d6b46bf7c10db7014cd600 } ]
+  - DIP (entry) @ location: 34 (remaining gas: unaccounted)
+    [ { 0x00000000000000000000000000000000000000000000000001c0843d0000dac9f52543da1aed0bc1d6b46bf7c10db7014cd600 } ]
+    - [log] (exit) @ location: 34 (remaining gas: unaccounted)
+      [  ]
+  - NOW (entry) @ location: 36 (remaining gas: unaccounted)
+    [  ]
+    - [log] (exit) @ location: 36 (remaining gas: unaccounted)
+      [ "2022-04-14T12:32:39Z" ]
+  - [halt] (entry) @ location: 36 (remaining gas: unaccounted)
+    [ "2022-04-14T12:32:39Z" ]
+    - control: KUndip
+    - control: KCons
+    - [log] (exit) @ location: 34 (remaining gas: unaccounted)
+      [ { 0x00000000000000000000000000000000000000000000000001c0843d0000dac9f52543da1aed0bc1d6b46bf7c10db7014cd600 }
+        "2022-04-14T12:32:39Z" ]
+  - PAIR (entry) @ location: 37 (remaining gas: unaccounted)
+    [ { 0x00000000000000000000000000000000000000000000000001c0843d0000dac9f52543da1aed0bc1d6b46bf7c10db7014cd600 }
+      "2022-04-14T12:32:39Z" ]
+    - [log] (exit) @ location: 37 (remaining gas: unaccounted)
+      [ (Pair { 0x00000000000000000000000000000000000000000000000001c0843d0000dac9f52543da1aed0bc1d6b46bf7c10db7014cd600 }
+              "2022-04-14T12:32:39Z") ]
+  - [halt] (entry) @ location: 6 (remaining gas: unaccounted)
+    [ (Pair { 0x00000000000000000000000000000000000000000000000001c0843d0000dac9f52543da1aed0bc1d6b46bf7c10db7014cd600 }
+            "2022-04-14T12:32:39Z") ]
+    - control: KNil

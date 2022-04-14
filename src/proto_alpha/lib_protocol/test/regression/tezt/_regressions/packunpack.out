@@ -1,0 +1,104 @@
+packunpack.out
+
+trace
+  - CAR (interp) @ location: 15 (remaining gas: unaccounted)
+    [ (Pair (Pair (Pair (Pair "abc" { 1 ; 2 ; 3 }) { 4 ; 5 ; 6 })
+                  0x0507070707010000000361626302000000060001000200030200000006000400050006)
+            Unit) ]
+  - CAR (entry) @ location: 15 (remaining gas: unaccounted)
+    [ (Pair (Pair (Pair (Pair "abc" { 1 ; 2 ; 3 }) { 4 ; 5 ; 6 })
+                  0x0507070707010000000361626302000000060001000200030200000006000400050006)
+            Unit) ]
+    - [log] (exit) @ location: 15 (remaining gas: unaccounted)
+      [ (Pair (Pair (Pair "abc" { 1 ; 2 ; 3 }) { 4 ; 5 ; 6 })
+              0x0507070707010000000361626302000000060001000200030200000006000400050006) ]
+  - UNPAIR (entry) @ location: 16 (remaining gas: unaccounted)
+    [ (Pair (Pair (Pair "abc" { 1 ; 2 ; 3 }) { 4 ; 5 ; 6 })
+            0x0507070707010000000361626302000000060001000200030200000006000400050006) ]
+    - [log] (exit) @ location: 16 (remaining gas: unaccounted)
+      [ (Pair (Pair "abc" { 1 ; 2 ; 3 }) { 4 ; 5 ; 6 })
+        0x0507070707010000000361626302000000060001000200030200000006000400050006 ]
+  - DIP (entry) @ location: 17 (remaining gas: unaccounted)
+    [ (Pair (Pair "abc" { 1 ; 2 ; 3 }) { 4 ; 5 ; 6 })
+      0x0507070707010000000361626302000000060001000200030200000006000400050006 ]
+    - [log] (exit) @ location: 17 (remaining gas: unaccounted)
+      [ 0x0507070707010000000361626302000000060001000200030200000006000400050006 ]
+  - DUP (entry) @ location: 19 (remaining gas: unaccounted)
+    [ 0x0507070707010000000361626302000000060001000200030200000006000400050006 ]
+    - [log] (exit) @ location: 19 (remaining gas: unaccounted)
+      [ 0x0507070707010000000361626302000000060001000200030200000006000400050006
+        0x0507070707010000000361626302000000060001000200030200000006000400050006 ]
+  - [halt] (entry) @ location: 19 (remaining gas: unaccounted)
+    [ 0x0507070707010000000361626302000000060001000200030200000006000400050006
+      0x0507070707010000000361626302000000060001000200030200000006000400050006 ]
+    - control: KUndip
+    - control: KCons
+    - [log] (exit) @ location: 17 (remaining gas: unaccounted)
+      [ (Pair (Pair "abc" { 1 ; 2 ; 3 }) { 4 ; 5 ; 6 })
+        0x0507070707010000000361626302000000060001000200030200000006000400050006
+        0x0507070707010000000361626302000000060001000200030200000006000400050006 ]
+  - PACK (entry) @ location: 20 (remaining gas: unaccounted)
+    [ (Pair (Pair "abc" { 1 ; 2 ; 3 }) { 4 ; 5 ; 6 })
+      0x0507070707010000000361626302000000060001000200030200000006000400050006
+      0x0507070707010000000361626302000000060001000200030200000006000400050006 ]
+    - [log] (exit) @ location: 20 (remaining gas: unaccounted)
+      [ 0x0507070707010000000361626302000000060001000200030200000006000400050006
+        0x0507070707010000000361626302000000060001000200030200000006000400050006
+        0x0507070707010000000361626302000000060001000200030200000006000400050006 ]
+  - COMPARE (entry) @ location: 23 (remaining gas: unaccounted)
+    [ 0x0507070707010000000361626302000000060001000200030200000006000400050006
+      0x0507070707010000000361626302000000060001000200030200000006000400050006
+      0x0507070707010000000361626302000000060001000200030200000006000400050006 ]
+    - [log] (exit) @ location: 23 (remaining gas: unaccounted)
+      [ 0
+        0x0507070707010000000361626302000000060001000200030200000006000400050006 ]
+  - EQ (entry) @ location: 24 (remaining gas: unaccounted)
+    [ 0
+      0x0507070707010000000361626302000000060001000200030200000006000400050006 ]
+    - [log] (exit) @ location: 24 (remaining gas: unaccounted)
+      [ True
+        0x0507070707010000000361626302000000060001000200030200000006000400050006 ]
+  - IF (entry) @ location: 25 (remaining gas: unaccounted)
+    [ True
+      0x0507070707010000000361626302000000060001000200030200000006000400050006 ]
+    - [log] (exit) @ location: 25 (remaining gas: unaccounted)
+      [ 0x0507070707010000000361626302000000060001000200030200000006000400050006 ]
+  - [halt] (entry) @ location: 31 (remaining gas: unaccounted)
+    [ 0x0507070707010000000361626302000000060001000200030200000006000400050006 ]
+    - control: KCons
+    - [log] (exit) @ location: 25 (remaining gas: unaccounted)
+      [ 0x0507070707010000000361626302000000060001000200030200000006000400050006 ]
+  - UNPACK (entry) @ location: 31 (remaining gas: unaccounted)
+    [ 0x0507070707010000000361626302000000060001000200030200000006000400050006 ]
+    - [log] (exit) @ location: 31 (remaining gas: unaccounted)
+      [ (Some (Pair (Pair "abc" { 1 ; 2 ; 3 }) { 4 ; 5 ; 6 })) ]
+  - IF_NONE (entry) @ location: 40 (remaining gas: unaccounted)
+    [ (Some (Pair (Pair "abc" { 1 ; 2 ; 3 }) { 4 ; 5 ; 6 })) ]
+    - [log] (exit) @ location: 40 (remaining gas: unaccounted)
+      [ (Pair (Pair "abc" { 1 ; 2 ; 3 }) { 4 ; 5 ; 6 }) ]
+  - [halt] (entry) @ location: 46 (remaining gas: unaccounted)
+    [ (Pair (Pair "abc" { 1 ; 2 ; 3 }) { 4 ; 5 ; 6 }) ]
+    - control: KCons
+    - [log] (exit) @ location: 40 (remaining gas: unaccounted)
+      [ (Pair (Pair "abc" { 1 ; 2 ; 3 }) { 4 ; 5 ; 6 }) ]
+  - DROP (entry) @ location: 46 (remaining gas: unaccounted)
+    [ (Pair (Pair "abc" { 1 ; 2 ; 3 }) { 4 ; 5 ; 6 }) ]
+    - [log] (exit) @ location: 46 (remaining gas: unaccounted)
+      [  ]
+  - CONST (entry) @ location: 47 (remaining gas: unaccounted)
+    [  ]
+    - [log] (exit) @ location: 47 (remaining gas: unaccounted)
+      [ Unit ]
+  - NIL (entry) @ location: 48 (remaining gas: unaccounted)
+    [ Unit ]
+    - [log] (exit) @ location: 48 (remaining gas: unaccounted)
+      [ {}
+        Unit ]
+  - PAIR (entry) @ location: 50 (remaining gas: unaccounted)
+    [ {}
+      Unit ]
+    - [log] (exit) @ location: 50 (remaining gas: unaccounted)
+      [ (Pair {} Unit) ]
+  - [halt] (entry) @ location: 14 (remaining gas: unaccounted)
+    [ (Pair {} Unit) ]
+    - control: KNil

@@ -1,0 +1,43 @@
+ticket_join.out
+
+trace
+  - UNPAIR (interp) @ location: 10 (remaining gas: unaccounted)
+    [ (Pair (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 3) None) ]
+  - UNPAIR (entry) @ location: 10 (remaining gas: unaccounted)
+    [ (Pair (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 3) None) ]
+    - [log] (exit) @ location: 10 (remaining gas: unaccounted)
+      [ (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 3)
+        None ]
+  - SWAP (entry) @ location: 11 (remaining gas: unaccounted)
+    [ (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 3)
+      None ]
+    - [log] (exit) @ location: 11 (remaining gas: unaccounted)
+      [ None
+        (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 3) ]
+  - IF_NONE (entry) @ location: 12 (remaining gas: unaccounted)
+    [ None
+      (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 3) ]
+    - [log] (exit) @ location: 12 (remaining gas: unaccounted)
+      [ (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 3) ]
+  - [halt] (entry) @ location: 24 (remaining gas: unaccounted)
+    [ (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 3) ]
+    - control: KCons
+    - [log] (exit) @ location: 12 (remaining gas: unaccounted)
+      [ (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 3) ]
+  - SOME (entry) @ location: 24 (remaining gas: unaccounted)
+    [ (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 3) ]
+    - [log] (exit) @ location: 24 (remaining gas: unaccounted)
+      [ (Some (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 3)) ]
+  - NIL (entry) @ location: 25 (remaining gas: unaccounted)
+    [ (Some (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 3)) ]
+    - [log] (exit) @ location: 25 (remaining gas: unaccounted)
+      [ {}
+        (Some (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 3)) ]
+  - PAIR (entry) @ location: 27 (remaining gas: unaccounted)
+    [ {}
+      (Some (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 3)) ]
+    - [log] (exit) @ location: 27 (remaining gas: unaccounted)
+      [ (Pair {} (Some (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 3))) ]
+  - [halt] (entry) @ location: 9 (remaining gas: unaccounted)
+    [ (Pair {} (Some (Pair "KT1Ln1MPvHDJ1phLL8dNL4jrKF6Q1yQCBG1v" 17 3))) ]
+    - control: KNil

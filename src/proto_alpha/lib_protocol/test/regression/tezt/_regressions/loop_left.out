@@ -1,0 +1,254 @@
+loop_left.out
+
+trace
+  - CAR (interp) @ location: 9 (remaining gas: unaccounted)
+    [ (Pair { "abc" ; "xyz" } { "zyx" ; "cba" }) ]
+  - CAR (entry) @ location: 9 (remaining gas: unaccounted)
+    [ (Pair { "abc" ; "xyz" } { "zyx" ; "cba" }) ]
+    - [log] (exit) @ location: 9 (remaining gas: unaccounted)
+      [ { "abc" ; "xyz" } ]
+  - NIL (entry) @ location: 10 (remaining gas: unaccounted)
+    [ { "abc" ; "xyz" } ]
+    - [log] (exit) @ location: 10 (remaining gas: unaccounted)
+      [ {}
+        { "abc" ; "xyz" } ]
+  - SWAP (entry) @ location: 12 (remaining gas: unaccounted)
+    [ {}
+      { "abc" ; "xyz" } ]
+    - [log] (exit) @ location: 12 (remaining gas: unaccounted)
+      [ { "abc" ; "xyz" }
+        {} ]
+  - PAIR (entry) @ location: 13 (remaining gas: unaccounted)
+    [ { "abc" ; "xyz" }
+      {} ]
+    - [log] (exit) @ location: 13 (remaining gas: unaccounted)
+      [ (Pair { "abc" ; "xyz" } {}) ]
+  - LEFT (entry) @ location: 14 (remaining gas: unaccounted)
+    [ (Pair { "abc" ; "xyz" } {}) ]
+    - [log] (exit) @ location: 14 (remaining gas: unaccounted)
+      [ (Left (Pair { "abc" ; "xyz" } {})) ]
+  - LOOP_LEFT (entry) @ location: 17 (remaining gas: unaccounted)
+    [ (Left (Pair { "abc" ; "xyz" } {})) ]
+    - control: KLoop_in_left
+    - [log] (exit) @ location: 17 (remaining gas: unaccounted)
+      [ (Pair { "abc" ; "xyz" } {}) ]
+  - DUP (entry) @ location: 19 (remaining gas: unaccounted)
+    [ (Pair { "abc" ; "xyz" } {}) ]
+    - [log] (exit) @ location: 19 (remaining gas: unaccounted)
+      [ (Pair { "abc" ; "xyz" } {})
+        (Pair { "abc" ; "xyz" } {}) ]
+  - CAR (entry) @ location: 20 (remaining gas: unaccounted)
+    [ (Pair { "abc" ; "xyz" } {})
+      (Pair { "abc" ; "xyz" } {}) ]
+    - [log] (exit) @ location: 20 (remaining gas: unaccounted)
+      [ { "abc" ; "xyz" }
+        (Pair { "abc" ; "xyz" } {}) ]
+  - DIP (entry) @ location: 21 (remaining gas: unaccounted)
+    [ { "abc" ; "xyz" }
+      (Pair { "abc" ; "xyz" } {}) ]
+    - [log] (exit) @ location: 21 (remaining gas: unaccounted)
+      [ (Pair { "abc" ; "xyz" } {}) ]
+  - CDR (entry) @ location: 23 (remaining gas: unaccounted)
+    [ (Pair { "abc" ; "xyz" } {}) ]
+    - [log] (exit) @ location: 23 (remaining gas: unaccounted)
+      [ {} ]
+  - [halt] (entry) @ location: 23 (remaining gas: unaccounted)
+    [ {} ]
+    - control: KUndip
+    - control: KCons
+    - [log] (exit) @ location: 21 (remaining gas: unaccounted)
+      [ { "abc" ; "xyz" }
+        {} ]
+  - IF_CONS (entry) @ location: 24 (remaining gas: unaccounted)
+    [ { "abc" ; "xyz" }
+      {} ]
+    - [log] (exit) @ location: 24 (remaining gas: unaccounted)
+      [ "abc"
+        { "xyz" }
+        {} ]
+  - SWAP (entry) @ location: 26 (remaining gas: unaccounted)
+    [ "abc"
+      { "xyz" }
+      {} ]
+    - [log] (exit) @ location: 26 (remaining gas: unaccounted)
+      [ { "xyz" }
+        "abc"
+        {} ]
+  - DIP (entry) @ location: 27 (remaining gas: unaccounted)
+    [ { "xyz" }
+      "abc"
+      {} ]
+    - [log] (exit) @ location: 27 (remaining gas: unaccounted)
+      [ "abc"
+        {} ]
+  - CONS (entry) @ location: 29 (remaining gas: unaccounted)
+    [ "abc"
+      {} ]
+    - [log] (exit) @ location: 29 (remaining gas: unaccounted)
+      [ { "abc" } ]
+  - [halt] (entry) @ location: 29 (remaining gas: unaccounted)
+    [ { "abc" } ]
+    - control: KUndip
+    - control: KCons
+    - [log] (exit) @ location: 27 (remaining gas: unaccounted)
+      [ { "xyz" }
+        { "abc" } ]
+  - PAIR (entry) @ location: 30 (remaining gas: unaccounted)
+    [ { "xyz" }
+      { "abc" } ]
+    - [log] (exit) @ location: 30 (remaining gas: unaccounted)
+      [ (Pair { "xyz" } { "abc" }) ]
+  - LEFT (entry) @ location: 31 (remaining gas: unaccounted)
+    [ (Pair { "xyz" } { "abc" }) ]
+    - [log] (exit) @ location: 31 (remaining gas: unaccounted)
+      [ (Left (Pair { "xyz" } { "abc" })) ]
+  - [halt] (entry) @ location: 17 (remaining gas: unaccounted)
+    [ (Left (Pair { "xyz" } { "abc" })) ]
+    - control: KCons
+    - [log] (exit) @ location: 24 (remaining gas: unaccounted)
+      [ (Left (Pair { "xyz" } { "abc" })) ]
+  - [halt] (entry) @ location: 17 (remaining gas: unaccounted)
+    [ (Left (Pair { "xyz" } { "abc" })) ]
+    - control: KLoop_in_left
+    - [log] (exit) @ location: 17 (remaining gas: unaccounted)
+      [ (Pair { "xyz" } { "abc" }) ]
+  - DUP (entry) @ location: 19 (remaining gas: unaccounted)
+    [ (Pair { "xyz" } { "abc" }) ]
+    - [log] (exit) @ location: 19 (remaining gas: unaccounted)
+      [ (Pair { "xyz" } { "abc" })
+        (Pair { "xyz" } { "abc" }) ]
+  - CAR (entry) @ location: 20 (remaining gas: unaccounted)
+    [ (Pair { "xyz" } { "abc" })
+      (Pair { "xyz" } { "abc" }) ]
+    - [log] (exit) @ location: 20 (remaining gas: unaccounted)
+      [ { "xyz" }
+        (Pair { "xyz" } { "abc" }) ]
+  - DIP (entry) @ location: 21 (remaining gas: unaccounted)
+    [ { "xyz" }
+      (Pair { "xyz" } { "abc" }) ]
+    - [log] (exit) @ location: 21 (remaining gas: unaccounted)
+      [ (Pair { "xyz" } { "abc" }) ]
+  - CDR (entry) @ location: 23 (remaining gas: unaccounted)
+    [ (Pair { "xyz" } { "abc" }) ]
+    - [log] (exit) @ location: 23 (remaining gas: unaccounted)
+      [ { "abc" } ]
+  - [halt] (entry) @ location: 23 (remaining gas: unaccounted)
+    [ { "abc" } ]
+    - control: KUndip
+    - control: KCons
+    - [log] (exit) @ location: 21 (remaining gas: unaccounted)
+      [ { "xyz" }
+        { "abc" } ]
+  - IF_CONS (entry) @ location: 24 (remaining gas: unaccounted)
+    [ { "xyz" }
+      { "abc" } ]
+    - [log] (exit) @ location: 24 (remaining gas: unaccounted)
+      [ "xyz"
+        {}
+        { "abc" } ]
+  - SWAP (entry) @ location: 26 (remaining gas: unaccounted)
+    [ "xyz"
+      {}
+      { "abc" } ]
+    - [log] (exit) @ location: 26 (remaining gas: unaccounted)
+      [ {}
+        "xyz"
+        { "abc" } ]
+  - DIP (entry) @ location: 27 (remaining gas: unaccounted)
+    [ {}
+      "xyz"
+      { "abc" } ]
+    - [log] (exit) @ location: 27 (remaining gas: unaccounted)
+      [ "xyz"
+        { "abc" } ]
+  - CONS (entry) @ location: 29 (remaining gas: unaccounted)
+    [ "xyz"
+      { "abc" } ]
+    - [log] (exit) @ location: 29 (remaining gas: unaccounted)
+      [ { "xyz" ; "abc" } ]
+  - [halt] (entry) @ location: 29 (remaining gas: unaccounted)
+    [ { "xyz" ; "abc" } ]
+    - control: KUndip
+    - control: KCons
+    - [log] (exit) @ location: 27 (remaining gas: unaccounted)
+      [ {}
+        { "xyz" ; "abc" } ]
+  - PAIR (entry) @ location: 30 (remaining gas: unaccounted)
+    [ {}
+      { "xyz" ; "abc" } ]
+    - [log] (exit) @ location: 30 (remaining gas: unaccounted)
+      [ (Pair {} { "xyz" ; "abc" }) ]
+  - LEFT (entry) @ location: 31 (remaining gas: unaccounted)
+    [ (Pair {} { "xyz" ; "abc" }) ]
+    - [log] (exit) @ location: 31 (remaining gas: unaccounted)
+      [ (Left (Pair {} { "xyz" ; "abc" })) ]
+  - [halt] (entry) @ location: 17 (remaining gas: unaccounted)
+    [ (Left (Pair {} { "xyz" ; "abc" })) ]
+    - control: KCons
+    - [log] (exit) @ location: 24 (remaining gas: unaccounted)
+      [ (Left (Pair {} { "xyz" ; "abc" })) ]
+  - [halt] (entry) @ location: 17 (remaining gas: unaccounted)
+    [ (Left (Pair {} { "xyz" ; "abc" })) ]
+    - control: KLoop_in_left
+    - [log] (exit) @ location: 17 (remaining gas: unaccounted)
+      [ (Pair {} { "xyz" ; "abc" }) ]
+  - DUP (entry) @ location: 19 (remaining gas: unaccounted)
+    [ (Pair {} { "xyz" ; "abc" }) ]
+    - [log] (exit) @ location: 19 (remaining gas: unaccounted)
+      [ (Pair {} { "xyz" ; "abc" })
+        (Pair {} { "xyz" ; "abc" }) ]
+  - CAR (entry) @ location: 20 (remaining gas: unaccounted)
+    [ (Pair {} { "xyz" ; "abc" })
+      (Pair {} { "xyz" ; "abc" }) ]
+    - [log] (exit) @ location: 20 (remaining gas: unaccounted)
+      [ {}
+        (Pair {} { "xyz" ; "abc" }) ]
+  - DIP (entry) @ location: 21 (remaining gas: unaccounted)
+    [ {}
+      (Pair {} { "xyz" ; "abc" }) ]
+    - [log] (exit) @ location: 21 (remaining gas: unaccounted)
+      [ (Pair {} { "xyz" ; "abc" }) ]
+  - CDR (entry) @ location: 23 (remaining gas: unaccounted)
+    [ (Pair {} { "xyz" ; "abc" }) ]
+    - [log] (exit) @ location: 23 (remaining gas: unaccounted)
+      [ { "xyz" ; "abc" } ]
+  - [halt] (entry) @ location: 23 (remaining gas: unaccounted)
+    [ { "xyz" ; "abc" } ]
+    - control: KUndip
+    - control: KCons
+    - [log] (exit) @ location: 21 (remaining gas: unaccounted)
+      [ {}
+        { "xyz" ; "abc" } ]
+  - IF_CONS (entry) @ location: 24 (remaining gas: unaccounted)
+    [ {}
+      { "xyz" ; "abc" } ]
+    - [log] (exit) @ location: 24 (remaining gas: unaccounted)
+      [ { "xyz" ; "abc" } ]
+  - RIGHT (entry) @ location: 35 (remaining gas: unaccounted)
+    [ { "xyz" ; "abc" } ]
+    - [log] (exit) @ location: 35 (remaining gas: unaccounted)
+      [ (Right { "xyz" ; "abc" }) ]
+  - [halt] (entry) @ location: 17 (remaining gas: unaccounted)
+    [ (Right { "xyz" ; "abc" }) ]
+    - control: KCons
+    - [log] (exit) @ location: 24 (remaining gas: unaccounted)
+      [ (Right { "xyz" ; "abc" }) ]
+  - [halt] (entry) @ location: 17 (remaining gas: unaccounted)
+    [ (Right { "xyz" ; "abc" }) ]
+    - control: KLoop_in_left
+    - control: KCons
+    - [log] (exit) @ location: 17 (remaining gas: unaccounted)
+      [ { "xyz" ; "abc" } ]
+  - NIL (entry) @ location: 41 (remaining gas: unaccounted)
+    [ { "xyz" ; "abc" } ]
+    - [log] (exit) @ location: 41 (remaining gas: unaccounted)
+      [ {}
+        { "xyz" ; "abc" } ]
+  - PAIR (entry) @ location: 43 (remaining gas: unaccounted)
+    [ {}
+      { "xyz" ; "abc" } ]
+    - [log] (exit) @ location: 43 (remaining gas: unaccounted)
+      [ (Pair {} { "xyz" ; "abc" }) ]
+  - [halt] (entry) @ location: 8 (remaining gas: unaccounted)
+    [ (Pair {} { "xyz" ; "abc" }) ]
+    - control: KNil

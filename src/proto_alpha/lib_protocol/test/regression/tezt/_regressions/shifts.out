@@ -1,0 +1,45 @@
+shifts.out
+
+trace
+  - CAR (interp) @ location: 14 (remaining gas: unaccounted)
+    [ (Pair (Right (Pair 3 2)) None) ]
+  - CAR (entry) @ location: 14 (remaining gas: unaccounted)
+    [ (Pair (Right (Pair 3 2)) None) ]
+    - [log] (exit) @ location: 14 (remaining gas: unaccounted)
+      [ (Right (Pair 3 2)) ]
+  - IF_LEFT (entry) @ location: 15 (remaining gas: unaccounted)
+    [ (Right (Pair 3 2)) ]
+    - [log] (exit) @ location: 15 (remaining gas: unaccounted)
+      [ (Pair 3 2) ]
+  - UNPAIR (entry) @ location: 20 (remaining gas: unaccounted)
+    [ (Pair 3 2) ]
+    - [log] (exit) @ location: 20 (remaining gas: unaccounted)
+      [ 3
+        2 ]
+  - LSR (entry) @ location: 21 (remaining gas: unaccounted)
+    [ 3
+      2 ]
+    - [log] (exit) @ location: 21 (remaining gas: unaccounted)
+      [ 0 ]
+  - [halt] (entry) @ location: 22 (remaining gas: unaccounted)
+    [ 0 ]
+    - control: KCons
+    - [log] (exit) @ location: 15 (remaining gas: unaccounted)
+      [ 0 ]
+  - SOME (entry) @ location: 22 (remaining gas: unaccounted)
+    [ 0 ]
+    - [log] (exit) @ location: 22 (remaining gas: unaccounted)
+      [ (Some 0) ]
+  - NIL (entry) @ location: 23 (remaining gas: unaccounted)
+    [ (Some 0) ]
+    - [log] (exit) @ location: 23 (remaining gas: unaccounted)
+      [ {}
+        (Some 0) ]
+  - PAIR (entry) @ location: 25 (remaining gas: unaccounted)
+    [ {}
+      (Some 0) ]
+    - [log] (exit) @ location: 25 (remaining gas: unaccounted)
+      [ (Pair {} (Some 0)) ]
+  - [halt] (entry) @ location: 13 (remaining gas: unaccounted)
+    [ (Pair {} (Some 0)) ]
+    - control: KNil

@@ -1,0 +1,62 @@
+comb-set.out
+
+trace
+  - CDR (interp) @ location: 11 (remaining gas: unaccounted)
+    [ (Pair Unit 1 4 2 Unit) ]
+  - CDR (entry) @ location: 11 (remaining gas: unaccounted)
+    [ (Pair Unit 1 4 2 Unit) ]
+    - [log] (exit) @ location: 11 (remaining gas: unaccounted)
+      [ (Pair 1 4 2 Unit) ]
+  - CONST (entry) @ location: 12 (remaining gas: unaccounted)
+    [ (Pair 1 4 2 Unit) ]
+    - [log] (exit) @ location: 12 (remaining gas: unaccounted)
+      [ 2
+        (Pair 1 4 2 Unit) ]
+  - UPDATE (entry) @ location: 15 (remaining gas: unaccounted)
+    [ 2
+      (Pair 1 4 2 Unit) ]
+    - [log] (exit) @ location: 15 (remaining gas: unaccounted)
+      [ (Pair 2 4 2 Unit) ]
+  - CONST (entry) @ location: 17 (remaining gas: unaccounted)
+    [ (Pair 2 4 2 Unit) ]
+    - [log] (exit) @ location: 17 (remaining gas: unaccounted)
+      [ 12
+        (Pair 2 4 2 Unit) ]
+  - UPDATE (entry) @ location: 20 (remaining gas: unaccounted)
+    [ 12
+      (Pair 2 4 2 Unit) ]
+    - [log] (exit) @ location: 20 (remaining gas: unaccounted)
+      [ (Pair 2 12 2 Unit) ]
+  - CONST (entry) @ location: 22 (remaining gas: unaccounted)
+    [ (Pair 2 12 2 Unit) ]
+    - [log] (exit) @ location: 22 (remaining gas: unaccounted)
+      [ 8
+        (Pair 2 12 2 Unit) ]
+  - UPDATE (entry) @ location: 25 (remaining gas: unaccounted)
+    [ 8
+      (Pair 2 12 2 Unit) ]
+    - [log] (exit) @ location: 25 (remaining gas: unaccounted)
+      [ (Pair 2 12 8 Unit) ]
+  - CONST (entry) @ location: 27 (remaining gas: unaccounted)
+    [ (Pair 2 12 8 Unit) ]
+    - [log] (exit) @ location: 27 (remaining gas: unaccounted)
+      [ Unit
+        (Pair 2 12 8 Unit) ]
+  - UPDATE (entry) @ location: 28 (remaining gas: unaccounted)
+    [ Unit
+      (Pair 2 12 8 Unit) ]
+    - [log] (exit) @ location: 28 (remaining gas: unaccounted)
+      [ (Pair 2 12 8 Unit) ]
+  - NIL (entry) @ location: 30 (remaining gas: unaccounted)
+    [ (Pair 2 12 8 Unit) ]
+    - [log] (exit) @ location: 30 (remaining gas: unaccounted)
+      [ {}
+        (Pair 2 12 8 Unit) ]
+  - PAIR (entry) @ location: 32 (remaining gas: unaccounted)
+    [ {}
+      (Pair 2 12 8 Unit) ]
+    - [log] (exit) @ location: 32 (remaining gas: unaccounted)
+      [ (Pair {} 2 12 8 Unit) ]
+  - [halt] (entry) @ location: 10 (remaining gas: unaccounted)
+    [ (Pair {} 2 12 8 Unit) ]
+    - control: KNil

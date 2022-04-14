@@ -1,0 +1,39 @@
+if.out
+
+trace
+  - CAR (interp) @ location: 8 (remaining gas: unaccounted)
+    [ (Pair True None) ]
+  - CAR (entry) @ location: 8 (remaining gas: unaccounted)
+    [ (Pair True None) ]
+    - [log] (exit) @ location: 8 (remaining gas: unaccounted)
+      [ True ]
+  - IF (entry) @ location: 9 (remaining gas: unaccounted)
+    [ True ]
+    - [log] (exit) @ location: 9 (remaining gas: unaccounted)
+      [  ]
+  - CONST (entry) @ location: 11 (remaining gas: unaccounted)
+    [  ]
+    - [log] (exit) @ location: 11 (remaining gas: unaccounted)
+      [ True ]
+  - [halt] (entry) @ location: 18 (remaining gas: unaccounted)
+    [ True ]
+    - control: KCons
+    - [log] (exit) @ location: 9 (remaining gas: unaccounted)
+      [ True ]
+  - SOME (entry) @ location: 18 (remaining gas: unaccounted)
+    [ True ]
+    - [log] (exit) @ location: 18 (remaining gas: unaccounted)
+      [ (Some True) ]
+  - NIL (entry) @ location: 19 (remaining gas: unaccounted)
+    [ (Some True) ]
+    - [log] (exit) @ location: 19 (remaining gas: unaccounted)
+      [ {}
+        (Some True) ]
+  - PAIR (entry) @ location: 21 (remaining gas: unaccounted)
+    [ {}
+      (Some True) ]
+    - [log] (exit) @ location: 21 (remaining gas: unaccounted)
+      [ (Pair {} (Some True)) ]
+  - [halt] (entry) @ location: 7 (remaining gas: unaccounted)
+    [ (Pair {} (Some True)) ]
+    - control: KNil
