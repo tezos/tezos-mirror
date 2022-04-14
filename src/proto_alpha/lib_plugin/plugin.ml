@@ -1402,8 +1402,8 @@ module View_helpers = struct
         obj2
           (req "entrypoint" Entrypoint.simple_encoding)
           (req "callback" Contract.encoding))
-      (function View_never_returns (e, c) -> Some (e, c) | _ -> None)
-      (fun (e, c) -> View_never_returns (e, c)) ;
+      (function View_unexpected_return (e, c) -> Some (e, c) | _ -> None)
+      (fun (e, c) -> View_unexpected_return (e, c)) ;
     Environment.Error_monad.register_error_kind
       `Permanent
       ~id:"viewNotFound"
