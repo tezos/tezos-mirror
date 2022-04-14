@@ -156,8 +156,9 @@ module Make (Protocol_services : PROTOCOL_SERVICES) : S = struct
                           header.Block_header.shell.Block_header.timestamp
                         in
                         Archiver.add_block
-                          block_level
+                          ~level:block_level
                           hash
+                          ~round:(Int32.of_int priority)
                           timestamp
                           reception_time
                           delegate

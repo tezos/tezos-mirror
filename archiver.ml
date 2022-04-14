@@ -55,6 +55,7 @@ module Block = struct
     hash : Block_hash.t;
     delegate : Signature.public_key_hash;
     delegate_alias : string option;
+    round : Int32.t;
     timestamp : Time.Protocol.t;
     reception_time : Time.System.t;
     nonce : unit option;
@@ -63,14 +64,37 @@ module Block = struct
   let encoding =
     let open Data_encoding in
     conv
-      (fun {hash; delegate; delegate_alias; reception_time; timestamp; nonce} ->
-        (hash, delegate, delegate_alias, reception_time, timestamp, nonce))
-      (fun (hash, delegate, delegate_alias, reception_time, timestamp, nonce) ->
-        {hash; delegate; delegate_alias; reception_time; timestamp; nonce})
-      (obj6
+      (fun {
+             hash;
+             delegate;
+             delegate_alias;
+             round;
+             reception_time;
+             timestamp;
+             nonce;
+           } ->
+        (hash, delegate, delegate_alias, round, reception_time, timestamp, nonce))
+      (fun ( hash,
+             delegate,
+             delegate_alias,
+             round,
+             reception_time,
+             timestamp,
+             nonce ) ->
+        {
+          hash;
+          delegate;
+          delegate_alias;
+          round;
+          reception_time;
+          timestamp;
+          nonce;
+        })
+      (obj7
          (req "hash" Block_hash.encoding)
          (req "delegate" Signature.Public_key_hash.encoding)
          (opt "delegate_alias" string)
+         (dft "round" int32 0l)
          (req "reception_time" Time.System.encoding)
          (req "timestamp" Time.Protocol.encoding)
          (opt "nonce" unit))
@@ -259,8 +283,8 @@ let extract_anomalies path level infos =
     | [] -> return_unit
     | _ :: _ -> dump_anomalies path level anomalies
 
-let dump_included_in_block cctxt path block_level block_hash timestamp
-    reception_time baker endorsers_pkhs =
+let dump_included_in_block cctxt path block_level block_hash block_round
+    timestamp reception_time baker endorsers_pkhs =
   let open Lwt.Infix in
   Wallet.of_context cctxt >>= fun aliases_opt ->
   let aliases =
@@ -353,6 +377,7 @@ let dump_included_in_block cctxt path block_level block_hash timestamp
             hash = block_hash;
             delegate = baker;
             delegate_alias = Wallet.alias_of_pkh aliases baker;
+            round = block_round;
             reception_time;
             timestamp;
             nonce = None;
@@ -468,6 +493,7 @@ type chunk =
   | Block of
       Int32.t
       * Block_hash.t
+      * Int32.t
       * Time.Protocol.t
       * Time.System.t
       * Signature.Public_key_hash.t
@@ -483,12 +509,15 @@ let (chunk_stream, chunk_feeder) = Lwt_stream.create ()
 let launch cctxt prefix =
   Lwt_stream.iter_p
     (function
-      | Block (block_level, block, timestamp, reception_time, delegate, pkhs) ->
+      | Block
+          (block_level, block, round, timestamp, reception_time, delegate, pkhs)
+        ->
           dump_included_in_block
             cctxt
             prefix
             block_level
             block
+            round
             timestamp
             reception_time
             delegate
@@ -502,8 +531,8 @@ let stop () = chunk_feeder None
 let add_received ?unaccurate level items =
   chunk_feeder (Some (Mempool (unaccurate, level, items)))
 
-let add_block block_level block_hash timestamp reception_time delegate pkhs =
+let add_block ~level block_hash ~round timestamp reception_time delegate pkhs =
   chunk_feeder
     (Some
        (Block
-          (block_level, block_hash, timestamp, reception_time, delegate, pkhs)))
+          (level, block_hash, round, timestamp, reception_time, delegate, pkhs)))

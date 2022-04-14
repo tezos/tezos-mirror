@@ -34,8 +34,9 @@ val add_received :
   unit
 
 val add_block :
-  Int32.t ->
+  level:Int32.t ->
   Block_hash.t ->
+  round:Int32.t ->
   Time.Protocol.t ->
   Time.System.t ->
   Signature.Public_key_hash.t ->
