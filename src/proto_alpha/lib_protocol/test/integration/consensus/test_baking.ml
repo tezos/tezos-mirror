@@ -309,7 +309,7 @@ let test_enough_active_stake_to_bake ~has_active_stake () =
   (* N.B. setting the balance has an impact on the active stake; without
      delegation, the full balance is the same as the staking balance and the
      active balance is less or equal the staking balance (see
-     [Delegate_storage.select_distribution_for_cycle]). *)
+     [Delegate_sampler.select_distribution_for_cycle]). *)
   let initial_bal1 = if has_active_stake then tpr else Int64.sub tpr 1L in
   Context.init2 ~initial_balances:[initial_bal1; tpr] ~consensus_threshold:0 ()
   >>=? fun (b0, (account1, _account2)) ->

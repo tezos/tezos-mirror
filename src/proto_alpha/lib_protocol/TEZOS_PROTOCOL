@@ -134,6 +134,10 @@
         "Contract_storage",
         "Token",
         "Delegate_storage",
+        "Delegate_sampler",
+        "Delegate_missed_endorsements_storage",
+        "Delegate_slashed_deposits_storage",
+        "Delegate_cycles",
         "Bootstrap_storage",
 
         "Vote_storage",

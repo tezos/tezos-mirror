@@ -100,7 +100,7 @@ let check ctxt ~selection =
     (fun () ->
       LevelRoundMap.fold_es
         (fun (level, round) delegate ctxt ->
-          Delegate_storage.baking_rights_owner ctxt level ~round
+          Delegate_sampler.baking_rights_owner ctxt level ~round
           >|= Environment.wrap_tzresult
           >>=? fun (ctxt, _, (_, pkh)) ->
           if not (Signature.Public_key_hash.equal delegate pkh) then raise Exit
