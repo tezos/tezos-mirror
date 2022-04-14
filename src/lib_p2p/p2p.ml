@@ -239,7 +239,7 @@ module Real = struct
       create_maintenance_worker limits pool connect_handler config triggers log
     in
     let* welcome = may_create_welcome_worker config limits connect_handler in
-    P2p_metrics.init pool ;
+    P2p_metrics.collect pool ;
     return
       {
         config;
