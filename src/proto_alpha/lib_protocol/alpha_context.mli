@@ -1479,6 +1479,8 @@ module Contract : sig
 
   include BASIC_DATA with type t := t
 
+  val originated_encoding : Contract_hash.t Data_encoding.t
+
   val in_memory_size : t -> Cache_memory_helpers.sint
 
   val rpc_arg : t RPC_arg.arg
@@ -3501,7 +3503,7 @@ module Liquidity_baking : sig
   val liquidity_baking_toggle_vote_encoding :
     liquidity_baking_toggle_vote Data_encoding.encoding
 
-  val get_cpmm_address : context -> Contract.t tzresult Lwt.t
+  val get_cpmm_address : context -> Contract_hash.t tzresult Lwt.t
 
   module Toggle_EMA : sig
     type t
@@ -3516,7 +3518,7 @@ module Liquidity_baking : sig
   val on_subsidy_allowed :
     context ->
     toggle_vote:liquidity_baking_toggle_vote ->
-    (context -> Contract.t -> (context * 'a list) tzresult Lwt.t) ->
+    (context -> Contract_hash.t -> (context * 'a list) tzresult Lwt.t) ->
     (context * 'a list * Toggle_EMA.t) tzresult Lwt.t
 end
 

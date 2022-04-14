@@ -1366,7 +1366,12 @@ module Liquidity_baking = struct
       (struct
         let name = ["liquidity_baking_cpmm_address"]
       end)
-      (Contract_repr)
+      (struct
+        type t = Contract_hash.t
+
+        (* Keeping contract-compatible encoding to avoid migrating this. *)
+        let encoding = Contract_repr.originated_encoding
+      end)
 end
 
 module Ticket_balance = struct

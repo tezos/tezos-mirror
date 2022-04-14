@@ -206,10 +206,7 @@ let init ctxt ~typecheck =
   >>?= fun (ctxt, cpmm_address) ->
   Contract_storage.fresh_contract_from_current_nonce ctxt
   >>?= fun (ctxt, lqt_address) ->
-  Storage.Liquidity_baking.Cpmm_address.init
-    ctxt
-    (Contract_repr.Originated cpmm_address)
-  >>=? fun ctxt ->
+  Storage.Liquidity_baking.Cpmm_address.init ctxt cpmm_address >>=? fun ctxt ->
   check_tzBTC
     ~typecheck
     current_level

@@ -178,7 +178,7 @@ module Liquidity_baking = struct
       RPC_service.get_service
         ~description:"Liquidity baking CPMM address"
         ~query:RPC_query.empty
-        ~output:Alpha_context.Contract.encoding
+        ~output:Alpha_context.Contract.originated_encoding
         RPC_path.(custom_root / "context" / "liquidity_baking" / "cpmm_address")
   end
 

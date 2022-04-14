@@ -26,7 +26,7 @@
 
 (** Get the address of the Constant-Product Market Maker receiving the 
     Liquidity Baking subsidy *)
-val get_cpmm_address : Raw_context.t -> Contract_repr.t tzresult Lwt.t
+val get_cpmm_address : Raw_context.t -> Contract_hash.t tzresult Lwt.t
 
 (** [on_subsidy_allowed ctxt ~toggle_vote f] updates the toggle EMA according to
     [toggle_vote]. Then the callback function [f] is called if the following
@@ -40,5 +40,5 @@ val get_cpmm_address : Raw_context.t -> Contract_repr.t tzresult Lwt.t
 val on_subsidy_allowed :
   Raw_context.t ->
   toggle_vote:Liquidity_baking_repr.liquidity_baking_toggle_vote ->
-  (Raw_context.t -> Contract_repr.t -> (Raw_context.t * 'a list) tzresult Lwt.t) ->
+  (Raw_context.t -> Contract_hash.t -> (Raw_context.t * 'a list) tzresult Lwt.t) ->
   (Raw_context.t * 'a list * Liquidity_baking_repr.Toggle_EMA.t) tzresult Lwt.t
