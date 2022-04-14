@@ -1293,25 +1293,15 @@ let apply ?simulate ?cached_result c ~cache block_header operations =
     in
     match r with
     | Error (Validation_errors.Inconsistent_hash _ :: _) ->
-        let*! protocol_hash = Context_ops.get_protocol c.predecessor_context in
-        let hangzhou_hash =
-          Protocol_hash.of_b58check_exn
-            "PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx"
-        in
-        if protocol_hash = hangzhou_hash then (
-          Tezos_protocol_environment.Context
-          .reset_cache_cache_hangzhou_issue_do_not_use_except_if_you_know_what_you_are_doing
-            () ;
-          Lwt.return r)
-        else
-          let*! () = Event.(emit inherited_inconsistent_cache) block_hash in
-          apply
-            ?cached_result
-            c
-            ~cache:`Force_load
-            block_hash
-            block_header
-            operations
+        (* The shell makes an assumption over the protocol concerning the cache which may be broken. In that case, the application fails with an [Inconsistency_hash] error. To make the node resilient to such problem, when such an error occurs, we retry the application using a fresh cache. *)
+        let*! () = Event.(emit inherited_inconsistent_cache) block_hash in
+        apply
+          ?cached_result
+          c
+          ~cache:`Force_load
+          block_hash
+          block_header
+          operations
     | (Ok _ | Error _) as res -> Lwt.return res
   in
   match r with
