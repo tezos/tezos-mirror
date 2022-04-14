@@ -1008,13 +1008,9 @@ let ex_ticket_size :
   (* gas *)
   return (ctxt, ty_size + val_size)
 
-let apply_transaction_to_tx_rollup ~ctxt ~parameters_ty ~parameters ~amount
-    ~entrypoint ~payer ~dst_rollup ~since =
+let apply_transaction_to_tx_rollup ~ctxt ~parameters_ty ~parameters ~entrypoint
+    ~payer ~dst_rollup ~since =
   assert_tx_rollup_feature_enabled ctxt >>=? fun () ->
-  fail_unless
-    Tez.(amount = zero)
-    Script_interpreter_defs.Tx_rollup_invalid_transaction_amount
-  >>=? fun () ->
   if Entrypoint.(entrypoint = Tx_rollup.deposit_entrypoint) then
     (* If the ticket deposit fails on L2 for some reason
        (e.g. [Balance_overflow] in the recipient), then it is
@@ -1209,7 +1205,6 @@ let apply_internal_manager_operation_content :
   | Transaction_to_tx_rollup
       {
         destination;
-        amount;
         entrypoint;
         unparsed_parameters = _;
         parameters_ty;
@@ -1219,7 +1214,6 @@ let apply_internal_manager_operation_content :
         ~ctxt
         ~parameters_ty
         ~parameters
-        ~amount
         ~entrypoint
         ~payer
         ~dst_rollup:destination

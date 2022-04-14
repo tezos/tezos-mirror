@@ -326,7 +326,6 @@ let transfer_operation_to_tx_rollup ~incr ~src ~parameters_ty ~parameters
           operation =
             Transaction_to_tx_rollup
               {
-                amount = Tez.zero;
                 unparsed_parameters = Micheline.strip_locations params_node;
                 entrypoint = Tx_rollup.deposit_entrypoint;
                 destination = tx_rollup;
