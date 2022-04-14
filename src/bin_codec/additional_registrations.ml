@@ -65,7 +65,9 @@ let () =
   (* string encodings *)
   let open Data_encoding in
   Registration.register (def "ground.string" string) ;
-  Registration.register (def "ground.bytes" bytes)
+  Registration.register (def "ground.variable.string" Variable.string) ;
+  Registration.register (def "ground.bytes" bytes) ;
+  Registration.register (def "ground.variable.bytes" Variable.bytes)
 
 let () =
   (* misc other ground encodings *)
