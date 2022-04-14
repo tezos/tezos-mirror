@@ -12,14 +12,16 @@ set -eu
 
 echo "Query GitLab to get generic package URL"
 
+# https://docs.gitlab.com/ee/api/packages.html#within-a-project
+# :gitlab_api_url/projects/:id/packages
 web_path=$(curl -fsSL -X GET \
                 -H "JOB-TOKEN: ${CI_JOB_TOKEN}" \
-                "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages" \
-           | jq -r ".[] | select(.version==\"${gitlab_release_no_v}\") | ._links.web_path")
+                "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages?sort=desc&package_name=${gitlab_package_name}" \
+           | jq -r ".[] | select(.version==\"${gitlab_package_version}\") | ._links.web_path")
 
 if [ -z "${web_path}" ]
 then
-  echo "Error: could not find package matching version ${gitlab_release_no_v}"
+  echo "Error: could not find package matching version ${gitlab_package_version}"
   exit 1
 else
   gitlab_package_url="https://${CI_SERVER_HOST}${web_path}"

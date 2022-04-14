@@ -11,12 +11,9 @@ set -eu
 # shellcheck source=./scripts/ci/release.sh
 . ./scripts/ci/release.sh
 
-# X.Y or X.Y-rcZ
-gitlab_package_name="${gitlab_release_no_v}"
-
 # https://docs.gitlab.com/ee/user/packages/generic_packages/index.html#download-package-file
 # :gitlab_api_url/projects/:id/packages/generic/:package_name/:package_version/:file_name
-gitlab_package_url="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${CI_PROJECT_NAME}/${gitlab_package_name}"
+gitlab_package_url="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${gitlab_package_name}/${gitlab_package_version}"
 
 gitlab_upload() {
   local_path="${1}"
@@ -68,7 +65,7 @@ do
 
   cd tezos-binaries/
   tar -czf "tezos-${architecture}.tar.gz" "tezos-${architecture}/"
-  gitlab_upload "tezos-${architecture}.tar.gz" "tezos-${gitlab_package_name}-linux-${architecture}.tar.gz"
+  gitlab_upload "tezos-${architecture}.tar.gz" "${gitlab_package_name}-linux-${architecture}.tar.gz"
   cd ..
 done
 
@@ -77,7 +74,7 @@ done
 # => create and upload manually
 echo 'Upload tarball of source code and its checksums'
 
-source_tarball="tezos-${gitlab_package_name}.tar.bz2"
+source_tarball="${gitlab_package_name}.tar.bz2"
 
 # We are using the export-subst feature of git onfigured in .gitattributes, requires git version >= 2.35
 # https://git-scm.com/docs/git-archive
