@@ -1214,7 +1214,7 @@ module Scripts = struct
           (View_helpers.extract_parameter_from_operations
              entrypoint
              operations
-             (Contract.Originated viewer_contract))) ;
+             viewer_contract)) ;
     Registration.register0
       ~chunked:true
       S.run_script_view
