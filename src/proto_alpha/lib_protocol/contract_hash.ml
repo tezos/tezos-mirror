@@ -43,3 +43,9 @@ include H
 include Path_encoding.Make_hex (H)
 
 let () = Base58.check_encoded_prefix b58check_encoding "KT1" 36
+
+let of_nonce nonce =
+  let data =
+    Data_encoding.Binary.to_bytes_exn Origination_nonce.encoding nonce
+  in
+  hash_bytes [data]
