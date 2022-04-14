@@ -46,3 +46,10 @@ else
   # shellcheck disable=SC2034
   gitlab_release_name="Release ${gitlab_release_major_version}.${gitlab_release_minor_version}"
 fi
+
+### Compute GitLab generic package names
+
+gitlab_package_name="${CI_PROJECT_NAME}-${gitlab_release_no_v}"
+
+# X.Y or X.Y-rcZ
+gitlab_package_version="${gitlab_release_no_v}"
