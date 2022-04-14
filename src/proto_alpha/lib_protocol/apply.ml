@@ -940,13 +940,13 @@ let apply_transaction ~ctxt ~parameter ~source ~(contract : Contract.t) ~amount
     ~entrypoint ~before_operation ~payer ~chain_id ~mode ~internal =
   match contract with
   | Originated _ -> (
-      (if Tez.(amount = zero) then
-       (* Detect potential call to non existent contract. *)
-       Contract.must_exist ctxt contract >|=? fun () -> (ctxt, [])
-      else
-        (* Since the contract is originated, nothing will be allocated
-           or this transfer of tokens will fail. *)
-        Token.transfer ctxt (`Contract source) (`Contract contract) amount)
+      (* Since the contract is originated, nothing will be allocated
+         or this transfer of tokens will fail.
+         Calls to non-existing contracts are detected by [Script_cache.find]
+         returning [None] because [Token.transfer] will succeed on non-existing
+         contracts if the amount is zero.
+      *)
+      Token.transfer ctxt (`Contract source) (`Contract contract) amount
       >>=? fun (ctxt, balance_updates) ->
       Script_cache.find ctxt contract >>=? fun (ctxt, cache_key, script) ->
       match script with
