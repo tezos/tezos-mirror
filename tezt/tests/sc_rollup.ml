@@ -298,12 +298,11 @@ let send_message client sc_rollup_address msg =
 
 let send_messages n sc_rollup_address client =
   let messages =
-    range 1 n |> fun is ->
     List.map
       (fun i ->
-        Printf.sprintf "text:[%s]" @@ String.concat ", "
-        @@ List.map (fun _ -> Printf.sprintf "\"CAFEBABE\"") (range 1 i))
-      is
+        let json = `A (List.map (fun _ -> `String "CAFEBABE") (range 1 i)) in
+        "text:" ^ Ezjsonm.to_string json)
+      (range 1 n)
   in
   Lwt_list.iter_s
     (fun msg -> send_message client sc_rollup_address msg)
