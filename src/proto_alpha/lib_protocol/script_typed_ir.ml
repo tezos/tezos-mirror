@@ -1379,7 +1379,6 @@ and 'kind manager_operation =
       -> Kind.transaction manager_operation
   | Transaction_to_tx_rollup : {
       destination : Tx_rollup.t;
-      entrypoint : Entrypoint.t;
       parameters_ty : ('a, _) ty;
       parameters : 'a;
       unparsed_parameters : Script.expr;

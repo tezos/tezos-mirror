@@ -552,6 +552,10 @@ let make_transaction_to_tx_rollup (type t tc) ctxt ~destination ~amount
      the type of the ticket. *)
   error_unless Tez.(amount = zero) Tx_rollup_invalid_transaction_amount
   >>?= fun () ->
+  error_unless
+    Entrypoint.(entrypoint = Tx_rollup.deposit_entrypoint)
+    (Script_tc_errors.No_such_entrypoint entrypoint)
+  >>?= fun () ->
   match parameters_ty with
   | Pair_t (Ticket_t (tp, _), _, _, _) ->
       unparse_data ctxt Optimized parameters_ty parameters
@@ -568,13 +572,7 @@ let make_transaction_to_tx_rollup (type t tc) ctxt ~destination ~amount
             Micheline.strip_locations unparsed_parameters
           in
           ( Transaction_to_tx_rollup
-              {
-                destination;
-                entrypoint;
-                parameters_ty;
-                parameters;
-                unparsed_parameters;
-              },
+              {destination; parameters_ty; parameters; unparsed_parameters},
             ctxt ) )
   | _ ->
       (* TODO: https://gitlab.com/tezos/tezos/-/issues/2455
