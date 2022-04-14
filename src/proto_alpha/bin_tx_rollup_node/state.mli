@@ -117,7 +117,7 @@ val tezos_block_already_processed : t -> Block_hash.t -> bool Lwt.t
 
 (** Set the current head of the rollup and return the blocks (hashes) that were
     reorganized. *)
-val set_head : t -> L2block.t -> (L2block.t * L2block.hash) reorg tzresult Lwt.t
+val set_head : t -> L2block.t -> L2block.t reorg tzresult Lwt.t
 
 (** Set the Tezos head. Returns the reorganization of L1 blocks (if any). *)
 val set_tezos_head :

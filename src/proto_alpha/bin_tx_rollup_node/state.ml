@@ -199,8 +199,7 @@ let distance_l2_levels l1 l2 =
    [old_head_hash] and the chain whose head [new_head_hash]. *)
 let rollup_reorg state ~old_head ~new_head =
   let open Lwt_syntax in
-  let rec loop old_chain new_chain (old_head, old_head_hash)
-      (new_head, new_head_hash) =
+  let rec loop old_chain new_chain old_head new_head =
     match (old_head, new_head) with
     | (None, _) | (_, None) ->
         return
@@ -210,10 +209,10 @@ let rollup_reorg state ~old_head ~new_head =
             new_chain = List.rev new_chain;
           }
     | (Some old_head, Some new_head) ->
-        if L2block.Hash.(old_head_hash = new_head_hash) then
+        if L2block.Hash.(old_head.L2block.hash = new_head.L2block.hash) then
           return
             {
-              ancestor = Some (old_head, old_head_hash);
+              ancestor = Some old_head;
               old_chain = List.rev old_chain;
               new_chain = List.rev new_chain;
             }
@@ -226,52 +225,44 @@ let rollup_reorg state ~old_head ~new_head =
           let* (old_chain, new_chain, old, new_) =
             if diff = 0l then
               (* Heads at same level *)
-              let new_chain = (new_head, new_head_hash) :: new_chain in
-              let old_chain = (old_head, old_head_hash) :: old_chain in
-              let new_head_hash = new_head.L2block.header.predecessor in
-              let old_head_hash = old_head.L2block.header.predecessor in
-              let* new_head = get_block state new_head_hash in
-              let+ old_head = get_block state old_head_hash in
-              ( old_chain,
-                new_chain,
-                (old_head, old_head_hash),
-                (new_head, new_head_hash) )
+              let new_chain = new_head :: new_chain in
+              let old_chain = old_head :: old_chain in
+              let* new_head =
+                get_block state new_head.L2block.header.predecessor
+              in
+              let+ old_head =
+                get_block state old_head.L2block.header.predecessor
+              in
+              (old_chain, new_chain, old_head, new_head)
             else if diff > 0l then
               (* New chain is longer *)
-              let new_chain = (new_head, new_head_hash) :: new_chain in
-              let new_head_hash = new_head.L2block.header.predecessor in
-              let+ new_head = get_block state new_head_hash in
-              ( old_chain,
-                new_chain,
-                (Some old_head, old_head_hash),
-                (new_head, new_head_hash) )
+              let new_chain = new_head :: new_chain in
+              let+ new_head =
+                get_block state new_head.L2block.header.predecessor
+              in
+              (old_chain, new_chain, Some old_head, new_head)
             else
               (* Old chain was longer *)
-              let old_chain = (old_head, old_head_hash) :: old_chain in
-              let old_head_hash = old_head.L2block.header.predecessor in
-              let+ old_head = get_block state old_head_hash in
-              ( old_chain,
-                new_chain,
-                (old_head, old_head_hash),
-                (Some new_head, new_head_hash) )
+              let old_chain = old_head :: old_chain in
+              let+ old_head =
+                get_block state old_head.L2block.header.predecessor
+              in
+              (old_chain, new_chain, old_head, Some new_head)
           in
           loop old_chain new_chain old new_
   in
-  let (old_head, old_head_hash) = old_head in
-  let (new_head, new_head_hash) = new_head in
-  loop [] [] (Some old_head, old_head_hash) (Some new_head, new_head_hash)
+  loop [] [] (Some old_head) (Some new_head)
 
-let patch_l2_levels state (reorg : (L2block.t * L2block.hash) reorg) =
+let patch_l2_levels state (reorg : L2block.t reorg) =
   let open Lwt_result_syntax in
   let*! () =
     List.iter_s
-      (fun (old_, _) ->
-        Stores.Level_store.remove state.stores.levels old_.L2block.header.level)
+      (fun old ->
+        Stores.Level_store.remove state.stores.levels old.L2block.header.level)
       reorg.old_chain
   in
   List.iter_s
-    (fun (new_, new_hash) ->
-      save_level state new_.L2block.header.level new_hash)
+    (fun new_ -> save_level state new_.L2block.header.level new_.L2block.hash)
     reorg.new_chain
 
 let set_head state head =
@@ -292,11 +283,7 @@ let set_head state head =
         let*! old_head = get_block state old_head_hash in
         match old_head with
         | None -> Lwt.return no_reorg
-        | Some old_head ->
-            rollup_reorg
-              state
-              ~old_head:(old_head, old_head_hash)
-              ~new_head:(head, hash))
+        | Some old_head -> rollup_reorg state ~old_head ~new_head:head)
   in
   let*! () = patch_l2_levels state l2_reorg in
   return l2_reorg
