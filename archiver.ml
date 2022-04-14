@@ -27,27 +27,80 @@ open Lwt_result_syntax
 let levels_per_folder = 4096l
 
 module Endorsement = struct
-  type t = {
-    delegate : Signature.public_key_hash;
-    delegate_alias : string option;
+  type operation = {
+    round : Int32.t option;
     reception_time : Time.System.t option;
     errors : error list option;
     block_inclusion : Block_hash.t list;
   }
 
-  let encoding =
+  let operation_encoding =
     let open Data_encoding in
     conv
-      (fun {delegate; delegate_alias; reception_time; errors; block_inclusion} ->
-        (delegate, delegate_alias, reception_time, errors, block_inclusion))
+      (fun {round; reception_time; errors; block_inclusion} ->
+        (round, reception_time, errors, block_inclusion))
+      (fun (round, reception_time, errors, block_inclusion) ->
+        {round; reception_time; errors; block_inclusion})
+      (obj4
+         (opt "round" int32)
+         (req "reception_time" (option Time.System.encoding))
+         (opt "errors" (list error_encoding))
+         (dft "included_in_blocks" (list Block_hash.encoding) []))
+
+  type t = {
+    delegate : Signature.public_key_hash;
+    delegate_alias : string option;
+    operations : operation list;
+  }
+
+  let legacy_encoding =
+    let open Data_encoding in
+    conv
+      (fun _ -> assert false)
       (fun (delegate, delegate_alias, reception_time, errors, block_inclusion) ->
-        {delegate; delegate_alias; reception_time; errors; block_inclusion})
+        match (reception_time, block_inclusion) with
+        | (None, []) -> {delegate; delegate_alias; operations = []}
+        | (_, _) ->
+            {
+              delegate;
+              delegate_alias;
+              operations =
+                [{reception_time; errors; round = None; block_inclusion}];
+            })
       (obj5
          (req "delegate" Signature.Public_key_hash.encoding)
          (opt "delegate_alias" string)
          (opt "reception_time" Time.System.encoding)
          (opt "errors" (list error_encoding))
          (dft "included_in_blocks" (list Block_hash.encoding) []))
+
+  let encoding =
+    let open Data_encoding in
+    conv
+      (fun {delegate; delegate_alias; operations} ->
+        (delegate, delegate_alias, operations))
+      (fun (delegate, delegate_alias, operations) ->
+        {delegate; delegate_alias; operations})
+      (obj3
+         (req "delegate" Signature.Public_key_hash.encoding)
+         (opt "delegate_alias" string)
+         (dft "operations" (list operation_encoding) []))
+
+  let encoding =
+    let open Data_encoding in
+    splitted
+      ~json:
+        (union
+           [
+             case ~title:"current" Json_only encoding Option.some (fun x -> x);
+             case
+               ~title:"legacy"
+               Json_only
+               legacy_encoding
+               (fun _ -> None)
+               (fun x -> x);
+           ])
+      ~binary:encoding
 end
 
 module Block = struct
@@ -237,51 +290,87 @@ let extract_anomalies path level infos =
   else
     let anomalies =
       List.fold_left
-        (fun acc
-             Endorsement.
-               {
-                 delegate;
-                 delegate_alias;
-                 reception_time;
-                 errors;
-                 block_inclusion;
-               } ->
-          match errors with
-          | Some (_ :: _) ->
-              Anomaly.
-                {level; delegate; delegate_alias; problem = Anomaly.Incorrect}
-              :: acc
-          | None | Some [] -> (
-              match (reception_time, block_inclusion) with
-              | (None, []) ->
-                  Anomaly.
-                    {level; delegate; delegate_alias; problem = Anomaly.Missed}
-                  :: acc
-              | (Some _, []) ->
+        (fun acc Endorsement.{delegate; delegate_alias; operations} ->
+          List.fold_left
+            (fun acc
+                 Endorsement.
+                   {round = _; reception_time; errors; block_inclusion} ->
+              match errors with
+              | Some (_ :: _) ->
                   Anomaly.
                     {
                       level;
                       delegate;
                       delegate_alias;
-                      problem = Anomaly.Forgotten;
+                      problem = Anomaly.Incorrect;
                     }
                   :: acc
-              | (None, _ :: _) ->
-                  Anomaly.
-                    {
-                      level;
-                      delegate;
-                      delegate_alias;
-                      problem = Anomaly.Sequestered;
-                    }
-                  :: acc
-              | (Some _, _ :: _) -> acc))
+              | None | Some [] -> (
+                  match (reception_time, block_inclusion) with
+                  | (None, []) ->
+                      Anomaly.
+                        {
+                          level;
+                          delegate;
+                          delegate_alias;
+                          problem = Anomaly.Missed;
+                        }
+                      :: acc
+                  | (Some _, []) ->
+                      Anomaly.
+                        {
+                          level;
+                          delegate;
+                          delegate_alias;
+                          problem = Anomaly.Forgotten;
+                        }
+                      :: acc
+                  | (None, _ :: _) ->
+                      Anomaly.
+                        {
+                          level;
+                          delegate;
+                          delegate_alias;
+                          problem = Anomaly.Sequestered;
+                        }
+                      :: acc
+                  | (Some _, _ :: _) -> acc))
+            acc
+            operations)
         []
         infos.endorsements
     in
     match anomalies with
     | [] -> return_unit
     | _ :: _ -> dump_anomalies path level anomalies
+
+let add_to_operations block_hash block_round operations =
+  match
+    List.partition
+      (fun Endorsement.{round; _} ->
+        match round with
+        | None -> true
+        | Some round -> Int32.equal block_round round)
+      operations
+  with
+  | ( Endorsement.{round = _; errors; reception_time; block_inclusion} :: _,
+      operations' ) ->
+      Endorsement.
+        {
+          round = Some block_round;
+          errors;
+          reception_time;
+          block_inclusion = block_hash :: block_inclusion;
+        }
+      :: operations'
+  | ([], _) ->
+      {
+        round = Some block_round;
+        errors = None;
+        reception_time = None;
+        block_inclusion = [block_hash];
+      }
+      :: operations
 
 let dump_included_in_block cctxt path block_level block_hash block_round
     timestamp reception_time baker endorsers_pkhs =
@@ -302,14 +391,7 @@ let dump_included_in_block cctxt path block_level block_hash block_round
        let (updated_known, unknown) =
          List.fold_left
            (fun (acc, missing)
-                Endorsement.(
-                  {
-                    delegate;
-                    delegate_alias;
-                    reception_time;
-                    errors;
-                    block_inclusion;
-                  } as en) ->
+                Endorsement.({delegate; delegate_alias; operations} as en) ->
              match
                List.partition
                  (fun pkh -> Signature.Public_key_hash.equal pkh delegate)
@@ -320,9 +402,8 @@ let dump_included_in_block cctxt path block_level block_hash block_round
                      {
                        delegate;
                        delegate_alias;
-                       reception_time;
-                       errors;
-                       block_inclusion = block_hash :: block_inclusion;
+                       operations =
+                         add_to_operations block_hash block_round operations;
                      }
                    :: acc,
                    missing' )
@@ -340,9 +421,15 @@ let dump_included_in_block cctxt path block_level block_hash block_round
                    {
                      delegate;
                      delegate_alias = Wallet.alias_of_pkh aliases delegate;
-                     reception_time = None;
-                     errors = None;
-                     block_inclusion = [block_hash];
+                     operations =
+                       [
+                         {
+                           round = Some block_round;
+                           errors = None;
+                           reception_time = None;
+                           block_inclusion = [block_hash];
+                         };
+                       ];
                    }
                  :: acc)
                updated_known
@@ -406,6 +493,32 @@ let dump_included_in_block cctxt path block_level block_hash block_round
            Error_monad.pp_print_trace
            err)
 
+let merge_operations =
+  List.fold_left (fun acc (round, errors, reception_time) ->
+      match
+        List.partition
+          (fun Endorsement.{round = r; _} -> Option.equal Int32.equal r round)
+          acc
+      with
+      | (Endorsement.{block_inclusion; reception_time = None; _} :: _, acc') ->
+          Endorsement.
+            {
+              round;
+              errors;
+              reception_time = Some reception_time;
+              block_inclusion;
+            }
+          :: acc'
+      | (_ :: _, _) -> acc
+      | ([], _) ->
+          {
+            round;
+            errors;
+            reception_time = Some reception_time;
+            block_inclusion = [];
+          }
+          :: acc)
+
 let dump_received cctxt path ?unaccurate level items =
   let filename = filename_of_level path level in
   let mutex = get_file_mutex filename in
@@ -415,33 +528,18 @@ let dump_received cctxt path ?unaccurate level items =
         let (updated_known, unknown) =
           List.fold_left
             (fun (acc, missing)
-                 Endorsement.(
-                   {
-                     delegate;
-                     delegate_alias;
-                     reception_time;
-                     errors;
-                     block_inclusion;
-                   } as en) ->
+                 Endorsement.({delegate; delegate_alias; operations} as en) ->
               match
                 List.partition
-                  (fun (pkh, _, _) ->
-                    Signature.Public_key_hash.equal pkh delegate)
+                  (fun (pkh, _) -> Signature.Public_key_hash.equal pkh delegate)
                   missing
               with
-              | ((_, err, time) :: _, missing') ->
-                  let (reception_time, errors) =
-                    match reception_time with
-                    | Some _ -> (reception_time, errors)
-                    | None -> (time, err)
-                  in
+              | ((_, new_operations) :: _, missing') ->
                   ( Endorsement.
                       {
                         delegate;
                         delegate_alias;
-                        reception_time;
-                        errors;
-                        block_inclusion;
+                        operations = merge_operations operations new_operations;
                       }
                     :: acc,
                     missing' )
@@ -459,14 +557,21 @@ let dump_received cctxt path ?unaccurate level items =
                   | Error _err -> StringMap.empty in*)
               return
                 (List.fold_left
-                   (fun acc (delegate, errors, reception_time) ->
+                   (fun acc (delegate, ops) ->
                      Endorsement.
                        {
                          delegate;
                          delegate_alias = Wallet.alias_of_pkh aliases delegate;
-                         reception_time;
-                         errors;
-                         block_inclusion = [];
+                         operations =
+                           List.rev_map
+                             (fun (round, errors, reception_time) ->
+                               {
+                                 round;
+                                 errors;
+                                 reception_time = Some reception_time;
+                                 block_inclusion = [];
+                               })
+                             ops;
                        }
                      :: acc)
                    updated_known
@@ -501,7 +606,8 @@ type chunk =
   | Mempool of
       bool option
       * Int32.t
-      * (Signature.Public_key_hash.t * error list option * Time.System.t option)
+      * (Signature.Public_key_hash.t
+        * (Int32.t option * error list option * Time.System.t) list)
         list
 
 let (chunk_stream, chunk_feeder) = Lwt_stream.create ()

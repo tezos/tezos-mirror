@@ -40,7 +40,9 @@ module type PROTOCOL_SERVICES = sig
   val couple_ops_to_rights :
     (error trace option * Ptime.t * int) list ->
     endorsing_rights ->
-    (Signature.public_key_hash * error trace option * Ptime.t option) list
+    (Signature.public_key_hash
+    * (Int32.t option * error trace option * Ptime.t) list)
+    list
     * Signature.public_key_hash list
 
   val consensus_operation_stream :
@@ -82,10 +84,7 @@ module Make (Protocol_services : PROTOCOL_SERVICES) : S = struct
     let (items, missing) = Protocol_services.couple_ops_to_rights ops rights in
     let endorsements =
       if full then
-        List.fold_left
-          (fun acc delegate -> (delegate, None, None) :: acc)
-          items
-          missing
+        List.fold_left (fun acc delegate -> (delegate, []) :: acc) items missing
       else items
     in
     let unaccurate = if full then Some false else None in

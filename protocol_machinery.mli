@@ -38,7 +38,9 @@ module type PROTOCOL_SERVICES = sig
   val couple_ops_to_rights :
     (error trace option * Ptime.t * int) list ->
     endorsing_rights ->
-    (Signature.public_key_hash * error trace option * Ptime.t option) list
+    (Signature.public_key_hash
+    * (Int32.t option * error trace option * Ptime.t) list)
+    list
     * Signature.public_key_hash list
 
   val consensus_operation_stream :

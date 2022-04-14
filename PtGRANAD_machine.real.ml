@@ -62,8 +62,7 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
           | (([] | _ :: _ :: _), _) -> assert false
           | ([right], rights') ->
               ( ( right.Protocol.Delegate_services.Endorsing_rights.delegate,
-                  errors,
-                  Some delay )
+                  [(None, errors, delay)] )
                 :: acc,
                 rights' ))
         ([], rights)
