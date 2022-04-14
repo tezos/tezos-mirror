@@ -2,11 +2,11 @@
 
 Compile with `make`.
 
-Run with `dune exec git-gas-diff [file]`.
+Run on the standard input with `dune exec git-gas-diff`.
 
-For instance, create a file from `git diff` and launch the tool with:
+Typical usage is to pipe a `git diff` with the tool:
 ```
-git diff HEAD^ HEAD | dune exec git-gas-diff /dev/stdin
+git diff HEAD^ HEAD | dune exec git-gas-diff
 ```
 if the top commit is an update of the gas for regression traces.
 
@@ -14,7 +14,7 @@ See `bin/main.ml` for more details.
 
 Example of a run and its output:
 ```
-$ git diff 530825d255c3a8a6c9777ff910a3deb5ffe15261 cc6a393d71007599c600afbc82ccea66a8517070 | dune exec git-gas-diff /dev/stdin
+$ git diff 530825d255c3a8a6c9777ff910a3deb5ffe15261 cc6a393d71007599c600afbc82ccea66a8517070 | dune exec git-gas-diff
 * Could not parse `-            fee_first_transfer = 394`
 * Could not parse `-            fee_second_transfer = 298`
 * Could not parse `+            fee_first_transfer = 397`

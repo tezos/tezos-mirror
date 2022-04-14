@@ -27,13 +27,10 @@
 [git-gas-diff] is a tool that outputs a synthesis of gas changes from a git
 diff on regression traces.
 
-Typical usage is to first create a file with a git diff that contains gas
-changes. For example:
-  git diff HEAD^ HEAD > [file]
-And then call the script on the resulting file (from the root of the tool):
-  dune exec git-gas-diff [file]
+Typical usage is to pipe a git diff that contains gas changes with the tool:
+  git diff HEAD^ HEAD | dune exec git-gas-diff
 
-The script reads the file line by line in the [run] function.
+The script reads the standard input line by line in the [read_all] sub-function.
 It ignores lines that do not start with '+' or '-', and the ones that start with
 "+++" and "---".
 
@@ -634,22 +631,14 @@ module Synths = struct
      @ to_strs @ parameter_strs)
 end
 
-let run file =
-  try
-    let ic = open_in file in
-    let rec read_all line_number synths =
-      try
-        (* Printf.printf "%d\n%!" line_number ; *)
-        let line = input_line ic in
-        let synths = Synths.add_line synths line in
-        read_all (succ line_number) synths
-      with End_of_file -> synths
-    in
-    let synths = read_all 1 Synths.empty in
-    close_in ic;
-    Synths.show synths
-  with Sys_error _ -> Printf.printf "* Could not read file `%s`.\n%!" file
-
 let () =
-  if Array.length Sys.argv = 2 then run Sys.argv.(1)
-  else Printf.printf "* Error. Usage: %s [diff_file]\n%!" Sys.argv.(0)
+  let rec read_all line_number synths =
+    try
+      (* Printf.printf "%d\n%!" line_number ; *)
+      let line = input_line stdin in
+      let synths = Synths.add_line synths line in
+      read_all (succ line_number) synths
+    with End_of_file -> synths
+  in
+  let synths = read_all 1 Synths.empty in
+  Synths.show synths
