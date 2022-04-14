@@ -331,7 +331,7 @@ let build_commitment_info ~tx_level ~tx_rollup_hash ~tx_node ~client =
         let*! root =
           Rollup.message_result_hash
             ~context_hash
-            ~withdraw_list_hash:Constant.tx_rollup_empty_withdraw_list
+            ~withdraw_list_hash:Constant.tx_rollup_empty_withdraw_list_hash
             client
         in
         return root)
@@ -467,7 +467,7 @@ let build_rejection ~tx_level ~tx_node ~message_pos ~client ?agreed_context_hash
       rejected_message_result_hash;
       rejected_message_result_path;
       context_hash = agreed_context_hash;
-      withdraw_list_hash = Constant.tx_rollup_empty_withdraw_list;
+      withdraw_list_hash = Constant.tx_rollup_empty_withdraw_list_hash;
       agreed_message_result_path;
     }
 
