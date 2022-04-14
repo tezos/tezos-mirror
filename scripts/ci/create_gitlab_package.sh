@@ -23,16 +23,31 @@ gitlab_upload() {
   remote_file="${2}"
   echo "Upload to ${gitlab_package_url}/${remote_file}"
 
-  http_code=$(curl -fsSL -o /dev/null -w "%{http_code}" \
-                   -H "JOB-TOKEN: ${CI_JOB_TOKEN}" \
-                   -T "${local_path}" \
-                   "${gitlab_package_url}/${remote_file}")
+  i=0
+  max_attempts=10
 
-  if [ "${http_code}" != '201' ]
-  then
+  # Retry because gitlab.com is flaky sometimes, curl upload fails with http status code 524 (timeout)
+  while [ "${i}" != "${max_attempts}" ]
+  do
+    i=$((i + 1))
+    http_code=$(curl -fsSL -o /dev/null -w "%{http_code}" \
+                     -H "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+                     -T "${local_path}" \
+                     "${gitlab_package_url}/${remote_file}")
+
+    # Success
+    [ "${http_code}" = '201' ] && return
+    # Failure
     echo "Error: HTTP response code ${http_code}, expected 201"
-    exit 1
-  fi
+    # Do not backoff after last attempt
+    [ "${i}" = "${max_attempts}" ] && break
+    # Backoff
+    echo "Retry (${i}) in one minute..."
+    sleep 60s
+  done
+
+  echo "Error: maximum attempts exhausted (${max_attempts})"
+  exit 1
 }
 
 # Loop over architectures
