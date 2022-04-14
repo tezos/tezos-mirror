@@ -518,6 +518,54 @@ let make_transaction_to_contract ctxt ~destination ~amount ~entrypoint ~location
           },
         ctxt ) )
 
+let make_transaction_to_tx_rollup (type t tc) ctxt ~destination ~amount
+    ~entrypoint ~location ~(parameters_ty : (t, tc) ty) ~parameters =
+  (* The entrypoints of a transaction rollup are polymorphic wrt. the
+     tickets it can process. However, two Michelson values can have
+     the same Micheline representation, but different types. What
+     this means is that when we start the execution of a transaction
+     rollup, the type of its argument is lost if we just give it the
+     values provided by the Michelson script.
+
+     To address this issue, we instrument a transfer to a transaction
+     rollup to inject the exact type of the entrypoint as used by
+     the smart contract. This allows the transaction rollup to extract
+     the type of the ticket. *)
+  match parameters_ty with
+  | Pair_t (Ticket_t (tp, _), _, _, _) ->
+      unparse_data ctxt Optimized parameters_ty parameters
+      >>=? fun (unparsed_parameters, ctxt) ->
+      Lwt.return
+        ( Script_ir_translator.unparse_ty ~loc:Micheline.dummy_location ctxt tp
+        >>? fun (ty, ctxt) ->
+          let unparsed_parameters =
+            Micheline.Seq (Micheline.dummy_location, [unparsed_parameters; ty])
+          in
+          Gas.consume ctxt (Script.strip_locations_cost unparsed_parameters)
+          >|? fun ctxt ->
+          let unparsed_parameters =
+            Micheline.strip_locations unparsed_parameters
+          in
+          ( Transaction_to_tx_rollup
+              {
+                destination;
+                amount;
+                entrypoint;
+                location;
+                parameters_ty;
+                parameters;
+                unparsed_parameters;
+              },
+            ctxt ) )
+  | _ ->
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/2455
+         Refute this branch thanks to the type system.
+         Thanks to the implementation of the [CONTRACT]
+         instruction, this branch is unreachable. But this is
+         not enforced by the type system, which means we are one
+         refactoring away to reach it. *)
+      assert false
+
 (* [transfer (ctxt, sc) gas tez parameters_ty parameters destination entrypoint]
    creates an operation that transfers an amount of [tez] to
    a contract determined by [(destination, entrypoint)]
@@ -544,58 +592,15 @@ let transfer (ctxt, sc) gas amount location parameters_ty parameters destination
           ~location
           ~parameters_ty
           ~parameters
-    (* The entrypoints of a transaction rollup are polymorphic wrt. the
-       tickets it can process. However, two Michelson values can have
-       the same Micheline representation, but different types. What
-       this means is that when we start the execution of a transaction
-       rollup, the type of its argument is lost if we just give it the
-       values provided by the Michelson script.
-
-       To address this issue, we instrument a transfer to a transaction
-       rollup to inject the exact type of the entrypoint as used by
-       the smart contract. This allows the transaction rollup to extract
-       the type of the ticket. *)
-    | Tx_rollup destination -> (
-        match parameters_ty with
-        | Pair_t (Ticket_t (tp, _), _, _, _) ->
-            unparse_data ctxt Optimized parameters_ty parameters
-            >>=? fun (unparsed_parameters, ctxt) ->
-            Lwt.return
-              ( Script_ir_translator.unparse_ty
-                  ~loc:Micheline.dummy_location
-                  ctxt
-                  tp
-              >>? fun (ty, ctxt) ->
-                let unparsed_parameters =
-                  Micheline.Seq
-                    (Micheline.dummy_location, [unparsed_parameters; ty])
-                in
-                Gas.consume
-                  ctxt
-                  (Script.strip_locations_cost unparsed_parameters)
-                >|? fun ctxt ->
-                let unparsed_parameters =
-                  Micheline.strip_locations unparsed_parameters
-                in
-                ( Transaction_to_tx_rollup
-                    {
-                      destination;
-                      amount;
-                      entrypoint;
-                      location;
-                      parameters_ty;
-                      parameters;
-                      unparsed_parameters;
-                    },
-                  ctxt ) )
-        | _ ->
-            (* TODO: https://gitlab.com/tezos/tezos/-/issues/2455
-               Refute this branch thanks to the type system.
-               Thanks to the implementation of the [CONTRACT]
-               instruction, this branch is unreachable. But this is
-               not enforced by the type system, which means we are one
-               refactoring away to reach it. *)
-            assert false)
+    | Tx_rollup destination ->
+        make_transaction_to_tx_rollup
+          ctxt
+          ~destination
+          ~amount
+          ~entrypoint
+          ~location
+          ~parameters_ty
+          ~parameters
   in
   let ctxt = update_context gas ctxt in
   collect_lazy_storage ctxt parameters_ty parameters
