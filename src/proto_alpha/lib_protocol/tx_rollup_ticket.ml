@@ -78,11 +78,11 @@ let parse_ticket_and_operation ~consume_deserialization_gas ~ticketer ~contents
         source;
         nonce;
         operation =
-          Transaction_to_contract
+          Transaction_to_smart_contract
             {
               amount = Tez.zero;
               unparsed_parameters;
-              destination = Contract.Originated destination;
+              destination;
               entrypoint;
               location = Micheline.location parameters_expr;
               parameters_ty = ticket_ty;

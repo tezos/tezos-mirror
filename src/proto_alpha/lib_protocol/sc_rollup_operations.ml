@@ -200,9 +200,9 @@ let to_transaction_operation ctxt ~source
   *)
   let* ctxt = validate_parameters_ty ctxt parameters_ty in
   let operation =
-    Script_typed_ir.Transaction_to_contract
+    Script_typed_ir.Transaction_to_smart_contract
       {
-        destination = Contract.Originated destination;
+        destination;
         amount = Tez.zero;
         entrypoint;
         location = Micheline.dummy_location;

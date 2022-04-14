@@ -488,8 +488,8 @@ let make_transaction_to_contract ctxt ~(destination : Contract.t) ~amount
     >|? fun ctxt ->
       let unparsed_parameters = Micheline.strip_locations unparsed_parameters in
       match destination with
-      | Implicit _ ->
-          ( Transaction_to_contract
+      | Implicit destination ->
+          ( Transaction_to_implicit
               {
                 destination;
                 amount;
@@ -500,8 +500,8 @@ let make_transaction_to_contract ctxt ~(destination : Contract.t) ~amount
                 unparsed_parameters;
               },
             ctxt )
-      | Originated _ ->
-          ( Transaction_to_contract
+      | Originated destination ->
+          ( Transaction_to_smart_contract
               {
                 destination;
                 amount;

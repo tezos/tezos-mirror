@@ -236,9 +236,9 @@ let verify_execute_outbox_message_operations incr ~loc ~source ~operations
         {
           source = op_source;
           operation =
-            Transaction_to_contract
+            Transaction_to_smart_contract
               {
-                destination = Originated destination;
+                destination;
                 amount;
                 entrypoint;
                 location = _;

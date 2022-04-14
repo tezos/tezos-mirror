@@ -64,14 +64,8 @@ let contents_of_internal_operation (type kind)
     kind internal_contents =
   let operation : kind internal_manager_operation =
     match operation with
-    | Transaction_to_contract
-        {
-          destination = Implicit destination;
-          amount;
-          entrypoint;
-          unparsed_parameters;
-          _;
-        } ->
+    | Transaction_to_implicit
+        {destination; amount; entrypoint; unparsed_parameters; _} ->
         Transaction
           {
             destination = Contract (Implicit destination);
@@ -79,14 +73,8 @@ let contents_of_internal_operation (type kind)
             entrypoint;
             parameters = Script.lazy_expr unparsed_parameters;
           }
-    | Transaction_to_contract
-        {
-          destination = Originated destination;
-          amount;
-          entrypoint;
-          unparsed_parameters;
-          _;
-        } ->
+    | Transaction_to_smart_contract
+        {destination; amount; entrypoint; unparsed_parameters; _} ->
         Transaction
           {
             destination = Contract (Originated destination);

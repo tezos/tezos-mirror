@@ -391,12 +391,12 @@ let transfer_operation ctxt ~src ~destination ~arg_type ~arg =
         {
           source = src;
           operation =
-            Transaction_to_contract
+            Transaction_to_smart_contract
               {
                 amount = Tez.zero;
                 unparsed_parameters = Micheline.strip_locations params_node;
                 entrypoint = Entrypoint.default;
-                destination = Contract.Originated destination;
+                destination;
                 location = Micheline.dummy_location;
                 parameters_ty = arg_type;
                 parameters = arg;

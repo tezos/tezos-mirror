@@ -1098,9 +1098,9 @@ let apply_internal_manager_operation_content :
      comparing it with the [ctxt] we will have at the end of the
      application). *)
   match operation with
-  | Transaction_to_contract
+  | Transaction_to_implicit
       {
-        destination = Implicit pkh;
+        destination = pkh;
         amount;
         unparsed_parameters = _;
         entrypoint;
@@ -1121,10 +1121,10 @@ let apply_internal_manager_operation_content :
         (ITransaction_result res
           : kind successful_internal_manager_operation_result),
         ops )
-  | Transaction_to_contract
+  | Transaction_to_smart_contract
       {
         amount;
-        destination = Originated contract_hash;
+        destination = contract_hash;
         entrypoint;
         location;
         parameters_ty;

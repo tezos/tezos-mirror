@@ -174,13 +174,13 @@ let tickets_of_origination ctxt ~allow_zero_amount_tickets ~preorigination
 let tickets_of_operation ctxt ~allow_zero_amount_tickets
     (Script_typed_ir.Internal_operation {source = _; operation; nonce = _}) =
   match operation with
-  | Transaction_to_contract {destination = Implicit _; _} -> return (None, ctxt)
-  | Transaction_to_contract
+  | Transaction_to_implicit _ -> return (None, ctxt)
+  | Transaction_to_smart_contract
       {
         amount = _;
         unparsed_parameters = _;
         entrypoint = _;
-        destination = Originated _ as contract;
+        destination;
         location = _;
         parameters_ty;
         parameters;
@@ -188,7 +188,7 @@ let tickets_of_operation ctxt ~allow_zero_amount_tickets
       tickets_of_transaction
         ctxt
         ~allow_zero_amount_tickets
-        ~destination:(Destination.Contract contract)
+        ~destination:(Destination.Contract (Originated destination))
         ~parameters_ty
         ~parameters
   | Transaction_to_tx_rollup
