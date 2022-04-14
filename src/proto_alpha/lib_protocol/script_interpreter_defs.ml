@@ -646,7 +646,9 @@ let create_contract (ctxt, sc) gas storage_type code delegate credit init =
   unparse_data ctxt Optimized storage_type init >>=? fun (storage, ctxt) ->
   Gas.consume ctxt (Script.strip_locations_cost storage) >>?= fun ctxt ->
   let storage = Micheline.strip_locations storage in
-  Contract.fresh_contract_from_current_nonce ctxt >>?= fun (ctxt, contract) ->
+  Contract.fresh_contract_from_current_nonce ctxt
+  >>?= fun (ctxt, contract_hash) ->
+  let contract = Contract.Originated contract_hash in
   let origination =
     {
       credit;

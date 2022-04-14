@@ -150,7 +150,7 @@ val raw_originate :
   Raw_context.t tzresult Lwt.t
 
 val fresh_contract_from_current_nonce :
-  Raw_context.t -> (Raw_context.t * Contract_repr.t) tzresult
+  Raw_context.t -> (Raw_context.t * Contract_hash.t) tzresult
 
 val originated_from_current_nonce :
   since:Raw_context.t ->

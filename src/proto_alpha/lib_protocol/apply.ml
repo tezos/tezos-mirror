@@ -1414,7 +1414,8 @@ let apply_external_manager_operation_content :
          so that the script can use it immediately.
          The address of external originations is generated here. *)
       Contract.fresh_contract_from_current_nonce ctxt
-      >>?= fun (ctxt, contract) ->
+      >>?= fun (ctxt, contract_hash) ->
+      let contract = Contract.Originated contract_hash in
       Script.force_decode_in_context
         ~consume_deserialization_gas
         ctxt

@@ -1520,7 +1520,8 @@ module Contract : sig
 
   val get_balance_carbonated : context -> t -> (context * Tez.t) tzresult Lwt.t
 
-  val fresh_contract_from_current_nonce : context -> (context * t) tzresult
+  val fresh_contract_from_current_nonce :
+    context -> (context * Contract_hash.t) tzresult
 
   val originated_from_current_nonce :
     since:context -> until:context -> t list tzresult Lwt.t

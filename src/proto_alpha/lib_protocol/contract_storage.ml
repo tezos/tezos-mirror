@@ -502,7 +502,7 @@ let list c = Storage.Contract.list c
 
 let fresh_contract_from_current_nonce c =
   Raw_context.increment_origination_nonce c >|? fun (c, nonce) ->
-  (c, Contract_repr.originated_contract nonce)
+  (c, Contract_hash.of_nonce nonce)
 
 let originated_from_current_nonce ~since:ctxt_since ~until:ctxt_until =
   Raw_context.get_origination_nonce ctxt_since >>?= fun since ->
