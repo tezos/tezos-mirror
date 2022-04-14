@@ -35,10 +35,11 @@ type injection_strategy =
           operations. This strategy allows for maximizing the number of the same
           kind of operations to include in a block. *)
 
-(** Initializes the injector with a client context, for a list of signers. Each
-    signer has its own worker with a queue of operations to inject. *)
+(** Initializes the injector with the rollup node state, for a list of
+    signers. Each signer has its own worker with a queue of operations to
+    inject. *)
 val init :
-  #Client_context.full ->
+  State.t ->
   signers:
     (public_key_hash * injection_strategy * Injector_worker_types.tag list) list ->
   unit tzresult Lwt.t

@@ -52,7 +52,6 @@ type t = {
   constants : Constants.t;
   operator : signer option;
   signers : Configuration.signers;
-  batcher : Batcher.t option;
 }
 
 (* Stands for the manager operation pass, in which the rollup transactions are
@@ -267,11 +266,6 @@ let patch_l2_levels state (reorg : L2block.t reorg) =
 
 let set_head state head =
   let open Lwt_result_syntax in
-  let*! () =
-    match state.batcher with
-    | None -> Lwt.return_unit
-    | Some batcher -> Batcher.new_head batcher head
-  in
   state.head <- head ;
   let*! old_head = Stores.Head_store.read state.stores.head in
   let hash = head.L2block.hash in
@@ -407,30 +401,6 @@ let init cctxt ~data_dir ?(readonly = false) ?rollup_genesis
   in
   let*! head = init_head stores context_index rollup rollup_info in
   let* constants = retrieve_constants cctxt in
-  let* () =
-    Injector.init
-      cctxt
-      ~signers:
-        (List.filter_map
-           (function
-             | (None, _, _) -> None
-             | (Some x, strategy, tags) -> Some (x, strategy, tags))
-           [
-             (operator, Injector.Each_block, [`Commitment]);
-             (* Batches of L2 operations are submitted with a delay after each
-                block, to allow for more operations to arrive and be included in
-                the following block. *)
-             (signers.submit_batch, Delay_block, [`Submit_batch]);
-             (signers.finalize_commitment, Each_block, [`Finalize_commitment]);
-             (signers.remove_commitment, Each_block, [`Remove_commitment]);
-             (signers.rejection, Each_block, [`Rejection]);
-           ])
-  in
-  let* batcher =
-    Option.map_es
-      (fun signer -> Batcher.init ~rollup ~signer context_index constants)
-      signers.submit_batch
-  in
   let* operator = Option.map_es (get_signer cctxt) operator in
   (* L1 blocks are cached to handle reorganizations efficiently *)
   let tezos_blocks_cache = Tezos_blocks_cache.create 32 in
@@ -445,5 +415,4 @@ let init cctxt ~data_dir ?(readonly = false) ?rollup_genesis
       constants;
       operator;
       signers;
-      batcher;
     }
