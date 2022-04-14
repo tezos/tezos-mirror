@@ -4,4 +4,5 @@
 (package
  (name git-gas-diff)
  (depends
-  (num (>= 1.4))))
+  (num (>= 1.4))
+  (re (>= 10.1.3))))

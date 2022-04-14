@@ -15,28 +15,28 @@ See `bin/main.ml` for more details.
 Example of a run and its output:
 ```
 $ git diff 530825d255c3a8a6c9777ff910a3deb5ffe15261 cc6a393d71007599c600afbc82ccea66a8517070 | dune exec git-gas-diff
-* Could not parse `-            fee_first_transfer = 394`
-* Could not parse `-            fee_second_transfer = 298`
-* Could not parse `+            fee_first_transfer = 397`
-* Could not parse `+            fee_second_transfer = 301`
-* Could not parse `-          KT1TLT2cXZCtenEAXzkndiAQGJXWenkwThRv`
-* Could not parse `+          KT1LfQjDNgPpdwMHbhzyQcD8GTE2L4rwxxpN`
-* Could not parse `-      tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ0.000591`
-* Could not parse `+      tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ0.00059`
-* Could not parse `-          KT1LvTWVW1cc4DeSPCseMsiPdDDkTKvMrNZb`
-* Could not parse `+          KT1RdnquZZf4Y4ZDJvaEuY4cbam3xor3CffU`
-* Could not parse `-      tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ0.000795`
-* Could not parse `+      tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ0.000748`
-* Could not parse `-        KT1LvTWVW1cc4DeSPCseMsiPdDDkTKvMrNZb ... +ꜩ1`
-* Could not parse `+        KT1RdnquZZf4Y4ZDJvaEuY4cbam3xor3CffU ... +ꜩ1`
-* Could not parse `-      tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ0.000467`
-* Could not parse `+      tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ0.000472`
-* Could not parse `-        KT1TLT2cXZCtenEAXzkndiAQGJXWenkwThRv ... +ꜩ1`
-* Could not parse `+        KT1LfQjDNgPpdwMHbhzyQcD8GTE2L4rwxxpN ... +ꜩ1`
-* Could not parse `-      tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ0.000927`
-* Could not parse `+      tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ0.000749`
-* Could not parse `-        KT1LvTWVW1cc4DeSPCseMsiPdDDkTKvMrNZb ... +ꜩ1`
-* Could not parse `+        KT1RdnquZZf4Y4ZDJvaEuY4cbam3xor3CffU ... +ꜩ1`
+* Could not parse `-            fee_first_transfer = 394`.
+* Could not parse `-            fee_second_transfer = 298`.
+* Could not parse `+            fee_first_transfer = 397`.
+* Could not parse `+            fee_second_transfer = 301`.
+* Could not parse `-          KT1TLT2cXZCtenEAXzkndiAQGJXWenkwThRv`.
+* Could not parse `+          KT1LfQjDNgPpdwMHbhzyQcD8GTE2L4rwxxpN`.
+* Could not parse `-      tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ0.000591`.
+* Could not parse `+      tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ0.00059`.
+* Could not parse `-          KT1LvTWVW1cc4DeSPCseMsiPdDDkTKvMrNZb`.
+* Could not parse `+          KT1RdnquZZf4Y4ZDJvaEuY4cbam3xor3CffU`.
+* Could not parse `-      tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ0.000795`.
+* Could not parse `+      tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ0.000748`.
+* Could not parse `-        KT1LvTWVW1cc4DeSPCseMsiPdDDkTKvMrNZb ... +ꜩ1`.
+* Could not parse `+        KT1RdnquZZf4Y4ZDJvaEuY4cbam3xor3CffU ... +ꜩ1`.
+* Could not parse `-      tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ0.000467`.
+* Could not parse `+      tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ0.000472`.
+* Could not parse `-        KT1TLT2cXZCtenEAXzkndiAQGJXWenkwThRv ... +ꜩ1`.
+* Could not parse `+        KT1LfQjDNgPpdwMHbhzyQcD8GTE2L4rwxxpN ... +ꜩ1`.
+* Could not parse `-      tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ0.000927`.
+* Could not parse `+      tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx ... -ꜩ0.000749`.
+* Could not parse `-        KT1LvTWVW1cc4DeSPCseMsiPdDDkTKvMrNZb ... +ꜩ1`.
+* Could not parse `+        KT1RdnquZZf4Y4ZDJvaEuY4cbam3xor3CffU ... +ꜩ1`.
 
 Lines with `Estimated gas: `:
   (Better means the value must decrease.)

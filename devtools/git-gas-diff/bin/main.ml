@@ -123,18 +123,17 @@ module Decimal = struct
     let value1, value2, _decimals = scale r1 r2 in
     Big_int.gt_big_int value1 value2
 
+  let re = Re.Posix.re "([0-9]+)(\\.([0-9]*))?"
+
+  let re_t = Re.compile re
+
   let of_string s =
-    let dot_index = String.index_opt s '.' in
-    let s, decimals =
-      match dot_index with
-      | None -> (s, 0)
-      | Some dot_index ->
-          let sint_part = String.sub s 0 dot_index in
-          let start = dot_index + 1 in
-          let sdec_part = String.sub s start (String.length s - start) in
-          (sint_part ^ sdec_part, String.length sdec_part)
-    in
-    let+ value = Big_int.big_int_of_string_opt s in
+    let open Re in
+    let* group = exec_opt re_t s in
+    let* int_part = Group.get_opt group 1 in
+    let dec_part = Option.value ~default:"" (Group.get_opt group 3) in
+    let+ value = Big_int.big_int_of_string_opt (int_part ^ dec_part) in
+    let decimals = String.length dec_part in
     { value; decimals }
 
   let to_string { value; decimals } =
@@ -319,31 +318,21 @@ module Synth = struct
 
   let get_diff = function '-' -> Some Removed | '+' -> Some Added | _ -> None
 
-  (* [contains s sub] returns [Some index] if [sub] is a sub-string of [s], and
-     where [index] is the index of the character following [sub] in [s].
-     The function returns [None] if [sub] is not a sub-string of [s]. *)
-  let contains s sub =
-    let sl = String.length s in
-    let subl = String.length sub in
-    let rec check i =
-      if i + subl > sl then None
-      else if String.sub s i subl = sub then Some (i + subl)
-      else check (i + 1)
-    in
-    check 0
-
-  (* [get_dec str cstr (line, length)] looks for [str] in [line] (whose length
-     is [length]) and then parses a decimal number at the index following the
-     occurrence of [str]. Finally, it applies [cstr] to the obtained decimal.
+  (* [get_dec str cstr line] looks for [str] in [line] and then parses a decimal
+     number at the index following the occurrence of [str]. Finally, it applies
+     [cstr] to the obtained decimal.
      The function is used to return the amount found on a line of a git diff for
      the various supported categories. *)
-  let get_dec str cstr (line, length) =
-    let* start = contains line str in
-    let last_index =
-      try String.index_from line start ' ' with Not_found -> length
-    in
-    let+ v = Decimal.of_string (String.sub line start (last_index - start)) in
-    cstr v
+  let get_dec sub cstr =
+    (* Lets's leave this line below out of the function so that the expression is
+       compiled only once for each [get_*], and not every time we call
+       [get_dec]. *)
+    let re = Re.(compile (seq [ str sub; group Decimal.re ])) in
+    fun line ->
+      let* re = Re.exec_opt re line in
+      let* dec_str = Re.Group.get_opt re 1 in
+      let+ dec = Decimal.of_string dec_str in
+      cstr dec
 
   let get_estimated = get_dec estimated_str (fun v -> Estimated v)
 
@@ -361,10 +350,13 @@ module Synth = struct
 
   let get_fee = get_dec fee_str (fun v -> Fee v)
 
-  let get_discarded strs res (line, _length) =
-    let check_contains s line = contains line s in
-    let+ _ = either (List.map check_contains strs) line in
-    res
+  let get_discarded strs res =
+    (* Lets's leave this line below out of the function so that the expression is
+       compiled only once for each [get_*], and not every time we call
+       [get_discarded]. *)
+    let re_ts = List.map (fun sub -> Re.(compile (str sub))) strs in
+    let contains line re_t = Re.execp re_t line in
+    fun line -> if List.exists (contains line) re_ts then Some res else None
 
   let get_hash = get_discarded hash_strs Hash
 
@@ -378,7 +370,7 @@ module Synth = struct
 
   let get_parameter = get_discarded parameter_strs Parameter
 
-  let get_kind line length =
+  let get_kind line =
     either
       [
         get_estimated;
@@ -396,7 +388,7 @@ module Synth = struct
         get_to;
         get_parameter;
       ]
-      (line, length)
+      line
 end
 
 module Synths = struct
@@ -444,21 +436,21 @@ module Synths = struct
        are correctly parsed by the script (i.e. the kind was recognized. *)
     | Diff of diff_kind
 
-  let categorize line =
-    let length = String.length line in
-    let is_git_garbage =
-      try
-        let prefix = String.sub line 0 4 in
-        prefix = "--- " || prefix = "+++ "
-      with Invalid_argument _ -> false
-    in
-    if length = 0 then Garbage
-    else
-      match (get_diff line.[0], get_kind line length) with
-      | None, _ -> Garbage
-      | Some _, _ when is_git_garbage -> Garbage
-      | Some _, None -> Unsupported
-      | Some diff, Some kind -> Diff (diff, kind)
+  let categorize =
+    (* Lets's leave this line below out of the function so that the expression is
+       compiled only once and for all, i.e. not every time we call [categorize].
+    *)
+    let re_t = Re.Posix.(compile (re "^(\\+\\+\\+)|(---)")) in
+    fun line ->
+      let length = String.length line in
+      let is_git_garbage = Re.execp re_t line in
+      if length = 0 then Garbage
+      else
+        match (get_diff line.[0], get_kind line) with
+        | None, _ -> Garbage
+        | Some _, _ when is_git_garbage -> Garbage
+        | Some _, None -> Unsupported
+        | Some diff, Some kind -> Diff (diff, kind)
 
   let same_kind kind1 kind2 =
     match (kind1, kind2) with
@@ -568,12 +560,12 @@ module Synths = struct
 
   (* [consume_kind line synths kind] tries to match the added line [line], that
      was successfully parsed as [kind], with the first element of the queue of
-     deleted lines [synths.previous_kinds]. If they indeed match, that synthesis in
-     [synths] is updated accordingly. *)
+     deleted lines [synths.previous_kinds]. If they indeed match, that synthesis
+     in [synths] is updated accordingly. *)
   let consume_kind line synths kind =
     match synths.previous_kinds with
     | [] ->
-        Printf.printf "* No line to compare `%s`\n%!" line;
+        Printf.printf "* No line to consume `%s`.\n%!" line;
         synths
     | (_, previous_kind) :: previous_kinds when same_kind previous_kind kind ->
         let synths =
@@ -584,14 +576,14 @@ module Synths = struct
         in
         { synths with previous_kinds }
     | (line', _) :: _ ->
-        Printf.printf "* Unmatched lines `%s` and `%s`\n%!" line line';
+        Printf.printf "* Unmatched lines `%s` and `%s`.\n%!" line line';
         synths
 
   let add_line synths line =
     match categorize line with
     | Garbage -> synths
     | Unsupported ->
-        Printf.printf "* Could not parse `%s`\n%!" line;
+        Printf.printf "* Could not parse `%s`.\n%!" line;
         synths
     | Diff (Removed, k) ->
         { synths with previous_kinds = synths.previous_kinds @ [ (line, k) ] }
