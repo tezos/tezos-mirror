@@ -69,6 +69,11 @@ Node
   carrying a field ``trace`` with the relevant economic-protocol errors, the
   relevant economic-protocol errors are included in the main trace itself.
 
+- Exported snapshots now have version number 4 (previously 3).
+  Snapshots of version 2 and 3 exported with previous versions of
+  Octez can still be imported. Snapshots of version 4 cannot be
+  imported with Octez prior to version 13.0.
+
 Client
 ------
 
