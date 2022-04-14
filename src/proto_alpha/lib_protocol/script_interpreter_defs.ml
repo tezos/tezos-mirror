@@ -498,6 +498,26 @@ let apply ctxt gas capture_ty capture lam =
       let (gas, ctxt) = local_gas_counter_and_outdated_context ctxt in
       return (lam', ctxt, gas)
 
+let make_transaction_to_contract ctxt ~destination ~amount ~entrypoint ~location
+    ~parameters_ty ~parameters =
+  unparse_data ctxt Optimized parameters_ty parameters
+  >>=? fun (unparsed_parameters, ctxt) ->
+  Lwt.return
+    ( Gas.consume ctxt (Script.strip_locations_cost unparsed_parameters)
+    >|? fun ctxt ->
+      let unparsed_parameters = Micheline.strip_locations unparsed_parameters in
+      ( Transaction_to_contract
+          {
+            destination;
+            amount;
+            entrypoint;
+            location;
+            parameters_ty;
+            parameters;
+            unparsed_parameters;
+          },
+        ctxt ) )
+
 (* [transfer (ctxt, sc) gas tez parameters_ty parameters destination entrypoint]
    creates an operation that transfers an amount of [tez] to
    a contract determined by [(destination, entrypoint)]
@@ -516,25 +536,14 @@ let transfer (ctxt, sc) gas amount location parameters_ty parameters destination
       (Kind.transaction manager_operation * context) tzresult Lwt.t =
    fun ctxt parameters_ty parameters -> function
     | Contract destination ->
-        unparse_data ctxt Optimized parameters_ty parameters
-        >>=? fun (unparsed_parameters, ctxt) ->
-        Lwt.return
-          ( Gas.consume ctxt (Script.strip_locations_cost unparsed_parameters)
-          >|? fun ctxt ->
-            let unparsed_parameters =
-              Micheline.strip_locations unparsed_parameters
-            in
-            ( Transaction_to_contract
-                {
-                  destination;
-                  amount;
-                  entrypoint;
-                  location;
-                  parameters_ty;
-                  parameters;
-                  unparsed_parameters;
-                },
-              ctxt ) )
+        make_transaction_to_contract
+          ctxt
+          ~destination
+          ~amount
+          ~entrypoint
+          ~location
+          ~parameters_ty
+          ~parameters
     (* The entrypoints of a transaction rollup are polymorphic wrt. the
        tickets it can process. However, two Michelson values can have
        the same Micheline representation, but different types. What
