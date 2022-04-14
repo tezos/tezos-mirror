@@ -225,7 +225,7 @@ module Synth = struct
     max_gain_pct : Decimal.t option;
     (* The number of lines with a degradation (with regards to [dir] below).
       *)
-    nb_wrong : int;
+    degradations : int;
     total : int;
     (* Total number of lines changed. *)
     (* Whether an amelioration is seen when the amount increases or decreases.
@@ -272,7 +272,7 @@ module Synth = struct
       max_loss_pct = None;
       max_gain = Decimal.zero;
       max_gain_pct = None;
-      nb_wrong = 0;
+      degradations = 0;
       total = 0;
       win;
       str;
@@ -286,7 +286,7 @@ module Synth = struct
         max_loss_pct;
         max_gain;
         max_gain_pct;
-        nb_wrong;
+        degradations;
         total;
         win;
         str;
@@ -321,7 +321,7 @@ module Synth = struct
       (string_of_max_pct max_loss_pct)
       (to_string max_gain)
       (string_of_max_pct max_gain_pct)
-      total nb_wrong
+      total degradations
 
   let get_diff = function '-' -> Some Removed | '+' -> Some Added | _ -> None
 
@@ -555,7 +555,9 @@ module Synths = struct
     let max_gain = max synth.max_gain (opp loss) in
     let max_gain_pct = update_max old_v max_gain synth.max_gain_pct in
     let open Stdlib in
-    let nb_wrong = synth.nb_wrong + if Decimal.gt loss zero then 1 else 0 in
+    let degradations =
+      synth.degradations + if Decimal.gt loss zero then 1 else 0
+    in
     let total = synth.total + 1 in
     {
       old;
@@ -564,7 +566,7 @@ module Synths = struct
       max_loss_pct;
       max_gain;
       max_gain_pct;
-      nb_wrong;
+      degradations;
       total;
       win;
       str = synth.str;
