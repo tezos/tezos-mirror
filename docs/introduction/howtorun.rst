@@ -268,16 +268,22 @@ cause the offender to lose its security deposit.
 Docker
 ~~~~~~
 
-The docker image runs the daemons by default for all your keys.
-Assuming you run on Ithacanet, to know if you baked, just run::
+If you are running the baker Docker image, you can watch the baker logs with
+``docker logs``. First, find the name of your container with::
 
-    ./ithacanet.sh baker log
+    docker ps
 
-(replace ``ithacanet.sh`` with ``mainnet.sh`` for Mainnet).
+If your container is running, its name will appear in the last column.
+For instance, if the name is ``mainnet_baker-012-Psithaca_1``, you can
+view recent logs with::
+
+    docker logs mainnet_baker-012-Psithaca_1
+
+If you want to keep watching logs, use ``-f``::
+
+    docker logs mainnet_baker-012-Psithaca_1 -f
+
+This allows you to know if you baked.
 You should see lines such as::
 
     Injected block BLxzbB7PBW1axq for bootstrap5 after BLSrg4dXzL2aqq  (level 1381, slot 0, fitness 00::0000000000005441, operations 21)
-
-Or::
-
-    Injected endorsement for block 'BLSrg4dXzL2aqq'  (level 1381, slot 3, contract bootstrap5) 'oo524wKiEWBoPD'

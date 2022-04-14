@@ -42,8 +42,6 @@ Ithacanet
     to the second version of Ithacanet which runs ``Psithaca2`` instead
     of ``PsiThaCa``.
 
-- Run Docker image: ``wget -O ithacanet.sh https://gitlab.com/tezos/tezos/raw/latest-release/scripts/tezos-docker-manager.sh``
-
 Ithacanet is a test network which ran the Ithaca protocol and which was reset
 to run on the Ithaca2 protocol.
 Ithacanet will run until Ithaca2 is replaced by another protocol on Mainnet.

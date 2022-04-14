@@ -135,6 +135,17 @@ Codec
 Docker Images
 -------------
 
+- Script ``tezos_docker_manager.sh`` (also known as ``mainnet.sh``) is now deprecated.
+  It may be removed from Octez starting from version 14.0.
+  It is recommended to write your own Docker Compose files instead.
+  To this end, you can take inspiration from ``scripts/docker/docker-compose-generic.yml``.
+
+- ``tezos_docker_manager.sh`` no longer starts the endorser.
+  As a reminder, starting from Ithaca, which is the active protocol on Mainnet,
+  there is no endorser: its role is played by the baker.
+
+- ``tezos_docker_manager.sh`` no longer supports Hangzhounet.
+
 Miscellaneous
 -------------
 

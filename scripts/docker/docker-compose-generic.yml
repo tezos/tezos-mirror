@@ -28,18 +28,6 @@ services:
       - client_data:/var/run/tezos/client
     restart: on-failure
 
-  endorser-alpha:
-    image: tezos/tezos:latest
-    hostname: endorser-alpha
-    environment:
-      - PROTOCOL=alpha
-    command: tezos-endorser
-    links:
-      - node
-    volumes:
-      - client_data:/var/run/tezos/client
-    restart: on-failure
-
   accuser-alpha:
     image: tezos/tezos:latest
     hostname: accuser-alpha
