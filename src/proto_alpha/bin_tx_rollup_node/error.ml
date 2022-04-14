@@ -326,3 +326,22 @@ let () =
     (function
       | Tx_rollup_invalid_message_position_in_inbox i -> Some i | _ -> None)
     (fun i -> Tx_rollup_invalid_message_position_in_inbox i)
+
+type error += No_worker_for_source of Signature.Public_key_hash.t
+
+let () =
+  register_error_kind
+    ~id:"tx_rollup.node.no_worker_for_source"
+    ~title:"No injecting queue for source"
+    ~description:
+      "An L1 operation could not be queued because its source has no worker."
+    ~pp:(fun ppf s ->
+      Format.fprintf
+        ppf
+        "No worker for source %a"
+        Signature.Public_key_hash.pp
+        s)
+    `Permanent
+    Data_encoding.(obj1 (req "source" Signature.Public_key_hash.encoding))
+    (function No_worker_for_source s -> Some s | _ -> None)
+    (fun s -> No_worker_for_source s)

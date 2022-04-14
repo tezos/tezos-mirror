@@ -25,32 +25,25 @@
 open Protocol
 open Alpha_context
 
-(** The internal state of the batcher. In particular, the batcher maintains an
+(** The type of a batcher worker. In particular, the batcher maintains an
     incremental context on top of the current head to apply incoming
     transactions. *)
-type state
+type t
 
 (** Initialize the internal state of the batcher. *)
 val init :
-  #Client_context.full ->
   rollup:Tx_rollup.t ->
-  signer:string option ->
+  signer:Signature.public_key_hash ->
   Context.index ->
-  Protocol.Alpha_context.Constants.parametric ->
-  state option tzresult Lwt.t
-
-(** Updates the incremental context in the batcher's state.
-
-    {b Warning:} Use with caution. This function can introduce race conditions
-    on the incremental context. *)
-val update_incr_context : state -> Context.t -> unit
+  Constants.t ->
+  t tzresult Lwt.t
 
 (** Retrieve an L2 transaction from the queue. *)
-val find_transaction : state -> L2_transaction.hash -> L2_transaction.t option
+val find_transaction : t -> L2_transaction.hash -> L2_transaction.t option
 
 (** List all queued transactions in the order they appear in the queue, i.e. the
     message that were added first to the queue are at the end of list. *)
-val get_queue : state -> L2_transaction.t list
+val get_queue : t -> L2_transaction.t list
 
 (** [register_transaction ?apply state tx] registers a new L2 transaction [tx]
     in the queue of the batcher for future injection on L1. If [apply] is [true]
@@ -61,16 +54,14 @@ val get_queue : state -> L2_transaction.t list
 val register_transaction :
   ?eager_batch:bool ->
   ?apply:bool ->
-  state ->
+  t ->
   L2_transaction.t ->
   L2_transaction.hash tzresult Lwt.t
 
 (** Create L2 batches of operations from the queue and pack them in an L1 batch
-    operation. The batch operation is injected on the Tezos node by the
-    signer. If the injection to L1 fails, the transactions are not removed from
-    the queue. *)
-val batch_and_inject : state -> Operation_hash.t option tzresult Lwt.t
+    operation. The batch operation is queued in the injector for injection on the
+    Tezos node. *)
+val batch : t -> unit tzresult Lwt.t
 
-(** Same as [batch_and_inject] but asynchronous. In particular, the potential
-    failures are not reported here. *)
-val async_batch_and_inject : state -> unit
+(** Notifies a new L2 head to the batcher worker. *)
+val new_head : t -> L2block.t -> unit Lwt.t

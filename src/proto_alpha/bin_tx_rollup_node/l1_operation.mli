@@ -2,8 +2,6 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
-(* Copyright (c) 2022 Marigold, <contact@marigold.dev>                       *)
-(* Copyright (c) 2022 Oxhead Alpha <info@oxhead-alpha.com>                   *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -25,49 +23,34 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/2458
-   Provide a default configuration
-*)
+open Protocol.Alpha_context
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/2817
-   Better documentation/semantic for signers + modes
-*)
-type signers = {
-  submit_batch : Signature.public_key_hash option;
-  finalize_commitment : Signature.public_key_hash option;
-  remove_commitment : Signature.public_key_hash option;
-  rejection : Signature.public_key_hash option;
-}
+(** Hash with b58check encoding mop(53), for hashes of L1 manager operations *)
+module Hash : S.HASH
 
+(** Alias for L1 operations hashes *)
+type hash = Hash.t
+
+(** The type of L1 operations that are injected on Tezos by the rollup node *)
 type t = {
-  data_dir : string;
-  rollup_id : Protocol.Alpha_context.Tx_rollup.t;
-  rollup_genesis : Block_hash.t option;
-  rpc_addr : P2p_point.Id.t;
-  reconnection_delay : float;
-  operator : Signature.public_key_hash option;
-  signers : signers;
-  l2_blocks_cache_size : int;
+  hash : hash;  (** The hash of the L1 manager operation (without the source) *)
+  source : public_key_hash;
+      (** The source of the operation, i.e., the key that will sign the
+          operation for injection. Note: the source is decided when the
+          operation is queued in the injector at the moment. *)
+  manager_operation : packed_manager_operation;  (** The manager operation *)
 }
 
-(** [default_data_dir] is the default value for [data_dir]. *)
-val default_data_dir : Protocol.Alpha_context.Tx_rollup.t -> string
+(** Hash a manager operation *)
+val hash_manager_operation : packed_manager_operation -> hash
 
-(** [default_rpc_addr] is the default value for [rpc_addr]. *)
-val default_rpc_addr : P2p_point.Id.t
+(** Hash an L1 operation. This is the same as hashing the corresponding manager
+    operation. *)
+val hash : t -> hash
 
-(** [default_reconnection_delay] is the default value for [reconnection-delay] *)
-val default_reconnection_delay : float
-
-(** [default_l2_blocks_cache_size] is the default number of L2 blocks that are
-    cached by the rollup node *)
-val default_l2_blocks_cache_size : int
-
-(** [save configuration] overwrites [configuration] file and returns the filename. *)
-val save : t -> string tzresult Lwt.t
-
-(** [load ~data_dir] loads a configuration stored in [data_dir]. *)
-val load : data_dir:string -> t tzresult Lwt.t
-
-(** [encoding] encodes a configuration. *)
+(** Encoding for L1 operations *)
 val encoding : t Data_encoding.t
+
+(** Pretty printer for L1 operations. Only the relevant part for the rollup node
+    is printed. *)
+val pp : Format.formatter -> t -> unit

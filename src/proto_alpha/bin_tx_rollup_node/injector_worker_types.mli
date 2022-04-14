@@ -2,8 +2,6 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
-(* Copyright (c) 2022 Marigold, <contact@marigold.dev>                       *)
-(* Copyright (c) 2022 Oxhead Alpha <info@oxhead-alpha.com>                   *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -25,49 +23,44 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/2458
-   Provide a default configuration
-*)
+open Protocol_client_context
+open Protocol
+open Alpha_context
+open Common
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/2817
-   Better documentation/semantic for signers + modes
-*)
-type signers = {
-  submit_batch : Signature.public_key_hash option;
-  finalize_commitment : Signature.public_key_hash option;
-  remove_commitment : Signature.public_key_hash option;
-  rejection : Signature.public_key_hash option;
-}
+type tag =
+  [ `Commitment
+  | `Submit_batch
+  | `Finalize_commitment
+  | `Remove_commitment
+  | `Rejection ]
 
-type t = {
-  data_dir : string;
-  rollup_id : Protocol.Alpha_context.Tx_rollup.t;
-  rollup_genesis : Block_hash.t option;
-  rpc_addr : P2p_point.Id.t;
-  reconnection_delay : float;
-  operator : Signature.public_key_hash option;
-  signers : signers;
-  l2_blocks_cache_size : int;
-}
+module Tags : Set.S with type elt = tag
 
-(** [default_data_dir] is the default value for [data_dir]. *)
-val default_data_dir : Protocol.Alpha_context.Tx_rollup.t -> string
+type tags = Tags.t
 
-(** [default_rpc_addr] is the default value for [rpc_addr]. *)
-val default_rpc_addr : P2p_point.Id.t
+val tags_encoding : tags Data_encoding.t
 
-(** [default_reconnection_delay] is the default value for [reconnection-delay] *)
-val default_reconnection_delay : float
+val pp_tags : Format.formatter -> tags -> unit
 
-(** [default_l2_blocks_cache_size] is the default number of L2 blocks that are
-    cached by the rollup node *)
-val default_l2_blocks_cache_size : int
+module Request : sig
+  type 'a t =
+    | Add_pending : L1_operation.t -> unit t
+    | New_tezos_head :
+        Alpha_block_services.block_info * Alpha_block_services.block_info reorg
+        -> unit t
+    | Inject : unit t
 
-(** [save configuration] overwrites [configuration] file and returns the filename. *)
-val save : t -> string tzresult Lwt.t
+  type view = View : _ t -> view
 
-(** [load ~data_dir] loads a configuration stored in [data_dir]. *)
-val load : data_dir:string -> t tzresult Lwt.t
+  include Worker_intf.REQUEST with type 'a t := 'a t and type view := view
+end
 
-(** [encoding] encodes a configuration. *)
-val encoding : t Data_encoding.t
+module Name : Worker_intf.NAME with type t = public_key_hash
+
+module Dummy_event : Worker_intf.EVENT with type t = unit
+
+module Logger :
+  Worker_intf.LOGGER
+    with module Event = Dummy_event
+     and type Request.view = Request.view

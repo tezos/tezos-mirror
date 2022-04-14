@@ -25,7 +25,9 @@ depends: [
   "tezos-micheline"
   "tezos-client-base"
   "tezos-client-base-unix"
+  "tezos-shell"
   "tezos-store"
+  "tezos-workers"
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]

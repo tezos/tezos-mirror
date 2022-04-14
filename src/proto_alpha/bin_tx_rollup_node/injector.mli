@@ -2,8 +2,6 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
-(* Copyright (c) 2022 Marigold, <contact@marigold.dev>                       *)
-(* Copyright (c) 2022 Oxhead Alpha <info@oxhead-alpha.com>                   *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -25,49 +23,47 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/2458
-   Provide a default configuration
-*)
+open Protocol_client_context
+open Protocol
+open Alpha_context
+open Common
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/2817
-   Better documentation/semantic for signers + modes
-*)
-type signers = {
-  submit_batch : Signature.public_key_hash option;
-  finalize_commitment : Signature.public_key_hash option;
-  remove_commitment : Signature.public_key_hash option;
-  rejection : Signature.public_key_hash option;
-}
+type injection_strategy =
+  | Each_block  (** Inject pending operations after each new L1 block *)
+  | Delay_block
+      (** Wait for some time after the L1 block is produced to inject pending
+          operations. This strategy allows for maximizing the number of the same
+          kind of operations to include in a block. *)
 
-type t = {
-  data_dir : string;
-  rollup_id : Protocol.Alpha_context.Tx_rollup.t;
-  rollup_genesis : Block_hash.t option;
-  rpc_addr : P2p_point.Id.t;
-  reconnection_delay : float;
-  operator : Signature.public_key_hash option;
-  signers : signers;
-  l2_blocks_cache_size : int;
-}
+(** Initializes the injector with a client context, for a list of signers. Each
+    signer has its own worker with a queue of operations to inject. *)
+val init :
+  #Client_context.full ->
+  signers:
+    (public_key_hash * injection_strategy * Injector_worker_types.tag list) list ->
+  unit tzresult Lwt.t
 
-(** [default_data_dir] is the default value for [data_dir]. *)
-val default_data_dir : Protocol.Alpha_context.Tx_rollup.t -> string
+(** Add an operation as pending injection in the injector. *)
+val add_pending_operation : L1_operation.t -> unit tzresult Lwt.t
 
-(** [default_rpc_addr] is the default value for [rpc_addr]. *)
-val default_rpc_addr : P2p_point.Id.t
+(** Add multiple operations as pending injection in the injector. *)
+val add_pending_operations : L1_operation.t trace -> unit tzresult Lwt.t
 
-(** [default_reconnection_delay] is the default value for [reconnection-delay] *)
-val default_reconnection_delay : float
+(** Notify the injector of a new Tezos head. The injector marks the operations
+    appropriately (for instance reverted operations that are part of a
+    reorganization are put back in the pending queue). When an operation is
+    considered as {e confirmed}, it disappears from the injector. *)
+val new_tezos_head :
+  Alpha_block_services.block_info ->
+  Alpha_block_services.block_info reorg ->
+  unit Lwt.t
 
-(** [default_l2_blocks_cache_size] is the default number of L2 blocks that are
-    cached by the rollup node *)
-val default_l2_blocks_cache_size : int
-
-(** [save configuration] overwrites [configuration] file and returns the filename. *)
-val save : t -> string tzresult Lwt.t
-
-(** [load ~data_dir] loads a configuration stored in [data_dir]. *)
-val load : data_dir:string -> t tzresult Lwt.t
-
-(** [encoding] encodes a configuration. *)
-val encoding : t Data_encoding.t
+(** Trigger an injection of the pending operations for all workers. If [tags]
+    is given, only the workers which have a tag in [tags] inject their pending
+    operations. If [strategy] is given, only workers which have this strategy
+    inject their pending operations. *)
+val inject :
+  ?tags:Injector_worker_types.tag list ->
+  ?strategy:injection_strategy ->
+  unit ->
+  unit Lwt.t

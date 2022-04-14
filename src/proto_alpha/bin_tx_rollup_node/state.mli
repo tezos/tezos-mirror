@@ -42,30 +42,17 @@ type rollup_info = Stores.rollup_info = {
   origination_level : int32;
 }
 
-(* TODO/TORU: have different operators (for commitments, rejections, batches,
-   etc.) and have multiple injection keys (except for commitments). *)
-
 type t = private {
   stores : Stores.t;
+  cctxt : Client_context.full;
   context_index : Context.index;
   mutable head : L2block.t;
   rollup_info : rollup_info;
   tezos_blocks_cache : Alpha_block_services.block_info Tezos_blocks_cache.t;
+  constants : Constants.t;
   operator : signer option;
-  batcher_state : Batcher.state option;
-  l1_constants : Protocol.Alpha_context.Constants.parametric;
-}
-
-(** Type of chain reorganizations. *)
-type 'block reorg = {
-  ancestor : 'block option;
-      (** The common ancestor of the two chains. Can be None if the chains have no
-          common ancestor, in which case all the blocks are changed *)
-  old_chain : 'block list;
-      (** The blocks that were in the old chain and which are not in the new one. *)
-  new_chain : 'block list;
-      (** The blocks that are now in the new chain. The length of [old_chain] and
-      [new_chain] may be different. *)
+  signers : Configuration.signers;
+  batcher : Batcher.t option;
 }
 
 (** [init cctxt ~data_dir ~rollup_genesis ~operator rollup] creates a new state
@@ -82,7 +69,8 @@ val init :
   ?readonly:bool ->
   ?rollup_genesis:Block_hash.t ->
   l2_blocks_cache_size:int ->
-  operator:string option ->
+  operator:Signature.public_key_hash option ->
+  signers:Configuration.signers ->
   Tx_rollup.t ->
   t tzresult Lwt.t
 
@@ -127,13 +115,13 @@ val tezos_block_already_processed : t -> Block_hash.t -> bool Lwt.t
 
 (** {2 Saving the state to disk}  *)
 
-(** Set the current head of the rollup with its context and return the blocks
-    (hashes) that were reorganized. *)
-val set_head :
-  t -> L2block.t -> Context.t -> (L2block.t * L2block.hash) reorg tzresult Lwt.t
+(** Set the current head of the rollup and return the blocks (hashes) that were
+    reorganized. *)
+val set_head : t -> L2block.t -> L2block.t reorg tzresult Lwt.t
 
 (** Set the Tezos head. Returns the reorganization of L1 blocks (if any). *)
-val set_tezos_head : t -> Block_hash.t -> Block_hash.t reorg tzresult Lwt.t
+val set_tezos_head :
+  t -> Block_hash.t -> Alpha_block_services.block_info reorg tzresult Lwt.t
 
 (** Save an L2 block to disk:
     - Save both the header and the inbox
@@ -161,3 +149,7 @@ val save_tezos_block_info :
     stored into a [Block_info.t]. Currently, the manager operation validation
     pass is used. *)
 val rollup_operation_index : int
+
+(** Fetch a Tezos block from the cache or the node *)
+val fetch_tezos_block :
+  t -> Block_hash.t -> Alpha_block_services.block_info tzresult Lwt.t

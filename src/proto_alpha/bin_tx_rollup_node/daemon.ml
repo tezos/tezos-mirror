@@ -28,15 +28,9 @@
 open Protocol.Apply_results
 open Tezos_shell_services
 open Protocol_client_context
-open Protocol.Alpha_context
+open Protocol
+open Alpha_context
 open Error
-
-(* TODO/TORU: Move application logic in other module *)
-
-let checkout_context (state : State.t) ctxt_hash =
-  let open Lwt_syntax in
-  let+ context = Context.checkout state.context_index ctxt_hash in
-  Option.to_result ~none:[Tx_rollup_cannot_checkout_context ctxt_hash] context
 
 let parse_tx_rollup_l2_address :
     Script.node -> Protocol.Tx_rollup_l2_address.Indexable.value tzresult =
@@ -225,22 +219,22 @@ let process_messages_and_inboxes (state : State.t) ~(predecessor : L2block.t)
   let*! () = Event.(emit messages_application) (List.length messages) in
   let* predecessor_context =
     match predecessor_context with
-    | None -> checkout_context state predecessor.header.context
+    | None -> Context.checkout state.context_index predecessor.header.context
     | Some context -> return context
   in
-  let l2_parameters =
+  let parameters =
     Protocol.Tx_rollup_l2_apply.
       {
         tx_rollup_max_withdrawals_per_batch =
-          state.l1_constants.tx_rollup_max_withdrawals_per_batch;
+          state.constants.parametric.tx_rollup_max_withdrawals_per_batch;
       }
   in
   let* (context, contents) =
     Interpreter.interpret_messages
       predecessor_context
-      l2_parameters
+      parameters
       ~rejection_max_proof_size:
-        state.l1_constants.tx_rollup_rejection_max_proof_size
+        state.constants.parametric.tx_rollup_rejection_max_proof_size
       messages
   in
   match contents with
@@ -271,27 +265,7 @@ let process_messages_and_inboxes (state : State.t) ~(predecessor : L2block.t)
       in
       return (block, context)
 
-let get_tezos_block cctxt state hash =
-  let open Lwt_syntax in
-  let fetch hash =
-    let+ block =
-      Alpha_block_services.info
-        cctxt
-        ~chain:cctxt#chain
-        ~block:(`Hash (hash, 0))
-        ()
-    in
-    Result.to_option block
-  in
-  let+ block =
-    State.Tezos_blocks_cache.find_or_replace
-      state.State.tezos_blocks_cache
-      hash
-      fetch
-  in
-  Result.of_option ~error:[Tx_rollup_cannot_fetch_tezos_block hash] block
-
-let rec process_block cctxt state current_hash rollup_id :
+let rec process_block state current_hash rollup_id :
     (L2block.t * Context.context option, tztrace) result Lwt.t =
   let open Lwt_result_syntax in
   if Block_hash.equal state.State.rollup_info.origination_block current_hash
@@ -307,11 +281,10 @@ let rec process_block cctxt state current_hash rollup_id :
     | Some l2_block ->
         (* Already processed *)
         let*! () = Event.(emit block_already_processed) current_hash in
-        let* context = checkout_context state l2_block.header.context in
-        let* _l2_reorg = State.set_head state l2_block context in
-        return (l2_block, Some context)
+        let* _l2_reorg = State.set_head state l2_block in
+        return (l2_block, None)
     | None ->
-        let* block_info = get_tezos_block cctxt state current_hash in
+        let* block_info = State.fetch_tezos_block state current_hash in
         let predecessor_hash = block_info.header.shell.predecessor in
         let block_level = block_info.header.shell.level in
         let* () =
@@ -322,7 +295,7 @@ let rec process_block cctxt state current_hash rollup_id :
         (* Handle predecessor Tezos block first *)
         let*! () = Event.(emit processing_block_predecessor) predecessor_hash in
         let* (l2_predecessor_header, predecessor_context) =
-          process_block cctxt state predecessor_hash rollup_id
+          process_block state predecessor_hash rollup_id
         in
         let*! () =
           Event.(emit processing_block) (current_hash, predecessor_hash)
@@ -343,24 +316,103 @@ let rec process_block cctxt state current_hash rollup_id :
             ~level:block_info.header.shell.level
             ~predecessor:block_info.header.shell.predecessor
         in
-        let* _l2_reorg = State.set_head state l2_block context in
+        let* _l2_reorg = State.set_head state l2_block in
         let*! () = Event.(emit new_tezos_head) current_hash in
         let*! () = Event.(emit block_processed) (current_hash, block_level) in
         return (l2_block, Some context)
 
-let maybe_batch_and_inject state =
-  match state.State.batcher_state with
-  | None -> ()
-  | Some batcher_state -> Batcher.async_batch_and_inject batcher_state
+let batch state =
+  match state.State.batcher with
+  | None -> return_unit
+  | Some batcher -> Batcher.batch batcher
 
-let process_head cctxt state current_hash rollup_id =
+let notify_head state head reorg =
+  let open Lwt_result_syntax in
+  let* head = State.fetch_tezos_block state head in
+  let*! () = Injector.new_tezos_head head reorg in
+  return_unit
+
+let queue_gc_operations state =
+  let open Lwt_result_syntax in
+  let tx_rollup = state.State.rollup_info.rollup_id in
+  let inject source op =
+    let manager_operation = Manager op in
+    let hash = L1_operation.hash_manager_operation manager_operation in
+    Injector.add_pending_operation
+      {L1_operation.hash; source; manager_operation}
+  in
+  let queue_finalize_commitment state =
+    match state.State.signers.finalize_commitment with
+    | None -> return_unit
+    | Some source -> inject source (Tx_rollup_finalize_commitment {tx_rollup})
+  in
+  let queue_remove_commitment state =
+    match state.State.signers.remove_commitment with
+    | None -> return_unit
+    | Some source -> inject source (Tx_rollup_remove_commitment {tx_rollup})
+  in
+  let* () = queue_finalize_commitment state in
+  queue_remove_commitment state
+
+let time_until_next_block state (header : Tezos_base.Block_header.t) =
+  let open Result_syntax in
+  let Constants.{minimal_block_delay; delay_increment_per_round; _} =
+    state.State.constants.parametric
+  in
+  let next_level_timestamp =
+    let* durations =
+      Round.Durations.create
+        ~first_round_duration:minimal_block_delay
+        ~delay_increment_per_round
+    in
+    let* predecessor_round = Fitness.round_from_raw header.shell.fitness in
+    Round.timestamp_of_round
+      durations
+      ~predecessor_timestamp:header.shell.timestamp
+      ~predecessor_round
+      ~round:Round.zero
+  in
+  let next_level_timestamp =
+    Result.value
+      next_level_timestamp
+      ~default:
+        (WithExceptions.Result.get_ok
+           ~loc:__LOC__
+           Timestamp.(header.shell.timestamp +? minimal_block_delay))
+  in
+  Ptime.diff
+    (Time.System.of_protocol_exn next_level_timestamp)
+    (Time.System.now ())
+
+let trigger_injection state header =
+  let open Lwt_syntax in
+  (* Queue request for injection of operation that must be delayed *)
+  (* Waiting only half the time until next block to allow for propagation *)
+  let promise =
+    let delay =
+      Ptime.Span.to_float_s (time_until_next_block state header) /. 2.
+    in
+    let* () =
+      if delay <= 0. then return_unit
+      else
+        let* () = Event.(emit Injector.wait) delay in
+        Lwt_unix.sleep delay
+    in
+    Injector.inject ~strategy:Injector.Delay_block ()
+  in
+  ignore promise ;
+  (* Queue request for injection of operation that must be injected each block *)
+  Injector.inject ~strategy:Injector.Each_block ()
+
+let process_head state (current_hash, current_header) rollup_id =
   let open Lwt_result_syntax in
   let*! () = Event.(emit new_block) current_hash in
-  let* res = process_block cctxt state current_hash rollup_id in
-  let* _l1_reorg = State.set_tezos_head state current_hash in
-  maybe_batch_and_inject state ;
-  (* TODO/TORU: handle new head and reorgs w.r.t. injected operations by the
-     rollup node, like commitments and rejections. *)
+  let* res = process_block state current_hash rollup_id in
+  let* l1_reorg = State.set_tezos_head state current_hash in
+  let* () = batch state in
+  let* () = queue_gc_operations state in
+  let* () = notify_head state current_hash l1_reorg in
+  let*! () = trigger_injection state current_header in
   return res
 
 let main_exit_callback state exit_status =
@@ -390,6 +442,7 @@ let run configuration cctxt =
     rollup_id;
     rollup_genesis;
     operator;
+    signers;
     reconnection_delay;
     l2_blocks_cache_size;
     _;
@@ -402,6 +455,7 @@ let run configuration cctxt =
       ~data_dir
       ~l2_blocks_cache_size
       ~operator
+      ~signers
       ?rollup_genesis
       rollup_id
   in
@@ -420,8 +474,8 @@ let run configuration cctxt =
           in
           let*! () =
             Lwt_stream.iter_s
-              (fun (current_hash, _header) ->
-                let*! r = process_head cctxt state current_hash rollup_id in
+              (fun head ->
+                let*! r = process_head state head rollup_id in
                 match r with
                 | Ok (_, _) -> Lwt.return ()
                 | Error (Tx_rollup_originated_in_fork :: _ as e) ->

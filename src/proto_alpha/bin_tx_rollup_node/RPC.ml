@@ -243,7 +243,7 @@ module Block = struct
         match block_id with
         | `Tezos_block b when Block_hash.(block.header.tezos_block <> b) ->
             (* Tezos block has no l2 inbox *)
-            failwith "The tezos block (%a) has not l2 inbox" Block_hash.pp b
+            failwith "The tezos block (%a) has not L2 inbox" Block_hash.pp b
         | _ ->
             let open Inbox in
             let inbox = block.inbox in
@@ -296,7 +296,8 @@ module Block = struct
               Protocol.Tx_rollup_l2_apply.
                 {
                   tx_rollup_max_withdrawals_per_batch =
-                    state.l1_constants.tx_rollup_max_withdrawals_per_batch;
+                    state.constants.parametric
+                      .tx_rollup_max_withdrawals_per_batch;
                 }
             in
             let* (proof, _) =
@@ -521,16 +522,16 @@ end
 module Injection = struct
   let path = RPC_path.(open_root / "queue")
 
-  let directory : Batcher.state RPC_directory.t ref = ref RPC_directory.empty
+  let directory : Batcher.t RPC_directory.t ref = ref RPC_directory.empty
 
   let register service f =
     directory := RPC_directory.register !directory service f
 
   let build_directory state =
-    match state.State.batcher_state with
+    match state.State.batcher with
     | None -> RPC_directory.empty
-    | Some batcher_state ->
-        !directory |> RPC_directory.map (fun () -> Lwt.return batcher_state)
+    | Some batcher ->
+        !directory |> RPC_directory.map (fun () -> Lwt.return batcher)
 
   let inject_query =
     let open RPC_query in
@@ -564,18 +565,19 @@ module Injection = struct
       path
 
   let () =
-    register inject_transaction (fun state q transaction ->
+    register inject_transaction (fun batcher q transaction ->
         Batcher.register_transaction
           ~eager_batch:q#eager_batch
-          state
+          batcher
           transaction)
 
   let () =
-    register get_transaction (fun (state, tr_hash) () () ->
-        return @@ Batcher.find_transaction state tr_hash)
+    register get_transaction (fun (batcher, tr_hash) () () ->
+        return @@ Batcher.find_transaction batcher tr_hash)
 
   let () =
-    register get_queue (fun state () () -> return @@ Batcher.get_queue state)
+    register get_queue (fun batcher () () ->
+        return @@ Batcher.get_queue batcher)
 end
 
 let register state =

@@ -3462,7 +3462,9 @@ end = struct
             tezos_micheline |> open_;
             tezos_client_base |> open_;
             tezos_client_base_unix |> open_;
+            tezos_shell;
             tezos_store;
+            tezos_workers |> open_;
           ]
     in
     let benchmark_type_inference =
