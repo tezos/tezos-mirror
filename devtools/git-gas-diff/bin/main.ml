@@ -125,19 +125,16 @@ module Decimal = struct
 
   let of_string s =
     let dot_index = String.index_opt s '.' in
-    let sint_part, sdec_part, decimals =
+    let s, decimals =
       match dot_index with
-      | None -> (s, "0", 0)
+      | None -> (s, 0)
       | Some dot_index ->
           let sint_part = String.sub s 0 dot_index in
           let start = dot_index + 1 in
           let sdec_part = String.sub s start (String.length s - start) in
-          (sint_part, sdec_part, String.length sdec_part)
+          (sint_part ^ sdec_part, String.length sdec_part)
     in
-    let open Big_int in
-    let* int_part = big_int_of_string_opt sint_part in
-    let+ dec_part = big_int_of_string_opt sdec_part in
-    let value = (int_part * power_int_positive_int 10 decimals) + dec_part in
+    let+ value = Big_int.big_int_of_string_opt s in
     { value; decimals }
 
   let to_string { value; decimals } =
