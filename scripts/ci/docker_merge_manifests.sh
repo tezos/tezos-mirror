@@ -23,7 +23,6 @@ do
   amends=''
   for docker_architecture in ${docker_architectures}
   do
-    docker pull "${docker_image}:${docker_architecture}_${short_tag}"
     amends="${amends} --amend ${docker_image}:${docker_architecture}_${short_tag}"
   done
 
