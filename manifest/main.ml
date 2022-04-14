@@ -3691,13 +3691,10 @@ end = struct
   let active = List.filter (fun p -> p.baking_commands_registration <> None) all
 
   let all_optionally (get_packages : (t -> target option) list) =
-    let get_all_packages_for_protocol_package_type
-        (get_package : t -> target option) =
-      List.map (fun protocol -> Option.to_list (get_package protocol)) all
-      |> List.flatten
+    let get_targets_for_protocol protocol =
+      List.filter_map (fun get_package -> get_package protocol) get_packages
     in
-    List.map get_all_packages_for_protocol_package_type get_packages
-    |> List.flatten |> List.map optional
+    List.map get_targets_for_protocol all |> List.flatten |> List.map optional
 end
 
 (* TESTS THAT USE PROTOCOLS *)
