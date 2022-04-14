@@ -1367,18 +1367,17 @@ module Tx_rollup = struct
         ?hooks
         client
         (["--wait"; wait]
-        @ ["submit"; "tx"; "rollup"; "reject"; "commitment"]
+        @ ["reject"; "commitment"; "of"; "tx"; "rollup"; rollup]
         @ ["at"; "level"; string_of_int level]
-        @ ["message"; message]
-        @ ["at"; "position"; string_of_int position]
+        @ ["with"; "result"; "hash"; message_result_hash]
+        @ ["and"; "result"; "path"; rejected_message_result_path]
+        @ ["for"; "message"; "at"; "position"; string_of_int position]
+        @ ["with"; "content"; message]
         @ ["and"; "path"; path]
-        @ ["to"; "reject"; message_result_hash]
-        @ ["with"; "path"; rejected_message_result_path]
-        @ ["with"; "proof"; proof]
         @ ["with"; "agreed"; "context"; "hash"; context_hash]
-        @ ["and"; "withdraw"; "list"; withdraw_list_hash]
-        @ ["with"; "path"; agreed_message_result_path]
-        @ ["to"; rollup] @ ["from"; src]
+        @ ["and"; "withdraw"; "list"; "hash"; withdraw_list_hash]
+        @ ["and"; "result"; "path"; agreed_message_result_path]
+        @ ["using"; "proof"; proof; "from"; src]
         @ optional_arg ~name:"burn-cap" Tez.to_string burn_cap
         @ optional_arg ~name:"storage-limit" string_of_int storage_limit)
     in

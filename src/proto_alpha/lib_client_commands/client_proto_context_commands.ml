@@ -2653,54 +2653,55 @@ let commands_rw () =
          force_low_fee_arg
          fee_cap_arg
          burn_cap_arg)
-      (prefixes
-         ["submit"; "tx"; "rollup"; "reject"; "commitment"; "at"; "level"]
+      (prefixes ["reject"; "commitment"; "of"; "tx"; "rollup"]
+      @@ tx_rollup_param
+      @@ prefixes ["at"; "level"]
       @@ Clic.param
            ~name:"level"
            ~desc:"The level"
            Client_proto_args.int_parameter
-      @@ prefix "message"
-      @@ Clic.param
-           ~name:"message"
-           ~desc:"the message being rejected"
-           Client_proto_args.string_parameter
-      @@ prefix "at" @@ prefix "position"
-      @@ Clic.param
-           ~name:"message_position"
-           ~desc:"position of the message being rejected in the inbox"
-           int_parameter
-      @@ prefix "and" @@ prefix "path"
-      @@ Clic.param
-           ~name:"message_path"
-           ~desc:"merkle path of the message being rejected in the inbox"
-           string_parameter
-      @@ prefixes ["to"; "reject"]
+      @@ prefixes ["with"; "result"; "hash"]
       @@ Clic.param
            ~name:"message_result_hash"
            ~desc:"message result hash being rejected"
            Client_proto_args.string_parameter
-      @@ prefixes ["with"; "path"]
+      @@ prefixes ["and"; "result"; "path"]
       @@ Clic.param
            ~name:"message_result_path"
            ~desc:"merkle path of message result hash being rejected"
            Client_proto_args.string_parameter
-      @@ prefix "with" @@ prefix "proof" @@ tx_rollup_proof_param
+      @@ prefixes ["for"; "message"; "at"; "position"]
+      @@ Clic.param
+           ~name:"message_position"
+           ~desc:"position of the message being rejected in the inbox"
+           int_parameter
+      @@ prefixes ["with"; "content"]
+      @@ Clic.param
+           ~name:"message"
+           ~desc:"the message being rejected"
+           Client_proto_args.string_parameter
+      @@ prefixes ["and"; "path"]
+      @@ Clic.param
+           ~name:"message_path"
+           ~desc:"merkle path of the message being rejected in the inbox"
+           string_parameter
       @@ prefixes ["with"; "agreed"; "context"; "hash"]
       @@ Clic.param
            ~name:"context_hash"
            ~desc:"the context hash of the layer 2"
            Client_proto_args.string_parameter
-      @@ prefixes ["and"; "withdraw"; "list"]
+      @@ prefixes ["and"; "withdraw"; "list"; "hash"]
       @@ Clic.param
            ~name:"withdraw_list_hash"
            ~desc:"the hash of the withdraw list"
            Client_proto_args.string_parameter
-      @@ prefixes ["with"; "path"]
+      @@ prefixes ["and"; "result"; "path"]
       @@ Clic.param
            ~name:"message_result_path"
            ~desc:"merkle path of the message result being rejected in the inbox"
            string_parameter
-      @@ prefix "to" @@ tx_rollup_param @@ prefix "from"
+      @@ prefixes ["using"; "proof"]
+      @@ tx_rollup_proof_param @@ prefix "from"
       @@ ContractAlias.destination_param
            ~name:"src"
            ~desc:"name of the account rejecting the commitment."
@@ -2717,17 +2718,17 @@ let commands_rw () =
              force_low_fee,
              fee_cap,
              burn_cap )
+           tx_rollup
            level
-           message
-           message_position
-           message_path
-           message_result_hash
-           message_result_path
-           proof
+           rejected_message_result_hash
+           rejected_message_result_path
+           confliting_message_position
+           confliting_message
+           confliting_message_path
            previous_context_hash
            previous_withdraw_list_hash
            previous_message_result_path
-           tx_rollup
+           proof
            (_, source)
            cctxt ->
         let level = Int32.of_int level in
@@ -2764,11 +2765,11 @@ let commands_rw () =
               ~fee_parameter
               ~tx_rollup
               ~level
-              ~message
-              ~message_position
-              ~message_path
-              ~message_result_hash
-              ~message_result_path
+              ~message:confliting_message
+              ~message_position:confliting_message_position
+              ~message_path:confliting_message_path
+              ~message_result_hash:rejected_message_result_hash
+              ~message_result_path:rejected_message_result_path
               ~proof
               ~previous_context_hash
               ~previous_withdraw_list_hash
