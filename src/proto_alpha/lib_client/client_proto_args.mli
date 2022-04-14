@@ -156,3 +156,20 @@ val display_names_flag : (bool, full) Clic.arg
 val level_arg : (Script_int.n Script_int.num option, full) Clic.arg
 
 val now_arg : (Script_timestamp.t option, full) Clic.arg
+
+module Tx_rollup : sig
+  val tx_rollup_address_param :
+    ('a, full) Clic.params ->
+    (Alpha_context.Tx_rollup.t -> 'a, full) Clic.params
+
+  val level_param :
+    ('a, full) Clic.params -> (Tx_rollup_level.t -> 'a, full) Clic.params
+
+  val context_hash_parameter : (Context_hash.t, full) Clic.parameter
+
+  val message_result_path_parameter :
+    (Tx_rollup_commitment.Merkle.path, full) Clic.parameter
+
+  val tickets_dispatch_info_parameter :
+    (Tx_rollup_reveal.t, full) Clic.parameter
+end

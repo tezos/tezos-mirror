@@ -616,3 +616,80 @@ module Daemon = struct
   let denunciation_switch =
     switch ~long:"denunciation" ~short:'D' ~doc:"run the denunciation daemon" ()
 end
+
+module Tx_rollup = struct
+  let tx_rollup_address_parameter =
+    Clic.parameter (fun _ s ->
+        match Tx_rollup.of_b58check_opt s with
+        | Some c -> return c
+        | None -> failwith "Parameter '%s' is an invalid tx rollup address" s)
+
+  let tx_rollup_address_param next =
+    Clic.param
+      ~name:"tx rollup address"
+      ~desc:"Transaction rollup address to use in a transaction rollup command."
+      tx_rollup_address_parameter
+      next
+
+  let level_parameter =
+    Clic.parameter (fun _ s ->
+        match Int32.of_string_opt s with
+        | Some i ->
+            Lwt.return @@ Environment.wrap_tzresult (Tx_rollup_level.of_int32 i)
+        | None ->
+            failwith
+              "'%s' is not a valid transaction rollup level (should be an \
+               int32 value)"
+              s)
+
+  let level_param next =
+    Clic.param
+      ~name:"tx rollup level"
+      ~desc:"Transaction rollup level to use in a transaction rollup command."
+      level_parameter
+      next
+
+  let context_hash_parameter =
+    Clic.parameter (fun _ s ->
+        match Context_hash.of_b58check_opt s with
+        | Some hash -> return hash
+        | None -> failwith "%s is not a valid notation for a context hash" s)
+
+  let message_result_path_parameter =
+    Clic.parameter (fun _ s ->
+        match Data_encoding.Json.from_string s with
+        | Ok json -> (
+            try
+              return
+                (Data_encoding.Json.destruct
+                   Tx_rollup_commitment.Merkle.path_encoding
+                   json)
+            with Data_encoding.Json.Cannot_destruct (_path, exn) ->
+              failwith
+                "Invalid JSON for a message result path: %a"
+                (fun ppf -> Data_encoding.Json.print_error ppf)
+                exn)
+        | Error err ->
+            failwith
+              "'%s' is not a valid JSON-encoded message result path: %s"
+              s
+              err)
+
+  let tickets_dispatch_info_parameter =
+    Clic.parameter (fun _ s ->
+        match Data_encoding.Json.from_string s with
+        | Ok json -> (
+            try
+              return
+                (Data_encoding.Json.destruct Tx_rollup_reveal.encoding json)
+            with Data_encoding.Json.Cannot_destruct (_path, exn) ->
+              failwith
+                "Invalid JSON for tickets dispatch info: %a"
+                (fun ppf -> Data_encoding.Json.print_error ppf)
+                exn)
+        | Error err ->
+            failwith
+              "'%s' is not a valid JSON-encoded tickets dispatch info: %s"
+              s
+              err)
+end

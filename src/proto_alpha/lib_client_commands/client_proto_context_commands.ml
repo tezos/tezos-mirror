@@ -95,86 +95,6 @@ let block_hash_param =
       try return (Block_hash.of_b58check_exn s)
       with _ -> failwith "Parameter '%s' is an invalid block hash" s)
 
-let tx_rollup_parameter =
-  Clic.parameter (fun _ s ->
-      match Tx_rollup.of_b58check_opt s with
-      | Some c -> return c
-      | None -> failwith "Parameter '%s' is an invalid tx rollup address" s)
-
-let tx_rollup_param next =
-  Clic.param
-    ~name:"tx rollup address"
-    ~desc:"Transaction rollup address to use in a transaction rollup command."
-    tx_rollup_parameter
-    next
-
-let tx_rollup_level_parameter =
-  Clic.parameter (fun _ s ->
-      match Int32.of_string_opt s with
-      | Some i ->
-          Lwt.return @@ Environment.wrap_tzresult (Tx_rollup_level.of_int32 i)
-      | None ->
-          failwith
-            "'%s' is not a valid transaction rollup level (should be an int32 \
-             value)"
-            s)
-
-let tx_rollup_level_param next =
-  Clic.param
-    ~name:"tx rollup level"
-    ~desc:"Transaction rollup level to use in a transaction rollup command."
-    tx_rollup_level_parameter
-    next
-
-let tx_rollup_context_hash_parameter =
-  Clic.parameter (fun _ s ->
-      match Context_hash.of_b58check_opt s with
-      | Some hash -> return hash
-      | None -> failwith "%s is not a valid notation for a context hash" s)
-
-let tx_rollup_message_result_path_parameter =
-  Clic.parameter (fun _ s ->
-      match Data_encoding.Json.from_string s with
-      | Ok json -> (
-          try
-            return
-              (Data_encoding.Json.destruct
-                 Tx_rollup_commitment.Merkle.path_encoding
-                 json)
-          with Data_encoding.Json.Cannot_destruct (_path, exn) ->
-            failwith
-              "Invalid JSON for a message result path: %a"
-              (fun ppf -> Data_encoding.Json.print_error ppf)
-              exn)
-      | Error err ->
-          failwith
-            "'%s' is not a valid JSON-encoded message result path: %s"
-            s
-            err)
-
-let tx_rollup_tickets_dispatch_info_parameter =
-  Clic.parameter (fun _ s ->
-      match Data_encoding.Json.from_string s with
-      | Ok json -> (
-          try
-            return (Data_encoding.Json.destruct Tx_rollup_reveal.encoding json)
-          with Data_encoding.Json.Cannot_destruct (_path, exn) ->
-            failwith
-              "Invalid JSON for tickets dispatch info: %a"
-              (fun ppf -> Data_encoding.Json.print_error ppf)
-              exn)
-      | Error err ->
-          failwith
-            "'%s' is not a valid JSON-encoded tickets dispatch info: %s"
-            s
-            err)
-
-let tx_rollup_proof_param =
-  Clic.param
-    ~name:"tx_rollup rejection proof"
-    ~desc:"The proof associated to the rejection operation"
-    string_parameter
-
 let rollup_kind_param =
   Clic.parameter (fun _ name ->
       match Sc_rollups.from ~name with
@@ -2268,7 +2188,7 @@ let commands_rw () =
            ~name:"bytes"
            ~desc:"a bytes representation of the batch in hexadecimal form."
            Client_proto_args.string_parameter
-      @@ prefix "to" @@ tx_rollup_param @@ prefix "from"
+      @@ prefix "to" @@ Tx_rollup.tx_rollup_address_param @@ prefix "from"
       @@ ContractAlias.destination_param
            ~name:"src"
            ~desc:"name of the account originating the transaction rollup."
@@ -2348,7 +2268,7 @@ let commands_rw () =
             ~placeholder:"predecessor commitment hash"
             string_parameter))
       (prefixes ["commit"; "to"; "tx"; "rollup"]
-      @@ tx_rollup_param @@ prefix "from"
+      @@ Tx_rollup.tx_rollup_address_param @@ prefix "from"
       @@ ContractAlias.destination_param
            ~name:"src"
            ~desc:"name of the account submitting the commitment."
@@ -2444,7 +2364,7 @@ let commands_rw () =
          fee_cap_arg
          burn_cap_arg)
       (prefixes ["finalize"; "commitment"; "of"; "tx"; "rollup"]
-      @@ tx_rollup_param @@ prefix "from"
+      @@ Tx_rollup.tx_rollup_address_param @@ prefix "from"
       @@ ContractAlias.destination_param
            ~name:"src"
            ~desc:"name of the account finalizing the commitment."
@@ -2517,7 +2437,7 @@ let commands_rw () =
            ~name:"src"
            ~desc:"account that owns the bond."
       @@ prefixes ["for"; "tx"; "rollup"]
-      @@ tx_rollup_param @@ stop)
+      @@ Tx_rollup.tx_rollup_address_param @@ stop)
       (fun ( fee,
              dry_run,
              verbose_signing,
@@ -2583,7 +2503,7 @@ let commands_rw () =
          fee_cap_arg
          burn_cap_arg)
       (prefixes ["remove"; "commitment"; "of"; "tx"; "rollup"]
-      @@ tx_rollup_param @@ prefix "from"
+      @@ Tx_rollup.tx_rollup_address_param @@ prefix "from"
       @@ ContractAlias.destination_param
            ~name:"src"
            ~desc:"name of the account removing the commitment."
@@ -2654,7 +2574,7 @@ let commands_rw () =
          fee_cap_arg
          burn_cap_arg)
       (prefixes ["reject"; "commitment"; "of"; "tx"; "rollup"]
-      @@ tx_rollup_param
+      @@ Tx_rollup.tx_rollup_address_param
       @@ prefixes ["at"; "level"]
       @@ Clic.param
            ~name:"level"
@@ -2701,7 +2621,11 @@ let commands_rw () =
            ~desc:"merkle path of the message result being rejected in the inbox"
            string_parameter
       @@ prefixes ["using"; "proof"]
-      @@ tx_rollup_proof_param @@ prefix "from"
+      @@ Clic.param
+           ~name:"tx_rollup rejection proof"
+           ~desc:"The proof associated to the rejection operation"
+           string_parameter
+      @@ prefix "from"
       @@ ContractAlias.destination_param
            ~name:"src"
            ~desc:"name of the account rejecting the commitment."
@@ -2800,12 +2724,12 @@ let commands_rw () =
          fee_cap_arg
          burn_cap_arg)
       (prefixes ["dispatch"; "tickets"; "of"; "tx"; "rollup"]
-      @@ tx_rollup_param @@ prefix "from"
+      @@ Tx_rollup.tx_rollup_address_param @@ prefix "from"
       @@ ContractAlias.destination_param
            ~name:"source"
            ~desc:"Account used to dispatch tickets."
       @@ prefixes ["at"; "level"]
-      @@ tx_rollup_level_param
+      @@ Tx_rollup.level_param
       @@ prefixes ["for"; "the"; "message"; "at"; "index"]
       @@ Clic.param
            ~name:"message index"
@@ -2817,7 +2741,7 @@ let commands_rw () =
            ~desc:
              "Context hash (base58 encoded) from the message result of the \
               message producing the withdrawals."
-           tx_rollup_context_hash_parameter
+           Tx_rollup.context_hash_parameter
       @@ prefixes ["and"; "path"]
       @@ Clic.param
            ~name:"message result path"
@@ -2825,7 +2749,7 @@ let commands_rw () =
              "Merkle path (JSON encoded) for the message result hash of the \
               message producing the withdrawals in the commitment.\n\
               The JSON should be list of base58-encoded message result hashes."
-           tx_rollup_message_result_path_parameter
+           Tx_rollup.message_result_path_parameter
       @@ prefixes ["and"; "tickets"; "info"]
       @@ seq_of_param
            (Clic.param
@@ -2837,7 +2761,7 @@ let commands_rw () =
                  content>,\"ty\": <tickets type>, \"ticketer\": <ticketer \
                  contract address>, \"amount\": <withdrawn amount>, \
                  \"\"claimer\": <new owner's public key hash>}"
-              tx_rollup_tickets_dispatch_info_parameter))
+              Tx_rollup.tickets_dispatch_info_parameter))
       (fun ( fee,
              dry_run,
              verbose_signing,
