@@ -25,7 +25,7 @@
 
 (*
 [git-gas-diff] is a tool that outputs a synthesis of gas changes from a git
-diff.
+diff on regression traces.
 
 Typical usage is to first create a file with a git diff that contains gas
 changes. For example:

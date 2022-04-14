@@ -1,4 +1,4 @@
-`git-gas-diff` is a tool that synthesizes gas changes from a git diff.
+`git-gas-diff` is a tool that makes a synthesis of gas changes from a git diff on regression traces.
 
 Compile with `make`.
 
@@ -8,7 +8,7 @@ For instance, create a file from `git diff` and launch the tool with:
 ```
 git diff HEAD^ HEAD | dune exec git-gas-diff /dev/stdin
 ```
-if the top commit is an update of the gas for regression tests.
+if the top commit is an update of the gas for regression traces.
 
 See `bin/main.ml` for more details.
 
