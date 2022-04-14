@@ -1320,7 +1320,7 @@ let test_reorganization =
       in
       unit)
 
-let test_l2_proofs =
+let test_l2_proof_rpc_position =
   Protocol.register_test
     ~__FILE__
     ~title:"TX_rollup: reject messages at position 0 and 1"
@@ -1556,6 +1556,85 @@ let test_l2_proofs =
       in
       unit)
 
+let test_reject_bad_commitment =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"TX_rollup: reject bad commitment"
+    ~tags:["tx_rollup"; "node"; "proofs"; "rejection"]
+    (fun protocol ->
+      let* parameter_file = get_rollup_parameter_file ~protocol in
+      let* (node, client) =
+        Client.init_with_protocol ~parameter_file `Client ~protocol ()
+      in
+      let operator = Constant.bootstrap1.public_key_hash in
+      let* (tx_rollup_hash, tx_node) =
+        init_and_run_rollup_node ~operator node client
+      in
+      (* Generating some identities *)
+      let* bls_key1 = generate_bls_addr ~alias:"alice" client in
+      let pkh1_str = bls_key1.aggregate_public_key_hash in
+      let* (tx_node, _node, client, _level) =
+        make_deposit
+          ~tx_rollup_hash
+          ~tx_node
+          ~node
+          ~client
+          ~tickets_amount:10
+          pkh1_str
+      in
+      let* ({roots = _; context_hashes = _; inbox_merkle_root; predecessor} as
+           commitment_info) =
+        build_commitment_info ~tx_level:0 ~tx_rollup_hash ~tx_node ~client
+      in
+      (* Change the roots to produce an invalid commitment. *)
+      let roots = [Constant.tx_rollup_initial_message_result] in
+      let*! () =
+        Client.Tx_rollup.submit_commitment
+          ~level:0
+          ~roots
+          ~inbox_merkle_root
+          ?predecessor
+          ~rollup:tx_rollup_hash
+          ~src:Constant.bootstrap3.public_key_hash
+          client
+      in
+      let* () = Client.bake_for client in
+      let* _ = Rollup_node.wait_for_tezos_level tx_node 4 in
+      let* {
+             proof;
+             message;
+             path;
+             rejected_message_result_hash = _;
+             rejected_message_result_path;
+             context_hash;
+             withdraw_list_hash;
+             agreed_message_result_path;
+           } =
+        build_rejection
+          ~tx_level:0
+          ~tx_node
+          ~message_pos:0
+          ~client
+          commitment_info
+      in
+      let*! () =
+        Client.Tx_rollup.submit_rejection
+          ~src:operator
+          ~proof
+          ~rollup:tx_rollup_hash
+          ~level:0
+          ~message
+          ~position:0
+          ~path
+          ~message_result_hash:Constant.tx_rollup_initial_message_result
+          ~rejected_message_result_path
+          ~context_hash
+          ~withdraw_list_hash
+          ~agreed_message_result_path
+          client
+      in
+      unit)
+
 let register ~protocols =
   test_node_configuration protocols ;
   test_tx_node_origination protocols ;
@@ -1564,4 +1643,5 @@ let register ~protocols =
   test_l2_to_l2_transaction protocols ;
   test_batcher protocols ;
   test_reorganization protocols ;
-  test_l2_proofs protocols
+  test_l2_proof_rpc_position protocols ;
+  test_reject_bad_commitment protocols
