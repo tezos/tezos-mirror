@@ -511,27 +511,30 @@ let transfer (ctxt, sc) gas amount location parameters_ty parameters destination
       type a ac.
       context ->
       (a, ac) ty ->
-      (location, prim) Micheline.node ->
+      a ->
       Destination.t ->
-      (Kind.transaction manager_operation * context) tzresult =
-   fun ctxt tp unparsed_parameters -> function
+      (Kind.transaction manager_operation * context) tzresult Lwt.t =
+   fun ctxt parameters_ty parameters -> function
     | Contract destination ->
-        Gas.consume ctxt (Script.strip_locations_cost unparsed_parameters)
-        >|? fun ctxt ->
-        let unparsed_parameters =
-          Micheline.strip_locations unparsed_parameters
-        in
-        ( Transaction_to_contract
-            {
-              destination;
-              amount;
-              entrypoint;
-              location;
-              parameters_ty;
-              parameters;
-              unparsed_parameters;
-            },
-          ctxt )
+        unparse_data ctxt Optimized parameters_ty parameters
+        >>=? fun (unparsed_parameters, ctxt) ->
+        Lwt.return
+          ( Gas.consume ctxt (Script.strip_locations_cost unparsed_parameters)
+          >|? fun ctxt ->
+            let unparsed_parameters =
+              Micheline.strip_locations unparsed_parameters
+            in
+            ( Transaction_to_contract
+                {
+                  destination;
+                  amount;
+                  entrypoint;
+                  location;
+                  parameters_ty;
+                  parameters;
+                  unparsed_parameters;
+                },
+              ctxt ) )
     (* The entrypoints of a transaction rollup are polymorphic wrt. the
        tickets it can process. However, two Michelson values can have
        the same Micheline representation, but different types. What
@@ -544,32 +547,38 @@ let transfer (ctxt, sc) gas amount location parameters_ty parameters destination
        the smart contract. This allows the transaction rollup to extract
        the type of the ticket. *)
     | Tx_rollup destination -> (
-        match tp with
+        match parameters_ty with
         | Pair_t (Ticket_t (tp, _), _, _, _) ->
-            Script_ir_translator.unparse_ty
-              ~loc:Micheline.dummy_location
-              ctxt
-              tp
-            >>? fun (ty, ctxt) ->
-            let unparsed_parameters =
-              Micheline.Seq (Micheline.dummy_location, [unparsed_parameters; ty])
-            in
-            Gas.consume ctxt (Script.strip_locations_cost unparsed_parameters)
-            >|? fun ctxt ->
-            let unparsed_parameters =
-              Micheline.strip_locations unparsed_parameters
-            in
-            ( Transaction_to_tx_rollup
-                {
-                  destination;
-                  amount;
-                  entrypoint;
-                  location;
-                  parameters_ty;
-                  parameters;
-                  unparsed_parameters;
-                },
-              ctxt )
+            unparse_data ctxt Optimized parameters_ty parameters
+            >>=? fun (unparsed_parameters, ctxt) ->
+            Lwt.return
+              ( Script_ir_translator.unparse_ty
+                  ~loc:Micheline.dummy_location
+                  ctxt
+                  tp
+              >>? fun (ty, ctxt) ->
+                let unparsed_parameters =
+                  Micheline.Seq
+                    (Micheline.dummy_location, [unparsed_parameters; ty])
+                in
+                Gas.consume
+                  ctxt
+                  (Script.strip_locations_cost unparsed_parameters)
+                >|? fun ctxt ->
+                let unparsed_parameters =
+                  Micheline.strip_locations unparsed_parameters
+                in
+                ( Transaction_to_tx_rollup
+                    {
+                      destination;
+                      amount;
+                      entrypoint;
+                      location;
+                      parameters_ty;
+                      parameters;
+                      unparsed_parameters;
+                    },
+                  ctxt ) )
         | _ ->
             (* TODO: https://gitlab.com/tezos/tezos/-/issues/2455
                Refute this branch thanks to the type system.
@@ -592,10 +601,8 @@ let transfer (ctxt, sc) gas amount location parameters_ty parameters destination
     ~to_update
     ~temporary:true
   >>=? fun (parameters, lazy_storage_diff, ctxt) ->
-  unparse_data ctxt Optimized parameters_ty parameters
-  >>=? fun (unparsed_parameters, ctxt) ->
-  craft_transfer_operation ctxt parameters_ty unparsed_parameters destination
-  >>?= fun (operation, ctxt) ->
+  craft_transfer_operation ctxt parameters_ty parameters destination
+  >>=? fun (operation, ctxt) ->
   fresh_internal_nonce ctxt >>?= fun (ctxt, nonce) ->
   let iop = {source = sc.self; operation; nonce} in
   let res = {piop = Internal_operation iop; lazy_storage_diff} in
