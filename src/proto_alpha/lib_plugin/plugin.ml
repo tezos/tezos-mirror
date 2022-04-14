@@ -2442,14 +2442,15 @@ module RPC = struct
           `Minted
           (`Contract dummy_contract)
           balance
-        >>=? fun (ctxt, _) -> return (ctxt, dummy_contract)
+        >>=? fun (ctxt, _) -> return (ctxt, dummy_contract_hash)
       in
       let configure_contracts ctxt script balance ~src_opt ~pay_opt ~self_opt =
         (match self_opt with
         | None ->
             let balance = Option.value ~default:default_balance balance in
             originate_dummy_contract ctxt script balance
-            >>=? fun (ctxt, addr) -> return (ctxt, addr, balance)
+            >>=? fun (ctxt, addr) ->
+            return (ctxt, Contract.Originated addr, balance)
         | Some addr ->
             default_from_context
               ctxt
@@ -2713,7 +2714,7 @@ module RPC = struct
           let parameter =
             View_helpers.make_view_parameter
               (Micheline.root input)
-              viewer_contract
+              (Contract.Originated viewer_contract)
           in
           Script_interpreter.execute
             ctxt
@@ -2737,7 +2738,7 @@ module RPC = struct
             (View_helpers.extract_parameter_from_operations
                entrypoint
                operations
-               viewer_contract)) ;
+               (Contract.Originated viewer_contract))) ;
       Registration.register0
         ~chunked:true
         S.run_script_view
