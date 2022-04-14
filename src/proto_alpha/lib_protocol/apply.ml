@@ -2175,8 +2175,7 @@ let may_start_new_cycle ctxt =
   match Level.dawn_of_a_new_cycle ctxt with
   | None -> return (ctxt, [], [])
   | Some last_cycle ->
-      Seed.cycle_end ctxt last_cycle >>=? fun (ctxt, unrevealed) ->
-      Delegate.cycle_end ctxt last_cycle unrevealed
+      Delegate.cycle_end ctxt last_cycle
       >>=? fun (ctxt, balance_updates, deactivated) ->
       Bootstrap.cycle_end ctxt last_cycle >|=? fun ctxt ->
       (ctxt, balance_updates, deactivated)

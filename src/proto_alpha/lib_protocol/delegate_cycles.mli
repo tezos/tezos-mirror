@@ -34,7 +34,6 @@
 val cycle_end :
   Raw_context.t ->
   Cycle_repr.t ->
-  Storage.Seed.unrevealed_nonce list ->
   (Raw_context.t
   * Receipt_repr.balance_updates
   * Signature.Public_key_hash.t list)

@@ -247,7 +247,8 @@ let distribute_endorsing_rewards ctxt last_cycle unrevealed_nonces =
     (ctxt, [])
     delegates
 
-let cycle_end ctxt last_cycle unrevealed_nonces =
+let cycle_end ctxt last_cycle =
+  Seed_storage.cycle_end ctxt last_cycle >>=? fun (ctxt, unrevealed_nonces) ->
   let new_cycle = Cycle_repr.add last_cycle 1 in
   Delegate_sampler.select_new_distribution_at_cycle_end ctxt ~new_cycle
   >>=? fun ctxt ->

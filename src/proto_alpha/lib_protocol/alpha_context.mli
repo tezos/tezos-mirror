@@ -1350,9 +1350,6 @@ module Seed : sig
 
   val compute_randao : context -> context tzresult Lwt.t
 
-  val cycle_end :
-    context -> Cycle.t -> (context * Nonce.unrevealed list) tzresult Lwt.t
-
   (* RPC *)
   type seed_computation_status =
     | Nonce_revelation_stage
@@ -2565,7 +2562,6 @@ module Delegate : sig
   val cycle_end :
     context ->
     Cycle.t ->
-    Nonce.unrevealed list ->
     (context * Receipt.balance_updates * Signature.Public_key_hash.t list)
     tzresult
     Lwt.t
