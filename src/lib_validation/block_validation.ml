@@ -85,8 +85,8 @@ let validation_store_encoding =
 
 type operation_metadata = Metadata of Bytes.t | Too_large_metadata
 
-(* [default_operation_metadata_size_limit] is used to filter and potentially discard a
-   given metadata if its size exceed the cap. *)
+(* [default_operation_metadata_size_limit] is used to filter and
+   potentially discard a given metadata if its size exceed the cap. *)
 let default_operation_metadata_size_limit = Some 10_000_000
 
 let operation_metadata_encoding =
@@ -482,6 +482,95 @@ module Make (Proto : Registered_protocol.T) = struct
     in
     return (block_metadata, ops_metadata)
 
+  let prepare_context predecessor_block_metadata_hash
+      predecessor_ops_metadata_hash (block_header : Proto.block_header)
+      predecessor_context predecessor_hash =
+    let open Lwt_result_syntax in
+    let*! context =
+      update_testchain_status
+        predecessor_context
+        ~predecessor_hash
+        block_header.shell.timestamp
+    in
+    let*! context =
+      match predecessor_block_metadata_hash with
+      | None -> Lwt.return context
+      | Some hash -> Context.add_predecessor_block_metadata_hash context hash
+    in
+    let*! context =
+      match predecessor_ops_metadata_hash with
+      | None -> Lwt.return context
+      | Some hash -> Context.add_predecessor_ops_metadata_hash context hash
+    in
+    return @@ Shell_context.wrap_disk_context context
+
+  let proto_apply_operations chain_id context cache
+      (predecessor_block_header : Block_header.t) block_header block_hash
+      operations =
+    let open Lwt_result_syntax in
+    trace
+      (invalid_block block_hash Economic_protocol_error)
+      (let* state =
+         (Proto.begin_application
+            ~chain_id
+            ~predecessor_context:context
+            ~predecessor_timestamp:predecessor_block_header.shell.timestamp
+            ~predecessor_fitness:predecessor_block_header.shell.fitness
+            ~cache
+            block_header [@time.duration_lwt application_beginning])
+       in
+       let* (state, ops_metadata) =
+         (List.fold_left_es
+            (fun (state, acc) ops ->
+              let* (state, ops_metadata) =
+                List.fold_left_es
+                  (fun (state, acc) op ->
+                    let* (state, op_metadata) =
+                      Proto.apply_operation state op
+                    in
+                    return (state, op_metadata :: acc))
+                  (state, [])
+                  ops
+              in
+              return (state, List.rev ops_metadata :: acc))
+            (state, [])
+            operations [@time.duration_lwt operations_application])
+       in
+       let ops_metadata = List.rev ops_metadata in
+       let* (validation_result, block_data) =
+         (Proto.finalize_block
+            state
+            (Some block_header.shell) [@time.duration_lwt block_finalization])
+       in
+       return (validation_result, block_data, ops_metadata))
+
+  let may_init_new_protocol new_protocol (block_header : Proto.block_header)
+      block_hash (validation_result : Environment_context.validation_result) =
+    let open Lwt_result_syntax in
+    if Protocol_hash.equal new_protocol Proto.hash then
+      return (validation_result, Proto.environment_version)
+    else
+      match Registered_protocol.get new_protocol with
+      | None ->
+          tzfail
+            (Unavailable_protocol {block = block_hash; protocol = new_protocol})
+      | Some (module NewProto) ->
+          let*? () =
+            check_proto_environment_version_increasing
+              block_hash
+              Proto.environment_version
+              NewProto.environment_version
+          in
+          let*! () =
+            Validation_events.(emit new_protocol_initialisation new_protocol)
+          in
+          NewProto.set_log_message_consumer
+            (Protocol_logging.make_log_message_consumer ()) ;
+          let* validation_result =
+            NewProto.init validation_result.context block_header.shell
+          in
+          return (validation_result, NewProto.environment_version)
+
   let apply ?cached_result chain_id ~cache ~user_activated_upgrades
       ~user_activated_protocol_overrides ~operation_metadata_size_limit
       ~max_operations_ttl ~(predecessor_block_header : Block_header.t)
@@ -514,67 +603,28 @@ module Make (Proto : Registered_protocol.T) = struct
         let* block_header = parse_block_header block_hash block_header in
         let* () = check_operation_quota block_hash operations in
         let predecessor_hash = Block_header.hash predecessor_block_header in
-        let*! context =
-          update_testchain_status
-            predecessor_context
-            ~predecessor_hash
-            block_header.shell.timestamp
-        in
         let* operations =
           (parse_operations
              block_hash
              operations [@time.duration_lwt operations_parsing])
         in
-        let*! context =
-          match predecessor_block_metadata_hash with
-          | None -> Lwt.return context
-          | Some hash ->
-              Context.add_predecessor_block_metadata_hash context hash
+        let* context =
+          prepare_context
+            predecessor_block_metadata_hash
+            predecessor_ops_metadata_hash
+            block_header
+            predecessor_context
+            predecessor_hash
         in
-        let*! context =
-          match predecessor_ops_metadata_hash with
-          | None -> Lwt.return context
-          | Some hash -> Context.add_predecessor_ops_metadata_hash context hash
-        in
-        let context = Shell_context.wrap_disk_context context in
         let* (validation_result, block_metadata, ops_metadata) =
-          trace
-            (invalid_block block_hash Economic_protocol_error)
-            (let* state =
-               (Proto.begin_application
-                  ~chain_id
-                  ~predecessor_context:context
-                  ~predecessor_timestamp:
-                    predecessor_block_header.shell.timestamp
-                  ~predecessor_fitness:predecessor_block_header.shell.fitness
-                  ~cache
-                  block_header [@time.duration_lwt application_beginning])
-             in
-             let* (state, ops_metadata) =
-               (List.fold_left_es
-                  (fun (state, acc) ops ->
-                    let* (state, ops_metadata) =
-                      List.fold_left_es
-                        (fun (state, acc) op ->
-                          let* (state, op_metadata) =
-                            Proto.apply_operation state op
-                          in
-                          return (state, op_metadata :: acc))
-                        (state, [])
-                        ops
-                    in
-                    return (state, List.rev ops_metadata :: acc))
-                  (state, [])
-                  operations [@time.duration_lwt operations_application])
-             in
-             let ops_metadata = List.rev ops_metadata in
-             let* (validation_result, block_data) =
-               (Proto.finalize_block
-                  state
-                  (Some block_header.shell)
-                [@time.duration_lwt block_finalization])
-             in
-             return (validation_result, block_data, ops_metadata))
+          proto_apply_operations
+            chain_id
+            context
+            cache
+            predecessor_block_header
+            block_header
+            block_hash
+            operations
         in
         let*! validation_result =
           may_patch_protocol
@@ -615,31 +665,11 @@ module Make (Proto : Registered_protocol.T) = struct
                   }))
         in
         let* (validation_result, new_protocol_env_version) =
-          if Protocol_hash.equal new_protocol Proto.hash then
-            return (validation_result, Proto.environment_version)
-          else
-            match Registered_protocol.get new_protocol with
-            | None ->
-                tzfail
-                  (Unavailable_protocol
-                     {block = block_hash; protocol = new_protocol})
-            | Some (module NewProto) ->
-                let*? () =
-                  check_proto_environment_version_increasing
-                    block_hash
-                    Proto.environment_version
-                    NewProto.environment_version
-                in
-                let*! () =
-                  Validation_events.(
-                    emit new_protocol_initialisation new_protocol)
-                in
-                NewProto.set_log_message_consumer
-                  (Protocol_logging.make_log_message_consumer ()) ;
-                let* validation_result =
-                  NewProto.init validation_result.context block_header.shell
-                in
-                return (validation_result, NewProto.environment_version)
+          may_init_new_protocol
+            new_protocol
+            block_header
+            block_hash
+            validation_result
         in
         let max_operations_ttl =
           max
