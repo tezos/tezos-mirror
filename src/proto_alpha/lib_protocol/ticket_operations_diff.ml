@@ -261,7 +261,6 @@ let tickets_of_operation ctxt
         unparsed_parameters = _;
         entrypoint;
         amount = _;
-        location = _;
         parameters_ty;
         parameters;
       } ->

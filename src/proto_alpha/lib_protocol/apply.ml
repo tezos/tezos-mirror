@@ -1211,7 +1211,6 @@ let apply_internal_manager_operation_content :
         amount;
         entrypoint;
         unparsed_parameters = _;
-        location = _;
         parameters_ty;
         parameters;
       } ->

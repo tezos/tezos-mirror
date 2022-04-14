@@ -330,7 +330,6 @@ let transfer_operation_to_tx_rollup ~incr ~src ~parameters_ty ~parameters
                 unparsed_parameters = Micheline.strip_locations params_node;
                 entrypoint = Tx_rollup.deposit_entrypoint;
                 destination = tx_rollup;
-                location = Micheline.dummy_location;
                 parameters_ty;
                 parameters;
               };

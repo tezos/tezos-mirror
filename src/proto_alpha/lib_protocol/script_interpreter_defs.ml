@@ -519,7 +519,7 @@ let make_transaction_to_contract ctxt ~destination ~amount ~entrypoint ~location
         ctxt ) )
 
 let make_transaction_to_tx_rollup (type t tc) ctxt ~destination ~amount
-    ~entrypoint ~location ~(parameters_ty : (t, tc) ty) ~parameters =
+    ~entrypoint ~(parameters_ty : (t, tc) ty) ~parameters =
   (* The entrypoints of a transaction rollup are polymorphic wrt. the
      tickets it can process. However, two Michelson values can have
      the same Micheline representation, but different types. What
@@ -551,7 +551,6 @@ let make_transaction_to_tx_rollup (type t tc) ctxt ~destination ~amount
                 destination;
                 amount;
                 entrypoint;
-                location;
                 parameters_ty;
                 parameters;
                 unparsed_parameters;
@@ -601,7 +600,6 @@ let transfer (ctxt, sc) gas amount location parameters_ty parameters
         ~destination
         ~amount
         ~entrypoint
-        ~location
         ~parameters_ty
         ~parameters)
   >>=? fun (operation, ctxt) ->

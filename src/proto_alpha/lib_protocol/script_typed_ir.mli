@@ -1514,7 +1514,6 @@ and 'kind manager_operation =
       destination : Tx_rollup.t;
       amount : Tez.tez;
       entrypoint : Entrypoint.t;
-      location : Script.location;
       parameters_ty : ('a, _) ty;
       parameters : 'a;
       unparsed_parameters : Script.expr;
