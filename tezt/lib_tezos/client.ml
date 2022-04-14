@@ -1303,7 +1303,15 @@ module Tx_rollup = struct
         client
         (["--wait"; wait]
         @ [
-            "submit"; "tx"; "rollup"; "batch"; content; "to"; rollup; "from"; src;
+            "submit";
+            "tx";
+            "rollup";
+            "batch";
+            "0x" ^ content;
+            "to";
+            rollup;
+            "from";
+            src;
           ]
         @ optional_arg ~name:"burn-cap" Tez.to_string burn_cap
         @ optional_arg ~name:"storage-limit" string_of_int storage_limit)

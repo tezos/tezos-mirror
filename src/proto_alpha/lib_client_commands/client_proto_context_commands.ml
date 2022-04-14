@@ -2186,8 +2186,10 @@ let commands_rw () =
       (prefixes ["submit"; "tx"; "rollup"; "batch"]
       @@ Clic.param
            ~name:"bytes"
-           ~desc:"a bytes representation of the batch in hexadecimal form."
-           Client_proto_args.string_parameter
+           ~desc:
+             "a bytes representation of the batch in hexadecimal form. Bytes \
+              must be prefixed by '0x'"
+           bytes_parameter
       @@ prefix "to" @@ Tx_rollup.tx_rollup_address_param @@ prefix "from"
       @@ ContractAlias.destination_param
            ~name:"src"
@@ -2241,7 +2243,7 @@ let commands_rw () =
               ~src_sk
               ~fee_parameter
               ~tx_rollup
-              ~content
+              ~content:(Bytes.to_string content)
               ()
             >>=? fun _res -> return_unit);
     command
@@ -2266,28 +2268,25 @@ let commands_rw () =
               "a bytes representation of the predecessor commitment in \
                hexadecimal form, or empty for no predecessor."
             ~placeholder:"predecessor commitment hash"
-            string_parameter))
+            Tx_rollup.commitment_hash_parameter))
       (prefixes ["commit"; "to"; "tx"; "rollup"]
       @@ Tx_rollup.tx_rollup_address_param @@ prefix "from"
       @@ ContractAlias.destination_param
            ~name:"src"
            ~desc:"name of the account submitting the commitment."
       @@ prefixes ["for"; "level"]
-      @@ Clic.param
-           ~name:"level"
-           ~desc:"The level"
-           Client_proto_args.int_parameter
+      @@ Tx_rollup.level_param
       @@ prefixes ["with"; "inbox"; "hash"]
       @@ Clic.param
            ~name:"inbox_merkle_root"
            ~desc:"the inbox merkle root to commit to in b58check notation."
-           Client_proto_args.string_parameter
+           Tx_rollup.inbox_root_hash_parameter
       @@ prefixes ["and"; "messages"; "result"; "hash"]
       @@ seq_of_param
            (Clic.param
               ~name:"batches"
               ~desc:"a bytes representation of a message result hash in hex"
-              Client_proto_args.string_parameter))
+              Tx_rollup.message_result_hash_parameter))
       (fun ( fee,
              dry_run,
              verbose_signing,
@@ -2305,9 +2304,8 @@ let commands_rw () =
            (_, source)
            level
            inbox_merkle_root
-           batches
+           messages
            cctxt ->
-        let level = Int32.of_int level in
         match Contract.is_implicit source with
         | None ->
             failwith
@@ -2342,7 +2340,7 @@ let commands_rw () =
               ~tx_rollup
               ~level
               ~inbox_merkle_root
-              ~batches
+              ~messages
               ~predecessor
               ()
             >>=? fun _res -> return_unit);
@@ -2576,55 +2574,52 @@ let commands_rw () =
       (prefixes ["reject"; "commitment"; "of"; "tx"; "rollup"]
       @@ Tx_rollup.tx_rollup_address_param
       @@ prefixes ["at"; "level"]
-      @@ Clic.param
-           ~name:"level"
-           ~desc:"The level"
-           Client_proto_args.int_parameter
+      @@ Tx_rollup.level_param
       @@ prefixes ["with"; "result"; "hash"]
       @@ Clic.param
            ~name:"message_result_hash"
            ~desc:"message result hash being rejected"
-           Client_proto_args.string_parameter
+           Tx_rollup.message_result_hash_parameter
       @@ prefixes ["and"; "result"; "path"]
       @@ Clic.param
            ~name:"message_result_path"
            ~desc:"merkle path of message result hash being rejected"
-           Client_proto_args.string_parameter
+           Tx_rollup.message_result_path_parameter
       @@ prefixes ["for"; "message"; "at"; "position"]
       @@ Clic.param
            ~name:"message_position"
            ~desc:"position of the message being rejected in the inbox"
-           int_parameter
+           non_negative_param
       @@ prefixes ["with"; "content"]
       @@ Clic.param
            ~name:"message"
            ~desc:"the message being rejected"
-           Client_proto_args.string_parameter
+           Tx_rollup.message_parameter
       @@ prefixes ["and"; "path"]
       @@ Clic.param
            ~name:"message_path"
            ~desc:"merkle path of the message being rejected in the inbox"
-           string_parameter
+           Tx_rollup.message_path_parameter
       @@ prefixes ["with"; "agreed"; "context"; "hash"]
       @@ Clic.param
            ~name:"context_hash"
            ~desc:"the context hash of the layer 2"
-           Client_proto_args.string_parameter
+           Tx_rollup.context_hash_parameter
       @@ prefixes ["and"; "withdraw"; "list"; "hash"]
       @@ Clic.param
            ~name:"withdraw_list_hash"
            ~desc:"the hash of the withdraw list"
-           Client_proto_args.string_parameter
+           Tx_rollup.withdraw_list_hash_parameter
       @@ prefixes ["and"; "result"; "path"]
       @@ Clic.param
            ~name:"message_result_path"
            ~desc:"merkle path of the message result being rejected in the inbox"
-           string_parameter
+           Tx_rollup.message_result_path_parameter
       @@ prefixes ["using"; "proof"]
       @@ Clic.param
            ~name:"tx_rollup rejection proof"
            ~desc:"The proof associated to the rejection operation"
-           string_parameter
+           Tx_rollup.proof_parameter
       @@ prefix "from"
       @@ ContractAlias.destination_param
            ~name:"src"
@@ -2655,7 +2650,6 @@ let commands_rw () =
            proof
            (_, source)
            cctxt ->
-        let level = Int32.of_int level in
         match Contract.is_implicit source with
         | None ->
             failwith

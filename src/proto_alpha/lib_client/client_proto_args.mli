@@ -172,4 +172,23 @@ module Tx_rollup : sig
 
   val tickets_dispatch_info_parameter :
     (Tx_rollup_reveal.t, full) Clic.parameter
+
+  val message_result_hash_parameter :
+    (Tx_rollup_message_result_hash.t, full) Clic.parameter
+
+  val withdraw_list_hash_parameter :
+    (Tx_rollup_withdraw_list_hash.t, full) Clic.parameter
+
+  val commitment_hash_parameter :
+    (Tx_rollup_commitment_hash.t, full) Clic.parameter
+
+  val message_parameter : (Tx_rollup_message.t, full) Clic.parameter
+
+  val message_path_parameter :
+    (Tx_rollup_inbox.Merkle.path, full) Clic.parameter
+
+  val proof_parameter : (Tx_rollup_l2_proof.t, full) Clic.parameter
+
+  val inbox_root_hash_parameter :
+    (Tx_rollup_inbox.Merkle.root, full) Clic.parameter
 end

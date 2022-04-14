@@ -640,12 +640,12 @@ module Tx_rollup = struct
   let level_parameter =
     Clic.parameter (fun _ s ->
         match Int32.of_string_opt s with
-        | Some i ->
+        | Some i when i >= 0l ->
             Lwt.return @@ Environment.wrap_tzresult (Tx_rollup_level.of_int32 i)
-        | None ->
+        | _ ->
             failwith
-              "'%s' is not a valid transaction rollup level (should be an \
-               int32 value)"
+              "'%s' is not a valid transaction rollup level (should be a non \
+               negative int32 value)"
               s)
 
   let level_param next =
@@ -687,4 +687,70 @@ module Tx_rollup = struct
                (fun ppf -> Data_encoding.Json.print_error ppf)
                exn))
       json_parameter
+
+  let message_result_hash_parameter =
+    Clic.parameter (fun _ s ->
+        match Tx_rollup_message_result_hash.of_b58check_opt s with
+        | Some hash -> return hash
+        | None ->
+            failwith "%s is not a valid notation for a withdraw list hash" s)
+
+  let withdraw_list_hash_parameter =
+    Clic.parameter (fun _ s ->
+        match Tx_rollup_withdraw_list_hash.of_b58check_opt s with
+        | Some hash -> return hash
+        | None ->
+            failwith "%s is not a valid notation for a withdraw list hash" s)
+
+  let commitment_hash_parameter =
+    Clic.parameter (fun _ s ->
+        match Tx_rollup_commitment_hash.of_b58check_opt s with
+        | Some hash -> return hash
+        | None -> failwith "%s is not a valid notation for a commitment hash" s)
+
+  let message_parameter =
+    Clic.map_parameter
+      ~f:(fun json ->
+        try Data_encoding.Json.destruct Tx_rollup_message.encoding json
+        with Data_encoding.Json.Cannot_destruct (_path, exn) ->
+          Stdlib.failwith
+            (Format.asprintf
+               "Invalid json for a message: %a"
+               (fun ppf -> Data_encoding.Json.print_error ppf)
+               exn))
+      json_parameter
+
+  let message_path_parameter =
+    Clic.map_parameter
+      ~f:(fun json ->
+        try
+          Data_encoding.Json.destruct Tx_rollup_inbox.Merkle.path_encoding json
+        with Data_encoding.Json.Cannot_destruct (_path, exn) ->
+          Stdlib.failwith
+            (Format.asprintf
+               "Invalid json for a message path: %a"
+               (fun ppf -> Data_encoding.Json.print_error ppf)
+               exn))
+      json_parameter
+
+  let proof_parameter =
+    Clic.map_parameter
+      ~f:(fun json ->
+        try Data_encoding.Json.destruct Tx_rollup_l2_proof.encoding json
+        with Data_encoding.Json.Cannot_destruct (_path, exn) ->
+          Stdlib.failwith
+            (Format.asprintf
+               "Invalid json for a tx_rollup proof: %a"
+               (fun ppf -> Data_encoding.Json.print_error ppf)
+               exn))
+      json_parameter
+
+  let inbox_root_hash_parameter =
+    Clic.parameter (fun _ s ->
+        match Tx_rollup_inbox.Merkle.root_of_b58check_opt s with
+        | Some hash -> return hash
+        | None ->
+            failwith
+              "%s is not a valid B58-encoded notation for an inbox merkle root"
+              s)
 end
