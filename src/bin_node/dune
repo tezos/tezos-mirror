@@ -40,9 +40,7 @@
   (select void_for_linking-tezos-embedded-protocol-demo-counter from
    (tezos-embedded-protocol-demo-counter -> void_for_linking-tezos-embedded-protocol-demo-counter.empty)
    (-> void_for_linking-tezos-embedded-protocol-demo-counter.empty))
-  (select void_for_linking-tezos-embedded-protocol-000-Ps9mPmXa from
-   (tezos-embedded-protocol-000-Ps9mPmXa -> void_for_linking-tezos-embedded-protocol-000-Ps9mPmXa.empty)
-   (-> void_for_linking-tezos-embedded-protocol-000-Ps9mPmXa.empty))
+  tezos-embedded-protocol-000-Ps9mPmXa
   (select void_for_linking-tezos-embedded-protocol-001-PtCJ7pwo from
    (tezos-embedded-protocol-001-PtCJ7pwo -> void_for_linking-tezos-embedded-protocol-001-PtCJ7pwo.empty)
    (-> void_for_linking-tezos-embedded-protocol-001-PtCJ7pwo.empty))
@@ -97,18 +95,10 @@
   (select void_for_linking-tezos-protocol-plugin-011-PtHangz2-registerer from
    (tezos-protocol-plugin-011-PtHangz2-registerer -> void_for_linking-tezos-protocol-plugin-011-PtHangz2-registerer.empty)
    (-> void_for_linking-tezos-protocol-plugin-011-PtHangz2-registerer.empty))
-  (select void_for_linking-tezos-embedded-protocol-012-Psithaca from
-   (tezos-embedded-protocol-012-Psithaca -> void_for_linking-tezos-embedded-protocol-012-Psithaca.empty)
-   (-> void_for_linking-tezos-embedded-protocol-012-Psithaca.empty))
-  (select void_for_linking-tezos-protocol-plugin-012-Psithaca-registerer from
-   (tezos-protocol-plugin-012-Psithaca-registerer -> void_for_linking-tezos-protocol-plugin-012-Psithaca-registerer.empty)
-   (-> void_for_linking-tezos-protocol-plugin-012-Psithaca-registerer.empty))
-  (select void_for_linking-tezos-embedded-protocol-013-PtJakart from
-   (tezos-embedded-protocol-013-PtJakart -> void_for_linking-tezos-embedded-protocol-013-PtJakart.empty)
-   (-> void_for_linking-tezos-embedded-protocol-013-PtJakart.empty))
-  (select void_for_linking-tezos-protocol-plugin-013-PtJakart-registerer from
-   (tezos-protocol-plugin-013-PtJakart-registerer -> void_for_linking-tezos-protocol-plugin-013-PtJakart-registerer.empty)
-   (-> void_for_linking-tezos-protocol-plugin-013-PtJakart-registerer.empty))
+  tezos-embedded-protocol-012-Psithaca
+  tezos-protocol-plugin-012-Psithaca-registerer
+  tezos-embedded-protocol-013-PtJakart
+  tezos-protocol-plugin-013-PtJakart-registerer
   (select void_for_linking-tezos-embedded-protocol-alpha from
    (tezos-embedded-protocol-alpha -> void_for_linking-tezos-embedded-protocol-alpha.empty)
    (-> void_for_linking-tezos-embedded-protocol-alpha.empty))
@@ -140,7 +130,6 @@
    (write-file void_for_linking-tezos-embedded-protocol-genesis.empty "")
    (write-file void_for_linking-tezos-embedded-protocol-demo-noops.empty "")
    (write-file void_for_linking-tezos-embedded-protocol-demo-counter.empty "")
-   (write-file void_for_linking-tezos-embedded-protocol-000-Ps9mPmXa.empty "")
    (write-file void_for_linking-tezos-embedded-protocol-001-PtCJ7pwo.empty "")
    (write-file void_for_linking-tezos-embedded-protocol-002-PsYLVpVv.empty "")
    (write-file void_for_linking-tezos-embedded-protocol-003-PsddFKi3.empty "")
@@ -159,10 +148,6 @@
    (write-file void_for_linking-tezos-protocol-plugin-010-PtGRANAD-registerer.empty "")
    (write-file void_for_linking-tezos-embedded-protocol-011-PtHangz2.empty "")
    (write-file void_for_linking-tezos-protocol-plugin-011-PtHangz2-registerer.empty "")
-   (write-file void_for_linking-tezos-embedded-protocol-012-Psithaca.empty "")
-   (write-file void_for_linking-tezos-protocol-plugin-012-Psithaca-registerer.empty "")
-   (write-file void_for_linking-tezos-embedded-protocol-013-PtJakart.empty "")
-   (write-file void_for_linking-tezos-protocol-plugin-013-PtJakart-registerer.empty "")
    (write-file void_for_linking-tezos-embedded-protocol-alpha.empty "")
    (write-file void_for_linking-tezos-protocol-plugin-alpha-registerer.empty ""))))
 
