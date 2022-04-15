@@ -300,8 +300,6 @@ let utop = external_lib "utop" V.(at_least "2.8")
 
 let uutf = external_lib ~js_compatible:true "uutf" V.True
 
-let vector = external_lib ~js_compatible:true "vector" V.True
-
 (* The signature of the [Z] module has changed in 1.12. *)
 let zarith =
   external_lib
@@ -1406,9 +1404,8 @@ let _tezos_context_tests =
         tezos_context |> open_;
         tezos_stdlib_unix |> open_;
         alcotest_lwt;
-        vector;
       ]
-    ~modules:["assert"; "test_context"; "test_utils"; "test"]
+    ~modules:["assert"; "test_context"; "test"]
 
 let _tezos_context_memory_tests =
   test

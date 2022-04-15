@@ -517,7 +517,11 @@ let test_dump {idx; block3b; _} =
           in
           Lwt.finalize
             (fun () ->
-              Context.dump_context idx target_context_hash ~fd:context_fd)
+              Context.dump_context
+                ~on_disk:false
+                idx
+                target_context_hash
+                ~fd:context_fd)
             (fun () -> Lwt_unix.close context_fd)
         in
         let root = base_dir2 // "context" in
@@ -533,7 +537,9 @@ let test_dump {idx; block3b; _} =
               idx2
               ~expected_context_hash:target_context_hash
               ~nb_context_elements
-              ~fd:context_fd)
+              ~fd:context_fd
+              ~legacy:false
+              ~in_memory:true)
           (fun () -> Lwt_unix.close context_fd))
   in
   Lwt.return_unit

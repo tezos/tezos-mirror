@@ -122,7 +122,7 @@ module Term = struct
         else fail (Cannot_locate_file path)
 
   let process subcommand args snapshot_path block disable_check export_format
-      rolling reconstruct sandbox_file =
+      rolling reconstruct in_memory_index on_disk_index sandbox_file =
     let run =
       let open Lwt_tzresult_syntax in
       let*! () = Tezos_base_unix.Internal_event_unix.init () in
@@ -159,6 +159,7 @@ module Term = struct
             ~context_dir
             ~chain_name
             ~block
+            ~on_disk:on_disk_index
             genesis
       | Import ->
           let data_dir =
@@ -244,6 +245,7 @@ module Term = struct
                   ~operation_metadata_size_limit:
                     node_config.shell.block_validator_limits
                       .operation_metadata_size_limit
+                  ~in_memory:in_memory_index
                   genesis)
           in
           if reconstruct then
@@ -354,9 +356,7 @@ module Term = struct
       "Force export command to dump a minimal snapshot based on the rolling \
        mode."
     in
-    Arg.(
-      value & flag
-      & info ~docs:Node_shared_arg.Manpage.misc_section ~doc ["rolling"])
+    Arg.(value & flag & info ~doc ["rolling"])
 
   let reconstruct =
     let open Cmdliner in
@@ -364,9 +364,23 @@ module Term = struct
       "Start a storage reconstruction from a full mode snapshot to an archive \
        storage. This operation can be quite long."
     in
-    Arg.(
-      value & flag
-      & info ~docs:Node_shared_arg.Manpage.misc_section ~doc ["reconstruct"])
+    Arg.(value & flag & info ~doc ["reconstruct"])
+
+  let in_memory_index =
+    let open Cmdliner in
+    let doc =
+      "Imports a snapshot with in-memory indexes to speed up the procedure. As \
+       a counter part, the import will requires more memory."
+    in
+    Arg.(value & flag & info ~doc ["in-memory"])
+
+  let on_disk_index =
+    let open Cmdliner in
+    let doc =
+      "Exports a snapshot with on-disk indexes, in order to use less memory. \
+       As a counter part, the export will requires more time."
+    in
+    Arg.(value & flag & info ~doc ["on-disk"])
 
   let sandbox =
     let open Cmdliner in
@@ -392,7 +406,7 @@ module Term = struct
     ret
       (const process $ subcommand_arg $ Node_shared_arg.Term.args $ file_arg
      $ block $ disable_check $ export_format $ export_rolling $ reconstruct
-     $ sandbox)
+     $ in_memory_index $ on_disk_index $ sandbox)
 end
 
 module Manpage = struct
@@ -426,6 +440,9 @@ module Manpage = struct
            the current head)",
           "$(mname) snapshot export file.full --block head~10" );
       `I
+        ( "$(b,Export a snapshot slower, but with a lower memory usage)",
+          "$(mname) snapshot export file.full --on-disk)" );
+      `I
         ( "$(b,Import a snapshot located in file.full)",
           "$(mname) snapshot import file.full" );
       `I
@@ -436,6 +453,9 @@ module Manpage = struct
         ( "$(b,Import a full mode snapshot and then reconstruct the whole \
            storage to obtain an archive mode storage)",
           "$(mname) snapshot import file.full --reconstruct" );
+      `I
+        ( "$(b,Import a snapshot faster, but with a higher memory usage)",
+          "$(mname) snapshot import file.full --in-memory)" );
     ]
 
   let man = description @ options @ examples @ Node_shared_arg.Manpage.bugs

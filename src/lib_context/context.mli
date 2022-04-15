@@ -62,6 +62,7 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) : sig
     ?patch_context:(context -> context tzresult Lwt.t) ->
     ?readonly:bool ->
     ?indexing_strategy:[`Always | `Minimal] ->
+    ?index_log_size:int ->
     string ->
     index Lwt.t
 
@@ -175,19 +176,20 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) : sig
   (** {2 Context dumping} *)
 
   val dump_context :
-    index -> Context_hash.t -> fd:Lwt_unix.file_descr -> int tzresult Lwt.t
+    index ->
+    Context_hash.t ->
+    fd:Lwt_unix.file_descr ->
+    on_disk:bool ->
+    int tzresult Lwt.t
 
-  (** Rebuild a context from a given snapshot.
-
-      NOTE: the indexing strategy used by the [index] must be [`Always] (in
-      order to recover direct internal pointers between store objects during
-      the import). This limitation is likely to be removed in a future version
-      of [lib_context]. *)
+  (** Rebuild a context from a given snapshot. *)
   val restore_context :
     index ->
     expected_context_hash:Context_hash.t ->
     nb_context_elements:int ->
     fd:Lwt_unix.file_descr ->
+    legacy:bool ->
+    in_memory:bool ->
     unit tzresult Lwt.t
 
   val retrieve_commit_info :

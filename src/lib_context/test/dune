@@ -8,14 +8,13 @@
   tezos-base.unix
   tezos-context
   tezos-stdlib-unix
-  alcotest-lwt
-  vector)
+  alcotest-lwt)
  (flags
   (:standard
    -open Tezos_base.TzPervasives
    -open Tezos_context
    -open Tezos_stdlib_unix))
- (modules assert test_context test_utils test))
+ (modules assert test_context test))
 
 (rule
  (alias runtest)

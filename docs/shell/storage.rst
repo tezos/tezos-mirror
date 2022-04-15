@@ -178,3 +178,5 @@ commas such as `TEZOS_CONTEXT="v, variable=value"`):
   (default `10_000`)
 - "lru-size": number of entries stored in the Irmin's LRU cache
   (default `5_000`)
+- "indexing-strategy": strategy for indexing object (default
+  `minimal`)

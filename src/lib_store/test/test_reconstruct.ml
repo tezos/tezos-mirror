@@ -206,6 +206,7 @@ let test_from_snapshot ~descr:_ (store_dir, context_dir) store
             ~context_dir
             ~chain_name
             ~snapshot_path
+            ~on_disk:false
             genesis
         in
         let* () =
@@ -220,6 +221,7 @@ let test_from_snapshot ~descr:_ (store_dir, context_dir) store
             ~user_activated_upgrades:[]
             ~user_activated_protocol_overrides:[]
             ~operation_metadata_size_limit:None
+            ~in_memory:true
             genesis
         in
         let* () =
