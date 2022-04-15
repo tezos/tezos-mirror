@@ -80,3 +80,29 @@
   (run
    %{dep:../../tooling/node_wrapper.exe} --bls12-381 --secp256k1 --hacl
    %{dep:./test_p2p_addr.bc.js})))
+
+(executable
+ (name test_sized)
+ (modes native js)
+ (libraries
+  tezos-base
+  tezos-error-monad
+  data-encoding
+  qcheck-alcotest
+  tezos-test-helpers)
+ (js_of_ocaml)
+ (flags (:standard -open Tezos_base -open Tezos_error_monad))
+ (modules test_sized))
+
+(rule
+ (alias runtest)
+ (package tezos-base)
+ (action (run %{dep:./test_sized.exe})))
+
+(rule
+ (alias runtest_js)
+ (package tezos-base)
+ (action
+  (run
+   %{dep:../../tooling/node_wrapper.exe} --bls12-381 --secp256k1 --hacl
+   %{dep:./test_sized.bc.js})))

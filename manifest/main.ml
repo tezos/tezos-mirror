@@ -960,6 +960,8 @@ let _tezos_base_tests_1 =
 let _tezos_base_tests_2 =
   lib_base_tests ["test_p2p_addr"] ~dep_files:["points.ok"; "points.ko"]
 
+let _tezos_base_tests_3 = lib_base_tests ["test_sized"]
+
 let _tezos_base_unix_tests =
   test
     "test_unix_error"
