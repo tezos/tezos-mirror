@@ -1469,7 +1469,12 @@ module View_helpers = struct
            Transaction
              {
                transaction =
-                 {destination; parameters; entrypoint = _; amount = _};
+                 {
+                   destination = Contract destination;
+                   parameters;
+                   entrypoint = _;
+                   amount = _;
+                 };
                parameters = _;
                parameters_ty = _;
                location = _;
@@ -1478,7 +1483,7 @@ module View_helpers = struct
          nonce = _;
        };
     ]
-      when Destination.equal destination (Contract callback) ->
+      when Contract.equal destination callback ->
         ok parameters
     | [] ->
         Environment.Error_monad.error
