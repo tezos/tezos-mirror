@@ -32,20 +32,23 @@ module type PROTOCOL_SERVICES = sig
 
   type endorsing_rights
 
-  val endorsing_rights :
-    wrap_full -> Block_hash.t -> endorsing_rights tzresult Lwt.t
+  val endorsing_rights : wrap_full -> Int32.t -> endorsing_rights tzresult Lwt.t
 
   val couple_ops_to_rights :
-    (error trace option * Ptime.t * int) list ->
+    (error trace option * Ptime.t * Int32.t option * int) list ->
     endorsing_rights ->
     (Signature.public_key_hash
     * (Int32.t option * error trace option * Ptime.t) list)
     list
     * Signature.public_key_hash list
 
+  type block_id
+
+  module BlockIdMap : Map.S with type key = block_id
+
   val consensus_operation_stream :
     wrap_full ->
-    (((Operation_hash.t * ((Block_hash.t * int32 * int32 option) * int))
+    (((Operation_hash.t * ((block_id * Int32.t * Int32.t option) * int))
      * error trace option)
      Lwt_stream.t
     * RPC_context.stopper)

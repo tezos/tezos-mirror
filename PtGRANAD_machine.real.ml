@@ -44,12 +44,16 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
   let endorsing_rights cctxt block =
     Protocol.Delegate_services.Endorsing_rights.get
       cctxt
-      (cctxt#chain, `Hash (block, 0))
+      (cctxt#chain, `Level block)
+
+  type block_id = Block_hash.t
+
+  module BlockIdMap = Block_hash.Map
 
   let couple_ops_to_rights ops rights =
     let (items, missing) =
       List.fold_left
-        (fun (acc, rights) (errors, delay, slot) ->
+        (fun (acc, rights) (errors, delay, round, slot) ->
           match
             List.partition
               (fun right ->
@@ -62,7 +66,7 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
           | (([] | _ :: _ :: _), _) -> assert false
           | ([right], rights') ->
               ( ( right.Protocol.Delegate_services.Endorsing_rights.delegate,
-                  [(None, errors, delay)] )
+                  [(round, errors, delay)] )
                 :: acc,
                 rights' ))
         ([], rights)

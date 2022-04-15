@@ -8,7 +8,11 @@ license: "MIT"
 depends: [
   "dune" { >= "2.7" }
   "tezos-client-base-unix"
-  "tezos-client-009-PsFLoren"
+]
+depopts: [
+  "tezos-client-010-PtGRANAD"
+  "tezos-client-011-PtHangz2"
+  "tezos-client-012-Psithaca"
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]

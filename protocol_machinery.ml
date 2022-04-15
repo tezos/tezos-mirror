@@ -34,20 +34,23 @@ module type PROTOCOL_SERVICES = sig
 
   type endorsing_rights
 
-  val endorsing_rights :
-    wrap_full -> Block_hash.t -> endorsing_rights tzresult Lwt.t
+  val endorsing_rights : wrap_full -> Int32.t -> endorsing_rights tzresult Lwt.t
 
   val couple_ops_to_rights :
-    (error trace option * Ptime.t * int) list ->
+    (error trace option * Ptime.t * Int32.t option * int) list ->
     endorsing_rights ->
     (Signature.public_key_hash
     * (Int32.t option * error trace option * Ptime.t) list)
     list
     * Signature.public_key_hash list
 
+  type block_id
+
+  module BlockIdMap : Map.S with type key = block_id
+
   val consensus_operation_stream :
     wrap_full ->
-    (((Operation_hash.t * ((Block_hash.t * int32 * int32 option) * int))
+    (((Operation_hash.t * ((block_id * Int32.t * Int32.t option) * int))
      * error trace option)
      Lwt_stream.t
     * RPC_context.stopper)
@@ -79,8 +82,8 @@ module Make (Protocol_services : PROTOCOL_SERVICES) : S = struct
         let () = Error_monad.pp_print_trace Format.err_formatter e in
         Lwt.return_unit
 
-  let dump_my_current_endorsements cctxt ~full block level ops =
-    let* rights = Protocol_services.endorsing_rights cctxt block in
+  let dump_my_current_endorsements cctxt ~full level ops =
+    let* rights = Protocol_services.endorsing_rights cctxt level in
     let (items, missing) = Protocol_services.couple_ops_to_rights ops rights in
     let endorsements =
       if full then
@@ -97,21 +100,21 @@ module Make (Protocol_services : PROTOCOL_SERVICES) : S = struct
     in
     let*! out =
       Lwt_stream.fold
-        (fun ((_hash, ((block, level, _round), news)), errors) acc ->
+        (fun ((_hash, ((block, level, round), news)), errors) acc ->
           let delay = Time.System.now () in
-          Block_hash.Map.update
+          Protocol_services.BlockIdMap.update
             block
             (function
-              | Some (_, l) -> Some (level, (errors, delay, news) :: l)
-              | None -> Some (level, [(errors, delay, news)]))
+              | Some (_, l) -> Some (level, (errors, delay, round, news) :: l)
+              | None -> Some (level, [(errors, delay, round, news)]))
             acc)
         op_stream
-        Block_hash.Map.empty
+        Protocol_services.BlockIdMap.empty
     in
-    Block_hash.Map.iter_ep
-      (fun block (level, endorsements) ->
+    Protocol_services.BlockIdMap.iter_ep
+      (fun _ (level, endorsements) ->
         let full = Compare.Int32.(current_level = level) in
-        dump_my_current_endorsements cctxt ~full block level endorsements)
+        dump_my_current_endorsements cctxt ~full level endorsements)
       out
 
   let blocks_loop cctxt =

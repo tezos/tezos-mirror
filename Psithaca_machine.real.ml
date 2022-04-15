@@ -24,28 +24,39 @@
 (*****************************************************************************)
 
 module Block_services =
-  Tezos_client_011_PtHangz2.Protocol_client_context.Alpha_block_services
+  Tezos_client_012_Psithaca.Protocol_client_context.Alpha_block_services
 
 open Lwt_result_syntax
-open Tezos_protocol_011_PtHangz2
-open Tezos_protocol_plugin_011_PtHangz2
+open Tezos_protocol_012_Psithaca
+open Tezos_protocol_plugin_012_Psithaca
 
 module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
   let hash = Protocol.hash
 
-  type wrap_full = Tezos_client_011_PtHangz2.Protocol_client_context.wrap_full
+  type wrap_full = Tezos_client_012_Psithaca.Protocol_client_context.wrap_full
 
   let wrap_full cctxt =
-    new Tezos_client_011_PtHangz2.Protocol_client_context.wrap_full cctxt
+    new Tezos_client_012_Psithaca.Protocol_client_context.wrap_full cctxt
 
-  type endorsing_rights = Plugin.RPC.Endorsing_rights.t list
+  type endorsing_rights = Plugin.RPC.Endorsing_rights.delegate_rights list
 
-  let endorsing_rights cctxt block =
-    Plugin.RPC.Endorsing_rights.get cctxt (cctxt#chain, `Level block)
+  let endorsing_rights cctxt level =
+    let* answers =
+      Plugin.RPC.Endorsing_rights.get cctxt (cctxt#chain, `Level level)
+    in
+    match answers with
+    | answer :: _ -> return answer.Plugin.RPC.Endorsing_rights.delegates_rights
+    | [] -> return_nil
 
-  type block_id = Block_hash.t
+  type block_id = Protocol.Block_payload_hash.t
 
-  module BlockIdMap = Block_hash.Map
+  module BlockIdMap = Map.Make (Protocol.Block_payload_hash)
+
+  let slot_to_int x =
+    (* YES this is Fun.x ! *)
+    Data_encoding.Binary.of_bytes_exn
+      Data_encoding.uint16
+      (Data_encoding.Binary.to_bytes_exn Protocol.Alpha_context.Slot.encoding x)
 
   let couple_ops_to_rights ops rights =
     let (items, missing) =
@@ -54,10 +65,9 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
           match
             List.partition
               (fun right ->
-                List.mem
-                  ~equal:Int.equal
+                Int.equal
                   slot
-                  right.Plugin.RPC.Endorsing_rights.slots)
+                  (slot_to_int right.Plugin.RPC.Endorsing_rights.first_slot))
               rights
           with
           | (([] | _ :: _ :: _), _) -> assert false
@@ -81,26 +91,16 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
        Protocol.Alpha_context.Operation_data
          {
            contents =
-             Single
-               (Endorsement_with_slot
-                 {
-                   endorsement =
-                     {
-                       shell = _;
-                       protocol_data =
-                         {
-                           contents = Single (Endorsement {level});
-                           signature = _;
-                         };
-                     };
-                   slot;
-                 });
+             Single (Endorsement {slot; level; round; block_payload_hash});
            signature = _;
          };
-     shell = {branch};
+     shell = _;
     } ->
         Some
-          ((branch, Protocol.Alpha_context.Raw_level.to_int32 level, None), slot)
+          ( ( block_payload_hash,
+              Protocol.Alpha_context.Raw_level.to_int32 level,
+              Some (Protocol.Alpha_context.Round.to_int32 round) ),
+            slot_to_int slot )
     | _ -> None
 
   let consensus_operation_stream cctxt =
@@ -126,13 +126,13 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
     let* baking_rights =
       Plugin.RPC.Baking_rights.get
         ?levels:None
-        ~max_priority:priority
+        ~max_round:priority
         cctxt
         (cctxt#chain, `Hash (hash, 0))
     in
     match List.last_opt baking_rights with
     | None -> fail_with_exn Not_found
-    | Some {delegate; priority = p; timestamp; _} ->
+    | Some {delegate; round = p; timestamp; _} ->
         let () = assert (Compare.Int.equal priority p) in
         return (delegate, timestamp)
 
@@ -142,8 +142,10 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
         Protocol.block_header_data_encoding
         header.Block_header.protocol_data
     with
-    | Ok data -> Ok data.contents.priority
     | Error err -> Error [Tezos_base.Data_encoding_wrapper.Decoding_error err]
+    | Ok data ->
+        Protocol.Environment.wrap_tzresult
+          (Protocol.Alpha_context.Round.to_int data.contents.payload_round)
 
   let consensus_op_participants_of_block cctxt hash =
     let* ops =
@@ -162,9 +164,7 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
                 {
                   contents =
                     Single_result
-                      (Protocol.Apply_results.Endorsement_with_slot_result
-                        (Tezos_raw_protocol_011_PtHangz2.Apply_results
-                         .Endorsement_result {delegate; _}));
+                      (Protocol.Apply_results.Endorsement_result {delegate; _});
                 }) ->
               Some delegate
           | _ -> None)

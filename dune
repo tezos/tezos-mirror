@@ -13,7 +13,12 @@
    PtHangz2_machine.ml
    from
    (tezos-client-011-PtHangz2 -> PtHangz2_machine.real.ml)
-   (-> PtHangz2_machine.no.ml)))
+   (-> PtHangz2_machine.no.ml))
+  (select
+   Psithaca_machine.ml
+   from
+   (tezos-client-012-Psithaca -> Psithaca_machine.real.ml)
+   (-> Psithaca_machine.no.ml)))
  (flags
   (:standard -open Tezos_base__TzPervasives -open Tezos_stdlib_unix -open
     Tezos_shell_services -open Tezos_client_base_unix -open
