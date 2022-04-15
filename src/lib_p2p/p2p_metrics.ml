@@ -27,7 +27,7 @@ let namespace = Tezos_version.Node_version.namespace
 
 let subsystem = "p2p"
 
-let metric ~help ~component ~name fn =
+let metric ~help ~component ~name collector =
   let info =
     {
       Prometheus.MetricInfo.name =
@@ -39,9 +39,14 @@ let metric ~help ~component ~name fn =
     }
   in
   let collect () =
-    Prometheus.LabelSetMap.singleton [] [Prometheus.Sample_set.sample (fn ())]
+    Prometheus.LabelSetMap.singleton
+      []
+      [Prometheus.Sample_set.sample (collector ())]
   in
   (info, collect)
+
+let add_metric (info, collector) =
+  Prometheus.CollectorRegistry.(register default) info collector
 
 module Connections = struct
   let component = "connections"
@@ -90,6 +95,16 @@ module Connections = struct
       ~name:"private"
       (fun () -> !Stats.private_)
 
+  let metrics =
+    [
+      active_connections;
+      incoming_connections;
+      outgoing_connections;
+      private_connections;
+    ]
+
+  let () = List.iter add_metric metrics
+
   let collect pool =
     Stats.zero () ;
     P2p_pool.Connection.iter
@@ -136,6 +151,10 @@ module Peers = struct
       ~component
       ~name:"disconnected"
       (fun () -> !Stats.disconnected)
+
+  let metrics = [accepted_peers; running_peers; disconnected_peers]
+
+  let () = List.iter add_metric metrics
 
   let collect pool =
     Stats.zero () ;
@@ -208,6 +227,17 @@ module Points = struct
       ~name:"disconnected"
       (fun () -> !Stats.disconnected)
 
+  let metrics =
+    [
+      trusted_points;
+      greylisted_points;
+      accepted_points;
+      running_points;
+      disconnected_points;
+    ]
+
+  let () = List.iter add_metric metrics
+
   let collect pool =
     Stats.zero () ;
     P2p_pool.Points.iter_known
@@ -224,28 +254,8 @@ module Points = struct
       pool
 end
 
-let metrics =
-  [
-    Connections.active_connections;
-    Connections.incoming_connections;
-    Connections.outgoing_connections;
-    Connections.private_connections;
-    Peers.accepted_peers;
-    Peers.running_peers;
-    Peers.disconnected_peers;
-    Points.trusted_points;
-    Points.greylisted_points;
-    Points.accepted_points;
-    Points.running_points;
-    Points.disconnected_points;
-  ]
-
-let init pool =
+let collect pool =
   Prometheus.CollectorRegistry.(register_pre_collect default) (fun () ->
       Connections.collect pool ;
       Peers.collect pool ;
-      Points.collect pool) ;
-  let add (info, collector) =
-    Prometheus.CollectorRegistry.(register default) info collector
-  in
-  List.iter add metrics
+      Points.collect pool)

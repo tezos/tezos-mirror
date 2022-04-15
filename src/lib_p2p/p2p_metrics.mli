@@ -23,5 +23,5 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [init pool] registers metrics collections of [pool] *)
-val init : ('msg, 'peer, 'conn) P2p_pool.t -> unit
+(** [collect pool] registers metrics collections of [pool] *)
+val collect : ('msg, 'peer, 'conn) P2p_pool.t -> unit
