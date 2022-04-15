@@ -11,28 +11,40 @@ set -eu
 # shellcheck source=./scripts/ci/release.sh
 . ./scripts/ci/release.sh
 
-# X.Y or X.Y-rcZ
-gitlab_package_name="${gitlab_release_no_v}"
-
 # https://docs.gitlab.com/ee/user/packages/generic_packages/index.html#download-package-file
 # :gitlab_api_url/projects/:id/packages/generic/:package_name/:package_version/:file_name
-gitlab_package_url="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${CI_PROJECT_NAME}/${gitlab_package_name}"
+gitlab_package_url="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${gitlab_package_name}/${gitlab_package_version}"
 
 gitlab_upload() {
   local_path="${1}"
   remote_file="${2}"
   echo "Upload to ${gitlab_package_url}/${remote_file}"
 
-  http_code=$(curl -fsSL -o /dev/null -w "%{http_code}" \
-                   -H "JOB-TOKEN: ${CI_JOB_TOKEN}" \
-                   -T "${local_path}" \
-                   "${gitlab_package_url}/${remote_file}")
+  i=0
+  max_attempts=10
 
-  if [ "${http_code}" != '201' ]
-  then
+  # Retry because gitlab.com is flaky sometimes, curl upload fails with http status code 524 (timeout)
+  while [ "${i}" != "${max_attempts}" ]
+  do
+    i=$((i + 1))
+    http_code=$(curl -fsSL -o /dev/null -w "%{http_code}" \
+                     -H "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+                     -T "${local_path}" \
+                     "${gitlab_package_url}/${remote_file}")
+
+    # Success
+    [ "${http_code}" = '201' ] && return
+    # Failure
     echo "Error: HTTP response code ${http_code}, expected 201"
-    exit 1
-  fi
+    # Do not backoff after last attempt
+    [ "${i}" = "${max_attempts}" ] && break
+    # Backoff
+    echo "Retry (${i}) in one minute..."
+    sleep 60s
+  done
+
+  echo "Error: maximum attempts exhausted (${max_attempts})"
+  exit 1
 }
 
 # Loop over architectures
@@ -53,7 +65,7 @@ do
 
   cd tezos-binaries/
   tar -czf "tezos-${architecture}.tar.gz" "tezos-${architecture}/"
-  gitlab_upload "tezos-${architecture}.tar.gz" "tezos-${gitlab_package_name}-linux-${architecture}.tar.gz"
+  gitlab_upload "tezos-${architecture}.tar.gz" "${gitlab_package_name}-linux-${architecture}.tar.gz"
   cd ..
 done
 
@@ -62,7 +74,7 @@ done
 # => create and upload manually
 echo 'Upload tarball of source code and its checksums'
 
-source_tarball="tezos-${gitlab_package_name}.tar.bz2"
+source_tarball="${gitlab_package_name}.tar.bz2"
 
 # We are using the export-subst feature of git onfigured in .gitattributes, requires git version >= 2.35
 # https://git-scm.com/docs/git-archive
