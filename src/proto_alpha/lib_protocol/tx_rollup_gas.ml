@@ -41,7 +41,7 @@ let hash_cost input_size =
   let cost_blake2b = Gas_limit_repr.atomic_step_cost cost_N_IBlake2b in
   ok @@ (cost_serialization + cost_blake2b)
 
-(** Model from {!Ticket_costs.cost_compare_ticket_hash} since they are
+(** Model from {!Ticket_costs.Constants.cost_compare_ticket_hash} since they are
     Blake2B hashes too. *)
 let compare_blake2b_hash = S.safe_int 10
 
