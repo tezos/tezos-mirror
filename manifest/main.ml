@@ -356,7 +356,7 @@ let tezos_stdlib =
     "tezos-stdlib"
     ~path:"src/lib_stdlib"
     ~synopsis:"Tezos: yet-another local-extension of the OCaml standard library"
-    ~deps:[hex; zarith; zarith_stubs_js; lwt]
+    ~deps:[hex; zarith; zarith_stubs_js; lwt; ringo]
     ~ocaml:V.(at_least "4.08")
     ~js_compatible:true
     ~inline_tests:ppx_inline_test
@@ -370,6 +370,7 @@ let _tezos_stdlib_tests =
       "test_tzString";
       "test_fallbackArray";
       "test_functionalArray";
+      "test_hash_queue";
     ]
     ~path:"src/lib_stdlib/test"
     ~opam:"src/lib_stdlib/tezos-stdlib"
@@ -386,7 +387,12 @@ let _tezos_stdlib_tests =
 
 let _tezos_stdlib_unix_tests =
   tests
-    ["test_lwt_pipe"; "test_circular_buffer"; "test_circular_buffer_fuzzy"]
+    [
+      "test_lwt_pipe";
+      "test_circular_buffer";
+      "test_circular_buffer_fuzzy";
+      "test_hash_queue_lwt";
+    ]
     ~path:"src/lib_stdlib/test-unix"
     ~opam:"src/lib_stdlib/tezos-stdlib"
     ~deps:

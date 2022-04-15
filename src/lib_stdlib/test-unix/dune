@@ -2,7 +2,11 @@
 ; Edit file manifest/main.ml instead.
 
 (executables
- (names test_lwt_pipe test_circular_buffer test_circular_buffer_fuzzy)
+ (names
+  test_lwt_pipe
+  test_circular_buffer
+  test_circular_buffer_fuzzy
+  test_hash_queue_lwt)
  (libraries
   tezos-stdlib
   alcotest
@@ -28,3 +32,8 @@
  (alias runtest)
  (package tezos-stdlib)
  (action (run %{dep:./test_circular_buffer_fuzzy.exe})))
+
+(rule
+ (alias runtest)
+ (package tezos-stdlib)
+ (action (run %{dep:./test_hash_queue_lwt.exe})))

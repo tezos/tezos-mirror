@@ -23,8 +23,16 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Bounded queues combined with hash-tables, based on {!Ringo}.
+
+    A {e hash queue} is a structure where one can add elements to the back of
+    the queue, while associating them to keys. This allows for efficiently
+    retrieving elements based on the key and for removing elements anywhere in
+    the queue.
+*)
+
 module Make
-    (K : Stdlib.Hashtbl.HashedType) (V : sig
+    (K : Hashtbl.HashedType) (V : sig
       type t
     end) : sig
   (** The type of hash queues holding bindings from [K.t] to [V.t] *)
@@ -47,7 +55,7 @@ module Make
       otherwise. *)
   val find_opt : t -> K.t -> V.t option
 
-  (** [filter q f] retain only the bindings [(k, v)] such that [f k v = true]. *)
+  (** [filter q f] retains only the bindings [(k, v)] such that [f k v = true]. *)
   val filter : t -> (K.t -> V.t -> bool) -> unit
 
   (** [length q] is the number of bindings held by [q]. *)
@@ -60,23 +68,33 @@ module Make
   (** [clear q] removes all bindings from [q]. *)
   val clear : t -> unit
 
-  (** [fold f q init] folds the function [f] and V.t [init] over the bindings
+  (** [fold f q init] folds the function [f] over the bindings
       of [q]. The elements are iterated from oldest to newest. *)
   val fold : (K.t -> V.t -> 'a -> 'a) -> t -> 'a -> 'a
 
-  (** Returns the first element of the queue when not empty. Returns [None] when
-      empty.  *)
+  (** Folding in the Lwt monad, from oldest to newest. *)
+  val fold_s : (K.t -> V.t -> 'a -> 'a Lwt.t) -> t -> 'a -> 'a Lwt.t
+
+  (** Folding in the error monad, from oldest to newest. *)
+  val fold_es :
+    (K.t -> V.t -> 'a -> ('a, 'error) result Lwt.t) ->
+    t ->
+    'a ->
+    ('a, 'error) result Lwt.t
+
+  (** Returns the oldest element of the queue when not empty. Returns [None]
+      when empty. *)
   val peek : t -> V.t option
 
-  (** [take q] removes and returns the first element in queue [q], or returns
+  (** [take q] removes and returns the oldest element in queue [q], or returns
       [None] if the queue is empty. *)
   val take : t -> V.t option
 
-  (** [peek_at_most q n] returns the first n elements of the queue [q]. If the
+  (** [peek_at_most q n] returns the oldest n elements of the queue [q]. If the
       queue has less than [n] elements, returns all elements of the queue. *)
   val peek_at_most : t -> int -> V.t list
 
-  (** [take_at_most q n] removes and returns the first n elements of the queue
+  (** [take_at_most q n] removes and returns the oldest n elements of the queue
       [q]. If the queue has less than [n] elements, removes and returns all
       elements of the queue. *)
   val take_at_most : t -> int -> V.t list

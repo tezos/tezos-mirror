@@ -9,7 +9,8 @@
   hex
   zarith
   zarith_stubs_js
-  lwt)
+  lwt
+  ringo)
  (inline_tests (flags -verbose) (modes native))
  (preprocess (pps ppx_inline_test))
  (js_of_ocaml))
