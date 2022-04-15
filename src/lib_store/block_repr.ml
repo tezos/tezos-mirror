@@ -264,7 +264,7 @@ let block_metadata metadata = metadata.block_metadata
 let operations_metadata metadata = metadata.operations_metadata
 
 let check_block_consistency ?genesis_hash ?pred_block block =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let block_header = header block in
   let block_hash = hash block in
   let result_hash = Block_header.hash block_header in

@@ -185,7 +185,7 @@ let on_batch state =
       return_unit
 
 let on_register state ~apply (tr : L2_transaction.t) =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   Lwt_mutex.with_lock state.lock @@ fun () ->
   let batch =
     Tx_rollup_l2_batch.V1.
@@ -212,7 +212,7 @@ let on_register state ~apply (tr : L2_transaction.t) =
             return new_context
         | Batch_V1.Batch_result
             {results = [(_tr, Transaction_failure {reason; _})]; _} ->
-            fail (Environment.wrap_tzerror reason)
+            tzfail (Environment.wrap_tzerror reason)
         | _ -> return context
       in
       context

@@ -767,7 +767,7 @@ module List_cmd = struct
         (fun (module Bench : Benchmark.S) ->
           Format.fprintf Format.std_formatter "%s: %s\n" Bench.name Bench.info)
         bench_list ;
-    Lwt_tzresult_syntax.return_unit
+    Lwt_result_syntax.return_unit
 
   let handler_all_bench show_tags () =
     base_handler_bench (Registration.all_benchmarks ()) show_tags
@@ -778,7 +778,7 @@ module List_cmd = struct
     List.iter
       (fun tag -> Format.fprintf Format.std_formatter "%s\n" tag)
       (Registration.all_tags ()) ;
-    Lwt_tzresult_syntax.return_unit
+    Lwt_result_syntax.return_unit
 
   let params_bench_tags_any =
     Clic.(

@@ -36,7 +36,7 @@ let print_invalid_blocks ppf (b : Shell_services.Chain.invalid_block) =
     b.errors
 
 let commands () =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let open Clic in
   let group =
     {name = "report"; title = "Commands to report the node's status"}

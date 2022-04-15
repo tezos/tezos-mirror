@@ -29,7 +29,7 @@ module List_known_contracts = struct
    fun () ctxt ->
     let module C = (val ctxt) in
     C.list_known_contracts () ;
-    Lwt_tzresult_syntax.return_unit
+    Lwt_result_syntax.return_unit
 
   let command =
     Clic.command

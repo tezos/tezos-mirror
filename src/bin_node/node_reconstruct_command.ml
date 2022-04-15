@@ -46,7 +46,7 @@ let () =
 module Term = struct
   let process args sandbox_file =
     let run =
-      let open Lwt_tzresult_syntax in
+      let open Lwt_result_syntax in
       let*! () = Tezos_base_unix.Internal_event_unix.init () in
       let* node_config = Node_shared_arg.read_and_patch_config_file args in
       let data_dir = node_config.data_dir in
@@ -64,11 +64,11 @@ module Term = struct
             let*! r = Lwt_utils_unix.Json.read_file filename in
             match r with
             | Error _err ->
-                fail (Node_run_command.Invalid_sandbox_file filename)
+                tzfail (Node_run_command.Invalid_sandbox_file filename)
             | Ok json -> return_some ("sandbox_parameter", json))
       in
       Lwt_lock_file.try_with_lock
-        ~when_locked:(fun () -> fail Locked_directory)
+        ~when_locked:(fun () -> tzfail Locked_directory)
         ~filename:(Node_data_version.lock_file data_dir)
       @@ fun () ->
       let context_dir = Node_data_version.context_dir data_dir in

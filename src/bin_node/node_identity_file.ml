@@ -127,19 +127,19 @@ let () =
       Identity_keys_mismatch {filename; expected_key})
 
 let read ?expected_pow filename =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let*! file_exists = Lwt_unix.file_exists filename in
-  if not file_exists then fail (No_identity_file filename)
+  if not file_exists then tzfail (No_identity_file filename)
   else
     let* json = Lwt_utils_unix.Json.read_file filename in
     let id = Data_encoding.Json.destruct P2p_identity.encoding json in
     let pkh = Crypto_box.hash id.public_key in
     (* check public_key hash *)
     if not (Crypto_box.Public_key_hash.equal pkh id.peer_id) then
-      fail (Identity_mismatch {filename; peer_id = pkh})
+      tzfail (Identity_mismatch {filename; peer_id = pkh})
       (* check public/private keys correspondence *)
     else if not Crypto_box.(equal (neuterize id.secret_key) id.public_key) then
-      fail (Identity_keys_mismatch {filename; expected_key = id.public_key})
+      tzfail (Identity_keys_mismatch {filename; expected_key = id.public_key})
     else
       (* check PoW level *)
       match expected_pow with
@@ -152,7 +152,7 @@ let read ?expected_pow filename =
                  id.public_key
                  id.proof_of_work_stamp
                  target)
-          then fail (Insufficient_proof_of_work {expected})
+          then tzfail (Insufficient_proof_of_work {expected})
           else return id
 
 type error += Existent_identity_file of string
@@ -175,8 +175,8 @@ let () =
     (fun file -> Existent_identity_file file)
 
 let write file identity =
-  let open Lwt_tzresult_syntax in
-  if Sys.file_exists file then fail (Existent_identity_file file)
+  let open Lwt_result_syntax in
+  if Sys.file_exists file then tzfail (Existent_identity_file file)
   else
     let* () = Node_data_version.ensure_data_dir (Filename.dirname file) in
     Lwt_utils_unix.Json.write_file
@@ -205,9 +205,9 @@ let generate_with_animation ppf target =
     10000
 
 let generate identity_file expected_pow =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   if Sys.file_exists identity_file then
-    fail (Existent_identity_file identity_file)
+    tzfail (Existent_identity_file identity_file)
   else
     let target = Crypto_box.make_pow_target expected_pow in
     Format.eprintf "Generating a new identity... (level: %.2f) " expected_pow ;

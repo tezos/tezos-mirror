@@ -119,10 +119,10 @@ module Pk_uri_hashtbl = Hashtbl.Make (struct
 end)
 
 let make_pk_uri (x : Uri.t) : pk_uri tzresult =
-  let open Tzresult_syntax in
+  let open Result_syntax in
   match Uri.scheme x with
   | None ->
-      fail (Exn (Failure "Error while parsing URI: PK_URI needs a scheme"))
+      tzfail (Exn (Failure "Error while parsing URI: PK_URI needs a scheme"))
   | Some _ -> return x
 
 type sk_uri = Uri.t
@@ -134,27 +134,27 @@ module CompareUri = Compare.Make (struct
 end)
 
 let make_sk_uri (x : Uri.t) : sk_uri tzresult =
-  let open Tzresult_syntax in
+  let open Result_syntax in
   match Uri.scheme x with
   | None ->
-      fail (Exn (Failure "Error while parsing URI: SK_URI needs a scheme"))
+      tzfail (Exn (Failure "Error while parsing URI: SK_URI needs a scheme"))
   | Some _ -> return x
 
 type sapling_uri = Uri.t
 
 let make_sapling_uri (x : Uri.t) : sapling_uri tzresult =
-  let open Tzresult_syntax in
+  let open Result_syntax in
   match Uri.scheme x with
-  | None -> fail (Exn (Failure "SAPLING_URI needs a scheme"))
+  | None -> tzfail (Exn (Failure "SAPLING_URI needs a scheme"))
   | Some _ -> return x
 
 type pvss_sk_uri = Uri.t
 
 let make_pvss_sk_uri (x : Uri.t) : pvss_sk_uri tzresult =
-  let open Tzresult_syntax in
+  let open Result_syntax in
   match Uri.scheme x with
   | None ->
-      fail (Exn (Failure "Error while parsing URI: PVSS_URI needs a scheme"))
+      tzfail (Exn (Failure "Error while parsing URI: PVSS_URI needs a scheme"))
   | Some _ -> return x
 
 type aggregate_pk_uri = Uri.t
@@ -162,10 +162,10 @@ type aggregate_pk_uri = Uri.t
 type aggregate_sk_uri = Uri.t
 
 let make_aggregate_pk_uri (x : Uri.t) : aggregate_pk_uri tzresult =
-  let open Tzresult_syntax in
+  let open Result_syntax in
   match Uri.scheme x with
   | None ->
-      fail
+      tzfail
         (Exn
            (Failure "Error while parsing URI: AGGREGATE_PK_URI needs a scheme"))
   (* because it's possible to make an aggregate pk uri without having the signer
@@ -173,10 +173,10 @@ let make_aggregate_pk_uri (x : Uri.t) : aggregate_pk_uri tzresult =
   | Some _ -> return x
 
 let make_aggregate_sk_uri (x : Uri.t) : aggregate_sk_uri tzresult =
-  let open Tzresult_syntax in
+  let open Result_syntax in
   match Uri.scheme x with
   | None ->
-      fail
+      tzfail
         (Exn
            (Failure "Error while parsing URI: AGGREGATE_SK_URI needs a scheme"))
   | Some _ -> return x
@@ -319,7 +319,7 @@ module Sapling_key = Client_aliases.Alias (struct
          (req "address_index" S.Viewing_key.index_encoding))
 
   let of_source s =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let open Data_encoding in
     match Json.from_string s with
     | Error _ -> failwith "corrupted wallet"
@@ -362,7 +362,7 @@ module Aggregate_alias = struct
 
       let of_source s = Lwt.return (of_b58check s)
 
-      let to_source p = Lwt_tzresult_syntax.return (to_b58check p)
+      let to_source p = Lwt_result_syntax.return (to_b58check p)
 
       let name = "Aggregate_public_key_hash"
     end)
@@ -371,10 +371,10 @@ module Aggregate_alias = struct
   type pk_uri = Uri.t
 
   let make_pk_uri (x : Uri.t) : pk_uri tzresult =
-    let open Tzresult_syntax in
+    let open Result_syntax in
     match Uri.scheme x with
     | None ->
-        fail
+        tzfail
           (Exn
              (Failure "Error while parsing URI: AGGREGATE_PK_URI needs a scheme"))
     | Some _ -> return x
@@ -397,7 +397,7 @@ module Aggregate_alias = struct
       let*? pk_uri = make_pk_uri @@ Uri.of_string s in
       return (pk_uri, None)
 
-    let to_source (t, _) = Lwt_tzresult_syntax.return (Uri.to_string t)
+    let to_source (t, _) = Lwt_result_syntax.return (Uri.to_string t)
 
     let encoding =
       let open Data_encoding in
@@ -423,7 +423,7 @@ module Aggregate_alias = struct
   type sk_uri = Uri.t
 
   let make_sk_uri (x : Uri.t) : sk_uri tzresult Lwt.t =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     match Uri.scheme x with
     | None ->
         failwith "Error while parsing URI: AGGREGATE_SK_URI needs a scheme"
@@ -440,7 +440,7 @@ module Aggregate_alias = struct
 
     let of_source s = make_sk_uri @@ Uri.of_string s
 
-    let to_source t = Lwt_tzresult_syntax.return (Uri.to_string t)
+    let to_source t = Lwt_result_syntax.return (Uri.to_string t)
   end)
 end
 
@@ -558,23 +558,23 @@ let register_aggregate_signer signer =
   String.Hashtbl.replace signers_table Signer.scheme (Aggregate signer)
 
 let find_signer_for_key ~scheme : signer tzresult =
-  let open Tzresult_syntax in
+  let open Result_syntax in
   match String.Hashtbl.find signers_table scheme with
-  | None -> fail (Unregistered_key_scheme scheme)
+  | None -> tzfail (Unregistered_key_scheme scheme)
   | Some signer -> return signer
 
 let find_simple_signer_for_key ~scheme =
-  let open Tzresult_syntax in
+  let open Result_syntax in
   let* signer = find_signer_for_key ~scheme in
   match signer with
   | Simple signer -> return signer
-  | Aggregate _signer -> fail (Wrong_key_scheme ("simple", "aggregate"))
+  | Aggregate _signer -> tzfail (Wrong_key_scheme ("simple", "aggregate"))
 
 let find_aggregate_signer_for_key ~scheme =
-  let open Tzresult_syntax in
+  let open Result_syntax in
   let* signer = find_signer_for_key ~scheme in
   match signer with
-  | Simple _signer -> fail (Wrong_key_scheme ("aggregate", "standard"))
+  | Simple _signer -> tzfail (Wrong_key_scheme ("aggregate", "standard"))
   | Aggregate signer -> return signer
 
 let registered_signers () : (string * signer) list =
@@ -600,27 +600,27 @@ let () =
 
 let with_scheme_signer (uri : Uri.t) (f : signer -> 'a tzresult Lwt.t) :
     'a tzresult Lwt.t =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   match Uri.scheme uri with
-  | None -> fail @@ Unexisting_scheme uri
+  | None -> tzfail @@ Unexisting_scheme uri
   | Some scheme ->
       let*? signer = find_signer_for_key ~scheme in
       f signer
 
 let with_scheme_simple_signer (uri : Uri.t)
     (f : (module SIGNER) -> 'a tzresult Lwt.t) : 'a tzresult Lwt.t =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   match Uri.scheme uri with
-  | None -> fail @@ Unexisting_scheme uri
+  | None -> tzfail @@ Unexisting_scheme uri
   | Some scheme ->
       let*? signer = find_simple_signer_for_key ~scheme in
       f signer
 
 let with_scheme_aggregate_signer (uri : Uri.t)
     (f : (module AGGREGATE_SIGNER) -> 'a tzresult Lwt.t) : 'a tzresult Lwt.t =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   match Uri.scheme uri with
-  | None -> fail @@ Unexisting_scheme uri
+  | None -> tzfail @@ Unexisting_scheme uri
   | Some scheme ->
       let*? signer = find_aggregate_signer_for_key ~scheme in
       f signer
@@ -642,7 +642,7 @@ let import_secret_key ~io pk_uri =
       Signer.import_secret_key ~io pk_uri)
 
 let sign cctxt ?watermark sk_uri buf =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   with_scheme_simple_signer sk_uri (fun (module Signer : SIGNER) ->
       let* signature = Signer.sign ?watermark sk_uri buf in
       let* pk_uri = Signer.neuterize sk_uri in
@@ -685,7 +685,7 @@ let deterministic_nonce_hash sk_uri data =
       Signer.deterministic_nonce_hash sk_uri data)
 
 let supports_deterministic_nonces sk_uri =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   with_scheme_signer sk_uri (function
       | Simple (module Signer : SIGNER) ->
           Signer.supports_deterministic_nonces sk_uri
@@ -734,7 +734,7 @@ let join_keys keys1_opt keys2 =
    [pks], [sks] represent the already loaded list of public key
    hashes, public keys, and secret keys. *)
 let raw_get_key_aux (cctxt : #Client_context.wallet) pkhs pks sks pkh =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let rev_find_all list pkh =
     List.filter_map
       (fun (name, pkh') ->
@@ -792,7 +792,7 @@ let raw_get_key (cctxt : #Client_context.wallet) pkh =
   raw_get_key_aux cctxt pkhs pks sks pkh
 
 let get_key cctxt pkh =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let* r = raw_get_key cctxt pkh in
   match r with
   | (pkh, Some pk, Some sk) -> return (pkh, pk, sk)
@@ -802,7 +802,7 @@ let get_key cctxt pkh =
       failwith "Unknown public key for %a" Signature.Public_key_hash.pp pkh
 
 let get_public_key cctxt pkh =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let* r = raw_get_key cctxt pkh in
   match r with
   | (pkh, Some pk, _sk) -> return (pkh, pk)
@@ -810,7 +810,7 @@ let get_public_key cctxt pkh =
       failwith "Unknown public key for %a" Signature.Public_key_hash.pp pkh
 
 let get_keys (cctxt : #Client_context.wallet) =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let* sks = Secret_key.load cctxt in
   let* pkhs = Public_key_hash.load cctxt in
   let* pks = Public_key.load cctxt in
@@ -884,7 +884,7 @@ let aggregate_public_key pk_uri =
    hashes, public keys, and secret keys. *)
 let raw_get_aggregate_key_aux (cctxt : #Client_context.wallet) pkhs pks sks pkh
     =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let rev_find_all list pkh =
     List.filter_map
       (fun (name, pkh') ->

@@ -152,7 +152,7 @@ type t = {
     - The checkpoint has been reached (that is, the head of the chain
    is past the checkpoint) but the block is not yet in the chain. *)
 let assert_acceptable_header pipeline hash (header : Block_header.t) =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let chain_store = Distributed_db.chain_store pipeline.chain_db in
   let time_now = Time.System.now () in
   let* () =
@@ -201,7 +201,7 @@ let assert_acceptable_header pipeline hash (header : Block_header.t) =
 
     4. It loops on the predecessor of the current block. *)
 let fetch_step pipeline (step : Block_locator.step) =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let rec fetch_loop acc hash cpt =
     let*! () = Lwt.pause () in
     let*! () =
@@ -217,13 +217,13 @@ let fetch_step pipeline (step : Block_locator.step) =
       let*! () =
         Bootstrap_pipeline_event.(emit step_too_long) pipeline.peer_id
       in
-      fail (Invalid_locator (pipeline.peer_id, pipeline.locator))
+      tzfail (Invalid_locator (pipeline.peer_id, pipeline.locator))
     else if Block_hash.equal hash step.predecessor then
       if step.strict_step && cpt <> step.step then
         let*! () =
           Bootstrap_pipeline_event.(emit step_too_short) pipeline.peer_id
         in
-        fail (Invalid_locator (pipeline.peer_id, pipeline.locator))
+        tzfail (Invalid_locator (pipeline.peer_id, pipeline.locator))
       else return acc
     else
       let chain_store = Distributed_db.chain_store pipeline.chain_db in
@@ -265,7 +265,7 @@ let fetch_step pipeline (step : Block_locator.step) =
    A step may be truncated in [rolling] or in [full] mode if the
    blocks are below the [savepoint].*)
 let headers_fetch_worker_loop pipeline =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let*! r =
     let sender_id = Distributed_db.my_peer_id pipeline.chain_db in
     (* sender and receiver are inverted here because they are from the
@@ -303,7 +303,7 @@ let headers_fetch_worker_loop pipeline =
         (locator_length, pipeline.peer_id, number_of_steps)
     in
     match steps with
-    | [] -> fail (Too_short_locator (sender_id, pipeline.locator))
+    | [] -> tzfail (Too_short_locator (sender_id, pipeline.locator))
     | {Block_locator.predecessor; _} :: _ ->
         let*! predecessor_known =
           Store.Block.is_known chain_store predecessor
@@ -396,7 +396,7 @@ let headers_fetch_worker_loop pipeline =
    successfuly in the queue. It is canceled if one operation could not
    be fetched. *)
 let rec operations_fetch_worker_loop pipeline =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let*! r =
     let*! () = Lwt.pause () in
     let* batch =
@@ -474,7 +474,7 @@ let rec operations_fetch_worker_loop pipeline =
    fulfilled if every block from the locator was validated. It is
    canceled if the validation of one block fails. *)
 let rec validation_worker_loop pipeline =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let*! r =
     let*! () = Lwt.pause () in
     let* (hash, header, operations) =

@@ -90,13 +90,13 @@ let write_file encoded_file data =
 
 let write (Stored_data v) data =
   Lwt_idle_waiter.force_idle v.scheduler (fun () ->
-      if v.cache = data then Lwt_tzresult_syntax.return_unit
+      if v.cache = data then Lwt_result_syntax.return_unit
       else (
         v.cache <- data ;
         write_file v.file data))
 
 let create file data =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let file = file in
   let scheduler = Lwt_idle_waiter.create () in
   let* () = write_file file data in
@@ -112,7 +112,7 @@ let update_with (Stored_data v) f =
         write_file v.file new_data))
 
 let load file =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let*! o =
     if Naming.is_json_file file then read_json_file file else read_file file
   in
@@ -120,7 +120,7 @@ let load file =
   | Some cache ->
       let scheduler = Lwt_idle_waiter.create () in
       return (Stored_data {cache; file; scheduler})
-  | None -> fail (Missing_stored_data (Naming.encoded_file_path file))
+  | None -> tzfail (Missing_stored_data (Naming.encoded_file_path file))
 
 let init file ~initial_data =
   let open Lwt_syntax in

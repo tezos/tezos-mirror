@@ -55,7 +55,7 @@ let dummy_encoding flags : 'a Data_encoding.encoding =
     Data_encoding.bytes
 
 let write ~value_encoding ~flags outch v =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let value_encoding =
     Option.value ~default:(dummy_encoding flags) value_encoding
   in
@@ -77,7 +77,7 @@ let write ~value_encoding ~flags outch v =
       @@ TzTrace.cons (error_of_fmt "write error %s" __LOC__) trace)
 
 let read ~value_encoding ~flags inch =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let value_encoding =
     Option.value ~default:(dummy_encoding flags) value_encoding
   in
@@ -180,7 +180,7 @@ let terminate pid =
   Lwt.return_unit
 
 let wait ~value_encoding ~flags pid result_ch =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   Lwt.catch
     (fun () ->
       let*! s = Lwt_unix.waitpid [] pid in
@@ -193,7 +193,7 @@ let wait ~value_encoding ~flags pid result_ch =
     (function
       | Lwt.Canceled ->
           let*! () = terminate pid in
-          fail Canceled
+          tzfail Canceled
       | exn -> fail_with_exn exn)
 
 type ('a, 'b, 'c) t = {

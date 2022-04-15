@@ -85,7 +85,7 @@ let may_select_version ~compare accepted_versions remote_version motive =
   else P2p_rejection.rejecting motive
 
 let select ~chain_name ~distributed_db_versions ~p2p_versions remote =
-  let open Error_monad.Tzresult_syntax in
+  let open Error_monad.Result_syntax in
   assert (distributed_db_versions <> []) ;
   assert (p2p_versions <> []) ;
   if chain_name <> remote.chain_name then

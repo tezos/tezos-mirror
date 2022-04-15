@@ -132,7 +132,7 @@ type metadata_status = Complete | Partial of Int32.t | Not_stored
    - there only exists a contiguous set of empty metadata *)
 let cemented_metadata_status cemented_store
     {Cemented_block_store.start_level; end_level; _} =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let* o = Cemented_block_store.read_block_metadata cemented_store end_level in
   match o with
   | None -> return Not_stored
@@ -194,7 +194,7 @@ let apply_context context_index chain_id ~user_activated_upgrades
     ~user_activated_protocol_overrides ~operation_metadata_size_limit
     ~predecessor_block_metadata_hash ~predecessor_ops_metadata_hash
     ~predecessor_block block =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let block_header = Store.Block.header block in
   let operations = Store.Block.operations block in
   let predecessor_block_header = Store.Block.header predecessor_block in
@@ -204,7 +204,7 @@ let apply_context context_index chain_id ~user_activated_upgrades
     match o with
     | Some ctxt -> return ctxt
     | None ->
-        fail
+        tzfail
           (Store_errors.Cannot_checkout_context
              (Store.Block.hash predecessor_block, context_hash))
   in
@@ -249,16 +249,16 @@ let apply_context context_index chain_id ~user_activated_upgrades
 
 (** Returns the protocol environment version of a given protocol level. *)
 let protocol_env_of_protocol_level chain_store protocol_level block_hash =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let* protocol_hash =
     let*! o = Store.Chain.find_protocol chain_store ~protocol_level in
     match o with
     | Some ph -> return ph
-    | None -> fail (Store_errors.Cannot_find_protocol protocol_level)
+    | None -> tzfail (Store_errors.Cannot_find_protocol protocol_level)
   in
   match Registered_protocol.get protocol_hash with
   | None ->
-      fail
+      tzfail
         (Block_validator_errors.Unavailable_protocol
            {block = block_hash; protocol = protocol_hash})
   | Some (module Proto) -> return Proto.environment_version
@@ -295,7 +295,7 @@ let restore_block_contents chain_store block_protocol_env ~block_metadata
   {block with contents; metadata = Some metadata}
 
 let reconstruct_genesis_operations_metadata chain_store =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let*! genesis_block = Store.Chain.genesis_block chain_store in
   let* {
          message;
@@ -329,7 +329,7 @@ let reconstruct_genesis_operations_metadata chain_store =
 let reconstruct_chunk chain_store context_index ~user_activated_upgrades
     ~user_activated_protocol_overrides ~operation_metadata_size_limit
     ~start_level ~end_level =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let chain_id = Store.Chain.chain_id chain_store in
   let rec loop level acc =
     if level > end_level then return List.(rev acc)
@@ -413,7 +413,7 @@ let reconstruct_chunk chain_store context_index ~user_activated_upgrades
   loop start_level []
 
 let store_chunk cemented_store chunk =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let* (lower_block, lower_env_version) =
     match List.hd chunk with
     | None -> failwith "Cannot read chunk to cement."
@@ -442,7 +442,7 @@ let store_chunk cemented_store chunk =
           level
       in
       match o with
-      | None -> fail (Reconstruction_failure (Cannot_read_block_level level))
+      | None -> tzfail (Reconstruction_failure (Cannot_read_block_level level))
       | Some b -> (
           match
             ( Block_repr.block_metadata_hash b,
@@ -472,7 +472,7 @@ let store_chunk cemented_store chunk =
         block_chunk
 
 let gather_available_metadata chain_store ~start_level ~end_level =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let rec aux level acc =
     if level > end_level then return acc
     else
@@ -491,7 +491,7 @@ let gather_available_metadata chain_store ~start_level ~end_level =
 let reconstruct_cemented chain_store context_index ~user_activated_upgrades
     ~user_activated_protocol_overrides ~operation_metadata_size_limit
     ~start_block_level =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let block_store = Store.Unsafe.get_block_store chain_store in
   let cemented_block_store = Block_store.cemented_block_store block_store in
   let chain_dir = Store.Chain.chain_dir chain_store in
@@ -595,7 +595,7 @@ let reconstruct_cemented chain_store context_index ~user_activated_upgrades
 
 let reconstruct_floating chain_store context_index ~user_activated_upgrades
     ~user_activated_protocol_overrides ~operation_metadata_size_limit =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let chain_id = Store.Chain.chain_id chain_store in
   let chain_dir = Store.Chain.chain_dir chain_store in
   let block_store = Store.Unsafe.get_block_store chain_store in
@@ -672,7 +672,7 @@ let reconstruct_floating chain_store context_index ~user_activated_upgrades
                                 in
                                 match o with
                                 | None ->
-                                    fail
+                                    tzfail
                                       (Reconstruction_failure
                                          (Cannot_read_block_hash
                                             predecessor_hash))
@@ -776,13 +776,13 @@ let reconstruct_floating chain_store context_index ~user_activated_upgrades
 
 (* Only Full modes with any offset can be reconstructed *)
 let check_history_mode_compatibility chain_store savepoint genesis_block =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   match Store.Chain.history_mode chain_store with
   | History_mode.(Full _) ->
       fail_when
         (snd savepoint = Store.Block.level genesis_block)
         (Reconstruction_failure Nothing_to_reconstruct)
-  | _ as history_mode -> fail (Cannot_reconstruct history_mode)
+  | _ as history_mode -> tzfail (Cannot_reconstruct history_mode)
 
 let restore_constants chain_store genesis_block head_lafl_block
     ~cementing_highwatermark =
@@ -812,7 +812,7 @@ let restore_constants chain_store genesis_block head_lafl_block
    at the lowest non cemented cycle. Otherwise, the reconstruction starts
    at the genesis. *)
 let compute_start_level chain_store savepoint =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let chain_dir = Store.Chain.chain_dir chain_store in
   let reconstruct_lockfile = Naming.reconstruction_lock_file chain_dir in
   let reconstruct_lockfile_path = Naming.file_path reconstruct_lockfile in

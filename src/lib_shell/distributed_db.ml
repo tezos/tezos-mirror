@@ -175,7 +175,7 @@ let activate
               P2p.send p2p conn (Get_current_branch chain_id) :: acc)
         in
         Error_monad.dont_wait
-          (fun () -> Error_monad.Lwt_tzresult_syntax.join sends)
+          (fun () -> Error_monad.Lwt_result_syntax.tzjoin sends)
           (fun trace ->
             Format.eprintf
               "Uncaught error: %a\n%!"

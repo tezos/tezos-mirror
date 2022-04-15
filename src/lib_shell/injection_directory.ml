@@ -46,7 +46,7 @@ let inject_block validator ?force ?chain bytes operations =
       return_unit )
 
 let inject_operation validator ~force ?chain bytes =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let*! chain_id = read_chain_id validator chain in
   let t =
     match Data_encoding.Binary.of_bytes_opt Operation.encoding bytes with
@@ -57,7 +57,7 @@ let inject_operation validator ~force ?chain bytes =
   Lwt.return (hash, t)
 
 let inject_protocol store proto =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let proto_bytes = Data_encoding.Binary.to_bytes_exn Protocol.encoding proto in
   let hash = Protocol_hash.hash_bytes [proto_bytes] in
   let validation =

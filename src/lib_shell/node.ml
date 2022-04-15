@@ -203,7 +203,7 @@ let store_known_protocols store =
     embedded_protocols
 
 let check_context_consistency store =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let main_chain_store = Store.main_chain_store store in
   let*! block = Store.Chain.current_head main_chain_store in
   let*! b = Store.Block.context_exists main_chain_store block in
@@ -213,7 +213,7 @@ let check_context_consistency store =
       return_unit
   | false ->
       let*! () = Node_event.(emit storage_corrupted_context_detected ()) in
-      fail Non_recoverable_context
+      tzfail Non_recoverable_context
 
 let create ?(sandboxed = false) ?sandbox_parameters ~singleprocess
     {
@@ -234,7 +234,7 @@ let create ?(sandboxed = false) ?sandbox_parameters ~singleprocess
       enable_testchain;
     } peer_validator_limits block_validator_limits prevalidator_limits
     chain_validator_limits history_mode =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let (start_prevalidator, start_testchain) =
     match p2p_params with
     | Some _ -> (not disable_mempool, enable_testchain)

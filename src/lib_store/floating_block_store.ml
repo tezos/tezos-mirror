@@ -89,10 +89,10 @@ let read_block floating_store hash =
   | None -> Lwt.return_none
 
 let locked_write_block floating_store ~offset ~block ~predecessors =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let* block_bytes =
     match Data_encoding.Binary.to_bytes_opt Block_repr.encoding block with
-    | None -> fail (Cannot_encode_block block.Block_repr.hash)
+    | None -> tzfail (Cannot_encode_block block.Block_repr.hash)
     | Some bytes -> return bytes
   in
   let block_length = Bytes.length block_bytes in
@@ -123,7 +123,7 @@ let append_block ?(flush = true) floating_store predecessors
 
 let append_all floating_store
     (blocks : (Block_hash.t list * Block_repr.t) Seq.t) =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   Lwt_idle_waiter.force_idle floating_store.scheduler (fun () ->
       let*! eof_offset = Lwt_unix.lseek floating_store.fd 0 Unix.SEEK_END in
       let* _last_offset =
@@ -140,7 +140,7 @@ let append_all floating_store
       return_unit)
 
 let iter_s_raw_fd f fd =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let*! eof_offset = Lwt_unix.lseek fd 0 Unix.SEEK_END in
   let*! _file_start = Lwt_unix.lseek fd 0 Unix.SEEK_SET in
   let rec loop nb_bytes_left =
@@ -265,7 +265,7 @@ let close {floating_block_index; fd; scheduler; _} =
       Lwt.return_unit)
 
 let append_floating_store ~from ~into =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   protect (fun () ->
       let* () =
         iter_with_pred_s
@@ -377,7 +377,7 @@ let swap ~src ~dst =
 
 (* Call this function when full_integrity_check has failed. *)
 let fix_integrity chain_dir kind =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let*! b = full_integrity_check chain_dir kind in
   match b with
   | true -> (* Nothing to do *) return_unit

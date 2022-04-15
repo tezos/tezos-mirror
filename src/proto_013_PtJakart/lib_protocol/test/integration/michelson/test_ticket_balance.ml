@@ -34,7 +34,7 @@
 
 open Protocol
 open Alpha_context
-open Lwt_tzresult_syntax
+open Lwt_result_syntax
 
 let wrap m = m >|= Environment.wrap_tzresult
 

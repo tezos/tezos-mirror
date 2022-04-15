@@ -161,7 +161,7 @@ struct
     include Client_keys.Signature_type
 
     let parse uri =
-      let open Tzresult_syntax in
+      let open Result_syntax in
       assert (Uri.scheme uri = Some scheme) ;
       match Uri.get_query_param uri "pkh" with
       | None -> error_with "Missing the query parameter: 'pkh=tz1...'"
@@ -221,7 +221,7 @@ struct
     include Client_keys.Signature_type
 
     let parse uri =
-      let open Tzresult_syntax in
+      let open Result_syntax in
       assert (Uri.scheme uri = Some scheme) ;
       match (Uri.host uri, Uri.port uri) with
       | (None, _) -> error_with "Missing host address"

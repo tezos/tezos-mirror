@@ -86,7 +86,7 @@ let bootstrap_secrets_encoding = Data_encoding.list bootstrap_secret_encoding
 
 let populate (cctxt : #Tezos_client_base.Client_context.io_wallet)
     bootstrap_accounts_file =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let* accounts =
     match bootstrap_accounts_file with
     | None -> default_bootstrap_accounts

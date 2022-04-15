@@ -1125,7 +1125,7 @@ let run ?(config = default_config) bakers_spec =
     Lwt.pick
       [
         timeout_process ();
-        Lwt_tzresult_syntax.join
+        Lwt_result_syntax.tzjoin
           (take_third
              (List.fold_left
                 (fun (i, delegates_acc, ms) (n, user_hooks) ->

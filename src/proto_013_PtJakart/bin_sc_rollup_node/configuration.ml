@@ -68,6 +68,6 @@ let save config =
   Lwt_utils_unix.Json.write_file (filename config) json
 
 let load ~data_dir =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let+ json = Lwt_utils_unix.Json.read_file (relative_filename data_dir) in
   Data_encoding.Json.destruct encoding json

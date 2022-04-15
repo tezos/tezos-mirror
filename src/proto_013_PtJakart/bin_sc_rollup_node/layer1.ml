@@ -260,7 +260,7 @@ let catch_up cctxt store chain last_seen_head new_head =
   | Some predecessor -> aux [] predecessor
 
 let chain_events cctxt store chain =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let on_head (hash, (block_header : Tezos_base.Block_header.t)) =
     let level = block_header.shell.level in
     let new_head = Head {hash; level} in
@@ -279,7 +279,7 @@ let chain_events cctxt store chain =
 
 let check_sc_rollup_address_exists sc_rollup_address
     (cctxt : Protocol_client_context.full) =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let* kind_opt =
     RPC.Sc_rollup.kind cctxt (cctxt#chain, cctxt#block) sc_rollup_address ()
   in
@@ -292,7 +292,7 @@ let check_sc_rollup_address_exists sc_rollup_address
   return_unit
 
 let start configuration (cctxt : Protocol_client_context.full) store =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let*! () = Layer1_event.starting () in
   let* () =
     check_sc_rollup_address_exists configuration.sc_rollup_address cctxt

@@ -93,7 +93,7 @@ struct
       Buffer.to_bytes buf
     in
     let decode b =
-      let open Tzresult_syntax in
+      let open Result_syntax in
       let error = Error "invalid 5bit list" in
       let* l =
         let sl = Bytes.length b in
@@ -165,7 +165,7 @@ struct
       Buffer.to_bytes buf
     in
     let decode b =
-      let open Tzresult_syntax in
+      let open Result_syntax in
       let error = Error "invalid binary list" in
       let* l =
         let sl = Bytes.length b in

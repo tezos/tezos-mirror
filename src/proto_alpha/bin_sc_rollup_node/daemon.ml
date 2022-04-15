@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 let on_layer_1_chain_event cctxt store chain_event =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let* () = Inbox.update cctxt store chain_event in
   let* () = Interpreter.Arith.update store chain_event in
   let*! () = Layer1.processed chain_event in
@@ -53,7 +53,7 @@ let install_finalizer store rpc_server =
   Tezos_base_unix.Internal_event_unix.close ()
 
 let run ~data_dir (cctxt : Protocol_client_context.full) =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let start () =
     let*! () = Event.starting_node () in
     let* configuration = Configuration.load ~data_dir in

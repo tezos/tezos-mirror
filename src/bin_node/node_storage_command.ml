@@ -57,7 +57,7 @@ module Term = struct
     | Head_commit
 
   let read_config_file config_file =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let+ config =
       Option.filter Sys.file_exists config_file
       |> Option.map_es Node_config_file.read
@@ -65,25 +65,25 @@ module Term = struct
     Option.value ~default:Node_config_file.default_config config
 
   let ensure_context_dir context_dir =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     Lwt.catch
       (fun () ->
         let*! b = Lwt_unix.file_exists context_dir in
         if not b then
-          fail
+          tzfail
             (Node_data_version.Invalid_data_dir
                {data_dir = context_dir; msg = None})
         else
           let pack = context_dir // "store.pack" in
           let*! b = Lwt_unix.file_exists pack in
           if not b then
-            fail
+            tzfail
               (Node_data_version.Invalid_data_dir
                  {data_dir = context_dir; msg = None})
           else return_unit)
       (function
         | Unix.Unix_error _ ->
-            fail
+            tzfail
               (Node_data_version.Invalid_data_dir
                  {data_dir = context_dir; msg = None})
         | exc -> raise exc)
@@ -115,10 +115,10 @@ module Term = struct
     return_unit
 
   let index_dir_exists context_dir output =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let index_dir = Option.value output ~default:(context_dir // "index") in
     let*! b = Lwt_unix.file_exists index_dir in
-    if not b then return_unit else fail (Existing_index_dir index_dir)
+    if not b then return_unit else tzfail (Existing_index_dir index_dir)
 
   let reconstruct_index config_file data_dir output index_log_size =
     let open Lwt_result_syntax in

@@ -193,7 +193,7 @@ module Real = struct
   }
 
   let create ~config ~limits meta_cfg msg_cfg conn_meta_cfg =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let io_sched = create_scheduler limits in
     let watcher = Lwt_watcher.create_input () in
     let log event = Lwt_watcher.notify watcher event in
@@ -581,10 +581,10 @@ let faked_network (msg_cfg : 'msg P2p_params.message_config) peer_cfg
     set_peer_metadata = (fun _ _ -> ());
     connect =
       (fun ?timeout:_ _ ->
-        Lwt_tzresult_syntax.fail P2p_errors.Connection_refused);
+        Lwt_result_syntax.tzfail P2p_errors.Connection_refused);
     recv = (fun _ -> Lwt_utils.never_ending ());
     recv_any = (fun () -> Lwt_utils.never_ending ());
-    send = (fun _ _ -> Lwt_tzresult_syntax.fail P2p_errors.Connection_closed);
+    send = (fun _ _ -> Lwt_result_syntax.tzfail P2p_errors.Connection_closed);
     try_send = (fun _ _ -> false);
     fold_connections = (fun ~init ~f:_ -> init);
     iter_connections = (fun _f -> ());

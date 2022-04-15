@@ -24,13 +24,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type error = TzCore.error = ..
+module Option_syntax = TzLwtreslib.Monad.Option_syntax
+module Lwt_option_syntax = TzLwtreslib.Monad.Option_syntax
 
 include
-  Tezos_lwt_result_stdlib.Lwtreslib.TRACED_MONAD
-    with type 'error trace := 'error TzTrace.trace
-
-include
-  Sig.MONAD_EXTENSION
-    with type error := error
+  Monad_maker.S
+    with type error := TzCore.error
      and type 'error trace := 'error TzTrace.trace

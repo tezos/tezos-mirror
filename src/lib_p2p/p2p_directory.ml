@@ -84,7 +84,7 @@ let info_of_peer_info pool i =
     }
 
 let build_rpc_directory net =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let dir = RPC_directory.empty in
   (* Network : Global *)
   (* DEPRECATED: use [version] from "lib_shell_services/version_services"
@@ -101,13 +101,13 @@ let build_rpc_directory net =
   let dir =
     RPC_directory.register0 dir P2p_services.S.self (fun () () ->
         match P2p.pool net with
-        | None -> fail P2p_errors.P2p_layer_disabled
+        | None -> tzfail P2p_errors.P2p_layer_disabled
         | Some pool -> return (P2p_pool.config pool).identity.peer_id)
   in
   let dir =
     RPC_directory.register0 dir P2p_services.S.stat (fun () () ->
         match P2p.connect_handler net with
-        | None -> fail P2p_errors.P2p_layer_disabled
+        | None -> tzfail P2p_errors.P2p_layer_disabled
         | Some connect_handler ->
             return (P2p_connect_handler.stat connect_handler))
   in
@@ -120,9 +120,8 @@ let build_rpc_directory net =
   in
   let dir =
     RPC_directory.register1 dir P2p_services.S.connect (fun point q () ->
-        let open Lwt_tzresult_syntax in
         match P2p.connect_handler net with
-        | None -> fail P2p_errors.P2p_layer_disabled
+        | None -> tzfail P2p_errors.P2p_layer_disabled
         | Some connect_handler ->
             let* _conn =
               P2p_connect_handler.connect
@@ -159,7 +158,7 @@ let build_rpc_directory net =
   let dir =
     RPC_directory.register0 dir P2p_services.Connections.S.list (fun () () ->
         match P2p.pool net with
-        | None -> fail P2p_errors.P2p_layer_disabled
+        | None -> tzfail P2p_errors.P2p_layer_disabled
         | Some pool ->
             return
             @@ P2p_pool.Connection.fold pool ~init:[] ~f:(fun _peer_id c acc ->
@@ -169,7 +168,7 @@ let build_rpc_directory net =
   let dir =
     RPC_directory.register0 dir P2p_services.Peers.S.list (fun q () ->
         match P2p.pool net with
-        | None -> fail P2p_errors.P2p_layer_disabled
+        | None -> tzfail P2p_errors.P2p_layer_disabled
         | Some pool ->
             return
             @@ P2p_pool.Peers.fold_known pool ~init:[] ~f:(fun peer_id i a ->
@@ -186,7 +185,7 @@ let build_rpc_directory net =
       P2p_services.Peers.S.info
       (fun peer_id () () ->
         match P2p.pool net with
-        | None -> fail P2p_errors.P2p_layer_disabled
+        | None -> tzfail P2p_errors.P2p_layer_disabled
         | Some pool ->
             return
             @@ Option.map
@@ -304,7 +303,7 @@ let build_rpc_directory net =
       P2p_services.Peers.S.banned
       (fun peer_id () () ->
         match P2p.pool net with
-        | None -> fail P2p_errors.P2p_layer_disabled
+        | None -> tzfail P2p_errors.P2p_layer_disabled
         | Some pool when P2p_pool.Peers.get_trusted pool peer_id -> return_false
         | Some pool -> return (P2p_pool.Peers.banned pool peer_id))
   in
@@ -314,14 +313,14 @@ let build_rpc_directory net =
       P2p_services.ACL.S.get_greylisted_peers
       (fun () () ->
         match P2p.pool net with
-        | None -> fail P2p_errors.P2p_layer_disabled
+        | None -> tzfail P2p_errors.P2p_layer_disabled
         | Some pool -> return (P2p_pool.Peers.get_greylisted_list pool))
   in
   (* Network : Point *)
   let dir =
     RPC_directory.register0 dir P2p_services.Points.S.list (fun q () ->
         match P2p.pool net with
-        | None -> fail P2p_errors.P2p_layer_disabled
+        | None -> tzfail P2p_errors.P2p_layer_disabled
         | Some pool ->
             return
             @@ P2p_pool.Points.fold_known pool ~init:[] ~f:(fun point i a ->
@@ -338,7 +337,7 @@ let build_rpc_directory net =
       P2p_services.Points.S.info
       (fun point () () ->
         match P2p.pool net with
-        | None -> fail P2p_errors.P2p_layer_disabled
+        | None -> tzfail P2p_errors.P2p_layer_disabled
         | Some pool ->
             return
             @@ Option.map info_of_point_info (P2p_pool.Points.info pool point))
@@ -468,7 +467,7 @@ let build_rpc_directory net =
       P2p_services.ACL.S.get_greylisted_ips
       (fun () () ->
         match P2p.pool net with
-        | None -> fail P2p_errors.P2p_layer_disabled
+        | None -> tzfail P2p_errors.P2p_layer_disabled
         | Some pool ->
             return
               {
@@ -481,7 +480,7 @@ let build_rpc_directory net =
   let dir =
     RPC_directory.register0 dir P2p_services.ACL.S.clear (fun () () ->
         match P2p.pool net with
-        | None -> fail P2p_errors.P2p_layer_disabled
+        | None -> tzfail P2p_errors.P2p_layer_disabled
         | Some pool ->
             P2p_pool.acl_clear pool ;
             return_unit)

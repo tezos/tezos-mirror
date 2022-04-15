@@ -383,4 +383,4 @@ end
 let () =
   Client_main_run.run
     (module Signer_config)
-    ~select_commands:(fun _ _ -> Lwt_tzresult_syntax.return_nil)
+    ~select_commands:(fun _ _ -> Lwt_result_syntax.return_nil)

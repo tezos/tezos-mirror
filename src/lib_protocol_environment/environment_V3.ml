@@ -660,7 +660,7 @@ struct
     include Error_core
     include Tezos_error_monad.TzLwtreslib.Monad
     include
-      Tezos_error_monad.Monad_extension_maker.Make (Error_core) (TzTrace)
+      Tezos_error_monad.Monad_maker.Make (Error_core) (TzTrace)
         (Tezos_error_monad.TzLwtreslib.Monad)
 
     (* Backwards compatibility additions (dont_wait, trace helpers) *)
@@ -720,11 +720,11 @@ struct
     (* Shouldn't be used, only to keep the same environment interface *)
     let classify_error error = (find_info_of_error error).category
 
-    let both_e = Tzresult_syntax.both
+    let both_e = Tezos_error_monad.TzLwtreslib.Monad.Traced_result_syntax.both
 
-    let join_e = Tzresult_syntax.join
+    let join_e = Tezos_error_monad.TzLwtreslib.Monad.Traced_result_syntax.join
 
-    let all_e = Tzresult_syntax.all
+    let all_e = Tezos_error_monad.TzLwtreslib.Monad.Traced_result_syntax.all
   end
 
   let () =

@@ -63,7 +63,7 @@ let uname () =
       | exn -> Lwt.return_error (error_info "uname" (Printexc.to_string exn)))
 
 let page_size sysname =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let get_conf_process =
     match sysname with
     | Linux -> Ok ("getconf", [|"getconf"; "PAGE_SIZE"|])

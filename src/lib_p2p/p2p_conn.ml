@@ -136,7 +136,7 @@ let create ~conn ~point_info ~peer_info ~messages ~canceler ~greylister
   t
 
 let pipe_exn_handler = function
-  | Lwt_pipe.Closed -> Lwt_tzresult_syntax.fail P2p_errors.Connection_closed
+  | Lwt_pipe.Closed -> Lwt_result_syntax.tzfail P2p_errors.Connection_closed
   | exc -> Lwt.fail exc
 
 (* see [Lwt_pipe.Maybe_bounded.pop] *)
@@ -154,7 +154,7 @@ let read t =
     pipe_exn_handler
 
 let is_readable t =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   Lwt.catch
     (fun () ->
       let*! _ = Lwt_pipe.Maybe_bounded.peek t.messages in

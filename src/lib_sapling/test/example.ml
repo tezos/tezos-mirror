@@ -372,7 +372,7 @@ module Validator = struct
   let verify_update (transaction : Core.UTXO.transaction)
       (state : Storage.state) (key : string) :
       (Int64.t * Storage.state) tzresult Lwt.t =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     (* Check the transaction *)
     (* Check the memo_size*)
     let coherence_of_memo_size =
@@ -382,18 +382,18 @@ module Validator = struct
           = Storage.get_memo_size state)
         transaction.outputs
     in
-    if not coherence_of_memo_size then fail (Incoherent_memo_size ())
+    if not coherence_of_memo_size then tzfail (Incoherent_memo_size ())
     else if
       (* To avoid overflowing the balance, the number of inputs and outputs must be
          bounded *)
       Compare.List_length_with.(transaction.inputs >= 5208)
-    then fail (Too_many_inputs transaction.inputs)
+    then tzfail (Too_many_inputs transaction.inputs)
     else if Compare.List_length_with.(transaction.outputs >= 2019) then
-      fail (Too_many_outputs transaction.outputs)
+      tzfail (Too_many_outputs transaction.outputs)
     else if
       (* Check the root is a recent state *)
       not (Storage.mem_root state transaction.root)
-    then fail (Too_old_root transaction.root)
+    then tzfail (Too_old_root transaction.root)
     else
       let* () =
         Core.Verification.with_verification_ctx (fun ctx ->
@@ -413,7 +413,7 @@ module Validator = struct
                   if
                     Core.Verification.check_spend ctx input transaction.root key
                   then return_unit
-                  else fail (Input_incorrect input))
+                  else tzfail (Input_incorrect input))
                 transaction.inputs
             in
             (* Check the signature and balance of the whole transaction *)
@@ -427,7 +427,7 @@ module Validator = struct
         List.fold_left_es
           (fun state input ->
             if Storage.mem_nullifier state Core.UTXO.(input.nf) then
-              fail (Input_spent input)
+              tzfail (Input_spent input)
             else return (Storage.add_nullifier state Core.UTXO.(input.nf)))
           state
           transaction.inputs

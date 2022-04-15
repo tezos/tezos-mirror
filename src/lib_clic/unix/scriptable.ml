@@ -15,7 +15,7 @@ let clic_arg () =
     ~long:"for-script"
     ~placeholder:"FORMAT"
     (parameter (fun _ spec ->
-         let open Lwt_tzresult_syntax in
+         let open Lwt_result_syntax in
          match String.lowercase_ascii spec with
          | "tsv" -> return tsv
          | "csv" -> return csv

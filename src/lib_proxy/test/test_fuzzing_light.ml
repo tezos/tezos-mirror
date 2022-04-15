@@ -507,7 +507,7 @@ module Consensus = struct
                  | Ok rogue_mtree -> rogue_mtree
                  | _ -> QCheck2.assume_fail ()
                else mtree)
-        |> Lwt_tzresult_syntax.return
+        |> Lwt.return_ok
     end : Tezos_proxy.Light_proto.PROTO_RPCS)
 
   let mock_printer () =

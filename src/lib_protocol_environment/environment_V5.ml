@@ -682,7 +682,7 @@ struct
     module Tzresult_syntax = Traced_result_syntax
     module Lwt_tzresult_syntax = Lwt_traced_result_syntax
     include
-      Tezos_error_monad.Monad_extension_maker.Make (Error_core) (TzTrace)
+      Tezos_error_monad.Monad_maker.Make (Error_core) (TzTrace)
         (Tezos_error_monad.TzLwtreslib.Monad)
 
     (* Backwards compatibility additions (dont_wait, trace helpers) *)
@@ -734,11 +734,11 @@ struct
       let+ r = Result.catch_s ?catch_only f in
       Result.map_error (fun e -> error_of_exn e) r
 
-    let both_e = Tzresult_syntax.both
+    let both_e = Tezos_error_monad.TzLwtreslib.Monad.Traced_result_syntax.both
 
-    let join_e = Tzresult_syntax.join
+    let join_e = Tezos_error_monad.TzLwtreslib.Monad.Traced_result_syntax.join
 
-    let all_e = Tzresult_syntax.all
+    let all_e = Tezos_error_monad.TzLwtreslib.Monad.Traced_result_syntax.all
   end
 
   let () =

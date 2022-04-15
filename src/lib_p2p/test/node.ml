@@ -321,6 +321,6 @@ let detach_nodes ?timeout ?prefix ?min_connections ?max_connections
           port)
       points
   in
-  let*? nodes = Error_monad.Tzresult_syntax.all nodes in
+  let*? nodes = Error_monad.Result_syntax.tzall nodes in
   Lwt.ignore_result (sync_nodes nodes) ;
   Process.wait_all nodes

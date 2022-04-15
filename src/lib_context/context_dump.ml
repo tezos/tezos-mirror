@@ -95,7 +95,7 @@ let () =
 (* IO toolkit. *)
 
 let rec read_string rbuf ~len =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let (fd, buf, ofs, total) = !rbuf in
   if Bytes.length buf - ofs < len then (
     let blen = Bytes.length buf - ofs in
@@ -103,7 +103,7 @@ let rec read_string rbuf ~len =
     Bytes.blit buf ofs neu 0 blen ;
     let*! bread = Lwt_unix.read fd neu blen 1_000_000 in
     total := !total + bread ;
-    if bread = 0 then fail Inconsistent_context_dump
+    if bread = 0 then tzfail Inconsistent_context_dump
     else
       let neu =
         if bread <> 1_000_000 then Bytes.sub neu 0 (blen + bread) else neu
@@ -172,7 +172,7 @@ module Make_legacy (I : Dump_interface) = struct
     let length = Int32.to_int l in
     let (fd, buf, ofs, total) = !rbuf in
     rbuf := (fd, buf, ofs - 4, total) ;
-    Lwt.return_ok (length + 4)
+    return (length + 4)
 
   let read_variable_length_string rbuf =
     let open Lwt_result_syntax in
@@ -193,13 +193,13 @@ module Make_legacy (I : Dump_interface) = struct
   let read_seq rbuf total =
     let open Lwt_result_syntax in
     let step i =
-      if i >= total then Lwt.return_ok None
+      if i >= total then return_none
       else
         let* (length_name, name) = read_variable_length_string rbuf in
-        let+ (length_hash, hash) = read_fixed_length_hash rbuf in
+        let* (length_hash, hash) = read_fixed_length_hash rbuf in
         let node = (name, hash) in
         let i = i + length_name + length_hash in
-        Some (node, i)
+        return_some (node, i)
     in
     Seq_es.unfold_es step 0
 
@@ -210,7 +210,7 @@ module Make_legacy (I : Dump_interface) = struct
       (req "parents" (list I.Commit_hash.encoding))
 
   let get_command rbuf =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let* t = get_int64 rbuf in
     let total = Int64.to_int t in
     let* t = get_char rbuf in
@@ -246,13 +246,13 @@ module Make_legacy (I : Dump_interface) = struct
         let* s = get_int4 rbuf in
         let list_size = Int32.to_int s in
         let data = read_seq rbuf list_size in
-        Lwt.return_ok (Node_seq data)
-    | _ -> fail Restore_context_failure
+        return (Node_seq data)
+    | _ -> tzfail Restore_context_failure
 
   (* Restoring *)
 
   let restore_context_fd index ~expected_context_hash ~fd ~nb_context_elements =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let read = ref 0 in
     let rbuf = ref (fd, Bytes.empty, 0, read) in
     (* Editing the repository *)
@@ -263,13 +263,15 @@ module Make_legacy (I : Dump_interface) = struct
     let add_dir t keys =
       let* r = I.add_dir t keys in
       match r with
-      | None -> fail Restore_context_failure
+      | None -> tzfail Restore_context_failure
       | Some tree -> return tree
     in
     let restore () =
       let first_pass () =
         let* r = get_command rbuf in
-        match r with Root -> return_unit | _ -> fail Inconsistent_context_dump
+        match r with
+        | Root -> return_unit
+        | _ -> tzfail Inconsistent_context_dump
       in
       let rec second_pass batch ctxt context_hash notify =
         let*! () = notify () in
@@ -284,13 +286,15 @@ module Make_legacy (I : Dump_interface) = struct
         | Eoc {info; parents} -> (
             let*! b = I.set_context ~info ~parents ctxt context_hash in
             match b with
-            | false -> fail Inconsistent_context_dump
+            | false -> tzfail Inconsistent_context_dump
             | true -> return_unit)
-        | _ -> fail Inconsistent_context_dump
+        | _ -> tzfail Inconsistent_context_dump
       in
       let check_eof () =
         let* e = get_command rbuf in
-        match e with Eof -> return_unit | _ -> fail Inconsistent_context_dump
+        match e with
+        | Eof -> return_unit
+        | _ -> tzfail Inconsistent_context_dump
       in
       let* block_data = first_pass () in
       let* () =
@@ -321,7 +325,7 @@ module Make_legacy (I : Dump_interface) = struct
       (fun () -> restore ())
       (function
         | Unix.Unix_error (e, _, _) ->
-            fail @@ System_read_error (Unix.error_message e)
+            tzfail @@ System_read_error (Unix.error_message e)
         | err -> Lwt.fail err)
 end
 
@@ -440,7 +444,7 @@ module Make (I : Dump_interface) = struct
       tree
 
   let dump_context_fd idx context_hash ~context_fd ~on_disk =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     (* Dumping *)
     let buf = Buffer.create 1_000_000 in
     let written = ref 0 in
@@ -450,7 +454,7 @@ module Make (I : Dump_interface) = struct
         match o with
         | None ->
             (* FIXME: dirty *)
-            fail @@ Context_not_found (I.Commit_hash.to_bytes context_hash)
+            tzfail @@ Context_not_found (I.Commit_hash.to_bytes context_hash)
         | Some ctxt ->
             Animation.display_progress
               ~every:1000
@@ -484,14 +488,14 @@ module Make (I : Dump_interface) = struct
                 return elements))
       (function
         | Unix.Unix_error (e, _, _) ->
-            fail @@ System_write_error (Unix.error_message e)
+            tzfail @@ System_write_error (Unix.error_message e)
         | err -> Lwt.fail err)
 
   (* Restoring *)
 
   let restore_context_fd index ~expected_context_hash ~fd ~nb_context_elements
       ~in_memory =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let read = ref 0 in
     let rbuf = ref (fd, Bytes.empty, 0, read) in
     (* Editing the repository *)
@@ -500,13 +504,15 @@ module Make (I : Dump_interface) = struct
     let add_inode i =
       let*! tree = save_inode i in
       match tree with
-      | None -> fail Restore_context_failure
+      | None -> tzfail Restore_context_failure
       | Some tree -> return tree
     in
     let restore () =
       let first_pass () =
         let* r = get_command rbuf in
-        match r with Root -> return_unit | _ -> fail Inconsistent_context_dump
+        match r with
+        | Root -> return_unit
+        | _ -> tzfail Inconsistent_context_dump
       in
       let rec second_pass batch ctxt context_hash notify =
         let*! () = notify () in
@@ -521,9 +527,9 @@ module Make (I : Dump_interface) = struct
         | Eoc {info; parents} -> (
             let*! b = I.set_context ~info ~parents ctxt context_hash in
             match b with
-            | false -> fail Inconsistent_context_dump
+            | false -> tzfail Inconsistent_context_dump
             | true -> return_unit)
-        | _ -> fail Inconsistent_context_dump
+        | _ -> tzfail Inconsistent_context_dump
       in
       let check_eof () =
         let* e = get_command rbuf in
@@ -531,7 +537,7 @@ module Make (I : Dump_interface) = struct
         | Eof ->
             I.close_import import_t ;
             return_unit
-        | _ -> fail Inconsistent_context_dump
+        | _ -> tzfail Inconsistent_context_dump
       in
       let* block_data = first_pass () in
       let* () =
@@ -562,7 +568,7 @@ module Make (I : Dump_interface) = struct
       (fun () -> restore ())
       (function
         | Unix.Unix_error (e, _, _) ->
-            fail @@ System_read_error (Unix.error_message e)
+            tzfail @@ System_read_error (Unix.error_message e)
         | err -> Lwt.fail err)
 end
 

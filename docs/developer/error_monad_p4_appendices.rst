@@ -106,23 +106,23 @@ a given syntax module, the legacy code relied on global values.
 +--------------------------------------+-------------------------------+
 | ::                                   | ::                            |
 |                                      |                               |
-|    let open Tzresult_syntax in       |    ok x                       |
+|    let open Result_syntax in         |    ok x                       |
 |    return x                          |                               |
 +--------------------------------------+-------------------------------+
 | ::                                   | ::                            |
 |                                      |                               |
-|    let open Tzresult_syntax in       |    error e                    |
-|    fail e                            |                               |
+|    let open Result_syntax in         |    error e                    |
+|    tzfail e                          |                               |
 +--------------------------------------+-------------------------------+
 | ::                                   | ::                            |
 |                                      |                               |
-|    let open Lwt_tzresult_syntax in   |    return x                   |
+|    let open Lwt_result_syntax in     |    return x                   |
 |    return x                          |                               |
 +--------------------------------------+-------------------------------+
 | ::                                   | ::                            |
 |                                      |                               |
-|    let open Lwt_tzresult_syntax in   |    fail e                     |
-|    fail e                            |                               |
+|    let open Lwt_result_syntax in     |    fail e                     |
+|    tzfail e                          |                               |
 +--------------------------------------+-------------------------------+
 
 In addition to these syntactic differences, there are also usage
@@ -262,7 +262,7 @@ The ``Error_monad`` module exports:
 -  the ``error`` type along with the ``register_error_kind`` function,
 -  the ``'a tzresult`` type,
 -  the ``TzTrace`` module,
--  the ``Tzresult_syntax`` and ``Lwt_tzresult_syntax`` modules
+-  the ``Result_syntax`` and ``Lwt_result_syntax`` modules
    (from a different, more generic name),
 - and exports a few more functions.
 

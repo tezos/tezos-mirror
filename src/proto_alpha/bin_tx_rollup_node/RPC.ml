@@ -158,7 +158,7 @@ module Arg = struct
 end
 
 module Block = struct
-  open Lwt_tzresult_syntax
+  open Lwt_result_syntax
 
   let path = RPC_path.(open_root)
 
@@ -312,7 +312,7 @@ module Block = struct
 end
 
 module Context_RPC = struct
-  open Lwt_tzresult_syntax
+  open Lwt_result_syntax
 
   let path = RPC_path.open_root
 

@@ -104,9 +104,9 @@ end
 (** Doesn't depend on heavy [Registered_protocol.T] for testability. *)
 let safe_binary_of_bytes (encoding : 'a Data_encoding.t) (bytes : bytes) :
     'a tzresult =
-  let open Tzresult_syntax in
+  let open Result_syntax in
   match Data_encoding.Binary.of_bytes_opt encoding bytes with
-  | None -> fail Parse_error
+  | None -> tzfail Parse_error
   | Some protocol_data -> return protocol_data
 
 module MakeAbstract
@@ -142,10 +142,10 @@ module MakeAbstract
     safe_binary_of_bytes Proto.operation_data_encoding proto
 
   let parse hash (raw : Operation.t) =
-    let open Tzresult_syntax in
+    let open Result_syntax in
     let size = Data_encoding.Binary.length Operation.encoding raw in
     if size > Proto.max_operation_data_length then
-      fail (Oversized_operation {size; max = Proto.max_operation_data_length})
+      tzfail (Oversized_operation {size; max = Proto.max_operation_data_length})
     else
       let+ protocol_data = parse_unsafe raw.proto in
       {
@@ -171,7 +171,7 @@ module MakeAbstract
       () =
     (* The prevalidation module receives input from the system byt handles
        protocol values. It translates timestamps here. *)
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let {
       Block_header.shell =
         {

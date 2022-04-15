@@ -55,7 +55,7 @@ let test_get_set (c, ofs) =
   List.for_all
     (fun ofs' ->
       let res =
-        let open Tzresult_syntax in
+        let open Result_syntax in
         let* c' = add c ofs in
         let* v = mem c ofs' in
         let* v' = mem c' ofs' in

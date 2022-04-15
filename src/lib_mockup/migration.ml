@@ -27,7 +27,7 @@ open Persistence
 
 let migrate_mockup ~(cctxt : Tezos_client_base.Client_context.full)
     ~protocol_hash ~next_protocol_hash =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let base_dir = cctxt#get_base_dir in
   let explain_will_not_work explain =
     let*! () =

@@ -35,7 +35,7 @@ let list_mockup_command_handler _ _ =
       let module Mockup = (val mockup) in
       Format.printf "%a@." Protocol_hash.pp Mockup.protocol_hash)
     available ;
-  Lwt_tzresult_syntax.return_unit
+  Lwt_result_syntax.return_unit
 
 let list_mockup_command : Tezos_client_base.Client_context.full Clic.command =
   let open Clic in

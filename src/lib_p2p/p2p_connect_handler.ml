@@ -208,7 +208,7 @@ let create_connection t p2p_conn id_point point_info peer_info
   conn
 
 let is_acceptable t connection_point_info peer_info incoming version =
-  let open Tzresult_syntax in
+  let open Result_syntax in
   (* Private mode only accept trusted *)
   let unexpected =
     t.config.private_mode
@@ -221,7 +221,7 @@ let is_acceptable t connection_point_info peer_info incoming version =
   in
   if unexpected then (
     Events.(emit__dont_wait__use_with_care peer_rejected) () ;
-    fail P2p_errors.Private_mode)
+    tzfail P2p_errors.Private_mode)
   else
     (* checking if point is acceptable *)
     let* version =
@@ -256,7 +256,7 @@ let may_register_my_id_point pool = function
    *)
 let check_expected_peer_id (point_info : 'a P2p_point_state.Info.t option)
     (conn_info : 'b P2p_connection.Info.t) =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   match point_info with
   | None ->
       (* if no point info, nothing is expected from the point, it cannot
@@ -272,7 +272,7 @@ let check_expected_peer_id (point_info : 'a P2p_point_state.Info.t option)
               Events.(emit authenticate_status_peer_id_incorrect)
                 ("peer_id", point, expected_peer_id, conn_info.peer_id)
             in
-            fail
+            tzfail
               P2p_errors.(
                 Identity_check_failure
                   {
@@ -288,7 +288,7 @@ let check_expected_peer_id (point_info : 'a P2p_point_state.Info.t option)
             return_unit)
 
 let raw_authenticate t ?point_info canceler scheduled_conn point =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let incoming = point_info = None in
   let incoming_str = if incoming then "incoming" else "outgoing" in
   let*! () = Events.(emit authenticate_start) (point, incoming_str) in
@@ -360,7 +360,7 @@ let raw_authenticate t ?point_info canceler scheduled_conn point =
   (* [acceptable] is either Ok with a network version, or a Rejecting
      error with a motive *)
   let acceptable =
-    let open Tzresult_syntax in
+    let open Result_syntax in
     let* version =
       Network_version.select
         ~chain_name:t.message_config.chain_name
@@ -430,10 +430,10 @@ let raw_authenticate t ?point_info canceler scheduled_conn point =
                 t.custom_p2p_versions,
                 info.announced_version.p2p_version )
           in
-          fail
+          tzfail
             (P2p_errors.Rejected_no_common_protocol
                {announced = info.announced_version})
-      | _ -> fail (P2p_errors.Rejected {peer = info.peer_id; motive}))
+      | _ -> tzfail (P2p_errors.Rejected {peer = info.peer_id; motive}))
   | Error errs as err ->
       let*! () =
         Events.(emit authenticate_status) ("reject", point, info.peer_id)
@@ -530,7 +530,7 @@ let raw_authenticate t ?point_info canceler scheduled_conn point =
       return conn
 
 let authenticate t ?point_info canceler fd point =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let scheduled_conn = P2p_io_scheduler.register t.io_sched fd in
   let*! r = raw_authenticate t ?point_info canceler scheduled_conn point in
   match r with
@@ -587,14 +587,14 @@ let accept t fd point =
           (Printexc.to_string exc))
 
 let fail_unless_disconnected_point point_info =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   match P2p_point_state.get point_info with
   | Disconnected -> return_unit
-  | Requested _ | Accepted _ -> fail P2p_errors.Pending_connection
-  | Running _ -> fail P2p_errors.Connected
+  | Requested _ | Accepted _ -> tzfail P2p_errors.Pending_connection
+  | Running _ -> tzfail P2p_errors.Connected
 
 let connect ?timeout t point =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let* () =
     fail_when
       (P2p_pool.Points.banned t.pool point)
@@ -643,7 +643,7 @@ let connect ?timeout t point =
               close_res ;
             match err with
             | [Exn (Unix.Unix_error (Unix.ECONNREFUSED, _, _))] ->
-                fail P2p_errors.Connection_refused
+                tzfail P2p_errors.Connection_refused
             | err -> Lwt.return_error err)
       in
       let*! () = Events.(emit connect_status) ("authenticate", point) in

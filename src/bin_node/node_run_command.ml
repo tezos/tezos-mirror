@@ -228,7 +228,7 @@ let init_identity_file (config : Node_config_file.t) =
 
 let init_node ?sandbox ?target ~identity ~singleprocess
     ~force_history_mode_switch (config : Node_config_file.t) =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   (* TODO "WARN" when pow is below our expectation. *)
   let*! () =
     if config.disable_config_validation then
@@ -262,7 +262,7 @@ let init_node ?sandbox ?target ~identity ~singleprocess
     | (Some addr, Some _) when Ipaddr.V6.(compare addr unspecified) = 0 ->
         return_none
     | (Some addr, Some _) when not (Ipaddr.V6.is_private addr) ->
-        fail (Non_private_sandbox addr)
+        tzfail (Non_private_sandbox addr)
     | (None, Some _) -> return_none
     | _ ->
         let* trusted_points =
@@ -360,7 +360,7 @@ let sanitize_cors_headers ~default headers =
 
 let launch_rpc_server ~acl_policy ~media_types (config : Node_config_file.t)
     node (addr, port) =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let rpc_config = config.rpc in
   let host = Ipaddr.V6.to_string addr in
   let dir = Node.build_rpc_directory node in
@@ -409,11 +409,11 @@ let launch_rpc_server ~acl_policy ~media_types (config : Node_config_file.t)
          This exception seems to be unreachable.
       *)
       | Unix.Unix_error (Unix.EADDRINUSE, "bind", "") ->
-          fail (RPC_Port_already_in_use [(addr, port)])
+          tzfail (RPC_Port_already_in_use [(addr, port)])
       | exn -> fail_with_exn exn)
 
 let init_rpc (config : Node_config_file.t) node =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let media_types = config.rpc.media_type in
   List.concat_map_es
     (fun addr ->
@@ -433,7 +433,7 @@ let init_rpc (config : Node_config_file.t) node =
 module Metrics_server = Prometheus_app.Cohttp (Cohttp_lwt_unix.Server)
 
 let metrics_serve metrics_addrs =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let* addrs =
     List.map_ep Node_config_file.resolve_metrics_addrs metrics_addrs
   in
@@ -456,7 +456,7 @@ let metrics_serve metrics_addrs =
 
 let run ?verbosity ?sandbox ?target ~singleprocess ~force_history_mode_switch
     (config : Node_config_file.t) =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let* () = Node_data_version.ensure_data_dir config.data_dir in
   (* Main loop *)
   let log_cfg =
@@ -526,7 +526,7 @@ let run ?verbosity ?sandbox ?target ~singleprocess ~force_history_mode_switch
 
 let process sandbox verbosity target singleprocess force_history_mode_switch
     args =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let verbosity =
     let open Internal_event in
     match verbosity with [] -> None | [_] -> Some Info | _ -> Some Debug

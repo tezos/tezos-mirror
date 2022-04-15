@@ -253,7 +253,7 @@ module Block = struct
     Block_hash.equal hash genesis.Genesis.block
 
   let read_block {block_store; _} ?(distance = 0) hash =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let* o =
       Block_store.read_block
         ~read_metadata:false
@@ -261,7 +261,7 @@ module Block = struct
         (Block (hash, distance))
     in
     match o with
-    | None -> fail @@ Block_not_found {hash; distance}
+    | None -> tzfail @@ Block_not_found {hash; distance}
     | Some block -> return block
 
   let read_block_metadata ?(distance = 0) chain_store hash =
@@ -288,11 +288,11 @@ module Block = struct
         | None -> Lwt.return_none)
 
   let get_block_metadata chain_store block =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let*! o = get_block_metadata_opt chain_store block in
     match o with
     | Some metadata -> return metadata
-    | None -> fail (Block_metadata_not_found (Block_repr.hash block))
+    | None -> tzfail (Block_metadata_not_found (Block_repr.hash block))
 
   let read_block_opt chain_store ?(distance = 0) hash =
     let open Lwt_syntax in
@@ -327,17 +327,17 @@ module Block = struct
     | None -> Lwt.return_none
 
   let read_predecessor_of_hash chain_store hash =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let*! o = read_predecessor_of_hash_opt chain_store hash in
     match o with
     | Some b -> return b
-    | None -> fail @@ Block_not_found {hash; distance = 0}
+    | None -> tzfail @@ Block_not_found {hash; distance = 0}
 
   let locked_read_block_by_level chain_store head level =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let distance = Int32.(to_int (sub (Block_repr.level head) level)) in
     if distance < 0 then
-      fail
+      tzfail
         (Bad_level
            {
              head_level = Block_repr.level head;
@@ -367,11 +367,11 @@ module Block = struct
         | Some t -> t)
 
   let read_prechecked_block chain_store hash =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let*! o = read_prechecked_block_opt chain_store hash in
     match o with
     | Some b -> return b
-    | None -> fail (Block_not_found {hash; distance = 0})
+    | None -> tzfail (Block_not_found {hash; distance = 0})
 
   let check_metadata_list ~block_hash ~operations ~ops_metadata =
     fail_unless
@@ -400,7 +400,7 @@ module Block = struct
              } ))
 
   let store_block chain_store ~block_header ~operations validation_result =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let {
       Block_validation.validation_store =
         {
@@ -549,7 +549,7 @@ module Block = struct
         return_some block
 
   let store_prechecked_block chain_store ~hash ~block_header ~operations =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let operations_length = List.length operations in
     let validation_passes = block_header.Block_header.shell.validation_passes in
     let* () =
@@ -592,12 +592,12 @@ module Block = struct
     Context.checkout context_index (Block_repr.context block)
 
   let context chain_store block =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let*! o = context_opt chain_store block in
     match o with
     | Some context -> return context
     | None ->
-        fail
+        tzfail
           (Cannot_checkout_context
              (Block_repr.hash block, Block_repr.context block))
 
@@ -606,13 +606,13 @@ module Block = struct
     Context.exists context_index (Block_repr.context block)
 
   let testchain_status chain_store block =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let* context =
       let*! o = context_opt chain_store block in
       match o with
       | Some ctxt -> return ctxt
       | None ->
-          fail
+          tzfail
             (Cannot_checkout_context
                (Block_repr.hash block, Block_repr.context block))
     in
@@ -632,7 +632,7 @@ module Block = struct
     | Not_running -> return (status, None)
 
   let protocol_hash chain_store block =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     Shared.use chain_store.chain_state (fun chain_state ->
         let*! protocol_levels =
           Stored_data.get chain_state.protocol_levels_data
@@ -641,7 +641,7 @@ module Block = struct
         let proto_level = Block_repr.proto_level block in
         match find proto_level protocol_levels with
         | Some {protocol; _} -> return protocol
-        | None -> fail (Cannot_find_protocol proto_level))
+        | None -> tzfail (Cannot_find_protocol proto_level))
 
   let protocol_hash_exn chain_store block =
     let open Lwt_syntax in
@@ -661,8 +661,8 @@ module Block = struct
         Stored_data.get chain_state.invalid_blocks_data)
 
   let mark_invalid chain_store hash ~level errors =
-    let open Lwt_tzresult_syntax in
-    if is_genesis chain_store hash then fail Invalid_genesis_marking
+    let open Lwt_result_syntax in
+    if is_genesis chain_store hash then tzfail Invalid_genesis_marking
     else
       let* () =
         Shared.use chain_store.chain_state (fun chain_state ->
@@ -894,7 +894,7 @@ module Chain = struct
     Shared.use chain_store.chain_state (fun {mempool; _} -> Lwt.return mempool)
 
   let block_of_identifier chain_store =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let not_found () = fail_with_exn Not_found in
     function
     | `Genesis ->
@@ -942,7 +942,7 @@ module Chain = struct
     | Error _ -> Lwt.return_none
 
   let set_mempool chain_store ~head mempool =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     Shared.update_with chain_store.chain_state (fun chain_state ->
         let*! current_head_descr =
           Stored_data.get chain_state.current_head_data
@@ -1265,7 +1265,7 @@ module Chain = struct
 
   let may_update_checkpoint_and_target chain_store ~new_head ~new_head_lafl
       ~checkpoint ~target =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let new_checkpoint =
       if Compare.Int32.(snd new_head_lafl > snd checkpoint) then new_head_lafl
       else checkpoint
@@ -1281,7 +1281,7 @@ module Chain = struct
           | false ->
               (* Impossible: a block is not acceptable to be stored if
                  it's not compatible with the target *)
-              fail Target_mismatch
+              tzfail Target_mismatch
         else return (new_checkpoint, Some target)
 
   let locked_determine_cementing_highwatermark chain_store chain_state head_lafl
@@ -1340,7 +1340,7 @@ module Chain = struct
     return_unit
 
   let set_head chain_store new_head =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     Shared.update_with chain_store.chain_state (fun chain_state ->
         (* The merge cannot finish until we release the lock on the
            chain state so its status cannot change while this
@@ -1575,7 +1575,7 @@ module Chain = struct
   (* TODO (later) check if that's ok *)
   let locked_is_valid_for_checkpoint chain_store chain_state
       (given_checkpoint_hash, given_checkpoint_level) =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let current_head = chain_state.current_head in
     let* current_head_metadata =
       Block.get_block_metadata chain_store current_head
@@ -1611,7 +1611,7 @@ module Chain = struct
                   (Block.hash current_head)
               in
               match o with
-              | None -> fail Missing_last_allowed_fork_level_block
+              | None -> tzfail Missing_last_allowed_fork_level_block
               | Some lafl_hash -> return (Block_hash.equal lafl_hash ancestor)))
 
   let is_valid_for_checkpoint chain_store given_checkpoint =
@@ -1629,7 +1629,7 @@ module Chain = struct
               given_checkpoint)
 
   let best_known_head_for_checkpoint chain_store ~checkpoint =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let (_, checkpoint_level) = checkpoint in
     let*! current_head = current_head chain_store in
     let* valid =
@@ -1665,7 +1665,7 @@ module Chain = struct
         heads
 
   let set_target chain_store new_target =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let*! () = Block_store.await_merging chain_store.block_store in
     Shared.use chain_store.chain_state (fun chain_state ->
         let*! checkpoint = Stored_data.get chain_state.checkpoint_data in
@@ -1675,7 +1675,7 @@ module Chain = struct
           in
           match b with
           | true -> return_unit
-          | false -> fail (Cannot_set_target new_target)
+          | false -> tzfail (Cannot_set_target new_target)
         else
           (* new_target > checkpoint *)
           let*! b = Block.is_known_valid chain_store (fst new_target) in
@@ -1685,7 +1685,7 @@ module Chain = struct
                 Block.locked_is_known_invalid chain_state (fst new_target)
               in
               match b with
-              | true -> fail (Cannot_set_target new_target)
+              | true -> tzfail (Cannot_set_target new_target)
               | false ->
                   (* unknown block => new_target > all_heads *)
                   (* Write future-block as target, [set_head] will
@@ -1826,7 +1826,7 @@ module Chain = struct
 
   let create_chain_state ?target ~genesis_block ~genesis_protocol
       ~genesis_commit_info chain_dir =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let genesis_proto_level = Block_repr.proto_level genesis_block in
     let ((_, genesis_level) as genesis_descr) =
       Block_repr.descriptor genesis_block
@@ -1941,7 +1941,7 @@ module Chain = struct
   (* TODO add integrity check to ensure that files are present? *)
   (* Files are expected to be present *)
   let load_chain_state chain_dir block_store =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let* protocol_levels_data =
       Stored_data.load (Naming.protocol_levels_file chain_dir)
     in
@@ -2009,11 +2009,11 @@ module Chain = struct
           }
 
   let get_commit_info index header =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     protect
       ~on_error:(fun err ->
         Format.kasprintf
-          (fun e -> fail (Missing_commit_info e))
+          (fun e -> tzfail (Missing_commit_info e))
           "%a"
           Error_monad.pp_print_trace
           err)
@@ -2029,7 +2029,7 @@ module Chain = struct
   let create_chain_store ?block_cache_limit global_store chain_dir ?target
       ~chain_id ?(expiration = None) ?genesis_block ~genesis ~genesis_context
       history_mode =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     (* Chain directory *)
     let genesis_block =
       match genesis_block with
@@ -2084,7 +2084,7 @@ module Chain = struct
 
   let load_chain_store ?block_cache_limit global_store chain_dir ~chain_id
       ~readonly =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let* chain_config_data =
       Stored_data.load (Naming.chain_config_file chain_dir)
     in
@@ -2120,7 +2120,7 @@ module Chain = struct
     let*! head = current_head chain_store in
     let*! o = Block.get_block_metadata_opt chain_store head in
     match o with
-    | None -> fail Inconsistent_chain_store
+    | None -> tzfail Inconsistent_chain_store
     | Some metadata ->
         Shared.update_with chain_state (fun chain_state ->
             let*! (live_blocks, live_operations) =
@@ -2167,7 +2167,7 @@ module Chain = struct
   let testchain_store {testchain_store; _} = testchain_store
 
   let locked_load_testchain chain_store chain_state ~chain_id =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let {forked_chains_data; active_testchain; _} = chain_state in
     match active_testchain with
     | Some testchain
@@ -2193,7 +2193,7 @@ module Chain = struct
 
   let fork_testchain chain_store ~testchain_id ~forked_block ~genesis_hash
       ~genesis_header ~test_protocol ~expiration =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let forked_block_hash = Block.hash forked_block in
     let genesis_hash' = Context.compute_testchain_genesis forked_block_hash in
     assert (Block_hash.equal genesis_hash genesis_hash') ;
@@ -2211,7 +2211,7 @@ module Chain = struct
             if Chain_id.equal testchain_store.chain_id testchain_id then (
               assert (Block_hash.equal forked_block forked_block_hash) ;
               return (None, testchain))
-            else fail (Cannot_fork_testchain testchain_id)
+            else tzfail (Cannot_fork_testchain testchain_id)
         | None ->
             let chain_dir = chain_store.chain_dir in
             let testchains_dir = Naming.testchains_dir chain_dir in
@@ -2228,7 +2228,7 @@ module Chain = struct
                   ~chain_id:testchain_id
               in
               match o with
-              | None -> fail (Cannot_load_testchain testchain_dir_path)
+              | None -> tzfail (Cannot_load_testchain testchain_dir_path)
               | Some testchain ->
                   return
                     ( Some {chain_state with active_testchain = Some testchain},
@@ -2302,7 +2302,7 @@ module Chain = struct
   (* Protocols *)
 
   let compute_commit_info chain_store block =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let index = chain_store.global_store.context_index in
     protect
       ~on_error:(fun _ -> return_none)
@@ -2311,7 +2311,7 @@ module Chain = struct
         return_some commit_info)
 
   let set_protocol_level chain_store ~protocol_level (block, protocol_hash) =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     Shared.locked_use chain_store.chain_state (fun {protocol_levels_data; _} ->
         let* commit_info_opt =
           compute_commit_info chain_store (Block.header block)
@@ -2355,7 +2355,7 @@ module Chain = struct
 
   let may_update_protocol_level chain_store ?pred ?protocol_level
       (block, protocol_hash) =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let* pred =
       match pred with
       | None -> Block.read_predecessor chain_store block
@@ -2377,7 +2377,7 @@ module Chain = struct
     else return_unit
 
   let may_update_ancestor_protocol_level chain_store ~head =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let head_proto_level = Block.proto_level head in
     let*! o =
       find_activation_block chain_store ~protocol_level:head_proto_level
@@ -2497,7 +2497,7 @@ end
 let create_store ?block_cache_limit ~context_index ~chain_id ~genesis
     ~genesis_context ?(history_mode = History_mode.default) ~allow_testchains
     store_dir =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let store_dir_path = Naming.dir_path store_dir in
   let*! () = Lwt_utils_unix.create_dir store_dir_path in
   let*! protocol_store = Protocol_store.init store_dir in
@@ -2531,7 +2531,7 @@ let create_store ?block_cache_limit ~context_index ~chain_id ~genesis
 
 let load_store ?history_mode ?block_cache_limit store_dir ~context_index
     ~genesis ~chain_id ~allow_testchains ~readonly () =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let chain_dir = Naming.chain_dir store_dir chain_id in
   let* () =
     protect
@@ -2612,7 +2612,7 @@ let main_chain_store store =
 
 let init ?patch_context ?commit_genesis ?history_mode ?(readonly = false)
     ?block_cache_limit ~store_dir ~context_dir ~allow_testchains genesis =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let store_dir = Naming.store_dir ~dir_path:store_dir in
   let chain_id = Chain_id.of_block_hash genesis.Genesis.block in
   let*! (context_index, commit_genesis) =
@@ -2674,7 +2674,7 @@ let close_store global_store =
   Context.close global_store.context_index
 
 let may_switch_history_mode ~store_dir ~context_dir genesis ~new_history_mode =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let store_dir = Naming.store_dir ~dir_path:store_dir in
   let chain_id = Chain_id.of_block_hash genesis.Genesis.block in
   let chain_dir = Naming.chain_dir store_dir chain_id in
@@ -2746,13 +2746,13 @@ let may_switch_history_mode ~store_dir ~context_dir genesis ~new_history_mode =
 let get_chain_store store chain_id =
   let chain_store = main_chain_store store in
   let rec loop chain_store =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     if Chain_id.equal (Chain.chain_id chain_store) chain_id then
       return chain_store
     else
       Shared.use chain_store.chain_state (fun {active_testchain; _} ->
           match active_testchain with
-          | None -> fail (Validation_errors.Unknown_chain chain_id)
+          | None -> tzfail (Validation_errors.Unknown_chain chain_id)
           | Some {testchain_store; _} -> loop testchain_store)
   in
   loop chain_store
@@ -3046,7 +3046,7 @@ module Unsafe = struct
 
   let open_for_snapshot_export ~store_dir ~context_dir genesis
       ~(locked_f : chain_store -> 'a tzresult Lwt.t) =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let store_dir = Naming.store_dir ~dir_path:store_dir in
     let chain_id = Chain_id.of_block_hash genesis.Genesis.block in
     let chain_dir = Naming.chain_dir store_dir chain_id in
@@ -3076,7 +3076,7 @@ module Unsafe = struct
   let restore_from_snapshot ?(notify = fun () -> Lwt.return_unit) store_dir
       ~genesis ~genesis_context_hash ~floating_blocks_stream
       ~new_head_with_metadata ~protocol_levels ~history_mode =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let chain_id = Chain_id.of_block_hash genesis.Genesis.block in
     let chain_dir = Naming.chain_dir store_dir chain_id in
     let genesis_block =

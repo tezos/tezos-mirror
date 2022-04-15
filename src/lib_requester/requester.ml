@@ -515,11 +515,11 @@ module Make
       (fun key -> Timeout key)
 
   let read s k =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     match Memory_table.find s.memory k with
     | None -> trace (Missing_data k) @@ Disk_table.read s.disk k
     | Some (Found v) -> return v
-    | Some (Pending _) -> fail (Missing_data k)
+    | Some (Pending _) -> tzfail (Missing_data k)
 
   let wrap s k ?timeout t =
     let open Lwt_syntax in
@@ -533,13 +533,13 @@ module Make
             if data.waiters = 0 then (
               Memory_table.remove s.memory k ;
               Scheduler.notify_cancellation s.scheduler k ;
-              Lwt.wakeup_later w (Tzresult_syntax.fail (Canceled k)))) ;
+              Lwt.wakeup_later w (Result_syntax.tzfail (Canceled k)))) ;
     match timeout with
     | None -> t
     | Some delay ->
         let timeout =
           let* () = Systime_os.sleep delay in
-          Lwt_tzresult_syntax.fail (Timeout k)
+          Lwt_result_syntax.tzfail (Timeout k)
         in
         Lwt.pick [t; timeout]
 
@@ -632,7 +632,7 @@ module Make
     | Some (Pending {wakener = w; _}) ->
         Scheduler.notify_cancellation s.scheduler k ;
         Memory_table.remove s.memory k ;
-        Lwt.wakeup_later w (Tzresult_syntax.fail (Canceled k))
+        Lwt.wakeup_later w (Result_syntax.tzfail (Canceled k))
     | Some (Found _) -> Memory_table.remove s.memory k
 
   let watch s = Lwt_watcher.create_stream s.input

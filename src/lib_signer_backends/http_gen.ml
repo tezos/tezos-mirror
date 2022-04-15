@@ -92,7 +92,7 @@ struct
 
     let parse uri =
       (* extract `tz1..` from the last component of the path *)
-      let open Lwt_tzresult_syntax in
+      let open Lwt_result_syntax in
       assert (Uri.scheme uri = Some scheme) ;
       let path = Uri.path uri in
       let* (base, pkh) =

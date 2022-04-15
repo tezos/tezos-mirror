@@ -76,7 +76,7 @@ module BlockToHashClient (S : Registration.Proxy_sig) : BLOCK_TO_HASH = struct
   let hash_of_block (rpc_context : #RPC_context.simple)
       (chain : Tezos_shell_services.Shell_services.chain)
       (block : Tezos_shell_services.Block_services.block) =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     match raw_hash_of_block block with
     | Some h ->
         (* Block is defined by its hash *)
@@ -307,7 +307,7 @@ let build_directory (printer : Tezos_client_base.Client_context.printer)
       | Proxy_client | Light_client _ -> 16)
   in
   let get_env_rpc_context chain block =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let* block_hash_opt = B2H.hash_of_block rpc_context chain block in
     let (block_key, (fill_b2h : Block_hash.t -> unit)) =
       match block_hash_opt with

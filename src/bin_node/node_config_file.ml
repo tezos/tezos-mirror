@@ -1251,24 +1251,24 @@ let string_of_json_encoding_error exn =
   Format.asprintf "%a" (Json_encoding.print_error ?print_unknown:None) exn
 
 let read fp =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   if Sys.file_exists fp then
     let* json = Lwt_utils_unix.Json.read_file fp in
     try return (Data_encoding.Json.destruct encoding json) with
     | Json_encoding.Cannot_destruct (path, exn) ->
         let path = Json_query.json_pointer_of_path path in
         let exn = string_of_json_encoding_error exn in
-        fail (Invalid_content (Some path, exn))
+        tzfail (Invalid_content (Some path, exn))
     | ( Json_encoding.Unexpected _ | Json_encoding.No_case_matched _
       | Json_encoding.Bad_array_size _ | Json_encoding.Missing_field _
       | Json_encoding.Unexpected_field _ | Json_encoding.Bad_schema _ ) as exn
       ->
         let exn = string_of_json_encoding_error exn in
-        fail (Invalid_content (None, exn))
+        tzfail (Invalid_content (None, exn))
   else return default_config
 
 let write fp cfg =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let* () = Node_data_version.ensure_data_dir (Filename.dirname fp) in
   Lwt_utils_unix.Json.write_file fp (Data_encoding.Json.construct encoding cfg)
 
@@ -1287,7 +1287,7 @@ let update ?(disable_config_validation = false) ?data_dir ?min_connections
     ?(enable_testchain = false) ?(cors_origins = []) ?(cors_headers = [])
     ?rpc_tls ?log_output ?synchronisation_threshold ?history_mode ?network
     ?latency cfg =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let disable_config_validation =
     cfg.disable_config_validation || disable_config_validation
   in
@@ -1456,15 +1456,15 @@ let to_ipv4 ipv6_l =
 let resolve_addr ~default_addr ?(no_peer_id_expected = true) ?default_port
     ?(passive = false) peer :
     (P2p_point.Id.t * P2p_peer.Id.t option) list tzresult Lwt.t =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   match P2p_point.Id.parse_addr_port_id peer with
   | (Error (P2p_point.Id.Bad_id_format _) | Ok {peer_id = Some _; _})
     when no_peer_id_expected ->
-      fail
+      tzfail
         (Failed_to_parse_address
            (peer, "no peer identity should be specified here"))
   | Error err ->
-      fail
+      tzfail
         (Failed_to_parse_address (peer, P2p_point.Id.string_of_parsing_error err))
   | Ok {addr; port; peer_id} ->
       let service_port =
@@ -1485,7 +1485,7 @@ let resolve_addrs ?default_port ?passive ?no_peer_id_expected ~default_addr
     addrs
 
 let resolve_discovery_addrs discovery_addr =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let* addrs =
     resolve_addr
       ~default_addr:Ipaddr.V4.(to_string broadcast)
@@ -1497,7 +1497,7 @@ let resolve_discovery_addrs discovery_addr =
   return addrs
 
 let resolve_listening_addrs listen_addr =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let+ addrs =
     resolve_addr
       ~default_addr:"::"
@@ -1508,7 +1508,7 @@ let resolve_listening_addrs listen_addr =
   List.map fst addrs
 
 let resolve_rpc_listening_addrs listen_addr =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let+ addrs =
     resolve_addr
       ~default_addr:"localhost"
@@ -1519,7 +1519,7 @@ let resolve_rpc_listening_addrs listen_addr =
   List.map fst addrs
 
 let resolve_metrics_addrs metrics_addr =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let+ addrs =
     resolve_addr
       ~default_addr:"localhost"

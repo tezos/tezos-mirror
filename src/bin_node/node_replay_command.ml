@@ -152,7 +152,7 @@ let () =
     (fun () -> Cannot_replay_below_savepoint)
 
 let replay ~singleprocess (config : Node_config_file.t) blocks =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let store_root = Node_data_version.store_dir config.data_dir in
   let context_root = Node_data_version.context_dir config.data_dir in
   let protocol_root = Node_data_version.protocol_dir config.data_dir in
@@ -220,13 +220,13 @@ let replay ~singleprocess (config : Node_config_file.t) blocks =
           in
           let* block =
             protect
-              ~on_error:(fun _ -> fail Block_not_found)
+              ~on_error:(fun _ -> tzfail Block_not_found)
               (fun () ->
                 let*! o =
                   Store.Chain.block_of_identifier_opt main_chain_store block
                 in
                 match o with
-                | None -> fail Block_not_found
+                | None -> tzfail Block_not_found
                 | Some block -> return block)
           in
           let predecessor_hash = Store.Block.predecessor block in
@@ -234,13 +234,13 @@ let replay ~singleprocess (config : Node_config_file.t) blocks =
             Store.Block.read_block_opt main_chain_store predecessor_hash
           in
           match predecessor_opt with
-          | None -> fail Cannot_replay_orphan
+          | None -> tzfail Cannot_replay_orphan
           | Some predecessor ->
               let*! (_, savepoint_level) =
                 Store.Chain.savepoint main_chain_store
               in
               if Store.Block.level block <= savepoint_level then
-                fail Cannot_replay_below_savepoint
+                tzfail Cannot_replay_below_savepoint
               else
                 let expected_context_hash = Store.Block.context_hash block in
                 let* metadata =

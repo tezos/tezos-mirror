@@ -189,7 +189,7 @@ module Merkle = struct
     else return_none
 
   let union_irmin_tree_merkle_tree repo tree mtree =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let* tree_opt = union_irmin_tree_merkle_tree repo [] tree mtree in
     let tree = Option.value ~default:tree tree_opt in
     return tree

@@ -53,7 +53,7 @@ let () =
     (fun addrlist -> Proxy_server_RPC_Port_already_in_use addrlist)
 
 let launch_rpc_server dir {address; port; tls_cert_and_key} =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let host = Ipaddr.V6.to_string address in
   let mode =
     match tls_cert_and_key with
@@ -71,7 +71,7 @@ let launch_rpc_server dir {address; port; tls_cert_and_key} =
            ~media_types:Tezos_rpc_http.Media_type.all_media_types)
     (function
       | Unix.Unix_error (Unix.EADDRINUSE, "bind", "") ->
-          fail (Proxy_server_RPC_Port_already_in_use [(address, port)])
+          tzfail (Proxy_server_RPC_Port_already_in_use [(address, port)])
       | exn -> fail_with_exn exn)
 
 let run dir ({address; port; _} as args) =

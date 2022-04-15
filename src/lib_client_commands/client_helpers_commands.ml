@@ -31,7 +31,7 @@ let unique_switch =
     ()
 
 let commands () =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let open Clic in
   [
     command

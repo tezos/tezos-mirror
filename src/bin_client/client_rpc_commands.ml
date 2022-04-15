@@ -534,7 +534,7 @@ let meth_params ?(name = "HTTP method") ?(desc = "") params =
          @@ List.map Resto.string_of_meth
          @@ [`GET; `POST; `DELETE; `PUT; `PATCH])
        (fun _ name ->
-         let open Lwt_tzresult_syntax in
+         let open Lwt_result_syntax in
          match Resto.meth_of_string (String.uppercase_ascii name) with
          | None -> failwith "Unknown HTTP method: %s" name
          | Some meth -> return meth))

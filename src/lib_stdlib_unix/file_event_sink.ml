@@ -281,7 +281,7 @@ module Sink_implementation : Internal_event.SINK with type t = t = struct
 
   let handle (type a) {path; lwt_bad_citizen_hack; event_filter} m
       ?(section = Internal_event.Section.empty) (v : unit -> a) =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let module M = (val m : Internal_event.EVENT_DEFINITION with type t = a) in
     let now = Micro_seconds.now () in
     let (date, time) = Micro_seconds.date_string now in
@@ -333,7 +333,7 @@ open Sink_implementation
 
 module Query = struct
   let with_file_kind dir p =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let* kind =
       protect (fun () ->
           let* {Lwt_unix.st_kind; _} =
@@ -348,7 +348,7 @@ module Query = struct
         return (`Special (k, p))
 
   let fold_directory path ~init ~f =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let* dirhandle =
       protect (fun () -> Lwt_result.ok @@ Lwt_unix.opendir path)
     in
@@ -545,7 +545,7 @@ module Query = struct
 
   let fold ?on_unknown ?only_sections ?only_names ?(time_query = `All) uri ~init
       ~f =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let name_matches =
       match only_names with
       | None -> fun _ -> true

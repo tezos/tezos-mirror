@@ -129,10 +129,10 @@ type result = {
 type apply_result = {result : result; cache : Environment_context.Context.cache}
 
 let check_proto_environment_version_increasing block_hash before after =
-  let open Tzresult_syntax in
+  let open Result_syntax in
   if Protocol.compare_version before after <= 0 then return_unit
   else
-    fail
+    tzfail
       (invalid_block
          block_hash
          (Invalid_protocol_environment_transition (before, after)))
@@ -155,7 +155,7 @@ let update_testchain_status ctxt ~predecessor_hash timestamp =
         (Running {chain_id; genesis; protocol; expiration})
 
 let init_test_chain ctxt forked_header =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let*! tc = Context.get_test_chain ctxt in
   match tc with
   | Not_running | Running _ -> assert false
@@ -163,7 +163,7 @@ let init_test_chain ctxt forked_header =
       let* (module Proto_test) =
         match Registered_protocol.get protocol with
         | Some proto -> return proto
-        | None -> fail (Missing_test_protocol protocol)
+        | None -> tzfail (Missing_test_protocol protocol)
       in
       let test_ctxt = Shell_context.wrap_disk_context ctxt in
       let*! () =
@@ -287,7 +287,7 @@ module Make (Proto : Registered_protocol.T) = struct
 
   let check_block_header ~(predecessor_block_header : Block_header.t) hash
       (block_header : Block_header.t) =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let* () =
       fail_unless
         (Int32.succ predecessor_block_header.shell.level
@@ -324,19 +324,19 @@ module Make (Proto : Registered_protocol.T) = struct
     return_unit
 
   let parse_block_header block_hash (block_header : Block_header.t) =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     match
       Data_encoding.Binary.of_bytes_opt
         Proto.block_header_data_encoding
         block_header.protocol_data
     with
-    | None -> fail (invalid_block block_hash Cannot_parse_block_header)
+    | None -> tzfail (invalid_block block_hash Cannot_parse_block_header)
     | Some protocol_data ->
         return
           ({shell = block_header.shell; protocol_data} : Proto.block_header)
 
   let check_one_operation_quota block_hash pass ops quota =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let* () =
       fail_unless
         (match quota.Tezos_protocol_environment.max_op with
@@ -384,7 +384,7 @@ module Make (Proto : Registered_protocol.T) = struct
   let parse_operations block_hash operations =
     List.mapi_es
       (fun pass ->
-        let open Lwt_tzresult_syntax in
+        let open Lwt_result_syntax in
         List.map_es (fun op ->
             let op_hash = Operation.hash op in
             match
@@ -393,7 +393,8 @@ module Make (Proto : Registered_protocol.T) = struct
                 op.Operation.proto
             with
             | None ->
-                fail (invalid_block block_hash (Cannot_parse_operation op_hash))
+                tzfail
+                  (invalid_block block_hash (Cannot_parse_operation op_hash))
             | Some protocol_data ->
                 let op = {Proto.shell = op.shell; protocol_data} in
                 let allowed_pass = Proto.acceptable_passes op in
@@ -413,7 +414,7 @@ module Make (Proto : Registered_protocol.T) = struct
      See https://gitlab.com/tezos/tezos/-/issues/2716 *)
   let compute_metadata ~operation_metadata_size_limit proto_env_version
       block_data ops_metadata =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     (* Block and operation metadata hashes are not required for
        environment V0. *)
     let should_include_metadata_hashes =
@@ -477,7 +478,7 @@ module Make (Proto : Registered_protocol.T) = struct
       with exn ->
         trace
           Validation_errors.Cannot_serialize_operation_metadata
-          (fail (Exn exn))
+          (tzfail (Exn exn))
     in
     return (block_metadata, ops_metadata)
 
@@ -486,7 +487,7 @@ module Make (Proto : Registered_protocol.T) = struct
       ~max_operations_ttl ~(predecessor_block_header : Block_header.t)
       ~predecessor_block_metadata_hash ~predecessor_ops_metadata_hash
       ~predecessor_context ~(block_header : Block_header.t) operations =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let block_hash = Block_header.hash block_header in
     match cached_result with
     | Some (({result; _} as cached_result), context)
@@ -619,7 +620,7 @@ module Make (Proto : Registered_protocol.T) = struct
           else
             match Registered_protocol.get new_protocol with
             | None ->
-                fail
+                tzfail
                   (Unavailable_protocol
                      {block = block_hash; protocol = new_protocol})
             | Some (module NewProto) ->
@@ -723,20 +724,20 @@ module Make (Proto : Registered_protocol.T) = struct
   (** Doesn't depend on heavy [Registered_protocol.T] for testability. *)
   let safe_binary_of_bytes (encoding : 'a Data_encoding.t) (bytes : bytes) :
       'a tzresult =
-    let open Tzresult_syntax in
+    let open Result_syntax in
     match Data_encoding.Binary.of_bytes_opt encoding bytes with
-    | None -> fail Parse_error
+    | None -> tzfail Parse_error
     | Some protocol_data -> return protocol_data
 
   let parse_unsafe (proto : bytes) : Proto.operation_data tzresult =
     safe_binary_of_bytes Proto.operation_data_encoding proto
 
   let parse (raw : Operation.t) =
-    let open Tzresult_syntax in
+    let open Result_syntax in
     let hash = Operation.hash raw in
     let size = Data_encoding.Binary.length Operation.encoding raw in
     if size > Proto.max_operation_data_length then
-      fail (Oversized_operation {size; max = Proto.max_operation_data_length})
+      tzfail (Oversized_operation {size; max = Proto.max_operation_data_length})
     else
       let* protocol_data = parse_unsafe raw.proto in
       return {hash; raw; protocol_data}
@@ -748,7 +749,7 @@ module Make (Proto : Registered_protocol.T) = struct
       ~(predecessor_shell_header : Block_header.shell_header) ~predecessor_hash
       ~predecessor_max_operations_ttl ~predecessor_block_metadata_hash
       ~predecessor_ops_metadata_hash ~operations =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let context = predecessor_context in
     let*! context =
       update_testchain_status context ~predecessor_hash timestamp
@@ -768,7 +769,7 @@ module Make (Proto : Registered_protocol.T) = struct
       match predecessor_block_metadata_hash with
       | None ->
           if should_metadata_be_present then
-            fail (Missing_block_metadata_hash predecessor_hash)
+            tzfail (Missing_block_metadata_hash predecessor_hash)
           else return context
       | Some hash ->
           Lwt_result.ok
@@ -778,7 +779,7 @@ module Make (Proto : Registered_protocol.T) = struct
       match predecessor_ops_metadata_hash with
       | None ->
           if should_metadata_be_present then
-            fail (Missing_operation_metadata_hashes predecessor_hash)
+            tzfail (Missing_operation_metadata_hashes predecessor_hash)
           else return context
       | Some hash ->
           Lwt_result.ok
@@ -925,7 +926,7 @@ module Make (Proto : Registered_protocol.T) = struct
       else
         match Registered_protocol.get protocol with
         | None ->
-            fail
+            tzfail
               (Block_validator_errors.Unavailable_protocol
                  {block = predecessor_hash; protocol})
         | Some (module NewProto) ->
@@ -987,7 +988,7 @@ module Make (Proto : Registered_protocol.T) = struct
   let precheck block_hash chain_id ~(predecessor_block_header : Block_header.t)
       ~predecessor_block_hash ~predecessor_context ~cache
       ~(block_header : Block_header.t) operations =
-    let open Lwt_tzresult_syntax in
+    let open Lwt_result_syntax in
     let* () =
       check_block_header ~predecessor_block_header block_hash block_header
     in
@@ -1042,7 +1043,7 @@ module Make (Proto : Registered_protocol.T) = struct
 end
 
 let assert_no_duplicate_operations block_hash live_operations operations =
-  let open Tzresult_syntax in
+  let open Result_syntax in
   let exception Duplicate of block_error in
   try
     return
@@ -1054,10 +1055,10 @@ let assert_no_duplicate_operations block_hash live_operations operations =
               else Operation_hash.Set.add oph live_operations))
          live_operations
          operations)
-  with Duplicate err -> fail (invalid_block block_hash err)
+  with Duplicate err -> tzfail (invalid_block block_hash err)
 
 let assert_operation_liveness block_hash live_blocks operations =
-  let open Tzresult_syntax in
+  let open Result_syntax in
   let exception Outdated of block_error in
   try
     return
@@ -1074,7 +1075,7 @@ let assert_operation_liveness block_hash live_blocks operations =
                 in
                 raise (Outdated error)))
          operations)
-  with Outdated err -> fail (invalid_block block_hash err)
+  with Outdated err -> tzfail (invalid_block block_hash err)
 
 (* Maybe this function should be moved somewhere else since it used
    once by [Block_validator_process] *)
@@ -1109,12 +1110,12 @@ let apply ?cached_result
       predecessor_ops_metadata_hash;
       predecessor_context;
     } ~cache block_hash block_header operations =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let*! pred_protocol_hash = Context.get_protocol predecessor_context in
   let* (module Proto) =
     match Registered_protocol.get pred_protocol_hash with
     | None ->
-        fail
+        tzfail
           (Unavailable_protocol
              {block = block_hash; protocol = pred_protocol_hash})
     | Some p -> return p
@@ -1136,7 +1137,7 @@ let apply ?cached_result
     operations
 
 let apply ?cached_result c ~cache block_header operations =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let block_hash = Block_header.hash block_header in
   let*! r =
     (* The cache might be inconsistent with the context. By forcing
@@ -1169,18 +1170,18 @@ let apply ?cached_result c ~cache block_header operations =
   in
   match r with
   | Error (Exn (Unix.Unix_error (errno, fn, msg)) :: _) ->
-      fail (System_error {errno = Unix.error_message errno; fn; msg})
+      tzfail (System_error {errno = Unix.error_message errno; fn; msg})
   | (Ok _ | Error _) as res -> Lwt.return res
 
 let precheck ~chain_id ~predecessor_block_header ~predecessor_block_hash
     ~predecessor_context ~cache block_header operations =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let block_hash = Block_header.hash block_header in
   let*! pred_protocol_hash = Context.get_protocol predecessor_context in
   let* (module Proto) =
     match Registered_protocol.get pred_protocol_hash with
     | None ->
-        fail
+        tzfail
           (Unavailable_protocol
              {block = block_hash; protocol = pred_protocol_hash})
     | Some p -> return p
@@ -1200,7 +1201,7 @@ let preapply ~chain_id ~user_activated_upgrades
     ~protocol_data ~live_blocks ~live_operations ~predecessor_context
     ~predecessor_shell_header ~predecessor_hash ~predecessor_max_operations_ttl
     ~predecessor_block_metadata_hash ~predecessor_ops_metadata_hash operations =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let*! protocol = Context.get_protocol predecessor_context in
   let* (module Proto) =
     match Registered_protocol.get protocol with
@@ -1248,7 +1249,7 @@ let preapply ~chain_id ~user_activated_upgrades
     ~protocol_data ~live_blocks ~live_operations ~predecessor_context
     ~predecessor_shell_header ~predecessor_hash ~predecessor_max_operations_ttl
     ~predecessor_block_metadata_hash ~predecessor_ops_metadata_hash operations =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_result_syntax in
   let*! r =
     preapply
       ~chain_id
@@ -1269,5 +1270,5 @@ let preapply ~chain_id ~user_activated_upgrades
   in
   match r with
   | Error (Exn (Unix.Unix_error (errno, fn, msg)) :: _) ->
-      fail (System_error {errno = Unix.error_message errno; fn; msg})
+      tzfail (System_error {errno = Unix.error_message errno; fn; msg})
   | (Ok _ | Error _) as res -> Lwt.return res
