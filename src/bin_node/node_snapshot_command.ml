@@ -356,9 +356,7 @@ module Term = struct
       "Force export command to dump a minimal snapshot based on the rolling \
        mode."
     in
-    Arg.(
-      value & flag
-      & info ~docs:Node_shared_arg.Manpage.misc_section ~doc ["rolling"])
+    Arg.(value & flag & info ~doc ["rolling"])
 
   let reconstruct =
     let open Cmdliner in
@@ -366,9 +364,7 @@ module Term = struct
       "Start a storage reconstruction from a full mode snapshot to an archive \
        storage. This operation can be quite long."
     in
-    Arg.(
-      value & flag
-      & info ~docs:Node_shared_arg.Manpage.misc_section ~doc ["reconstruct"])
+    Arg.(value & flag & info ~doc ["reconstruct"])
 
   let in_memory_index =
     let open Cmdliner in
@@ -376,9 +372,7 @@ module Term = struct
       "Imports a snapshot with in-memory indexes to speed up the procedure. As \
        a counter part, the import will requires more memory."
     in
-    Arg.(
-      value & flag
-      & info ~docs:Node_shared_arg.Manpage.misc_section ~doc ["in-memory"])
+    Arg.(value & flag & info ~doc ["in-memory"])
 
   let on_disk_index =
     let open Cmdliner in
@@ -386,9 +380,7 @@ module Term = struct
       "Exports a snapshot with on-disk indexes, in order to use less memory. \
        As a counter part, the export will requires more time."
     in
-    Arg.(
-      value & flag
-      & info ~docs:Node_shared_arg.Manpage.misc_section ~doc ["on-disk"])
+    Arg.(value & flag & info ~doc ["on-disk"])
 
   let sandbox =
     let open Cmdliner in
