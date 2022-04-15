@@ -2,7 +2,7 @@
 
 Compile with `make`.
 
-Run on the standard input with `dune exec git-gas-diff`.
+Run with `dune exec git-gas-diff [file]`. [file] is optional; if absent, the standard input will be read.
 
 Typical usage is to pipe a `git diff` with the tool:
 ```

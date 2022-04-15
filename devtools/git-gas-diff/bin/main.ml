@@ -30,7 +30,8 @@ diff on regression traces.
 Typical usage is to pipe a git diff that contains gas changes with the tool:
   git diff HEAD^ HEAD | dune exec git-gas-diff
 
-The script reads the standard input line by line in the [read_all] sub-function.
+The script reads a file (or the standard input if no file is provided) line by
+line in the [run] function.
 It ignores lines that do not start with '+' or '-', and the ones that start with
 "+++" and "---".
 
@@ -626,14 +627,18 @@ module Synths = struct
      @ to_strs @ parameter_strs)
 end
 
-let () =
+let run file_opt =
+  let ic = Option.value_map stdin open_in file_opt in
   let rec read_all line_number synths =
     try
       (* Printf.printf "%d\n%!" line_number ; *)
-      let line = input_line stdin in
+      let line = input_line ic in
       let synths = Synths.add_line synths line in
       read_all (succ line_number) synths
     with End_of_file -> synths
   in
   let synths = read_all 1 Synths.empty in
+  if Option.is_some file_opt then close_in ic;
   Synths.show synths
+
+let () = run (try Some Sys.argv.(1) with Invalid_argument _ -> None)
