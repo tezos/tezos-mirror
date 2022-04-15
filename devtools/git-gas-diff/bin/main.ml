@@ -58,6 +58,12 @@ let ( let+ ) f opt = Option.map opt f
 
 let either l a = List.find_map (fun f -> f a) l
 
+module Option = struct
+  include Option
+
+  let value_map default f opt = value ~default (map f opt)
+end
+
 module Decimal = struct
   module Big_int = struct
     include Big_int
@@ -110,11 +116,6 @@ module Decimal = struct
       decimals = decimals1 + decimals2;
     }
 
-  let div r1 r2 =
-    let value1, value2, _decimals = scale r1 r2 in
-    try Some { value = Big_int.div_big_int value1 value2; decimals = 0 }
-    with Division_by_zero -> None
-
   let ge r1 r2 =
     let value1, value2, _decimals = scale r1 r2 in
     Big_int.ge_big_int value1 value2
@@ -154,13 +155,20 @@ module Decimal = struct
 
   let ( * ) = mul
 
-  let ( / ) = div
-
   let ( >= ) = ge
 
   let ( > ) = gt
 
   let max r1 r2 = if r1 >= r2 then r1 else r2
+
+  (* [pct v ref_v] returns the percentage represented by [v] with regards to the
+     reference value [ref_v], close to the lower percent. *)
+  let pct v ref_v =
+    let open Big_int in
+    let v, ref_v, _decimals = scale v ref_v in
+    let v = mult_big_int v (big_int_of_int 100) in
+    try Some { value = div_big_int v ref_v; decimals = 0 }
+    with Division_by_zero -> None
 end
 
 module Synth = struct
@@ -293,9 +301,7 @@ module Synth = struct
       | Some v -> " (~" ^ Decimal.to_string v ^ "%)"
     in
     let percent =
-      match total_win * of_int 100 / old with
-      | Some percent -> Decimal.to_string percent
-      | None -> "N/A"
+      Option.value_map "N/A" Decimal.to_string (pct total_win old)
     in
     Printf.printf
       "Lines with `%s`:\n\
@@ -523,7 +529,7 @@ module Synths = struct
 
   let update_max old_value max_diff old_max_diff_pct =
     let open Decimal in
-    let max_diff_pct = max_diff * of_int 100 / old_value in
+    let max_diff_pct = pct max_diff old_value in
     match (old_max_diff_pct, max_diff_pct) with
     | None, _ -> max_diff_pct
     | _, None -> old_max_diff_pct
