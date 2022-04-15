@@ -23,9 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let on_layer_1_chain_event cctxt store chain_event =
+let on_layer_1_chain_event node_ctxt store chain_event =
   let open Lwt_result_syntax in
-  let* () = Inbox.update cctxt store chain_event in
+  let* () = Inbox.update node_ctxt store chain_event in
   let* () = Interpreter.Arith.update store chain_event in
   let*! () = Layer1.processed chain_event in
   return ()
@@ -39,10 +39,10 @@ let iter_stream stream handle =
   in
   go ()
 
-let daemonize cctxt store layer_1_chain_events =
+let daemonize node_ctxt store layer_1_chain_events =
   Lwt.no_cancel
   @@ iter_stream layer_1_chain_events
-  @@ on_layer_1_chain_event cctxt store
+  @@ on_layer_1_chain_event node_ctxt store
 
 let install_finalizer store rpc_server =
   let open Lwt_syntax in
@@ -63,24 +63,21 @@ let run ~data_dir (cctxt : Protocol_client_context.full) =
     in
     let*! store = Store.load configuration in
     let* rpc_server = RPC_server.Arith.start store configuration in
-    (* TODO:https://gitlab.com/tezos/tezos/-/issues/2791
-       The Constants module should be deprecated in favour of a data
-       structure that contains rollup address, rollup node operator
-       address, and rollup origination level.
-    *)
-    let* () = Constants.init cctxt sc_rollup_address sc_rollup_node_operator in
+    let* node_ctxt =
+      Node_context.init cctxt sc_rollup_address sc_rollup_node_operator
+    in
     (* Check that the public key hash is valid *)
-    let* (_pkh, _pk, _skh) = Constants.get_operator_keys cctxt in
+    let* (_pkh, _pk, _skh) = Node_context.get_operator_keys node_ctxt in
     (* Do not reorder the operations above this one, as
         State depends on the RPC server to fetch the initial
         rollup level, and modules below depend on State
         to fetch in-memory variables
     *)
-    let* tezos_heads = Layer1.start configuration cctxt store in
-    let*! () = Inbox.start store sc_rollup_address in
+    let* tezos_heads = Layer1.start configuration node_ctxt.cctxt store in
+    let*! () = Inbox.start store node_ctxt in
     let* () = Interpreter.Arith.start store in
     let _ = install_finalizer store rpc_server in
     let*! () = Event.node_is_ready ~rpc_addr ~rpc_port in
-    daemonize cctxt store tezos_heads
+    daemonize node_ctxt store tezos_heads
   in
   start ()

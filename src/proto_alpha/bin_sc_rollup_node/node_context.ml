@@ -23,43 +23,27 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* TODO:https://gitlab.com/tezos/tezos/-/issues/2791 
-   This module should be deprecated in favour of a data structure that 
-   contains rollup address, rollup node operator address, and rollup 
-   origination level.
-*)
+open Protocol
+open Alpha_context
 
-let unstarted_failure () =
-  Format.eprintf "Sc rollup state is not initialised.\n" ;
-  Lwt_exit.exit_and_raise 1
+type t = {
+  cctxt : Protocol_client_context.full;
+  rollup_address : Sc_rollup.t;
+  operator : Signature.Public_key_hash.t;
+  initial_level : Raw_level.t;
+}
 
-let make_ref () =
-  let reference = ref None in
-  ( (fun x -> reference := Some x),
-    fun () -> match !reference with None -> unstarted_failure () | Some a -> a
-  )
-
-let (set_sc_rollup_address, get_sc_rollup_address) = make_ref ()
-
-let (set_sc_rollup_node_operator, get_sc_rollup_node_operator) = make_ref ()
-
-let (set_sc_rollup_initial_level, get_sc_rollup_initial_level) = make_ref ()
-
-let get_operator_keys cctxt =
+let get_operator_keys ctxt =
   let open Lwt_result_syntax in
-  let pkh = get_sc_rollup_node_operator () in
-  let+ (_, pk, sk) = Client_keys.get_key cctxt pkh in
-  (pkh, pk, sk)
+  let+ (_, pk, sk) = Client_keys.get_key ctxt.cctxt ctxt.operator in
+  (ctxt.operator, pk, sk)
 
-let init (cctxt : Protocol_client_context.full) sc_rollup_address
-    sc_rollup_node_operator =
+let init (cctxt : Protocol_client_context.full) rollup_address operator =
   let open Lwt_result_syntax in
-  set_sc_rollup_address sc_rollup_address ;
-  set_sc_rollup_node_operator sc_rollup_node_operator ;
   let+ initial_level =
     Plugin.RPC.Sc_rollup.initial_level
       cctxt
       (cctxt#chain, cctxt#block)
-      sc_rollup_address
+      rollup_address
   in
-  set_sc_rollup_initial_level initial_level
+  {cctxt; rollup_address; operator; initial_level}

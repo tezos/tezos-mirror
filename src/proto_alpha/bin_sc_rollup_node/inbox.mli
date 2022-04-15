@@ -39,7 +39,7 @@ open Protocol
     through the context client [cctxt] to retrieve the messages published
     during this [chain_event]. *)
 val update :
-  #RPC_context.simple -> Store.t -> Layer1.chain_event -> unit tzresult Lwt.t
+  Node_context.t -> Store.t -> Layer1.chain_event -> unit tzresult Lwt.t
 
 (** [inbox_of_hash store block_hash] returns the rollup inbox at the end of the
     given validation of [block_hash]. *)
@@ -48,4 +48,4 @@ val inbox_of_hash :
 
 (** [start store rollup] initializes the inbox to track the messages published for
     the given [rollup]. *)
-val start : Store.t -> Alpha_context.Sc_rollup.t -> unit Lwt.t
+val start : Store.t -> Node_context.t -> unit Lwt.t
