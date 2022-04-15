@@ -9,7 +9,7 @@ dev-repo: "git+https://gitlab.com/tezos/tezos.git"
 license: "MIT"
 depends: [
   "dune" { >= "2.9" & < "3.0" }
-  "ocaml" { >= "4.12.1" & < "4.13" }
+  "ocaml" { >= "4.14.0" & < "4.15" }
   "tezos-base"
   "tezos-protocol-environment"
   "tezos-version"

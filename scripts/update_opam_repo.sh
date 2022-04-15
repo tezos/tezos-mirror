@@ -124,7 +124,7 @@ OPAMSOLVERTIMEOUT=600 opam admin filter --yes --resolve \
 
 
 ## Adding useful compiler variants
-for variant in afl flambda fp spacetime ; do
+for variant in afl flambda fp ; do
     git checkout packages/ocaml-option-$variant/ocaml-option-$variant.1
 done
 
@@ -148,14 +148,6 @@ fi
 
 ## Adding safer hashes
 cp -rf packages packages.bak
-
-# Work around a bug in opam admin 2.1 https://github.com/ocaml/opam/issues/5116,
-# manually add hash for ocaml-base-compiler.
-# This will no longer be necessary after we switch to ocaml.4.14.
-# Indeed, the bug is triggered by the extra-source in
-# https://github.com/ocaml/opam-repository/blob/master/packages/ocaml-base-compiler/ocaml-base-compiler.4.12.0/opam
-# which is not present on 4.14.
-sed 's/"sha256=59de25b95409c1927c4b607fb4b1218ff7623fca45474448c8e114a42853e3ad"/[\n   "sha256=59de25b95409c1927c4b607fb4b1218ff7623fca45474448c8e114a42853e3ad"\n   "sha512=19c7d19be804110e968866b4355871cdeb23bd4d56c18288bc0040d59702b7ee541e8bb6d49f64fa3b5a1232b50821efb50cd17544d3a2d20d760dece69e67c7"]/' -i packages/ocaml-base-compiler/ocaml-base-compiler.4.12.1/opam
 
 opam admin add-hashes sha256 sha512
 

@@ -1835,7 +1835,7 @@ let tezos_protocol_compiler_lib =
     ~ocaml:
       V.(
         (* Should be in sync with scripts/version.sh *)
-        at_least "4.12.1" && less_than "4.13")
+        at_least "4.14.0" && less_than "4.15")
     ~deps:
       [
         tezos_base |> open_ ~m:"TzPervasives";
