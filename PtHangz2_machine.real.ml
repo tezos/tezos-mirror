@@ -26,7 +26,7 @@
 module Block_services =
   Tezos_client_011_PtHangz2.Protocol_client_context.Alpha_block_services
 
-open Lwt_tzresult_syntax
+open Lwt_result_syntax
 open Tezos_protocol_011_PtHangz2
 open Tezos_protocol_plugin_011_PtHangz2
 
