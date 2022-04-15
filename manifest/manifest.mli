@@ -578,6 +578,8 @@ val inline_tests_backend : target -> inline_tests
 
     - [warnings]: the argument passed to the -w flag when building.
 
+    - [warn_error]: the argument passed to the -warn-error flag when building.
+
     - [wrapped]: if [false], add the [(wrapped false)] stanza in the [dune] file.
       This causes the library to not come with a toplevel module with aliases to
       all other modules. Not recommended (according to the dune documentation).
@@ -618,6 +620,7 @@ type 'a maker =
   ?description:string ->
   ?time_measurement_ppx:bool ->
   ?warnings:string ->
+  ?warn_error:string ->
   ?wrapped:bool ->
   ?cram:bool ->
   path:string ->

@@ -854,6 +854,7 @@ module Target = struct
     synopsis : string option;
     description : string option;
     warnings : string option;
+    warn_error : string option;
     wrapped : bool;
     npm_deps : Npm.t list;
     cram : bool;
@@ -1004,6 +1005,7 @@ module Target = struct
     ?description:string ->
     ?time_measurement_ppx:bool ->
     ?warnings:string ->
+    ?warn_error:string ->
     ?wrapped:bool ->
     ?cram:bool ->
     path:string ->
@@ -1052,7 +1054,7 @@ module Target = struct
       ?(opens = []) ?(preprocess = []) ?(preprocessor_deps = [])
       ?(private_modules = []) ?(opam_only_deps = []) ?release ?static
       ?static_cclibs ?synopsis ?description ?(time_measurement_ppx = false)
-      ?warnings ?(wrapped = true) ?(cram = false) ~path names =
+      ?warnings ?warn_error ?(wrapped = true) ?(cram = false) ~path names =
     let conflicts = List.filter_map Fun.id conflicts in
     let deps = List.filter_map Fun.id deps in
     let opam_only_deps = List.filter_map Fun.id opam_only_deps in
@@ -1260,6 +1262,7 @@ module Target = struct
         description;
         npm_deps;
         warnings;
+        warn_error;
         wrapped;
         cram;
       }
@@ -1545,6 +1548,11 @@ let generate_dune ~dune_file_has_static_profile (internal : Target.internal) =
     else flags
   in
   let flags =
+    match internal.warn_error with
+    | None -> flags
+    | Some w -> Dune.[H [S "-warn-error"; S w]] @ flags
+  in
+  let flags =
     match internal.warnings with
     | None -> flags
     | Some w -> Dune.[H [S "-w"; S w]] @ flags
@@ -1563,6 +1571,7 @@ let generate_dune ~dune_file_has_static_profile (internal : Target.internal) =
                    @ flags));
             ]
   in
+
   let preprocess =
     let make_pp (PPS (target, args) : Target.preprocessor) =
       match Target.names_for_dune target with
