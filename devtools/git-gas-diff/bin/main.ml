@@ -218,13 +218,13 @@ module Synth = struct
     (* The maximum amount loss on a line (with regards to [dir] below). *)
     max_loss : Decimal.t;
     (* The maximum amount loss in percentage on a line (with regards to [dir]
-       below). *)
-    max_loss_pct : Decimal.t option;
+       below), with the line number. *)
+    max_loss_pct : (Decimal.t * int) option;
     (* The maximum amount saved on a line (with regards to [dir] below). *)
     max_gain : Decimal.t;
     (* The maximum amount saved in percentage on a line (with regards to [dir]
-       below). *)
-    max_gain_pct : Decimal.t option;
+       below), with the line number. *)
+    max_gain_pct : (Decimal.t * int) option;
     (* The number of lines with a degradation (with regards to [dir] below).
       *)
     degradations : int;
@@ -299,7 +299,8 @@ module Synth = struct
     let total_win = if total_win >= zero then total_win else opp total_win in
     let string_of_max_pct = function
       | None -> ""
-      | Some v -> " (~" ^ Decimal.to_string v ^ "%)"
+      | Some (v, l) ->
+          " (~" ^ Decimal.to_string v ^ "%, line " ^ string_of_int l ^ ")"
     in
     let percent =
       Option.value_map "N/A" Decimal.to_string (pct total_win old)
@@ -331,8 +332,8 @@ module Synth = struct
      The function is used to return the amount found on a line of a git diff for
      the various supported categories. *)
   let get_dec sub cstr =
-    (* Lets's leave this line below out of the function so that the expression is
-       compiled only once for each [get_*], and not every time we call
+    (* Lets's leave this line below out of the function so that the expression
+       is compiled only once for each [get_*], and not every time we call
        [get_dec]. *)
     let re = Re.(compile (seq [ str sub; group Decimal.re ])) in
     fun line ->
@@ -358,8 +359,8 @@ module Synth = struct
   let get_fee = get_dec fee_str (fun v -> Fee v)
 
   let get_discarded strs res =
-    (* Lets's leave this line below out of the function so that the expression is
-       compiled only once for each [get_*], and not every time we call
+    (* Lets's leave this line below out of the function so that the expression
+       is compiled only once for each [get_*], and not every time we call
        [get_discarded]. *)
     let re_ts = List.map (fun sub -> Re.(compile (str sub))) strs in
     let contains line re_t = Re.execp re_t line in
@@ -444,9 +445,9 @@ module Synths = struct
     | Diff of diff_kind
 
   let categorize =
-    (* Lets's leave this line below out of the function so that the expression is
-       compiled only once and for all, i.e. not every time we call [categorize].
-    *)
+    (* Lets's leave this line below out of the function so that the expression
+       is compiled only once and for all, i.e. not every time we call
+       [categorize]. *)
     let re_t = Re.Posix.(compile (re "^(\\+\\+\\+)|(---)")) in
     fun line ->
       let length = String.length line in
@@ -528,25 +529,26 @@ module Synths = struct
     let+ new_v = extract_value new_kind in
     (old_v, new_v, getter, setter)
 
-  let update_max old_value max_diff old_max_diff_pct =
+  let update_max line_nb old_value old_max_diff old_max_diff_pct diff =
     let open Decimal in
-    let max_diff_pct = pct max_diff old_value in
-    match (old_max_diff_pct, max_diff_pct) with
-    | None, _ -> max_diff_pct
-    | _, None -> old_max_diff_pct
-    | Some max_loss_pct, Some max_loss_pct' ->
-        Some (max max_loss_pct max_loss_pct')
+    if diff >= old_max_diff then
+      let diff_pct = pct diff old_value in
+      let max_diff_pct = Option.map (fun v -> (v, line_nb)) diff_pct in
+      (diff, max_diff_pct)
+    else (old_max_diff, old_max_diff_pct)
 
-  let update synth old_v new_v =
+  let update line_nb synth old_v new_v =
     let open Decimal in
     let win = synth.win in
     let old = synth.old + old_v in
     let new_ = synth.new_ + new_v in
     let loss = match win with Dec -> new_v - old_v | Inc -> old_v - new_v in
-    let max_loss = max synth.max_loss loss in
-    let max_loss_pct = update_max old_v max_loss synth.max_loss_pct in
-    let max_gain = max synth.max_gain (opp loss) in
-    let max_gain_pct = update_max old_v max_gain synth.max_gain_pct in
+    let max_loss, max_loss_pct =
+      update_max line_nb old_v synth.max_loss synth.max_loss_pct loss
+    in
+    let max_gain, max_gain_pct =
+      update_max line_nb old_v synth.max_gain synth.max_gain_pct (opp loss)
+    in
     let open Stdlib in
     let degradations =
       synth.degradations + if Decimal.gt loss zero then 1 else 0
@@ -565,11 +567,12 @@ module Synths = struct
       str = synth.str;
     }
 
-  (* [consume_kind line synths kind] tries to match the added line [line], that
-     was successfully parsed as [kind], with the first element of the queue of
-     deleted lines [synths.previous_kinds]. If they indeed match, that synthesis
-     in [synths] is updated accordingly. *)
-  let consume_kind line synths kind =
+  (* [consume_kind line line_nb synths kind] tries to match the added line
+     [line] at line number [line_nb], that was successfully parsed as [kind],
+     with the first element of the queue of deleted lines
+     [synths.previous_kinds]. If they indeed match, that synthesis in [synths]
+     is updated accordingly. *)
+  let consume_kind line line_nb synths kind =
     match synths.previous_kinds with
     | [] ->
         Printf.printf "* No line to consume `%s`.\n%!" line;
@@ -579,14 +582,14 @@ module Synths = struct
           match builders previous_kind kind with
           | None -> synths
           | Some (old_v, new_v, getter, setter) ->
-              setter (update (getter synths) old_v new_v) synths
+              setter (update line_nb (getter synths) old_v new_v) synths
         in
         { synths with previous_kinds }
     | (line', _) :: _ ->
         Printf.printf "* Unmatched lines `%s` and `%s`.\n%!" line line';
         synths
 
-  let add_line synths line =
+  let add_line synths line line_nb =
     match categorize line with
     | Garbage -> synths
     | Unsupported ->
@@ -594,7 +597,7 @@ module Synths = struct
         synths
     | Diff (Removed, k) ->
         { synths with previous_kinds = synths.previous_kinds @ [ (line, k) ] }
-    | Diff (Added, k) -> consume_kind line synths k
+    | Diff (Added, k) -> consume_kind line line_nb synths k
 
   let show
       {
@@ -629,12 +632,11 @@ end
 
 let run file_opt =
   let ic = Option.value_map stdin open_in file_opt in
-  let rec read_all line_number synths =
+  let rec read_all line_nb synths =
     try
-      (* Printf.printf "%d\n%!" line_number ; *)
       let line = input_line ic in
-      let synths = Synths.add_line synths line in
-      read_all (succ line_number) synths
+      let synths = Synths.add_line synths line line_nb in
+      read_all (succ line_nb) synths
     with End_of_file -> synths
   in
   let synths = read_all 1 Synths.empty in

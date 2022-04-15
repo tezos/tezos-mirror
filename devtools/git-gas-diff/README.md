@@ -43,8 +43,8 @@ Lines with `Estimated gas: `:
   Accumulated value before: 364093.096
   Accumulated value now:    345025.713
   Total gain: ~5%
-  Maximum loss on a line: 155 (~10%)
-  Maximum gain on a line: 1779.637 (~126%)
+  Maximum loss on a line: 155 (~4%, line 38732)
+  Maximum gain on a line: 1779.637 (~28%, line 36665)
   Number of lines with a change:      123
   Number of lines with a degradation: 75
 
@@ -53,8 +53,8 @@ Lines with `Consumed gas: `:
   Accumulated value before: 360694.441
   Accumulated value now:    341627.058
   Total gain: ~5%
-  Maximum loss on a line: 155 (~10%)
-  Maximum gain on a line: 1779.637 (~126%)
+  Maximum loss on a line: 155 (~4%, line 38758)
+  Maximum gain on a line: 1779.637 (~28%, line 36701)
   Number of lines with a change:      140
   Number of lines with a degradation: 80
 
@@ -63,8 +63,8 @@ Lines with `Gas remaining: `:
   Accumulated value before: 328622803.888
   Accumulated value now:    328631151.408
   Total gain: ~0%
-  Maximum loss on a line: 1 (~0%)
-  Maximum gain on a line: 1929.380 (~0%)
+  Maximum loss on a line: 1 (~0%, line 1526)
+  Maximum gain on a line: 1929.380 (~0%, line 3476)
   Number of lines with a change:      316
   Number of lines with a degradation: 3
 
@@ -73,8 +73,8 @@ Lines with `Gas limit: `:
   Accumulated value before: 371942
   Accumulated value now:    352873
   Total gain: ~5%
-  Maximum loss on a line: 155 (~10%)
-  Maximum gain on a line: 1779 (~117%)
+  Maximum loss on a line: 155 (~4%, line 38744)
+  Maximum gain on a line: 1779 (~28%, line 36682)
   Number of lines with a change:      120
   Number of lines with a degradation: 75
 
@@ -83,8 +83,8 @@ Lines with `remaining gas: `:
   Accumulated value before: 6310916745.321
   Accumulated value now:    6311167310.034
   Total gain: ~0%
-  Maximum loss on a line: 1 (~0%)
-  Maximum gain on a line: 1304.820 (~0%)
+  Maximum loss on a line: 1 (~0%, line 7126)
+  Maximum gain on a line: 1304.820 (~0%, line 28455)
   Number of lines with a change:      6069
   Number of lines with a degradation: 83
 
@@ -93,8 +93,8 @@ Lines with `Fee to the baker: ꜩ`:
   Accumulated value before: 0.168683
   Accumulated value now:    0.166774
   Total gain: ~1%
-  Maximum loss on a line: 0.000015 (~3%)
-  Maximum gain on a line: 0.000178 (~47%)
+  Maximum loss on a line: 0.000015 (~2%, line 38741)
+  Maximum gain on a line: 0.000178 (~19%, line 36679)
   Number of lines with a change:      105
   Number of lines with a degradation: 75
 
@@ -103,8 +103,8 @@ Lines with `payload fees(the block proposer) ....... +ꜩ`:
   Accumulated value before: 0.168683
   Accumulated value now:    0.166774
   Total gain: ~1%
-  Maximum loss on a line: 0.000015 (~3%)
-  Maximum gain on a line: 0.000178 (~47%)
+  Maximum loss on a line: 0.000015 (~2%, line 38750)
+  Maximum gain on a line: 0.000178 (~19%, line 36688)
   Number of lines with a change:      105
   Number of lines with a degradation: 75
 
@@ -113,8 +113,8 @@ Lines with `fee = `:
   Accumulated value before: 0.001372
   Accumulated value now:    0.001318
   Total gain: ~3%
-  Maximum loss on a line: 0.000002 (~0%)
-  Maximum gain on a line: 0.000056 (~7%)
+  Maximum loss on a line: 0.000002 (~0%, line 36308)
+  Maximum gain on a line: 0.000056 (~7%, line 36317)
   Number of lines with a change:      2
   Number of lines with a degradation: 1
 
