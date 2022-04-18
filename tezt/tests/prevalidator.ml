@@ -26,7 +26,7 @@
 (* Testing
    -------
    Component:    Mempool
-   Invocation:   dune exec tezt/tests/main.exe -- --file mempool.ml
+   Invocation:   dune exec tezt/tests/main.exe -- --file prevalidator.ml
    Subject:      .
 *)
 
