@@ -24,8 +24,8 @@
 (*****************************************************************************)
 
 let init_account (ctxt, balance_updates)
-    ({public_key_hash; public_key; amount} : Parameters_repr.bootstrap_account)
-    =
+    ({public_key_hash; public_key; amount; delegate_to} :
+      Parameters_repr.bootstrap_account) =
   let contract = Contract_repr.Implicit public_key_hash in
   Token.transfer
     ~origin:Protocol_migration
@@ -40,7 +40,11 @@ let init_account (ctxt, balance_updates)
         ctxt
         public_key_hash
         public_key
-      >>=? fun ctxt -> Delegate_storage.set ctxt contract (Some public_key_hash)
+      >>=? fun ctxt ->
+      Delegate_storage.set
+        ctxt
+        contract
+        (Some (Option.value ~default:public_key_hash delegate_to))
   | None -> return ctxt)
   >|=? fun ctxt -> (ctxt, new_balance_updates @ balance_updates)
 

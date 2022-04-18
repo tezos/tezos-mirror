@@ -59,8 +59,10 @@ val default_initial_balance : Tez.t
 val generate_accounts :
   ?rng_state:Random.State.t ->
   ?initial_balances:int64 list ->
+  ?bootstrap_delegations:
+    (Signature.Public_key_hash.t * Signature.Public_key_hash.t) list ->
   int ->
-  (t * Tez.t) list
+  (t * Tez.t * Signature.Public_key_hash.t option) list
 
 val commitment_secret : Blinded_public_key_hash.activation_code
 

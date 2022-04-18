@@ -3475,6 +3475,7 @@ module Parameters : sig
     public_key_hash : public_key_hash;
     public_key : public_key option;
     amount : Tez.t;
+    delegate_to : public_key_hash option;
   }
 
   type bootstrap_contract = {

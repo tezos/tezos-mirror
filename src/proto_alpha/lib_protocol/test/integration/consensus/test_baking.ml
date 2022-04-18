@@ -342,9 +342,9 @@ let test_committee_sampling () =
     in
     let bootstrap_accounts =
       List.map
-        (fun (acc, tez) ->
+        (fun (acc, tez, delegate_to) ->
           Default_parameters.make_bootstrap_account
-            (acc.Account.pkh, acc.Account.pk, tez))
+            (acc.Account.pkh, acc.Account.pk, tez, delegate_to))
         accounts
     in
     let consensus_committee_size = max_round in
@@ -368,7 +368,7 @@ let test_committee_sampling () =
     >|=? fun bakers ->
     let stats = Stdlib.Hashtbl.create 10 in
     Stdlib.List.iter2
-      (fun (acc, _) bounds ->
+      (fun (acc, _, _) bounds ->
         Stdlib.Hashtbl.add stats acc.Account.pkh (bounds, 0))
       accounts
       bounds ;
