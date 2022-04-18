@@ -507,56 +507,6 @@ let test_migration_constants ~migrate_from ~migrate_to =
           (JSON.encode const_migrated) ;
         Test.fail "Protocol constants mismatch"))
 
-let test_migration_ticket_balance ~migrate_from ~migrate_to =
-  Regression.register
-    ~__FILE__
-    ~title:
-      (sf
-         "(%s -> %s) ticket balance migration"
-         (Protocol.name migrate_from)
-         (Protocol.name migrate_to))
-    ~tags:["mockup"; "migration"; "tickets"]
-    ~output_file:("tickets" // "ticket_balance")
-    (fun () ->
-      let* context_json =
-        perform_migration
-          ~protocol:migrate_from
-          ~next_protocol:migrate_to
-          ~next_constants:Protocol.Constants_mainnet
-          ~pre_migration:(fun client ->
-            let* _ =
-              Client.originate_contract
-                ~alias:"with_tickets"
-                ~amount:Tez.zero
-                ~src:"bootstrap1"
-                ~prg:
-                  "file:./tezt/tests/contracts/proto_current_mainnet/tickets.tz"
-                ~init:"{}"
-                ~burn_cap:(Tez.of_int 2)
-                client
-            in
-            Client.transfer
-              ~amount:(Tez.of_int 0)
-              ~giver:"bootstrap1"
-              ~receiver:"with_tickets"
-              ~burn_cap:(Tez.of_int 1)
-              client)
-          ~post_migration:(fun client _ ->
-            let context_file =
-              Client.base_dir client // "mockup" // "context.json"
-            in
-            let json = JSON.parse_file context_file in
-            let json =
-              JSON.(
-                json |-> "context" |-> "context" |=> 0 |=> 1 |> as_list
-                |> List.find (fun item ->
-                       item |=> 0 |> as_string = "ticket_balance"))
-            in
-            return json)
-      in
-      Regression.capture (JSON.encode context_json) ;
-      return ())
-
 (** Test. Reproduce the scenario of https://gitlab.com/tezos/tezos/-/issues/1143 *)
 let test_origination_from_unrevealed_fees =
   Protocol.register_test
@@ -676,8 +626,5 @@ let register_global_constants ~protocols =
 
 let register_constant_migration ~migrate_from ~migrate_to =
   test_migration_constants ~migrate_from ~migrate_to
-
-let register_migration_ticket_balance ~migrate_from ~migrate_to =
-  test_migration_ticket_balance ~migrate_from ~migrate_to
 
 let register_protocol_independent () = test_migration_transfer ()
