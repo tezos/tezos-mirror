@@ -820,7 +820,7 @@ let prepare ~level ~predecessor_timestamp ~timestamp ctxt =
       };
   }
 
-type previous_protocol = Genesis of Parameters_repr.t | Ithaca_012
+type previous_protocol = Genesis of Parameters_repr.t | Jakarta_013
 
 let check_and_update_protocol_version ctxt =
   (Context.find ctxt version_key >>= function
@@ -832,7 +832,7 @@ let check_and_update_protocol_version ctxt =
          failwith "Internal error: previously initialized context."
        else if Compare.String.(s = "genesis") then
          get_proto_param ctxt >|=? fun (param, ctxt) -> (Genesis param, ctxt)
-       else if Compare.String.(s = "ithaca_012") then return (Ithaca_012, ctxt)
+       else if Compare.String.(s = "jakarta_013") then return (Jakarta_013, ctxt)
        else Lwt.return @@ storage_error (Incompatible_protocol_version s))
   >>=? fun (previous_proto, ctxt) ->
   Context.add ctxt version_key (Bytes.of_string version_value) >|= fun ctxt ->
@@ -883,13 +883,8 @@ let prepare_first_block ~level ~timestamp ctxt =
       Level_repr.create_cycle_eras [cycle_era] >>?= fun cycle_eras ->
       set_cycle_eras ctxt cycle_eras >>=? fun ctxt ->
       add_constants ctxt param.constants >|= ok
-  | Ithaca_012 ->
+  | Jakarta_013 ->
       get_previous_protocol_constants ctxt >>= fun c ->
-      let cycles_per_voting_period =
-        (* Ignore reminder if any *)
-        Int32.div c.blocks_per_voting_period c.blocks_per_cycle
-      in
-      let tx_rollup_finality_period = 40_000 in
       let constants =
         Constants_parametric_repr.
           {
@@ -897,7 +892,7 @@ let prepare_first_block ~level ~timestamp ctxt =
             blocks_per_cycle = c.blocks_per_cycle;
             blocks_per_commitment = c.blocks_per_commitment;
             blocks_per_stake_snapshot = c.blocks_per_stake_snapshot;
-            cycles_per_voting_period;
+            cycles_per_voting_period = c.cycles_per_voting_period;
             hard_gas_limit_per_operation = c.hard_gas_limit_per_operation;
             hard_gas_limit_per_block = c.hard_gas_limit_per_block;
             proof_of_work_threshold = c.proof_of_work_threshold;
@@ -916,7 +911,8 @@ let prepare_first_block ~level ~timestamp ctxt =
             min_proposal_quorum = c.min_proposal_quorum;
             liquidity_baking_subsidy = c.liquidity_baking_subsidy;
             liquidity_baking_sunset_level = c.liquidity_baking_sunset_level;
-            liquidity_baking_toggle_ema_threshold = 1_000_000_000l;
+            liquidity_baking_toggle_ema_threshold =
+              c.liquidity_baking_toggle_ema_threshold;
             minimal_block_delay = c.minimal_block_delay;
             delay_increment_per_round = c.delay_increment_per_round;
             consensus_committee_size = c.consensus_committee_size;
@@ -927,58 +923,32 @@ let prepare_first_block ~level ~timestamp ctxt =
             double_baking_punishment = c.double_baking_punishment;
             ratio_of_frozen_deposits_slashed_per_double_endorsement =
               c.ratio_of_frozen_deposits_slashed_per_double_endorsement;
-            initial_seed = None;
-            cache_script_size = 100_000_000;
-            cache_stake_distribution_cycles = 8;
-            cache_sampler_state_cycles = 8;
-            tx_rollup_enable = true;
-            (* Based on how storage burn is implemented for
-               transaction rollups, this means that a rollup operator
-               can create 100 inboxes (40 bytes per inboxes) before
-               having to pay storage burn. *)
-            tx_rollup_origination_size = 4_000;
-            (* Considering an average size of layer-2 operations of
-               20, this gives a TPS per rollup higher than 400, and
-               the capability to have two rollups at full speed on
-               mainnet (as long as they do not reach scalability
-               issues related to proof size). *)
-            tx_rollup_hard_size_limit_per_inbox = 500_000;
-            tx_rollup_hard_size_limit_per_message = 5_000;
-            (* Tickets are transmitted in batches in the
-               [Tx_rollup_dispatch_tickets] operation.
-
-               The semantics is that this operation is used to
-               concretize the withdraw orders emitted by the layer-2,
-               one layer-1 operation per messages of an
-               inbox. Therefore, it is of significant importance that
-               a valid batch does not produce a list of withdraw
-               orders which could not fit in a layer-1 operation.
-
-               With these values, at least 2048 bytes remain available
-               to store the rest of the operands of
-               [Tx_rollup_dispatch_tickets] (in practice, even more,
-               because we overapproximate the size of tickets). So we
-               are safe. *)
-            tx_rollup_max_withdrawals_per_batch = 15;
-            tx_rollup_max_ticket_payload_size = 2_048;
-            tx_rollup_commitment_bond = Tez_repr.of_mutez_exn 10_000_000_000L;
-            tx_rollup_finality_period;
-            tx_rollup_withdraw_period = tx_rollup_finality_period;
-            tx_rollup_max_inboxes_count = tx_rollup_finality_period + 100;
-            (* This is determined by [max_operation_data_length] minus
-               the overhead of a commitment (192) divided by the size of an
-               Irmin Merkle root (32). But we subtract 8 just in case we
-               later need to increase the size of a commitment. *)
-            tx_rollup_max_messages_per_inbox = 1_010;
-            tx_rollup_max_commitments_count =
-              (2 * tx_rollup_finality_period) + 100;
-            (* The default ema factor is [120] blocks, so about one hour. *)
-            tx_rollup_cost_per_byte_ema_factor = 120;
-            tx_rollup_rejection_max_proof_size = 30_000;
-            (* This is the first block of cycle 618, which is expected to be
-               about one year after the activation of protocol J.
-               See https://tzstats.com/cycle/618 *)
-            tx_rollup_sunset_level = 3_473_409l;
+            initial_seed = c.initial_seed;
+            cache_script_size = c.cache_script_size;
+            cache_stake_distribution_cycles = c.cache_stake_distribution_cycles;
+            cache_sampler_state_cycles = c.cache_sampler_state_cycles;
+            tx_rollup_enable = c.tx_rollup_enable;
+            tx_rollup_origination_size = c.tx_rollup_origination_size;
+            tx_rollup_hard_size_limit_per_inbox =
+              c.tx_rollup_hard_size_limit_per_inbox;
+            tx_rollup_hard_size_limit_per_message =
+              c.tx_rollup_hard_size_limit_per_message;
+            tx_rollup_max_withdrawals_per_batch =
+              c.tx_rollup_max_withdrawals_per_batch;
+            tx_rollup_max_ticket_payload_size =
+              c.tx_rollup_max_ticket_payload_size;
+            tx_rollup_commitment_bond = c.tx_rollup_commitment_bond;
+            tx_rollup_finality_period = c.tx_rollup_finality_period;
+            tx_rollup_withdraw_period = c.tx_rollup_withdraw_period;
+            tx_rollup_max_inboxes_count = c.tx_rollup_max_inboxes_count;
+            tx_rollup_max_messages_per_inbox =
+              c.tx_rollup_max_messages_per_inbox;
+            tx_rollup_max_commitments_count = c.tx_rollup_max_commitments_count;
+            tx_rollup_cost_per_byte_ema_factor =
+              c.tx_rollup_cost_per_byte_ema_factor;
+            tx_rollup_rejection_max_proof_size =
+              c.tx_rollup_rejection_max_proof_size;
+            tx_rollup_sunset_level = c.tx_rollup_sunset_level;
             sc_rollup_enable = false;
             (* The following value is chosen to prevent spam. *)
             sc_rollup_origination_size = 6_314;

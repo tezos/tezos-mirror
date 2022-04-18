@@ -775,7 +775,6 @@ let init ctxt block_header =
   in
   Alpha_context.prepare_first_block ~typecheck ~level ~timestamp ctxt
   >>=? fun ctxt ->
-  Ticket_balance_migration_for_j.init ctxt >>=? fun ctxt ->
   let cache_nonce =
     cache_nonce_from_block_header
       block_header

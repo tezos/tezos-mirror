@@ -25,52 +25,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Patch_legacy_contracts_for_J = struct
-  let patch_script (address, legacy_script_hash, patched_code) ctxt =
-    Contract_repr.of_b58check address >>?= fun contract ->
-    Storage.Contract.Code.find ctxt contract >>=? fun (ctxt, code_opt) ->
-    Logging.log Notice "Patching %s... " address ;
-    match code_opt with
-    | Some old_code ->
-        let old_bin = Data_encoding.force_bytes old_code in
-        let old_hash = Script_expr_hash.hash_bytes [old_bin] in
-        if Script_expr_hash.equal old_hash legacy_script_hash then (
-          let new_code = Script_repr.lazy_expr patched_code in
-          Logging.log Notice "Contract %s successfully patched" address ;
-          Storage.Contract.Code.update ctxt contract new_code
-          >>=? fun (ctxt, size_diff) ->
-          let size_diff = Z.of_int size_diff in
-          Storage.Contract.Used_storage_space.get ctxt contract
-          >>=? fun prev_size ->
-          let new_size = Z.add prev_size size_diff in
-          Storage.Contract.Used_storage_space.update ctxt contract new_size
-          >>=? fun ctxt ->
-          if Z.(gt size_diff zero) then
-            Storage.Contract.Paid_storage_space.get ctxt contract
-            >>=? fun prev_paid_size ->
-            let paid_size = Z.add prev_paid_size size_diff in
-            Storage.Contract.Paid_storage_space.update ctxt contract paid_size
-          else return ctxt)
-        else (
-          Logging.log
-            Error
-            "Patching %s was skipped because its script does not have the \
-             expected hash (expected: %a, found: %a)"
-            address
-            Script_expr_hash.pp
-            legacy_script_hash
-            Script_expr_hash.pp
-            old_hash ;
-          return ctxt)
-    | None ->
-        Logging.log
-          Error
-          "Patching %s was skipped because no script was found for it in the \
-           context."
-          address ;
-        return ctxt
-end
-
 (*
   To add invoices, you can use a helper function like this one:
 
@@ -97,6 +51,13 @@ end
         | Error _ -> (ctxt, []))
 *)
 
+(*
+  To patch code of legacy contracts you can add a helper function here and call
+  it at the end of prepare_first_block.
+
+  See !3730 for an example.
+*)
+
 let prepare_first_block ctxt ~typecheck ~level ~timestamp =
   Raw_context.prepare_first_block ~level ~timestamp ctxt
   >>=? fun (previous_protocol, ctxt) ->
@@ -106,11 +67,12 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp =
       (Constants_repr.cache_layout parametric)
   >|= fun ctxt -> Raw_context.Cache.clear ctxt )
   >>= fun ctxt ->
-  Raw_level_repr.of_int32 level >>?= fun level ->
-  Storage.Tenderbake.First_level_of_protocol.init ctxt level >>=? fun ctxt ->
   (match previous_protocol with
   | Genesis param ->
       (* This is the genesis protocol: initialise the state *)
+      Raw_level_repr.of_int32 level >>?= fun level ->
+      Storage.Tenderbake.First_level_of_protocol.init ctxt level
+      >>=? fun ctxt ->
       Storage.Block_round.init ctxt Round_repr.zero >>=? fun ctxt ->
       let init_commitment (ctxt, balance_updates)
           Commitment_repr.{blinded_public_key_hash; amount} =
@@ -156,23 +118,16 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp =
         ( ctxt,
           commitments_balance_updates @ bootstrap_balance_updates
           @ deposits_balance_updates )
-  | Ithaca_012 ->
+  | Jakarta_013 ->
       (* TODO (#2704): possibly handle endorsements for migration block (in bakers);
          if that is done, do not set Storage.Tenderbake.First_level_of_protocol. *)
-      Storage.Vote.Legacy_listings_size.remove ctxt >>= fun ctxt ->
-      Vote_storage.update_listings ctxt >>=? fun ctxt ->
-      Liquidity_baking_migration.Migration_from_Ithaca.update ctxt
+      Raw_level_repr.of_int32 level >>?= fun level ->
+      Storage.Tenderbake.First_level_of_protocol.update ctxt level
       >>=? fun ctxt -> return (ctxt, []))
   >>=? fun (ctxt, balance_updates) ->
-  Storage.Tenderbake.First_level_legacy.remove ctxt >>= fun ctxt ->
   Receipt_repr.group_balance_updates balance_updates >>?= fun balance_updates ->
   Storage.Pending_migration.Balance_updates.add ctxt balance_updates
-  >>= fun ctxt ->
-  List.fold_right_es
-    Patch_legacy_contracts_for_J.patch_script
-    Legacy_script_patches_for_J.addresses_to_patch
-    ctxt
-  >>=? fun ctxt -> return ctxt
+  >>= fun ctxt -> return ctxt
 
 let prepare ctxt ~level ~predecessor_timestamp ~timestamp =
   Raw_context.prepare ~level ~predecessor_timestamp ~timestamp ctxt
