@@ -1,7 +1,7 @@
 TMP=/tmp
 
-CURRENT_PROTO_HASH=Psithaca2MLRFYargivpo7YvUr7wUDqyxrdhC5CQq78mRvimz6A
-CURRENT_PROTO_NAME=Ithaca
+CURRENT_PROTO_HASH=PtJakartaiDz69SfDDLXJSiuZqTSeSKRDbKVZC8MNzJnvRjvnGw
+CURRENT_PROTO_NAME=Jakarta
 
 .PHONY: all
 all: accusations_simple_double_endorsing
