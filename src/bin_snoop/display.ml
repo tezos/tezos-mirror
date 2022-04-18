@@ -154,7 +154,7 @@ let qt_pixel_size opts = opts.qt_target_pixel_size
 let pdf_cm_size opts = opts.pdf_target_cm_size
 
 (* A [raw_row] is consists in a list of named values called a workload
-   (corresponding to time measurement of events) together with the
+   (corresponding to the size of some computational jobs) together with the
    corresponding measured execution time. Hence, if [n] is the length
    of the workload, there are [n+1] columns. *)
 type raw_row = {workload : (string * float) list; qty : float array}
@@ -292,7 +292,7 @@ let empirical_data opts
   | [] | _ :: _ :: _ ->
       Format.kasprintf
         Result.error
-        "Display.empirical_data: variables not named consistenly@."
+        "Display.empirical_data: variables not named consistently@."
   | [vars] ->
       let rows = List.length samples in
       let input_dims = List.length vars in
@@ -380,13 +380,31 @@ let validator opts (problem : Inference.problem) (solution : Inference.solution)
       in
       return plots
 
+let is_trivial_workload workload = Array.for_all (fun x -> x = 1.0) workload
+
 let empirical opts (workload_data : (Sparse_vec.String.t * float array) list) =
   let open Result_syntax in
   if opts.reduced_plot_verbosity then return []
   else
     let* columns, timings = empirical_data opts workload_data in
-    let* plots = plot_scatter opts "Empirical" columns [timings] in
-    return plots
+    (* If the data is non-trivial, we produce a scatter plot.
+       Otherwise, we produce a histogram of the data. *)
+    match columns with
+    | [(name, workload)] when is_trivial_workload workload ->
+        let data = timings |> Array.to_list |> Array.concat in
+        let std = Maths.std (Maths.vector_of_array data) in
+        let points = data |> Array.map Plot.r1 |> Data.of_array in
+        let plot =
+          plot2
+            ~xaxis:name
+            ~yaxis:"freq"
+            ~title:"Empirical (histogram)"
+            [Histogram.hist ~binwidth:(std *. 0.1) ~points ()]
+        in
+        return [plot]
+    | _ ->
+        let* plots = plot_scatter opts "Empirical" columns [timings] in
+        return plots
 
 let eval_mset (mset : Free_variable.Sparse_vec.t)
     (eval : Free_variable.t -> float) =
