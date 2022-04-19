@@ -714,12 +714,23 @@ val private_exes : string list maker
     - [dep_files]: a list of files to add as dependencies using [(deps (file ...))]
       in the [runtest] alias.
 
+    - [dep_globs]: a list of files to add as dependencies using [(deps (glob_files ...))]
+      in the [dune] file.
+
     Since tests are private, they have no public name: the ['a]
     argument of [maker] is the internal name. *)
-val test : ?dep_files:string list -> ?runtest:bool -> string maker
+val test :
+  ?dep_files:string list ->
+  ?dep_globs:string list ->
+  ?runtest:bool ->
+  string maker
 
 (** Same as {!test} but with several names, to define multiple tests at once. *)
-val tests : ?dep_files:string list -> ?runtest:bool -> string list maker
+val tests :
+  ?dep_files:string list ->
+  ?dep_globs:string list ->
+  ?runtest:bool ->
+  string list maker
 
 (** Make an external vendored library, for use in internal target dependencies.
 

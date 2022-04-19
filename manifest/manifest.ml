@@ -333,11 +333,20 @@ module Dune = struct
       ~deps:dep_files
       ~action:[S "run"; S "node"; S ("%{dep:./" ^ name ^ ".bc.js}")]
 
-  let runtest ~package ~dep_files name =
+  let file name = [S "file"; S name]
+
+  let glob_files expr = [S "glob_files"; S expr]
+
+  let runtest ~package ~dep_files ~dep_globs name =
+    let deps_dune =
+      let files = List.map file dep_files in
+      let globs = List.map glob_files dep_globs in
+      of_list (files @ globs)
+    in
     alias_rule
       "runtest"
       ~package
-      ~deps:dep_files
+      ~deps_dune
       ~action:[S "run"; S ("%{dep:./" ^ name ^ ".exe}")]
 
   let setenv name value followup = [G [S "setenv"; S name; S value]; followup]
@@ -352,8 +361,6 @@ module Dune = struct
   let pps ?(args = Stdlib.List.[]) name = S "pps" :: S name :: of_atom_list args
 
   let include_ name = [S "include"; S name]
-
-  let file name = [S "file"; S name]
 
   let targets_rule ?deps targets ~action =
     [
@@ -1046,10 +1053,10 @@ module Target = struct
     snd (collect deps)
 
   let internal make_kind ?all_modules_except ?bisect_ppx ?c_library_flags
-      ?(conflicts = []) ?(dep_files = []) ?(deps = []) ?(dune = Dune.[])
-      ?(flags_nostandard = false) ?foreign_stubs ?inline_tests ?js_compatible
-      ?js_of_ocaml ?documentation ?(linkall = false) ?modes ?modules
-      ?(modules_without_implementation = []) ?(npm_deps = [])
+      ?(conflicts = []) ?(dep_files = []) ?(dep_globs = []) ?(deps = [])
+      ?(dune = Dune.[]) ?(flags_nostandard = false) ?foreign_stubs ?inline_tests
+      ?js_compatible ?js_of_ocaml ?documentation ?(linkall = false) ?modes
+      ?modules ?(modules_without_implementation = []) ?(npm_deps = [])
       ?(nopervasives = false) ?(nostdlib = false) ?ocaml ?opam ?(opaque = false)
       ?(opens = []) ?(preprocess = []) ?(preprocessor_deps = [])
       ?(private_modules = []) ?(opam_only_deps = []) ?release ?static
@@ -1208,7 +1215,7 @@ module Target = struct
           let runtest_rules =
             if run_native then
               List.map
-                (fun name -> Dune.(runtest ~dep_files ~package name))
+                (fun name -> Dune.(runtest ~dep_files ~dep_globs ~package name))
                 (Ne_list.to_list names)
             else []
           in
@@ -1268,23 +1275,24 @@ module Target = struct
       }
 
   let public_lib ?internal_name =
-    internal ?dep_files:None @@ fun public_name ->
+    internal ?dep_files:None ?dep_globs:None @@ fun public_name ->
     let internal_name =
       Option.value internal_name ~default:(convert_to_identifier public_name)
     in
     Public_library {internal_name; public_name}
 
-  let private_lib = internal ?dep_files:None @@ fun name -> Private_library name
+  let private_lib =
+    internal ?dep_files:None ?dep_globs:None @@ fun name -> Private_library name
 
   let public_exe ?internal_name =
-    internal ?dep_files:None @@ fun public_name ->
+    internal ?dep_files:None ?dep_globs:None @@ fun public_name ->
     let internal_name =
       Option.value internal_name ~default:(convert_to_identifier public_name)
     in
     Public_executable ({internal_name; public_name}, [])
 
   let public_exes ?internal_names =
-    internal ?dep_files:None @@ fun public_names ->
+    internal ?dep_files:None ?dep_globs:None @@ fun public_names ->
     let names =
       match internal_names with
       | None ->
@@ -1308,21 +1316,21 @@ module Target = struct
     | head :: tail -> Public_executable (head, tail)
 
   let private_exe =
-    internal ?dep_files:None @@ fun internal_name ->
+    internal ?dep_files:None ?dep_globs:None @@ fun internal_name ->
     Private_executable (internal_name, [])
 
   let private_exes =
-    internal ?dep_files:None @@ fun internal_names ->
+    internal ?dep_files:None ?dep_globs:None @@ fun internal_names ->
     match internal_names with
     | [] -> invalid_argf "Target.private_exes: at least one name must be given"
     | head :: tail -> Private_executable (head, tail)
 
-  let test ?dep_files ?(runtest = true) =
-    internal ?dep_files @@ fun test_name ->
+  let test ?dep_files ?dep_globs ?(runtest = true) =
+    internal ?dep_files ?dep_globs @@ fun test_name ->
     Test_executable {names = (test_name, []); run = runtest}
 
-  let tests ?dep_files ?(runtest = true) =
-    internal ?dep_files @@ fun test_names ->
+  let tests ?dep_files ?dep_globs ?(runtest = true) =
+    internal ?dep_files ?dep_globs @@ fun test_names ->
     match test_names with
     | [] -> invalid_arg "Target.tests: at least one name must be given"
     | head :: tail -> Test_executable {names = (head, tail); run = runtest}
