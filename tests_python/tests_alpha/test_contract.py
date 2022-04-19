@@ -539,7 +539,7 @@ class TestContracts:
             # error message for set update on non-comparable type
             (
                 "set_update_non_comparable.tz",
-                r'Type nat is not compatible with type list operation',
+                r'Type nat\s+is not compatible with type list operation',
             ),
             # error message for the arity of the chain_id type
             (
