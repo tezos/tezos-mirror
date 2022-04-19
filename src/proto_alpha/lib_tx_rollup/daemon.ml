@@ -423,11 +423,130 @@ let trigger_injection state header =
   (* Queue request for injection of operation that must be injected each block *)
   Injector.inject ~strategy:Injector.Each_block ()
 
+let process_op (type kind) (state : State.t) l1_block l1_operation ~source:_
+    (op : kind manager_operation) (result : kind manager_operation_result)
+    (acc : 'acc) : 'acc tzresult Lwt.t =
+  let open Lwt_result_syntax in
+  let is_my_rollup tx_rollup =
+    Tx_rollup.equal state.rollup_info.rollup_id tx_rollup
+  in
+  match (op, result) with
+  | ( Tx_rollup_commit {commitment; tx_rollup},
+      Applied (Tx_rollup_commit_result _) )
+    when is_my_rollup tx_rollup ->
+      let commitment_hash =
+        Tx_rollup_commitment.(Compact.hash (Full.compact commitment))
+      in
+      let*! () =
+        State.set_commitment_included
+          state
+          commitment_hash
+          l1_block
+          l1_operation
+      in
+      return acc
+  | (_, _) -> return acc
+
+let rollback_op (type kind) (state : State.t) l1_block l1_operation ~source:_
+    (op : kind manager_operation) (result : kind manager_operation_result)
+    (acc : 'acc) : 'acc tzresult Lwt.t =
+  ignore (state, l1_block, l1_operation, op, result) ;
+  (* TODO/TORU: implement rollback actions for some Tx rollup operations *)
+  return acc
+
+let handle_l1_operation direction (block : Alpha_block_services.block_info)
+    state acc (operation : Alpha_block_services.operation) =
+  let open Lwt_result_syntax in
+  let handle_op =
+    match direction with `Rollback -> rollback_op | `Process -> process_op
+  in
+  let rec handle :
+      type kind.
+      source:public_key_hash ->
+      kind manager_operation ->
+      kind manager_operation_result ->
+      packed_internal_manager_operation_result list ->
+      'acc ->
+      'acc tzresult Lwt.t =
+   fun ~source op result internal_operation_results acc ->
+    let* acc =
+      handle_op state ~source block.hash operation.hash op result acc
+    in
+    (* Add messages from internal operations *)
+    List.fold_left_es
+      (fun acc (Internal_manager_operation_result ({operation; _}, result)) ->
+        let operation = manager_operation_of_internal_operation operation in
+        handle ~source operation result [] acc)
+      acc
+      internal_operation_results
+  in
+  let rec handle_list :
+      type kind. 'acc -> kind contents_and_result_list -> 'acc tzresult Lwt.t =
+   fun acc -> function
+    | Single_and_result
+        ( Manager_operation {operation; source; _},
+          Manager_operation_result
+            {operation_result; internal_operation_results; _} ) ->
+        handle ~source operation operation_result internal_operation_results acc
+    | Single_and_result (_, _) -> return acc
+    | Cons_and_result
+        ( Manager_operation {operation; source; _},
+          Manager_operation_result
+            {operation_result; internal_operation_results; _},
+          rest ) ->
+        let* acc =
+          handle
+            ~source
+            operation
+            operation_result
+            internal_operation_results
+            acc
+        in
+        handle_list acc rest
+  in
+  match (operation.protocol_data, operation.receipt) with
+  | (_, Receipt No_operation_metadata) | (_, Empty) | (_, Too_large) ->
+      fail [Tx_rollup_no_operation_metadata operation.hash]
+  | ( Operation_data {contents = operation_contents; _},
+      Receipt (Operation_metadata {contents = result_contents}) ) -> (
+      match kind_equal_list operation_contents result_contents with
+      | None ->
+          (* Should not happen *)
+          return acc
+      | Some Eq ->
+          let operation_and_result =
+            pack_contents_list operation_contents result_contents
+          in
+          handle_list acc operation_and_result)
+
+let handle_l1_block direction state acc block =
+  List.fold_left_es
+    (List.fold_left_es (handle_l1_operation direction block state))
+    acc
+    block.Alpha_block_services.operations
+
+let handle_l1_reorg state acc reorg =
+  let open Lwt_result_syntax in
+  let* acc =
+    List.fold_left_es
+      (handle_l1_block `Rollback state)
+      acc
+      reorg.Common.old_chain
+  in
+  let* acc =
+    List.fold_left_es
+      (handle_l1_block `Process state)
+      acc
+      reorg.Common.new_chain
+  in
+  return acc
+
 let process_head state (current_hash, current_header) rollup_id =
   let open Lwt_result_syntax in
   let*! () = Event.(emit new_block) current_hash in
   let* res = process_block state current_hash rollup_id in
   let* l1_reorg = State.set_tezos_head state current_hash in
+  let* () = handle_l1_reorg state () l1_reorg in
   let* () = batch () in
   let* () = queue_gc_operations state in
   let* () = notify_head state current_hash l1_reorg in
