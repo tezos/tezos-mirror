@@ -192,6 +192,14 @@ module Event = struct
       (* may be negative in case of signals *)
       ("exit_code", Data_encoding.int31)
 
+  let metrics_ended =
+    declare_1
+      ~section
+      ~name:"metrics_ended"
+      ~level:Error
+      ~msg:"metrics server ended with error {stacktrace}"
+      ("stacktrace", Data_encoding.string)
+
   let incorrect_history_mode =
     declare_2
       ~section
@@ -539,7 +547,16 @@ let run ?verbosity ?sandbox ?target ~singleprocess ~force_history_mode_switch
         let*! () = Event.(emit bye) exit_status in
         Tezos_base_unix.Internal_event_unix.close ())
   in
-  let* _ = metrics_serve config.metrics_addr in
+  Lwt.dont_wait
+    (fun () ->
+      let*! r = metrics_serve config.metrics_addr in
+      match r with
+      | Ok _ -> Lwt.return_unit
+      | Error err ->
+          Event.(emit metrics_ended (Format.asprintf "%a" pp_print_trace err)))
+    (fun exn ->
+      Event.(
+        emit__dont_wait__use_with_care metrics_ended (Printexc.to_string exn))) ;
   Lwt_utils.never_ending ()
 
 let process sandbox verbosity target singleprocess force_history_mode_switch
