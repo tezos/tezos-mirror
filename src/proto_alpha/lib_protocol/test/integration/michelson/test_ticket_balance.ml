@@ -507,6 +507,215 @@ let test_send_tickets () =
   let token_red = string_token ~ticketer:ticket_sender "Red" in
   assert_token_balance ~loc:__LOC__ block token_red ticket_receiver (Some 2)
 
+(** Test sending and storing tickets with amount zero. *)
+let test_send_and_store_zero_amount_tickets () =
+  let* {block; baker; contract = source_contract} = init_env () in
+  (* A contract that, given an address to a contract that receives tickets,
+     mints a ticket and sends it over. *)
+  let* (ticket_minter, _script, block) =
+    originate
+      ~baker
+      ~source_contract
+      ~script:
+        {|
+          { parameter (pair address nat) ;
+            storage unit ;
+            code { CAR ;
+                  UNPAIR ;
+                  CONTRACT (ticket string) ;
+                  IF_NONE
+                    { DROP ;
+                      PUSH string "Contract of type `ticket(string)` not found" ;
+                      FAILWITH }
+                    { PUSH mutez 0 ;
+                      DIG 2 ;
+                      PUSH string "Red" ;
+                      TICKET ;
+                      TRANSFER_TOKENS ;
+                      PUSH unit Unit ;
+                      NIL operation ;
+                      DIG 2 ;
+                      CONS ;
+                      PAIR } } }
+         |}
+      ~storage:"Unit"
+      block
+  in
+  (* A contract with two entrypoints:
+      - Store (ticket): stores the received ticket.
+      - Send (address) sends the last received tickets to the given address.
+  *)
+  let ticket_storer_script =
+    {|
+      { parameter (or (address %send) (ticket %store string)) ;
+        storage (list (ticket string)) ;
+        code { UNPAIR ;
+              IF_LEFT
+                { CONTRACT (ticket string) ;
+                  IF_NONE
+                    { DROP ;
+                      PUSH string "Contract of type `ticket(string)` not found" ;
+                      FAILWITH }
+                    { SWAP ;
+                      IF_CONS
+                        { DIG 2 ;
+                          PUSH mutez 0 ;
+                          DIG 2 ;
+                          TRANSFER_TOKENS ;
+                          SWAP ;
+                          NIL operation ;
+                          DIG 2 ;
+                          CONS ;
+                          PAIR }
+                        { DROP ; PUSH string "Empty storage" ; FAILWITH } } }
+                { CONS ; NIL operation ; PAIR } } }
+    |}
+  in
+  let* (ticket_store_1, _script, block) =
+    originate
+      ~baker
+      ~source_contract
+      ~script:ticket_storer_script
+      ~storage:"{}"
+      block
+  in
+  let* (ticket_store_2, _script, block) =
+    originate
+      ~baker
+      ~source_contract
+      ~script:ticket_storer_script
+      ~storage:"{}"
+      block
+  in
+  let mint_and_send_to_storer_1 block amount =
+    transaction
+      ~entrypoint:Entrypoint.default
+      ~baker
+      ~sender:source_contract
+      block
+      ~recipient:ticket_minter
+      ~parameters:
+        (Printf.sprintf
+           {|Pair "%s%s" %d|}
+           (Contract.to_b58check ticket_store_1)
+           "%store"
+           amount)
+  in
+  let send_from_store_1_to_store_2 block =
+    transaction
+      ~entrypoint:(Entrypoint.of_string_strict_exn "send")
+      ~baker
+      ~sender:source_contract
+      block
+      ~recipient:ticket_store_1
+      ~parameters:
+        (Printf.sprintf
+           {|"%s%s"|}
+           (Contract.to_b58check ticket_store_2)
+           "%store")
+  in
+  let token_red = string_token ~ticketer:ticket_minter "Red" in
+  (* Mint and send a ticket with amount 0 to [ticket_store_1]. After the
+     transaction:
+
+     [ticket_store_1]:
+       [
+         (TM, "Red", 0)
+       ]
+  *)
+  let* block = mint_and_send_to_storer_1 block 0 in
+  let* () =
+    assert_token_balance ~loc:__LOC__ block token_red ticket_store_1 None
+  in
+  (* Mint and send a ticket with amount 10 to [ticket_store_1]. After
+     the transaction:
+
+     [ticket_store_1]:
+       [
+         (TM, "Red", 10)
+         (TM, "Red",  0)
+       ]
+  *)
+  let* block = mint_and_send_to_storer_1 block 10 in
+  let* () =
+    assert_token_balance ~loc:__LOC__ block token_red ticket_store_1 (Some 10)
+  in
+  (* Send the top of [ticket_storer_1]'s list to [ticket_store_2]. That is the
+     ticket (TM, "Red", 10). After the transaction:
+
+     ticket_store_1:
+       [
+         (TM, "Red",  0)
+       ]
+     ticket_store_2:
+       [
+         (TM, "Red", 10)
+       ]
+  *)
+  let* block = send_from_store_1_to_store_2 block in
+  let* () =
+    assert_token_balance ~loc:__LOC__ block token_red ticket_store_1 None
+  in
+  let* () =
+    assert_token_balance ~loc:__LOC__ block token_red ticket_store_2 (Some 10)
+  in
+  (* Send the top of [ticket_store_1]'s stack to [ticket_store_2]. That is the
+     ticket (TM, "Red", 0). Now, [ticket_store_2] holds both tickets.
+
+     ticket_store_1:
+       [ ]
+     [ticket_store_2]:
+      [
+        (TM, "Red", 10)
+        (TM, "Red",  0)
+      ]
+  *)
+  let* block = send_from_store_1_to_store_2 block in
+  let* () =
+    assert_token_balance ~loc:__LOC__ block token_red ticket_store_1 None
+  in
+  let* () =
+    assert_token_balance ~loc:__LOC__ block token_red ticket_store_2 (Some 10)
+  in
+  (* Mint and send a ticket with amount 5 to [ticket_store_1]. After the
+     transaction:
+
+     [ticket_store_1]:
+       [
+         (TM, "Red", 5)
+       ]
+     [ticket_store_2]:
+      [
+        (TM, "Red", 10)
+        (TM, "Red",  0)
+      ]
+  *)
+  let* block = mint_and_send_to_storer_1 block 5 in
+  let* () =
+    assert_token_balance ~loc:__LOC__ block token_red ticket_store_1 (Some 5)
+  in
+  (* Send the top of [ticket_store_1]'s stack to [ticket_store_2]. That is the
+     ticket (TM, "Red", 5). After the transaction, [ticket_store_2] holds three
+     tickets:
+
+     ticket_store_1:
+       [ ]
+     [ticket_store_2]:
+      [
+        (TM, "Red",  5)
+        (TM, "Red", 10)
+        (TM, "Red",  0)
+      ]
+  *)
+  let* block = send_from_store_1_to_store_2 block in
+  let* () =
+    assert_token_balance ~loc:__LOC__ block token_red ticket_store_1 None
+  in
+  let* () =
+    assert_token_balance ~loc:__LOC__ block token_red ticket_store_2 (Some 15)
+  in
+  return_unit
+
 (** Test sending tickets in a big-map. *)
 let test_send_tickets_in_big_map () =
   let* {block; baker; contract = source_contract} = init_env () in
@@ -1458,6 +1667,10 @@ let tests =
     Tztest.tztest "Test add to big-map" `Quick test_add_to_big_map;
     Tztest.tztest "Test swap big-map" `Quick test_swap_big_map;
     Tztest.tztest "Test send ticket" `Quick test_send_tickets;
+    Tztest.tztest
+      "Test send and store tickets with amount 0"
+      `Quick
+      test_send_and_store_zero_amount_tickets;
     Tztest.tztest
       "Test send tickets in big-map"
       `Quick
