@@ -236,11 +236,6 @@ test-coverage-tenderbake:
 	-@$(MAKE) test-unit-alpha
 	-@$(MAKE) test-python-tenderbake
 
-.PHONY: lint-opam-dune
-lint-opam-dune:
-	@dune build --profile=$(PROFILE) @runtest_dune_template
-
-
 # Ensure that all unit tests are restricted to their opam package
 # (change 'tezos-test-helpers' to one the most elementary packages of
 # the repo if you add "internal" dependencies to tezos-test-helpers)
@@ -283,7 +278,7 @@ lint-ometrics-gitlab:
 	@echo "Report should be available in file://$(shell pwd)/${CODE_QUALITY_REPORT}"
 
 .PHONY: test
-test: lint-opam-dune test-code
+test: test-code
 
 .PHONY: check-linting check-python-linting
 
