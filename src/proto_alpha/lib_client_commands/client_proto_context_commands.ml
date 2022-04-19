@@ -2512,12 +2512,12 @@ let commands_rw () =
          force_low_fee_arg
          fee_cap_arg
          burn_cap_arg)
-      (prefixes ["submit"; "tx"; "rollup"; "return"; "bond"]
-      @@ prefix "to" @@ tx_rollup_param @@ prefix "from"
+      (prefixes ["recover"; "bond"; "of"]
       @@ ContractAlias.destination_param
            ~name:"src"
            ~desc:"account that owns the bond."
-      @@ stop)
+      @@ prefixes ["for"; "tx"; "rollup"]
+      @@ tx_rollup_param @@ stop)
       (fun ( fee,
              dry_run,
              verbose_signing,
@@ -2530,8 +2530,8 @@ let commands_rw () =
              force_low_fee,
              fee_cap,
              burn_cap )
-           tx_rollup
            (_, source)
+           tx_rollup
            cctxt ->
         match Contract.is_implicit source with
         | None -> failwith "Only implicit accounts can deposit/recover bonds"

@@ -1393,9 +1393,7 @@ module Tx_rollup = struct
         ?hooks
         client
         (["--wait"; wait]
-        @ [
-            "submit"; "tx"; "rollup"; "return"; "bond"; "to"; rollup; "from"; src;
-          ]
+        @ ["recover"; "bond"; "of"; src; "for"; "tx"; "rollup"; rollup]
         @ Option.fold
             ~none:[]
             ~some:(fun burn_cap -> ["--burn-cap"; Tez.to_string burn_cap])
