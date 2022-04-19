@@ -95,24 +95,6 @@ let block_hash_param =
       try return (Block_hash.of_b58check_exn s)
       with _ -> failwith "Parameter '%s' is an invalid block hash" s)
 
-let tx_rollup_parameter =
-  Clic.parameter (fun _ s ->
-      match Tx_rollup.of_b58check_opt s with
-      | Some c -> return c
-      | None -> failwith "Parameter '%s' is an invalid tx rollup address" s)
-
-let tx_rollup_param =
-  Clic.param
-    ~name:"tx_rollup address"
-    ~desc:"The tx rollup address that we are sending this batch to."
-    tx_rollup_parameter
-
-let tx_rollup_proof_param =
-  Clic.param
-    ~name:"tx_rollup rejection proof"
-    ~desc:"The proof associated to the rejection operation"
-    string_parameter
-
 let rollup_kind_param =
   Clic.parameter (fun _ name ->
       match Sc_rollups.from ~name with
@@ -2119,7 +2101,7 @@ let commands_rw () =
             >>=? fun _ -> return_unit);
     command
       ~group
-      ~desc:"Launch a new optimistic transaction rollup."
+      ~desc:"Launch a new transaction rollup."
       (args12
          fee_arg
          dry_run_switch
@@ -2137,7 +2119,7 @@ let commands_rw () =
       @@ prefix "from"
       @@ ContractAlias.destination_param
            ~name:"src"
-           ~desc:"name of the account originating the transaction rollup"
+           ~desc:"Account originating the transaction rollup."
       @@ stop)
       (fun ( fee,
              dry_run,
@@ -2187,7 +2169,7 @@ let commands_rw () =
             >>=? fun _res -> return_unit);
     command
       ~group
-      ~desc:"Submit a batch of optimistic transaction rollup operations."
+      ~desc:"Submit a batch of transaction rollup operations."
       (args12
          fee_arg
          dry_run_switch
@@ -2203,13 +2185,18 @@ let commands_rw () =
          burn_cap_arg)
       (prefixes ["submit"; "tx"; "rollup"; "batch"]
       @@ Clic.param
-           ~name:"bytes"
-           ~desc:"a bytes representation of the batch in hexadecimal form."
-           Client_proto_args.string_parameter
-      @@ prefix "to" @@ tx_rollup_param @@ prefix "from"
+           ~name:"batch"
+           ~desc:
+             "Bytes representation (hexadecimal string) of the batch. Must be \
+              prefixed by '0x'."
+           bytes_parameter
+      @@ prefix "to"
+      @@ Tx_rollup.tx_rollup_address_param
+           ~usage:"Tx rollup receiving the batch."
+      @@ prefix "from"
       @@ ContractAlias.destination_param
            ~name:"src"
-           ~desc:"name of the account originating the transaction rollup."
+           ~desc:"Account submiting the transaction rollup batches."
       @@ stop)
       (fun ( fee,
              dry_run,
@@ -2259,13 +2246,16 @@ let commands_rw () =
               ~src_sk
               ~fee_parameter
               ~tx_rollup
-              ~content
+              ~content:(Bytes.to_string content)
               ()
             >>=? fun _res -> return_unit);
     command
       ~group
-      ~desc:"Submit an optimistic transaction rollup commitment operation."
-      (args12
+      ~desc:
+        "Commit to an optimistic transaction rollup for an inbox and level.\n\n\
+         The provided list of message result hash must be ordered in the same \
+         way the messages was ordered in the inbox."
+      (args13
          fee_arg
          dry_run_switch
          verbose_signing_switch
@@ -2277,33 +2267,29 @@ let commands_rw () =
          counter_arg
          force_low_fee_arg
          fee_cap_arg
-         burn_cap_arg)
-      (prefixes ["submit"; "tx"; "rollup"; "commitment"]
-      @@ Clic.param
-           ~name:"level"
-           ~desc:"The level"
-           Client_proto_args.int_parameter
-      @@ Clic.param
-           ~name:"inbox_merkle_root"
-           ~desc:"the inbox merkle root to commit to in b58check notation."
-           Client_proto_args.string_parameter
-      @@ Clic.param
-           ~name:"predecessor"
-           ~desc:
-             "a bytes representation of the predecessor commitment in \
-              hexadecimal form, or empty for no predecessor."
-           Client_proto_args.string_parameter
-      @@ Clic.param
-           ~name:"batches"
-           ~desc:
-             "a bytes representation of the commitment roots in hex and, \
-              separated by !."
-           Client_proto_args.string_parameter
-      @@ prefix "to" @@ tx_rollup_param @@ prefix "from"
+         burn_cap_arg
+         (Tx_rollup.commitment_hash_arg
+            ~long:"predecessor-hash"
+            ~usage:
+              "Predecessor commitment hash, empty for the first commitment."
+            ()))
+      (prefixes ["commit"; "to"; "tx"; "rollup"]
+      @@ Tx_rollup.tx_rollup_address_param
+           ~usage:"Transaction rollup addressb committed to."
+      @@ prefix "from"
       @@ ContractAlias.destination_param
            ~name:"src"
-           ~desc:"name of the account submitting the commitment."
-      @@ stop)
+           ~desc:"Account commiting to the transaction rollup."
+      @@ prefixes ["for"; "level"]
+      @@ Tx_rollup.level_param ~usage:"Level used for the commitment."
+      @@ prefixes ["with"; "inbox"; "hash"]
+      @@ Tx_rollup.inbox_root_hash_param ~usage:"Inbox used for the commitment."
+      @@ prefixes ["and"; "messages"; "result"; "hash"]
+      @@ seq_of_param
+           (Tx_rollup.message_result_hash_param
+              ~usage:
+                "Message result hash of a message from the inbox being \
+                 comitted."))
       (fun ( fee,
              dry_run,
              verbose_signing,
@@ -2315,15 +2301,14 @@ let commands_rw () =
              counter,
              force_low_fee,
              fee_cap,
-             burn_cap )
-           level
-           inbox_merkle_root
-           predecessor
-           batches
+             burn_cap,
+             predecessor )
            tx_rollup
            (_, source)
+           level
+           inbox_merkle_root
+           messages
            cctxt ->
-        let level = Int32.of_int level in
         match Contract.is_implicit source with
         | None ->
             failwith
@@ -2339,9 +2324,6 @@ let commands_rw () =
                 fee_cap;
                 burn_cap;
               }
-            in
-            let predecessor =
-              if String.equal predecessor "" then None else Some predecessor
             in
             submit_tx_rollup_commitment
               cctxt
@@ -2361,14 +2343,13 @@ let commands_rw () =
               ~tx_rollup
               ~level
               ~inbox_merkle_root
-              ~batches
+              ~messages
               ~predecessor
               ()
             >>=? fun _res -> return_unit);
     command
       ~group
-      ~desc:
-        "Submit an optimistic transaction rollup finalise commitment operation."
+      ~desc:"Finalize a commitment of an transaction rollup."
       (args12
          fee_arg
          dry_run_switch
@@ -2382,11 +2363,13 @@ let commands_rw () =
          force_low_fee_arg
          fee_cap_arg
          burn_cap_arg)
-      (prefixes ["submit"; "tx"; "rollup"; "finalize"; "commitment"]
-      @@ prefix "to" @@ tx_rollup_param @@ prefix "from"
+      (prefixes ["finalize"; "commitment"; "of"; "tx"; "rollup"]
+      @@ Tx_rollup.tx_rollup_address_param
+           ~usage:"Tx rollup that have his commitment finalized."
+      @@ prefix "from"
       @@ ContractAlias.destination_param
            ~name:"src"
-           ~desc:"name of the account finalizing the commitment."
+           ~desc:"Account finalizing the commitment."
       @@ stop)
       (fun ( fee,
              dry_run,
@@ -2437,7 +2420,7 @@ let commands_rw () =
             >>=? fun _res -> return_unit);
     command
       ~group
-      ~desc:"Submit an optimistic transaction rollup operation to recover bond."
+      ~desc:"Recover commitment bond from an transaction rollup."
       (args12
          fee_arg
          dry_run_switch
@@ -2451,11 +2434,12 @@ let commands_rw () =
          force_low_fee_arg
          fee_cap_arg
          burn_cap_arg)
-      (prefixes ["submit"; "tx"; "rollup"; "return"; "bond"]
-      @@ prefix "to" @@ tx_rollup_param @@ prefix "from"
+      (prefixes ["recover"; "bond"; "of"]
       @@ ContractAlias.destination_param
            ~name:"src"
-           ~desc:"account that owns the bond."
+           ~desc:"Account that owns the bond."
+      @@ prefixes ["for"; "tx"; "rollup"]
+      @@ Tx_rollup.tx_rollup_address_param ~usage:"Tx rollup of the bond."
       @@ stop)
       (fun ( fee,
              dry_run,
@@ -2469,8 +2453,8 @@ let commands_rw () =
              force_low_fee,
              fee_cap,
              burn_cap )
-           tx_rollup
            (_, source)
+           tx_rollup
            cctxt ->
         match Contract.is_implicit source with
         | None -> failwith "Only implicit accounts can deposit/recover bonds"
@@ -2506,8 +2490,7 @@ let commands_rw () =
             >>=? fun _res -> return_unit);
     command
       ~group
-      ~desc:
-        "Submit an optimistic transaction rollup remove commitment operation."
+      ~desc:"Remove a commitment from an transaction rollup."
       (args12
          fee_arg
          dry_run_switch
@@ -2521,8 +2504,10 @@ let commands_rw () =
          force_low_fee_arg
          fee_cap_arg
          burn_cap_arg)
-      (prefixes ["submit"; "tx"; "rollup"; "remove"; "commitment"]
-      @@ prefix "to" @@ tx_rollup_param @@ prefix "from"
+      (prefixes ["remove"; "commitment"; "of"; "tx"; "rollup"]
+      @@ Tx_rollup.tx_rollup_address_param
+           ~usage:"Tx rollup that have his commitment removed."
+      @@ prefix "from"
       @@ ContractAlias.destination_param
            ~name:"src"
            ~desc:"name of the account removing the commitment."
@@ -2543,9 +2528,7 @@ let commands_rw () =
            (_, source)
            cctxt ->
         match Contract.is_implicit source with
-        | None ->
-            failwith
-              "Only implicit accounts can remove transaction rollup commitments"
+        | None -> failwith "Only implicit accounts can remove commitments."
         | Some source ->
             Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
             let fee_parameter =
@@ -2578,7 +2561,7 @@ let commands_rw () =
             >>=? fun _res -> return_unit);
     command
       ~group
-      ~desc:"Submit an optimistic transaction rollup rejection operation."
+      ~desc:"Reject a commitment of an transaction rollup."
       (args12
          fee_arg
          dry_run_switch
@@ -2592,57 +2575,57 @@ let commands_rw () =
          force_low_fee_arg
          fee_cap_arg
          burn_cap_arg)
-      (prefixes
-         ["submit"; "tx"; "rollup"; "reject"; "commitment"; "at"; "level"]
+      (prefixes ["reject"; "commitment"; "of"; "tx"; "rollup"]
+      @@ Tx_rollup.tx_rollup_address_param
+           ~usage:"Tx rollup that have one of his commitment rejected."
+      @@ prefixes ["at"; "level"]
+      @@ Tx_rollup.level_param ~usage:"Level of the commitment disputed."
+      @@ prefixes ["with"; "result"; "hash"]
+      @@ Tx_rollup.message_result_hash_param
+           ~usage:"Disputed message result hash."
+      @@ prefixes ["and"; "result"; "path"]
+      @@ Tx_rollup.message_result_path_param
+           ~usage:"Disputed message result path."
+      @@ prefixes ["for"; "message"; "at"; "position"]
       @@ Clic.param
-           ~name:"level"
-           ~desc:"The level"
-           Client_proto_args.int_parameter
-      @@ prefix "message"
-      @@ Clic.param
-           ~name:"message"
-           ~desc:"the message being rejected"
-           Client_proto_args.string_parameter
-      @@ prefix "at" @@ prefix "position"
-      @@ Clic.param
-           ~name:"message_position"
-           ~desc:"position of the message being rejected in the inbox"
-           int_parameter
-      @@ prefix "and" @@ prefix "path"
-      @@ Clic.param
-           ~name:"message_path"
-           ~desc:"merkle path of the message being rejected in the inbox"
-           string_parameter
-      @@ prefixes ["to"; "reject"]
-      @@ Clic.param
-           ~name:"message_result_hash"
-           ~desc:"message result hash being rejected"
-           Client_proto_args.string_parameter
-      @@ prefixes ["with"; "path"]
-      @@ Clic.param
-           ~name:"message_result_path"
-           ~desc:"merkle path of message result hash being rejected"
-           Client_proto_args.string_parameter
-      @@ prefix "with" @@ prefix "proof" @@ tx_rollup_proof_param
+           ~name:"message position"
+           ~desc:
+             "Position of the message in the inbox with the result being \
+              disputed."
+           non_negative_param
+      @@ prefixes ["with"; "content"]
+      @@ Tx_rollup.message_param
+           ~usage:"Message content with the result being disputed."
+      @@ prefixes ["and"; "path"]
+      @@ Tx_rollup.message_path_param
+           ~usage:"Path of the message with the result being disputed."
       @@ prefixes ["with"; "agreed"; "context"; "hash"]
-      @@ Clic.param
-           ~name:"context_hash"
-           ~desc:"the context hash of the layer 2"
-           Client_proto_args.string_parameter
-      @@ prefixes ["and"; "withdraw"; "list"]
-      @@ Clic.param
-           ~name:"withdrawals_merkle_root"
-           ~desc:"the hash of the merkelised withdraw list"
-           Client_proto_args.string_parameter
-      @@ prefixes ["with"; "path"]
-      @@ Clic.param
-           ~name:"message_result_path"
-           ~desc:"merkle path of the message result being rejected in the inbox"
-           string_parameter
-      @@ prefix "to" @@ tx_rollup_param @@ prefix "from"
+      @@ Tx_rollup.context_hash_param
+           ~usage:
+             (Format.sprintf
+                "@[Context hash of the precedent message result in the \
+                 commitment.@,\
+                 @[This must be the context hash of the last message result \
+                 agreed on.@]@]")
+      @@ prefixes ["and"; "withdraw"; "list"; "hash"]
+      @@ Tx_rollup.withdraw_list_hash_param
+           ~usage:
+             (Format.sprintf
+                "@[Withdraw list hash of the precedent message result in the \
+                 commitment.@,\
+                 @[This must be the withdraw list hash of the last message \
+                 result agreed on.@]@]")
+      @@ prefixes ["and"; "result"; "path"]
+      @@ Tx_rollup.message_result_path_param
+           ~usage:"Precedent message result path."
+      @@ prefixes ["using"; "proof"]
+      @@ Tx_rollup.proof_param
+           ~usage:
+             "Proof that the disputed message result provided is incorrect."
+      @@ prefix "from"
       @@ ContractAlias.destination_param
            ~name:"src"
-           ~desc:"name of the account rejecting the commitment."
+           ~desc:"Account rejecting the commitment."
       @@ stop)
       (fun ( fee,
              dry_run,
@@ -2656,24 +2639,24 @@ let commands_rw () =
              force_low_fee,
              fee_cap,
              burn_cap )
+           tx_rollup
            level
-           message
-           message_position
-           message_path
-           message_result_hash
-           message_result_path
-           proof
+           rejected_message_result_hash
+           rejected_message_result_path
+           confliting_message_position
+           confliting_message
+           confliting_message_path
            previous_context_hash
            previous_withdraw_list_hash
            previous_message_result_path
-           tx_rollup
+           proof
            (_, source)
            cctxt ->
-        let level = Int32.of_int level in
         match Contract.is_implicit source with
         | None ->
             failwith
-              "Only implicit accounts can reject transaction rollup commitments"
+              "Only implicit accounts can reject transaction rollup \
+               commitments."
         | Some source ->
             Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
             let fee_parameter =
@@ -2703,15 +2686,231 @@ let commands_rw () =
               ~fee_parameter
               ~tx_rollup
               ~level
-              ~message
-              ~message_position
-              ~message_path
-              ~message_result_hash
-              ~message_result_path
+              ~message:confliting_message
+              ~message_position:confliting_message_position
+              ~message_path:confliting_message_path
+              ~message_result_hash:rejected_message_result_hash
+              ~message_result_path:rejected_message_result_path
               ~proof
               ~previous_context_hash
               ~previous_withdraw_list_hash
               ~previous_message_result_path
+              ()
+            >>=? fun _res -> return_unit);
+    command
+      ~group
+      ~desc:
+        "Dispatch tickets withdrawn from a transaction rollup to owners. The \
+         withdrawals are part of a finalized commitment of the transaction \
+         rollup. Owners are implicit accounts who can then transfer the \
+         tickets to smart contracts using the \"transfer tickets\" command. \
+         See transaction rollups documentation for more information.\n\n\
+         The provided list of ticket information must be ordered as in \
+         withdrawal list computed by the application of the message."
+      (args12
+         fee_arg
+         dry_run_switch
+         verbose_signing_switch
+         simulate_switch
+         minimal_fees_arg
+         minimal_nanotez_per_byte_arg
+         minimal_nanotez_per_gas_unit_arg
+         storage_limit_arg
+         counter_arg
+         force_low_fee_arg
+         fee_cap_arg
+         burn_cap_arg)
+      (prefixes ["dispatch"; "tickets"; "of"; "tx"; "rollup"]
+      @@ Tx_rollup.tx_rollup_address_param
+           ~usage:"Tx rollup which have some tickets dispatched."
+      @@ prefix "from"
+      @@ ContractAlias.destination_param
+           ~name:"source"
+           ~desc:"Account used to dispatch tickets."
+      @@ prefixes ["at"; "level"]
+      @@ Tx_rollup.level_param
+           ~usage:
+             "Level of the finalized commitment that includes the message \
+              result whose withdrawals will be dispatched."
+      @@ prefixes ["for"; "the"; "message"; "at"; "index"]
+      @@ Clic.param
+           ~name:"message index"
+           ~desc:"Index of the message whose withdrawals will be dispatched."
+           non_negative_param
+      @@ prefixes ["with"; "the"; "context"; "hash"]
+      @@ Tx_rollup.context_hash_param
+           ~usage:
+             "Context hash of the message result in the commitment whose \
+              withdrawals will be dispatched."
+      @@ prefixes ["and"; "path"]
+      @@ Tx_rollup.message_result_path_param
+           ~usage:
+             "Path of the message result whose withdrawals will be dispatched."
+      @@ prefixes ["and"; "tickets"; "info"]
+      @@ seq_of_param
+           (Tx_rollup.tickets_dispatch_info_param
+              ~usage:"Information needed to dispatch tickets to its owner."))
+      (fun ( fee,
+             dry_run,
+             verbose_signing,
+             simulation,
+             minimal_fees,
+             minimal_nanotez_per_byte,
+             minimal_nanotez_per_gas_unit,
+             storage_limit,
+             counter,
+             force_low_fee,
+             fee_cap,
+             burn_cap )
+           tx_rollup
+           (_, source)
+           level
+           message_position
+           context_hash
+           message_result_path
+           tickets_info
+           cctxt ->
+        match Contract.is_implicit source with
+        | None ->
+            failwith
+              "Only implicit account can dispatch tickets for a transaction \
+               rollup."
+        | Some source ->
+            Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+            let fee_parameter =
+              {
+                Injection.minimal_fees;
+                minimal_nanotez_per_byte;
+                minimal_nanotez_per_gas_unit;
+                force_low_fee;
+                fee_cap;
+                burn_cap;
+              }
+            in
+            tx_rollup_dispatch_tickets
+              cctxt
+              ~chain:cctxt#chain
+              ~block:cctxt#block
+              ~dry_run
+              ~verbose_signing
+              ?fee
+              ?storage_limit
+              ?counter
+              ?confirmations:cctxt#confirmations
+              ~simulation
+              ~source
+              ~src_pk
+              ~src_sk
+              ~fee_parameter
+              ~level
+              ~context_hash
+              ~message_position
+              ~message_result_path
+              ~tickets_info
+              ~tx_rollup
+              ()
+            >>=? fun _res -> return_unit);
+    command
+      ~group
+      ~desc:"Transfer tickets from an implicit account to a contract."
+      (args12
+         fee_arg
+         dry_run_switch
+         verbose_signing_switch
+         simulate_switch
+         minimal_fees_arg
+         minimal_nanotez_per_byte_arg
+         minimal_nanotez_per_gas_unit_arg
+         storage_limit_arg
+         counter_arg
+         force_low_fee_arg
+         fee_cap_arg
+         burn_cap_arg)
+      (prefix "transfer"
+      @@ non_negative_z_param ~name:"qty" ~desc:"Amount of tickets to transfer."
+      @@ prefixes ["tickets"; "from"]
+      @@ ContractAlias.destination_param
+           ~name:"tickets owner"
+           ~desc:"Implicit account owning the tickets."
+      @@ prefix "to"
+      @@ ContractAlias.destination_param
+           ~name:"recipient contract"
+           ~desc:"Contract receiving the tickets."
+      @@ prefixes ["with"; "entrypoint"]
+      @@ Clic.param
+           ~name:"entrypoint"
+           ~desc:"Entrypoint to use on the receiving contract."
+           entrypoint_parameter
+      @@ prefixes ["and"; "contents"]
+      @@ Clic.param
+           ~name:"tickets content"
+           ~desc:"Content of the tickets."
+           Client_proto_args.string_parameter
+      @@ prefixes ["and"; "type"]
+      @@ Clic.param
+           ~name:"tickets type"
+           ~desc:"Type of the tickets."
+           Client_proto_args.string_parameter
+      @@ prefixes ["and"; "ticketer"]
+      @@ ContractAlias.destination_param
+           ~name:"tickets ticketer"
+           ~desc:"Ticketer contract of the tickets."
+      @@ stop)
+      (fun ( fee,
+             dry_run,
+             verbose_signing,
+             simulation,
+             minimal_fees,
+             minimal_nanotez_per_byte,
+             minimal_nanotez_per_gas_unit,
+             storage_limit,
+             counter,
+             force_low_fee,
+             fee_cap,
+             burn_cap )
+           amount
+           (_, source)
+           (_, destination)
+           entrypoint
+           contents
+           ty
+           (_, ticketer)
+           cctxt ->
+        match Contract.is_implicit source with
+        | None -> failwith "Only implicit accounts can transfer tickets."
+        | Some source ->
+            Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+            let fee_parameter =
+              {
+                Injection.minimal_fees;
+                minimal_nanotez_per_byte;
+                minimal_nanotez_per_gas_unit;
+                force_low_fee;
+                fee_cap;
+                burn_cap;
+              }
+            in
+            transfer_ticket
+              cctxt
+              ~chain:cctxt#chain
+              ~block:cctxt#block
+              ~dry_run
+              ~verbose_signing
+              ?fee
+              ?storage_limit
+              ?counter
+              ?confirmations:cctxt#confirmations
+              ~simulation
+              ~source
+              ~src_pk
+              ~src_sk
+              ~fee_parameter
+              ~contents
+              ~ty
+              ~ticketer
+              ~amount
+              ~destination
+              ~entrypoint
               ()
             >>=? fun _res -> return_unit);
     command
