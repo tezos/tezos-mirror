@@ -3997,6 +3997,30 @@ let _tezos_node =
         ]
 
 let _tezos_client =
+  let protocol_deps =
+    let deps_for_protocol protocol =
+      let is_optional =
+        match (Protocol.status protocol, Protocol.number protocol) with
+        | (Active, V _) -> false
+        | ((Frozen | Overridden | Not_mainnet), _) | (Active, (Alpha | Other))
+          ->
+            true
+      in
+      let targets =
+        List.filter_map
+          Fun.id
+          [
+            (match Protocol.client_commands_registration protocol with
+            | None -> Protocol.client protocol
+            | x -> x);
+            Protocol.baking_commands_registration protocol;
+            Protocol.plugin protocol;
+          ]
+      in
+      if is_optional then List.map optional targets else targets
+    in
+    List.map deps_for_protocol Protocol.all |> List.flatten
+  in
   public_exes
     ["tezos-client"; "tezos-admin-client"]
     ~path:"src/bin_client"
@@ -4017,15 +4041,7 @@ let _tezos_client =
          tezos_client_base_unix |> open_;
          tezos_signer_backends_unix;
        ]
-      @ Protocol.all_optionally
-          [
-            (fun protocol ->
-              match Protocol.client_commands_registration protocol with
-              | None -> Protocol.client protocol
-              | x -> x);
-            Protocol.baking_commands_registration;
-            Protocol.plugin;
-          ])
+      @ protocol_deps)
     ~linkall:true
     ~dune:
       Dune.
