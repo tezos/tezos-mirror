@@ -32,21 +32,6 @@ type constrnt = Full of (Costlang.affine * measure)
 
 and measure = Measure of vector
 
-(* Create a [matrix] overlay over a Python matrix.
-   Note how we switch from row major to column major in
-   order to comply to [Linalg]'s defaults. *)
-let of_scipy m =
-  let r = Scikit_matrix.dim1 m in
-  let c = Scikit_matrix.dim2 m in
-  Matrix.make (Linalg.Tensor.Int.rank_two c r) @@ fun (c, r) ->
-  Scikit_matrix.get m r c
-
-(* Convert a matrix overlay to a Python matrix. *)
-let to_scipy m =
-  let cols = Linalg.Tensor.Int.numel (Matrix.cols m) in
-  let rows = Linalg.Tensor.Int.numel (Matrix.rows m) in
-  Scikit_matrix.init ~lines:rows ~cols ~f:(fun l c -> Matrix.get m (c, l))
-
 type problem =
   | Non_degenerate of {
       lines : constrnt list;
@@ -289,38 +274,61 @@ let solution_to_csv : solution -> Csv.csv option =
 (* -------------------------------------------------------------------------- *)
 (* Solving problems *)
 
+(* Create a [matrix] overlay over a Python matrix.
+   Note how we switch from row major to column major in
+   order to comply to [Linalg]'s defaults. *)
+let of_scipy m =
+  let r = Scikit_matrix.dim1 m in
+  let c = Scikit_matrix.dim2 m in
+  Matrix.make (Linalg.Tensor.Int.rank_two c r) @@ fun (c, r) ->
+  Scikit_matrix.get m r c
+
+(* Convert a matrix overlay to a Python matrix. *)
+let to_scipy m =
+  let cols = Maths.col_dim m in
+  let rows = Maths.row_dim m in
+  Scikit_matrix.init ~lines:rows ~cols ~f:(fun l c -> Matrix.get m (c, l))
+
+let wrap_python_solver ~input ~output solver =
+  (* Scipy's solvers expect a column vector on output. *)
+  let output =
+    Matrix.of_col
+    @@ map_rows
+         (fun row ->
+           Stats.Emp.quantile (module Float) (vector_to_array row) 0.5)
+         output
+  in
+  let input = to_scipy input in
+  let output = to_scipy output in
+  solver input output |> of_scipy
+
+let ridge ~alpha ~normalize ~input ~output =
+  wrap_python_solver ~input ~output (fun input output ->
+      Scikit.LinearModel.ridge ~alpha ~normalize ~input ~output ())
+
+let lasso ~alpha ~normalize ~positive ~input ~output =
+  wrap_python_solver ~input ~output (fun input output ->
+      Scikit.LinearModel.lasso ~alpha ~normalize ~positive ~input ~output ())
+
+let nnls ~input ~output =
+  wrap_python_solver ~input ~output (fun input output ->
+      Scikit.LinearModel.nnls ~input ~output)
+
 let solve_problem : problem -> solver -> solution =
  fun problem solver ->
   match problem with
   | Degenerate _ -> {mapping = []; weights = empty_matrix}
   | Non_degenerate {input; output; nmap; _} ->
-      (* Scipy's solvers expect a column vector on output. *)
-      let output =
-        Matrix.of_col
-        @@ map_rows
-             (fun row ->
-               Stats.Emp.quantile (module Float) (vector_to_array row) 0.5)
-             output
-      in
-      let input = to_scipy input in
-      let output = to_scipy output in
       let weights =
         match solver with
-        | Ridge {alpha; normalize} ->
-            Scikit.LinearModel.ridge ~alpha ~normalize ~input ~output ()
+        | Ridge {alpha; normalize} -> ridge ~alpha ~normalize ~input ~output
         | Lasso {alpha; normalize; positive} ->
-            Scikit.LinearModel.lasso
-              ~alpha
-              ~normalize
-              ~positive
-              ~input
-              ~output
-              ()
-        | NNLS -> Scikit.LinearModel.nnls ~input ~output
+            lasso ~alpha ~normalize ~positive ~input ~output
+        | NNLS -> nnls ~input ~output
       in
-      let lines = Scikit_matrix.dim1 weights in
+      let lines = Maths.row_dim weights in
       if lines <> NMap.support nmap then
-        let cols = Scikit_matrix.dim2 weights in
+        let cols = Maths.col_dim weights in
         let dims = Format.asprintf "%d x %d" lines cols in
         let err =
           Format.asprintf
@@ -330,7 +338,6 @@ let solve_problem : problem -> solver -> solution =
         in
         Stdlib.failwith err
       else
-        let weights = of_scipy weights in
         let mapping =
           NMap.fold
             (fun variable dim acc ->
