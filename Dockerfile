@@ -10,7 +10,6 @@ FROM ${BUILD_IMAGE}:${BUILD_IMAGE_VERSION} as builder
 FROM ${BASE_IMAGE}:${BASE_IMAGE_VERSION} as intermediate
 # Pull in built binaries
 COPY --chown=tezos:nogroup --from=builder /home/tezos/tezos/tezos-baker-* /home/tezos/bin/
-COPY --chown=tezos:nogroup --from=builder /home/tezos/tezos/tezos-endorser-* /home/tezos/bin/
 COPY --chown=tezos:nogroup --from=builder /home/tezos/tezos/tezos-accuser-* /home/tezos/bin/
 COPY --chown=tezos:nogroup --from=builder /home/tezos/tezos/tezos-client /home/tezos/bin/
 COPY --chown=tezos:nogroup --from=builder /home/tezos/tezos/tezos-admin-client /home/tezos/bin/
