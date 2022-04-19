@@ -487,21 +487,35 @@ module Time = struct
     [@@inline always]
 end
 
-let make_sampler closure _rng_state = Time.measure closure
-
 let compute_empirical_timing_distribution :
-    closure:(unit -> 'a) -> nsamples:int -> float Emp.t =
- fun ~closure ~nsamples ->
-  let sampler = make_sampler closure in
-  let dummy_rng_state = Random.State.make [|1; 2; 3|] in
-  Emp.of_generative ~nsamples sampler dummy_rng_state
+    closure:(unit -> 'a) ->
+    nsamples:int ->
+    buffer:(float, Bigarray.float64_elt, Bigarray.c_layout) Bigarray.Array1.t ->
+    index:int ref ->
+    int Linalg.Vec.Float.t =
+ fun ~closure ~nsamples ~buffer ~index ->
+  let start = !index in
+  let stop = !index + nsamples - 1 in
+  index := stop + 1 ;
+  for i = start to stop do
+    let dt = Time.measure closure in
+    buffer.{i} <- dt
+  done ;
+  let shape = Linalg.Tensor.Int.rank_one nsamples in
+  Linalg.Vec.Float.make shape (fun i -> buffer.{i + start})
+ [@@ocaml.inline]
 
 let determinizer_from_options options =
   match options.determinizer with
   | Percentile i ->
       let perc = float_of_int i *. 0.01 in
-      fun dist -> Emp.quantile (module Basic_structures.Std.Float) dist perc
-  | Mean -> fun dist -> Emp.Float.empirical_mean dist
+      fun dist ->
+        let dist = Maths.vector_to_array dist in
+        Emp.quantile (module Basic_structures.Std.Float) dist perc
+  | Mean ->
+      fun dist ->
+        let dist = Maths.vector_to_array dist in
+        Emp.Float.empirical_mean dist
 
 let seed_init_from_options (options : options) =
   match options.seed with
@@ -573,6 +587,14 @@ let perform_benchmark (type c t) (options : options)
   let (module Bench) = bench in
   let config = parse_config bench options in
   let rng_state = seed_init_from_options options in
+  let buffer =
+    (* holds all samples; avoids allocating an array at each bench *)
+    Bigarray.Array1.create
+      Bigarray.float64
+      Bigarray.c_layout
+      (options.bench_number * options.nsamples)
+  in
+  let index = ref 0 in
   let benchmarks =
     Bench.create_benchmarks ~rng_state ~bench_num:options.bench_number config
   in
@@ -596,6 +618,8 @@ let perform_benchmark (type c t) (options : options)
               compute_empirical_timing_distribution
                 ~closure
                 ~nsamples:options.nsamples
+                ~buffer
+                ~index
             in
             let qty = determinizer qty_dist in
             {workload; qty} :: workload_data
@@ -605,6 +629,8 @@ let perform_benchmark (type c t) (options : options)
                   compute_empirical_timing_distribution
                     ~closure:(fun () -> closure context)
                     ~nsamples:options.nsamples
+                    ~buffer
+                    ~index
                 in
                 let qty = determinizer qty_dist in
                 {workload; qty} :: workload_data)
@@ -615,7 +641,7 @@ let perform_benchmark (type c t) (options : options)
             List.fold_left
               (fun acc aspect ->
                 let results = probe.Generator.get aspect in
-                let qty_dist = Array.of_list results in
+                let qty_dist = Maths.vector_of_array (Array.of_list results) in
                 let qty = determinizer qty_dist in
                 let workload = workload aspect in
                 {workload; qty} :: acc)
