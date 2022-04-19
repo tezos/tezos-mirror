@@ -276,9 +276,7 @@ let manager_op_content_to_json_string
       let rollup = `String tx_rollup in
       let proof = Ezjsonm.value_from_string proof in
       let level = `Float (float_of_int level) in
-      let message =
-        match message with `Batch (`Hex str) -> `O [("batch", `String str)]
-      in
+      let message = Rollup.Tx_rollup.json_of_message message in
       let message_position = `String (string_of_int message_position) in
       let message_path = `A (List.map (fun x -> `String x) message_path) in
       let previous_message_result =

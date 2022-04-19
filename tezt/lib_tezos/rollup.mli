@@ -62,9 +62,44 @@ module Tx_rollup : sig
     finalized_at : int option;
   }
 
-  type message = [`Batch of Hex.t]
+  type deposit_content = {
+    sender : string;
+    destination : string;
+    ticket_hash : string;
+    amount : int64;
+  }
 
-  val make_batch : string -> message
+  type deposit = [`Deposit of deposit_content]
+
+  type batch = [`Batch of Hex.t]
+
+  type message = [deposit | batch]
+
+  val json_of_message : message -> JSON.u
+
+  val make_batch : string -> [> batch]
+
+  val make_deposit :
+    sender:string ->
+    destination:string ->
+    ticket_hash:string ->
+    amount:int64 ->
+    [> deposit]
+
+  type withdraw = {claimer : string; ticket_hash : string; amount : int64}
+
+  val json_of_withdraw : withdraw -> JSON.u
+
+  type ticket_dispatch_info = {
+    contents : string;
+    ty : string;
+    ticketer : string;
+    amount : int64;
+    claimer : string;
+  }
+
+  val get_json_of_ticket_dispatch_info :
+    ticket_dispatch_info -> Client.t -> JSON.u Lwt.t
 
   val get_state :
     ?hooks:Process.hooks -> rollup:string -> Client.t -> state Runnable.process
@@ -126,7 +161,7 @@ module Tx_rollup : sig
 
   val withdraw_list_hash :
     ?hooks:Process.hooks ->
-    withdrawals:string list ->
+    withdrawals:withdraw list ->
     Client.t ->
     string Runnable.process
 

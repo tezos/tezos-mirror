@@ -1388,6 +1388,84 @@ module Tx_rollup = struct
     in
     let parse process = Process.check process in
     {value = process; run = parse}
+
+  let dispatch_tickets ?(wait = "none") ?burn_cap ?storage_limit ?hooks
+      ~tx_rollup ~src ~level ~message_position ~context_hash
+      ~message_result_path ~ticket_dispatch_info_data_list client =
+    let process =
+      spawn_command
+        ?hooks
+        client
+        (["--wait"; wait]
+        @ [
+            "dispatch";
+            "tickets";
+            "of";
+            "tx";
+            "rollup";
+            tx_rollup;
+            "from";
+            src;
+            "at";
+            "level";
+            string_of_int level;
+            "for";
+            "the";
+            "message";
+            "at";
+            "index";
+            string_of_int message_position;
+            "with";
+            "the";
+            "context";
+            "hash";
+            context_hash;
+            "and";
+            "path";
+            message_result_path;
+            "and";
+            "tickets";
+            "info";
+          ]
+        @ ticket_dispatch_info_data_list
+        @ optional_arg ~name:"burn-cap" Tez.to_string burn_cap
+        @ optional_arg ~name:"storage-limit" string_of_int storage_limit)
+    in
+    let parse process = Process.check process in
+    {value = process; run = parse}
+
+  let transfer_tickets ?(wait = "none") ?burn_cap ?hooks ~qty ~src ~destination
+      ~entrypoint ~contents ~ty ~ticketer client =
+    let process =
+      spawn_command
+        ?hooks
+        client
+        (["--wait"; wait]
+        @ [
+            "transfer";
+            Int64.to_string qty;
+            "tickets";
+            "from";
+            src;
+            "to";
+            destination;
+            "with";
+            "entrypoint";
+            entrypoint;
+            "and";
+            "contents";
+            contents;
+            "and";
+            "type";
+            ty;
+            "and";
+            "ticketer";
+            ticketer;
+          ]
+        @ optional_arg ~name:"burn-cap" Tez.to_string burn_cap)
+    in
+    let parse process = Process.check process in
+    {value = process; run = parse}
 end
 
 let spawn_show_voting_period ?endpoint client =

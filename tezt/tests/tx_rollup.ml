@@ -66,8 +66,12 @@ let init_with_tx_rollup ?additional_bootstrap_account_count
   let* _ = Node.wait_for_level node 2 in
   return {node; client; rollup}
 
-let submit_batch ~batch:(`Batch content) ?(batches = []) {rollup; client; node}
-    =
+let submit_batch :
+    batch:[> `Batch of Hex.t] ->
+    ?batches:([> `Batch of Hex.t] * string) list ->
+    t ->
+    unit Lwt.t =
+ fun ~batch:(`Batch content) ?(batches = []) {rollup; client; node} ->
   let*! () =
     Client.Tx_rollup.submit_batch
       ~hooks
@@ -722,7 +726,10 @@ let submit_three_batches_and_check_size ~rollup ~tezos_level ~tx_level node
   let* _ = Node.wait_for_level node tezos_level in
   (* Check the inbox has been created, with the expected cumulated size. *)
   let* expected_inbox =
-    Rollup.compute_inbox_from_messages ~hooks messages client
+    Rollup.compute_inbox_from_messages
+      ~hooks
+      (messages :> Rollup.message list)
+      client
   in
   let*! inbox = Rollup.get_inbox ~hooks ~rollup ~level:tx_level client in
   Check.(
@@ -1536,6 +1543,230 @@ let test_rollup_bond_return =
   let* () = attempt_return_bond state client ~src ~expected:`Ko in
   unit
 
+(** [test_deposit_withdraw_max_big_tickets] tests to deposit an enormous amount
+    of tickets with maximum payload, then commit the maximum allowed
+    withdrawals, and finally tries to dispatch/transfer all them. This test
+    makes sure we can't hit the size limit of an operation with withdrawals. *)
+let test_deposit_withdraw_max_big_tickets =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"deposit and withdraw big tickets"
+    ~tags:["tx_rollup"; "withdraw"; "deposit"; "ticket"]
+  @@ fun protocol ->
+  let parameters = Parameters.{finality_period = 4; withdraw_period = 4} in
+  let* ({rollup; client; node = _} as state) =
+    init_with_tx_rollup ~parameters ~protocol ()
+  in
+  let* constants = RPC.get_constants client in
+  let max_ticket_payload_size =
+    (* [overhead] is the number of bytes introduced by the wrapping of a
+       string in a ticket. This encompasses the ticketer, amount and ty
+       fields.
+
+       This value has been fetched from the failing test, and acts as a
+       regression value. *)
+    let overhead = 232 in
+    JSON.(constants |-> "tx_rollup_max_ticket_payload_size" |> as_int)
+    - overhead
+  in
+  let max_withdrawals_per_batch =
+    JSON.(constants |-> "tx_rollup_max_withdrawals_per_batch" |> as_int)
+  in
+  let account = Constant.bootstrap1.public_key_hash in
+
+  (* The following values make sure we can deposit then withdraw the maximum
+     tickets of the maximum size. *)
+  let l2_amount = Int64.max_int in
+  let ticket_contents =
+    Format.sprintf {|"%s"|} (String.make max_ticket_payload_size 't')
+  in
+  let ticket_contents_ty = "string" in
+  (* 1. originate a deposit contract *)
+  let* deposit_contract =
+    Client.originate_contract
+      ~alias:"deposit_contract"
+      ~amount:Tez.zero
+      ~src:account
+      ~prg:
+        "file:./tezt/tests/contracts/proto_alpha/tx_rollup_deposit_set_ticket.tz"
+      ~init:"Unit"
+      ~burn_cap:Tez.one
+      client
+  in
+  let* () = Client.bake_for client in
+  (* 2. Deposit tickets to the tx_rollup. *)
+  (* deposit [max_withdrawals_per_batch] times to be able to withdraw [max_int *
+     max_withdrawals_per_batch] in one operation. Last iteration is done outside
+     of [repeat] to retrieve the [ticket_hash]. *)
+  let* () =
+    repeat (max_withdrawals_per_batch - 1) (fun () ->
+        let* () =
+          Client.transfer
+            ~amount:Tez.zero
+            ~giver:account
+            ~receiver:deposit_contract
+            ~gas_limit:10000
+            ~arg:
+              (Format.sprintf
+                 {|Pair %s %Ld "%s" "%s"|}
+                 ticket_contents
+                 l2_amount
+                 Constant.tx_rollup_l2_address
+                 rollup)
+            ~burn_cap:Tez.one
+            client
+        in
+        let* _ = Client.bake_for client in
+        unit)
+  in
+  let process =
+    Client.spawn_transfer
+      ~amount:Tez.zero
+      ~giver:account
+      ~receiver:deposit_contract
+      ~gas_limit:10000
+      ~arg:
+        (Format.sprintf
+           {|Pair %s %Ld "%s" "%s"|}
+           ticket_contents
+           l2_amount
+           Constant.tx_rollup_l2_address
+           rollup)
+      ~burn_cap:Tez.one
+      client
+  in
+  let* client_output = Process.check_and_read_stdout process in
+  let* ticket_hash =
+    match client_output =~* rex "Ticket hash: ?(expr\\w{50})" with
+    | None ->
+        Test.fail
+          "Cannot extract ticket hash from client_output: %s"
+          client_output
+    | Some hash -> return hash
+  in
+  let* () = Client.bake_for client in
+  (* 3. commit the new inbox with deposit and withdraw at the same time. *)
+  let deposit =
+    Rollup.make_deposit
+      ~sender:account
+      ~destination:Constant.tx_rollup_l2_address
+      ~ticket_hash
+      ~amount:l2_amount
+  in
+  let*! withdraw_list_hash =
+    let withdrawals =
+      Rollup.(
+        List.init max_withdrawals_per_batch (fun _i ->
+            let amount = l2_amount in
+            let claimer = account in
+            {claimer; ticket_hash; amount}))
+    in
+    Rollup.withdraw_list_hash ~withdrawals client
+  in
+  let context_hash = Constant.tx_rollup_empty_l2_context in
+  let*! message_result_hash =
+    Rollup.message_result_hash ~context_hash ~withdraw_list_hash client
+  in
+  let*! tx_rollup_state = Rollup.get_state ~rollup client in
+  let tx_rollup_level = 0 in
+  let* () =
+    submit_commitment
+      ~src:account
+      ~level:tx_rollup_level
+      ~roots:[message_result_hash]
+      ~predecessor:tx_rollup_state.commitment_newest_hash
+      ~inbox_content:(`Content [deposit])
+      state
+  in
+  let* () =
+    (* bake until the finality period is over to be able to withdraw *)
+    repeat parameters.finality_period (fun () -> Client.bake_for client)
+  in
+
+  (* 4. finalize the commitment *)
+  let*! () = submit_finalize_commitment state in
+  let* () = Client.bake_for client in
+
+  (* 5. dispatch tickets from withdrawals to implicit account.*)
+
+  (* list of ticket dispatch info with contents and ty encoding in json for the
+     client command. *)
+  let* ticket_dispatch_info_data_list =
+    let* ticket_dispatch_info_data =
+      Rollup.get_json_of_ticket_dispatch_info
+        Rollup.
+          {
+            contents = ticket_contents;
+            ty = ticket_contents_ty;
+            ticketer = deposit_contract;
+            amount = l2_amount;
+            claimer = account;
+          }
+        client
+    in
+    let ticket_dispatch_info_data_str =
+      JSON.encode_u ticket_dispatch_info_data
+    in
+    return
+      (List.init max_withdrawals_per_batch (fun _i ->
+           ticket_dispatch_info_data_str))
+  in
+  let message_position = 0 in
+  let*! message_result_path =
+    Rollup.commitment_merkle_tree_path
+      ~message_result_hashes:[`Hash Constant.tx_rollup_initial_message_result]
+      ~position:0
+      client
+  in
+  let*! () =
+    Client.Tx_rollup.dispatch_tickets
+      ~burn_cap:Tez.one
+      ~tx_rollup:rollup
+      ~src:account
+      ~level:tx_rollup_level
+      ~message_position
+      ~context_hash
+      ~message_result_path:(message_result_path |> JSON.encode)
+      ~ticket_dispatch_info_data_list
+      client
+  in
+  let* () = Client.bake_for client in
+
+  (* 6. Transfer tickets from implicit account to originated account. *)
+
+  (* Withdraw contract that has an optional tickets in storage. Drop the
+     previous value. *)
+  let* withdraw_contract =
+    Client.originate_contract
+      ~alias:"withdraw_contract"
+      ~amount:Tez.zero
+      ~src:account
+      ~prg:"file:./tezt/tests/contracts/proto_alpha/tx_rollup_withdraw.tz"
+      ~init:"None"
+      ~burn_cap:Tez.one
+      client
+  in
+  let* () = Client.bake_for client in
+  (* repeat the operation to ensure all tickets can be transfered *)
+  let* () =
+    repeat max_withdrawals_per_batch (fun () ->
+        let*! () =
+          Client.Tx_rollup.transfer_tickets
+            ~qty:l2_amount
+            ~src:account
+            ~destination:withdraw_contract
+            ~entrypoint:"default"
+            ~contents:ticket_contents
+            ~ty:ticket_contents_ty
+            ~ticketer:deposit_contract
+            ~burn_cap:Tez.one
+            client
+        in
+        let* () = Client.bake_for client in
+        unit)
+  in
+  unit
+
 let register ~protocols =
   Regressions.register protocols ;
   test_submit_batches_in_several_blocks protocols ;
@@ -1546,4 +1777,5 @@ let register ~protocols =
   test_rollup_wrong_rejection protocols ;
   test_rollup_wrong_path_for_rejection protocols ;
   test_rollup_wrong_rejection_long_path protocols ;
-  test_rollup_bond_return protocols
+  test_rollup_bond_return protocols ;
+  test_deposit_withdraw_max_big_tickets protocols

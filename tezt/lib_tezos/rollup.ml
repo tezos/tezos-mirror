@@ -86,9 +86,74 @@ module Tx_rollup = struct
     finalized_at : int option;
   }
 
-  type message = [`Batch of Hex.t]
+  type deposit_content = {
+    sender : string;
+    destination : string;
+    ticket_hash : string;
+    amount : int64;
+  }
+
+  type deposit = [`Deposit of deposit_content]
+
+  type batch = [`Batch of Hex.t]
+
+  type message = [deposit | batch]
 
   let make_batch batch = `Batch (Hex.of_string batch)
+
+  let make_deposit ~sender ~destination ~ticket_hash ~amount =
+    `Deposit {sender; destination; ticket_hash; amount}
+
+  let json_of_batch (`Hex message) = `O [("batch", `String message)]
+
+  let json_of_deposit {sender; destination; ticket_hash; amount} =
+    `O
+      [
+        ( "deposit",
+          `O
+            [
+              ("sender", `String sender);
+              ("destination", `String destination);
+              ("ticket_hash", `String ticket_hash);
+              ("amount", `String (Int64.to_string amount));
+            ] );
+      ]
+
+  let json_of_message = function
+    | `Batch batch -> json_of_batch batch
+    | `Deposit deposit -> json_of_deposit deposit
+
+  type withdraw = {claimer : string; ticket_hash : string; amount : int64}
+
+  let json_of_withdraw {claimer; ticket_hash; amount} =
+    `O
+      [
+        ("claimer", `String claimer);
+        ("ticket_hash", `String ticket_hash);
+        ("amount", `String (Int64.to_string amount));
+      ]
+
+  type ticket_dispatch_info = {
+    contents : string;
+    ty : string;
+    ticketer : string;
+    amount : int64;
+    claimer : string;
+  }
+
+  let get_json_of_ticket_dispatch_info {contents; ty; ticketer; amount; claimer}
+      client =
+    let* contents_json = Client.convert_data_to_json ~data:contents client in
+    let* ty_json = Client.convert_data_to_json ~data:ty client in
+    return
+      (`O
+        [
+          ("contents", contents_json);
+          ("ty", ty_json);
+          ("ticketer", `String ticketer);
+          ("amount", `String (Int64.to_string amount));
+          ("claimer", `String claimer);
+        ])
 
   let get_state ?hooks ~rollup client =
     let parse json =
@@ -174,9 +239,9 @@ module Tx_rollup = struct
       ~pkh
       client
 
-  let message_hash ?hooks ~message:(`Batch (`Hex message) : message) client =
+  let message_hash ?hooks ~message client =
     let parse json = `Hash JSON.(json |-> "hash" |> as_string) in
-    let data : JSON.u = `O [("message", `O [("batch", `String message)])] in
+    let data : JSON.u = `O [("message", json_of_message message)] in
     RPC.Tx_rollup.Forge.Inbox.message_hash ?hooks ~data client
     |> Runnable.map parse
 
@@ -237,7 +302,7 @@ module Tx_rollup = struct
   let withdraw_list_hash ?hooks ~withdrawals client =
     let parse json = JSON.(json |-> "hash" |> as_string) in
     let data =
-      `O [("withdraw_list", `A (List.map (fun x -> `String x) withdrawals))]
+      `O [("withdraw_list", `A (List.map json_of_withdraw withdrawals))]
     in
     RPC.Tx_rollup.Forge.Withdraw.withdraw_list_hash ?hooks ~data client
     |> Runnable.map parse
@@ -270,10 +335,18 @@ module Tx_rollup = struct
         inbox_length = List.length messages;
         cumulated_size =
           List.map
-            (fun (`Batch (`Hex message)) ->
-              (* In the Hex reprensatated as a string, a byte is
-                 encoded using two characters. *)
-              String.length message / 2)
+            (function
+              | `Batch (`Hex message) ->
+                  (* In the Hex represented as a string, a byte is
+                     encoded using two characters. *)
+                  String.length message / 2
+              | `Deposit _ ->
+                  let sender_pkh_size = 65 in
+                  let destination_bls_pkh_size = 36 in
+                  let ticket_hash_size = 32 in
+                  let amount_size = 8 in
+                  sender_pkh_size + destination_bls_pkh_size + ticket_hash_size
+                  + amount_size)
             messages
           |> List.fold_left ( + ) 0;
         merkle_root;
