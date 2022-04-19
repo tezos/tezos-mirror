@@ -1046,6 +1046,35 @@ module Tx_rollup : sig
     src:string ->
     t ->
     unit Runnable.process
+
+  val dispatch_tickets :
+    ?wait:string ->
+    ?burn_cap:Tez.t ->
+    ?storage_limit:int ->
+    ?hooks:Process.hooks ->
+    tx_rollup:string ->
+    src:string ->
+    level:int ->
+    message_position:int ->
+    context_hash:string ->
+    message_result_path:string ->
+    ticket_dispatch_info_data_list:string list ->
+    t ->
+    unit Runnable.process
+
+  val transfer_tickets :
+    ?wait:string ->
+    ?burn_cap:Tez.t ->
+    ?hooks:Process.hooks ->
+    qty:int64 ->
+    src:string ->
+    destination:string ->
+    entrypoint:string ->
+    contents:string ->
+    ty:string ->
+    ticketer:string ->
+    t ->
+    unit Runnable.process
 end
 
 (** Run [tezos-client show voting period] and return the period name. *)
