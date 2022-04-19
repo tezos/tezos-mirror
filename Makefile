@@ -259,7 +259,7 @@ lint-ometrics:
         --exclude-entry-re "encoding\|encoding_.+\|.+_encoding" \
         --exclude-entry-re "compare\|compare_.+\|.+_compare"
 
-.PHONY: lint-ometric-gitlab
+.PHONY: lint-ometrics-gitlab
 lint-ometrics-gitlab:
 	@echo "Running ometrics analysis in your changes."
 	@mkdir -p _reports
