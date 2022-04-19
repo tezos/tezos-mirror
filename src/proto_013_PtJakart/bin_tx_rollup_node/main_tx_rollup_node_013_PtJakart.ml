@@ -46,17 +46,44 @@ let data_dir_arg =
     Client_proto_args.string_parameter
 
 let operator_arg =
-  let doc = "The public key of the node operator" in
-  Clic.arg
+  Client_keys.Public_key_hash.source_arg
     ~long:"operator"
-    ~placeholder:"public_key"
-    ~doc
-    Client_proto_args.string_parameter
+    ~placeholder:"operator"
+    ~doc:"The operator of the rollup"
+    ()
+
+let batch_signer_arg =
+  Client_keys.Public_key_hash.source_arg
+    ~long:"batch-signer"
+    ~placeholder:"batch-signer"
+    ~doc:"The signer for submission of batches"
+    ()
+
+let finalize_commitment_signer_arg =
+  Client_keys.Public_key_hash.source_arg
+    ~long:"finalize-commitment-signer"
+    ~placeholder:"finalize-commitment-signer"
+    ~doc:"The signer for finalization of commitments"
+    ()
+
+let remove_commitment_signer_arg =
+  Client_keys.Public_key_hash.source_arg
+    ~long:"remove-commitment-signer"
+    ~placeholder:"remove-commitment-signer"
+    ~doc:"The signer for removals of commitments"
+    ()
+
+let rejection_signer_arg =
+  Client_keys.Public_key_hash.source_arg
+    ~long:"rejection-signer"
+    ~placeholder:"rejection-signer"
+    ~doc:"The signer for rejections"
+    ()
 
 let rollup_id_arg =
   Clic.arg
     ~long:"rollup-id"
-    ~placeholder:"rollup_id"
+    ~placeholder:"rollup-id"
     ~doc:"The rollup id of the rollup to target"
     (Clic.parameter (fun _ s ->
          match Protocol.Alpha_context.Tx_rollup.of_b58check s with
@@ -112,9 +139,13 @@ let configuration_init_command =
   command
     ~group
     ~desc:"Configure the transaction rollup daemon."
-    (args6
+    (args10
        data_dir_arg
        operator_arg
+       batch_signer_arg
+       finalize_commitment_signer_arg
+       remove_commitment_signer_arg
+       rejection_signer_arg
        rollup_id_arg
        rollup_genesis_arg
        rpc_addr_arg
@@ -122,6 +153,10 @@ let configuration_init_command =
     (prefixes ["config"; "init"; "on"] @@ stop)
     (fun ( data_dir,
            operator,
+           batch_signer,
+           finalize_commitment_signer,
+           remove_commitment_signer,
+           rejection_signer,
            rollup_id,
            rollup_genesis,
            rpc_addr,
@@ -140,6 +175,13 @@ let configuration_init_command =
           {
             data_dir;
             operator;
+            signers =
+              {
+                submit_batch = batch_signer;
+                finalize_commitment = finalize_commitment_signer;
+                remove_commitment = remove_commitment_signer;
+                rejection = rejection_signer;
+              };
             rollup_id;
             rollup_genesis;
             rpc_addr;
