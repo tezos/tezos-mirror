@@ -1524,6 +1524,28 @@ module Make
           worker = mk_worker_tools w;
         }
       in
+      Shell_metrics.Mempool.set_applied_collector (fun () ->
+          List.length shell.classification.applied_rev |> float_of_int) ;
+      Shell_metrics.Mempool.set_prechecked_collector (fun () ->
+          Prevalidator_classification.Sized_map.cardinal
+            shell.classification.prechecked
+          |> float_of_int) ;
+      Shell_metrics.Mempool.set_refused_collector (fun () ->
+          Prevalidator_classification.cardinal shell.classification.refused
+          |> float_of_int) ;
+      Shell_metrics.Mempool.set_branch_refused_collector (fun () ->
+          Prevalidator_classification.cardinal
+            shell.classification.branch_refused
+          |> float_of_int) ;
+      Shell_metrics.Mempool.set_branch_delayed_collector (fun () ->
+          Prevalidator_classification.cardinal
+            shell.classification.branch_delayed
+          |> float_of_int) ;
+      Shell_metrics.Mempool.set_outdated_collector (fun () ->
+          Prevalidator_classification.cardinal shell.classification.outdated
+          |> float_of_int) ;
+      Shell_metrics.Mempool.set_unprocessed_collector (fun () ->
+          Prevalidator_pending_operations.cardinal shell.pending |> float_of_int) ;
 
       let* filter_state =
         Filter.Mempool.init

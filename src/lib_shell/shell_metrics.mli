@@ -23,6 +23,23 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Metrics associated to the mempool *)
+module Mempool : sig
+  val set_applied_collector : (unit -> float) -> unit
+
+  val set_prechecked_collector : (unit -> float) -> unit
+
+  val set_refused_collector : (unit -> float) -> unit
+
+  val set_branch_refused_collector : (unit -> float) -> unit
+
+  val set_branch_delayed_collector : (unit -> float) -> unit
+
+  val set_outdated_collector : (unit -> float) -> unit
+
+  val set_unprocessed_collector : (unit -> float) -> unit
+end
+
 module Worker : sig
   type t
 
