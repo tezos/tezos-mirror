@@ -64,6 +64,13 @@ type t = {
   commitment : Tx_rollup_commitment.Full.t option;
 }
 
+type commitment_included_info = {
+  block : Block_hash.t;
+  operation : Operation_hash.t;
+}
+
+type metadata = {commitment_included : commitment_included_info option}
+
 (** Build the genesis block  *)
 val genesis_block : Context.t -> Tx_rollup.t -> Block_hash.t -> t Lwt.t
 
@@ -76,6 +83,8 @@ val level_to_string : level -> string
 val header_encoding : header Data_encoding.t
 
 val encoding : t Data_encoding.t
+
+val metadata_encoding : metadata Data_encoding.t
 
 (**  {2 Hashing} *)
 

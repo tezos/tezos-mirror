@@ -93,7 +93,7 @@ let get_tx_block () =
     (fun () block (cctxt : #Configuration.tx_client_context) ->
       RPC.block cctxt block >>=? fun block ->
       let json =
-        Data_encoding.(Json.construct (option L2block.encoding)) block
+        Data_encoding.(Json.construct (option RPC.Encodings.block)) block
       in
       cctxt#message "@[%s@]" (Data_encoding.Json.to_string json) >>= fun () ->
       return_unit)

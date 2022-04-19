@@ -60,6 +60,13 @@ type t = {
   commitment : Tx_rollup_commitment.Full.t option;
 }
 
+type commitment_included_info = {
+  block : Block_hash.t;
+  operation : Operation_hash.t;
+}
+
+type metadata = {commitment_included : commitment_included_info option}
+
 let level_encoding =
   let open Data_encoding in
   splitted
@@ -121,6 +128,22 @@ let encoding =
        (req "header" header_encoding)
        (req "inbox" Inbox.encoding)
        (opt "commitment" Tx_rollup_commitment.Full.encoding))
+
+let commitment_included_info_encoding =
+  let open Data_encoding in
+  conv
+    (fun {block; operation} -> (block, operation))
+    (fun (block, operation) -> {block; operation})
+    (obj2
+       (req "block" Block_hash.encoding)
+       (req "operation" Operation_hash.encoding))
+
+let metadata_encoding =
+  let open Data_encoding in
+  conv
+    (fun {commitment_included} -> commitment_included)
+    (fun commitment_included -> {commitment_included})
+    (obj1 (opt "commitment_included" commitment_included_info_encoding))
 
 let genesis_hash rollup = Hash.hash_string [Tx_rollup.to_b58check rollup]
 
