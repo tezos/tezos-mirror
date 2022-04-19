@@ -199,6 +199,9 @@ let unix_tm_encoding : Unix.tm Data_encoding.encoding =
           Benchmark_helpers.int_encoding
           bool)
 
+let vec_encoding : Maths.vector Data_encoding.t =
+  Data_encoding.(conv Maths.vector_to_array Maths.vector_of_array (array float))
+
 let timed_workload_encoding workload_encoding =
   let open Data_encoding in
   conv
@@ -498,7 +501,7 @@ let determinizer_from_options options =
   | Percentile i ->
       let perc = float_of_int i *. 0.01 in
       fun dist -> Emp.quantile (module Basic_structures.Std.Float) dist perc
-  | Mean -> Emp.Float.empirical_mean
+  | Mean -> fun dist -> Emp.Float.empirical_mean dist
 
 let seed_init_from_options (options : options) =
   match options.seed with
@@ -612,7 +615,7 @@ let perform_benchmark (type c t) (options : options)
             List.fold_left
               (fun acc aspect ->
                 let results = probe.Generator.get aspect in
-                let qty_dist = Emp.of_raw_data (Array.of_list results) in
+                let qty_dist = Array.of_list results in
                 let qty = determinizer qty_dist in
                 let workload = workload aspect in
                 {workload; qty} :: acc)

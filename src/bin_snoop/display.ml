@@ -245,59 +245,61 @@ let empirical_data (workload_data : (Sparse_vec.String.t * float) list) =
       in
       Ok (named_columns, timings)
 
-let column_is_constant (m : Matrix.t) =
-  let rows, cols = Matrix.shape m in
-  assert (cols = 1) ;
-  let fst = Matrix.get m 0 0 in
+let column_is_constant (v : Maths.vector) =
+  let rows = Maths.vec_dim v in
+  assert (rows > 0) ;
+  let fst = Maths.Vector.get v 0 in
   let flg = ref true in
   for i = 1 to rows - 1 do
-    let v = Matrix.get m i 0 in
+    let v = Maths.Vector.get v i in
     flg := !flg && v = fst
   done ;
   !flg
 
 (* Prune the dimensions of the input matrix which are constant. *)
-let prune_problem problem : (Free_variable.t * Matrix.t) list * Matrix.t =
-  match problem with
-  | Inference.Degenerate _ -> assert false
-  | Inference.Non_degenerate {input; output; nmap; _} ->
-      let _, cols = Matrix.shape input in
-      let named_columns =
-        List.init ~when_negative_length:() cols (fun c ->
-            let name = Inference.NMap.nth_exn nmap c in
-            let col = Matrix.column input c in
-            (name, col))
-        |> (* column count cannot be negative *)
-        WithExceptions.Result.get_ok ~loc:__LOC__
-      in
-      let columns =
-        List.filter (fun (_, col) -> not (column_is_constant col)) named_columns
-      in
-      (columns, output)
+let prune_problem input nmap : (Free_variable.t * Maths.vector) list =
+  let cols = Maths.col_dim input in
+  let named_columns =
+    List.init ~when_negative_length:() cols (fun c ->
+        let name = Inference.NMap.nth_exn nmap c in
+        let col = Maths.Matrix.col input c in
+        (name, col))
+    |> (* column count cannot be negative *)
+    WithExceptions.Result.get_ok ~loc:__LOC__
+  in
+  List.filter (fun (_, col) -> not (column_is_constant col)) named_columns
 
-let column_to_array (m : Matrix.t) =
-  let rows = Matrix.dim1 m in
-  let cols = Matrix.dim2 m in
+let column_to_array (m : Maths.matrix) =
+  let rows = Maths.row_dim m in
+  let cols = Maths.col_dim m in
   assert (cols = 1) ;
-  Array.init rows (fun i -> Matrix.get m i 0)
+  Array.init rows (fun i -> Maths.Matrix.get m (0, i))
+
+let vector_to_array = Maths.vector_to_array
 
 let validator opts (problem : Inference.problem) (solution : Inference.solution)
     =
   let open Result_syntax in
   match problem with
   | Inference.Degenerate _ -> Error "Display.validator: degenerate plot"
-  | Inference.Non_degenerate {input; _} ->
+  | Inference.Non_degenerate {input; output; nmap; _} ->
       let {Inference.weights; _} = solution in
-      let predicted = Matrix.numpy_mul input weights in
-      let columns, timings = prune_problem problem in
+      let predicted = Maths.Matrix.mm input weights in
+      let columns = prune_problem input nmap in
       let columns =
         List.map
           (fun (c, m) ->
-            (Format.asprintf "%a" Free_variable.pp c, column_to_array m))
+            (Format.asprintf "%a" Free_variable.pp c, vector_to_array m))
           columns
       in
-      let timings = column_to_array timings in
-      let predicted = column_to_array predicted in
+      let median_timing =
+        Maths.map_rows
+          (fun row ->
+            Stats.Emp.quantile (module Float) (Maths.vector_to_array row) 0.5)
+          output
+      in
+      let timings = vector_to_array median_timing in
+      let predicted = vector_to_array (Maths.Matrix.col predicted 0) in
       let* plots =
         plot_scatter
           opts

@@ -31,16 +31,17 @@ module Numpy = struct
 end
 
 module LinearModel = struct
-  let assert_matrix_nontrivial (m : Matrix.t) =
-    let l, c = Matrix.shape m in
+  let assert_matrix_nontrivial (m : Scikit_matrix.t) =
+    let l, c = Scikit_matrix.shape m in
     assert (l <> 0 && c <> 0)
 
   let ridge ~(alpha : float) ?(fit_intercept : bool = false)
-      ?(normalize : bool = false) ~(input : Matrix.t) ~(output : Matrix.t) () =
+      ?(normalize : bool = false) ~(input : Scikit_matrix.t)
+      ~(output : Scikit_matrix.t) () =
     assert_matrix_nontrivial input ;
     assert_matrix_nontrivial output ;
-    let input = Matrix.to_numpy input in
-    let output = Matrix.to_numpy output in
+    let input = Scikit_matrix.to_numpy input in
+    let output = Scikit_matrix.to_numpy output in
     let ridge_object =
       Py.Module.get_function_with_keywords
         (Pyinit.linear_model ())
@@ -60,15 +61,15 @@ module LinearModel = struct
     match Py.Object.get_attr_string ridge_object "coef_" with
     | None ->
         Stdlib.failwith "Scikit.LinearModel.ridge: attribute coef_ not found"
-    | Some coef -> Matrix.of_numpy (Numpy.transpose coef)
+    | Some coef -> Scikit_matrix.of_numpy (Numpy.transpose coef)
 
   let lasso ~(alpha : float) ?(fit_intercept : bool = false)
-      ?(normalize : bool = false) ?(positive : bool = false) ~(input : Matrix.t)
-      ~(output : Matrix.t) () =
+      ?(normalize : bool = false) ?(positive : bool = false)
+      ~(input : Scikit_matrix.t) ~(output : Scikit_matrix.t) () =
     assert_matrix_nontrivial input ;
     assert_matrix_nontrivial output ;
-    let input = Matrix.to_numpy input in
-    let output = Matrix.to_numpy output in
+    let input = Scikit_matrix.to_numpy input in
+    let output = Scikit_matrix.to_numpy output in
     let lasso_object =
       Py.Module.get_function_with_keywords
         (Pyinit.linear_model ())
@@ -89,14 +90,14 @@ module LinearModel = struct
     match Py.Object.get_attr_string lasso_object "coef_" with
     | None ->
         Stdlib.failwith "Scikit.LinearModel.lasso: attribute coef_ not found"
-    | Some coef -> Matrix.of_numpy coef
+    | Some coef -> Scikit_matrix.of_numpy coef
 
-  let nnls ~(input : Matrix.t) ~(output : Matrix.t) =
+  let nnls ~(input : Scikit_matrix.t) ~(output : Scikit_matrix.t) =
     assert_matrix_nontrivial input ;
     assert_matrix_nontrivial output ;
-    let len = Matrix.dim1 output in
-    let input = Matrix.to_numpy input in
-    let output = Matrix.to_numpy output in
+    let len = Scikit_matrix.dim1 output in
+    let input = Scikit_matrix.to_numpy input in
+    let output = Scikit_matrix.to_numpy output in
     let output =
       Py.Module.get_function
         (Pyinit.numpy ())
@@ -111,5 +112,5 @@ module LinearModel = struct
       Stdlib.failwith "Scikit.nnls: invalid outcome"
     else
       let res = array.(0) in
-      Matrix.of_numpy res
+      Scikit_matrix.of_numpy res
 end
