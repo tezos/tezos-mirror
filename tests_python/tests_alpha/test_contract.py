@@ -550,11 +550,6 @@ class TestContracts:
             ("big_dip.tz", r'expected a positive 10-bit integer'),
             # error message for DROP over the limit
             ("big_drop.tz", r'expected a positive 10-bit integer'),
-            # error message for set update on non-comparable type
-            (
-                "set_update_non_comparable.tz",
-                r'Type nat is not compatible with type list operation',
-            ),
             # error message for attempting to push a value of type never
             ("never_literal.tz", r'type never has no inhabitant.'),
             # COMB, UNCOMB, and DUP cannot take 0 as argument
