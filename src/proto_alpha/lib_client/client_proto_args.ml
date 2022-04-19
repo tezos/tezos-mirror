@@ -628,12 +628,21 @@ module Tx_rollup = struct
     Clic.parameter (fun _ s ->
         match Tx_rollup.of_b58check_opt s with
         | Some c -> return c
-        | None -> failwith "Parameter '%s' is an invalid tx rollup address" s)
+        | None ->
+            failwith
+              "Parameter '%s' is an invalid transaction rollup address encoded \
+               in a base58 string."
+              s)
 
-  let tx_rollup_address_param next =
+  let tx_rollup_address_param ?(name = "transaction rollup address") ~usage next
+      =
     Clic.param
-      ~name:"tx rollup address"
-      ~desc:"Transaction rollup address to use in a transaction rollup command."
+      ~name
+      ~desc:
+        (Format.sprintf
+           "@[@[%s@]@.@[Transaction rollup address encoded in a base58 \
+            string.@]@]"
+           usage)
       tx_rollup_address_parameter
       next
 
@@ -648,10 +657,14 @@ module Tx_rollup = struct
                negative int32 value)"
               s)
 
-  let level_param next =
+  let level_param ?(name = "tx rollup level") ~usage next =
     Clic.param
-      ~name:"tx rollup level"
-      ~desc:"Transaction rollup level to use in a transaction rollup command."
+      ~name
+      ~desc:
+        (Format.sprintf
+           "@[@[%s@]@.@[Transaction rollup level encoded in a non negative \
+            int32.@]@]"
+           usage)
       level_parameter
       next
 
@@ -659,7 +672,21 @@ module Tx_rollup = struct
     Clic.parameter (fun _ s ->
         match Context_hash.of_b58check_opt s with
         | Some hash -> return hash
-        | None -> failwith "%s is not a valid notation for a context hash" s)
+        | None ->
+            failwith
+              "%s is not a valid notation for a context hash encoded in a \
+               base58 string"
+              s)
+
+  let context_hash_param ?(name = "context hash") ~usage next =
+    Clic.param
+      ~name
+      ~desc:
+        (Format.sprintf
+           "@[@[%s@]@.@[Context hash encoded in a base58 string.@]@]"
+           usage)
+      context_hash_parameter
+      next
 
   let message_result_path_parameter =
     Clic.map_parameter
@@ -676,6 +703,19 @@ module Tx_rollup = struct
                exn))
       json_parameter
 
+  let message_result_path_param ?(name = "message result path") ~usage next =
+    Clic.param
+      ~name
+      ~desc:
+        (Format.sprintf
+           "@[@[%s@]@.@[Merkle path (JSON encoded) for a message result hash \
+            in a commitment.\n\
+            The JSON should be a list of base58-encoded message result \
+            hashes.@]@]"
+           usage)
+      message_result_path_parameter
+      next
+
   let tickets_dispatch_info_parameter =
     Clic.map_parameter
       ~f:(fun json ->
@@ -688,12 +728,36 @@ module Tx_rollup = struct
                exn))
       json_parameter
 
+  let tickets_dispatch_info_param ?(name = "tickets information") ~usage next =
+    Clic.param
+      ~name
+      ~desc:
+        (Format.sprintf
+           "@[@[%s@]@.@[Tickets related information are encoded in a JSON with \
+            the following format: {\"contents\": <tickets content>,\"ty\": \
+            <tickets type>, \"ticketer\": <ticketer contract address>, \
+            \"amount\": <withdrawn amount>, \"\"claimer\": <new owner's public \
+            key hash>}@]@]"
+           usage)
+      tickets_dispatch_info_parameter
+      next
+
   let message_result_hash_parameter =
     Clic.parameter (fun _ s ->
         match Tx_rollup_message_result_hash.of_b58check_opt s with
         | Some hash -> return hash
         | None ->
             failwith "%s is not a valid notation for a withdraw list hash" s)
+
+  let message_result_hash_param ?(name = "message result hash") ~usage next =
+    Clic.param
+      ~name
+      ~desc:
+        (Format.sprintf
+           "@[@[%s@]@.@[Message result hash encoded in a base58 string.@]@]"
+           usage)
+      message_result_hash_parameter
+      next
 
   let withdraw_list_hash_parameter =
     Clic.parameter (fun _ s ->
@@ -702,11 +766,42 @@ module Tx_rollup = struct
         | None ->
             failwith "%s is not a valid notation for a withdraw list hash" s)
 
+  let withdraw_list_hash_param ?(name = "withdraw list hash") ~usage next =
+    Clic.param
+      ~name
+      ~desc:
+        (Format.sprintf
+           "@[@[%s@]@.@[Withdraw list hash encoded in a base58 string.@]@]"
+           usage)
+      withdraw_list_hash_parameter
+      next
+
   let commitment_hash_parameter =
     Clic.parameter (fun _ s ->
         match Tx_rollup_commitment_hash.of_b58check_opt s with
         | Some hash -> return hash
         | None -> failwith "%s is not a valid notation for a commitment hash" s)
+
+  let commitment_hash_param ?(name = "commitment hash") ~usage next =
+    Clic.param
+      ~name
+      ~desc:
+        (Format.sprintf
+           "@[@[%s@]@.@[Commitment hash encoded in a base58 string.@]@]"
+           usage)
+      commitment_hash_parameter
+      next
+
+  let commitment_hash_arg ?(long = "commitment-hash")
+      ?(placeholder = "commitment hash") ~usage () =
+    Clic.arg
+      ~long
+      ~doc:
+        (Format.sprintf
+           "@[@[%s@]@.@[Commitment hash encoded in a base58 string.@]@]"
+           usage)
+      ~placeholder
+      commitment_hash_parameter
 
   let message_parameter =
     Clic.map_parameter
@@ -719,6 +814,20 @@ module Tx_rollup = struct
                (fun ppf -> Data_encoding.Json.print_error ppf)
                exn))
       json_parameter
+
+  let message_param ?(name = "message") ~usage next =
+    Clic.param
+      ~name
+      ~desc:
+        (Format.sprintf
+           "@[@[%s@]@.@[Message are encoded in a JSON with one of the \
+            following format: {\"batch\": bytes} or {\"deposit\": {\"sender\": \
+            <depositer public key hash>; \"destination\": <layer 2 destination \
+            (address or index)>;\"ticket_hash\": <hash of the tickets> \
+            ;\"amount\": <deposited amount> }}.@]@]"
+           usage)
+      message_parameter
+      next
 
   let message_path_parameter =
     Clic.map_parameter
@@ -733,6 +842,18 @@ module Tx_rollup = struct
                exn))
       json_parameter
 
+  let message_path_param ?(name = "message path") ~usage next =
+    Clic.param
+      ~name
+      ~desc:
+        (Format.sprintf
+           "@[@[%s@]@.@[\n\
+            Merkle path (JSON encoded) for a message in an inbox. The JSON \
+            should be a list of base58-encoded message hashes.@]@]"
+           usage)
+      message_path_parameter
+      next
+
   let proof_parameter =
     Clic.map_parameter
       ~f:(fun json ->
@@ -745,6 +866,17 @@ module Tx_rollup = struct
                exn))
       json_parameter
 
+  let proof_param ?(name = "rejection proof") ~usage next =
+    Clic.param
+      ~name
+      ~desc:
+        (Format.sprintf
+           "@[@[%s@]@.@[Rejection proof are stream encoded in a JSON. See \
+            documentation of transaction rollup for more information.@]@]"
+           usage)
+      proof_parameter
+      next
+
   let inbox_root_hash_parameter =
     Clic.parameter (fun _ s ->
         match Tx_rollup_inbox.Merkle.root_of_b58check_opt s with
@@ -753,4 +885,15 @@ module Tx_rollup = struct
             failwith
               "%s is not a valid B58-encoded notation for an inbox merkle root"
               s)
+
+  let inbox_root_hash_param ?(name = "inbox root hash") ~usage next =
+    Clic.param
+      ~name
+      ~desc:
+        (Format.sprintf
+           "@[@[%s@]@.@[Root's hash of a merkelized inbox list, encoded in a \
+            base58 string.@]@]"
+           usage)
+      inbox_root_hash_parameter
+      next
 end

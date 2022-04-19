@@ -3,7 +3,7 @@ tx_rollup_client_submit_batch_invalid_rollup_address.out
 ./tezos-client --wait none submit tx rollup batch 0x to 'this is an invalid tx rollup address' from '[PUBLIC_KEY_HASH]'
 Error:
   Erroneous command line argument 7 (this is an invalid tx rollup address).
-  Parameter 'this is an invalid tx rollup address' is an invalid tx rollup address
+  Parameter 'this is an invalid tx rollup address' is an invalid transaction rollup address encoded in a base58 string.
 
 Usage:
   tezos-client [global options] command [command options]

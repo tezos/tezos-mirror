@@ -585,8 +585,10 @@ module Regressions = struct
           ~exit_code:1
           ~msg:
             (rex
-               ("Parameter '" ^ invalid_address
-              ^ "' is an invalid tx rollup address"))
+               (Format.sprintf
+                  "Parameter '%s' is an invalid transaction rollup address \
+                   encoded in a base58 string."
+                  invalid_address))
           process
       in
       unit

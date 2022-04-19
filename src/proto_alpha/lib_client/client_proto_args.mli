@@ -159,36 +159,81 @@ val now_arg : (Script_timestamp.t option, full) Clic.arg
 
 module Tx_rollup : sig
   val tx_rollup_address_param :
+    ?name:string ->
+    usage:string ->
     ('a, full) Clic.params ->
     (Alpha_context.Tx_rollup.t -> 'a, full) Clic.params
 
   val level_param :
-    ('a, full) Clic.params -> (Tx_rollup_level.t -> 'a, full) Clic.params
+    ?name:string ->
+    usage:string ->
+    ('a, full) Clic.params ->
+    (Tx_rollup_level.t -> 'a, full) Clic.params
 
-  val context_hash_parameter : (Context_hash.t, full) Clic.parameter
+  val context_hash_param :
+    ?name:string ->
+    usage:string ->
+    ('a, full) Clic.params ->
+    (Context_hash.t -> 'a, full) Clic.params
 
-  val message_result_path_parameter :
-    (Tx_rollup_commitment.Merkle.path, full) Clic.parameter
+  val message_result_path_param :
+    ?name:string ->
+    usage:string ->
+    ('a, full) Clic.params ->
+    (Tx_rollup_commitment.Merkle.path -> 'a, full) Clic.params
 
-  val tickets_dispatch_info_parameter :
-    (Tx_rollup_reveal.t, full) Clic.parameter
+  val tickets_dispatch_info_param :
+    ?name:string ->
+    usage:string ->
+    ('a, full) Clic.params ->
+    (Tx_rollup_reveal.t -> 'a, full) Clic.params
 
-  val message_result_hash_parameter :
-    (Tx_rollup_message_result_hash.t, full) Clic.parameter
+  val message_result_hash_param :
+    ?name:string ->
+    usage:string ->
+    ('a, full) Clic.params ->
+    (Tx_rollup_message_result_hash.t -> 'a, full) Clic.params
 
-  val withdraw_list_hash_parameter :
-    (Tx_rollup_withdraw_list_hash.t, full) Clic.parameter
+  val withdraw_list_hash_param :
+    ?name:string ->
+    usage:string ->
+    ('a, full) Clic.params ->
+    (Tx_rollup_withdraw_list_hash.t -> 'a, full) Clic.params
 
-  val commitment_hash_parameter :
-    (Tx_rollup_commitment_hash.t, full) Clic.parameter
+  val commitment_hash_param :
+    ?name:string ->
+    usage:string ->
+    ('a, full) Clic.params ->
+    (Tx_rollup_commitment_hash.t -> 'a, full) Clic.params
 
-  val message_parameter : (Tx_rollup_message.t, full) Clic.parameter
+  val commitment_hash_arg :
+    ?long:string ->
+    ?placeholder:string ->
+    usage:string ->
+    unit ->
+    (Tx_rollup_commitment_hash.t option, full) Clic.arg
 
-  val message_path_parameter :
-    (Tx_rollup_inbox.Merkle.path, full) Clic.parameter
+  val message_param :
+    ?name:string ->
+    usage:string ->
+    ('a, full) Clic.params ->
+    (Tx_rollup_message.t -> 'a, full) Clic.params
 
-  val proof_parameter : (Tx_rollup_l2_proof.t, full) Clic.parameter
+  val message_path_param :
+    ?name:string ->
+    usage:string ->
+    ('a, full) Clic.params ->
+    (Tx_rollup_inbox.Merkle.path -> 'a, full) Clic.params
 
-  val inbox_root_hash_parameter :
-    (Tx_rollup_inbox.Merkle.root, full) Clic.parameter
+  val proof_param :
+    ?name:string ->
+    usage:string ->
+    ('a, full) Clic.params ->
+    (Tx_rollup_l2_proof.t -> 'a, full) Clic.params
+
+  val inbox_root_hash_param :
+    ?name:string ->
+    usage:string ->
+    ('a, full) Clic.params ->
+    (Tx_rollup_inbox.Merkle.root -> 'a, full) Clic.params
 end
