@@ -331,7 +331,7 @@ val spawn_activate_protocol :
    encoding of an empty mempool. This file can be given to [bake_for]
    command with the [mempool] parameter to ensure that the block baked
    will contain no operations. *)
-val empty_mempool_file : ?filename:string -> unit -> string Lwt.t
+val empty_mempool_file : ?filename:string -> unit -> string
 
 (** Run [tezos-client bake for].
 

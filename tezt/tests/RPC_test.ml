@@ -666,7 +666,7 @@ let mempool_node_flags =
     ]
 
 let bake_empty_block ?endpoint client =
-  let* mempool = Client.empty_mempool_file () in
+  let mempool = Client.empty_mempool_file () in
   (* We defer to using a low-level command here since we enforce using protocol
      in order to distinguish which form of the option we actually need, since
      the name has changed. *)
