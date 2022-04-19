@@ -526,9 +526,9 @@ let unparse_option ~loc unparse_v ctxt = function
 
 (* -- Unparsing data of comparable types -- *)
 
-let comparable_comb_witness2 :
-    type t. t comparable_ty -> (t, unit -> unit -> unit) comb_witness = function
-  | Pair_t (_, Pair_t _, _, YesYes) -> Comb_Pair (Comb_Pair Comb_Any)
+let comb_witness2 :
+    type t tc. (t, tc) ty -> (t, unit -> unit -> unit) comb_witness = function
+  | Pair_t (_, Pair_t _, _, _) -> Comb_Pair (Comb_Pair Comb_Any)
   | Pair_t _ -> Comb_Pair Comb_Any
   | _ -> Comb_Any
 
@@ -568,7 +568,7 @@ let[@coq_axiom_with_reason "gadt"] rec unparse_comparable_data :
   | (Chain_id_t, chain_id) ->
       Lwt.return @@ unparse_chain_id ~loc ctxt mode chain_id
   | (Pair_t (tl, tr, _, YesYes), pair) ->
-      let r_witness = comparable_comb_witness2 tr in
+      let r_witness = comb_witness2 tr in
       let unparse_l ctxt v = unparse_comparable_data ~loc ctxt mode tl v in
       let unparse_r ctxt v = unparse_comparable_data ~loc ctxt mode tr v in
       unparse_pair ~loc unparse_l unparse_r ctxt mode r_witness pair
@@ -689,86 +689,10 @@ let type_metadata_eq :
  fun ~error_details {size = size_a} {size = size_b} ->
   Type_size.check_eq ~error_details size_a size_b
 
-let default_ty_eq_error ty1 ty2 =
+let default_ty_eq_error loc ty1 ty2 =
   let ty1 = serialize_ty_for_error ty1 in
   let ty2 = serialize_ty_for_error ty2 in
-  Inconsistent_types (None, ty1, ty2)
-
-(* Check that two comparable types are equal.
-
-   The result is an equality witness between the types of the two inputs within
-   the gas monad (for gas consumption).
- *)
-let rec comparable_ty_eq :
-    type ta tb error_trace.
-    error_details:error_trace error_details ->
-    ta comparable_ty ->
-    tb comparable_ty ->
-    ((ta comparable_ty, tb comparable_ty) eq, error_trace) Gas_monad.t =
-  let open Gas_monad in
-  fun ~error_details ta tb ->
-    let open Gas_monad.Syntax in
-    let* () = Gas_monad.consume_gas Typecheck_costs.merge_cycle in
-    let type_metadata_eq meta_a meta_b =
-      of_result @@ type_metadata_eq ~error_details meta_a meta_b
-    in
-    let not_equal () =
-      of_result
-      @@ Error
-           (match error_details with
-           | Fast -> (Inconsistent_types_fast : error_trace)
-           | Informative -> trace_of_error @@ default_ty_eq_error ta tb)
-    in
-    match (ta, tb) with
-    | (Unit_t, Unit_t) -> return (Eq : (ta comparable_ty, tb comparable_ty) eq)
-    | (Unit_t, _) -> not_equal ()
-    | (Never_t, Never_t) -> return Eq
-    | (Never_t, _) -> not_equal ()
-    | (Int_t, Int_t) -> return Eq
-    | (Int_t, _) -> not_equal ()
-    | (Nat_t, Nat_t) -> return Eq
-    | (Nat_t, _) -> not_equal ()
-    | (Signature_t, Signature_t) -> return Eq
-    | (Signature_t, _) -> not_equal ()
-    | (String_t, String_t) -> return Eq
-    | (String_t, _) -> not_equal ()
-    | (Bytes_t, Bytes_t) -> return Eq
-    | (Bytes_t, _) -> not_equal ()
-    | (Mutez_t, Mutez_t) -> return Eq
-    | (Mutez_t, _) -> not_equal ()
-    | (Bool_t, Bool_t) -> return Eq
-    | (Bool_t, _) -> not_equal ()
-    | (Key_hash_t, Key_hash_t) -> return Eq
-    | (Key_hash_t, _) -> not_equal ()
-    | (Key_t, Key_t) -> return Eq
-    | (Key_t, _) -> not_equal ()
-    | (Timestamp_t, Timestamp_t) -> return Eq
-    | (Timestamp_t, _) -> not_equal ()
-    | (Chain_id_t, Chain_id_t) -> return Eq
-    | (Chain_id_t, _) -> not_equal ()
-    | (Address_t, Address_t) -> return Eq
-    | (Address_t, _) -> not_equal ()
-    | (Tx_rollup_l2_address_t, Tx_rollup_l2_address_t) -> return Eq
-    | (Tx_rollup_l2_address_t, _) -> not_equal ()
-    | ( Pair_t (left_a, right_a, meta_a, YesYes),
-        Pair_t (left_b, right_b, meta_b, YesYes) ) ->
-        let* () = type_metadata_eq meta_a meta_b in
-        let* Eq = comparable_ty_eq ~error_details left_a left_b in
-        let+ Eq = comparable_ty_eq ~error_details right_a right_b in
-        (Eq : (ta comparable_ty, tb comparable_ty) eq)
-    | (Pair_t _, _) -> not_equal ()
-    | ( Union_t (left_a, right_a, meta_a, YesYes),
-        Union_t (left_b, right_b, meta_b, YesYes) ) ->
-        let* () = type_metadata_eq meta_a meta_b in
-        let* Eq = comparable_ty_eq ~error_details left_a left_b in
-        let+ Eq = comparable_ty_eq ~error_details right_a right_b in
-        (Eq : (ta comparable_ty, tb comparable_ty) eq)
-    | (Union_t _, _) -> not_equal ()
-    | (Option_t (ta, meta_a, Yes), Option_t (tb, meta_b, Yes)) ->
-        let* () = type_metadata_eq meta_a meta_b in
-        let+ Eq = comparable_ty_eq ~error_details ta tb in
-        (Eq : (ta comparable_ty, tb comparable_ty) eq)
-    | (Option_t _, _) -> not_equal ()
+  Inconsistent_types (loc, ty1, ty2)
 
 let memo_size_eq :
     type error_trace.
@@ -784,8 +708,12 @@ let memo_size_eq :
       | Fast -> Inconsistent_types_fast
       | Informative -> trace_of_error @@ Inconsistent_memo_sizes (ms1, ms2))
 
-(** Same as comparable_ty_eq but for any types. *)
-let ty_eq :
+(* Check that two types are equal.
+
+   The result is an equality witness between the types of the two inputs within
+   the gas monad (for gas consumption).
+ *)
+let rec ty_eq :
     type a ac b bc error_trace.
     error_details:error_trace error_details ->
     Script.location ->
@@ -798,7 +726,7 @@ let ty_eq :
     |> Gas_monad.record_trace_eval ~error_details (fun () ->
            let ty1 = serialize_ty_for_error ty1 in
            let ty2 = serialize_ty_for_error ty2 in
-           Inconsistent_types (Some loc, ty1, ty2))
+           Inconsistent_types (loc, ty1, ty2))
   in
   let memo_size_eq ms1 ms2 =
     Gas_monad.of_result (memo_size_eq ~error_details ms1 ms2)
@@ -811,7 +739,7 @@ let ty_eq :
    fun ty1 ty2 ->
     help0 ty1 ty2
     |> Gas_monad.record_trace_eval ~error_details (fun () ->
-           default_ty_eq_error ty1 ty2)
+           default_ty_eq_error loc ty1 ty2)
   and help0 :
       type ta tac tb tbc.
       (ta, tac) ty ->
@@ -825,7 +753,7 @@ let ty_eq :
       @@ Error
            (match error_details with
            | Fast -> (Inconsistent_types_fast : error_trace)
-           | Informative -> trace_of_error @@ default_ty_eq_error ty1 ty2)
+           | Informative -> trace_of_error @@ default_ty_eq_error loc ty1 ty2)
     in
     match (ty1, ty2) with
     | (Unit_t, Unit_t) -> return (Eq : ((ta, tac) ty, (tb, tbc) ty) eq)
@@ -869,23 +797,23 @@ let ty_eq :
     | (Map_t (tal, tar, meta1), Map_t (tbl, tbr, meta2)) ->
         let* () = type_metadata_eq meta1 meta2 in
         let* Eq = help tar tbr in
-        let+ Eq = comparable_ty_eq ~error_details tal tbl in
+        let+ Eq = ty_eq ~error_details loc tal tbl in
         (Eq : ((ta, tac) ty, (tb, tbc) ty) eq)
     | (Map_t _, _) -> not_equal ()
     | (Big_map_t (tal, tar, meta1), Big_map_t (tbl, tbr, meta2)) ->
         let* () = type_metadata_eq meta1 meta2 in
         let* Eq = help tar tbr in
-        let+ Eq = comparable_ty_eq ~error_details tal tbl in
+        let+ Eq = ty_eq ~error_details loc tal tbl in
         (Eq : ((ta, tac) ty, (tb, tbc) ty) eq)
     | (Big_map_t _, _) -> not_equal ()
     | (Set_t (ea, meta1), Set_t (eb, meta2)) ->
         let* () = type_metadata_eq meta1 meta2 in
-        let+ Eq = comparable_ty_eq ~error_details ea eb in
+        let+ Eq = ty_eq ~error_details loc ea eb in
         (Eq : ((ta, tac) ty, (tb, tbc) ty) eq)
     | (Set_t _, _) -> not_equal ()
     | (Ticket_t (ea, meta1), Ticket_t (eb, meta2)) ->
         let* () = type_metadata_eq meta1 meta2 in
-        let+ Eq = comparable_ty_eq ~error_details ea eb in
+        let+ Eq = ty_eq ~error_details loc ea eb in
         (Eq : ((ta, tac) ty, (tb, tbc) ty) eq)
     | (Ticket_t _, _) -> not_equal ()
     | (Pair_t (tal, tar, meta1, cmp1), Pair_t (tbl, tbr, meta2, cmp2)) ->
@@ -2354,8 +2282,8 @@ let parse_option parse_v ctxt ~legacy = function
 
 (* -- parse data of comparable types -- *)
 
-let comparable_comb_witness1 :
-    type t. t comparable_ty -> (t, unit -> unit) comb_witness = function
+let comb_witness1 : type t tc. (t, tc) ty -> (t, unit -> unit) comb_witness =
+  function
   | Pair_t _ -> Comb_Pair Comb_Any
   | _ -> Comb_Any
 
@@ -2406,7 +2334,7 @@ let[@coq_axiom_with_reason "gadt"] rec parse_comparable_data :
   | (Tx_rollup_l2_address_t, expr) ->
       Lwt.return @@ traced_no_lwt @@ parse_tx_rollup_l2_address ctxt expr
   | (Pair_t (tl, tr, _, YesYes), expr) ->
-      let r_witness = comparable_comb_witness1 tr in
+      let r_witness = comb_witness1 tr in
       let parse_l ctxt v = parse_comparable_data ?type_logger ctxt tl v in
       let parse_r ctxt v = parse_comparable_data ?type_logger ctxt tr v in
       traced @@ parse_pair parse_l parse_r ctxt ~legacy r_witness expr
@@ -2420,11 +2348,6 @@ let[@coq_axiom_with_reason "gadt"] rec parse_comparable_data :
   | (Never_t, expr) -> Lwt.return @@ traced_no_lwt @@ parse_never expr
 
 (* -- parse data of any type -- *)
-
-let comb_witness1 : type t tc. (t, tc) ty -> (t, unit -> unit) comb_witness =
-  function
-  | Pair_t _ -> Comb_Pair Comb_Any
-  | _ -> Comb_Any
 
 (*
   Some values, such as operations, tickets, or big map ids, are used only
@@ -2765,9 +2688,7 @@ let[@coq_axiom_with_reason "gadt"] rec parse_data :
                     (Gas_monad.run ctxt
                     @@
                     let open Gas_monad.Syntax in
-                    let* Eq =
-                      comparable_ty_eq ~error_details:Informative tk btk
-                    in
+                    let* Eq = ty_eq ~error_details:Informative loc tk btk in
                     ty_eq ~error_details:Informative loc tv btv)
                     >>? fun (eq, ctxt) ->
                     eq >|? fun Eq -> (Some id, ctxt) )
@@ -4818,7 +4739,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
           rest ) ) ->
       check_var_annot loc annot >>?= fun () ->
       Gas_monad.run ctxt
-      @@ comparable_ty_eq ~error_details:Informative contents_ty_a contents_ty_b
+      @@ ty_eq ~error_details:Informative loc contents_ty_a contents_ty_b
       >>?= fun (eq, ctxt) ->
       eq >>?= fun Eq ->
       option_t loc ty_a >>?= fun res_ty ->
@@ -5562,12 +5483,6 @@ let list_entrypoints_uncarbonated (type full fullc) (full : (full, fullc) ty)
 (* ---- Unparsing (Typed IR -> Untyped expressions) --------------------------*)
 
 (* -- Unparsing data of any type -- *)
-
-let comb_witness2 :
-    type t tc. (t, tc) ty -> (t, unit -> unit -> unit) comb_witness = function
-  | Pair_t (_, Pair_t _, _, _) -> Comb_Pair (Comb_Pair Comb_Any)
-  | Pair_t _ -> Comb_Pair Comb_Any
-  | _ -> Comb_Any
 
 let[@coq_axiom_with_reason "gadt"] rec unparse_data :
     type a ac.

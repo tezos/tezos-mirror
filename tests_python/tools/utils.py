@@ -438,18 +438,13 @@ def assert_run_failure(pattern: str, mode: str = 'stderr'):
         yield None
         assert False, "Code ran without throwing exception"
     except subprocess.CalledProcessError as exc:
-        stdout_output = exc.stdout
-        stderr_output = exc.stderr
-        data = []  # type: List[str]
         if mode == 'stderr':
-            data = stderr_output.split('\n')
+            output = exc.stderr
         else:
-            data = stdout_output.split('\n')
-        for line in data:
-            if re.search(pattern, line):
-                return
-        data_pretty = "\n".join(data)
-        assert False, f"Could not find '{pattern}' in '{data_pretty}'"
+            output = exc.stdout
+        if re.search(pattern, output):
+            return
+        assert False, f"Could not find '{pattern}' in '{output}'"
     except Exception as exc:  # pylint: disable=broad-except
         assert_msg = f'Expected CalledProcessError but got {type(exc)}'
         assert False, assert_msg
