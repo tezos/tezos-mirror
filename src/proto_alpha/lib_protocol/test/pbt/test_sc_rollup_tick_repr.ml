@@ -32,48 +32,60 @@
 *)
 
 open Protocol.Alpha_context.Sc_rollup
-open QCheck
+open QCheck2
 
 (** A generator for ticks *)
-let tick : Tick.t QCheck.arbitrary =
-  QCheck.(
-    Gen.(make (Option.value ~default:Tick.initial <$> map Tick.of_int nat)))
+let tick =
+  let open Gen in
+  let+ n = nat in
+  Option.value ~default:Tick.initial (Tick.of_int n)
 
 (** For all x, x = initial \/ x > initial. *)
 let test_initial_is_bottom =
-  QCheck.Test.make ~name:"x = initial \\/ x > initial" tick @@ fun x ->
+  Test.make ~name:"x = initial \\/ x > initial" tick @@ fun x ->
   Tick.(x = initial || x > initial)
 
 (** For all x, next x > x. *)
 let test_next_is_monotonic =
-  QCheck.Test.make ~name:"next x > x" tick @@ fun x -> Tick.(next x > x)
+  Test.make ~name:"next x > x" tick @@ fun x -> Tick.(next x > x)
 
-(** distance is indeed a distance. *)
-let test_distance_identity_of_indiscernibles =
-  QCheck.Test.make ~name:"distance is a distance (identity)" (pair tick tick)
-  @@ fun (x, y) ->
-  (Z.(equal (Tick.distance x y) zero) && Tick.(x = y))
-  || Z.(not (equal (Tick.distance x y) zero))
+(** Distance from self to self is zero *)
+let test_distance_from_self =
+  Test.make ~name:"distance from x to x is 0" tick (fun x ->
+      Z.(equal (Tick.distance x x) zero))
 
+(** Distance from non-self is non-zero. *)
+let tets_distance_from_non_self =
+  Test.make
+    ~name:"distance from non-self is non-zero"
+    (Gen.pair tick tick)
+    (fun (x, y) ->
+      let dist = Tick.distance x y in
+      if x = y then Compare.Z.(dist = Z.zero) else Compare.Z.(dist <> Z.zero))
+
+(** Distance is symmetric . *)
 let test_distance_symmetry =
-  QCheck.Test.make ~name:"distance is a distance (symmetry)" (pair tick tick)
-  @@ fun (x, y) -> Z.(equal (Tick.distance x y) (Tick.distance y x))
+  Test.make
+    ~name:"distance is a distance (symmetry)"
+    (Gen.pair tick tick)
+    (fun (x, y) -> Z.(equal (Tick.distance x y) (Tick.distance y x)))
 
+(** Distance satisfies triangular inequality. *)
 let test_distance_triangle_inequality =
-  QCheck.Test.make
+  Test.make
     ~name:"distance is a distance (triangle inequality)"
-    (triple tick tick tick)
-  @@ fun (x, y, z) ->
-  Tick.(Z.(geq (distance x y + distance y z) (distance x z)))
+    (Gen.triple tick tick tick)
+    (fun (x, y, z) ->
+      Tick.(Z.(geq (distance x y + distance y z) (distance x z))))
 
-(** [of_int x = Some t] iff [x >= 0] *)
+(** Test that [of_int x = Some t] iff [x >= 0] *)
 let test_of_int =
-  QCheck.Test.make ~name:"of_int only accepts natural numbers" int @@ fun x ->
-  match Tick.of_int x with None -> x < 0 | Some _ -> x >= 0
+  Test.make ~name:"of_int only accepts natural numbers" Gen.int (fun x ->
+      match Tick.of_int x with None -> x < 0 | Some _ -> x >= 0)
 
-(** [of_int (to_int x) = Some x]. *)
+(** Test [of_int o to_int = identity]. *)
 let test_of_int_to_int =
-  QCheck.Test.make ~name:"to_int o of_int = identity" tick @@ fun x ->
+  Test.make ~name:"to_int o of_int = identity" tick @@ fun x ->
   Tick.(
     match to_int x with
     | None -> (* by the tick generator definition. *) assert false
@@ -83,7 +95,8 @@ let tests =
   [
     test_next_is_monotonic;
     test_initial_is_bottom;
-    test_distance_identity_of_indiscernibles;
+    test_distance_from_self;
+    tets_distance_from_non_self;
     test_distance_symmetry;
     test_distance_triangle_inequality;
     test_of_int;
