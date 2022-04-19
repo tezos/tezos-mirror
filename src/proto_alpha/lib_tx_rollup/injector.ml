@@ -120,7 +120,8 @@ let init_injector rollup_node_state ~signer strategy tags =
   let open Lwt_result_syntax in
   let+ signer = get_signer rollup_node_state.State.cctxt signer in
   let queue = Op_queue.create 50_000 in
-  (* Very coarse approximation Number of operation we expect for each block *)
+  (* Very coarse approximation for the number of operation we expect for each
+     block *)
   let n =
     Tags.fold
       (fun t acc ->
@@ -584,7 +585,7 @@ let requeue_reverted_operation state op =
               let commit_hash =
                 Tx_rollup_commitment.(Compact.hash (Full.compact commitment))
               in
-              (* Do not re-queue if commitment for this level hash changed *)
+              (* Do not re-queue if commitment for this level has changed *)
               Tx_rollup_commitment_hash.(c = commit_hash)))
   | _ -> return_true
 
