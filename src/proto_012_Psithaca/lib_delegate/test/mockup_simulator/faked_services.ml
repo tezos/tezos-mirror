@@ -144,7 +144,7 @@ module Make (Hooks : Mocked_services_hooks) = struct
     @@ Directory.register
          Directory.empty
          Mockup.M.Block_services.S.Operations.operations
-         (fun (((), _chain), block) () () -> Hooks.operations block)
+         (fun (((), _chain), block) _ () -> Hooks.operations block)
 
   let hash =
     Directory.prefix

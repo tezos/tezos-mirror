@@ -212,7 +212,12 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
   open RPC_context
 
   val info :
-    #simple -> ?chain:chain -> ?block:block -> unit -> block_info tzresult Lwt.t
+    #simple ->
+    ?force_metadata:bool ->
+    ?chain:chain ->
+    ?block:block ->
+    unit ->
+    block_info tzresult Lwt.t
 
   val hash :
     #simple ->
@@ -267,6 +272,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
   module Operations : sig
     val operations :
       #simple ->
+      ?force_metadata:bool ->
       ?chain:chain ->
       ?block:block ->
       unit ->
@@ -274,6 +280,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
 
     val operations_in_pass :
       #simple ->
+      ?force_metadata:bool ->
       ?chain:chain ->
       ?block:block ->
       int ->
@@ -281,6 +288,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
 
     val operation :
       #simple ->
+      ?force_metadata:bool ->
       ?chain:chain ->
       ?block:block ->
       int ->
@@ -491,7 +499,14 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
   module S : sig
     val hash : ([`GET], prefix, prefix, unit, unit, Block_hash.t) RPC_service.t
 
-    val info : ([`GET], prefix, prefix, unit, unit, block_info) RPC_service.t
+    val info :
+      ( [`GET],
+        prefix,
+        prefix,
+        < force_metadata : bool >,
+        unit,
+        block_info )
+      RPC_service.t
 
     val header :
       ([`GET], prefix, prefix, unit, unit, block_header) RPC_service.t
@@ -532,16 +547,28 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
 
     module Operations : sig
       val operations :
-        ([`GET], prefix, prefix, unit, unit, operation list list) RPC_service.t
+        ( [`GET],
+          prefix,
+          prefix,
+          < force_metadata : bool >,
+          unit,
+          operation list list )
+        RPC_service.t
 
       val operations_in_pass :
-        ([`GET], prefix, prefix * int, unit, unit, operation list) RPC_service.t
+        ( [`GET],
+          prefix,
+          prefix * int,
+          < force_metadata : bool >,
+          unit,
+          operation list )
+        RPC_service.t
 
       val operation :
         ( [`GET],
           prefix,
           (prefix * int) * int,
-          unit,
+          < force_metadata : bool >,
           unit,
           operation )
         RPC_service.t

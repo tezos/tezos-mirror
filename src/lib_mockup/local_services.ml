@@ -872,7 +872,7 @@ module Make (E : MENV) = struct
     @@ Directory.register
          Directory.empty
          E.Block_services.S.Operations.operations
-         (fun (((), chain), _block) () () ->
+         (fun (((), chain), _block) _query () ->
            with_chain ~caller_name:"operations" chain (fun () ->
                (* FIXME: Better answer here *)
                RPC_answer.return [[]; []; []; []]))
