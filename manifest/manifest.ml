@@ -1749,11 +1749,14 @@ let rec as_opam_dependency ~fix_version ~(for_package : string) ~with_test
       let version =
         (* FIXME: https://gitlab.com/tezos/tezos/-/issues/1453
            Remove this once all packages (including protocol packages)
-           have been ported to the manifest. *)
+           have been ported to the manifest.
+           "tezos-rust-libs" is an exception to the exception... *)
         if
           fix_version
           && (has_prefix ~prefix:"tezos-" (Filename.basename opam)
              || has_prefix ~prefix:"octez-" (Filename.basename opam))
+          && Filename.basename opam <> "tezos-rust-libs"
+          && Filename.basename opam <> "octez-rust-libs"
         then Version.(Exactly Version)
         else version
       in

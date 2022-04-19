@@ -2560,9 +2560,22 @@ let tezos_openapi =
 module Protocol : sig
   type number = Alpha | V of int | Other
 
+  (** Status of the protocol on Mainnet.
+
+      - [Active]: the protocol is the current protocol on Mainnet, is being proposed,
+        or was active recently and was not deleted or frozen yet.
+        Or, it is protocol Alpha.
+      - [Frozen]: the protocol is an old protocol of Mainnet which was frozen
+        (its tests, daemons etc. have been removed).
+      - [Overridden]: the protocol has been replaced using a user-activated protocol override.
+      - [Not_mainnet]: this protocol was never on Mainnet (e.g. demo protocols). *)
+  type status = Active | Frozen | Overridden | Not_mainnet
+
   type t
 
   val number : t -> number
+
+  val status : t -> status
 
   (** Name without the number, e.g. "alpha" or "PsDELPH1". *)
   val name : t -> string
@@ -2603,6 +2616,9 @@ module Protocol : sig
 
   val alpha : t
 
+  (** List of all protocols. *)
+  val all : t list
+
   (** List of active protocols. *)
   val active : t list
 
@@ -2618,8 +2634,11 @@ module Protocol : sig
 end = struct
   type number = Alpha | V of int | Other
 
+  type status = Active | Frozen | Overridden | Not_mainnet
+
   type t = {
     number : number;
+    status : status;
     name : string;
     main : target;
     embedded : target;
@@ -2638,9 +2657,10 @@ end = struct
   let make ?(number = Other) ?client ?client_commands
       ?client_commands_registration ?baking_commands_registration ?plugin
       ?plugin_registerer ?test_helpers ?parameters ?benchmarks_proto ?baking
-      ~name ~main ~embedded () =
+      ~status ~name ~main ~embedded () =
     {
       number;
+      status;
       name;
       main;
       embedded;
@@ -2671,6 +2691,8 @@ end = struct
     | Some x -> x
 
   let number p = p.number
+
+  let status p = p.status
 
   let name p = p.name
 
@@ -2739,6 +2761,7 @@ end = struct
     register
     @@ make
          ~name:"genesis"
+         ~status:Not_mainnet
          ~main:(todo "tezos-protocol-genesis")
          ~embedded:(todo "tezos-embedded-protocol-genesis")
          ~client
@@ -2748,6 +2771,7 @@ end = struct
     register
     @@ make
          ~name:"demo-noops"
+         ~status:Not_mainnet
          ~main:(todo "tezos-protocol-demo-noops")
          ~embedded:(todo "tezos-embedded-protocol-demo-noops")
          ()
@@ -2781,12 +2805,11 @@ end = struct
     register
     @@ make
          ~name:"demo-counter"
+         ~status:Not_mainnet
          ~main:(todo "tezos-protocol-demo-counter")
          ~embedded:(todo "tezos-embedded-protocol-demo-counter")
          ~client
          ()
-
-  type status = Active | Frozen | Overridden
 
   (* N as in "protocol number in the Alpha family". *)
   module N = struct
@@ -2829,10 +2852,14 @@ end = struct
     let name_underscore = make_full_name '_' in
     let some_if condition make = if condition then Some (make ()) else None in
     let active =
-      match status with Frozen | Overridden -> false | Active -> true
+      match status with
+      | Frozen | Overridden | Not_mainnet -> false
+      | Active -> true
     in
     let not_overridden =
-      match status with Frozen | Active -> true | Overridden -> false
+      match status with
+      | Frozen | Active | Not_mainnet -> true
+      | Overridden -> false
     in
     let opt_map l f = Option.map f l in
     let warnings =
@@ -3631,6 +3658,7 @@ end = struct
     register
     @@ make
          ~number
+         ~status
          ~name
          ~main
          ~embedded
@@ -3691,13 +3719,10 @@ end = struct
   let active = List.filter (fun p -> p.baking_commands_registration <> None) all
 
   let all_optionally (get_packages : (t -> target option) list) =
-    let get_all_packages_for_protocol_package_type
-        (get_package : t -> target option) =
-      List.map (fun protocol -> Option.to_list (get_package protocol)) all
-      |> List.flatten
+    let get_targets_for_protocol protocol =
+      List.filter_map (fun get_package -> get_package protocol) get_packages
     in
-    List.map get_all_packages_for_protocol_package_type get_packages
-    |> List.flatten |> List.map optional
+    List.map get_targets_for_protocol all |> List.flatten |> List.map optional
 end
 
 (* TESTS THAT USE PROTOCOLS *)
@@ -3904,6 +3929,32 @@ let _tezos_validator_bin =
     ~linkall:true
 
 let _tezos_node =
+  let protocol_deps =
+    let deps_for_protocol protocol =
+      let is_optional =
+        match (Protocol.status protocol, Protocol.number protocol) with
+        | (_, V 000) ->
+            (* The node always needs to be linked with this protocol for Mainnet. *)
+            false
+        | (Active, V _) ->
+            (* Active protocols cannot be optional because of a bug
+               that results in inconsistent hashes. Once this bug is fixed,
+               this exception can be removed. *)
+            false
+        | ((Frozen | Overridden | Not_mainnet), _) | (Active, (Alpha | Other))
+          ->
+            (* Other protocols are optional. *)
+            true
+      in
+      let targets =
+        List.filter_map
+          Fun.id
+          [Protocol.embedded_opt protocol; Protocol.plugin_registerer protocol]
+      in
+      if is_optional then List.map optional targets else targets
+    in
+    List.map deps_for_protocol Protocol.all |> List.flatten
+  in
   public_exe
     "tezos-node"
     ~path:"src/bin_node"
@@ -3934,8 +3985,7 @@ let _tezos_node =
          prometheus_app_unix;
          lwt_exit;
        ]
-      @ Protocol.all_optionally
-          [Protocol.embedded_opt; Protocol.plugin_registerer])
+      @ protocol_deps)
     ~linkall:true
     ~dune:
       Dune.
@@ -3947,6 +3997,30 @@ let _tezos_node =
         ]
 
 let _tezos_client =
+  let protocol_deps =
+    let deps_for_protocol protocol =
+      let is_optional =
+        match (Protocol.status protocol, Protocol.number protocol) with
+        | (Active, V _) -> false
+        | ((Frozen | Overridden | Not_mainnet), _) | (Active, (Alpha | Other))
+          ->
+            true
+      in
+      let targets =
+        List.filter_map
+          Fun.id
+          [
+            (match Protocol.client_commands_registration protocol with
+            | None -> Protocol.client protocol
+            | x -> x);
+            Protocol.baking_commands_registration protocol;
+            Protocol.plugin protocol;
+          ]
+      in
+      if is_optional then List.map optional targets else targets
+    in
+    List.map deps_for_protocol Protocol.all |> List.flatten
+  in
   public_exes
     ["tezos-client"; "tezos-admin-client"]
     ~path:"src/bin_client"
@@ -3967,15 +4041,7 @@ let _tezos_client =
          tezos_client_base_unix |> open_;
          tezos_signer_backends_unix;
        ]
-      @ Protocol.all_optionally
-          [
-            (fun protocol ->
-              match Protocol.client_commands_registration protocol with
-              | None -> Protocol.client protocol
-              | x -> x);
-            Protocol.baking_commands_registration;
-            Protocol.plugin;
-          ])
+      @ protocol_deps)
     ~linkall:true
     ~dune:
       Dune.
