@@ -91,6 +91,7 @@ let () =
   Mockup.register_protocol_independent () ;
   Bootstrap.register_protocol_independent () ;
   Cli_tezos.register_protocol_independent () ;
+  Client_keys.register_protocol_independent () ;
   (* Tests that are heavily protocol-dependent.
      Those modules define different tests for different protocols in their [register]. *)
   RPC_test.register [Ithaca; Jakarta; Alpha] ;

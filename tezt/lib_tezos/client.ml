@@ -628,36 +628,67 @@ let spawn_show_address ~alias client =
   spawn_command client ["show"; "address"; alias; "--show-secret"]
 
 let show_address ~alias client =
-  let extract_key (client_output : string) : Account.key =
-    let public_key_hash =
-      (* group of letters and digits after "Hash: "
-         e.g. "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" *)
-      client_output =~* rex "Hash: ?(\\w*)" |> mandatory "public key hash"
-    in
-    let public_key =
-      (* group of letters and digits after "Public Key: "
-         e.g. "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav" *)
-      client_output =~* rex "Public Key: ?(\\w*)" |> mandatory "public key"
-    in
-    let sk =
-      (* group of letters and digits after "Secret Key: unencrypted:"
-         e.g. "edsk3gUfUPyBSfrS9CCgmCiQsTCHGkviBDusMxDJstFtojtc1zcpsh"
-         Note: The tests only use unencrypted keys for the moment. If
-         this changes, please update secret key parsing. *)
-      client_output
-      =~* rex "Secret Key: unencrypted:?(\\w*)"
-      |> mandatory "secret key"
-    in
-    {alias; public_key_hash; public_key; secret_key = Unencrypted sk}
-  in
-  let* output =
+  let* client_output =
     spawn_show_address ~alias client |> Process.check_and_read_stdout
   in
-  return @@ extract_key output
+  return @@ Account.parse_client_output ~alias ~client_output
 
 let gen_and_show_keys ?alias client =
   let* alias = gen_keys ?alias client in
   show_address ~alias client
+
+let spawn_bls_gen_keys ?hooks ?(force = false) ~alias client =
+  spawn_command
+    ?hooks
+    client
+    (["bls"; "gen"; "keys"; alias] @ if force then ["--force"] else [])
+
+let bls_gen_keys ?hooks ?force ~alias client =
+  spawn_bls_gen_keys ?hooks ?force ~alias client |> Process.check
+
+let spawn_bls_list_keys ?hooks client =
+  spawn_command ?hooks client ["bls"; "list"; "keys"]
+
+let parse_list_keys output =
+  output |> String.trim |> String.split_on_char '\n'
+  |> List.map (fun s ->
+         match s =~** rex "^(\\w+): (\\w{36})" with
+         | Some s -> s
+         | None ->
+             Test.fail
+               ~__LOC__
+               "Cannot extract `list keys` format from client_output: %s"
+               output)
+
+let bls_list_keys ?hooks client =
+  let* out =
+    spawn_bls_list_keys ?hooks client |> Process.check_and_read_stdout
+  in
+  return (parse_list_keys out)
+
+let spawn_bls_show_address ?hooks ~alias client =
+  spawn_command ?hooks client ["bls"; "show"; "address"; alias]
+
+let bls_show_address ?hooks ~alias client =
+  let* out =
+    spawn_bls_show_address ?hooks ~alias client |> Process.check_and_read_stdout
+  in
+  return (Account.parse_client_output_aggregate ~alias ~client_output:out)
+
+let spawn_bls_import_secret_key ?hooks ?(force = false)
+    (key : Account.aggregate_key) client =
+  let sk_uri =
+    let (Unencrypted sk) = key.aggregate_secret_key in
+    "aggregate_unencrypted:" ^ sk
+  in
+  spawn_command
+    ?hooks
+    client
+    (["bls"; "import"; "secret"; "key"; key.aggregate_alias; sk_uri]
+    @ if force then ["--force"] else [])
+
+let bls_import_secret_key ?hooks ?force key sc_client =
+  spawn_bls_import_secret_key ?hooks ?force key sc_client |> Process.check
 
 let spawn_transfer ?hooks ?log_output ?endpoint ?(wait = "none") ?burn_cap ?fee
     ?gas_limit ?storage_limit ?counter ?arg ?(force = false) ~amount ~giver

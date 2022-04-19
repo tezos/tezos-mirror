@@ -93,3 +93,15 @@ let tx_rollup_proof_initial_state =
   "before": { "node": "CoVu7Pqp1Gh3z33mink5T5Q2kAQKtnn3GHxVhyehdKZpQMBxFBGF" },
   "after": { "node": "CoVu7Pqp1Gh3z33mink5T5Q2kAQKtnn3GHxVhyehdKZpQMBxFBGF" } ,
   "state": [] }|}
+
+(** A valid base58 encoded layer-2 account to be used to test transaction and
+    smart contract rollups. *)
+let tz4_account : Account.aggregate_key =
+  {
+    aggregate_alias = "bls_test_account";
+    aggregate_public_key_hash = "tz4EECtMxAuJ9UDLaiMZH7G1GCFYUWsj8HZn";
+    aggregate_public_key =
+      "BLpk1yUiLJ7RezbyViD5ZvWTfQndM3TRRYmvYWkUfH2EJqsLFnzzvpJss6pbuz3U1DDMpk8v16nV";
+    aggregate_secret_key =
+      Unencrypted "BLsk1hKAHyGqY9qRbgoSVnjiSmDWpKGjFF3WNQ7BaiaMUA6RMA6Pfq";
+  }

@@ -33,7 +33,14 @@ type key = {
   secret_key : secret_key;
 }
 
-let sign_bytes ~watermark ~signer (message : Bytes.t) =
+type aggregate_key = {
+  aggregate_alias : string;
+  aggregate_public_key_hash : string;
+  aggregate_public_key : string;
+  aggregate_secret_key : secret_key;
+}
+
+let sign_bytes ~watermark ~(signer : key) (message : Bytes.t) =
   let (Unencrypted b58_secret_key) = signer.secret_key in
   let secret_key =
     Tezos_crypto.Signature.Secret_key.of_b58check_exn b58_secret_key
@@ -115,3 +122,53 @@ module Bootstrap = struct
       };
     |]
 end
+
+let parse_client_output_public_keys ~client_output =
+  let public_key_hash =
+    (* group of letters and digits after "Hash: "
+       e.g. "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" *)
+    client_output =~* rex "Hash: ?(\\w*)" |> mandatory "public key hash"
+  in
+  let public_key =
+    (* group of letters and digits after "Public Key: "
+       e.g. "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav" *)
+    client_output =~* rex "Public Key: ?(\\w*)" |> mandatory "public key"
+  in
+  (public_key_hash, public_key)
+
+let parse_client_output ~alias ~client_output =
+  let (public_key_hash, public_key) =
+    parse_client_output_public_keys ~client_output
+  in
+  let secret_key =
+    (* group of letters and digits after "Secret Key: unencrypted:" e.g.
+       "edsk3gUfUPyBSfrS9CCgmCiQsTCHGkviBDusMxDJstFtojtc1zcpsh" Note: The tests
+       only use unencrypted keys for the moment. If this changes, please update
+       secret key parsing. *)
+    client_output
+    =~* rex "Secret Key: unencrypted:?(\\w*)"
+    |> mandatory "secret key"
+    |> fun sk -> Unencrypted sk
+  in
+  {alias; public_key_hash; public_key; secret_key}
+
+let parse_client_output_aggregate ~alias ~client_output =
+  let (aggregate_public_key_hash, aggregate_public_key) =
+    parse_client_output_public_keys ~client_output
+  in
+  let aggregate_secret_key =
+    (* group of letters and digits after "Secret Key: aggregate_unencrypted"
+       e.g. "BLsk1hKAHyGqY9qRbgoSVnjiSmDWpKGjFF3WNQ7BaiaMUA6RMA6Pfq" Note: The
+       tests only use unencrypted keys for the moment. If this changes, please
+       update secret key parsing. *)
+    client_output
+    =~* rex "Secret Key: aggregate_unencrypted:?(\\w*)"
+    |> mandatory "secret key"
+    |> fun sk -> Unencrypted sk
+  in
+  {
+    aggregate_alias = alias;
+    aggregate_public_key_hash;
+    aggregate_public_key;
+    aggregate_secret_key;
+  }

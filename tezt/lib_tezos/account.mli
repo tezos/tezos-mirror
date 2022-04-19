@@ -48,24 +48,44 @@ type key = {
   secret_key : secret_key;
 }
 
+(** Keys associated to an aggregatable account. For example:
+{[
+    {
+      aggregate_alias = "bls_account";
+      aggregate_public_key_hash = "tz4EECtMxAuJ9UDLaiMZH7G1GCFYUWsj8HZn";
+      aggregate_public_key =
+        "BLpk1yUiLJ7RezbyViD5ZvWTfQndM3TRRYmvYWkUfH2EJqsLFnzzvpJss6pbuz3U1DDMpk8v16nV";
+      aggregate_secret_key =
+        Unencrypted "BLsk1hKAHyGqY9qRbgoSVnjiSmDWpKGjFF3WNQ7BaiaMUA6RMA6Pfq";
+    }
+]} *)
+type aggregate_key = {
+  aggregate_alias : string;
+  aggregate_public_key_hash : string;
+  aggregate_public_key : string;
+  aggregate_secret_key : secret_key;
+}
+
 (** [sign_bytes ~watermark ~signer message] signs the bytes [message] with
     [signer]'s secret key. Returns the corresponding Tezos signature. This
     function can be used to sign transactions, blocks, etc. depending on
-    the given [watermark]. *)
+    the given [watermark].
+
+    Used for regular accounts. *)
 val sign_bytes :
   watermark:Tezos_crypto.Signature.watermark ->
   signer:key ->
   bytes ->
   Tezos_crypto.Signature.t
 
-(** [write keys ~base_dir] writes the keys into the [tezos-client]'s data 
+(** [write keys ~base_dir] writes the keys into the [tezos-client]'s data
    directory [base_dir]. This function has the same effect
    as importing all the keys manually  via [tezos-client] but is
    faster. *)
 val write : key list -> base_dir:string -> unit
 
 module Bootstrap : sig
-  (** Standard name for a bootstrap account parameterised by an 
+  (** Standard name for a bootstrap account parameterised by an
       integer. This alias can be used to name new bootstrap
       accounts. *)
   val alias : int -> string
@@ -73,3 +93,26 @@ module Bootstrap : sig
   (** The default bootstrap keys. *)
   val keys : key array
 end
+
+(** [parse_client_output ~alias ~client_output] extracts keys from clients output that
+    yields result of the form
+{v
+      Hash: tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx
+      Public Key: edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav
+      Secret Key: unencrypted:edsk3gUfUPyBSfrS9CCgmCiQsTCHGkviBDusMxDJstFtojtc1zcpsh
+v}
+    and returns the corresponding key.
+*)
+val parse_client_output : alias:string -> client_output:string -> key
+
+(** [parse_client_output_aggregate ~alias ~client_output] extracts keys from
+    clients output that yields result of the form
+{v
+      Hash: tz4EECtMxAuJ9UDLaiMZH7G1GCFYUWsj8HZn
+      Public Key: BLpk1yUiLJ7RezbyViD5ZvWTfQndM3TRRYmvYWkUfH2EJqsLFnzzvpJss6pbuz3U1DDMpk8v16nV
+      Secret Key: aggregate_unencrypted:BLsk1hKAHyGqY9qRbgoSVnjiSmDWpKGjFF3WNQ7BaiaMUA6RMA6Pfq
+v}
+    and returns the corresponding key.
+*)
+val parse_client_output_aggregate :
+  alias:string -> client_output:string -> aggregate_key
