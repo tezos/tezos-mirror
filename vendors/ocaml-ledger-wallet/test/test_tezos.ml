@@ -39,7 +39,7 @@ let msg_bytes = Cstruct.to_bytes msg
 
 let test_getpk h curve =
   get_public_key h curve path >>| fun pk ->
-  Alcotest.(check int "pklen" 65 (Cstruct.len pk))
+  Alcotest.(check int "pklen" 65 (Cstruct.length pk))
 
 let test_getpk () =
   with_connection (fun h ->

@@ -171,7 +171,7 @@ let get_git_commit ?pp ?buf h =
 let read_path_with_length buf =
   let length = Cstruct.get_uint8 buf 0 in
   let rec go acc path =
-    if Cstruct.len path = 0 || List.length acc = length then List.rev acc
+    if Cstruct.length path = 0 || List.length acc = length then List.rev acc
     else
       go (Cstruct.BE.get_uint32 path 0 :: acc)
         (Cstruct.shift path 4) in
@@ -321,10 +321,10 @@ let get_deterministic_nonce ?pp ?buf h curve path payload =
     data in
   let data = Cstruct.append path_data payload in
   let cmd = wrap_ins Make_deterministic_nonce in
-  let lc = Cstruct.len data in
+  let lc = Cstruct.length data in
   if lc >= Apdu.max_data_length then
     Transport.app_error ~msg:"get_deterministic_nonce"
-    @@ R.error (Payload_too_big (Cstruct.len payload))
+    @@ R.error (Payload_too_big (Cstruct.length payload))
   else
     let apdu = Apdu.create ~p2:(int_of_curve curve) ~lc ~data cmd in
     let msg = "make-deterministic-nonce" in

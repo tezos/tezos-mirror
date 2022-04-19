@@ -11,7 +11,7 @@ let apdu = 0x05
 let ping = 0x02
 
 let check_buflen cs =
-  let cslen = Cstruct.len cs in
+  let cslen = Cstruct.length cs in
   if cslen < packet_length then invalid_arg
       ("HID packets must be 64 bytes long, got " ^ string_of_int cslen)
 
@@ -147,7 +147,7 @@ module Header = struct
     R.error (Error.Unexpected_sequence_number { expected ; actual })
 
   let read cs =
-    let cslen = Cstruct.len cs in
+    let cslen = Cstruct.length cs in
     begin if cslen < 5 then
         fail_header_too_short cslen
       else R.ok ()
@@ -306,17 +306,17 @@ let read ?pp ?(buf=Cstruct.create packet_length) h =
       expected_seq := !expected_seq + 1 ;
     end else begin (* next frames *)
       (* let rem = Bytes.length !payload - !pos in *)
-      let nb_to_read = min (Cstruct.len !payload) (packet_length - 5) in
+      let nb_to_read = min (Cstruct.length !payload) (packet_length - 5) in
       Cstruct.blit buf 0 !payload 0 nb_to_read ;
       payload := Cstruct.shift !payload nb_to_read ;
       (* pos := !pos + nb_to_read ; *)
       expected_seq := !expected_seq + 1
     end ;
-    match Cstruct.len !payload, hdr.cmd with
+    match Cstruct.length !payload, hdr.cmd with
     | 0, Ping -> R.ok (Status.Ok, Cstruct.create 0)
     | 0, Apdu ->
         (* let sw_pos = Bytes.length !payload - 2 in *)
-        let payload_len = Cstruct.len !full_payload in
+        let payload_len = Cstruct.length !full_payload in
         let sw = Cstruct.BE.get_uint16 !full_payload (payload_len - 2) in
         R.ok
           (Status.of_int sw,
@@ -347,7 +347,7 @@ let apdu ?pp ?(msg="") ?buf h apdu =
 let write_payload
     ?pp ?(msg="write_payload") ?buf ?(mark_last=false) ~cmd ?p1 ?p2 h cs =
   let rec inner cs =
-    let cs_len = Cstruct.len cs in
+    let cs_len = Cstruct.length cs in
     let lc = min Apdu.max_data_length cs_len in
     let last = lc = cs_len in
     let p1 = match last, mark_last, p1 with
@@ -359,7 +359,7 @@ let write_payload
               ~data:(Cstruct.sub cs 0 lc) cmd) >>= fun response ->
     if last then R.ok response
     else inner (Cstruct.shift cs lc) in
-  if Cstruct.len cs = 0 then R.ok cs else inner cs
+  if Cstruct.length cs = 0 then R.ok cs else inner cs
 
 (*---------------------------------------------------------------------------
    Copyright (c) 2017 Vincent Bernardoff
