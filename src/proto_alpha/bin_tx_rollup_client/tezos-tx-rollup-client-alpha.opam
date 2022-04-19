@@ -10,14 +10,13 @@ license: "MIT"
 depends: [
   "dune" { >= "2.9" }
   "tezos-base"
-  "tezos-protocol-013-PtJakart"
-  "tezos-client-013-PtJakart"
-  "tezos-client-base"
+  "tezos-protocol-alpha"
+  "tezos-client-alpha"
   "tezos-client-base-unix"
-  "tezos-tx-rollup-013-PtJakart"
+  "tezos-tx-rollup-alpha"
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Tezos/Protocol: Transaction Rollup node binary"
+synopsis: "Tezos/Protocol: `tezos-tx-rollup-client-alpha` client binary"

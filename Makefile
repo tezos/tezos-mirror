@@ -36,6 +36,7 @@ TEZOS_BIN=tezos-node tezos-validator tezos-client tezos-admin-client tezos-signe
 		             echo tezos-endorser-$(p); fi)) \
 
 UNRELEASED_TEZOS_BIN=$(foreach p, $(tx_rollup_protocol_versions), tezos-tx-rollup-node-$p) \
+   $(foreach p, $(tx_rollup_protocol_versions), tezos-tx-rollup-client-$p) \
    $(foreach p, $(sc_rollup_protocol_versions), tezos-sc-rollup-node-$p) \
    $(foreach p, $(sc_rollup_protocol_versions), tezos-sc-rollup-client-$p)
 

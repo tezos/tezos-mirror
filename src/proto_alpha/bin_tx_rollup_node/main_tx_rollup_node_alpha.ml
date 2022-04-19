@@ -83,7 +83,7 @@ let rejection_signer_arg =
 let rollup_id_arg =
   Clic.arg
     ~long:"rollup-id"
-    ~placeholder:"rollup_id"
+    ~placeholder:"rollup-id"
     ~doc:"The rollup id of the rollup to target"
     (Clic.parameter (fun _ s ->
          match Protocol.Alpha_context.Tx_rollup.of_b58check s with

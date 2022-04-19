@@ -3466,13 +3466,13 @@ end = struct
             ringo_lwt;
           ]
     in
-    let _tx_rollup_node =
-      some_if (active && N.(number >= 013)) @@ fun () ->
-      public_exe
-        (sf "tezos-tx-rollup-node-%s" name_dash)
-        ~internal_name:(sf "main_tx_rollup_node_%s" name_underscore)
-        ~path:(sf "src/proto_%s/bin_tx_rollup_node" name_underscore)
-        ~synopsis:"Tezos/Protocol: Transaction Rollup node binary"
+    let tx_rollup =
+      some_if N.(number >= 013) @@ fun () ->
+      public_lib
+        (sf "tezos-tx-rollup-%s" name_dash)
+        ~path:(sf "src/proto_%s/lib_tx_rollup" name_underscore)
+        ~synopsis:
+          "Tezos/Protocol: protocol specific library for `tezos-tx-rollup`"
         ~deps:
           [
             index;
@@ -3497,6 +3497,45 @@ end = struct
             tezos_shell;
             tezos_store;
             tezos_workers |> open_;
+          ]
+        ~inline_tests:ppx_inline_test
+        ~linkall:true
+    in
+    let _tx_rollup_client =
+      some_if (active && N.(number >= 013)) @@ fun () ->
+      public_exe
+        (sf "tezos-tx-rollup-client-%s" name_dash)
+        ~internal_name:(sf "main_tx_rollup_client_%s" name_underscore)
+        ~path:(sf "src/proto_%s/bin_tx_rollup_client" name_underscore)
+        ~synopsis:"Tezos/Protocol: `tezos-tx-rollup-client-alpha` client binary"
+        ~deps:
+          [
+            tezos_base |> open_ ~m:"TzPervasives"
+            |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
+            main |> open_;
+            client |> if_some |> open_;
+            tezos_client_base_unix |> open_;
+            tx_rollup |> if_some |> open_;
+            raw_protocol |> open_;
+          ]
+    in
+    let _tx_rollup_node =
+      some_if (active && N.(number >= 013)) @@ fun () ->
+      public_exe
+        (sf "tezos-tx-rollup-node-%s" name_dash)
+        ~internal_name:(sf "main_tx_rollup_node_%s" name_underscore)
+        ~path:(sf "src/proto_%s/bin_tx_rollup_node" name_underscore)
+        ~synopsis:"Tezos/Protocol: Transaction Rollup node binary"
+        ~deps:
+          [
+            tezos_base |> open_ ~m:"TzPervasives"
+            |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals"
+            |> open_;
+            main |> open_;
+            client |> if_some |> open_;
+            tezos_client_base |> open_;
+            tezos_client_base_unix |> open_;
+            tx_rollup |> if_some |> open_;
           ]
     in
     let benchmark_type_inference =

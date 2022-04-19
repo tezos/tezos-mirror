@@ -4,24 +4,23 @@
 (env (static (flags (:standard -ccopt -static))))
 
 (executable
- (name main_tx_rollup_node_013_PtJakart)
- (public_name tezos-tx-rollup-node-013-PtJakart)
- (package tezos-tx-rollup-node-013-PtJakart)
+ (name main_tx_rollup_client_013_PtJakart)
+ (public_name tezos-tx-rollup-client-013-PtJakart)
+ (package tezos-tx-rollup-client-013-PtJakart)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base
   tezos-protocol-013-PtJakart
   tezos-client-013-PtJakart
-  tezos-client-base
   tezos-client-base-unix
-  tezos-tx-rollup-013-PtJakart)
+  tezos-tx-rollup-013-PtJakart
+  tezos-protocol-013-PtJakart.raw)
  (flags
   (:standard
    -open Tezos_base.TzPervasives
    -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
-   -open Tezos_base
    -open Tezos_protocol_013_PtJakart
    -open Tezos_client_013_PtJakart
-   -open Tezos_client_base
    -open Tezos_client_base_unix
-   -open Tezos_tx_rollup_013_PtJakart)))
+   -open Tezos_tx_rollup_013_PtJakart
+   -open Tezos_raw_protocol_013_PtJakart)))
