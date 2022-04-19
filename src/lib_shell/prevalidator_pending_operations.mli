@@ -35,6 +35,9 @@ type priority = [`High | `Medium | `Low of Q.t list]
    [`High] priority first, followed by [`Medium] and finally [`Low] priority. *)
 type 'protocol_data t
 
+module Sized_set :
+  Tezos_base.Sized.SizedSet with type set := Operation_hash.Set.t
+
 (** The empty structure of pending operations. *)
 val empty : 'protocol_data t
 

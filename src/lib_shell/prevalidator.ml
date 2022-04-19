@@ -668,7 +668,8 @@ module Make_s
             List.rev_map
               (fun op -> op.Prevalidation.hash)
               pv_shell.classification.applied_rev
-            @ (Operation_hash.Map.to_seq pv_shell.classification.prechecked
+            @ (Classification.Sized_map.to_seq
+                 pv_shell.classification.prechecked
               |> Seq.map fst |> List.of_seq);
           pending = Pending_ops.hashes pv_shell.pending;
         }
@@ -1248,7 +1249,8 @@ module Make
                reflect that. *)
             let prechecked_with_applied =
               if params#applied then
-                (Operation_hash.Map.bindings pv.shell.classification.prechecked
+                (Classification.Sized_map.bindings
+                   pv.shell.classification.prechecked
                 |> List.rev_map (fun (oph, op) ->
                        (oph, op.Prevalidation.protocol)))
                 @ applied
@@ -1301,7 +1303,7 @@ module Make
                handled the same way for the user point of view. *)
             let prechecked =
               if params#applied then
-                Operation_hash.Map.fold
+                Classification.Sized_map.fold
                   (fun hash op acc ->
                     (hash, op.Prevalidation.protocol, []) :: acc)
                   pv.shell.classification.prechecked
