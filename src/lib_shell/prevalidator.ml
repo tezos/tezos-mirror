@@ -664,18 +664,20 @@ module Make_s
       in
       advertise pv_shell mempool_to_advertise ;
       let our_mempool =
+        let rev_prechecked_hashes =
+          Classification.Sized_map.fold
+            (fun x _ acc -> x :: acc)
+            pv_shell.classification.prechecked
+            []
+        in
         {
-          (* Using List.rev_map is ok since the size of pv.shell.classification.applied
-             cannot be too big. *)
           (* FIXME: https://gitlab.com/tezos/tezos/-/issues/2065
              This field does not only contain valid operation *)
           Mempool.known_valid =
-            List.rev_map
-              (fun op -> op.Prevalidation.hash)
-              pv_shell.classification.applied_rev
-            @ (Classification.Sized_map.to_seq
-                 pv_shell.classification.prechecked
-              |> Seq.map fst |> List.of_seq);
+            List.fold_left
+              (fun acc op -> op.Prevalidation.hash :: acc)
+              (List.rev rev_prechecked_hashes)
+              pv_shell.classification.applied_rev;
           pending = Pending_ops.hashes pv_shell.pending;
         }
       in
@@ -1261,11 +1263,10 @@ module Make
                reflect that. *)
             let prechecked_with_applied =
               if params#applied then
-                (Classification.Sized_map.bindings
-                   pv.shell.classification.prechecked
-                |> List.rev_map (fun (oph, op) ->
-                       (oph, op.Prevalidation.protocol)))
-                @ applied
+                Classification.Sized_map.fold
+                  (fun oph op acc -> (oph, op.Prevalidation.protocol) :: acc)
+                  pv.shell.classification.prechecked
+                  applied
               else applied
             in
             let pending_operations =
