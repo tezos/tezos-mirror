@@ -489,53 +489,6 @@ module Infer_cmd = struct
       infer_handler
 end
 
-module Cull_outliers_cmd = struct
-  (* ----------------------------------------------------------------------- *)
-  (* Handling options for the "cull outliers" command *)
-
-  let cull_handler () workload_data sigmas save_file () =
-    let nsigmas =
-      match float_of_string_opt sigmas with
-      | Some s -> s
-      | None ->
-          Printf.eprintf "Could not parse back float value for nsigmas.\n" ;
-          exit 1
-    in
-    commandline_outcome_ref :=
-      Some (Cull_outliers {workload_data; nsigmas; save_file}) ;
-    Lwt.return_ok ()
-
-  let options = Clic.no_options
-
-  let params =
-    Clic.(
-      prefixes ["remove"; "outliers"; "from"; "data"]
-      @@ string
-           ~name:"WORKLOAD-DATA-FILE-IN"
-           ~desc:"File containing input workload data"
-      @@ prefixes ["above"]
-      @@ string
-           ~name:"SIGMAS"
-           ~desc:
-             "Standard deviations around the mean above which data will be \
-              culled"
-      @@ prefixes ["sigmas"]
-      @@ prefixes ["and"; "save"; "to"]
-      @@ string
-           ~name:"WORKLOAD-DATA-FILE-OUT"
-           ~desc:"File to which cleaned workload data will be saved"
-      @@ stop)
-
-  let group =
-    {
-      Clic.name = "cull_outlier";
-      title = "Command for removing outliers from raw data";
-    }
-
-  let command =
-    Clic.command ~group ~desc:"Cull outliers" options params cull_handler
-end
-
 module Codegen_cmd = struct
   (* ------------------------------------------------------------------------- *)
   (* Handling options for the "generate code" command *)
@@ -785,7 +738,6 @@ let all_commands =
   [
     Benchmark_cmd.command;
     Infer_cmd.command;
-    Cull_outliers_cmd.command;
     Codegen_cmd.command;
     Codegen_all_cmd.command;
   ]

@@ -86,11 +86,6 @@ type command =
       solver : string;
       infer_opts : infer_parameters_options;
     }
-  | Cull_outliers of {
-      workload_data : string;
-      nsigmas : float;
-      save_file : string;
-    }
   | Codegen of {
       solution : string;
       model_name : string;
