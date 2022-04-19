@@ -129,6 +129,15 @@ let compute_proof_after_hash ~max_proof_size ctxt parameters agreed proof
   let message_length =
     Data_encoding.Binary.length Tx_rollup_message.encoding message
   in
+  (* When considering “proof large enough to make a batch invalid,
+     even if truncated”, we actually need to take into consideration
+     the size of the message.
+
+     [max_proof_size] is the upper bound, but we need to make room for
+     the message itself. So the real limit for the proof size is
+     reduced to that end. This way, we save a bit of TPS compared to
+     just having a lower [max_proof_size] constant. *)
+  let max_proof_size = max_proof_size - message_length in
   let proof_is_too_long = Compare.Int.(proof_length > max_proof_size) in
   let before = match proof.before with `Node x -> x | `Value x -> x in
   let agreed_is_correct = Context_hash.(before = agreed) in
