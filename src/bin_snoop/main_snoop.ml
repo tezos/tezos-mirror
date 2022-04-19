@@ -335,12 +335,8 @@ and get_all_workload_data_files directory =
   in
   loop []
 
-let cull_outliers_cmd workload_data nsigmas save_file =
-  let measure = Measure.load ~filename:workload_data in
-  match measure with
-  | Measure.Measurement (bench, {bench_opts; workload_data; date = _}) ->
-      let workload_data = Measure.cull_outliers ~nsigmas workload_data in
-      Measure.save ~filename:save_file ~options:bench_opts ~bench ~workload_data
+(* To be removed in subsequent commit *)
+let cull_outliers_cmd _workload_data _nsigmas _save_file = assert false
 
 let codegen_cmd solution model_name codegen_options =
   let sol = Codegen.load_solution solution in

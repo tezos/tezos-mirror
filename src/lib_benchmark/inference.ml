@@ -28,9 +28,9 @@ open Costlang
 open Maths
 module NMap = Stats.Finbij.Make (Free_variable)
 
-type constrnt = Full of (Costlang.affine * quantity)
+type constrnt = Full of (Costlang.affine * measure)
 
-and quantity = Quantity of float
+and measure = Measure of vector
 
 (* Create a [matrix] overlay over a Python matrix.
    Note how we switch from row major to column major in
@@ -90,13 +90,14 @@ let line_list_to_ols (lines : constrnt list) =
   List.iteri
     (fun i line ->
       match line with
-      | Full (affine, Quantity qty) ->
+      | Full (affine, Measure vec) ->
           Free_variable.Sparse_vec.iter
             (fun variable multiplicity ->
               let dim = NMap.idx_exn nmap variable in
               inputs.(i).(dim) <- multiplicity)
             affine.linear_comb ;
-          outputs.(i).(0) <- qty -. affine.const)
+          let vec = Vector.map (fun qty -> qty -. affine.const) vec in
+          outputs.(i) <- vector_to_array vec)
     lines ;
   Tezos_stdlib_unix.Utils.display_progress_end () ;
   (matrix_of_array_array inputs, matrix_of_array_array outputs, nmap)
@@ -159,7 +160,7 @@ let compute_error_statistics ~(predicted : matrix) ~(measured : matrix) =
 
 let make_problem_from_workloads :
     type workload.
-    data:(workload * float) list ->
+    data:(workload * vector) list ->
     overrides:(Free_variable.t -> float option) ->
     evaluate:(workload -> Eval_to_vector.size Eval_to_vector.repr) ->
     problem =
@@ -179,12 +180,14 @@ let make_problem_from_workloads :
   (* This function has to _preserve the order of workloads_. *)
   let lines =
     List.fold_left
-      (fun lines (workload, time) ->
+      (fun lines (workload, measures) ->
         model_progress () ;
         let res = Eval_to_vector.prj (evaluate workload) in
         let res = Hash_cons_vector.prj res in
         let affine = Eval_linear_combination_impl.run overrides res in
-        let line = Full (affine, Quantity time) in
+        (* We hardcode determinization of the empirical timing distribution
+           using the median statistic. *)
+        let line = Full (affine, Measure measures) in
         line :: lines)
       []
       data
@@ -198,11 +201,11 @@ let make_problem_from_workloads :
       lines
   then
     let predicted, measured =
-      List.map (fun (Full (affine, Quantity q)) -> (affine.const, q)) lines
+      List.map (fun (Full (affine, Measure vec)) -> (affine.const, vec)) lines
       |> List.split
     in
     let measured =
-      matrix_of_array_array (Array.of_list (List.map (fun x -> [|x|]) measured))
+      matrix_of_array_array (Array.of_list (List.map vector_to_array measured))
     in
     let predicted =
       matrix_of_array_array
@@ -219,7 +222,9 @@ let make_problem :
     overrides:(Free_variable.t -> float option) ->
     problem =
  fun ~data ~model ~overrides ->
-  let data = List.map (fun {Measure.workload; qty} -> (workload, qty)) data in
+  let data =
+    List.map (fun {Measure.workload; measures} -> (workload, measures)) data
+  in
   match model with
   | Model.Packaged {conv; model} ->
       let module M = (val model) in
@@ -290,8 +295,13 @@ let solve_problem : problem -> solver -> solution =
   | Degenerate _ -> {mapping = []; weights = empty_matrix}
   | Non_degenerate {input; output; nmap; _} ->
       (* Scipy's solvers expect a column vector on output. *)
-      let cols = Linalg.Tensor.Int.numel @@ Matrix.cols output in
-      assert (cols = 1) ;
+      let output =
+        Matrix.of_col
+        @@ map_rows
+             (fun row ->
+               Stats.Emp.quantile (module Float) (vector_to_array row) 0.5)
+             output
+      in
       let input = to_scipy input in
       let output = to_scipy output in
       let weights =

@@ -111,6 +111,16 @@ type raw_row = {workload : (string * float) list; qty : float}
 (* Gnuplot interprets by default underscores as subscript symbols *)
 let underscore_to_dash = String.map (fun c -> if c = '_' then '-' else c)
 
+(* Workload contains all sample but by default, we only plot the median. *)
+let convert_workload_data :
+    (Sparse_vec.String.t * float array) list -> raw_row list =
+ fun workload_data ->
+  List.map
+    (fun (vec, qty) ->
+      let a = Stats.Emp.quantile (module Float) qty 0.5 in
+      {workload = Sparse_vec.String.to_list vec; qty = a})
+    workload_data
+
 let style opts i =
   let open Style in
   match i with
@@ -206,17 +216,11 @@ let plot_scatter opts title input_columns outputs =
    together with timings:
      [| 2879 ; 768 |] *)
 
-let convert_workload_data : (Sparse_vec.String.t * float) list -> raw_row list =
- fun workload_data ->
-  List.map
-    (fun (vec, qty) -> {workload = Sparse_vec.String.to_list vec; qty})
-    workload_data
-
-let empirical_data (workload_data : (Sparse_vec.String.t * float) list) =
+let empirical_data (workload_data : (Sparse_vec.String.t * float array) list) =
   let samples = convert_workload_data workload_data in
   (* Extract name of variables and check well-formedness *)
   let variables =
-    List.map (fun {workload; _} -> List.map fst workload) samples
+    List.rev_map (fun {workload; _} -> List.rev_map fst workload) samples
   in
   let variables = List.sort_uniq Stdlib.compare variables in
   match variables with
@@ -309,7 +313,7 @@ let validator opts (problem : Inference.problem) (solution : Inference.solution)
       in
       return plots
 
-let empirical opts (workload_data : (Sparse_vec.String.t * float) list) =
+let empirical opts (workload_data : (Sparse_vec.String.t * float array) list) =
   let open Result_syntax in
   if opts.reduced_plot_verbosity then return []
   else
@@ -368,7 +372,8 @@ let perform_plot ~measure ~model_name ~problem ~solution ~plot_target ~options =
   in
   let workload_data =
     List.map
-      (fun {Measure.workload; qty} -> (Bench.workload_to_vector workload, qty))
+      (fun {Measure.workload; measures} ->
+        (Bench.workload_to_vector workload, Maths.vector_to_array measures))
       measurement.workload_data
   in
   let try_plot kind plot_result =

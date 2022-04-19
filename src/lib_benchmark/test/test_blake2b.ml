@@ -43,8 +43,6 @@ let bench_opts =
   {
     seed = Some 1337;
     nsamples = 3000;
-    (* Percentile 50 = Median *)
-    determinizer = Percentile 50;
     bench_number = 100;
     minor_heap_size = `words (256 * 1024);
     config_dir = None;

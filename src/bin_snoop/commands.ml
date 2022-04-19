@@ -45,8 +45,6 @@ module Benchmark_cmd = struct
 
   let set_nsamples nsamples options = {options with nsamples}
 
-  let set_determinizer determinizer options = {options with determinizer}
-
   let set_save_file save_file options = {options with save_file}
 
   let set_csv_export csv_export (options : Cmdline.benchmark_options) =
@@ -66,7 +64,6 @@ module Benchmark_cmd = struct
       {
         seed = None;
         nsamples = 3000;
-        determinizer = Percentile 50;
         bench_number = 300;
         minor_heap_size = `words (256 * 1024);
         config_dir = None;
@@ -106,16 +103,10 @@ module Benchmark_cmd = struct
   (* "benchmark" command handler *)
 
   let benchmark_handler
-      ( det,
-        nsamples,
-        seed,
-        bench_number,
-        minor_heap_size,
-        config_dir,
-        csv_export ) bench_name save_file () =
+      (nsamples, seed, bench_number, minor_heap_size, config_dir, csv_export)
+      bench_name save_file () =
     let options =
       default_benchmark_options.options
-      |> lift_opt set_determinizer det
       |> lift_opt set_nsamples nsamples
       |> lift_opt set_seed seed
       |> lift_opt set_bench_number bench_number
@@ -131,34 +122,6 @@ module Benchmark_cmd = struct
     Lwt.return_ok ()
 
   module Options = struct
-    (* Sum type [mean| percentile [1-100]] argument --determinizer *)
-    let determinizer_arg =
-      let determinizer_arg_param =
-        Clic.parameter
-          ~autocomplete:(fun () -> Lwt.return_ok ["mean"; "percentile@[0-100]"])
-          (fun (_ : unit) parsed ->
-            match parsed with
-            | "mean" -> Lwt.return_ok Mean
-            | s -> (
-                let error () =
-                  Printf.eprintf "Wrong determinizer specification.\n" ;
-                  exit 1
-                in
-                match String.split_on_char '@' s with
-                | ["percentile"; i] ->
-                    let i =
-                      Option.value_f (int_of_string_opt i) ~default:error
-                    in
-                    if i < 1 || i > 100 then error ()
-                    else Lwt.return_ok (Percentile i)
-                | _ -> error ()))
-      in
-      Clic.arg
-        ~doc:"Method for determinizing empirical timing distribution"
-        ~long:"determinizer"
-        ~placeholder:"{mean | percentile@[1-100]}"
-        determinizer_arg_param
-
     (* Integer argument --nsamples *)
     let nsamples_arg =
       let nsamples_arg_param =
@@ -234,8 +197,7 @@ module Benchmark_cmd = struct
 
   let options =
     let open Options in
-    Clic.args7
-      determinizer_arg
+    Clic.args6
       nsamples_arg
       seed_arg
       bench_number_arg
