@@ -86,6 +86,10 @@ Node
   re-computed metadata are not stored on disk after this call, they are
   just returned.
 
+- Added ``--progress-display-mode`` option to the ``tezos-node`` commands
+  that display progress animation. This option allows to redirect progress
+  animation to non-TTY file descriptors.
+
 Client
 ------
 
