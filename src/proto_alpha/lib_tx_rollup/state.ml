@@ -287,6 +287,40 @@ let tezos_block_already_processed state hash =
   let+ info = get_tezos_l2_block_hash state hash in
   Option.is_some info
 
+let get_included_commitment state commitment_hash =
+  let open Lwt_syntax in
+  let+ info =
+    Stores.Commitment_store.find state.stores.commitments commitment_hash
+  in
+  Option.map
+    (fun Stores.Commitment_store.{block; operation} ->
+      L2block.{block; operation})
+    info
+
+let set_commitment_included state commitment_hash block operation =
+  Stores.Commitment_store.add
+    state.stores.commitments
+    commitment_hash
+    Stores.Commitment_store.{block; operation}
+
+let get_block_metadata state (header : L2block.header) =
+  let open Lwt_syntax in
+  let+ commitment_included =
+    match header.commitment with
+    | None -> return_none
+    | Some c -> get_included_commitment state c
+  in
+  L2block.{commitment_included}
+
+let get_block_and_metadata state hash =
+  let open Lwt_syntax in
+  let* block = get_block state hash in
+  match block with
+  | None -> return_none
+  | Some block ->
+      let* metadata = get_block_metadata state block.header in
+      return_some (block, metadata)
+
 let check_origination_in_block_info rollup block_info =
   let extract_originated_tx_rollup :
       type kind. kind manager_operation_result -> Tx_rollup.t option = function

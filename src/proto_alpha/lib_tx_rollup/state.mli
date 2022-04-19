@@ -112,6 +112,19 @@ val get_level_l2_block : t -> L2block.level -> L2block.t option Lwt.t
 (** Returns [true] if the Tezos block was already processed by the rollup node. *)
 val tezos_block_already_processed : t -> Block_hash.t -> bool Lwt.t
 
+(** Returns the inclusion info for a commitment. *)
+val get_included_commitment :
+  t ->
+  Tx_rollup_commitment_hash.t ->
+  L2block.commitment_included_info option Lwt.t
+
+(** Retrieve an L2 block metadata from its header *)
+val get_block_metadata : t -> L2block.header -> L2block.metadata Lwt.t
+
+(** Retrieve an L2 block and associated metadata by its hash *)
+val get_block_and_metadata :
+  t -> L2block.hash -> (L2block.t * L2block.metadata) option Lwt.t
+
 (** {2 Saving the state to disk}  *)
 
 (** Set the current head of the rollup and return the blocks (hashes) that were
@@ -140,6 +153,14 @@ val save_tezos_block_info :
   L2block.hash ->
   level:int32 ->
   predecessor:Block_hash.t ->
+  unit Lwt.t
+
+(** Register a commitment as included on L1. *)
+val set_commitment_included :
+  t ->
+  Tx_rollup_commitment_hash.t ->
+  Block_hash.t ->
+  Operation_hash.t ->
   unit Lwt.t
 
 (** {2 Misc}  *)
