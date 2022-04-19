@@ -345,6 +345,50 @@ let get_ticket_hash_from_deposit (d : Rollup_node.Inbox.message) : string =
 let make_tx_rollup_deposit_argument txr1 tz4 =
   "( Pair " ^ "\"" ^ txr1 ^ "\" \"" ^ tz4 ^ "\")"
 
+(** Originate a contract and make a deposit for [dest] and optionally
+    for a list of destination in [dests]. *)
+let make_deposit ~prg ~tx_rollup_hash ~tx_node ~node ~client ?(dests = []) dest
+    =
+  let* contract_id =
+    Client.originate_contract
+      ~alias:"rollup_deposit"
+      ~amount:Tez.zero
+      ~src:"bootstrap1"
+      ~prg
+      ~init:"Unit"
+      ~burn_cap:Tez.(of_int 1)
+      client
+  in
+  let* level = Client.level client in
+  let* () = Client.bake_for client in
+  let level = succ level in
+  let* _ = Rollup_node.wait_for_tezos_level tx_node level in
+  Log.info
+    "The tx_rollup_deposit %s contract was successfully originated"
+    contract_id ;
+  let dests = dest :: dests in
+  Lwt_list.fold_left_s
+    (fun (tx_node, node, client, level) dest ->
+      let arg = make_tx_rollup_deposit_argument tx_rollup_hash dest in
+      let* () =
+        Client.transfer
+          ~gas_limit:100_000
+          ~fee:Tez.one
+          ~amount:Tez.zero
+          ~burn_cap:Tez.one
+          ~storage_limit:10_000
+          ~giver:Constant.bootstrap1.alias
+          ~receiver:contract_id
+          ~arg
+          client
+      in
+      let* () = Client.bake_for client in
+      let level = succ level in
+      let* _ = Rollup_node.wait_for_tezos_level tx_node level in
+      return (tx_node, node, client, level))
+    (tx_node, node, client, level)
+    dests
+
 (* FIXME/TORU: we should merge this into Tezos_crypto.Bls *)
 module Bls_public_key_hash = struct
   include
@@ -410,40 +454,17 @@ let test_ticket_deposit_from_l1_to_l2 =
       let* (tx_rollup_hash, tx_node) =
         init_and_run_rollup_node ~operator node client
       in
-      let* contract_id =
-        Client.originate_contract
-          ~alias:"rollup_deposit"
-          ~amount:Tez.zero
-          ~src:"bootstrap1"
-          ~prg:"file:./tezt/tests/contracts/proto_alpha/tx_rollup_deposit.tz"
-          ~init:"Unit"
-          ~burn_cap:Tez.(of_int 1)
-          client
-      in
-      let* () = Client.bake_for client in
-      let* _ = Node.wait_for_level node 3 in
-      Log.info
-        "The tx_rollup_deposit %s contract was successfully originated"
-        contract_id ;
       let (bls_pkh, _, _) = generate_bls_addr client in
       let bls_pkh_str = Bls_public_key_hash.to_b58check bls_pkh in
-      let arg = make_tx_rollup_deposit_argument tx_rollup_hash bls_pkh_str in
-      (* This smart contract call will transfer 100_000 tickets to the
-         given address. *)
-      let* () =
-        Client.transfer
-          ~gas_limit:100_000
-          ~fee:Tez.one
-          ~amount:Tez.zero
-          ~burn_cap:Tez.one
-          ~storage_limit:10_000
-          ~giver:"bootstrap1"
-          ~receiver:contract_id
-          ~arg
-          client
+      let* (tx_node, _node, _client, _level) =
+        make_deposit
+          ~prg:"file:./tezt/tests/contracts/proto_alpha/tx_rollup_deposit.tz"
+          ~tx_rollup_hash
+          ~tx_node
+          ~node
+          ~client
+          bls_pkh_str
       in
-      let* () = Client.bake_for client in
-      let* _ = Rollup_node.wait_for_tezos_level tx_node 4 in
       (* Get the operation containing the ticket transfer. We assume
          that only one operation is issued in this block. *)
       let* inbox = Rollup_node.Client.get_inbox ~tx_node ~block:"head" in
@@ -530,21 +551,6 @@ let test_l2_to_l2_transaction =
       let* (tx_rollup_hash, tx_node) =
         init_and_run_rollup_node ~operator node client
       in
-      let* contract_id =
-        Client.originate_contract
-          ~alias:"rollup_deposit"
-          ~amount:Tez.zero
-          ~src:"bootstrap1"
-          ~prg:"file:./tezt/tests/contracts/proto_alpha/tx_rollup_deposit.tz"
-          ~init:"Unit"
-          ~burn_cap:Tez.(of_int 1)
-          client
-      in
-      let* () = Client.bake_for client in
-      let* _ = Node.wait_for_level node 3 in
-      Log.info
-        "The tx_rollup_deposit %s contract was successfully originated"
-        contract_id ;
       (* Generating some identities *)
       let (bls_1_pkh, bls_pk_1, bls_sk_1) = generate_bls_addr client in
       let bls_pkh_1_str = Bls_public_key_hash.to_b58check bls_1_pkh in
@@ -553,24 +559,16 @@ let test_l2_to_l2_transaction =
       let bls_pkh_2_str = Bls_public_key_hash.to_b58check bls_2_pkh in
       let (bls_3_pkh, _, _) = generate_bls_addr client in
       let bls_pkh_3_str = Bls_public_key_hash.to_b58check bls_3_pkh in
-      let arg_1 =
-        make_tx_rollup_deposit_argument tx_rollup_hash bls_pkh_1_str
+      let* (tx_node, node, client, _level) =
+        make_deposit
+          ~prg:"file:./tezt/tests/contracts/proto_alpha/tx_rollup_deposit.tz"
+          ~tx_rollup_hash
+          ~tx_node
+          ~node
+          ~client
+          bls_pkh_1_str
+          ~dests:[bls_pkh_2_str]
       in
-      let* () =
-        Client.transfer
-          ~gas_limit:100_000
-          ~fee:Tez.one
-          ~amount:Tez.zero
-          ~burn_cap:Tez.one
-          ~storage_limit:10_000
-          ~giver:"bootstrap1"
-          ~receiver:contract_id
-          ~arg:arg_1
-          client
-      in
-      let* () = Client.bake_for client in
-      let* _ = Node.wait_for_level node 4 in
-      let* _ = Rollup_node.wait_for_tezos_level tx_node 4 in
       let* inbox = Rollup_node.Client.get_inbox ~tx_node ~block:"head" in
       let ticket_id = get_ticket_hash_from_deposit (List.hd inbox.contents) in
       Log.info "Ticket %s was successfully emitted" ticket_id ;
@@ -582,24 +580,6 @@ let test_l2_to_l2_transaction =
           ~tz4_address:bls_pkh_1_str
           ~expected_balance:100_000
       in
-      let arg_2 =
-        make_tx_rollup_deposit_argument tx_rollup_hash bls_pkh_2_str
-      in
-      let* () =
-        Client.transfer
-          ~gas_limit:100_000
-          ~fee:Tez.one
-          ~amount:Tez.zero
-          ~burn_cap:Tez.one
-          ~storage_limit:10_000
-          ~giver:"bootstrap1"
-          ~receiver:contract_id
-          ~arg:arg_2
-          client
-      in
-      let* () = Client.bake_for client in
-      let* _ = Node.wait_for_level node 5 in
-      let* _ = Rollup_node.wait_for_tezos_level tx_node 5 in
       let* () =
         check_tz4_balance
           ~tx_node
@@ -716,45 +696,23 @@ let test_batcher =
           node
           client
       in
-      let* contract_id =
-        Client.originate_contract
-          ~alias:"rollup_deposit"
-          ~amount:Tez.zero
-          ~src:"bootstrap1"
-          ~prg:"file:./tezt/tests/contracts/proto_alpha/tx_rollup_deposit.tz"
-          ~init:"Unit"
-          ~burn_cap:Tez.(of_int 1)
-          client
-      in
-      let* () = Client.bake_for client in
-      let* _ = Node.wait_for_level node 3 in
-      Log.info
-        "The tx_rollup_deposit %s contract was successfully originated"
-        contract_id ;
-      (* Genarating some identities *)
+      (* Generating some identities *)
       let (bls_1_pkh, bls_pk_1, bls_sk_1) = generate_bls_addr client in
       let bls_pkh_1_str = Bls_public_key_hash.to_b58check bls_1_pkh in
       (* FIXME/TORU: Use the client *)
       let (bls_2_pkh, bls_pk_2, bls_sk_2) = generate_bls_addr client in
       let bls_pkh_2_str = Bls_public_key_hash.to_b58check bls_2_pkh in
-      let arg_1 =
-        make_tx_rollup_deposit_argument tx_rollup_hash bls_pkh_1_str
+      let* (tx_node, _node, client, _level) =
+        make_deposit
+          ~prg:"file:./tezt/tests/contracts/proto_alpha/tx_rollup_deposit.tz"
+          ~tx_rollup_hash
+          ~tx_node
+          ~node
+          ~client
+          bls_pkh_1_str
+          ~dests:[bls_pkh_2_str]
       in
-      let* () =
-        Client.transfer
-          ~gas_limit:100_000
-          ~fee:Tez.one
-          ~amount:Tez.zero
-          ~burn_cap:Tez.one
-          ~storage_limit:10_000
-          ~giver:"bootstrap1"
-          ~receiver:contract_id
-          ~arg:arg_1
-          client
-      in
-      let* () = Client.bake_for client in
-      let* _ = Node.wait_for_level node 4 in
-      let* _ = Rollup_node.wait_for_tezos_level tx_node 4 in
+
       let* inbox = Rollup_node.Client.get_inbox ~tx_node ~block:"head" in
       let ticket_id = get_ticket_hash_from_deposit (List.hd inbox.contents) in
       Log.info "Ticket %s was successfully emitted" ticket_id ;
@@ -766,24 +724,6 @@ let test_batcher =
           ~tz4_address:bls_pkh_1_str
           ~expected_balance:100_000
       in
-      let arg_2 =
-        make_tx_rollup_deposit_argument tx_rollup_hash bls_pkh_2_str
-      in
-      let* () =
-        Client.transfer
-          ~gas_limit:100_000
-          ~fee:Tez.one
-          ~amount:Tez.zero
-          ~burn_cap:Tez.one
-          ~storage_limit:10_000
-          ~giver:"bootstrap3"
-          ~receiver:contract_id
-          ~arg:arg_2
-          client
-      in
-      let* () = Client.bake_for client in
-      let* _ = Node.wait_for_level node 5 in
-      let* _ = Rollup_node.wait_for_tezos_level tx_node 5 in
       let* () =
         check_tz4_balance
           ~tx_node
@@ -1004,44 +944,21 @@ let test_reorganization =
       let* (tx_rollup_hash, tx_node) =
         init_and_run_rollup_node ~operator node1 client1
       in
-      let* contract_id =
-        Client.originate_contract
-          ~alias:"rollup_deposit"
-          ~amount:Tez.zero
-          ~src:"bootstrap1"
-          ~prg:"file:./tezt/tests/contracts/proto_alpha/tx_rollup_deposit.tz"
-          ~init:"Unit"
-          ~burn_cap:Tez.(of_int 1)
-          client1
-      in
-      let* () = Client.bake_for client1 in
-      let* _ = Node.wait_for_level node1 3 in
-      Log.info
-        "The tx_rollup_deposit %s contract was successfully originated"
-        contract_id ;
-      (* Genarating some identities *)
+      (* Generating some identities *)
       let (bls_1_pkh, bls_pk_1, bls_sk_1) = generate_bls_addr client1 in
       let bls_pkh_1_str = Bls_public_key_hash.to_b58check bls_1_pkh in
       (* FIXME/TORU: Use the client *)
       let (bls_2_pkh, _, _) = generate_bls_addr client1 in
       let bls_pkh_2_str = Bls_public_key_hash.to_b58check bls_2_pkh in
-      let arg_1 =
-        make_tx_rollup_deposit_argument tx_rollup_hash bls_pkh_1_str
+      let* (tx_node, node1, client1, _level) =
+        make_deposit
+          ~prg:"file:./tezt/tests/contracts/proto_alpha/tx_rollup_deposit.tz"
+          ~tx_rollup_hash
+          ~tx_node
+          ~node:node1
+          ~client:client1
+          bls_pkh_1_str
       in
-      let* () =
-        Client.transfer
-          ~gas_limit:100_000
-          ~fee:Tez.one
-          ~amount:Tez.zero
-          ~burn_cap:Tez.one
-          ~storage_limit:10_000
-          ~giver:"bootstrap1"
-          ~receiver:contract_id
-          ~arg:arg_1
-          client1
-      in
-      let* () = Client.bake_for client1 in
-      let* _ = Node.wait_for_level node1 4 in
       let* _ = Rollup_node.wait_for_tezos_level tx_node 4 in
       let* inbox = Rollup_node.Client.get_inbox ~tx_node ~block:"head" in
       let ticket_id = get_ticket_hash_from_deposit (List.hd inbox.contents) in
@@ -1140,46 +1057,23 @@ let test_l2_proofs =
       let* (tx_rollup_hash, tx_node) =
         init_and_run_rollup_node ~operator node client
       in
-      let* contract_id =
-        Client.originate_contract
-          ~alias:"rollup_deposit"
-          ~amount:Tez.zero
-          ~src:"bootstrap1"
-          ~prg:"file:./tezt/tests/contracts/proto_alpha/tx_rollup_deposit.tz"
-          ~init:"Unit"
-          ~burn_cap:Tez.(of_int 1)
-          client
-      in
-      let* () = Client.bake_for client in
-      let* _ = Node.wait_for_level node 3 in
-      Log.info
-        "The tx_rollup_deposit %s contract was successfully originated"
-        contract_id ;
       (* Generating some identities *)
       let (pkh1, pk1, sk1) = generate_bls_addr client in
       let pkh1_str = Bls_public_key_hash.to_b58check pkh1 in
       let (pkh2, pk2, sk2) = generate_bls_addr client in
       let pkh2_str = Bls_public_key_hash.to_b58check pkh2 in
-      let arg = make_tx_rollup_deposit_argument tx_rollup_hash pkh1_str in
-      let* () =
-        Client.transfer
-          ~gas_limit:100_000
-          ~fee:Tez.one
-          ~amount:Tez.zero
-          ~burn_cap:Tez.one
-          ~storage_limit:10_000
-          ~giver:"bootstrap1"
-          ~receiver:contract_id
-          ~arg
-          client
+      let* (tx_node, node, client, _level) =
+        make_deposit
+          ~prg:"file:./tezt/tests/contracts/proto_alpha/tx_rollup_deposit.tz"
+          ~tx_rollup_hash
+          ~tx_node
+          ~node
+          ~client
+          pkh1_str
       in
-      let* () = Client.bake_for client in
-      let* _ = Node.wait_for_level node 4 in
-      let* _ = Rollup_node.wait_for_tezos_level tx_node 4 in
       let* inbox = Rollup_node.Client.get_inbox ~tx_node ~block:"head" in
       let ticket_id = get_ticket_hash_from_deposit (List.hd inbox.contents) in
       Log.info "Ticket %s was successfully emitted" ticket_id ;
-      (* TODO: commitment here *)
       Log.info "Crafting a commitment for the deposit" ;
       let*! inbox_opt =
         Rollup.get_inbox ~rollup:tx_rollup_hash ~level:0 client
