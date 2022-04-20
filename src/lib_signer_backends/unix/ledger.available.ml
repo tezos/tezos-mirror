@@ -574,10 +574,14 @@ let nano_s_product_ids = [0x0001] @ (0x1000 -- 0x101f)
 
 let nano_x_product_ids = [0x0004] @ (0x4000 -- 0x401f)
 
+let nano_s_plus_product_ids = [0x0005] @ (0x5000 -- 0x501f)
+
 let use_ledger ?(filter : Filter.t = `None) f =
   let open Lwt_result_syntax in
   let ledgers =
-    let all_product_ids = nano_s_product_ids @ nano_x_product_ids in
+    let all_product_ids =
+      nano_s_product_ids @ nano_x_product_ids @ nano_s_plus_product_ids
+    in
     let open Hidapi in
     List.filter
       (fun hid -> List.mem ~equal:Int.equal hid.product_id all_product_ids)

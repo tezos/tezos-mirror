@@ -128,6 +128,8 @@ Signer
   one. Option ``--password-file`` which actually was a complete no-op
   has been removed.
 
+- Added support for Ledger Nano S plus devices
+
 Proxy server
 ------------
 
