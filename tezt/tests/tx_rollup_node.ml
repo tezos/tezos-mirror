@@ -129,9 +129,10 @@ let test_node_configuration =
       in
       unit)
 
-let init_and_run_rollup_node ~operator ?batch_signer ?finalize_commitment_signer
-    ?remove_commitment_signer ?rejection_signer node client =
-  let*! tx_rollup_hash = Client.Tx_rollup.originate ~src:operator client in
+let init_and_run_rollup_node ~originator ?operator ?batch_signer
+    ?finalize_commitment_signer ?remove_commitment_signer ?rejection_signer node
+    client =
+  let*! tx_rollup_hash = Client.Tx_rollup.originate ~src:originator client in
   let* () = Client.bake_for client in
   let* _ = Node.wait_for_level node 2 in
   Log.info "Tx_rollup %s was successfully originated" tx_rollup_hash ;
@@ -140,7 +141,7 @@ let init_and_run_rollup_node ~operator ?batch_signer ?finalize_commitment_signer
     Rollup_node.create
       ~rollup_id:tx_rollup_hash
       ~rollup_genesis:block_hash
-      ~operator
+      ?operator
       ?batch_signer
       ?finalize_commitment_signer
       ?remove_commitment_signer
@@ -166,8 +167,8 @@ let test_tx_node_origination =
       let* (node, client) =
         Client.init_with_protocol ~parameter_file `Client ~protocol ()
       in
-      let operator = Constant.bootstrap1.public_key_hash in
-      let* _tx_node = init_and_run_rollup_node ~operator node client in
+      let originator = Constant.bootstrap1.public_key_hash in
+      let* _tx_node = init_and_run_rollup_node ~originator node client in
       unit)
 
 (*FIXME/TORU: add additional checks such as contents, context_hash, …*)
@@ -232,7 +233,11 @@ let test_tx_node_store_inbox =
       (* Submit a batch *)
       let (`Batch content) = Rollup.make_batch "tezos_l2_batch_1" in
       let*! () =
-        Client.Tx_rollup.submit_batch ~content ~rollup ~src:operator client
+        Client.Tx_rollup.submit_batch
+          ~content
+          ~rollup
+          ~src:Constant.bootstrap2.public_key_hash
+          client
       in
       let* () = Client.bake_for client in
       let* _ = Node.wait_for_level node 3 in
@@ -250,7 +255,11 @@ let test_tx_node_store_inbox =
            Computed %L" ;
       let (`Batch content) = Rollup.make_batch "tezos_l2_batch_2" in
       let*! () =
-        Client.Tx_rollup.submit_batch ~content ~rollup ~src:operator client
+        Client.Tx_rollup.submit_batch
+          ~content
+          ~rollup
+          ~src:Constant.bootstrap2.public_key_hash
+          client
       in
       let* () = Client.bake_for client in
       let* _ = Node.wait_for_level node 4 in
@@ -510,7 +519,7 @@ let test_ticket_deposit_from_l1_to_l2 =
       in
       let operator = Constant.bootstrap1.public_key_hash in
       let* (tx_rollup_hash, tx_node) =
-        init_and_run_rollup_node ~operator node client
+        init_and_run_rollup_node ~originator:operator node client
       in
       let tx_client = Tx_rollup_client.create tx_node in
       let* contract_id =
@@ -632,9 +641,9 @@ let test_l2_to_l2_transaction =
       let* (node, client) =
         Client.init_with_protocol ~parameter_file `Client ~protocol ()
       in
-      let operator = Constant.bootstrap1.public_key_hash in
+      let originator = Constant.bootstrap1.public_key_hash in
       let* (tx_rollup_hash, tx_node) =
-        init_and_run_rollup_node ~operator node client
+        init_and_run_rollup_node ~originator node client
       in
       let tx_client = Tx_rollup_client.create tx_node in
       let* contract_id =
@@ -750,7 +759,7 @@ let test_l2_to_l2_transaction =
         Client.Tx_rollup.submit_batch
           ~content:(Hex.of_string batch)
           ~rollup:tx_rollup_hash
-          ~src:operator
+          ~src:Constant.bootstrap2.public_key_hash
           client
       in
       Log.info "Baking the batch" ;
@@ -866,13 +875,13 @@ let get_ticket_hash_from_op op =
 
 (** Originate a contract and make a deposit for [dest] and optionally
     for a list of destination in [dests]. *)
-let make_deposit ~tx_rollup_hash ~tx_node ~node ~client ?(dests = [])
+let make_deposit ~source ~tx_rollup_hash ~tx_node ~node ~client ?(dests = [])
     ~tickets_amount dest =
   let* contract_id =
     Client.originate_contract
       ~alias:"rollup_deposit"
       ~amount:Tez.zero
-      ~src:"bootstrap1"
+      ~src:source
       ~prg:"file:./tezt/tests/contracts/proto_alpha/tx_rollup_deposit.tz"
       ~init:"Unit"
       ~burn_cap:Tez.(of_int 1)
@@ -903,7 +912,7 @@ let make_deposit ~tx_rollup_hash ~tx_node ~node ~client ?(dests = [])
           ~amount:Tez.zero
           ~burn_cap:Tez.one
           ~storage_limit:10_000
-          ~giver:Constant.bootstrap1.alias
+          ~giver:source
           ~receiver:contract_id
           ~arg
           client
@@ -928,8 +937,10 @@ let test_batcher =
         Client.init_with_protocol ~parameter_file `Client ~protocol ()
       in
       let operator = Constant.bootstrap1.public_key_hash in
+      let originator = Constant.bootstrap2.public_key_hash in
       let* (tx_rollup_hash, tx_node) =
         init_and_run_rollup_node
+          ~originator
           ~operator
           ~batch_signer:Constant.bootstrap5.public_key_hash
           ~finalize_commitment_signer:Constant.bootstrap4.public_key_hash
@@ -947,6 +958,7 @@ let test_batcher =
       let bls_pk_2 = bls_key_2.aggregate_public_key in
       let* (tx_node, _node, client, _level) =
         make_deposit
+          ~source:Constant.bootstrap2.public_key_hash
           ~tx_rollup_hash
           ~tx_node
           ~node
@@ -1206,7 +1218,7 @@ let test_reorganization =
       in
       let operator = Constant.bootstrap1.public_key_hash in
       let* (tx_rollup_hash, tx_node) =
-        init_and_run_rollup_node ~operator node1 client1
+        init_and_run_rollup_node ~originator:operator node1 client1
       in
       let tx_client = Tx_rollup_client.create tx_node in
       (* Genarating some identities *)
@@ -1218,6 +1230,7 @@ let test_reorganization =
       let bls_pkh_2 = bls_key_2.aggregate_public_key_hash in
       let* (tx_node, node1, client1, _level) =
         make_deposit
+          ~source:Constant.bootstrap2.public_key_hash
           ~tx_rollup_hash
           ~tx_node
           ~node:node1
@@ -1268,7 +1281,7 @@ let test_reorganization =
         Client.Tx_rollup.submit_batch
           ~content:(Hex.of_string batch)
           ~rollup:tx_rollup_hash
-          ~src:operator
+          ~src:Constant.bootstrap2.public_key_hash
           client1
       in
       let* () = Client.bake_for client1 in
@@ -1331,8 +1344,9 @@ let test_l2_proof_rpc_position =
         Client.init_with_protocol ~parameter_file `Client ~protocol ()
       in
       let operator = Constant.bootstrap1.public_key_hash in
+      let originator = Constant.bootstrap2.public_key_hash in
       let* (tx_rollup_hash, tx_node) =
-        init_and_run_rollup_node ~operator node client
+        init_and_run_rollup_node ~originator node client
       in
       let tx_client = Tx_rollup_client.create tx_node in
       (* Generating some identities *)
@@ -1346,6 +1360,7 @@ let test_l2_proof_rpc_position =
       let bls_sk_2 = bls_key_2.aggregate_secret_key in
       let* (tx_node, node, client, _level) =
         make_deposit
+          ~source:Constant.bootstrap2.public_key_hash
           ~tx_rollup_hash
           ~tx_node
           ~node
@@ -1566,15 +1581,16 @@ let test_reject_bad_commitment =
       let* (node, client) =
         Client.init_with_protocol ~parameter_file `Client ~protocol ()
       in
-      let operator = Constant.bootstrap1.public_key_hash in
+      let originator = Constant.bootstrap1.public_key_hash in
       let* (tx_rollup_hash, tx_node) =
-        init_and_run_rollup_node ~operator node client
+        init_and_run_rollup_node ~originator node client
       in
       (* Generating some identities *)
       let* bls_key1 = generate_bls_addr ~alias:"alice" client in
       let pkh1_str = bls_key1.aggregate_public_key_hash in
       let* (tx_node, _node, client, _level) =
         make_deposit
+          ~source:Constant.bootstrap2.public_key_hash
           ~tx_rollup_hash
           ~tx_node
           ~node
@@ -1619,7 +1635,7 @@ let test_reject_bad_commitment =
       in
       let*! () =
         Client.Tx_rollup.submit_rejection
-          ~src:operator
+          ~src:Constant.bootstrap4.public_key_hash
           ~proof
           ~rollup:tx_rollup_hash
           ~level:0
