@@ -62,3 +62,8 @@ val current_request :
   option
 
 val pipeline_length : t -> Peer_validator_worker_state.pipeline_length
+
+module Internal_for_tests : sig
+  val validate_new_head :
+    t -> Block_hash.t -> Block_header.t -> (unit, error trace) result Lwt.t
+end

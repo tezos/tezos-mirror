@@ -59,6 +59,10 @@ Node
 - Fixed a wrong behavior that could cause the savepoint to be dragged
   too early.
 
+- Fixed a memory leak where some operations were not cleaned up. This problem
+  occurred occasionally, when during the fetching the operation of some block,
+  the node changed his head.
+
 - The node context storage format was upgraded. To this end, a new storage
   version was introduced: 0.0.8 (previously 0.0.7). Upgrading from 0.0.7 to
   0.0.8 is done automatically by the node the first time you run it. This

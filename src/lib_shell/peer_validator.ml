@@ -148,7 +148,7 @@ let only_if_fitness_increases w distant_header hash cont =
   let* known_valid = Store.Block.is_known_valid chain_store hash in
   if known_valid then (
     pv.last_validated_head <- distant_header ;
-    return_ok_unit)
+    cont `Known_valid)
   else
     let* current_head = Store.Chain.current_head chain_store in
     if
@@ -163,8 +163,8 @@ let only_if_fitness_increases w distant_header hash cont =
         Distributed_db.get_peer_metadata pv.parameters.chain_db pv.peer_id
       in
       Peer_metadata.incr meta Old_heads ;
-      return_ok_unit)
-    else cont ()
+      cont `Lower_fitness)
+    else cont `Ok
 
 let validate_new_head w hash (header : Block_header.t) =
   let open Lwt_result_syntax in
@@ -185,42 +185,57 @@ let validate_new_head w hash (header : Block_header.t) =
   in
   (* We redo a check for the fitness here because while waiting for the
      operations, a new head better than this block might be validated. *)
-  only_if_fitness_increases w header hash @@ fun () ->
-  let*! () =
-    Worker.log_event w (Requesting_new_head_validation block_received)
-  in
-  let*! v =
-    Block_validator.validate
-      ~notify_new_block:pv.parameters.notify_new_block
-      ~precheck_and_notify:true
-      pv.parameters.block_validator
-      pv.parameters.chain_db
-      hash
-      header
-      operations
-  in
-  match v with
-  | Invalid errs ->
-      (* This will convert into a kickban when treated by [on_error] --
-         or, at least, by a worker termination which will close the
-         connection. *)
-      Lwt.return_error errs
-  | Invalid_after_precheck _errs ->
+  only_if_fitness_increases w header hash @@ function
+  | `Known_valid | `Lower_fitness ->
+      (* If the block is known valid or if the fitness does not increase
+         we need to clear the fetched operation of the block from the ddb *)
+      List.iter
+        (fun i ->
+          Distributed_db.Operations.clear_or_cancel
+            pv.parameters.chain_db
+            (hash, i))
+        (0 -- (header.shell.validation_passes - 1)) ;
+      return_unit
+  | `Ok -> (
       let*! () =
-        Worker.log_event w (Ignoring_prechecked_invalid_block block_received)
+        Worker.log_event w (Requesting_new_head_validation block_received)
       in
-      (* We do not kickban the peer if the block received was
-         successfully prechecked but invalid -- this means that he
-         could have propagated a precheckable block before terminating
-         its validation *)
-      return_unit
-  | Valid ->
-      let*! () = Worker.log_event w (New_head_validation_end block_received) in
-      let meta =
-        Distributed_db.get_peer_metadata pv.parameters.chain_db pv.peer_id
+      let*! v =
+        Block_validator.validate
+          ~notify_new_block:pv.parameters.notify_new_block
+          ~precheck_and_notify:true
+          pv.parameters.block_validator
+          pv.parameters.chain_db
+          hash
+          header
+          operations
       in
-      Peer_metadata.incr meta Valid_blocks ;
-      return_unit
+      match v with
+      | Invalid errs ->
+          (* This will convert into a kickban when treated by [on_error] --
+             or, at least, by a worker termination which will close the
+             connection. *)
+          Lwt.return_error errs
+      | Invalid_after_precheck _errs ->
+          let*! () =
+            Worker.log_event
+              w
+              (Ignoring_prechecked_invalid_block block_received)
+          in
+          (* We do not kickban the peer if the block received was
+             successfully prechecked but invalid -- this means that he
+             could have propagated a precheckable block before terminating
+             its validation *)
+          return_unit
+      | Valid ->
+          let*! () =
+            Worker.log_event w (New_head_validation_end block_received)
+          in
+          let meta =
+            Distributed_db.get_peer_metadata pv.parameters.chain_db pv.peer_id
+          in
+          Peer_metadata.incr meta Valid_blocks ;
+          return_unit)
 
 let assert_acceptable_head w hash (header : Block_header.t) =
   let open Lwt_result_syntax in
@@ -274,9 +289,11 @@ let may_validate_new_head w hash (header : Block_header.t) =
       () ;
     return_unit)
   else
-    only_if_fitness_increases w header hash @@ fun () ->
-    let* () = assert_acceptable_head w hash header in
-    validate_new_head w hash header
+    only_if_fitness_increases w header hash @@ function
+    | `Known_valid | `Lower_fitness -> return_unit
+    | `Ok ->
+        let* () = assert_acceptable_head w hash header in
+        validate_new_head w hash header
 
 let may_validate_new_branch w locator =
   let open Lwt_result_syntax in
@@ -286,38 +303,42 @@ let may_validate_new_branch w locator =
       =
     locator
   in
-  only_if_fitness_increases w distant_header distant_hash @@ fun () ->
-  let* () = assert_acceptable_head w distant_hash distant_header in
-  let chain_store = Distributed_db.chain_store pv.parameters.chain_db in
-  (* TODO: should we consider level as well ? Rolling could have
-     difficulties boostrapping. *)
-  let block_received = {Event.peer = pv.peer_id; hash = distant_hash} in
-  let*! v =
-    Block_locator.unknown_prefix
-      ~is_known:(Store.Block.validity chain_store)
-      locator
-  in
-  match v with
-  | (Known_valid, prefix_locator) ->
-      if prefix_locator.Block_locator.history <> [] then
-        bootstrap_new_branch w prefix_locator
-      else return_unit
-  | (Unknown, _) ->
-      (* May happen when:
-         - A locator from another chain is received;
-         - A rolling peer is too far ahead;
-         - In rolling mode when the step is too wide. *)
-      let*! () =
-        Worker.log_event
-          w
-          (Ignoring_branch_without_common_ancestor block_received)
+  only_if_fitness_increases w distant_header distant_hash @@ function
+  | `Known_valid | `Lower_fitness -> return_unit
+  | `Ok -> (
+      let* () = assert_acceptable_head w distant_hash distant_header in
+      let chain_store = Distributed_db.chain_store pv.parameters.chain_db in
+      (* TODO: should we consider level as well ? Rolling could have
+         difficulties boostrapping. *)
+      let block_received = {Event.peer = pv.peer_id; hash = distant_hash} in
+      let*! v =
+        Block_locator.unknown_prefix
+          ~is_known:(Store.Block.validity chain_store)
+          locator
       in
-      tzfail Validation_errors.Unknown_ancestor
-  | (Known_invalid, _) ->
-      let*! () =
-        Worker.log_event w (Ignoring_branch_with_invalid_locator block_received)
-      in
-      tzfail (Validation_errors.Invalid_locator (pv.peer_id, locator))
+      match v with
+      | (Known_valid, prefix_locator) ->
+          if prefix_locator.Block_locator.history <> [] then
+            bootstrap_new_branch w prefix_locator
+          else return_unit
+      | (Unknown, _) ->
+          (* May happen when:
+             - A locator from another chain is received;
+             - A rolling peer is too far ahead;
+             - In rolling mode when the step is too wide. *)
+          let*! () =
+            Worker.log_event
+              w
+              (Ignoring_branch_without_common_ancestor block_received)
+          in
+          tzfail Validation_errors.Unknown_ancestor
+      | (Known_invalid, _) ->
+          let*! () =
+            Worker.log_event
+              w
+              (Ignoring_branch_with_invalid_locator block_received)
+          in
+          tzfail (Validation_errors.Invalid_locator (pv.peer_id, locator)))
 
 let on_no_request w =
   let open Lwt_syntax in
@@ -538,3 +559,10 @@ let current_request t = Worker.current_request t
 let pipeline_length w =
   let state = Worker.state w in
   Types.pipeline_length state.pipeline
+
+module Internal_for_tests = struct
+  let validate_new_head (t : t) block_hash block_header =
+    let open Lwt_result_syntax in
+    let* () = validate_new_head t block_hash block_header in
+    return_unit
+end
