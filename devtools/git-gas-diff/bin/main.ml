@@ -76,9 +76,9 @@ module Decimal = struct
 
   (* A decimal is represented by its value without decimals (an integer), and
      the number of decimals. *)
-  type t = { value : Big_int.big_int; decimals : int }
+  type t = {value : Big_int.big_int; decimals : int}
 
-  let of_int i = { value = Big_int.big_int_of_int i; decimals = 0 }
+  let of_int i = {value = Big_int.big_int_of_int i; decimals = 0}
 
   let zero = of_int 0
 
@@ -90,39 +90,39 @@ module Decimal = struct
      number of zeros to the one with the fewest decimals.
      This eases some operations on decimal numbers (such as the sum). *)
   let scale r1 r2 =
-    let { value = value1; decimals = decimals1 } = r1 in
-    let { value = value2; decimals = decimals2 } = r2 in
+    let {value = value1; decimals = decimals1} = r1 in
+    let {value = value2; decimals = decimals2} = r2 in
     let decimals = max decimals1 decimals2 in
     let pow10 = abs (decimals1 - decimals2) in
     let scale_value v = Big_int.(v * power_int_positive_int 10 pow10) in
-    let value1, value2 =
+    let (value1, value2) =
       if decimals1 >= decimals2 then (value1, scale_value value2)
       else (scale_value value1, value2)
     in
     (value1, value2, decimals)
 
   let add r1 r2 =
-    let value1, value2, decimals = scale r1 r2 in
-    { value = Big_int.add_big_int value1 value2; decimals }
+    let (value1, value2, decimals) = scale r1 r2 in
+    {value = Big_int.add_big_int value1 value2; decimals}
 
-  let opp r = { r with value = Big_int.minus_big_int r.value }
+  let opp r = {r with value = Big_int.minus_big_int r.value}
 
   let sub r1 r2 = add r1 (opp r2)
 
   let mul r1 r2 =
-    let { value = value1; decimals = decimals1 } = r1 in
-    let { value = value2; decimals = decimals2 } = r2 in
+    let {value = value1; decimals = decimals1} = r1 in
+    let {value = value2; decimals = decimals2} = r2 in
     {
       value = Big_int.mult_big_int value1 value2;
       decimals = decimals1 + decimals2;
     }
 
   let ge r1 r2 =
-    let value1, value2, _decimals = scale r1 r2 in
+    let (value1, value2, _decimals) = scale r1 r2 in
     Big_int.ge_big_int value1 value2
 
   let gt r1 r2 =
-    let value1, value2, _decimals = scale r1 r2 in
+    let (value1, value2, _decimals) = scale r1 r2 in
     Big_int.gt_big_int value1 value2
 
   let re = Re.Posix.re "([0-9]+)(\\.([0-9]*))?"
@@ -136,11 +136,11 @@ module Decimal = struct
     let dec_part = Option.value ~default:"" (Group.get_opt group 3) in
     let+ value = Big_int.big_int_of_string_opt (int_part ^ dec_part) in
     let decimals = String.length dec_part in
-    { value; decimals }
+    {value; decimals}
 
-  let to_string { value; decimals } =
+  let to_string {value; decimals} =
     let pow10 = Big_int.power_int_positive_int 10 decimals in
-    let int_part, dec_part = Big_int.quomod_big_int value pow10 in
+    let (int_part, dec_part) = Big_int.quomod_big_int value pow10 in
     let int_part = Big_int.string_of_big_int int_part in
     let dec_part =
       if Big_int.(eq_big_int dec_part zero_big_int) then ""
@@ -166,9 +166,9 @@ module Decimal = struct
      reference value [ref_v], close to the lower percent. *)
   let pct v ref_v =
     let open Big_int in
-    let v, ref_v, _decimals = scale v ref_v in
+    let (v, ref_v, _decimals) = scale v ref_v in
     let v = mult_big_int v (big_int_of_int 100) in
-    try Some { value = div_big_int v ref_v; decimals = 0 }
+    try Some {value = div_big_int v ref_v; decimals = 0}
     with Division_by_zero -> None
 end
 
@@ -211,10 +211,10 @@ module Synth = struct
 
   (* The synthesis associated to a kind that has an amount for parameter. *)
   type synth = {
-    old : Decimal.t;
     (* The accumulated amount from deleted lines. *)
-    new_ : Decimal.t;
+    old : Decimal.t;
     (* The accumulated amount from added lines. *)
+    new_ : Decimal.t;
     (* The maximum amount loss on a line (with regards to [dir] below). *)
     max_loss : Decimal.t;
     (* The maximum amount loss in percentage on a line (with regards to [dir]
@@ -228,8 +228,8 @@ module Synth = struct
     (* The number of lines with a degradation (with regards to [dir] below).
       *)
     degradations : int;
-    total : int;
     (* Total number of lines changed. *)
+    total : int;
     (* Whether an amelioration is seen when the amount increases or decreases.
      *)
     win : dir;
@@ -254,17 +254,17 @@ module Synth = struct
 
   let fee_str = "fee = "
 
-  let hash_strs = [ "PUBLIC_KEY_HASH"; "CONTRACT_HASH" ]
+  let hash_strs = ["PUBLIC_KEY_HASH"; "CONTRACT_HASH"]
 
-  let operation_hash_strs = [ "Operation hash" ]
+  let operation_hash_strs = ["Operation hash"]
 
-  let tezos_client_strs = [ "tezos-client" ]
+  let tezos_client_strs = ["tezos-client"]
 
-  let new_contract_strs = [ "New contract" ]
+  let new_contract_strs = ["New contract"]
 
-  let to_strs = [ "To: " ]
+  let to_strs = ["To: "]
 
-  let parameter_strs = [ "Parameter: " ]
+  let parameter_strs = ["Parameter: "]
 
   let empty_synth str win =
     {
@@ -318,11 +318,16 @@ module Synth = struct
        %!"
       str
       (match win with Dec -> "dec" | Inc -> "inc")
-      (to_string old) (to_string new_) win_loss percent (to_string max_loss)
+      (to_string old)
+      (to_string new_)
+      win_loss
+      percent
+      (to_string max_loss)
       (string_of_max_pct max_loss_pct)
       (to_string max_gain)
       (string_of_max_pct max_gain_pct)
-      total degradations
+      total
+      degradations
 
   let get_diff = function '-' -> Some Removed | '+' -> Some Added | _ -> None
 
@@ -335,7 +340,7 @@ module Synth = struct
     (* Lets's leave this line below out of the function so that the expression
        is compiled only once for each [get_*], and not every time we call
        [get_dec]. *)
-    let re = Re.(compile (seq [ str sub; group Decimal.re ])) in
+    let re = Re.(compile (seq [str sub; group Decimal.re])) in
     fun line ->
       let* re = Re.exec_opt re line in
       let* dec_str = Re.Group.get_opt re 1 in
@@ -455,28 +460,28 @@ module Synths = struct
       if length = 0 then Garbage
       else
         match (get_diff line.[0], get_kind line) with
-        | None, _ -> Garbage
-        | Some _, _ when is_git_garbage -> Garbage
-        | Some _, None -> Unsupported
-        | Some diff, Some kind -> Diff (diff, kind)
+        | (None, _) -> Garbage
+        | (Some _, _) when is_git_garbage -> Garbage
+        | (Some _, None) -> Unsupported
+        | (Some diff, Some kind) -> Diff (diff, kind)
 
   let same_kind kind1 kind2 =
     match (kind1, kind2) with
-    | Estimated _, Estimated _
-    | Consumed _, Consumed _
-    | Gas_remaining _, Gas_remaining _
-    | Gas_limit _, Gas_limit _
-    | Remaining_gas _, Remaining_gas _
-    | Baker_fee _, Baker_fee _
-    | Payload_fee _, Payload_fee _
-    | Fee _, Fee _
-    | Hash, Hash ->
+    | (Estimated _, Estimated _)
+    | (Consumed _, Consumed _)
+    | (Gas_remaining _, Gas_remaining _)
+    | (Gas_limit _, Gas_limit _)
+    | (Remaining_gas _, Remaining_gas _)
+    | (Baker_fee _, Baker_fee _)
+    | (Payload_fee _, Payload_fee _)
+    | (Fee _, Fee _)
+    | (Hash, Hash)
+    | (Tezos_client, Tezos_client)
+    | (Operation_hash, Operation_hash)
+    | (New_contract, New_contract)
+    | (To, To)
+    | (Parameter, Parameter) ->
         true
-    | Tezos_client, Tezos_client -> true
-    | Operation_hash, Operation_hash -> true
-    | New_contract, New_contract -> true
-    | To, To -> true
-    | Parameter, Parameter -> true
     | _ (* we shouldn't be using a joker here... *) -> false
 
   let builder = function
@@ -484,48 +489,48 @@ module Synths = struct
         Some
           ( v,
             (fun synth -> synth.estimated),
-            fun estimated synths -> { synths with estimated } )
+            fun estimated synths -> {synths with estimated} )
     | Consumed v ->
         Some
           ( v,
             (fun synth -> synth.consumed),
-            fun consumed synths -> { synths with consumed } )
+            fun consumed synths -> {synths with consumed} )
     | Gas_remaining v ->
         Some
           ( v,
             (fun synth -> synth.gas_remaining),
-            fun gas_remaining synths -> { synths with gas_remaining } )
+            fun gas_remaining synths -> {synths with gas_remaining} )
     | Gas_limit v ->
         Some
           ( v,
             (fun synth -> synth.gas_limit),
-            fun gas_limit synths -> { synths with gas_limit } )
+            fun gas_limit synths -> {synths with gas_limit} )
     | Remaining_gas v ->
         Some
           ( v,
             (fun synth -> synth.remaining_gas),
-            fun remaining_gas synths -> { synths with remaining_gas } )
+            fun remaining_gas synths -> {synths with remaining_gas} )
     | Baker_fee v ->
         Some
           ( v,
             (fun synth -> synth.baker_fee),
-            fun baker_fee synths -> { synths with baker_fee } )
+            fun baker_fee synths -> {synths with baker_fee} )
     | Payload_fee v ->
         Some
           ( v,
             (fun synth -> synth.payload_fee),
-            fun payload_fee synths -> { synths with payload_fee } )
+            fun payload_fee synths -> {synths with payload_fee} )
     | Fee v ->
-        Some (v, (fun synth -> synth.fee), fun fee synths -> { synths with fee })
+        Some (v, (fun synth -> synth.fee), fun fee synths -> {synths with fee})
     | Hash | Tezos_client | Operation_hash | New_contract | To | Parameter ->
         None
 
   let extract_value kind =
-    let+ v, _, _ = builder kind in
+    let+ (v, _, _) = builder kind in
     v
 
   let builders old_kind new_kind =
-    let* old_v, getter, setter = builder old_kind in
+    let* (old_v, getter, setter) = builder old_kind in
     let+ new_v = extract_value new_kind in
     (old_v, new_v, getter, setter)
 
@@ -543,10 +548,10 @@ module Synths = struct
     let old = synth.old + old_v in
     let new_ = synth.new_ + new_v in
     let loss = match win with Dec -> new_v - old_v | Inc -> old_v - new_v in
-    let max_loss, max_loss_pct =
+    let (max_loss, max_loss_pct) =
       update_max line_nb old_v synth.max_loss synth.max_loss_pct loss
     in
-    let max_gain, max_gain_pct =
+    let (max_gain, max_gain_pct) =
       update_max line_nb old_v synth.max_gain synth.max_gain_pct (opp loss)
     in
     let open Stdlib in
@@ -575,7 +580,7 @@ module Synths = struct
   let consume_kind line line_nb synths kind =
     match synths.previous_kinds with
     | [] ->
-        Printf.printf "* No line to consume `%s`.\n%!" line;
+        Printf.printf "* No line to consume `%s`.\n%!" line ;
         synths
     | (_, previous_kind) :: previous_kinds when same_kind previous_kind kind ->
         let synths =
@@ -584,19 +589,19 @@ module Synths = struct
           | Some (old_v, new_v, getter, setter) ->
               setter (update line_nb (getter synths) old_v new_v) synths
         in
-        { synths with previous_kinds }
+        {synths with previous_kinds}
     | (line', _) :: _ ->
-        Printf.printf "* Unmatched lines `%s` and `%s`.\n%!" line line';
+        Printf.printf "* Unmatched lines `%s` and `%s`.\n%!" line line' ;
         synths
 
   let add_line synths line line_nb =
     match categorize line with
     | Garbage -> synths
     | Unsupported ->
-        Printf.printf "* Could not parse `%s`.\n%!" line;
+        Printf.printf "* Could not parse `%s`.\n%!" line ;
         synths
     | Diff (Removed, k) ->
-        { synths with previous_kinds = synths.previous_kinds @ [ (line, k) ] }
+        {synths with previous_kinds = synths.previous_kinds @ [(line, k)]}
     | Diff (Added, k) -> consume_kind line line_nb synths k
 
   let show
@@ -613,17 +618,17 @@ module Synths = struct
       } =
     List.iter
       (fun (line, _) -> Printf.printf "* Leftover line: `%s`.\n%!" line)
-      previous_kinds;
-    Printf.printf "\n%!";
-    Synth.show estimated;
-    Synth.show consumed;
-    Synth.show gas_remaining;
-    Synth.show gas_limit;
-    Synth.show remaining_gas;
-    Synth.show baker_fee;
-    Synth.show payload_fee;
-    Synth.show fee;
-    Printf.printf "Lines with the following strings were ignored:\n%!";
+      previous_kinds ;
+    Printf.printf "\n%!" ;
+    Synth.show estimated ;
+    Synth.show consumed ;
+    Synth.show gas_remaining ;
+    Synth.show gas_limit ;
+    Synth.show remaining_gas ;
+    Synth.show baker_fee ;
+    Synth.show payload_fee ;
+    Synth.show fee ;
+    Printf.printf "Lines with the following strings were ignored:\n%!" ;
     List.iter
       (Printf.printf "  `%s`\n%!")
       (hash_strs @ tezos_client_strs @ operation_hash_strs @ new_contract_strs
@@ -640,7 +645,7 @@ let run file_opt =
     with End_of_file -> synths
   in
   let synths = read_all 1 Synths.empty in
-  if Option.is_some file_opt then close_in ic;
+  if Option.is_some file_opt then close_in ic ;
   Synths.show synths
 
 let () = run (try Some Sys.argv.(1) with Invalid_argument _ -> None)
