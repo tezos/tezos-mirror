@@ -157,7 +157,9 @@ let test_stresstest_sources_format =
   let* bootstraps_to_use =
     (* Note that bootstrap indices start at 1; we keep the ones with
        an even index. *)
-    Lwt_list.map_p
+    (* FIXME: https://gitlab.com/tezos/tezos/-/issues/2836
+       Calling Client.show_address in parallel is flaky but should not. *)
+    Lwt_list.map_s
       (fun i -> Client.show_address ~alias:(sf "bootstrap%d" (2 * i)) client)
       (range 1 n_bootstraps_to_use)
   in
@@ -375,7 +377,9 @@ let test_stresstest_multiple_nodes =
   let* _ = Node.wait_for_level central_node 3 in
   let get_accounts_from_num_range (num_range : int list) =
     let aliases = List.map (sf "bootstrap%d") num_range in
-    Lwt_list.map_p
+    (* FIXME: https://gitlab.com/tezos/tezos/-/issues/2836
+       Calling Client.show_address in parallel is flaky but should not. *)
+    Lwt_list.map_s
       (fun alias -> Client.show_address ~alias central_client)
       aliases
   in
