@@ -266,3 +266,43 @@ module Chain_validator = struct
         validation_worker_metrics = validation_worker_metrics [label];
       }
 end
+
+module Version = struct
+  let metric =
+    Prometheus.Gauge.v_labels
+      ~help:"Node version"
+      ~namespace
+      ~label_names:
+        [
+          "version";
+          "chain_name";
+          "distributed_db_version";
+          "p2p_version";
+          "commit_hash";
+          "commit_date";
+        ]
+      "version"
+
+  let version = Tezos_version.Version.to_string Current_git_info.version
+
+  let network_version net =
+    let Network_version.{chain_name; distributed_db_version; p2p_version} =
+      P2p.announced_version net
+    in
+    [
+      Format.asprintf "%a" Distributed_db_version.Name.pp chain_name;
+      Format.asprintf "%a" Distributed_db_version.pp distributed_db_version;
+      Format.asprintf "%a" P2p_version.pp p2p_version;
+    ]
+
+  let commit_hash = Current_git_info.commit_hash
+
+  let commit_date = Current_git_info.committer_date
+
+  let init net =
+    let _ =
+      Prometheus.Gauge.labels metric
+      @@ [version] @ network_version net @ [commit_hash; commit_date]
+    in
+    ()
+end
