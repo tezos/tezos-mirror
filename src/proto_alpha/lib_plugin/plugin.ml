@@ -4202,10 +4202,13 @@ module RPC = struct
             "Retrieves the delegates allowed to endorse a block.\n\
              By default, it gives the endorsing power for delegates that have \
              at least one endorsing slot for the next block.\n\
-             Parameters `level` and `cycle` can be used to specify the (valid) \
-             level(s) in the past or future at which the endorsing rights have \
-             to be returned. Parameter `delegate` can be used to restrict the \
-             results to the given delegates.\n\
+             The `level` parameter can be used to specify the (valid) level(s) \
+             in the past or future at which the endorsing rights have to be \
+             returned.\n\
+             The `cycle` parameter can do the same for cycles, but it is \
+             deprecated because in this case the RPC takes a long time and \
+             returns an unreasonable amount of data. Parameter `delegate` can \
+             be used to restrict the results to the given delegates.\n\
              Returns the smallest endorsing slots and the endorsing power. \
              Also returns the minimal timestamp that corresponds to endorsing \
              at the given level. The timestamps are omitted for levels in the \
