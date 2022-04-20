@@ -279,9 +279,14 @@ let test_tx_node_store_inbox =
       unit)
 
 (* The contract is expecting a parameter of the form:
-   (Pair tx_rollup_txr1_address tx_rollup_tz4_address) *)
-let make_tx_rollup_deposit_argument txr1 tz4 =
-  "( Pair " ^ "\"" ^ txr1 ^ "\" \"" ^ tz4 ^ "\")"
+   (Pair string amount tx_rollup_tz4_address tx_rollup_txr1_address) *)
+let make_tx_rollup_deposit_argument tickets_content tickets_amount tz4 txr1 =
+  Format.sprintf
+    {|(Pair "%s" %d "%s" "%s" )|}
+    tickets_content
+    tickets_amount
+    tz4
+    txr1
 
 let generate_bls_addr ~alias client =
   let* () = Client.bls_gen_keys ~alias client in
@@ -348,7 +353,15 @@ let test_ticket_deposit_from_l1_to_l2 =
         contract_id ;
       let* bls_keys = generate_bls_addr ~alias:"bob" client in
       let bls_pkh_str = bls_keys.aggregate_public_key_hash in
-      let arg = make_tx_rollup_deposit_argument tx_rollup_hash bls_pkh_str in
+      let tickets_content = "toru" in
+      let tickets_amount = 100_000 in
+      let arg =
+        make_tx_rollup_deposit_argument
+          tickets_content
+          tickets_amount
+          bls_pkh_str
+          tx_rollup_hash
+      in
       (* This smart contract call will transfer 100_000 tickets to the
          given address. *)
       let* () =
@@ -480,8 +493,14 @@ let test_l2_to_l2_transaction =
       in
       let* bls_keys_2 = generate_bls_addr ~alias:"alice" client in
       let bls_pkh_2_str = bls_keys_2.aggregate_public_key_hash in
+      let tickets_content = "toru" in
+      let tickets_amount = 100_000 in
       let arg_1 =
-        make_tx_rollup_deposit_argument tx_rollup_hash bls_pkh_1_str
+        make_tx_rollup_deposit_argument
+          tickets_content
+          tickets_amount
+          bls_pkh_1_str
+          tx_rollup_hash
       in
       let* () =
         Client.transfer
@@ -509,8 +528,14 @@ let test_l2_to_l2_transaction =
           ~tz4_address:bls_pkh_1_str
           ~expected_balance:100_000
       in
+      let tickets_content = "toru" in
+      let tickets_amount = 100_000 in
       let arg_2 =
-        make_tx_rollup_deposit_argument tx_rollup_hash bls_pkh_2_str
+        make_tx_rollup_deposit_argument
+          tickets_content
+          tickets_amount
+          bls_pkh_2_str
+          tx_rollup_hash
       in
       let* () =
         Client.transfer
@@ -667,14 +692,14 @@ let get_ticket_hash_from_op op =
 
 (** Originate a contract and make a deposit for [dest] and optionally
     for a list of destination in [dests]. *)
-let make_deposit ~prg ~tx_rollup_hash ~tx_node ~node ~client ?(dests = []) dest
-    =
+let make_deposit ~tx_rollup_hash ~tx_node ~node ~client ?(dests = [])
+    ~tickets_amount dest =
   let* contract_id =
     Client.originate_contract
       ~alias:"rollup_deposit"
       ~amount:Tez.zero
       ~src:"bootstrap1"
-      ~prg
+      ~prg:"file:./tezt/tests/contracts/proto_alpha/tx_rollup_deposit.tz"
       ~init:"Unit"
       ~burn_cap:Tez.(of_int 1)
       client
@@ -687,9 +712,16 @@ let make_deposit ~prg ~tx_rollup_hash ~tx_node ~node ~client ?(dests = []) dest
     "The tx_rollup_deposit %s contract was successfully originated"
     contract_id ;
   let dests = dest :: dests in
+  let tickets_content = "toru" in
   Lwt_list.fold_left_s
     (fun (tx_node, node, client, level) dest ->
-      let arg = make_tx_rollup_deposit_argument tx_rollup_hash dest in
+      let arg =
+        make_tx_rollup_deposit_argument
+          tickets_content
+          tickets_amount
+          dest
+          tx_rollup_hash
+      in
       let* () =
         Client.transfer
           ~gas_limit:100_000
@@ -741,11 +773,11 @@ let test_batcher =
       let bls_pk_2 = bls_key_2.aggregate_public_key in
       let* (tx_node, _node, client, _level) =
         make_deposit
-          ~prg:"file:./tezt/tests/contracts/proto_alpha/tx_rollup_deposit.tz"
           ~tx_rollup_hash
           ~tx_node
           ~node
           ~client
+          ~tickets_amount:100_000
           bls_pkh_1
           ~dests:[bls_pkh_2]
       in
@@ -981,7 +1013,7 @@ let test_batcher =
    - create a branch of size two on node 2 (with no L2 operations)
    - connecting node 1 and node 2
    - check that operation modifying the L2 balance was not applied
- *)
+*)
 let test_reorganization =
   Protocol.register_test
     ~__FILE__
@@ -1012,11 +1044,11 @@ let test_reorganization =
       let bls_pkh_2 = bls_key_2.aggregate_public_key_hash in
       let* (tx_node, node1, client1, _level) =
         make_deposit
-          ~prg:"file:./tezt/tests/contracts/proto_alpha/tx_rollup_deposit.tz"
           ~tx_rollup_hash
           ~tx_node
           ~node:node1
           ~client:client1
+          ~tickets_amount:100_000
           bls_pkh_1
       in
       let* _ = Rollup_node.wait_for_tezos_level tx_node 4 in
@@ -1132,11 +1164,11 @@ let test_l2_proofs =
       let bls_sk_2 = bls_key_2.aggregate_secret_key in
       let* (tx_node, node, client, _level) =
         make_deposit
-          ~prg:"file:./tezt/tests/contracts/proto_alpha/tx_rollup_deposit.tz"
           ~tx_rollup_hash
           ~tx_node
           ~node
           ~client
+          ~tickets_amount:100_000
           bls_pkh_1
       in
       let* inbox = Rollup_node.Client.get_inbox ~tx_node ~block:"head" in

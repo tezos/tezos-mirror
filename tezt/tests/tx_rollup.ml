@@ -1580,8 +1580,7 @@ let test_deposit_withdraw_max_big_tickets =
       ~alias:"deposit_contract"
       ~amount:Tez.zero
       ~src:account
-      ~prg:
-        "file:./tezt/tests/contracts/proto_alpha/tx_rollup_deposit_set_ticket.tz"
+      ~prg:"file:./tezt/tests/contracts/proto_alpha/tx_rollup_deposit.tz"
       ~init:"Unit"
       ~burn_cap:Tez.one
       client
