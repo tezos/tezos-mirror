@@ -455,14 +455,9 @@ let activate_protocol ?endpoint ~protocol ?fitness ?key ?timestamp
 
 let empty_mempool_file ?(filename = "mempool.json") () =
   let mempool_str = "[]" in
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/1928
-     a write_file function should be added to the tezt base module *)
   let mempool = Temp.file filename in
-  let* _ =
-    Lwt_io.with_file ~mode:Lwt_io.Output mempool (fun oc ->
-        Lwt_io.write oc mempool_str)
-  in
-  Lwt.return mempool
+  write_file mempool ~contents:mempool_str ;
+  mempool
 
 let spawn_bake_for ?endpoint ?protocol ?(keys = [Constant.bootstrap1.alias])
     ?minimal_fees ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte

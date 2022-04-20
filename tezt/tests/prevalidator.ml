@@ -62,7 +62,7 @@ module Revamped = struct
     let* level = Client.level client in
     let* () =
       if empty then
-        let* empty_mempool_file = Client.empty_mempool_file () in
+        let empty_mempool_file = Client.empty_mempool_file () in
         Client.bake_for
           ~mempool:empty_mempool_file
           ~ignore_node_mempool:true
@@ -2159,7 +2159,7 @@ let forge_and_inject_n_operations ~branch ~fee ~gas_limit ~source ~destination
 
 (** Bakes with an empty mempool to force synchronisation between nodes. *)
 let bake_empty_block ?endpoint ~protocol client =
-  let* mempool = Client.empty_mempool_file () in
+  let mempool = Client.empty_mempool_file () in
   Client.bake_for ~protocol ?endpoint ~mempool client
 
 (** [bake_empty_mempool_and_wait_for_flush client node] bakes for [client]
@@ -2761,7 +2761,7 @@ let check_op_removed client op =
 
 (** Bakes with an empty mempool to force synchronisation between nodes. *)
 let bake_empty_block ?endpoint ?protocol client =
-  let* mempool = Client.empty_mempool_file () in
+  let mempool = Client.empty_mempool_file () in
   Client.bake_for ?protocol ?endpoint ~mempool ~ignore_node_mempool:true client
 
 (** [bake_empty_block_and_wait_for_flush client node] bakes for [client]
