@@ -209,6 +209,15 @@ let create_genesis_block state tezos_block =
   let+ _block_hash = State.save_block state genesis_block in
   (genesis_block, ctxt)
 
+let commit_block_on_l1 state block =
+  match state.State.operator with
+  | None -> return_unit
+  | Some operator ->
+      Committer.commit_block
+        ~operator:operator.pkh
+        state.State.rollup_info.rollup_id
+        block
+
 let process_messages_and_inboxes (state : State.t) ~(predecessor : L2block.t)
     ?predecessor_context block_info rollup_id =
   let open Lwt_result_syntax in
@@ -246,24 +255,28 @@ let process_messages_and_inboxes (state : State.t) ~(predecessor : L2block.t)
       let*! context_hash = Context.commit context in
       let level =
         match predecessor.header.level with
-        | Genesis -> L2block.Rollup_level Tx_rollup_level.root
-        | Rollup_level l -> Rollup_level (Tx_rollup_level.succ l)
+        | Genesis -> Tx_rollup_level.root
+        | Rollup_level l -> Tx_rollup_level.succ l
       in
+      let commitment = Committer.commitment_of_inbox ~predecessor level inbox in
       let header : L2block.header =
         {
-          level;
+          level = Rollup_level level;
           tezos_block = current_hash;
           predecessor = predecessor.hash;
           context = context_hash;
+          commitment =
+            Some Tx_rollup_commitment.(Compact.hash (Full.compact commitment));
         }
       in
       let hash = L2block.hash_header header in
-      let block = L2block.{hash; header; inbox} in
+      let block = L2block.{hash; header; inbox; commitment = Some commitment} in
       let*! () = State.save_block state block in
       let*! () =
         Event.(emit rollup_block) (header.level, hash, header.tezos_block)
       in
-      return (block, context)
+      let+ () = commit_block_on_l1 state block in
+      (block, context)
 
 let set_head state head =
   let open Lwt_result_syntax in

@@ -26,58 +26,43 @@
 open Protocol
 open Alpha_context
 
-(**  {2 Types for L2 block and header} *)
+let commitment_of_inbox ~predecessor level (inbox : Inbox.t) =
+  let messages =
+    List.map
+      (fun msg ->
+        let withdrawals =
+          match msg.Inbox.result with
+          | Inbox.Discarded _ -> []
+          | Interpreted (_result, withdrawals) -> withdrawals
+        in
+        let message_result =
+          Tx_rollup_message_result.
+            {
+              context_hash = msg.Inbox.l2_context_hash.tree_hash;
+              withdraw_list_hash =
+                Tx_rollup_withdraw_list_hash.hash_uncarbonated withdrawals;
+            }
+        in
+        Tx_rollup_message_result_hash.hash_uncarbonated message_result)
+      inbox.contents
+  in
+  let message_hashes =
+    List.map
+      (fun msg -> Tx_rollup_message_hash.hash_uncarbonated msg.Inbox.message)
+      inbox.contents
+  in
+  let inbox_merkle_root = Tx_rollup_inbox.Merkle.merklize_list message_hashes in
+  let predecessor = predecessor.L2block.header.commitment in
+  Tx_rollup_commitment.{level; messages; predecessor; inbox_merkle_root}
 
-(** Hash with b58check encoding BTx(53), for hashes of L2 block headers *)
-module Hash : S.HASH
-
-(** Alias for block (header) hashes *)
-type hash = Hash.t
-
-(** The level of an L2 block  *)
-type level =
-  | Genesis
-      (** When the rollup has not received any inbox, it is at level Genesis  *)
-  | Rollup_level of Tx_rollup_level.t
-      (** When the rollup has had at least one inbox *)
-
-(** Type of L2 block headers *)
-type header = {
-  level : level;  (** The level of the L2 block *)
-  tezos_block : Block_hash.t;
-      (** The Tezos block on which this L2 block in anchored, i.e. the Tezos block
-      in which the inbox was sent *)
-  predecessor : hash;  (** The hash predecessor L2 block *)
-  context : Tx_rollup_l2_context_hash.t;
-      (** The hash of the context resulting of the application of the L2 block's inbox *)
-  commitment : Tx_rollup_commitment_hash.t option;
-      (** The hash of the commitment for the inbox of this block *)
-}
-
-(** L2 blocks are composed of a header and an inbox. The inbox contains the
-    actual messages. The hash in the block structure corresponds the hash of the
-    header. *)
-type t = {
-  hash : hash;
-  header : header;
-  inbox : Inbox.t;
-  commitment : Tx_rollup_commitment.Full.t option;
-}
-
-(** Build the genesis block  *)
-val genesis_block : Context.t -> Tx_rollup.t -> Block_hash.t -> t Lwt.t
-
-(**  {2 Encoding} *)
-
-val level_encoding : level Data_encoding.t
-
-val level_to_string : level -> string
-
-val header_encoding : header Data_encoding.t
-
-val encoding : t Data_encoding.t
-
-(**  {2 Hashing} *)
-
-(** Returns the hash of an L2 block header *)
-val hash_header : header -> hash
+let commit_block ~operator tx_rollup block =
+  let open Lwt_result_syntax in
+  match block.L2block.commitment with
+  | None -> return_unit
+  | Some commitment ->
+      let manager_operation =
+        Manager (Tx_rollup_commit {tx_rollup; commitment})
+      in
+      let hash = L1_operation.hash_manager_operation manager_operation in
+      Injector.add_pending_operation
+        {L1_operation.hash; source = operator; manager_operation}
