@@ -293,7 +293,7 @@ let inbox_testable = Alcotest.testable Tx_rollup_inbox.pp Tx_rollup_inbox.( = )
 
 let rng_state = Random.State.make_self_init ()
 
-let gen_l2_account () =
+let gen_l2_account ?(rng_state = rng_state) () =
   let seed =
     Bytes.init 32 (fun _ -> char_of_int @@ Random.State.int rng_state 255)
   in
@@ -3208,6 +3208,8 @@ module Rejection = struct
         match node with Nil -> Nil | n -> Cons (x, fun () -> drop n))
     | Nil -> assert false
 
+  let rec drop_n x n = if n <= 0 then x else drop_n (drop x) (n - 1)
+
   let test_valid_proof_truncated () =
     let (_, _, addr) = gen_l2_account () in
     init_l2_store () >>= fun store ->
@@ -3376,6 +3378,181 @@ module Rejection = struct
     (* It must be rejected: (limit + 1) is above the limit *)
     test_reject_withdrawals_helper (limit + 1)
 
+  (** Fill a storage with [l2_accounts], they are all credited [100] of
+      [Ticket_hash.zero]. *)
+  let fill_store store l2_accounts =
+    let open L2_Context.Syntax in
+    let* (store, _, tidx) =
+      L2_Context.Ticket_index.get_or_associate_index store Ticket_hash.zero
+    in
+    let* store =
+      list_fold_left_m
+        (fun store (_, pk, addr) ->
+          let* (store, _, aidx) =
+            L2_Context.Address_index.get_or_associate_index store addr
+          in
+          let* store =
+            L2_Context.Address_metadata.init_with_public_key store aidx pk
+          in
+          let* store =
+            L2_Context.Ticket_ledger.credit
+              store
+              tidx
+              aidx
+              (Tx_rollup_l2_qty.of_int64_exn 100L)
+          in
+          return store)
+        store
+        l2_accounts
+    in
+    let time = time () in
+    let* _ = C.commit ~time store in
+    return store
+
+  (** Regression test to ensure that we can reject a commitment where the
+      proof is truncated to be close to the maximum size limit (i.e. 32Kb) and
+      the rejected message size is close to the maximum size (i.e. 5Kb).
+
+      It also test that all required parameters for the rejection fits in a
+      Tezos operation even in the worst cases.
+  *)
+  let test_rejection_size_limit () =
+    let rng_state = Random.State.make [|42|] in
+    context_init1 () >>=? fun (b, account) ->
+    originate b account >>=? fun (b, tx_rollup) ->
+    Context.get_constants (B b) >>=? fun constant ->
+    (* We begin by creating a context for the first message, the context is
+       obviously invalid but we will use it as the supposedly valid base for
+       the second message which we will reject. *)
+    init_l2_store () >>= fun store ->
+    (* 200 accounts with this fixed random state is enough to create a proof
+       larger than the current max proof size (i.e. 30Kb). The more accounts
+       we add in the context, bigger the proofs becomes. It needs to be adjusted
+       so the following [message2] in this context produces a proof that
+       is larger to 30Kb. *)
+    List.init ~when_negative_length:[] 200 (fun _ ->
+        gen_l2_account ~rng_state ())
+    >>?= fun l2_accounts ->
+    (* The context is filled with the generated l2 accounts. *)
+    fill_store store l2_accounts >>= fun store ->
+    hash_tree_from_store store >>= fun l2_context_hash ->
+    let message0_result : Tx_rollup_message_result.t =
+      {
+        context_hash = l2_context_hash;
+        withdraw_list_hash = Tx_rollup_withdraw_list_hash.empty;
+      }
+    in
+    let message0_result_hash =
+      Tx_rollup_message_result_hash.hash_uncarbonated message0_result
+    in
+    (* Then, we build a real message which is close to the maximum message size
+       limit and produces a proof also close to the maximum proof size limit. *)
+    let (_sk, _pk, addr) = gen_l2_account ~rng_state () in
+    let (signers, transfers) =
+      List.map
+        (fun (sk, pk, _) ->
+          (sk, (bls_pk pk, None, [(addr, Ticket_hash.zero, 1L)])))
+        (* 45 with this fixed random state is enough to create message
+           close to the maximum message size (i.e. 5Kb), but small enough so
+           it is not rejected by the protocol. The more we put transfers in
+           the operation, bigger the message becomes. *)
+        (List.take_n 45 l2_accounts)
+      |> List.split
+    in
+    l2_parameters (B b) >>=? fun l2_parameters ->
+    let (message1, batch_bytes) = make_message_transfer ~signers transfers in
+    let message1_hash = Tx_rollup_message_hash.hash_uncarbonated message1 in
+    Incremental.begin_construction b >>=? fun i ->
+    (* Submit the two first hand-crafted messages. *)
+    let (message0, _) = Tx_rollup_message.make_batch "xoxo" in
+    let message0_hash = Tx_rollup_message_hash.hash_uncarbonated message0 in
+    Op.tx_rollup_submit_batch
+      ~gas_limit:(Gas.Arith.integral_of_int_exn 2_500)
+      (I i)
+      account
+      tx_rollup
+      "xoxo"
+    >>=? fun op1 ->
+    Op.tx_rollup_submit_batch (I i) account tx_rollup batch_bytes
+    >>=? fun op2 ->
+    let message_count =
+      constant.parametric.tx_rollup_max_messages_per_inbox - 2
+    in
+    (* Fill the inbox at tx_level 0. Trying to reject a commitment for a full
+       inbox has the benefit of having large message paths. Thus, making the
+       rejection operation size even larger. *)
+    let ops = List.repeat message_count op1 in
+    Op.combine_operations ~source:account (I i) ([op1; op2] @ ops)
+    >>=? fun op ->
+    Incremental.add_operation i op >>=? fun i ->
+    Incremental.finalize_block i >>=? fun b ->
+    (* Prepare a commitment for the tx_level 0, only the very first message
+       result hash will be a real value (in order to start the proof verification
+       from a valid state). *)
+    let message2_result_hash =
+      Tx_rollup_message_result_hash.hash_uncarbonated previous_message_result
+    in
+    let messages = [message0; message1] @ List.repeat message_count message0 in
+    let message_hashes =
+      [message0_hash; message1_hash] @ List.repeat message_count message0_hash
+    in
+    let message_result_hashes =
+      [message0_result_hash; message2_result_hash]
+      @ List.repeat message_count message0_result_hash
+    in
+    let commitment : Tx_rollup_commitment.Full.t =
+      {
+        level = Tx_rollup_level.root;
+        messages = message_result_hashes;
+        predecessor = None;
+        inbox_merkle_root = Tx_rollup_inbox.Merkle.merklize_list message_hashes;
+      }
+    in
+    Op.tx_rollup_commit (B b) account tx_rollup commitment >>=? fun operation ->
+    Block.bake ~operation b >>=? fun b ->
+    (* Prepare the rejection for the second message. *)
+    make_proof store l2_parameters message1 >>= fun proof ->
+    let message_hashes =
+      List.map Tx_rollup_message_hash.hash_uncarbonated messages
+    in
+    let message_path =
+      assert_ok @@ Tx_rollup_inbox.Merkle.compute_path message_hashes 1
+    in
+    let (message_result_hash, message_result_path) =
+      message_result_hash_and_path commitment ~message_position:1
+    in
+    let (_, previous_message_result_path) =
+      message_result_hash_and_path commitment ~message_position:0
+    in
+    (* The actual proof size is almost 32Kb, after the drop the truncated
+       proof size is 26Kb. *)
+    let proof_truncated =
+      let proof_node = proof.state () in
+      (* 100 is the magic number of nodes to drop in the proof. The more nodes
+         we drop, smaller the proof becomes. The goal here is to drop enough
+         nodes to have a proof close to 26Kb. *)
+      let truncated_node = drop_n proof_node 100 in
+      {proof with state = (fun () -> truncated_node)}
+    in
+    Op.tx_rollup_reject
+      (B b)
+      account
+      tx_rollup
+      Tx_rollup_level.root
+      message1
+      ~message_position:1
+      ~message_path
+      ~message_result_hash
+      ~message_result_path
+      ~proof:proof_truncated
+      ~previous_message_result:message0_result
+      ~previous_message_result_path
+    >>=? fun op ->
+    Incremental.begin_construction b >>=? fun i ->
+    (* Finally, we reject the commitment and check that the size fits in
+       a Tezos operation. *)
+    Incremental.add_operation ~check_size:true i op >>=? fun _i -> return_unit
+
   let tests =
     [
       Tztest.tztest
@@ -3436,6 +3613,10 @@ module Rejection = struct
         "reject withdrawals when out of bound"
         `Quick
         test_reject_withdrawals_limit;
+      Tztest.tztest
+        "regression test rejection max proof size and message"
+        `Quick
+        test_rejection_size_limit;
     ]
 end
 
