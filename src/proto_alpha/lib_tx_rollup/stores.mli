@@ -111,6 +111,39 @@ module Level_store : sig
   val remove : ?flush:bool -> t -> L2block.level -> unit Lwt.t
 end
 
+(** An index store to map commitment hashes to their inclusion information. *)
+module Commitment_store : sig
+  (** The type of store for Tezos block hashes *)
+  type t
+
+  type info = {
+    block : Block_hash.t;
+        (** Tezos block in which the commitment is included. *)
+    operation : Operation_hash.t;
+        (** Operation of the block in which the commitment is included. *)
+  }
+
+  (** Returns [true] if the commitment hash has inclusion information associated
+      in the store. *)
+  val mem :
+    t -> Protocol.Alpha_context.Tx_rollup_commitment_hash.t -> bool Lwt.t
+
+  (** Returns the inclusion information associated to a commitment hash in the
+      store, or [None] otherwise. *)
+  val find :
+    t -> Protocol.Alpha_context.Tx_rollup_commitment_hash.t -> info option Lwt.t
+
+  (** Add an association from a commitment hash to an L2 block hash in the
+      store. If [flush] (default to [true]) is set, the index is written on disk
+      right away. *)
+  val add :
+    ?flush:bool ->
+    t ->
+    Protocol.Alpha_context.Tx_rollup_commitment_hash.t ->
+    info ->
+    unit Lwt.t
+end
+
 (** {2 Singleton stores}  *)
 
 (** A store composed of a single file on disk to store the current head *)
@@ -166,6 +199,7 @@ type t = {
   blocks : L2_block_store.t;
   tezos_blocks : Tezos_block_store.t;
   levels : Level_store.t;
+  commitments : Commitment_store.t;
   head : Head_store.t;
   tezos_head : Tezos_head_store.t;
   rollup_info : Rollup_info_store.t;

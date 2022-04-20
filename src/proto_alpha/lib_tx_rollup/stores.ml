@@ -172,6 +172,44 @@ module L2_level_key = struct
   let decode str i = TzEndian.get_int32_string str i |> of_int32
 end
 
+module Operation_key = struct
+  include Operation_hash
+
+  (* [hash] in Blake2B.Make is {!Stdlib.Hashtbl.hash} which is 30 bits *)
+  let hash_size = 30 (* in bits *)
+
+  let t =
+    let open Repr in
+    map
+      (bytes_of (`Fixed hash_size))
+      (fun b -> of_bytes_exn b)
+      (fun bh -> to_bytes bh)
+end
+
+module Commitment_key = struct
+  include Protocol.Alpha_context.Tx_rollup_commitment_hash
+
+  let hash = Stdlib.Hashtbl.hash
+
+  (* {!Stdlib.Hashtbl.hash} is 30 bits *)
+  let hash_size = 30 (* in bits *)
+
+  let t =
+    let open Repr in
+    map
+      (bytes_of (`Fixed hash_size))
+      (fun b -> of_bytes_exn b)
+      (fun bh -> to_bytes bh)
+
+  let encode bh = Bytes.unsafe_to_string (to_bytes bh)
+
+  let encoded_size = size (* in bytes *)
+
+  let decode str off =
+    let str = String.sub str off encoded_size in
+    of_bytes_exn (Bytes.unsafe_of_string str)
+end
+
 module L2_block_info = struct
   type t = {
     offset : int;
@@ -297,6 +335,34 @@ module L2_level_info = struct
     | _ -> assert false
 end
 
+module Commitment_info = struct
+  type t = {block : Block_hash.t; operation : Operation_hash.t}
+
+  let t =
+    let open Repr in
+    map
+      (pair Tezos_store.Block_key.t Operation_key.t)
+      (fun (block, operation) -> {block; operation})
+      (fun {block; operation} -> (block, operation))
+
+  let encoded_size = Block_hash.size + Operation_hash.size
+
+  let encode v =
+    let dst = Bytes.create encoded_size in
+    let offset = blit ~src:(Block_hash.to_bytes v.block) ~dst 0 in
+    let _ = blit ~src:(Operation_hash.to_bytes v.operation) ~dst offset in
+    Bytes.unsafe_to_string dst
+
+  let decode str offset =
+    let (block, offset) =
+      read_str str ~offset ~len:Block_hash.size Block_hash.of_string_exn
+    in
+    let (operation, _) =
+      read_str str ~offset ~len:Operation_hash.size Operation_hash.of_string_exn
+    in
+    {block; operation}
+end
+
 module L2_block_index =
   Index_unix.Make (L2_block_key) (L2_block_info) (Index.Cache.Unbounded)
 module Level_index =
@@ -304,6 +370,8 @@ module Level_index =
 module Tezos_block_index =
   Index_unix.Make (Tezos_store.Block_key) (Tezos_block_info)
     (Index.Cache.Unbounded)
+module Commitment_index =
+  Index_unix.Make (Commitment_key) (Commitment_info) (Index.Cache.Unbounded)
 
 module L2_blocks_file = struct
   let encoding = Data_encoding.dynamic_size ~kind:`Uint30 L2block.encoding
@@ -534,6 +602,49 @@ module Level_store = struct
     Lwt.return_unit
 end
 
+module Commitment_store = struct
+  type t = {index : Commitment_index.t; scheduler : Lwt_idle_waiter.t}
+
+  type info = Commitment_info.t = {
+    block : Block_hash.t;
+    operation : Operation_hash.t;
+  }
+
+  let log_size = 1_000
+
+  let mem store hash =
+    Lwt_idle_waiter.task store.scheduler @@ fun () ->
+    Lwt.return (Commitment_index.mem store.index hash)
+
+  let find store hash =
+    let open Lwt_syntax in
+    Lwt_idle_waiter.task store.scheduler @@ fun () ->
+    Option.catch_os @@ fun () ->
+    let info = Commitment_index.find store.index hash in
+    return_some info
+
+  let add ?(flush = true) store tezos_block info =
+    Lwt_idle_waiter.force_idle store.scheduler @@ fun () ->
+    Commitment_index.replace store.index tezos_block info ;
+    if flush then Commitment_index.flush store.index ;
+    Lwt.return_unit
+
+  let init ~data_dir ~readonly =
+    let index =
+      Commitment_index.v
+        ~log_size
+        ~readonly
+        (Node_data.commitments_index data_dir)
+    in
+    let scheduler = Lwt_idle_waiter.create () in
+    Lwt.return {index; scheduler}
+
+  let close store =
+    Lwt_idle_waiter.force_idle store.scheduler @@ fun () ->
+    (try Commitment_index.close store.index with Index.Closed -> ()) ;
+    Lwt.return_unit
+end
+
 module Make_singleton (S : sig
   type t
 
@@ -626,6 +737,7 @@ type t = {
   blocks : L2_block_store.t;
   tezos_blocks : Tezos_block_store.t;
   levels : Level_store.t;
+  commitments : Commitment_store.t;
   head : Head_store.t;
   tezos_head : Tezos_head_store.t;
   rollup_info : Rollup_info_store.t;
@@ -638,14 +750,17 @@ let init ~data_dir ~readonly ~blocks_cache_size =
     L2_block_store.init ~data_dir ~readonly ~cache_size:blocks_cache_size
   and* tezos_blocks = Tezos_block_store.init ~data_dir ~readonly
   and* levels = Level_store.init ~data_dir ~readonly
+  and* commitments = Commitment_store.init ~data_dir ~readonly
   and* head = Head_store.init ~data_dir
   and* tezos_head = Tezos_head_store.init ~data_dir
   and* rollup_info = Rollup_info_store.init ~data_dir in
-  return {blocks; tezos_blocks; levels; head; tezos_head; rollup_info}
+  return
+    {blocks; tezos_blocks; commitments; levels; head; tezos_head; rollup_info}
 
 let close stores =
   let open Lwt_syntax in
   let* () = L2_block_store.close stores.blocks
   and* () = Tezos_block_store.close stores.tezos_blocks
-  and* () = Level_store.close stores.levels in
+  and* () = Level_store.close stores.levels
+  and* () = Commitment_store.close stores.commitments in
   return_unit
