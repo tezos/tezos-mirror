@@ -354,7 +354,7 @@ let test_ticket_deposit_from_l1_to_l2 =
       let* bls_keys = generate_bls_addr ~alias:"bob" client in
       let bls_pkh_str = bls_keys.aggregate_public_key_hash in
       let tickets_content = "toru" in
-      let tickets_amount = 100_000 in
+      let tickets_amount = 10 in
       let arg =
         make_tx_rollup_deposit_argument
           tickets_content
@@ -362,8 +362,8 @@ let test_ticket_deposit_from_l1_to_l2 =
           bls_pkh_str
           tx_rollup_hash
       in
-      (* This smart contract call will transfer 100_000 tickets to the
-         given address. *)
+      (* This smart contract call will transfer 10 tickets to the given
+         address. *)
       let* () =
         Client.transfer
           ~gas_limit:100_000
@@ -383,15 +383,12 @@ let test_ticket_deposit_from_l1_to_l2 =
       let* inbox = tx_client_get_inbox_as_json ~tx_client ~block:"head" in
       let ticket_id = get_ticket_hash_from_deposit_json inbox in
       Log.info "Ticket %s was successfully emitted" ticket_id ;
-      let* () =
-        check_tz4_balance
-          ~tx_client
-          ~block:"head"
-          ~ticket_id
-          ~tz4_address:bls_pkh_str
-          ~expected_balance:100_000
-      in
-      unit)
+      check_tz4_balance
+        ~tx_client
+        ~block:"head"
+        ~ticket_id
+        ~tz4_address:bls_pkh_str
+        ~expected_balance:10)
 
 let sign_one_transaction sk txs_string =
   let open Tezos_protocol_alpha.Protocol in
@@ -494,7 +491,7 @@ let test_l2_to_l2_transaction =
       let* bls_keys_2 = generate_bls_addr ~alias:"alice" client in
       let bls_pkh_2_str = bls_keys_2.aggregate_public_key_hash in
       let tickets_content = "toru" in
-      let tickets_amount = 100_000 in
+      let tickets_amount = 10 in
       let arg_1 =
         make_tx_rollup_deposit_argument
           tickets_content
@@ -526,10 +523,10 @@ let test_l2_to_l2_transaction =
           ~block:"head"
           ~ticket_id
           ~tz4_address:bls_pkh_1_str
-          ~expected_balance:100_000
+          ~expected_balance:10
       in
       let tickets_content = "toru" in
-      let tickets_amount = 100_000 in
+      let tickets_amount = 10 in
       let arg_2 =
         make_tx_rollup_deposit_argument
           tickets_content
@@ -558,7 +555,7 @@ let test_l2_to_l2_transaction =
           ~block:"head"
           ~ticket_id
           ~tz4_address:bls_pkh_2_str
-          ~expected_balance:100_000
+          ~expected_balance:10
       in
       Log.info "Crafting a l2 transaction" ;
       let* tx =
@@ -595,14 +592,14 @@ let test_l2_to_l2_transaction =
           ~block:"head"
           ~ticket_id
           ~tz4_address:bls_pkh_1_str
-          ~expected_balance:99_999
+          ~expected_balance:9
       and* () =
         check_tz4_balance
           ~tx_client
           ~block:"head"
           ~ticket_id
           ~tz4_address:bls_pkh_2_str
-          ~expected_balance:100_001
+          ~expected_balance:11
       in
       unit)
 
@@ -1048,7 +1045,7 @@ let test_reorganization =
           ~tx_node
           ~node:node1
           ~client:client1
-          ~tickets_amount:100_000
+          ~tickets_amount:10
           bls_pkh_1
       in
       let* _ = Rollup_node.wait_for_tezos_level tx_node 4 in
@@ -1061,14 +1058,14 @@ let test_reorganization =
       let* _ = Node.wait_for_level node2 4 in
       Log.info "Nodes are synchronized, shutting down node 2" ;
       let* () = Node.terminate node2 in
-      Log.info "Check that L2 balance is 100_000" ;
+      Log.info "Check that L2 balance is 10" ;
       let* () =
         check_tz4_balance
           ~tx_client
           ~block:"head"
           ~ticket_id
           ~tz4_address:bls_pkh_1
-          ~expected_balance:100_000
+          ~expected_balance:10
       in
       Log.info "crafting a branch of size 1 on node 1 with a L2 transfer" ;
       let* tx =
@@ -1107,7 +1104,15 @@ let test_reorganization =
           ~block:"head"
           ~ticket_id
           ~tz4_address:bls_pkh_1
-          ~expected_balance:99_990
+          ~expected_balance:0
+      in
+      let* () =
+        check_tz4_balance
+          ~tx_client
+          ~block:"head"
+          ~ticket_id
+          ~tz4_address:bls_pkh_2
+          ~expected_balance:10
       in
       Log.info "Running the node2 in private mode and craft a branch of size 2" ;
       let* () = Node.run node2 (Node.Private_mode :: nodes_args) in
@@ -1134,7 +1139,7 @@ let test_reorganization =
           ~block:"head"
           ~ticket_id
           ~tz4_address:bls_pkh_1
-          ~expected_balance:100_000
+          ~expected_balance:10
       in
       unit)
 
