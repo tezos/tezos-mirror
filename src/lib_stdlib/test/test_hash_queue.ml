@@ -68,124 +68,99 @@ let string_of_int_list l =
 
 let test_create () =
   let q = Queue.create 10 in
-  Assert.equal ~prn:string_of_int ~msg:__LOC__ 10 (Queue.capacity q)
+  Assert.Int.equal ~loc:__LOC__ 10 (Queue.capacity q)
 
 let test_replace () =
   let q = Queue.create 10 in
   Queue.replace q "v" 3 ;
   let v = Queue.find_opt q "v" in
-  Assert.equal ~msg:__LOC__ (Some 3) v
+  Assert.Int.Option.equal ~loc:__LOC__ (Some 3) v
 
 let test_replace_existing () =
   let q = Queue.create 10 in
   Queue.replace q "v" 3 ;
   Queue.replace q "v" 12 ;
   let v = Queue.find_opt q "v" in
-  Assert.equal ~prn:string_of_opt_int ~msg:__LOC__ (Some 12) v
+  Assert.Int.Option.equal ~loc:__LOC__ (Some 12) v
 
 let test_replace_incr_length () =
   let q = init_queue 10 5 in
   Queue.replace q "v" 12 ;
-  Assert.equal ~prn:string_of_int ~msg:__LOC__ 6 (Queue.length q)
+  Assert.Int.equal ~loc:__LOC__ 6 (Queue.length q)
 
 let test_peek () =
   let q = init_queue 10 10 in
-  Assert.equal ~prn:string_of_opt_int ~msg:__LOC__ (Some 0) (Queue.peek q)
+  Assert.Int.Option.equal ~loc:__LOC__ (Some 0) (Queue.peek q)
 
 let test_peek_empty () =
   let q = Queue.create 10 in
-  Assert.equal ~prn:string_of_opt_int ~msg:__LOC__ None (Queue.peek q)
+  Assert.is_none ~pp:Format.pp_print_int ~loc:__LOC__ (Queue.peek q)
 
 let test_peek_at_most () =
   let q = init_queue 10 10 in
-  Assert.equal
-    ~prn:string_of_int_list
-    ~msg:__LOC__
-    [0; 1; 2]
-    (Queue.peek_at_most q 3)
+  Assert.Int.List.equal ~loc:__LOC__ [0; 1; 2] (Queue.peek_at_most q 3)
 
 let test_peek_at_most_above_length () =
   let q = init_queue 3 2 in
-  Assert.equal
-    ~prn:string_of_int_list
-    ~msg:__LOC__
-    [0; 1]
-    (Queue.peek_at_most q 3)
+  Assert.Int.List.equal ~loc:__LOC__ [0; 1] (Queue.peek_at_most q 3)
 
 let test_peek_at_most_above_capacity () =
   let q = init_queue 3 3 in
-  Assert.equal
-    ~prn:string_of_int_list
-    ~msg:__LOC__
-    [0; 1; 2]
-    (Queue.peek_at_most q 4)
+  Assert.Int.List.equal ~loc:__LOC__ [0; 1; 2] (Queue.peek_at_most q 4)
 
 let test_take () =
   let q = init_queue 10 10 in
-  Assert.equal ~prn:string_of_opt_int ~msg:__LOC__ (Some 0) (Queue.take q) ;
-  Assert.equal ~prn:string_of_opt_int ~msg:__LOC__ (Some 1) (Queue.peek q) ;
-  Assert.equal ~prn:string_of_int ~msg:__LOC__ 9 (Queue.length q)
+  Assert.Int.Option.equal ~loc:__LOC__ (Some 0) (Queue.take q) ;
+  Assert.Int.Option.equal ~loc:__LOC__ (Some 1) (Queue.peek q) ;
+  Assert.Int.equal ~loc:__LOC__ 9 (Queue.length q)
 
 let test_take_empty () =
   let q = Queue.create 10 in
-  Assert.equal ~msg:__LOC__ None (Queue.take q)
+  Assert.is_none ~loc:__LOC__ (Queue.take q)
 
 let test_take_at_most () =
   let q = init_queue 10 10 in
-  Assert.equal
-    ~prn:string_of_int_list
-    ~msg:__LOC__
-    [0; 1; 2]
-    (Queue.take_at_most q 3) ;
-  Assert.equal ~prn:string_of_opt_int ~msg:__LOC__ (Some 3) (Queue.peek q) ;
-  Assert.equal ~prn:string_of_int ~msg:__LOC__ 7 (Queue.length q)
+  Assert.Int.List.equal ~loc:__LOC__ [0; 1; 2] (Queue.take_at_most q 3) ;
+  Assert.Int.Option.equal ~loc:__LOC__ (Some 3) (Queue.peek q) ;
+  Assert.Int.equal ~loc:__LOC__ 7 (Queue.length q)
 
 let test_take_at_most_above_length () =
   let q = init_queue 10 2 in
-  Assert.equal
-    ~prn:string_of_int_list
-    ~msg:__LOC__
-    (Queue.take_at_most q 3)
-    [0; 1] ;
-  Assert.equal ~prn:string_of_opt_int ~msg:__LOC__ None (Queue.peek q) ;
-  Assert.equal ~prn:string_of_int ~msg:__LOC__ 0 (Queue.length q)
+  Assert.Int.List.equal ~loc:__LOC__ (Queue.take_at_most q 3) [0; 1] ;
+  Assert.is_none ~loc:__LOC__ (Queue.peek q) ;
+  Assert.Int.equal ~loc:__LOC__ 0 (Queue.length q)
 
 let test_take_at_most_above_capacity () =
   let q = init_queue 3 3 in
-  Assert.equal
-    ~prn:string_of_int_list
-    ~msg:__LOC__
-    (Queue.take_at_most q 4)
-    [0; 1; 2] ;
-  Assert.equal ~prn:string_of_opt_int ~msg:__LOC__ None (Queue.peek q) ;
-  Assert.equal ~prn:string_of_int ~msg:__LOC__ 0 (Queue.length q)
+  Assert.Int.List.equal ~loc:__LOC__ (Queue.take_at_most q 4) [0; 1; 2] ;
+  Assert.is_none ~loc:__LOC__ (Queue.peek q) ;
+  Assert.Int.equal ~loc:__LOC__ 0 (Queue.length q)
 
 let test_replace_above_capacity () =
   let q = init_queue 10 10 in
   let length_before = Queue.length q in
   Queue.replace q "new_key" 10 ;
-  Assert.equal ~prn:string_of_int ~msg:__LOC__ length_before (Queue.length q) ;
-  Assert.equal ~prn:string_of_opt_int ~msg:__LOC__ (Some 1) (Queue.peek q) ;
-  Assert.equal
-    ~prn:string_of_opt_int
-    ~msg:__LOC__
+  Assert.Int.equal ~loc:__LOC__ length_before (Queue.length q) ;
+  Assert.Int.Option.equal ~loc:__LOC__ (Some 1) (Queue.peek q) ;
+  Assert.is_none
+    ~pp:Format.pp_print_int
+    ~loc:__LOC__
     (Queue.find_opt q (mock_key 0))
-    None
 
 let test_filter () =
   let q = init_queue 10 10 in
   Queue.filter q (fun _ v -> v < 5) ;
-  Assert.equal ~prn:string_of_int ~msg:__LOC__ 5 (Queue.length q)
+  Assert.Int.equal ~loc:__LOC__ 5 (Queue.length q)
 
 let test_filter_none () =
   let q = init_queue 10 10 in
   Queue.filter q (fun _ v -> v < 15) ;
-  Assert.equal ~prn:string_of_int ~msg:__LOC__ 10 (Queue.length q)
+  Assert.Int.equal ~loc:__LOC__ 10 (Queue.length q)
 
 let test_clear () =
   let q = init_queue 10 10 in
   Queue.clear q ;
-  Assert.equal ~prn:string_of_int ~msg:__LOC__ 0 (Queue.length q)
+  Assert.Int.is_zero ~loc:__LOC__ (Queue.length q)
 
 let test_fold () =
   let q = init_queue 10 10 in
@@ -194,10 +169,10 @@ let test_fold () =
     (* The resulting list is newest to oldest *)
     Queue.fold (fun k v acc -> (k, v) :: acc) q []
   in
-  Assert.make_equal_list
-    ~msg:__LOC__
-    (fun (k1, v1) (k2, v2) -> String.equal k1 k2 && Int.equal v1 v2)
-    (fun (k, v) -> Printf.sprintf "(%s, %d)" k v)
+  Assert.equal_list
+    ~loc:__LOC__
+    ~eq:(fun (k1, v1) (k2, v2) -> String.equal k1 k2 && Int.equal v1 v2)
+    ~pp:(fun ppf (k, v) -> Format.fprintf ppf "(%s, %d)" k v)
     vs
     (vs_from_fold |> List.rev)
 
@@ -205,7 +180,7 @@ let test_elements () =
   let q = init_queue 10 10 in
   let (_, vs) = gen_values 10 |> List.split in
   let elts = Queue.elements q in
-  Assert.make_equal_list ~msg:__LOC__ Int.equal string_of_int vs elts
+  Assert.Int.List.equal ~loc:__LOC__ vs elts
 
 let test_take_replace_keep_order () =
   let q = init_queue 10 5 in
@@ -213,12 +188,7 @@ let test_take_replace_keep_order () =
   (* Queue should be [3; 4] *)
   Queue.replace q "val<25>" 25 ;
   (* Queue is now be [3; 4; 25] *)
-  Assert.make_equal_list
-    ~msg:__LOC__
-    Int.equal
-    string_of_int
-    [3; 4; 25]
-    (Queue.elements q)
+  Assert.Int.List.equal ~loc:__LOC__ [3; 4; 25] (Queue.elements q)
 
 let () =
   Alcotest.run

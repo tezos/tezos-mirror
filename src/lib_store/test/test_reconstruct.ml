@@ -43,8 +43,7 @@ let check_flags descr store expected_head =
   let*! checkpoint = Store.Chain.checkpoint chain_store in
   let* metadata = Store.Block.get_block_metadata chain_store expected_head in
   let expected_checkpoint = Store.Block.last_allowed_fork_level metadata in
-  Assert.equal
-    ~prn:(Format.sprintf "%ld")
+  Assert.Int32.equal
     ~msg:("checkpoint consistency: " ^ descr)
     expected_checkpoint
     (snd checkpoint) ;

@@ -28,60 +28,36 @@
 module Crypto : sig
   (** [equal_operation msg op0 op1] checks that the operations [op0] and [op1] are
         equal. Will fail with the message [msg] otherwise *)
-  val equal_operation :
-    ?msg:string ->
-    Tezos_base.Operation.t option ->
-    Tezos_base.Operation.t option ->
-    unit
+  val equal_operation : Tezos_base.Operation.t option Lib_test.Assert.check2
 
-  (** [equal_block msg b0 b1] checks that the blocks [b0] and [b1] are
+  (** [equal_block loc msg b0 b1] checks that the blocks [b0] and [b1] are
         equal. Will fail with the message [msg] otherwise *)
-  val equal_block :
-    ?msg:string ->
-    Tezos_base.Block_header.t ->
-    Tezos_base.Block_header.t ->
-    unit
+  val equal_block : Tezos_base.Block_header.t Lib_test.Assert.check2
 
   (** [equal_block_set msg bs0 bs1] checks that the block sets [bs0] and [bs1] are
         equal. Will fail with the message [msg] otherwise *)
-  val equal_block_set :
-    ?msg:string ->
-    Tezos_crypto.Block_hash.Set.t ->
-    Tezos_crypto.Block_hash.Set.t ->
-    unit
+  val equal_block_set : Tezos_crypto.Block_hash.Set.t Lib_test.Assert.check2
 
   (** [equal_block_map msg bm0 bm1] checks that the block maps [bm0] and [bm1] are
         equal. Will fail with the message [msg] otherwise *)
   val equal_block_map :
-    ?msg:string ->
     eq:('a -> 'a -> bool) ->
-    'a Tezos_crypto.Block_hash.Map.t ->
-    'a Tezos_crypto.Block_hash.Map.t ->
-    unit
+    'a Tezos_crypto.Block_hash.Map.t Lib_test.Assert.check2
 
   (** [equal_block_hash_list msg bhl0 bhl1] checks that the block hashes list [bhl0] and [bhl1] are
         equal. Will fail with the message [msg] otherwise *)
   val equal_block_hash_list :
-    ?msg:string ->
-    Tezos_crypto.Block_hash.t list ->
-    Tezos_crypto.Block_hash.t list ->
-    unit
+    Tezos_crypto.Block_hash.t list Lib_test.Assert.check2
 
   (** [equal_block_descriptor msg bd0 bd1] checks that the block descriptors [bd0] and [bd1] are
         equal. Will fail with the message [msg] otherwise *)
   val equal_block_descriptor :
-    ?msg:string ->
-    int32 * Tezos_crypto.Block_hash.t ->
-    int32 * Tezos_crypto.Block_hash.t ->
-    unit
+    (int32 * Tezos_crypto.Block_hash.t) Lib_test.Assert.check2
 end
 
 module Shell_services : sig
   (** [equal_history_mode msg hm0 hm1] checks that the history modes [hm0] and [hm1] are
         equal. Will fail with the message [msg] otherwise *)
   val equal_history_mode :
-    ?msg:string ->
-    Tezos_shell_services.History_mode.t ->
-    Tezos_shell_services.History_mode.t ->
-    unit
+    Tezos_shell_services.History_mode.t Lib_test.Assert.check2
 end

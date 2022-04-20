@@ -67,7 +67,8 @@ let test_context_mem_fct (proxy : Context.t) : unit Lwt.t =
   let open Lwt_syntax in
   let assert_mem key expected =
     let* res = Context.mem proxy key in
-    Assert.equal_bool
+    Assert.Bool.equal
+      ~loc:__LOC__
       ~msg:(Printf.sprintf "Context.mem [%s], got %b" (key_to_string key) res)
       expected
       res ;
@@ -82,7 +83,8 @@ let test_context_mem_tree_fct (proxy : Context.t) : unit Lwt.t =
   let open Lwt_syntax in
   let assert_mem_tree key expected =
     let* res = Context.mem_tree proxy key in
-    Assert.equal_bool
+    Assert.Bool.equal
+      ~loc:__LOC__
       ~msg:
         (Printf.sprintf "Context.mem_tree [%s], got %b" (key_to_string key) res)
       expected
@@ -98,7 +100,8 @@ let test_context_find_fct (proxy : Context.t) : unit Lwt.t =
   let open Lwt_syntax in
   let assert_find key expected =
     let* res = Context.find proxy key in
-    Assert.equal_bytes_option
+    Assert.Bytes.Option.equal
+      ~loc:__LOC__
       ~msg:
         (Printf.sprintf
            "Context.find [%s], is some: %b"
@@ -117,7 +120,8 @@ let test_context_find_tree_fct (proxy : Context.t) : unit Lwt.t =
   let open Lwt_syntax in
   let assert_find_tree key expected =
     let* res = Context.find_tree proxy key in
-    Assert.equal_bool
+    Assert.Bool.equal
+      ~loc:__LOC__
       ~msg:
         (Printf.sprintf
            "Context.find_tree [%s], is some: %b"
@@ -136,7 +140,8 @@ let test_context_list_fct (proxy : Context.t) : unit Lwt.t =
   let open Lwt_syntax in
   let assert_list key expected_keys =
     let+ res = Context.list proxy key in
-    Assert.equal_string_list
+    Assert.String.List.equal
+      ~loc:__LOC__
       ~msg:
         (Printf.sprintf
            "Context.list [%s], got [%s]"
@@ -155,6 +160,7 @@ let test_context_length_fct (proxy : Context.t) : unit Lwt.t =
   let assert_length key expected =
     let* res = Context.length proxy key in
     Assert.equal
+      ~loc:__LOC__
       ~msg:
         (Printf.sprintf "Context.length [%s], got %d" (key_to_string key) res)
       expected
@@ -174,6 +180,7 @@ let test_context_fold_fct (proxy : Context.t) : unit Lwt.t =
           return (acc ^ ":" ^ key_to_string k))
     in
     Assert.equal
+      ~loc:__LOC__
       ~msg:(Printf.sprintf "Context.fold [%s], got %S" (key_to_string key) res)
       exp
       res ;

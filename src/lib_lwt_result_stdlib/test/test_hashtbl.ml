@@ -27,6 +27,7 @@
    checks most errors directly. So we don't need the syntactic support to
    alleviate the error handling. *)
 open Support.Lib.Monad.Lwt_syntax
+module Assert = Lib_test.Assert
 
 module IntESHashtbl = Support.Lib.Hashtbl.Make_es (struct
   type t = int
@@ -40,27 +41,32 @@ let test_add_remove _ _ =
   let t = IntESHashtbl.create 2 in
   let* r = IntESHashtbl.find_or_make t 0 (fun () -> return_ok 0) in
   match r with
-  | Error _ -> Assert.fail "Ok 0" "Error _" "find_or_make"
+  | Error _ -> Assert.String.fail "Ok 0" "Error _" ~msg:"find_or_make"
   | Ok n -> (
       if not (n = 0) then
-        Assert.fail "Ok 0" (Format.asprintf "Ok %d" n) "find_or_make"
+        Assert.String.fail
+          "Ok 0"
+          (Format.asprintf "Ok %d" n)
+          ~msg:"find_or_make"
       else
         match IntESHashtbl.find t 0 with
-        | None -> Assert.fail "Some (Ok 0)" "None" "find"
+        | None -> Assert.String.fail "Some (Ok 0)" "None" ~msg:"find"
         | Some p -> (
             let* r = p in
             match r with
-            | Error _ -> Assert.fail "Some (Ok 0)" "Some (Error _)" "find"
+            | Error _ ->
+                Assert.String.fail "Some (Ok 0)" "Some (Error _)" ~msg:"find"
             | Ok n ->
                 if not (n = 0) then
-                  Assert.fail
+                  Assert.String.fail
                     "Some (Ok 0)"
                     (Format.asprintf "Some (Ok %d)" n)
-                    "find"
+                    ~msg:"find"
                 else (
                   IntESHashtbl.remove t 0 ;
                   match IntESHashtbl.find t 0 with
-                  | Some _ -> Assert.fail "None" "Some _" "remove;find"
+                  | Some _ ->
+                      Assert.String.fail "None" "Some _" ~msg:"remove;find"
                   | None -> Lwt.return_unit)))
 
 let test_add_add _ _ =
@@ -68,14 +74,17 @@ let test_add_add _ _ =
   let* _ = IntESHashtbl.find_or_make t 0 (fun () -> return_ok 0) in
   let* _ = IntESHashtbl.find_or_make t 0 (fun () -> return_ok 1) in
   match IntESHashtbl.find t 0 with
-  | None -> Assert.fail "Some (Ok 0)" "None" "find"
+  | None -> Assert.String.fail "Some (Ok 0)" "None" ~msg:"find"
   | Some p -> (
       let* r = p in
       match r with
-      | Error _ -> Assert.fail "Some (Ok 0)" "Some (Error _)" "find"
+      | Error _ -> Assert.String.fail "Some (Ok 0)" "Some (Error _)" ~msg:"find"
       | Ok n ->
           if not (n = 0) then
-            Assert.fail "Some (Ok 0)" (Format.asprintf "Some (Ok %d)" n) "find"
+            Assert.String.fail
+              "Some (Ok 0)"
+              (Format.asprintf "Some (Ok %d)" n)
+              ~msg:"find"
           else Lwt.return_unit)
 
 let test_length _ _ =
@@ -85,7 +94,8 @@ let test_length _ _ =
   let* _ = IntESHashtbl.find_or_make t 2 (fun () -> Lwt.return_ok 2) in
   let* _ = IntESHashtbl.find_or_make t 3 (fun () -> Lwt.return_ok 3) in
   let l = IntESHashtbl.length t in
-  if not (l = 4) then Assert.fail "4" (Format.asprintf "%d" l) "length"
+  if not (l = 4) then
+    Assert.String.fail "4" (Format.asprintf "%d" l) ~msg:"length"
   else Lwt.return_unit
 
 let test_self_clean _ _ =
@@ -104,7 +114,8 @@ let test_self_clean _ _ =
       (function Not_found -> Lwt.return_unit | exn -> Lwt.fail exn)
   in
   let l = IntESHashtbl.length t in
-  if not (l = 3) then Assert.fail "3" (Format.asprintf "%d" l) "length"
+  if not (l = 3) then
+    Assert.String.fail "3" (Format.asprintf "%d" l) ~msg:"length"
   else Lwt.return_unit
 
 let test_order _ _ =
@@ -140,19 +151,25 @@ let test_order _ _ =
   let* () =
     let* r = p_a in
     match r with
-    | Error _ -> Assert.fail "Ok 0" "Error _" "find_or_make(a)"
+    | Error _ -> Assert.String.fail "Ok 0" "Error _" ~msg:"find_or_make(a)"
     | Ok n ->
         if not (n = 0) then
-          Assert.fail "Ok 0" (Format.asprintf "Ok %d" n) "find_or_make(a)"
+          Assert.String.fail
+            "Ok 0"
+            (Format.asprintf "Ok %d" n)
+            ~msg:"find_or_make(a)"
         else Lwt.return_unit
   in
   let* () =
     let* r = p_b in
     match r with
-    | Error _ -> Assert.fail "Ok 0" "Error _" "find_or_make(b)"
+    | Error _ -> Assert.String.fail "Ok 0" "Error _" ~msg:"find_or_make(b)"
     | Ok n ->
         if not (n = 0) then
-          Assert.fail "Ok 0" (Format.asprintf "Ok %d" n) "find_or_make(b)"
+          Assert.String.fail
+            "Ok 0"
+            (Format.asprintf "Ok %d" n)
+            ~msg:"find_or_make(b)"
         else Lwt.return_unit
   in
   (* Check that the `world` record is as expected *)
@@ -160,10 +177,10 @@ let test_order _ _ =
   | ["b_outer"; "a_outer"; "a_inner"] | ["a_outer"; "b_outer"; "a_inner"] ->
       Lwt.return ()
   | world ->
-      Assert.fail
+      Assert.String.fail
         "[outers;a_inner]"
         Format.(asprintf "[%a]" (pp_print_list pp_print_string) world)
-        "world"
+        ~msg:"world"
 
 let tests =
   [

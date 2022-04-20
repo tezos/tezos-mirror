@@ -24,6 +24,7 @@
 (*****************************************************************************)
 
 open Lwt.Syntax
+module Assert = Lib_test.Assert
 
 module type GEN = sig
   type 'a t
@@ -58,16 +59,16 @@ end
 module Testing = struct
   exception Nope of int
 
-  module Prn = struct
-    let int = string_of_int
+  module Pp = struct
+    let int = Format.pp_print_int
 
-    let res f g = function
-      | Ok o -> "ok(" ^ f o ^ ")"
-      | Error e -> "error(" ^ g e ^ ")"
+    let res f g ppf = function
+      | Ok o -> Format.fprintf ppf "ok(%a)" f o
+      | Error e -> Format.fprintf ppf "error(%a)" g e
 
-    let unit _ = "()"
+    let unit ppf _ = Format.pp_print_string ppf "()"
 
-    let t _ _ = "T"
+    let t _ ppf _ = Format.pp_print_string ppf "T"
   end
 
   module Iter = struct
@@ -79,13 +80,13 @@ module Testing = struct
 
     let exn_now _ = raise (Nope 2048)
 
-    let prn = Prn.(res unit int)
+    let pp = Pp.(res unit int)
 
-    let eq a b = Assert.equal ~prn a b
+    let eq a b = Assert.equal ~pp a b
 
     let eq_s a b =
       let+ b = b in
-      Assert.equal ~prn a b
+      Assert.equal ~pp a b
 
     let eq_s_catch a b =
       let+ rb =
@@ -95,7 +96,7 @@ module Testing = struct
             Lwt.return_ok x)
           (function Nope d -> Lwt.return_error d | exc -> raise exc)
       in
-      Assert.equal ~prn:Prn.(res prn int) a rb
+      Assert.equal ~pp:Pp.(res pp int) a rb
   end
 
   module Folder = struct
@@ -107,13 +108,13 @@ module Testing = struct
 
     let exn_now _ _ = raise (Nope 2048)
 
-    let prn = Prn.(res int int)
+    let pp = Pp.(res int int)
 
-    let eq a b = Assert.equal ~prn a b
+    let eq a b = Assert.equal ~pp a b
 
     let eq_s a b =
       let+ b = b in
-      Assert.equal ~prn a b
+      eq a b
 
     let eq_s_catch a b =
       let+ rb =
@@ -123,7 +124,7 @@ module Testing = struct
             Lwt.return_ok x)
           (function Nope d -> Lwt.return_error d | exc -> raise exc)
       in
-      Assert.equal ~prn:Prn.(res prn int) a rb
+      Assert.equal ~pp:Pp.(res pp int) a rb
   end
 
   (* NOTE: the functor is necessary to avoid a type escaping its scope latter on *)
@@ -136,13 +137,14 @@ module Testing = struct
 
     let exn_now _ = raise (Nope 2048)
 
-    let prn : ('a G.t, int) result -> string = Prn.(res (t int) int)
+    let pp : Format.formatter -> ('a G.t, int) result -> unit =
+      Pp.(res (t int) int)
 
-    let eq a b = Assert.equal ~prn a b
+    let eq a b = Assert.equal ~pp a b
 
     let eq_s a b =
       let+ b = b in
-      Assert.equal ~prn a b
+      Assert.equal ~pp a b
 
     let eq_s_catch a b =
       let+ rb =
@@ -152,7 +154,7 @@ module Testing = struct
             Lwt.return_ok x)
           (function Nope d -> Lwt.return_error d | exc -> raise exc)
       in
-      Assert.equal ~prn:Prn.(res prn int) a rb
+      Assert.equal ~pp:Pp.(res pp int) a rb
   end
 end
 
@@ -184,7 +186,7 @@ struct
     let witness = ref 0 in
     (* vanilla, uninterrupted iter *)
     iter (fun _ -> incr witness) (up 10) ;
-    Assert.equal ~msg:"vanilla iter" ~prn:Testing.Prn.int 11 !witness ;
+    Assert.equal ~msg:"vanilla iter" ~pp:Testing.Pp.int 11 !witness ;
     (* error interrupted iter *)
     let ie =
       iter_e
@@ -197,10 +199,10 @@ struct
     | Error n ->
         Assert.equal
           ~msg:"unexpected error in result iter"
-          ~prn:Testing.Prn.int
+          ~pp:Testing.Pp.int
           10
           n ;
-        Assert.equal ~msg:"result iter" ~prn:Testing.Prn.int 22 !witness
+        Assert.equal ~msg:"result iter" ~pp:Testing.Pp.int 22 !witness
     | Ok () -> Assert.equal ~msg:"unexpected success in result iter" true false) ;
     (* lwt-error interrupted iter *)
     let+ r =
@@ -214,10 +216,10 @@ struct
     | Error n ->
         Assert.equal
           ~msg:"unexpected error in lwt-result iter"
-          ~prn:Testing.Prn.int
+          ~pp:Testing.Pp.int
           10
           n ;
-        Assert.equal ~msg:"lwt-result iter" ~prn:Testing.Prn.int 33 !witness
+        Assert.equal ~msg:"lwt-result iter" ~pp:Testing.Pp.int 33 !witness
     | Ok () ->
         Assert.equal ~msg:"unexpected success in lwt-result iter" true false
 

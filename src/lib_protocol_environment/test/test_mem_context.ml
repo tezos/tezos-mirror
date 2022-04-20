@@ -78,7 +78,7 @@ let wrap_context_init f _ () =
 
 (** Simple test *)
 
-let c = function None -> None | Some s -> Some (Bytes.to_string s)
+let c = Option.map Bytes.to_string
 
 (** Restore the context applied until [block2]. It is asserted that
     the following key-values are present:
@@ -89,27 +89,27 @@ let c = function None -> None | Some s -> Some (Bytes.to_string s)
 let test_simple {block2 = ctxt; _} =
   let open Lwt_syntax in
   let* version = Context.find ctxt ["version"] in
-  Assert.equal_string_option ~msg:__LOC__ (c version) (Some "0.0") ;
+  Assert.String.Option.equal ~loc:__LOC__ (c version) (Some "0.0") ;
   let* novembre = Context.find ctxt ["a"; "b"] in
-  Assert.equal_string_option (Some "Novembre") (c novembre) ;
+  Assert.String.Option.equal (Some "Novembre") (c novembre) ;
   let* juin = Context.find ctxt ["a"; "c"] in
-  Assert.equal_string_option ~msg:__LOC__ (Some "Juin") (c juin) ;
+  Assert.String.Option.equal ~loc:__LOC__ (Some "Juin") (c juin) ;
 
   (* Mem function returns "true" if the key given leads to an existing leaf *)
   let* res = Context.mem ctxt ["a"] in
-  Assert.equal_bool false res ;
+  Assert.Bool.equal false res ;
   let* res = Context.mem ctxt ["a"; "c"] in
-  Assert.equal_bool true res ;
+  Assert.Bool.equal true res ;
   let* res = Context.mem ctxt ["a"; "x"] in
-  Assert.equal_bool false res ;
+  Assert.Bool.equal false res ;
 
   (* Mem_tree is like "mem", but also returns "true" for a trunk node *)
   let* res = Context.mem_tree ctxt ["a"] in
-  Assert.equal_bool true res ;
+  Assert.Bool.equal true res ;
   let* res = Context.mem_tree ctxt ["a"; "c"] in
-  Assert.equal_bool true res ;
+  Assert.Bool.equal true res ;
   let* res = Context.mem_tree ctxt ["a"; "x"] in
-  Assert.equal_bool false res ;
+  Assert.Bool.equal false res ;
   return_unit
 
 (** Restore the context applied until [block3a]. It is asserted that
@@ -123,13 +123,13 @@ let test_simple {block2 = ctxt; _} =
 let test_continuation {block3a = ctxt; _} =
   let open Lwt_syntax in
   let* version = Context.find ctxt ["version"] in
-  Assert.equal_string_option ~msg:__LOC__ (Some "0.0") (c version) ;
+  Assert.String.Option.equal ~loc:__LOC__ (Some "0.0") (c version) ;
   let* novembre = Context.find ctxt ["a"; "b"] in
-  Assert.assert_none ~msg:__LOC__ (c novembre) ;
+  Assert.is_none ~loc:__LOC__ (c novembre) ;
   let* juin = Context.find ctxt ["a"; "c"] in
-  Assert.equal_string_option ~msg:__LOC__ (Some "Juin") (c juin) ;
+  Assert.String.Option.equal ~loc:__LOC__ (Some "Juin") (c juin) ;
   let* mars = Context.find ctxt ["a"; "d"] in
-  Assert.equal_string_option ~msg:__LOC__ (Some "Mars") (c mars) ;
+  Assert.String.Option.equal ~loc:__LOC__ (Some "Mars") (c mars) ;
   Lwt.return_unit
 
 (** Restore the context applied until [block3b]. It is asserted that
@@ -143,13 +143,13 @@ let test_continuation {block3a = ctxt; _} =
 let test_fork {block3b = ctxt; _} =
   let open Lwt_syntax in
   let* version = Context.find ctxt ["version"] in
-  Assert.equal_string_option ~msg:__LOC__ (Some "0.0") (c version) ;
+  Assert.String.Option.equal ~loc:__LOC__ (Some "0.0") (c version) ;
   let* novembre = Context.find ctxt ["a"; "b"] in
-  Assert.equal_string_option ~msg:__LOC__ (Some "Novembre") (c novembre) ;
+  Assert.String.Option.equal ~loc:__LOC__ (Some "Novembre") (c novembre) ;
   let* juin = Context.find ctxt ["a"; "c"] in
-  Assert.assert_none ~msg:__LOC__ (c juin) ;
+  Assert.is_none ~loc:__LOC__ (c juin) ;
   let* mars = Context.find ctxt ["a"; "d"] in
-  Assert.equal_string_option ~msg:__LOC__ (Some "Février") (c mars) ;
+  Assert.String.Option.equal ~loc:__LOC__ (Some "Février") (c mars) ;
   Lwt.return_unit
 
 (** Restore the context at [genesis] and explicitly replay
@@ -164,15 +164,15 @@ let test_replay {genesis = ctxt0; _} =
   let* ctxt4b = Context.add ctxt3 ["a"; "d"] (Bytes.of_string "Juillet") in
   let* ctxt5a = Context.add ctxt4a ["a"; "b"] (Bytes.of_string "November") in
   let* novembre = Context.find ctxt4a ["a"; "b"] in
-  Assert.equal_string_option ~msg:__LOC__ (Some "Novembre") (c novembre) ;
+  Assert.String.Option.equal ~loc:__LOC__ (Some "Novembre") (c novembre) ;
   let* november = Context.find ctxt5a ["a"; "b"] in
-  Assert.equal_string_option ~msg:__LOC__ (Some "November") (c november) ;
+  Assert.String.Option.equal ~loc:__LOC__ (Some "November") (c november) ;
   let* july = Context.find ctxt5a ["a"; "d"] in
-  Assert.equal_string_option ~msg:__LOC__ (Some "July") (c july) ;
+  Assert.String.Option.equal ~loc:__LOC__ (Some "July") (c july) ;
   let* novembre = Context.find ctxt4b ["a"; "b"] in
-  Assert.equal_string_option ~msg:__LOC__ (Some "Novembre") (c novembre) ;
+  Assert.String.Option.equal ~loc:__LOC__ (Some "Novembre") (c novembre) ;
   let* juillet = Context.find ctxt4b ["a"; "d"] in
-  Assert.equal_string_option ~msg:__LOC__ (Some "Juillet") (c juillet) ;
+  Assert.String.Option.equal ~loc:__LOC__ (Some "Juillet") (c juillet) ;
   Lwt.return_unit
 
 let fold_keys s root ~init ~f =
@@ -194,21 +194,21 @@ let test_fold_keys {genesis = ctxt; _} =
   let* ctxt = Context.add ctxt ["f"] (Bytes.of_string "Avril") in
   let* ctxt = Context.add ctxt ["g"; "h"] (Bytes.of_string "Avril") in
   let* l = keys ctxt [] in
-  Assert.equal_string_list_list
-    ~msg:__LOC__
+  Assert.String.List_list.equal
+    ~loc:__LOC__
     [["a"; "b"]; ["a"; "c"]; ["a"; "d"; "e"]; ["f"]; ["g"; "h"]]
     (List.sort compare l) ;
   let* l = keys ctxt ["a"] in
-  Assert.equal_string_list_list
-    ~msg:__LOC__
+  Assert.String.List_list.equal
+    ~loc:__LOC__
     [["a"; "b"]; ["a"; "c"]; ["a"; "d"; "e"]]
     (List.sort compare l) ;
   let* l = keys ctxt ["f"] in
-  Assert.equal_string_list_list ~msg:__LOC__ [] l ;
+  Assert.String.List_list.equal ~loc:__LOC__ [] l ;
   let* l = keys ctxt ["g"] in
-  Assert.equal_string_list_list ~msg:__LOC__ [["g"; "h"]] l ;
+  Assert.String.List_list.equal ~loc:__LOC__ [["g"; "h"]] l ;
   let* l = keys ctxt ["i"] in
-  Assert.equal_string_list_list ~msg:__LOC__ [] l ;
+  Assert.String.List_list.equal ~loc:__LOC__ [] l ;
   Lwt.return_unit
 
 let test_fold {genesis = ctxt; _} =
@@ -230,8 +230,8 @@ let test_fold {genesis = ctxt; _} =
         ~order:`Sorted
         ~init:([], [])
     in
-    Assert.equal_string_list_list ~msg:__LOC__ ecs cs ;
-    Assert.equal_string_list_list ~msg:__LOC__ ens ns ;
+    Assert.String.List_list.equal ~loc:__LOC__ ecs cs ;
+    Assert.String.List_list.equal ~loc:__LOC__ ens ns ;
     Lwt.return ()
   in
   let* () =
@@ -292,7 +292,7 @@ let test_fold_order {genesis = ctxt; _} =
     fold_keys ctxt ["root"] ~init:[] ~f:(fun k acc -> Lwt.return (k :: acc))
   in
   let bs = List.rev bs in
-  Assert.equal_string_list_list ~msg:__LOC__ (List.map fst bindings) bs ;
+  Assert.String.List_list.equal ~loc:__LOC__ (List.map fst bindings) bs ;
   Lwt.return_unit
 
 let test_trees {genesis = ctxt; _} =
@@ -326,8 +326,8 @@ let test_trees {genesis = ctxt; _} =
         ~order:`Sorted
         ~init:([], [])
     in
-    Assert.equal_string_list_list ~msg:__LOC__ ecs cs ;
-    Assert.equal_string_list_list ~msg:__LOC__ ens ns ;
+    Assert.String.List_list.equal ~loc:__LOC__ ecs cs ;
+    Assert.String.List_list.equal ~loc:__LOC__ ens ns ;
     Lwt.return ()
   in
   let* () =
@@ -352,18 +352,18 @@ let test_trees {genesis = ctxt; _} =
   let* () = fold (Some (`Gt 2)) [["foo"; "bar"; "toto"]] [] in
   let* v1 = Context.Tree.remove v1 ["foo"; "bar"; "toto"] in
   let* v = Context.Tree.find v1 ["foo"; "bar"; "toto"] in
-  Assert.equal_bytes_option ~msg:__LOC__ None v ;
+  Assert.Bytes.Option.equal ~loc:__LOC__ None v ;
   let* v = Context.Tree.find v1 ["foo"; "toto"] in
-  Assert.equal_bytes_option ~msg:__LOC__ (Some foo1) v ;
+  Assert.Bytes.Option.equal ~loc:__LOC__ (Some foo1) v ;
   Context.Tree.empty ctxt |> fun v1 ->
   let* v1 = Context.Tree.add v1 ["foo"; "1"] foo1 in
   let* v1 = Context.Tree.add v1 ["foo"; "2"] foo2 in
   let* v1 = Context.Tree.remove v1 ["foo"; "1"] in
   let* v1 = Context.Tree.remove v1 ["foo"; "2"] in
   let* v = Context.Tree.find v1 ["foo"; "1"] in
-  Assert.equal_bytes_option ~msg:__LOC__ None v ;
+  Assert.Bytes.Option.equal ~loc:__LOC__ None v ;
   let* v1 = Context.Tree.remove v1 [] in
-  Assert.equal_bool ~msg:__LOC__ true (Context.Tree.is_empty v1) ;
+  Assert.Bool.equal ~loc:__LOC__ true (Context.Tree.is_empty v1) ;
   Lwt.return ()
 
 (* We now test the [keys] function.
@@ -394,7 +394,7 @@ module PP = struct
       k
 
   let domain ppf d =
-    let l = StringListSet.to_seq d |> List.of_seq in
+    let l = StringListSet.elements d in
     Format.pp_print_list
       key
       ppf
@@ -402,15 +402,12 @@ module PP = struct
       l
 
   let domain ppf d = Format.fprintf ppf "[%a]" domain d
-
-  let domain_to_string d = Format.asprintf "%a" domain d
 end
 
 let domain ctxt = keys ctxt []
 
 let check_eq_domains d1 d2 =
-  let eq d d' = StringListSet.subset d d' && StringListSet.subset d' d in
-  Assert.equal ~eq ~prn:PP.domain_to_string d1 d2
+  Assert.equal ~eq:StringListSet.equal ~pp:PP.domain d1 d2
 
 let test_domain0 () =
   let open Lwt_syntax in
