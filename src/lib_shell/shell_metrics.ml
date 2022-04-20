@@ -25,6 +25,121 @@
 
 let namespace = Tezos_version.Node_version.namespace
 
+module Mempool = struct
+  open Prometheus
+
+  let component = "mempool_pending"
+
+  type mempool_collectors = {
+    mutable applied : unit -> float;
+    mutable prechecked : unit -> float;
+    mutable refused : unit -> float;
+    mutable branch_refused : unit -> float;
+    mutable branch_delayed : unit -> float;
+    mutable outdated : unit -> float;
+    mutable unprocessed : unit -> float;
+  }
+
+  let mempool_collectors =
+    {
+      applied = (fun () -> 0.);
+      prechecked = (fun () -> 0.);
+      refused = (fun () -> 0.);
+      branch_refused = (fun () -> 0.);
+      branch_delayed = (fun () -> 0.);
+      outdated = (fun () -> 0.);
+      unprocessed = (fun () -> 0.);
+    }
+
+  let set_applied_collector fn = mempool_collectors.applied <- fn
+
+  let set_prechecked_collector fn = mempool_collectors.prechecked <- fn
+
+  let set_refused_collector fn = mempool_collectors.refused <- fn
+
+  let set_branch_delayed_collector fn = mempool_collectors.branch_delayed <- fn
+
+  let set_branch_refused_collector fn = mempool_collectors.branch_refused <- fn
+
+  let set_outdated_collector fn = mempool_collectors.outdated <- fn
+
+  let set_unprocessed_collector fn = mempool_collectors.unprocessed <- fn
+
+  let () =
+    let metric ~help ~name collector =
+      let info =
+        MetricInfo.
+          {
+            name = MetricName.v (String.concat "_" [namespace; component; name]);
+            metric_type = Gauge;
+            help;
+            label_names = [];
+          }
+      in
+      let collect () =
+        LabelSetMap.singleton [] [Sample_set.sample (collector ())]
+      in
+      (info, collect)
+    in
+    let applied =
+      metric
+        ~help:"Mempool pending applied operations count"
+        ~name:"applied"
+        (fun () -> mempool_collectors.applied ())
+    in
+    let prechecked =
+      metric
+        ~help:"Mempool pending prechecked operations count"
+        ~name:"prechecked"
+        (fun () -> mempool_collectors.prechecked ())
+    in
+    let refused =
+      metric
+        ~help:"Mempool pending refused operations count"
+        ~name:"refused"
+        (fun () -> mempool_collectors.refused ())
+    in
+    let branch_refused =
+      metric
+        ~help:"Mempool pending branch refused operations count"
+        ~name:"branch_refused"
+        (fun () -> mempool_collectors.branch_refused ())
+    in
+    let branch_delayed =
+      metric
+        ~help:"Mempool pending branch delayed operations count"
+        ~name:"branch_delayed"
+        (fun () -> mempool_collectors.branch_delayed ())
+    in
+    let outdated =
+      metric
+        ~help:"Mempool pending outdated operations count"
+        ~name:"outdated"
+        (fun () -> mempool_collectors.outdated ())
+    in
+    let unprocessed =
+      metric
+        ~help:"Mempool pending unprocessed operations count"
+        ~name:"unprocessed"
+        (fun () -> mempool_collectors.unprocessed ())
+    in
+    let metrics =
+      [
+        applied;
+        prechecked;
+        refused;
+        branch_refused;
+        branch_delayed;
+        outdated;
+        unprocessed;
+      ]
+    in
+    let add (info, collector) =
+      CollectorRegistry.(register default info collector)
+    in
+    List.iter add metrics
+end
+
 module Worker = struct
   type t = {
     last_finished_request_push_timestamp : Prometheus.Gauge.t;

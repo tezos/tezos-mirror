@@ -260,15 +260,15 @@ let with_t_operation_gen : unit t -> unit Prevalidation.operation QCheck2.Gen.t
     let freq_fresh t =
       max
         1
-        (freq_of_list t.applied_rev + freq_of_map t.prechecked
+        (freq_of_list t.applied_rev
+        + freq_of_map (Sized_map.to_map t.prechecked)
         + freq_of_map (Classification.map t.branch_refused)
         + freq_of_map (Classification.map t.branch_delayed)
         + freq_of_map (Classification.map t.refused)
         + freq_of_map (Classification.map t.outdated))
     in
     freq_and_gen_of_list t.applied_rev
-    @ freq_and_gen_of_list
-        (List.map snd (Operation_hash.Map.bindings t.prechecked))
+    @ freq_and_gen_of_list (List.map snd (Sized_map.bindings t.prechecked))
     @ freq_and_gen_of_map (Classification.map t.branch_refused)
     @ freq_and_gen_of_map (Classification.map t.branch_delayed)
     @ freq_and_gen_of_map (Classification.map t.refused)

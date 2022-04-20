@@ -177,7 +177,7 @@ let disjoint_union_classified_fields ?fail_msg (t : unit Classification.t) =
   let to_set = Classification.Internal_for_tests.set_of_bounded_map in
   to_set t.refused +> to_set t.outdated +> to_set t.branch_refused
   +> to_set t.branch_delayed
-  +> (Operation_hash.Map.to_seq t.prechecked
+  +> (Classification.Sized_map.to_seq t.prechecked
      |> Seq.map fst |> Operation_hash.Set.of_seq)
   +> (Operation_hash.Set.of_list
      @@ List.rev_map (fun op -> op.Prevalidation.hash) t.applied_rev)
@@ -200,9 +200,8 @@ let check_invariants ?fail_msg (t : unit Classification.t) =
     Operation_hash.Map.to_seq map |> Seq.map fst |> Operation_hash.Set.of_seq
   in
   let expected_in_mempool = disjoint_union_classified_fields ?fail_msg t in
-  let mempool_as_set = to_set t.in_mempool in
-  if not (Operation_hash.Set.equal expected_in_mempool (to_set t.in_mempool))
-  then
+  let mempool_as_set = to_set (Classification.Sized_map.to_map t.in_mempool) in
+  if not (Operation_hash.Set.equal expected_in_mempool mempool_as_set) then
     let set_pp ppf set =
       set |> Operation_hash.Set.elements
       |> Format.fprintf ppf "%a" (Format.pp_print_list Operation_hash.pp)

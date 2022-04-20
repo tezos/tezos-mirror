@@ -668,7 +668,8 @@ module Make_s
             List.rev_map
               (fun op -> op.Prevalidation.hash)
               pv_shell.classification.applied_rev
-            @ (Operation_hash.Map.to_seq pv_shell.classification.prechecked
+            @ (Classification.Sized_map.to_seq
+                 pv_shell.classification.prechecked
               |> Seq.map fst |> List.of_seq);
           pending = Pending_ops.hashes pv_shell.pending;
         }
@@ -1248,7 +1249,8 @@ module Make
                reflect that. *)
             let prechecked_with_applied =
               if params#applied then
-                (Operation_hash.Map.bindings pv.shell.classification.prechecked
+                (Classification.Sized_map.bindings
+                   pv.shell.classification.prechecked
                 |> List.rev_map (fun (oph, op) ->
                        (oph, op.Prevalidation.protocol)))
                 @ applied
@@ -1301,7 +1303,7 @@ module Make
                handled the same way for the user point of view. *)
             let prechecked =
               if params#applied then
-                Operation_hash.Map.fold
+                Classification.Sized_map.fold
                   (fun hash op acc ->
                     (hash, op.Prevalidation.protocol, []) :: acc)
                   pv.shell.classification.prechecked
@@ -1522,6 +1524,28 @@ module Make
           worker = mk_worker_tools w;
         }
       in
+      Shell_metrics.Mempool.set_applied_collector (fun () ->
+          List.length shell.classification.applied_rev |> float_of_int) ;
+      Shell_metrics.Mempool.set_prechecked_collector (fun () ->
+          Prevalidator_classification.Sized_map.cardinal
+            shell.classification.prechecked
+          |> float_of_int) ;
+      Shell_metrics.Mempool.set_refused_collector (fun () ->
+          Prevalidator_classification.cardinal shell.classification.refused
+          |> float_of_int) ;
+      Shell_metrics.Mempool.set_branch_refused_collector (fun () ->
+          Prevalidator_classification.cardinal
+            shell.classification.branch_refused
+          |> float_of_int) ;
+      Shell_metrics.Mempool.set_branch_delayed_collector (fun () ->
+          Prevalidator_classification.cardinal
+            shell.classification.branch_delayed
+          |> float_of_int) ;
+      Shell_metrics.Mempool.set_outdated_collector (fun () ->
+          Prevalidator_classification.cardinal shell.classification.outdated
+          |> float_of_int) ;
+      Shell_metrics.Mempool.set_unprocessed_collector (fun () ->
+          Prevalidator_pending_operations.cardinal shell.pending |> float_of_int) ;
 
       let* filter_state =
         Filter.Mempool.init

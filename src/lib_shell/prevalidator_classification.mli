@@ -40,10 +40,18 @@ val map :
   'protocol_data bounded_map ->
   ('protocol_data Prevalidation.operation * tztrace) Operation_hash.Map.t
 
+(** [cardinal bounded_map] gets the cardinal of the underling map of the [bounded_map] *)
+val cardinal : 'protocol_data bounded_map -> int
+
 type parameters = {
   map_size_limit : int;
   on_discarded_operation : Operation_hash.t -> unit;
 }
+
+module Sized_map :
+  Tezos_base.Sized.SizedMap
+    with type 'a map := 'a Operation_hash.Map.t
+     and type key = Operation_hash.t
 
 (** Invariants ensured by this module, provided that the caller does
     not {!add} an operation which is already present in [t]:
@@ -74,12 +82,10 @@ type 'protocol_data t = private {
   branch_refused : 'protocol_data bounded_map;
   branch_delayed : 'protocol_data bounded_map;
   mutable applied_rev : 'protocol_data Prevalidation.operation list;
-  mutable prechecked :
-    'protocol_data Prevalidation.operation Operation_hash.Map.t;
+  mutable prechecked : 'protocol_data Prevalidation.operation Sized_map.t;
   mutable unparsable : Operation_hash.Set.t;
   mutable in_mempool :
-    ('protocol_data Prevalidation.operation * classification)
-    Operation_hash.Map.t;
+    ('protocol_data Prevalidation.operation * classification) Sized_map.t;
 }
 
 (** [create parameters] returns an empty {!t} whose bounded maps hold
