@@ -606,6 +606,12 @@ let display_names_flag =
     ~doc:"Print names of scripts passed to this command"
     ()
 
+let json_parameter =
+  Clic.parameter (fun _ s ->
+      match Data_encoding.Json.from_string s with
+      | Ok json -> return json
+      | Error err -> failwith "'%s' is not a valid JSON-encoded valie: %s" s err)
+
 module Daemon = struct
   let baking_switch =
     switch ~long:"baking" ~short:'B' ~doc:"run the baking daemon" ()
@@ -656,40 +662,29 @@ module Tx_rollup = struct
         | None -> failwith "%s is not a valid notation for a context hash" s)
 
   let message_result_path_parameter =
-    Clic.parameter (fun _ s ->
-        match Data_encoding.Json.from_string s with
-        | Ok json -> (
-            try
-              return
-                (Data_encoding.Json.destruct
-                   Tx_rollup_commitment.Merkle.path_encoding
-                   json)
-            with Data_encoding.Json.Cannot_destruct (_path, exn) ->
-              failwith
-                "Invalid JSON for a message result path: %a"
-                (fun ppf -> Data_encoding.Json.print_error ppf)
-                exn)
-        | Error err ->
-            failwith
-              "'%s' is not a valid JSON-encoded message result path: %s"
-              s
-              err)
+    Clic.map_parameter
+      ~f:(fun json ->
+        try
+          Data_encoding.Json.destruct
+            Tx_rollup_commitment.Merkle.path_encoding
+            json
+        with Data_encoding.Json.Cannot_destruct (_path, exn) ->
+          Stdlib.failwith
+            (Format.asprintf
+               "Invalid JSON for a message result path: %a"
+               (fun ppf -> Data_encoding.Json.print_error ppf)
+               exn))
+      json_parameter
 
   let tickets_dispatch_info_parameter =
-    Clic.parameter (fun _ s ->
-        match Data_encoding.Json.from_string s with
-        | Ok json -> (
-            try
-              return
-                (Data_encoding.Json.destruct Tx_rollup_reveal.encoding json)
-            with Data_encoding.Json.Cannot_destruct (_path, exn) ->
-              failwith
-                "Invalid JSON for tickets dispatch info: %a"
-                (fun ppf -> Data_encoding.Json.print_error ppf)
-                exn)
-        | Error err ->
-            failwith
-              "'%s' is not a valid JSON-encoded tickets dispatch info: %s"
-              s
-              err)
+    Clic.map_parameter
+      ~f:(fun json ->
+        try Data_encoding.Json.destruct Tx_rollup_reveal.encoding json
+        with Data_encoding.Json.Cannot_destruct (_path, exn) ->
+          Stdlib.failwith
+            (Format.asprintf
+               "Invalid JSON for tickets dispatch info: %a"
+               (fun ppf -> Data_encoding.Json.print_error ppf)
+               exn))
+      json_parameter
 end
