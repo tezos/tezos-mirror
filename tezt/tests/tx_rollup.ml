@@ -1547,7 +1547,7 @@ let test_deposit_withdraw_max_big_tickets =
     ~tags:["tx_rollup"; "withdraw"; "deposit"; "ticket"]
   @@ fun protocol ->
   let parameters = Parameters.{finality_period = 4; withdraw_period = 4} in
-  let* ({rollup; client; node = _} as state) =
+  let* ({rollup; client; node} as state) =
     init_with_tx_rollup ~parameters ~protocol ()
   in
   let* constants = RPC.get_constants client in
@@ -1586,7 +1586,7 @@ let test_deposit_withdraw_max_big_tickets =
       ~burn_cap:Tez.one
       client
   in
-  let* () = Client.bake_for client in
+  let* () = bake_and_wait client node in
   (* 2. Deposit tickets to the tx_rollup. *)
   (* deposit [max_withdrawals_per_batch] times to be able to withdraw [max_int *
      max_withdrawals_per_batch] in one operation. Last iteration is done outside
@@ -1609,7 +1609,7 @@ let test_deposit_withdraw_max_big_tickets =
             ~burn_cap:Tez.one
             client
         in
-        let* _ = Client.bake_for client in
+        let* () = bake_and_wait client node in
         unit)
   in
   let process =
@@ -1637,7 +1637,7 @@ let test_deposit_withdraw_max_big_tickets =
           client_output
     | Some hash -> return hash
   in
-  let* () = Client.bake_for client in
+  let* () = bake_and_wait client node in
   (* 3. commit the new inbox with deposit and withdraw at the same time. *)
   let deposit =
     Rollup.make_deposit
@@ -1673,12 +1673,12 @@ let test_deposit_withdraw_max_big_tickets =
   in
   let* () =
     (* bake until the finality period is over to be able to withdraw *)
-    repeat parameters.finality_period (fun () -> Client.bake_for client)
+    bake_and_wait ~nb:parameters.finality_period client node
   in
 
   (* 4. finalize the commitment *)
   let*! () = submit_finalize_commitment state in
-  let* () = Client.bake_for client in
+  let* () = bake_and_wait client node in
 
   (* 5. dispatch tickets from withdrawals to implicit account.*)
 
@@ -1723,7 +1723,7 @@ let test_deposit_withdraw_max_big_tickets =
       ~ticket_dispatch_info_data_list
       client
   in
-  let* () = Client.bake_for client in
+  let* () = bake_and_wait client node in
 
   (* 6. Transfer tickets from implicit account to originated account. *)
 
@@ -1739,7 +1739,7 @@ let test_deposit_withdraw_max_big_tickets =
       ~burn_cap:Tez.one
       client
   in
-  let* () = Client.bake_for client in
+  let* () = bake_and_wait client node in
   (* repeat the operation to ensure all tickets can be transfered *)
   let* () =
     repeat max_withdrawals_per_batch (fun () ->
@@ -1755,7 +1755,7 @@ let test_deposit_withdraw_max_big_tickets =
             ~burn_cap:Tez.one
             client
         in
-        let* () = Client.bake_for client in
+        let* () = bake_and_wait client node in
         unit)
   in
   unit
