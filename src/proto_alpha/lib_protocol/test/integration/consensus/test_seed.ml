@@ -185,7 +185,7 @@ let test_unrevealed () =
       baking_reward_fixed_portion = Tez.zero;
       seed_nonce_revelation_tip = Tez.zero;
       consensus_threshold = 0;
-      minimal_participation_ratio = Constants.{numerator = 0; denominator = 1};
+      minimal_participation_ratio = Ratio.{numerator = 0; denominator = 1};
     }
   in
   Context.init_with_constants2 constants >>=? fun (b, (_account1, account2)) ->

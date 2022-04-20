@@ -40,7 +40,7 @@ type t = {
   bootstrap_accounts : bootstrap_account list;
   bootstrap_contracts : bootstrap_contract list;
   commitments : Commitment_repr.t list;
-  constants : Constants_repr.parametric;
+  constants : Constants_parametric_repr.t;
   security_deposit_ramp_up_cycles : int option;
   no_reward_cycles : int option;
 }
@@ -127,6 +127,6 @@ let encoding =
           (dft "commitments" (list Commitment_repr.encoding) [])
           (opt "security_deposit_ramp_up_cycles" int31)
           (opt "no_reward_cycles" int31))
-       Constants_repr.parametric_encoding)
+       Constants_parametric_repr.encoding)
 
 let check_params params = Constants_repr.check_constants params.constants

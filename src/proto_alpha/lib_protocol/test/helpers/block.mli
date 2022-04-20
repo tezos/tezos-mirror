@@ -101,7 +101,7 @@ module Forge : sig
   val sign_header : header -> Block_header.block_header tzresult Lwt.t
 end
 
-val check_constants_consistency : Constants.parametric -> unit tzresult Lwt.t
+val check_constants_consistency : Constants.Parametric.t -> unit tzresult Lwt.t
 
 (** [genesis <opts> accounts] : generates an initial block with the
     given constants [<opts>] and initializes [accounts] with their
@@ -263,7 +263,7 @@ val prepare_initial_context_params :
   ?tx_rollup_origination_size:int ->
   ?sc_rollup_enable:bool ->
   (Account.t * Tez.t) list ->
-  ( Constants.parametric * Block_header.shell_header * Block_hash.t,
+  ( Constants.Parametric.t * Block_header.shell_header * Block_hash.t,
     tztrace )
   result
   Lwt.t

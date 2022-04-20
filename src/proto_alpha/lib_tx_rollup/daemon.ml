@@ -356,7 +356,7 @@ let queue_gc_operations state =
 
 let time_until_next_block state (header : Tezos_base.Block_header.t) =
   let open Result_syntax in
-  let Constants.{minimal_block_delay; delay_increment_per_round; _} =
+  let Constants.Parametric.{minimal_block_delay; delay_increment_per_round; _} =
     state.State.constants.parametric
   in
   let next_level_timestamp =

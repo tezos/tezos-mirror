@@ -46,11 +46,14 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    tez_repr.mli tez_repr.ml
    period_repr.mli period_repr.ml
    time_repr.mli time_repr.ml
+   ratio_repr.mli ratio_repr.ml
    round_repr.mli round_repr.ml
    block_payload_repr.mli block_payload_repr.ml
    fixed_point_repr.mli fixed_point_repr.ml
    saturation_repr.mli saturation_repr.ml
    gas_limit_repr.mli gas_limit_repr.ml
+   constants_parametric_repr.mli constants_parametric_repr.ml
+   constants_parametric_previous_repr.mli constants_parametric_previous_repr.ml
    constants_repr.mli constants_repr.ml
    raw_level_repr.mli raw_level_repr.ml
    fitness_repr.mli fitness_repr.ml
@@ -233,11 +236,14 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    tez_repr.mli tez_repr.ml
    period_repr.mli period_repr.ml
    time_repr.mli time_repr.ml
+   ratio_repr.mli ratio_repr.ml
    round_repr.mli round_repr.ml
    block_payload_repr.mli block_payload_repr.ml
    fixed_point_repr.mli fixed_point_repr.ml
    saturation_repr.mli saturation_repr.ml
    gas_limit_repr.mli gas_limit_repr.ml
+   constants_parametric_repr.mli constants_parametric_repr.ml
+   constants_parametric_previous_repr.mli constants_parametric_previous_repr.ml
    constants_repr.mli constants_repr.ml
    raw_level_repr.mli raw_level_repr.ml
    fitness_repr.mli fitness_repr.ml
@@ -420,11 +426,14 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    tez_repr.mli tez_repr.ml
    period_repr.mli period_repr.ml
    time_repr.mli time_repr.ml
+   ratio_repr.mli ratio_repr.ml
    round_repr.mli round_repr.ml
    block_payload_repr.mli block_payload_repr.ml
    fixed_point_repr.mli fixed_point_repr.ml
    saturation_repr.mli saturation_repr.ml
    gas_limit_repr.mli gas_limit_repr.ml
+   constants_parametric_repr.mli constants_parametric_repr.ml
+   constants_parametric_previous_repr.mli constants_parametric_previous_repr.ml
    constants_repr.mli constants_repr.ml
    raw_level_repr.mli raw_level_repr.ml
    fitness_repr.mli fitness_repr.ml
@@ -629,11 +638,14 @@ include Tezos_raw_protocol_alpha.Main
    Tez_repr
    Period_repr
    Time_repr
+   Ratio_repr
    Round_repr
    Block_payload_repr
    Fixed_point_repr
    Saturation_repr
    Gas_limit_repr
+   Constants_parametric_repr
+   Constants_parametric_previous_repr
    Constants_repr
    Raw_level_repr
    Fitness_repr
@@ -857,11 +869,14 @@ include Tezos_raw_protocol_alpha.Main
    tez_repr.mli tez_repr.ml
    period_repr.mli period_repr.ml
    time_repr.mli time_repr.ml
+   ratio_repr.mli ratio_repr.ml
    round_repr.mli round_repr.ml
    block_payload_repr.mli block_payload_repr.ml
    fixed_point_repr.mli fixed_point_repr.ml
    saturation_repr.mli saturation_repr.ml
    gas_limit_repr.mli gas_limit_repr.ml
+   constants_parametric_repr.mli constants_parametric_repr.ml
+   constants_parametric_previous_repr.mli constants_parametric_previous_repr.ml
    constants_repr.mli constants_repr.ml
    raw_level_repr.mli raw_level_repr.ml
    fitness_repr.mli fitness_repr.ml

@@ -90,6 +90,7 @@ module First_level_of_protocol = struct
   let get = Storage.Tenderbake.First_level_of_protocol.get
 end
 
+module Ratio = Ratio_repr
 module Raw_level = Raw_level_repr
 module Cycle = Cycle_repr
 
@@ -125,6 +126,7 @@ type signature = Signature.t
 module Constants = struct
   include Constants_repr
   include Constants_storage
+  module Parametric = Constants_parametric_repr
 
   let round_durations ctxt = Raw_context.round_durations ctxt
 

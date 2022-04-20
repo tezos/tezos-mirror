@@ -130,7 +130,7 @@ let test_participation_rpc () =
   let del2 = Context.Contract.pkh account2 in
   Context.get_constants (B b0) >>=? fun csts ->
   let blocks_per_cycle = Int32.to_int csts.parametric.blocks_per_cycle in
-  let Constants.{numerator; denominator} =
+  let Ratio.{numerator; denominator} =
     csts.parametric.minimal_participation_ratio
   in
   let expected_cycle_activity =

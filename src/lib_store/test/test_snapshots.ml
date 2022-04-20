@@ -379,7 +379,8 @@ let test store_path ~test_descr ?exported_block_level
 let make_tests speed genesis_parameters =
   let open Tezos_protocol_alpha.Protocol.Alpha_context in
   let {
-    Parameters.constants = {Constants.blocks_per_cycle; preserved_cycles; _};
+    Parameters.constants =
+      {Constants.Parametric.blocks_per_cycle; preserved_cycles; _};
     _;
   } =
     genesis_parameters

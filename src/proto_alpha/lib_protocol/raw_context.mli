@@ -103,10 +103,10 @@ val predecessor_timestamp : t -> Time.t
 
 val current_timestamp : t -> Time.t
 
-val constants : t -> Constants_repr.parametric
+val constants : t -> Constants_parametric_repr.t
 
 val patch_constants :
-  t -> (Constants_repr.parametric -> Constants_repr.parametric) -> t Lwt.t
+  t -> (Constants_parametric_repr.t -> Constants_parametric_repr.t) -> t Lwt.t
 
 val round_durations : t -> Round_repr.Durations.t
 

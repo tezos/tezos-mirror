@@ -23,42 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol
-open Alpha_context
+type t = {numerator : int; denominator : int}
 
-type unsigned_block = {
-  unsigned_block_header : Block_header.t;
-  operations : Tezos_base.Operation.t list list;
-}
+val encoding : t Data_encoding.t
 
-type simulation_kind =
-  | Filter of Operation_pool.Prioritized.t
-  | Apply of {
-      ordered_pool : Operation_pool.ordered_pool;
-      payload_hash : Block_payload_hash.t;
-    }
-
-type simulation_mode = Local of Context.index | Node
-
-val forge_faked_protocol_data :
-  ?payload_hash:Block_payload_hash.t ->
-  payload_round:Round.t ->
-  seed_nonce_hash:Nonce_hash.t option ->
-  liquidity_baking_toggle_vote:Liquidity_baking.liquidity_baking_toggle_vote ->
-  unit ->
-  block_header_data
-
-val forge :
-  #Protocol_client_context.full ->
-  chain_id:Chain_id.t ->
-  pred_info:Baking_state.block_info ->
-  timestamp:Time.Protocol.t ->
-  liquidity_baking_toggle_vote:Liquidity_baking.liquidity_baking_toggle_vote ->
-  user_activated_upgrades:User_activated.upgrades ->
-  Baking_configuration.fees_config ->
-  seed_nonce_hash:Nonce_hash.t option ->
-  payload_round:Round.t ->
-  Baking_state.validation_mode ->
-  simulation_kind ->
-  Constants.Parametric.t ->
-  unsigned_block tzresult Lwt.t
+val pp : Format.formatter -> t -> unit

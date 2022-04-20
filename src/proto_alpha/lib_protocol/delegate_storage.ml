@@ -815,7 +815,7 @@ let already_slashed_for_double_baking ctxt delegate (level : Level_repr.t) =
 let punish_double_endorsing ctxt delegate (level : Level_repr.t) =
   let delegate_contract = Contract_repr.implicit_contract delegate in
   Frozen_deposits_storage.get ctxt delegate_contract >>=? fun frozen_deposits ->
-  let slashing_ratio : Constants_repr.ratio =
+  let slashing_ratio : Ratio_repr.t =
     Constants_storage.ratio_of_frozen_deposits_slashed_per_double_endorsement
       ctxt
   in
@@ -921,7 +921,7 @@ let record_endorsing_participation ctxt ~delegate ~participation
                 ~total_active_stake
                 ~active_stake
               >>?= fun expected_slots ->
-              let Constants_repr.{numerator; denominator} =
+              let Ratio_repr.{numerator; denominator} =
                 Constants_storage.minimal_participation_ratio ctxt
               in
               let minimal_activity = expected_slots * numerator / denominator in
@@ -999,7 +999,7 @@ let delegate_participation_info ctxt delegate =
         ~total_active_stake
         ~active_stake
       >>?= fun expected_cycle_activity ->
-      let Constants_repr.{numerator; denominator} =
+      let Ratio_repr.{numerator; denominator} =
         Constants_storage.minimal_participation_ratio ctxt
       in
       let endorsing_reward_per_slot =

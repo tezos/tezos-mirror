@@ -223,7 +223,7 @@ end
 
 type back = {
   context : Context.t;
-  constants : Constants_repr.parametric;
+  constants : Constants_parametric_repr.t;
   round_durations : Round_repr.Durations.t;
   cycle_eras : Level_repr.cycle_eras;
   level : Level_repr.t;
@@ -740,7 +740,7 @@ let get_proto_param ctxt =
 let add_constants ctxt constants =
   let bytes =
     Data_encoding.Binary.to_bytes_exn
-      Constants_repr.parametric_encoding
+      Constants_parametric_repr.encoding
       constants
   in
   Context.add ctxt constants_key bytes
@@ -751,7 +751,7 @@ let get_constants ctxt =
   | Some bytes -> (
       match
         Data_encoding.Binary.of_bytes_opt
-          Constants_repr.parametric_encoding
+          Constants_parametric_repr.encoding
           bytes
       with
       | None -> failwith "Internal error: cannot parse constants in context."
@@ -772,7 +772,7 @@ let check_inited ctxt =
       else storage_error (Incompatible_protocol_version s)
 
 let check_cycle_eras (cycle_eras : Level_repr.cycle_eras)
-    (constants : Constants_repr.parametric) =
+    (constants : Constants_parametric_repr.t) =
   let current_era = Level_repr.current_era cycle_eras in
   assert (
     Compare.Int32.(current_era.blocks_per_cycle = constants.blocks_per_cycle)) ;
@@ -809,7 +809,7 @@ let prepare ~level ~predecessor_timestamp ~timestamp ctxt =
         internal_nonces_used = Int_set.empty;
         remaining_block_gas =
           Gas_limit_repr.Arith.fp
-            constants.Constants_repr.hard_gas_limit_per_block;
+            constants.Constants_parametric_repr.hard_gas_limit_per_block;
         unlimited_operation_gas = true;
         consensus = Raw_consensus.empty;
         non_consensus_operations_rev = [];
@@ -847,7 +847,7 @@ let[@warning "-32"] get_previous_protocol_constants ctxt =
   | Some bytes -> (
       match
         Data_encoding.Binary.of_bytes_opt
-          Constants_repr.Proto_previous.parametric_encoding
+          Constants_parametric_previous_repr.encoding
           bytes
       with
       | None ->
@@ -856,8 +856,8 @@ let[@warning "-32"] get_previous_protocol_constants ctxt =
              context."
       | Some constants -> Lwt.return constants)
 
-(* You should ensure that if the type `Constant_repr.parametric` is
-   different from the previous protocol or the value of these
+(* You should ensure that if the type `Constants_parametric_repr.t` is
+   different from `Constants_parametric_previous_repr.t` or the value of these
    constants is modified, is changed from the previous protocol, then
    you `propagate` these constants to the new protocol by writing them
    onto the context via the function `add_constants` or
@@ -891,7 +891,7 @@ let prepare_first_block ~level ~timestamp ctxt =
       in
       let tx_rollup_finality_period = 40_000 in
       let constants =
-        Constants_repr.
+        Constants_parametric_repr.
           {
             preserved_cycles = c.preserved_cycles;
             blocks_per_cycle = c.blocks_per_cycle;

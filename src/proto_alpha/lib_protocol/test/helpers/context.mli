@@ -75,7 +75,7 @@ val get_constants : t -> Constants.t tzresult Lwt.t
 
 (** The default constants used in the test framework. To be used with
     [init_with_constants]. *)
-val default_test_constants : Constants.parametric
+val default_test_constants : Constants.Parametric.t
 
 val get_baking_reward_fixed_portion : t -> Tez.t tzresult Lwt.t
 
@@ -255,19 +255,19 @@ val init3 :
 
 val init_with_constants_gen :
   (Alpha_context.Contract.t, 'contracts) tup ->
-  Constants.parametric ->
+  Constants.Parametric.t ->
   (Block.t * 'contracts) tzresult Lwt.t
 
 val init_with_constants_n :
-  Constants.parametric ->
+  Constants.Parametric.t ->
   int ->
   (Block.t * Alpha_context.Contract.t list) tzresult Lwt.t
 
 val init_with_constants1 :
-  Constants.parametric -> (Block.t * Alpha_context.Contract.t) tzresult Lwt.t
+  Constants.Parametric.t -> (Block.t * Alpha_context.Contract.t) tzresult Lwt.t
 
 val init_with_constants2 :
-  Constants.parametric ->
+  Constants.Parametric.t ->
   (Block.t * (Alpha_context.Contract.t * Alpha_context.Contract.t)) tzresult
   Lwt.t
 
