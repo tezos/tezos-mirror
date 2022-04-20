@@ -200,6 +200,8 @@
         "Sc_rollup_arith",
         "Sc_rollups",
 
+	"Dal_apply",
+
         "Baking",
         "Amendment",
         "Apply",
