@@ -69,7 +69,8 @@ end = struct
       ?(include_endorsement = false) ?(block_round = 0)
       ?(mk_evidence = fun ctxt p1 p2 -> Op.double_preendorsement ctxt p1 p2)
       ~loc () =
-    Context.init ~consensus_threshold:0 10 >>=? fun (genesis, _) ->
+    Context.init_n ~consensus_threshold:0 10 ()
+    >>=? fun (genesis, _contracts) ->
     bake genesis >>=? fun b1 ->
     bake ~policy:(By_round 0) b1 >>=? fun b2_A ->
     Op.endorsement ~endorsed_block:b1 (B genesis) () >>=? fun e ->
@@ -81,7 +82,7 @@ end = struct
     bake b1 ~operations:[op] >>= fun res -> invalid_denunciation loc res
 
   let max_slashing_period () =
-    Context.init ~consensus_threshold:0 1 >>=? fun (genesis, _) ->
+    Context.init1 ~consensus_threshold:0 () >>=? fun (genesis, _contract) ->
     Context.get_constants (B genesis)
     >>=? fun {parametric = {max_slashing_period; blocks_per_cycle; _}; _} ->
     return (max_slashing_period * Int32.to_int blocks_per_cycle)
@@ -172,7 +173,7 @@ end = struct
       ?(pick_endorsers =
         fun ctxt -> pick_endorsers ctxt >>=? fun (a, _b) -> return (a, a)) ~loc
       () =
-    Context.init ~consensus_threshold:0 10 >>=? fun (genesis, contracts) ->
+    Context.init_n ~consensus_threshold:0 10 () >>=? fun (genesis, contracts) ->
     let addr =
       match List.hd contracts with None -> assert false | Some e -> e
     in

@@ -180,11 +180,8 @@ let string_token ~ticketer content =
 
 (** Initializes one address for operations and one baker. *)
 let init ?tx_rollup_enable () =
-  Context.init ?tx_rollup_enable ~consensus_threshold:0 2
-  >|=? fun (block, contracts) ->
-  let (src0, src1) =
-    match contracts with src0 :: src1 :: _ -> (src0, src1) | _ -> assert false
-  in
+  Context.init2 ?tx_rollup_enable ~consensus_threshold:0 ()
+  >|=? fun (block, (src0, src1)) ->
   let baker =
     match Alpha_context.Contract.is_implicit src0 with
     | Some v -> v

@@ -46,21 +46,8 @@ let constants =
     origination_size = 0;
   }
 
-let get_first_2_accounts_contracts contracts =
-  let ((contract1, account1), (contract2, account2)) =
-    match contracts with
-    | [a1; a2] ->
-        ( ( a1,
-            Contract.is_implicit a1 |> function
-            | None -> assert false
-            | Some pkh -> pkh ),
-          ( a2,
-            Contract.is_implicit a2 |> function
-            | None -> assert false
-            | Some pkh -> pkh ) )
-    | _ -> assert false
-  in
-  ((contract1, account1), (contract2, account2))
+let get_first_2_accounts_contracts (a1, a2) =
+  ((a1, Context.Contract.pkh a1), (a2, Context.Contract.pkh a2))
 
 (* Terminology:
 
@@ -80,7 +67,7 @@ let get_first_2_accounts_contracts contracts =
 - full balance = spendable balance + frozen deposits; obtained with Delegate.full_balance
 *)
 let test_invariants () =
-  Context.init_with_constants constants 2 >>=? fun (genesis, contracts) ->
+  Context.init_with_constants2 constants >>=? fun (genesis, contracts) ->
   let ((contract1, account1), (contract2, _account2)) =
     get_first_2_accounts_contracts contracts
   in
@@ -141,7 +128,7 @@ let test_invariants () =
   Assert.equal_tez ~loc:__LOC__ new_frozen_deposits expected_new_frozen_deposits
 
 let test_set_limit balance_percentage () =
-  Context.init_with_constants constants 2 >>=? fun (genesis, contracts) ->
+  Context.init_with_constants2 constants >>=? fun (genesis, contracts) ->
   let ((contract1, account1), (_contract2, account2)) =
     get_first_2_accounts_contracts contracts
   in
@@ -199,7 +186,7 @@ let test_set_limit balance_percentage () =
   Assert.equal_tez ~loc:__LOC__ frozen_deposits limit
 
 let test_set_too_high_limit () =
-  Context.init_with_constants constants 2 >>=? fun (genesis, contracts) ->
+  Context.init_with_constants2 constants >>=? fun (genesis, contracts) ->
   let ((contract1, _account1), _) = get_first_2_accounts_contracts contracts in
   let max_limit =
     Tez.of_mutez_exn
@@ -228,7 +215,7 @@ let test_set_too_high_limit () =
   Incremental.finalize_block b >>=? fun _ -> return_unit
 
 let test_unset_limit () =
-  Context.init_with_constants constants 2 >>=? fun (genesis, contracts) ->
+  Context.init_with_constants2 constants >>=? fun (genesis, contracts) ->
   let ((contract1, account1), (_contract2, account2)) =
     get_first_2_accounts_contracts contracts
   in
@@ -275,7 +262,7 @@ let test_unset_limit () =
   >>=? fun () -> return_unit
 
 let test_cannot_bake_with_zero_deposits () =
-  Context.init_with_constants constants 2 >>=? fun (genesis, contracts) ->
+  Context.init_with_constants2 constants >>=? fun (genesis, contracts) ->
   let ((contract1, account1), (_contract2, account2)) =
     get_first_2_accounts_contracts contracts
   in
@@ -308,7 +295,7 @@ let test_cannot_bake_with_zero_deposits () =
   Assert.error ~loc:__LOC__ b1 (fun _ -> true)
 
 let test_deposits_after_stake_removal () =
-  Context.init_with_constants constants 2 >>=? fun (genesis, contracts) ->
+  Context.init_with_constants2 constants >>=? fun (genesis, contracts) ->
   let ((contract1, account1), (contract2, account2)) =
     get_first_2_accounts_contracts contracts
   in
@@ -376,7 +363,7 @@ let test_deposits_after_stake_removal () =
   Assert.equal_tez ~loc:__LOC__ frozen_deposits_2 expected_new_frozen_deposits_2
 
 let test_unfreeze_deposits_after_deactivation () =
-  Context.init_with_constants constants 2 >>=? fun (genesis, contracts) ->
+  Context.init_with_constants2 constants >>=? fun (genesis, contracts) ->
   let ((contract1, account1), (_contract2, account2)) =
     get_first_2_accounts_contracts contracts
   in
@@ -422,7 +409,7 @@ let test_unfreeze_deposits_after_deactivation () =
   loop genesis cycles_to_bake >>=? fun _b -> return_unit
 
 let test_frozen_deposits_with_delegation () =
-  Context.init_with_constants constants 2 >>=? fun (genesis, contracts) ->
+  Context.init_with_constants2 constants >>=? fun (genesis, contracts) ->
   let ((_contract1, account1), (contract2, account2)) =
     get_first_2_accounts_contracts contracts
   in
@@ -482,7 +469,7 @@ let test_frozen_deposits_with_delegation () =
   loop b cycles_to_bake >>=? fun _b -> return_unit
 
 let test_frozen_deposits_with_overdelegation () =
-  Context.init_with_constants constants 2 >>=? fun (genesis, contracts) ->
+  Context.init_with_constants2 constants >>=? fun (genesis, contracts) ->
   let ((contract1, account1), (contract2, account2)) =
     get_first_2_accounts_contracts contracts
   in
@@ -561,7 +548,7 @@ let test_frozen_deposits_with_overdelegation () =
 
 let test_set_limit_with_overdelegation () =
   let constants = {constants with frozen_deposits_percentage = 10} in
-  Context.init_with_constants constants 2 >>=? fun (genesis, contracts) ->
+  Context.init_with_constants2 constants >>=? fun (genesis, contracts) ->
   let ((contract1, account1), (contract2, account2)) =
     get_first_2_accounts_contracts contracts
   in
@@ -629,20 +616,9 @@ let test_set_limit_with_overdelegation () =
 (** This test fails when [to_cycle] in [Delegate.freeze_deposits] is smaller than
    [new_cycle + preserved_cycles]. *)
 let test_error_is_thrown_when_smaller_upper_bound_for_frozen_window () =
-  Context.init_with_constants constants 2 >>=? fun (genesis, contracts) ->
-  let ((contract1, account1), (contract2, _account2)) =
-    match contracts with
-    | [a1; a2] ->
-        ( ( a1,
-            Contract.is_implicit a1 |> function
-            | None -> assert false
-            | Some pkh -> pkh ),
-          ( a2,
-            Contract.is_implicit a2 |> function
-            | None -> assert false
-            | Some pkh -> pkh ) )
-    | _ -> assert false
-  in
+  Context.init_with_constants2 constants >>=? fun (genesis, contracts) ->
+  let (contract1, contract2) = contracts in
+  let account1 = Context.Contract.pkh contract1 in
   (* [account2] delegates (through [new_account]) to [account1] its spendable
      balance. The point is to make [account1] have a lot of staking balance so
      that, after [preserved_cycles] when the active stake reflects this increase

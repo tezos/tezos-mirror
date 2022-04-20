@@ -150,7 +150,7 @@ module Alpha_context_helpers = struct
   include Common
 
   let init () =
-    Context.init 1 >>=? fun (b, _) ->
+    Context.init1 () >>=? fun (b, _contract) ->
     Alpha_context.prepare
       b.context
       ~level:b.header.shell.level

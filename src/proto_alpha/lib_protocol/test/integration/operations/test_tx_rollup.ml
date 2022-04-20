@@ -64,13 +64,9 @@ let is_implicit_exn x =
 (** [test_disable_feature_flag] try to originate a tx rollup with the feature
     flag is deactivated and check it fails *)
 let test_disable_feature_flag () =
-  Context.init_with_constants
+  Context.init_with_constants1
     {Context.default_test_constants with tx_rollup_enable = false}
-    1
-  >>=? fun (b, contracts) ->
-  let contract =
-    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0
-  in
+  >>=? fun (b, contract) ->
   Incremental.begin_construction b >>=? fun i ->
   Op.tx_rollup_origination (I i) contract >>=? fun (op, _tx_rollup) ->
   Incremental.add_operation
@@ -82,17 +78,13 @@ let test_disable_feature_flag () =
 (** [test_sunset] try to originate a tx rollup after the sunset and check
     that it fails *)
 let test_sunset () =
-  Context.init_with_constants
+  Context.init_with_constants1
     {
       Context.default_test_constants with
       tx_rollup_enable = true;
       tx_rollup_sunset_level = 0l;
     }
-    1
-  >>=? fun (b, contracts) ->
-  let contract =
-    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0
-  in
+  >>=? fun (b, contract) ->
   Incremental.begin_construction b >>=? fun i ->
   Op.tx_rollup_origination (I i) contract >>=? fun (op, _tx_rollup) ->
   Incremental.add_operation
@@ -194,16 +186,17 @@ let inbox_burn state size =
     the inbox. *)
 let burn_per_byte state = inbox_burn state 1
 
-(** [context_init n] initializes a context with no consensus rewards
+(** [context_init tup] initializes a context with no consensus rewards
     to not interfere with balances prediction. It returns the created
-    context and [n] contracts. *)
+    context and contracts. *)
 let context_init ?(tx_rollup_max_inboxes_count = 2100)
     ?(tx_rollup_rejection_max_proof_size = 30_000)
     ?(tx_rollup_max_ticket_payload_size = 10_240)
     ?(tx_rollup_finality_period = 1) ?(tx_rollup_origination_size = 60_000)
     ?(cost_per_byte = Tez.zero) ?(tx_rollup_hard_size_limit_per_message = 5_000)
-    n =
-  Context.init_with_constants
+    tup =
+  Context.init_with_constants_gen
+    tup
     {
       Context.default_test_constants with
       consensus_threshold = 0;
@@ -222,7 +215,6 @@ let context_init ?(tx_rollup_max_inboxes_count = 2100)
       tx_rollup_max_ticket_payload_size;
       cost_per_byte;
     }
-    n
 
 (** [context_init1] initializes a context with no consensus rewards
     to not interfere with balances prediction. It returns the created
@@ -239,10 +231,7 @@ let context_init1 ?tx_rollup_max_inboxes_count
     ?tx_rollup_origination_size
     ?cost_per_byte
     ?tx_rollup_hard_size_limit_per_message
-    1
-  >|=? function
-  | (b, contract_1 :: _) -> (b, contract_1)
-  | (_, _) -> assert false
+    Context.T1
 
 (** [context_init2] initializes a context with no consensus rewards
     to not interfere with balances prediction. It returns the created
@@ -255,10 +244,7 @@ let context_init2 ?tx_rollup_max_inboxes_count
     ?tx_rollup_max_ticket_payload_size
     ?cost_per_byte
     ?tx_rollup_hard_size_limit_per_message
-    2
-  >|=? function
-  | (b, contract_1 :: contract_2 :: _) -> (b, contract_1, contract_2)
-  | (_, _) -> assert false
+    Context.T2
 
 (** [originate b contract] originates a tx_rollup from [contract],
     and returns the new block and the tx_rollup address. *)
@@ -612,11 +598,8 @@ let message_result context_hash withdraws =
 (** [test_origination] originates a transaction rollup and checks that
     it burns the expected quantity of xtz. *)
 let test_origination () =
-  Context.init ~tx_rollup_enable:true ~tx_rollup_sunset_level:Int32.max_int 1
-  >>=? fun (b, contracts) ->
-  let contract =
-    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0
-  in
+  Context.init1 ~tx_rollup_enable:true ~tx_rollup_sunset_level:Int32.max_int ()
+  >>=? fun (b, contract) ->
   Context.get_constants (B b)
   >>=? fun {parametric = {tx_rollup_origination_size; cost_per_byte; _}; _} ->
   Context.Contract.balance (B b) contract >>=? fun balance ->
@@ -636,11 +619,8 @@ let test_origination () =
 (** [test_two_originations] originates two transaction rollups in the
     same operation and checks that they have a different address. *)
 let test_two_originations () =
-  Context.init ~tx_rollup_enable:true ~tx_rollup_sunset_level:Int32.max_int 1
-  >>=? fun (b, contracts) ->
-  let contract =
-    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0
-  in
+  Context.init1 ~tx_rollup_enable:true ~tx_rollup_sunset_level:Int32.max_int ()
+  >>=? fun (b, contract) ->
   Incremental.begin_construction b >>=? fun i ->
   Op.tx_rollup_origination (I i) contract >>=? fun (op1, _false_tx_rollup1) ->
   (* tx_rollup1 and tx_rollup2 are equal and both are false. The addresses are
@@ -1429,10 +1409,7 @@ let test_valid_deposit_invalid_amount () =
 let test_deposit_too_many_tickets () =
   let too_many = Z.succ (Z.of_int64 Int64.max_int) in
   let (_, _, pkh) = gen_l2_account () in
-  context_init 1 >>=? fun (block, accounts) ->
-  let account1 =
-    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth accounts 0
-  in
+  context_init1 () >>=? fun (block, account1) ->
   originate block account1 >>=? fun (block, tx_rollup) ->
   Nat_ticket.init_deposit too_many block tx_rollup account1
   >>=? fun (operation, b, deposit_contract) ->
@@ -1469,11 +1446,9 @@ let test_deposit_by_non_internal_operation () =
 
 (** Test that block finalization changes gas rates *)
 let test_finalization () =
-  context_init ~tx_rollup_max_inboxes_count:5_000 2 >>=? fun (b, contracts) ->
-  let filler = WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0 in
-  let contract =
-    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0
-  in
+  context_init2 ~tx_rollup_max_inboxes_count:5_000 () >>=? fun (b, contracts) ->
+  let (contract, _) = contracts in
+  let filler = contract in
   originate b contract >>=? fun (b, tx_rollup) ->
   Context.get_constants (B b)
   >>=? fun {parametric = {tx_rollup_hard_size_limit_per_inbox; _}; _} ->
@@ -1558,7 +1533,7 @@ let test_finalization () =
     level, and ensures that this fails.  It adds a commitment with
     the wrong batch count and ensures that that fails. *)
 let test_commitment_duplication () =
-  context_init2 () >>=? fun (b, contract1, contract2) ->
+  context_init2 () >>=? fun (b, (contract1, contract2)) ->
   let pkh1 = is_implicit_exn contract1 in
   originate b contract1 >>=? fun (b, tx_rollup) ->
   Context.Contract.balance (B b) contract1 >>=? fun balance ->
@@ -1647,7 +1622,7 @@ let test_commitment_duplication () =
   return ()
 
 let test_commit_current_inbox () =
-  context_init2 () >>=? fun (b, contract1, contract2) ->
+  context_init2 () >>=? fun (b, (contract1, contract2)) ->
   originate b contract1 >>=? fun (b, tx_rollup) ->
   (* In order to have a permissible commitment, we need a transaction. *)
   Incremental.begin_construction b >>=? fun i ->
@@ -1942,10 +1917,7 @@ let test_full_inbox () =
       tx_rollup_max_inboxes_count = 15;
     }
   in
-  Context.init_with_constants constants 1 >>=? fun (b, contracts) ->
-  let contract =
-    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0
-  in
+  Context.init_with_constants1 constants >>=? fun (b, contract) ->
   originate b contract >>=? fun (b, tx_rollup) ->
   let range start top =
     let rec aux n acc = if n < start then acc else aux (n - 1) (n :: acc) in
@@ -2378,7 +2350,7 @@ module Rejection = struct
   let init_with_deposit ?tx_rollup_hard_size_limit_per_message addr =
     init_l2_store () >>= fun store ->
     context_init2 ?tx_rollup_hard_size_limit_per_message ()
-    >>=? fun (b, account, account2) ->
+    >>=? fun (b, (account, account2)) ->
     originate b account >>=? fun (b, tx_rollup) ->
     make_deposit b tx_rollup account addr
     >>=? fun (b, (deposit, _), ticket_hash) ->
@@ -2607,7 +2579,7 @@ module Rejection = struct
     let open Error_monad_operators in
     let (_, _, addr) = gen_l2_account () in
     init_l2_store () >>= fun store ->
-    context_init2 () >>=? fun (b, contract1, contract2) ->
+    context_init2 () >>=? fun (b, (contract1, contract2)) ->
     originate b contract1 >>=? fun (b, tx_rollup) ->
     make_deposit b tx_rollup contract1 addr
     >>=? fun (b, (deposit_message, _), _ticket_hash) ->
@@ -2936,10 +2908,7 @@ module Rejection = struct
   (** Test that rejection successfully fails when there's no commitment to
       reject *)
   let test_no_commitment () =
-    context_init 1 >>=? fun (b, contracts) ->
-    let contract =
-      WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0
-    in
+    context_init1 () >>=? fun (b, contract) ->
     originate b contract >>=? fun (b, tx_rollup) ->
     let message = "bogus" in
     Op.tx_rollup_submit_batch (B b) contract tx_rollup message
@@ -3558,7 +3527,7 @@ end
     rejecting commitments. *)
 let test_state () =
   let open Single_message_inbox in
-  context_init2 () >>=? fun (b, account1, account2) ->
+  context_init2 () >>=? fun (b, (account1, account2)) ->
   originate b account1 >>=? fun (b, tx_rollup) ->
   (* Submit bogus message three time to have three inboxes *)
   submit b tx_rollup account1 >>=? fun b ->
@@ -3804,15 +3773,13 @@ let test_state_message_storage_preallocation () =
   return_unit
 
 module Withdraw = struct
-  (** [context_init_withdraw n] initializes a context with [n + 1] accounts, one rollup and a
+  (** [context_init_withdraw tup] initializes a context with [tup] accounts, one rollup and a
       withdrawal recipient contract. *)
   let context_init_withdraw ?tx_rollup_origination_size
-      ?(amount = Z.of_int64 @@ Tx_rollup_l2_qty.to_int64 Nat_ticket.amount) n =
-    context_init ?tx_rollup_origination_size (n + 1)
-    >>=? fun (block, accounts) ->
-    let account1 =
-      WithExceptions.Option.get ~loc:__LOC__ @@ List.nth accounts 0
-    in
+      ?(amount = Z.of_int64 @@ Tx_rollup_l2_qty.to_int64 Nat_ticket.amount) tup
+      =
+    context_init ?tx_rollup_origination_size tup >>=? fun (block, accounts) ->
+    let account1 = Context.tup_hd tup accounts in
     originate block account1 >>=? fun (block, tx_rollup) ->
     Nat_ticket.init_deposit amount block tx_rollup account1
     >>=? fun (operation, block, deposit_contract) ->
@@ -3836,7 +3803,7 @@ module Withdraw = struct
   (** [context_init1_withdraw] initializes a context with one account, one rollup and a
       withdrawal recipient contract. *)
   let context_init1_withdraw () =
-    context_init_withdraw 0
+    context_init_withdraw Context.T1
     >>=? fun ( account1,
                _accounts,
                tx_rollup,
@@ -3848,16 +3815,13 @@ module Withdraw = struct
   (** [context_init2_withdraw] initializes a context with two accounts, one rollup and a
       withdrawal recipient contract. *)
   let context_init2_withdraw () =
-    context_init_withdraw 1
+    context_init_withdraw Context.T2
     >>=? fun ( account1,
-               accounts,
+               (_, account2),
                tx_rollup,
                deposit_contract,
                withdraw_contract,
                b ) ->
-    let account2 =
-      WithExceptions.Option.get ~loc:__LOC__ @@ List.nth accounts 1
-    in
     return
       (account1, account2, tx_rollup, deposit_contract, withdraw_contract, b)
 
@@ -4974,10 +4938,7 @@ module Withdraw = struct
        we overflow. *)
     let max = Int64.(sub max_int 1L) in
     let (_, _, pkh) = gen_l2_account () in
-    context_init 1 >>=? fun (b, accounts) ->
-    let account1 =
-      WithExceptions.Option.get ~loc:__LOC__ @@ List.nth accounts 0
-    in
+    context_init1 () >>=? fun (b, account1) ->
     originate b account1 >>=? fun (b, tx_rollup) ->
     let pkh_str = Tx_rollup_l2_address.to_b58check pkh in
     Nat_ticket.init_deposit_contract (Z.of_int64 max) b account1

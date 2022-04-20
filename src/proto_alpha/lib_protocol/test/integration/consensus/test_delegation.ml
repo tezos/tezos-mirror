@@ -71,24 +71,15 @@ let expect_delegate_already_active_error i op =
 
 (** Bootstrap contracts delegate to themselves. *)
 let bootstrap_manager_is_bootstrap_delegate () =
-  Context.init 1 >>=? fun (b, bootstrap_contracts) ->
-  let bootstrap0 =
-    WithExceptions.Option.get ~loc:__LOC__ @@ List.hd bootstrap_contracts
-  in
+  Context.init1 () >>=? fun (b, bootstrap0) ->
   Context.Contract.delegate (B b) bootstrap0 >>=? fun delegate0 ->
   Context.Contract.manager (B b) bootstrap0 >>=? fun manager0 ->
   Assert.equal_pkh ~loc:__LOC__ delegate0 manager0.pkh
 
 (** Bootstrap contracts cannot change their delegate. *)
 let bootstrap_delegate_cannot_change ~fee () =
-  Context.init 2 >>=? fun (b, bootstrap_contracts) ->
-  let bootstrap0 =
-    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth bootstrap_contracts 0
-  in
-  let bootstrap1 =
-    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth bootstrap_contracts 1
-  in
-  Context.Contract.pkh bootstrap0 >>=? fun pkh1 ->
+  Context.init2 () >>=? fun (b, (bootstrap0, bootstrap1)) ->
+  let pkh1 = Context.Contract.pkh bootstrap0 in
   Incremental.begin_construction b ~policy:(Block.Excluding [pkh1])
   >>=? fun i ->
   Context.Contract.manager (I i) bootstrap1 >>=? fun manager1 ->
@@ -113,10 +104,7 @@ let bootstrap_delegate_cannot_change ~fee () =
 
 (** Bootstrap contracts cannot delete their delegation. *)
 let bootstrap_delegate_cannot_be_removed ~fee () =
-  Context.init 1 >>=? fun (b, bootstrap_contracts) ->
-  let bootstrap =
-    WithExceptions.Option.get ~loc:__LOC__ @@ List.hd bootstrap_contracts
-  in
+  Context.init1 () >>=? fun (b, bootstrap) ->
   Incremental.begin_construction b >>=? fun i ->
   Context.Contract.balance (I i) bootstrap >>=? fun balance ->
   Context.Contract.delegate (I i) bootstrap >>=? fun delegate ->
@@ -139,13 +127,7 @@ let bootstrap_delegate_cannot_be_removed ~fee () =
 (** Contracts not registered as delegate can change their
     delegation. *)
 let delegate_can_be_changed_from_unregistered_contract ~fee () =
-  Context.init 2 >>=? fun (b, bootstrap_contracts) ->
-  let bootstrap0 =
-    WithExceptions.Option.get ~loc:__LOC__ @@ List.hd bootstrap_contracts
-  in
-  let bootstrap1 =
-    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth bootstrap_contracts 1
-  in
+  Context.init2 () >>=? fun (b, (bootstrap0, bootstrap1)) ->
   let unregistered_account = Account.new_account () in
   let unregistered_pkh = Account.(unregistered_account.pkh) in
   let unregistered = Contract.implicit_contract unregistered_pkh in
@@ -178,10 +160,7 @@ let delegate_can_be_changed_from_unregistered_contract ~fee () =
 (** Contracts not registered as delegate can delete their
     delegation. *)
 let delegate_can_be_removed_from_unregistered_contract ~fee () =
-  Context.init 1 >>=? fun (b, bootstrap_contracts) ->
-  let bootstrap =
-    WithExceptions.Option.get ~loc:__LOC__ @@ List.hd bootstrap_contracts
-  in
+  Context.init1 () >>=? fun (b, bootstrap) ->
   let unregistered_account = Account.new_account () in
   let unregistered_pkh = Account.(unregistered_account.pkh) in
   let unregistered = Contract.implicit_contract unregistered_pkh in
@@ -213,11 +192,8 @@ let delegate_can_be_removed_from_unregistered_contract ~fee () =
 
 (** Bootstrap keys are already registered as delegate keys. *)
 let bootstrap_manager_already_registered_delegate ~fee () =
-  Context.init 1 >>=? fun (b, bootstrap_contracts) ->
+  Context.init1 () >>=? fun (b, bootstrap) ->
   Incremental.begin_construction b >>=? fun i ->
-  let bootstrap =
-    WithExceptions.Option.get ~loc:__LOC__ @@ List.hd bootstrap_contracts
-  in
   Context.Contract.manager (I i) bootstrap >>=? fun manager ->
   let pkh = manager.pkh in
   let impl_contract = Contract.implicit_contract pkh in
@@ -239,11 +215,8 @@ let bootstrap_manager_already_registered_delegate ~fee () =
 (** Bootstrap manager can be set as delegate of an originated contract
     (through origination operation). *)
 let delegate_to_bootstrap_by_origination ~fee () =
-  Context.init 1 >>=? fun (b, bootstrap_contracts) ->
+  Context.init1 () >>=? fun (b, bootstrap) ->
   Incremental.begin_construction b >>=? fun i ->
-  let bootstrap =
-    WithExceptions.Option.get ~loc:__LOC__ @@ List.hd bootstrap_contracts
-  in
   Context.Contract.manager (I i) bootstrap >>=? fun manager ->
   Context.Contract.balance (I i) bootstrap >>=? fun balance ->
   (* originate a contract with bootstrap's manager as delegate *)
@@ -293,13 +266,13 @@ let delegate_to_bootstrap_by_origination ~fee () =
     Assert.balance_was_debited ~loc:__LOC__ (I i) bootstrap balance total_fee
 
 let undelegated_originated_bootstrap_contract () =
-  Context.init
-    1
+  Context.init1
     ~bootstrap_contracts:
       [
         Parameters.{delegate = None; amount = Tez.zero; script = Op.dummy_script};
       ]
-  >>=? fun (b, _) ->
+    ()
+  >>=? fun (b, _contract) ->
   Block.bake b >>=? fun b ->
   (* We know the address of the first originated bootstrap contract because we know the bootstrap origination nonce. This address corresponds to the first TF vesting contract on mainnnet. *)
   Lwt.return @@ Environment.wrap_tzresult
@@ -450,11 +423,8 @@ let expect_unregistered_key pkh = function
     (unregistered key), and the fees are still debited. Using RPCs, we
     verify the contract has not been originated. *)
 let test_unregistered_delegate_key_init_origination ~fee () =
-  Context.init 1 >>=? fun (b, bootstrap_contracts) ->
+  Context.init1 () >>=? fun (b, bootstrap) ->
   Incremental.begin_construction b >>=? fun i ->
-  let bootstrap =
-    WithExceptions.Option.get ~loc:__LOC__ @@ List.hd bootstrap_contracts
-  in
   let unregistered_account = Account.new_account () in
   let unregistered_pkh = Account.(unregistered_account.pkh) in
   (* origination with delegate argument *)
@@ -492,11 +462,8 @@ let test_unregistered_delegate_key_init_origination ~fee () =
     [Balance_too_low] is raised. Otherwise, fees are still debited. The
     implicit contract has no delegate. *)
 let test_unregistered_delegate_key_init_delegation ~fee () =
-  Context.init 1 >>=? fun (b, bootstrap_contracts) ->
+  Context.init1 () >>=? fun (b, bootstrap) ->
   Incremental.begin_construction b >>=? fun i ->
-  let bootstrap =
-    WithExceptions.Option.get ~loc:__LOC__ @@ List.hd bootstrap_contracts
-  in
   let unregistered_account = Account.new_account () in
   let unregistered_pkh = Account.(unregistered_account.pkh) in
   let impl_contract = Contract.implicit_contract unregistered_pkh in
@@ -532,11 +499,8 @@ let test_unregistered_delegate_key_init_delegation ~fee () =
     raised. Otherwise, fees are not debited and the implicit contract
     delegate remains unchanged. *)
 let test_unregistered_delegate_key_switch_delegation ~fee () =
-  Context.init 1 >>=? fun (b, bootstrap_contracts) ->
+  Context.init1 () >>=? fun (b, bootstrap) ->
   Incremental.begin_construction b >>=? fun i ->
-  let bootstrap =
-    WithExceptions.Option.get ~loc:__LOC__ @@ List.hd bootstrap_contracts
-  in
   let bootstrap_pkh =
     Contract.is_implicit bootstrap |> WithExceptions.Option.get ~loc:__LOC__
   in
@@ -577,11 +541,8 @@ let test_unregistered_delegate_key_switch_delegation ~fee () =
 (** Same as [unregistered_delegate_key_init_origination] and credits
     [amount], no self-delegation. *)
 let test_unregistered_delegate_key_init_origination_credit ~fee ~amount () =
-  Context.init 1 >>=? fun (b, bootstrap_contracts) ->
+  Context.init1 () >>=? fun (b, bootstrap) ->
   Incremental.begin_construction b >>=? fun i ->
-  let bootstrap =
-    WithExceptions.Option.get ~loc:__LOC__ @@ List.hd bootstrap_contracts
-  in
   let unregistered_account = Account.new_account () in
   let unregistered_pkh = Account.(unregistered_account.pkh) in
   let impl_contract = Contract.implicit_contract unregistered_pkh in
@@ -617,11 +578,8 @@ let test_unregistered_delegate_key_init_origination_credit ~fee ~amount () =
 (** Same as [unregistered_delegate_key_init_delegation] and credits
     the amount [amount] of the implicit contract. *)
 let test_unregistered_delegate_key_init_delegation_credit ~fee ~amount () =
-  Context.init 1 >>=? fun (b, bootstrap_contracts) ->
+  Context.init1 () >>=? fun (b, bootstrap) ->
   Incremental.begin_construction b >>=? fun i ->
-  let bootstrap =
-    WithExceptions.Option.get ~loc:__LOC__ @@ List.hd bootstrap_contracts
-  in
   let unregistered_account = Account.new_account () in
   let unregistered_pkh = Account.(unregistered_account.pkh) in
   let impl_contract = Contract.implicit_contract unregistered_pkh in
@@ -660,11 +618,8 @@ let test_unregistered_delegate_key_init_delegation_credit ~fee ~amount () =
 (** Same as in [unregistered_delegate_key_switch_delegation] and
     credits the amount [amount] to the implicit contract. *)
 let test_unregistered_delegate_key_switch_delegation_credit ~fee ~amount () =
-  Context.init 1 >>=? fun (b, bootstrap_contracts) ->
+  Context.init1 () >>=? fun (b, bootstrap) ->
   Incremental.begin_construction b >>=? fun i ->
-  let bootstrap =
-    WithExceptions.Option.get ~loc:__LOC__ @@ List.hd bootstrap_contracts
-  in
   let bootstrap_pkh =
     Contract.is_implicit bootstrap |> WithExceptions.Option.get ~loc:__LOC__
   in
@@ -712,11 +667,8 @@ let test_unregistered_delegate_key_switch_delegation_credit ~fee ~amount () =
     no self-delegation. *)
 let test_unregistered_delegate_key_init_origination_credit_debit ~fee ~amount ()
     =
-  Context.init 1 >>=? fun (b, bootstrap_contracts) ->
+  Context.init1 () >>=? fun (b, bootstrap) ->
   Incremental.begin_construction b >>=? fun i ->
-  let bootstrap =
-    WithExceptions.Option.get ~loc:__LOC__ @@ List.hd bootstrap_contracts
-  in
   let unregistered_account = Account.new_account () in
   let unregistered_pkh = Account.(unregistered_account.pkh) in
   let impl_contract = Contract.implicit_contract unregistered_pkh in
@@ -757,11 +709,8 @@ let test_unregistered_delegate_key_init_origination_credit_debit ~fee ~amount ()
     then debits the amount [amount] to the implicit contract. *)
 let test_unregistered_delegate_key_init_delegation_credit_debit ~amount ~fee ()
     =
-  Context.init 1 >>=? fun (b, bootstrap_contracts) ->
+  Context.init1 () >>=? fun (b, bootstrap) ->
   Incremental.begin_construction b >>=? fun i ->
-  let bootstrap =
-    WithExceptions.Option.get ~loc:__LOC__ @@ List.hd bootstrap_contracts
-  in
   let unregistered_account = Account.new_account () in
   let unregistered_pkh = Account.(unregistered_account.pkh) in
   let impl_contract = Contract.implicit_contract unregistered_pkh in
@@ -805,11 +754,8 @@ let test_unregistered_delegate_key_init_delegation_credit_debit ~amount ~fee ()
     credits then debits the amount [amount] to the implicit contract. *)
 let test_unregistered_delegate_key_switch_delegation_credit_debit ~fee ~amount
     () =
-  Context.init 1 >>=? fun (b, bootstrap_contracts) ->
+  Context.init1 () >>=? fun (b, bootstrap) ->
   Incremental.begin_construction b >>=? fun i ->
-  let bootstrap =
-    WithExceptions.Option.get ~loc:__LOC__ @@ List.hd bootstrap_contracts
-  in
   let bootstrap_pkh =
     Contract.is_implicit bootstrap |> WithExceptions.Option.get ~loc:__LOC__
   in
@@ -860,7 +806,7 @@ let test_unregistered_delegate_key_switch_delegation_credit_debit ~fee ~amount
 
 (** Self-delegation with zero-balance contract should fail. *)
 let test_failed_self_delegation_no_transaction () =
-  Context.init 1 >>=? fun (b, _) ->
+  Context.init1 () >>=? fun (b, _contract) ->
   Incremental.begin_construction b >>=? fun i ->
   let account = Account.new_account () in
   let unregistered_pkh = Account.(account.pkh) in
@@ -878,11 +824,8 @@ let test_failed_self_delegation_no_transaction () =
     is emptied). Self-delegation fails. *)
 let test_failed_self_delegation_emptied_implicit_contract amount () =
   (* create an implicit contract *)
-  Context.init 1 >>=? fun (b, bootstrap_contracts) ->
+  Context.init1 () >>=? fun (b, bootstrap) ->
   Incremental.begin_construction b >>=? fun i ->
-  let bootstrap =
-    WithExceptions.Option.get ~loc:__LOC__ @@ List.hd bootstrap_contracts
-  in
   let account = Account.new_account () in
   let unregistered_pkh = Account.(account.pkh) in
   let impl_contract = Contract.implicit_contract unregistered_pkh in
@@ -906,11 +849,8 @@ let test_failed_self_delegation_emptied_implicit_contract amount () =
     tz, then it is delegated. The operation of debit of [amount] tz
     should fail as the contract is already delegated. *)
 let test_emptying_delegated_implicit_contract_fails amount () =
-  Context.init 1 >>=? fun (b, bootstrap_contracts) ->
+  Context.init1 () >>=? fun (b, bootstrap) ->
   Incremental.begin_construction b >>=? fun i ->
-  let bootstrap =
-    WithExceptions.Option.get ~loc:__LOC__ @@ List.hd bootstrap_contracts
-  in
   Context.Contract.manager (I i) bootstrap >>=? fun bootstrap_manager ->
   let account = Account.new_account () in
   let unregistered_pkh = Account.(account.pkh) in
@@ -944,11 +884,8 @@ let test_emptying_delegated_implicit_contract_fails amount () =
     self-delegated. *)
 let test_valid_delegate_registration_init_delegation_credit amount () =
   (* create an implicit contract *)
-  Context.init 1 >>=? fun (b, bootstrap_contracts) ->
+  Context.init1 () >>=? fun (b, bootstrap) ->
   Incremental.begin_construction b >>=? fun i ->
-  let bootstrap =
-    WithExceptions.Option.get ~loc:__LOC__ @@ List.hd bootstrap_contracts
-  in
   let delegate_account = Account.new_account () in
   let delegate_pkh = Account.(delegate_account.pkh) in
   let impl_contract = Contract.implicit_contract delegate_pkh in
@@ -990,11 +927,8 @@ let test_valid_delegate_registration_init_delegation_credit amount () =
     contract. *)
 let test_valid_delegate_registration_switch_delegation_credit amount () =
   (* create an implicit contract *)
-  Context.init 1 >>=? fun (b, bootstrap_contracts) ->
+  Context.init1 () >>=? fun (b, bootstrap) ->
   Incremental.begin_construction b >>=? fun i ->
-  let bootstrap =
-    WithExceptions.Option.get ~loc:__LOC__ @@ List.hd bootstrap_contracts
-  in
   let delegate_account = Account.new_account () in
   let delegate_pkh = Account.(delegate_account.pkh) in
   let impl_contract = Contract.implicit_contract delegate_pkh in
@@ -1034,11 +968,8 @@ let test_valid_delegate_registration_switch_delegation_credit amount () =
 (** Create an implicit contract. *)
 let test_valid_delegate_registration_init_delegation_credit_debit amount () =
   (* create an implicit contract *)
-  Context.init 1 >>=? fun (b, bootstrap_contracts) ->
+  Context.init1 () >>=? fun (b, bootstrap) ->
   Incremental.begin_construction b >>=? fun i ->
-  let bootstrap =
-    WithExceptions.Option.get ~loc:__LOC__ @@ List.hd bootstrap_contracts
-  in
   let delegate_account = Account.new_account () in
   let delegate_pkh = Account.(delegate_account.pkh) in
   let impl_contract = Contract.implicit_contract delegate_pkh in
@@ -1091,11 +1022,8 @@ let test_valid_delegate_registration_init_delegation_credit_debit amount () =
     be re-delegated to the latter contract. *)
 let test_valid_delegate_registration_switch_delegation_credit_debit amount () =
   (* create an implicit contract *)
-  Context.init 1 >>=? fun (b, bootstrap_contracts) ->
+  Context.init1 () >>=? fun (b, bootstrap) ->
   Incremental.begin_construction b >>=? fun i ->
-  let bootstrap =
-    WithExceptions.Option.get ~loc:__LOC__ @@ List.hd bootstrap_contracts
-  in
   let delegate_account = Account.new_account () in
   let delegate_pkh = Account.(delegate_account.pkh) in
   let impl_contract = Contract.implicit_contract delegate_pkh in
@@ -1145,11 +1073,8 @@ let test_valid_delegate_registration_switch_delegation_credit_debit amount () =
 (** Second self-delegation should fail with implicit contract with
     some credit. *)
 let test_double_registration () =
-  Context.init 1 >>=? fun (b, bootstrap_contracts) ->
+  Context.init1 () >>=? fun (b, bootstrap) ->
   Incremental.begin_construction b >>=? fun i ->
-  let bootstrap =
-    WithExceptions.Option.get ~loc:__LOC__ @@ List.hd bootstrap_contracts
-  in
   let account = Account.new_account () in
   let pkh = Account.(account.pkh) in
   let impl_contract = Contract.implicit_contract pkh in
@@ -1168,11 +1093,8 @@ let test_double_registration () =
 (** Second self-delegation should fail with implicit contract emptied
     after first self-delegation. *)
 let test_double_registration_when_empty () =
-  Context.init 1 >>=? fun (b, bootstrap_contracts) ->
+  Context.init1 () >>=? fun (b, bootstrap) ->
   Incremental.begin_construction b >>=? fun i ->
-  let bootstrap =
-    WithExceptions.Option.get ~loc:__LOC__ @@ List.hd bootstrap_contracts
-  in
   let account = Account.new_account () in
   let pkh = Account.(account.pkh) in
   let impl_contract = Contract.implicit_contract pkh in
@@ -1196,11 +1118,8 @@ let test_double_registration_when_empty () =
 (** Second self-delegation should fail with implicit contract emptied
     then credited back after first self-delegation. *)
 let test_double_registration_when_recredited () =
-  Context.init 1 >>=? fun (b, bootstrap_contracts) ->
+  Context.init1 () >>=? fun (b, bootstrap) ->
   Incremental.begin_construction b >>=? fun i ->
-  let bootstrap =
-    WithExceptions.Option.get ~loc:__LOC__ @@ List.hd bootstrap_contracts
-  in
   let account = Account.new_account () in
   let pkh = Account.(account.pkh) in
   let impl_contract = Contract.implicit_contract pkh in
@@ -1228,11 +1147,8 @@ let test_double_registration_when_recredited () =
 
 (** Self-delegation on unrevealed contract. *)
 let test_unregistered_and_unrevealed_self_delegate_key_init_delegation ~fee () =
-  Context.init 1 >>=? fun (b, bootstrap_contracts) ->
+  Context.init1 () >>=? fun (b, bootstrap) ->
   Incremental.begin_construction b >>=? fun i ->
-  let bootstrap =
-    WithExceptions.Option.get ~loc:__LOC__ @@ List.hd bootstrap_contracts
-  in
   let {Account.pkh; _} = Account.new_account () in
   let {Account.pkh = delegate_pkh; _} = Account.new_account () in
   let contract = Alpha_context.Contract.implicit_contract pkh in
@@ -1252,11 +1168,8 @@ let test_unregistered_and_unrevealed_self_delegate_key_init_delegation ~fee () =
 
 (** Self-delegation on revealed but not registered contract. *)
 let test_unregistered_and_revealed_self_delegate_key_init_delegation ~fee () =
-  Context.init 1 >>=? fun (b, bootstrap_contracts) ->
+  Context.init1 () >>=? fun (b, bootstrap) ->
   Incremental.begin_construction b >>=? fun i ->
-  let bootstrap =
-    WithExceptions.Option.get ~loc:__LOC__ @@ List.hd bootstrap_contracts
-  in
   let {Account.pkh; pk; _} = Account.new_account () in
   let {Account.pkh = delegate_pkh; _} = Account.new_account () in
   let contract = Alpha_context.Contract.implicit_contract pkh in
@@ -1278,11 +1191,8 @@ let test_unregistered_and_revealed_self_delegate_key_init_delegation ~fee () =
 
 (** Self-delegation emptying a fresh contract. *)
 let test_self_delegation_emptying_contract () =
-  Context.init 1 >>=? fun (b, bootstrap_contracts) ->
+  Context.init1 () >>=? fun (b, bootstrap) ->
   Incremental.begin_construction b >>=? fun i ->
-  let bootstrap =
-    WithExceptions.Option.get ~loc:__LOC__ @@ List.hd bootstrap_contracts
-  in
   let {Account.pkh; pk; _} = Account.new_account () in
   let {Account.pkh = delegate_pkh; _} = Account.new_account () in
   let contract = Alpha_context.Contract.implicit_contract pkh in
@@ -1306,11 +1216,8 @@ let test_self_delegation_emptying_contract () =
 
 (** Self-delegation on revealed and registered contract. *)
 let test_registered_self_delegate_key_init_delegation () =
-  Context.init 1 >>=? fun (b, bootstrap_contracts) ->
+  Context.init1 () >>=? fun (b, bootstrap) ->
   Incremental.begin_construction b >>=? fun i ->
-  let bootstrap =
-    WithExceptions.Option.get ~loc:__LOC__ @@ List.hd bootstrap_contracts
-  in
   let {Account.pkh; _} = Account.new_account () in
   let {Account.pkh = delegate_pkh; pk = delegate_pk; _} =
     Account.new_account ()

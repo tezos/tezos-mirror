@@ -38,7 +38,7 @@ open Lwt_result_syntax
 let lift k = Lwt.map Environment.wrap_tzresult k
 
 let new_context () =
-  let* (b, _contracts) = Context.init 1 in
+  let* (b, _contract) = Context.init1 () in
   Incremental.begin_construction b >|=? fun inc ->
   let state = Incremental.validation_state inc in
   let ctxt = state.ctxt in

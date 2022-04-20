@@ -41,8 +41,7 @@ open Test_tez
 let ten_tez = of_int 10
 
 let test_simple_reveal () =
-  Context.init ~consensus_threshold:0 1 >>=? fun (blk, contracts) ->
-  let c = WithExceptions.Option.get ~loc:__LOC__ @@ List.hd contracts in
+  Context.init1 ~consensus_threshold:0 () >>=? fun (blk, c) ->
   let new_c = Account.new_account () in
   let new_contract = Alpha_context.Contract.implicit_contract new_c.pkh in
   (* Create the contract *)
@@ -60,8 +59,7 @@ let test_simple_reveal () =
   | false -> Stdlib.failwith "New contract revelation failed."
 
 let test_empty_account_on_reveal () =
-  Context.init ~consensus_threshold:0 1 >>=? fun (blk, contracts) ->
-  let c = WithExceptions.Option.get ~loc:__LOC__ @@ List.hd contracts in
+  Context.init1 ~consensus_threshold:0 () >>=? fun (blk, c) ->
   let new_c = Account.new_account () in
   let new_contract = Alpha_context.Contract.implicit_contract new_c.pkh in
   let amount = Tez.one_mutez in
@@ -82,8 +80,7 @@ let test_empty_account_on_reveal () =
   | true -> Stdlib.failwith "Empty account still exists and is revealed."
 
 let test_not_enough_found_for_reveal () =
-  Context.init 1 >>=? fun (blk, contracts) ->
-  let c = WithExceptions.Option.get ~loc:__LOC__ @@ List.hd contracts in
+  Context.init1 () >>=? fun (blk, c) ->
   let new_c = Account.new_account () in
   let new_contract = Alpha_context.Contract.implicit_contract new_c.pkh in
   (* Create the contract *)
@@ -99,8 +96,7 @@ let test_not_enough_found_for_reveal () =
   Assert.proto_error_with_info ~loc:__LOC__ res "Balance too low"
 
 let test_transfer_fees_emptying_after_reveal_batched () =
-  Context.init 1 >>=? fun (blk, contracts) ->
-  let c = WithExceptions.Option.get ~loc:__LOC__ @@ List.hd contracts in
+  Context.init1 () >>=? fun (blk, c) ->
   let new_c = Account.new_account () in
   let new_contract = Alpha_context.Contract.implicit_contract new_c.pkh in
   (* Create the contract *)

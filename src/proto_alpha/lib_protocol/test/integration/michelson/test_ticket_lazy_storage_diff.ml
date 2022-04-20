@@ -133,8 +133,7 @@ let make_alloc big_map_id alloc updates =
     (Update {init = Lazy_storage.Alloc alloc; updates})
 
 let init () =
-  let* (block, contracts) = Context.init 1 in
-  let source = WithExceptions.Option.get ~loc:__LOC__ @@ List.hd contracts in
+  let* (block, source) = Context.init1 () in
   let* (operation, originated) =
     Op.contract_origination (B block) source ~script:Op.dummy_script
   in

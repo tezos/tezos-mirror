@@ -49,22 +49,6 @@ let block_fork b =
 (*                        Tests                                 *)
 (****************************************************************)
 
-let get_first_2_accounts_contracts contracts =
-  let ((contract1, account1), (contract2, account2)) =
-    match contracts with
-    | [a1; a2] ->
-        ( ( a1,
-            Contract.is_implicit a1 |> function
-            | None -> assert false
-            | Some pkh -> pkh ),
-          ( a2,
-            Contract.is_implicit a2 |> function
-            | None -> assert false
-            | Some pkh -> pkh ) )
-    | _ -> assert false
-  in
-  ((contract1, account1), (contract2, account2))
-
 let order_endorsements ~correct_order op1 op2 =
   let oph1 = Operation.hash op1 in
   let oph2 = Operation.hash op2 in
@@ -87,7 +71,7 @@ let double_endorsement ctxt ?(correct_order = true) op1 op2 =
     delegate and exposed by a double_endorsement operation. Also verify
     that punishment is operated. *)
 let test_valid_double_endorsement_evidence () =
-  Context.init ~consensus_threshold:0 2 >>=? fun (genesis, _) ->
+  Context.init2 ~consensus_threshold:0 () >>=? fun (genesis, _contracts) ->
   block_fork genesis >>=? fun (blk_1, blk_2) ->
   (* from blk_1 we bake blk_a and from blk_2 we bake blk_b so that
      the same delegate endorses blk_a and blk_b and these 2 form
@@ -145,7 +129,7 @@ let test_valid_double_endorsement_evidence () =
 (** Say a delegate double-endorses twice and say the 2 evidences are timely
    included. Then the delegate can no longer bake. *)
 let test_two_double_endorsement_evidences_leadsto_no_bake () =
-  Context.init ~consensus_threshold:0 2 >>=? fun (genesis, _) ->
+  Context.init2 ~consensus_threshold:0 () >>=? fun (genesis, _contracts) ->
   block_fork genesis >>=? fun (blk_1, blk_2) ->
   Block.bake blk_1 >>=? fun blk_a ->
   Block.bake blk_2 >>=? fun blk_b ->
@@ -183,7 +167,7 @@ let test_two_double_endorsement_evidences_leadsto_no_bake () =
 (** Check that an invalid double endorsement operation that exposes a
       valid endorsement fails. *)
 let test_invalid_double_endorsement () =
-  Context.init ~consensus_threshold:0 10 >>=? fun (genesis, _) ->
+  Context.init_n ~consensus_threshold:0 10 () >>=? fun (genesis, _contracts) ->
   Block.bake genesis >>=? fun b ->
   Op.endorsement ~endorsed_block:b (B genesis) () >>=? fun endorsement ->
   Block.bake ~operation:(Operation.pack endorsement) b >>=? fun b ->
@@ -194,7 +178,7 @@ let test_invalid_double_endorsement () =
 (** Check that an double endorsement operation that is invalid due to
    incorrect ordering of the endorsements fails. *)
 let test_invalid_double_endorsement_variant () =
-  Context.init ~consensus_threshold:0 2 >>=? fun (genesis, _) ->
+  Context.init2 ~consensus_threshold:0 () >>=? fun (genesis, _contracts) ->
   Block.bake_until_cycle_end genesis >>=? fun b ->
   block_fork b >>=? fun (blk_1, blk_2) ->
   Block.bake blk_1 >>=? fun blk_a ->
@@ -212,7 +196,7 @@ let test_invalid_double_endorsement_variant () =
 
 (** Check that a future-cycle double endorsement fails. *)
 let test_too_early_double_endorsement_evidence () =
-  Context.init ~consensus_threshold:0 2 >>=? fun (genesis, _) ->
+  Context.init2 ~consensus_threshold:0 () >>=? fun (genesis, _contracts) ->
   Block.bake_until_cycle_end genesis >>=? fun b ->
   block_fork b >>=? fun (blk_1, blk_2) ->
   Block.bake blk_1 >>=? fun blk_a ->
@@ -226,7 +210,7 @@ let test_too_early_double_endorsement_evidence () =
 (** Check that after [max_slashing_period * blocks_per_cycle + 1], it is not possible
     to create a double_endorsement anymore. *)
 let test_too_late_double_endorsement_evidence () =
-  Context.init ~consensus_threshold:0 2 >>=? fun (genesis, _) ->
+  Context.init2 ~consensus_threshold:0 () >>=? fun (genesis, _contracts) ->
   Context.get_constants (B genesis)
   >>=? fun Constants.
              {parametric = {max_slashing_period; blocks_per_cycle; _}; _} ->
@@ -244,7 +228,7 @@ let test_too_late_double_endorsement_evidence () =
 (** Check that an invalid double endorsement evidence that exposes two
     endorsements made by two different endorsers fails. *)
 let test_different_delegates () =
-  Context.init ~consensus_threshold:0 2 >>=? fun (genesis, _) ->
+  Context.init2 ~consensus_threshold:0 () >>=? fun (genesis, _contracts) ->
   Block.bake genesis >>=? fun genesis ->
   block_fork genesis >>=? fun (blk_1, blk_2) ->
   Block.bake blk_1 >>=? fun blk_a ->
@@ -277,7 +261,7 @@ let test_different_delegates () =
 (** Check that a double endorsement evidence that exposes a ill-formed
     endorsement fails. *)
 let test_wrong_delegate () =
-  Context.init ~consensus_threshold:0 2 >>=? fun (genesis, _contracts) ->
+  Context.init2 ~consensus_threshold:0 () >>=? fun (genesis, _contracts) ->
   block_fork genesis >>=? fun (blk_1, blk_2) ->
   Block.bake blk_1 >>=? fun blk_a ->
   Block.bake blk_2 >>=? fun blk_b ->
@@ -362,10 +346,9 @@ let test_freeze_more_with_low_balance =
           {numerator = 1; denominator = 2};
       }
     in
-    Context.init_with_constants constants 2 >>=? fun (genesis, contracts) ->
-    let ((_contract1, account1), (_contract2, account2)) =
-      get_first_2_accounts_contracts contracts
-    in
+    Context.init_with_constants2 constants >>=? fun (genesis, (c1, c2)) ->
+    let account1 = Context.Contract.pkh c1 in
+    let account2 = Context.Contract.pkh c2 in
     (* we empty the available balance of [account1]. *)
     Context.Delegate.info (B genesis) account1 >>=? fun info1 ->
     Op.transaction

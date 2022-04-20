@@ -159,8 +159,7 @@ let make_alloc big_map_id alloc updates =
 
 let init () =
   let open Lwt_result_syntax in
-  let* (block, contracts) = Context.init 1 in
-  let source = WithExceptions.Option.get ~loc:__LOC__ @@ List.hd contracts in
+  let* (block, source) = Context.init1 () in
   let* (operation, originated) =
     Op.contract_origination (B block) source ~script:Op.dummy_script
   in
@@ -170,10 +169,7 @@ let init () =
 
 (** Initializes one address for operations and one baker. *)
 let init_for_operation () =
-  Context.init ~consensus_threshold:0 2 >|=? fun (block, contracts) ->
-  let (src0, src1) =
-    match contracts with src0 :: src1 :: _ -> (src0, src1) | _ -> assert false
-  in
+  Context.init2 ~consensus_threshold:0 () >|=? fun (block, (src0, src1)) ->
   let baker =
     match Alpha_context.Contract.is_implicit src0 with
     | Some v -> v

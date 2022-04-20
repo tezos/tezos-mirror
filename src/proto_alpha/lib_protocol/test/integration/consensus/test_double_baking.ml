@@ -43,10 +43,7 @@ open Alpha_context
 
 (** Bake two block at the same level using the same policy (i.e. same
     baker). *)
-let block_fork ?policy contracts b =
-  let (contract_a, contract_b) =
-    match contracts with x :: y :: _ -> (x, y) | _ -> assert false
-  in
+let block_fork ?policy (contract_a, contract_b) b =
   Op.transaction (B b) contract_a contract_b Alpha_context.Tez.one_cent
   >>=? fun operation ->
   Block.bake ?policy ~operation b >>=? fun blk_a ->
@@ -71,7 +68,7 @@ let double_baking ctxt ?(correct_order = true) bh1 bh2 =
 (** Simple scenario where two blocks are baked by a same baker and
     exposed by a double baking evidence operation. *)
 let test_valid_double_baking_evidence () =
-  Context.init ~consensus_threshold:0 2 >>=? fun (genesis, contracts) ->
+  Context.init2 ~consensus_threshold:0 () >>=? fun (genesis, contracts) ->
   Context.get_constants (B genesis)
   >>=? fun Constants.{parametric = {double_baking_punishment; _}; _} ->
   Context.get_first_different_bakers (B genesis) >>=? fun (baker1, baker2) ->
@@ -111,7 +108,7 @@ let double_endorsement ctxt ?(correct_order = true) op1 op2 =
   Op.double_endorsement ctxt e1 e2
 
 let test_valid_double_baking_followed_by_double_endorsing () =
-  Context.init ~consensus_threshold:0 2 >>=? fun (genesis, contracts) ->
+  Context.init2 ~consensus_threshold:0 () >>=? fun (genesis, contracts) ->
   Context.get_first_different_bakers (B genesis) >>=? fun (baker1, baker2) ->
   Block.bake genesis >>=? fun b ->
   Context.Delegate.current_frozen_deposits (B b) baker1
@@ -162,7 +159,7 @@ let block_fork_diff b =
   Block.bake ~policy:(By_account baker_2) b >|=? fun blk_b -> (blk_a, blk_b)
 
 let test_valid_double_endorsing_followed_by_double_baking () =
-  Context.init ~consensus_threshold:0 2 >>=? fun (genesis, contracts) ->
+  Context.init2 ~consensus_threshold:0 () >>=? fun (genesis, contracts) ->
   Context.get_first_different_bakers (B genesis) >>=? fun (baker1, baker2) ->
   block_fork_diff genesis >>=? fun (blk_1, blk_2) ->
   Context.Delegate.current_frozen_deposits (B genesis) baker1
@@ -213,7 +210,7 @@ let test_valid_double_endorsing_followed_by_double_baking () =
    baking evidence (and not the block producer, if different) receives
    the reward. *)
 let test_payload_producer_gets_evidence_rewards () =
-  Context.init ~consensus_threshold:0 10 >>=? fun (genesis, contracts) ->
+  Context.init_n ~consensus_threshold:0 10 () >>=? fun (genesis, contracts) ->
   Context.get_constants (B genesis)
   >>=? fun Constants.
              {
@@ -222,7 +219,10 @@ let test_payload_producer_gets_evidence_rewards () =
                _;
              } ->
   Context.get_first_different_bakers (B genesis) >>=? fun (baker1, baker2) ->
-  block_fork ~policy:(By_account baker1) contracts genesis >>=? fun (b1, b2) ->
+  let c1_c2 =
+    match contracts with c1 :: c2 :: _ -> (c1, c2) | _ -> assert false
+  in
+  block_fork ~policy:(By_account baker1) c1_c2 genesis >>=? fun (b1, b2) ->
   double_baking (B b1) b1.header b2.header |> fun db_evidence ->
   Block.bake ~policy:(By_account baker2) ~operation:db_evidence b1
   >>=? fun b_with_evidence ->
@@ -287,7 +287,7 @@ let test_payload_producer_gets_evidence_rewards () =
 (** Check that a double baking operation fails if it exposes the same two
     blocks. *)
 let test_same_blocks () =
-  Context.init 2 >>=? fun (b, _contracts) ->
+  Context.init2 () >>=? fun (b, _contracts) ->
   Block.bake b >>=? fun ba ->
   double_baking (B ba) ba.header ba.header |> fun operation ->
   Block.bake ~operation ba >>= fun res ->
@@ -296,7 +296,7 @@ let test_same_blocks () =
 (** Check that an double baking operation that is invalid due to
    incorrect ordering of the block headers fails. *)
 let test_incorrect_order () =
-  Context.init ~consensus_threshold:0 2 >>=? fun (genesis, contracts) ->
+  Context.init2 ~consensus_threshold:0 () >>=? fun (genesis, contracts) ->
   block_fork ~policy:(By_round 0) contracts genesis >>=? fun (blk_a, blk_b) ->
   double_baking (B genesis) ~correct_order:false blk_a.header blk_b.header
   |> fun operation ->
@@ -306,7 +306,7 @@ let test_incorrect_order () =
 (** Check that a double baking operation exposing two blocks with
     different levels fails. *)
 let test_different_levels () =
-  Context.init ~consensus_threshold:0 2 >>=? fun (b, contracts) ->
+  Context.init2 ~consensus_threshold:0 () >>=? fun (b, contracts) ->
   block_fork ~policy:(By_round 0) contracts b >>=? fun (blk_a, blk_b) ->
   Block.bake blk_b >>=? fun blk_b_2 ->
   double_baking (B blk_a) blk_a.header blk_b_2.header |> fun operation ->
@@ -316,7 +316,7 @@ let test_different_levels () =
 (** Check that a double baking operation exposing two yet-to-be-baked
     blocks fails. *)
 let test_too_early_double_baking_evidence () =
-  Context.init ~consensus_threshold:0 2 >>=? fun (genesis, contracts) ->
+  Context.init2 ~consensus_threshold:0 () >>=? fun (genesis, contracts) ->
   Block.bake_until_cycle_end genesis >>=? fun b ->
   block_fork ~policy:(By_round 0) contracts b >>=? fun (blk_a, blk_b) ->
   double_baking (B b) blk_a.header blk_b.header |> fun operation ->
@@ -326,7 +326,7 @@ let test_too_early_double_baking_evidence () =
 (** Check that after [max_slashing_period * blocks_per_cycle + 1] blocks -- corresponding to 2 cycles
    --, it is not possible to create a double baking operation anymore. *)
 let test_too_late_double_baking_evidence () =
-  Context.init ~consensus_threshold:0 2 >>=? fun (b, contracts) ->
+  Context.init2 ~consensus_threshold:0 () >>=? fun (b, contracts) ->
   Context.get_constants (B b)
   >>=? fun Constants.{parametric = {max_slashing_period; _}; _} ->
   block_fork ~policy:(By_round 0) contracts b >>=? fun (blk_a, blk_b) ->
@@ -339,7 +339,7 @@ let test_too_late_double_baking_evidence () =
    -- corresponding to 2 cycles --, it is still possible to create a
    double baking operation. *)
 let test_just_in_time_double_baking_evidence () =
-  Context.init ~consensus_threshold:0 2 >>=? fun (b, contracts) ->
+  Context.init2 ~consensus_threshold:0 () >>=? fun (b, contracts) ->
   Context.get_constants (B b)
   >>=? fun Constants.{parametric = {blocks_per_cycle; _}; _} ->
   block_fork ~policy:(By_round 0) contracts b >>=? fun (blk_a, blk_b) ->
@@ -353,7 +353,7 @@ let test_just_in_time_double_baking_evidence () =
 (** Check that an invalid double baking evidence that exposes two
     block baking with same level made by different bakers fails. *)
 let test_different_delegates () =
-  Context.init 2 >>=? fun (b, _) ->
+  Context.init2 () >>=? fun (b, _contracts) ->
   Context.get_first_different_bakers (B b) >>=? fun (baker_1, baker_2) ->
   Block.bake ~policy:(By_account baker_1) b >>=? fun blk_a ->
   Block.bake ~policy:(By_account baker_2) b >>=? fun blk_b ->
@@ -382,7 +382,7 @@ let test_wrong_signer () =
     >>=? fun header ->
     Block.Forge.set_baker baker_2 header |> Block.Forge.sign_header
   in
-  Context.init 2 >>=? fun (b, _) ->
+  Context.init2 () >>=? fun (b, _contracts) ->
   Context.get_first_different_bakers (B b) >>=? fun (baker_1, baker_2) ->
   Block.bake ~policy:(By_account baker_1) b >>=? fun blk_a ->
   let ts = Timestamp.of_seconds_string (Int64.to_string 10L) in
@@ -397,8 +397,8 @@ let test_wrong_signer () =
 (** an evidence can only be accepted once (this also means that the
    same evidence doesn't lead to slashing the offender twice) *)
 let test_double_evidence () =
-  Context.init ~consensus_threshold:0 3 >>=? fun (blk, contracts) ->
-  block_fork contracts blk >>=? fun (blk_a, blk_b) ->
+  Context.init3 ~consensus_threshold:0 () >>=? fun (blk, (c1, c2, _c3)) ->
+  block_fork (c1, c2) blk >>=? fun (blk_a, blk_b) ->
   Block.bake_until_cycle_end blk_a >>=? fun blk ->
   double_baking (B blk) blk_a.header blk_b.header |> fun evidence ->
   Block.bake ~operation:evidence blk >>=? fun blk ->

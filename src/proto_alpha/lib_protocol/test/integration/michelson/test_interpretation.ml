@@ -39,7 +39,7 @@ open Script_interpreter
 open Error_monad_operators
 
 let test_context () =
-  Context.init 3 >>=? fun (b, _cs) ->
+  Context.init3 () >>=? fun (b, _cs) ->
   Incremental.begin_construction b >>=? fun v ->
   return (Incremental.alpha_ctxt v)
 

@@ -117,7 +117,7 @@ module Contract : sig
 
   val equal : Contract.t -> Contract.t -> bool
 
-  val pkh : Contract.t -> public_key_hash tzresult Lwt.t
+  val pkh : Contract.t -> public_key_hash
 
   (** Returns the balance of a contract, by default the main balance.
       If the contract is implicit the frozen balances are available too:
@@ -202,9 +202,15 @@ module Tx_rollup : sig
     Tx_rollup_commitment.Submitted_commitment.t option tzresult Lwt.t
 end
 
-(** [init n] : returns an initial block with [n] initialized accounts
-    and the associated implicit contracts *)
-val init :
+type (_, _) tup =
+  | T1 : ('a, 'a) tup
+  | T2 : ('a, 'a * 'a) tup
+  | T3 : ('a, 'a * 'a * 'a) tup
+  | TList : int -> ('a, 'a list) tup
+
+val tup_hd : ('a, 'elts) tup -> 'elts -> 'a
+
+type 'accounts init :=
   ?rng_state:Random.State.t ->
   ?commitments:Commitment.t list ->
   ?initial_balances:int64 list ->
@@ -224,59 +230,46 @@ val init :
   ?tx_rollup_sunset_level:int32 ->
   ?tx_rollup_origination_size:int ->
   ?sc_rollup_enable:bool ->
-  int ->
-  (Block.t * Alpha_context.Contract.t list) tzresult Lwt.t
+  unit ->
+  (Block.t * 'accounts) tzresult Lwt.t
+
+(** [init_n n] : returns an initial block with [n] initialized accounts
+    and the associated implicit contracts *)
+val init_n : int -> Alpha_context.Contract.t list init
 
 (** [init1] : returns an initial block with 1 initialized bootstrap account
     and the associated implicit contract *)
-val init1 :
-  ?rng_state:Random.State.t ->
-  ?commitments:Commitment.t list ->
-  ?initial_balances:int64 list ->
-  ?consensus_threshold:int ->
-  ?min_proposal_quorum:int32 ->
-  ?level:int32 ->
-  ?cost_per_byte:Tez.t ->
-  ?liquidity_baking_subsidy:Tez.t ->
-  ?endorsing_reward_per_slot:Tez.t ->
-  ?baking_reward_bonus_per_slot:Tez.t ->
-  ?baking_reward_fixed_portion:Tez.t ->
-  ?origination_size:int ->
-  ?blocks_per_cycle:int32 ->
-  ?cycles_per_voting_period:int32 ->
-  ?tx_rollup_enable:bool ->
-  ?tx_rollup_sunset_level:int32 ->
-  ?sc_rollup_enable:bool ->
-  unit ->
-  (Block.t * Alpha_context.Contract.t) tzresult Lwt.t
+val init1 : Alpha_context.Contract.t init
 
 (** [init2] : returns an initial block with 2 initialized bootstrap accounts
     and the associated implicit contracts *)
-val init2 :
-  ?rng_state:Random.State.t ->
-  ?commitments:Commitment.t list ->
-  ?initial_balances:int64 list ->
-  ?consensus_threshold:int ->
-  ?min_proposal_quorum:int32 ->
-  ?level:int32 ->
-  ?cost_per_byte:Tez.t ->
-  ?liquidity_baking_subsidy:Tez.t ->
-  ?endorsing_reward_per_slot:Tez.t ->
-  ?baking_reward_bonus_per_slot:Tez.t ->
-  ?baking_reward_fixed_portion:Tez.t ->
-  ?origination_size:int ->
-  ?blocks_per_cycle:int32 ->
-  ?cycles_per_voting_period:int32 ->
-  ?tx_rollup_enable:bool ->
-  ?tx_rollup_sunset_level:int32 ->
-  ?sc_rollup_enable:bool ->
-  unit ->
-  (Block.t * Alpha_context.Contract.t * Alpha_context.Contract.t) tzresult Lwt.t
+val init2 : (Alpha_context.Contract.t * Alpha_context.Contract.t) init
 
-val init_with_constants :
+(** [init3] : returns an initial block with 3 initialized bootstrap accounts
+    and the associated implicit contracts *)
+val init3 :
+  (Alpha_context.Contract.t
+  * Alpha_context.Contract.t
+  * Alpha_context.Contract.t)
+  init
+
+val init_with_constants_gen :
+  (Alpha_context.Contract.t, 'contracts) tup ->
+  Constants.parametric ->
+  (Block.t * 'contracts) tzresult Lwt.t
+
+val init_with_constants_n :
   Constants.parametric ->
   int ->
   (Block.t * Alpha_context.Contract.t list) tzresult Lwt.t
+
+val init_with_constants1 :
+  Constants.parametric -> (Block.t * Alpha_context.Contract.t) tzresult Lwt.t
+
+val init_with_constants2 :
+  Constants.parametric ->
+  (Block.t * (Alpha_context.Contract.t * Alpha_context.Contract.t)) tzresult
+  Lwt.t
 
 (** [default_raw_context] returns a [Raw_context.t] for use in tests
     below [Alpha_context] *)

@@ -41,7 +41,7 @@ let print_script_expr_list fmtr (exprs : Protocol.Script_repr.expr list) =
 
 let typecheck_by_tezos =
   let context_init_memory ~rng_state =
-    Context.init
+    Context.init_n
       ~rng_state
       ~initial_balances:
         [
@@ -52,6 +52,7 @@ let typecheck_by_tezos =
           4_000_000_000_000L;
         ]
       5
+      ()
     >>=? fun (block, _accounts) ->
     Context.get_constants (B block) >>=? fun csts ->
     let minimal_block_delay =

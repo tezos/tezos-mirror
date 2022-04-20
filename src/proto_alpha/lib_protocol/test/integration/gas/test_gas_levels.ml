@@ -49,7 +49,7 @@ let succeed x = match x with Ok _ -> true | _ -> false
 let failed x = not (succeed x)
 
 let dummy_context () =
-  Context.init ~consensus_threshold:0 1 >>=? fun (block, _) ->
+  Context.init1 ~consensus_threshold:0 () >>=? fun (block, _contract) ->
   Raw_context.prepare
     ~level:Int32.zero
     ~predecessor_timestamp:Time.Protocol.epoch
@@ -255,8 +255,7 @@ let originate_contract block source script =
   Block.bake ~operation block >>=? fun block -> return (block, dst)
 
 let init_block to_originate =
-  Context.init ~consensus_threshold:0 1 >>=? fun (block, contracts) ->
-  let src = WithExceptions.Option.get ~loc:__LOC__ @@ List.hd contracts in
+  Context.init1 ~consensus_threshold:0 () >>=? fun (block, src) ->
   (*** originate contracts ***)
   let rec full_originate block originated = function
     | [] -> return (block, List.rev originated)

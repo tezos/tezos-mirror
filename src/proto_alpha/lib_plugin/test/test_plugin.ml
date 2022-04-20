@@ -52,10 +52,10 @@ let test_flush () =
       let filter_state =
         add_manager_restriction filter_state op_info.operation_hash op_info pkh
       in
-      Context.init 1 >>= function
+      Context.init1 () >>= function
       | Error e ->
           failwith "Error at context initialisation: %a" pp_print_trace e
-      | Ok (b, _contracts) -> (
+      | Ok (b, _contract) -> (
           let predecessor =
             Block_header.
               {shell = b.header.shell; protocol_data = Bytes.make 10 ' '}

@@ -39,7 +39,7 @@ open Alpha_context
 (****************************************************************)
 
 let init_genesis ?policy () =
-  Context.init ~consensus_threshold:0 5 >>=? fun (genesis, _) ->
+  Context.init_n ~consensus_threshold:0 5 () >>=? fun (genesis, _contracts) ->
   Block.bake ?policy genesis >>=? fun b -> return (genesis, b)
 
 (****************************************************************)

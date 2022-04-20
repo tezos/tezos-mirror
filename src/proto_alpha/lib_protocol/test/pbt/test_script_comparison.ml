@@ -202,7 +202,7 @@ let assert_return x = assert_ok (Lwt_main.run x)
 
 let ctxt =
   assert_return
-    ( Context.init 3 >>=? fun (b, _cs) ->
+    ( Context.init3 () >>=? fun (b, _cs) ->
       Incremental.begin_construction b >>=? fun v ->
       return (Incremental.alpha_ctxt v) )
 

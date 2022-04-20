@@ -79,7 +79,7 @@ let two_over_n_of_balance incr contract n =
 (********************)
 
 let single_transfer ?fee ?expect_failure amount =
-  Context.init2 () >>=? fun (b, contract_1, contract_2) ->
+  Context.init2 () >>=? fun (b, (contract_1, contract_2)) ->
   Incremental.begin_construction b >>=? fun b ->
   transfer_and_check_balances
     ~loc:__LOC__
@@ -115,8 +115,7 @@ let test_transfer_zero_tez () =
 
 (** Transfer zero tez from an implicit contract. *)
 let test_transfer_zero_implicit () =
-  Context.init 1 >>=? fun (b, contracts) ->
-  let dest = WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0 in
+  Context.init1 () >>=? fun (b, dest) ->
   let account = Account.new_account () in
   Incremental.begin_construction b >>=? fun i ->
   let src = Contract.implicit_contract account.Account.pkh in
@@ -126,10 +125,7 @@ let test_transfer_zero_implicit () =
 
 (** Transfer to originated contract. *)
 let test_transfer_to_originate_with_fee () =
-  Context.init 1 >>=? fun (b, contracts) ->
-  let contract =
-    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0
-  in
+  Context.init1 () >>=? fun (b, contract) ->
   Incremental.begin_construction b >>=? fun b ->
   two_over_n_of_balance b contract 10L >>=? fun fee ->
   (* originated contract, paying a fee to originated this contract *)
@@ -143,8 +139,8 @@ let test_transfer_to_originate_with_fee () =
 
 (** Transfer from balance. *)
 let test_transfer_amount_of_contract_balance () =
-  Context.init2 () >>=? fun (b, contract_1, contract_2) ->
-  Context.Contract.pkh contract_1 >>=? fun pkh1 ->
+  Context.init2 () >>=? fun (b, (contract_1, contract_2)) ->
+  let pkh1 = Context.Contract.pkh contract_1 in
   (* given that contract_1 no longer has a sufficient balance to bake,
      make sure it cannot be chosen as baker *)
   Incremental.begin_construction b ~policy:(Block.Excluding [pkh1])
@@ -158,10 +154,7 @@ let test_transfer_amount_of_contract_balance () =
 
 (** Transfer to oneself. *)
 let test_transfers_to_self () =
-  Context.init 1 >>=? fun (b, contracts) ->
-  let contract =
-    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0
-  in
+  Context.init1 () >>=? fun (b, contract) ->
   Incremental.begin_construction b >>=? fun b ->
   two_over_n_of_balance b contract 3L >>=? fun amount ->
   transfer_to_itself_and_check_balances ~loc:__LOC__ b contract amount
@@ -173,10 +166,10 @@ let test_transfers_to_self () =
 
 (** Forgot to add the valid transaction into the block. *)
 let test_missing_transaction () =
-  Context.init2 () >>=? fun (b, contract_1, contract_2) ->
+  Context.init2 () >>=? fun (b, (contract_1, contract_2)) ->
   (* given that contract_1 no longer has a sufficient balance to bake,
      make sure it cannot be chosen as baker *)
-  Context.Contract.pkh contract_1 >>=? fun pkh1 ->
+  let pkh1 = Context.Contract.pkh contract_1 in
   Incremental.begin_construction b ~policy:(Block.Excluding [pkh1])
   >>=? fun b ->
   two_over_n_of_balance b contract_1 6L >>=? fun amount ->
@@ -188,8 +181,7 @@ let test_missing_transaction () =
 
 (** Transfer zero tez to an implicit contract, with fee equals balance of src. *)
 let test_transfer_zero_implicit_with_bal_src_as_fee () =
-  Context.init 1 >>=? fun (b, contracts) ->
-  let dest = WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0 in
+  Context.init1 () >>=? fun (b, dest) ->
   let account = Account.new_account () in
   Incremental.begin_construction b >>=? fun i ->
   let src = Contract.implicit_contract account.Account.pkh in
@@ -203,8 +195,7 @@ let test_transfer_zero_implicit_with_bal_src_as_fee () =
 
 (** Transfer zero tez to an originated contract, with fee equals balance of src. *)
 let test_transfer_zero_to_originated_with_bal_src_as_fee () =
-  Context.init 1 >>=? fun (b, contracts) ->
-  let dest = WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0 in
+  Context.init1 () >>=? fun (b, dest) ->
   let account = Account.new_account () in
   Incremental.begin_construction b >>=? fun i ->
   let src = Contract.implicit_contract account.Account.pkh in
@@ -221,8 +212,7 @@ let test_transfer_zero_to_originated_with_bal_src_as_fee () =
 
 (** Transfer one tez to an implicit contract, with fee equals balance of src. *)
 let test_transfer_one_to_implicit_with_bal_src_as_fee () =
-  Context.init 1 >>=? fun (b, contracts) ->
-  let dest = WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0 in
+  Context.init1 () >>=? fun (b, dest) ->
   let account = Account.new_account () in
   Incremental.begin_construction b >>=? fun i ->
   let src = Contract.implicit_contract account.Account.pkh in
@@ -245,10 +235,7 @@ let test_transfer_one_to_implicit_with_bal_src_as_fee () =
 
 (** Implicit to Implicit. *)
 let test_transfer_from_implicit_to_implicit_contract () =
-  Context.init 1 >>=? fun (b, contracts) ->
-  let bootstrap_contract =
-    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0
-  in
+  Context.init1 () >>=? fun (b, bootstrap_contract) ->
   let account_a = Account.new_account () in
   let account_b = Account.new_account () in
   Incremental.begin_construction b >>=? fun b ->
@@ -282,13 +269,8 @@ let test_transfer_from_implicit_to_implicit_contract () =
 
 (** Implicit to originated. *)
 let test_transfer_from_implicit_to_originated_contract () =
-  Context.init 1 >>=? fun (b, contracts) ->
-  let bootstrap_contract =
-    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0
-  in
-  let contract =
-    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0
-  in
+  Context.init1 () >>=? fun (b, bootstrap_contract) ->
+  let contract = bootstrap_contract in
   let account = Account.new_account () in
   let src = Contract.implicit_contract account.Account.pkh in
   Incremental.begin_construction b >>=? fun b ->
@@ -318,7 +300,7 @@ let test_transfer_from_implicit_to_originated_contract () =
 (********************)
 
 let multiple_transfer n ?fee amount =
-  Context.init2 () >>=? fun (b, contract_1, contract_2) ->
+  Context.init2 () >>=? fun (b, (contract_1, contract_2)) ->
   Incremental.begin_construction b >>=? fun b ->
   n_transactions n b ?fee contract_1 contract_2 amount >>=? fun b ->
   Incremental.finalize_block b >>=? fun _ -> return_unit
@@ -339,7 +321,7 @@ let test_block_with_multiple_transfers_pay_fee () =
     2- Apply multiple transfers without fees;
     3- Apply multiple transfers with fees. *)
 let test_block_with_multiple_transfers_with_without_fee () =
-  Context.init 8 >>=? fun (b, contracts) ->
+  Context.init_n 8 () >>=? fun (b, contracts) ->
   let contracts = Array.of_list contracts in
   Incremental.begin_construction b >>=? fun b ->
   let hundred = of_int 100 in
@@ -366,7 +348,7 @@ let test_block_with_multiple_transfers_with_without_fee () =
 (** Build a chain that has 10 blocks. *)
 let test_build_a_chain () =
   Context.init2 ~consensus_threshold:0 ()
-  >>=? fun (b, contract_1, contract_2) ->
+  >>=? fun (b, (contract_1, contract_2)) ->
   let ten = of_int 10 in
   List.fold_left_es
     (fun b _ ->
@@ -383,8 +365,7 @@ let test_build_a_chain () =
 
 (** Transferring zero tez is forbidden in implicit contract. *)
 let test_empty_implicit () =
-  Context.init 1 >>=? fun (b, contracts) ->
-  let dest = WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0 in
+  Context.init1 () >>=? fun (b, dest) ->
   let account = Account.new_account () in
   Incremental.begin_construction b >>=? fun incr ->
   let src = Contract.implicit_contract account.Account.pkh in
@@ -396,7 +377,7 @@ let test_empty_implicit () =
 
 (** Balance is too low to transfer. *)
 let test_balance_too_low fee () =
-  Context.init2 () >>=? fun (b, contract_1, contract_2) ->
+  Context.init2 () >>=? fun (b, (contract_1, contract_2)) ->
   Incremental.begin_construction b >>=? fun i ->
   Context.Contract.balance (I i) contract_1 >>=? fun balance1 ->
   Context.Contract.balance (I i) contract_2 >>=? fun balance2 ->
@@ -431,16 +412,7 @@ let test_balance_too_low fee () =
     3- Add another transfer that send tez from a zero balance contract;
     4- Catch the expected error: Balance_too_low. *)
 let test_balance_too_low_two_transfers fee () =
-  Context.init 3 >>=? fun (b, contracts) ->
-  let contract_1 =
-    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0
-  in
-  let contract_2 =
-    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 1
-  in
-  let contract_3 =
-    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 2
-  in
+  Context.init3 () >>=? fun (b, (contract_1, contract_2, contract_3)) ->
   Incremental.begin_construction b >>=? fun i ->
   Context.Contract.balance (I i) contract_1 >>=? fun balance ->
   balance /? 3L >>?= fun res ->
@@ -475,7 +447,7 @@ let test_balance_too_low_two_transfers fee () =
 
 (** The counter is already used for the previous operation. *)
 let invalid_counter () =
-  Context.init2 () >>=? fun (b, contract_1, contract_2) ->
+  Context.init2 () >>=? fun (b, (contract_1, contract_2)) ->
   Incremental.begin_construction b >>=? fun b ->
   Op.transaction (I b) contract_1 contract_2 Tez.one >>=? fun op1 ->
   Op.transaction (I b) contract_1 contract_2 Tez.one >>=? fun op2 ->
@@ -489,7 +461,7 @@ let invalid_counter () =
 (** Same as before but through a different way to perform this
     error. *)
 let test_add_the_same_operation_twice () =
-  Context.init2 () >>=? fun (b, contract_1, contract_2) ->
+  Context.init2 () >>=? fun (b, (contract_1, contract_2)) ->
   Incremental.begin_construction b >>=? fun b ->
   transfer_and_check_balances ~loc:__LOC__ b contract_1 contract_2 ten_tez
   >>=? fun (b, op_transfer) ->
@@ -502,7 +474,7 @@ let test_add_the_same_operation_twice () =
 
 (** The counter is in the future *)
 let invalid_counter_in_the_future () =
-  Context.init2 () >>=? fun (b, contract_1, contract_2) ->
+  Context.init2 () >>=? fun (b, (contract_1, contract_2)) ->
   Incremental.begin_construction b >>=? fun b ->
   Context.Contract.counter (I b) contract_1 >>=? fun cpt ->
   let counter = Z.add cpt (Z.of_int 10) in
@@ -515,7 +487,7 @@ let invalid_counter_in_the_future () =
 
 (** Check ownership. *)
 let test_ownership_sender () =
-  Context.init2 () >>=? fun (b, contract_1, contract_2) ->
+  Context.init2 () >>=? fun (b, (contract_1, contract_2)) ->
   Incremental.begin_construction b >>=? fun b ->
   (* get the manager of the contract_1 as a sender *)
   Context.Contract.manager (I b) contract_1 >>=? fun manager ->
@@ -545,11 +517,11 @@ let random_contract contract_array =
 (** Transfer by randomly choose amount 10 contracts, and randomly
     choose the amount in the source contract. *)
 let test_random_transfer () =
-  Context.init 10 >>=? fun (b, contracts) ->
+  Context.init_n 10 () >>=? fun (b, contracts) ->
   let contracts = Array.of_list contracts in
   let source = random_contract contracts in
   let dest = random_contract contracts in
-  Context.Contract.pkh source >>=? fun source_pkh ->
+  let source_pkh = Context.Contract.pkh source in
   (* given that source may not have a sufficient balance for the transfer + to bake,
      make sure it cannot be chosen as baker *)
   Incremental.begin_construction b ~policy:(Block.Excluding [source_pkh])
@@ -569,7 +541,7 @@ let test_random_multi_transactions () =
 (*********************************************************************)
 
 let test_bad_entrypoint () =
-  Context.init 1 >>=? fun (b, _cs) ->
+  Context.init1 () >>=? fun (b, _c) ->
   Incremental.begin_construction b >>=? fun v ->
   let ctxt = Incremental.alpha_ctxt v in
   let storage = "Unit" in
@@ -596,7 +568,7 @@ let test_bad_entrypoint () =
       Alcotest.failf "Unexpected error: %a" Error_monad.pp_print_trace errs
 
 let test_bad_parameter () =
-  Context.init 1 >>=? fun (b, _cs) ->
+  Context.init1 () >>=? fun (b, _c) ->
   Incremental.begin_construction b >>=? fun v ->
   let ctxt = Incremental.alpha_ctxt v in
   let storage = "Unit" in
@@ -623,9 +595,8 @@ let test_bad_parameter () =
 
 let transfer_to_itself_with_no_such_entrypoint () =
   let entrypoint = Entrypoint.of_string_strict_exn "bad entrypoint" in
-  Context.init 1 >>=? fun (b, contract) ->
+  Context.init1 () >>=? fun (b, addr) ->
   Incremental.begin_construction b >>=? fun i ->
-  let addr = match contract with [hd] -> hd | _ -> assert false in
   Op.transaction (B b) addr addr Tez.one ~entrypoint >>=? fun transaction ->
   let expect_failure = function
     | Environment.Ecoproto_error (Script_tc_errors.No_such_entrypoint _ as e)

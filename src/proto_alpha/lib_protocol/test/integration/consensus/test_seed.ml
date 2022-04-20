@@ -39,7 +39,7 @@ open Protocol
 (** Baking [blocks_per_commitment] blocks without a [seed_nonce_hash]
     commitment fails with an "Invalid commitment in block header" error. *)
 let test_no_commitment () =
-  Context.init ~consensus_threshold:0 5 >>=? fun (b, _) ->
+  Context.init_n ~consensus_threshold:0 5 () >>=? fun (b, _contracts) ->
   Context.get_constants (B b)
   >>=? fun {parametric = {blocks_per_commitment; _}; _} ->
   let blocks_per_commitment = Int32.to_int blocks_per_commitment in
@@ -63,7 +63,7 @@ let test_no_commitment () =
     - revealing twice produces an error *)
 let test_revelation_early_wrong_right_twice () =
   let open Assert in
-  Context.init ~consensus_threshold:0 5 >>=? fun (b, _) ->
+  Context.init_n ~consensus_threshold:0 5 () >>=? fun (b, _contracts) ->
   Context.get_constants (B b) >>=? fun csts ->
   let tip = csts.parametric.seed_nonce_revelation_tip in
   let blocks_per_commitment =
@@ -145,7 +145,7 @@ let test_revelation_early_wrong_right_twice () =
 let test_revelation_missing_and_late () =
   let open Context in
   let open Assert in
-  Context.init ~consensus_threshold:0 5 >>=? fun (b, _) ->
+  Context.init_n ~consensus_threshold:0 5 () >>=? fun (b, _contracts) ->
   get_constants (B b) >>=? fun csts ->
   let blocks_per_commitment =
     Int32.to_int csts.parametric.blocks_per_commitment
@@ -188,15 +188,8 @@ let test_unrevealed () =
       minimal_participation_ratio = Constants.{numerator = 0; denominator = 1};
     }
   in
-  Context.init_with_constants constants 2 >>=? fun (b, accounts) ->
-  let (account1, account2) =
-    match accounts with a1 :: a2 :: _ -> (a1, a2) | _ -> assert false
-  in
-  let (_delegate1, delegate2) =
-    match (Contract.is_implicit account1, Contract.is_implicit account2) with
-    | (Some d, Some d') -> (d, d')
-    | _ -> assert false
-  in
+  Context.init_with_constants2 constants >>=? fun (b, (_account1, account2)) ->
+  let delegate2 = Context.Contract.pkh account2 in
   (* Delegate 2 will add a nonce but never reveals it *)
   Context.get_constants (B b) >>=? fun csts ->
   let blocks_per_commitment =

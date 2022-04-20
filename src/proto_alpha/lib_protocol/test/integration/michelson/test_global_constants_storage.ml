@@ -40,11 +40,6 @@ let get_next_context b =
   Incremental.begin_construction b >>=? fun b ->
   return (Incremental.alpha_ctxt b)
 
-let register_two_contracts ?consensus_threshold () =
-  Context.init ?consensus_threshold 2 >|=? function
-  | (_, []) | (_, [_]) -> assert false
-  | (b, contract_1 :: contract_2 :: _) -> (b, contract_1, contract_2)
-
 let assert_proto_error_id loc id result =
   let test err =
     (Error_monad.find_info_of_error err).id
@@ -60,7 +55,7 @@ let expr_to_hash expr =
    that values written to the global table of constants persist across
    blocks. *)
 let get_happy_path () =
-  Context.init2 () >>=? fun (b, alice, bob) ->
+  Context.init2 () >>=? fun (b, (alice, bob)) ->
   Incremental.begin_construction b >>=? fun b ->
   let expr_str = "Pair 3 7" in
   let expr = Expr.from_string expr_str in

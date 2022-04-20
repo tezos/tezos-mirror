@@ -258,9 +258,9 @@ module Contract = struct
   let equal a b = Alpha_context.Contract.compare a b = 0
 
   let pkh c =
-    Alpha_context.Contract.is_implicit c |> function
-    | Some p -> return p
-    | None -> failwith "pkh: only for implicit contracts"
+    match Alpha_context.Contract.is_implicit c with
+    | Some p -> p
+    | None -> Stdlib.failwith "pkh: only for implicit contracts"
 
   let balance ctxt contract =
     Alpha_services.Contract.balance rpc_ctxt ctxt contract
@@ -354,12 +354,43 @@ module Tx_rollup = struct
     Tx_rollup_services.commitment rpc_ctxt ctxt tx_rollup
 end
 
-let init ?rng_state ?commitments ?(initial_balances = []) ?consensus_threshold
-    ?min_proposal_quorum ?bootstrap_contracts ?level ?cost_per_byte
-    ?liquidity_baking_subsidy ?endorsing_reward_per_slot
+type (_, _) tup =
+  | T1 : ('a, 'a) tup
+  | T2 : ('a, 'a * 'a) tup
+  | T3 : ('a, 'a * 'a * 'a) tup
+  | TList : int -> ('a, 'a list) tup
+
+let tup_hd : type a r. (a, r) tup -> r -> a =
+ fun tup elts ->
+  match (tup, elts) with
+  | (T1, v) -> v
+  | (T2, (v, _)) -> v
+  | (T3, (v, _, _)) -> v
+  | (TList _, v :: _) -> v
+  | (TList _, []) -> assert false
+
+let tup_n : type a r. (a, r) tup -> int = function
+  | T1 -> 1
+  | T2 -> 2
+  | T3 -> 3
+  | TList n -> n
+
+let tup_get : type a r. (a, r) tup -> a list -> r =
+ fun tup list ->
+  match (tup, list) with
+  | (T1, [v]) -> v
+  | (T2, [v1; v2]) -> (v1, v2)
+  | (T3, [v1; v2; v3]) -> (v1, v2, v3)
+  | (TList _, l) -> l
+  | _ -> assert false
+
+let init_gen tup ?rng_state ?commitments ?(initial_balances = [])
+    ?consensus_threshold ?min_proposal_quorum ?bootstrap_contracts ?level
+    ?cost_per_byte ?liquidity_baking_subsidy ?endorsing_reward_per_slot
     ?baking_reward_bonus_per_slot ?baking_reward_fixed_portion ?origination_size
     ?blocks_per_cycle ?cycles_per_voting_period ?tx_rollup_enable
-    ?tx_rollup_sunset_level ?tx_rollup_origination_size ?sc_rollup_enable n =
+    ?tx_rollup_sunset_level ?tx_rollup_origination_size ?sc_rollup_enable () =
+  let n = tup_n tup in
   let accounts = Account.generate_accounts ?rng_state ~initial_balances n in
   let contracts =
     List.map
@@ -385,67 +416,18 @@ let init ?rng_state ?commitments ?(initial_balances = []) ?consensus_threshold
     ?tx_rollup_origination_size
     ?sc_rollup_enable
     accounts
-  >|=? fun blk -> (blk, contracts)
+  >|=? fun blk -> (blk, tup_get tup contracts)
 
-let init1 ?rng_state ?commitments ?(initial_balances = []) ?consensus_threshold
-    ?min_proposal_quorum ?level ?cost_per_byte ?liquidity_baking_subsidy
-    ?endorsing_reward_per_slot ?baking_reward_bonus_per_slot
-    ?baking_reward_fixed_portion ?origination_size ?blocks_per_cycle
-    ?cycles_per_voting_period ?tx_rollup_enable ?tx_rollup_sunset_level
-    ?sc_rollup_enable () =
-  init
-    ?rng_state
-    ?commitments
-    ~initial_balances
-    ?consensus_threshold
-    ?min_proposal_quorum
-    ?level
-    ?cost_per_byte
-    ?liquidity_baking_subsidy
-    ?endorsing_reward_per_slot
-    ?baking_reward_bonus_per_slot
-    ?baking_reward_fixed_portion
-    ?origination_size
-    ?blocks_per_cycle
-    ?cycles_per_voting_period
-    ?tx_rollup_enable
-    ?tx_rollup_sunset_level
-    ?sc_rollup_enable
-    1
-  >|=? function
-  | (_, []) -> assert false
-  | (b, contract_1 :: _) -> (b, contract_1)
+let init_n n = init_gen (TList n)
 
-let init2 ?rng_state ?commitments ?(initial_balances = []) ?consensus_threshold
-    ?min_proposal_quorum ?level ?cost_per_byte ?liquidity_baking_subsidy
-    ?endorsing_reward_per_slot ?baking_reward_bonus_per_slot
-    ?baking_reward_fixed_portion ?origination_size ?blocks_per_cycle
-    ?cycles_per_voting_period ?tx_rollup_enable ?tx_rollup_sunset_level
-    ?sc_rollup_enable () =
-  init
-    ?rng_state
-    ?commitments
-    ~initial_balances
-    ?consensus_threshold
-    ?min_proposal_quorum
-    ?level
-    ?cost_per_byte
-    ?liquidity_baking_subsidy
-    ?endorsing_reward_per_slot
-    ?baking_reward_bonus_per_slot
-    ?baking_reward_fixed_portion
-    ?origination_size
-    ?blocks_per_cycle
-    ?cycles_per_voting_period
-    ?tx_rollup_enable
-    ?tx_rollup_sunset_level
-    ?sc_rollup_enable
-    2
-  >|=? function
-  | (_, []) | (_, [_]) -> assert false
-  | (b, contract_1 :: contract_2 :: _) -> (b, contract_1, contract_2)
+let init1 = init_gen T1
 
-let init_with_constants constants n =
+let init2 = init_gen T2
+
+let init3 = init_gen T3
+
+let init_with_constants_gen tup constants =
+  let n = tup_n tup in
   let accounts = Account.generate_accounts n in
   let contracts =
     List.map
@@ -463,7 +445,14 @@ let init_with_constants constants n =
   let parameters =
     Default_parameters.parameters_of_constants ~bootstrap_accounts constants
   in
-  Block.genesis_with_parameters parameters >|=? fun blk -> (blk, contracts)
+  Block.genesis_with_parameters parameters >|=? fun blk ->
+  (blk, tup_get tup contracts)
+
+let init_with_constants_n consts n = init_with_constants_gen (TList n) consts
+
+let init_with_constants1 = init_with_constants_gen T1
+
+let init_with_constants2 = init_with_constants_gen T2
 
 let default_raw_context () =
   let initial_accounts =

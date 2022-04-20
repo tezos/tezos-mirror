@@ -39,8 +39,6 @@ open Protocol
 open Alpha_context
 open Test_tez
 
-let account_pair = function [a1; a2] -> (a1, a2) | _ -> assert false
-
 let wrap e = Lwt.return (Environment.wrap_tzresult e)
 
 (** Check that [Delegate.staking_balance] is the same as [Delegate.full_balance]
@@ -87,10 +85,9 @@ let check_no_stake ~loc (b : Block.t) (account : Account.t) =
     own balance, and that its staking rights are consistent
     (check_stake). *)
 let test_simple_staking_rights () =
-  Context.init 2 >>=? fun (b, accounts) ->
-  let (a1, _a2) = account_pair accounts in
+  Context.init2 () >>=? fun (b, (a1, _a2)) ->
   Context.Contract.balance (B b) a1 >>=? fun balance ->
-  Context.Contract.pkh a1 >>=? fun delegate1 ->
+  let delegate1 = Context.Contract.pkh a1 in
   Context.Delegate.current_frozen_deposits (B b) delegate1
   >>=? fun frozen_deposits ->
   let expected_initial_balance =
@@ -110,13 +107,12 @@ let test_simple_staking_rights () =
     equals to its balance. Then both accounts have consistent staking
     rights. *)
 let test_simple_staking_rights_after_baking () =
-  Context.init ~consensus_threshold:0 2 >>=? fun (b, accounts) ->
-  let (a1, a2) = account_pair accounts in
+  Context.init2 ~consensus_threshold:0 () >>=? fun (b, (a1, a2)) ->
   Context.Contract.manager (B b) a1 >>=? fun m1 ->
   Context.Contract.manager (B b) a2 >>=? fun m2 ->
   Block.bake_n ~policy:(By_account m2.pkh) 5 b >>=? fun b ->
   Context.Contract.balance (B b) a1 >>=? fun balance ->
-  Context.Contract.pkh a1 >>=? fun delegate1 ->
+  let delegate1 = Context.Contract.pkh a1 in
   Context.Delegate.current_frozen_deposits (B b) delegate1
   >>=? fun frozen_deposits ->
   balance +? frozen_deposits >>?= fun full_balance ->
@@ -130,8 +126,7 @@ let check_active_staking_balance ~loc ~deactivated b (m : Account.t) =
   if deactivated then check_no_stake ~loc b m else check_stake ~loc b m
 
 let run_until_deactivation () =
-  Context.init ~consensus_threshold:0 2 >>=? fun (b, accounts) ->
-  let (a1, a2) = account_pair accounts in
+  Context.init2 ~consensus_threshold:0 () >>=? fun (b, (a1, a2)) ->
   Context.Contract.balance (B b) a1 >>=? fun balance_start ->
   Context.Contract.manager (B b) a1 >>=? fun m1 ->
   Context.Contract.manager (B b) a2 >>=? fun m2 ->
@@ -297,8 +292,7 @@ let test_deactivation_then_empty_then_self_delegation_then_recredit () =
    be activated. Again, consistency for baking rights are preserved for the
    first and third accounts. *)
 let test_delegation () =
-  Context.init ~consensus_threshold:0 2 >>=? fun (b, accounts) ->
-  let (a1, a2) = account_pair accounts in
+  Context.init2 ~consensus_threshold:0 () >>=? fun (b, (a1, a2)) ->
   let m3 = Account.new_account () in
   Account.add_account m3 ;
   Context.Contract.manager (B b) a1 >>=? fun m1 ->

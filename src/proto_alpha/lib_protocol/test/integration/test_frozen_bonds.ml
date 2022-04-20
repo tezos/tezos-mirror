@@ -308,16 +308,13 @@ let test_total_stake ~user_is_delegate () =
     These rpcs call the functions [Contract.get_frozen_bonds] and
     [Contract.get_balance_and_frozen_bonds] already tested in previous tests. *)
 let test_rpcs () =
-  Context.init 1 >>=? fun (blk, contracts) ->
-  match contracts with
-  | [contract] ->
-      Context.Contract.frozen_bonds (B blk) contract >>=? fun frozen_bonds ->
-      Assert.equal_tez ~loc:__LOC__ frozen_bonds Tez.zero >>=? fun () ->
-      Context.Contract.balance_and_frozen_bonds (B blk) contract
-      >>=? fun balance_and_frozen_bonds ->
-      Context.Contract.balance (B blk) contract >>=? fun balance ->
-      Assert.equal_tez ~loc:__LOC__ balance_and_frozen_bonds balance
-  | _ -> (* Exactly one account has been generated. *) assert false
+  Context.init1 () >>=? fun (blk, contract) ->
+  Context.Contract.frozen_bonds (B blk) contract >>=? fun frozen_bonds ->
+  Assert.equal_tez ~loc:__LOC__ frozen_bonds Tez.zero >>=? fun () ->
+  Context.Contract.balance_and_frozen_bonds (B blk) contract
+  >>=? fun balance_and_frozen_bonds ->
+  Context.Contract.balance (B blk) contract >>=? fun balance ->
+  Assert.equal_tez ~loc:__LOC__ balance_and_frozen_bonds balance
 
 (** A helper to test a particular delegation/freezing scenario *)
 let test_scenario scenario =

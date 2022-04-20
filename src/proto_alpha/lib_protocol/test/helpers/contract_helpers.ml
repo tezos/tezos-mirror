@@ -30,12 +30,7 @@ open Error_monad_operators
 (** Initializes 2 addresses to do only operations plus one that will be
     used to bake. *)
 let init () =
-  Context.init ~consensus_threshold:0 3 >|=? fun (b, contracts) ->
-  let (src0, src1, src2) =
-    match contracts with
-    | src0 :: src1 :: src2 :: _ -> (src0, src1, src2)
-    | _ -> assert false
-  in
+  Context.init3 ~consensus_threshold:0 () >|=? fun (b, (src0, src1, src2)) ->
   let baker =
     match Alpha_context.Contract.is_implicit src0 with
     | Some v -> v

@@ -61,9 +61,8 @@ let contract_factory_with_annotations =
 let lazy_none = Script.lazy_expr (Expr.from_string "None")
 
 let init_and_originate contract_code_string =
-  Context.init ~consensus_threshold:0 1 >>=? fun (b, contracts) ->
+  Context.init1 ~consensus_threshold:0 () >>=? fun (b, source) ->
   Incremental.begin_construction b >>=? fun inc ->
-  let source = WithExceptions.Option.get ~loc:__LOC__ @@ List.hd contracts in
   let code = Expr.toplevel_from_string contract_code_string in
   let script = Script.{code = lazy_expr code; storage = lazy_none} in
   Op.contract_origination (I inc) source ~script >>=? fun (operation, addr) ->
