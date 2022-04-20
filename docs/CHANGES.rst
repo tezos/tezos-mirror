@@ -14,8 +14,8 @@ Node
 
 - **Breaking change**:
   Restored the encoding of events corresponding to "completed
-  requests" (block validation, head switch, ...) to pre v11. They only
-  contain absolute timestamps.
+  requests" (block validation, head switch, ...) to their format prior to Octez v11.
+  They only contain absolute timestamps.
 
 - Add optional query parameters ``applied``, ``refused``, ``outdated``,
   ``branch_refused``, and ``branch_delayed`` to RPC
@@ -27,14 +27,14 @@ Node
 
 - Added optional parameter ``--media-type`` and its corresponding field
   in the configuration file. It defines which format of data serialisation
-  must be used for RPC requests to the node. The value can be  ``json``,
+  must be used for RPC requests to the node. The value can be ``json``,
   ``binary`` or ``any``. By default, the value is set to ``any``.
 
 - Added an option ``--metrics-addr <ADDR>:<PORT>`` to ``tezos-node`` to
   expose some metrics using the Prometheus format.
 
-- Adds ``tezos-node storage head-commmit`` command to print the current
-  context head commit hash to stdout.
+- Added command ``tezos-node storage head-commmit`` which prints the commit hash
+  of the current context head.
 
 - Added a history mode check when importing a snapshot to ensure the consistency between the
   history mode of the snapshot and the one stored in the targeted data
@@ -47,7 +47,8 @@ Node
   occurred occasionally, when during the fetching the operation of some block,
   the node changed his head.
 
-- The node context storage format was upgraded. To this end, a new storage
+- **Breaking change**:
+  The node context storage format was upgraded. To this end, a new storage
   version was introduced: 0.0.8 (previously 0.0.7). Backward compatibility is
   preserved: upgrading from 0.0.7 to
   0.0.8 is done automatically by the node the first time you run it. This
@@ -55,22 +56,24 @@ Node
   compatibility: previous versions of Octez
   will refuse to run on a data directory which was used with Octez 13.0.
 
-- Validation errors are flatter. Instead of the ``economic_protocol_error``
+- **Breaking change**:
+  Validation errors are flatter. Instead of ``economic_protocol_error``
   carrying a field ``trace`` with the relevant economic-protocol errors, the
   relevant economic-protocol errors are included in the main trace itself.
 
-- Exported snapshots now have version number 4 (previously 3).
+- **Breaking change**:
+  Exported snapshots now have version number 4 (previously 3).
   Snapshots of version 2 and 3 exported with previous versions of
   Octez can still be imported. Snapshots of version 4 cannot be
   imported with Octez prior to version 13.0.
 
-- Added optional query parameter ``force_metadata`` to the ``GET
-  /chains/<chain>/blocks/<block>/`` and ``GET
-  /chains/<chain>/blocks/<block>/operations/`` RPCs. Passing this
-  parameter forces the re-computation of operation metadata that were
-  considered as too large, even if they exceed the configured limit. The
-  re-computed metadata are not stored on disk after this call, they are
-  just returned.
+- Added an optional query parameter ``force_metadata`` to the
+  ``GET /chains/<chain>/blocks/<block>/`` and
+  ``GET /chains/<chain>/blocks/<block>/operations/`` RPCs. Passing this
+  parameter overrides the metadata size limit configuration, and forces
+  the re-computation of operation metadata whose size was beyond the
+  limit, and therefore not stored. The re-computed metadata are not
+  stored on disk after this call, but rather just returned by the RPC call.
 
 - Added ``--progress-display-mode`` option to the ``tezos-node`` commands
   that display progress animation. This option allows to redirect progress
@@ -102,10 +105,12 @@ Client
 Baker / Endorser / Accuser
 --------------------------
 
-- The ``--liquidity-baking-escape-vote`` command-line has been renamed
+- **Breaking change**:
+  The ``--liquidity-baking-escape-vote`` command-line option has been renamed
   to ``--liquidity-baking-toggle-vote``.
 
-- The ``--liquidity-baking-toggle-vote`` command-line option is made
+- **Breaking change**:
+  The ``--liquidity-baking-toggle-vote`` command-line option is now
   mandatory. The ``--votefile`` option can still be used to change
   vote without restarting the baker daemon, if both options are
   provided ``--votefile`` takes precedence and
@@ -113,9 +118,10 @@ Baker / Endorser / Accuser
   default behavior of the daemon when an error occurs while reading
   the vote file.
 
-- The format of the vote file provided by the ``--votefile`` option
-  has changed too; the ``liquidity_baking_escape_vote`` key is renamed
-  to ``liquidity_baking_toggle_vote`` and the value must now be one of
+- **Breaking change**:
+  The format of the vote file provided by the ``--votefile`` option
+  has changed too; the ``liquidity_baking_escape_vote`` key is now named
+  ``liquidity_baking_toggle_vote`` and its value must now be one of
   the following strings: ``"on"`` to vote to continue Liquidity
   Baking, ``"off"`` to vote to stop it, or ``"pass"`` to abstain.
 
@@ -131,10 +137,12 @@ Signer
 ------
 
 - Added global option ``--password-filename`` which acts as the client
-  one. Option ``--password-file`` which actually was a complete no-op
-  has been removed.
+  one.
 
-- Added support for Ledger Nano S plus devices
+- **Breaking change**:
+  Option ``--password-file``, which did nothing, has been removed.
+
+- Added support for Ledger Nano S Plus devices.
 
 Proxy server
 ------------
@@ -153,7 +161,8 @@ Codec
 Docker Images
 -------------
 
-- Script ``tezos_docker_manager.sh`` (also known as ``mainnet.sh``) is now deprecated.
+- **Breaking change**:
+  Script ``tezos_docker_manager.sh`` (also known as ``mainnet.sh``) is now deprecated.
   It may be removed from Octez starting from version 14.0.
   It is recommended to write your own Docker Compose files instead.
   To this end, you can take inspiration from ``scripts/docker/docker-compose-generic.yml``.
