@@ -1394,7 +1394,7 @@ let test_l2_proof_rpc_position =
       let bls_pk_1 = bls_key_1.aggregate_public_key in
       let bls_sk_1 = bls_key_1.aggregate_secret_key in
       let* bls_key_2 = generate_bls_addr ~alias:"bob" client in
-      let bls_pkh_2 = bls_key_1.aggregate_public_key_hash in
+      let bls_pkh_2 = bls_key_2.aggregate_public_key_hash in
       let bls_pk_2 = bls_key_2.aggregate_public_key in
       let bls_sk_2 = bls_key_2.aggregate_secret_key in
       let* (_level, _contract_id) =
@@ -1914,7 +1914,6 @@ let test_tickets_context =
       let* tx =
         craft_tx
           tx_client
-          ~counter:1L
           ~signer:bls_pk_2
           ~dest:bls_pkh_1
           ~ticket:ticket_id
