@@ -41,6 +41,8 @@ type error += Bad_endorsement_delay of string
 
 type error += Bad_preserved_levels of string
 
+type error += Forbidden_Negative_int of string
+
 let () =
   register_error_kind
     `Permanent
@@ -119,7 +121,21 @@ let () =
         literal)
     Data_encoding.(obj1 (req "parameter" string))
     (function Bad_preserved_levels parameter -> Some parameter | _ -> None)
-    (fun parameter -> Bad_preserved_levels parameter)
+    (fun parameter -> Bad_preserved_levels parameter) ;
+  register_error_kind
+    `Permanent
+    ~id:"ForbiddenNegativeInt"
+    ~title:"Forbidden negative int"
+    ~description:"invalid number, must a non negative natural "
+    Data_encoding.(obj1 (req "invalid_natural" string))
+    ~pp:(fun ppf literal ->
+      Format.fprintf
+        ppf
+        "Bad argument value for natural. Expected a non negative integer, but \
+         given '%s'"
+        literal)
+    (function Forbidden_Negative_int str -> Some str | _ -> None)
+    (fun str -> Forbidden_Negative_int str)
 
 let tez_sym = "\xEA\x9C\xA9"
 
@@ -277,8 +293,8 @@ let non_negative_z_parameter =
   parameter (fun _ s ->
       try
         let v = Z.of_string s in
-        assert (Compare.Z.(v >= Z.zero)) ;
-        return v
+        error_when Compare.Z.(v < Z.zero) (Forbidden_Negative_int s)
+        >>?= fun () -> return v
       with _ -> failwith "Invalid number, must be a non negative number.")
 
 let non_negative_z_param ~name ~desc next =
