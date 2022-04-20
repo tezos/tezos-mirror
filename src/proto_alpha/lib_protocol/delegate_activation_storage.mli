@@ -23,6 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** This module provides functions related to delegates' activity.
+
+    Typically, they can be used to deactivate a delegate that has not shown
+    activity for a certain number of cycles, and to reactivate it when
+    appropriate.
+*)
+
 val is_inactive :
   Raw_context.t -> Signature.Public_key_hash.t -> bool tzresult Lwt.t
 
