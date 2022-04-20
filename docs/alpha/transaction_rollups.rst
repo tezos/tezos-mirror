@@ -552,8 +552,8 @@ layer-2 operations.
 
     tezos-client submit tx rollup batch <batch content in hexadecimal notation> to <transaction rollup address> from <implicit account address>
 
-It is also possible to retrieve the content of an inbox thanks
-to a dedicated RPC of the ``tezos-node``.
+It is also possible to retrieve the state (that is, size and Merkle
+root) of an inbox thanks to a dedicated RPC of the ``tezos-node``.
 
 .. code:: sh
 
