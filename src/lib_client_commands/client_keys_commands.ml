@@ -55,17 +55,28 @@ let sig_algo_arg =
     ~default:"ed25519"
     (algo_param ())
 
-let gen_keys_containing ?(encrypted = false) ?(prefix = false) ?(force = false)
-    ~containing ~name (cctxt : #Client_context.io_wallet) =
+let gen_keys_containing ?(encrypted = false) ?(prefix = false)
+    ?(ignore_case = false) ?(force = false) ~containing ~name
+    (cctxt : #Client_context.io_wallet) =
   let open Lwt_result_syntax in
   let unrepresentable =
     List.filter
       (fun s ->
-        not @@ Base58.Alphabet.all_in_alphabet Base58.Alphabet.bitcoin s)
+        not
+        @@ Base58.Alphabet.all_in_alphabet
+             ~ignore_case
+             Base58.Alphabet.bitcoin
+             s)
       containing
   in
   let good_initial_char = "KLMNPQRSTUVWXYZabcdefghi" in
-  let bad_initial_char = "123456789ABCDEFGHJjkmnopqrstuvwxyz" in
+  let bad_initial_char =
+    if ignore_case then "123456789Jj" else "123456789ABCDEFGHJjkmnopqrstuvwxyz"
+  in
+  let containing =
+    if ignore_case then List.map String.lowercase_ascii containing
+    else containing
+  in
   match unrepresentable with
   | _ :: _ ->
       cctxt#error
@@ -114,19 +125,23 @@ let gen_keys_containing ?(encrypted = false) ?(prefix = false) ?(force = false)
                 "This process uses a brute force search and may take a long \
                  time to find a key."
             in
+            let adjust_case =
+              if ignore_case then String.lowercase_ascii else Fun.id
+            in
             let matches =
               if prefix then
                 let containing_tz1 = List.map (( ^ ) "tz1") containing in
                 fun key ->
                   List.exists
                     (fun containing ->
-                      String.sub key 0 (String.length containing) = containing)
+                      String.sub (adjust_case key) 0 (String.length containing)
+                      = containing)
                     containing_tz1
               else
                 let re = Re.Str.regexp (String.concat "\\|" containing) in
                 fun key ->
                   try
-                    ignore (Re.Str.search_forward re key 0) ;
+                    ignore (Re.Str.search_forward re (adjust_case key) 0) ;
                     true
                   with Not_found -> false
             in
@@ -514,11 +529,16 @@ let commands network : Client_context.full Clic.command list =
         command
           ~group
           ~desc:"Generate keys including the given string."
-          (args2
+          (args3
              (switch
                 ~long:"prefix"
                 ~short:'P'
                 ~doc:"the key must begin with tz1[word]"
+                ())
+             (switch
+                ~long:"ignore-case"
+                ~short:'I'
+                ~doc:"make the pattern case-insensitive"
                 ())
              (force_switch ()))
           (prefixes ["gen"; "vanity"; "keys"]
@@ -527,12 +547,16 @@ let commands network : Client_context.full Clic.command list =
           @@ string
                ~name:"words"
                ~desc:"string key must contain one of these words")
-          (fun (prefix, force) name containing (cctxt : Client_context.full) ->
+          (fun (prefix, ignore_case, force)
+               name
+               containing
+               (cctxt : Client_context.full) ->
             let* name = Public_key_hash.of_fresh cctxt force name in
             gen_keys_containing
               ~encrypted:true
               ~force
               ~prefix
+              ~ignore_case
               ~containing
               ~name
               cctxt)
@@ -540,11 +564,16 @@ let commands network : Client_context.full Clic.command list =
         command
           ~group
           ~desc:"Generate keys including the given string."
-          (args3
+          (args4
              (switch
                 ~long:"prefix"
                 ~short:'P'
                 ~doc:"the key must begin with tz1[word]"
+                ())
+             (switch
+                ~long:"ignore-case"
+                ~short:'I'
+                ~doc:"make the pattern case-insensitive"
                 ())
              (force_switch ())
              (encrypted_switch ()))
@@ -554,7 +583,7 @@ let commands network : Client_context.full Clic.command list =
           @@ string
                ~name:"words"
                ~desc:"string key must contain one of these words")
-          (fun (prefix, force, encrypted)
+          (fun (prefix, ignore_case, force, encrypted)
                name
                containing
                (cctxt : Client_context.full) ->
@@ -563,6 +592,7 @@ let commands network : Client_context.full Clic.command list =
               ~encrypted
               ~force
               ~prefix
+              ~ignore_case
               ~containing
               ~name
               cctxt));

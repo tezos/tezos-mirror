@@ -60,9 +60,15 @@ module Alphabet = struct
 
   let default = bitcoin
 
-  let all_in_alphabet alphabet string =
+  let all_in_alphabet ?(ignore_case = false) alphabet string =
     let ok = Array.make 256 false in
-    String.iter (fun x -> ok.(Char.code x) <- true) alphabet.encode ;
+    String.iter
+      (fun x ->
+        if ignore_case then ok.(Char.code x) <- true
+        else (
+          ok.(Char.code (Char.lowercase_ascii x)) <- true ;
+          ok.(Char.code (Char.uppercase_ascii x)) <- true))
+      alphabet.encode ;
     let res = ref true in
     for i = 0 to String.length string - 1 do
       res := !res && ok.(Char.code string.[i])
