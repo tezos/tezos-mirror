@@ -52,6 +52,8 @@ script:test-gen-genesis:
 script:test_release_versions:
   extends: .test_template
   script:
+    # FIXME: root user owns the project directory
+    - sudo chown -R $(id -u):$(id -g) $CI_PROJECT_DIR
     - ./scripts/test_release_version.sh
 
 ############################################################
