@@ -1334,12 +1334,27 @@ module Make
                   []
               else []
             in
+            let outdated =
+              if params#outdated then
+                Operation_hash.Map.fold
+                  fold_op
+                  (Classification.map pv.shell.classification.outdated)
+                  []
+              else []
+            in
             let current_mempool =
               List.concat_map
                 (List.map (function
                     | (hash, op, []) -> ((hash, op), None)
                     | (hash, op, errors) -> ((hash, op), Some errors)))
-                [applied; prechecked; refused; branch_refused; branch_delayed]
+                [
+                  applied;
+                  prechecked;
+                  refused;
+                  branch_refused;
+                  branch_delayed;
+                  outdated;
+                ]
             in
             let current_mempool = ref (Some current_mempool) in
             let filter_result = function
