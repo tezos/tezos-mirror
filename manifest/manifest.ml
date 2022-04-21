@@ -339,14 +339,14 @@ module Dune = struct
 
   let runtest ~package ~dep_files ~dep_globs name =
     let deps_dune =
-      let files = List.map file dep_files in
+      let files = List.map (fun s -> S s) dep_files in
       let globs = List.map glob_files dep_globs in
-      of_list (files @ globs)
+      match files @ globs with [] -> None | deps -> Some (of_list deps)
     in
     alias_rule
       "runtest"
       ~package
-      ~deps_dune
+      ?deps_dune
       ~action:[S "run"; S ("%{dep:./" ^ name ^ ".exe}")]
 
   let setenv name value followup = [G [S "setenv"; S name; S value]; followup]
