@@ -614,7 +614,13 @@ let test_ticket_deposit_from_l1_to_l2 =
         ~tz4_address:bls_pkh_str
         ~expected_balance:10)
 
-let sign_one_transaction sk txs_string =
+let bls_sk_of_key bls_key =
+  let (Account.Unencrypted sk) = bls_key.Account.aggregate_secret_key in
+  let sk = Tezos_crypto.Bls.Secret_key.of_b58check_exn sk in
+  Data_encoding.Binary.to_bytes_exn Tezos_crypto.Bls.Secret_key.encoding sk
+  |> Bls12_381.Signature.sk_of_bytes_exn
+
+let sign_one_transaction key txs_string =
   let open Tezos_protocol_alpha.Protocol in
   let txs_json =
     match Data_encoding.Json.from_string txs_string with
@@ -632,7 +638,7 @@ let sign_one_transaction sk txs_string =
       Tx_rollup_l2_batch.V1.transaction_encoding
       (List.hd txs)
   in
-  Bls12_381.Signature.MinPk.Aug.sign sk buf
+  Bls12_381.Signature.MinPk.Aug.sign (bls_sk_of_key key) buf
 
 let craft_tx ?counter tx_client ~qty ~signer ~dest ~ticket =
   let* json_str =
@@ -646,7 +652,22 @@ let craft_tx ?counter tx_client ~qty ~signer ~dest ~ticket =
   in
   Lwt.return json_str
 
-let craft_batch tx_client ~batch ~signatures =
+let bls_signers_sks_json keys =
+  let sks =
+    List.map
+      (List.map (fun key ->
+           let (Account.Unencrypted b58_sk_signer) =
+             key.Account.aggregate_secret_key
+           in
+           Tezos_crypto.Bls.Secret_key.of_b58check_exn b58_sk_signer))
+      keys
+  in
+  Data_encoding.(
+    Json.construct (list (list Tezos_crypto.Bls.Secret_key.encoding)) sks
+    |> Json.to_string)
+
+let craft_batch tx_client ~batch ~signers =
+  let signatures = bls_signers_sks_json signers in
   let* json_str =
     Tx_rollup_client.craft_tx_batch tx_client ~batch ~signatures
   in
@@ -702,16 +723,6 @@ let test_l2_to_l2_transaction =
       (* Genarating some identities *)
       let* bls_keys_1 = generate_bls_addr ~alias:"bob" client in
       let bls_pkh_1_str = bls_keys_1.aggregate_public_key_hash in
-      (* FIXME/TORU: Use a cleaner interface *)
-      let bls_sk_1_str =
-        let (Unencrypted b58_sk_signer) = bls_keys_1.aggregate_secret_key in
-        let sk = Tezos_crypto.Bls.Secret_key.of_b58check_exn b58_sk_signer in
-        Data_encoding.(
-          Json.construct
-            (list (list Tezos_crypto.Bls.Secret_key.encoding))
-            [[sk]]
-          |> Json.to_string)
-      in
       let* bls_keys_2 = generate_bls_addr ~alias:"alice" client in
       let bls_pkh_2_str = bls_keys_2.aggregate_public_key_hash in
       let tickets_content = "toru" in
@@ -791,7 +802,7 @@ let test_l2_to_l2_transaction =
           ~ticket:ticket_id
       in
       Log.info "Crafting a batch" ;
-      let* batch = craft_batch tx_client ~batch:tx ~signatures:bls_sk_1_str in
+      let* batch = craft_batch tx_client ~batch:tx ~signers:[[bls_keys_1]] in
       Log.info "Submiting a batch" ;
       let*! () =
         Client.Tx_rollup.submit_batch
@@ -1038,17 +1049,7 @@ let test_batcher =
           ~dest:bls_pkh_2
           ~ticket:ticket_id
       in
-
-      (* FIXME/TORU: Use a cleaner interface *)
-      let bls_sk_1 =
-        let (Unencrypted sk) = bls_key_1.aggregate_secret_key in
-        let sk = Tezos_crypto.Bls.Secret_key.of_b58check_exn sk in
-        Data_encoding.Binary.to_bytes_exn
-          Tezos_crypto.Bls.Secret_key.encoding
-          sk
-        |> Bls12_381.Signature.sk_of_bytes_exn
-      in
-      let signature = sign_one_transaction bls_sk_1 tx in
+      let signature = sign_one_transaction bls_key_1 tx in
       Log.info "Submitting the L2 transaction" ;
       let* txh1 = tx_client_inject_transaction ~tx_client tx signature in
       Log.info "Successfully submitted L2 transaction %s" txh1 ;
@@ -1064,16 +1065,7 @@ let test_batcher =
           ~dest:bls_pkh_1
           ~ticket:ticket_id
       in
-      (* FIXME/TORU: Use a cleaner interface *)
-      let bls_sk_2 =
-        let (Unencrypted sk) = bls_key_2.aggregate_secret_key in
-        let sk = Tezos_crypto.Bls.Secret_key.of_b58check_exn sk in
-        Data_encoding.Binary.to_bytes_exn
-          Tezos_crypto.Bls.Secret_key.encoding
-          sk
-        |> Bls12_381.Signature.sk_of_bytes_exn
-      in
-      let signature = sign_one_transaction bls_sk_2 tx in
+      let signature = sign_one_transaction bls_key_2 tx in
       Log.info "Submitting the L2 transaction" ;
       let* txh2 = tx_client_inject_transaction ~tx_client tx signature in
       Log.info "Successfully submitted L2 transaction %s" txh2 ;
@@ -1089,7 +1081,7 @@ let test_batcher =
           ~ticket:ticket_id
       in
 
-      let signature = sign_one_transaction bls_sk_2 tx in
+      let signature = sign_one_transaction bls_key_2 tx in
       Log.info "Submitting the bad counter L2 transaction" ;
       let* _ =
         tx_client_inject_transaction
@@ -1109,7 +1101,7 @@ let test_batcher =
           ~ticket:ticket_id
       in
 
-      let signature = sign_one_transaction bls_sk_2 tx in
+      let signature = sign_one_transaction bls_key_2 tx in
       Log.info "Submitting the bad signature L2 transaction" ;
       let* _ =
         tx_client_inject_transaction
@@ -1130,7 +1122,7 @@ let test_batcher =
           ~counter:2L
       in
 
-      let signature = sign_one_transaction bls_sk_1 tx in
+      let signature = sign_one_transaction bls_key_1 tx in
       Log.info "Submitting the wrong amount L2 transaction" ;
       let* _ =
         tx_client_inject_transaction
@@ -1167,18 +1159,18 @@ let test_batcher =
           ~expected_balance:99_996
       in
 
-      let inject_tx ~counter ~from ~dest ?(amount = 1L) sk =
+      let inject_tx ~counter ~from ~dest ?(amount = 1L) () =
         let* tx =
           craft_tx
             tx_client
             ~qty:amount
             ~counter
-            ~signer:from
+            ~signer:from.Account.aggregate_public_key
             ~dest
             ~ticket:ticket_id
         in
 
-        let signature = sign_one_transaction sk tx in
+        let signature = sign_one_transaction from tx in
         tx_client_inject_transaction ~tx_client tx signature
       in
       let nbtxs1 = 70 in
@@ -1187,9 +1179,7 @@ let test_batcher =
       let* () =
         Lwt_list.iter_s
           (fun counter ->
-            let* _ =
-              inject_tx ~counter ~from:bls_pk_1 ~dest:bls_pkh_2 bls_sk_1
-            in
+            let* _ = inject_tx ~counter ~from:bls_key_1 ~dest:bls_pkh_2 () in
             unit)
           (List.init nbtxs1 (fun i -> Int64.of_int (i + 2)))
       in
@@ -1198,9 +1188,7 @@ let test_batcher =
       let* () =
         Lwt_list.iter_s
           (fun counter ->
-            let* _ =
-              inject_tx ~counter ~from:bls_pk_2 ~dest:bls_pkh_1 bls_sk_2
-            in
+            let* _ = inject_tx ~counter ~from:bls_key_2 ~dest:bls_pkh_1 () in
             unit)
           (List.init nbtxs2 (fun i -> Int64.of_int (i + 2)))
       in
@@ -1265,7 +1253,6 @@ let test_reorganization =
       let* bls_key_1 = generate_bls_addr ~alias:"alice" client1 in
       let bls_pkh_1 = bls_key_1.aggregate_public_key_hash in
       let bls_pk_1 = bls_key_1.aggregate_public_key in
-      let bls_sk_1 = bls_key_1.aggregate_secret_key in
       let* bls_key_2 = generate_bls_addr ~alias:"bob" client1 in
       let bls_pkh_2 = bls_key_2.aggregate_public_key_hash in
       let* (_level, _contract_id) =
@@ -1305,17 +1292,7 @@ let test_reorganization =
           ~dest:bls_pkh_2
           ~ticket:ticket_id
       in
-      (* FIXME/TORU: Use a cleaner interface *)
-      let bls_sk_1_str =
-        let (Unencrypted b58_sk_signer) = bls_sk_1 in
-        let sk = Tezos_crypto.Bls.Secret_key.of_b58check_exn b58_sk_signer in
-        Data_encoding.(
-          Json.construct
-            (list (list Tezos_crypto.Bls.Secret_key.encoding))
-            [[sk]]
-          |> Json.to_string)
-      in
-      let* batch = craft_batch tx_client ~batch:tx ~signatures:bls_sk_1_str in
+      let* batch = craft_batch tx_client ~batch:tx ~signers:[[bls_key_1]] in
       let*! () =
         Client.Tx_rollup.submit_batch
           ~content:(Hex.of_string batch)
@@ -1392,11 +1369,9 @@ let test_l2_proof_rpc_position =
       let* bls_key_1 = generate_bls_addr ~alias:"alice" client in
       let bls_pkh_1 = bls_key_1.aggregate_public_key_hash in
       let bls_pk_1 = bls_key_1.aggregate_public_key in
-      let bls_sk_1 = bls_key_1.aggregate_secret_key in
       let* bls_key_2 = generate_bls_addr ~alias:"bob" client in
       let bls_pkh_2 = bls_key_2.aggregate_public_key_hash in
       let bls_pk_2 = bls_key_2.aggregate_public_key in
-      let bls_sk_2 = bls_key_2.aggregate_secret_key in
       let* (_level, _contract_id) =
         make_deposit
           ~source:Constant.bootstrap2.public_key_hash
@@ -1439,17 +1414,7 @@ let test_l2_proof_rpc_position =
           ~ticket:ticket_id
           ~qty:5L
       in
-      (* FIXME/TORU: Use a cleaner interface *)
-      let bls_sk_1_str =
-        let (Unencrypted b58_sk_signer) = bls_sk_1 in
-        let sk = Tezos_crypto.Bls.Secret_key.of_b58check_exn b58_sk_signer in
-        Data_encoding.(
-          Json.construct
-            (list (list Tezos_crypto.Bls.Secret_key.encoding))
-            [[sk]]
-          |> Json.to_string)
-      in
-      let* batch1 = craft_batch tx_client ~batch:tx1 ~signatures:bls_sk_1_str in
+      let* batch1 = craft_batch tx_client ~batch:tx1 ~signers:[[bls_key_1]] in
       let content1 = Hex.of_string batch1 in
       let* tx2 =
         craft_tx
@@ -1460,17 +1425,7 @@ let test_l2_proof_rpc_position =
           ~ticket:ticket_id
           ~qty:10L
       in
-      (* FIXME/TORU: Use a cleaner interface *)
-      let bls_sk_2_str =
-        let (Unencrypted b58_sk_signer) = bls_sk_2 in
-        let sk = Tezos_crypto.Bls.Secret_key.of_b58check_exn b58_sk_signer in
-        Data_encoding.(
-          Json.construct
-            (list (list Tezos_crypto.Bls.Secret_key.encoding))
-            [[sk]]
-          |> Json.to_string)
-      in
-      let* batch2 = craft_batch tx_client ~batch:tx2 ~signatures:bls_sk_2_str in
+      let* batch2 = craft_batch tx_client ~batch:tx2 ~signers:[[bls_key_2]] in
       let content2 = Hex.of_string batch2 in
       Log.info "Submiting two batches" ;
       let*! () =
@@ -1726,24 +1681,16 @@ let test_committer =
       let* inbox = Rollup_node.Client.get_inbox ~tx_node ~block:"head" in
       let ticket_id = get_ticket_hash_from_deposit (List.hd inbox.contents) in
       let inject_tx ?counter ~from ~dest ?(amount = 1L) () =
-        let sk =
-          let (Unencrypted sk) = from.Account.aggregate_secret_key in
-          let sk = Tezos_crypto.Bls.Secret_key.of_b58check_exn sk in
-          Data_encoding.Binary.to_bytes_exn
-            Tezos_crypto.Bls.Secret_key.encoding
-            sk
-          |> Bls12_381.Signature.sk_of_bytes_exn
-        in
         let* tx =
           craft_tx
             tx_client
             ~qty:amount
             ?counter
-            ~signer:from.aggregate_public_key
+            ~signer:from.Account.aggregate_public_key
             ~dest
             ~ticket:ticket_id
         in
-        let signature = sign_one_transaction sk tx in
+        let signature = sign_one_transaction from tx in
         tx_client_inject_transaction ~tx_client tx signature
       in
       let check_l2_level block expected_level =
@@ -1900,16 +1847,7 @@ let test_tickets_context =
           ~ticket:ticket_id
           ~qty:10L
       in
-      (* FIXME/TORU: Use a cleaner interface *)
-      let bls_sk_1 =
-        let (Unencrypted sk) = bls_key_1.aggregate_secret_key in
-        let sk = Tezos_crypto.Bls.Secret_key.of_b58check_exn sk in
-        Data_encoding.Binary.to_bytes_exn
-          Tezos_crypto.Bls.Secret_key.encoding
-          sk
-        |> Bls12_381.Signature.sk_of_bytes_exn
-      in
-      let signature = sign_one_transaction bls_sk_1 tx in
+      let signature = sign_one_transaction bls_key_1 tx in
       let* _txh1 = tx_client_inject_transaction ~tx_client tx signature in
       let* tx =
         craft_tx
@@ -1919,15 +1857,7 @@ let test_tickets_context =
           ~ticket:ticket_id
           ~qty:5L
       in
-      let bls_sk_2 =
-        let (Unencrypted sk) = bls_key_2.aggregate_secret_key in
-        let sk = Tezos_crypto.Bls.Secret_key.of_b58check_exn sk in
-        Data_encoding.Binary.to_bytes_exn
-          Tezos_crypto.Bls.Secret_key.encoding
-          sk
-        |> Bls12_381.Signature.sk_of_bytes_exn
-      in
-      let signature = sign_one_transaction bls_sk_2 tx in
+      let signature = sign_one_transaction bls_key_2 tx in
       let* _txh2 = tx_client_inject_transaction ~tx_client tx signature in
       Log.info "Waiting for new L2 block" ;
       let* () = Client.bake_for client in
