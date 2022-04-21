@@ -27,6 +27,10 @@ module Make (C : sig
   val cctxt : Client_context.io_wallet
 end) : Client_keys.SIGNER
 
+module Make_aggregate (C : sig
+  val cctxt : Client_context.io_wallet
+end) : Client_keys.AGGREGATE_SIGNER
+
 val decrypt :
   #Client_context.io_wallet ->
   ?name:string ->

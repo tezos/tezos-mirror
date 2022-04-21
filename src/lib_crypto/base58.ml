@@ -440,4 +440,7 @@ module Prefix = struct
 
   (* 54 *)
   let bls12_381_secret_key = "\003\150\192\040" (* BLsk(32) *)
+
+  (* 88 *)
+  let bls12_381_encrypted_secret_key = "\002\005\030\053\025" (* BLesk(58) *)
 end
