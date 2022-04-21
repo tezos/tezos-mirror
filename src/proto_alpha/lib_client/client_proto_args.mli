@@ -76,21 +76,15 @@ val fee_cap_arg : (Tez.t, full) Clic.arg
 
 val burn_cap_arg : (Tez.t, full) Clic.arg
 
-val no_waiting_for_endorsements_arg : (bool, full) Clic.arg
-
 val replace_by_fees_arg : (bool, full) Clic.arg
 
 val successor_level_arg : (bool, full) Clic.arg
-
-val await_endorsements_arg : (bool, full) Clic.arg
 
 val force_switch : (bool, full) Clic.arg
 
 val no_endorse_switch : (bool, full) Clic.arg
 
 val minimal_timestamp_switch : (bool, full) Clic.arg
-
-val endorsement_delay_arg : (int, full) Clic.arg
 
 val preserved_levels_arg : (int option, full) Clic.arg
 
