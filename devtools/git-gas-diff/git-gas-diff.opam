@@ -1,0 +1,27 @@
+opam-version: "2.0"
+synopsis: "Make a synthesis of gas changes from a git diff"
+authors: "Nomadic Labs R&D team"
+maintainer: [
+  "Nicolas Ayache <nicolas.ayache@nomadic-labs.com>"
+]
+homepage: "https://gitlab.com/tezos/tezos/-/tree/master/devtools/git-gas-diff"
+bug-reports: "https://gitlab.com/tezos/tezos/-/issues"
+depends: [
+  "dune" {>= "2.9"}
+  "num" {>= "1.4"}
+  "re" {>= "10.1.3"}
+]
+build: [
+  ["dune" "subst"] {dev}
+  [
+    "dune"
+    "build"
+    "-p"
+    name
+    "-j"
+    jobs
+    "--promote-install-files=false"
+    "@install"
+  ]
+  ["dune" "install" "-p" name "--create-install-files" name]
+]
