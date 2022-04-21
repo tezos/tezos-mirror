@@ -273,11 +273,19 @@ module P2p_connect_handler = struct
     declare_2
       ~section
       ~name:"connect_error"
-      ~msg:"connection error for point {point}, disconnecting: {errors}"
+      ~msg:"connection error for point {point}, disconnecting : {errors}"
       ~level:Debug
       ("point", P2p_point.Id.encoding)
-      ~pp2:pp_print_top_error_of_trace
-      ("errors", Error_monad.trace_encoding)
+      ("errors", Data_encoding.(conv Lazy.force Lazy.from_val string))
+
+  let connect_close_error =
+    declare_2
+      ~section
+      ~name:"connect_close_error"
+      ~msg:"connection error while closing for point {point}: {errors}"
+      ~level:Debug
+      ("point", P2p_point.Id.encoding)
+      ("errors", Data_encoding.(conv Lazy.force Lazy.from_val string))
 
   let authenticate_reject_protocol_mismatch =
     declare_8

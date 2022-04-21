@@ -175,20 +175,20 @@ let get_buf_with_offset t write_len =
 let write ~maxlen ~fill_using t =
   if maxlen < 0 then invalid_arg "Circular_buffer.write: negative length." ;
   if maxlen = 0 then
-    Lwt.return {offset = t.data_end; length = 0; buf = t.buffer}
+    Lwt.return_ok {offset = t.data_end; length = 0; buf = t.buffer}
   else
-    let open Lwt.Syntax in
+    let open Lwt_result.Syntax in
     let buf, offset = get_buf_with_offset t maxlen in
     let maxlen =
       if buf == t.buffer then maxlen else min t.fresh_buf_size maxlen
     in
-    let* written = fill_using buf offset maxlen in
+    let+ written = fill_using buf offset maxlen in
     if written > maxlen then
-      invalid_arg "Circular_buffer.write: written more bytes than maxlen" ;
-    if t.buffer == buf then (
-      t.data_end <- written + offset ;
-      if t.data_end = t.data_start then t.full <- true) ;
-    Lwt.return {offset; length = written; buf}
+      invalid_arg "Circular_buffer.write: written more bytes than maxlen"
+    else (
+      if t.buffer == buf then t.data_end <- written + offset ;
+      if t.data_end = t.data_start then t.full <- true ;
+      {offset; length = written; buf})
 
 (* [read data ?len t ~into ~offset]  will read [len] data from
    [data.buf]  and update [t.data_start] pointer accordingly.

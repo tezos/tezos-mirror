@@ -147,15 +147,19 @@ let test_read_less_than_length : QCheck2.Test.t =
   (* Wrap in a timeout in case reading hangs - which can happen if the
      test is not well written or if a bug is introduced. Better safe than sorry. *)
   Lwt_unix.with_timeout 1. @@ fun () ->
-  let* data =
+  let* data_result =
     Circular_buffer.write
       ~maxlen:(String.length data_to_write)
       ~fill_using:(fun bytes offset maxlen ->
         Bytes.blit_string data_to_write 0 bytes offset maxlen ;
-        Lwt.return maxlen)
+        Lwt.return_ok maxlen)
       read_buffer
   in
-  let* () = Lwt_pipe.Maybe_bounded.push read_queue (Ok data) in
+  let* () =
+    match data_result with
+    | Ok data -> Lwt_pipe.Maybe_bounded.push read_queue (Ok data)
+    | Error _ -> Alcotest.failf "Faild to read from circular buffer"
+  in
   let+ res = P2p_buffer_reader.read readable reader_buffer in
   qcheck_eq'
     ~expected:true
@@ -227,15 +231,19 @@ let test_read_partial : QCheck2.Test.t =
      test is not well written or if a bug is introduced. Better safe than sorry. *)
   Lwt_unix.with_timeout 1. @@ fun () ->
   (* Write data into the [readable] *)
-  let* data =
+  let* data_result =
     Circular_buffer.write
       ~maxlen:(buf1_size + buf2_size + additional_size)
       ~fill_using:(fun bytes offset maxlen ->
         Bytes.blit_string data_to_write 0 bytes offset maxlen ;
-        Lwt.return maxlen)
+        Lwt.return_ok maxlen)
       read_buffer
   in
-  let* () = Lwt_pipe.Maybe_bounded.push read_queue (Ok data) in
+  let* () =
+    match data_result with
+    | Ok data -> Lwt_pipe.Maybe_bounded.push read_queue (Ok data)
+    | Error _ -> Alcotest.failf "Faild to read from circular buffer"
+  in
   (* [read] a first segment, which leaves partial data in the [readable] *)
   let* res1 = P2p_buffer_reader.read readable reader_buffer1 in
   (* [read] a second segment, which should start on the remaining partial data of the [readable] *)
@@ -265,15 +273,19 @@ let test_read_full_basic =
   (* Wrap in a timeout in case reading hangs - which can happen if the
      test is not well written or if a bug is introduced. Better safe than sorry. *)
   Lwt_unix.with_timeout 1. @@ fun () ->
-  let* data =
+  let* data_result =
     Circular_buffer.write
       ~maxlen:(String.length data_to_write)
       ~fill_using:(fun bytes offset maxlen ->
         Bytes.blit_string data_to_write 0 bytes offset maxlen ;
-        Lwt.return maxlen)
+        Lwt.return_ok maxlen)
       read_buffer
   in
-  let* () = Lwt_pipe.Maybe_bounded.push read_queue (Ok data) in
+  let* () =
+    match data_result with
+    | Ok data -> Lwt_pipe.Maybe_bounded.push read_queue (Ok data)
+    | Error _ -> Alcotest.failf "Faild to read from circular buffer"
+  in
   let+ res = P2p_buffer_reader.read_full readable reader_buffer in
   let _ = qcheck_eq' ~expected:true ~actual:(Result.is_ok res) () in
   qcheck_eq' ~expected:data_to_write ~actual:(Bytes.to_string buffer) ()
@@ -305,15 +317,19 @@ let test_read_full_waits =
     let* () = Lwt_unix.sleep 0.01 in
     List.iter_s
       (fun data_to_write ->
-        let* data =
+        let* data_result =
           Circular_buffer.write
             ~maxlen:(String.length data_to_write)
             ~fill_using:(fun bytes offset maxlen ->
               Bytes.blit_string data_to_write 0 bytes offset maxlen ;
-              Lwt.return maxlen)
+              Lwt.return_ok maxlen)
             read_buffer
         in
-        let* () = Lwt_pipe.Maybe_bounded.push read_queue (Ok data) in
+        let* () =
+          match data_result with
+          | Ok data -> Lwt_pipe.Maybe_bounded.push read_queue (Ok data)
+          | Error _ -> Alcotest.failf "Faild to read from circular buffer"
+        in
         (* Note: this cooperation point is necessary to allow [read_full] to read some data from the circular buffer before writing again; otherwise it can deadlock if [total_size > Circular_buffer.default_size] (one can also set the Circular_buffer size to [total_size] but putting a cooperation point is more representative of real-world scenarios). *)
         Lwt.pause ())
       data_to_write_list

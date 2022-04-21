@@ -68,12 +68,17 @@ module Constant = struct
     let seed_count = Array.length seed_chunks in
     let data_store =
       Array.init chunks_count (fun i ->
-          Buff.write
-            ~maxlen:chunks_size
-            ~fill_using:(fun buff off maxlen ->
-              Bytes.blit seed_chunks.(i mod seed_count) 0 buff off maxlen ;
-              Lwt.return maxlen)
-            circular_buffer)
+          let* res =
+            Buff.write
+              ~maxlen:chunks_size
+              ~fill_using:(fun buff off maxlen ->
+                Bytes.blit seed_chunks.(i mod seed_count) 0 buff off maxlen ;
+                Lwt.return_ok maxlen)
+              circular_buffer
+          in
+          match res with
+          | Error _ -> failwith "fill_full: fill_using_error"
+          | Ok res -> Lwt.return res)
     in
     data_store
 
@@ -83,13 +88,18 @@ module Constant = struct
     let seed_count = Array.length seed_chunks in
     let data_store =
       Array.init chunks_count (fun i ->
-          Buff.write
-            ~maxlen:chunks_size
-            ~fill_using:(fun buff off maxlen ->
-              let length = Random.int maxlen in
-              Bytes.blit seed_chunks.(i mod seed_count) 0 buff off length ;
-              Lwt.return length)
-            circular_buffer)
+          let* res =
+            Buff.write
+              ~maxlen:chunks_size
+              ~fill_using:(fun buff off maxlen ->
+                let length = Random.int maxlen in
+                Bytes.blit seed_chunks.(i mod seed_count) 0 buff off length ;
+                Lwt.return_ok length)
+              circular_buffer
+          in
+          match res with
+          | Error _ -> failwith "fill_partial: fill_using_error"
+          | Ok res -> Lwt.return res)
     in
     data_store
 
@@ -274,7 +284,7 @@ module Fail_Test = struct
             ~maxlen:max_data_size
             ~fill_using:(fun buff off _maxlen ->
               Bytes.blit tmp_buff 0 buff off actual_data_size ;
-              Lwt.return actual_data_size)
+              Lwt.return_ok actual_data_size)
             circular_buffer
         in
         assert false)
@@ -289,20 +299,23 @@ module Fail_Test = struct
         ~maxlen:max_data_size
         ~fill_using:(fun buff off _maxlen ->
           Bytes.blit tmp_buff 0 buff off actual_data_size ;
-          Lwt.return actual_data_size)
+          Lwt.return_ok actual_data_size)
         circular_buffer
     in
-    try
-      let _ =
-        Buff.read
-          data
-          ~len:(actual_data_size + 1)
-          circular_buffer
-          ~into:tmp_buff
-          ~offset:0
-      in
-      assert false
-    with Invalid_argument _ -> Lwt.return_unit
+    match data with
+    | Error _ -> failwith "read_invalid: fill_using_error"
+    | Ok data -> (
+        try
+          let _ =
+            Buff.read
+              data
+              ~len:(actual_data_size + 1)
+              circular_buffer
+              ~into:tmp_buff
+              ~offset:0
+          in
+          assert false
+        with Invalid_argument _ -> Lwt.return_unit)
 
   let run_write_too_long_in_buffer () =
     write_invalid ~max_buffer_len:10 ~max_data_size:5 ~actual_data_size:6
