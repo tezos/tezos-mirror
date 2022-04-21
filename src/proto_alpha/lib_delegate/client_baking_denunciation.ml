@@ -355,27 +355,23 @@ let process_new_block (cctxt : #Protocol_client_context.full) state
       Raw_level.max level state.highest_level_encountered ;
     (* Processing blocks *)
     (Alpha_block_services.info cctxt ~chain ~block () >>= function
-     | Ok block_info -> process_block cctxt state block_info
+     | Ok block_info -> (
+         process_block cctxt state block_info >>=? fun () ->
+         (* Processing (pre)endorsements in the block *)
+         match block_info.operations with
+         | consensus_ops :: _ ->
+             let packed_op {Alpha_block_services.shell; protocol_data; _} =
+               {shell; protocol_data}
+             in
+             process_operations cctxt state consensus_ops ~packed_op chain_id
+         | _ ->
+             (* Should not happen as a block should contain 4 lists of
+                operations, the first list being dedicated to consensus
+                operations. *)
+             Events.(emit fetch_operations_error hash) >>= fun () -> return_unit
+         )
      | Error errs ->
-         Events.(emit fetch_operations_error) (hash, errs) >>= fun () ->
-         return_unit)
-    >>=? fun () ->
-    (* Processing (pre)endorsements in the block *)
-    (Alpha_block_services.Operations.operations cctxt ~chain ~block ()
-     >>= function
-     | Ok (consensus_ops :: _) ->
-         let packed_op {Alpha_block_services.shell; protocol_data; _} =
-           {shell; protocol_data}
-         in
-         process_operations cctxt state consensus_ops ~packed_op chain_id
-     | Ok [] ->
-         (* should not happen, unless the semantics of
-            Alpha_block_services.Operations.operations (which is supposed to
-            return a list of 4 elements changes. In which case, this code
-            should be adapted). *)
-         assert false
-     | Error errs ->
-         Events.(emit fetch_operations_error) (hash, errs) >>= fun () ->
+         Events.(emit accuser_block_error) (hash, errs) >>= fun () ->
          return_unit)
     >>=? fun () ->
     cleanup_old_operations state ;
