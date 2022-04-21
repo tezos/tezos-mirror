@@ -191,6 +191,21 @@ let on_register state ~apply (tr : L2_transaction.t) =
     Tx_rollup_l2_batch.V1.
       {contents = [tr.transaction]; aggregated_signature = tr.signature}
   in
+  let batch_string =
+    Data_encoding.Binary.to_string_exn Tx_rollup_l2_batch.encoding (V1 batch)
+  in
+  let (_msg, msg_size) = Tx_rollup_message.make_batch batch_string in
+  let* () =
+    fail_when
+      (msg_size
+     >= state.constants.parametric.tx_rollup_hard_size_limit_per_message)
+      (Error.Transaction_too_large
+         {
+           actual = msg_size;
+           limit =
+             state.constants.parametric.tx_rollup_hard_size_limit_per_message;
+         })
+  in
   let context = state.incr_context in
   let prev_context = context in
   let* context =

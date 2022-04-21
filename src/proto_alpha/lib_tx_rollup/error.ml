@@ -481,3 +481,17 @@ let () =
       | _ -> None)
     (fun (level, reconstructed_inbox, protocol_inbox) ->
       Tx_rollup_inbox_mismatch {level; reconstructed_inbox; protocol_inbox})
+
+type error += Transaction_too_large of {actual : int; limit : int}
+
+let () =
+  register_error_kind
+    ~id:"tx_rollup.node.transaction_too_large"
+    ~title:"transaction too large to be batched"
+    ~description:"The transaction is too large to be batched."
+    `Permanent
+    Data_encoding.(obj2 (req "actual" int31) (req "limit" int31))
+    (function
+      | Transaction_too_large {actual; limit} -> Some (actual, limit)
+      | _ -> None)
+    (fun (actual, limit) -> Transaction_too_large {actual; limit})
