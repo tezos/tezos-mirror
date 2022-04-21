@@ -3825,6 +3825,61 @@ module Withdraw = struct
     return
       (account1, account2, tx_rollup, deposit_contract, withdraw_contract, b)
 
+  let originate_forge_withdraw_deposit_contract account block =
+    Contract_helpers.originate_contract_from_string
+      ~script:
+        {| parameter (or (pair %default nat nat)
+                         (or (ticket %withdraw nat)
+                             (pair %deposit address tx_rollup_l2_address)));
+           storage (list (ticket nat));
+           code
+             {
+               UNPAIR;
+               IF_LEFT
+                 {
+                   UNPAIR;
+                   TICKET;
+                   CONS;
+                   NIL operation;
+                   PAIR
+                 }
+                 {
+                   IF_LEFT
+                     {
+                       CONS;
+                       NIL operation;
+                       PAIR;
+                     }
+                     {
+                       UNPAIR;
+                       CONTRACT %deposit (pair (ticket nat) tx_rollup_l2_address);
+                       ASSERT_SOME;
+                       DUG 2;
+                       SWAP;
+                       IF_CONS
+                         {
+                           SWAP;
+                           DUG 3;
+                           PAIR;
+                           PUSH mutez 0;
+                           SWAP;
+                           TRANSFER_TOKENS;
+                           NIL operation;
+                           SWAP;
+                           CONS;
+                           PAIR
+                         }
+                         { FAIL }
+                     }
+                }
+             } |}
+      ~storage:"{}"
+      ~source_contract:account
+      ~baker:(is_implicit_exn account)
+      block
+    >>=? fun (forge_withdraw_deposit_contract, _script, block) ->
+    return (forge_withdraw_deposit_contract, block)
+
   (** [finalize_all_commitment_with_withdrawals ~account ~tx_rollup ~withdrawals
       b] commit and finalize all uncommitted inboxes for a tx_rollup and a
       commitment containing [withdrawals] for the last unfinalized commitments
@@ -3852,7 +3907,7 @@ module Withdraw = struct
     Context.Tx_rollup.state (B b) tx_rollup >>=? fun state ->
     Alpha_context.Tx_rollup_state.Internal_for_tests.next_commitment_level
       state
-      current_level
+      (Raw_level.succ current_level)
     >>??= fun next_commitment_level ->
     let uncommitted_inboxes =
       Alpha_context.Tx_rollup_state.Internal_for_tests.uncommitted_inboxes_count
@@ -5083,63 +5138,8 @@ module Withdraw = struct
   let test_forge_deposit_withdraw_deposit () =
     context_init1 () >>=? fun (block, account) ->
     originate block account >>=? fun (block, tx_rollup) ->
-    (* This script has 3 entrypoints:
-       - %default: forges new tickets and stores it in contract's storage.
-       - %withdraw: receives tickets and add it in contract's storage.
-       - %deposit: sends the last tickets stored in the contract's storage to an
-         <l2_address> of a <tx_rollup>, both given in the entrypoint's parameter. *)
-    Contract_helpers.originate_contract_from_string
-      ~script:
-        {| parameter (or (pair %default nat nat)
-                         (or (ticket %withdraw nat)
-                             (pair %deposit address tx_rollup_l2_address)));
-           storage (list (ticket nat));
-           code
-             {
-               UNPAIR;
-               IF_LEFT
-                 {
-                   UNPAIR;
-                   TICKET;
-                   CONS;
-                   NIL operation;
-                   PAIR
-                 }
-                 {
-                   IF_LEFT
-                     {
-                       CONS;
-                       NIL operation;
-                       PAIR;
-                     }
-                     {
-                       UNPAIR;
-                       CONTRACT %deposit (pair (ticket nat) tx_rollup_l2_address);
-                       ASSERT_SOME;
-                       DUG 2;
-                       SWAP;
-                       IF_CONS
-                         {
-                           SWAP;
-                           DUG 3;
-                           PAIR;
-                           PUSH mutez 0;
-                           SWAP;
-                           TRANSFER_TOKENS;
-                           NIL operation;
-                           SWAP;
-                           CONS;
-                           PAIR
-                         }
-                         { FAIL }
-                     }
-                }
-             } |}
-      ~storage:"{}"
-      ~source_contract:account
-      ~baker:(is_implicit_exn account)
-      block
-    >>=? fun (forge_withdraw_deposit_contract, _script, block) ->
+    originate_forge_withdraw_deposit_contract account block
+    >>=? fun (forge_withdraw_deposit_contract, block) ->
     let forge_ticket block =
       Op.transaction
         (B block)
@@ -5280,6 +5280,170 @@ module Withdraw = struct
     assert_tx_rollup_ticket_balance ~__LOC__ block (Some 10) >>=? fun () ->
     assert_account_ticket_balance ~__LOC__ block None
 
+  let test_0_amount_tickets () =
+    context_init1 () >>=? fun (block, account) ->
+    originate block account >>=? fun (block, tx_rollup) ->
+    originate_forge_withdraw_deposit_contract account block
+    >>=? fun (forge_withdraw_deposit_contract, block) ->
+    let forge_ticket block =
+      Op.transaction
+        (B block)
+        ~entrypoint:Entrypoint.default
+        ~parameters:
+          (Expr_common.(
+             pair_n [int (Z.of_int Nat_ticket.contents_nat); int Z.zero])
+          |> Tezos_micheline.Micheline.strip_locations |> Script.lazy_expr)
+        ~fee:Tez.one
+        account
+        forge_withdraw_deposit_contract
+        (Tez.of_mutez_exn 0L)
+      >>=? fun operation -> Block.bake ~operation block
+    in
+    let failing_deposit_ticket block =
+      Op.transaction
+        (B block)
+        ~entrypoint:(Entrypoint.of_string_strict_exn "deposit")
+        ~parameters:
+          (Expr_common.(
+             pair_n
+               [
+                 string (Tx_rollup.to_b58check tx_rollup);
+                 string "tz4MSfZsn6kMDczShy8PMeB628TNukn9hi2K";
+               ])
+          |> Tezos_micheline.Micheline.strip_locations |> Script.lazy_expr)
+        ~fee:Tez.one
+        account
+        forge_withdraw_deposit_contract
+        (Tez.of_mutez_exn 0L)
+      >>=? fun operation ->
+      Incremental.begin_construction block >>=? fun incr ->
+      Incremental.add_operation
+        ~expect_failure:(check_proto_error Apply.Forbidden_zero_ticket_quantity)
+        incr
+        operation
+      >>=? fun _incr -> return_unit
+    in
+    let failing_dispatch_ticket block =
+      Nat_ticket.withdrawal
+        ~amount:Tx_rollup_l2_qty.zero
+        (B block)
+        ~ticketer:forge_withdraw_deposit_contract
+        ~claimer:account
+        tx_rollup
+      >>=? fun (withdraw, ticket_info) ->
+      let message_index = 0 in
+      finalize_all_commitment_with_withdrawals
+        ~batches:["batch"]
+        ~account
+        ~tx_rollup
+        ~withdrawals:[(message_index, [withdraw])]
+        block
+      >>=? fun (commitment, context_hash_list, committed_level, block) ->
+      let context_hash =
+        WithExceptions.Option.get
+          ~loc:__LOC__
+          (List.nth context_hash_list message_index)
+      in
+      let message_result_path =
+        compute_message_result_path commitment ~message_position:message_index
+      in
+      Op.tx_rollup_dispatch_tickets
+        (B block)
+        ~source:account
+        ~message_index
+        ~message_result_path
+        tx_rollup
+        committed_level
+        context_hash
+        [ticket_info]
+      >>=? fun operation ->
+      Incremental.begin_construction block >>=? fun incr ->
+      Incremental.add_operation
+        ~expect_failure:(check_proto_error Apply.Forbidden_zero_ticket_quantity)
+        incr
+        operation
+      >>=? fun _incr -> return_unit
+    in
+    let failing_transfer_ticket block =
+      Op.transfer_ticket
+        (B block)
+        ~source:account
+        ~contents:(Script.lazy_expr Nat_ticket.contents)
+        ~ty:(Script.lazy_expr Nat_ticket.ty)
+        ~ticketer:forge_withdraw_deposit_contract
+        Z.zero
+        ~destination:forge_withdraw_deposit_contract
+        (Entrypoint.of_string_strict_exn "withdraw")
+      >>=? fun operation ->
+      Incremental.begin_construction block >>=? fun incr ->
+      Incremental.add_operation
+        ~expect_failure:(check_proto_error Apply.Forbidden_zero_ticket_quantity)
+        incr
+        operation
+      >>=? fun _incr -> return_unit
+    in
+    let token_one =
+      Nat_ticket.ex_token ~ticketer:forge_withdraw_deposit_contract
+    in
+    let assert_ticket_in_storage block =
+      let expected_storage =
+        Expr_common.(
+          seq
+            [
+              pair
+                (address forge_withdraw_deposit_contract)
+                (pair (int (Z.of_int Nat_ticket.contents_nat)) (int Z.zero));
+            ])
+        |> Tezos_micheline.Micheline.strip_locations |> Option.some
+      in
+      Incremental.begin_construction block >>=? fun incr ->
+      let ctxt = Incremental.alpha_ctxt incr in
+      Contract.get_storage ctxt forge_withdraw_deposit_contract
+      >>=?? fun (_ctxt, found_storage) ->
+      if expected_storage = found_storage then return_unit
+      else
+        Alcotest.fail
+          (Format.sprintf
+             "Found storage: %s@,expected storage: %s@,"
+             (match found_storage with
+             | Some s -> Expr.to_string s
+             | None -> "None")
+             (match expected_storage with
+             | Some s -> Expr.to_string s
+             | None -> "None"))
+    in
+    let assert_contract_ticket_balance ~__LOC__ block balance =
+      assert_ticket_balance
+        ~loc:__LOC__
+        block
+        token_one
+        (Contract forge_withdraw_deposit_contract)
+        balance
+    in
+    let assert_account_ticket_balance ~__LOC__ block balance =
+      assert_ticket_balance
+        ~loc:__LOC__
+        block
+        token_one
+        (Contract account)
+        balance
+    in
+    let assert_tx_rollup_ticket_balance ~__LOC__ block balance =
+      assert_ticket_balance
+        ~loc:__LOC__
+        block
+        token_one
+        (Tx_rollup tx_rollup)
+        balance
+    in
+    forge_ticket block >>=? fun block ->
+    assert_ticket_in_storage block >>=? fun () ->
+    assert_contract_ticket_balance ~__LOC__ block None >>=? fun () ->
+    assert_tx_rollup_ticket_balance ~__LOC__ block None >>=? fun () ->
+    assert_account_ticket_balance ~__LOC__ block None >>=? fun () ->
+    failing_deposit_ticket block >>=? fun () ->
+    failing_dispatch_ticket block >>=? fun () -> failing_transfer_ticket block
+
   let tests =
     [
       Tztest.tztest "Test withdraw" `Quick test_valid_withdraw;
@@ -5326,6 +5490,10 @@ module Withdraw = struct
          batches"
         `Quick
         test_forge_deposit_withdraw_deposit;
+      Tztest.tztest
+        "Test to deposit/dispatch/transfer 0 tickets"
+        `Quick
+        test_0_amount_tickets;
     ]
 end
 
