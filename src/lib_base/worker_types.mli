@@ -25,6 +25,9 @@
 
 open Error_monad
 
+(** The error used when a worker has terminated *)
+type error += Terminated
+
 (** The running status of an individual worker. *)
 type worker_status =
   | Launching of Time.System.t

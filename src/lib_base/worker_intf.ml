@@ -77,12 +77,12 @@ module type REQUEST = sig
       the worker using {!push_request_and_wait}. In this case, the
       handler for this event can return a value. The parameter is the
       type of this value. *)
-  type 'a t
+  type ('response, 'error) t
 
   include VIEW
 
   (** The projection function from full request to simple views. *)
-  val view : 'a t -> view
+  val view : ('response, 'error) t -> view
 end
 
 (** The (imperative) state of the event loop. *)

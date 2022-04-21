@@ -42,7 +42,7 @@ val create :
   Block_validator.t ->
   Distributed_db.chain_db ->
   P2p_peer.Id.t ->
-  t tzresult Lwt.t
+  t Lwt.t
 
 val shutdown : t -> unit Lwt.t
 

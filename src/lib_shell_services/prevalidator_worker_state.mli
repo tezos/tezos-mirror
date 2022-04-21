@@ -25,30 +25,30 @@
 (*****************************************************************************)
 
 module Request : sig
-  type 'a t =
+  type ('a, 'b) t =
     | Flush :
         Block_hash.t
         * Chain_validator_worker_state.Event.update
         * Block_hash.Set.t
         * Operation_hash.Set.t
-        -> unit t
+        -> (unit, error trace) t
         (** The chain changed, the mempool is being notified of the new state. *)
-    | Notify : P2p_peer.Id.t * Mempool.t -> unit t
+    | Notify : P2p_peer.Id.t * Mempool.t -> (unit, error trace) t
         (** The given peer sent this mempool. *)
-    | Leftover : unit t
+    | Leftover : (unit, error trace) t
         (** Operations not yet processed should be processed. *)
-    | Inject : {op : Operation.t; force : bool} -> unit t
+    | Inject : {op : Operation.t; force : bool} -> (unit, error trace) t
         (** Operation has been locally injected (sent) to the node. *)
-    | Arrived : Operation_hash.t * Operation.t -> unit t
+    | Arrived : Operation_hash.t * Operation.t -> (unit, error trace) t
         (** Operation was fetched by the node. *)
-    | Advertise : unit t
+    | Advertise : (unit, error trace) t
         (** Current mempool should be advertised to all known peers. *)
-    | Ban : Operation_hash.t -> unit t
+    | Ban : Operation_hash.t -> (unit, error trace) t
         (** User requested the node to ban operation with this hash. *)
 
   type view = View : _ t -> view
 
-  val view : 'a t -> view
+  val view : (_, _) t -> view
 
   val encoding : view Data_encoding.t
 

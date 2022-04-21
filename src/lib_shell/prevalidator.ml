@@ -153,9 +153,11 @@ module Tools = struct
 
       Also see the enclosing module documentation as to why we have this record. *)
   type worker_tools = {
-    push_request : unit Prevalidator_worker_state.Request.t -> unit Lwt.t;
+    push_request :
+      (unit, error trace) Prevalidator_worker_state.Request.t -> bool Lwt.t;
         (** Adds a message to the queue. *)
-    push_request_now : unit Prevalidator_worker_state.Request.t -> unit;
+    push_request_now :
+      (unit, error trace) Prevalidator_worker_state.Request.t -> unit;
         (** Adds a message to the queue immediately. *)
   }
 end
@@ -299,13 +301,11 @@ module type T = sig
   module Worker :
     Worker.T
       with type Event.t = Dummy_event.t
-       and type 'a Request.t = 'a Request.t
+       and type ('a, 'b) Request.t = ('a, 'b) Request.t
        and type Request.view = Request.view
        and type Types.state = types_state
 
   type worker = Worker.infinite Worker.queue Worker.t
-
-  val initialization_errors : unit tzresult Lwt.t
 
   val worker : worker Lazy.t
 end
@@ -643,7 +643,9 @@ module Make_s
     match r with
     | Error (filter_state, state, advertised_mempool) ->
         (* Early return after iteration limit was reached *)
-        let* () = shell.worker.push_request Request.Leftover in
+        let* (_was_pushed : bool) =
+          shell.worker.push_request Request.Leftover
+        in
         Lwt.return (filter_state, state, advertised_mempool)
     | Ok (filter_state, state, advertised_mempool, _) ->
         Lwt.return (filter_state, state, advertised_mempool)
@@ -1101,7 +1103,7 @@ module Make
     Worker.T
       with type Name.t = Name.t
        and type Event.t = Dummy_event.t
-       and type 'a Request.t = 'a Request.t
+       and type ('a, 'b) Request.t = ('a, 'b) Request.t
        and type Request.view = Request.view
        and type Types.state = Types.state
        and type Types.parameters = Types.parameters =
@@ -1167,7 +1169,14 @@ module Make
           !dir
           (Proto_services.S.Mempool.ban_operation RPC_path.open_root)
           (fun _pv () oph ->
-            Worker.Queue.push_request_and_wait w (Request.Ban oph)) ;
+            let open Lwt_result_syntax in
+            let*! r = Worker.Queue.push_request_and_wait w (Request.Ban oph) in
+            match r with
+            | Error (Closed None) -> fail [Worker_types.Terminated]
+            | Error (Closed (Some errs)) -> fail errs
+            | Error (Request_error err) -> fail err
+            | Error (Any exn) -> fail [Exn exn]
+            | Ok () -> return_unit) ;
       (* Unban an operation (from its given hash): remove it from the
          set pv.banned_operations (nothing happens if it was not banned). *)
       dir :=
@@ -1397,45 +1406,55 @@ module Make
   module Handlers = struct
     type self = worker
 
-    let on_request : type r. worker -> r Request.t -> r tzresult Lwt.t =
+    let on_request :
+        type r request_error.
+        worker ->
+        (r, request_error) Request.t ->
+        (r, request_error) result Lwt.t =
      fun w request ->
       let open Lwt_result_syntax in
       let pv = Worker.state w in
-      let* r =
-        match request with
-        | Request.Flush (hash, event, live_blocks, live_operations) ->
-            Requests.on_advertise pv.shell ;
-            (* TODO: https://gitlab.com/tezos/tezos/-/issues/1727
-               Rebase the advertisement instead. *)
-            let* block = pv.shell.parameters.tools.read_block hash in
-            let handle_branch_refused =
-              Chain_validator_worker_state.Event.(
-                match event with
-                | Head_increment | Ignored_head -> false
-                | Branch_switch -> true)
-            in
-            Lwt_mutex.with_lock pv.lock @@ fun () : r tzresult Lwt.t ->
-            Requests.on_flush
-              ~handle_branch_refused
-              pv
-              block
-              live_blocks
-              live_operations
-        | Request.Notify (peer, mempool) ->
-            let*! () = Requests.on_notify pv.shell peer mempool in
-            return_unit
-        | Request.Leftover ->
-            (* unprocessed ops are handled just below *)
-            return_unit
-        | Request.Inject {op; force} -> Requests.on_inject pv ~force op
-        | Request.Arrived (oph, op) -> Requests.on_arrived pv oph op
-        | Request.Advertise ->
-            Requests.on_advertise pv.shell ;
-            return_unit
-        | Request.Ban oph -> Requests.on_ban pv oph
+      let post_processing :
+          (r, request_error) result Lwt.t -> (r, request_error) result Lwt.t =
+       fun r ->
+        let open Lwt_syntax in
+        let* () = handle_unprocessed pv in
+        r
       in
-      let*! () = handle_unprocessed pv in
-      return r
+      post_processing
+      @@
+      match request with
+      | Request.Flush (hash, event, live_blocks, live_operations) ->
+          Requests.on_advertise pv.shell ;
+          (* TODO: https://gitlab.com/tezos/tezos/-/issues/1727
+             Rebase the advertisement instead. *)
+          let* block = pv.shell.parameters.tools.read_block hash in
+          let handle_branch_refused =
+            Chain_validator_worker_state.Event.(
+              match event with
+              | Head_increment | Ignored_head -> false
+              | Branch_switch -> true)
+          in
+          Lwt_mutex.with_lock pv.lock
+          @@ fun () : (r, error trace) result Lwt.t ->
+          Requests.on_flush
+            ~handle_branch_refused
+            pv
+            block
+            live_blocks
+            live_operations
+      | Request.Notify (peer, mempool) ->
+          let*! () = Requests.on_notify pv.shell peer mempool in
+          return_unit
+      | Request.Leftover ->
+          (* unprocessed ops are handled just below *)
+          return_unit
+      | Request.Inject {op; force} -> Requests.on_inject pv ~force op
+      | Request.Arrived (oph, op) -> Requests.on_arrived pv oph op
+      | Request.Advertise ->
+          Requests.on_advertise pv.shell ;
+          return_unit
+      | Request.Ban oph -> Requests.on_ban pv oph
 
     let on_close w =
       let pv = Worker.state w in
@@ -1488,7 +1507,9 @@ module Make
       let push_request_now r = Worker.Queue.push_request_now w r in
       {push_request; push_request_now}
 
-    let on_launch w _ (limits, chain_db) =
+    type launch_error = error trace
+
+    let on_launch w _ (limits, chain_db) : (state, launch_error) result Lwt.t =
       let open Lwt_result_syntax in
       let chain_store = Distributed_db.chain_store chain_db in
       let*! predecessor = Store.Chain.current_head chain_store in
@@ -1593,12 +1614,24 @@ module Make
       in
       return pv
 
-    let on_error _w r st errs =
-      let open Lwt_syntax in
-      let+ () = Event.(emit request_failed) (r, st, errs) in
-      match r with
-      | Request.(View (Inject _)) -> Result.return_unit
-      | _ -> Error errs
+    let on_error (type a b) _w st (request : (a, b) Request.t) (errs : b) :
+        unit tzresult Lwt.t =
+      let open Lwt_result_syntax in
+      let emit_and_return errs =
+        let request_view = Request.view request in
+        let*! () = Event.(emit request_failed) (request_view, st, errs) in
+        Lwt.return_error errs
+      in
+      match request with
+      | Request.(Inject _) as r ->
+          let*! () = Event.(emit request_failed) (Request.view r, st, errs) in
+          return_unit
+      | Request.Flush _ -> emit_and_return errs
+      | Request.Notify _ -> emit_and_return errs
+      | Request.Leftover -> emit_and_return errs
+      | Request.Arrived _ -> emit_and_return errs
+      | Request.Advertise -> emit_and_return errs
+      | Request.Ban _ -> emit_and_return errs
 
     let on_completion _w r _ st =
       match Request.view r with
@@ -1607,7 +1640,7 @@ module Make
       | View (Notify _) | View Leftover | View (Arrived _) | View Advertise ->
           Event.(emit request_completed_debug) (Request.view r, st)
 
-    let on_no_request _ = Lwt_result_syntax.return_unit
+    let on_no_request _ = Lwt.return_unit
   end
 
   let table = Worker.create_table Queue
@@ -1618,16 +1651,6 @@ module Make
    * of a transition plan to a one-worker-per-peer architecture. *)
   let worker_promise =
     Worker.launch table name (Arg.limits, Arg.chain_db) (module Handlers)
-
-  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/1266
-
-     If the interface of worker would not use tzresult we would
-     see that this is not necessary since the function
-     [Handlers.on_launch] do not actually raise any error. *)
-  let initialization_errors =
-    let open Lwt_result_syntax in
-    let* _ = worker_promise in
-    return_unit
 
   let worker =
     lazy
@@ -1668,9 +1691,6 @@ let create limits (module Filter : Prevalidator_filters.FILTER) chain_db =
           end)
           (Prevalidation_t)
       in
-      (* Checking initialization errors before giving a reference to dangerous
-       * `worker` value to caller. *)
-      let* () = Prevalidator.initialization_errors in
       chain_proto_registry :=
         ChainProto_registry.add
           Prevalidator.name
@@ -1687,21 +1707,43 @@ let shutdown (t : t) =
   Prevalidator.Worker.shutdown w
 
 let flush (t : t) event head live_blocks live_operations =
+  let open Lwt_result_syntax in
   let module Prevalidator : T = (val t) in
   let w = Lazy.force Prevalidator.worker in
-  Prevalidator.Worker.Queue.push_request_and_wait
-    w
-    (Request.Flush (head, event, live_blocks, live_operations))
+  let*! r =
+    Prevalidator.Worker.Queue.push_request_and_wait
+      w
+      (Request.Flush (head, event, live_blocks, live_operations))
+  in
+  match r with
+  | Ok r -> Lwt.return_ok r
+  | Error (Closed None) -> fail [Worker_types.Terminated]
+  | Error (Closed (Some errs)) -> fail errs
+  | Error (Any exn) -> fail [Exn exn]
+  | Error (Request_error error_trace) -> fail error_trace
 
 let notify_operations (t : t) peer mempool =
   let module Prevalidator : T = (val t) in
   let w = Lazy.force Prevalidator.worker in
-  Prevalidator.Worker.Queue.push_request w (Request.Notify (peer, mempool))
+  let open Lwt_result_syntax in
+  let*! (_was_pushed : bool) =
+    Prevalidator.Worker.Queue.push_request w (Request.Notify (peer, mempool))
+  in
+  Lwt.return_unit
 
 let inject_operation (t : t) ~force op =
   let module Prevalidator : T = (val t) in
+  let open Lwt_result_syntax in
   let w = Lazy.force Prevalidator.worker in
-  Prevalidator.Worker.Queue.push_request_and_wait w (Inject {op; force})
+  let*! r =
+    Prevalidator.Worker.Queue.push_request_and_wait w (Inject {op; force})
+  in
+  match r with
+  | Ok r -> Lwt.return_ok r
+  | Error (Closed None) -> fail [Worker_types.Terminated]
+  | Error (Closed (Some errs)) -> fail errs
+  | Error (Any exn) -> fail [Exn exn]
+  | Error (Request_error error_trace) -> fail error_trace
 
 let status (t : t) =
   let module Prevalidator : T = (val t) in
@@ -1757,23 +1799,16 @@ let rpc_directory : t option RPC_directory.t =
   RPC_directory.register_dynamic_directory
     RPC_directory.empty
     (Block_services.mempool_path RPC_path.open_root)
-    (let open Lwt_syntax in
-    function
-    | None ->
-        Lwt.return
-          (RPC_directory.map (fun _ -> Lwt.return_unit) empty_rpc_directory)
-    | Some t -> (
-        let module Prevalidator : T = (val t : T) in
-        let* r = Prevalidator.initialization_errors in
-        match r with
-        | Error _ ->
-            Lwt.return
-              (RPC_directory.map (fun _ -> Lwt.return_unit) empty_rpc_directory)
-        | Ok () ->
-            let w = Lazy.force Prevalidator.worker in
-            let pv = Prevalidator.Worker.state w in
-            let pv_rpc_dir = Lazy.force pv.rpc_directory in
-            Lwt.return (RPC_directory.map (fun _ -> Lwt.return pv) pv_rpc_dir)))
+    (function
+      | None ->
+          Lwt.return
+            (RPC_directory.map (fun _ -> Lwt.return_unit) empty_rpc_directory)
+      | Some t ->
+          let module Prevalidator : T = (val t : T) in
+          let w = Lazy.force Prevalidator.worker in
+          let pv = Prevalidator.Worker.state w in
+          let pv_rpc_dir = Lazy.force pv.rpc_directory in
+          Lwt.return (RPC_directory.map (fun _ -> Lwt.return pv) pv_rpc_dir))
 
 module Internal_for_tests = struct
   include Tools

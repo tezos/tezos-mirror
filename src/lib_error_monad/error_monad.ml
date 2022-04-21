@@ -191,3 +191,17 @@ let either_f (left : 'a tzresult Lwt.t) (right : unit -> 'a tzresult Lwt.t) =
   | Error tr -> (
       let* r = right () in
       match r with Ok x -> return_ok x | Error e -> return_error (tr @ e))
+
+let protect_result_canceler canceler t =
+  let open Lwt_syntax in
+  TzLwtreslib.Result.catch_s @@ fun () ->
+  let cancellation =
+    let* () = Lwt_canceler.when_canceling canceler in
+    raise Lwt.Canceled
+  in
+  Lwt.pick [cancellation; t ()]
+
+let protect_result ?canceler t =
+  match canceler with
+  | None -> TzLwtreslib.Result.catch_s t
+  | Some canceler -> protect_result_canceler canceler t

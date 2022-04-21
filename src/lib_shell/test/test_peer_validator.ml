@@ -79,14 +79,14 @@ let wrap
       let* block_validator_processs =
         Block_validator_process.init validator_environment internal_validator
       in
-      let* block_validator =
+      let*! block_validator =
         Block_validator.create
           Node.default_block_validator_limits
           db
           block_validator_processs
           ~start_testchain:false
       in
-      let* pv =
+      let*! pv =
         Peer_validator.create
           Node.default_peer_validator_limits
           block_validator

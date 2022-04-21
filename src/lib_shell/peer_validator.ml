@@ -44,11 +44,11 @@ end
 module Request = struct
   include Request
 
-  type _ t =
-    | New_head : Block_hash.t * Block_header.t -> unit t
-    | New_branch : Block_locator.t * Block_locator.seed -> unit t
+  type (_, _) t =
+    | New_head : Block_hash.t * Block_header.t -> (unit, error trace) t
+    | New_branch : Block_locator.t * Block_locator.seed -> (unit, error trace) t
 
-  let view (type a) (req : a t) : view =
+  let view (type a b) (req : (a, b) t) : view =
     match req with
     | New_head (hash, _) -> New_head hash
     | New_branch (locator, seed) ->
@@ -126,8 +126,8 @@ let bootstrap_new_branch w unknown_prefix =
   in
   pv.pipeline <- Some pipeline ;
   let* () =
-    Worker.protect
-      w
+    protect
+      ~canceler:(Worker.canceler w)
       ~on_error:(fun error ->
         (* if the peer_validator is killed, let's cancel the pipeline *)
         pv.pipeline <- None ;
@@ -176,7 +176,7 @@ let validate_new_head w hash (header : Block_header.t) =
   let* operations =
     List.map_ep
       (fun i ->
-        Worker.protect w (fun () ->
+        protect ~canceler:(Worker.canceler w) (fun () ->
             Distributed_db.Operations.fetch
               ~timeout:pv.parameters.limits.block_operations_timeout
               pv.parameters.chain_db
@@ -353,9 +353,9 @@ let on_no_request w =
     Worker.log_event w (No_new_head_from_peer {peer = pv.peer_id; timespan})
   in
   Distributed_db.Request.current_head pv.parameters.chain_db ~peer:pv.peer_id () ;
-  return_ok_unit
+  Lwt.return_unit
 
-let on_request (type a) w (req : a Request.t) : a tzresult Lwt.t =
+let on_request (type a b) w (req : (a, b) Request.t) : (a, b) result Lwt.t =
   let open Lwt_syntax in
   let pv = Worker.state w in
   match req with
@@ -373,122 +373,142 @@ let on_request (type a) w (req : a Request.t) : a tzresult Lwt.t =
       in
       may_validate_new_branch w locator
 
-let on_completion (type a) w (r : a Request.t) _ st =
+let on_completion (type a request_error) w (r : (a, request_error) Request.t) _
+    st =
   (match r with
   | Request.New_head _ -> Prometheus.Counter.inc_one metrics.new_head_completed
   | Request.New_branch _ ->
       Prometheus.Counter.inc_one metrics.new_branch_completed) ;
   Worker.log_event w (Event.Request (Request.view r, st, None))
 
-let on_error w r st err =
+let on_error (type a b) w st (request : (a, b) Request.t) (err : b) :
+    unit tzresult Lwt.t =
   let open Lwt_syntax in
   let pv = Worker.state w in
-  match err with
-  | (( Validation_errors.Invalid_locator _
-     | Block_validator_errors.Invalid_block _ ) as e)
-    :: _ ->
-      let* () = Distributed_db.greylist pv.parameters.chain_db pv.peer_id in
-      let* () =
-        Worker.log_event
-          w
-          (Terminating_worker
-             {peer = pv.peer_id; reason = "invalid data received: kickban"})
-      in
-      (match e with
-      | Validation_errors.Invalid_locator _ ->
-          Prometheus.Counter.inc_one metrics.invalid_locator
-      | Block_validator_errors.Invalid_block _ ->
-          Prometheus.Counter.inc_one metrics.invalid_block
-      | _ -> (* Cannot happen but OCaml type checker disagrees. *) ()) ;
-      Worker.trigger_shutdown w ;
-      let* () = Worker.log_event w (Event.Request (r, st, Some err)) in
-      Lwt.return_error err
-  | Block_validator_errors.System_error _ :: _ ->
-      Prometheus.Counter.inc_one metrics.system_error ;
-      let* () = Worker.log_event w (Event.Request (r, st, Some err)) in
-      return_ok_unit
-  | Block_validator_errors.Unavailable_protocol {protocol; _} :: _ -> (
-      Prometheus.Counter.inc_one metrics.unavailable_protocol ;
-      let* fetched_and_compiled =
-        Block_validator.fetch_and_compile_protocol
-          pv.parameters.block_validator
-          ~peer:pv.peer_id
-          ~timeout:pv.parameters.limits.protocol_timeout
-          protocol
-      in
-      match fetched_and_compiled with
-      | Ok _ ->
-          Distributed_db.Request.current_head
-            pv.parameters.chain_db
+  let on_error_trace err =
+    let request_view = Request.view request in
+    match err with
+    | (( Validation_errors.Invalid_locator _
+       | Block_validator_errors.Invalid_block _ ) as e)
+      :: _ ->
+        let* () = Distributed_db.greylist pv.parameters.chain_db pv.peer_id in
+        let* () =
+          Worker.log_event
+            w
+            (Terminating_worker
+               {peer = pv.peer_id; reason = "invalid data received: kickban"})
+        in
+        (match e with
+        | Validation_errors.Invalid_locator _ ->
+            Prometheus.Counter.inc_one metrics.invalid_locator
+        | Block_validator_errors.Invalid_block _ ->
+            Prometheus.Counter.inc_one metrics.invalid_block
+        | _ -> (* Cannot happen but OCaml type checker disagrees. *) ()) ;
+        Worker.trigger_shutdown w ;
+        let* () =
+          Worker.log_event w (Event.Request (request_view, st, Some err))
+        in
+        Lwt.return_error err
+    | Block_validator_errors.System_error _ :: _ ->
+        Prometheus.Counter.inc_one metrics.system_error ;
+        let* () =
+          Worker.log_event w (Event.Request (request_view, st, Some err))
+        in
+        return_ok_unit
+    | Block_validator_errors.Unavailable_protocol {protocol; _} :: _ -> (
+        Prometheus.Counter.inc_one metrics.unavailable_protocol ;
+        let* fetched_and_compiled =
+          Block_validator.fetch_and_compile_protocol
+            pv.parameters.block_validator
             ~peer:pv.peer_id
-            () ;
-          return_ok_unit
-      | Error _ ->
-          (* TODO: punish *)
-          let* () =
-            Worker.log_event
-              w
-              (Terminating_worker
-                 {
-                   peer = pv.peer_id;
-                   reason =
-                     Format.asprintf
-                       "missing protocol: %a"
-                       Protocol_hash.pp
-                       protocol;
-                 })
-          in
-          let* () = Worker.log_event w (Event.Request (r, st, Some err)) in
-          Lwt.return_error err)
-  | ((Validation_errors.Unknown_ancestor | Validation_errors.Too_short_locator _)
-    as e)
-    :: _ ->
-      (match e with
-      | Validation_errors.Unknown_ancestor ->
-          Prometheus.Counter.inc_one metrics.unknown_ancestor
-      | Validation_errors.Too_short_locator _ ->
-          Prometheus.Counter.inc_one metrics.too_short_locator
-      | _ -> (* Cannot happen but OCaml type checker disagrees. *) ()) ;
-      let* () =
-        Worker.log_event
-          w
-          (Terminating_worker
-             {
-               peer = pv.peer_id;
-               reason =
-                 Format.asprintf "unknown ancestor or too short locator: kick";
-             })
-      in
-      Worker.trigger_shutdown w ;
-      let* () = Worker.log_event w (Event.Request (r, st, Some err)) in
-      return_ok_unit
-  | Distributed_db.Operations.Canceled _ :: _ -> (
-      (* Given two nodes A and B (remote). This may happen if A
-         prechecks a block, sends it to B. B prechecks a block, sends
-         it to A. A tries to fetch operations of the block to B, in
-         the meantime, A validates the block and cancels the fetching.
-      *)
-      match r with
-      | New_head hash -> (
-          let chain_store = Distributed_db.chain_store pv.parameters.chain_db in
-          let* b = Store.Block.is_known_valid chain_store hash in
-          match b with
-          | true ->
-              Prometheus.Counter.inc_one
-                metrics.operations_fetching_canceled_new_known_valid_head ;
-              return_ok_unit
-          | false ->
-              Prometheus.Counter.inc_one
-                metrics.operations_fetching_canceled_new_unknown_head ;
-              Lwt.return_error err)
-      | _ ->
-          Prometheus.Counter.inc_one
-            metrics.operations_fetching_canceled_new_branch ;
-          Lwt.return_error err)
-  | _ ->
-      Prometheus.Counter.inc_one metrics.unknown_error ;
-      let* () = Worker.log_event w (Event.Request (r, st, Some err)) in
-      Lwt.return_error err
+            ~timeout:pv.parameters.limits.protocol_timeout
+            protocol
+        in
+        match fetched_and_compiled with
+        | Ok _ ->
+            Distributed_db.Request.current_head
+              pv.parameters.chain_db
+              ~peer:pv.peer_id
+              () ;
+            return_ok_unit
+        | Error _ ->
+            (* TODO: punish *)
+            let* () =
+              Worker.log_event
+                w
+                (Terminating_worker
+                   {
+                     peer = pv.peer_id;
+                     reason =
+                       Format.asprintf
+                         "missing protocol: %a"
+                         Protocol_hash.pp
+                         protocol;
+                   })
+            in
+            let* () =
+              Worker.log_event w (Event.Request (request_view, st, Some err))
+            in
+            Lwt.return_error err)
+    | (( Validation_errors.Unknown_ancestor
+       | Validation_errors.Too_short_locator _ ) as e)
+      :: _ ->
+        (match e with
+        | Validation_errors.Unknown_ancestor ->
+            Prometheus.Counter.inc_one metrics.unknown_ancestor
+        | Validation_errors.Too_short_locator _ ->
+            Prometheus.Counter.inc_one metrics.too_short_locator
+        | _ -> (* Cannot happen but OCaml type checker disagrees. *) ()) ;
+        let* () =
+          Worker.log_event
+            w
+            (Terminating_worker
+               {
+                 peer = pv.peer_id;
+                 reason =
+                   Format.asprintf "unknown ancestor or too short locator: kick";
+               })
+        in
+        Worker.trigger_shutdown w ;
+        let* () =
+          Worker.log_event w (Event.Request (request_view, st, Some err))
+        in
+        return_ok_unit
+    | Distributed_db.Operations.Canceled _ :: _ -> (
+        (* Given two nodes A and B (remote). This may happen if A
+           prechecks a block, sends it to B. B prechecks a block, sends
+           it to A. A tries to fetch operations of the block to B, in
+           the meantime, A validates the block and cancels the fetching.
+        *)
+        match request_view with
+        | New_head hash -> (
+            let chain_store =
+              Distributed_db.chain_store pv.parameters.chain_db
+            in
+            let* b = Store.Block.is_known_valid chain_store hash in
+            match b with
+            | true ->
+                Prometheus.Counter.inc_one
+                  metrics.operations_fetching_canceled_new_known_valid_head ;
+                return_ok_unit
+            | false ->
+                Prometheus.Counter.inc_one
+                  metrics.operations_fetching_canceled_new_unknown_head ;
+                Lwt.return_error err)
+        | _ ->
+            Prometheus.Counter.inc_one
+              metrics.operations_fetching_canceled_new_branch ;
+            Lwt.return_error err)
+    | _ ->
+        Prometheus.Counter.inc_one metrics.unknown_error ;
+        let* () =
+          Worker.log_event w (Event.Request (request_view, st, Some err))
+        in
+        Lwt.return_error err
+  in
+  match request with
+  | New_head _ -> on_error_trace err
+  | New_branch _ -> on_error_trace err
 
 let on_close w =
   let open Lwt_syntax in
@@ -497,7 +517,9 @@ let on_close w =
   pv.parameters.notify_termination () ;
   Lwt.return_unit
 
-let on_launch _ name parameters =
+type launch_error = |
+
+let on_launch _ name parameters : (_, launch_error) result Lwt.t =
   let open Lwt_syntax in
   let chain_store = Distributed_db.chain_store parameters.chain_db in
   let* genesis = Store.Chain.genesis_block chain_store in
@@ -515,7 +537,7 @@ let on_launch _ name parameters =
     parameters.notify_new_block block
   in
   Prometheus.Counter.inc_one metrics.connections ;
-  return_ok pv
+  Lwt.return (Ok pv)
 
 let table =
   let merge w (Worker.Any_request neu) old =
@@ -547,6 +569,8 @@ let create ?(notify_new_block = fun _ -> ()) ?(notify_termination = fun _ -> ())
   let module Handlers = struct
     type self = t
 
+    type nonrec launch_error = launch_error
+
     let on_launch = on_launch
 
     let on_request = on_request
@@ -559,12 +583,16 @@ let create ?(notify_new_block = fun _ -> ()) ?(notify_termination = fun _ -> ())
 
     let on_no_request = on_no_request
   end in
-  Worker.launch
-    table
-    ~timeout:limits.new_head_request_timeout
-    name
-    parameters
-    (module Handlers)
+  let open Lwt_syntax in
+  let* (Ok worker) =
+    Worker.launch
+      table
+      ~timeout:limits.new_head_request_timeout
+      name
+      parameters
+      (module Handlers)
+  in
+  Lwt.return worker
 
 let notify_branch w locator =
   let pv = Worker.state w in

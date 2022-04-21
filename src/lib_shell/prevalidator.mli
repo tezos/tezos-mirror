@@ -151,8 +151,10 @@ module Internal_for_tests : sig
 
   (** Documented in {!Prevalidator}, because this is only exported for tests. *)
   type worker_tools = {
-    push_request : unit Prevalidator_worker_state.Request.t -> unit Lwt.t;
-    push_request_now : unit Prevalidator_worker_state.Request.t -> unit;
+    push_request :
+      (unit, error trace) Prevalidator_worker_state.Request.t -> bool Lwt.t;
+    push_request_now :
+      (unit, error trace) Prevalidator_worker_state.Request.t -> unit;
   }
 
   (** The corresponding internal type of the mempool (see {!Prevalidator.S}),
