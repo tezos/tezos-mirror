@@ -41,15 +41,6 @@ type error +=
   | (* `Permanent *) Empty_delegate_account of Signature.Public_key_hash.t
   | (* `Permanent *) Unregistered_delegate of Signature.Public_key_hash.t
 
-val set_active :
-  Raw_context.t -> Signature.Public_key_hash.t -> Raw_context.t tzresult Lwt.t
-
-val set_inactive :
-  Raw_context.t -> Signature.Public_key_hash.t -> Raw_context.t tzresult Lwt.t
-
-val deactivated :
-  Raw_context.t -> Signature.Public_key_hash.t -> bool tzresult Lwt.t
-
 (** Allow to register a delegate when creating an account. *)
 val init :
   Raw_context.t ->

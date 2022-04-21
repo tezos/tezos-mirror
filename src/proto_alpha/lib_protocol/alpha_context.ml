@@ -485,6 +485,8 @@ module Delegate = struct
   let find = Contract_delegate_storage.find
 
   let delegated_contracts = Contract_delegate_storage.delegated_contracts
+
+  let deactivated = Delegate_activation_storage.is_inactive
 end
 
 module Stake_distribution = struct

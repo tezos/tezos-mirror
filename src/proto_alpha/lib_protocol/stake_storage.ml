@@ -107,16 +107,21 @@ let add_stake ctxt delegate amount =
        would also have it now). *)
     return ctxt
 
-let deactivate_only_call_from_delegate_storage ctxt delegate =
+let set_inactive ctxt delegate =
+  Delegate_activation_storage.set_inactive ctxt delegate >>= fun ctxt ->
   Storage.Stake.Active_delegates_with_minimal_stake.remove ctxt delegate
 
-let activate_only_call_from_delegate_storage ctxt delegate =
-  get_initialized_stake ctxt delegate >>=? fun (staking_balance, ctxt) ->
-  let minimal_stake = Constants_storage.minimal_stake ctxt in
-  if Tez_repr.(staking_balance >= minimal_stake) then
-    Storage.Stake.Active_delegates_with_minimal_stake.add ctxt delegate ()
-    >>= fun ctxt -> return ctxt
-  else return ctxt
+let set_active ctxt delegate =
+  Delegate_activation_storage.set_active ctxt delegate
+  >>=? fun (ctxt, inactive) ->
+  if not inactive then return ctxt
+  else
+    get_initialized_stake ctxt delegate >>=? fun (staking_balance, ctxt) ->
+    let minimal_stake = Constants_storage.minimal_stake ctxt in
+    if Tez_repr.(staking_balance >= minimal_stake) then
+      Storage.Stake.Active_delegates_with_minimal_stake.add ctxt delegate ()
+      >>= fun ctxt -> return ctxt
+    else return ctxt
 
 let snapshot ctxt =
   Storage.Stake.Last_snapshot.get ctxt >>=? fun index ->

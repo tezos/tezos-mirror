@@ -41,8 +41,8 @@ let update_activity ctxt last_cycle =
             delegate
           >>=? fun cycle ->
           if Cycle_repr.(cycle <= last_cycle) then
-            Delegate_storage.set_inactive ctxt delegate >|=? fun ctxt ->
-            (ctxt, delegate :: deactivated)
+            Stake_storage.set_inactive ctxt delegate >>= fun ctxt ->
+            return (ctxt, delegate :: deactivated)
           else return (ctxt, deactivated))
       >|=? fun (ctxt, deactivated) -> (ctxt, deactivated)
 

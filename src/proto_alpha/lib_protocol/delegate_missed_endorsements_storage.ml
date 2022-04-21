@@ -50,7 +50,7 @@ type level_participation = Participated | Didn't_participate
 let record_endorsing_participation ctxt ~delegate ~participation
     ~endorsing_power =
   match participation with
-  | Participated -> Delegate_storage.set_active ctxt delegate
+  | Participated -> Stake_storage.set_active ctxt delegate
   | Didn't_participate -> (
       let contract = Contract_repr.Implicit delegate in
       Storage.Contract.Missed_endorsements.find ctxt contract >>=? function
@@ -97,9 +97,9 @@ let record_endorsing_participation ctxt ~delegate ~participation
 
 let record_baking_activity_and_pay_rewards_and_fees ctxt ~payload_producer
     ~block_producer ~baking_reward ~reward_bonus =
-  Delegate_storage.set_active ctxt payload_producer >>=? fun ctxt ->
+  Stake_storage.set_active ctxt payload_producer >>=? fun ctxt ->
   (if not (Signature.Public_key_hash.equal payload_producer block_producer) then
-   Delegate_storage.set_active ctxt block_producer
+   Stake_storage.set_active ctxt block_producer
   else return ctxt)
   >>=? fun ctxt ->
   let pay_payload_producer ctxt delegate =
