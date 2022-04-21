@@ -28,6 +28,7 @@ open Alpha_context
 open Protocol_client_context
 open Client_baking_blocks
 module Events = Delegate_events.Denunciator
+module B_Events = Delegate_events.Baking_scheduling
 
 module HLevel = Hashtbl.Make (struct
   type t = Chain_id.t * Raw_level.t * Round.t
@@ -379,10 +380,9 @@ let process_new_block (cctxt : #Protocol_client_context.full) state
 
 let process_new_block cctxt state bi =
   process_new_block cctxt state bi >>= function
-  | Ok () -> Events.(emit accuser_processed_block) bi.hash >>= return
-  | Error errs -> Events.(emit accuser_block_error) (bi.hash, errs) >>= return
-
-module B_Events = Delegate_events.Baking_scheduling
+  | Ok () -> Events.(emit accuser_processed_block) bi.hash >>= Lwt.return
+  | Error errs ->
+      Events.(emit accuser_block_error) (bi.hash, errs) >>= Lwt.return
 
 let rec wait_for_first_block ~name stream =
   Lwt_stream.get stream >>= function
@@ -458,8 +458,7 @@ let create (cctxt : #Protocol_client_context.full) ?canceler ~preserved_levels
         fail Baking_errors.Node_connection_lost
     | `Block (Some (Ok bi)) ->
         last_get_block := None ;
-        log_errors_and_continue ~name @@ process_new_block cctxt state bi
-        >>= fun () -> worker_loop ()
+        process_new_block cctxt state bi >>= fun () -> worker_loop ()
     | `Operations None ->
         (* restart a new operations monitor stream *)
         last_get_ops := None ;
