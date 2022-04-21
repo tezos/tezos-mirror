@@ -44,6 +44,7 @@ type error +=
   | Tx_rollup_non_internal_transaction
   | Sc_rollup_feature_disabled
   | Inconsistent_counters
+  | Forbidden_zero_ticket_quantity
 
 val begin_partial_construction :
   context ->

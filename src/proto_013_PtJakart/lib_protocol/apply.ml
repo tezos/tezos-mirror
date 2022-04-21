@@ -125,6 +125,7 @@ type error +=
   | Inconsistent_sources
   | Failing_noop_error
   | Zero_frozen_deposits of Signature.Public_key_hash.t
+  | Forbidden_zero_ticket_quantity
 
 let () =
   register_error_kind
@@ -778,7 +779,16 @@ let () =
         delegate)
     Data_encoding.(obj1 (req "delegate" Signature.Public_key_hash.encoding))
     (function Zero_frozen_deposits delegate -> Some delegate | _ -> None)
-    (fun delegate -> Zero_frozen_deposits delegate)
+    (fun delegate -> Zero_frozen_deposits delegate) ;
+  register_error_kind
+    `Permanent
+    ~id:"forbidden_zero_amount_ticket"
+    ~title:"Zero ticket amount is not allowed"
+    ~description:
+      "It is not allowed to use a zero amount ticket in this operation."
+    Data_encoding.empty
+    (function Forbidden_zero_ticket_quantity -> Some () | _ -> None)
+    (fun () -> Forbidden_zero_ticket_quantity)
 
 open Apply_results
 
@@ -1033,6 +1043,10 @@ let apply_transaction_to_tx_rollup ~ctxt ~parameters_ty ~parameters ~amount
          (Script_int.to_int64 ticket_amount)
          Tx_rollup_l2_qty.of_int64)
     >>?= fun ticket_amount ->
+    error_when
+      Tx_rollup_l2_qty.(ticket_amount <= zero)
+      Forbidden_zero_ticket_quantity
+    >>?= fun () ->
     let (deposit, message_size) =
       Tx_rollup_message.make_deposit
         payer
@@ -1308,6 +1322,10 @@ let apply_external_manager_operation_content :
       List.fold_left_es
         (fun (acc_withdraw, acc, ctxt)
              Tx_rollup_reveal.{contents; ty; ticketer; amount; claimer} ->
+          error_when
+            Tx_rollup_l2_qty.(amount <= zero)
+            Forbidden_zero_ticket_quantity
+          >>?= fun () ->
           Tx_rollup_ticket.parse_ticket
             ~consume_deserialization_gas
             ~ticketer
@@ -1374,6 +1392,10 @@ let apply_external_manager_operation_content :
       in
       return (ctxt, result, [])
   | Transfer_ticket {contents; ty; ticketer; amount; destination; entrypoint} ->
+      (* The encoding ensures that the amount is in a natural number. Here is
+         mainly to check that it is non-zero.*)
+      error_when Compare.Z.(amount <= Z.zero) Forbidden_zero_ticket_quantity
+      >>?= fun () ->
       error_when
         (Option.is_some @@ Contract.is_implicit destination)
         Cannot_transfer_ticket_to_implicit
