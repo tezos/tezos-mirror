@@ -94,8 +94,8 @@ let submit_batch :
   let* _ = Node.wait_for_level node (current_level + 1) in
   return ()
 
-let submit_commitment ?(src = Constant.bootstrap1.public_key_hash) ~level ~roots
-    ~inbox_content ~predecessor {rollup; client; node} =
+let submit_commitment ?(src = Constant.bootstrap1.public_key_hash) ?predecessor
+    ~level ~roots ~inbox_content {rollup; client; node} =
   let* inbox_merkle_root =
     match inbox_content with
     | `Root inbox_merkle_root -> inbox_merkle_root
@@ -106,10 +106,10 @@ let submit_commitment ?(src = Constant.bootstrap1.public_key_hash) ~level ~roots
   let*! () =
     Client.Tx_rollup.submit_commitment
       ~hooks
+      ?predecessor
       ~level
       ~roots
       ~inbox_merkle_root
-      ~predecessor
       ~rollup
       ~src
       client
@@ -270,7 +270,6 @@ module Regressions = struct
           ~level:0
           ~roots:[Constant.tx_rollup_initial_message_result]
           ~inbox_content
-          ~predecessor:None
           state
       in
       let*! commitment =
@@ -410,7 +409,6 @@ module Regressions = struct
           ~level:0
           ~roots:[Constant.tx_rollup_initial_message_result]
           ~inbox_content
-          ~predecessor:None
           state
       in
       let*! _commitment =
@@ -587,8 +585,10 @@ module Regressions = struct
           ~exit_code:1
           ~msg:
             (rex
-               ("Parameter '" ^ invalid_address
-              ^ "' is an invalid tx rollup address"))
+               (Format.sprintf
+                  "Parameter '%s' is an invalid transaction rollup address \
+                   encoded in a base58 string."
+                  invalid_address))
           process
       in
       unit
@@ -672,7 +672,6 @@ module Regressions = struct
           ~level:0
           ~roots:[Constant.tx_rollup_initial_message_result]
           ~inbox_content
-          ~predecessor:None
           state
       in
       let* () = Client.bake_for client in
@@ -896,7 +895,6 @@ let test_rollup_with_two_commitments =
       ~level:0
       ~roots:[Constant.tx_rollup_initial_message_result]
       ~inbox_content
-      ~predecessor:None
       state
   in
   let* () =
@@ -971,7 +969,7 @@ let test_rollup_with_two_commitments =
       ~level:1
       ~roots:[Constant.tx_rollup_initial_message_result]
       ~inbox_content
-      ~predecessor
+      ?predecessor
       state
   in
   let* () =
@@ -1034,7 +1032,6 @@ let test_rollup_last_commitment_is_rejected =
       ~level:0
       ~roots:["txmr2DouKqJu5o8KEVGe6gLoiw1J3krjsxhf6C2a1kDNTTr8BdKpf2"]
       ~inbox_content
-      ~predecessor:None
       state
   in
   let* () =
@@ -1116,7 +1113,6 @@ let test_rollup_reject_position_one =
           "txmr2DouKqJu5o8KEVGe6gLoiw1J3krjsxhf6C2a1kDNTTr8BdKpf2";
         ]
       ~inbox_content
-      ~predecessor:None
       state
   in
   let* () =
@@ -1198,7 +1194,6 @@ let test_rollup_wrong_rejection =
       ~level:0
       ~roots:[Constant.tx_rollup_initial_message_result]
       ~inbox_content
-      ~predecessor:None
       state
   in
   let* () =
@@ -1289,7 +1284,6 @@ let test_rollup_wrong_path_for_rejection =
       ~level:0
       ~roots:[Constant.tx_rollup_initial_message_result]
       ~inbox_content
-      ~predecessor:None
       state
   in
   let* () =
@@ -1358,7 +1352,6 @@ let test_rollup_wrong_rejection_long_path =
       ~level:0
       ~roots:[Constant.tx_rollup_initial_message_result]
       ~inbox_content
-      ~predecessor:None
       state
   in
   let* () =
@@ -1493,7 +1486,7 @@ let test_rollup_bond_return =
           ~src
           ~level:rollup_level
           ~roots:[Constant.tx_rollup_initial_message_result]
-          ~predecessor:s.Rollup.commitment_newest_hash
+          ?predecessor:s.Rollup.commitment_newest_hash
           ~inbox_content:(`Content [batch])
           state
       in
@@ -1554,7 +1547,7 @@ let test_deposit_withdraw_max_big_tickets =
     ~tags:["tx_rollup"; "withdraw"; "deposit"; "ticket"]
   @@ fun protocol ->
   let parameters = Parameters.{finality_period = 4; withdraw_period = 4} in
-  let* ({rollup; client; node = _} as state) =
+  let* ({rollup; client; node} as state) =
     init_with_tx_rollup ~parameters ~protocol ()
   in
   let* constants = RPC.get_constants client in
@@ -1593,7 +1586,7 @@ let test_deposit_withdraw_max_big_tickets =
       ~burn_cap:Tez.one
       client
   in
-  let* () = Client.bake_for client in
+  let* () = bake_and_wait client node in
   (* 2. Deposit tickets to the tx_rollup. *)
   (* deposit [max_withdrawals_per_batch] times to be able to withdraw [max_int *
      max_withdrawals_per_batch] in one operation. Last iteration is done outside
@@ -1616,7 +1609,7 @@ let test_deposit_withdraw_max_big_tickets =
             ~burn_cap:Tez.one
             client
         in
-        let* _ = Client.bake_for client in
+        let* () = bake_and_wait client node in
         unit)
   in
   let process =
@@ -1644,7 +1637,7 @@ let test_deposit_withdraw_max_big_tickets =
           client_output
     | Some hash -> return hash
   in
-  let* () = Client.bake_for client in
+  let* () = bake_and_wait client node in
   (* 3. commit the new inbox with deposit and withdraw at the same time. *)
   let deposit =
     Rollup.make_deposit
@@ -1674,18 +1667,18 @@ let test_deposit_withdraw_max_big_tickets =
       ~src:account
       ~level:tx_rollup_level
       ~roots:[message_result_hash]
-      ~predecessor:tx_rollup_state.commitment_newest_hash
+      ?predecessor:tx_rollup_state.commitment_newest_hash
       ~inbox_content:(`Content [deposit])
       state
   in
   let* () =
     (* bake until the finality period is over to be able to withdraw *)
-    repeat parameters.finality_period (fun () -> Client.bake_for client)
+    bake_and_wait ~nb:parameters.finality_period client node
   in
 
   (* 4. finalize the commitment *)
   let*! () = submit_finalize_commitment state in
-  let* () = Client.bake_for client in
+  let* () = bake_and_wait client node in
 
   (* 5. dispatch tickets from withdrawals to implicit account.*)
 
@@ -1730,7 +1723,7 @@ let test_deposit_withdraw_max_big_tickets =
       ~ticket_dispatch_info_data_list
       client
   in
-  let* () = Client.bake_for client in
+  let* () = bake_and_wait client node in
 
   (* 6. Transfer tickets from implicit account to originated account. *)
 
@@ -1746,7 +1739,7 @@ let test_deposit_withdraw_max_big_tickets =
       ~burn_cap:Tez.one
       client
   in
-  let* () = Client.bake_for client in
+  let* () = bake_and_wait client node in
   (* repeat the operation to ensure all tickets can be transfered *)
   let* () =
     repeat max_withdrawals_per_batch (fun () ->
@@ -1762,7 +1755,7 @@ let test_deposit_withdraw_max_big_tickets =
             ~burn_cap:Tez.one
             client
         in
-        let* () = Client.bake_for client in
+        let* () = bake_and_wait client node in
         unit)
   in
   unit

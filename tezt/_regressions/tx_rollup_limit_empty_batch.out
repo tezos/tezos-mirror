@@ -29,7 +29,7 @@ This sequence of operations was run:
       Originated tx rollup: [TX_ROLLUP_HASH]
 
 
-./tezos-client --wait none submit tx rollup batch  to '[TX_ROLLUP_HASH]' from '[PUBLIC_KEY_HASH]'
+./tezos-client --wait none submit tx rollup batch 0x to '[TX_ROLLUP_HASH]' from '[PUBLIC_KEY_HASH]'
 Node is bootstrapped.
 Estimated gas: 2104.259 units (will add 100 for safety)
 Estimated storage: no bytes added

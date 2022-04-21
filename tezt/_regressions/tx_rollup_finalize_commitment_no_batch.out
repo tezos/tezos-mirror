@@ -29,7 +29,7 @@ This sequence of operations was run:
       Originated tx rollup: [TX_ROLLUP_HASH]
 
 
-./tezos-client --wait none submit tx rollup finalize commitment to '[TX_ROLLUP_HASH]' from '[PUBLIC_KEY_HASH]'
+./tezos-client --wait none finalize commitment of tx rollup '[TX_ROLLUP_HASH]' from '[PUBLIC_KEY_HASH]'
 Node is bootstrapped.
 This simulation failed:
   Manager signed operations:

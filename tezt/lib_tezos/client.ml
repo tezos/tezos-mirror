@@ -1303,7 +1303,15 @@ module Tx_rollup = struct
         client
         (["--wait"; wait]
         @ [
-            "submit"; "tx"; "rollup"; "batch"; content; "to"; rollup; "from"; src;
+            "submit";
+            "tx";
+            "rollup";
+            "batch";
+            "0x" ^ content;
+            "to";
+            rollup;
+            "from";
+            src;
           ]
         @ optional_arg ~name:"burn-cap" Tez.to_string burn_cap
         @ optional_arg ~name:"storage-limit" string_of_int storage_limit)
@@ -1311,25 +1319,19 @@ module Tx_rollup = struct
     let parse process = Process.check process in
     {value = process; run = parse}
 
-  let submit_commitment ?(wait = "none") ?burn_cap ?storage_limit ?hooks ~level
-      ~roots ~predecessor ~inbox_merkle_root ~rollup ~src client =
+  let submit_commitment ?(wait = "none") ?burn_cap ?storage_limit ?hooks
+      ?predecessor ~level ~roots ~inbox_merkle_root ~rollup ~src client =
     let process =
-      let predecessor = Option.value ~default:"" predecessor in
       spawn_command
         ?hooks
         client
         (["--wait"; wait]
-        @ [
-            "submit";
-            "tx";
-            "rollup";
-            "commitment";
-            Int.to_string level;
-            inbox_merkle_root;
-            predecessor;
-          ]
-        @ [String.concat "!" roots]
-        @ ["to"; rollup; "from"; src]
+        @ ["commit"; "to"; "tx"; "rollup"; rollup; "from"; src]
+        @ ["for"; "level"; Int.to_string level]
+        @ ["with"; "inbox"; "hash"; inbox_merkle_root]
+        @ ["and"; "messages"; "result"; "hash"]
+        @ roots
+        @ optional_arg ~name:"predecessor-hash" (fun s -> s) predecessor
         @ optional_arg ~name:"burn-cap" Tez.to_string burn_cap
         @ optional_arg ~name:"storage-limit" string_of_int storage_limit)
     in
@@ -1343,8 +1345,7 @@ module Tx_rollup = struct
         ?hooks
         client
         (["--wait"; wait]
-        @ ["submit"; "tx"; "rollup"; "finalize"; "commitment"]
-        @ ["to"; rollup; "from"; src]
+        @ ["finalize"; "commitment"; "of"; "tx"; "rollup"; rollup; "from"; src]
         @ optional_arg ~name:"burn-cap" Tez.to_string burn_cap
         @ optional_arg ~name:"storage-limit" string_of_int storage_limit)
     in
@@ -1358,8 +1359,7 @@ module Tx_rollup = struct
         ?hooks
         client
         (["--wait"; wait]
-        @ ["submit"; "tx"; "rollup"; "remove"; "commitment"]
-        @ ["to"; rollup; "from"; src]
+        @ ["remove"; "commitment"; "of"; "tx"; "rollup"; rollup; "from"; src]
         @ optional_arg ~name:"burn-cap" Tez.to_string burn_cap
         @ optional_arg ~name:"storage-limit" string_of_int storage_limit)
     in
@@ -1375,18 +1375,17 @@ module Tx_rollup = struct
         ?hooks
         client
         (["--wait"; wait]
-        @ ["submit"; "tx"; "rollup"; "reject"; "commitment"]
+        @ ["reject"; "commitment"; "of"; "tx"; "rollup"; rollup]
         @ ["at"; "level"; string_of_int level]
-        @ ["message"; message]
-        @ ["at"; "position"; string_of_int position]
+        @ ["with"; "result"; "hash"; message_result_hash]
+        @ ["and"; "result"; "path"; rejected_message_result_path]
+        @ ["for"; "message"; "at"; "position"; string_of_int position]
+        @ ["with"; "content"; message]
         @ ["and"; "path"; path]
-        @ ["to"; "reject"; message_result_hash]
-        @ ["with"; "path"; rejected_message_result_path]
-        @ ["with"; "proof"; proof]
         @ ["with"; "agreed"; "context"; "hash"; context_hash]
-        @ ["and"; "withdraw"; "list"; withdraw_list_hash]
-        @ ["with"; "path"; agreed_message_result_path]
-        @ ["to"; rollup] @ ["from"; src]
+        @ ["and"; "withdraw"; "list"; "hash"; withdraw_list_hash]
+        @ ["and"; "result"; "path"; agreed_message_result_path]
+        @ ["using"; "proof"; proof; "from"; src]
         @ optional_arg ~name:"burn-cap" Tez.to_string burn_cap
         @ optional_arg ~name:"storage-limit" string_of_int storage_limit)
     in
@@ -1400,9 +1399,7 @@ module Tx_rollup = struct
         ?hooks
         client
         (["--wait"; wait]
-        @ [
-            "submit"; "tx"; "rollup"; "return"; "bond"; "to"; rollup; "from"; src;
-          ]
+        @ ["recover"; "bond"; "of"; src; "for"; "tx"; "rollup"; rollup]
         @ Option.fold
             ~none:[]
             ~some:(fun burn_cap -> ["--burn-cap"; Tez.to_string burn_cap])

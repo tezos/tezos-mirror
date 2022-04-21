@@ -820,13 +820,6 @@ let originate_tx_rollup (cctxt : #full) ~chain ~block ?confirmations ?dry_run
 let submit_tx_rollup_batch (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ?verbose_signing ?simulation ?fee ?burn_limit ?gas_limit ?storage_limit
     ?counter ~source ~src_pk ~src_sk ~fee_parameter ~content ~tx_rollup () =
-  (match Hex.to_string (`Hex content) with
-  | Some content -> return content
-  | None ->
-      failwith
-        "%s is not a valid binary text encoded using the hexadecimal notation"
-        content)
-  >>=? fun content ->
   let contents :
       Kind.tx_rollup_submit_batch Annotated_manager_operation.annotated_list =
     Annotated_manager_operation.Single_manager
@@ -862,26 +855,7 @@ let submit_tx_rollup_batch (cctxt : #full) ~chain ~block ?confirmations ?dry_run
 let submit_tx_rollup_commitment (cctxt : #full) ~chain ~block ?confirmations
     ?dry_run ?verbose_signing ?simulation ?fee ?gas_limit ?storage_limit
     ?counter ~source ~src_pk ~src_sk ~fee_parameter ~level ~inbox_merkle_root
-    ~batches ~predecessor ~tx_rollup () =
-  Environment.wrap_tzresult (Tx_rollup_level.of_int32 level) >>?= fun level ->
-  List.map_es
-    (fun root ->
-      match
-        Alpha_context.Tx_rollup_message_result_hash.of_b58check_opt root
-      with
-      | Some content -> return content
-      | None -> failwith "%s is not a valid message result hash notation" root)
-    (String.split_on_char '!' batches)
-  >>=? fun messages ->
-  let predecessor =
-    Option.map
-      (fun pred_str -> Tx_rollup_commitment_hash.of_b58check_exn pred_str)
-      predecessor
-  in
-  (match Tx_rollup_inbox.Merkle.root_of_b58check_opt inbox_merkle_root with
-  | Some content -> return content
-  | None -> failwith "%s is not a valid inbox merkle root" inbox_merkle_root)
-  >>=? fun inbox_merkle_root ->
+    ~messages ~predecessor ~tx_rollup () =
   let commitment : Tx_rollup_commitment.Full.t =
     {level; messages; predecessor; inbox_merkle_root}
   in
@@ -995,28 +969,6 @@ let submit_tx_rollup_rejection (cctxt : #full) ~chain ~block ?confirmations
     ~message_position ~message_path ~message_result_hash ~message_result_path
     ~previous_context_hash ~previous_withdraw_list_hash
     ~previous_message_result_path ~proof () =
-  (match Data_encoding.Json.from_string message with
-  | Ok json -> return json
-  | Error err -> failwith "Message is not a valid JSON-encoded message: %s" err)
-  >>=? fun json ->
-  let message = Data_encoding.Json.(destruct Tx_rollup_message.encoding json) in
-  Environment.wrap_tzresult (Tx_rollup_level.of_int32 level) >>?= fun level ->
-  (match Context_hash.of_b58check_opt previous_context_hash with
-  | Some hash -> return hash
-  | None ->
-      failwith
-        "%s is not a valid notation for a context hash"
-        previous_context_hash)
-  >>=? fun previous_context_hash ->
-  (match
-     Tx_rollup_withdraw_list_hash.of_b58check_opt previous_withdraw_list_hash
-   with
-  | Some hash -> return hash
-  | None ->
-      failwith
-        "%s is not a valid notation for a withdraw list hash"
-        previous_withdraw_list_hash)
-  >>=? fun previous_withdraw_list_hash ->
   let previous_message_result =
     Tx_rollup_message_result.
       {
@@ -1024,41 +976,6 @@ let submit_tx_rollup_rejection (cctxt : #full) ~chain ~block ?confirmations
         withdraw_list_hash = previous_withdraw_list_hash;
       }
   in
-  (match Tx_rollup_message_result_hash.of_b58check_opt message_result_hash with
-  | Some x -> return x
-  | _ ->
-      failwith
-        "%s is not a valid notation for a withdraw list hash"
-        message_result_hash)
-  >>=? fun message_result_hash ->
-  (match Data_encoding.Json.from_string message_path with
-  | Ok json ->
-      Data_encoding.Json.destruct Tx_rollup_inbox.Merkle.path_encoding json
-      |> return
-  | Error err ->
-      failwith "Message path is not a valid JSON-encoded message: %s" err)
-  >>=? fun message_path ->
-  (match Data_encoding.Json.from_string message_result_path with
-  | Ok json ->
-      Data_encoding.Json.destruct Tx_rollup_commitment.Merkle.path_encoding json
-      |> return
-  | Error err ->
-      failwith "Message result path is not a valid JSON-encoded message: %s" err)
-  >>=? fun message_result_path ->
-  (match Data_encoding.Json.from_string previous_message_result_path with
-  | Ok json ->
-      Data_encoding.Json.destruct Tx_rollup_commitment.Merkle.path_encoding json
-      |> return
-  | Error err ->
-      failwith
-        "Previous message result path is not a valid JSON-encoded message: %s"
-        err)
-  >>=? fun previous_message_result_path ->
-  (match Data_encoding.Json.from_string proof with
-  | Ok json ->
-      Data_encoding.Json.destruct Tx_rollup_l2_proof.encoding json |> return
-  | Error err -> failwith "Proof is not a valid JSON-encoded message: %s" err)
-  >>=? fun proof ->
   let contents :
       Kind.tx_rollup_rejection Annotated_manager_operation.annotated_list =
     Annotated_manager_operation.Single_manager

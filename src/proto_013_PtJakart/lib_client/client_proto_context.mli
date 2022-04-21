@@ -485,10 +485,10 @@ val submit_tx_rollup_commitment :
   src_pk:Signature.public_key ->
   src_sk:Client_keys.sk_uri ->
   fee_parameter:Injection.fee_parameter ->
-  level:int32 ->
-  inbox_merkle_root:string ->
-  batches:string ->
-  predecessor:string option ->
+  level:Tx_rollup_level.t ->
+  inbox_merkle_root:Tx_rollup_inbox.Merkle.root ->
+  messages:Tx_rollup_message_result_hash.t list ->
+  predecessor:Tx_rollup_commitment_hash.t option ->
   tx_rollup:Tx_rollup.t ->
   unit ->
   (Operation_hash.t
@@ -562,17 +562,17 @@ val submit_tx_rollup_rejection :
   src_pk:Signature.public_key ->
   src_sk:Client_keys.sk_uri ->
   fee_parameter:Injection.fee_parameter ->
-  level:int32 ->
+  level:Tx_rollup_level.t ->
   tx_rollup:Tx_rollup.t ->
-  message:string ->
+  message:Tx_rollup_message.t ->
   message_position:int ->
-  message_path:string ->
-  message_result_hash:string ->
-  message_result_path:string ->
-  previous_context_hash:string ->
-  previous_withdraw_list_hash:string ->
-  previous_message_result_path:string ->
-  proof:string ->
+  message_path:Tx_rollup_inbox.Merkle.path ->
+  message_result_hash:Tx_rollup_message_result_hash.t ->
+  message_result_path:Tx_rollup_commitment.Merkle.path ->
+  previous_context_hash:Context_hash.t ->
+  previous_withdraw_list_hash:Tx_rollup_withdraw_list_hash.t ->
+  previous_message_result_path:Tx_rollup_commitment.Merkle.path ->
+  proof:Tx_rollup_l2_proof.t ->
   unit ->
   (Operation_hash.t
   * Kind.tx_rollup_rejection Kind.manager contents
@@ -601,6 +601,64 @@ val submit_tx_rollup_return_bond :
   (Operation_hash.t
   * Kind.tx_rollup_return_bond Kind.manager contents
   * Kind.tx_rollup_return_bond Kind.manager Apply_results.contents_result)
+  tzresult
+  Lwt.t
+
+val tx_rollup_dispatch_tickets :
+  #Protocol_client_context.full ->
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
+  ?confirmations:int ->
+  ?dry_run:bool ->
+  ?verbose_signing:bool ->
+  ?simulation:bool ->
+  ?fee:Tez.tez ->
+  ?gas_limit:Gas.Arith.integral ->
+  ?storage_limit:Z.t ->
+  ?counter:Z.t ->
+  source:Signature.public_key_hash ->
+  src_pk:Signature.public_key ->
+  src_sk:Client_keys.sk_uri ->
+  fee_parameter:Injection.fee_parameter ->
+  level:Tx_rollup_level.t ->
+  context_hash:Context_hash.t ->
+  message_position:int ->
+  message_result_path:Tx_rollup_commitment.Merkle.path ->
+  tickets_info:Tx_rollup_reveal.t list ->
+  tx_rollup:Tx_rollup.t ->
+  unit ->
+  (Operation_hash.t
+  * Kind.tx_rollup_dispatch_tickets Kind.manager contents
+  * Kind.tx_rollup_dispatch_tickets Kind.manager Apply_results.contents_result)
+  tzresult
+  Lwt.t
+
+val transfer_ticket :
+  #Protocol_client_context.full ->
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
+  ?confirmations:int ->
+  ?dry_run:bool ->
+  ?verbose_signing:bool ->
+  ?simulation:bool ->
+  ?fee:Tez.tez ->
+  ?gas_limit:Gas.Arith.integral ->
+  ?storage_limit:Z.t ->
+  ?counter:Z.t ->
+  source:Signature.public_key_hash ->
+  src_pk:Signature.public_key ->
+  src_sk:Client_keys.sk_uri ->
+  fee_parameter:Injection.fee_parameter ->
+  contents:string ->
+  ty:string ->
+  ticketer:Contract.t ->
+  amount:Z.t ->
+  destination:Contract.t ->
+  entrypoint:Entrypoint.t ->
+  unit ->
+  (Operation_hash.t
+  * Kind.transfer_ticket Kind.manager contents
+  * Kind.transfer_ticket Kind.manager Apply_results.contents_result)
   tzresult
   Lwt.t
 
