@@ -521,7 +521,8 @@ let test_dump {idx; block3b; _} =
                 ~on_disk:false
                 idx
                 target_context_hash
-                ~fd:context_fd)
+                ~fd:context_fd
+                ~progress_display_mode:Animation.Auto)
             (fun () -> Lwt_unix.close context_fd)
         in
         let root = base_dir2 // "context" in
@@ -539,7 +540,8 @@ let test_dump {idx; block3b; _} =
               ~nb_context_elements
               ~fd:context_fd
               ~legacy:false
-              ~in_memory:true)
+              ~in_memory:true
+              ~progress_display_mode:Animation.Auto)
           (fun () -> Lwt_unix.close context_fd))
   in
   Lwt.return_unit

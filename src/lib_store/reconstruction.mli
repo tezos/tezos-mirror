@@ -73,4 +73,5 @@ val reconstruct :
   user_activated_upgrades:User_activated.upgrades ->
   user_activated_protocol_overrides:User_activated.protocol_overrides ->
   operation_metadata_size_limit:int option ->
+  progress_display_mode:Animation.progress_display_mode ->
   unit tzresult Lwt.t

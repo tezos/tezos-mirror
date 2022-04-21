@@ -180,6 +180,7 @@ val export :
   context_dir:string ->
   chain_name:Distributed_db_version.Name.t ->
   on_disk:bool ->
+  progress_display_mode:Animation.progress_display_mode ->
   Genesis.t ->
   unit tzresult Lwt.t
 
@@ -210,6 +211,7 @@ val import :
   user_activated_protocol_overrides:User_activated.protocol_overrides ->
   operation_metadata_size_limit:int option ->
   in_memory:bool ->
+  progress_display_mode:Animation.progress_display_mode ->
   Genesis.t ->
   unit tzresult Lwt.t
 

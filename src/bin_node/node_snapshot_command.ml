@@ -122,7 +122,8 @@ module Term = struct
         else tzfail (Cannot_locate_file path)
 
   let process subcommand args snapshot_path block disable_check export_format
-      rolling reconstruct in_memory_index on_disk_index sandbox_file =
+      rolling reconstruct in_memory_index on_disk_index sandbox_file
+      progress_display_mode =
     let run =
       let open Lwt_result_syntax in
       let*! () = Tezos_base_unix.Internal_event_unix.init () in
@@ -160,6 +161,7 @@ module Term = struct
             ~chain_name
             ~block
             ~on_disk:on_disk_index
+            ~progress_display_mode
             genesis
       | Import ->
           let data_dir =
@@ -246,6 +248,7 @@ module Term = struct
                     node_config.shell.block_validator_limits
                       .operation_metadata_size_limit
                   ~in_memory:in_memory_index
+                  ~progress_display_mode
                   genesis)
           in
           if reconstruct then
@@ -261,6 +264,7 @@ module Term = struct
               ~operation_metadata_size_limit:
                 node_config.shell.block_validator_limits
                   .operation_metadata_size_limit
+              ~progress_display_mode
           else return_unit
       | Info ->
           let* snapshot_path = check_snapshot_path snapshot_path in
@@ -401,12 +405,30 @@ module Term = struct
           ~docv:"FILE.json"
           ["sandbox"])
 
+  let progress_display_mode =
+    let open Cmdliner in
+    let doc =
+      Format.sprintf
+        "Determine whether the progress animation will be displayed to the \
+         logs. 'auto' will display progress animation only to a TTY. 'always' \
+         will display progress animation to any file descriptor. 'never' will \
+         not display progress animation."
+    in
+    Arg.(
+      value
+      & opt (enum Animation.progress_display_mode_enum) Animation.Auto
+      & info
+          ~docs:Node_shared_arg.Manpage.misc_section
+          ~doc
+          ~docv:"<auto|always|never>"
+          ["progress-display-mode"])
+
   let term =
     let open Cmdliner.Term in
     ret
       (const process $ subcommand_arg $ Node_shared_arg.Term.args $ file_arg
      $ block $ disable_check $ export_format $ export_rolling $ reconstruct
-     $ in_memory_index $ on_disk_index $ sandbox)
+     $ in_memory_index $ on_disk_index $ sandbox $ progress_display_mode)
 end
 
 module Manpage = struct

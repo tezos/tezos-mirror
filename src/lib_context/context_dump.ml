@@ -251,7 +251,8 @@ module Make_legacy (I : Dump_interface) = struct
 
   (* Restoring *)
 
-  let restore_context_fd index ~expected_context_hash ~fd ~nb_context_elements =
+  let restore_context_fd index ~expected_context_hash ~fd ~nb_context_elements
+      ~progress_display_mode =
     let open Lwt_result_syntax in
     let read = ref 0 in
     let rbuf = ref (fd, Bytes.empty, 0, read) in
@@ -300,6 +301,7 @@ module Make_legacy (I : Dump_interface) = struct
       let* () =
         Animation.display_progress
           ~every:1000
+          ~progress_display_mode
           ~pp_print_step:(fun fmt i ->
             Format.fprintf
               fmt
@@ -443,7 +445,8 @@ module Make (I : Dump_interface) = struct
       (fun sub_tree -> set_tree written context_fd ~notify buf sub_tree)
       tree
 
-  let dump_context_fd idx context_hash ~context_fd ~on_disk =
+  let dump_context_fd idx context_hash ~context_fd ~on_disk
+      ~progress_display_mode =
     let open Lwt_result_syntax in
     (* Dumping *)
     let buf = Buffer.create 1_000_000 in
@@ -458,6 +461,7 @@ module Make (I : Dump_interface) = struct
         | Some ctxt ->
             Animation.display_progress
               ~every:1000
+              ~progress_display_mode
               ~pp_print_step:(fun fmt i ->
                 Format.fprintf
                   fmt
@@ -494,7 +498,7 @@ module Make (I : Dump_interface) = struct
   (* Restoring *)
 
   let restore_context_fd index ~expected_context_hash ~fd ~nb_context_elements
-      ~in_memory =
+      ~in_memory ~progress_display_mode =
     let open Lwt_result_syntax in
     let read = ref 0 in
     let rbuf = ref (fd, Bytes.empty, 0, read) in
@@ -543,6 +547,7 @@ module Make (I : Dump_interface) = struct
       let* () =
         Animation.display_progress
           ~every:1000
+          ~progress_display_mode
           ~pp_print_step:(fun fmt i ->
             Format.fprintf
               fmt
