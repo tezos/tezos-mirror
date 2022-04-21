@@ -511,10 +511,11 @@ let successor_level_arg =
     ()
 
 let preserved_levels_arg =
-  arg
+  default_arg
     ~long:"preserved-levels"
     ~placeholder:"threshold"
     ~doc:"Number of effective levels kept in the accuser's memory"
+    ~default:"200"
     (parameter (fun _ s ->
          try
            let preserved_cycles = int_of_string s in

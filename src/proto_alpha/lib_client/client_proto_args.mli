@@ -86,7 +86,7 @@ val no_endorse_switch : (bool, full) Clic.arg
 
 val minimal_timestamp_switch : (bool, full) Clic.arg
 
-val preserved_levels_arg : (int option, full) Clic.arg
+val preserved_levels_arg : (int, full) Clic.arg
 
 val no_print_source_flag : (bool, full) Clic.arg
 
