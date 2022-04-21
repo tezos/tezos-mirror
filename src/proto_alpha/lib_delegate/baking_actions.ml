@@ -276,6 +276,21 @@ let inject_block ~state_recorder state block_to_bake ~updated_state =
         ~default
         ~per_block_vote_file)
   >>= fun liquidity_baking_toggle_vote ->
+  (* Cache last toggle vote to use in case of vote file errors *)
+  let updated_state =
+    {
+      updated_state with
+      global_state =
+        {
+          updated_state.global_state with
+          config =
+            {
+              updated_state.global_state.config with
+              liquidity_baking_toggle_vote;
+            };
+        };
+    }
+  in
   Events.(emit vote_for_liquidity_baking_toggle) liquidity_baking_toggle_vote
   >>= fun () ->
   Block_forge.forge
