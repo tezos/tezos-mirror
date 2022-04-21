@@ -71,7 +71,7 @@ let () =
         "Round cannot be built out of integer greater than maximum int32 value \
          (%Ld)"
         i)
-    (obj1 (req "Negative_round" int64))
+    (obj1 (req "Round_overflow" int64))
     (function Round_overflow i -> Some (Int64.of_int i) | _ -> None)
     (fun i -> Round_overflow (Int64.to_int i))
 
