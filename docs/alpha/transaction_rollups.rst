@@ -417,7 +417,7 @@ but without finalized commitments, no further messages are accepted on
 the rollup until a commitment is finalized.
 
 In order to issue a commitment, a **bond** is required: Tez tokens are
-temporarily frozen, and is subject to slashing in the event of a
+temporarily frozen, and are subject to slashing in the event of a
 rejection. The bond is treated just like frozen balances for the
 purpose of delegation. The bond is expensive enough
 (``tx_rollup_commitment_bond`` = 10,000 Tez) to discourage bad
@@ -440,7 +440,7 @@ the compact commitment's Merkle tree. A layer-1 node can then replay
 just the transfers of a single message to determine whether the
 rejection is valid. Because of the compact structure of commitments, a
 rejection also must include the predecessor message's layer-2 context
-hash, as a staring point to verify the proof. And the withdrawal list
+hash, as a starting point to verify the proof. And the withdrawal list
 must be included, so that the layer-2 context hash can be verified
 against the disputed message's predecessor.  A rejection must be
 included in a block within the finality period of the commitment.
