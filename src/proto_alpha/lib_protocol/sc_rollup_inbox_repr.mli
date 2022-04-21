@@ -54,7 +54,7 @@
    message unprocessed by the rollup is always available.
 
    The number of available messages is bounded by
-   {!Constants_repr.sc_rollup_max_available_messages}. When an inbox
+   {!Constants_storage.sc_rollup_max_available_messages}. When an inbox
    reaches the maximum number of available messages, the inbox is said
    to be full and cannot accept more messages. This limitation is
    meant to ensure that Merkle proofs about the inbox contents have a
