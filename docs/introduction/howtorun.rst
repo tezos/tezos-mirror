@@ -5,12 +5,12 @@ How to run Tezos
 
 In this section, we discuss how to take part in the protocol that runs
 the network.
-There are two main ways to participate in the consensus: delegating
+There are two main ways to participate: delegating
 your coins and running a delegate.
 The main advantage of delegating your coins is simplicity.
 The second way allows to participate more actively in the protocol, by baking blocks and voting, but is more demanding; however, the extra effort is compensated by more rewards in tez.
 
-To learn more about the protocol refer to :doc:`this page <../active/proof_of_stake>`.
+To learn more about the protocol refer to :doc:`this page <../active/protocol_overview>`.
 
 No matter how you decide to run Tezos, your node must have an accurate time source and be properly synchronized to it, e.g. by configuring an NTP daemon.
 This is especially important for bakers, as baking nodes desynchronized from the correct time of day have caused operational problems in the past by "baking in the future".
@@ -65,6 +65,12 @@ must be a *tz* address.
 Funds in implicit accounts which are not registered as delegates
 do not participate in baking.
 
+Note that delegating coins doesn't mean that a delegate can spend
+them, they only add to its delegated balance.
+In turn, delegators can freely spend their own funds in spite of the active delegation (they are not locked, like in other PoS algorithms).
+Technically, delegation is a link between a delegator account and a delegate account, meaning that *all* the funds of the former are delegated to the latter, until the delegation is withdrawn.
+When a delegator spends their tokens, the delegated balance of their delegate decreases; conversely, when they receive tokens the delegated balance of their delegate increases.
+
 
 Running a delegate
 ------------------
@@ -75,98 +81,39 @@ endorse. A delegate is also responsible for taking part in the
 :doc:`governance process<../active/voting>`.
 
 Rights for baking and endorsing are randomly assigned
-to delegates proportionally to the number of rolls they have been
-delegated.
-A roll is just a block of 8kꜩ and all computations with rolls are
-rounded to the nearest lower integer e.g. if you have 15kꜩ it amounts
-to 1 roll.
+to delegates proportionally to their :ref:`active stake<active_stake>`,
+which usually is the same as their staking balance,
+that is, their own balance plus their delegated balance.
+
+A minimum active stake of one roll
+is required for participating in consensus and in governance.
+A :ref:`roll<glossary_roll>` is just an amount of 6kꜩ and all
+computations with rolls are rounded to the nearest lower integer
+e.g. if you have 15kꜩ it amounts to 2 rolls. Rolls are used as a unit
+to determine delegates' voting rights in governance, while rights in
+consensus are not roll-based, they are based on the actual, non-approximated stake.
+
+Delegates are required to freeze around 10% of their active stake into
+a security deposit (more precisely, it's 10% of the maximum active
+stake during the last 7 cycles). A delegate is
+:ref:`slashed<slashing_ithaca>`, that is, it looses funds from its
+security deposits when it misbehaves by double-signing. The funds in
+the security deposit come from the delegate's account. In case a
+delegate is over-delegated (that is, its own balance does not cover
+10% of its staking balance), the delegate's active balance is then set
+to be 10 times its own balance. Delegates can set an upper limit to their
+frozen deposits with the following command:
+
+::
+
+   tezos-client set deposits limit for <delegate> to <limit>
+
 
 On testnets, when you obtain coins from :ref:`the faucet<faucet>`, if you
 are lucky to obtain more than one roll, you can register a delegate
 using this identity.
 Otherwise, you need to ask the faucet for more accounts and
 delegate them to the first.
-
-.. _over_delegation:
-
-Deposits and over-delegation
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-When baking or endorsing a block, a *security deposit* (or *bond*) is
-frozen for :ref:`preserved_cycles<ps_constants>` cycles from the account of the
-delegate.
-Hence a delegate must have enough funds to be able to pay security
-deposits for all the blocks it can potentially bake/endorse during
-``preserved_cycles``.
-The current deposits are *640ꜩ* for baked block and *2.5ꜩ* for
-endorsement.
-Note that delegating coins doesn't mean that a delegate can spend
-them, they only add up to its rolls count while all the deposits must
-come from the delegate's account.
-In turn, delegators can freely spend their own funds in spite of the active delegation (they are not locked, like in other PoS algorithms).
-Technically, delegation is a link between a delegator account and a delegate account, meaning that *all* the funds of the former are delegated to the latter, until the delegation is withdrawn.
-When a delegator spends their tokens, the delegated balance of their delegate decreases; when they receive tokens the delegated balance of their delegate increases.
-If a delegate runs out of funds to deposit it won't be able to bake or
-endorse. Other than being a missed opportunity for them, this has also
-negative consequences on the network.
-Missing baking or endorsing slots slows down the network, as it is necessary to wait some time for the baker at the next priority to bake, and also some other time for each missed endorsing slot.
-Besides, missed endorsements also make the chain more susceptible to forks.
-Running out of funds can happen if a delegate is *over-delegated*,
-that is if the delegated amount is disproportionate
-with respect to its available funds.
-
-It is in the interest of every delegator to make sure a delegate is
-not already over-delegated, because a delegate cannot refuse a delegation.
-Indeed, over-delegation translates in missed baking and endorsing slots, as explained above, and hence in missed rewards. On the other hand,
-each delegate should plan carefully its deposits, as explained next, by buying more tez if needed.
-
-.. _expected_rights:
-
-Expected rights, deposits and rewards
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Let's assume we have `x` rolls. We want to estimate our chances to bake
-or endorse to prepare the funds for our deposits.
-Our chances depend on how many rolls are currently active in the
-network. Once we know this number, we can estimate how many baking and
-endorsing slots we could be assigned in a cycle.
-The number of active rolls can be computed with two RPCs. First, we
-list all the active delegates with ``/chains/main/blocks/head/context/delegates?active``. Then, we sum
-all their ``staking_balance``. Finally, we divide by the size of a
-roll, 8kꜩ.
-For example, if the number of active rolls is ~80k then,
-for each block, we know that the chance that we get selected for
-baking is ``x/80k`` while for endorsing is 256 times that.
-Given that every draw is with replacement, the distribution that
-describes our chances of being selected is the binomial with
-probability of success ``p=x/80k``.
-The distribution has another parameter ``n`` for the number of times
-we draw, in our case in a cycle the draws for baking are ``blocks_per_cycle``
-while for endorsing are ``blocks_per_cycle * endorsers_per_block``
-(see :ref:`this page<ps_constants>` for the current values of these constants).
-Moreover we could extend ``n`` to cover ``preserved_cycles``.
-Once we have ``p`` and ``n``, the expected number of times that we
-might get selected is ``p * n`` (the mean of the distribution).
-Over many cycles, our chances will fall around the mean; in some cycles,
-we might get unlucky and be assigned fewer rights, but in some cycles we might
-get lucky and be assigned more rights!
-Clearly, we would like to plan and have enough deposits to cover
-also the "lucky" cycles so we need to compute a sort of "maximum"
-number of rights that is safe for `most cases`.
-We can compute this maximum using the inverse of Cumulative
-Distribution Function of the Binomial, where the so-called confidence is, in our case, the probability that the real deposits fall below the estimated maximum. We can set it, for instance, to 0.99.
-The computations can be found in this `Python
-script <https://gitlab.com/paracetamolo/utils/blob/master/estimated-rights.py>`_
-which returns the deposits and rewards,
-expected and maximum, for a given number of rolls and cycles.
-
-After ``preserved_cycles``, not only does the delegate take back control of
-its frozen deposits, but it also receives its rewards for baking and endorsing.
-Additionally, a baker also receives the fees of the operations it
-included in its blocks.
-While fees are unfrozen after ``preserved_cycles`` like deposits and
-rewards, they participate in the staking balance of the delegate
-immediately after the block has been baked.
 
 
 .. _DelegateRegistration:
@@ -187,12 +134,10 @@ cycle, up to 5 cycles in the future.
 
 ::
 
-   tezos-client rpc get /chains/main/blocks/head/helpers/baking_rights\?cycle=300\&delegate=tz1_xxxxxxxxxxx\&max_priority=2
+   tezos-client rpc get /chains/main/blocks/head/helpers/baking_rights\?cycle=300\&delegate=tz1_xxxxxxxxxxx\&max_round=2
 
-Sometimes a delegate skips its turn so it is worth considering also
-baking rights at priority 2 like in the example above.
-There is no priority for endorsements, every missed endorsement is
-lost.
+Sometimes there is no consensus at a round, so it is worth considering also
+baking rights at higher rounds, like 2 in the example above.
 
 .. _inactive_delegates:
 
@@ -204,7 +149,7 @@ it is marked **inactive** and its rights are removed.
 This mechanism is important to remove inactive delegates and reallocate
 their rights to the active ones so that the network is always working
 smoothly.
-Normally even a baker with one single roll should perform enough
+Normally even a baker with the minimal stake should perform enough
 operations during 5 cycles to remain active.
 If for some reason your delegate is marked inactive you can reactivate
 it simply by re-registering again like above.
@@ -217,34 +162,34 @@ Alternatively, you may use the baking rights RPC and the endorsing rights RPC (s
 Baker
 ~~~~~
 
-The baker is a daemon that, once connected to an account, computes the
-baking rights for that account, selects transactions from the mempool
-and bakes blocks.
-Note that the baker needs direct access to
-the node data directory for performance reasons (to avoid RPC calls to the node).
+The baker is a daemon that executes Tezos' :ref:<consensus algorithm<active/consensus>.
+The baker runs on behalf of one or more specified accounts or, if none is specified, on behalf of
+all accounts whose secret keys are known.
 
-It also  computes the endorsing rights for that account and, upon reception of a new
-block, verifies the validity of the block and emits an endorsement
-operation. It can endorse for a specific account or if not specified it endorses for
-all known accounts.
-
+During its run, the baker bakes blocks (by selecting transactions from
+the mempool and arranging them in a new block) and emits consensus
+operations like endorsements. It does so whenever the associated
+accounts have the necessary rights.
 
 Let's launch the daemon pointing to the standard node directory and
 baking for user *bob*::
 
    tezos-baker-alpha run with local node ~/.tezos-node bob
 
+Note that the baker needs direct access to
+the node data directory for performance reasons (to reduce the number of RPC calls to the node).
+
 .. warning::
 
-    **Remember that having two bakers or endorsers running connected to the same account could lead to double baking/endorsing and the loss of all your bonds.**
+    **Remember that having two bakers running connected to the same account could lead to double baking/endorsing and the loss of all your bonds.**
     If you are worried about the availability of your node when it is its turn to bake/endorse, there are other ways than duplicating your credentials (see the discussion in section :ref:`inactive_delegates`).
     **Never** use the same account on two daemons.
 
 
 .. note::
 
-   In protocols before Ithaca, the endorser runs as a separate daemon.
-   Therefore, one needs to run the daemon ``tezos-endorser-NNN-*`` to endorse.
+   In protocols before Ithaca, a separate daemon, the endorser, is responsible for emitting endorsements.
+   In these protocols, one needs to run the daemon ``tezos-endorser-NNN-*`` to endorse.
 
 Accuser
 ~~~~~~~
@@ -252,13 +197,13 @@ Accuser
 The accuser is a daemon that monitors all blocks received on all
 chains and looks for:
 
-* bakers who signed two blocks at the same level
-* endorsers who injected more than one endorsement operation for the
-  same baking slot (more details :doc:`here <../active/proof_of_stake>`)
+* bakers who signed two blocks at the same level and the same round
+* bakers who injected more than one pre-endorsements or endorsement operation for the
+  same level and round (more details :doc:`here <../active/consensus>`)
 
 Upon finding such irregularity, it will emit respectively a
-double-baking or double-endorsing denunciation operation, which will
-cause the offender to lose its security deposit.
+double-baking, double-pre-endorsing, or double-endorsing denunciation operation, which will
+cause the offender to be :ref:`slashed<slashing>`, that is, to lose part of its security deposit. 
 
 ::
 

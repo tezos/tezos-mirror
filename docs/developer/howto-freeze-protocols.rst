@@ -14,11 +14,11 @@ and "current protocol" refers to its successor, N+1. For instance, if
 The various pieces of code to be removed are within directory
 `src/proto_<N>_<Hash>/`, unless indicated otherwise.
 
-Remove Accuser, Baker, Endorser
--------------------------------
+Remove Accuser, Baker
+---------------------
 
-All these three daemons are no longer needed. Thus, the code in
-`bin_{accuser,baker,endorser}/`,  can be safely removed and the files
+These daemons are no longer needed. Thus, the code in
+`bin_{accuser,baker}/` can be safely removed and the files
 `active_protocol_versions` and `active_testing_protocol_versions` should be
 modified accordingly.
 

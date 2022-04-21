@@ -5,7 +5,7 @@
 _`Block`
     The Tezos blockchain is a linked list of blocks (or actually, a tree when several competing branches exist).
     Blocks conceptually contain a header and a list of Operations_,
-    which are specific to the `Economic Protocol`_.
+    which are specific to the `economic protocol`_.
 
     The header itself decomposes into a shell header (common to all protocols) and a protocol-specific header.
     The shell header contains `protocol`-agnostic data such as the
@@ -13,24 +13,24 @@ _`Block`
 
 _`Context`
     The state of the blockchain. The context is defined by the
-    `Economic Protocol`_ and typically includes information such as
+    `economic protocol`_ and typically includes information such as
     “this account_ is credited with this many tez” and “this is the
     code for that `smart contract`_.”
 
-    The Context is modified by Operations_. For example, an
+    The context is modified by operations_. For example, an
     operation_ can transfer tez from one account_ to another, which modifies the
     part of the context that tracks account_ credit.
 
 _`Economic protocol`
     The economic protocol is the application that runs on top of the blockchain
-    proper. It defines a Context_ (the state of the application), some
-    Operations_ (how the state evolves).
+    proper. It defines a context_ (the state of the application), some
+    operations_ (how the state evolves).
 
     In Tezos, the economic protocol can be upgraded without interruption or
     forking of the blockchain. The procedure for an upgrade is defined within
     the economic protocol itself so it can be upgraded as well.
 
-_`Fitness` (a.k.a. Score, a.k.a. Weight)
+_`Fitness` (a.k.a. score, a.k.a. weight)
     To each block, we associate a fitness which determines the quality of the chain leading to that block.
     This measure is computed by the consensus protocol.
     The shell changes the head of the chain to the valid block that has the highest fitness.
@@ -45,7 +45,7 @@ _`Mempool`
 _`Metadata`
     A metadata, or operation's metadata, is a piece of data associated to
     an Operation_. It is computed as a result of the application of the
-    operation included in a Block_ on its associated Context_. The metadata
+    operation included in a block_ on its associated context_. The metadata
     consists in many information such as the operation receipts,
     rewards updates, voting period, etc.
 

@@ -23,7 +23,6 @@ distinguish the following components:
  - Networked nodes
  - Client
  - Ledger application
- - Endorser
  - Baker
 
 Secondly, these components can be tested at different levels of

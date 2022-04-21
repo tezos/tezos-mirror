@@ -235,7 +235,7 @@ Edit the ``builtin_blockchain_networks_with_tags`` variable in this file to
 add or remove built-in networks.
 
 To be able to connect to multiple networks without having to download the protocols,
-and to provide all the relevant baker / endorser / accuser binaries, all current and
+and to provide all the relevant baker / accuser (/ endorser) binaries, all current and
 past protocols are compiled and linked. This means that if you patch the client commands
 for a protocol, you should patch the other protocols as well (at least the ones which
 are still in use).

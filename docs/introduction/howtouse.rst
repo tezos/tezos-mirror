@@ -18,8 +18,8 @@ After a successful compilation, you should have the following binaries:
 - ``tezos-node``: the tezos daemon itself (see `Node`_);
 - ``tezos-client``: a command-line client and basic wallet (see `Client`_);
 - ``tezos-admin-client``: administration tool for the node (see :ref:`tezos-admin-client`);
-- ``tezos-{baker,endorser,accuser}-*``: daemons to bake, endorse and
-  accuse on the Tezos network (see :doc:`howtorun`);
+- ``tezos-{baker,accuser}-*``: daemons to bake and accuse on the Tezos network (see :doc:`howtorun`);
+  note that prior to v12 of Octez, there was also an endorser daemon ``tezos-endorser-*``;
 - ``tezos-validator``: a daemon for validating and applying operations in blocks (see `Validator`_)
 - ``tezos-signer``: a client to remotely sign operations or blocks
   (see :ref:`signer`);
@@ -32,7 +32,7 @@ bound to, and up to some version, also by its number.
 For instance, ``tezos-baker-012-Psithaca`` is the baker
 for the Ithaca protocol, and ``tezos-baker-alpha`` is the baker
 of the development protocol.
-The ``tezos-node`` daemon is not suffixed by any protocol name, because it is independent of the economic protocol. See also the `Node Protocol`_ section below.
+The ``tezos-node`` daemon is not suffixed by any protocol name, because it is independent of the economic protocol. See also the `Node's Protocol`_ section below.
 
 
 Read The Manual
@@ -95,10 +95,10 @@ p2p connections).
 Using this peer-to-peer network, an operation originated by a user can
 hop several times through other nodes until it finds its way in a
 block baked by a baker.
-Using the blocks it receives on the gossip network the shell also
+Using the blocks it receives on the gossip network the node also
 keeps up to date the current `context`, that is the full state of
 the blockchain shared by all peers.
-Approximately every minute a new block is created and, when the shell
+Approximately every 30 seconds a new block is created and, when the node
 receives it, it applies each operation in the block to its current
 context and computes a new context.
 The last block received on a chain is also called the `head` of that
@@ -112,7 +112,7 @@ its own new operations when instructed by the ``tezos-client`` and even
 send new blocks when guided by the ``tezos-baker-*``.
 The node has also a view of the multiple chains that may exist
 concurrently and selects the best one based on its fitness (see
-:doc:`../active/proof_of_stake`).
+:doc:`../active/consensus`).
 
 
 Node Identity
@@ -130,7 +130,7 @@ connect to the network::
 
 The identity comprises a pair of cryptographic
 keys that nodes use to encrypt messages sent to each other, and an
-antispam-PoW stamp proving that enough computing power has been
+antispam proof-of-work stamp proving that enough computing power has been
 dedicated to creating this identity.
 Note that this is merely a network identity and it is not related in
 any way to a Tezos address on the blockchain.
@@ -152,8 +152,8 @@ Some operations require the node to be bootstrapped.
 
 .. _node-protocol:
 
-Node Protocol
-~~~~~~~~~~~~~
+Node's Protocol
+~~~~~~~~~~~~~~~
 
 A Tezos node can switch from one protocol to another during its
 execution.  This typically happens during the synchronization phase
@@ -620,29 +620,54 @@ For example to check the value of important
      "nonce_length": 32,
      "max_anon_ops_per_block": 132,
      "max_operation_data_length": 32768,
-     "preserved_cycles": 5,
-     "blocks_per_cycle": 4096,
-     "blocks_per_commitment": 32,
-     "blocks_per_roll_snapshot": 256,
-     "blocks_per_voting_period": 32768,
-     "time_between_blocks": [
-       "60",
-       "75"
+     "max_proposals_per_delegate": 20,
+     "max_micheline_node_count": 50000,
+     "max_micheline_bytes_limit": 50000,
+     "max_allowed_global_constants_depth": 10000,
+     "cache_layout": [
+       "100000000",
+       "240000",
+       "2560"
      ],
-     "endorsers_per_block": 32,
-     "hard_gas_limit_per_operation": "400000",
-     "hard_gas_limit_per_block": "4000000",
+     "michelson_maximum_type_size": 2001,
+     "preserved_cycles": 5,
+     "blocks_per_cycle": 8192,
+     "blocks_per_commitment": 64,
+     "blocks_per_stake_snapshot": 512,
+     "blocks_per_voting_period": 40960,
+     "hard_gas_limit_per_operation": "1040000",
+     "hard_gas_limit_per_block": "5200000",
      "proof_of_work_threshold": "70368744177663",
-     "tokens_per_roll": "10000000000",
-     "michelson_maximum_type_size": 1000,
+     "tokens_per_roll": "6000000000",
      "seed_nonce_revelation_tip": "125000",
-     "origination_burn": "257000",
-     "block_security_deposit": "48000000",
-     "endorsement_security_deposit": "6000000",
-     "block_reward": "0",
-     "endorsement_reward": "0",
-     "cost_per_byte": "1000",
-     "hard_storage_limit_per_operation": "60000"
+     "origination_size": 257,
+     "baking_reward_fixed_portion": "10000000",
+     "baking_reward_bonus_per_slot": "4286",
+     "endorsing_reward_per_slot": "2857",
+     "cost_per_byte": "250",
+     "hard_storage_limit_per_operation": "60000",
+     "quorum_min": 2000,
+     "quorum_max": 7000,
+     "min_proposal_quorum": 500,
+     "liquidity_baking_subsidy": "2500000",
+     "liquidity_baking_sunset_level": 3063809,
+     "liquidity_baking_escape_ema_threshold": 666667,
+     "max_operations_time_to_live": 120,
+     "minimal_block_delay": "30",
+     "delay_increment_per_round": "15",
+     "consensus_committee_size": 7000,
+     "consensus_threshold": 4667,
+     "minimal_participation_ratio": {
+       "numerator": 2,
+       "denominator": 3
+     },
+     "max_slashing_period": 2,
+     "frozen_deposits_percentage": 10,
+     "double_baking_punishment": "640000000",
+     "ratio_of_frozen_deposits_slashed_per_double_endorsement": {
+       "numerator": 1,
+       "denominator": 2
+     }
    }
 
 Another interesting use of RPCs is to inspect the receipts of the
