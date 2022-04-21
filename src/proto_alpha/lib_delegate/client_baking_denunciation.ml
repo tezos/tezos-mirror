@@ -432,7 +432,7 @@ let create (cctxt : #Protocol_client_context.full) ?canceler ~preserved_levels
   let get_block () =
     match !last_get_block with
     | None ->
-        let t = Lwt_stream.get state.blocks_stream in
+        let t = Lwt_stream.get state.blocks_stream >|= fun e -> `Block e in
         last_get_block := Some t ;
         t
     | Some t -> t
@@ -441,21 +441,17 @@ let create (cctxt : #Protocol_client_context.full) ?canceler ~preserved_levels
   let get_ops () =
     match !last_get_ops with
     | None ->
-        let t = Lwt_stream.get state.ops_stream in
+        let t = Lwt_stream.get state.ops_stream >|= fun e -> `Operations e in
         last_get_ops := Some t ;
         t
     | Some t -> t
   in
   Chain_services.chain_id cctxt () >>=? fun chain_id ->
   (* main loop *)
+  (* Only allocate once the termination promise *)
+  let terminated = Lwt_exit.clean_up_starts >|= fun _ -> `Termination in
   let rec worker_loop () =
-    Lwt.choose
-      [
-        (Lwt_exit.clean_up_starts >|= fun _ -> `Termination);
-        (get_block () >|= fun e -> `Block e);
-        (get_ops () >|= fun e -> `Operations e);
-      ]
-    >>= function
+    Lwt.choose [terminated; get_block (); get_ops ()] >>= function
     (* event matching *)
     | `Termination -> return_unit
     | `Block (None | Some (Error _)) ->
