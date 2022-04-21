@@ -28,6 +28,7 @@ type metrics = {
   savepoint_level : Prometheus.Gauge.t;
   caboose_level : Prometheus.Gauge.t;
   alternate_heads_count : Prometheus.Gauge.t;
+  last_written_block_size : Prometheus.Gauge.t;
 }
 
 let namespace = Tezos_version.Node_version.namespace
@@ -50,4 +51,14 @@ let metrics =
     let help = "Current number of alternated heads known" in
     Prometheus.Gauge.v ~help ~namespace ?subsystem "alternate_heads_count"
   in
-  {checkpoint_level; savepoint_level; caboose_level; alternate_heads_count}
+  let last_written_block_size =
+    let help = "Size, in bytes, of the last block written in store" in
+    Prometheus.Gauge.v ~help ~namespace ?subsystem "last_written_block_size"
+  in
+  {
+    checkpoint_level;
+    savepoint_level;
+    caboose_level;
+    alternate_heads_count;
+    last_written_block_size;
+  }

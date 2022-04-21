@@ -109,17 +109,21 @@ let locked_write_block floating_store ~offset ~block ~predecessors =
     {offset; predecessors} ;
   return block_length
 
-let append_block ?(flush = true) floating_store predecessors
-    (block : Block_repr.t) =
-  let open Lwt_syntax in
+let append_block ?(flush = true) ?(log_metrics = false) floating_store
+    predecessors (block : Block_repr.t) =
+  let open Lwt_result_syntax in
   Lwt_idle_waiter.force_idle floating_store.scheduler (fun () ->
-      let* offset = Lwt_unix.lseek floating_store.fd 0 Unix.SEEK_END in
-      let* _written_len =
+      let*! offset = Lwt_unix.lseek floating_store.fd 0 Unix.SEEK_END in
+      let* written_len =
         locked_write_block floating_store ~offset ~block ~predecessors
       in
       if flush then
         Floating_block_index.flush floating_store.floating_block_index ;
-      Lwt.return_unit)
+      if log_metrics then
+        Prometheus.Gauge.set
+          Store_metrics.metrics.last_written_block_size
+          (Int.to_float written_len) ;
+      return_unit)
 
 let append_all floating_store
     (blocks : (Block_hash.t list * Block_repr.t) Seq.t) =
@@ -269,9 +273,7 @@ let append_floating_store ~from ~into =
   protect (fun () ->
       let* () =
         iter_with_pred_s
-          (fun (block, preds) ->
-            let*! () = append_block ~flush:false into preds block in
-            return_unit)
+          (fun (block, preds) -> append_block ~flush:false into preds block)
           from
       in
       Floating_block_index.flush ~with_fsync:true into.floating_block_index ;
@@ -414,10 +416,7 @@ let fix_integrity chain_dir kind =
                         match o with
                         | Some preds ->
                             (* TODO: should we retrieve info ? e.g. highest_level, highest_fitness ? *)
-                            let*! () =
-                              append_block fresh_floating_store preds block
-                            in
-                            return_unit
+                            append_block fresh_floating_store preds block
                         | None -> Lwt.fail Exit)
                       inconsistent_floating_store)
                   (function Exit -> return_unit | exn -> Lwt.fail exn)
