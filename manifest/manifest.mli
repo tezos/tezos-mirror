@@ -620,6 +620,46 @@ type 'a maker =
   'a ->
   target
 
+module Env : sig
+  (** [env] stanza *)
+  type t
+
+  (** profile selector for the env stanza. A profile name or Any (_) *)
+  type profile = Profile of string | Any
+
+  (** The empty env *)
+  val empty : t
+
+  (** [add profile ~key payload] adds a [key] entry with its [payload]
+      to the given [profile].  Adding an entry to [Any] profile means
+      that it will apply regardless of the profile. In practice, it
+      means that the entry can end up being duplicated in the resulting
+      [s_expr].
+    {[
+      Env.empty
+      |> Env.add Any ~key:"flags" Dune.[S "-flag"]
+      |> Env.add (Profile "static") ~key:"link_flags" Dune.[S "-link-flag"]
+    ]}
+
+    will generate
+
+    {v
+      (env
+        (_
+          (flags (-flag))
+        )
+        (static
+          (flags (-flag))
+          (link_flags (-link_flag))
+        )
+      )
+    v}
+
+    Also note that [Profile "_"] is not allowed. One should use [Any] instead.
+ *)
+  val add : profile -> key:string -> Dune.s_expr -> t -> t
+end
+
 (** Register and return an internal public library.
 
     The ['a] argument of [maker] is [string]: it is the public name.
@@ -844,3 +884,11 @@ val name_for_errors : target -> string
     directory (i.e. that usually starts with [../]) and shall return [true]
     if this path should not result in an error. *)
 val generate : ?exclude:(string -> bool) -> unit -> unit
+
+(** Generate dune-workspace file.
+
+    [generate_workspace env dune] will generate a dune-workspace file at the root of the repo.
+    [env] will translate into the corresponding env stanza.
+    [dune] is a free form s-expression that will be included as is at the end of the file.
+ *)
+val generate_workspace : Env.t -> Dune.s_expr -> unit

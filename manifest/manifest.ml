@@ -678,45 +678,16 @@ module Opam = struct
 end
 
 module Env : sig
-  (** [env] stanza *)
+  (* See manifest.mli for documentation *)
+
   type t
 
-  (** profile selector for the env stanza. A profile name or Any (_) *)
   type profile = Profile of string | Any
 
-  (** The empty env *)
   val empty : t
 
-  (** [to_s_expr env] converts an env into a s_expr *)
   val to_s_expr : t -> Dune.s_expr
 
-  (** [add profile ~key payload] adds a [key] entry with its [payload]
-      to the given [profile].  Adding an entry to [Any] profile means
-      that it will apply regardless of the profile. In practice, it
-      means that the entry can end up being duplicated in the resulting
-      [s_expr].
-    {[
-      Env.empty
-      |> Env.add Any ~key:"flags" Dune.[S "-flag"]
-      |> Env.add (Profile "static") ~key:"link_flags" Dune.[S "-link-flag"]
-    ]}
-
-    will generate
-
-    {v
-      (env
-        (_
-          (flags (-flag))
-        )
-        (static
-          (flags (-flag))
-          (link_flags (-link_flag))
-        )
-      )
-    v}
-
-    Also note that [Profile "_"] is not allowed. One should use [Any] instead.
- *)
   val add : profile -> key:string -> Dune.s_expr -> t -> t
 end = struct
   type entry = string * Dune.s_expr
@@ -2065,6 +2036,18 @@ let generate_package_json_file () =
        ~pp_sep:(fun fmt () -> Format.fprintf fmt ",@.")
        pp_dep)
     (List.sort compare !l)
+
+let generate_workspace env dune =
+  let pp_dune fmt dune =
+    if not (Dune.is_empty dune) then Format.fprintf fmt "@.%a@." Dune.pp dune
+  in
+  write "dune-workspace" @@ fun fmt ->
+  Format.fprintf fmt "(lang dune %s)@." dune_lang_version ;
+  pp_dune fmt Dune.[Env.to_s_expr env] ;
+  pp_dune fmt dune ;
+  Format.fprintf fmt "@." ;
+  Format.fprintf fmt "; This file was automatically generated, do not edit.@." ;
+  Format.fprintf fmt "; Edit file manifest/manifest.ml instead.@."
 
 let check_for_non_generated_files ?(exclude = fun _ -> false) () =
   let rec find_opam_and_dune_files acc dir =
