@@ -8,7 +8,8 @@
  (libraries
   dune-configurator
   tezos-version.parser)
- (flags (:standard \ -ccopt -static))
+ (flags (:standard
+         \ -ccopt -static))
  (modules get_git_info))
 
 (executable
@@ -18,5 +19,6 @@
  (libraries
   tezos-version
   tezos-base.unix)
- (flags (:standard -open Tezos_version))
+ (flags (:standard
+         -open Tezos_version))
  (modules tezos_print_version))

@@ -16,4 +16,7 @@
  (preprocess (pps ppx_inline_test))
  (js_of_ocaml)
  (flags
-  (:standard -open Tezos_stdlib -open Tezos_error_monad -open Data_encoding)))
+  (:standard
+   -open Tezos_stdlib
+   -open Tezos_error_monad
+   -open Data_encoding)))

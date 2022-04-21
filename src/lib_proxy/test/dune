@@ -14,7 +14,9 @@
   qcheck-alcotest
   alcotest-lwt)
  (flags
-  (:standard -open Tezos_base.TzPervasives -open Tezos_base_test_helpers)))
+  (:standard
+   -open Tezos_base.TzPervasives
+   -open Tezos_base_test_helpers)))
 
 (rule
  (alias runtest)

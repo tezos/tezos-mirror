@@ -11,7 +11,9 @@
   qcheck-alcotest
   tezos-test-helpers)
  (js_of_ocaml)
- (flags (:standard -open Tezos_base -open Tezos_error_monad))
+ (flags (:standard
+         -open Tezos_base
+         -open Tezos_error_monad))
  (modules test_bounded test_time test_protocol))
 
 (rule
@@ -63,7 +65,9 @@
   qcheck-alcotest
   tezos-test-helpers)
  (js_of_ocaml)
- (flags (:standard -open Tezos_base -open Tezos_error_monad))
+ (flags (:standard
+         -open Tezos_base
+         -open Tezos_error_monad))
  (modules test_p2p_addr))
 
 (rule
@@ -91,7 +95,9 @@
   qcheck-alcotest
   tezos-test-helpers)
  (js_of_ocaml)
- (flags (:standard -open Tezos_base -open Tezos_error_monad))
+ (flags (:standard
+         -open Tezos_base
+         -open Tezos_error_monad))
  (modules test_sized))
 
 (rule

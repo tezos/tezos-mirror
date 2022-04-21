@@ -56,7 +56,9 @@
   tezos-base.unix
   tezos-stdlib-unix
   re.str)
- (flags (:standard -open Tezos_base.TzPervasives -open Tezos_stdlib_unix))
+ (flags (:standard
+         -open Tezos_base.TzPervasives
+         -open Tezos_stdlib_unix))
  (modules Replace))
 
 (install (section libexec) (files (replace.exe as replace)))

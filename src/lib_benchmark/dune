@@ -19,4 +19,6 @@
   benchmark-utils
   pyml-plot
   ocaml-migrate-parsetree)
- (flags (:standard -open Tezos_base.TzPervasives -open Tezos_stdlib_unix)))
+ (flags (:standard
+         -open Tezos_base.TzPervasives
+         -open Tezos_stdlib_unix)))

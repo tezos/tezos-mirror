@@ -9,7 +9,9 @@
   tezos-shell-services
   alcotest)
  (js_of_ocaml)
- (flags (:standard -open Tezos_base.TzPervasives -open Tezos_shell_services)))
+ (flags (:standard
+         -open Tezos_base.TzPervasives
+         -open Tezos_shell_services)))
 
 (rule
  (alias runtest)

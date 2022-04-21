@@ -8,7 +8,8 @@
  (libraries
   tezos-base
   resto-cohttp)
- (flags (:standard -open Tezos_base.TzPervasives))
+ (flags (:standard
+         -open Tezos_base.TzPervasives))
  (modules RPC_client_errors media_type))
 
 (library
@@ -19,7 +20,9 @@
   tezos-base
   resto-cohttp-client
   tezos-rpc-http)
- (flags (:standard -open Tezos_base.TzPervasives -open Tezos_rpc_http))
+ (flags (:standard
+         -open Tezos_base.TzPervasives
+         -open Tezos_rpc_http))
  (modules RPC_client))
 
 (library
@@ -32,7 +35,9 @@
   cohttp-lwt-unix
   resto-cohttp-client
   tezos-rpc-http-client)
- (flags (:standard -open Tezos_base.TzPervasives -open Tezos_rpc_http_client))
+ (flags (:standard
+         -open Tezos_base.TzPervasives
+         -open Tezos_rpc_http_client))
  (modules RPC_client_unix))
 
 (library

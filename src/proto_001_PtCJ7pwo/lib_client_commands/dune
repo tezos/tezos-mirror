@@ -17,8 +17,7 @@
  (library_flags (:standard -linkall))
  (flags
   (:standard
-   -w
-   -9+27-30-32-40@8
+   -w -9+27-30-32-40@8
    -open Tezos_base.TzPervasives
    -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
    -open Tezos_protocol_001_PtCJ7pwo
@@ -46,8 +45,7 @@
  (library_flags (:standard -linkall))
  (flags
   (:standard
-   -w
-   -9+27-30-32-40@8
+   -w -9+27-30-32-40@8
    -open Tezos_base.TzPervasives
    -open Tezos_base.TzPervasives.Error_monad.Legacy_monad_globals
    -open Tezos_protocol_001_PtCJ7pwo

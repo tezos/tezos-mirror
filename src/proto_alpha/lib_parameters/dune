@@ -10,7 +10,9 @@
   tezos-protocol-environment
   tezos-protocol-alpha)
  (library_flags (:standard -linkall))
- (flags (:standard -open Tezos_base.TzPervasives -open Tezos_protocol_alpha))
+ (flags (:standard
+         -open Tezos_base.TzPervasives
+         -open Tezos_protocol_alpha))
  (modules (:standard \ gen)))
 
 (executable

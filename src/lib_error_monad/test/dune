@@ -9,7 +9,8 @@
   data-encoding
   alcotest)
  (js_of_ocaml)
- (flags (:standard -open Tezos_error_monad)))
+ (flags (:standard
+         -open Tezos_error_monad)))
 
 (rule
  (alias runtest)

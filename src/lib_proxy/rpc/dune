@@ -11,4 +11,5 @@
   tezos-mockup-proxy
   tezos-rpc
   tezos-proxy)
- (flags (:standard -open Tezos_base.TzPervasives)))
+ (flags (:standard
+         -open Tezos_base.TzPervasives)))
