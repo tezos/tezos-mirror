@@ -405,6 +405,7 @@ let start_ops_monitor cctxt =
     ~branch_delayed:true
     ~branch_refused:true
     ~refused:true
+    ~outdated:true
     ()
 
 let create (cctxt : #Protocol_client_context.full) ?canceler ~preserved_levels
