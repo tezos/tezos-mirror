@@ -30,7 +30,12 @@
    Subject:      On context features.
 *)
 
+module Assert_lib = Lib_test_extra.Assert_lib
+module Assert = Lib_test.Assert
 open Context
+
+let equal_context_hash ?loc ?msg l1 l2 =
+  Assert.equal ?loc ~eq:Context_hash.( = ) ~pp:Context_hash.pp ?msg l1 l2
 
 let ( let* ) = Lwt.bind
 
@@ -446,7 +451,7 @@ let test_raw {idx; genesis; _} =
       let c = String.Map.add "bar" (`Tree b) a in
       let d = String.Map.singleton "foo" (`Tree c) in
       let e = `Tree d in
-      Assert.equal_raw_tree ~loc:__LOC__ e raw ;
+      Assert_lib.Raw_Tree.equal ~loc:__LOC__ e raw ;
       Lwt.return ()
 
 let string n = String.make n 'a'
@@ -465,14 +470,14 @@ let test_encoding {idx; genesis; _} =
       let* ctxt = add ctxt [string 64] foo2 in
       let* ctxt = add ctxt [string 127] foo2 in
       let* h = commit ctxt in
-      Assert.equal_context_hash
+      equal_context_hash
         ~loc:__LOC__
         (Context_hash.of_b58check_exn
            "CoWJsL2ehZ39seTr8inBCJb5tVjW8KGNweJ5cvuVq51mAASrRmim")
         h ;
       let* ctxt = add ctxt [string 255] foo2 in
       let* h = commit ctxt in
-      Assert.equal_context_hash
+      equal_context_hash
         ~loc:__LOC__
         (Context_hash.of_b58check_exn
            "CoVexcEHMXmSA2k42aNc5MCDtVJFRs3CC6vcQWYwFoj7EFsBPw1c")
@@ -569,7 +574,7 @@ let test_is_empty {idx; block2; _} =
             ~msg:"length of directory /a/ is unexpectedly not 0"
             []
             ls ;
-          Assert.equal_context_hash
+          equal_context_hash
             ~loc:__LOC__
             ~msg:
               "A fresh empty tree has the same hash as a tree containing data \
