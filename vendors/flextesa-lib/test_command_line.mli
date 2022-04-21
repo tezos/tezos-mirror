@@ -47,8 +47,8 @@ module Run_command : sig
     -> ( < application_name: string ; console: Console.t ; .. >
        * (unit -> (unit, 'errors) Asynchronous_result.t) )
        Cmdliner.Term.t
-    -> Cmdliner.Term.info
-    -> unit Cmdliner.Term.t * Cmdliner.Term.info
+    -> Cmdliner.Cmd.info
+    -> unit Cmdliner.Term.t * Cmdliner.Cmd.info
 end
 
 module Full_default_state : sig

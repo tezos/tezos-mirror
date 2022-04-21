@@ -164,7 +164,7 @@ module Manpage = struct
     @ (* [ `S misc_docs ] @ *)
     Node_shared_arg.Manpage.bugs
 
-  let info = Cmdliner.Term.info ~doc:"Manage node upgrades" ~man "upgrade"
+  let info = Cmdliner.Cmd.info ~doc:"Manage node upgrades" ~man "upgrade"
 end
 
-let cmd = (Term.term, Manpage.info)
+let cmd = Cmdliner.Cmd.v Manpage.info Term.term

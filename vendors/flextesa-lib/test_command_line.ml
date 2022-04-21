@@ -73,7 +73,7 @@ module Run_command = struct
   let term ~pp_error () =
     Cmdliner.Term.pure (fun (state, run) -> or_hard_fail state run ~pp_error)
 
-  let make ~pp_error t (i : Cmdliner.Term.info) =
+  let make ~pp_error t (i : Cmdliner.Cmd.info) =
     Cmdliner.Term.(term ~pp_error () $ t, i)
 end
 

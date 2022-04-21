@@ -644,6 +644,6 @@ let cmd () =
   in
   let info =
     let doc = "Interactive test exercising the Ledger Baking app features" in
-    info ~doc "ledger-baking"
+    Cmd.info ~doc "ledger-baking"
   in
-  (term, info)
+  Cmd.v info term

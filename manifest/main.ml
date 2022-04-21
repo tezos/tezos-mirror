@@ -59,7 +59,7 @@ let caqti_lwt = external_lib "caqti-lwt" V.True
 
 let caqti_driver_postgresql = external_lib "caqti-driver-postgresql" V.True
 
-let cmdliner = external_lib "cmdliner" V.True
+let cmdliner = external_lib "cmdliner" V.(at_least "1.1.0")
 
 let cohttp_lwt_unix = external_lib "cohttp-lwt-unix" V.(at_least "2.2.0")
 
