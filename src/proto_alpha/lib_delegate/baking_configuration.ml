@@ -84,7 +84,7 @@ type t = {
   user_activated_upgrades : (int32 * Protocol_hash.t) list;
   liquidity_baking_toggle_vote :
     Protocol.Alpha_context.Liquidity_baking.liquidity_baking_toggle_vote;
-  per_block_vote_file : string;
+  per_block_vote_file : string option;
   force : bool;
   state_recorder : state_recorder_config;
   extra_operations : Operations_source.t option;
@@ -130,7 +130,7 @@ let default_config =
     force = default_force;
     state_recorder = default_state_recorder_config;
     extra_operations = default_extra_operations;
-    per_block_vote_file = default_per_block_vote_file;
+    per_block_vote_file = None;
   }
 
 let make ?(minimal_fees = default_fees_config.minimal_fees)
@@ -141,9 +141,8 @@ let make ?(minimal_fees = default_fees_config.minimal_fees)
     ?(retries_on_failure = default_retries_on_failure_config)
     ?(user_activated_upgrades = default_user_activated_upgrades)
     ?(liquidity_baking_toggle_vote = default_liquidity_baking_toggle_vote)
-    ?(per_block_vote_file = default_per_block_vote_file)
-    ?(force = default_force) ?(state_recorder = default_state_recorder_config)
-    ?extra_operations () =
+    ?per_block_vote_file ?(force = default_force)
+    ?(state_recorder = default_state_recorder_config) ?extra_operations () =
   let fees =
     {minimal_fees; minimal_nanotez_per_gas_unit; minimal_nanotez_per_byte}
   in
@@ -308,7 +307,7 @@ let encoding : t Data_encoding.t =
           (req
              "liquidity_baking_toggle_vote"
              liquidity_baking_toggle_vote_config_encoding)
-          (req "per_block_vote_file" Data_encoding.string)
+          (opt "per_block_vote_file" Data_encoding.string)
           (req "force" force_config_encoding)
           (req "state_recorder" state_recorder_config_encoding)
           (opt "extra_operations" Operations_source.encoding))

@@ -51,6 +51,8 @@ type error += Block_vote_file_wrong_content of string
 
 type error += Block_vote_file_missing_liquidity_baking_toggle_vote of string
 
+type error += Missing_vote_on_startup
+
 let () =
   register_error_kind
     `Permanent
@@ -132,7 +134,24 @@ let () =
           Some file_path
       | _ -> None)
     (fun file_path ->
-      Block_vote_file_missing_liquidity_baking_toggle_vote file_path)
+      Block_vote_file_missing_liquidity_baking_toggle_vote file_path) ;
+  register_error_kind
+    `Permanent
+    ~id:"Client_baking_forge.missing_vote_on_startup"
+    ~title:"Missing vote on startup"
+    ~description:
+      "No CLI flag, file path, or vote file in default location provided on \
+       startup"
+    ~pp:(fun fmt () ->
+      Format.fprintf
+        fmt
+        "Missing liquidity baking toggle vote, please use either the \
+         --liquidity-baking-toggle-vote or --per_block_vote_file option or a \
+         vote file in the default location: per_block_votes.json in the \
+         current working directory.")
+    Data_encoding.empty
+    (function Missing_vote_on_startup -> Some () | _ -> None)
+    (fun () -> Missing_vote_on_startup)
 
 let traced_option_to_result ~error =
   Option.fold ~some:ok ~none:(Result_syntax.tzfail error)
@@ -169,3 +188,13 @@ let read_liquidity_baking_toggle_vote_no_fail ~default ~per_block_vote_file =
   | Error errs ->
       Events.(emit per_block_vote_file_fail) errs >>= fun () ->
       Lwt.return default
+
+let read_liquidity_baking_toggle_vote_on_startup ~default ~per_block_vote_file =
+  read_liquidity_baking_toggle_vote ~per_block_vote_file >>= function
+  | Ok vote -> return (vote, true)
+  | Error errs -> (
+      match default with
+      | None ->
+          Events.(emit per_block_vote_file_fail) errs >>= fun () ->
+          fail Missing_vote_on_startup
+      | Some vote -> return (vote, false))

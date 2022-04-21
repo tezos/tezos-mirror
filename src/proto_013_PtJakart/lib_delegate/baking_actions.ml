@@ -270,9 +270,12 @@ let inject_block ~state_recorder state block_to_bake ~updated_state =
   (* Set liquidity_baking_toggle_vote for this block *)
   let default = state.global_state.config.liquidity_baking_toggle_vote in
   let per_block_vote_file = state.global_state.config.per_block_vote_file in
-  Liquidity_baking_vote_file.read_liquidity_baking_toggle_vote_no_fail
-    ~default
-    ~per_block_vote_file
+  (match per_block_vote_file with
+  | None -> Lwt.return default
+  | Some per_block_vote_file ->
+      Liquidity_baking_vote_file.read_liquidity_baking_toggle_vote_no_fail
+        ~default
+        ~per_block_vote_file)
   >>= fun liquidity_baking_toggle_vote ->
   (* Cache last toggle vote to use in case of vote file errors *)
   let updated_state =
