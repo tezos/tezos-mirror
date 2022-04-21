@@ -40,7 +40,7 @@ let protocols =
     ( "jakarta",
       "Jakarta",
       Some "/include/rpc_introduction.rst.inc",
-      "PtJakartaiDz69SfDDLXJSiuZqTSeSKRDbKVZC8MNzJnvRjvnGw" );
+      "PtJakart2xVj7pYXJBXrqHgd82rdkLey5ZeeGwDgPp9rhQUbSqY" );
   ]
 
 let pp_name ppf = function
