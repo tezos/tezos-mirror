@@ -93,6 +93,7 @@ ometrics-code-quality:
     - .image_template__runtime_build_test_dependencies_template
     - .template__code_quality
     - .rules_template__merge_request_only
+  allow_failure: true
   script:
     - OMETRICS_GIT=$CI_MERGE_REQUEST_SOURCE_PROJECT_URL OMETRICS_BRANCH=$CI_MERGE_REQUEST_SOURCE_BRANCH_NAME make lint-ometrics-gitlab
   artifacts:
