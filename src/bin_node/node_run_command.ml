@@ -717,7 +717,7 @@ module Manpage = struct
     description @ Node_shared_arg.Manpage.args @ debug @ examples
     @ Node_shared_arg.Manpage.bugs
 
-  let info = Cmdliner.Term.info ~doc:"Run the Tezos node" ~man "run"
+  let info = Cmdliner.Cmd.info ~doc:"Run the Tezos node" ~man "run"
 end
 
-let cmd = (Term.term, Manpage.info)
+let cmd = Cmdliner.Cmd.v Manpage.info Term.term

@@ -783,6 +783,6 @@ let cmd () =
              ]);
       ]
     in
-    info "daemons-upgrade" ~man ~doc
+    Cmd.info "daemons-upgrade" ~man ~doc
   in
-  (term, info)
+  Cmd.v info term

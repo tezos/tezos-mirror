@@ -34,12 +34,15 @@ let cmd () =
       ~command_name:"prevalidation"
       ()
   in
-  ( const (fun bnod bcli state ->
+  let term =
+    const (fun bnod bcli state ->
         Test_command_line.Run_command.or_hard_fail
           state
           ~pp_error
           (run state bnod bcli))
     $ Tezos_executable.cli_term base_state `Node "tezos"
     $ Tezos_executable.cli_term base_state `Client "tezos"
-    $ Test_command_line.cli_state ~name:"prevalidation" (),
-    info ~doc:"Work-in-progress." "prevalidation" )
+    $ Test_command_line.cli_state ~name:"prevalidation" ()
+  in
+  let info = Cmd.info ~doc:"Work-in-progress." "prevalidation" in
+  Cmd.v info term

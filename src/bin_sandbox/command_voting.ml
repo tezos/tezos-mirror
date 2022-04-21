@@ -1035,6 +1035,6 @@ $ Arg.(
            operation.";
       ]
     in
-    info ~doc ~man "voting"
+    Cmd.info ~doc ~man "voting"
   in
-  (term, info)
+  Cmd.v info term

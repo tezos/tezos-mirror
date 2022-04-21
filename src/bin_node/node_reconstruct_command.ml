@@ -158,7 +158,7 @@ module Manpage = struct
   let man = description @ options @ examples @ Node_shared_arg.Manpage.bugs
 
   let info =
-    Cmdliner.Term.info ~doc:"Manage storage reconstruction" ~man "reconstruct"
+    Cmdliner.Cmd.info ~doc:"Manage storage reconstruction" ~man "reconstruct"
 end
 
-let cmd = (Term.term, Manpage.info)
+let cmd = Cmdliner.Cmd.v Manpage.info Term.term

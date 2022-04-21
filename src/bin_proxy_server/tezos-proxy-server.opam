@@ -11,7 +11,7 @@ depends: [
   "dune" { >= "2.9" }
   "tezos-base"
   "tezos-stdlib-unix"
-  "cmdliner"
+  "cmdliner" { >= "1.1.0" }
   "lwt-exit"
   "lwt" { >= "5.4.0" }
   "tezos-proxy"

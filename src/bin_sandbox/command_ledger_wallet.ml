@@ -1723,6 +1723,6 @@ let cmd () =
   in
   let info =
     let doc = "Interactive test exercising the Ledger Wallet app features" in
-    info ~doc "ledger-wallet"
+    Cmd.info ~doc "ledger-wallet"
   in
-  (term, info)
+  Cmd.v info term

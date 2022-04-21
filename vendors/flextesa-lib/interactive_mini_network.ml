@@ -407,5 +407,5 @@ let cmd () =
         ; `P
             "There is also the option of running the sandbox non-interactively \
              for a given number of blocks, cf. `--until-level LEVEL`." ] in
-    info "mini-network" ~man ~doc in
-  (term, info)
+    Cmd.info "mini-network" ~man ~doc in
+  Cmd.v info term
