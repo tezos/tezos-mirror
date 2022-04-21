@@ -157,8 +157,12 @@ let detect_script_failure :
   in
   fun {contents} -> detect_script_failure contents
 
-let add_operation ?expect_apply_failure ?expect_failure st op =
+let add_operation ?expect_apply_failure ?expect_failure ?(check_size = false) st
+    op =
   let open Apply_results in
+  (if check_size then
+   let operation_size = Data_encoding.Binary.length Operation.encoding op in
+   assert (operation_size < Constants_repr.max_operation_data_length)) ;
   apply_operation st.state op >|= Environment.wrap_tzresult >>= fun result ->
   match (expect_apply_failure, result) with
   | (Some _, Ok _) -> failwith "Error expected while adding operation"
