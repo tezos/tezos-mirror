@@ -1153,6 +1153,23 @@ let _tezos_tooling_js_inline_tests =
     ~modules:["run_js_inline_tests"]
     ~deps:[parsexp; unix]
 
+let _tezos_tooling_opam_file_format =
+  private_lib
+    "opam_file_format"
+    ~opam:"tezos-tooling"
+    ~path:"src/tooling/opam-lint/opam-file-format-src"
+    ~deps:[unix]
+    ~wrapped:false
+    ~dune:Dune.[ocamllex "opamLexer"; ocamlyacc "opamBaseParser"]
+
+let _tezos_tooling_opam_lint =
+  test
+    "opam_lint"
+    ~runtest:false
+    ~path:"src/tooling/opam-lint"
+    ~opam:"tezos-tooling"
+    ~deps:[_tezos_tooling_opam_file_format; unix]
+
 let tezos_p2p =
   public_lib
     "tezos-p2p"

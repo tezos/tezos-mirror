@@ -358,6 +358,8 @@ module Dune = struct
 
   let ocamllex name = [S "ocamllex"; S name]
 
+  let ocamlyacc name = [S "ocamlyacc"; S name]
+
   let pps ?(args = Stdlib.List.[]) name = S "pps" :: S name :: of_atom_list args
 
   let include_ name = [S "include"; S name]
