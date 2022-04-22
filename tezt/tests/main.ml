@@ -83,6 +83,7 @@ let () =
   Encoding.register ~protocols ;
   Precheck.register ~protocols:[Ithaca; Jakarta; Alpha] ;
   Tenderbake.register ~protocols:[Alpha] ;
+  Forge.register ~protocols:[Alpha] ;
   (* Tests that are protocol-independent.
      They do not take a protocol as a parameter and thus need to be registered only once. *)
   Light.register_protocol_independent () ;
