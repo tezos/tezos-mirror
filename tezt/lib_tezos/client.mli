@@ -545,6 +545,7 @@ val transfer :
   ?storage_limit:int ->
   ?counter:int ->
   ?arg:string ->
+  ?simulation:bool ->
   ?force:bool ->
   ?expect_failure:bool ->
   amount:Tez.t ->
@@ -565,6 +566,7 @@ val spawn_transfer :
   ?storage_limit:int ->
   ?counter:int ->
   ?arg:string ->
+  ?simulation:bool ->
   ?force:bool ->
   amount:Tez.t ->
   giver:string ->

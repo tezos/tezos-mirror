@@ -48,6 +48,7 @@ let () =
   Signer_test.register ~protocols:[Alpha] ;
   Basic.register ~protocols:[Alpha] ;
   Client_config.register ~protocols:[Alpha] ;
+  Client_commands.register ~protocols:[Jakarta; Alpha] ;
   Global_constants.register ~protocols:[Alpha] ;
   Bootstrap.register ~protocols:[Alpha] ;
   Hash_data.register ~protocols:[Alpha] ;
