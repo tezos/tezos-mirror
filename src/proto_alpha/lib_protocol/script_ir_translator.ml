@@ -953,130 +953,6 @@ let parse_memo_size (n : (location, _) Micheline.node) :
 type ex_comparable_ty =
   | Ex_comparable_ty : 'a comparable_ty -> ex_comparable_ty
 
-let[@coq_struct "ty"] rec parse_comparable_ty :
-    stack_depth:int ->
-    context ->
-    Script.node ->
-    (ex_comparable_ty * context) tzresult =
- fun ~stack_depth ctxt ty ->
-  Gas.consume ctxt Typecheck_costs.parse_type_cycle >>? fun ctxt ->
-  if Compare.Int.(stack_depth > 10000) then
-    error Typechecking_too_many_recursive_calls
-  else
-    match ty with
-    | Prim (loc, T_unit, [], annot) ->
-        check_type_annot loc annot >|? fun () -> (Ex_comparable_ty unit_t, ctxt)
-    | Prim (loc, T_never, [], annot) ->
-        check_type_annot loc annot >|? fun () -> (Ex_comparable_ty never_t, ctxt)
-    | Prim (loc, T_int, [], annot) ->
-        check_type_annot loc annot >|? fun () -> (Ex_comparable_ty int_t, ctxt)
-    | Prim (loc, T_nat, [], annot) ->
-        check_type_annot loc annot >|? fun () -> (Ex_comparable_ty nat_t, ctxt)
-    | Prim (loc, T_signature, [], annot) ->
-        check_type_annot loc annot >|? fun () ->
-        (Ex_comparable_ty signature_t, ctxt)
-    | Prim (loc, T_string, [], annot) ->
-        check_type_annot loc annot >|? fun () ->
-        (Ex_comparable_ty string_t, ctxt)
-    | Prim (loc, T_bytes, [], annot) ->
-        check_type_annot loc annot >|? fun () -> (Ex_comparable_ty bytes_t, ctxt)
-    | Prim (loc, T_mutez, [], annot) ->
-        check_type_annot loc annot >|? fun () -> (Ex_comparable_ty mutez_t, ctxt)
-    | Prim (loc, T_bool, [], annot) ->
-        check_type_annot loc annot >|? fun () -> (Ex_comparable_ty bool_t, ctxt)
-    | Prim (loc, T_key_hash, [], annot) ->
-        check_type_annot loc annot >|? fun () ->
-        (Ex_comparable_ty key_hash_t, ctxt)
-    | Prim (loc, T_key, [], annot) ->
-        check_type_annot loc annot >|? fun () -> (Ex_comparable_ty key_t, ctxt)
-    | Prim (loc, T_timestamp, [], annot) ->
-        check_type_annot loc annot >|? fun () ->
-        (Ex_comparable_ty timestamp_t, ctxt)
-    | Prim (loc, T_chain_id, [], annot) ->
-        check_type_annot loc annot >|? fun () ->
-        (Ex_comparable_ty chain_id_t, ctxt)
-    | Prim (loc, T_address, [], annot) ->
-        check_type_annot loc annot >|? fun () ->
-        (Ex_comparable_ty address_t, ctxt)
-    | Prim (loc, T_tx_rollup_l2_address, [], annot) ->
-        if Constants.tx_rollup_enable ctxt then
-          check_type_annot loc annot >|? fun () ->
-          (Ex_comparable_ty tx_rollup_l2_address_t, ctxt)
-        else error @@ Tx_rollup_addresses_disabled loc
-    | Prim
-        ( loc,
-          (( T_unit | T_never | T_int | T_nat | T_string | T_bytes | T_mutez
-           | T_bool | T_key_hash | T_timestamp | T_address | T_chain_id
-           | T_signature | T_key ) as prim),
-          l,
-          _ ) ->
-        error (Invalid_arity (loc, prim, 0, List.length l))
-    | Prim (loc, T_pair, left :: right, annot) ->
-        check_type_annot loc annot >>? fun () ->
-        remove_field_annot left >>? fun left ->
-        (match right with
-        | [right] -> remove_field_annot right
-        | right ->
-            (* Unfold [pair t1 ... tn] as [pair t1 (... (pair tn-1 tn))] *)
-            ok (Prim (loc, T_pair, right, [])))
-        >>? fun right ->
-        parse_comparable_ty ~stack_depth:(stack_depth + 1) ctxt right
-        >>? fun (Ex_comparable_ty right, ctxt) ->
-        parse_comparable_ty ~stack_depth:(stack_depth + 1) ctxt left
-        >>? fun (Ex_comparable_ty left, ctxt) ->
-        comparable_pair_t loc left right >|? fun ty ->
-        (Ex_comparable_ty ty, ctxt)
-    | Prim (loc, T_or, [left; right], annot) ->
-        check_type_annot loc annot >>? fun () ->
-        remove_field_annot left >>? fun left ->
-        remove_field_annot right >>? fun right ->
-        parse_comparable_ty ~stack_depth:(stack_depth + 1) ctxt right
-        >>? fun (Ex_comparable_ty right, ctxt) ->
-        parse_comparable_ty ~stack_depth:(stack_depth + 1) ctxt left
-        >>? fun (Ex_comparable_ty left, ctxt) ->
-        comparable_union_t loc left right >|? fun ty ->
-        (Ex_comparable_ty ty, ctxt)
-    | Prim (loc, ((T_pair | T_or) as prim), l, _) ->
-        error (Invalid_arity (loc, prim, 2, List.length l))
-    | Prim (loc, T_option, [t], annot) ->
-        check_type_annot loc annot >>? fun () ->
-        parse_comparable_ty ~stack_depth:(stack_depth + 1) ctxt t
-        >>? fun (Ex_comparable_ty t, ctxt) ->
-        comparable_option_t loc t >|? fun ty -> (Ex_comparable_ty ty, ctxt)
-    | Prim (loc, T_option, l, _) ->
-        error (Invalid_arity (loc, T_option, 1, List.length l))
-    | Prim
-        ( loc,
-          (T_set | T_map | T_list | T_lambda | T_contract | T_operation),
-          _,
-          _ ) ->
-        error (Comparable_type_expected (loc, Micheline.strip_locations ty))
-    | expr ->
-        error
-        @@ unexpected
-             expr
-             []
-             Type_namespace
-             [
-               T_unit;
-               T_never;
-               T_int;
-               T_nat;
-               T_string;
-               T_bytes;
-               T_mutez;
-               T_bool;
-               T_key_hash;
-               T_timestamp;
-               T_address;
-               T_pair;
-               T_or;
-               T_option;
-               T_chain_id;
-               T_signature;
-               T_key;
-             ]
-
 type ex_ty = Ex_ty : ('a, _) ty -> ex_ty
 
 type ex_parameter_ty_and_entrypoints_node =
@@ -1439,6 +1315,30 @@ let[@coq_axiom_with_reason "complex mutually recursive definition"] rec parse_ty
                T_ticket;
                T_tx_rollup_l2_address;
              ]
+
+and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_comparable_ty
+    :
+    context ->
+    stack_depth:int ->
+    Script.node ->
+    (ex_comparable_ty * context) tzresult =
+ fun ctxt ~stack_depth node ->
+  parse_ty
+    ~ret:Don't_parse_entrypoints
+    ctxt
+    ~stack_depth:(stack_depth + 1)
+    ~legacy:false
+    ~allow_lazy_storage:false
+    ~allow_operation:false
+    ~allow_contract:false
+    ~allow_ticket:false
+    node
+  >>? fun (Ex_ty t, ctxt) ->
+  match is_comparable t with
+  | Yes -> ok (Ex_comparable_ty t, ctxt)
+  | No ->
+      error
+        (Comparable_type_expected (location node, Micheline.strip_locations node))
 
 and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_passable_ty :
     type ret name.
