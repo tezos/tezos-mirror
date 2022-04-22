@@ -4,6 +4,8 @@ misc_checks:
   retry: 1
   needs: []
   script:
+    # FIXME: https://gitlab.com/tezos/tezos/-/issues/2865
+    - sudo chown -R $(id -u):$(id -g) $CI_PROJECT_DIR
     # misc linting
     - find . ! -path "./_opam/*" -name "*.opam" -exec opam lint {} +;
     - make check-linting

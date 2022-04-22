@@ -24,11 +24,15 @@ script:prepare_migration_test:
     - new_proto_version=$(printf "%03d" $((10#$last_proto_version + 1)))
     - make
   script:
+    # FIXME: https://gitlab.com/tezos/tezos/-/issues/2865
+    - sudo chown -R $(id -u):$(id -g) $CI_PROJECT_DIR
     - ./scripts/prepare_migration_test.sh manual "next_$new_proto_version" 1
 
 script:snapshot_alpha_and_link:
   extends: .test_template
   script:
+    # FIXME: https://gitlab.com/tezos/tezos/-/issues/2865
+    - sudo chown -R $(id -u):$(id -g) $CI_PROJECT_DIR
     - last_proto_name=$(find src -name "proto_[0-9][0-9][0-9]_*" | awk -F'/' '{print $NF}' | sort -r | head -1)
     - last_proto_version=$(echo $last_proto_name | cut -d'_' -f2)
     - new_proto_version=$(printf "%03d" $((10#$last_proto_version + 1)))
@@ -52,7 +56,7 @@ script:test-gen-genesis:
 script:test_release_versions:
   extends: .test_template
   script:
-    # FIXME: root user owns the project directory
+    # FIXME: https://gitlab.com/tezos/tezos/-/issues/2865
     - sudo chown -R $(id -u):$(id -g) $CI_PROJECT_DIR
     - ./scripts/test_release_version.sh
 
