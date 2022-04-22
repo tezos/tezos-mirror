@@ -151,6 +151,12 @@ opam admin add-hashes sha256 sha512
 git remote add tezos $opam_repository_git
 git fetch --depth 1 tezos "$opam_repository_tag"
 git reset "$opam_repository_tag"
+
+## opam.2.1 will try to delete opam-depext, we should restore it.
+if [ ! -d packages/opam-depext ]; then
+    git restore packages/opam-depext
+fi
+
 git add packages
 git diff HEAD -- packages > "$target"
 
