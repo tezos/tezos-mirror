@@ -10,6 +10,8 @@ gitlab:release:
     - build:static-arm64-linux-binaries
     - docker:merge_manifests
   script:
+    # FIXME: https://gitlab.com/tezos/tezos/-/issues/2865
+    - sudo chown -R $(id -u):$(id -g) $CI_PROJECT_DIR
     # we run the smoketest only for x86_64 since this job is executed on x86_64
     - ./scripts/ci/static_smoke_test.sh x86_64 version
     # create a GitLab generic package
@@ -29,6 +31,8 @@ docker:merge_manifests:
   image: "${CI_REGISTRY}/tezos/docker-images/ci-docker:v1.1.0"
   stage: publish_release
   script:
+    # FIXME: https://gitlab.com/tezos/tezos/-/issues/2865
+    - sudo chown -R $(id -u):$(id -g) $CI_PROJECT_DIR
     # Environment variables from before_script
     - . ./scripts/ci/docker.env
     - ./scripts/ci/docker_merge_manifests.sh
@@ -41,6 +45,8 @@ docker:promote_to_latest:
   image: "${CI_REGISTRY}/tezos/docker-images/ci-docker:v1.1.0"
   stage: publish_release
   script:
+    # FIXME: https://gitlab.com/tezos/tezos/-/issues/2865
+    - sudo chown -R $(id -u):$(id -g) $CI_PROJECT_DIR
     # Environment variables from before_script
     - . ./scripts/ci/docker.env
     - ./scripts/ci/docker_promote_to_latest.sh
