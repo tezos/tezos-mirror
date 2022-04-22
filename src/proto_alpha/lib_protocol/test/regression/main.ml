@@ -26,8 +26,8 @@
 (** Testing
     -------
     Component:    Protocol
-    Invocation:   dune runtest src/proto_alpha/lib_protocol/test/regression
-    Subject:      Protocol Regessions
+    Invocation:   cd src/proto_alpha/lib_protocol/test/regression && dune exec ./main.exe
+    Subject:      Protocol Regressions
  *)
 
 (* This module runs the tests implemented in all other modules of this directory.

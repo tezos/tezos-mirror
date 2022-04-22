@@ -2,7 +2,7 @@
  (name main)
  (package tezos-protocol-alpha-tests)
  (deps (glob_files contracts/*)
-       (glob_files tezt/_regressions))
+       (glob_files tezt/_regressions/*))
  (libraries tezt
             tezos-base
             tezos-protocol-alpha

@@ -2171,7 +2171,7 @@ module RPC = struct
         | Chest_key_t -> return (T_chest_key, [], [])
     end
 
-    let pp_instr_name :
+    let rec pp_instr_name :
         type a b c d.
         Format.formatter -> (a, b, c, d) Script_typed_ir.kinstr -> unit =
       let open Script_typed_ir in
@@ -2324,7 +2324,8 @@ module RPC = struct
         | IJoin_tickets _ -> pp_print_string fmt "JOIN_TICKETS"
         | IOpen_chest _ -> pp_print_string fmt "OPEN_CHEST"
         | IHalt _ -> pp_print_string fmt "[halt]"
-        | ILog _ -> pp_print_string fmt "[log]"
+        | ILog (_, _, _, instr) ->
+            Format.fprintf fmt "log/%a" pp_instr_name instr
 
     let run_operation_service ctxt ()
         ({shell; protocol_data = Operation_data protocol_data}, chain_id) =

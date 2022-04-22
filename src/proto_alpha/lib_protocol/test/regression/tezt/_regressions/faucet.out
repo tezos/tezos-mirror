@@ -1,123 +1,123 @@
 faucet.out
 
 trace
-  - UNPAIR (interp) @ location: 7 (remaining gas: unaccounted)
+  - UNPAIR (interp) @ location: 7
     [ (Pair "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU" "2020-01-01T00:00:00Z") ]
-  - UNPAIR (entry) @ location: 7 (remaining gas: unaccounted)
+  - UNPAIR (entry) @ location: 7
     [ (Pair "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU" "2020-01-01T00:00:00Z") ]
-    - [log] (exit) @ location: 7 (remaining gas: unaccounted)
+    - log/SWAP (exit) @ location: 7
       [ "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU"
         "2020-01-01T00:00:00Z" ]
-  - SWAP (entry) @ location: 8 (remaining gas: unaccounted)
+  - SWAP (entry) @ location: 8
     [ "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU"
       "2020-01-01T00:00:00Z" ]
-    - [log] (exit) @ location: 8 (remaining gas: unaccounted)
+    - log/CONST (exit) @ location: 8
       [ "2020-01-01T00:00:00Z"
         "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU" ]
-  - CONST (entry) @ location: 9 (remaining gas: unaccounted)
+  - CONST (entry) @ location: 9
     [ "2020-01-01T00:00:00Z"
       "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU" ]
-    - [log] (exit) @ location: 9 (remaining gas: unaccounted)
+    - log/ADD (exit) @ location: 9
       [ 300
         "2020-01-01T00:00:00Z"
         "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU" ]
-  - ADD (entry) @ location: 12 (remaining gas: unaccounted)
+  - ADD (entry) @ location: 12
     [ 300
       "2020-01-01T00:00:00Z"
       "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU" ]
-    - [log] (exit) @ location: 12 (remaining gas: unaccounted)
+    - log/NOW (exit) @ location: 12
       [ "2020-01-01T00:05:00Z"
         "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU" ]
-  - NOW (entry) @ location: 13 (remaining gas: unaccounted)
+  - NOW (entry) @ location: 13
     [ "2020-01-01T00:05:00Z"
       "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU" ]
-    - [log] (exit) @ location: 13 (remaining gas: unaccounted)
+    - log/COMPARE (exit) @ location: 13
       [ "2022-04-14T12:32:39Z"
         "2020-01-01T00:05:00Z"
         "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU" ]
-  - COMPARE (entry) @ location: 16 (remaining gas: unaccounted)
+  - COMPARE (entry) @ location: 16
     [ "2022-04-14T12:32:39Z"
       "2020-01-01T00:05:00Z"
       "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU" ]
-    - [log] (exit) @ location: 16 (remaining gas: unaccounted)
+    - log/GE (exit) @ location: 16
       [ 1
         "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU" ]
-  - GE (entry) @ location: 17 (remaining gas: unaccounted)
+  - GE (entry) @ location: 17
     [ 1
       "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU" ]
-    - [log] (exit) @ location: 17 (remaining gas: unaccounted)
+    - log/IF (exit) @ location: 17
       [ True
         "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU" ]
-  - IF (entry) @ location: 18 (remaining gas: unaccounted)
+  - IF (entry) @ location: 18
     [ True
       "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU" ]
-    - [log] (exit) @ location: 18 (remaining gas: unaccounted)
+    - log/[halt] (exit) @ location: 18
       [ "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU" ]
-  - [halt] (entry) @ location: 24 (remaining gas: unaccounted)
+  - [halt] (entry) @ location: 24
     [ "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU" ]
     - control: KCons
-    - [log] (exit) @ location: 18 (remaining gas: unaccounted)
+    - log/IMPLICIT_ACCOUNT (exit) @ location: 18
       [ "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU" ]
-  - IMPLICIT_ACCOUNT (entry) @ location: 24 (remaining gas: unaccounted)
+  - IMPLICIT_ACCOUNT (entry) @ location: 24
     [ "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU" ]
-    - [log] (exit) @ location: 24 (remaining gas: unaccounted)
+    - log/CONST (exit) @ location: 24
       [ "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU" ]
-  - CONST (entry) @ location: 25 (remaining gas: unaccounted)
+  - CONST (entry) @ location: 25
     [ "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU" ]
-    - [log] (exit) @ location: 25 (remaining gas: unaccounted)
+    - log/CONST (exit) @ location: 25
       [ 1000000
         "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU" ]
-  - CONST (entry) @ location: 28 (remaining gas: unaccounted)
+  - CONST (entry) @ location: 28
     [ 1000000
       "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU" ]
-    - [log] (exit) @ location: 28 (remaining gas: unaccounted)
+    - log/TRANSFER_TOKENS (exit) @ location: 28
       [ Unit
         1000000
         "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU" ]
-  - TRANSFER_TOKENS (entry) @ location: 29 (remaining gas: unaccounted)
+  - TRANSFER_TOKENS (entry) @ location: 29
     [ Unit
       1000000
       "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU" ]
-    - [log] (exit) @ location: 29 (remaining gas: unaccounted)
+    - log/NIL (exit) @ location: 29
       [ 0x00000000000000000000000000000000000000000000000001c0843d0000dac9f52543da1aed0bc1d6b46bf7c10db7014cd600 ]
-  - NIL (entry) @ location: 30 (remaining gas: unaccounted)
+  - NIL (entry) @ location: 30
     [ 0x00000000000000000000000000000000000000000000000001c0843d0000dac9f52543da1aed0bc1d6b46bf7c10db7014cd600 ]
-    - [log] (exit) @ location: 30 (remaining gas: unaccounted)
+    - log/SWAP (exit) @ location: 30
       [ {}
         0x00000000000000000000000000000000000000000000000001c0843d0000dac9f52543da1aed0bc1d6b46bf7c10db7014cd600 ]
-  - SWAP (entry) @ location: 32 (remaining gas: unaccounted)
+  - SWAP (entry) @ location: 32
     [ {}
       0x00000000000000000000000000000000000000000000000001c0843d0000dac9f52543da1aed0bc1d6b46bf7c10db7014cd600 ]
-    - [log] (exit) @ location: 32 (remaining gas: unaccounted)
+    - log/CONS (exit) @ location: 32
       [ 0x00000000000000000000000000000000000000000000000001c0843d0000dac9f52543da1aed0bc1d6b46bf7c10db7014cd600
         {} ]
-  - CONS (entry) @ location: 33 (remaining gas: unaccounted)
+  - CONS (entry) @ location: 33
     [ 0x00000000000000000000000000000000000000000000000001c0843d0000dac9f52543da1aed0bc1d6b46bf7c10db7014cd600
       {} ]
-    - [log] (exit) @ location: 33 (remaining gas: unaccounted)
+    - log/DIP (exit) @ location: 33
       [ { 0x00000000000000000000000000000000000000000000000001c0843d0000dac9f52543da1aed0bc1d6b46bf7c10db7014cd600 } ]
-  - DIP (entry) @ location: 34 (remaining gas: unaccounted)
+  - DIP (entry) @ location: 34
     [ { 0x00000000000000000000000000000000000000000000000001c0843d0000dac9f52543da1aed0bc1d6b46bf7c10db7014cd600 } ]
-    - [log] (exit) @ location: 34 (remaining gas: unaccounted)
+    - log/NOW (exit) @ location: 34
       [  ]
-  - NOW (entry) @ location: 36 (remaining gas: unaccounted)
+  - NOW (entry) @ location: 36
     [  ]
-    - [log] (exit) @ location: 36 (remaining gas: unaccounted)
+    - log/[halt] (exit) @ location: 36
       [ "2022-04-14T12:32:39Z" ]
-  - [halt] (entry) @ location: 36 (remaining gas: unaccounted)
+  - [halt] (entry) @ location: 36
     [ "2022-04-14T12:32:39Z" ]
     - control: KUndip
     - control: KCons
-    - [log] (exit) @ location: 34 (remaining gas: unaccounted)
+    - log/PAIR (exit) @ location: 34
       [ { 0x00000000000000000000000000000000000000000000000001c0843d0000dac9f52543da1aed0bc1d6b46bf7c10db7014cd600 }
         "2022-04-14T12:32:39Z" ]
-  - PAIR (entry) @ location: 37 (remaining gas: unaccounted)
+  - PAIR (entry) @ location: 37
     [ { 0x00000000000000000000000000000000000000000000000001c0843d0000dac9f52543da1aed0bc1d6b46bf7c10db7014cd600 }
       "2022-04-14T12:32:39Z" ]
-    - [log] (exit) @ location: 37 (remaining gas: unaccounted)
+    - log/[halt] (exit) @ location: 37
       [ (Pair { 0x00000000000000000000000000000000000000000000000001c0843d0000dac9f52543da1aed0bc1d6b46bf7c10db7014cd600 }
               "2022-04-14T12:32:39Z") ]
-  - [halt] (entry) @ location: 6 (remaining gas: unaccounted)
+  - [halt] (entry) @ location: 6
     [ (Pair { 0x00000000000000000000000000000000000000000000000001c0843d0000dac9f52543da1aed0bc1d6b46bf7c10db7014cd600 }
             "2022-04-14T12:32:39Z") ]
     - control: KNil

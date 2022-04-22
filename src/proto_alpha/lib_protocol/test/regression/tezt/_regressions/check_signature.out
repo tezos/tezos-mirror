@@ -1,29 +1,29 @@
 check_signature.out
 
 trace
-  - DUP (interp) @ location: 9 (remaining gas: unaccounted)
+  - DUP (interp) @ location: 9
     [ (Pair "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
             "edsigu6Ue4mQgPC5aCFqqjitU9pCs5VErXrfPTAZffyJepccGzDEEBExtuPjGuMc2ZRSTBUDR7tJMLVTeJzZn7p9jN9inh4ooV1"
             "TEZOS") ]
-  - DUP (entry) @ location: 9 (remaining gas: unaccounted)
+  - DUP (entry) @ location: 9
     [ (Pair "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
             "edsigu6Ue4mQgPC5aCFqqjitU9pCs5VErXrfPTAZffyJepccGzDEEBExtuPjGuMc2ZRSTBUDR7tJMLVTeJzZn7p9jN9inh4ooV1"
             "TEZOS") ]
-    - [log] (exit) @ location: 9 (remaining gas: unaccounted)
+    - log/DUP (exit) @ location: 9
       [ (Pair "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
               "edsigu6Ue4mQgPC5aCFqqjitU9pCs5VErXrfPTAZffyJepccGzDEEBExtuPjGuMc2ZRSTBUDR7tJMLVTeJzZn7p9jN9inh4ooV1"
               "TEZOS")
         (Pair "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
               "edsigu6Ue4mQgPC5aCFqqjitU9pCs5VErXrfPTAZffyJepccGzDEEBExtuPjGuMc2ZRSTBUDR7tJMLVTeJzZn7p9jN9inh4ooV1"
               "TEZOS") ]
-  - DUP (entry) @ location: 10 (remaining gas: unaccounted)
+  - DUP (entry) @ location: 10
     [ (Pair "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
             "edsigu6Ue4mQgPC5aCFqqjitU9pCs5VErXrfPTAZffyJepccGzDEEBExtuPjGuMc2ZRSTBUDR7tJMLVTeJzZn7p9jN9inh4ooV1"
             "TEZOS")
       (Pair "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
             "edsigu6Ue4mQgPC5aCFqqjitU9pCs5VErXrfPTAZffyJepccGzDEEBExtuPjGuMc2ZRSTBUDR7tJMLVTeJzZn7p9jN9inh4ooV1"
             "TEZOS") ]
-    - [log] (exit) @ location: 10 (remaining gas: unaccounted)
+    - log/DIP (exit) @ location: 10
       [ (Pair "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
               "edsigu6Ue4mQgPC5aCFqqjitU9pCs5VErXrfPTAZffyJepccGzDEEBExtuPjGuMc2ZRSTBUDR7tJMLVTeJzZn7p9jN9inh4ooV1"
               "TEZOS")
@@ -33,7 +33,7 @@ trace
         (Pair "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
               "edsigu6Ue4mQgPC5aCFqqjitU9pCs5VErXrfPTAZffyJepccGzDEEBExtuPjGuMc2ZRSTBUDR7tJMLVTeJzZn7p9jN9inh4ooV1"
               "TEZOS") ]
-  - DIP (entry) @ location: 11 (remaining gas: unaccounted)
+  - DIP (entry) @ location: 11
     [ (Pair "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
             "edsigu6Ue4mQgPC5aCFqqjitU9pCs5VErXrfPTAZffyJepccGzDEEBExtuPjGuMc2ZRSTBUDR7tJMLVTeJzZn7p9jN9inh4ooV1"
             "TEZOS")
@@ -43,33 +43,33 @@ trace
       (Pair "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
             "edsigu6Ue4mQgPC5aCFqqjitU9pCs5VErXrfPTAZffyJepccGzDEEBExtuPjGuMc2ZRSTBUDR7tJMLVTeJzZn7p9jN9inh4ooV1"
             "TEZOS") ]
-    - [log] (exit) @ location: 11 (remaining gas: unaccounted)
+    - log/CDR (exit) @ location: 11
       [ (Pair "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
               "edsigu6Ue4mQgPC5aCFqqjitU9pCs5VErXrfPTAZffyJepccGzDEEBExtuPjGuMc2ZRSTBUDR7tJMLVTeJzZn7p9jN9inh4ooV1"
               "TEZOS")
         (Pair "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
               "edsigu6Ue4mQgPC5aCFqqjitU9pCs5VErXrfPTAZffyJepccGzDEEBExtuPjGuMc2ZRSTBUDR7tJMLVTeJzZn7p9jN9inh4ooV1"
               "TEZOS") ]
-  - CDR (entry) @ location: 13 (remaining gas: unaccounted)
+  - CDR (entry) @ location: 13
     [ (Pair "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
             "edsigu6Ue4mQgPC5aCFqqjitU9pCs5VErXrfPTAZffyJepccGzDEEBExtuPjGuMc2ZRSTBUDR7tJMLVTeJzZn7p9jN9inh4ooV1"
             "TEZOS")
       (Pair "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
             "edsigu6Ue4mQgPC5aCFqqjitU9pCs5VErXrfPTAZffyJepccGzDEEBExtuPjGuMc2ZRSTBUDR7tJMLVTeJzZn7p9jN9inh4ooV1"
             "TEZOS") ]
-    - [log] (exit) @ location: 13 (remaining gas: unaccounted)
+    - log/DUP (exit) @ location: 13
       [ (Pair "edsigu6Ue4mQgPC5aCFqqjitU9pCs5VErXrfPTAZffyJepccGzDEEBExtuPjGuMc2ZRSTBUDR7tJMLVTeJzZn7p9jN9inh4ooV1"
               "TEZOS")
         (Pair "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
               "edsigu6Ue4mQgPC5aCFqqjitU9pCs5VErXrfPTAZffyJepccGzDEEBExtuPjGuMc2ZRSTBUDR7tJMLVTeJzZn7p9jN9inh4ooV1"
               "TEZOS") ]
-  - DUP (entry) @ location: 14 (remaining gas: unaccounted)
+  - DUP (entry) @ location: 14
     [ (Pair "edsigu6Ue4mQgPC5aCFqqjitU9pCs5VErXrfPTAZffyJepccGzDEEBExtuPjGuMc2ZRSTBUDR7tJMLVTeJzZn7p9jN9inh4ooV1"
             "TEZOS")
       (Pair "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
             "edsigu6Ue4mQgPC5aCFqqjitU9pCs5VErXrfPTAZffyJepccGzDEEBExtuPjGuMc2ZRSTBUDR7tJMLVTeJzZn7p9jN9inh4ooV1"
             "TEZOS") ]
-    - [log] (exit) @ location: 14 (remaining gas: unaccounted)
+    - log/CAR (exit) @ location: 14
       [ (Pair "edsigu6Ue4mQgPC5aCFqqjitU9pCs5VErXrfPTAZffyJepccGzDEEBExtuPjGuMc2ZRSTBUDR7tJMLVTeJzZn7p9jN9inh4ooV1"
               "TEZOS")
         (Pair "edsigu6Ue4mQgPC5aCFqqjitU9pCs5VErXrfPTAZffyJepccGzDEEBExtuPjGuMc2ZRSTBUDR7tJMLVTeJzZn7p9jN9inh4ooV1"
@@ -77,7 +77,7 @@ trace
         (Pair "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
               "edsigu6Ue4mQgPC5aCFqqjitU9pCs5VErXrfPTAZffyJepccGzDEEBExtuPjGuMc2ZRSTBUDR7tJMLVTeJzZn7p9jN9inh4ooV1"
               "TEZOS") ]
-  - CAR (entry) @ location: 15 (remaining gas: unaccounted)
+  - CAR (entry) @ location: 15
     [ (Pair "edsigu6Ue4mQgPC5aCFqqjitU9pCs5VErXrfPTAZffyJepccGzDEEBExtuPjGuMc2ZRSTBUDR7tJMLVTeJzZn7p9jN9inh4ooV1"
             "TEZOS")
       (Pair "edsigu6Ue4mQgPC5aCFqqjitU9pCs5VErXrfPTAZffyJepccGzDEEBExtuPjGuMc2ZRSTBUDR7tJMLVTeJzZn7p9jN9inh4ooV1"
@@ -85,61 +85,61 @@ trace
       (Pair "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
             "edsigu6Ue4mQgPC5aCFqqjitU9pCs5VErXrfPTAZffyJepccGzDEEBExtuPjGuMc2ZRSTBUDR7tJMLVTeJzZn7p9jN9inh4ooV1"
             "TEZOS") ]
-    - [log] (exit) @ location: 15 (remaining gas: unaccounted)
+    - log/DIP (exit) @ location: 15
       [ "edsigu6Ue4mQgPC5aCFqqjitU9pCs5VErXrfPTAZffyJepccGzDEEBExtuPjGuMc2ZRSTBUDR7tJMLVTeJzZn7p9jN9inh4ooV1"
         (Pair "edsigu6Ue4mQgPC5aCFqqjitU9pCs5VErXrfPTAZffyJepccGzDEEBExtuPjGuMc2ZRSTBUDR7tJMLVTeJzZn7p9jN9inh4ooV1"
               "TEZOS")
         (Pair "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
               "edsigu6Ue4mQgPC5aCFqqjitU9pCs5VErXrfPTAZffyJepccGzDEEBExtuPjGuMc2ZRSTBUDR7tJMLVTeJzZn7p9jN9inh4ooV1"
               "TEZOS") ]
-  - DIP (entry) @ location: 16 (remaining gas: unaccounted)
+  - DIP (entry) @ location: 16
     [ "edsigu6Ue4mQgPC5aCFqqjitU9pCs5VErXrfPTAZffyJepccGzDEEBExtuPjGuMc2ZRSTBUDR7tJMLVTeJzZn7p9jN9inh4ooV1"
       (Pair "edsigu6Ue4mQgPC5aCFqqjitU9pCs5VErXrfPTAZffyJepccGzDEEBExtuPjGuMc2ZRSTBUDR7tJMLVTeJzZn7p9jN9inh4ooV1"
             "TEZOS")
       (Pair "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
             "edsigu6Ue4mQgPC5aCFqqjitU9pCs5VErXrfPTAZffyJepccGzDEEBExtuPjGuMc2ZRSTBUDR7tJMLVTeJzZn7p9jN9inh4ooV1"
             "TEZOS") ]
-    - [log] (exit) @ location: 16 (remaining gas: unaccounted)
+    - log/CDR (exit) @ location: 16
       [ (Pair "edsigu6Ue4mQgPC5aCFqqjitU9pCs5VErXrfPTAZffyJepccGzDEEBExtuPjGuMc2ZRSTBUDR7tJMLVTeJzZn7p9jN9inh4ooV1"
               "TEZOS")
         (Pair "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
               "edsigu6Ue4mQgPC5aCFqqjitU9pCs5VErXrfPTAZffyJepccGzDEEBExtuPjGuMc2ZRSTBUDR7tJMLVTeJzZn7p9jN9inh4ooV1"
               "TEZOS") ]
-  - CDR (entry) @ location: 18 (remaining gas: unaccounted)
+  - CDR (entry) @ location: 18
     [ (Pair "edsigu6Ue4mQgPC5aCFqqjitU9pCs5VErXrfPTAZffyJepccGzDEEBExtuPjGuMc2ZRSTBUDR7tJMLVTeJzZn7p9jN9inh4ooV1"
             "TEZOS")
       (Pair "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
             "edsigu6Ue4mQgPC5aCFqqjitU9pCs5VErXrfPTAZffyJepccGzDEEBExtuPjGuMc2ZRSTBUDR7tJMLVTeJzZn7p9jN9inh4ooV1"
             "TEZOS") ]
-    - [log] (exit) @ location: 18 (remaining gas: unaccounted)
+    - log/PACK (exit) @ location: 18
       [ "TEZOS"
         (Pair "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
               "edsigu6Ue4mQgPC5aCFqqjitU9pCs5VErXrfPTAZffyJepccGzDEEBExtuPjGuMc2ZRSTBUDR7tJMLVTeJzZn7p9jN9inh4ooV1"
               "TEZOS") ]
-  - PACK (entry) @ location: 19 (remaining gas: unaccounted)
+  - PACK (entry) @ location: 19
     [ "TEZOS"
       (Pair "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
             "edsigu6Ue4mQgPC5aCFqqjitU9pCs5VErXrfPTAZffyJepccGzDEEBExtuPjGuMc2ZRSTBUDR7tJMLVTeJzZn7p9jN9inh4ooV1"
             "TEZOS") ]
-    - [log] (exit) @ location: 19 (remaining gas: unaccounted)
+    - log/[halt] (exit) @ location: 19
       [ 0x05010000000554455a4f53
         (Pair "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
               "edsigu6Ue4mQgPC5aCFqqjitU9pCs5VErXrfPTAZffyJepccGzDEEBExtuPjGuMc2ZRSTBUDR7tJMLVTeJzZn7p9jN9inh4ooV1"
               "TEZOS") ]
-  - [halt] (entry) @ location: 17 (remaining gas: unaccounted)
+  - [halt] (entry) @ location: 17
     [ 0x05010000000554455a4f53
       (Pair "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
             "edsigu6Ue4mQgPC5aCFqqjitU9pCs5VErXrfPTAZffyJepccGzDEEBExtuPjGuMc2ZRSTBUDR7tJMLVTeJzZn7p9jN9inh4ooV1"
             "TEZOS") ]
     - control: KUndip
     - control: KCons
-    - [log] (exit) @ location: 16 (remaining gas: unaccounted)
+    - log/[halt] (exit) @ location: 16
       [ "edsigu6Ue4mQgPC5aCFqqjitU9pCs5VErXrfPTAZffyJepccGzDEEBExtuPjGuMc2ZRSTBUDR7tJMLVTeJzZn7p9jN9inh4ooV1"
         0x05010000000554455a4f53
         (Pair "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
               "edsigu6Ue4mQgPC5aCFqqjitU9pCs5VErXrfPTAZffyJepccGzDEEBExtuPjGuMc2ZRSTBUDR7tJMLVTeJzZn7p9jN9inh4ooV1"
               "TEZOS") ]
-  - [halt] (entry) @ location: 12 (remaining gas: unaccounted)
+  - [halt] (entry) @ location: 12
     [ "edsigu6Ue4mQgPC5aCFqqjitU9pCs5VErXrfPTAZffyJepccGzDEEBExtuPjGuMc2ZRSTBUDR7tJMLVTeJzZn7p9jN9inh4ooV1"
       0x05010000000554455a4f53
       (Pair "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
@@ -147,7 +147,7 @@ trace
             "TEZOS") ]
     - control: KUndip
     - control: KCons
-    - [log] (exit) @ location: 11 (remaining gas: unaccounted)
+    - log/CAR (exit) @ location: 11
       [ (Pair "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
               "edsigu6Ue4mQgPC5aCFqqjitU9pCs5VErXrfPTAZffyJepccGzDEEBExtuPjGuMc2ZRSTBUDR7tJMLVTeJzZn7p9jN9inh4ooV1"
               "TEZOS")
@@ -156,7 +156,7 @@ trace
         (Pair "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
               "edsigu6Ue4mQgPC5aCFqqjitU9pCs5VErXrfPTAZffyJepccGzDEEBExtuPjGuMc2ZRSTBUDR7tJMLVTeJzZn7p9jN9inh4ooV1"
               "TEZOS") ]
-  - CAR (entry) @ location: 20 (remaining gas: unaccounted)
+  - CAR (entry) @ location: 20
     [ (Pair "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
             "edsigu6Ue4mQgPC5aCFqqjitU9pCs5VErXrfPTAZffyJepccGzDEEBExtuPjGuMc2ZRSTBUDR7tJMLVTeJzZn7p9jN9inh4ooV1"
             "TEZOS")
@@ -165,66 +165,66 @@ trace
       (Pair "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
             "edsigu6Ue4mQgPC5aCFqqjitU9pCs5VErXrfPTAZffyJepccGzDEEBExtuPjGuMc2ZRSTBUDR7tJMLVTeJzZn7p9jN9inh4ooV1"
             "TEZOS") ]
-    - [log] (exit) @ location: 20 (remaining gas: unaccounted)
+    - log/CHECK_SIGNATURE (exit) @ location: 20
       [ "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
         "edsigu6Ue4mQgPC5aCFqqjitU9pCs5VErXrfPTAZffyJepccGzDEEBExtuPjGuMc2ZRSTBUDR7tJMLVTeJzZn7p9jN9inh4ooV1"
         0x05010000000554455a4f53
         (Pair "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
               "edsigu6Ue4mQgPC5aCFqqjitU9pCs5VErXrfPTAZffyJepccGzDEEBExtuPjGuMc2ZRSTBUDR7tJMLVTeJzZn7p9jN9inh4ooV1"
               "TEZOS") ]
-  - CHECK_SIGNATURE (entry) @ location: 21 (remaining gas: unaccounted)
+  - CHECK_SIGNATURE (entry) @ location: 21
     [ "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
       "edsigu6Ue4mQgPC5aCFqqjitU9pCs5VErXrfPTAZffyJepccGzDEEBExtuPjGuMc2ZRSTBUDR7tJMLVTeJzZn7p9jN9inh4ooV1"
       0x05010000000554455a4f53
       (Pair "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
             "edsigu6Ue4mQgPC5aCFqqjitU9pCs5VErXrfPTAZffyJepccGzDEEBExtuPjGuMc2ZRSTBUDR7tJMLVTeJzZn7p9jN9inh4ooV1"
             "TEZOS") ]
-    - [log] (exit) @ location: 21 (remaining gas: unaccounted)
+    - log/IF (exit) @ location: 21
       [ True
         (Pair "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
               "edsigu6Ue4mQgPC5aCFqqjitU9pCs5VErXrfPTAZffyJepccGzDEEBExtuPjGuMc2ZRSTBUDR7tJMLVTeJzZn7p9jN9inh4ooV1"
               "TEZOS") ]
-  - IF (entry) @ location: 22 (remaining gas: unaccounted)
+  - IF (entry) @ location: 22
     [ True
       (Pair "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
             "edsigu6Ue4mQgPC5aCFqqjitU9pCs5VErXrfPTAZffyJepccGzDEEBExtuPjGuMc2ZRSTBUDR7tJMLVTeJzZn7p9jN9inh4ooV1"
             "TEZOS") ]
-    - [log] (exit) @ location: 22 (remaining gas: unaccounted)
+    - log/[halt] (exit) @ location: 22
       [ (Pair "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
               "edsigu6Ue4mQgPC5aCFqqjitU9pCs5VErXrfPTAZffyJepccGzDEEBExtuPjGuMc2ZRSTBUDR7tJMLVTeJzZn7p9jN9inh4ooV1"
               "TEZOS") ]
-  - [halt] (entry) @ location: 28 (remaining gas: unaccounted)
+  - [halt] (entry) @ location: 28
     [ (Pair "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
             "edsigu6Ue4mQgPC5aCFqqjitU9pCs5VErXrfPTAZffyJepccGzDEEBExtuPjGuMc2ZRSTBUDR7tJMLVTeJzZn7p9jN9inh4ooV1"
             "TEZOS") ]
     - control: KCons
-    - [log] (exit) @ location: 22 (remaining gas: unaccounted)
+    - log/CDR (exit) @ location: 22
       [ (Pair "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
               "edsigu6Ue4mQgPC5aCFqqjitU9pCs5VErXrfPTAZffyJepccGzDEEBExtuPjGuMc2ZRSTBUDR7tJMLVTeJzZn7p9jN9inh4ooV1"
               "TEZOS") ]
-  - CDR (entry) @ location: 28 (remaining gas: unaccounted)
+  - CDR (entry) @ location: 28
     [ (Pair "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"
             "edsigu6Ue4mQgPC5aCFqqjitU9pCs5VErXrfPTAZffyJepccGzDEEBExtuPjGuMc2ZRSTBUDR7tJMLVTeJzZn7p9jN9inh4ooV1"
             "TEZOS") ]
-    - [log] (exit) @ location: 28 (remaining gas: unaccounted)
+    - log/NIL (exit) @ location: 28
       [ (Pair "edsigu6Ue4mQgPC5aCFqqjitU9pCs5VErXrfPTAZffyJepccGzDEEBExtuPjGuMc2ZRSTBUDR7tJMLVTeJzZn7p9jN9inh4ooV1"
               "TEZOS") ]
-  - NIL (entry) @ location: 29 (remaining gas: unaccounted)
+  - NIL (entry) @ location: 29
     [ (Pair "edsigu6Ue4mQgPC5aCFqqjitU9pCs5VErXrfPTAZffyJepccGzDEEBExtuPjGuMc2ZRSTBUDR7tJMLVTeJzZn7p9jN9inh4ooV1"
             "TEZOS") ]
-    - [log] (exit) @ location: 29 (remaining gas: unaccounted)
+    - log/PAIR (exit) @ location: 29
       [ {}
         (Pair "edsigu6Ue4mQgPC5aCFqqjitU9pCs5VErXrfPTAZffyJepccGzDEEBExtuPjGuMc2ZRSTBUDR7tJMLVTeJzZn7p9jN9inh4ooV1"
               "TEZOS") ]
-  - PAIR (entry) @ location: 31 (remaining gas: unaccounted)
+  - PAIR (entry) @ location: 31
     [ {}
       (Pair "edsigu6Ue4mQgPC5aCFqqjitU9pCs5VErXrfPTAZffyJepccGzDEEBExtuPjGuMc2ZRSTBUDR7tJMLVTeJzZn7p9jN9inh4ooV1"
             "TEZOS") ]
-    - [log] (exit) @ location: 31 (remaining gas: unaccounted)
+    - log/[halt] (exit) @ location: 31
       [ (Pair {}
               "edsigu6Ue4mQgPC5aCFqqjitU9pCs5VErXrfPTAZffyJepccGzDEEBExtuPjGuMc2ZRSTBUDR7tJMLVTeJzZn7p9jN9inh4ooV1"
               "TEZOS") ]
-  - [halt] (entry) @ location: 8 (remaining gas: unaccounted)
+  - [halt] (entry) @ location: 8
     [ (Pair {}
             "edsigu6Ue4mQgPC5aCFqqjitU9pCs5VErXrfPTAZffyJepccGzDEEBExtuPjGuMc2ZRSTBUDR7tJMLVTeJzZn7p9jN9inh4ooV1"
             "TEZOS") ]

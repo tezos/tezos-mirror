@@ -1,70 +1,70 @@
 concat.out
 
 trace
-  - DUP (interp) @ location: 7 (remaining gas: unaccounted)
+  - DUP (interp) @ location: 7
     [ (Pair "abcd" "efgh") ]
-  - DUP (entry) @ location: 7 (remaining gas: unaccounted)
+  - DUP (entry) @ location: 7
     [ (Pair "abcd" "efgh") ]
-    - [log] (exit) @ location: 7 (remaining gas: unaccounted)
+    - log/DIP (exit) @ location: 7
       [ (Pair "abcd" "efgh")
         (Pair "abcd" "efgh") ]
-  - DIP (entry) @ location: 8 (remaining gas: unaccounted)
+  - DIP (entry) @ location: 8
     [ (Pair "abcd" "efgh")
       (Pair "abcd" "efgh") ]
-    - [log] (exit) @ location: 8 (remaining gas: unaccounted)
+    - log/CDR (exit) @ location: 8
       [ (Pair "abcd" "efgh") ]
-  - CDR (entry) @ location: 10 (remaining gas: unaccounted)
+  - CDR (entry) @ location: 10
     [ (Pair "abcd" "efgh") ]
-    - [log] (exit) @ location: 10 (remaining gas: unaccounted)
+    - log/NIL (exit) @ location: 10
       [ "efgh" ]
-  - NIL (entry) @ location: 11 (remaining gas: unaccounted)
+  - NIL (entry) @ location: 11
     [ "efgh" ]
-    - [log] (exit) @ location: 11 (remaining gas: unaccounted)
+    - log/SWAP (exit) @ location: 11
       [ {}
         "efgh" ]
-  - SWAP (entry) @ location: 13 (remaining gas: unaccounted)
+  - SWAP (entry) @ location: 13
     [ {}
       "efgh" ]
-    - [log] (exit) @ location: 13 (remaining gas: unaccounted)
+    - log/CONS (exit) @ location: 13
       [ "efgh"
         {} ]
-  - CONS (entry) @ location: 14 (remaining gas: unaccounted)
+  - CONS (entry) @ location: 14
     [ "efgh"
       {} ]
-    - [log] (exit) @ location: 14 (remaining gas: unaccounted)
+    - log/[halt] (exit) @ location: 14
       [ { "efgh" } ]
-  - [halt] (entry) @ location: 9 (remaining gas: unaccounted)
+  - [halt] (entry) @ location: 9
     [ { "efgh" } ]
     - control: KUndip
     - control: KCons
-    - [log] (exit) @ location: 8 (remaining gas: unaccounted)
+    - log/CAR (exit) @ location: 8
       [ (Pair "abcd" "efgh")
         { "efgh" } ]
-  - CAR (entry) @ location: 15 (remaining gas: unaccounted)
+  - CAR (entry) @ location: 15
     [ (Pair "abcd" "efgh")
       { "efgh" } ]
-    - [log] (exit) @ location: 15 (remaining gas: unaccounted)
+    - log/CONS (exit) @ location: 15
       [ "abcd"
         { "efgh" } ]
-  - CONS (entry) @ location: 16 (remaining gas: unaccounted)
+  - CONS (entry) @ location: 16
     [ "abcd"
       { "efgh" } ]
-    - [log] (exit) @ location: 16 (remaining gas: unaccounted)
+    - log/CONCAT (exit) @ location: 16
       [ { "abcd" ; "efgh" } ]
-  - CONCAT (entry) @ location: 17 (remaining gas: unaccounted)
+  - CONCAT (entry) @ location: 17
     [ { "abcd" ; "efgh" } ]
-    - [log] (exit) @ location: 17 (remaining gas: unaccounted)
+    - log/NIL (exit) @ location: 17
       [ "abcdefgh" ]
-  - NIL (entry) @ location: 18 (remaining gas: unaccounted)
+  - NIL (entry) @ location: 18
     [ "abcdefgh" ]
-    - [log] (exit) @ location: 18 (remaining gas: unaccounted)
+    - log/PAIR (exit) @ location: 18
       [ {}
         "abcdefgh" ]
-  - PAIR (entry) @ location: 20 (remaining gas: unaccounted)
+  - PAIR (entry) @ location: 20
     [ {}
       "abcdefgh" ]
-    - [log] (exit) @ location: 20 (remaining gas: unaccounted)
+    - log/[halt] (exit) @ location: 20
       [ (Pair {} "abcdefgh") ]
-  - [halt] (entry) @ location: 6 (remaining gas: unaccounted)
+  - [halt] (entry) @ location: 6
     [ (Pair {} "abcdefgh") ]
     - control: KNil

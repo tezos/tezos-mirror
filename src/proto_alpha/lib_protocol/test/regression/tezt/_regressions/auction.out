@@ -1,17 +1,17 @@
 auction.out
 
 trace
-  - DUP (interp) @ location: 11 (remaining gas: unaccounted)
+  - DUP (interp) @ location: 11
     [ (Pair "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv"
             "2099-12-31T23:59:59Z"
             50000000
             "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU") ]
-  - DUP (entry) @ location: 11 (remaining gas: unaccounted)
+  - DUP (entry) @ location: 11
     [ (Pair "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv"
             "2099-12-31T23:59:59Z"
             50000000
             "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU") ]
-    - [log] (exit) @ location: 11 (remaining gas: unaccounted)
+    - log/CDR (exit) @ location: 11
       [ (Pair "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv"
               "2099-12-31T23:59:59Z"
               50000000
@@ -20,7 +20,7 @@ trace
               "2099-12-31T23:59:59Z"
               50000000
               "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU") ]
-  - CDR (entry) @ location: 13 (remaining gas: unaccounted)
+  - CDR (entry) @ location: 13
     [ (Pair "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv"
             "2099-12-31T23:59:59Z"
             50000000
@@ -29,45 +29,45 @@ trace
             "2099-12-31T23:59:59Z"
             50000000
             "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU") ]
-    - [log] (exit) @ location: 13 (remaining gas: unaccounted)
+    - log/CAR (exit) @ location: 13
       [ (Pair "2099-12-31T23:59:59Z" 50000000 "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU")
         (Pair "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv"
               "2099-12-31T23:59:59Z"
               50000000
               "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU") ]
-  - CAR (entry) @ location: 14 (remaining gas: unaccounted)
+  - CAR (entry) @ location: 14
     [ (Pair "2099-12-31T23:59:59Z" 50000000 "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU")
       (Pair "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv"
             "2099-12-31T23:59:59Z"
             50000000
             "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU") ]
-    - [log] (exit) @ location: 14 (remaining gas: unaccounted)
+    - log/DUP (exit) @ location: 14
       [ "2099-12-31T23:59:59Z"
         (Pair "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv"
               "2099-12-31T23:59:59Z"
               50000000
               "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU") ]
-  - DUP (entry) @ location: 15 (remaining gas: unaccounted)
+  - DUP (entry) @ location: 15
     [ "2099-12-31T23:59:59Z"
       (Pair "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv"
             "2099-12-31T23:59:59Z"
             50000000
             "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU") ]
-    - [log] (exit) @ location: 15 (remaining gas: unaccounted)
+    - log/NOW (exit) @ location: 15
       [ "2099-12-31T23:59:59Z"
         "2099-12-31T23:59:59Z"
         (Pair "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv"
               "2099-12-31T23:59:59Z"
               50000000
               "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU") ]
-  - NOW (entry) @ location: 16 (remaining gas: unaccounted)
+  - NOW (entry) @ location: 16
     [ "2099-12-31T23:59:59Z"
       "2099-12-31T23:59:59Z"
       (Pair "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv"
             "2099-12-31T23:59:59Z"
             50000000
             "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU") ]
-    - [log] (exit) @ location: 16 (remaining gas: unaccounted)
+    - log/COMPARE (exit) @ location: 16
       [ "2022-04-14T12:32:39Z"
         "2099-12-31T23:59:59Z"
         "2099-12-31T23:59:59Z"
@@ -75,7 +75,7 @@ trace
               "2099-12-31T23:59:59Z"
               50000000
               "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU") ]
-  - COMPARE (entry) @ location: 18 (remaining gas: unaccounted)
+  - COMPARE (entry) @ location: 18
     [ "2022-04-14T12:32:39Z"
       "2099-12-31T23:59:59Z"
       "2099-12-31T23:59:59Z"
@@ -83,72 +83,72 @@ trace
             "2099-12-31T23:59:59Z"
             50000000
             "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU") ]
-    - [log] (exit) @ location: 18 (remaining gas: unaccounted)
+    - log/GT (exit) @ location: 18
       [ -1
         "2099-12-31T23:59:59Z"
         (Pair "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv"
               "2099-12-31T23:59:59Z"
               50000000
               "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU") ]
-  - GT (entry) @ location: 19 (remaining gas: unaccounted)
+  - GT (entry) @ location: 19
     [ -1
       "2099-12-31T23:59:59Z"
       (Pair "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv"
             "2099-12-31T23:59:59Z"
             50000000
             "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU") ]
-    - [log] (exit) @ location: 19 (remaining gas: unaccounted)
+    - log/IF (exit) @ location: 19
       [ False
         "2099-12-31T23:59:59Z"
         (Pair "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv"
               "2099-12-31T23:59:59Z"
               50000000
               "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU") ]
-  - IF (entry) @ location: 20 (remaining gas: unaccounted)
+  - IF (entry) @ location: 20
     [ False
       "2099-12-31T23:59:59Z"
       (Pair "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv"
             "2099-12-31T23:59:59Z"
             50000000
             "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU") ]
-    - [log] (exit) @ location: 20 (remaining gas: unaccounted)
+    - log/[halt] (exit) @ location: 20
       [ "2099-12-31T23:59:59Z"
         (Pair "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv"
               "2099-12-31T23:59:59Z"
               50000000
               "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU") ]
-  - [halt] (entry) @ location: 26 (remaining gas: unaccounted)
+  - [halt] (entry) @ location: 26
     [ "2099-12-31T23:59:59Z"
       (Pair "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv"
             "2099-12-31T23:59:59Z"
             50000000
             "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU") ]
     - control: KCons
-    - [log] (exit) @ location: 20 (remaining gas: unaccounted)
+    - log/SWAP (exit) @ location: 20
       [ "2099-12-31T23:59:59Z"
         (Pair "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv"
               "2099-12-31T23:59:59Z"
               50000000
               "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU") ]
-  - SWAP (entry) @ location: 26 (remaining gas: unaccounted)
+  - SWAP (entry) @ location: 26
     [ "2099-12-31T23:59:59Z"
       (Pair "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv"
             "2099-12-31T23:59:59Z"
             50000000
             "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU") ]
-    - [log] (exit) @ location: 26 (remaining gas: unaccounted)
+    - log/DUP (exit) @ location: 26
       [ (Pair "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv"
               "2099-12-31T23:59:59Z"
               50000000
               "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU")
         "2099-12-31T23:59:59Z" ]
-  - DUP (entry) @ location: 27 (remaining gas: unaccounted)
+  - DUP (entry) @ location: 27
     [ (Pair "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv"
             "2099-12-31T23:59:59Z"
             50000000
             "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU")
       "2099-12-31T23:59:59Z" ]
-    - [log] (exit) @ location: 27 (remaining gas: unaccounted)
+    - log/CAR (exit) @ location: 27
       [ (Pair "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv"
               "2099-12-31T23:59:59Z"
               50000000
@@ -158,7 +158,7 @@ trace
               50000000
               "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU")
         "2099-12-31T23:59:59Z" ]
-  - CAR (entry) @ location: 28 (remaining gas: unaccounted)
+  - CAR (entry) @ location: 28
     [ (Pair "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv"
             "2099-12-31T23:59:59Z"
             50000000
@@ -168,247 +168,247 @@ trace
             50000000
             "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU")
       "2099-12-31T23:59:59Z" ]
-    - [log] (exit) @ location: 28 (remaining gas: unaccounted)
+    - log/DIP (exit) @ location: 28
       [ "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv"
         (Pair "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv"
               "2099-12-31T23:59:59Z"
               50000000
               "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU")
         "2099-12-31T23:59:59Z" ]
-  - DIP (entry) @ location: 29 (remaining gas: unaccounted)
+  - DIP (entry) @ location: 29
     [ "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv"
       (Pair "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv"
             "2099-12-31T23:59:59Z"
             50000000
             "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU")
       "2099-12-31T23:59:59Z" ]
-    - [log] (exit) @ location: 29 (remaining gas: unaccounted)
+    - log/CDR (exit) @ location: 29
       [ (Pair "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv"
               "2099-12-31T23:59:59Z"
               50000000
               "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU")
         "2099-12-31T23:59:59Z" ]
-  - CDR (entry) @ location: 32 (remaining gas: unaccounted)
+  - CDR (entry) @ location: 32
     [ (Pair "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv"
             "2099-12-31T23:59:59Z"
             50000000
             "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU")
       "2099-12-31T23:59:59Z" ]
-    - [log] (exit) @ location: 32 (remaining gas: unaccounted)
+    - log/CDR (exit) @ location: 32
       [ (Pair "2099-12-31T23:59:59Z" 50000000 "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU")
         "2099-12-31T23:59:59Z" ]
-  - CDR (entry) @ location: 33 (remaining gas: unaccounted)
+  - CDR (entry) @ location: 33
     [ (Pair "2099-12-31T23:59:59Z" 50000000 "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU")
       "2099-12-31T23:59:59Z" ]
-    - [log] (exit) @ location: 33 (remaining gas: unaccounted)
+    - log/[halt] (exit) @ location: 33
       [ (Pair 50000000 "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU")
         "2099-12-31T23:59:59Z" ]
-  - [halt] (entry) @ location: 31 (remaining gas: unaccounted)
+  - [halt] (entry) @ location: 31
     [ (Pair 50000000 "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU")
       "2099-12-31T23:59:59Z" ]
     - control: KUndip
     - control: KCons
-    - [log] (exit) @ location: 29 (remaining gas: unaccounted)
+    - log/AMOUNT (exit) @ location: 29
       [ "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv"
         (Pair 50000000 "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU")
         "2099-12-31T23:59:59Z" ]
-  - AMOUNT (entry) @ location: 34 (remaining gas: unaccounted)
+  - AMOUNT (entry) @ location: 34
     [ "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv"
       (Pair 50000000 "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU")
       "2099-12-31T23:59:59Z" ]
-    - [log] (exit) @ location: 34 (remaining gas: unaccounted)
+    - log/PAIR (exit) @ location: 34
       [ 100000000
         "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv"
         (Pair 50000000 "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU")
         "2099-12-31T23:59:59Z" ]
-  - PAIR (entry) @ location: 35 (remaining gas: unaccounted)
+  - PAIR (entry) @ location: 35
     [ 100000000
       "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv"
       (Pair 50000000 "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU")
       "2099-12-31T23:59:59Z" ]
-    - [log] (exit) @ location: 35 (remaining gas: unaccounted)
+    - log/SWAP (exit) @ location: 35
       [ (Pair 100000000 "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv")
         (Pair 50000000 "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU")
         "2099-12-31T23:59:59Z" ]
-  - SWAP (entry) @ location: 36 (remaining gas: unaccounted)
+  - SWAP (entry) @ location: 36
     [ (Pair 100000000 "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv")
       (Pair 50000000 "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU")
       "2099-12-31T23:59:59Z" ]
-    - [log] (exit) @ location: 36 (remaining gas: unaccounted)
+    - log/DIP (exit) @ location: 36
       [ (Pair 50000000 "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU")
         (Pair 100000000 "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv")
         "2099-12-31T23:59:59Z" ]
-  - DIP (entry) @ location: 37 (remaining gas: unaccounted)
+  - DIP (entry) @ location: 37
     [ (Pair 50000000 "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU")
       (Pair 100000000 "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv")
       "2099-12-31T23:59:59Z" ]
-    - [log] (exit) @ location: 37 (remaining gas: unaccounted)
+    - log/SWAP (exit) @ location: 37
       [ (Pair 100000000 "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv")
         "2099-12-31T23:59:59Z" ]
-  - SWAP (entry) @ location: 39 (remaining gas: unaccounted)
+  - SWAP (entry) @ location: 39
     [ (Pair 100000000 "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv")
       "2099-12-31T23:59:59Z" ]
-    - [log] (exit) @ location: 39 (remaining gas: unaccounted)
+    - log/PAIR (exit) @ location: 39
       [ "2099-12-31T23:59:59Z"
         (Pair 100000000 "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv") ]
-  - PAIR (entry) @ location: 40 (remaining gas: unaccounted)
+  - PAIR (entry) @ location: 40
     [ "2099-12-31T23:59:59Z"
       (Pair 100000000 "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv") ]
-    - [log] (exit) @ location: 40 (remaining gas: unaccounted)
+    - log/[halt] (exit) @ location: 40
       [ (Pair "2099-12-31T23:59:59Z" 100000000 "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv") ]
-  - [halt] (entry) @ location: 38 (remaining gas: unaccounted)
+  - [halt] (entry) @ location: 38
     [ (Pair "2099-12-31T23:59:59Z" 100000000 "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv") ]
     - control: KUndip
     - control: KCons
-    - [log] (exit) @ location: 37 (remaining gas: unaccounted)
+    - log/DUP (exit) @ location: 37
       [ (Pair 50000000 "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU")
         (Pair "2099-12-31T23:59:59Z" 100000000 "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv") ]
-  - DUP (entry) @ location: 41 (remaining gas: unaccounted)
+  - DUP (entry) @ location: 41
     [ (Pair 50000000 "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU")
       (Pair "2099-12-31T23:59:59Z" 100000000 "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv") ]
-    - [log] (exit) @ location: 41 (remaining gas: unaccounted)
+    - log/CAR (exit) @ location: 41
       [ (Pair 50000000 "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU")
         (Pair 50000000 "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU")
         (Pair "2099-12-31T23:59:59Z" 100000000 "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv") ]
-  - CAR (entry) @ location: 42 (remaining gas: unaccounted)
+  - CAR (entry) @ location: 42
     [ (Pair 50000000 "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU")
       (Pair 50000000 "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU")
       (Pair "2099-12-31T23:59:59Z" 100000000 "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv") ]
-    - [log] (exit) @ location: 42 (remaining gas: unaccounted)
+    - log/AMOUNT (exit) @ location: 42
       [ 50000000
         (Pair 50000000 "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU")
         (Pair "2099-12-31T23:59:59Z" 100000000 "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv") ]
-  - AMOUNT (entry) @ location: 43 (remaining gas: unaccounted)
+  - AMOUNT (entry) @ location: 43
     [ 50000000
       (Pair 50000000 "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU")
       (Pair "2099-12-31T23:59:59Z" 100000000 "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv") ]
-    - [log] (exit) @ location: 43 (remaining gas: unaccounted)
+    - log/COMPARE (exit) @ location: 43
       [ 100000000
         50000000
         (Pair 50000000 "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU")
         (Pair "2099-12-31T23:59:59Z" 100000000 "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv") ]
-  - COMPARE (entry) @ location: 45 (remaining gas: unaccounted)
+  - COMPARE (entry) @ location: 45
     [ 100000000
       50000000
       (Pair 50000000 "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU")
       (Pair "2099-12-31T23:59:59Z" 100000000 "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv") ]
-    - [log] (exit) @ location: 45 (remaining gas: unaccounted)
+    - log/LE (exit) @ location: 45
       [ 1
         (Pair 50000000 "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU")
         (Pair "2099-12-31T23:59:59Z" 100000000 "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv") ]
-  - LE (entry) @ location: 46 (remaining gas: unaccounted)
+  - LE (entry) @ location: 46
     [ 1
       (Pair 50000000 "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU")
       (Pair "2099-12-31T23:59:59Z" 100000000 "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv") ]
-    - [log] (exit) @ location: 46 (remaining gas: unaccounted)
+    - log/IF (exit) @ location: 46
       [ False
         (Pair 50000000 "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU")
         (Pair "2099-12-31T23:59:59Z" 100000000 "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv") ]
-  - IF (entry) @ location: 47 (remaining gas: unaccounted)
+  - IF (entry) @ location: 47
     [ False
       (Pair 50000000 "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU")
       (Pair "2099-12-31T23:59:59Z" 100000000 "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv") ]
-    - [log] (exit) @ location: 47 (remaining gas: unaccounted)
+    - log/[halt] (exit) @ location: 47
       [ (Pair 50000000 "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU")
         (Pair "2099-12-31T23:59:59Z" 100000000 "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv") ]
-  - [halt] (entry) @ location: 53 (remaining gas: unaccounted)
+  - [halt] (entry) @ location: 53
     [ (Pair 50000000 "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU")
       (Pair "2099-12-31T23:59:59Z" 100000000 "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv") ]
     - control: KCons
-    - [log] (exit) @ location: 47 (remaining gas: unaccounted)
+    - log/DUP (exit) @ location: 47
       [ (Pair 50000000 "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU")
         (Pair "2099-12-31T23:59:59Z" 100000000 "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv") ]
-  - DUP (entry) @ location: 53 (remaining gas: unaccounted)
+  - DUP (entry) @ location: 53
     [ (Pair 50000000 "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU")
       (Pair "2099-12-31T23:59:59Z" 100000000 "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv") ]
-    - [log] (exit) @ location: 53 (remaining gas: unaccounted)
+    - log/CAR (exit) @ location: 53
       [ (Pair 50000000 "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU")
         (Pair 50000000 "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU")
         (Pair "2099-12-31T23:59:59Z" 100000000 "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv") ]
-  - CAR (entry) @ location: 54 (remaining gas: unaccounted)
+  - CAR (entry) @ location: 54
     [ (Pair 50000000 "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU")
       (Pair 50000000 "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU")
       (Pair "2099-12-31T23:59:59Z" 100000000 "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv") ]
-    - [log] (exit) @ location: 54 (remaining gas: unaccounted)
+    - log/DIP (exit) @ location: 54
       [ 50000000
         (Pair 50000000 "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU")
         (Pair "2099-12-31T23:59:59Z" 100000000 "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv") ]
-  - DIP (entry) @ location: 55 (remaining gas: unaccounted)
+  - DIP (entry) @ location: 55
     [ 50000000
       (Pair 50000000 "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU")
       (Pair "2099-12-31T23:59:59Z" 100000000 "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv") ]
-    - [log] (exit) @ location: 55 (remaining gas: unaccounted)
+    - log/CDR (exit) @ location: 55
       [ (Pair 50000000 "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU")
         (Pair "2099-12-31T23:59:59Z" 100000000 "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv") ]
-  - CDR (entry) @ location: 57 (remaining gas: unaccounted)
+  - CDR (entry) @ location: 57
     [ (Pair 50000000 "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU")
       (Pair "2099-12-31T23:59:59Z" 100000000 "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv") ]
-    - [log] (exit) @ location: 57 (remaining gas: unaccounted)
+    - log/IMPLICIT_ACCOUNT (exit) @ location: 57
       [ "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU"
         (Pair "2099-12-31T23:59:59Z" 100000000 "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv") ]
-  - IMPLICIT_ACCOUNT (entry) @ location: 58 (remaining gas: unaccounted)
+  - IMPLICIT_ACCOUNT (entry) @ location: 58
     [ "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU"
       (Pair "2099-12-31T23:59:59Z" 100000000 "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv") ]
-    - [log] (exit) @ location: 58 (remaining gas: unaccounted)
+    - log/[halt] (exit) @ location: 58
       [ "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU"
         (Pair "2099-12-31T23:59:59Z" 100000000 "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv") ]
-  - [halt] (entry) @ location: 56 (remaining gas: unaccounted)
+  - [halt] (entry) @ location: 56
     [ "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU"
       (Pair "2099-12-31T23:59:59Z" 100000000 "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv") ]
     - control: KUndip
     - control: KCons
-    - [log] (exit) @ location: 55 (remaining gas: unaccounted)
+    - log/CONST (exit) @ location: 55
       [ 50000000
         "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU"
         (Pair "2099-12-31T23:59:59Z" 100000000 "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv") ]
-  - CONST (entry) @ location: 59 (remaining gas: unaccounted)
+  - CONST (entry) @ location: 59
     [ 50000000
       "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU"
       (Pair "2099-12-31T23:59:59Z" 100000000 "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv") ]
-    - [log] (exit) @ location: 59 (remaining gas: unaccounted)
+    - log/TRANSFER_TOKENS (exit) @ location: 59
       [ Unit
         50000000
         "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU"
         (Pair "2099-12-31T23:59:59Z" 100000000 "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv") ]
-  - TRANSFER_TOKENS (entry) @ location: 60 (remaining gas: unaccounted)
+  - TRANSFER_TOKENS (entry) @ location: 60
     [ Unit
       50000000
       "tz1faswCTDciRzE4oJ9jn2Vm2dvjeyA9fUzU"
       (Pair "2099-12-31T23:59:59Z" 100000000 "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv") ]
-    - [log] (exit) @ location: 60 (remaining gas: unaccounted)
+    - log/NIL (exit) @ location: 60
       [ 0x0000000000000000000000000000000000000000000000000180e1eb170000dac9f52543da1aed0bc1d6b46bf7c10db7014cd600
         (Pair "2099-12-31T23:59:59Z" 100000000 "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv") ]
-  - NIL (entry) @ location: 61 (remaining gas: unaccounted)
+  - NIL (entry) @ location: 61
     [ 0x0000000000000000000000000000000000000000000000000180e1eb170000dac9f52543da1aed0bc1d6b46bf7c10db7014cd600
       (Pair "2099-12-31T23:59:59Z" 100000000 "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv") ]
-    - [log] (exit) @ location: 61 (remaining gas: unaccounted)
+    - log/SWAP (exit) @ location: 61
       [ {}
         0x0000000000000000000000000000000000000000000000000180e1eb170000dac9f52543da1aed0bc1d6b46bf7c10db7014cd600
         (Pair "2099-12-31T23:59:59Z" 100000000 "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv") ]
-  - SWAP (entry) @ location: 63 (remaining gas: unaccounted)
+  - SWAP (entry) @ location: 63
     [ {}
       0x0000000000000000000000000000000000000000000000000180e1eb170000dac9f52543da1aed0bc1d6b46bf7c10db7014cd600
       (Pair "2099-12-31T23:59:59Z" 100000000 "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv") ]
-    - [log] (exit) @ location: 63 (remaining gas: unaccounted)
+    - log/CONS (exit) @ location: 63
       [ 0x0000000000000000000000000000000000000000000000000180e1eb170000dac9f52543da1aed0bc1d6b46bf7c10db7014cd600
         {}
         (Pair "2099-12-31T23:59:59Z" 100000000 "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv") ]
-  - CONS (entry) @ location: 64 (remaining gas: unaccounted)
+  - CONS (entry) @ location: 64
     [ 0x0000000000000000000000000000000000000000000000000180e1eb170000dac9f52543da1aed0bc1d6b46bf7c10db7014cd600
       {}
       (Pair "2099-12-31T23:59:59Z" 100000000 "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv") ]
-    - [log] (exit) @ location: 64 (remaining gas: unaccounted)
+    - log/PAIR (exit) @ location: 64
       [ { 0x0000000000000000000000000000000000000000000000000180e1eb170000dac9f52543da1aed0bc1d6b46bf7c10db7014cd600 }
         (Pair "2099-12-31T23:59:59Z" 100000000 "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv") ]
-  - PAIR (entry) @ location: 65 (remaining gas: unaccounted)
+  - PAIR (entry) @ location: 65
     [ { 0x0000000000000000000000000000000000000000000000000180e1eb170000dac9f52543da1aed0bc1d6b46bf7c10db7014cd600 }
       (Pair "2099-12-31T23:59:59Z" 100000000 "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv") ]
-    - [log] (exit) @ location: 65 (remaining gas: unaccounted)
+    - log/[halt] (exit) @ location: 65
       [ (Pair { 0x0000000000000000000000000000000000000000000000000180e1eb170000dac9f52543da1aed0bc1d6b46bf7c10db7014cd600 }
               "2099-12-31T23:59:59Z"
               100000000
               "tz1b7tUupMgCNw2cCLpKTkSD1NZzB5TkP2sv") ]
-  - [halt] (entry) @ location: 10 (remaining gas: unaccounted)
+  - [halt] (entry) @ location: 10
     [ (Pair { 0x0000000000000000000000000000000000000000000000000180e1eb170000dac9f52543da1aed0bc1d6b46bf7c10db7014cd600 }
             "2099-12-31T23:59:59Z"
             100000000

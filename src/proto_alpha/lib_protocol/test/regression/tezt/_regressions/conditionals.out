@@ -1,67 +1,67 @@
 conditionals.out
 
 trace
-  - CAR (interp) @ location: 10 (remaining gas: unaccounted)
+  - CAR (interp) @ location: 10
     [ (Pair (Right (Some 23)) "") ]
-  - CAR (entry) @ location: 10 (remaining gas: unaccounted)
+  - CAR (entry) @ location: 10
     [ (Pair (Right (Some 23)) "") ]
-    - [log] (exit) @ location: 10 (remaining gas: unaccounted)
+    - log/IF_LEFT (exit) @ location: 10
       [ (Right (Some 23)) ]
-  - IF_LEFT (entry) @ location: 11 (remaining gas: unaccounted)
+  - IF_LEFT (entry) @ location: 11
     [ (Right (Some 23)) ]
-    - [log] (exit) @ location: 11 (remaining gas: unaccounted)
+    - log/IF_NONE (exit) @ location: 11
       [ (Some 23) ]
-  - IF_NONE (entry) @ location: 14 (remaining gas: unaccounted)
+  - IF_NONE (entry) @ location: 14
     [ (Some 23) ]
-    - [log] (exit) @ location: 14 (remaining gas: unaccounted)
+    - log/CONST (exit) @ location: 14
       [ 23 ]
-  - CONST (entry) @ location: 20 (remaining gas: unaccounted)
+  - CONST (entry) @ location: 20
     [ 23 ]
-    - [log] (exit) @ location: 20 (remaining gas: unaccounted)
+    - log/COMPARE (exit) @ location: 20
       [ 0
         23 ]
-  - COMPARE (entry) @ location: 24 (remaining gas: unaccounted)
+  - COMPARE (entry) @ location: 24
     [ 0
       23 ]
-    - [log] (exit) @ location: 24 (remaining gas: unaccounted)
+    - log/GT (exit) @ location: 24
       [ -1 ]
-  - GT (entry) @ location: 25 (remaining gas: unaccounted)
+  - GT (entry) @ location: 25
     [ -1 ]
-    - [log] (exit) @ location: 25 (remaining gas: unaccounted)
+    - log/IF (exit) @ location: 25
       [ False ]
-  - IF (entry) @ location: 26 (remaining gas: unaccounted)
+  - IF (entry) @ location: 26
     [ False ]
-    - [log] (exit) @ location: 26 (remaining gas: unaccounted)
+    - log/CONST (exit) @ location: 26
       [  ]
-  - CONST (entry) @ location: 32 (remaining gas: unaccounted)
+  - CONST (entry) @ location: 32
     [  ]
-    - [log] (exit) @ location: 32 (remaining gas: unaccounted)
+    - log/[halt] (exit) @ location: 32
       [ "" ]
-  - [halt] (entry) @ location: 35 (remaining gas: unaccounted)
+  - [halt] (entry) @ location: 35
     [ "" ]
     - control: KCons
-    - [log] (exit) @ location: 26 (remaining gas: unaccounted)
+    - log/[halt] (exit) @ location: 26
       [ "" ]
-  - [halt] (entry) @ location: 35 (remaining gas: unaccounted)
+  - [halt] (entry) @ location: 35
     [ "" ]
     - control: KCons
-    - [log] (exit) @ location: 14 (remaining gas: unaccounted)
+    - log/[halt] (exit) @ location: 14
       [ "" ]
-  - [halt] (entry) @ location: 35 (remaining gas: unaccounted)
+  - [halt] (entry) @ location: 35
     [ "" ]
     - control: KCons
-    - [log] (exit) @ location: 11 (remaining gas: unaccounted)
+    - log/NIL (exit) @ location: 11
       [ "" ]
-  - NIL (entry) @ location: 35 (remaining gas: unaccounted)
+  - NIL (entry) @ location: 35
     [ "" ]
-    - [log] (exit) @ location: 35 (remaining gas: unaccounted)
+    - log/PAIR (exit) @ location: 35
       [ {}
         "" ]
-  - PAIR (entry) @ location: 37 (remaining gas: unaccounted)
+  - PAIR (entry) @ location: 37
     [ {}
       "" ]
-    - [log] (exit) @ location: 37 (remaining gas: unaccounted)
+    - log/[halt] (exit) @ location: 37
       [ (Pair {} "") ]
-  - [halt] (entry) @ location: 9 (remaining gas: unaccounted)
+  - [halt] (entry) @ location: 9
     [ (Pair {} "") ]
     - control: KNil

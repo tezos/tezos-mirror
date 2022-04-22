@@ -1,52 +1,52 @@
 set_delegate.out
 
 trace
-  - UNPAIR (interp) @ location: 8 (remaining gas: unaccounted)
+  - UNPAIR (interp) @ location: 8
     [ (Pair (Some "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN") Unit) ]
-  - UNPAIR (entry) @ location: 8 (remaining gas: unaccounted)
+  - UNPAIR (entry) @ location: 8
     [ (Pair (Some "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN") Unit) ]
-    - [log] (exit) @ location: 8 (remaining gas: unaccounted)
+    - log/SET_DELEGATE (exit) @ location: 8
       [ (Some "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN")
         Unit ]
-  - SET_DELEGATE (entry) @ location: 9 (remaining gas: unaccounted)
+  - SET_DELEGATE (entry) @ location: 9
     [ (Some "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN")
       Unit ]
-    - [log] (exit) @ location: 9 (remaining gas: unaccounted)
+    - log/DIP (exit) @ location: 9
       [ 0x00000000000000000000000000000000000000000000000003ff00e7670f32038107a59a2b9cfefae36ea21f5aa63c
         Unit ]
-  - DIP (entry) @ location: 10 (remaining gas: unaccounted)
+  - DIP (entry) @ location: 10
     [ 0x00000000000000000000000000000000000000000000000003ff00e7670f32038107a59a2b9cfefae36ea21f5aa63c
       Unit ]
-    - [log] (exit) @ location: 10 (remaining gas: unaccounted)
+    - log/NIL (exit) @ location: 10
       [ Unit ]
-  - NIL (entry) @ location: 12 (remaining gas: unaccounted)
+  - NIL (entry) @ location: 12
     [ Unit ]
-    - [log] (exit) @ location: 12 (remaining gas: unaccounted)
+    - log/[halt] (exit) @ location: 12
       [ {}
         Unit ]
-  - [halt] (entry) @ location: 12 (remaining gas: unaccounted)
+  - [halt] (entry) @ location: 12
     [ {}
       Unit ]
     - control: KUndip
     - control: KCons
-    - [log] (exit) @ location: 10 (remaining gas: unaccounted)
+    - log/CONS (exit) @ location: 10
       [ 0x00000000000000000000000000000000000000000000000003ff00e7670f32038107a59a2b9cfefae36ea21f5aa63c
         {}
         Unit ]
-  - CONS (entry) @ location: 14 (remaining gas: unaccounted)
+  - CONS (entry) @ location: 14
     [ 0x00000000000000000000000000000000000000000000000003ff00e7670f32038107a59a2b9cfefae36ea21f5aa63c
       {}
       Unit ]
-    - [log] (exit) @ location: 14 (remaining gas: unaccounted)
+    - log/PAIR (exit) @ location: 14
       [ { 0x00000000000000000000000000000000000000000000000003ff00e7670f32038107a59a2b9cfefae36ea21f5aa63c }
         Unit ]
-  - PAIR (entry) @ location: 15 (remaining gas: unaccounted)
+  - PAIR (entry) @ location: 15
     [ { 0x00000000000000000000000000000000000000000000000003ff00e7670f32038107a59a2b9cfefae36ea21f5aa63c }
       Unit ]
-    - [log] (exit) @ location: 15 (remaining gas: unaccounted)
+    - log/[halt] (exit) @ location: 15
       [ (Pair { 0x00000000000000000000000000000000000000000000000003ff00e7670f32038107a59a2b9cfefae36ea21f5aa63c }
               Unit) ]
-  - [halt] (entry) @ location: 7 (remaining gas: unaccounted)
+  - [halt] (entry) @ location: 7
     [ (Pair { 0x00000000000000000000000000000000000000000000000003ff00e7670f32038107a59a2b9cfefae36ea21f5aa63c }
             Unit) ]
     - control: KNil

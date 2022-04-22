@@ -1,45 +1,45 @@
 shifts.out
 
 trace
-  - CAR (interp) @ location: 14 (remaining gas: unaccounted)
+  - CAR (interp) @ location: 14
     [ (Pair (Right (Pair 3 2)) None) ]
-  - CAR (entry) @ location: 14 (remaining gas: unaccounted)
+  - CAR (entry) @ location: 14
     [ (Pair (Right (Pair 3 2)) None) ]
-    - [log] (exit) @ location: 14 (remaining gas: unaccounted)
+    - log/IF_LEFT (exit) @ location: 14
       [ (Right (Pair 3 2)) ]
-  - IF_LEFT (entry) @ location: 15 (remaining gas: unaccounted)
+  - IF_LEFT (entry) @ location: 15
     [ (Right (Pair 3 2)) ]
-    - [log] (exit) @ location: 15 (remaining gas: unaccounted)
+    - log/UNPAIR (exit) @ location: 15
       [ (Pair 3 2) ]
-  - UNPAIR (entry) @ location: 20 (remaining gas: unaccounted)
+  - UNPAIR (entry) @ location: 20
     [ (Pair 3 2) ]
-    - [log] (exit) @ location: 20 (remaining gas: unaccounted)
+    - log/LSR (exit) @ location: 20
       [ 3
         2 ]
-  - LSR (entry) @ location: 21 (remaining gas: unaccounted)
+  - LSR (entry) @ location: 21
     [ 3
       2 ]
-    - [log] (exit) @ location: 21 (remaining gas: unaccounted)
+    - log/[halt] (exit) @ location: 21
       [ 0 ]
-  - [halt] (entry) @ location: 22 (remaining gas: unaccounted)
+  - [halt] (entry) @ location: 22
     [ 0 ]
     - control: KCons
-    - [log] (exit) @ location: 15 (remaining gas: unaccounted)
+    - log/SOME (exit) @ location: 15
       [ 0 ]
-  - SOME (entry) @ location: 22 (remaining gas: unaccounted)
+  - SOME (entry) @ location: 22
     [ 0 ]
-    - [log] (exit) @ location: 22 (remaining gas: unaccounted)
+    - log/NIL (exit) @ location: 22
       [ (Some 0) ]
-  - NIL (entry) @ location: 23 (remaining gas: unaccounted)
+  - NIL (entry) @ location: 23
     [ (Some 0) ]
-    - [log] (exit) @ location: 23 (remaining gas: unaccounted)
+    - log/PAIR (exit) @ location: 23
       [ {}
         (Some 0) ]
-  - PAIR (entry) @ location: 25 (remaining gas: unaccounted)
+  - PAIR (entry) @ location: 25
     [ {}
       (Some 0) ]
-    - [log] (exit) @ location: 25 (remaining gas: unaccounted)
+    - log/[halt] (exit) @ location: 25
       [ (Pair {} (Some 0)) ]
-  - [halt] (entry) @ location: 13 (remaining gas: unaccounted)
+  - [halt] (entry) @ location: 13
     [ (Pair {} (Some 0)) ]
     - control: KNil

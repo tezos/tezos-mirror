@@ -74,29 +74,24 @@ let with_indentation fmt = function
   | Interp ->
       Format.fprintf
         fmt
-        "- @[<v 0>%a (interp) @@ location: %d (remaining gas: %a)@,\
-         [ @[<v 0>%a ]@]@]"
+        "- @[<v 0>%a (interp) @@ location: %d@,[ @[<v 0>%a ]@]@]"
   | Exit ->
       Format.fprintf
         fmt
-        "- @[<v 0>%a (exit) @@ location: %d (remaining gas: %a)@,\
-         [ @[<v 0>%a ]@]@]@]"
+        "- @[<v 0>%a (exit) @@ location: %d@,[ @[<v 0>%a ]@]@]@]"
   | Entry ->
       Format.fprintf
         fmt
-        "@[<v 2>- @[<v 0>%a (entry) @@ location: %d (remaining gas: %a)@,\
-         [ @[<v 0>%a ]@]@]"
+        "@[<v 2>- @[<v 0>%a (entry) @@ location: %d@,[ @[<v 0>%a ]@]@]"
 
 let pp_trace fmt = function
-  | TInstr (loc, gas, instr, stack, element_kind) ->
+  | TInstr (loc, _gas, instr, stack, element_kind) ->
       with_indentation
         fmt
         element_kind
         Plugin.RPC.Scripts.pp_instr_name
         instr
         loc
-        Gas.pp
-        gas
         (Format.pp_print_list (fun ppf e ->
              Format.fprintf ppf "@[<v 0>%a@]" Michelson_v1_printer.print_expr e))
         stack
@@ -155,7 +150,7 @@ let logger () :
 
 let test_context () =
   let open Environment.Error_monad in
-  let* b, _contracts = Context.init1 ~consensus_threshold:0 () in
+  let* b, _contract = Context.init1 ~consensus_threshold:0 () in
   let* inc = Incremental.begin_construction b in
   let ctxt = Incremental.alpha_ctxt inc in
   return @@ Alpha_context.Origination_nonce.init ctxt Operation_hash.zero

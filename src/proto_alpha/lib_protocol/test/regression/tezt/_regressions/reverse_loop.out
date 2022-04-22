@@ -1,262 +1,262 @@
 reverse_loop.out
 
 trace
-  - CAR (interp) @ location: 9 (remaining gas: unaccounted)
+  - CAR (interp) @ location: 9
     [ (Pair { "abc" ; "def" ; "ghi" } {}) ]
-  - CAR (entry) @ location: 9 (remaining gas: unaccounted)
+  - CAR (entry) @ location: 9
     [ (Pair { "abc" ; "def" ; "ghi" } {}) ]
-    - [log] (exit) @ location: 9 (remaining gas: unaccounted)
+    - log/NIL (exit) @ location: 9
       [ { "abc" ; "def" ; "ghi" } ]
-  - NIL (entry) @ location: 10 (remaining gas: unaccounted)
+  - NIL (entry) @ location: 10
     [ { "abc" ; "def" ; "ghi" } ]
-    - [log] (exit) @ location: 10 (remaining gas: unaccounted)
+    - log/SWAP (exit) @ location: 10
       [ {}
         { "abc" ; "def" ; "ghi" } ]
-  - SWAP (entry) @ location: 12 (remaining gas: unaccounted)
+  - SWAP (entry) @ location: 12
     [ {}
       { "abc" ; "def" ; "ghi" } ]
-    - [log] (exit) @ location: 12 (remaining gas: unaccounted)
+    - log/CONST (exit) @ location: 12
       [ { "abc" ; "def" ; "ghi" }
         {} ]
-  - CONST (entry) @ location: 13 (remaining gas: unaccounted)
+  - CONST (entry) @ location: 13
     [ { "abc" ; "def" ; "ghi" }
       {} ]
-    - [log] (exit) @ location: 13 (remaining gas: unaccounted)
+    - log/LOOP (exit) @ location: 13
       [ True
         { "abc" ; "def" ; "ghi" }
         {} ]
-  - LOOP (entry) @ location: 16 (remaining gas: unaccounted)
+  - LOOP (entry) @ location: 16
     [ True
       { "abc" ; "def" ; "ghi" }
       {} ]
     - control: KLoop_in
-    - [log] (exit) @ location: 16 (remaining gas: unaccounted)
+    - log/IF_CONS (exit) @ location: 16
       [ { "abc" ; "def" ; "ghi" }
         {} ]
-  - IF_CONS (entry) @ location: 18 (remaining gas: unaccounted)
+  - IF_CONS (entry) @ location: 18
     [ { "abc" ; "def" ; "ghi" }
       {} ]
-    - [log] (exit) @ location: 18 (remaining gas: unaccounted)
+    - log/SWAP (exit) @ location: 18
       [ "abc"
         { "def" ; "ghi" }
         {} ]
-  - SWAP (entry) @ location: 20 (remaining gas: unaccounted)
+  - SWAP (entry) @ location: 20
     [ "abc"
       { "def" ; "ghi" }
       {} ]
-    - [log] (exit) @ location: 20 (remaining gas: unaccounted)
+    - log/DIP (exit) @ location: 20
       [ { "def" ; "ghi" }
         "abc"
         {} ]
-  - DIP (entry) @ location: 21 (remaining gas: unaccounted)
+  - DIP (entry) @ location: 21
     [ { "def" ; "ghi" }
       "abc"
       {} ]
-    - [log] (exit) @ location: 21 (remaining gas: unaccounted)
+    - log/CONS (exit) @ location: 21
       [ "abc"
         {} ]
-  - CONS (entry) @ location: 23 (remaining gas: unaccounted)
+  - CONS (entry) @ location: 23
     [ "abc"
       {} ]
-    - [log] (exit) @ location: 23 (remaining gas: unaccounted)
+    - log/[halt] (exit) @ location: 23
       [ { "abc" } ]
-  - [halt] (entry) @ location: 23 (remaining gas: unaccounted)
+  - [halt] (entry) @ location: 23
     [ { "abc" } ]
     - control: KUndip
     - control: KCons
-    - [log] (exit) @ location: 21 (remaining gas: unaccounted)
+    - log/CONST (exit) @ location: 21
       [ { "def" ; "ghi" }
         { "abc" } ]
-  - CONST (entry) @ location: 24 (remaining gas: unaccounted)
+  - CONST (entry) @ location: 24
     [ { "def" ; "ghi" }
       { "abc" } ]
-    - [log] (exit) @ location: 24 (remaining gas: unaccounted)
+    - log/[halt] (exit) @ location: 24
       [ True
         { "def" ; "ghi" }
         { "abc" } ]
-  - [halt] (entry) @ location: 16 (remaining gas: unaccounted)
+  - [halt] (entry) @ location: 16
     [ True
       { "def" ; "ghi" }
       { "abc" } ]
     - control: KCons
-    - [log] (exit) @ location: 18 (remaining gas: unaccounted)
+    - log/[halt] (exit) @ location: 18
       [ True
         { "def" ; "ghi" }
         { "abc" } ]
-  - [halt] (entry) @ location: 16 (remaining gas: unaccounted)
+  - [halt] (entry) @ location: 16
     [ True
       { "def" ; "ghi" }
       { "abc" } ]
     - control: KLoop_in
-    - [log] (exit) @ location: 16 (remaining gas: unaccounted)
+    - log/IF_CONS (exit) @ location: 16
       [ { "def" ; "ghi" }
         { "abc" } ]
-  - IF_CONS (entry) @ location: 18 (remaining gas: unaccounted)
+  - IF_CONS (entry) @ location: 18
     [ { "def" ; "ghi" }
       { "abc" } ]
-    - [log] (exit) @ location: 18 (remaining gas: unaccounted)
+    - log/SWAP (exit) @ location: 18
       [ "def"
         { "ghi" }
         { "abc" } ]
-  - SWAP (entry) @ location: 20 (remaining gas: unaccounted)
+  - SWAP (entry) @ location: 20
     [ "def"
       { "ghi" }
       { "abc" } ]
-    - [log] (exit) @ location: 20 (remaining gas: unaccounted)
+    - log/DIP (exit) @ location: 20
       [ { "ghi" }
         "def"
         { "abc" } ]
-  - DIP (entry) @ location: 21 (remaining gas: unaccounted)
+  - DIP (entry) @ location: 21
     [ { "ghi" }
       "def"
       { "abc" } ]
-    - [log] (exit) @ location: 21 (remaining gas: unaccounted)
+    - log/CONS (exit) @ location: 21
       [ "def"
         { "abc" } ]
-  - CONS (entry) @ location: 23 (remaining gas: unaccounted)
+  - CONS (entry) @ location: 23
     [ "def"
       { "abc" } ]
-    - [log] (exit) @ location: 23 (remaining gas: unaccounted)
+    - log/[halt] (exit) @ location: 23
       [ { "def" ; "abc" } ]
-  - [halt] (entry) @ location: 23 (remaining gas: unaccounted)
+  - [halt] (entry) @ location: 23
     [ { "def" ; "abc" } ]
     - control: KUndip
     - control: KCons
-    - [log] (exit) @ location: 21 (remaining gas: unaccounted)
+    - log/CONST (exit) @ location: 21
       [ { "ghi" }
         { "def" ; "abc" } ]
-  - CONST (entry) @ location: 24 (remaining gas: unaccounted)
+  - CONST (entry) @ location: 24
     [ { "ghi" }
       { "def" ; "abc" } ]
-    - [log] (exit) @ location: 24 (remaining gas: unaccounted)
+    - log/[halt] (exit) @ location: 24
       [ True
         { "ghi" }
         { "def" ; "abc" } ]
-  - [halt] (entry) @ location: 16 (remaining gas: unaccounted)
+  - [halt] (entry) @ location: 16
     [ True
       { "ghi" }
       { "def" ; "abc" } ]
     - control: KCons
-    - [log] (exit) @ location: 18 (remaining gas: unaccounted)
+    - log/[halt] (exit) @ location: 18
       [ True
         { "ghi" }
         { "def" ; "abc" } ]
-  - [halt] (entry) @ location: 16 (remaining gas: unaccounted)
+  - [halt] (entry) @ location: 16
     [ True
       { "ghi" }
       { "def" ; "abc" } ]
     - control: KLoop_in
-    - [log] (exit) @ location: 16 (remaining gas: unaccounted)
+    - log/IF_CONS (exit) @ location: 16
       [ { "ghi" }
         { "def" ; "abc" } ]
-  - IF_CONS (entry) @ location: 18 (remaining gas: unaccounted)
+  - IF_CONS (entry) @ location: 18
     [ { "ghi" }
       { "def" ; "abc" } ]
-    - [log] (exit) @ location: 18 (remaining gas: unaccounted)
+    - log/SWAP (exit) @ location: 18
       [ "ghi"
         {}
         { "def" ; "abc" } ]
-  - SWAP (entry) @ location: 20 (remaining gas: unaccounted)
+  - SWAP (entry) @ location: 20
     [ "ghi"
       {}
       { "def" ; "abc" } ]
-    - [log] (exit) @ location: 20 (remaining gas: unaccounted)
+    - log/DIP (exit) @ location: 20
       [ {}
         "ghi"
         { "def" ; "abc" } ]
-  - DIP (entry) @ location: 21 (remaining gas: unaccounted)
+  - DIP (entry) @ location: 21
     [ {}
       "ghi"
       { "def" ; "abc" } ]
-    - [log] (exit) @ location: 21 (remaining gas: unaccounted)
+    - log/CONS (exit) @ location: 21
       [ "ghi"
         { "def" ; "abc" } ]
-  - CONS (entry) @ location: 23 (remaining gas: unaccounted)
+  - CONS (entry) @ location: 23
     [ "ghi"
       { "def" ; "abc" } ]
-    - [log] (exit) @ location: 23 (remaining gas: unaccounted)
+    - log/[halt] (exit) @ location: 23
       [ { "ghi" ; "def" ; "abc" } ]
-  - [halt] (entry) @ location: 23 (remaining gas: unaccounted)
+  - [halt] (entry) @ location: 23
     [ { "ghi" ; "def" ; "abc" } ]
     - control: KUndip
     - control: KCons
-    - [log] (exit) @ location: 21 (remaining gas: unaccounted)
+    - log/CONST (exit) @ location: 21
       [ {}
         { "ghi" ; "def" ; "abc" } ]
-  - CONST (entry) @ location: 24 (remaining gas: unaccounted)
+  - CONST (entry) @ location: 24
     [ {}
       { "ghi" ; "def" ; "abc" } ]
-    - [log] (exit) @ location: 24 (remaining gas: unaccounted)
+    - log/[halt] (exit) @ location: 24
       [ True
         {}
         { "ghi" ; "def" ; "abc" } ]
-  - [halt] (entry) @ location: 16 (remaining gas: unaccounted)
+  - [halt] (entry) @ location: 16
     [ True
       {}
       { "ghi" ; "def" ; "abc" } ]
     - control: KCons
-    - [log] (exit) @ location: 18 (remaining gas: unaccounted)
+    - log/[halt] (exit) @ location: 18
       [ True
         {}
         { "ghi" ; "def" ; "abc" } ]
-  - [halt] (entry) @ location: 16 (remaining gas: unaccounted)
+  - [halt] (entry) @ location: 16
     [ True
       {}
       { "ghi" ; "def" ; "abc" } ]
     - control: KLoop_in
-    - [log] (exit) @ location: 16 (remaining gas: unaccounted)
+    - log/IF_CONS (exit) @ location: 16
       [ {}
         { "ghi" ; "def" ; "abc" } ]
-  - IF_CONS (entry) @ location: 18 (remaining gas: unaccounted)
+  - IF_CONS (entry) @ location: 18
     [ {}
       { "ghi" ; "def" ; "abc" } ]
-    - [log] (exit) @ location: 18 (remaining gas: unaccounted)
+    - log/NIL (exit) @ location: 18
       [ { "ghi" ; "def" ; "abc" } ]
-  - NIL (entry) @ location: 28 (remaining gas: unaccounted)
+  - NIL (entry) @ location: 28
     [ { "ghi" ; "def" ; "abc" } ]
-    - [log] (exit) @ location: 28 (remaining gas: unaccounted)
+    - log/CONST (exit) @ location: 28
       [ {}
         { "ghi" ; "def" ; "abc" } ]
-  - CONST (entry) @ location: 30 (remaining gas: unaccounted)
+  - CONST (entry) @ location: 30
     [ {}
       { "ghi" ; "def" ; "abc" } ]
-    - [log] (exit) @ location: 30 (remaining gas: unaccounted)
+    - log/[halt] (exit) @ location: 30
       [ False
         {}
         { "ghi" ; "def" ; "abc" } ]
-  - [halt] (entry) @ location: 16 (remaining gas: unaccounted)
+  - [halt] (entry) @ location: 16
     [ False
       {}
       { "ghi" ; "def" ; "abc" } ]
     - control: KCons
-    - [log] (exit) @ location: 18 (remaining gas: unaccounted)
+    - log/[halt] (exit) @ location: 18
       [ False
         {}
         { "ghi" ; "def" ; "abc" } ]
-  - [halt] (entry) @ location: 16 (remaining gas: unaccounted)
+  - [halt] (entry) @ location: 16
     [ False
       {}
       { "ghi" ; "def" ; "abc" } ]
     - control: KLoop_in
     - control: KCons
-    - [log] (exit) @ location: 16 (remaining gas: unaccounted)
+    - log/DROP (exit) @ location: 16
       [ {}
         { "ghi" ; "def" ; "abc" } ]
-  - DROP (entry) @ location: 33 (remaining gas: unaccounted)
+  - DROP (entry) @ location: 33
     [ {}
       { "ghi" ; "def" ; "abc" } ]
-    - [log] (exit) @ location: 33 (remaining gas: unaccounted)
+    - log/NIL (exit) @ location: 33
       [ { "ghi" ; "def" ; "abc" } ]
-  - NIL (entry) @ location: 34 (remaining gas: unaccounted)
+  - NIL (entry) @ location: 34
     [ { "ghi" ; "def" ; "abc" } ]
-    - [log] (exit) @ location: 34 (remaining gas: unaccounted)
+    - log/PAIR (exit) @ location: 34
       [ {}
         { "ghi" ; "def" ; "abc" } ]
-  - PAIR (entry) @ location: 36 (remaining gas: unaccounted)
+  - PAIR (entry) @ location: 36
     [ {}
       { "ghi" ; "def" ; "abc" } ]
-    - [log] (exit) @ location: 36 (remaining gas: unaccounted)
+    - log/[halt] (exit) @ location: 36
       [ (Pair {} { "ghi" ; "def" ; "abc" }) ]
-  - [halt] (entry) @ location: 8 (remaining gas: unaccounted)
+  - [halt] (entry) @ location: 8
     [ (Pair {} { "ghi" ; "def" ; "abc" }) ]
     - control: KNil

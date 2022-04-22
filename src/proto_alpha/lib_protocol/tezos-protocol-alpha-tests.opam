@@ -21,6 +21,7 @@ depends: [
   "tezos-base-test-helpers" { with-test }
   "tezos-benchmark" { with-test }
   "tezos-benchmark-alpha" { with-test }
+  "tezt" { with-test }
 ]
 build: [
   [
