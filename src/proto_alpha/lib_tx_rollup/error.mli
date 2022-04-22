@@ -88,3 +88,6 @@ type error += Tx_rollup_invalid_message_position_in_inbox of int
 (** Error when the injector has no worker for the source which must inject an
     operation. *)
 type error += No_worker_for_source of Signature.Public_key_hash.t
+
+(** Error when we want to interact with the batcher but it was not started. *)
+type error += No_batcher

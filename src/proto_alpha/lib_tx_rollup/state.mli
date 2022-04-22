@@ -52,7 +52,6 @@ type t = private {
   constants : Constants.t;
   operator : signer option;
   signers : Configuration.signers;
-  batcher : Batcher.t option;
 }
 
 (** [init cctxt ~data_dir ~rollup_genesis ~operator rollup] creates a new state
@@ -153,3 +152,8 @@ val rollup_operation_index : int
 (** Fetch a Tezos block from the cache or the node *)
 val fetch_tezos_block :
   t -> Block_hash.t -> Alpha_block_services.block_info tzresult Lwt.t
+
+(** Compute the reorganization of L2 blocks from the chain whose head is
+    [old_head_hash] and the chain whose head [new_head_hash]. *)
+val rollup_reorg :
+  t -> old_head:L2block.t -> new_head:L2block.t -> L2block.t reorg Lwt.t

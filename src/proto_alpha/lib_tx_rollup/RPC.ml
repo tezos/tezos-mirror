@@ -547,7 +547,7 @@ module Injection = struct
 
   let prefix = RPC_path.(open_root)
 
-  let directory : Batcher.t RPC_directory.t ref = ref RPC_directory.empty
+  let directory : unit RPC_directory.t ref = ref RPC_directory.empty
 
   let register service f =
     directory := RPC_directory.register !directory service f
@@ -558,11 +558,10 @@ module Injection = struct
 
   let export_service s = RPC_service.prefix prefix s
 
-  let build_directory state =
-    match state.State.batcher with
-    | None -> RPC_directory.empty
-    | Some batcher ->
-        !directory |> RPC_directory.map (fun () -> Lwt.return batcher)
+  let build_directory _state =
+    if Batcher.active () then !directory
+    else (* No queue/batching RPC if batcher is inactive *)
+      RPC_directory.empty
 
   let inject_query =
     let open RPC_query in
@@ -596,19 +595,20 @@ module Injection = struct
       path
 
   let () =
-    register0 inject_transaction (fun batcher q transaction ->
-        Batcher.register_transaction
-          ~eager_batch:q#eager_batch
-          batcher
-          transaction)
+    register0 inject_transaction (fun () q transaction ->
+        Batcher.register_transaction ~eager_batch:q#eager_batch transaction)
 
   let () =
-    register1 get_transaction (fun (batcher, tr_hash) () () ->
-        return @@ Batcher.find_transaction batcher tr_hash)
+    register1 get_transaction (fun ((), tr_hash) () () ->
+        let open Lwt_result_syntax in
+        let*? tr = Batcher.find_transaction tr_hash in
+        return tr)
 
   let () =
-    register0 get_queue (fun batcher () () ->
-        return @@ Batcher.get_queue batcher)
+    register0 get_queue (fun () () () ->
+        let open Lwt_result_syntax in
+        let*? q = Batcher.get_queue () in
+        return q)
 end
 
 let register state =

@@ -345,3 +345,17 @@ let () =
     Data_encoding.(obj1 (req "source" Signature.Public_key_hash.encoding))
     (function No_worker_for_source s -> Some s | _ -> None)
     (fun s -> No_worker_for_source s)
+
+type error += No_batcher
+
+let () =
+  register_error_kind
+    ~id:"tx_rollup.node.no_batcher"
+    ~title:"No batcher for this node"
+    ~description:"This node does not have a batcher"
+    ~pp:(fun ppf () ->
+      Format.fprintf ppf "This rollup node does not have batcher.")
+    `Permanent
+    Data_encoding.unit
+    (function No_batcher -> Some () | _ -> None)
+    (fun () -> No_batcher)

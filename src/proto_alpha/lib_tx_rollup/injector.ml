@@ -96,6 +96,8 @@ type state = {
       (** The information about included operations. {b Note}: Operations which
           are confirmed are simply removed from the state and do not appear
           anymore. *)
+  rollup_node_state : State.t;
+      (** The state of the rollup node (essentially to access the stores). *)
 }
 
 (** Builds a client context from another client context but uses logging instead
@@ -114,9 +116,9 @@ let injector_context (cctxt : #Client_context.full) =
       Format.ksprintf Stdlib.failwith "Injector client wants to exit %d" code
   end
 
-let init_injector cctxt ~signer strategy tags =
+let init_injector rollup_node_state ~signer strategy tags =
   let open Lwt_result_syntax in
-  let+ signer = get_signer cctxt signer in
+  let+ signer = get_signer rollup_node_state.State.cctxt signer in
   let queue = Op_queue.create 50_000 in
   (* Very coarse approximation Number of operation we expect for each block *)
   let n =
@@ -135,7 +137,7 @@ let init_injector cctxt ~signer strategy tags =
       0
   in
   {
-    cctxt = injector_context cctxt;
+    cctxt = injector_context rollup_node_state.State.cctxt;
     signer;
     tags;
     strategy;
@@ -150,6 +152,7 @@ let init_injector cctxt ~signer strategy tags =
         included_operations = L1_operation.Hash.Table.create (confirmations * n);
         included_in_blocks = Block_hash.Table.create (confirmations * n);
       };
+    rollup_node_state;
   }
 
 module Event = struct
@@ -638,7 +641,7 @@ module Types = struct
   type nonrec state = state
 
   type parameters = {
-    cctxt : Client_context.full;
+    rollup_node_state : State.t;
     strategy : injection_strategy;
     tags : Tags.t;
   }
@@ -669,8 +672,8 @@ module Handlers = struct
        worker in case of an exception. *)
     protect @@ fun () -> on_request w r
 
-  let on_launch _w signer Types.{cctxt; strategy; tags} =
-    init_injector cctxt ~signer strategy tags
+  let on_launch _w signer Types.{rollup_node_state; strategy; tags} =
+    init_injector rollup_node_state ~signer strategy tags
 
   let on_error w r st errs =
     let open Lwt_result_syntax in
@@ -699,7 +702,7 @@ let table = Worker.create_table Queue
 
 (* TODO/TORU: https://gitlab.com/tezos/tezos/-/issues/2754
    Injector worker in a separate process *)
-let init cctxt ~signers =
+let init rollup_node_state ~signers =
   let open Lwt_result_syntax in
   let signers_map =
     List.fold_left
@@ -730,7 +733,7 @@ let init cctxt ~signers =
         Worker.launch
           table
           signer
-          {cctxt = (cctxt :> Client_context.full); strategy; tags}
+          {rollup_node_state; strategy; tags}
           (module Handlers)
       in
       ignore worker)

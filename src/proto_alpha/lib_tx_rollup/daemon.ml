@@ -265,6 +265,15 @@ let process_messages_and_inboxes (state : State.t) ~(predecessor : L2block.t)
       in
       return (block, context)
 
+let set_head state head =
+  let open Lwt_result_syntax in
+  let* _l2_reorg = State.set_head state head in
+  let*! new_head_batcher = Batcher.new_head head in
+  match new_head_batcher with
+  | Error [No_batcher] -> return_unit
+  | Ok () -> return_unit
+  | Error _ as res -> Lwt.return res
+
 let rec process_block state current_hash rollup_id :
     (L2block.t * Context.context option, tztrace) result Lwt.t =
   let open Lwt_result_syntax in
@@ -281,7 +290,7 @@ let rec process_block state current_hash rollup_id :
     | Some l2_block ->
         (* Already processed *)
         let*! () = Event.(emit block_already_processed) current_hash in
-        let* _l2_reorg = State.set_head state l2_block in
+        let* () = set_head state l2_block in
         return (l2_block, None)
     | None ->
         let* block_info = State.fetch_tezos_block state current_hash in
@@ -316,15 +325,12 @@ let rec process_block state current_hash rollup_id :
             ~level:block_info.header.shell.level
             ~predecessor:block_info.header.shell.predecessor
         in
-        let* _l2_reorg = State.set_head state l2_block in
+        let* () = set_head state l2_block in
         let*! () = Event.(emit new_tezos_head) current_hash in
         let*! () = Event.(emit block_processed) (current_hash, block_level) in
         return (l2_block, Some context)
 
-let batch state =
-  match state.State.batcher with
-  | None -> return_unit
-  | Some batcher -> Batcher.batch batcher
+let batch () = if Batcher.active () then Batcher.batch () else return_unit
 
 let notify_head state head reorg =
   let open Lwt_result_syntax in
@@ -409,7 +415,7 @@ let process_head state (current_hash, current_header) rollup_id =
   let*! () = Event.(emit new_block) current_hash in
   let* res = process_block state current_hash rollup_id in
   let* l1_reorg = State.set_tezos_head state current_hash in
-  let* () = batch state in
+  let* () = batch () in
   let* () = queue_gc_operations state in
   let* () = notify_head state current_hash l1_reorg in
   let*! () = trigger_injection state current_header in
@@ -459,6 +465,35 @@ let run configuration cctxt =
       ?rollup_genesis
       rollup_id
   in
+  let* () =
+    Injector.init
+      state
+      ~signers:
+        (List.filter_map
+           (function
+             | (None, _, _) -> None
+             | (Some x, strategy, tags) -> Some (x, strategy, tags))
+           [
+             (operator, Injector.Each_block, [`Commitment]);
+             (* Batches of L2 operations are submitted with a delay after each
+                block, to allow for more operations to arrive and be included in
+                the following block. *)
+             (signers.submit_batch, Delay_block, [`Submit_batch]);
+             (signers.finalize_commitment, Each_block, [`Finalize_commitment]);
+             (signers.remove_commitment, Each_block, [`Remove_commitment]);
+             (signers.rejection, Each_block, [`Rejection]);
+           ])
+  in
+  let* () =
+    Option.iter_es
+      (fun signer ->
+        Batcher.init
+          ~rollup:rollup_id
+          ~signer
+          state.State.context_index
+          state.State.constants)
+      signers.submit_batch
+  in
   let* _rpc_server = RPC.start configuration state in
   let _ =
     (* Register cleaner callback *)
@@ -477,7 +512,7 @@ let run configuration cctxt =
               (fun head ->
                 let*! r = process_head state head rollup_id in
                 match r with
-                | Ok (_, _) -> Lwt.return ()
+                | Ok _ -> Lwt.return ()
                 | Error (Tx_rollup_originated_in_fork :: _ as e) ->
                     Format.eprintf "%a@.Exiting.@." pp_print_trace e ;
                     Lwt_exit.exit_and_raise 1

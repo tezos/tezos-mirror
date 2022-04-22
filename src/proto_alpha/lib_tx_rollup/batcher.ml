@@ -301,24 +301,53 @@ end
 
 let table = Worker.create_table Queue
 
-type t = worker
+let (worker_promise, worker_waker) = Lwt.task ()
 
 let init ~rollup ~signer index constants =
-  Worker.launch table rollup {signer; index; constants} (module Handlers)
+  let open Lwt_result_syntax in
+  let+ worker =
+    Worker.launch table rollup {signer; index; constants} (module Handlers)
+  in
+  Lwt.wakeup worker_waker worker
 
-let find_transaction w tr_hash =
+(* This is a batcher worker for a single tx rollup *)
+let worker =
+  lazy
+    (match Lwt.state worker_promise with
+    | Lwt.Return worker -> ok worker
+    | Lwt.Fail _ | Lwt.Sleep -> error Error.No_batcher)
+
+let active () =
+  match Lwt.state worker_promise with
+  | Lwt.Return _ -> true
+  | Lwt.Fail _ | Lwt.Sleep -> false
+
+let find_transaction tr_hash =
+  let open Result_syntax in
+  let+ w = Lazy.force worker in
   let state = Worker.state w in
   Tx_queue.find_opt state.transactions tr_hash
 
-let get_queue w =
+let get_queue () =
+  let open Result_syntax in
+  let+ w = Lazy.force worker in
   let state = Worker.state w in
   Tx_queue.elements state.transactions
 
-let register_transaction ?(eager_batch = false) ?(apply = true) w tr =
+let register_transaction ?(eager_batch = false) ?(apply = true) tr =
+  let open Lwt_result_syntax in
+  let*? w = Lazy.force worker in
   Worker.Queue.push_request_and_wait
     w
     (Request.Register {tr; apply; eager_batch})
 
-let batch w = Worker.Queue.push_request_and_wait w Request.Batch
+let batch () =
+  let open Lwt_result_syntax in
+  let*? w = Lazy.force worker in
+  Worker.Queue.push_request_and_wait w Request.Batch
 
-let new_head w b = Worker.Queue.push_request w (Request.New_head b)
+let new_head b =
+  let open Lwt_result_syntax in
+  let*? w = Lazy.force worker in
+  let*! () = Worker.Queue.push_request w (Request.New_head b) in
+  return_unit
