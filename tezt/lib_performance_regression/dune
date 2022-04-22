@@ -8,4 +8,6 @@
   tezt
   uri
   cohttp-lwt-unix)
- (flags (:standard -open Tezt -open Tezt.Base)))
+ (flags (:standard
+         -open Tezt
+         -open Tezt.Base)))

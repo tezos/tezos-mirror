@@ -10,7 +10,8 @@
   tezos-client-base
   tezos-shell-services
   tezos-protocol-environment)
- (flags (:standard -open Tezos_base.TzPervasives))
+ (flags (:standard
+         -open Tezos_base.TzPervasives))
  (modules registration registration_intf mockup_args))
 
 (library
@@ -32,7 +33,9 @@
   tezos-rpc-http-client
   tezos-mockup-registration)
  (flags
-  (:standard -open Tezos_base.TzPervasives -open Tezos_mockup_registration))
+  (:standard
+   -open Tezos_base.TzPervasives
+   -open Tezos_mockup_registration))
  (modules
   files
   local_services

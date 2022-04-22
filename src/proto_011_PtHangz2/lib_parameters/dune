@@ -11,7 +11,9 @@
   tezos-protocol-011-PtHangz2)
  (library_flags (:standard -linkall))
  (flags
-  (:standard -open Tezos_base.TzPervasives -open Tezos_protocol_011_PtHangz2))
+  (:standard
+   -open Tezos_base.TzPervasives
+   -open Tezos_protocol_011_PtHangz2))
  (modules (:standard \ gen)))
 
 (executable

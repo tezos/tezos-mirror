@@ -8,7 +8,8 @@
   tezos-micheline
   alcotest)
  (js_of_ocaml)
- (flags (:standard -open Tezos_micheline)))
+ (flags (:standard
+         -open Tezos_micheline)))
 
 (rule
  (alias runtest)

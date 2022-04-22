@@ -14,4 +14,5 @@
   alcotest-lwt
   qcheck-alcotest)
  (library_flags (:standard -linkall))
- (flags (:standard -open Tezos_base.TzPervasives)))
+ (flags (:standard
+         -open Tezos_base.TzPervasives)))

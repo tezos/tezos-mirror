@@ -16,7 +16,8 @@
   lwt.unix
   tezos-test-helpers
   qcheck-alcotest)
- (flags (:standard -open Tezos_stdlib)))
+ (flags (:standard
+         -open Tezos_stdlib)))
 
 (rule
  (alias runtest)

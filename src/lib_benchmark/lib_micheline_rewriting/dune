@@ -12,4 +12,7 @@
   tezos-error-monad
   tezos-micheline)
  (flags
-  (:standard -open Tezos_stdlib -open Tezos_error_monad -open Tezos_micheline)))
+  (:standard
+   -open Tezos_stdlib
+   -open Tezos_error_monad
+   -open Tezos_micheline)))

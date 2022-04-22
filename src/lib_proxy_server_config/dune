@@ -8,4 +8,5 @@
  (libraries
   tezos-base
   tezos-stdlib-unix)
- (flags (:standard -open Tezos_base.TzPervasives)))
+ (flags (:standard
+         -open Tezos_base.TzPervasives)))

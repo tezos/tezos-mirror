@@ -7,7 +7,9 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-protocol-environment.sigs.stdlib-compat)
- (flags (:standard -nostdlib -nopervasives))
+ (flags (:standard
+         -nostdlib
+         -nopervasives))
  (modules V0 V1 V2 V3 V4 V5))
 
 (include v0.dune.inc)

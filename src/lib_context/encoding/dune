@@ -10,4 +10,6 @@
   tezos-stdlib
   irmin
   irmin-pack)
- (flags (:standard -open Tezos_base.TzPervasives -open Tezos_stdlib)))
+ (flags (:standard
+         -open Tezos_base.TzPervasives
+         -open Tezos_stdlib)))

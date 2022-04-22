@@ -11,7 +11,9 @@
   tezos-error-monad
   tezos-client-alpha)
  (flags
-  (:standard -open Tezos_micheline -open Tezos_benchmark_type_inference_alpha)))
+  (:standard
+   -open Tezos_micheline
+   -open Tezos_benchmark_type_inference_alpha)))
 
 (rule
  (alias runtest)

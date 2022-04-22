@@ -7,7 +7,9 @@
   tezos-stdlib
   tezos-clic
   alcotest-lwt)
- (flags (:standard -open Tezos_stdlib -open Tezos_clic)))
+ (flags (:standard
+         -open Tezos_stdlib
+         -open Tezos_clic)))
 
 (rule
  (alias runtest)

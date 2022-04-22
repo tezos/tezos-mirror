@@ -12,4 +12,6 @@
   lwt
   tezos-lwt-result-stdlib)
  (js_of_ocaml)
- (flags (:standard -open Tezos_stdlib -open Data_encoding)))
+ (flags (:standard
+         -open Tezos_stdlib
+         -open Data_encoding)))

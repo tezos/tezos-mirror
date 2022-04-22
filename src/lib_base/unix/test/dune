@@ -11,7 +11,10 @@
   tezos-test-helpers
   qcheck-alcotest)
  (flags
-  (:standard -open Tezos_base -open Tezos_base_unix -open Tezos_error_monad)))
+  (:standard
+   -open Tezos_base
+   -open Tezos_base_unix
+   -open Tezos_error_monad)))
 
 (rule
  (alias runtest)

@@ -11,7 +11,9 @@
   tezos-protocol-010-PtGRANAD)
  (library_flags (:standard -linkall))
  (flags
-  (:standard -open Tezos_base.TzPervasives -open Tezos_protocol_010_PtGRANAD))
+  (:standard
+   -open Tezos_base.TzPervasives
+   -open Tezos_protocol_010_PtGRANAD))
  (modules (:standard \ gen)))
 
 (executable

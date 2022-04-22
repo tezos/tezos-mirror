@@ -1522,7 +1522,7 @@ let generate_dune ~dune_file_has_static_profile (internal : Target.internal) =
   in
   let flags =
     internal.opens
-    |> List.map (fun m -> Dune.(G [S "-open"; S m]))
+    |> List.map (fun m -> Dune.(H [S "-open"; S m]))
     |> cons_if internal.nopervasives (Dune.S "-nopervasives")
     |> cons_if internal.nostdlib (Dune.S "-nostdlib")
     |> cons_if internal.opaque (Dune.S "-opaque")
@@ -1532,18 +1532,18 @@ let generate_dune ~dune_file_has_static_profile (internal : Target.internal) =
       (* Disable static compilation for this particular target
          (the static profile is global for the dune file).
          This must be at the end of the flag list. *)
-      flags @ [Dune.(G [S "\\"; S "-ccopt"; S "-static"])]
+      flags @ [Dune.(H [S "\\"; S "-ccopt"; S "-static"])]
     else flags
   in
   let flags =
     match internal.warnings with
     | None -> flags
-    | Some w -> Dune.[S "-w"; S w] @ flags
+    | Some w -> Dune.[H [S "-w"; S w]] @ flags
   in
   let flags =
     match flags with
     | [] -> None
-    | _ :: _ -> Some (Dune.of_list (Dune.S ":standard" :: flags))
+    | _ :: _ -> Some Dune.[V (Dune.S ":standard" :: Dune.of_list flags)]
   in
   let preprocess =
     let make_pp (PPS (target, args) : Target.preprocessor) =
