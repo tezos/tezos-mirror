@@ -30,8 +30,8 @@ Node
 Client
 ------
 
-Baker
------
+- Client allows to simulate failing operations with ``--simulation
+  --force``, and report errors without specifying limits.
 
 Accuser
 -------
