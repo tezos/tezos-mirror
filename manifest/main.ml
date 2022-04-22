@@ -1091,6 +1091,23 @@ let tezos_shell_services =
     ~linkall:true
     ~js_compatible:true
 
+let tezos_test_helpers_extra =
+  public_lib
+    "tezos-test-helpers-extra"
+    ~path:"src/lib_test"
+    ~internal_name:"lib_test_extra"
+    ~synopsis:"Test helpers dependent on tezos-base"
+    ~deps:[tezos_base; tezos_crypto; tezos_test_helpers; tezos_shell_services]
+    ~ocaml:V.(at_least "4.08")
+    ~dune:
+      Dune.
+        [
+          (* This rule is necessary for `make lint-tests-pkg`, without it dune
+             complains that the alias is empty. *)
+          alias_rule "runtest_js_base" ~action:(S "progn");
+        ]
+    ~modules:["assert_lib"]
+
 let _tezos_shell_services_tests =
   test
     "test"
@@ -1410,9 +1427,10 @@ let _tezos_context_tests =
         tezos_context |> open_;
         tezos_stdlib_unix |> open_;
         tezos_test_helpers;
+        tezos_test_helpers_extra;
         alcotest_lwt;
       ]
-    ~modules:["assert"; "test_context"; "test"]
+    ~modules:["test_context"; "test"]
 
 let _tezos_context_memory_tests =
   test
@@ -1853,23 +1871,6 @@ let tezos_store =
         tar_unix;
         prometheus;
       ]
-
-let tezos_test_helpers_extra =
-  public_lib
-    "tezos-test-helpers-extra"
-    ~path:"src/lib_test"
-    ~internal_name:"lib_test_extra"
-    ~synopsis:"Test helpers dependent on tezos-base"
-    ~deps:[tezos_base; tezos_crypto; tezos_test_helpers; tezos_shell_services]
-    ~ocaml:V.(at_least "4.08")
-    ~dune:
-      Dune.
-        [
-          (* This rule is necessary for `make lint-tests-pkg`, without it dune
-             complains that the alias is empty. *)
-          alias_rule "runtest_js_base" ~action:(S "progn");
-        ]
-    ~modules:["assert_lib"]
 
 let tezos_requester =
   public_lib
