@@ -44,6 +44,39 @@ let get_rollup_parameter_file ~protocol =
 let wait_for_batch_success_event node =
   Rollup_node.wait_for node "batch_success.v0" (fun _ -> Some ())
 
+(* Wait for the [injecting_pending] event from the injector. *)
+let wait_for_injecting_event ?(tags = []) ?count node =
+  Rollup_node.wait_for node "injecting_pending.v0" @@ fun json ->
+  let event_tags = JSON.(json |-> "tags" |> as_list |> List.map as_string) in
+  let event_count = JSON.(json |-> "count" |> as_int) in
+  match count with
+  | Some c when c <> event_count -> None
+  | _ ->
+      if List.for_all (fun t -> List.mem t event_tags) tags then
+        Some event_count
+      else None
+
+(* Wait for the [request_completed] event from the injector. *)
+let wait_for_request_completed ?(tags = []) node request =
+  Rollup_node.wait_for node "request_completed_notice.v0" @@ fun json ->
+  let event_request = JSON.(json |-> "view" |-> "request" |> as_string) in
+  if request <> event_request then None
+  else
+    let event_tags = JSON.(json |-> "tags" |> as_list |> List.map as_string) in
+    if List.for_all (fun t -> List.mem t event_tags) tags then Some () else None
+
+(* Wait for injecting or request completed events from the injector. *)
+let wait_for_injecting_or_completed_event ?(tags = []) ?count node =
+  let wait_injected =
+    let* count = wait_for_injecting_event ~tags ?count node in
+    return (`Injected count)
+  in
+  let wait_completed =
+    let* () = wait_for_request_completed ~tags node "inject" in
+    return `Nothing_injected
+  in
+  Lwt.choose [wait_injected; wait_completed]
+
 (* Check that all messages in the inbox have been successfully applied. *)
 let check_inbox_success (inbox : Rollup_node.Inbox.t) =
   let ( |->? ) json field =
@@ -1651,6 +1684,143 @@ let test_reject_bad_commitment =
       in
       unit)
 
+let test_committer =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"TX_rollup: injecting commitments automatically"
+    ~tags:["tx_rollup"; "node"; "commitments"]
+    (fun protocol ->
+      let* parameter_file = get_rollup_parameter_file ~protocol in
+      let* (node, client) =
+        Client.init_with_protocol ~parameter_file `Client ~protocol ()
+      in
+      let operator = Constant.bootstrap1.public_key_hash in
+      let originator = Constant.bootstrap2.public_key_hash in
+      let* (tx_rollup_hash, tx_node) =
+        init_and_run_rollup_node
+          ~originator
+          ~operator
+          ~batch_signer:Constant.bootstrap5.public_key_hash
+          node
+          client
+      in
+      let tx_client = Tx_rollup_client.create tx_node in
+      (* Generating some identities *)
+      let* bls_key_1 = generate_bls_addr ~alias:"alice" client in
+      let bls_pkh_1 = bls_key_1.aggregate_public_key_hash in
+      let* bls_key_2 = generate_bls_addr ~alias:"bob" client in
+      let bls_pkh_2 = bls_key_2.aggregate_public_key_hash in
+      let* (tx_node, _node, client, tzlevel) =
+        make_deposit
+          ~source:Constant.bootstrap2.public_key_hash
+          ~tx_rollup_hash
+          ~tx_node
+          ~node
+          ~client
+          ~tickets_amount:100_000
+          bls_pkh_1
+      in
+      let* inbox = Rollup_node.Client.get_inbox ~tx_node ~block:"head" in
+      let ticket_id = get_ticket_hash_from_deposit (List.hd inbox.contents) in
+      let inject_tx ?counter ~from ~dest ?(amount = 1L) () =
+        let sk =
+          let (Unencrypted sk) = from.Account.aggregate_secret_key in
+          let sk = Tezos_crypto.Bls.Secret_key.of_b58check_exn sk in
+          Data_encoding.Binary.to_bytes_exn
+            Tezos_crypto.Bls.Secret_key.encoding
+            sk
+          |> Bls12_381.Signature.sk_of_bytes_exn
+        in
+        let* tx =
+          craft_tx
+            tx_client
+            ~qty:amount
+            ?counter
+            ~signer:from.aggregate_public_key
+            ~dest
+            ~ticket:ticket_id
+        in
+        let signature = sign_one_transaction sk tx in
+        tx_client_inject_transaction ~tx_client tx signature
+      in
+      let check_l2_level block expected_level =
+        let level = JSON.(block |-> "header" |-> "level" |> as_int) in
+        Check.((level = expected_level) int)
+          ~error_msg:"L2 level is %L but expected %R" ;
+        Log.info "Rollup level %d" level
+      in
+      let check_commitment_included block expected =
+        let level = JSON.(block |-> "header" |-> "level") in
+        let not_included =
+          JSON.(block |-> "metadata" |-> "commitment_included" |> is_null)
+        in
+        if not_included = expected then
+          Test.fail
+            "Commitment for level %s is %sincluded but should %sbe"
+            (JSON.encode level)
+            (if not_included then "not " else "")
+            (if expected then "" else "not ")
+      in
+      let check_commitments_inclusion list =
+        Lwt_list.iter_p
+          (fun (block, included) ->
+            let* block = Rollup_node.Client.get_block ~tx_node ~block in
+            check_commitment_included block included ;
+            unit)
+          list
+      in
+      let check_commitment_injection f =
+        let inject_commitment =
+          wait_for_injecting_or_completed_event ~tags:["commitment"] tx_node
+        in
+        let* () = f in
+        let* injected = inject_commitment in
+        match injected with
+        | `Injected count ->
+            Log.info "Injected %d commitments" count ;
+            unit
+        | `Nothing_injected -> Test.fail "No commitment injected"
+      in
+      let* () = check_commitments_inclusion [("0", false)] in
+      Log.info "Sending some L2 transactions" ;
+      let* _ = inject_tx ~from:bls_key_1 ~dest:bls_pkh_2 ~amount:1000L () in
+      let* _ = inject_tx ~from:bls_key_2 ~dest:bls_pkh_1 ~amount:2L () in
+      let* () = Client.bake_for client in
+      let* tzlevel = Rollup_node.wait_for_tezos_level tx_node (tzlevel + 1) in
+      let* () = check_commitments_inclusion [("0", true)] in
+      let* () = check_commitment_injection @@ Client.bake_for client in
+      let* tzlevel = Rollup_node.wait_for_tezos_level tx_node (tzlevel + 1) in
+      let* block = Rollup_node.Client.get_block ~tx_node ~block:"head" in
+      check_l2_level block 1 ;
+      let* () = check_commitments_inclusion [("0", true); ("1", false)] in
+      Log.info "Sending some more L2 transactions" ;
+      let* _ = inject_tx ~from:bls_key_1 ~dest:bls_pkh_2 ~amount:3L () in
+      let* _ = inject_tx ~from:bls_key_2 ~dest:bls_pkh_1 ~amount:4L () in
+      let* () = Client.bake_for client in
+      let* tzlevel = Rollup_node.wait_for_tezos_level tx_node (tzlevel + 1) in
+      let* block = Rollup_node.Client.get_block ~tx_node ~block:"head" in
+      check_l2_level block 1 ;
+      let* () = check_commitments_inclusion [("0", true); ("1", true)] in
+      Log.info "Sending some more L2 transactions" ;
+      let* _ = inject_tx ~from:bls_key_1 ~dest:bls_pkh_2 ~amount:5L () in
+      let* _ = inject_tx ~from:bls_key_2 ~dest:bls_pkh_1 ~amount:6L () in
+      let* () = check_commitment_injection @@ Client.bake_for client in
+      let* tzlevel = Rollup_node.wait_for_tezos_level tx_node (tzlevel + 1) in
+      let* block = Rollup_node.Client.get_block ~tx_node ~block:"head" in
+      check_l2_level block 2 ;
+      let* () =
+        check_commitments_inclusion [("0", true); ("1", true); ("2", false)]
+      in
+      let* () = check_commitment_injection @@ Client.bake_for client in
+      let* _tzlevel = Rollup_node.wait_for_tezos_level tx_node (tzlevel + 1) in
+      let* block = Rollup_node.Client.get_block ~tx_node ~block:"head" in
+      check_l2_level block 3 ;
+      let* () =
+        check_commitments_inclusion
+          [("0", true); ("1", true); ("2", true); ("3", false)]
+      in
+      unit)
+
 let register ~protocols =
   test_node_configuration protocols ;
   test_tx_node_origination protocols ;
@@ -1660,4 +1830,5 @@ let register ~protocols =
   test_batcher protocols ;
   test_reorganization protocols ;
   test_l2_proof_rpc_position protocols ;
-  test_reject_bad_commitment protocols
+  test_reject_bad_commitment protocols ;
+  test_committer protocols
