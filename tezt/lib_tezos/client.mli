@@ -991,7 +991,7 @@ val spawn_run_view :
   ?source:string ->
   ?payer:string ->
   ?gas:int ->
-  ?unparsing_mode:[`Optimized | `Optimized_legacy | `Readable] ->
+  ?unparsing_mode:normalize_mode ->
   view:string ->
   contract:string ->
   ?input:string ->
@@ -1010,7 +1010,7 @@ val run_view :
   ?source:string ->
   ?payer:string ->
   ?gas:int ->
-  ?unparsing_mode:[`Optimized | `Optimized_legacy | `Readable] ->
+  ?unparsing_mode:normalize_mode ->
   view:string ->
   contract:string ->
   ?input:string ->
@@ -1352,10 +1352,7 @@ val register_key : string -> t -> unit Lwt.t
 (** Get contract storage for a contract. Returns a Micheline expression
     representing the storage as a string. *)
 val contract_storage :
-  ?unparsing_mode:[`Optimized | `Optimized_legacy | `Readable] ->
-  string ->
-  t ->
-  string Lwt.t
+  ?unparsing_mode:normalize_mode -> string -> t -> string Lwt.t
 
 (** Sign a string of bytes with secret key of the given account. *)
 val sign_bytes : signer:string -> data:string -> t -> string Lwt.t
