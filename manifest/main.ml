@@ -47,13 +47,7 @@ let bls12_381 =
   let version = V.(at_least "3.0.0" && less_than "3.1.0") in
   external_lib
     ~js_compatible:true
-    ~npm_deps:
-      [
-        Npm.make
-          ~node_wrapper_flags:["--bls12-381"]
-          "@dannywillems/ocaml-bls12-381"
-          version;
-      ]
+    ~npm_deps:[Npm.make "@dannywillems/ocaml-bls12-381" version]
     "bls12-381"
     version
 
@@ -109,13 +103,10 @@ let fmt_cli = external_sublib fmt "fmt.cli"
 
 let fmt_tty = external_sublib fmt "fmt.tty"
 
-let hacl_star_npm =
-  Npm.make ~node_wrapper_flags:["--hacl"] "hacl-wasm" V.(exactly "1.1.0")
-
 let hacl_star =
   external_lib
     ~js_compatible:true
-    ~npm_deps:[hacl_star_npm]
+    ~npm_deps:[Npm.make "hacl-wasm" V.(exactly "1.1.0")]
     "hacl-star"
     V.(at_least "0.4.2" && less_than "0.5")
 
@@ -270,13 +261,7 @@ let ringo_lwt = external_lib "ringo-lwt" V.(exactly "0.8")
 let secp256k1_internal =
   let version = V.(at_least "0.3.0") in
   external_lib
-    ~npm_deps:
-      [
-        Npm.make
-          ~node_wrapper_flags:["--secp256k1"]
-          "@nomadic-labs/secp256k1-wasm"
-          version;
-      ]
+    ~npm_deps:[Npm.make "@nomadic-labs/secp256k1-wasm" version]
     ~js_compatible:true
     "secp256k1-internal"
     version
@@ -612,10 +597,10 @@ let _tezos_hacl_gen =
              [
                S "action";
                [
-                 S "run";
-                 S "%{dep:../../tooling/node_wrapper.exe}";
-                 H (of_atom_list (Npm.node_wrapper_flags hacl_star_npm));
-                 S "%{dep:./check-api.js}";
+                 S "setenv";
+                 S "NODE_PRELOAD";
+                 S "hacl-wasm";
+                 [S "run"; S "node"; S "%{dep:./check-api.js}"];
                ];
              ];
            ];

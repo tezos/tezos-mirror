@@ -1,6 +1,8 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
+(env (_ (binaries (%{workspace_root}/src/tooling/node_wrapper.exe as node))))
+
 (library
  (name tezos_micheline)
  (public_name tezos-micheline)

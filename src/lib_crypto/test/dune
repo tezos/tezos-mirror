@@ -1,6 +1,8 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
+(env (_ (env-vars (NODE_PRELOAD hacl-wasm,ocaml-bls12-381,secp256k1-wasm))))
+
 (executables
  (names test_run test_prop_signature)
  (modes native js)
@@ -36,15 +38,9 @@
 (rule
  (alias runtest_js)
  (package tezos-crypto)
- (action
-  (run
-   %{dep:../../tooling/node_wrapper.exe} --bls12-381 --secp256k1 --hacl
-   %{dep:./test_run.bc.js})))
+ (action (run node %{dep:./test_run.bc.js})))
 
 (rule
  (alias runtest_js)
  (package tezos-crypto)
- (action
-  (run
-   %{dep:../../tooling/node_wrapper.exe} --bls12-381 --secp256k1 --hacl
-   %{dep:./test_prop_signature.bc.js})))
+ (action (run node %{dep:./test_prop_signature.bc.js})))

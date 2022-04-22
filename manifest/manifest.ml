@@ -308,30 +308,12 @@ module Dune = struct
 
   let run_exe exe_name args = run ("%{exe:" ^ exe_name ^ ".exe}") args
 
-  let runtest_js ~package ~dir ~dep_files ~(node_wrapper_flags : string list)
-      name =
-    let rec go_to_src acc dir =
-      match dir with
-      | "" | "." ->
-          (* we are at the root *)
-          Filename.concat acc "src"
-      | "src" ->
-          (* we are in %root%/src *)
-          acc
-      | _ -> go_to_src (Filename.concat ".." acc) (Filename.dirname dir)
-    in
-    let runner =
-      match node_wrapper_flags with
-      | [] -> S "node"
-      | _ ->
-          let node = go_to_src "tooling/node_wrapper.exe" dir in
-          [S ("%{dep:" ^ node ^ "}"); G (of_atom_list node_wrapper_flags)]
-    in
+  let runtest_js ~package ~dep_files name =
     alias_rule
       "runtest_js"
       ~package
       ~deps:dep_files
-      ~action:[S "run"; G runner; S ("%{dep:./" ^ name ^ ".bc.js}")]
+      ~action:[S "run"; S "node"; S ("%{dep:./" ^ name ^ ".bc.js}")]
 
   let runtest ~package ~dep_files name =
     alias_rule
@@ -445,16 +427,14 @@ module Version = struct
 end
 
 module Npm = struct
-  type t = {
-    package : string;
-    version : Version.constraints;
-    node_wrapper_flags : string list;
-  }
+  type t = {package : string; version : Version.constraints}
 
-  let make ~node_wrapper_flags package version =
-    {package; version; node_wrapper_flags}
+  let make package version = {package; version}
 
-  let node_wrapper_flags t = t.node_wrapper_flags
+  let node_preload t =
+    match String.index_opt t.package '/' with
+    | None -> t.package
+    | Some i -> String.sub t.package (i + 1) (String.length t.package - i - 1)
 end
 
 (*****************************************************************************)
@@ -1030,6 +1010,39 @@ module Target = struct
     'a ->
     t option
 
+  let node_preload deps : string list =
+    let collect deps =
+      let rec loop (seen, acc) dep =
+        match library_name_for_dune dep with
+        | Error _ -> (seen, acc)
+        | Ok name -> (
+            if String_set.mem name seen then (seen, acc)
+            else
+              match dep with
+              | Internal {deps; npm_deps; _} ->
+                  let acc = List.map Npm.node_preload npm_deps @ acc in
+                  let seen = String_set.add name seen in
+                  loops (seen, acc) deps
+              | External {npm_deps; _} ->
+                  let seen = String_set.add name seen in
+                  (seen, List.map Npm.node_preload npm_deps @ acc)
+              | Vendored {npm_deps; _} ->
+                  let seen = String_set.add name seen in
+                  (seen, List.map Npm.node_preload npm_deps @ acc)
+              | Select {package; _} -> loop (seen, acc) package
+              | Opam_only _ -> (seen, acc)
+              | Optional t -> loop (seen, acc) t
+              | Open (t, _) -> loop (seen, acc) t)
+      and loops (seen, acc) deps =
+        List.fold_left
+          (fun (seen, acc) x -> loop (seen, acc) x)
+          (seen, acc)
+          deps
+      in
+      loops (String_set.empty, []) deps
+    in
+    snd (collect deps)
+
   let internal make_kind ?all_modules_except ?bisect_ppx ?c_library_flags
       ?(conflicts = []) ?(dep_files = []) ?(deps = []) ?(dune = Dune.[])
       ?foreign_stubs ?inline_tests ?js_compatible ?js_of_ocaml ?documentation
@@ -1140,38 +1153,6 @@ module Target = struct
     in
     let bisect_ppx = Option.value bisect_ppx ~default:not_a_test in
     let runtest_rules =
-      let collect_node_wrapper_flags deps =
-        let rec loop (seen, acc) dep =
-          match library_name_for_dune dep with
-          | Error _ -> (seen, acc)
-          | Ok name -> (
-              if String_set.mem name seen then (seen, acc)
-              else
-                match dep with
-                | Internal {deps; npm_deps; _} ->
-                    let acc =
-                      List.concat_map Npm.node_wrapper_flags npm_deps @ acc
-                    in
-                    let seen = String_set.add name seen in
-                    loops (seen, acc) deps
-                | External {npm_deps; _} ->
-                    let seen = String_set.add name seen in
-                    (seen, List.concat_map Npm.node_wrapper_flags npm_deps @ acc)
-                | Vendored {npm_deps; _} ->
-                    let seen = String_set.add name seen in
-                    (seen, List.concat_map Npm.node_wrapper_flags npm_deps @ acc)
-                | Select {package; _} -> loop (seen, acc) package
-                | Opam_only _ -> (seen, acc)
-                | Optional t -> loop (seen, acc) t
-                | Open (t, _) -> loop (seen, acc) t)
-        and loops (seen, acc) deps =
-          List.fold_left
-            (fun (seen, acc) x -> loop (seen, acc) x)
-            (seen, acc)
-            deps
-        in
-        loops (String_set.empty, []) deps
-      in
       let run_js = js_compatible in
       let run_native =
         match modes with
@@ -1182,17 +1163,12 @@ module Target = struct
       | (Test_executable {names; run = true}, Some package, _) ->
           let runtest_js_rules =
             if run_js then
-              let node_wrapper_flags : string list =
-                snd (collect_node_wrapper_flags deps)
-              in
               List.map
                 (fun name ->
                   Dune.(
                     runtest_js
                       ~dep_files
                       ~package:(Filename.basename package)
-                      ~node_wrapper_flags
-                      ~dir:path
                       name))
                 (Ne_list.to_list names)
             else []
@@ -1692,6 +1668,13 @@ let generate_dune_files () =
   let has_static =
     List.exists (fun (internal : Target.internal) -> internal.static) internals
   in
+  let node_preload =
+    List.concat_map
+      (fun (internal : Target.internal) ->
+        if internal.js_compatible then Target.node_preload internal.deps else [])
+      internals
+    |> List.sort_uniq compare
+  in
   let dunes =
     List.map (generate_dune ~dune_file_has_static_profile:has_static) internals
   in
@@ -1711,6 +1694,40 @@ let generate_dune_files () =
       in
       static_profile cclibs env
     else env
+  in
+  (* Ideally, we would want a wrap/shadow the node binary in a single place at the root of the repo.
+     It is achievable by setting the env in dune-workspace.
+     Sadly, we can't do that just yet because of a bug in dune (see https://github.com/ocaml/dune/issues/5555)
+     As a workaround, we can set env in dune files next to dune-project.
+     Note that dune will complain if the same binary is defined multiple times in the same scope
+     (e.g. src/lib_base/dune and src/lib_base/test/dune)
+  *)
+  let env =
+    if
+      String_map.exists
+        (fun opam internals ->
+          Filename.dirname opam = path
+          && List.exists
+               (fun (internal : Target.internal) -> internal.js_compatible)
+               internals)
+        !Target.by_opam
+    then
+      Env.add
+        Any
+        ~key:"binaries"
+        [S "%{workspace_root}/src/tooling/node_wrapper.exe"; S "as"; S "node"]
+        env
+    else env
+  in
+  let env =
+    match node_preload with
+    | [] -> env
+    | node_preload ->
+        Env.add
+          Any
+          ~key:"env-vars"
+          [S "NODE_PRELOAD"; S (String.concat "," node_preload)]
+          env
   in
   let dunes = Dune.[Env.to_s_expr env] :: dunes in
   List.iteri

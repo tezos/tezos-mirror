@@ -1,6 +1,8 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
+(env (_ (env-vars (NODE_PRELOAD hacl-wasm,ocaml-bls12-381,secp256k1-wasm))))
+
 (executables
  (names test_rustzcash test_keys test_merkle test_roots test_sapling)
  (libraries
@@ -66,7 +68,4 @@
 (rule
  (alias runtest_js)
  (package tezos-sapling)
- (action
-  (run
-   %{dep:../../tooling/node_wrapper.exe} --bls12-381 --secp256k1 --hacl
-   %{dep:./test_js.bc.js})))
+ (action (run node %{dep:./test_js.bc.js})))

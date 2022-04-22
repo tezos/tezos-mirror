@@ -429,18 +429,12 @@ module Npm : sig
 
   (** Make a npm package.
 
-    Usage: [Npm.make ~node_wrapper_flags package_name version]
+    Usage: [Npm.make package_name version]
 
   - [package_name] is the name of the npm package.
-  - [node_wrapper_flags]: flags to add to the [node_wrapper] executable
-    command in [runtest_js] aliases. Only used for test and executable test targets.
   - [version]: version constraint used by npm when installing dependencies.
   *)
-  val make :
-    node_wrapper_flags:string list -> string -> Version.constraints -> t
-
-  (** Get the flags given to [make]. *)
-  val node_wrapper_flags : t -> string list
+  val make : string -> Version.constraints -> t
 end
 
 (** Preprocessors. *)
