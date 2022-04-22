@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -540,12 +541,10 @@ module Encoding = struct
           inj = (fun pkh -> Reveal pkh);
         }
 
-    let transaction_tag = 1
-
     let[@coq_axiom_with_reason "gadt"] transaction_case =
       MCase
         {
-          tag = transaction_tag;
+          tag = 1;
           name = "transaction";
           encoding =
             obj3
@@ -579,12 +578,10 @@ module Encoding = struct
               Transaction {amount; destination; parameters; entrypoint});
         }
 
-    let origination_tag = 2
-
     let[@coq_axiom_with_reason "gadt"] origination_case =
       MCase
         {
-          tag = origination_tag;
+          tag = 2;
           name = "origination";
           encoding =
             obj3
@@ -602,12 +599,10 @@ module Encoding = struct
               Origination {credit; delegate; script});
         }
 
-    let delegation_tag = 3
-
     let[@coq_axiom_with_reason "gadt"] delegation_case =
       MCase
         {
-          tag = delegation_tag;
+          tag = 3;
           name = "delegation";
           encoding = obj1 (opt "delegate" Signature.Public_key_hash.encoding);
           select =

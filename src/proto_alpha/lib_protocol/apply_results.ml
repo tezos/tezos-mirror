@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -1037,7 +1038,9 @@ module Internal_result = struct
   let[@coq_axiom_with_reason "gadt"] transaction_case =
     MCase
       {
-        tag = Operation.Encoding.Manager_operations.transaction_tag;
+        (* This value should be changed with care: maybe receipts are read by
+           external tools such as indexers. *)
+        tag = 1;
         name = "transaction";
         encoding =
           obj3
@@ -1080,7 +1083,9 @@ module Internal_result = struct
   let[@coq_axiom_with_reason "gadt"] origination_case =
     MCase
       {
-        tag = Operation.Encoding.Manager_operations.origination_tag;
+        (* This value should be changed with care: maybe receipts are read by
+           external tools such as indexers. *)
+        tag = 2;
         name = "origination";
         encoding =
           obj3
@@ -1106,7 +1111,9 @@ module Internal_result = struct
   let[@coq_axiom_with_reason "gadt"] delegation_case =
     MCase
       {
-        tag = Operation.Encoding.Manager_operations.delegation_tag;
+        (* This value should be changed with care: maybe receipts are read by
+           external tools such as indexers. *)
+        tag = 3;
         name = "delegation";
         encoding = obj1 (opt "delegate" Signature.Public_key_hash.encoding);
         iselect : Kind.delegation iselect =
