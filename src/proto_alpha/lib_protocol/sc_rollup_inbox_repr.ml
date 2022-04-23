@@ -142,6 +142,13 @@ let pp_history_proof fmt cell =
    level, this archival process is applied until we reach the current
    level using an empty [current_messages]. See {!MakeHashingScheme.archive}
    for details.
+   
+   The [current_messages_hash] is either:
+   - the hash of 'empty bytes' when there are no current messages ;
+   - the root hash of the tree, where the contents of each message sit at the
+     key [[message_index, "payload"]], where [message_index] is the index of the
+     message in the list of [current_messages], if there are one or more
+     messages.
 
 *)
 type t = {
