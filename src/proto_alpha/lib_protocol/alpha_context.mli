@@ -4512,13 +4512,6 @@ module Stake_distribution : sig
     Level.t ->
     Slot.t ->
     (context * (public_key * public_key_hash)) tzresult Lwt.t
-
-  (** See {!Delegate.pubkey}. *)
-  val delegate_pubkey : context -> public_key_hash -> public_key tzresult Lwt.t
-
-  (** See {!Delegate.staking_balance}. *)
-  val get_staking_balance :
-    context -> Signature.Public_key_hash.t -> Tez.t tzresult Lwt.t
 end
 
 (** This module re-exports definitions from {!Commitment_repr} and,

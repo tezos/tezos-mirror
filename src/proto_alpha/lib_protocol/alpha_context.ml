@@ -495,10 +495,6 @@ module Stake_distribution = struct
   let baking_rights_owner = Delegate_sampler.baking_rights_owner
 
   let slot_owner = Delegate_sampler.slot_owner
-
-  let delegate_pubkey = Delegate.pubkey
-
-  let get_staking_balance = Delegate.staking_balance
 end
 
 module Nonce = Nonce_storage
