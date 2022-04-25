@@ -132,6 +132,7 @@ let init_injector rollup_node_state ~signer strategy tags =
           | `Finalize_commitment -> 3
           | `Remove_commitment -> 3
           | `Rejection -> 3
+          | `Dispatch_withdrawals -> 89
         in
         acc + n)
       tags

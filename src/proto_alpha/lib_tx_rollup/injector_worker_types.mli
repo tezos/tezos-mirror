@@ -33,7 +33,8 @@ type tag =
   | `Submit_batch
   | `Finalize_commitment
   | `Remove_commitment
-  | `Rejection ]
+  | `Rejection
+  | `Dispatch_withdrawals ]
 
 module Tags : Set.S with type elt = tag
 

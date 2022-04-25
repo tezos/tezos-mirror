@@ -694,6 +694,7 @@ let run configuration cctxt =
              (signers.finalize_commitment, Each_block, [`Finalize_commitment]);
              (signers.remove_commitment, Each_block, [`Remove_commitment]);
              (signers.rejection, Each_block, [`Rejection]);
+             (signers.dispatch_withdrawals, Each_block, [`Dispatch_withdrawals]);
            ])
   in
   let* () =

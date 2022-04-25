@@ -37,6 +37,7 @@ type signers = {
   finalize_commitment : Signature.public_key_hash option;
   remove_commitment : Signature.public_key_hash option;
   rejection : Signature.public_key_hash option;
+  dispatch_withdrawals : Signature.public_key_hash option;
 }
 
 type t = {
