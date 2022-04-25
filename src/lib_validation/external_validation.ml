@@ -75,6 +75,7 @@ type request =
       context_hash : Context_hash.t;
       forked_header : Block_header.t;
     }
+  | Context_garbage_collection of {context_hash : Context_hash.t}
   | Terminate
   | Reconfigure_event_logging of
       Tezos_base_unix.Internal_event_unix.Configuration.t
@@ -112,6 +113,12 @@ let request_pp ppf = function
         Block_hash.pp_short
         (Block_header.hash forked_header)
   | Terminate -> Format.fprintf ppf "terminate validation process"
+  | Context_garbage_collection {context_hash} ->
+      Format.fprintf
+        ppf
+        "unloading context below %a"
+        Context_hash.pp
+        context_hash
   | Reconfigure_event_logging _ ->
       Format.fprintf ppf "reconfigure event logging"
 
