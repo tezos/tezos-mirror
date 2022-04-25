@@ -541,7 +541,7 @@ let spawn_bake_for ?endpoint ?protocol ?(keys = [Constant.bootstrap1.alias])
 
 let bake_for ?endpoint ?protocol ?keys ?minimal_fees
     ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte ?minimal_timestamp
-    ?mempool ?ignore_node_mempool ?force ?context_path client =
+    ?mempool ?ignore_node_mempool ?force ?context_path ?expect_failure client =
   spawn_bake_for
     ?endpoint
     ?keys
@@ -555,7 +555,7 @@ let bake_for ?endpoint ?protocol ?keys ?minimal_fees
     ?context_path
     ?protocol
     client
-  |> Process.check
+  |> Process.check ?expect_failure
 
 let bake_for_and_wait ?endpoint ?protocol ?keys ?minimal_fees
     ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte ?minimal_timestamp
@@ -825,7 +825,7 @@ let get_delegate ?endpoint ~src client =
   Lwt.return (output =~* rex "(tz[a-zA-Z0-9]+) \\(.*\\)")
 
 let set_delegate ?endpoint ?(wait = "none") ?fee ?fee_cap
-    ?(force_low_fee = false) ~src ~delegate client =
+    ?(force_low_fee = false) ?expect_failure ~src ~delegate client =
   let value =
     spawn_command
       ?endpoint
@@ -836,7 +836,7 @@ let set_delegate ?endpoint ?(wait = "none") ?fee ?fee_cap
       @ optional_arg "fee-cap" Tez.to_string fee_cap
       @ if force_low_fee then ["--force-low-fee"] else [])
   in
-  {value; run = Process.check}
+  {value; run = Process.check ?expect_failure}
 
 let reveal ?endpoint ?(wait = "none") ?fee ?fee_cap ?(force_low_fee = false)
     ~src client =
@@ -856,10 +856,11 @@ let spawn_withdraw_delegate ?endpoint ?(wait = "none") ~src client =
   spawn_command
     ?endpoint
     client
-    (["--wait"; wait] @ ["withdraw"; "delegate"; "for"; src])
+    (["--wait"; wait] @ ["withdraw"; "delegate"; "from"; src])
 
-let withdraw_delegate ?endpoint ?wait ~src client =
-  spawn_withdraw_delegate ?endpoint ?wait ~src client |> Process.check
+let withdraw_delegate ?endpoint ?wait ?expect_failure ~src client =
+  spawn_withdraw_delegate ?endpoint ?wait ~src client
+  |> Process.check ?expect_failure
 
 let spawn_get_balance_for ?endpoint ~account client =
   spawn_command ?endpoint client ["get"; "balance"; "for"; account]
@@ -954,6 +955,33 @@ let increase_paid_storage ?hooks ?endpoint ?(wait = "none") ~contract ~amount
         payer;
       ])
   |> Process.check_and_read_stdout
+
+let update_consensus_key ?hooks ?endpoint ?(wait = "none") ?burn_cap
+    ?expect_failure ~src ~pk client =
+  spawn_command
+    ?hooks
+    ?endpoint
+    client
+    (["--wait"; wait]
+    @ ["set"; "consensus"; "key"; "for"; src; "to"; pk]
+    @ optional_arg "burn-cap" Tez.to_string burn_cap)
+  |> Process.check ?expect_failure
+
+let drain_delegate ?hooks ?endpoint ?(wait = "none") ?expect_failure ~delegate
+    ~consensus_key ?destination client =
+  let destination =
+    match destination with
+    | None -> []
+    | Some destination -> [destination; "with"]
+  in
+  spawn_command
+    ?hooks
+    ?endpoint
+    client
+    (["--wait"; wait]
+    @ ["drain"; "delegate"; delegate; "to"]
+    @ destination @ [consensus_key])
+  |> Process.check ?expect_failure
 
 let spawn_originate_contract ?hooks ?log_output ?endpoint ?(wait = "none") ?init
     ?burn_cap ?gas_limit ?(dry_run = false) ~alias ~amount ~src ~prg client =
@@ -1980,12 +2008,17 @@ let init_with_protocol ?path ?admin_path ?name ?color ?base_dir ?event_level
   let* _ = Node.wait_for_level node 1 in
   return (node, client)
 
-let spawn_register_key owner client =
+let spawn_register_key ?consensus owner client =
   spawn_command
     client
-    ["--wait"; "none"; "register"; "key"; owner; "as"; "delegate"]
+    (["--wait"; "none"; "register"; "key"; owner; "as"; "delegate"]
+    @
+    match consensus with
+    | None -> []
+    | Some pk -> ["with"; "consensus"; "key"; pk])
 
-let register_key owner client = spawn_register_key owner client |> Process.check
+let register_key ?consensus owner client =
+  spawn_register_key ?consensus owner client |> Process.check
 
 let contract_storage ?unparsing_mode address client =
   spawn_command

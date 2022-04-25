@@ -394,6 +394,7 @@ val bake_for :
   ?ignore_node_mempool:bool ->
   ?force:bool ->
   ?context_path:string ->
+  ?expect_failure:bool ->
   t ->
   unit Lwt.t
 
@@ -650,6 +651,7 @@ val set_delegate :
   ?fee:Tez.t ->
   ?fee_cap:Tez.t ->
   ?force_low_fee:bool ->
+  ?expect_failure:bool ->
   src:string ->
   delegate:string ->
   t ->
@@ -668,7 +670,12 @@ val reveal :
 
 (** Run [tezos-client withdraw delegate from <src>]. *)
 val withdraw_delegate :
-  ?endpoint:endpoint -> ?wait:string -> src:string -> t -> unit Lwt.t
+  ?endpoint:endpoint ->
+  ?wait:string ->
+  ?expect_failure:bool ->
+  src:string ->
+  t ->
+  unit Lwt.t
 
 (** Same as [withdraw_delegate], but do not wait for the process to exit. *)
 val spawn_withdraw_delegate :
@@ -764,6 +771,30 @@ val increase_paid_storage :
   payer:string ->
   t ->
   string Lwt.t
+
+(** Run [tezos-client use <pk> as consensus key for delegate <src>] *)
+val update_consensus_key :
+  ?hooks:Process.hooks ->
+  ?endpoint:endpoint ->
+  ?wait:string ->
+  ?burn_cap:Tez.t ->
+  ?expect_failure:bool ->
+  src:string ->
+  pk:string ->
+  t ->
+  unit Lwt.t
+
+(** Run [tezos-client drain delegate with consensus key <src>] *)
+val drain_delegate :
+  ?hooks:Process.hooks ->
+  ?endpoint:endpoint ->
+  ?wait:string ->
+  ?expect_failure:bool ->
+  delegate:string ->
+  consensus_key:string ->
+  ?destination:string ->
+  t ->
+  unit Lwt.t
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/2336
    [amount] should be named [transferring] *)
@@ -1450,10 +1481,10 @@ val spawn_command :
   Process.t
 
 (** Register public key for given account with given client. *)
-val spawn_register_key : string -> t -> Process.t
+val spawn_register_key : ?consensus:string -> string -> t -> Process.t
 
 (** Register public key for given account with given client. *)
-val register_key : string -> t -> unit Lwt.t
+val register_key : ?consensus:string -> string -> t -> unit Lwt.t
 
 (** Get contract storage for a contract. Returns a Micheline expression
     representing the storage as a string. *)

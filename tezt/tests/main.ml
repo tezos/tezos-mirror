@@ -108,6 +108,7 @@ let register_protocol_agnostic_tests () =
   Mockup.register_global_constants ~protocols:[Alpha] ;
   Monitor_operations.register ~protocols:[Alpha] ;
   Multinode_snapshot.register ~protocols:[Alpha] ;
+  Consensus_key.register ~protocols:[Alpha] ;
   Node_event_level.register ~protocols:[Alpha] ;
   Normalize.register ~protocols:[Alpha] ;
   Precheck.register ~protocols ;
