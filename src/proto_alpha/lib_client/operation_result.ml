@@ -209,6 +209,12 @@ let pp_manager_operation_content (type kind) source ppf
         source
         Contract_hash.pp
         destination
+  | Update_consensus_key pk ->
+      Format.fprintf
+        ppf
+        "Update_consensus_key:@,Public key hash: %a"
+        Signature.Public_key_hash.pp
+        (Signature.Public_key.hash pk)
   | Tx_rollup_origination ->
       Format.fprintf
         ppf
@@ -807,6 +813,7 @@ let pp_manager_operation_contents_result ppf op_result =
     | Delegation_result _ -> "delegation"
     | Register_global_constant_result _ -> "global constant registration"
     | Set_deposits_limit_result _ -> "deposits limit modification"
+    | Update_consensus_key_result _ -> "consensus key update"
     | Increase_paid_storage_result _ -> "paid storage increase"
     | Tx_rollup_origination_result _ -> "transaction rollup origination"
     | Tx_rollup_submit_batch_result _ -> "transaction rollup batch submission"
@@ -843,6 +850,8 @@ let pp_manager_operation_contents_result ppf op_result =
     | Reveal_result {consumed_gas} -> pp_consumed_gas ppf consumed_gas
     | Delegation_result {consumed_gas} -> pp_consumed_gas ppf consumed_gas
     | Set_deposits_limit_result {consumed_gas} ->
+        pp_consumed_gas ppf consumed_gas
+    | Update_consensus_key_result {consumed_gas} ->
         pp_consumed_gas ppf consumed_gas
     | Transaction_result tx -> pp_transaction_result ppf tx
     | Origination_result op_res -> pp_origination_result ppf op_res

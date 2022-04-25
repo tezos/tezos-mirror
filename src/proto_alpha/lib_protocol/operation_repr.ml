@@ -76,6 +76,8 @@ module Kind = struct
 
   type increase_paid_storage = Increase_paid_storage_kind
 
+  type update_consensus_key = Update_consensus_key_kind
+
   type failing_noop = Failing_noop_kind
 
   type register_global_constant = Register_global_constant_kind
@@ -130,6 +132,7 @@ module Kind = struct
     | Register_global_constant_manager_kind : register_global_constant manager
     | Set_deposits_limit_manager_kind : set_deposits_limit manager
     | Increase_paid_storage_manager_kind : increase_paid_storage manager
+    | Update_consensus_key_manager_kind : update_consensus_key manager
     | Tx_rollup_origination_manager_kind : tx_rollup_origination manager
     | Tx_rollup_submit_batch_manager_kind : tx_rollup_submit_batch manager
     | Tx_rollup_commit_manager_kind : tx_rollup_commit manager
@@ -353,6 +356,9 @@ and _ manager_operation =
       destination : Contract_hash.t;
     }
       -> Kind.increase_paid_storage manager_operation
+  | Update_consensus_key :
+      Signature.Public_key.t
+      -> Kind.update_consensus_key manager_operation
   | Tx_rollup_origination : Kind.tx_rollup_origination manager_operation
   | Tx_rollup_submit_batch : {
       tx_rollup : Tx_rollup_repr.t;
@@ -479,6 +485,7 @@ let manager_kind : type kind. kind manager_operation -> kind Kind.manager =
   | Register_global_constant _ -> Kind.Register_global_constant_manager_kind
   | Set_deposits_limit _ -> Kind.Set_deposits_limit_manager_kind
   | Increase_paid_storage _ -> Kind.Increase_paid_storage_manager_kind
+  | Update_consensus_key _ -> Kind.Update_consensus_key_manager_kind
   | Tx_rollup_origination -> Kind.Tx_rollup_origination_manager_kind
   | Tx_rollup_submit_batch _ -> Kind.Tx_rollup_submit_batch_manager_kind
   | Tx_rollup_commit _ -> Kind.Tx_rollup_commit_manager_kind
@@ -754,6 +761,21 @@ module Encoding = struct
           inj =
             (fun (amount_in_bytes, destination) ->
               Increase_paid_storage {amount_in_bytes; destination});
+        }
+
+    let update_consensus_key_tag = 6
+
+    let update_consensus_key_case =
+      MCase
+        {
+          tag = update_consensus_key_tag;
+          name = "update_consensus_key";
+          encoding = obj1 (req "pk" Signature.Public_key.encoding);
+          select =
+            (function
+            | Manager (Update_consensus_key _ as op) -> Some op | _ -> None);
+          proj = (function Update_consensus_key consensus_pk -> consensus_pk);
+          inj = (fun consensus_pk -> Update_consensus_key consensus_pk);
         }
 
     let tx_rollup_origination_case =
@@ -1580,6 +1602,9 @@ module Encoding = struct
   let increase_paid_storage_case =
     make_manager_case 113 Manager_operations.increase_paid_storage_case
 
+  let update_consensus_key_case =
+    make_manager_case 114 Manager_operations.update_consensus_key_case
+
   let tx_rollup_origination_case =
     make_manager_case
       tx_rollup_operation_tag_offset
@@ -1709,6 +1734,7 @@ module Encoding = struct
            make delegation_case;
            make set_deposits_limit_case;
            make increase_paid_storage_case;
+           make update_consensus_key_case;
            make failing_noop_case;
            make register_global_constant_case;
            make tx_rollup_origination_case;
@@ -1948,6 +1974,8 @@ let equal_manager_operation_kind :
   | Set_deposits_limit _, _ -> None
   | Increase_paid_storage _, Increase_paid_storage _ -> Some Eq
   | Increase_paid_storage _, _ -> None
+  | Update_consensus_key _, Update_consensus_key _ -> Some Eq
+  | Update_consensus_key _, _ -> None
   | Tx_rollup_origination, Tx_rollup_origination -> Some Eq
   | Tx_rollup_origination, _ -> None
   | Tx_rollup_submit_batch _, Tx_rollup_submit_batch _ -> Some Eq

@@ -32,11 +32,11 @@ let () =
     `Permanent
     ~id:"delegate.consensus_key.invalid_noop"
     ~title:"Invalid key for consensus key update"
-    ~description:"Tried to update the consensus key with an active key"
+    ~description:"Tried to update the consensus key with the active key"
     ~pp:(fun ppf cycle ->
       Format.fprintf
         ppf
-        "Invalid key while updating a consensus key (active since %a)."
+        "Invalid key while updating a consensus key (already active since %a)."
         Cycle_repr.pp
         cycle)
     Data_encoding.(obj1 (req "cycle" Cycle_repr.encoding))

@@ -1830,7 +1830,8 @@ module Manager = struct
           consume_decoding_gas remaining_gas script.storage
       | Register_global_constant {value} ->
           consume_decoding_gas remaining_gas value
-      | Delegation _ | Set_deposits_limit _ | Increase_paid_storage _ ->
+      | Delegation _ | Set_deposits_limit _ | Increase_paid_storage _
+      | Update_consensus_key _ ->
           return remaining_gas
       | Tx_rollup_origination ->
           let* () = assert_tx_rollup_feature_enabled vi in

@@ -164,6 +164,10 @@ and _ successful_manager_operation_result =
       consumed_gas : Gas.Arith.fp;
     }
       -> Kind.increase_paid_storage successful_manager_operation_result
+  | Update_consensus_key_result : {
+      consumed_gas : Gas.Arith.fp;
+    }
+      -> Kind.update_consensus_key successful_manager_operation_result
   | Tx_rollup_origination_result : {
       balance_updates : Receipt.balance_updates;
       consumed_gas : Gas.Arith.fp;

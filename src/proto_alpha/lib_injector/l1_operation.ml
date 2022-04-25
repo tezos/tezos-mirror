@@ -85,6 +85,7 @@ module Manager_operation = struct
     | Register_global_constant _ -> register_global_constant_case
     | Set_deposits_limit _ -> set_deposits_limit_case
     | Increase_paid_storage _ -> increase_paid_storage_case
+    | Update_consensus_key _ -> update_consensus_key_case
     | Tx_rollup_origination -> tx_rollup_origination_case
     | Tx_rollup_submit_batch _ -> tx_rollup_submit_batch_case
     | Tx_rollup_commit _ -> tx_rollup_commit_case

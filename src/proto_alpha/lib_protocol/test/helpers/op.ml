@@ -983,3 +983,18 @@ let zk_rollup_origination ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
   Context.Contract.manager ctxt src >|=? fun account ->
   let op = sign account.sk ctxt to_sign_op in
   originated_zk_rollup op |> fun addr -> (op, addr)
+
+let update_consensus_key ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
+    ctxt (src : Contract.t) pkh =
+  manager_operation
+    ?force_reveal
+    ?counter
+    ?fee
+    ?gas_limit
+    ?storage_limit
+    ~source:src
+    ctxt
+    (Update_consensus_key pkh)
+  >>=? fun to_sign_op ->
+  Context.Contract.manager ctxt src >|=? fun account ->
+  sign account.sk ctxt to_sign_op

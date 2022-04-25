@@ -66,6 +66,10 @@ type _ successful_manager_operation_result =
       consumed_gas : Gas.Arith.fp;
     }
       -> Kind.increase_paid_storage successful_manager_operation_result
+  | Update_consensus_key_result : {
+      consumed_gas : Gas.Arith.fp;
+    }
+      -> Kind.update_consensus_key successful_manager_operation_result
   | Tx_rollup_origination_result : {
       balance_updates : Receipt.balance_updates;
       consumed_gas : Gas.Arith.fp;
@@ -505,6 +509,26 @@ module Manager_result = struct
       ~kind:Kind.Delegation_manager_kind
       ~proj:(function Delegation_result {consumed_gas} -> consumed_gas)
       ~inj:(fun consumed_gas -> Delegation_result {consumed_gas})
+
+  let update_consensus_key_case =
+    make
+      ~op_case:Operation.Encoding.Manager_operations.update_consensus_key_case
+      ~encoding:
+        Data_encoding.(
+          obj2
+            (dft "consumed_gas" Gas.Arith.n_integral_encoding Gas.Arith.zero)
+            (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero))
+      ~select:(function
+        | Successful_manager_result (Update_consensus_key_result _ as op) ->
+            Some op
+        | _ -> None)
+      ~kind:Kind.Update_consensus_key_manager_kind
+      ~proj:(function
+        | Update_consensus_key_result {consumed_gas} ->
+            (Gas.Arith.ceil consumed_gas, consumed_gas))
+      ~inj:(fun (consumed_gas, consumed_milligas) ->
+        assert (Gas.Arith.(equal (ceil consumed_milligas) consumed_gas)) ;
+        Update_consensus_key_result {consumed_gas = consumed_milligas})
 
   let set_deposits_limit_case =
     make
@@ -1006,6 +1030,7 @@ let successful_manager_operation_result_encoding :
          make Manager_result.transaction_case;
          make Manager_result.origination_case;
          make Manager_result.delegation_case;
+         make Manager_result.update_consensus_key_case;
          make Manager_result.set_deposits_limit_case;
          make Manager_result.increase_paid_storage_case;
          make Manager_result.sc_rollup_originate_case;
@@ -1079,6 +1104,10 @@ let equal_manager_kind :
   | Kind.Origination_manager_kind, _ -> None
   | Kind.Delegation_manager_kind, Kind.Delegation_manager_kind -> Some Eq
   | Kind.Delegation_manager_kind, _ -> None
+  | ( Kind.Update_consensus_key_manager_kind,
+      Kind.Update_consensus_key_manager_kind ) ->
+      Some Eq
+  | Kind.Update_consensus_key_manager_kind, _ -> None
   | ( Kind.Register_global_constant_manager_kind,
       Kind.Register_global_constant_manager_kind ) ->
       Some Eq
@@ -1538,6 +1567,17 @@ module Encoding = struct
             Some (op, res)
         | _ -> None)
 
+  let update_consensus_key_case =
+    make_manager_case
+      Operation.Encoding.update_consensus_key_case
+      Manager_result.update_consensus_key_case
+      (function
+        | Contents_and_result
+            ( (Manager_operation {operation = Update_consensus_key _; _} as op),
+              res ) ->
+            Some (op, res)
+        | _ -> None)
+
   let register_global_constant_case =
     make_manager_case
       Operation.Encoding.register_global_constant_case
@@ -1836,6 +1876,7 @@ let contents_result_encoding =
          make register_global_constant_case;
          make set_deposits_limit_case;
          make increase_paid_storage_case;
+         make update_consensus_key_case;
          make tx_rollup_origination_case;
          make tx_rollup_submit_batch_case;
          make tx_rollup_commit_case;
@@ -1900,6 +1941,7 @@ let contents_and_result_encoding =
          make register_global_constant_case;
          make set_deposits_limit_case;
          make increase_paid_storage_case;
+         make update_consensus_key_case;
          make tx_rollup_origination_case;
          make tx_rollup_submit_batch_case;
          make tx_rollup_commit_case;
@@ -2146,6 +2188,32 @@ let kind_equal :
         } ) ->
       Some Eq
   | Manager_operation {operation = Delegation _; _}, _ -> None
+  | ( Manager_operation {operation = Update_consensus_key _; _},
+      Manager_operation_result
+        {operation_result = Applied (Update_consensus_key_result _); _} ) ->
+      Some Eq
+  | ( Manager_operation {operation = Update_consensus_key _; _},
+      Manager_operation_result
+        {operation_result = Backtracked (Update_consensus_key_result _, _); _} )
+    ->
+      Some Eq
+  | ( Manager_operation {operation = Update_consensus_key _; _},
+      Manager_operation_result
+        {
+          operation_result =
+            Failed (Alpha_context.Kind.Update_consensus_key_manager_kind, _);
+          _;
+        } ) ->
+      Some Eq
+  | ( Manager_operation {operation = Update_consensus_key _; _},
+      Manager_operation_result
+        {
+          operation_result =
+            Skipped Alpha_context.Kind.Update_consensus_key_manager_kind;
+          _;
+        } ) ->
+      Some Eq
+  | Manager_operation {operation = Update_consensus_key _; _}, _ -> None
   | ( Manager_operation {operation = Register_global_constant _; _},
       Manager_operation_result
         {operation_result = Applied (Register_global_constant_result _); _} ) ->

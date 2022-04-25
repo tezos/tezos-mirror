@@ -77,6 +77,7 @@ type manager_operation_kind =
   | K_Undelegation
   | K_Self_delegation
   | K_Set_deposits_limit
+  | K_Update_consensus_key
   | K_Increase_paid_storage
   | K_Reveal
   | K_Tx_rollup_origination
@@ -176,6 +177,7 @@ let kind_to_string = function
   | K_Undelegation -> "Undelegation"
   | K_Self_delegation -> "Self-delegation"
   | K_Set_deposits_limit -> "Set deposits limit"
+  | K_Update_consensus_key -> "Update consensus key"
   | K_Origination -> "Origination"
   | K_Register_global_constant -> "Register global constant"
   | K_Increase_paid_storage -> "Increase paid storage"
@@ -643,6 +645,19 @@ let mk_set_deposits_limit (oinfos : operation_req) (infos : infos) =
     (contract_of infos.accounts.source)
     None
 
+let mk_update_consensus_key (oinfos : operation_req) (infos : infos) =
+  Op.update_consensus_key
+    ?force_reveal:oinfos.force_reveal
+    ?fee:oinfos.fee
+    ?gas_limit:oinfos.gas_limit
+    ?storage_limit:oinfos.storage_limit
+    ?counter:oinfos.counter
+    (B infos.ctxt.block)
+    (contract_of infos.accounts.source)
+    (match infos.accounts.dest with
+    | None -> infos.accounts.source.pk
+    | Some dest -> dest.pk)
+
 let mk_increase_paid_storage (oinfos : operation_req) (infos : infos) =
   Op.increase_paid_storage
     ?force_reveal:oinfos.force_reveal
@@ -1059,6 +1074,7 @@ let select_op (op_req : operation_req) (infos : infos) =
     | K_Undelegation -> mk_undelegation
     | K_Self_delegation -> mk_self_delegation
     | K_Set_deposits_limit -> mk_set_deposits_limit
+    | K_Update_consensus_key -> mk_update_consensus_key
     | K_Increase_paid_storage -> mk_increase_paid_storage
     | K_Reveal -> mk_reveal
     | K_Tx_rollup_origination -> mk_tx_rollup_origination
@@ -1393,6 +1409,7 @@ let subjects =
     K_Undelegation;
     K_Self_delegation;
     K_Set_deposits_limit;
+    K_Update_consensus_key;
     K_Increase_paid_storage;
     K_Reveal;
     K_Tx_rollup_origination;
@@ -1417,14 +1434,15 @@ let subjects =
   ]
 
 let is_consumer = function
-  | K_Set_deposits_limit | K_Increase_paid_storage | K_Reveal
-  | K_Self_delegation | K_Delegation | K_Undelegation | K_Tx_rollup_origination
-  | K_Tx_rollup_submit_batch | K_Tx_rollup_finalize | K_Tx_rollup_commit
-  | K_Tx_rollup_return_bond | K_Tx_rollup_remove_commitment | K_Tx_rollup_reject
-  | K_Sc_rollup_add_messages | K_Sc_rollup_origination | K_Sc_rollup_refute
-  | K_Sc_rollup_timeout | K_Sc_rollup_cement | K_Sc_rollup_publish
-  | K_Sc_rollup_execute_outbox_message | K_Sc_rollup_recover_bond
-  | K_Dal_publish_slot_header | K_Zk_rollup_origination ->
+  | K_Set_deposits_limit | K_Update_consensus_key | K_Increase_paid_storage
+  | K_Reveal | K_Self_delegation | K_Delegation | K_Undelegation
+  | K_Tx_rollup_origination | K_Tx_rollup_submit_batch | K_Tx_rollup_finalize
+  | K_Tx_rollup_commit | K_Tx_rollup_return_bond | K_Tx_rollup_remove_commitment
+  | K_Tx_rollup_reject | K_Sc_rollup_add_messages | K_Sc_rollup_origination
+  | K_Sc_rollup_refute | K_Sc_rollup_timeout | K_Sc_rollup_cement
+  | K_Sc_rollup_publish | K_Sc_rollup_execute_outbox_message
+  | K_Sc_rollup_recover_bond | K_Dal_publish_slot_header
+  | K_Zk_rollup_origination ->
       false
   | K_Transaction | K_Origination | K_Register_global_constant
   | K_Tx_rollup_dispatch_tickets | K_Transfer_ticket ->
@@ -1439,7 +1457,7 @@ let revealed_subjects =
 let is_disabled flags = function
   | K_Transaction | K_Origination | K_Register_global_constant | K_Delegation
   | K_Undelegation | K_Self_delegation | K_Set_deposits_limit
-  | K_Increase_paid_storage | K_Reveal ->
+  | K_Update_consensus_key | K_Increase_paid_storage | K_Reveal ->
       false
   | K_Tx_rollup_origination | K_Tx_rollup_submit_batch | K_Tx_rollup_commit
   | K_Tx_rollup_return_bond | K_Tx_rollup_finalize

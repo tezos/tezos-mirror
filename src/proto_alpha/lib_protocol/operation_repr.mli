@@ -106,6 +106,8 @@ module Kind : sig
 
   type increase_paid_storage = Increase_paid_storage_kind
 
+  type update_consensus_key = Update_consensus_key_kind
+
   type failing_noop = Failing_noop_kind
 
   type register_global_constant = Register_global_constant_kind
@@ -160,6 +162,7 @@ module Kind : sig
     | Register_global_constant_manager_kind : register_global_constant manager
     | Set_deposits_limit_manager_kind : set_deposits_limit manager
     | Increase_paid_storage_manager_kind : increase_paid_storage manager
+    | Update_consensus_key_manager_kind : update_consensus_key manager
     | Tx_rollup_origination_manager_kind : tx_rollup_origination manager
     | Tx_rollup_submit_batch_manager_kind : tx_rollup_submit_batch manager
     | Tx_rollup_commit_manager_kind : tx_rollup_commit manager
@@ -393,6 +396,11 @@ and _ manager_operation =
       destination : Contract_hash.t;
     }
       -> Kind.increase_paid_storage manager_operation
+  (* [Update_consensus_key pk] updates the consensus key of
+     the signing delegate to [pk]. *)
+  | Update_consensus_key :
+      Signature.Public_key.t
+      -> Kind.update_consensus_key manager_operation
   (* [Tx_rollup_origination] allows an implicit contract to originate
      a new transactional rollup. *)
   | Tx_rollup_origination : Kind.tx_rollup_origination manager_operation
@@ -746,6 +754,8 @@ module Encoding : sig
 
   val delegation_case : Kind.delegation Kind.manager case
 
+  val update_consensus_key_case : Kind.update_consensus_key Kind.manager case
+
   val register_global_constant_case :
     Kind.register_global_constant Kind.manager case
 
@@ -821,6 +831,10 @@ module Encoding : sig
     val origination_case : Kind.origination case
 
     val delegation_case : Kind.delegation case
+
+    val update_consensus_key_tag : int
+
+    val update_consensus_key_case : Kind.update_consensus_key case
 
     val register_global_constant_case : Kind.register_global_constant case
 

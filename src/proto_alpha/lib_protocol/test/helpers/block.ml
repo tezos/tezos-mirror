@@ -841,9 +841,9 @@ let bake_n_with_all_balance_updates ?(baking_mode = Application) ?policy
               match r with
               | Transaction_result (Transaction_to_sc_rollup_result _)
               | Reveal_result _ | Delegation_result _
-              | Set_deposits_limit_result _ | Tx_rollup_origination_result _
-              | Tx_rollup_submit_batch_result _ | Tx_rollup_commit_result _
-              | Tx_rollup_return_bond_result _
+              | Update_consensus_key_result _ | Set_deposits_limit_result _
+              | Tx_rollup_origination_result _ | Tx_rollup_submit_batch_result _
+              | Tx_rollup_commit_result _ | Tx_rollup_return_bond_result _
               | Tx_rollup_finalize_commitment_result _
               | Tx_rollup_remove_commitment_result _
               | Tx_rollup_rejection_result _ | Transfer_ticket_result _
@@ -883,6 +883,7 @@ let bake_n_with_origination_results ?(baking_mode = Application) ?policy n b =
             function
             | Successful_manager_result (Reveal_result _)
             | Successful_manager_result (Delegation_result _)
+            | Successful_manager_result (Update_consensus_key_result _)
             | Successful_manager_result (Transaction_result _)
             | Successful_manager_result (Register_global_constant_result _)
             | Successful_manager_result (Set_deposits_limit_result _)

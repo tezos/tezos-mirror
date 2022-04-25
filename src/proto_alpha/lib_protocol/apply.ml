@@ -35,6 +35,7 @@ type error +=
   | Set_deposits_limit_on_unregistered_delegate of Signature.Public_key_hash.t
   | Set_deposits_limit_too_high of {limit : Tez.t; max_limit : Tez.t}
   | Error_while_taking_fees
+  | Update_consensus_key_on_unregistered_delegate of Signature.Public_key_hash.t
   | Empty_transaction of Contract.t
   | Tx_rollup_feature_disabled
   | Tx_rollup_invalid_transaction_ticket_amount
@@ -130,6 +131,21 @@ let () =
     (function Error_while_taking_fees -> Some () | _ -> None)
     (fun () -> Error_while_taking_fees) ;
 
+  register_error_kind
+    `Temporary
+    ~id:"operation.update_consensus_key_on_unregistered_delegate"
+    ~title:"Update consensus key on an unregistered delegate"
+    ~description:"Cannot update consensus key an unregistered delegate."
+    ~pp:(fun ppf c ->
+      Format.fprintf
+        ppf
+        "Cannot update the consensus key on the unregistered delegate %a."
+        Signature.Public_key_hash.pp
+        c)
+    Data_encoding.(obj1 (req "delegate" Signature.Public_key_hash.encoding))
+    (function
+      | Update_consensus_key_on_unregistered_delegate c -> Some c | _ -> None)
+    (fun c -> Update_consensus_key_on_unregistered_delegate c) ;
   register_error_kind
     `Branch
     ~id:"contract.empty_transaction"
@@ -1037,6 +1053,18 @@ let apply_manager_operation :
           }
       in
       (ctxt, result, [])
+  | Update_consensus_key pk ->
+      Delegate.registered ctxt source >>= fun is_registered ->
+      error_unless
+        is_registered
+        (Update_consensus_key_on_unregistered_delegate source)
+      >>?= fun () ->
+      Delegate.Consensus_key.register_update ctxt source pk >>=? fun ctxt ->
+      return
+        ( ctxt,
+          Update_consensus_key_result
+            {consumed_gas = Gas.consumed ~since:ctxt_before_op ~until:ctxt},
+          [] )
   | Tx_rollup_origination ->
       Tx_rollup.originate ctxt >>=? fun (ctxt, originated_tx_rollup) ->
       let result =
@@ -1542,7 +1570,8 @@ let burn_manager_storage_fees :
             size_of_constant = payload.size_of_constant;
             global_address = payload.global_address;
           } )
-  | Set_deposits_limit_result _ -> return (ctxt, storage_limit, smopr)
+  | Set_deposits_limit_result _ | Update_consensus_key_result _ ->
+      return (ctxt, storage_limit, smopr)
   | Increase_paid_storage_result _ -> return (ctxt, storage_limit, smopr)
   | Tx_rollup_origination_result payload ->
       Fees.burn_tx_rollup_origination_fees ctxt ~storage_limit ~payer

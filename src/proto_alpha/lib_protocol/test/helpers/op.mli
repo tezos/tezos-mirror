@@ -716,3 +716,14 @@ val zk_rollup_origination :
   init_state:Zk_rollup.State.t ->
   nb_ops:int ->
   (Operation.packed * Zk_rollup.t) tzresult Lwt.t
+
+val update_consensus_key :
+  ?force_reveal:bool ->
+  ?counter:counter ->
+  ?fee:Tez.t ->
+  ?gas_limit:gas_limit ->
+  ?storage_limit:counter ->
+  Context.t ->
+  Contract.t ->
+  public_key ->
+  (packed_operation, tztrace) result Lwt.t
