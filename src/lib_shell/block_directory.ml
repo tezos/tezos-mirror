@@ -520,25 +520,31 @@ let build_raw_rpc_directory (module Proto : Block_services.PROTO)
       let depth = Option.value ~default:max_int q#depth in
       (* [depth] is defined as a [uint] not an [int] *)
       assert (depth >= 0) ;
-      let* context = Store.Block.context chain_store block in
-      let*! mem = Context_ops.mem context path in
-      let*! dir_mem = Context_ops.mem_tree context path in
-      if not (mem || dir_mem) then Lwt.fail Not_found
-      else
-        let*! v = read_partial_context context path depth in
-        Lwt.return_ok v) ;
+      let*! _, savepoint_level = Store.Chain.savepoint chain_store in
+      if Store.Block.level block >= savepoint_level then
+        let* context = Store.Block.context chain_store block in
+        let*! mem = Context_ops.mem context path in
+        let*! dir_mem = Context_ops.mem_tree context path in
+        if not (mem || dir_mem) then Lwt.fail Not_found
+        else
+          let*! v = read_partial_context context path depth in
+          Lwt.return_ok v
+      else Lwt.fail Not_found) ;
   register1 S.Context.merkle_tree (fun (chain_store, block) path query () ->
-      let*! o = Store.Block.context_opt chain_store block in
-      match o with
-      | None -> return None
-      | Some context ->
-          let holey = Option.value ~default:false query#holey in
-          let leaf_kind =
-            let open Proof in
-            if holey then Hole else Raw_context
-          in
-          let*! v = Context_ops.merkle_tree context leaf_kind path in
-          return_some v) ;
+      let*! _, savepoint_level = Store.Chain.savepoint chain_store in
+      if Store.Block.level block >= savepoint_level then
+        let*! o = Store.Block.context_opt chain_store block in
+        match o with
+        | None -> return None
+        | Some context ->
+            let holey = Option.value ~default:false query#holey in
+            let leaf_kind =
+              let open Proof in
+              if holey then Hole else Raw_context
+            in
+            let*! v = Context_ops.merkle_tree context leaf_kind path in
+            return_some v
+      else Lwt.fail Not_found) ;
   (* info *)
   register0 S.info (fun (chain_store, block) q () ->
       let chain_id = Store.Chain.chain_id chain_store in
