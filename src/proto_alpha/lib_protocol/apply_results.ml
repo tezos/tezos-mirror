@@ -47,7 +47,13 @@ let error_encoding =
 let trace_encoding = make_trace_encoding error_encoding
 
 type 'kind internal_manager_operation =
-  | Transaction : transaction -> Kind.transaction internal_manager_operation
+  | Transaction : {
+      amount : Tez.tez;
+      parameters : Script.lazy_expr;
+      entrypoint : Entrypoint.t;
+      destination : Destination.t;
+    }
+      -> Kind.transaction internal_manager_operation
   | Origination : origination -> Kind.origination internal_manager_operation
   | Delegation :
       Signature.Public_key_hash.t option
@@ -71,7 +77,8 @@ let manager_operation_of_internal_operation (type kind)
     (operation : kind internal_manager_operation) :
     kind Alpha_context.manager_operation =
   match operation with
-  | Transaction transaction -> Transaction transaction
+  | Transaction {amount; parameters; entrypoint; destination} ->
+      Transaction {amount; parameters; entrypoint; destination}
   | Origination origination -> Origination origination
   | Delegation delegate -> Delegation delegate
 

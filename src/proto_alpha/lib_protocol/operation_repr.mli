@@ -185,13 +185,6 @@ type raw = Operation.t = {shell : Operation.shell_header; proto : bytes}
 
 val raw_encoding : raw Data_encoding.t
 
-type transaction = {
-  amount : Tez_repr.tez;
-  parameters : Script_repr.lazy_expr;
-  entrypoint : Entrypoint_repr.t;
-  destination : Destination_repr.t;
-}
-
 type origination = {
   delegate : Signature.Public_key_hash.t option;
   script : Script_repr.t;
@@ -316,7 +309,13 @@ and _ manager_operation =
   | Reveal : Signature.Public_key.t -> Kind.reveal manager_operation
   (* [Transaction] of some amount to some destination contract. It can
      also be used to execute/call smart-contracts. *)
-  | Transaction : transaction -> Kind.transaction manager_operation
+  | Transaction : {
+      amount : Tez_repr.tez;
+      parameters : Script_repr.lazy_expr;
+      entrypoint : Entrypoint_repr.t;
+      destination : Destination_repr.t;
+    }
+      -> Kind.transaction manager_operation
   (* [Origination] of a contract using a smart-contract [script] and
      initially credited with the amount [credit]. *)
   | Origination : origination -> Kind.origination manager_operation

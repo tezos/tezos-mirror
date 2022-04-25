@@ -34,8 +34,12 @@
 open Alpha_context
 
 type 'kind internal_manager_operation =
-  | Transaction :
-      Alpha_context.transaction
+  | Transaction : {
+      amount : Tez.tez;
+      parameters : Script.lazy_expr;
+      entrypoint : Entrypoint.t;
+      destination : Destination.t;
+    }
       -> Kind.transaction internal_manager_operation
   | Origination :
       Alpha_context.origination
