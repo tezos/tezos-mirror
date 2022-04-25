@@ -177,7 +177,7 @@ module Type_size : sig
   type 'a t
 
   val check_eq :
-    error_details:'error_trace Script_tc_errors.error_details ->
+    error_details:('error_context, 'error_trace) Script_tc_errors.error_details ->
     'a t ->
     'b t ->
     (unit, 'error_trace) result

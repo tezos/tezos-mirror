@@ -83,17 +83,18 @@ let run ctxt m =
       | None -> error Gas.Operation_quota_exceeded)
 
 let record_trace_eval :
-    type error_trace.
-    error_details:error_trace Script_tc_errors.error_details ->
-    (unit -> error) ->
+    type error_trace error_context.
+    error_details:(error_context, error_trace) Script_tc_errors.error_details ->
+    (error_context -> error) ->
     ('a, error_trace) t ->
     ('a, error_trace) t =
  fun ~error_details ->
   match error_details with
   | Fast -> fun _f m -> m
-  | Informative ->
+  | Informative err_ctxt ->
       fun f m gas ->
-        m gas >>?? fun (x, gas) -> of_result (record_trace_eval f x) gas
+        m gas >>?? fun (x, gas) ->
+        of_result (record_trace_eval (fun () -> f err_ctxt) x) gas
 
 let fail e = of_result (Error e) [@@ocaml.inline always]
 

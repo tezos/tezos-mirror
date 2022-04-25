@@ -206,6 +206,6 @@ the error will be ignored later. For example, when types are compared during
 the interpretation of the [CONTRACT] instruction any error will lead to
 returning [None] but the content of the error will be ignored. *)
 
-type _ error_details =
-  | Informative : error trace error_details
-  | Fast : inconsistent_types_fast_error error_details
+type (_, _) error_details =
+  | Informative : 'error_context -> ('error_context, error trace) error_details
+  | Fast : (_, inconsistent_types_fast_error) error_details

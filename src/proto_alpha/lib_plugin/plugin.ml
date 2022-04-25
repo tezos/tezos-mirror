@@ -2210,7 +2210,7 @@ module RPC = struct
             ->
             Gas_monad.run ctxt
             @@ Script_ir_translator.find_entrypoint
-                 ~error_details:Informative
+                 ~error_details:(Informative ())
                  arg_type
                  entrypoints
                  entrypoint

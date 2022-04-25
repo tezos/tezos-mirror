@@ -214,8 +214,7 @@ val big_map_get_and_update :
   Lwt.t
 
 val ty_eq :
-  error_details:'error_trace error_details ->
-  Script.location ->
+  error_details:(Script.location, 'error_trace) error_details ->
   ('a, 'ac) Script_typed_ir.ty ->
   ('b, 'bc) Script_typed_ir.ty ->
   ( (('a, 'ac) Script_typed_ir.ty, ('b, 'bc) Script_typed_ir.ty) eq,
@@ -434,7 +433,7 @@ type 'a ex_ty_cstr =
       -> 'a ex_ty_cstr
 
 val find_entrypoint :
-  error_details:'error_trace error_details ->
+  error_details:(_, 'error_trace) error_details ->
   ('t, _) Script_typed_ir.ty ->
   't Script_typed_ir.entrypoints ->
   Entrypoint.t ->

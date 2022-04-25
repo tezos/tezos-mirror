@@ -69,8 +69,8 @@ val run :
      when run, records trace levels using [f]. This function has no effect in
     the case of a gas-exhaustion error or if [error_details] is [Fast]. *)
 val record_trace_eval :
-  error_details:'error_trace Script_tc_errors.error_details ->
-  (unit -> error) ->
+  error_details:('error_context, 'error_trace) Script_tc_errors.error_details ->
+  ('error_context -> error) ->
   ('a, 'error_trace) t ->
   ('a, 'error_trace) t
 

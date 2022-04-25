@@ -168,8 +168,7 @@ let cast_transaction_parameter (type a ac b bc) ctxt location
   Gas_monad.run
     ctxt
     (Script_ir_translator.ty_eq
-       ~error_details:Informative
-       location
+       ~error_details:(Informative location)
        entry_arg_ty
        parameters_ty)
   >>?= fun (res, ctxt) ->
@@ -201,7 +200,7 @@ let tickets_of_transaction ctxt ~destination ~entrypoint ~location
       Gas_monad.run
         ctxt
         (Script_ir_translator.find_entrypoint
-           ~error_details:Informative
+           ~error_details:(Informative ())
            arg_type
            entrypoints
            entrypoint)

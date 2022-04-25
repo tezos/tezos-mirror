@@ -412,7 +412,7 @@ let[@coq_axiom_with_reason "gadt"] register () =
               ->
               Gas_monad.run ctxt
               @@ Script_ir_translator.find_entrypoint
-                   ~error_details:Informative
+                   ~error_details:(Informative ())
                    arg_type
                    entrypoints
                    entrypoint
