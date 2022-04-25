@@ -42,6 +42,7 @@ val create :
   ?batch_signer:string ->
   ?finalize_commitment_signer:string ->
   ?remove_commitment_signer:string ->
+  ?dispatch_withdrawals_signer:string ->
   ?rejection_signer:string ->
   Client.t ->
   Node.t ->
