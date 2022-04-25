@@ -91,3 +91,8 @@ type error += No_worker_for_source of Signature.Public_key_hash.t
 
 (** Error when we want to interact with the batcher but it was not started. *)
 type error += No_batcher
+
+(** Error when a ticket is not registered for a ticket index *)
+type error +=
+  | Tx_rollup_unknown_ticket of
+      Protocol.Tx_rollup_l2_context_sig.Ticket_indexable.either
