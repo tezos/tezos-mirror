@@ -116,6 +116,21 @@ let craft_tx_transaction tx_client ~signer ?counter
   in
   Lwt.return out
 
+let craft_tx_transfers tx_client Rollup.Tx_rollup.{counter; signer; contents} =
+  let contents_json =
+    let open Data_encoding in
+    Json.construct (list Rollup.Tx_rollup.transfer_content_encoding) contents
+    |> Json.to_string
+  in
+  let* out =
+    spawn_command
+      tx_client
+      (["craft"; "tx"; "transfers"; "from"; signer; "using"; contents_json]
+      @ optional_arg ~name:"counter" Int64.to_string counter)
+    |> Process.check_and_read_stdout
+  in
+  Lwt.return out
+
 let craft_tx_withdraw ?counter tx_client ~qty ~signer ~dest ~ticket =
   let qty = Int64.to_string qty in
   let* out =

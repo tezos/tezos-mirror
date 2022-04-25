@@ -730,6 +730,10 @@ let craft_tx ?counter tx_client ~qty ~signer ~dest ~ticket =
     tx_client
     {destination = dest; qty; ticket}
 
+let craft_tx_transfers ?counter ~signer tx_client contents =
+  let transfer : Rollup.transfer = {signer; counter; contents} in
+  Tx_rollup_client.craft_tx_transfers tx_client transfer
+
 let craft_batch tx_client ~batch ~signers =
   let signatures = bls_signers_sks_json signers in
   let* json_str =

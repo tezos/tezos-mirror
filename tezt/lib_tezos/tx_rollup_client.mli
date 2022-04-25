@@ -52,6 +52,7 @@ val craft_tx_transaction :
   Rollup.Tx_rollup.transfer_content ->
   string Lwt.t
 
+val craft_tx_transfers : t -> Rollup.Tx_rollup.transfer -> string Lwt.t
 
 val craft_tx_withdraw :
   ?counter:Int64.t ->
