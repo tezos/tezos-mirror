@@ -2710,6 +2710,35 @@ end = struct
   let todo ?opam ?main_module x =
     Printf.ksprintf (fun name -> external_lib ?opam ?main_module name V.True) x
 
+  (* N as in "protocol number in the Alpha family". *)
+  module N = struct
+    (* This function is asymmetrical on purpose: we don't want to compare
+       numbers with [Alpha] because such comparisons would break when snapshotting.
+       So the left-hand side is the number of the protocol being built,
+       but the right-hand side is an integer.
+
+       We could instead have defined functions with one argument [number_le], [number_ge],
+       [version_ne] and [version_eq] in [register_alpha_family] directly.
+       We chose to use a module instead because [number_le 013] is not as readable as
+       [N.(number <= 013)]. Indeed, is [number_le 013] equivalent to [(<=) 013],
+       meaning "greater than 013", or is [number_le 013] equivalent to [fun x -> x <= 013],
+       meaning the opposite? *)
+    let compare_asymmetric a b =
+      match a with
+      | Alpha -> 1
+      | V a -> Int.compare a b
+      | Other ->
+          invalid_arg "cannot use N.compare_asymmetric on Other protocols"
+
+    let ( <= ) a b = compare_asymmetric a b <= 0
+
+    let ( >= ) a b = compare_asymmetric a b >= 0
+
+    let ( <> ) a b = compare_asymmetric a b <> 0
+
+    let ( == ) a b = compare_asymmetric a b == 0
+  end
+
   let genesis =
     let name_dash = "genesis" in
     let name_underscore = "genesis" in
@@ -2790,34 +2819,6 @@ end = struct
          ~embedded:(todo "tezos-embedded-protocol-demo-counter")
          ~client
          ()
-
-  (* N as in "protocol number in the Alpha family". *)
-  module N = struct
-    (* This function is asymmetrical on purpose: we don't want to compare
-       numbers with [Alpha] because such comparisons would break when snapshotting.
-       So the left-hand side is the number of the protocol being built,
-       but the right-hand side is an integer.
-
-       We could instead have defined functions with one argument [number_le], [number_ge],
-       [version_ne] and [version_eq] in [register_alpha_family] directly.
-       We chose to use a module instead because [number_le 013] is not as readable as
-       [N.(number <= 013)]. Indeed, is [number_le 013] equivalent to [(<=) 013],
-       meaning "greater than 013", or is [number_le 013] equivalent to [fun x -> x <= 013],
-       meaning the opposite? *)
-    let compare_asymmetric a b =
-      match a with
-      | Alpha -> 1
-      | V a -> Int.compare a b
-      | Other -> invalid_arg "cannot use N.compare on Other protocols"
-
-    let ( <= ) a b = compare_asymmetric a b <= 0
-
-    let ( >= ) a b = compare_asymmetric a b >= 0
-
-    let ( <> ) a b = compare_asymmetric a b <> 0
-
-    let ( == ) a b = compare_asymmetric a b == 0
-  end
 
   let register_alpha_family status number name =
     let make_full_name sep =
