@@ -8,7 +8,10 @@ define directory_of_version
 src/proto_$(shell echo $1 | tr -- - _)
 endef
 
+ifndef TEZOS_WITHOUT_OPAM
 current_opam_version := $(shell opam --version)
+endif
+
 include scripts/version.sh
 
 DOCKER_IMAGE_NAME := tezos
@@ -40,15 +43,21 @@ UNRELEASED_TEZOS_BIN=$(foreach p, $(tx_rollup_protocol_versions), tezos-tx-rollu
    $(foreach p, $(sc_rollup_protocol_versions), tezos-sc-rollup-node-$p) \
    $(foreach p, $(sc_rollup_protocol_versions), tezos-sc-rollup-client-$p)
 
+ifndef TEZOS_WITHOUT_OPAM
 ifeq ($(filter ${opam_version}.%,${current_opam_version}),)
 $(error Unexpected opam version (found: ${current_opam_version}, expected: ${opam_version}.*))
+endif
 endif
 
 ifeq ($(filter ${VALID_PROFILES},${PROFILE}),)
 $(error Unexpected dune profile (got: ${PROFILE}, expecting one of: ${VALID_PROFILES}))
 endif
 
+ifdef TEZOS_WITHOUT_OPAM
+current_ocaml_version := $(shell ocamlc -version)
+else
 current_ocaml_version := $(shell opam exec -- ocamlc -version)
+endif
 
 .PHONY: all
 all:
