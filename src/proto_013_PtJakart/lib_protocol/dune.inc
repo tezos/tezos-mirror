@@ -584,7 +584,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
  (action
   (write-file %{targets}
     "module Environment = Tezos_protocol_environment_013_PtJakart.Environment
-let hash = Tezos_crypto.Protocol_hash.of_b58check_exn \"PtJakartaiDz69SfDDLXJSiuZqTSeSKRDbKVZC8MNzJnvRjvnGw\"
+let hash = Tezos_crypto.Protocol_hash.of_b58check_exn \"PtJakart2xVj7pYXJBXrqHgd82rdkLey5ZeeGwDgPp9rhQUbSqY\"
 let name = Environment.Name.name
 include Tezos_raw_protocol_013_PtJakart
 include Tezos_raw_protocol_013_PtJakart.Main
