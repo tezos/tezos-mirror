@@ -44,6 +44,7 @@ type block_store = {
   savepoint : block_descriptor Stored_data.t;
   status_data : status Stored_data.t;
   block_cache : Block_repr.t Block_lru_cache.t;
+  mutable gc_callback : (Context_hash.t -> unit tzresult Lwt.t) option;
   merge_mutex : Lwt_mutex.t;
   merge_scheduler : Lwt_idle_waiter.t;
   (* Target level x Merging thread *)
@@ -1225,6 +1226,32 @@ let create_merging_thread block_store ~history_mode ~old_ro_store ~old_rw_store
   in
   return (new_ro_store, new_savepoint, new_caboose)
 
+let may_trigger_gc block_store history_mode ~previous_savepoint ~new_savepoint =
+  let open Lwt_result_syntax in
+  let savepoint_hash = fst new_savepoint in
+  if
+    History_mode.(equal history_mode Archive)
+    || Block_hash.(savepoint_hash = fst previous_savepoint)
+  then (* No GC required *) return_unit
+  else
+    match block_store.gc_callback with
+    | None -> return_unit
+    | Some gc ->
+        let*! () = Store_events.(emit start_context_gc new_savepoint) in
+        let* savepoint =
+          let* block =
+            read_block
+              ~read_metadata:false
+              block_store
+              (Block (savepoint_hash, 0))
+          in
+          match block with
+          | None ->
+              tzfail @@ Block_not_found {hash = savepoint_hash; distance = 0}
+          | Some block -> return block
+        in
+        gc savepoint.contents.header.shell.context
+
 let merge_stores block_store ~(on_error : tztrace -> unit tzresult Lwt.t)
     ~finalizer ~history_mode ~new_head ~new_head_metadata
     ~cementing_highwatermark =
@@ -1251,6 +1278,7 @@ let merge_stores block_store ~(on_error : tztrace -> unit tzresult Lwt.t)
       in
       let*! () = Store_events.(emit start_merging_stores) new_head_lafl in
       let* () = check_store_consistency block_store ~cementing_highwatermark in
+      let*! previous_savepoint = Stored_data.get block_store.savepoint in
       let* lowest_bound_to_preserve_in_floating =
         compute_lowest_bound_to_preserve_in_floating
           block_store
@@ -1314,6 +1342,15 @@ let merge_stores block_store ~(on_error : tztrace -> unit tzresult Lwt.t)
                            section, in case it needs to access the block
                            store. *)
                         let* () = finalizer new_head_lafl in
+                        (* We can now trigger the context GC *)
+                        let* () =
+                          may_trigger_gc
+                            block_store
+                            history_mode
+                            ~previous_savepoint
+                            ~new_savepoint
+                        in
+
                         (* The merge operation succeeded, the store is now idle. *)
                         block_store.merging_thread <- None ;
                         let* () = write_status block_store Idle in
@@ -1485,6 +1522,7 @@ let load ?block_cache_limit chain_dir ~genesis_block ~readonly =
       savepoint;
       status_data;
       block_cache;
+      gc_callback = None;
       merge_mutex;
       merge_scheduler;
       merging_thread = None;
@@ -1504,6 +1542,9 @@ let create ?block_cache_limit chain_dir ~genesis_block =
   in
   let* () = store_block block_store genesis_block in
   return block_store
+
+let register_gc_callback block_store gc_callback =
+  block_store.gc_callback <- Some gc_callback
 
 let pp_merge_status fmt status =
   match status with

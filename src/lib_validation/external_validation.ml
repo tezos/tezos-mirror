@@ -116,7 +116,7 @@ let request_pp ppf = function
   | Context_garbage_collection {context_hash} ->
       Format.fprintf
         ppf
-        "unloading context below %a"
+        "garbage collecting context below %a"
         Context_hash.pp
         context_hash
   | Reconfigure_event_logging _ ->
@@ -346,6 +346,17 @@ let case_precheck tag =
           hash;
         })
 
+let case_context_gc tag =
+  let open Data_encoding in
+  case
+    tag
+    ~title:"context_gc"
+    (obj1 (req "context_hash" Context_hash.encoding))
+    (function
+      | Context_garbage_collection {context_hash} -> Some context_hash
+      | _ -> None)
+    (fun context_hash -> Context_garbage_collection {context_hash})
+
 let request_encoding =
   let open Data_encoding in
   union
@@ -391,6 +402,7 @@ let request_encoding =
         (fun c -> Reconfigure_event_logging c);
       case_preapply (Tag 7);
       case_precheck (Tag 8);
+      case_context_gc (Tag 9);
     ]
 
 let send pin encoding data =

@@ -335,6 +335,12 @@ val load :
   readonly:bool ->
   block_store tzresult Lwt.t
 
+(** [register_gc_callback block_store callback] installs a [callback]
+   that may be triggered during a block store merge in order to
+   garbage-collect old contexts. *)
+val register_gc_callback :
+  block_store -> (Context_hash.t -> unit tzresult Lwt.t) -> unit
+
 (** [close block_store] closes the [block_store] and every underlying
     opened stores.
 

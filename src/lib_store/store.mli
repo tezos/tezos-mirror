@@ -921,6 +921,12 @@ module Chain : sig
     next_protocol_hash:Protocol_hash.t ->
     (chain_store * Block.t) RPC_directory.t ->
     unit Lwt.t
+
+  (** [register_gc_callback chain_store callback] installs a
+      [callback] that may be triggered during a block store merge in
+      order to garbage-collect old contexts. *)
+  val register_gc_callback :
+    chain_store -> (Context_hash.t -> unit tzresult Lwt.t) -> unit
 end
 
 (** [global_block_watcher global_store] instantiates a new block

@@ -84,6 +84,9 @@ module type S = sig
     Operation.t trace trace ->
     unit tzresult Lwt.t
 
+  val context_garbage_collection :
+    t -> Context_ops.index -> Context_hash.t -> unit tzresult Lwt.t
+
   val commit_genesis : t -> chain_id:Chain_id.t -> Context_hash.t tzresult Lwt.t
 
   (** [init_test_chain] must only be called on a forking block. *)
@@ -337,6 +340,11 @@ module Internal_validator_process = struct
       ~cache
       header
       operations
+
+  let context_garbage_collection _validator context_index context_hash =
+    let open Lwt_result_syntax in
+    let*! () = Context_ops.gc context_index context_hash in
+    return_unit
 
   let commit_genesis validator ~chain_id =
     let context_index = get_context_index validator.chain_store in
@@ -809,6 +817,12 @@ module External_validator_process = struct
     in
     send_request validator request Data_encoding.unit
 
+  let context_garbage_collection validator _index context_hash =
+    let request =
+      External_validation.Context_garbage_collection {context_hash}
+    in
+    send_request validator request Data_encoding.unit
+
   let commit_genesis validator ~chain_id =
     let request = External_validation.Commit_genesis {chain_id} in
     send_request validator request Context_hash.encoding
@@ -950,6 +964,10 @@ let apply_block ?(simulate = false)
 let precheck_block (E {validator_process = (module VP); validator}) chain_store
     ~predecessor header operations =
   VP.precheck_block validator chain_store ~predecessor header operations
+
+let context_garbage_collection (E {validator_process = (module VP); validator})
+    context_index context_hash =
+  VP.context_garbage_collection validator context_index context_hash
 
 let commit_genesis (E {validator_process = (module VP); validator}) ~chain_id =
   VP.commit_genesis validator ~chain_id
