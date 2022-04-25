@@ -204,5 +204,3 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
   let start node_ctxt store configuration =
     Common.start configuration (register node_ctxt store configuration)
 end
-
-module Arith = Make (Arith_pvm)
