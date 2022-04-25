@@ -32,6 +32,7 @@ type t = {
   operator : Signature.Public_key_hash.t;
   initial_level : Raw_level.t;
   block_finality_time : int;
+  kind : Sc_rollup.Kind.t;
 }
 
 let get_operator_keys node_ctxt =
@@ -41,10 +42,31 @@ let get_operator_keys node_ctxt =
 
 let init (cctxt : Protocol_client_context.full) rollup_address operator =
   let open Lwt_result_syntax in
-  let+ initial_level =
+  let* initial_level =
     Plugin.RPC.Sc_rollup.initial_level
       cctxt
       (cctxt#chain, cctxt#block)
       rollup_address
   in
-  {cctxt; rollup_address; operator; initial_level; block_finality_time = 2}
+  let* kind =
+    Plugin.RPC.Sc_rollup.kind cctxt (cctxt#chain, cctxt#block) rollup_address ()
+  in
+  let+ kind =
+    match kind with
+    | Some k -> return k
+    | None ->
+        (* Technically this error cannot happen, initial level will fail if the
+           rollup does not exist. *)
+        cctxt#error
+          "Rollup %a does not exists."
+          Sc_rollup.Address.pp
+          rollup_address
+  in
+  {
+    cctxt;
+    rollup_address;
+    operator;
+    initial_level;
+    kind;
+    block_finality_time = 2;
+  }
