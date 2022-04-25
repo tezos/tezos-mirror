@@ -99,15 +99,9 @@ endif
 TEZOS_PROTOCOL_FILES=$(wildcard src/proto_*/lib_protocol/TEZOS_PROTOCOL)
 PROTOCOLS=$(patsubst %/lib_protocol/TEZOS_PROTOCOL,%,${TEZOS_PROTOCOL_FILES})
 
-DUNE_INCS=$(patsubst %,%/lib_protocol/dune.inc, ${PROTOCOLS})
-
 .PHONY: generate_dune
-generate_dune: ${DUNE_INCS}
-
-${DUNE_INCS}:: src/proto_%/lib_protocol/dune.inc: \
-  src/proto_%/lib_protocol/TEZOS_PROTOCOL
-	dune build --profile=$(PROFILE) @$(dir $@)/runtest_dune_template --auto-promote
-	touch $@
+generate_dune:
+	@make -C manifest
 
 .PHONY: all.pkg
 all.pkg: generate_dune
