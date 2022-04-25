@@ -485,6 +485,9 @@ val inline_tests_backend : target -> inline_tests
     - [dune]: added to the [dune] file after this target.
       A typical use is to add [rule] or [install] stanzas.
 
+    - [flags_nostandard]: if true, then omits the :standard flags in a [(flags ...)].
+      Default value is [false].
+
     - [foreign_stubs]: specifies a [(foreign_stubs)] stanza for the [dune] target.
 
     - [inline_tests]: specifies an inline_tests backend. Can only be used when constructing a library.
@@ -587,6 +590,7 @@ type 'a maker =
   ?conflicts:target list ->
   ?deps:target list ->
   ?dune:Dune.s_expr ->
+  ?flags_nostandard:bool ->
   ?foreign_stubs:Dune.foreign_stubs ->
   ?inline_tests:inline_tests ->
   ?js_compatible:bool ->

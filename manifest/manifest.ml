@@ -826,6 +826,7 @@ module Target = struct
     conflicts : t list;
     deps : t list;
     dune : Dune.s_expr;
+    flags_nostandard : bool;
     foreign_stubs : Dune.foreign_stubs option;
     inline_tests : bool;
     js_compatible : bool;
@@ -975,6 +976,7 @@ module Target = struct
     ?conflicts:t option list ->
     ?deps:t option list ->
     ?dune:Dune.s_expr ->
+    ?flags_nostandard:bool ->
     ?foreign_stubs:Dune.foreign_stubs ->
     ?inline_tests:inline_tests ->
     ?js_compatible:bool ->
@@ -1043,14 +1045,14 @@ module Target = struct
 
   let internal make_kind ?all_modules_except ?bisect_ppx ?c_library_flags
       ?(conflicts = []) ?(dep_files = []) ?(deps = []) ?(dune = Dune.[])
-      ?foreign_stubs ?inline_tests ?js_compatible ?js_of_ocaml ?documentation
-      ?(linkall = false) ?modes ?modules ?(modules_without_implementation = [])
-      ?(npm_deps = []) ?(nopervasives = false) ?(nostdlib = false) ?ocaml ?opam
-      ?(opaque = false) ?(opens = []) ?(preprocess = [])
-      ?(preprocessor_deps = []) ?(private_modules = []) ?(opam_only_deps = [])
-      ?release ?static ?static_cclibs ?synopsis ?description
-      ?(time_measurement_ppx = false) ?warnings ?(wrapped = true)
-      ?(cram = false) ~path names =
+      ?(flags_nostandard = false) ?foreign_stubs ?inline_tests ?js_compatible
+      ?js_of_ocaml ?documentation ?(linkall = false) ?modes ?modules
+      ?(modules_without_implementation = []) ?(npm_deps = [])
+      ?(nopervasives = false) ?(nostdlib = false) ?ocaml ?opam ?(opaque = false)
+      ?(opens = []) ?(preprocess = []) ?(preprocessor_deps = [])
+      ?(private_modules = []) ?(opam_only_deps = []) ?release ?static
+      ?static_cclibs ?synopsis ?description ?(time_measurement_ppx = false)
+      ?warnings ?(wrapped = true) ?(cram = false) ~path names =
     let conflicts = List.filter_map Fun.id conflicts in
     let deps = List.filter_map Fun.id deps in
     let opam_only_deps = List.filter_map Fun.id opam_only_deps in
@@ -1229,6 +1231,7 @@ module Target = struct
         conflicts;
         deps;
         dune;
+        flags_nostandard;
         foreign_stubs;
         inline_tests;
         js_compatible;
@@ -1549,7 +1552,16 @@ let generate_dune ~dune_file_has_static_profile (internal : Target.internal) =
   let flags =
     match flags with
     | [] -> None
-    | _ :: _ -> Some Dune.[V (Dune.S ":standard" :: Dune.of_list flags)]
+    | _ :: _ ->
+        Some
+          Dune.
+            [
+              V
+                (of_list
+                   ((if internal.flags_nostandard then []
+                    else [Dune.S ":standard"])
+                   @ flags));
+            ]
   in
   let preprocess =
     let make_pp (PPS (target, args) : Target.preprocessor) =
