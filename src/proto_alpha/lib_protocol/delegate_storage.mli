@@ -55,6 +55,9 @@ val set :
   Signature.Public_key_hash.t option ->
   Raw_context.t tzresult Lwt.t
 
+(** Has a delegate been registered in the delegate table? *)
+val registered : Raw_context.t -> Signature.Public_key_hash.t -> bool Lwt.t
+
 (** Iterate on all registered delegates. *)
 val fold :
   Raw_context.t ->

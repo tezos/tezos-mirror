@@ -2616,8 +2616,7 @@ module Delegate : sig
   val delegated_balance :
     context -> Signature.Public_key_hash.t -> Tez.t tzresult Lwt.t
 
-  (** See {!Contract_delegate_storage.registered}. *)
-  val registered : context -> Signature.Public_key_hash.t -> bool tzresult Lwt.t
+  val registered : context -> Signature.Public_key_hash.t -> bool Lwt.t
 
   val deactivated :
     context -> Signature.Public_key_hash.t -> bool tzresult Lwt.t

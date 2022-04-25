@@ -1011,7 +1011,7 @@ let apply_manager_operation :
             Tez.(limit > max_limit)
             (Set_deposits_limit_too_high {limit; max_limit}))
       >>?= fun () ->
-      Delegate.registered ctxt source >>=? fun is_registered ->
+      Delegate.registered ctxt source >>= fun is_registered ->
       error_unless
         is_registered
         (Set_deposits_limit_on_unregistered_delegate source)

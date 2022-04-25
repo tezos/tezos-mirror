@@ -101,11 +101,13 @@ let () =
     (function Unregistered_delegate k -> Some k | _ -> None)
     (fun k -> Unregistered_delegate k)
 
+let registered = Storage.Delegates.mem
+
 let init ctxt contract delegate =
   Contract_manager_storage.is_manager_key_revealed ctxt delegate
   >>=? fun known_delegate ->
   error_unless known_delegate (Unregistered_delegate delegate) >>?= fun () ->
-  Contract_delegate_storage.registered ctxt delegate >>=? fun is_registered ->
+  registered ctxt delegate >>= fun is_registered ->
   error_unless is_registered (Unregistered_delegate delegate) >>?= fun () ->
   Contract_delegate_storage.init ctxt contract delegate >>=? fun ctxt ->
   Contract_storage.get_balance_and_frozen_bonds ctxt contract
@@ -118,7 +120,7 @@ let set c contract delegate =
       (* check if contract is a registered delegate *)
       (match contract with
       | Contract_repr.Implicit pkh ->
-          Contract_delegate_storage.registered c pkh >>=? fun is_registered ->
+          registered c pkh >>= fun is_registered ->
           fail_when is_registered (No_deletion pkh)
       | Originated _ -> return_unit)
       >>=? fun () ->
@@ -133,8 +135,7 @@ let set c contract delegate =
   | Some delegate ->
       Contract_manager_storage.is_manager_key_revealed c delegate
       >>=? fun known_delegate ->
-      Contract_delegate_storage.registered c delegate
-      >>=? fun registered_delegate ->
+      registered c delegate >>= fun registered_delegate ->
       let self_delegation =
         match contract with
         | Implicit pkh -> Signature.Public_key_hash.equal pkh delegate
@@ -157,7 +158,7 @@ let set c contract delegate =
         (* check if contract is a registered delegate *)
         (match contract with
         | Contract_repr.Implicit pkh ->
-            Contract_delegate_storage.registered c pkh >>=? fun is_registered ->
+            registered c pkh >>= fun is_registered ->
             (* allow self-delegation to re-activate *)
             if (not self_delegation) && is_registered then
               fail (No_deletion pkh)
@@ -204,7 +205,7 @@ let spendable_balance ctxt delegate =
   Storage.Contract.Spendable_balance.get ctxt contract
 
 let staking_balance ctxt delegate =
-  Contract_delegate_storage.registered ctxt delegate >>=? fun is_registered ->
+  registered ctxt delegate >>= fun is_registered ->
   if is_registered then Stake_storage.get_staking_balance ctxt delegate
   else return Tez_repr.zero
 
