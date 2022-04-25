@@ -23,7 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type error += Invalid_consensus_key_update_noop of Cycle_repr.t
+type error +=
+  | Invalid_consensus_key_update_noop of Cycle_repr.t
+  | Invalid_consensus_key_update_active
 
 (** The public key of a consensus key and the associated delegate. *)
 type pk = Raw_context.consensus_pk = {

@@ -359,6 +359,12 @@ module Delegates :
     with type t := Raw_context.t
      and type elt = Signature.Public_key_hash.t
 
+(** Set of all active consensus keys in cycle `current + preserved_cycles + 1` *)
+module Consensus_keys :
+  Data_set_storage
+    with type t := Raw_context.t
+     and type elt = Signature.Public_key_hash.t
+
 type slashed_level = {for_double_endorsing : bool; for_double_baking : bool}
 
 (** Set used to avoid slashing multiple times the same event *)

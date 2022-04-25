@@ -23,7 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type error += Invalid_consensus_key_update_noop of Cycle_repr.t
+type error +=
+  | Invalid_consensus_key_update_noop of Cycle_repr.t
+  | Invalid_consensus_key_update_active
 
 let () =
   register_error_kind
@@ -39,7 +41,20 @@ let () =
         cycle)
     Data_encoding.(obj1 (req "cycle" Cycle_repr.encoding))
     (function Invalid_consensus_key_update_noop c -> Some c | _ -> None)
-    (fun c -> Invalid_consensus_key_update_noop c)
+    (fun c -> Invalid_consensus_key_update_noop c) ;
+  register_error_kind
+    `Permanent
+    ~id:"delegate.consensus_key.active"
+    ~title:"Active consensus key"
+    ~description:
+      "The delegate consensus key is already used by another delegate"
+    ~pp:(fun ppf () ->
+      Format.fprintf
+        ppf
+        "The delegate consensus key is already used by another delegate")
+    Data_encoding.empty
+    (function Invalid_consensus_key_update_active -> Some () | _ -> None)
+    (fun () -> Invalid_consensus_key_update_active)
 
 type pk = Raw_context.consensus_pk = {
   delegate : Signature.Public_key_hash.t;
@@ -70,7 +85,20 @@ let pp ppf {delegate; consensus_pkh} =
       consensus_pkh ;
   Format.fprintf ppf "@]"
 
+let check_inactive ctxt pkh =
+  let open Lwt_tzresult_syntax in
+  let*! is_active = Storage.Consensus_keys.mem ctxt pkh in
+  fail_when is_active Invalid_consensus_key_update_active
+
+let set_inactive = Storage.Consensus_keys.remove
+
+let set_active = Storage.Consensus_keys.add
+
 let init ctxt delegate pk =
+  let open Lwt_tzresult_syntax in
+  let pkh = Signature.Public_key.hash pk in
+  let* () = check_inactive ctxt pkh in
+  let*! ctxt = set_active ctxt pkh in
   Storage.Contract.Consensus_key.init ctxt (Contract_repr.Implicit delegate) pk
 
 let active_pubkey ctxt delegate =
@@ -141,6 +169,13 @@ let register_update ctxt delegate pk =
       Signature.Public_key.(pk = active_pubkey)
       (Invalid_consensus_key_update_noop first_active_cycle)
   in
+  let pkh = Signature.Public_key.hash pk in
+  let* () = check_inactive ctxt pkh in
+  let*! ctxt = set_active ctxt pkh in
+  let* {consensus_pkh = old_pkh; _} =
+    active_pubkey_for_cycle ctxt delegate update_cycle
+  in
+  let*! ctxt = set_inactive ctxt old_pkh in
   let*! ctxt =
     Storage.Contract.Pending_consensus_keys.add
       (ctxt, Contract_repr.Implicit delegate)

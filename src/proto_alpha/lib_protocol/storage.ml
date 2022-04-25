@@ -937,6 +937,14 @@ module Delegates =
        end))
        (Public_key_hash_index)
 
+module Consensus_keys =
+  Make_data_set_storage
+    (Make_subcontext (Registered) (Raw_context)
+       (struct
+         let name = ["consensus_keys"]
+       end))
+       (Public_key_hash_index)
+
 (** Per cycle storage *)
 
 type slashed_level = {for_double_endorsing : bool; for_double_baking : bool}
