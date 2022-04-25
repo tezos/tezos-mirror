@@ -22,7 +22,7 @@ rpc/alpha.proxy_server_data_dir.delegates.out
   "frozen_deposits": "200000000000", "staking_balance": "4000000000000",
   "delegated_contracts": [ "[PUBLIC_KEY_HASH]" ],
   "delegated_balance": "0", "deactivated": false, "grace_period": 5,
-  "voting_power": "4000000000000" }
+  "voting_power": "4000000000000", "remaining_proposals": 20 }
 
 ./tezos-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/full_balance'
 "4000000000000"

@@ -250,6 +250,13 @@ module Vote = struct
     TzEndian.set_int32 bytes 0 ema ;
     Environment.Context.add b.context ["votes"; "participation_ema"] bytes
     >|= fun context -> {b with context}
+
+  type delegate_info = Alpha_context.Vote.delegate_info = {
+    voting_power : Int64.t option;
+    current_ballot : Alpha_context.Vote.ballot option;
+    current_proposals : Protocol_hash.t list;
+    remaining_proposals : int;
+  }
 end
 
 module Contract = struct
@@ -321,7 +328,7 @@ module Delegate = struct
     delegated_balance : Tez.t;
     deactivated : bool;
     grace_period : Cycle.t;
-    voting_power : int64;
+    voting_info : Alpha_context.Vote.delegate_info;
   }
 
   let info ctxt pkh = Delegate_services.info rpc_ctxt ctxt pkh
@@ -341,6 +348,8 @@ module Delegate = struct
     Delegate_services.frozen_deposits_limit rpc_ctxt ctxt pkh
 
   let deactivated ctxt pkh = Delegate_services.deactivated rpc_ctxt ctxt pkh
+
+  let voting_info ctxt d = Alpha_services.Delegate.voting_info rpc_ctxt ctxt d
 
   let participation ctxt pkh = Delegate_services.participation rpc_ctxt ctxt pkh
 end

@@ -209,13 +209,13 @@ let get_delegates_and_power_from_listings b =
 
 (* compute the voting power of each delegate *)
 let get_power b delegates loc =
-  Context.Vote.get_listings (B b) >>=? fun l ->
   List.map_es
     (fun delegate ->
       let pkh = Context.Contract.pkh delegate in
-      match List.find_opt (fun (del, _) -> del = pkh) l with
+      Context.Delegate.voting_info (B b) pkh >>=? fun info ->
+      match info.voting_power with
       | None -> failwith "%s - Missing delegate" loc
-      | Some (_, power) -> return power)
+      | Some power -> return power)
     delegates
 
 (* Checks that the listings are populated *)
@@ -223,6 +223,24 @@ let assert_listings_not_empty b ~loc =
   Context.Vote.get_listings (B b) >>=? function
   | [] -> failwith "Unexpected empty listings (%s)" loc
   | _ -> return_unit
+
+let equal_delegate_info a b =
+  Option.equal Int64.equal a.Vote.voting_power b.Vote.voting_power
+  && Option.equal Vote.equal_ballot a.current_ballot b.current_ballot
+  && List.equal
+       Protocol_hash.equal
+       (List.sort Protocol_hash.compare a.current_proposals)
+       (List.sort Protocol_hash.compare b.current_proposals)
+  && Int.equal a.remaining_proposals b.remaining_proposals
+
+let assert_equal_info ~loc a b =
+  Assert.equal
+    ~loc
+    equal_delegate_info
+    "delegate_info"
+    Vote.pp_delegate_info
+    a
+    b
 
 let bake_until_first_block_of_next_period ?policy b =
   Context.Vote.get_current_period (B b) >>=? fun {remaining; _} ->
@@ -284,12 +302,38 @@ let test_successful_vote num_delegates () =
   let del2 =
     WithExceptions.Option.get ~loc:__LOC__ @@ List.nth delegates_p1 1
   in
+  let pkh1 = Context.Contract.pkh del1 in
+  let pkh2 = Context.Contract.pkh del2 in
+  let pow1 = WithExceptions.Option.get ~loc:__LOC__ @@ List.nth power_p1 0 in
+  let pow2 = WithExceptions.Option.get ~loc:__LOC__ @@ List.nth power_p1 1 in
   let props =
     List.map (fun i -> protos.(i)) (2 -- Constants.max_proposals_per_delegate)
   in
   Op.proposals (B b) del1 (Protocol_hash.zero :: props) >>=? fun ops1 ->
   Op.proposals (B b) del2 [Protocol_hash.zero] >>=? fun ops2 ->
   Block.bake ~operations:[ops1; ops2] b >>=? fun b ->
+  Context.Delegate.voting_info (B b) pkh1 >>=? fun info1 ->
+  Context.Delegate.voting_info (B b) pkh2 >>=? fun info2 ->
+  assert_equal_info
+    ~loc:__LOC__
+    info1
+    {
+      voting_power = Some pow1;
+      current_ballot = None;
+      current_proposals = Protocol_hash.zero :: props;
+      remaining_proposals = 0;
+    }
+  >>=? fun () ->
+  assert_equal_info
+    ~loc:__LOC__
+    info2
+    {
+      voting_power = Some pow2;
+      current_ballot = None;
+      current_proposals = [Protocol_hash.zero];
+      remaining_proposals = Constants.max_proposals_per_delegate - 1;
+    }
+  >>=? fun () ->
   (* proposals are now populated *)
   Context.Vote.get_proposals (B b) >>=? fun ps ->
   (* correctly count the double proposal for zero *)
@@ -344,6 +388,17 @@ let test_successful_vote num_delegates () =
   Block.bake ~operations b >>=? fun b ->
   Op.ballot (B b) del1 Protocol_hash.zero Vote.Nay >>=? fun op ->
   Block.bake ~operations:[op] b >>= fun res ->
+  Context.Delegate.voting_info (B b) pkh1 >>=? fun info1 ->
+  assert_equal_info
+    ~loc:__LOC__
+    info1
+    {
+      voting_power = Some pow1;
+      current_ballot = Some Yay;
+      current_proposals = [];
+      remaining_proposals = 0;
+    }
+  >>=? fun () ->
   Assert.proto_error_with_info ~loc:__LOC__ res "Duplicate ballot"
   >>=? fun () ->
   (* Allocate votes from weight of active delegates *)

@@ -2381,6 +2381,22 @@ module Vote : sig
 
   type ballot = Yay | Nay | Pass
 
+  val equal_ballot : ballot -> ballot -> bool
+
+  type delegate_info = {
+    voting_power : Int64.t option;
+    current_ballot : ballot option;
+    current_proposals : Protocol_hash.t list;
+    remaining_proposals : int;
+  }
+
+  val pp_delegate_info : Format.formatter -> delegate_info -> unit
+
+  val delegate_info_encoding : delegate_info Data_encoding.t
+
+  val get_delegate_info :
+    context -> Signature.Public_key_hash.t -> delegate_info tzresult Lwt.t
+
   val get_voting_power_free :
     context -> Signature.Public_key_hash.t -> int64 tzresult Lwt.t
 

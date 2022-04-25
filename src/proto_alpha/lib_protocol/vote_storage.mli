@@ -80,6 +80,20 @@ val in_listings : Raw_context.t -> Signature.Public_key_hash.t -> bool Lwt.t
 val get_listings :
   Raw_context.t -> (Signature.Public_key_hash.t * int64) list Lwt.t
 
+type delegate_info = {
+  voting_power : Int64.t option;
+  current_ballot : Vote_repr.ballot option;
+  current_proposals : Protocol_hash.t list;
+  remaining_proposals : int;
+}
+
+val pp_delegate_info : Format.formatter -> delegate_info -> unit
+
+val delegate_info_encoding : delegate_info Data_encoding.t
+
+val get_delegate_info :
+  Raw_context.t -> Signature.public_key_hash -> delegate_info tzresult Lwt.t
+
 val get_voting_power_free :
   Raw_context.t -> Signature.public_key_hash -> int64 tzresult Lwt.t
 

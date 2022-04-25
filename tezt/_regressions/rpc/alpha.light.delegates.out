@@ -24,7 +24,7 @@ protocol of light mode unspecified, using the node's protocol: ProtoGenesisGenes
   "frozen_deposits": "200000000000", "staking_balance": "4000000000000",
   "delegated_contracts": [ "[PUBLIC_KEY_HASH]" ],
   "delegated_balance": "0", "deactivated": false, "grace_period": 5,
-  "voting_power": "4000000000000" }
+  "voting_power": "4000000000000", "remaining_proposals": 20 }
 protocol of light mode unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
 
 ./tezos-client --mode light rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/full_balance'

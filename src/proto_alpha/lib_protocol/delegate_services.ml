@@ -59,7 +59,7 @@ type info = {
   delegated_balance : Tez.t;
   deactivated : bool;
   grace_period : Cycle.t;
-  voting_power : int64;
+  voting_info : Vote.delegate_info;
 }
 
 let info_encoding =
@@ -75,28 +75,28 @@ let info_encoding =
            delegated_balance;
            deactivated;
            grace_period;
-           voting_power;
+           voting_info;
          } ->
-      ( full_balance,
-        current_frozen_deposits,
-        frozen_deposits,
-        staking_balance,
-        frozen_deposits_limit,
-        delegated_contracts,
-        delegated_balance,
-        deactivated,
-        grace_period,
-        voting_power ))
-    (fun ( full_balance,
-           current_frozen_deposits,
-           frozen_deposits,
-           staking_balance,
-           frozen_deposits_limit,
-           delegated_contracts,
-           delegated_balance,
-           deactivated,
-           grace_period,
-           voting_power ) ->
+      ( ( full_balance,
+          current_frozen_deposits,
+          frozen_deposits,
+          staking_balance,
+          frozen_deposits_limit,
+          delegated_contracts,
+          delegated_balance,
+          deactivated,
+          grace_period ),
+        voting_info ))
+    (fun ( ( full_balance,
+             current_frozen_deposits,
+             frozen_deposits,
+             staking_balance,
+             frozen_deposits_limit,
+             delegated_contracts,
+             delegated_balance,
+             deactivated,
+             grace_period ),
+           voting_info ) ->
       {
         full_balance;
         current_frozen_deposits;
@@ -107,19 +107,20 @@ let info_encoding =
         delegated_balance;
         deactivated;
         grace_period;
-        voting_power;
+        voting_info;
       })
-    (obj10
-       (req "full_balance" Tez.encoding)
-       (req "current_frozen_deposits" Tez.encoding)
-       (req "frozen_deposits" Tez.encoding)
-       (req "staking_balance" Tez.encoding)
-       (opt "frozen_deposits_limit" Tez.encoding)
-       (req "delegated_contracts" (list Contract.encoding))
-       (req "delegated_balance" Tez.encoding)
-       (req "deactivated" bool)
-       (req "grace_period" Cycle.encoding)
-       (req "voting_power" int64))
+    (merge_objs
+       (obj9
+          (req "full_balance" Tez.encoding)
+          (req "current_frozen_deposits" Tez.encoding)
+          (req "frozen_deposits" Tez.encoding)
+          (req "staking_balance" Tez.encoding)
+          (opt "frozen_deposits_limit" Tez.encoding)
+          (req "delegated_contracts" (list Contract.encoding))
+          (req "delegated_balance" Tez.encoding)
+          (req "deactivated" bool)
+          (req "grace_period" Cycle.encoding))
+       Vote.delegate_info_encoding)
 
 let participation_info_encoding =
   let open Data_encoding in
@@ -297,6 +298,15 @@ module S = struct
       ~output:Data_encoding.int64
       RPC_path.(path / "voting_power")
 
+  let voting_info =
+    RPC_service.get_service
+      ~description:
+        "Returns the delegate info (e.g. voting power) found in the listings \
+         of the current voting period."
+      ~query:RPC_query.empty
+      ~output:Vote.delegate_info_encoding
+      RPC_path.(path / "voting_info")
+
   let participation =
     RPC_service.get_service
       ~description:
@@ -364,7 +374,7 @@ let register () =
       Delegate.delegated_balance ctxt pkh >>=? fun delegated_balance ->
       Delegate.deactivated ctxt pkh >>=? fun deactivated ->
       Delegate.last_cycle_before_deactivation ctxt pkh >>=? fun grace_period ->
-      Vote.get_voting_power_free ctxt pkh >|=? fun voting_power ->
+      Vote.get_delegate_info ctxt pkh >|=? fun voting_info ->
       {
         full_balance;
         current_frozen_deposits = frozen_deposits.current_amount;
@@ -375,7 +385,7 @@ let register () =
         delegated_balance;
         deactivated;
         grace_period;
-        voting_power;
+        voting_info;
       }) ;
   register1 ~chunked:false S.full_balance (fun ctxt pkh () () ->
       trace (Balance_rpc_non_delegate pkh) (Delegate.check_delegate ctxt pkh)
@@ -409,6 +419,9 @@ let register () =
   register1 ~chunked:false S.voting_power (fun ctxt pkh () () ->
       Delegate.check_delegate ctxt pkh >>=? fun () ->
       Vote.get_voting_power_free ctxt pkh) ;
+  register1 ~chunked:false S.voting_info (fun ctxt pkh () () ->
+      Delegate.check_delegate ctxt pkh >>=? fun () ->
+      Vote.get_delegate_info ctxt pkh) ;
   register1 ~chunked:false S.participation (fun ctxt pkh () () ->
       Delegate.check_delegate ctxt pkh >>=? fun () ->
       Delegate.delegate_participation_info ctxt pkh)
@@ -453,6 +466,9 @@ let grace_period ctxt block pkh =
 
 let voting_power ctxt block pkh =
   RPC_context.make_call1 S.voting_power ctxt block pkh () ()
+
+let voting_info ctxt block pkh =
+  RPC_context.make_call1 S.voting_info ctxt block pkh () ()
 
 let participation ctxt block pkh =
   RPC_context.make_call1 S.participation ctxt block pkh () ()

@@ -1749,7 +1749,7 @@ let commands_rw () =
          (switch
             ~doc:
               "Do not fail when the checks that try to prevent the user from \
-               shooting themselves in the foot do."
+               shooting themselves in the foot do fail."
             ~long:"force"
             ()))
       (prefixes ["submit"; "proposals"; "for"]
@@ -1783,14 +1783,26 @@ let commands_rw () =
               cctxt
             >>=? fun info ->
             (match info.current_period_kind with
-            | Proposal -> return_unit
-            | _ -> cctxt#error "Not in a proposal period")
-            >>=? fun () ->
+            | Proposal -> Lwt.return_unit
+            | _ ->
+                (if force then cctxt#warning else cctxt#error)
+                  "Not in a proposal period")
+            >>= fun () ->
             Shell_services.Protocol.list cctxt >>=? fun known_protos ->
             get_proposals ~chain:cctxt#chain ~block:cctxt#block cctxt
             >>=? fun known_proposals ->
-            Alpha_services.Voting.listings cctxt (cctxt#chain, cctxt#block)
-            >>=? fun listings ->
+            (Alpha_services.Delegate.voting_power
+               cctxt
+               (cctxt#chain, cctxt#block)
+               src_pkh
+             >>= function
+             | Ok voting_power -> return (voting_power <> 0L)
+             | Error
+                 (Environment.Ecoproto_error (Delegate_storage.Not_registered _)
+                 :: _) ->
+                 return false
+             | Error _ as err -> Lwt.return err)
+            >>=? fun has_voting_power ->
             (* for a proposal to be valid it must either a protocol that was already
                proposed by somebody else or a protocol known by the node, because
                the user is the first proposer and just injected it with
@@ -1838,13 +1850,7 @@ let commands_rw () =
                       Protocol_hash.pp
                       p)
                 proposals ;
-              if
-                not
-                  (List.exists
-                     (fun (pkh, _) ->
-                       Signature.Public_key_hash.equal pkh src_pkh)
-                     listings)
-              then
+              if not has_voting_power then
                 error
                   "Public-key-hash `%a` from account `%s` does not appear to \
                    have voting rights."
@@ -1908,7 +1914,15 @@ let commands_rw () =
     command
       ~group
       ~desc:"Submit a ballot"
-      (args2 verbose_signing_switch dry_run_switch)
+      (args3
+         verbose_signing_switch
+         dry_run_switch
+         (switch
+            ~doc:
+              "Do not fail when the checks that try to prevent the user from \
+               shooting themselves in the foot do fail."
+            ~long:"force"
+            ()))
       (prefixes ["submit"; "ballot"; "for"]
       @@ ContractAlias.destination_param
            ~name:"delegate"
@@ -1933,7 +1947,7 @@ let commands_rw () =
                 | "pass" -> return Vote.Pass
                 | s -> failwith "Invalid ballot: '%s'" s))
       @@ stop)
-      (fun (verbose_signing, dry_run)
+      (fun (verbose_signing, dry_run, force)
            (_name, source)
            proposal
            ballot
@@ -1942,7 +1956,7 @@ let commands_rw () =
         | None -> failwith "only implicit accounts can submit ballot"
         | Some src_pkh ->
             Client_keys.get_key cctxt src_pkh
-            >>=? fun (_src_name, _src_pk, src_sk) ->
+            >>=? fun (src_name, _src_pk, src_sk) ->
             get_period_info
             (* Find period info of the successor, because the operation will
                be injected on the next block at the earliest *)
@@ -1951,10 +1965,46 @@ let commands_rw () =
               ~block:cctxt#block
               cctxt
             >>=? fun info ->
-            (match info.current_period_kind with
-            | Exploration | Promotion -> return_unit
-            | _ -> cctxt#error "Not in Exploration or Promotion period")
+            Alpha_services.Voting.current_proposal
+              cctxt
+              (cctxt#chain, cctxt#block)
+            >>=? fun current_proposal ->
+            (match (info.current_period_kind, current_proposal) with
+            | ((Exploration | Promotion), Some current_proposal) ->
+                if Protocol_hash.equal proposal current_proposal then
+                  return_unit
+                else
+                  (if force then cctxt#warning else cctxt#error)
+                    "Unexpected proposal, expected: %a"
+                    Protocol_hash.pp
+                    current_proposal
+                  >>= fun () -> return_unit
+            | _ ->
+                (if force then cctxt#warning else cctxt#error)
+                  "Not in Exploration or Promotion period"
+                >>= fun () -> return_unit)
             >>=? fun () ->
+            (Alpha_services.Delegate.voting_power
+               cctxt
+               (cctxt#chain, cctxt#block)
+               src_pkh
+             >>= function
+             | Ok voting_power -> return (voting_power <> 0L)
+             | Error
+                 (Environment.Ecoproto_error (Delegate_storage.Not_registered _)
+                 :: _) ->
+                 return false
+             | Error _ as err -> Lwt.return err)
+            >>=? fun has_voting_power ->
+            (if has_voting_power then Lwt.return_unit
+            else
+              (if force then cctxt#warning else cctxt#error)
+                "Public-key-hash `%a` from account `%s` does not appear to \
+                 have voting rights."
+                Signature.Public_key_hash.pp
+                src_pkh
+                src_name)
+            >>= fun () ->
             submit_ballot
               cctxt
               ~chain:cctxt#chain

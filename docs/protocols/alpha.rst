@@ -23,6 +23,12 @@ Breaking Changes
 RPC Changes
 -----------
 
+- Add a new RPC for querying data found on the voting listings for a
+  delegate, i.e. voting power, casted ballots and proposals in the
+  current voting period.  (MR :gl:`!4577`)
+
+  ``/chains/<chain_id>/blocks/<block>/context/delegates/<delegate_pkh>/voting_info``
+
 Bug Fixes
 ---------
 
