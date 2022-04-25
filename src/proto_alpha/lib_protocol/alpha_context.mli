@@ -2556,7 +2556,7 @@ module Delegate : sig
     expected_endorsing_rewards : Tez.t;
   }
 
-  val delegate_participation_info :
+  val participation_info :
     context -> public_key_hash -> participation_info tzresult Lwt.t
 
   val cycle_end :

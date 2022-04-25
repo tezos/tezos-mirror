@@ -133,7 +133,7 @@ type participation_info = {
 }
 
 (* Inefficient, only for RPC *)
-let delegate_participation_info ctxt delegate =
+let participation_info ctxt delegate =
   let level = Level_storage.current ctxt in
   Stake_storage.get_selected_distribution ctxt level.cycle
   >>=? fun stake_distribution ->

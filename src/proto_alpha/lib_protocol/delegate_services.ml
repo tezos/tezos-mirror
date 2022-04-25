@@ -425,7 +425,7 @@ let register () =
       Vote.get_delegate_info ctxt pkh) ;
   register1 ~chunked:false S.participation (fun ctxt pkh () () ->
       Delegate.check_delegate ctxt pkh >>=? fun () ->
-      Delegate.delegate_participation_info ctxt pkh)
+      Delegate.participation_info ctxt pkh)
 
 let list ctxt block ?(active = true) ?(inactive = false)
     ?(with_minimal_stake = true) ?(without_minimal_stake = false) () =

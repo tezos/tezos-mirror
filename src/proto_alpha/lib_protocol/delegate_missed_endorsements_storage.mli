@@ -80,7 +80,7 @@ type participation_info = {
    [delegate_participation_info] and [!val:check_delegate] forms the
    implementation of RPC call "/context/delegates/<pkh>/participation".
  *)
-val delegate_participation_info :
+val participation_info :
   Raw_context.t ->
   Signature.Public_key_hash.t ->
   participation_info tzresult Lwt.t
