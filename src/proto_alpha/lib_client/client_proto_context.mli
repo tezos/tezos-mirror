@@ -162,6 +162,21 @@ val set_delegate :
   public_key_hash option ->
   Kind.delegation Kind.manager Injection.result tzresult Lwt.t
 
+val update_consensus_key :
+  #Protocol_client_context.full ->
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
+  ?confirmations:int ->
+  ?dry_run:bool ->
+  ?verbose_signing:bool ->
+  ?simulation:bool ->
+  ?fee:Tez.tez ->
+  consensus_pk:Signature.public_key ->
+  manager_sk:Client_keys.sk_uri ->
+  fee_parameter:Injection.fee_parameter ->
+  Signature.public_key ->
+  Kind.update_consensus_key Kind.manager Injection.result tzresult Lwt.t
+
 (** Calls {!Injection.inject_manager_operation}
     with {!Annotated_manager_operation.Single_manager} {!Alpha_context.Set_deposits_limit} [limit_opt]
     as operation. *)
@@ -215,8 +230,14 @@ val register_as_delegate :
   ?fee:Tez.tez ->
   manager_sk:Client_keys.sk_uri ->
   fee_parameter:Injection.fee_parameter ->
+  ?consensus_pk:public_key ->
   public_key ->
-  Kind.delegation Kind.manager Injection.result tzresult Lwt.t
+  (Kind.delegation Kind.manager Injection.result
+  * (Kind.update_consensus_key Kind.manager contents
+    * Kind.update_consensus_key Kind.manager Apply_results.contents_result)
+    option)
+  tzresult
+  Lwt.t
 
 (** Calls {!RawContractAlias.add}. *)
 val save_contract :

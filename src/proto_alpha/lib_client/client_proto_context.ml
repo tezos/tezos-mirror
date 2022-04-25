@@ -304,22 +304,101 @@ let set_delegate cctxt ~chain ~block ?confirmations ?dry_run ?verbose_signing
     ~fee_parameter
     opt_delegate
 
+let build_update_consensus_key ?fee ?gas_limit ?storage_limit consensus_pk =
+  let operation = Update_consensus_key consensus_pk in
+  Injection.prepare_manager_operation
+    ~fee:(Limit.of_option fee)
+    ~gas_limit:(Limit.of_option gas_limit)
+    ~storage_limit:(Limit.of_option storage_limit)
+    operation
+
 let register_as_delegate cctxt ~chain ~block ?confirmations ?dry_run
-    ?verbose_signing ?fee ~manager_sk ~fee_parameter src_pk =
+    ?verbose_signing ?fee ~manager_sk ~fee_parameter ?consensus_pk src_pk =
   let source = Signature.Public_key.hash src_pk in
-  delegate_contract
+  let delegate_op = build_delegate_operation ?fee (Some source) in
+  match consensus_pk with
+  | None -> (
+      let operation = Annotated_manager_operation.Single_manager delegate_op in
+      Injection.inject_manager_operation
+        cctxt
+        ~chain
+        ~block
+        ?confirmations
+        ?dry_run
+        ?verbose_signing
+        ~source
+        ~fee:(Limit.of_option fee)
+        ~gas_limit:Limit.unknown
+        ~storage_limit:Limit.unknown
+        ~src_pk
+        ~src_sk:manager_sk
+        ~fee_parameter
+        operation
+      >>=? fun (oph, _, op, result) ->
+      match Apply_results.pack_contents_list op result with
+      | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
+          return ((oph, op, result), None))
+  | Some consensus_pk -> (
+      let operation =
+        Annotated_manager_operation.Cons_manager
+          ( delegate_op,
+            Annotated_manager_operation.Single_manager
+              (build_update_consensus_key ?fee consensus_pk) )
+      in
+      Injection.inject_manager_operation
+        cctxt
+        ~chain
+        ~block
+        ?confirmations
+        ?dry_run
+        ?verbose_signing
+        ~successor_level:true
+        ~source
+        ~fee:(Limit.of_option fee)
+        ~gas_limit:Limit.unknown
+        ~storage_limit:Limit.unknown
+        ~src_pk
+        ~src_sk:manager_sk
+        ~fee_parameter
+        operation
+      >>=? fun (oph, _, op, result) ->
+      match Apply_results.pack_contents_list op result with
+      | Apply_results.Single_and_result
+          (Manager_operation _, Manager_operation_result _) ->
+          .
+      | Apply_results.Cons_and_result
+          ( (Manager_operation _ as op1),
+            res1,
+            Single_and_result ((Manager_operation _ as op2), res2) ) ->
+          return ((oph, op1, res1), Some (op2, res2)))
+
+let update_consensus_key cctxt ~chain ~block ?confirmations ?dry_run
+    ?verbose_signing ?simulation ?fee ~consensus_pk ~manager_sk ~fee_parameter
+    src_pk =
+  let source = Signature.Public_key.hash src_pk in
+  let operation = build_update_consensus_key ?fee consensus_pk in
+  let operation = Annotated_manager_operation.Single_manager operation in
+  Injection.inject_manager_operation
     cctxt
     ~chain
     ~block
     ?confirmations
     ?dry_run
     ?verbose_signing
+    ?simulation
+    ~successor_level:true
     ~source
+    ~fee:(Limit.of_option fee)
+    ~gas_limit:Limit.unknown
+    ~storage_limit:Limit.unknown
     ~src_pk
     ~src_sk:manager_sk
-    ?fee
     ~fee_parameter
-    (Some source)
+    operation
+  >>=? fun (oph, _, op, result) ->
+  match Apply_results.pack_contents_list op result with
+  | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
+      return (oph, op, result)
 
 let set_deposits_limit cctxt ~chain ~block ?confirmations ?dry_run
     ?verbose_signing ?simulation ?fee contract ~src_pk ~manager_sk

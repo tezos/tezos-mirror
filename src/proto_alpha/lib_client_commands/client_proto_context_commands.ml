@@ -1631,6 +1631,87 @@ let commands_rw () =
             return_unit
         | Error el -> Lwt.return_error el);
     command
+      ~group
+      ~desc:"Register the public key hash as a delegate."
+      (args4 fee_arg dry_run_switch verbose_signing_switch fee_parameter_args)
+      (prefixes ["register"; "key"]
+      @@ Public_key_hash.source_param ~name:"mgr" ~desc:"the delegate key"
+      @@ prefixes ["as"; "delegate"; "with"; "consensus"; "key"]
+      @@ Public_key.source_param ~name:"key" ~desc:"the consensus key"
+      @@ stop)
+      (fun (fee, dry_run, verbose_signing, fee_parameter)
+           src_pkh
+           (name_pk, consensus_pk)
+           cctxt ->
+        let open Lwt_result_syntax in
+        let* _, src_pk, src_sk = Client_keys.get_key cctxt src_pkh in
+        let* consensus_pk =
+          match consensus_pk with
+          | Some pk -> return pk
+          | None -> Client_keys.public_key name_pk
+        in
+        let*! r =
+          register_as_delegate
+            cctxt
+            ~chain:cctxt#chain
+            ~block:cctxt#block
+            ?confirmations:cctxt#confirmations
+            ~dry_run
+            ~fee_parameter
+            ~verbose_signing
+            ?fee
+            ~manager_sk:src_sk
+            ~consensus_pk
+            src_pk
+        in
+        match r with
+        | Ok _ -> return_unit
+        | Error
+            [
+              Environment.Ecoproto_error
+                Delegate_storage.Contract.Active_delegate;
+            ] ->
+            let*! () = cctxt#message "Delegate already activated." in
+            return_unit
+        | Error el -> Lwt.return_error el);
+    command
+      ~group
+      ~desc:"Update the consensus key of a delegate."
+      (args4 fee_arg dry_run_switch verbose_signing_switch fee_parameter_args)
+      (prefixes ["set"; "consensus"; "key"; "for"]
+      @@ Public_key_hash.source_param ~name:"mgr" ~desc:"the delegate key"
+      @@ prefixes ["to"]
+      @@ Public_key.source_param ~name:"key" ~desc:"the consensus key"
+      @@ stop)
+      (fun (fee, dry_run, verbose_signing, fee_parameter)
+           delegate_pkh
+           (name_pk, consensus_pk)
+           cctxt ->
+        let open Lwt_result_syntax in
+        let* _, delegate_pk, delegate_sk =
+          Client_keys.get_key cctxt delegate_pkh
+        in
+        let* consensus_pk =
+          match consensus_pk with
+          | Some pk -> return pk
+          | None -> Client_keys.public_key name_pk
+        in
+        let*! r =
+          update_consensus_key
+            cctxt
+            ~chain:cctxt#chain
+            ~block:cctxt#block
+            ?confirmations:cctxt#confirmations
+            ~dry_run
+            ~fee_parameter
+            ~verbose_signing
+            ?fee
+            ~consensus_pk
+            ~manager_sk:delegate_sk
+            delegate_pk
+        in
+        match r with Ok _ -> return_unit | Error el -> Lwt.return_error el);
+    command
       ~desc:"Wait until an operation is included in a block"
       (args3
          (default_arg
