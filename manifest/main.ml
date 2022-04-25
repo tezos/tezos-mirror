@@ -2535,6 +2535,47 @@ let _tezos_scoru_wasm =
       "Protocol environment dependency providing WASM functionality for SCORU"
     ~deps:[external_lib "tezos-webassembly-interpreter" V.True]
 
+let _tezos_protocol_compiler_bin =
+  public_exe
+    "tezos-protocol-compiler"
+    ~path:"src/lib_protocol_compiler/bin"
+    ~opam:"tezos-protocol-compiler"
+    ~internal_name:"main_native"
+    ~modes:[Native]
+    ~deps:[tezos_protocol_compiler_native]
+    ~linkall:true
+    ~modules:["Main_native"]
+
+let _tezos_protocol_compiler_tezos_protocol_packer =
+  public_exe
+    "tezos-protocol-compiler.tezos-protocol-packer"
+    ~path:"src/lib_protocol_compiler/bin"
+    ~opam:"tezos-protocol-compiler"
+    ~internal_name:"main_packer"
+    ~deps:
+      [
+        tezos_base |> open_ ~m:"TzPervasives";
+        tezos_stdlib_unix |> open_;
+        tezos_protocol_compiler_lib |> open_;
+      ]
+    ~modules:["Main_packer"]
+
+let _tezos_embedded_protocol_packer =
+  public_exe
+    "tezos-embedded-protocol-packer"
+    ~path:"src/lib_protocol_compiler/bin"
+    ~opam:"tezos-protocol-compiler"
+    ~internal_name:"main_embedded_packer"
+    ~modes:[Native]
+    ~deps:
+      [
+        tezos_base |> open_ ~m:"TzPervasives";
+        tezos_base_unix |> open_;
+        tezos_stdlib_unix |> open_;
+      ]
+    ~linkall:true
+    ~modules:["Main_embedded_packer"]
+
 (* PROTOCOL PACKAGES *)
 
 module Protocol : sig
@@ -3824,47 +3865,6 @@ let _git_gas_diff =
     ~static:false
     ~release:false
     ~bisect_ppx:false
-
-let _tezos_protocol_compiler_bin =
-  public_exe
-    "tezos-protocol-compiler"
-    ~path:"src/lib_protocol_compiler/bin"
-    ~opam:"tezos-protocol-compiler"
-    ~internal_name:"main_native"
-    ~modes:[Native]
-    ~deps:[tezos_protocol_compiler_native]
-    ~linkall:true
-    ~modules:["Main_native"]
-
-let _tezos_protocol_compiler_tezos_protocol_packer =
-  public_exe
-    "tezos-protocol-compiler.tezos-protocol-packer"
-    ~path:"src/lib_protocol_compiler/bin"
-    ~opam:"tezos-protocol-compiler"
-    ~internal_name:"main_packer"
-    ~deps:
-      [
-        tezos_base |> open_ ~m:"TzPervasives";
-        tezos_stdlib_unix |> open_;
-        tezos_protocol_compiler_lib |> open_;
-      ]
-    ~modules:["Main_packer"]
-
-let _tezos_embedded_protocol_packer =
-  public_exe
-    "tezos-embedded-protocol-packer"
-    ~path:"src/lib_protocol_compiler/bin"
-    ~opam:"tezos-protocol-compiler"
-    ~internal_name:"main_embedded_packer"
-    ~modes:[Native]
-    ~deps:
-      [
-        tezos_base |> open_ ~m:"TzPervasives";
-        tezos_base_unix |> open_;
-        tezos_stdlib_unix |> open_;
-      ]
-    ~linkall:true
-    ~modules:["Main_embedded_packer"]
 
 let _s_packer =
   private_exe
