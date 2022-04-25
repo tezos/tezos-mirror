@@ -150,4 +150,9 @@ module Client : sig
 
   val get_merkle_proof :
     tx_node:t -> block:string -> message_pos:string -> JSON.t Lwt.t
+
+  val get_ticket : tx_node:t -> block:string -> ticket_id:string -> JSON.t Lwt.t
+
+  val get_ticket_index :
+    tx_node:t -> block:string -> ticket_id:string -> int Lwt.t
 end

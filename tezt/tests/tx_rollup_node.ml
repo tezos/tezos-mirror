@@ -33,6 +33,11 @@
 module Rollup = Rollup.Tx_rollup
 module Rollup_node = Rollup_node.Tx_node
 
+let check_json =
+  Check.equalable
+    (fun ppf j -> Format.pp_print_string ppf (JSON.encode j))
+    (fun a b -> JSON.unannotate a = JSON.unannotate b)
+
 let get_block_hash block_json = JSON.(block_json |-> "hash" |> as_string)
 
 let get_rollup_parameter_file ~protocol =
@@ -908,7 +913,7 @@ let get_ticket_hash_from_op op =
 
 (** Originate a contract and make a deposit for [dest] and optionally
     for a list of destination in [dests]. *)
-let make_deposit ~source ~tx_rollup_hash ~tx_node ~node ~client ?(dests = [])
+let make_deposit ~source ~tx_rollup_hash ~tx_node ~client ?(dests = [])
     ~tickets_amount dest =
   let* contract_id =
     Client.originate_contract
@@ -929,33 +934,36 @@ let make_deposit ~source ~tx_rollup_hash ~tx_node ~node ~client ?(dests = [])
     contract_id ;
   let dests = dest :: dests in
   let tickets_content = "toru" in
-  Lwt_list.fold_left_s
-    (fun (tx_node, node, client, level) dest ->
-      let arg =
-        make_tx_rollup_deposit_argument
-          tickets_content
-          tickets_amount
-          dest
-          tx_rollup_hash
-      in
-      let* () =
-        Client.transfer
-          ~gas_limit:100_000
-          ~fee:Tez.one
-          ~amount:Tez.zero
-          ~burn_cap:Tez.one
-          ~storage_limit:10_000
-          ~giver:source
-          ~receiver:contract_id
-          ~arg
-          client
-      in
-      let* () = Client.bake_for client in
-      let level = succ level in
-      let* _ = Rollup_node.wait_for_tezos_level tx_node level in
-      return (tx_node, node, client, level))
-    (tx_node, node, client, level)
-    dests
+  let* level =
+    Lwt_list.fold_left_s
+      (fun level dest ->
+        let arg =
+          make_tx_rollup_deposit_argument
+            tickets_content
+            tickets_amount
+            dest
+            tx_rollup_hash
+        in
+        let* () =
+          Client.transfer
+            ~gas_limit:100_000
+            ~fee:Tez.one
+            ~amount:Tez.zero
+            ~burn_cap:Tez.one
+            ~storage_limit:10_000
+            ~giver:source
+            ~receiver:contract_id
+            ~arg
+            client
+        in
+        let* () = Client.bake_for client in
+        let level = succ level in
+        let* _ = Rollup_node.wait_for_tezos_level tx_node level in
+        return level)
+      level
+      dests
+  in
+  return (level, contract_id)
 
 (* Checks that the rollup node can receive L2 transactions in its queue, batch
    them and inject them in the Tezos node. *)
@@ -989,12 +997,11 @@ let test_batcher =
       let* bls_key_2 = generate_bls_addr ~alias:"alice" client in
       let bls_pkh_2 = bls_key_2.aggregate_public_key_hash in
       let bls_pk_2 = bls_key_2.aggregate_public_key in
-      let* (tx_node, _node, client, _level) =
+      let* (_level, _contract_id) =
         make_deposit
           ~source:Constant.bootstrap2.public_key_hash
           ~tx_rollup_hash
           ~tx_node
-          ~node
           ~client
           ~tickets_amount:100_000
           bls_pkh_1
@@ -1261,12 +1268,11 @@ let test_reorganization =
       let bls_sk_1 = bls_key_1.aggregate_secret_key in
       let* bls_key_2 = generate_bls_addr ~alias:"bob" client1 in
       let bls_pkh_2 = bls_key_2.aggregate_public_key_hash in
-      let* (tx_node, node1, client1, _level) =
+      let* (_level, _contract_id) =
         make_deposit
           ~source:Constant.bootstrap2.public_key_hash
           ~tx_rollup_hash
           ~tx_node
-          ~node:node1
           ~client:client1
           ~tickets_amount:10
           bls_pkh_1
@@ -1391,12 +1397,11 @@ let test_l2_proof_rpc_position =
       let bls_pkh_2 = bls_key_1.aggregate_public_key_hash in
       let bls_pk_2 = bls_key_2.aggregate_public_key in
       let bls_sk_2 = bls_key_2.aggregate_secret_key in
-      let* (tx_node, node, client, _level) =
+      let* (_level, _contract_id) =
         make_deposit
           ~source:Constant.bootstrap2.public_key_hash
           ~tx_rollup_hash
           ~tx_node
-          ~node
           ~client
           ~tickets_amount:100_000
           bls_pkh_1
@@ -1621,12 +1626,11 @@ let test_reject_bad_commitment =
       (* Generating some identities *)
       let* bls_key1 = generate_bls_addr ~alias:"alice" client in
       let pkh1_str = bls_key1.aggregate_public_key_hash in
-      let* (tx_node, _node, client, _level) =
+      let* (_level, _contract_id) =
         make_deposit
           ~source:Constant.bootstrap2.public_key_hash
           ~tx_rollup_hash
           ~tx_node
-          ~node
           ~client
           ~tickets_amount:10
           pkh1_str
@@ -1710,12 +1714,11 @@ let test_committer =
       let bls_pkh_1 = bls_key_1.aggregate_public_key_hash in
       let* bls_key_2 = generate_bls_addr ~alias:"bob" client in
       let bls_pkh_2 = bls_key_2.aggregate_public_key_hash in
-      let* (tx_node, _node, client, tzlevel) =
+      let* (tzlevel, _) =
         make_deposit
           ~source:Constant.bootstrap2.public_key_hash
           ~tx_rollup_hash
           ~tx_node
-          ~node
           ~client
           ~tickets_amount:100_000
           bls_pkh_1
@@ -1821,6 +1824,149 @@ let test_committer =
       in
       unit)
 
+let test_tickets_context =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"TX_rollup: tickets hashes to tickets context"
+    ~tags:["tx_rollup"; "tickets"; "context"]
+    (fun protocol ->
+      let* parameter_file = get_rollup_parameter_file ~protocol in
+      let* (node, client) =
+        Client.init_with_protocol ~parameter_file `Client ~protocol ()
+      in
+      let originator = Constant.bootstrap1.public_key_hash in
+      let* (tx_rollup_hash, tx_node) =
+        init_and_run_rollup_node
+          ~originator
+          ~batch_signer:Constant.bootstrap5.public_key_hash
+          node
+          client
+      in
+      let tx_client = Tx_rollup_client.create tx_node in
+      (* Generating some identities *)
+      let* bls_key_1 = generate_bls_addr ~alias:"alice" client in
+      let bls_pkh_1 = bls_key_1.aggregate_public_key_hash in
+      let bls_pk_1 = bls_key_1.aggregate_public_key in
+      let* bls_key_2 = generate_bls_addr ~alias:"bob" client in
+      let bls_pkh_2 = bls_key_2.aggregate_public_key_hash in
+      let bls_pk_2 = bls_key_2.aggregate_public_key in
+      let* (_level, contract_id) =
+        make_deposit
+          ~source:Constant.bootstrap2.public_key_hash
+          ~tx_rollup_hash
+          ~tx_node
+          ~client
+          ~tickets_amount:100_000
+          bls_pkh_1
+      in
+      let* inbox = tx_client_get_inbox_as_json ~tx_client ~block:"head" in
+      let ticket_id = get_ticket_hash_from_deposit_json inbox in
+      Log.info "Ticket %s was successfully emitted" ticket_id ;
+      Log.info "Checking ticket availability in head context" ;
+      let* ticket =
+        Rollup_node.Client.get_ticket ~tx_node ~block:"head" ~ticket_id
+      in
+      let expected_ticket =
+        JSON.annotate ~origin:"expected"
+        @@ `O
+             [
+               ("ticketer", `String contract_id);
+               ("ty", `O [("prim", `String "string")]);
+               ("contents", `O [("string", `String "toru")]);
+             ]
+      in
+      Check.(ticket = expected_ticket)
+        check_json
+        ~error_msg:"Ticket is %L but expected %R" ;
+      Log.info "Checking ticket can be retrieved by index" ;
+      let* ticket_index =
+        Rollup_node.Client.get_ticket_index ~tx_node ~block:"head" ~ticket_id
+      in
+      let* ticket =
+        Rollup_node.Client.get_ticket
+          ~tx_node
+          ~block:"head"
+          ~ticket_id:(string_of_int ticket_index)
+      in
+      Check.(ticket = expected_ticket)
+        check_json
+        ~error_msg:"Ticket is %L but expected %R" ;
+      Log.info "Submitting transactions to queue" ;
+      let* tx =
+        craft_tx
+          tx_client
+          ~signer:bls_pk_1
+          ~dest:bls_pkh_2
+          ~ticket:ticket_id
+          ~qty:10L
+      in
+      (* FIXME/TORU: Use a cleaner interface *)
+      let bls_sk_1 =
+        let (Unencrypted sk) = bls_key_1.aggregate_secret_key in
+        let sk = Tezos_crypto.Bls.Secret_key.of_b58check_exn sk in
+        Data_encoding.Binary.to_bytes_exn
+          Tezos_crypto.Bls.Secret_key.encoding
+          sk
+        |> Bls12_381.Signature.sk_of_bytes_exn
+      in
+      let signature = sign_one_transaction bls_sk_1 tx in
+      let* _txh1 = tx_client_inject_transaction ~tx_client tx signature in
+      let* tx =
+        craft_tx
+          tx_client
+          ~counter:1L
+          ~signer:bls_pk_2
+          ~dest:bls_pkh_1
+          ~ticket:ticket_id
+          ~qty:5L
+      in
+      let bls_sk_2 =
+        let (Unencrypted sk) = bls_key_2.aggregate_secret_key in
+        let sk = Tezos_crypto.Bls.Secret_key.of_b58check_exn sk in
+        Data_encoding.Binary.to_bytes_exn
+          Tezos_crypto.Bls.Secret_key.encoding
+          sk
+        |> Bls12_381.Signature.sk_of_bytes_exn
+      in
+      let signature = sign_one_transaction bls_sk_2 tx in
+      let* _txh2 = tx_client_inject_transaction ~tx_client tx signature in
+      Log.info "Waiting for new L2 block" ;
+      let* () = Client.bake_for client in
+      let* () = Client.bake_for client in
+      let* _ = Rollup_node.wait_for_tezos_level tx_node 6 in
+      let* inbox = Rollup_node.Client.get_inbox ~tx_node ~block:"head" in
+      check_inbox_success inbox ;
+      let* () =
+        check_tz4_balance
+          ~tx_client
+          ~block:"head"
+          ~ticket_id
+          ~tz4_address:bls_pkh_1
+          ~expected_balance:(100_000 - 5)
+      and* () =
+        check_tz4_balance
+          ~tx_client
+          ~block:"head"
+          ~ticket_id
+          ~tz4_address:bls_pkh_2
+          ~expected_balance:5
+      in
+      Log.info "Ticket still available in later contexts" ;
+      let* ticket =
+        Rollup_node.Client.get_ticket ~tx_node ~block:"head" ~ticket_id
+      in
+      Check.(ticket = expected_ticket)
+        check_json
+        ~error_msg:"Ticket is %L but expected %R" ;
+      Log.info "Ticket is not available in genesis context" ;
+      let* ticket_g =
+        Rollup_node.Client.get_ticket ~tx_node ~block:"genesis" ~ticket_id
+      in
+      Check.(ticket_g = JSON.annotate ~origin:"expected" `Null)
+        check_json
+        ~error_msg:"Ticket is %L but expected %R" ;
+      unit)
+
 let register ~protocols =
   test_node_configuration protocols ;
   test_tx_node_origination protocols ;
@@ -1831,4 +1977,5 @@ let register ~protocols =
   test_reorganization protocols ;
   test_l2_proof_rpc_position protocols ;
   test_reject_bad_commitment protocols ;
-  test_committer protocols
+  test_committer protocols ;
+  test_tickets_context protocols

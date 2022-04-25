@@ -345,4 +345,20 @@ module Client = struct
     raw_tx_node_rpc
       tx_node
       ~url:("block/" ^ block ^ "/proof/message/" ^ message_pos)
+
+  let get_ticket ~tx_node ~block ~ticket_id =
+    raw_tx_node_rpc tx_node ~url:("context/" ^ block ^ "/tickets/" ^ ticket_id)
+
+  let get_ticket_index ~tx_node ~block ~ticket_id =
+    let parse_json json =
+      match JSON.(json |> as_int_opt) with
+      | Some level -> level
+      | None -> Test.fail "Cannot retrieve ticket of %s" ticket_id
+    in
+    let* json =
+      raw_tx_node_rpc
+        tx_node
+        ~url:("context/" ^ block ^ "/tickets/" ^ ticket_id ^ "/index")
+    in
+    return (parse_json json)
 end
