@@ -144,12 +144,12 @@ class OriginationResult:
         pattern = r"Operation hash is '?(\w*)"
         match = re.search(pattern, client_output)
         if match is None:
-            raise InvalidClientOutput
+            raise InvalidClientOutput(client_output)
         self.operation_hash = match.groups()[0]
         pattern = r"Storage size: (.*) bytes"
         match = re.search(pattern, client_output)
         if match is None:
-            raise InvalidClientOutput
+            raise InvalidClientOutput(client_output)
         self.storage_size = match.groups()[0]
 
 

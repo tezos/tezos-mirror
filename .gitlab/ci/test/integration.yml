@@ -131,6 +131,5 @@ integration:pytest:
 integration:pytest_examples:
   extends: .integration_python_template
   script:
-    - PYTHONPATH=$PYTHONPATH:./ poetry run python examples/forge_transfer.py
     - PYTHONPATH=$PYTHONPATH:./ poetry run python examples/example.py
     - PYTHONPATH=./ poetry run pytest --exitfirst examples/test_example.py
