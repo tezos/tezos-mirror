@@ -2302,9 +2302,9 @@ let commands_rw () =
     command
       ~group
       ~desc:
-        "Commit to an optimistic transaction rollup for an inbox and level.\n\n\
+        "Commit to a transaction rollup for an inbox and level.\n\n\
          The provided list of message result hash must be ordered in the same \
-         way the messages was ordered in the inbox."
+         way the messages were ordered in the inbox."
       (args13
          fee_arg
          dry_run_switch
@@ -2325,7 +2325,7 @@ let commands_rw () =
             ()))
       (prefixes ["commit"; "to"; "tx"; "rollup"]
       @@ Tx_rollup.tx_rollup_address_param
-           ~usage:"Transaction rollup addressb committed to."
+           ~usage:"Transaction rollup address committed to."
       @@ prefix "from"
       @@ ContractAlias.destination_param
            ~name:"src"
@@ -2339,7 +2339,7 @@ let commands_rw () =
            (Tx_rollup.message_result_hash_param
               ~usage:
                 "Message result hash of a message from the inbox being \
-                 comitted."))
+                 committed."))
       (fun ( fee,
              dry_run,
              verbose_signing,
