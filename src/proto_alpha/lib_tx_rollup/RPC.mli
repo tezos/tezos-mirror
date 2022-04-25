@@ -88,3 +88,10 @@ val inject_transaction :
   ?eager_batch:bool ->
   L2_transaction.t ->
   L2_transaction.hash Error_monad.tzresult Lwt.t
+
+(** Get the merkle proof associated to a message position in the block's inbox. *)
+val get_message_proof :
+  #RPC_context.simple ->
+  block_id ->
+  message_position:int ->
+  Tx_rollup_l2_proof.t option Error_monad.tzresult Lwt.t
