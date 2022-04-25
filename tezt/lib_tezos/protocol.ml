@@ -51,6 +51,8 @@ let hash = function
 
 let genesis_hash = "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im"
 
+let demo_counter_hash = "ProtoDemoCounterDemoCounterDemoCounterDemoCou4LSpdT"
+
 let default_constants = Constants_sandbox
 
 let parameter_file ?(constants = default_constants) protocol =

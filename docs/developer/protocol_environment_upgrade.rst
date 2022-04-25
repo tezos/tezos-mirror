@@ -58,7 +58,13 @@ The following steps are roughly the steps taken in the `V5 bootstrap MR <https:/
 
    * ``src/lib_validation/block_validation.ml``
 
-6. Commit all those changes and open an MR with your changes.
+7. Adapt demo protocols to the new environment:
+
+   * Modify the required environment in ``src/proto_demo_noops/lib_protocol/TEZOS_PROTOCOL`` and ``src/proto_demo_counter/lib_protocol/TEZOS_PROTOCOL``
+
+   * Verify they both compile with ``dune build @src/proto_demo_noops/runtest_compile_protocol`` and ``dune build @src/proto_demo_counter/runtest_compile_protocol``
+
+8. Commit all those changes and open an MR with your changes.
 
 It is recommended that you test your work more comprehensively offline. To that end, follow the instructions below on how to activate the environment, and then run the protocol tests locally. Do not commit the changes or at least, do not push the changes.
 

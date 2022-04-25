@@ -34,7 +34,10 @@ let change_logging_configuration =
   let* main_node = Node.init ~name:"main_node" [] in
   let* client = Client.init ~endpoint:(Node main_node) () in
   let* () =
-    Client.activate_protocol ~protocol ~timestamp_delay:1_000_000. client
+    Client.activate_protocol
+      ~protocol
+      ~timestamp:(Ago (Ptime.Span.of_int_s 1_000_000))
+      client
   in
   let* () = repeat 2 (fun () -> Client.bake_for client) in
   let should_fail msg f =

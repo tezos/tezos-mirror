@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 G.B. Fefe  <gb.fefe@protonmail.com>                    *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,44 +23,41 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* Testing
-   -------
-   Component:    Baker
-   Invocation:   dune exec tezt/tests/main.exe -- --file baker_test.ml
-   Subject:      Run the baker while performing a lot of transfers
-*)
+module Time = Tezos_base.Time.System
 
-let baker_test ~title ~tags =
-  Protocol.register_test ~__FILE__ ~title ~tags @@ fun protocol ->
-  let* (node, client) =
-    Client.init_with_protocol `Client ~protocol ~timestamp:Now ()
-  in
-  let level_2_promise = Node.wait_for_level node 2 in
-  let level_3_promise = Node.wait_for_level node 3 in
-  let* baker = Baker.init ~protocol node client in
-  Log.info "Wait for new head." ;
-  Baker.log_events baker ;
-  let* _ = level_2_promise in
-  Log.info "New head arrive level 2" ;
-  let* _ = level_3_promise in
-  Log.info "New head arrive level 3" ;
-  Lwt.return_unit
+(** Run Tezos client with commands related to `demo_protocol`. *)
 
-let baker_stresstest =
-  Protocol.register_test
-    ~__FILE__
-    ~title:"baker stresstest"
-    ~tags:["node"; "baker"; "stresstest"]
-  @@ fun protocol ->
-  let* (node, client) =
-    Client.init_with_protocol `Client ~protocol () ~timestamp:Now
-  in
-  let* _ = Baker.init ~protocol node client in
-  let* _ = Node.wait_for_level node 3 in
-  (* Use a large tps, to have failing operations too *)
-  let* () = Client.stresstest ~tps:25 ~transfers:100 client in
-  Lwt.return_unit
+(** Run [tezos-client activate protocol] with `demo_protocol`.
 
-let register ~protocols =
-  let () = baker_test ~title:"baker test" ~tags:["node"; "baker"] protocols in
-  baker_stresstest protocols
+    If [timestamp] is not specified explicitely, it is set to [Ago
+    timestamp_delay], where [timestamp_delay] is 365 days, which
+    allows to bake plenty of blocks before their timestamp reach the
+    present (at which point one would have to wait between each block
+    so that peers do not reject them for being in the future). *)
+val activate :
+  ?endpoint:Client.endpoint ->
+  ?fitness:int ->
+  ?key:string ->
+  ?timestamp:Client.timestamp ->
+  Client.t ->
+  unit Lwt.t
+
+(** Run [tezos-client bake]. *)
+val bake : ?msg:string -> Client.t -> unit Lwt.t
+
+(** Run [tezos-client get a], get the current value of counter `a`. *)
+val get_a : Client.t -> int Lwt.t
+
+(** Run [tezos-client get a], get the current value of counter `b`. *)
+val get_b : Client.t -> int Lwt.t
+
+(** Run [tezos-client increment a], add one to counter `a`. *)
+val increment_a : Client.t -> unit Lwt.t
+
+(** Run [tezos-client increment b], add one to counter `a`.. *)
+val increment_b : Client.t -> unit Lwt.t
+
+(** Run [tezos-client transfer amount], when [amount] is positive,
+    transfer [amount] from counter `a` to counter `b. When [amount] is
+    negative, transfer [-amount] from `b` to `a`. *)
+val transfer : Client.t -> int -> unit Lwt.t

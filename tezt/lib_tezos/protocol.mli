@@ -59,6 +59,9 @@ val hash : t -> string
 (** Hash of protocol genesis *)
 val genesis_hash : string
 
+(** Hash of protocol demo_counter *)
+val demo_counter_hash : string
+
 (** Get the location of the parameter file.
 
     This returns the path to one of the parameter files of the ["parameters"]

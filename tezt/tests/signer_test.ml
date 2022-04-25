@@ -40,7 +40,7 @@ let signer_simple_test ~title ~tags ~keys =
       ~keys:[Constant.activator]
       `Client
       ~protocol
-      ~timestamp_delay:0.0
+      ~timestamp:Now
       ()
   in
   let* _ =
