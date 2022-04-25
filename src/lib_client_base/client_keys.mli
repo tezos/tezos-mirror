@@ -101,10 +101,6 @@ module PVSS_secret_key : Client_aliases.Alias with type t = pvss_sk_uri
 
     See [Client_aliases] for more information about Aliases.*)
 module Aggregate_alias : sig
-  type pk_uri = private Uri.t
-
-  type sk_uri = private Uri.t
-
   module Public_key_hash :
     Client_aliases.Alias with type t = Aggregate_signature.Public_key_hash.t
 
