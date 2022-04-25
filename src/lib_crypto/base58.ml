@@ -429,13 +429,15 @@ module Prefix = struct
   (* 43 *)
   let sapling_address = "\018\071\040\223" (* zet1(69) *)
 
-  (* 96 *)
+  (* 141 *)
+  let generic_aggregate_signature = "\002\075\234\101" (* asig(96) *)
 
-  let generic_aggregate_signature = "\002\075\234\101" (* asig(141) *)
+  (* 142 *)
+  let bls12_381_signature = "\040\171\064\207" (* BLsig(96) *)
 
-  let bls12_381_signature = "\040\171\064\207" (* BLsig(142) *)
+  (* 76 *)
+  let bls12_381_public_key = "\006\149\135\204" (* BLpk(48) *)
 
-  let bls12_381_public_key = "\006\149\135\204" (* BLpk(76) *)
-
-  let bls12_381_secret_key = "\003\150\192\040" (* BLsk(54) *)
+  (* 54 *)
+  let bls12_381_secret_key = "\003\150\192\040" (* BLsk(32) *)
 end
