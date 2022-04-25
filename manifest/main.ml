@@ -4271,9 +4271,6 @@ let _tezos_tps_evaluation =
 let exclude filename =
   let is_proto_ name = has_prefix ~prefix:"proto_" name in
   match String.split_on_char '/' filename with
-  (* lib_protocol files (that's a TODO). *)
-  | "src" :: maybe_proto :: "lib_protocol" :: _ when is_proto_ maybe_proto ->
-      true
   (* proto_/parameters/dune (it only has a (copy_files) stanza). *)
   | "src" :: maybe_proto :: "parameters" :: _ when is_proto_ maybe_proto -> true
   (* lib_time_measurement (its dune structure is *very* specific). *)
