@@ -376,12 +376,20 @@ let compute_accounts =
           public_key = Some public_key;
           amount = bootstrap_balance;
           delegate_to = None;
+          consensus_key = None;
         })
 
 let bootstrap_accounts = compute_accounts bootstrap_accounts_strings
 
-let make_bootstrap_account (pkh, pk, amount, delegate_to) =
-  Parameters.{public_key_hash = pkh; public_key = Some pk; amount; delegate_to}
+let make_bootstrap_account (pkh, pk, amount, delegate_to, consensus_key) =
+  Parameters.
+    {
+      public_key_hash = pkh;
+      public_key = Some pk;
+      amount;
+      delegate_to;
+      consensus_key;
+    }
 
 let parameters_of_constants ?(bootstrap_accounts = bootstrap_accounts)
     ?(bootstrap_contracts = []) ?(commitments = []) constants =

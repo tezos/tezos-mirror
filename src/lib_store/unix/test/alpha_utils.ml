@@ -111,7 +111,13 @@ module Account = struct
 
   let account_to_bootstrap ({pkh; pk; _}, amount, delegate_to) =
     let open Parameters in
-    ({public_key_hash = pkh; public_key = Some pk; amount; delegate_to}
+    ({
+       public_key_hash = pkh;
+       public_key = Some pk;
+       amount;
+       delegate_to;
+       consensus_key = None;
+     }
       : bootstrap_account)
 
   let commitment_secret =

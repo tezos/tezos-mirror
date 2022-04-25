@@ -38,7 +38,8 @@ val make_bootstrap_account :
   Signature.public_key_hash
   * Signature.public_key
   * Tez.t
-  * Signature.public_key_hash option ->
+  * Signature.public_key_hash option
+  * Signature.public_key option ->
   Parameters.bootstrap_account
 
 val parameters_of_constants :

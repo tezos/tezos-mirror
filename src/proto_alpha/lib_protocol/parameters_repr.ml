@@ -29,6 +29,7 @@ type bootstrap_account = {
   public_key : Signature.Public_key.t option;
   amount : Tez_repr.t;
   delegate_to : Signature.Public_key_hash.t option;
+  consensus_key : Signature.Public_key.t option;
 }
 
 type bootstrap_contract = {
@@ -60,30 +61,50 @@ let bootstrap_account_encoding =
               public_key = Some public_key;
               amount;
               delegate_to = None;
+              consensus_key = None;
             } ->
               assert (
                 Signature.Public_key_hash.equal
                   (Signature.Public_key.hash public_key)
                   public_key_hash) ;
               Some (public_key, amount)
-          | {public_key = None; _} | {delegate_to = Some _; _} -> None)
+          | {public_key = None; _}
+          | {delegate_to = Some _; _}
+          | {consensus_key = Some _; _} ->
+              None)
         (fun (public_key, amount) ->
           {
             public_key = Some public_key;
             public_key_hash = Signature.Public_key.hash public_key;
             amount;
             delegate_to = None;
+            consensus_key = None;
           });
       case
         (Tag 1)
         ~title:"Public_key_unknown"
         (tup2 Signature.Public_key_hash.encoding Tez_repr.encoding)
         (function
-          | {public_key_hash; public_key = None; amount; delegate_to = None} ->
+          | {
+              public_key_hash;
+              public_key = None;
+              amount;
+              delegate_to = None;
+              consensus_key = None;
+            } ->
               Some (public_key_hash, amount)
-          | {public_key = Some _; _} | {delegate_to = Some _; _} -> None)
+          | {public_key = Some _; _}
+          | {delegate_to = Some _; _}
+          | {consensus_key = Some _; _} ->
+              None)
         (fun (public_key_hash, amount) ->
-          {public_key = None; public_key_hash; amount; delegate_to = None});
+          {
+            public_key = None;
+            public_key_hash;
+            amount;
+            delegate_to = None;
+            consensus_key = None;
+          });
       case
         (Tag 2)
         ~title:"Public_key_known_with_delegate"
@@ -97,19 +118,24 @@ let bootstrap_account_encoding =
               public_key = Some public_key;
               amount;
               delegate_to = Some delegate;
+              consensus_key = None;
             } ->
               assert (
                 Signature.Public_key_hash.equal
                   (Signature.Public_key.hash public_key)
                   public_key_hash) ;
               Some (public_key, amount, delegate)
-          | {public_key = None; _} | {delegate_to = None; _} -> None)
+          | {public_key = None; _}
+          | {delegate_to = None; _}
+          | {consensus_key = Some _; _} ->
+              None)
         (fun (public_key, amount, delegate) ->
           {
             public_key = Some public_key;
             public_key_hash = Signature.Public_key.hash public_key;
             amount;
             delegate_to = Some delegate;
+            consensus_key = None;
           });
       case
         (Tag 3)
@@ -124,15 +150,52 @@ let bootstrap_account_encoding =
               public_key = None;
               amount;
               delegate_to = Some delegate;
+              consensus_key = None;
             } ->
               Some (public_key_hash, amount, delegate)
-          | {public_key = Some _; _} | {delegate_to = None; _} -> None)
+          | {public_key = Some _; _}
+          | {delegate_to = None; _}
+          | {consensus_key = Some _; _} ->
+              None)
         (fun (public_key_hash, amount, delegate) ->
           {
             public_key = None;
             public_key_hash;
             amount;
             delegate_to = Some delegate;
+            consensus_key = None;
+          });
+      case
+        (Tag 4)
+        ~title:"Public_key_known_with_consensus_key"
+        (tup3
+           Signature.Public_key.encoding
+           Tez_repr.encoding
+           Signature.Public_key.encoding)
+        (function
+          | {
+              public_key_hash;
+              public_key = Some public_key;
+              amount;
+              delegate_to = None;
+              consensus_key = Some consensus_key;
+            } ->
+              assert (
+                Signature.Public_key_hash.equal
+                  (Signature.Public_key.hash public_key)
+                  public_key_hash) ;
+              Some (public_key, amount, consensus_key)
+          | {public_key = None; _}
+          | {delegate_to = Some _; _}
+          | {consensus_key = None; _} ->
+              None)
+        (fun (public_key, amount, consensus_key) ->
+          {
+            public_key = Some public_key;
+            public_key_hash = Signature.Public_key.hash public_key;
+            amount;
+            delegate_to = None;
+            consensus_key = Some consensus_key;
           });
     ]
 

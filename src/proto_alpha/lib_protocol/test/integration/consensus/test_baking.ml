@@ -344,7 +344,7 @@ let test_committee_sampling () =
       List.map
         (fun (acc, tez, delegate_to) ->
           Default_parameters.make_bootstrap_account
-            (acc.Account.pkh, acc.Account.pk, tez, delegate_to))
+            (acc.Account.pkh, acc.Account.pk, tez, delegate_to, None))
         accounts
     in
     let consensus_committee_size = max_round in

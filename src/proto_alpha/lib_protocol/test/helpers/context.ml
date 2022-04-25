@@ -525,7 +525,7 @@ let init_with_constants_gen tup constants =
     List.map
       (fun (acc, tez, delegate_to) ->
         Default_parameters.make_bootstrap_account
-          (acc.Account.pkh, acc.Account.pk, tez, delegate_to))
+          (acc.Account.pkh, acc.Account.pk, tez, delegate_to, None))
       accounts
   in
   let parameters =
@@ -548,7 +548,8 @@ let default_raw_context () =
   let bootstrap_accounts =
     List.map
       (fun (Account.{pk; pkh; _}, amount, delegate_to) ->
-        Default_parameters.make_bootstrap_account (pkh, pk, amount, delegate_to))
+        Default_parameters.make_bootstrap_account
+          (pkh, pk, amount, delegate_to, None))
       initial_accounts
   in
   Block.prepare_initial_context_params initial_accounts

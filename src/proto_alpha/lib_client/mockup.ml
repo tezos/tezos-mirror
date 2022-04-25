@@ -107,6 +107,7 @@ module Parsed_account = struct
           public_key = Some public_key;
           amount = repr.amount;
           delegate_to = None;
+          consensus_key = None;
         }
 
   let default_to_json (cctxt : Tezos_client_base.Client_context.full) :
@@ -158,37 +159,17 @@ module Bootstrap_account = struct
   let encoding : Parameters.bootstrap_account Data_encoding.t =
     let open Data_encoding in
     let open Parameters in
-    union
-      [
-        case
-          ~title:"No delegate"
-          (Tag 0)
-          (obj3
-             (req "public_key_hash" Signature.Public_key_hash.encoding)
-             (opt "public_key" Signature.Public_key.encoding)
-             (req "amount" Tez.encoding))
-          (function
-            | {public_key_hash; public_key; amount; delegate_to = None} ->
-                Some (public_key_hash, public_key, amount)
-            | _ -> None)
-          (fun (public_key_hash, public_key, amount) ->
-            {public_key_hash; public_key; amount; delegate_to = None});
-        case
-          ~title:"With delegate"
-          (Tag 1)
-          (obj4
-             (req "public_key_hash" Signature.Public_key_hash.encoding)
-             (opt "public_key" Signature.Public_key.encoding)
-             (req "amount" Tez.encoding)
-             (req "delegate_to" Signature.Public_key_hash.encoding))
-          (function
-            | {public_key_hash; public_key; amount; delegate_to = Some delegate}
-              ->
-                Some (public_key_hash, public_key, amount, delegate)
-            | _ -> None)
-          (fun (public_key_hash, public_key, amount, delegate) ->
-            {public_key_hash; public_key; amount; delegate_to = Some delegate});
-      ]
+    conv
+      (fun {public_key_hash; public_key; amount; delegate_to; consensus_key} ->
+        (public_key_hash, public_key, amount, delegate_to, consensus_key))
+      (fun (public_key_hash, public_key, amount, delegate_to, consensus_key) ->
+        {public_key_hash; public_key; amount; delegate_to; consensus_key})
+      (obj5
+         (req "public_key_hash" Signature.Public_key_hash.encoding)
+         (opt "public_key" Signature.Public_key.encoding)
+         (req "amount" Tez.encoding)
+         (opt "delegate_to" Signature.Public_key_hash.encoding)
+         (opt "consensus_key" Signature.Public_key.encoding))
 end
 
 module Bootstrap_contract = struct
@@ -245,31 +226,12 @@ module Protocol_parameters = struct
 end
 
 (* This encoding extends [Protocol_constants_overrides.encoding] to allow
-   reading json files as produced by lib_parameters. Sadly, this require
-   copying partially [bootstrap_account_encoding], which is not exposed
-   in parameters_repr.ml. *)
+   reading json files as produced by lib_parameters. *)
 let lib_parameters_json_encoding =
-  let bootstrap_account_encoding =
-    let open Data_encoding in
-    conv
-      (function
-        | {Parameters.public_key; amount; _} -> (
-            match public_key with
-            | None -> assert false
-            | Some pk -> (pk, amount)))
-      (fun (pk, amount) ->
-        {
-          Parameters.public_key = Some pk;
-          public_key_hash = Signature.Public_key.hash pk;
-          amount;
-          delegate_to = None;
-        })
-      (tup2 Signature.Public_key.encoding Tez.encoding)
-  in
   Data_encoding.(
     merge_objs
       (obj2
-         (opt "bootstrap_accounts" (list bootstrap_account_encoding))
+         (opt "bootstrap_accounts" (list Parameters.bootstrap_account_encoding))
          (opt "commitments" (list Commitment.encoding)))
       Protocol_constants_overrides.encoding)
 

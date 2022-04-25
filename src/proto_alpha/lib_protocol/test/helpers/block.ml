@@ -296,7 +296,8 @@ let prepare_main_init_params ?bootstrap_contracts commitments constants
   let bootstrap_accounts =
     List.map
       (fun (Account.{pk; pkh; _}, amount, delegate_to) ->
-        Default_parameters.make_bootstrap_account (pkh, pk, amount, delegate_to))
+        Default_parameters.make_bootstrap_account
+          (pkh, pk, amount, delegate_to, None))
       initial_accounts
   in
   let parameters =
