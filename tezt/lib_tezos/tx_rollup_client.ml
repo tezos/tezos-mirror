@@ -238,6 +238,26 @@ let inject_batcher_transaction ?expect_failure tx_client ~transactions_and_sig =
   in
   Lwt.return out
 
+let get_message_proof ?(block = "head") tx_client ~message_position =
+  let* out =
+    spawn_command
+      tx_client
+      [
+        "get";
+        "proof";
+        "for";
+        "message";
+        "at";
+        "position";
+        string_of_int message_position;
+        "in";
+        "block";
+        block;
+      ]
+    |> Process.check_and_read_stdout
+  in
+  Lwt.return out
+
 module RPC = struct
   let get tx_client uri =
     let* out =
