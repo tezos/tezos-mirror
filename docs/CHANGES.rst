@@ -102,8 +102,8 @@ Client
   cast invalid ballots (unexpected voting period, missing voting
   rights, ...)
 
-Baker / Endorser / Accuser
---------------------------
+Baker
+-----
 
 - **Breaking change**:
   The ``--liquidity-baking-escape-vote`` command-line option has been renamed

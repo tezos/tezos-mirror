@@ -28,8 +28,11 @@ Node
 Client
 ------
 
-Baker / Endorser / Accuser
---------------------------
+Baker
+-----
+
+Accuser
+-------
 
 Signer
 ------
