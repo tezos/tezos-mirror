@@ -93,7 +93,8 @@ let get_block tx_client ~block =
   in
   Lwt.return out
 
-let craft_tx_transaction ?counter tx_client ~qty ~signer ~dest ~ticket =
+let craft_tx_transaction tx_client ~signer ?counter
+    Rollup.Tx_rollup.{qty; destination; ticket} =
   let qty = Int64.to_string qty in
   let* out =
     spawn_command
@@ -106,7 +107,7 @@ let craft_tx_transaction ?counter tx_client ~qty ~signer ~dest ~ticket =
          "from";
          signer;
          "to";
-         dest;
+         destination;
          "for";
          ticket;
        ]

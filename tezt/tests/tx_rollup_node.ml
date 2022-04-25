@@ -709,15 +709,6 @@ let sign_one_transaction key txs_string =
   in
   Tezos_crypto.Bls.sign (bls_sk_of_key key) buf
 
-let craft_tx ?counter tx_client ~qty ~signer ~dest ~ticket =
-  Tx_rollup_client.craft_tx_transaction
-    tx_client
-    ?counter
-    ~qty
-    ~signer
-    ~dest
-    ~ticket
-
 let bls_signers_sks_json keys =
   let sks =
     List.map
@@ -731,6 +722,13 @@ let bls_signers_sks_json keys =
   Data_encoding.(
     Json.construct (list (list Tezos_crypto.Bls.Secret_key.encoding)) sks
     |> Json.to_string)
+
+let craft_tx ?counter tx_client ~qty ~signer ~dest ~ticket =
+  Tx_rollup_client.craft_tx_transaction
+    ?counter
+    ~signer
+    tx_client
+    {destination = dest; qty; ticket}
 
 let craft_batch tx_client ~batch ~signers =
   let signatures = bls_signers_sks_json signers in
@@ -2009,7 +2007,7 @@ let test_withdrawals =
       Log.info "Ticket %s was successfully emitted" ticket_id ;
       Log.info "Submitting transactions to queue" ;
       let* tx =
-        Tx_rollup_client.craft_tx_transaction
+        craft_tx
           tx_client
           ~signer:bls_pk_1
           ~dest:bls_pkh_2
@@ -2019,7 +2017,7 @@ let test_withdrawals =
       let signature = sign_one_transaction bls_key_1 tx in
       let* _txh1 = tx_client_inject_transaction ~tx_client tx signature in
       let* tx =
-        Tx_rollup_client.craft_tx_transaction
+        craft_tx
           tx_client
           ~signer:bls_pk_2
           ~dest:bls_pkh_1

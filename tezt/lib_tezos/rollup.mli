@@ -62,6 +62,16 @@ module Tx_rollup : sig
     finalized_at : int option;
   }
 
+  type transfer_content = {qty : Int64.t; destination : string; ticket : string}
+
+  val transfer_content_encoding : transfer_content Data_encoding.t
+
+  type transfer = {
+    signer : string;
+    counter : int64 option;
+    contents : transfer_content list;
+  }
+
   type deposit_content = {
     sender : string;
     destination : string;
