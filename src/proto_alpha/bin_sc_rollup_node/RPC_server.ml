@@ -113,8 +113,24 @@ module Common = struct
   let shutdown = RPC_server.shutdown
 end
 
-module Make (PVM : Pvm.S) = struct
+module type S = sig
+  module PVM : Pvm.S
+
+  val shutdown : RPC_server.server -> unit Lwt.t
+
+  val register :
+    Node_context.t -> PVM.context -> Configuration.t -> unit RPC_directory.t
+
+  val start :
+    Node_context.t ->
+    PVM.context ->
+    Configuration.t ->
+    RPC_server.server tzresult Lwt.t
+end
+
+module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
   include Common
+  module PVM = PVM
 
   let register_current_total_ticks store dir =
     RPC_directory.register0
