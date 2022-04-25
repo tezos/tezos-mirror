@@ -33,6 +33,8 @@ type t =
     }
       -> t
 
+type introspectable = Any : _ Encoding.t -> introspectable
+
 module EncodingTable = Map.Make (String)
 
 let table = ref EncodingTable.empty
@@ -118,7 +120,18 @@ let register ?pp encoding =
 
 let find id = EncodingTable.find_opt id !table
 
+let find_introspectable id =
+  match EncodingTable.find_opt id !table with
+  | Some (Record {encoding; _}) -> Some (Any encoding)
+  | None -> None
+
 let list () = EncodingTable.bindings !table
+
+let iter : id:string -> (introspectable -> unit) -> unit =
+ fun ~id f ->
+  match find_introspectable id with
+  | Some introspectable -> f introspectable
+  | None -> ()
 
 let bytes_of_json (Record {encoding; _}) json =
   let data = Json.destruct encoding json in

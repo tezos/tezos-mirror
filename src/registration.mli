@@ -58,3 +58,9 @@ val list : unit -> (id * t) list
 val bytes_of_json : t -> Json.t -> Bytes.t option
 
 val json_of_bytes : t -> Bytes.t -> Json.t option
+
+type introspectable = Any : _ Encoding.t -> introspectable
+
+val find_introspectable : id -> introspectable option
+
+val iter : id:string -> (introspectable -> unit) -> unit
