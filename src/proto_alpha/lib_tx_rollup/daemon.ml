@@ -480,6 +480,18 @@ let trigger_injection state header =
   (* Queue request for injection of operation that must be injected each block *)
   Injector.inject ~strategy:Injector.Each_block ()
 
+let dispatch_withdrawals_on_l1 state level =
+  let open Lwt_result_syntax in
+  match state.State.signers.dispatch_withdrawals with
+  | None -> return_unit
+  | Some source -> (
+      let*! block =
+        State.get_level_l2_block state (L2block.Rollup_level level)
+      in
+      match block with
+      | None -> return_unit
+      | Some block -> Dispatcher.dispatch_withdrawals ~source state block)
+
 let process_op (type kind) (state : State.t) l1_block l1_operation ~source:_
     (op : kind manager_operation) (result : kind manager_operation_result)
     (acc : 'acc) : 'acc tzresult Lwt.t =
@@ -505,6 +517,7 @@ let process_op (type kind) (state : State.t) l1_block l1_operation ~source:_
   | ( Tx_rollup_finalize_commitment {tx_rollup},
       Applied (Tx_rollup_finalize_commitment_result {level; _}) )
     when is_my_rollup tx_rollup ->
+      let* () = dispatch_withdrawals_on_l1 state level in
       State.set_finalized_level state level
   | (_, _) -> return acc
 
