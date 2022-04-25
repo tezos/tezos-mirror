@@ -25,11 +25,14 @@
 
 (** BLS commands are used by rollup clients to handle their keys directly. *)
 module Bls_commands : sig
-  (** [generate_keys ~force alias cctxt] generates a BLS based pair of keys with
-      a fresh mnemonic with [alias] as alias. If [force] is [true], it will
-      replace the alias if it already exists. *)
+  (** [generate_keys ~force ~encrypted alias cctxt] generates a BLS
+      based pair of keys with a fresh mnemonic with [alias] as
+      alias. If [force] is [true], it will replace the alias if it
+      already exists. If [encrypted] is [true], then it will ask for a
+      passphrase, and encrypt the generated key. *)
   val generate_keys :
     force:bool ->
+    encrypted:bool ->
     Client_keys.Aggregate_alias.Secret_key.fresh_param ->
     #Client_context.io_wallet ->
     unit tzresult Lwt.t

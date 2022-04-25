@@ -37,6 +37,12 @@ val decrypt :
   Client_keys.sk_uri ->
   Signature.secret_key tzresult Lwt.t
 
+val decrypt_aggregate :
+  #Client_context.io_wallet ->
+  ?name:string ->
+  Client_keys.aggregate_sk_uri ->
+  Aggregate_signature.secret_key tzresult Lwt.t
+
 val decrypt_all : #Client_context.io_wallet -> unit tzresult Lwt.t
 
 val decrypt_list :
@@ -51,6 +57,14 @@ val prompt_twice_and_encrypt :
   #Client_context.io ->
   Signature.secret_key ->
   Client_keys.sk_uri tzresult Lwt.t
+
+(** [prompt_twice_and_encrypt_aggregate cctxt sk] Prompts password twice to user
+    for confirmation and returns the corresponding encrypted aggregate secret
+    key *)
+val prompt_twice_and_encrypt_aggregate :
+  #Client_context.io ->
+  Aggregate_signature.secret_key ->
+  Client_keys.aggregate_sk_uri tzresult Lwt.t
 
 val encrypt_sapling_key :
   #Client_context.io ->

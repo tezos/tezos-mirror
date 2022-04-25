@@ -44,6 +44,8 @@ open Client_keys
 
 let scheme = "encrypted"
 
+let aggregate_scheme = "aggregate_encrypted"
+
 module Raw = struct
   (* https://tools.ietf.org/html/rfc2898#section-4.1 *)
   let salt_len = 8
@@ -61,12 +63,15 @@ module Raw = struct
     let salt = Hacl.Rand.gen salt_len in
     let key = Crypto_box.Secretbox.unsafe_of_bytes (pbkdf ~salt ~password) in
     let msg =
-      match (sk : Signature.secret_key) with
-      | Ed25519 sk ->
+      match (sk : decrypted_sk) with
+      | Decrypted_sk (Ed25519 sk) ->
           Data_encoding.Binary.to_bytes_exn Ed25519.Secret_key.encoding sk
-      | Secp256k1 sk ->
+      | Decrypted_sk (Secp256k1 sk) ->
           Data_encoding.Binary.to_bytes_exn Secp256k1.Secret_key.encoding sk
-      | P256 sk -> Data_encoding.Binary.to_bytes_exn P256.Secret_key.encoding sk
+      | Decrypted_sk (P256 sk) ->
+          Data_encoding.Binary.to_bytes_exn P256.Secret_key.encoding sk
+      | Decrypted_aggregate_sk (Bls12_381 sk) ->
+          Data_encoding.Binary.to_bytes_exn Bls.Secret_key.encoding sk
     in
     Bytes.cat salt (Crypto_box.Secretbox.secretbox key msg nonce)
 
@@ -357,23 +362,46 @@ let rec read_password (cctxt : #Client_context.io) =
     read_password cctxt
   else return password
 
-let encrypt sk password =
-  let open Lwt_result_syntax in
+let common_encrypt sk password =
   let payload = Raw.encrypt ~password sk in
   let encoding =
     match sk with
-    | Ed25519 _ -> Encodings.ed25519
-    | Secp256k1 _ -> Encodings.secp256k1
-    | P256 _ -> Encodings.p256
+    | Decrypted_sk (Ed25519 _) -> Encodings.ed25519
+    | Decrypted_sk (Secp256k1 _) -> Encodings.secp256k1
+    | Decrypted_sk (P256 _) -> Encodings.p256
+    | Decrypted_aggregate_sk (Bls12_381 _) -> Encodings.bls12_381
   in
-  let path = Base58.simple_encode encoding payload in
+  Base58.simple_encode encoding payload
+
+let internal_encrypt_simple sk password =
+  let open Lwt_result_syntax in
+  let path = common_encrypt sk password in
   let*? v = Client_keys.make_sk_uri (Uri.make ~scheme ~path ()) in
   return v
+
+let internal_encrypt_aggregate sk password =
+  let open Lwt_result_syntax in
+  let path = common_encrypt sk password in
+  let*? v =
+    Client_keys.make_aggregate_sk_uri
+      (Uri.make ~scheme:aggregate_scheme ~path ())
+  in
+  return v
+
+let encrypt sk password = internal_encrypt_simple (Decrypted_sk sk) password
+
+let encrypt_aggregate sk password =
+  internal_encrypt_aggregate (Decrypted_aggregate_sk sk) password
 
 let prompt_twice_and_encrypt cctxt sk =
   let open Lwt_result_syntax in
   let* password = read_password cctxt in
   encrypt sk password
+
+let prompt_twice_and_encrypt_aggregate cctxt sk =
+  let open Lwt_result_syntax in
+  let* password = read_password cctxt in
+  encrypt_aggregate sk password
 
 module Sapling_raw = struct
   let salt_len = 8

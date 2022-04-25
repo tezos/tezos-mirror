@@ -99,7 +99,11 @@ module Keys = struct
       (prefixes ["gen"; "unencrypted"; "keys"]
       @@ Aggregate_alias.Secret_key.fresh_alias_param @@ stop)
       (fun force name (cctxt : #Configuration.sc_client_context) ->
-        Client_keys_commands.Bls_commands.generate_keys ~force name cctxt)
+        Client_keys_commands.Bls_commands.generate_keys
+          ~force
+          ~encrypted:false
+          name
+          cctxt)
 
   let list_keys () =
     command
