@@ -202,7 +202,9 @@ let sources_param =
   Clic.seq_of_param
     (Client_keys.Public_key_hash.source_param
        ~name:"baker"
-       ~desc:"name of the delegate owning the endorsement right")
+       ~desc:
+         "name of the delegate owning the endorsement/baking right or name of \
+          the consensus key signing on the delegate's behalf")
 
 let delegate_commands () : Protocol_client_context.full Clic.command list =
   let open Clic in

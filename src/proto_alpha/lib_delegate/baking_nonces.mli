@@ -84,7 +84,7 @@ val get_unrevealed_nonces :
 
 val generate_seed_nonce :
   Baking_configuration.nonce_config ->
-  Baking_state.delegate ->
+  Baking_state.consensus_key ->
   Raw_level.t ->
   (Nonce_hash.t * Nonce.t) tzresult Lwt.t
 

@@ -199,7 +199,7 @@ let get_unrevealed_nonces ({cctxt; chain; _} as state) nonces =
 (* Nonce creation *)
 
 let generate_seed_nonce (nonce_config : Baking_configuration.nonce_config)
-    (delegate : Baking_state.delegate) level =
+    (delegate : Baking_state.consensus_key) level =
   (match nonce_config with
   | Deterministic ->
       let data = Data_encoding.Binary.to_bytes_exn Raw_level.encoding level in

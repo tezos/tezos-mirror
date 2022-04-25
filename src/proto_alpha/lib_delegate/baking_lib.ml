@@ -80,7 +80,10 @@ let preendorse (cctxt : Protocol_client_context.full) ?(force = false) delegates
   let*! () =
     cctxt#message
       "@[<v 2>Preendorsing for:@ %a@]"
-      Format.(pp_print_list ~pp_sep:pp_print_space Baking_state.pp_delegate)
+      Format.(
+        pp_print_list
+          ~pp_sep:pp_print_space
+          Baking_state.pp_consensus_key_and_delegate)
       (List.map fst consensus_list)
   in
   let state_recorder ~new_state =
@@ -117,7 +120,10 @@ let endorse (cctxt : Protocol_client_context.full) ?(force = false) delegates =
   let*! () =
     cctxt#message
       "@[<v 2>Endorsing for:@ %a@]"
-      Format.(pp_print_list ~pp_sep:pp_print_space Baking_state.pp_delegate)
+      Format.(
+        pp_print_list
+          ~pp_sep:pp_print_space
+          Baking_state.pp_consensus_key_and_delegate)
       (List.map fst consensus_list)
   in
   let state_recorder ~new_state =

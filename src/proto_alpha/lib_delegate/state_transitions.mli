@@ -36,7 +36,7 @@ val is_acceptable_proposal_for_current_level :
   state -> proposal -> proposal_acceptance Lwt.t
 
 val make_consensus_list :
-  state -> proposal -> (delegate * consensus_content) list
+  state -> proposal -> (consensus_key_and_delegate * consensus_content) list
 
 val make_preendorse_action : state -> proposal -> action
 
@@ -51,21 +51,21 @@ val handle_new_proposal : state -> proposal -> (state * action) Lwt.t
 
 val round_proposer :
   state ->
-  (delegate * endorsing_slot) SlotMap.t ->
+  (consensus_key_and_delegate * endorsing_slot) SlotMap.t ->
   Round.t ->
-  (delegate * endorsing_slot) option
+  (consensus_key_and_delegate * endorsing_slot) option
 
 val propose_fresh_block_action :
   endorsements:Kind.endorsement Operation.t list ->
   ?last_proposal:block_info ->
   predecessor:block_info ->
   state ->
-  delegate ->
+  consensus_key_and_delegate ->
   Round.t ->
   action Lwt.t
 
 val propose_block_action :
-  state -> delegate -> Round.t -> proposal -> action Lwt.t
+  state -> consensus_key_and_delegate -> Round.t -> proposal -> action Lwt.t
 
 (** Increase the current round and propose at the new round (same
    level), if the baker has a proposer slot. *)

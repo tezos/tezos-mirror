@@ -44,7 +44,9 @@ val wait_next_event :
 val compute_next_round_time : state -> (Time.Protocol.t * Round.t) option
 
 val first_potential_round_at_next_level :
-  state -> earliest_round:Round.t -> (Round.t * delegate) option
+  state ->
+  earliest_round:Round.t ->
+  (Round.t * consensus_key_and_delegate) option
 
 val compute_next_potential_baking_time_at_next_level :
   state -> (Time.Protocol.t * Round.t) option Lwt.t
@@ -58,7 +60,7 @@ val create_initial_state :
   Baking_configuration.t ->
   Operation_worker.t ->
   current_proposal:proposal ->
-  delegate trace ->
+  consensus_key list ->
   state tzresult Lwt.t
 
 val compute_bootstrap_event : state -> event tzresult
@@ -79,5 +81,5 @@ val run :
   ?on_error:(tztrace -> unit tzresult Lwt.t) ->
   chain:Chain_services.chain ->
   Baking_configuration.t ->
-  delegate trace ->
+  consensus_key list ->
   unit tzresult Lwt.t

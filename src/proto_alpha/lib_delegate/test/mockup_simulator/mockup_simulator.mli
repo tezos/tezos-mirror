@@ -116,7 +116,7 @@ module type Hooks = sig
      bakers that were started for this run. *)
   val on_start_baker :
     baker_position:int ->
-    delegates:Baking_state.delegate list ->
+    delegates:Baking_state.consensus_key list ->
     cctxt:Protocol_client_context.full ->
     unit Lwt.t
 

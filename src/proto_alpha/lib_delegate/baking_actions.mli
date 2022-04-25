@@ -39,7 +39,7 @@ type block_kind =
 type block_to_bake = {
   predecessor : block_info;
   round : Round.t;
-  delegate : delegate;
+  delegate : consensus_key_and_delegate;
   kind : block_kind;
 }
 
@@ -47,11 +47,11 @@ type action =
   | Do_nothing
   | Inject_block of {block_to_bake : block_to_bake; updated_state : state}
   | Inject_preendorsements of {
-      preendorsements : (delegate * consensus_content) list;
+      preendorsements : (consensus_key_and_delegate * consensus_content) list;
       updated_state : state;
     }
   | Inject_endorsements of {
-      endorsements : (delegate * consensus_content) list;
+      endorsements : (consensus_key_and_delegate * consensus_content) list;
       updated_state : state;
     }
   | Update_to_level of level_update
@@ -75,7 +75,7 @@ type t = action
 
 val generate_seed_nonce_hash :
   Baking_configuration.nonce_config ->
-  delegate ->
+  consensus_key ->
   Level.t ->
   (Nonce_hash.t * Nonce.t) option tzresult Lwt.t
 
@@ -89,19 +89,19 @@ val inject_block :
 val inject_preendorsements :
   state_recorder:(new_state:state -> unit tzresult Lwt.t) ->
   state ->
-  preendorsements:(delegate * consensus_content) list ->
+  preendorsements:(consensus_key_and_delegate * consensus_content) list ->
   updated_state:state ->
   state tzresult Lwt.t
 
 val sign_endorsements :
   state ->
-  (delegate * consensus_content) list ->
-  (delegate * packed_operation) list tzresult Lwt.t
+  (consensus_key_and_delegate * consensus_content) list ->
+  (consensus_key_and_delegate * packed_operation) list tzresult Lwt.t
 
 val inject_endorsements :
   state_recorder:(new_state:state -> unit tzresult Lwt.t) ->
   state ->
-  endorsements:(delegate * consensus_content) list ->
+  endorsements:(consensus_key_and_delegate * consensus_content) list ->
   updated_state:state ->
   state tzresult Lwt.t
 

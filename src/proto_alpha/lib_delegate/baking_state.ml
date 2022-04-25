@@ -27,16 +27,16 @@ open Protocol
 open Alpha_context
 open Protocol_client_context
 
-(** A delegate (aka, a validator) is identified by its alias name, its
+(** A consensus key (aka, a validator) is identified by its alias name, its
     public key, its public key hash, and its secret key. *)
-type delegate = {
+type consensus_key = {
   alias : string option;
   public_key : Signature.Public_key.t;
   public_key_hash : Signature.Public_key_hash.t;
   secret_key_uri : Client_keys.sk_uri;
 }
 
-let delegate_encoding =
+let consensus_key_encoding =
   let open Data_encoding in
   conv
     (fun {alias; public_key; public_key_hash; secret_key_uri} ->
@@ -60,7 +60,7 @@ let delegate_encoding =
        (req "public_key_hash" Signature.Public_key_hash.encoding)
        (req "secret_key_uri" string))
 
-let pp_delegate fmt {alias; public_key_hash; _} =
+let pp_consensus_key fmt {alias; public_key_hash; _} =
   match alias with
   | None -> Format.fprintf fmt "%a" Signature.Public_key_hash.pp public_key_hash
   | Some alias ->
@@ -70,6 +70,26 @@ let pp_delegate fmt {alias; public_key_hash; _} =
         alias
         Signature.Public_key_hash.pp
         public_key_hash
+
+type consensus_key_and_delegate = consensus_key * Signature.Public_key_hash.t
+
+let consensus_key_and_delegate_encoding =
+  let open Data_encoding in
+  merge_objs
+    consensus_key_encoding
+    (obj1 (req "delegate" Signature.Public_key_hash.encoding))
+
+let pp_consensus_key_and_delegate fmt (consensus_key, delegate) =
+  if Signature.Public_key_hash.equal consensus_key.public_key_hash delegate then
+    pp_consensus_key fmt consensus_key
+  else
+    Format.fprintf
+      fmt
+      "%a@,on behalf of %a"
+      pp_consensus_key
+      consensus_key
+      Signature.Public_key_hash.pp
+      delegate
 
 type validation_mode = Node | Local of Abstract_context_index.t
 
@@ -97,7 +117,7 @@ type block_info = {
 type cache = {
   known_timestamps : Timestamp.time Baking_cache.Timestamp_of_round_cache.t;
   round_timestamps :
-    (Timestamp.time * Round.t * delegate)
+    (Timestamp.time * Round.t * consensus_key_and_delegate)
     Baking_cache.Round_timestamp_interval_cache.t;
 }
 
@@ -117,7 +137,7 @@ type global_state = {
   (* the validation mode used by the baker*)
   validation_mode : validation_mode;
   (* the delegates on behalf of which the baker is running *)
-  delegates : delegate list;
+  delegates : consensus_key list;
   cache : cache;
 }
 
@@ -216,11 +236,7 @@ module SlotMap : Map.S with type key = Slot.t = Map.Make (Slot)
     list of slots (i.e., a list of position indexes in the slot map, in
     other words the list of rounds when it will be the proposer), and
     its endorsing power. *)
-type endorsing_slot = {
-  delegate : Signature.Public_key_hash.t;
-  slots : Slot.t list;
-  endorsing_power : int;
-}
+type endorsing_slot = {slots : Slot.t list; endorsing_power : int}
 
 (* FIXME: determine if the slot map should contain all slots or just
    the first one *)
@@ -229,7 +245,7 @@ type endorsing_slot = {
 type delegate_slots = {
   (* be careful not to duplicate endorsing slots with different slots
      keys: always use the first slot in the slots list *)
-  own_delegate_slots : (delegate * endorsing_slot) SlotMap.t;
+  own_delegate_slots : (consensus_key_and_delegate * endorsing_slot) SlotMap.t;
   all_delegate_slots : endorsing_slot SlotMap.t;
   all_slots_by_round : Slot.t array;
 }
@@ -576,7 +592,7 @@ let may_load_endorsable_data state =
 
 module DelegateSet = struct
   include Set.Make (struct
-    type t = delegate
+    type t = consensus_key
 
     let compare {public_key_hash = pkh; _} {public_key_hash = pkh'; _} =
       Signature.Public_key_hash.compare pkh pkh'
@@ -606,10 +622,8 @@ let compute_delegate_slots (cctxt : Protocol_client_context.full)
   let own_delegate_slots, all_delegate_slots =
     List.fold_left
       (fun (own_map, all_map) slot ->
-        let {Plugin.RPC.Validators.consensus_key = delegate; slots; _} = slot in
-        let endorsing_slot =
-          {endorsing_power = List.length slots; delegate; slots}
-        in
+        let {Plugin.RPC.Validators.consensus_key; delegate; slots; _} = slot in
+        let endorsing_slot = {endorsing_power = List.length slots; slots} in
         let all_map =
           List.fold_left
             (fun all_map slot -> SlotMap.add slot endorsing_slot all_map)
@@ -617,11 +631,14 @@ let compute_delegate_slots (cctxt : Protocol_client_context.full)
             slots
         in
         let own_map =
-          match DelegateSet.find_pkh delegate own_delegates with
-          | Some delegate ->
+          match DelegateSet.find_pkh consensus_key own_delegates with
+          | Some consensus_key ->
               List.fold_left
                 (fun own_map slot ->
-                  SlotMap.add slot (delegate, endorsing_slot) own_map)
+                  SlotMap.add
+                    slot
+                    ((consensus_key, delegate), endorsing_slot)
+                    own_map)
                 own_map
                 slots
           | None -> own_map
@@ -659,7 +676,7 @@ let pp_global_state fmt {chain_id; config; validation_mode; delegates; _} =
     config
     pp_validation_mode
     validation_mode
-    Format.(pp_print_list pp_delegate)
+    Format.(pp_print_list pp_consensus_key)
     delegates
 
 let pp_option pp fmt = function
@@ -740,14 +757,15 @@ let pp_elected_block fmt {proposal; endorsement_qc} =
     proposal.block
     (List.length endorsement_qc)
 
-let pp_endorsing_slot fmt (delegate, {delegate = _; slots; endorsing_power}) =
+let pp_endorsing_slot fmt (consensus_key_and_delegate, {slots; endorsing_power})
+    =
   Format.fprintf
     fmt
     "slots: @[<h>[%a]@],@ delegate: %a,@ endorsing_power: %d"
     Format.(pp_print_list ~pp_sep:pp_print_space Slot.pp)
     slots
-    pp_delegate
-    delegate
+    pp_consensus_key_and_delegate
+    consensus_key_and_delegate
     endorsing_power
 
 let pp_delegate_slots fmt {own_delegate_slots; _} =

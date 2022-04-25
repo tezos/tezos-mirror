@@ -117,7 +117,7 @@ type block_kind =
 type block_to_bake = {
   predecessor : block_info;
   round : Round.t;
-  delegate : Baking_state.delegate;
+  delegate : Baking_state.consensus_key_and_delegate;
   kind : block_kind;
 }
 
@@ -125,11 +125,11 @@ type action =
   | Do_nothing
   | Inject_block of {block_to_bake : block_to_bake; updated_state : state}
   | Inject_preendorsements of {
-      preendorsements : (delegate * consensus_content) list;
+      preendorsements : (consensus_key_and_delegate * consensus_content) list;
       updated_state : state;
     }
   | Inject_endorsements of {
-      endorsements : (delegate * consensus_content) list;
+      endorsements : (consensus_key_and_delegate * consensus_content) list;
       updated_state : state;
     }
   | Update_to_level of level_update
@@ -214,7 +214,9 @@ let sign_block_header state proposer unsigned_block_header =
       return {Block_header.shell; protocol_data = {contents; signature}}
 
 let inject_block ~state_recorder state block_to_bake ~updated_state =
-  let {predecessor; round; delegate; kind} = block_to_bake in
+  let {predecessor; round; delegate = (consensus_key, _) as delegate; kind} =
+    block_to_bake
+  in
   let cctxt = state.global_state.cctxt in
   let chain_id = state.global_state.chain_id in
   let simulation_mode = state.global_state.validation_mode in
@@ -260,7 +262,7 @@ let inject_block ~state_recorder state block_to_bake ~updated_state =
   >>=? fun injection_level ->
   generate_seed_nonce_hash
     state.global_state.config.Baking_configuration.nonce
-    delegate
+    consensus_key
     injection_level
   >>=? fun seed_nonce_opt ->
   let seed_nonce_hash = Option.map fst seed_nonce_opt in
@@ -308,7 +310,7 @@ let inject_block ~state_recorder state block_to_bake ~updated_state =
     simulation_kind
     state.global_state.constants.parametric
   >>=? fun {unsigned_block_header; operations} ->
-  sign_block_header state delegate unsigned_block_header
+  sign_block_header state consensus_key unsigned_block_header
   >>=? fun signed_block_header ->
   (match seed_nonce_opt with
   | None ->
@@ -344,7 +346,7 @@ let inject_preendorsements ~state_recorder state ~preendorsements ~updated_state
     Baking_files.resolve_location ~chain_id `Highwatermarks
   in
   List.filter_map_es
-    (fun (delegate, consensus_content) ->
+    (fun (((consensus_key, _) as delegate), consensus_content) ->
       Events.(emit signing_preendorsement delegate) >>= fun () ->
       let shell =
         {
@@ -355,13 +357,12 @@ let inject_preendorsements ~state_recorder state ~preendorsements ~updated_state
       let contents = Single (Preendorsement consensus_content) in
       let level = Raw_level.to_int32 consensus_content.level in
       let round = consensus_content.round in
-      let sk_uri = delegate.secret_key_uri in
+      let sk_uri = consensus_key.secret_key_uri in
       cctxt#with_lock (fun () ->
-          let delegate = delegate.public_key_hash in
           Baking_highwatermarks.may_sign_preendorsement
             cctxt
             block_location
-            ~delegate
+            ~delegate:consensus_key.public_key_hash
             ~level
             ~round
           >>=? function
@@ -369,7 +370,7 @@ let inject_preendorsements ~state_recorder state ~preendorsements ~updated_state
               Baking_highwatermarks.record_preendorsement
                 cctxt
                 block_location
-                ~delegate
+                ~delegate:consensus_key.public_key_hash
                 ~level
                 ~round
               >>=? fun () -> return_true
@@ -430,7 +431,7 @@ let sign_endorsements state endorsements =
     Baking_files.resolve_location ~chain_id `Highwatermarks
   in
   List.filter_map_es
-    (fun (delegate, consensus_content) ->
+    (fun (((consensus_key, _) as delegate), consensus_content) ->
       Events.(emit signing_endorsement delegate) >>= fun () ->
       let shell =
         {
@@ -444,13 +445,12 @@ let sign_endorsements state endorsements =
       in
       let level = Raw_level.to_int32 consensus_content.level in
       let round = consensus_content.round in
-      let sk_uri = delegate.secret_key_uri in
+      let sk_uri = consensus_key.secret_key_uri in
       cctxt#with_lock (fun () ->
-          let delegate = delegate.public_key_hash in
           Baking_highwatermarks.may_sign_endorsement
             cctxt
             block_location
-            ~delegate
+            ~delegate:consensus_key.public_key_hash
             ~level
             ~round
           >>=? function
@@ -458,7 +458,7 @@ let sign_endorsements state endorsements =
               Baking_highwatermarks.record_endorsement
                 cctxt
                 block_location
-                ~delegate
+                ~delegate:consensus_key.public_key_hash
                 ~level
                 ~round
               >>=? fun () -> return_true
