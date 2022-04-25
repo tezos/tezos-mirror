@@ -1809,11 +1809,11 @@ module Contract : sig
     (** See {!Contract_delegate_storage.find}. *)
     val find : context -> t -> Signature.Public_key_hash.t option tzresult Lwt.t
 
-    (** See {!Delegate_storage.init}. *)
+    (** See {!Delegate_storage.Contract.init}. *)
     val init :
       context -> t -> Signature.Public_key_hash.t -> context tzresult Lwt.t
 
-    (** See {!Delegate_storage.set}. *)
+    (** See {!Delegate_storage.Contract.set}. *)
     val set :
       context ->
       t ->

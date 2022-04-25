@@ -309,9 +309,7 @@ module Contract = struct
   module Delegate = struct
     let find = Contract_delegate_storage.find
 
-    let init = Delegate_storage.init
-
-    let set = Delegate_storage.set
+    include Delegate_storage.Contract
   end
 
   module Internal_for_tests = struct

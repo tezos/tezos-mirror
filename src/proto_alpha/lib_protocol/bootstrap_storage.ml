@@ -59,7 +59,7 @@ let init_account (ctxt, balance_updates)
         public_key_hash
         public_key
       >>=? fun ctxt ->
-      Delegate_storage.set
+      Delegate_storage.Contract.set
         ctxt
         contract
         (Some (Option.value ~default:public_key_hash delegate_to))
@@ -84,7 +84,7 @@ let init_contract ~typecheck (ctxt, balance_updates)
   let contract = Contract_repr.Originated contract_hash in
   (match delegate with
   | None -> return ctxt
-  | Some delegate -> Delegate_storage.init ctxt contract delegate)
+  | Some delegate -> Delegate_storage.Contract.init ctxt contract delegate)
   >>=? fun ctxt ->
   let origin = Receipt_repr.Protocol_migration in
   Token.transfer ~origin ctxt `Bootstrap (`Contract contract) amount

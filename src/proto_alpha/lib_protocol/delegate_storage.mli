@@ -41,19 +41,21 @@ type error +=
   | (* `Permanent *) Empty_delegate_account of Signature.Public_key_hash.t
   | (* `Permanent *) Unregistered_delegate of Signature.Public_key_hash.t
 
-(** Allow to register a delegate when creating an account. *)
-val init :
-  Raw_context.t ->
-  Contract_repr.t ->
-  Signature.Public_key_hash.t ->
-  Raw_context.t tzresult Lwt.t
+module Contract : sig
+  (** Allow to register a delegate when creating an account. *)
+  val init :
+    Raw_context.t ->
+    Contract_repr.t ->
+    Signature.Public_key_hash.t ->
+    Raw_context.t tzresult Lwt.t
 
-(** Allow to set the delegate of an account. *)
-val set :
-  Raw_context.t ->
-  Contract_repr.t ->
-  Signature.Public_key_hash.t option ->
-  Raw_context.t tzresult Lwt.t
+  (** Allow to set the delegate of an account. *)
+  val set :
+    Raw_context.t ->
+    Contract_repr.t ->
+    Signature.Public_key_hash.t option ->
+    Raw_context.t tzresult Lwt.t
+end
 
 (** Has a delegate been registered in the delegate table? *)
 val registered : Raw_context.t -> Signature.Public_key_hash.t -> bool Lwt.t
