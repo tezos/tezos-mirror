@@ -43,6 +43,9 @@ module type SINGLETON_STORE = sig
 
   (** Write the value to disk. *)
   val write : t -> value -> unit tzresult Lwt.t
+
+  (** Deletes the value from the disk. *)
+  val delete : t -> unit Lwt.t
 end
 
 (** An index store mapping keys to values. It is composed of an index only. *)
@@ -169,6 +172,11 @@ type rollup_info = {
     the Tx rollup node. *)
 module Rollup_info_store : SINGLETON_STORE with type value := rollup_info
 
+(** A store composed of a single file on disk to store the last finalized rollup
+    level (on L1) *)
+module Finalized_level_store :
+  SINGLETON_STORE with type value := Protocol.Alpha_context.Tx_rollup_level.t
+
 (** The type of all stores of the Tx rollup node. *)
 type t = {
   blocks : L2_block_store.t;
@@ -178,6 +186,7 @@ type t = {
   head : Head_store.t;
   tezos_head : Tezos_head_store.t;
   rollup_info : Rollup_info_store.t;
+  finalized_level : Finalized_level_store.t;
 }
 
 (** [init ~data_dir ~readonly ~blocks_cache_size] creates or loads existing

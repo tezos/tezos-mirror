@@ -123,6 +123,8 @@ module type SINGLETON_STORE = sig
   val read : t -> value option Lwt.t
 
   val write : t -> value -> unit tzresult Lwt.t
+
+  val delete : t -> unit Lwt.t
 end
 
 module type INDEXABLE_STORE = sig
@@ -290,6 +292,13 @@ struct
     match res with
     | Ok res -> Lwt.return res
     | Error _ -> tzfail (Cannot_write_file S.name)
+
+  let delete store =
+    let open Lwt_syntax in
+    let* exists = Lwt_unix.file_exists store.file in
+    match exists with
+    | false -> return_unit
+    | true -> Lwt_unix.unlink store.file
 
   let init ~data_dir =
     let file = Filename.Infix.(Node_data.store_dir data_dir // S.name) in
@@ -724,6 +733,14 @@ module Rollup_info_store = Make_singleton (struct
          (req "origination_level" int32)
 end)
 
+module Finalized_level_store = Make_singleton (struct
+  type t = Protocol.Alpha_context.Tx_rollup_level.t
+
+  let name = "finalized_level"
+
+  let encoding = Protocol.Alpha_context.Tx_rollup_level.encoding
+end)
+
 type t = {
   blocks : L2_block_store.t;
   tezos_blocks : Tezos_block_store.t;
@@ -732,6 +749,7 @@ type t = {
   head : Head_store.t;
   tezos_head : Tezos_head_store.t;
   rollup_info : Rollup_info_store.t;
+  finalized_level : Finalized_level_store.t;
 }
 
 let init ~data_dir ~readonly ~blocks_cache_size =
@@ -744,9 +762,19 @@ let init ~data_dir ~readonly ~blocks_cache_size =
   and* commitments = Commitment_store.init ~data_dir ~readonly
   and* head = Head_store.init ~data_dir
   and* tezos_head = Tezos_head_store.init ~data_dir
-  and* rollup_info = Rollup_info_store.init ~data_dir in
+  and* rollup_info = Rollup_info_store.init ~data_dir
+  and* finalized_level = Finalized_level_store.init ~data_dir in
   return
-    {blocks; tezos_blocks; commitments; levels; head; tezos_head; rollup_info}
+    {
+      blocks;
+      tezos_blocks;
+      commitments;
+      levels;
+      head;
+      tezos_head;
+      rollup_info;
+      finalized_level;
+    }
 
 let close stores =
   let open Lwt_syntax in

@@ -324,6 +324,15 @@ let get_block_and_metadata state hash =
       let* metadata = get_block_metadata state block.header in
       return_some (block, metadata)
 
+let get_finalized_level state =
+  Stores.Finalized_level_store.read state.stores.finalized_level
+
+let set_finalized_level state l =
+  Stores.Finalized_level_store.write state.stores.finalized_level l
+
+let delete_finalized_level state =
+  Stores.Finalized_level_store.delete state.stores.finalized_level
+
 let check_origination_in_block_info rollup block_info =
   let extract_originated_tx_rollup :
       type kind. kind manager_operation_result -> Tx_rollup.t option = function

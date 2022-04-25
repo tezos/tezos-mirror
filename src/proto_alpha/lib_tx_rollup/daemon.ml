@@ -502,6 +502,10 @@ let process_op (type kind) (state : State.t) l1_block l1_operation ~source:_
           l1_operation
       in
       return acc
+  | ( Tx_rollup_finalize_commitment {tx_rollup},
+      Applied (Tx_rollup_finalize_commitment_result {level; _}) )
+    when is_my_rollup tx_rollup ->
+      State.set_finalized_level state level
   | (_, _) -> return acc
 
 let rollback_op (type kind) (state : State.t) _l1_block _l1_operation ~source:_
@@ -520,6 +524,14 @@ let rollback_op (type kind) (state : State.t) _l1_block _l1_operation ~source:_
       in
       let*! () = State.unset_commitment_included state commitment_hash in
       return acc
+  | ( Tx_rollup_finalize_commitment {tx_rollup},
+      Applied (Tx_rollup_finalize_commitment_result {level; _}) )
+    when is_my_rollup tx_rollup -> (
+      match Tx_rollup_level.pred level with
+      | None ->
+          let*! () = State.delete_finalized_level state in
+          return_unit
+      | Some level -> State.set_finalized_level state level)
   | (_, _) -> return acc
 
 let handle_l1_operation direction (block : Alpha_block_services.block_info)
