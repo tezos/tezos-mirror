@@ -228,7 +228,7 @@ let voting_tests state ~client ~src ~with_rejections ~protocol_kind
               match protocol_kind with
               | `Athens -> ()
               | `Babylon | `Carthage | `Delphi | `Edo | `Florence | `Granada
-              | `Hangzhou | `Ithaca | `Alpha ->
+              | `Hangzhou | `Ithaca | `Jakarta | `Alpha ->
                   wf
                     ppf
                     "From Babylon on, You will first be asked to provide the \
@@ -285,7 +285,7 @@ let voting_tests state ~client ~src ~with_rejections ~protocol_kind
                 match protocol_kind with
                 | `Athens -> ()
                 | `Babylon | `Carthage | `Delphi | `Edo | `Florence | `Granada
-                | `Hangzhou | `Ithaca | `Alpha ->
+                | `Hangzhou | `Ithaca | `Jakarta | `Alpha ->
                     wf
                       ppf
                       "From Babylon on, you will first be asked to provide the \
@@ -378,7 +378,7 @@ let originate_manager_tz_script state ~client ~name ~from ~bake ~protocol_kind
       @ (match protocol_kind with
         | `Athens -> ["for"; from]
         | `Babylon | `Carthage | `Delphi | `Edo | `Florence | `Granada
-        | `Hangzhou | `Ithaca | `Alpha ->
+        | `Hangzhou | `Ithaca | `Jakarta | `Alpha ->
             [])
       @ [
           "transferring";
@@ -775,7 +775,7 @@ let delegation_tests state ~client ~src ~with_rejections ~protocol_kind
   match protocol_kind with
   | `Athens -> self_delegation ()
   | `Babylon | `Carthage | `Delphi | `Edo | `Florence | `Granada | `Hangzhou
-  | `Ithaca | `Alpha ->
+  | `Ithaca | `Jakarta | `Alpha ->
       let* () = tz_account_delegation () in
       self_delegation ()
 
@@ -960,7 +960,7 @@ let prepare_origination_of_id_script ?(spendable = false) ?(delegatable = false)
     @ (match protocol_kind with
       | `Athens -> ["for"; from]
       | `Babylon | `Carthage | `Delphi | `Edo | `Florence | `Granada | `Hangzhou
-      | `Ithaca | `Alpha ->
+      | `Ithaca | `Jakarta | `Alpha ->
           [])
     @ [
         "transferring";
@@ -1128,7 +1128,7 @@ let basic_contract_operations_tests state ~client ~src ~with_rejections
           ~delegatable:true
           ()
     | `Babylon | `Carthage | `Delphi | `Edo | `Florence | `Granada | `Hangzhou
-    | `Ithaca | `Alpha ->
+    | `Ithaca | `Jakarta | `Alpha ->
         return ()
   in
   let push_drops =

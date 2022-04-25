@@ -423,10 +423,6 @@ module Vote : sig
       with type value = Protocol_hash.t
        and type t := Raw_context.t
 
-  (* To be removed when removing migration from Ithaca *)
-  module Legacy_listings_size :
-    Single_data_storage with type value = int32 and type t := Raw_context.t
-
   (** Sum of voting weights of all delegates. *)
   module Voting_power_in_listings :
     Single_data_storage with type value = int64 and type t := Raw_context.t
@@ -591,12 +587,6 @@ end
 (** Tenderbake *)
 
 module Tenderbake : sig
-  (** TODO: delete this module in K *)
-  module First_level_legacy :
-    Single_data_storage
-      with type t := Raw_context.t
-       and type value = Raw_level_repr.t
-
   (** [First_level_of_protocol] stores the level of the first block of
       this protocol. *)
   module First_level_of_protocol :

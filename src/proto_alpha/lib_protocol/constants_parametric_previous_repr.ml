@@ -25,34 +25,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type delegate_selection =
-  | Random
-  | Round_robin_over of Signature.Public_key.t list list
-
-let delegate_selection_encoding =
-  let open Data_encoding in
-  union
-    [
-      case
-        (Tag 0)
-        ~title:"Random_delegate_selection"
-        (constant "random")
-        (function Random -> Some () | _ -> None)
-        (fun () -> Random);
-      case
-        (Tag 1)
-        ~title:"Round_robin_over_delegates"
-        (list (list Signature.Public_key.encoding))
-        (function Round_robin_over l -> Some l | _ -> None)
-        (fun l -> Round_robin_over l);
-    ]
-
 type t = {
   preserved_cycles : int;
   blocks_per_cycle : int32;
   blocks_per_commitment : int32;
   blocks_per_stake_snapshot : int32;
-  blocks_per_voting_period : int32;
+  cycles_per_voting_period : int32;
   hard_gas_limit_per_operation : Gas_limit_repr.Arith.integral;
   hard_gas_limit_per_block : Gas_limit_repr.Arith.integral;
   proof_of_work_threshold : int64;
@@ -69,7 +47,7 @@ type t = {
   min_proposal_quorum : int32;
   liquidity_baking_subsidy : Tez_repr.t;
   liquidity_baking_sunset_level : int32;
-  liquidity_baking_escape_ema_threshold : int32;
+  liquidity_baking_toggle_ema_threshold : int32;
   max_operations_time_to_live : int;
   minimal_block_delay : Period_repr.t;
   delay_increment_per_round : Period_repr.t;
@@ -80,7 +58,29 @@ type t = {
   frozen_deposits_percentage : int;
   double_baking_punishment : Tez_repr.t;
   ratio_of_frozen_deposits_slashed_per_double_endorsement : Ratio_repr.t;
-  delegate_selection : delegate_selection;
+  initial_seed : State_hash.t option;
+  cache_script_size : int;
+  cache_stake_distribution_cycles : int;
+  cache_sampler_state_cycles : int;
+  tx_rollup_enable : bool;
+  tx_rollup_origination_size : int;
+  tx_rollup_hard_size_limit_per_inbox : int;
+  tx_rollup_hard_size_limit_per_message : int;
+  tx_rollup_commitment_bond : Tez_repr.t;
+  tx_rollup_finality_period : int;
+  tx_rollup_withdraw_period : int;
+  tx_rollup_max_inboxes_count : int;
+  tx_rollup_max_messages_per_inbox : int;
+  tx_rollup_max_commitments_count : int;
+  tx_rollup_cost_per_byte_ema_factor : int;
+  tx_rollup_max_ticket_payload_size : int;
+  tx_rollup_max_withdrawals_per_batch : int;
+  tx_rollup_rejection_max_proof_size : int;
+  tx_rollup_sunset_level : int32;
+  sc_rollup_enable : bool;
+  sc_rollup_origination_size : int;
+  sc_rollup_challenge_window_in_blocks : int;
+  sc_rollup_max_available_messages : int;
 }
 
 let encoding =
@@ -91,7 +91,7 @@ let encoding =
           c.blocks_per_cycle,
           c.blocks_per_commitment,
           c.blocks_per_stake_snapshot,
-          c.blocks_per_voting_period,
+          c.cycles_per_voting_period,
           c.hard_gas_limit_per_operation,
           c.hard_gas_limit_per_block,
           c.proof_of_work_threshold,
@@ -108,23 +108,45 @@ let encoding =
               c.min_proposal_quorum,
               c.liquidity_baking_subsidy,
               c.liquidity_baking_sunset_level,
-              c.liquidity_baking_escape_ema_threshold,
+              c.liquidity_baking_toggle_ema_threshold,
               c.max_operations_time_to_live,
               c.minimal_block_delay,
               c.delay_increment_per_round,
               c.consensus_committee_size,
               c.consensus_threshold ),
-            ( c.minimal_participation_ratio,
-              c.max_slashing_period,
-              c.frozen_deposits_percentage,
-              c.double_baking_punishment,
-              c.ratio_of_frozen_deposits_slashed_per_double_endorsement,
-              c.delegate_selection ) ) ) ))
+            ( ( c.minimal_participation_ratio,
+                c.max_slashing_period,
+                c.frozen_deposits_percentage,
+                c.double_baking_punishment,
+                c.ratio_of_frozen_deposits_slashed_per_double_endorsement,
+                c.initial_seed ),
+              ( ( c.cache_script_size,
+                  c.cache_stake_distribution_cycles,
+                  c.cache_sampler_state_cycles ),
+                ( ( ( c.tx_rollup_enable,
+                      c.tx_rollup_origination_size,
+                      c.tx_rollup_hard_size_limit_per_inbox,
+                      c.tx_rollup_hard_size_limit_per_message,
+                      c.tx_rollup_max_withdrawals_per_batch,
+                      c.tx_rollup_commitment_bond,
+                      c.tx_rollup_finality_period,
+                      c.tx_rollup_withdraw_period,
+                      c.tx_rollup_max_inboxes_count,
+                      c.tx_rollup_max_messages_per_inbox ),
+                    ( c.tx_rollup_max_commitments_count,
+                      c.tx_rollup_cost_per_byte_ema_factor,
+                      c.tx_rollup_max_ticket_payload_size,
+                      c.tx_rollup_rejection_max_proof_size,
+                      c.tx_rollup_sunset_level ) ),
+                  ( c.sc_rollup_enable,
+                    c.sc_rollup_origination_size,
+                    c.sc_rollup_challenge_window_in_blocks,
+                    c.sc_rollup_max_available_messages ) ) ) ) ) ) ))
     (fun ( ( preserved_cycles,
              blocks_per_cycle,
              blocks_per_commitment,
              blocks_per_stake_snapshot,
-             blocks_per_voting_period,
+             cycles_per_voting_period,
              hard_gas_limit_per_operation,
              hard_gas_limit_per_block,
              proof_of_work_threshold,
@@ -141,24 +163,46 @@ let encoding =
                  min_proposal_quorum,
                  liquidity_baking_subsidy,
                  liquidity_baking_sunset_level,
-                 liquidity_baking_escape_ema_threshold,
+                 liquidity_baking_toggle_ema_threshold,
                  max_operations_time_to_live,
                  minimal_block_delay,
                  delay_increment_per_round,
                  consensus_committee_size,
                  consensus_threshold ),
-               ( minimal_participation_ratio,
-                 max_slashing_period,
-                 frozen_deposits_percentage,
-                 double_baking_punishment,
-                 ratio_of_frozen_deposits_slashed_per_double_endorsement,
-                 delegate_selection ) ) ) ) ->
+               ( ( minimal_participation_ratio,
+                   max_slashing_period,
+                   frozen_deposits_percentage,
+                   double_baking_punishment,
+                   ratio_of_frozen_deposits_slashed_per_double_endorsement,
+                   initial_seed ),
+                 ( ( cache_script_size,
+                     cache_stake_distribution_cycles,
+                     cache_sampler_state_cycles ),
+                   ( ( ( tx_rollup_enable,
+                         tx_rollup_origination_size,
+                         tx_rollup_hard_size_limit_per_inbox,
+                         tx_rollup_hard_size_limit_per_message,
+                         tx_rollup_max_withdrawals_per_batch,
+                         tx_rollup_commitment_bond,
+                         tx_rollup_finality_period,
+                         tx_rollup_withdraw_period,
+                         tx_rollup_max_inboxes_count,
+                         tx_rollup_max_messages_per_inbox ),
+                       ( tx_rollup_max_commitments_count,
+                         tx_rollup_cost_per_byte_ema_factor,
+                         tx_rollup_max_ticket_payload_size,
+                         tx_rollup_rejection_max_proof_size,
+                         tx_rollup_sunset_level ) ),
+                     ( sc_rollup_enable,
+                       sc_rollup_origination_size,
+                       sc_rollup_challenge_window_in_blocks,
+                       sc_rollup_max_available_messages ) ) ) ) ) ) ) ->
       {
         preserved_cycles;
         blocks_per_cycle;
         blocks_per_commitment;
         blocks_per_stake_snapshot;
-        blocks_per_voting_period;
+        cycles_per_voting_period;
         hard_gas_limit_per_operation;
         hard_gas_limit_per_block;
         proof_of_work_threshold;
@@ -175,7 +219,7 @@ let encoding =
         min_proposal_quorum;
         liquidity_baking_subsidy;
         liquidity_baking_sunset_level;
-        liquidity_baking_escape_ema_threshold;
+        liquidity_baking_toggle_ema_threshold;
         max_operations_time_to_live;
         minimal_block_delay;
         delay_increment_per_round;
@@ -186,7 +230,29 @@ let encoding =
         frozen_deposits_percentage;
         double_baking_punishment;
         ratio_of_frozen_deposits_slashed_per_double_endorsement;
-        delegate_selection;
+        initial_seed;
+        cache_script_size;
+        cache_stake_distribution_cycles;
+        cache_sampler_state_cycles;
+        tx_rollup_enable;
+        tx_rollup_origination_size;
+        tx_rollup_hard_size_limit_per_inbox;
+        tx_rollup_hard_size_limit_per_message;
+        tx_rollup_max_withdrawals_per_batch;
+        tx_rollup_commitment_bond;
+        tx_rollup_finality_period;
+        tx_rollup_withdraw_period;
+        tx_rollup_max_inboxes_count;
+        tx_rollup_max_messages_per_inbox;
+        tx_rollup_max_commitments_count;
+        tx_rollup_cost_per_byte_ema_factor;
+        tx_rollup_max_ticket_payload_size;
+        tx_rollup_rejection_max_proof_size;
+        tx_rollup_sunset_level;
+        sc_rollup_enable;
+        sc_rollup_origination_size;
+        sc_rollup_challenge_window_in_blocks;
+        sc_rollup_max_available_messages;
       })
     (merge_objs
        (obj9
@@ -194,7 +260,7 @@ let encoding =
           (req "blocks_per_cycle" int32)
           (req "blocks_per_commitment" int32)
           (req "blocks_per_stake_snapshot" int32)
-          (req "blocks_per_voting_period" int32)
+          (req "cycles_per_voting_period" int32)
           (req
              "hard_gas_limit_per_operation"
              Gas_limit_repr.Arith.z_integral_encoding)
@@ -219,18 +285,48 @@ let encoding =
                 (req "min_proposal_quorum" int32)
                 (req "liquidity_baking_subsidy" Tez_repr.encoding)
                 (req "liquidity_baking_sunset_level" int32)
-                (req "liquidity_baking_escape_ema_threshold" int32)
+                (req "liquidity_baking_toggle_ema_threshold" int32)
                 (req "max_operations_time_to_live" int16)
                 (req "minimal_block_delay" Period_repr.encoding)
                 (req "delay_increment_per_round" Period_repr.encoding)
                 (req "consensus_committee_size" int31)
                 (req "consensus_threshold" int31))
-             (obj6
-                (req "minimal_participation_ratio" Ratio_repr.encoding)
-                (req "max_slashing_period" int31)
-                (req "frozen_deposits_percentage" int31)
-                (req "double_baking_punishment" Tez_repr.encoding)
-                (req
-                   "ratio_of_frozen_deposits_slashed_per_double_endorsement"
-                   Ratio_repr.encoding)
-                (dft "delegate_selection" delegate_selection_encoding Random)))))
+             (merge_objs
+                (obj6
+                   (req "minimal_participation_ratio" Ratio_repr.encoding)
+                   (req "max_slashing_period" int31)
+                   (req "frozen_deposits_percentage" int31)
+                   (req "double_baking_punishment" Tez_repr.encoding)
+                   (req
+                      "ratio_of_frozen_deposits_slashed_per_double_endorsement"
+                      Ratio_repr.encoding)
+                   (opt "initial_seed" State_hash.encoding))
+                (merge_objs
+                   (obj3
+                      (req "cache_script_size" int31)
+                      (req "cache_stake_distribution_cycles" int8)
+                      (req "cache_sampler_state_cycles" int8))
+                   (merge_objs
+                      (merge_objs
+                         (obj10
+                            (req "tx_rollup_enable" bool)
+                            (req "tx_rollup_origination_size" int31)
+                            (req "tx_rollup_hard_size_limit_per_inbox" int31)
+                            (req "tx_rollup_hard_size_limit_per_message" int31)
+                            (req "tx_rollup_max_withdrawals_per_batch" int31)
+                            (req "tx_rollup_commitment_bond" Tez_repr.encoding)
+                            (req "tx_rollup_finality_period" int31)
+                            (req "tx_rollup_withdraw_period" int31)
+                            (req "tx_rollup_max_inboxes_count" int31)
+                            (req "tx_rollup_max_messages_per_inbox" int31))
+                         (obj5
+                            (req "tx_rollup_max_commitments_count" int31)
+                            (req "tx_rollup_cost_per_byte_ema_factor" int31)
+                            (req "tx_rollup_max_ticket_payload_size" int31)
+                            (req "tx_rollup_rejection_max_proof_size" int31)
+                            (req "tx_rollup_sunset_level" int32)))
+                      (obj4
+                         (req "sc_rollup_enable" bool)
+                         (req "sc_rollup_origination_size" int31)
+                         (req "sc_rollup_challenge_window_in_blocks" int31)
+                         (req "sc_rollup_max_available_messages" int31))))))))

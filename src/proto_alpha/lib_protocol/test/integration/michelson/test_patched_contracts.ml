@@ -203,8 +203,7 @@ module Legacy_patch_test (Patches : LEGACY_SCRIPT_PATCHES) :
 end
 
 (* List modules containing patched scripts here: *)
-let test_modules : (module LEGACY_SCRIPT_PATCHES) list =
-  [(module Legacy_script_patches_for_J)]
+let test_modules : (module LEGACY_SCRIPT_PATCHES) list = []
 
 let tests =
   List.concat_map

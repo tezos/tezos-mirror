@@ -139,7 +139,6 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    liquidity_baking_cpmm.ml
    liquidity_baking_lqt.ml
    liquidity_baking_migration.mli liquidity_baking_migration.ml
-   legacy_script_patches_for_J.ml
    init_storage.mli init_storage.ml
    sapling_validator.ml
    global_constants_costs.mli global_constants_costs.ml
@@ -185,7 +184,6 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    ticket_token.mli ticket_token.ml
    ticket_balance_key.mli ticket_balance_key.ml
    ticket_lazy_storage_diff.mli ticket_lazy_storage_diff.ml
-   ticket_balance_migration_for_j.mli ticket_balance_migration_for_j.ml
    tx_rollup_parameters.mli tx_rollup_parameters.ml
    ticket_token_map.mli ticket_token_map.ml
    ticket_operations_diff.mli ticket_operations_diff.ml
@@ -329,7 +327,6 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    liquidity_baking_cpmm.ml
    liquidity_baking_lqt.ml
    liquidity_baking_migration.mli liquidity_baking_migration.ml
-   legacy_script_patches_for_J.ml
    init_storage.mli init_storage.ml
    sapling_validator.ml
    global_constants_costs.mli global_constants_costs.ml
@@ -375,7 +372,6 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    ticket_token.mli ticket_token.ml
    ticket_balance_key.mli ticket_balance_key.ml
    ticket_lazy_storage_diff.mli ticket_lazy_storage_diff.ml
-   ticket_balance_migration_for_j.mli ticket_balance_migration_for_j.ml
    tx_rollup_parameters.mli tx_rollup_parameters.ml
    ticket_token_map.mli ticket_token_map.ml
    ticket_operations_diff.mli ticket_operations_diff.ml
@@ -519,7 +515,6 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    liquidity_baking_cpmm.ml
    liquidity_baking_lqt.ml
    liquidity_baking_migration.mli liquidity_baking_migration.ml
-   legacy_script_patches_for_J.ml
    init_storage.mli init_storage.ml
    sapling_validator.ml
    global_constants_costs.mli global_constants_costs.ml
@@ -565,7 +560,6 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    ticket_token.mli ticket_token.ml
    ticket_balance_key.mli ticket_balance_key.ml
    ticket_lazy_storage_diff.mli ticket_lazy_storage_diff.ml
-   ticket_balance_migration_for_j.mli ticket_balance_migration_for_j.ml
    tx_rollup_parameters.mli tx_rollup_parameters.ml
    ticket_token_map.mli ticket_token_map.ml
    ticket_operations_diff.mli ticket_operations_diff.ml
@@ -731,7 +725,6 @@ include Tezos_raw_protocol_alpha.Main
    Liquidity_baking_cpmm
    Liquidity_baking_lqt
    Liquidity_baking_migration
-   Legacy_script_patches_for_J
    Init_storage
    Sapling_validator
    Global_constants_costs
@@ -777,7 +770,6 @@ include Tezos_raw_protocol_alpha.Main
    Ticket_token
    Ticket_balance_key
    Ticket_lazy_storage_diff
-   Ticket_balance_migration_for_j
    Tx_rollup_parameters
    Ticket_token_map
    Ticket_operations_diff
@@ -962,7 +954,6 @@ include Tezos_raw_protocol_alpha.Main
    liquidity_baking_cpmm.ml
    liquidity_baking_lqt.ml
    liquidity_baking_migration.mli liquidity_baking_migration.ml
-   legacy_script_patches_for_J.ml
    init_storage.mli init_storage.ml
    sapling_validator.ml
    global_constants_costs.mli global_constants_costs.ml
@@ -1008,7 +999,6 @@ include Tezos_raw_protocol_alpha.Main
    ticket_token.mli ticket_token.ml
    ticket_balance_key.mli ticket_balance_key.ml
    ticket_lazy_storage_diff.mli ticket_lazy_storage_diff.ml
-   ticket_balance_migration_for_j.mli ticket_balance_migration_for_j.ml
    tx_rollup_parameters.mli tx_rollup_parameters.ml
    ticket_token_map.mli ticket_token_map.ml
    ticket_operations_diff.mli ticket_operations_diff.ml
