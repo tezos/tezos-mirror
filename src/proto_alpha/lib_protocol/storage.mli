@@ -104,6 +104,20 @@ module Contract : sig
        and type value = Manager_repr.t
        and type t := Raw_context.t
 
+  (** The active consensus key of a delegate *)
+  module Consensus_key :
+    Indexed_data_storage
+      with type key = Contract_repr.t
+       and type value = Signature.Public_key.t
+       and type t := Raw_context.t
+
+  (** The pending consensus key of a delegate *)
+  module Pending_consensus_keys :
+    Indexed_data_storage
+      with type key = Cycle_repr.t
+       and type value = Signature.Public_key.t
+       and type t := Raw_context.t * Contract_repr.t
+
   (** The delegate of a contract, if any. *)
   module Delegate :
     Indexed_data_storage

@@ -212,6 +212,23 @@ module Contract = struct
       end)
       (Manager_repr)
 
+  module Consensus_key =
+    Indexed_context.Make_map
+      (Registered)
+      (struct
+        let name = ["consensus_key"; "active"]
+      end)
+      (Signature.Public_key)
+
+  module Pending_consensus_keys =
+    Make_indexed_data_storage
+      (Make_subcontext (Registered) (Indexed_context.Raw_context)
+         (struct
+           let name = ["consensus_key"; "pendings"]
+         end))
+         (Make_index (Cycle_repr.Index))
+      (Signature.Public_key)
+
   module Delegate =
     Indexed_context.Make_map
       (Registered)

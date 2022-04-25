@@ -103,11 +103,11 @@ module Contract = struct
       Stake_storage.set_active c delegate
     else
       let contract = Contract_repr.Implicit delegate in
-      let* () =
-        let* is_pk_revealed =
-          Contract_manager_storage.is_manager_key_revealed c delegate
-        in
-        fail_unless is_pk_revealed (Unregistered_delegate delegate)
+      let* pk =
+        Contract_manager_storage.get_manager_key
+          c
+          ~error:(Unregistered_delegate delegate)
+          delegate
       in
       let* () =
         let*! is_allocated = Contract_storage.allocated c contract in
@@ -122,6 +122,7 @@ module Contract = struct
       let* c = Contract_delegate_storage.set c contract delegate in
       let* c = Stake_storage.add_stake c delegate balance_and_frozen_bonds in
       let*! c = Storage.Delegates.add c delegate in
+      let* c = Delegate_consensus_key.init c delegate pk in
       let* c = Stake_storage.set_active c delegate in
       return c
 
@@ -252,3 +253,17 @@ let pubkey ctxt delegate =
     ctxt
     delegate
     ~error:(Unregistered_delegate delegate)
+
+module Migration_from_Kathmandu = struct
+  let update_delegate ctxt pkh =
+    let open Lwt_tzresult_syntax in
+    let* pk = Contract_manager_storage.get_manager_key ctxt pkh in
+    let* ctxt = Delegate_consensus_key.init ctxt pkh pk in
+    return ctxt
+
+  let update ctxt =
+    let open Lwt_tzresult_syntax in
+    let*! delegates = Storage.Delegates.elements ctxt in
+    let* ctxt = List.fold_left_es update_delegate ctxt delegates in
+    return ctxt
+end

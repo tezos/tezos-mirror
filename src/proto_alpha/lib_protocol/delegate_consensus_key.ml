@@ -1,0 +1,138 @@
+(*****************************************************************************)
+(*                                                                           *)
+(* Open Source License                                                       *)
+(* Copyright (c) 2022 G.B. Fefe, <gb.fefe@protonmail.com>                    *)
+(*                                                                           *)
+(* Permission is hereby granted, free of charge, to any person obtaining a   *)
+(* copy of this software and associated documentation files (the "Software"),*)
+(* to deal in the Software without restriction, including without limitation *)
+(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
+(* and/or sell copies of the Software, and to permit persons to whom the     *)
+(* Software is furnished to do so, subject to the following conditions:      *)
+(*                                                                           *)
+(* The above copyright notice and this permission notice shall be included   *)
+(* in all copies or substantial portions of the Software.                    *)
+(*                                                                           *)
+(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
+(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
+(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
+(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
+(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
+(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
+(* DEALINGS IN THE SOFTWARE.                                                 *)
+(*                                                                           *)
+(*****************************************************************************)
+
+type error += Invalid_consensus_key_update_noop of Cycle_repr.t
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"delegate.consensus_key.invalid_noop"
+    ~title:"Invalid key for consensus key update"
+    ~description:"Tried to update the consensus key with an active key"
+    ~pp:(fun ppf cycle ->
+      Format.fprintf
+        ppf
+        "Invalid key while updating a consensus key (active since %a)."
+        Cycle_repr.pp
+        cycle)
+    Data_encoding.(obj1 (req "cycle" Cycle_repr.encoding))
+    (function Invalid_consensus_key_update_noop c -> Some c | _ -> None)
+    (fun c -> Invalid_consensus_key_update_noop c)
+
+let init ctxt delegate pk =
+  Storage.Contract.Consensus_key.init ctxt (Contract_repr.Implicit delegate) pk
+
+let active_pubkey ctxt delegate =
+  let open Lwt_tzresult_syntax in
+  let* pk =
+    Storage.Contract.Consensus_key.get ctxt (Contract_repr.Implicit delegate)
+  in
+  return pk
+
+let active_key ctxt delegate =
+  let open Lwt_tzresult_syntax in
+  let* pk = active_pubkey ctxt delegate in
+  return (Signature.Public_key.hash pk)
+
+let raw_pending_updates ctxt delegate =
+  let open Lwt_tzresult_syntax in
+  let*! pendings =
+    Storage.Contract.Pending_consensus_keys.bindings
+      (ctxt, Contract_repr.Implicit delegate)
+  in
+  return pendings
+
+let pending_updates ctxt delegate =
+  let open Lwt_tzresult_syntax in
+  let* updates = raw_pending_updates ctxt delegate in
+  let updates =
+    List.sort (fun (c1, _) (c2, _) -> Cycle_repr.compare c1 c2) updates
+  in
+  return (List.map (fun (c, pk) -> (c, Signature.Public_key.hash pk)) updates)
+
+let raw_active_pubkey_for_cycle ctxt delegate cycle =
+  let open Lwt_tzresult_syntax in
+  let* pendings = raw_pending_updates ctxt delegate in
+  let* active = active_pubkey ctxt delegate in
+  let current_level = Raw_context.current_level ctxt in
+  let active_for_cycle =
+    List.fold_left
+      (fun (c1, active) (c2, pk) ->
+        if Cycle_repr.(c1 < c2 && c2 <= cycle) then (c2, pk) else (c1, active))
+      (current_level.cycle, active)
+      pendings
+  in
+  return active_for_cycle
+
+let active_pubkey_for_cycle ctxt delegate cycle =
+  let open Lwt_tzresult_syntax in
+  let* _, active = raw_active_pubkey_for_cycle ctxt delegate cycle in
+  return active
+
+let register_update ctxt delegate pk =
+  let open Lwt_tzresult_syntax in
+  let update_cycle =
+    let current_level = Raw_context.current_level ctxt in
+    let preserved_cycles = Constants_storage.preserved_cycles ctxt in
+    Cycle_repr.add current_level.cycle (preserved_cycles + 1)
+  in
+  let* () =
+    let* first_active_cycle, active_pubkey =
+      raw_active_pubkey_for_cycle ctxt delegate update_cycle
+    in
+    fail_when
+      Signature.Public_key.(pk = active_pubkey)
+      (Invalid_consensus_key_update_noop first_active_cycle)
+  in
+  let*! ctxt =
+    Storage.Contract.Pending_consensus_keys.add
+      (ctxt, Contract_repr.Implicit delegate)
+      update_cycle
+      pk
+  in
+  return ctxt
+
+let activate ctxt ~new_cycle =
+  let open Lwt_tzresult_syntax in
+  Storage.Delegates.fold
+    ctxt
+    ~order:`Undefined
+    ~init:(ok ctxt)
+    ~f:(fun delegate ctxt ->
+      let*? ctxt = ctxt in
+      let delegate = Contract_repr.Implicit delegate in
+      let* update =
+        Storage.Contract.Pending_consensus_keys.find (ctxt, delegate) new_cycle
+      in
+      match update with
+      | None -> return ctxt
+      | Some pk ->
+          let*! ctxt = Storage.Contract.Consensus_key.add ctxt delegate pk in
+          let*! ctxt =
+            Storage.Contract.Pending_consensus_keys.remove
+              (ctxt, delegate)
+              new_cycle
+          in
+          return ctxt)

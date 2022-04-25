@@ -2534,6 +2534,18 @@ module Delegate : sig
 
   val pubkey : context -> public_key_hash -> public_key tzresult Lwt.t
 
+  module Consensus_key : sig
+    val active_pubkey : context -> public_key_hash -> public_key tzresult Lwt.t
+
+    val pending_updates :
+      context ->
+      public_key_hash ->
+      (Cycle.t * public_key_hash) list tzresult Lwt.t
+
+    val register_update :
+      context -> public_key_hash -> public_key -> context tzresult Lwt.t
+  end
+
   (** See {!Stake_storage.prepare_stake_distribution}. *)
   val prepare_stake_distribution : context -> context tzresult Lwt.t
 end

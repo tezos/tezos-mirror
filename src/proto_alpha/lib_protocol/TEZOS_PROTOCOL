@@ -133,6 +133,7 @@
         "Stake_storage",
         "Contract_storage",
         "Token",
+        "Delegate_consensus_key",
         "Delegate_storage",
         "Delegate_sampler",
         "Delegate_missed_endorsements_storage",

@@ -216,8 +216,8 @@ let select_distribution_for_cycle ctxt cycle =
   >>=? fun ctxt ->
   List.fold_left_es
     (fun acc (pkh, stake) ->
-      Delegate_storage.pubkey ctxt pkh >|=? fun pk ->
-      ((pk, pkh), Tez_repr.to_mutez stake) :: acc)
+      Delegate_consensus_key.active_pubkey_for_cycle ctxt pkh cycle
+      >|=? fun pk -> ((pk, pkh), Tez_repr.to_mutez stake) :: acc)
     []
     stakes
   >>=? fun stakes_pk ->
