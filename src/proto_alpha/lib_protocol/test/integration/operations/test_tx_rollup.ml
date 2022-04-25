@@ -476,8 +476,8 @@ module Nat_ticket = struct
       ~ticketer
       tx_rollup
 
-  let withdrawal ctxt ~ticketer ?(claimer = ticketer) ?(amount = amount)
-      tx_rollup : (Tx_rollup_withdraw.t * Tx_rollup_reveal.t) tzresult Lwt.t =
+  let withdrawal ctxt ~ticketer ~claimer ?(amount = amount) tx_rollup :
+      (Tx_rollup_withdraw.t * Tx_rollup_reveal.t) tzresult Lwt.t =
     ticket_hash ctxt ~ticketer ~tx_rollup >|=? fun ticket_hash ->
     let claimer = Context.Contract.pkh claimer in
     ( Tx_rollup_withdraw.{claimer; ticket_hash; amount},
