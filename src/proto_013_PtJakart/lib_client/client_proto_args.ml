@@ -510,39 +510,12 @@ let successor_level_arg =
     ~doc:"Make the simulate on the successor level of the current head."
     ()
 
-let no_waiting_for_endorsements_arg =
-  switch
-    ~long:"no-waiting-for-late-endorsements"
-    ~doc:"Disable waiting for late endorsements"
-    ()
-
-let await_endorsements_arg =
-  switch
-    ~long:"await-late-endorsements"
-    ~doc:"Await late endorsements when baking a block"
-    ()
-
-let endorsement_delay_arg =
-  default_arg
-    ~long:"endorsement-delay"
-    ~placeholder:"seconds"
-    ~doc:
-      "delay before endorsing blocks\n\
-       Delay between notifications of new blocks from the node and production \
-       of endorsements for these blocks."
-    ~default:"0"
-    (parameter (fun _ s ->
-         try
-           let i = int_of_string s in
-           fail_when (i < 0) (Bad_endorsement_delay s) >>=? fun () ->
-           return (int_of_string s)
-         with _ -> fail (Bad_endorsement_delay s)))
-
 let preserved_levels_arg =
-  arg
+  default_arg
     ~long:"preserved-levels"
     ~placeholder:"threshold"
     ~doc:"Number of effective levels kept in the accuser's memory"
+    ~default:"200"
     (parameter (fun _ s ->
          try
            let preserved_cycles = int_of_string s in

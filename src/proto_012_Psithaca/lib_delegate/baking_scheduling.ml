@@ -32,10 +32,20 @@ type loop_state = {
   qc_stream : Operation_worker.event Lwt_stream.t;
   future_block_stream : proposal Lwt_stream.t;
   push_future_block : proposal -> unit;
-  mutable last_get_head_event : Baking_state.proposal option Lwt.t option;
-  mutable last_future_block_event : Baking_state.proposal Lwt.t option;
-  mutable last_get_qc_event : Operation_worker.event option Lwt.t option;
+  mutable last_get_head_event : [`New_proposal of proposal option] Lwt.t option;
+  mutable last_future_block_event :
+    [`New_future_block of Baking_state.proposal] Lwt.t option;
+  mutable last_get_qc_event :
+    [`QC_reached of Operation_worker.event option] Lwt.t option;
 }
+
+type events =
+  [ `New_future_block of proposal
+  | `New_proposal of proposal option
+  | `QC_reached of Operation_worker.event option
+  | `Termination
+  | `Timeout of timeout_kind ]
+  Lwt.t
 
 let create_loop_state block_stream operation_worker =
   let (future_block_stream, push_future_block) = Lwt_stream.create () in
@@ -90,6 +100,9 @@ let sleep_until time =
   if Ptime.Span.compare delay Ptime.Span.zero < 0 then None
   else Some (Lwt_unix.sleep (Ptime.Span.to_float_s delay))
 
+(* Only allocate once the termination promise *)
+let terminated = Lwt_exit.clean_up_starts >|= fun _ -> `Termination
+
 let rec wait_next_event ~timeout loop_state =
   (* TODO? should we prioritize head events/timeouts to resynchronize if needs be ? *)
   let get_head_event () =
@@ -97,7 +110,9 @@ let rec wait_next_event ~timeout loop_state =
        block_stream before starting baking. *)
     match loop_state.last_get_head_event with
     | None ->
-        let t = Lwt_stream.get loop_state.block_stream in
+        let t =
+          Lwt_stream.get loop_state.block_stream >|= fun e -> `New_proposal e
+        in
         loop_state.last_get_head_event <- Some t ;
         t
     | Some t -> t
@@ -108,11 +123,11 @@ let rec wait_next_event ~timeout loop_state =
     match loop_state.last_future_block_event with
     | None ->
         let t =
-          Lwt_stream.get loop_state.future_block_stream >>= function
+          Lwt_stream.get loop_state.future_block_stream >|= function
           | None ->
               (* unreachable, we never close the stream *)
               assert false
-          | Some proposal -> Lwt.return proposal
+          | Some proposal -> `New_future_block proposal
         in
         loop_state.last_future_block_event <- Some t ;
         t
@@ -121,7 +136,9 @@ let rec wait_next_event ~timeout loop_state =
   let get_qc_event () =
     match loop_state.last_get_qc_event with
     | None ->
-        let t = Lwt_stream.get loop_state.qc_stream in
+        let t =
+          Lwt_stream.get loop_state.qc_stream >|= fun e -> `QC_reached e
+        in
         loop_state.last_get_qc_event <- Some t ;
         t
     | Some t -> t
@@ -130,11 +147,11 @@ let rec wait_next_event ~timeout loop_state =
   let open Baking_state in
   Lwt.choose
     [
-      (Lwt_exit.clean_up_starts >|= fun _ -> `Termination);
-      (get_head_event () >|= fun e -> `New_proposal e);
-      (get_future_block_event () >|= fun e -> `New_future_block e);
-      (get_qc_event () >|= fun e -> `QC_reached e);
-      (timeout >|= fun e -> `Timeout e);
+      terminated;
+      (get_head_event () :> events);
+      (get_future_block_event () :> events);
+      (get_qc_event () :> events);
+      (timeout :> events);
     ]
   >>= function
   (* event matching *)
@@ -689,7 +706,8 @@ let rec automaton_loop ?(stop_on_event = fun _ -> false) ~config ~on_error
        state_recorder ~new_state:state' >>= fun _ -> return state')
   >>=? fun state'' ->
   compute_next_timeout state'' >>=? fun next_timeout ->
-  wait_next_event ~timeout:next_timeout loop_state >>=? function
+  wait_next_event ~timeout:(next_timeout >|= fun e -> `Timeout e) loop_state
+  >>=? function
   | None ->
       (* Termination *)
       return_none

@@ -386,7 +386,6 @@ let accuser_commands () =
       (args3 pidfile_arg Client_proto_args.preserved_levels_arg keep_alive_arg)
       (prefixes ["run"] @@ stop)
       (fun (pidfile, preserved_levels, keep_alive) cctxt ->
-        let preserved_levels = Option.value ~default:200 preserved_levels in
         may_lock_pidfile pidfile @@ fun () ->
         Client_daemon.Accuser.run
           cctxt

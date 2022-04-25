@@ -223,14 +223,13 @@ module Denunciator = struct
       ("hash", Block_hash.encoding)
 
   let fetch_operations_error =
-    declare_2
+    declare_1
       ~section
       ~level:Error
       ~name:"fetch_operations_error"
-      ~msg:"error while fetching operations in block {hash} {errors}"
-      ~pp2:pp_print_top_error_of_trace
+      ~msg:"error while fetching operations of block {hash}"
       ("hash", Block_hash.encoding)
-      ("errors", Error_monad.(TzTrace.encoding error_encoding))
+      ~pp1:Block_hash.pp
 
   let accuser_processed_block =
     declare_1

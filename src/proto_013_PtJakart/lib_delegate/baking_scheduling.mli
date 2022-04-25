@@ -37,7 +37,7 @@ val sleep_until : Time.Protocol.t -> unit Lwt.t option
     promises) and a timeout promise [timeout]. The function reacts to a
     promise being fulfilled by firing an event [Baking_state.event]. *)
 val wait_next_event :
-  timeout:timeout_kind Lwt.t ->
+  timeout:[`Timeout of timeout_kind] Lwt.t ->
   loop_state ->
   (event option, error trace) result Lwt.t
 

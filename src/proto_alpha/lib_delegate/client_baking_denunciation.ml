@@ -28,6 +28,7 @@ open Alpha_context
 open Protocol_client_context
 open Client_baking_blocks
 module Events = Delegate_events.Denunciator
+module B_Events = Delegate_events.Baking_scheduling
 
 module HLevel = Hashtbl.Make (struct
   type t = Chain_id.t * Raw_level.t * Round.t
@@ -355,27 +356,23 @@ let process_new_block (cctxt : #Protocol_client_context.full) state
       Raw_level.max level state.highest_level_encountered ;
     (* Processing blocks *)
     (Alpha_block_services.info cctxt ~chain ~block () >>= function
-     | Ok block_info -> process_block cctxt state block_info
+     | Ok block_info -> (
+         process_block cctxt state block_info >>=? fun () ->
+         (* Processing (pre)endorsements in the block *)
+         match block_info.operations with
+         | consensus_ops :: _ ->
+             let packed_op {Alpha_block_services.shell; protocol_data; _} =
+               {shell; protocol_data}
+             in
+             process_operations cctxt state consensus_ops ~packed_op chain_id
+         | _ ->
+             (* Should not happen as a block should contain 4 lists of
+                operations, the first list being dedicated to consensus
+                operations. *)
+             Events.(emit fetch_operations_error hash) >>= fun () -> return_unit
+         )
      | Error errs ->
-         Events.(emit fetch_operations_error) (hash, errs) >>= fun () ->
-         return_unit)
-    >>=? fun () ->
-    (* Processing (pre)endorsements in the block *)
-    (Alpha_block_services.Operations.operations cctxt ~chain ~block ()
-     >>= function
-     | Ok (consensus_ops :: _) ->
-         let packed_op {Alpha_block_services.shell; protocol_data; _} =
-           {shell; protocol_data}
-         in
-         process_operations cctxt state consensus_ops ~packed_op chain_id
-     | Ok [] ->
-         (* should not happen, unless the semantics of
-            Alpha_block_services.Operations.operations (which is supposed to
-            return a list of 4 elements changes. In which case, this code
-            should be adapted). *)
-         assert false
-     | Error errs ->
-         Events.(emit fetch_operations_error) (hash, errs) >>= fun () ->
+         Events.(emit accuser_block_error) (hash, errs) >>= fun () ->
          return_unit)
     >>=? fun () ->
     cleanup_old_operations state ;
@@ -383,10 +380,9 @@ let process_new_block (cctxt : #Protocol_client_context.full) state
 
 let process_new_block cctxt state bi =
   process_new_block cctxt state bi >>= function
-  | Ok () -> Events.(emit accuser_processed_block) bi.hash >>= return
-  | Error errs -> Events.(emit accuser_block_error) (bi.hash, errs) >>= return
-
-module B_Events = Delegate_events.Baking_scheduling
+  | Ok () -> Events.(emit accuser_processed_block) bi.hash >>= Lwt.return
+  | Error errs ->
+      Events.(emit accuser_block_error) (bi.hash, errs) >>= Lwt.return
 
 let rec wait_for_first_block ~name stream =
   Lwt_stream.get stream >>= function
@@ -409,6 +405,7 @@ let start_ops_monitor cctxt =
     ~branch_delayed:true
     ~branch_refused:true
     ~refused:true
+    ~outdated:true
     ()
 
 let create (cctxt : #Protocol_client_context.full) ?canceler ~preserved_levels
@@ -432,7 +429,7 @@ let create (cctxt : #Protocol_client_context.full) ?canceler ~preserved_levels
   let get_block () =
     match !last_get_block with
     | None ->
-        let t = Lwt_stream.get state.blocks_stream in
+        let t = Lwt_stream.get state.blocks_stream >|= fun e -> `Block e in
         last_get_block := Some t ;
         t
     | Some t -> t
@@ -441,21 +438,17 @@ let create (cctxt : #Protocol_client_context.full) ?canceler ~preserved_levels
   let get_ops () =
     match !last_get_ops with
     | None ->
-        let t = Lwt_stream.get state.ops_stream in
+        let t = Lwt_stream.get state.ops_stream >|= fun e -> `Operations e in
         last_get_ops := Some t ;
         t
     | Some t -> t
   in
   Chain_services.chain_id cctxt () >>=? fun chain_id ->
   (* main loop *)
+  (* Only allocate once the termination promise *)
+  let terminated = Lwt_exit.clean_up_starts >|= fun _ -> `Termination in
   let rec worker_loop () =
-    Lwt.choose
-      [
-        (Lwt_exit.clean_up_starts >|= fun _ -> `Termination);
-        (get_block () >|= fun e -> `Block e);
-        (get_ops () >|= fun e -> `Operations e);
-      ]
-    >>= function
+    Lwt.choose [terminated; get_block (); get_ops ()] >>= function
     (* event matching *)
     | `Termination -> return_unit
     | `Block (None | Some (Error _)) ->
@@ -465,8 +458,7 @@ let create (cctxt : #Protocol_client_context.full) ?canceler ~preserved_levels
         fail Baking_errors.Node_connection_lost
     | `Block (Some (Ok bi)) ->
         last_get_block := None ;
-        log_errors_and_continue ~name @@ process_new_block cctxt state bi
-        >>= fun () -> worker_loop ()
+        process_new_block cctxt state bi >>= fun () -> worker_loop ()
     | `Operations None ->
         (* restart a new operations monitor stream *)
         last_get_ops := None ;

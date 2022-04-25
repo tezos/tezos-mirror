@@ -134,6 +134,14 @@ Baker / Endorser / Accuser
   the following strings: ``"on"`` to vote to continue Liquidity
   Baking, ``"off"`` to vote to stop it, or ``"pass"`` to abstain.
 
+- Fixed a memory leak in ``baker`` binary (Ithaca2, Jakarta and Alpha)
+
+- Fixed a memory leak in ``accuser`` binary (Ithaca2, Jakarta and Alpha)
+
+- Fixed the RPC ``/chains/<chain>/mempool/monitor_operations`` which
+  would not notify outdated operations when the query
+  ``outdated=true`` was provided.
+
 Signer
 ------
 
