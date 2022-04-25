@@ -531,7 +531,7 @@ let handle_l1_reorg state acc reorg =
     List.fold_left_es
       (handle_l1_block `Rollback state)
       acc
-      reorg.Common.old_chain
+      (List.rev reorg.Common.old_chain)
   in
   let* acc =
     List.fold_left_es

@@ -644,7 +644,7 @@ let on_new_tezos_head state (head : Alpha_block_services.block_info)
     List.iter_s
       (fun removed_block ->
         revert_included_operations state removed_block.Alpha_block_services.hash)
-      reorg.old_chain
+      (List.rev reorg.old_chain)
   in
   let*! () =
     List.iter_s
