@@ -23,6 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* Testing
+   -------
+   Component:    Client keys
+   Invocation:   dune exec tezt/tests/main.exe -- --file client_keys.ml
+   Subject:      Checks client wallet commands
+*)
+
 let check_shown_account ~__LOC__ (expected : Account.aggregate_key)
     (shown : Account.aggregate_key) =
   if expected.aggregate_public_key_hash <> shown.aggregate_public_key_hash then

@@ -40,8 +40,12 @@ module Bls_commands : sig
   (** [list_keys cctxt] lists the BLS keys known by the wallet. *)
   val list_keys : #Client_context.io_wallet -> unit tzresult Lwt.t
 
-  (** [show_address alias] shows the address corresponding to given [alias]. *)
-  val show_address : string -> #Client_context.io_wallet -> unit tzresult Lwt.t
+  (** [show_address ~show_private alias] shows the address corresponding to given [alias]. *)
+  val show_address :
+    show_private:bool ->
+    string ->
+    #Client_context.io_wallet ->
+    unit tzresult Lwt.t
 
   (** [import_secret_key ~force alias uri cctxt] imports a secret key from [uri]
       as [alias] in the wallet. If [force] is [true], it will replace the alias

@@ -120,7 +120,10 @@ module Keys = struct
       (prefixes ["show"; "address"]
       @@ Aggregate_alias.Public_key_hash.alias_param @@ stop)
       (fun () (name, _pkh) (cctxt : #Configuration.sc_client_context) ->
-        Client_keys_commands.Bls_commands.show_address name cctxt)
+        Client_keys_commands.Bls_commands.show_address
+          ~show_private:true
+          name
+          cctxt)
 
   let import_secret_key () =
     command
