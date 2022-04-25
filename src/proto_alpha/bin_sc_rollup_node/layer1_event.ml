@@ -23,6 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/2880 
+   Add corresponding .mli file. *)
+
 module Simple = struct
   include Internal_event.Simple
 

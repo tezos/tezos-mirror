@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -25,55 +25,39 @@
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/2880 
    Add corresponding .mli file. *)
+
 module Simple = struct
   include Internal_event.Simple
 
-  let section = ["sc_rollup_node"]
+  let section = ["sc_rollup_node"; "daemon"]
 
-  let starting_node =
-    declare_0
+  let head_processing =
+    declare_4
       ~section
-      ~name:"starting_sc_rollup_node"
-      ~msg:"Starting the smart contract rollup node"
-      ~level:Notice
-      ()
-
-  let shutdown_node =
-    declare_1
-      ~section
-      ~name:"stopping_sc_rollup_node"
-      ~msg:"Stopping the smart contract rollup node"
-      ~level:Notice
-      ("exit_status", Data_encoding.int8)
-
-  let node_is_ready =
-    declare_2
-      ~section
-      ~name:"sc_rollup_node_is_ready"
-      ~msg:"The smart contract rollup node is listening to {addr}:{port}"
-      ~level:Notice
-      ("addr", Data_encoding.string)
-      ("port", Data_encoding.uint16)
-
-  let rollup_exists =
-    declare_2
-      ~section
-      ~name:"sc_rollup_node_knows_its_rollup"
+      ~name:"sc_rollup_daemon_process_head"
       ~msg:
-        "The smart contract rollup node is interacting with rollup {addr} of \
-         kind {kind}"
+        "Processing: head {hash} at level {level}: finalized? {finalized}, \
+         partially processed? {seen_before}"
       ~level:Notice
-      ("addr", Protocol.Alpha_context.Sc_rollup.Address.encoding)
-      ("kind", Data_encoding.string)
+      ("hash", Block_hash.encoding)
+      ("level", Data_encoding.int32)
+      ("finalized", Data_encoding.bool)
+      ("seen_before", Data_encoding.bool)
+
+  let not_finalized_head =
+    declare_2
+      ~section
+      ~name:"sc_rollup_daemon_not_finalized"
+      ~msg:
+        "The following head has only be partially processed - commitments have \
+         not been computed: Head {hash} at level {level}"
+      ~level:Notice
+      ("hash", Block_hash.encoding)
+      ("level", Data_encoding.int32)
 end
 
-let starting_node = Simple.(emit starting_node)
+let head_processing hash level finalized seen_before =
+  Simple.(emit head_processing (hash, level, finalized, seen_before))
 
-let shutdown_node exit_status = Simple.(emit shutdown_node exit_status)
-
-let node_is_ready ~rpc_addr ~rpc_port =
-  Simple.(emit node_is_ready (rpc_addr, rpc_port))
-
-let rollup_exists ~addr ~kind =
-  let kind = Protocol.Sc_rollups.string_of_kind kind in
-  Simple.(emit rollup_exists (addr, kind))
+let not_finalized_head hash level =
+  Simple.(emit not_finalized_head (hash, level))

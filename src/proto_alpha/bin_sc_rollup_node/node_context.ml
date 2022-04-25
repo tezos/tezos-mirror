@@ -31,12 +31,13 @@ type t = {
   rollup_address : Sc_rollup.t;
   operator : Signature.Public_key_hash.t;
   initial_level : Raw_level.t;
+  block_finality_time : int;
 }
 
-let get_operator_keys ctxt =
+let get_operator_keys node_ctxt =
   let open Lwt_result_syntax in
-  let+ (_, pk, sk) = Client_keys.get_key ctxt.cctxt ctxt.operator in
-  (ctxt.operator, pk, sk)
+  let+ (_, pk, sk) = Client_keys.get_key node_ctxt.cctxt node_ctxt.operator in
+  (node_ctxt.operator, pk, sk)
 
 let init (cctxt : Protocol_client_context.full) rollup_address operator =
   let open Lwt_result_syntax in
@@ -46,4 +47,4 @@ let init (cctxt : Protocol_client_context.full) rollup_address operator =
       (cctxt#chain, cctxt#block)
       rollup_address
   in
-  {cctxt; rollup_address; operator; initial_level}
+  {cctxt; rollup_address; operator; initial_level; block_finality_time = 2}

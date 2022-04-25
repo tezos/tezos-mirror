@@ -49,6 +49,20 @@ let info message =
   let date = Unix.gettimeofday () |> int_of_float |> Int64.of_int in
   Irmin.Info.Default.v ~author:"Tezos smart-contract rollup node" ~message date
 
+module type Mutable_value = sig
+  type value
+
+  val path_key : path
+
+  val decode_value : bytes -> value Lwt.t
+
+  val set : t -> value -> unit Lwt.t
+
+  val get : t -> value Lwt.t
+
+  val find : t -> value option Lwt.t
+end
+
 module Make_append_only_map (P : sig
   val path : path
 
@@ -112,6 +126,8 @@ module Make_mutable_value (P : sig
   val value_encoding : value Data_encoding.t
 end) =
 struct
+  type value = P.value
+
   let path_key = P.path
 
   let decode_value encoded_value =
@@ -270,4 +286,34 @@ module Histories = Make_append_only_map (struct
   type value = Inbox.history
 
   let value_encoding = Inbox.history_encoding
+end)
+
+module Commitments = Make_append_only_map (struct
+  let path = ["commitments"; "computed"]
+
+  let keep_last_n_entries_in_memory = 10
+
+  type key = Raw_level.t
+
+  let string_of_key l = Int32.to_string @@ Raw_level.to_int32 l
+
+  type value = Sc_rollup.Commitment.t
+
+  let value_encoding = Sc_rollup.Commitment.encoding
+end)
+
+module Last_stored_commitment_level = Make_mutable_value (struct
+  let path = ["commitments"; "last_stored_level"]
+
+  type value = Raw_level.t
+
+  let value_encoding = Raw_level.encoding
+end)
+
+module Last_published_commitment_level = Make_mutable_value (struct
+  let path = ["commitments"; "last_published_level"]
+
+  type value = Raw_level.t
+
+  let value_encoding = Raw_level.encoding
 end)

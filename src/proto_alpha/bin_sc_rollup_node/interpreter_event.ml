@@ -23,6 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/2880 
+   Add corresponding .mli file. *)
+
 open Protocol.Alpha_context.Sc_rollup
 
 module Simple = struct
