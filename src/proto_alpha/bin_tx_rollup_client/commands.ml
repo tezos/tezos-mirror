@@ -37,6 +37,26 @@ let l1_addr_param =
       | Some addr -> return addr
       | None -> failwith "The given L1 address is invalid")
 
+let parse_file parse path =
+  Lwt_utils_unix.read_file path >>= fun contents -> parse contents
+
+let file_or_text_parameter ~from_text
+    ?(from_path = parse_file (from_text ~heuristic:false)) () =
+  Clic.parameter @@ fun _ p ->
+  match String.split ~limit:1 ':' p with
+  | ["text"; text] -> from_text ~heuristic:false text
+  | ["file"; path] -> from_path path
+  | _ -> if Sys.file_exists p then from_path p else from_text ~heuristic:true p
+
+let json_file_or_text_parameter =
+  let from_text ~heuristic s =
+    try return (Ezjsonm.from_string s)
+    with Ezjsonm.Parse_error _ when heuristic ->
+      failwith "Neither an existing file nor valid JSON: '%s'" s
+  in
+  let from_path = Lwt_utils_unix.Json.read_file in
+  file_or_text_parameter ~from_text ~from_path ()
+
 let block_id_param =
   let open Lwt_result_syntax in
   Clic.parameter (fun _ s ->
@@ -112,18 +132,24 @@ let sign_transaction sks txs =
   in
   List.map (fun sk -> Bls.sign sk buf) sks
 
-let craft_tx ~counter ~signer ~destination ~ticket_hash ~qty =
-  let content =
-    Tx_rollup_l2_batch.V1.(
-      Transfer
-        {
-          destination = Indexable.from_value destination;
-          ticket_hash = Indexable.from_value ticket_hash;
-          qty;
-        })
+let craft_transfers ~counter ~signer transfers =
+  let contents =
+    List.map
+      (fun (qty, destination, ticket_hash) ->
+        Tx_rollup_l2_batch.V1.(
+          Transfer
+            {
+              destination = Indexable.from_value destination;
+              ticket_hash = Indexable.from_value ticket_hash;
+              qty;
+            }))
+      transfers
   in
   let signer = Indexable.from_value signer in
-  Tx_rollup_l2_batch.V1.{signer; counter; contents = [content]}
+  Tx_rollup_l2_batch.V1.{signer; counter; contents}
+
+let craft_tx ~counter ~signer ~destination ~ticket_hash ~qty =
+  craft_transfers ~counter ~signer [(qty, destination, ticket_hash)]
 
 let craft_withdraw ~counter ~signer ~destination ~ticket_hash ~qty =
   let content =
@@ -173,6 +199,83 @@ let conv_qty =
 let conv_counter =
   Clic.parameter (fun _ counter -> return (Int64.of_string counter))
 
+let signer_next_counter cctxt signer_pk counter =
+  match counter with
+  | Some c -> return c
+  | None ->
+      (* Retrieve the counter of the current head and increments it
+         by one. *)
+      (match RPC.destruct_block_id "head" with
+      | Ok v -> return v
+      | Error e ->
+          let pkh_str =
+            Bls12_381.Signature.MinPk.pk_to_bytes signer_pk
+            |> Data_encoding.Binary.of_bytes_exn
+                 Tezos_crypto.Bls.Public_key.encoding
+            |> Tezos_crypto.Bls.Public_key.to_b58check
+          in
+          failwith "Cannot get counter of %s (%s)" pkh_str e)
+      >>=? fun head ->
+      let pkh = Tx_rollup_l2_address.of_bls_pk signer_pk in
+      RPC.counter cctxt head pkh >>=? fun counter -> return (Int64.succ counter)
+
+let craft_tx_transfers () =
+  command
+    ~desc:"WIP: craft a transaction with transfers"
+    (args1
+       (arg
+          ~long:"counter"
+          ~placeholder:"counter"
+          ~doc:"counter value of the destination"
+          conv_counter))
+    (prefixes ["craft"; "tx"; "transfers"; "from"]
+    @@ param ~name:"signer_pk" ~desc:"public key of the signer" conv_pk
+    @@ prefix "using"
+    @@ param
+         ~name:"transfers.json"
+         ~desc:
+           "List of transfers from the signer in JSON format (from a file or \
+            directly inlined). The input JSON must be an array of objects of \
+            the form '[ {\"destination\": dst, \"qty\" : val, \"ticket\" : \
+            ticket_hash} ]'"
+         json_file_or_text_parameter
+    @@ stop)
+    (fun counter
+         signer_pk
+         transfers_json
+         (cctxt : #Configuration.tx_client_context) ->
+      let transfers_encoding =
+        let open Data_encoding in
+        let transfer_encoding =
+          obj3
+            (req "qty" string)
+            (req "destination" string)
+            (req "ticket" string)
+        in
+        list transfer_encoding
+      in
+      match Data_encoding.Json.destruct transfers_encoding transfers_json with
+      | [] -> failwith "Empty transfer list"
+      | transfers ->
+          let transfers =
+            List.map
+              (fun (qty, destination, ticket) ->
+                ( Int64.of_string qty |> Tx_rollup_l2_qty.of_int64_exn,
+                  Tx_rollup_l2_address.of_b58check_exn destination,
+                  Alpha_context.Ticket_hash.of_b58check_exn ticket ))
+              transfers
+          in
+          signer_next_counter cctxt signer_pk counter >>=? fun counter ->
+          let signer = Tx_rollup_l2_batch.Bls_pk signer_pk in
+          let op = craft_transfers ~counter ~signer transfers in
+          let json =
+            Data_encoding.Json.construct
+              (Data_encoding.list Tx_rollup_l2_batch.V1.transaction_encoding)
+              [[op]]
+          in
+          cctxt#message "@[%a@]" Data_encoding.Json.pp json >>= fun () ->
+          return_unit)
+
 let craft_tx_transaction () =
   command
     ~desc:"WIP: craft a transaction"
@@ -197,19 +300,7 @@ let craft_tx_transaction () =
          destination
          ticket_hash
          (cctxt : #Configuration.tx_client_context) ->
-      (match counter with
-      | Some c -> return c
-      | None ->
-          (* Retrieve the counter of the current head and increments it
-             by one. *)
-          (match RPC.destruct_block_id "head" with
-          | Ok v -> return v
-          | Error e -> failwith "Cannot get counter of current head (%s)" e)
-          >>=? fun head ->
-          let pkh = Tx_rollup_l2_address.of_bls_pk signer_pk in
-          RPC.counter cctxt head pkh >>=? fun counter ->
-          return (Int64.succ counter))
-      >>=? fun counter ->
+      signer_next_counter cctxt signer_pk counter >>=? fun counter ->
       let signer = Tx_rollup_l2_batch.Bls_pk signer_pk in
       let op = craft_tx ~counter ~signer ~destination ~ticket_hash ~qty in
       let json =
@@ -378,6 +469,7 @@ let all () =
     get_tx_inbox ();
     get_tx_block ();
     craft_tx_transaction ();
+    craft_tx_transfers ();
     craft_tx_withdrawal ();
     craft_tx_batch ();
     get_batcher_queue ();
