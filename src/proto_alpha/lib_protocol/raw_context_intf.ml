@@ -185,6 +185,20 @@ module type VIEW = sig
 
   (** [config t] is [t]'s hash configuration. *)
   val config : t -> config
+
+  (** [length t key] is an Lwt promise that resolves to the number of files and
+      sub-nodes stored under [k] in [t].
+
+      It is equivalent to [list t k >|= List.length] but has a constant-time
+      complexity.
+
+      Most of the time, this function does not perform any I/O as the length is
+      cached in the tree. It may perform one read to load the root node of the
+      tree in case it has not been loaded already. The initial constant is the
+      same between [list] and [length]. They both perform the same kind of I/O
+      reads. While [list] usually performs a linear number of reads, [length]
+      does at most one. *)
+  val length : t -> key -> int Lwt.t
 end
 
 module Kind = struct

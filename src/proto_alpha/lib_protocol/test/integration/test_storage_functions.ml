@@ -35,6 +35,14 @@
 open Protocol
 open Storage_functors
 
+let assert_length ~loc ctxt key expected =
+  let open Lwt_result_syntax in
+  let*! length = Raw_context.length ctxt key in
+  let* () = Assert.equal_int ~loc length expected in
+  let*! list = Raw_context.list ctxt key in
+  let list_length = List.length list in
+  Assert.equal_int ~loc length list_length
+
 module Int32 = struct
   type t = int32
 
@@ -117,10 +125,55 @@ let test_fold_keys_unaccounted () =
     [1; 2]
     items
 
+(** Test that [length] returns the number of elements for a given path. *)
+let test_length () =
+  let open Lwt_result_syntax in
+  let* ctxt = Context.default_raw_context () in
+  (* Add a tree to the context:
+     root:
+       left:
+         l1 : V1
+         l2 : V2
+         l3 : V3
+       right:
+         r1 : V4
+         r2 : V5
+       file : V6
+  *)
+  let*! tree =
+    let*! tree_left =
+      let tree = Raw_context.Tree.empty ctxt in
+      let*! tree = Raw_context.Tree.add tree ["l1"] (Bytes.of_string "V1") in
+      let*! tree = Raw_context.Tree.add tree ["l2"] (Bytes.of_string "V2") in
+      Raw_context.Tree.add tree ["c"] (Bytes.of_string "V3")
+    in
+    let*! tree_right =
+      let tree = Raw_context.Tree.empty ctxt in
+      let*! tree = Raw_context.Tree.add tree ["r1"] (Bytes.of_string "V4") in
+      Raw_context.Tree.add tree ["r2"] (Bytes.of_string "V5")
+    in
+    let tree = Raw_context.Tree.empty ctxt in
+    let*! tree = Raw_context.Tree.add_tree tree ["left"] tree_left in
+    let*! tree = Raw_context.Tree.add_tree tree ["right"] tree_right in
+    Raw_context.Tree.add tree ["file"] (Bytes.of_string "V6")
+  in
+  let* ctxt = wrap @@ Raw_context.init_tree ctxt ["root"] tree in
+  (* The root node contains 3 elements. *)
+  let* () = assert_length ctxt ~loc:__LOC__ ["root"] 3 in
+  (* The left branch contains 3 elements. *)
+  let* () = assert_length ctxt ~loc:__LOC__ ["root"; "left"] 3 in
+  (* The right branch contains 2 elements. *)
+  let* () = assert_length ctxt ~loc:__LOC__ ["root"; "right"] 2 in
+  (* Path [root/left/l1] is a leaf and thus returns length 0. *)
+  let* () = assert_length ctxt ~loc:__LOC__ ["root"; "left"; "l1"] 0 in
+  (* The length of a non-existing path also returns 0. *)
+  assert_length ctxt ~loc:__LOC__ ["root"; "right"; "non_existing"] 0
+
 let tests =
   [
     Tztest.tztest
       "fold_keys_unaccounted smoke test"
       `Quick
       test_fold_keys_unaccounted;
+    Tztest.tztest "length test" `Quick test_length;
   ]

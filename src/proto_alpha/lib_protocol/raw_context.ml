@@ -1078,6 +1078,8 @@ let config ctxt = Context.config (context ctxt)
 
 module Proof = Context.Proof
 
+let length ctxt key = Context.length (context ctxt) key
+
 module Tree :
   Raw_context_intf.TREE
     with type t := t
