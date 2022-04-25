@@ -544,7 +544,7 @@ Python integration and regression tests
   New Pytest tests will be included automatically in the CI.
   To rebalance the Pytest batches based on a previous pipeline,
   run (from the root of the Tezos repository):
-  ``cd tests_python && poetry run ./scripts/jobs_fetch_reports.py <PROJECT_ID> <PIPELINE_ID> test-results.xml``
+  ``cd tests_python && poetry run python ./scripts/jobs_fetch_reports.py <PROJECT_ID> <PIPELINE_ID> test-results.xml``
   setting ``<PROJECT_ID>`` to a GitLab project id (e.g. ``3836952`` or `tezos/tezos <https://gitlab.com/tezos/tezos>`_)
   and ``<PIPELINE_ID>`` to the id of a pipeline in this project for which integration tests have executed
   (e.g. `391861162 <https://gitlab.com/tezos/tezos/-/pipelines/391861162>`_).

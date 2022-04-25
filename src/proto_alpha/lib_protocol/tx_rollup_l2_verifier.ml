@@ -157,7 +157,7 @@ let compute_proof_after_hash ~max_proof_size ctxt parameters agreed proof
   >>= fun res ->
   match res with
   | (Ok _ | Error (`Stream_too_short _)) when proof_is_too_long ->
-      (* If the proof is larger than [proof_is_too_long] we care about 2 cases:
+      (* If the proof is larger than [max_proof_size] we care about 2 cases:
 
          - The proof verification succedeed but should not be considered valid
            since it is larger than the size limit
