@@ -639,14 +639,14 @@ if [ "$#" -eq 0 ] ; then usage ; exit 1;  else shift ; fi
 case $(basename "$0") in
     ithacanet.sh)
         docker_base_dir="$HOME/.tezos-ithacanet"
-        docker_image=tezos/tezos:master
+        docker_image=tezos/tezos:v13.0-rc1
         docker_compose_base_name=ithacanet
         default_port=9732
         network=ithacanet
         ;;
     *)
         docker_base_dir="$HOME/.tezos-mainnet"
-        docker_image=tezos/tezos:master
+        docker_image=tezos/tezos:v13.0-rc1
         docker_compose_base_name="mainnet"
         default_port=9732
         network=mainnet
