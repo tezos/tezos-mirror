@@ -248,6 +248,27 @@ let create_genesis_block state tezos_block =
   let+ _block_hash = State.save_block state genesis_block in
   (genesis_block, ctxt)
 
+let check_inbox state tezos_block level inbox =
+  let open Lwt_result_syntax in
+  Error.trace_fatal
+  @@ let* proto_inbox =
+       Protocol.Tx_rollup_services.inbox
+         state.State.cctxt
+         (state.State.cctxt#chain, `Hash (tezos_block, 0))
+         state.State.rollup_info.rollup_id
+         level
+     in
+     let*? protocol_inbox =
+       Result.of_option
+         ~error:[Error.Tx_rollup_no_proto_inbox (level, tezos_block)]
+         proto_inbox
+     in
+     let reconstructed_inbox = Inbox.to_proto inbox in
+     fail_unless
+       Tx_rollup_inbox.(reconstructed_inbox = protocol_inbox)
+       (Error.Tx_rollup_inbox_mismatch
+          {level; reconstructed_inbox; protocol_inbox})
+
 let commit_block_on_l1 state block =
   match state.State.operator with
   | None -> return_unit
@@ -315,6 +336,7 @@ let process_messages_and_inboxes (state : State.t) ~(predecessor : L2block.t)
         | Genesis -> Tx_rollup_level.root
         | Rollup_level l -> Tx_rollup_level.succ l
       in
+      let* () = check_inbox state current_hash level inbox in
       let commitment = Committer.commitment_of_inbox ~predecessor level inbox in
       let header : L2block.header =
         {

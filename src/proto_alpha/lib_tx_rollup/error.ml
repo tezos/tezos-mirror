@@ -33,7 +33,7 @@ let () =
     ~title:"Fatal error in rollup node"
     ~description:
       "The node encountered a fatal error which prevents it from working \
-       properly"
+       properly."
     ~pp:(fun ppf () -> Format.fprintf ppf "Fatal error in rollup node.")
     `Permanent
     Data_encoding.unit
@@ -400,3 +400,70 @@ let () =
            Protocol.Tx_rollup_l2_context_sig.Ticket_indexable.encoding))
     (function Tx_rollup_unknown_ticket t -> Some t | _ -> None)
     (fun t -> Tx_rollup_unknown_ticket t)
+
+type error +=
+  | Tx_rollup_no_proto_inbox of
+      Protocol.Alpha_context.Tx_rollup_level.t * Block_hash.t
+
+let () =
+  register_error_kind
+    ~id:"tx_rollup.node.no_proto_inbox"
+    ~title:"No inbox on L1 node"
+    ~description:"Inbox on L1 node cannot be retrieved."
+    ~pp:(fun ppf (l, b) ->
+      Format.fprintf
+        ppf
+        "No inbox on L1 for rollup level %a at block %a"
+        Protocol.Alpha_context.Tx_rollup_level.pp
+        l
+        Block_hash.pp
+        b)
+    `Permanent
+    Data_encoding.(
+      obj2
+        (req "level" Protocol.Alpha_context.Tx_rollup_level.encoding)
+        (req "block" Block_hash.encoding))
+    (function Tx_rollup_no_proto_inbox (l, b) -> Some (l, b) | _ -> None)
+    (fun (l, b) -> Tx_rollup_no_proto_inbox (l, b))
+
+type error +=
+  | Tx_rollup_inbox_mismatch of {
+      level : Protocol.Alpha_context.Tx_rollup_level.t;
+      reconstructed_inbox : Protocol.Alpha_context.Tx_rollup_inbox.t;
+      protocol_inbox : Protocol.Alpha_context.Tx_rollup_inbox.t;
+    }
+
+let () =
+  register_error_kind
+    ~id:"tx_rollup.node.inbox_mismatch"
+    ~title:"Inbox mismatch between L1 and L2"
+    ~description:
+      "Inbox reconstructed on L2 does not match the one stored on the L1 node."
+    ~pp:(fun ppf (level, reconstructed_inbox, protocol_inbox) ->
+      Format.fprintf
+        ppf
+        "@[<v 2>Inbox reconstructed for rollup level %a does not match the one \
+         stored on the Tezos node.@,\
+         @[<hov 2>Reconstructed:@ %a@]@,\
+         @[<hov 2>Stored on Tezos:@ %a@]@,\
+         @]"
+        Protocol.Alpha_context.Tx_rollup_level.pp
+        level
+        Protocol.Alpha_context.Tx_rollup_inbox.pp
+        reconstructed_inbox
+        Protocol.Alpha_context.Tx_rollup_inbox.pp
+        protocol_inbox)
+    `Permanent
+    Data_encoding.(
+      obj3
+        (req "level" Protocol.Alpha_context.Tx_rollup_level.encoding)
+        (req
+           "reconstructed_inbox"
+           Protocol.Alpha_context.Tx_rollup_inbox.encoding)
+        (req "protocol_inbox" Protocol.Alpha_context.Tx_rollup_inbox.encoding))
+    (function
+      | Tx_rollup_inbox_mismatch {level; reconstructed_inbox; protocol_inbox} ->
+          Some (level, reconstructed_inbox, protocol_inbox)
+      | _ -> None)
+    (fun (level, reconstructed_inbox, protocol_inbox) ->
+      Tx_rollup_inbox_mismatch {level; reconstructed_inbox; protocol_inbox})
