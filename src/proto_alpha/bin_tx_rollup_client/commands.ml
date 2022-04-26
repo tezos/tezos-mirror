@@ -26,11 +26,11 @@
 open Clic
 open Tezos_client_base
 
-let l1_addr_param =
+let l1_destination_parameter =
   Clic.parameter (fun _ s ->
       match Signature.Public_key_hash.of_b58check_opt s with
       | Some addr -> return addr
-      | None -> failwith "The given L1 address is invalid")
+      | None -> failwith "cannot parse %s to get a valid destination" s)
 
 let parse_file parse path =
   Lwt_utils_unix.read_file path >>= fun contents -> parse contents
@@ -62,6 +62,35 @@ let json_parameter =
 
 let alias_or_literal ~from_alias ~from_key =
   Client_aliases.parse_alternatives [("alias", from_alias); ("key", from_key)]
+
+type wallet_entry = {
+  alias : string;
+  public_key_hash : Bls.Public_key_hash.t;
+  public_key : Bls.Public_key.t option;
+  secret_key_uri : Client_keys.aggregate_sk_uri option;
+}
+
+let wallet_parameter () =
+  Clic.parameter (fun cctxt alias ->
+      let open Lwt_result_syntax in
+      let open Aggregate_signature in
+      let* (Bls12_381 public_key_hash) =
+        Client_keys.Aggregate_alias.Public_key_hash.find cctxt alias
+      in
+      let* (_, pk_opt) =
+        Client_keys.Aggregate_alias.Public_key.find cctxt alias
+      in
+      let public_key =
+        Option.map (fun (Bls12_381 pk : public_key) -> pk) pk_opt
+      in
+      let+ secret_key_uri =
+        Client_keys.Aggregate_alias.Secret_key.find_opt cctxt alias
+      in
+      {alias; public_key_hash; public_key; secret_key_uri})
+
+let wallet_param ?(name = "an alias for a tz4 address")
+    ?(desc = "an alias for a tz4 address") =
+  Clic.param ~name ~desc @@ wallet_parameter ()
 
 let bls_pkh_parameter () =
   Clic.parameter
@@ -189,9 +218,12 @@ let block_id_param =
       | Ok v -> return v
       | Error e -> failwith "%s" e)
 
-let parse_ticket =
+let ticket_hash_parameter =
+  let open Lwt_result_syntax in
   Clic.parameter (fun _ s ->
-      return (Alpha_context.Ticket_hash.of_b58check_exn s))
+      match Alpha_context.Ticket_hash.of_b58check_opt s with
+      | Some tkh -> return tkh
+      | None -> failwith "cannot parse %s to get a valid ticket_hash" s)
 
 let get_tx_address_balance_command () =
   command
@@ -211,7 +243,7 @@ let get_tx_address_balance_command () =
     @@ param
          ~name:"ticket-hash"
          ~desc:"ticket from which the balance is expected"
-         parse_ticket
+         ticket_hash_parameter
     @@ stop)
     (fun block tz4 ticket (cctxt : #Configuration.tx_client_context) ->
       RPC.balance cctxt block ticket tz4 >>=? fun value ->
@@ -409,7 +441,7 @@ let craft_tx_transaction () =
     @@ prefixes ["to"]
     @@ bls_pkh_param ~name:"dest" ~desc:"tz4 destination address"
     @@ prefixes ["for"]
-    @@ param ~name:"ticket" ~desc:"ticket to transfer" parse_ticket
+    @@ param ~name:"ticket" ~desc:"ticket to transfer" ticket_hash_parameter
     @@ stop)
     (fun counter
          qty
@@ -442,9 +474,12 @@ let craft_tx_withdrawal () =
     @@ prefixes ["from"]
     @@ bls_pk_param ~name:"signer_pk" ~desc:"public key of the signer"
     @@ prefixes ["to"]
-    @@ param ~name:"dest" ~desc:"L1 destination address" l1_addr_param
+    @@ param
+         ~name:"dest"
+         ~desc:"L1 destination address"
+         l1_destination_parameter
     @@ prefixes ["for"]
-    @@ param ~name:"ticket" ~desc:"ticket to withdraw" parse_ticket
+    @@ param ~name:"ticket" ~desc:"ticket to withdraw" ticket_hash_parameter
     @@ stop)
     (fun counter
          qty
@@ -505,42 +540,6 @@ let craft_tx_batch () =
         let*! () = cctxt#message "@[%a@]" Data_encoding.Json.pp json in
         return_unit)
 
-let sign_transaction () =
-  command
-    ~desc:"sign a transaction"
-    (args2
-       (Clic.switch ~doc:"aggregate signature" ~long:"aggregate" ())
-       signature_arg)
-    (prefixes ["sign"; "transaction"]
-    @@ transaction_param @@ prefix "with"
-    @@ seq_of_param bls_sk_uri_param)
-    (fun (aggregate, aggregated_signature)
-         transactions
-         sks_uri
-         (cctxt : #Configuration.tx_client_context) ->
-      let open Lwt_result_syntax in
-      let* signatures = sign_transaction cctxt sks_uri transactions in
-      if aggregate then
-        let signatures =
-          match aggregated_signature with
-          | Some aggregated_signature -> aggregated_signature :: signatures
-          | None -> signatures
-        in
-        let*? aggregated_signature = aggregate_signature signatures in
-
-        let*! () = cctxt#message "@[%a@]" Bls.pp aggregated_signature in
-        return_unit
-      else
-        let*! () =
-          cctxt#message
-            "@[%a@]"
-            (Format.pp_print_list
-               ~pp_sep:(fun ppf () -> Format.pp_print_string ppf ";")
-               Bls.pp)
-            signatures
-        in
-        return_unit)
-
 let get_batcher_queue () =
   command
     ~desc:"returns the batcher's queue of pending operations"
@@ -593,6 +592,114 @@ let inject_batcher_transaction () =
       cctxt#message "@[%s@]" (Data_encoding.Json.to_string json) >>= fun () ->
       return_unit)
 
+let transfer () =
+  let open Lwt_result_syntax in
+  command
+    ~desc:"submit a layer-2 transfer to a rollup node’s batcher"
+    (args1
+       (arg
+          ~long:"counter"
+          ~short:'c'
+          ~placeholder:"counter"
+          ~doc:"The counter associated to the signer address"
+          conv_counter))
+    (prefix "transfer"
+    @@ param ~name:"qty" ~desc:"quantity to transfer" conv_qty
+    @@ prefix "of"
+    @@ param ~name:"ticket" ~desc:"A ticket hash" ticket_hash_parameter
+    @@ prefix "from"
+    @@ wallet_param ~name:"source"
+    @@ prefix "to"
+    @@ bls_pkh_param
+         ~name:"destination"
+         ~desc:"A BLS public key hash or an alias"
+    @@ stop)
+    (fun counter qty ticket_hash signer destination cctxt ->
+      let open Tx_rollup_l2_batch in
+      let open Tx_rollup_l2_batch.V1 in
+      let*? signer_pk =
+        match signer.public_key with
+        | Some pk -> ok pk
+        | None -> error_with "missing signer public key in the wallet"
+      in
+      let signer_addr = Tx_rollup_l2_address.of_bls_pk signer_pk in
+      let* counter =
+        match counter with
+        | Some counter -> return counter
+        | None ->
+            let+ counter = RPC.counter cctxt `Head signer_addr in
+            Int64.succ counter
+      in
+      let*? sk_uri =
+        match signer.secret_key_uri with
+        | None -> error_with "missing secret key in wallet"
+        | Some sk_uri -> ok sk_uri
+      in
+      (* For the very first operation sent by a given account, we need
+         to provide the full public key; otherwise, sending the public
+         key hash is fine. *)
+      let signer =
+        if Compare.Int64.(counter = 1L) then Bls_pk signer_pk
+        else L2_addr signer_addr
+      in
+      (* TODO/TORU: https://gitlab.com/tezos/tezos/-/issues/2903
+         Use an RPC to know whether or not it can be safely replaced by
+         an index. *)
+      let signer = Indexable.from_value signer in
+      (* TODO/TORU: https://gitlab.com/tezos/tezos/-/issues/2903
+         Use an RPC to know whether or not it can be safely replaced by
+         an index. *)
+      let destination = Indexable.from_value destination in
+      (* TODO/TORU: https://gitlab.com/tezos/tezos/-/issues/2903
+         Use an RPC to know whether or not it can be safely replaced by
+         an index. *)
+      let ticket_hash = Indexable.from_value ticket_hash in
+      let contents = [Transfer {destination; ticket_hash; qty}] in
+      let operation = Tx_rollup_l2_batch.V1.{counter; signer; contents} in
+      let transaction = [operation] in
+      let* signatures = sign_transaction cctxt [sk_uri] transaction in
+      let* hash = RPC.inject_transaction cctxt {transaction; signatures} in
+      let*! () =
+        cctxt#message "Transaction hash: %a" L2_transaction.Hash.pp hash
+      in
+      return_unit)
+
+let sign_transaction () =
+  command
+    ~desc:"sign a transaction"
+    (args2
+       (Clic.switch ~doc:"aggregate signature" ~long:"aggregate" ())
+       signature_arg)
+    (prefixes ["sign"; "transaction"]
+    @@ transaction_param @@ prefix "with"
+    @@ seq_of_param bls_sk_uri_param)
+    (fun (aggregate, aggregated_signature)
+         transactions
+         sks_uri
+         (cctxt : #Configuration.tx_client_context) ->
+      let open Lwt_result_syntax in
+      let* signatures = sign_transaction cctxt sks_uri transactions in
+      if aggregate then
+        let signatures =
+          match aggregated_signature with
+          | Some aggregated_signature -> aggregated_signature :: signatures
+          | None -> signatures
+        in
+        let*? aggregated_signature = aggregate_signature signatures in
+
+        let*! () = cctxt#message "@[%a@]" Bls.pp aggregated_signature in
+        return_unit
+      else
+        let*! () =
+          cctxt#message
+            "@[%a@]"
+            (Format.pp_print_list
+               ~pp_sep:(fun ppf () -> Format.pp_print_string ppf ";")
+               Bls.pp)
+            signatures
+        in
+        return_unit)
+
 let all () =
   [
     get_tx_address_balance_command ();
@@ -606,4 +713,5 @@ let all () =
     get_batcher_queue ();
     get_batcher_transaction ();
     inject_batcher_transaction ();
+    transfer ();
   ]
