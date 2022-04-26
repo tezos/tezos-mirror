@@ -4289,6 +4289,26 @@ let exclude filename =
 (* Generate dune and opam files. *)
 let () = generate ~exclude ()
 
+(* Generate a dunw-workspace file at the root of the repo *)
+let () =
+  let p_static = Env.Profile "static" in
+  let p_release = Env.Profile "release" in
+  let env =
+    Env.empty
+    |> Env.add p_static ~key:"ocamlopt_flags" Dune.[S ":standard"; S "-O3"]
+    |> Env.add p_release ~key:"ocamlopt_flags" Dune.[S ":standard"; S "-O3"]
+  in
+  let dune =
+    Dune.
+      [
+        [
+          S "context";
+          [S "default"; [S "paths"; [S "ORIGINAL_PATH"; S ":standard"]]];
+        ];
+      ]
+  in
+  generate_workspace env dune
+
 (* Generate active_protocol_versions. *)
 let () =
   let ch = open_out "../active_protocol_versions" in
