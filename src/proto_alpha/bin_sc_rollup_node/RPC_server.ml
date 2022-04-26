@@ -72,13 +72,16 @@ module Common = struct
       (Sc_rollup_services.current_tezos_level ())
       (fun () () -> Layer1.current_level store >>= return)
 
-  let register_current_inbox store dir =
+  let register_current_inbox node_ctxt store dir =
+    let open Lwt_result_syntax in
     RPC_directory.opt_register0
       dir
       (Sc_rollup_services.current_inbox ())
       (fun () () ->
         Layer1.current_head_hash store >>= function
-        | Some head_hash -> Inbox.inbox_of_hash store head_hash >>= return_some
+        | Some head_hash ->
+            let*! inbox = Inbox.inbox_of_hash node_ctxt store head_hash in
+            return_some inbox
         | None -> return None)
 
   let register_current_ticks store dir =
@@ -143,19 +146,19 @@ module Make (PVM : Pvm.S) = struct
         let*! status = PVM.get_status state in
         return (PVM.string_of_status status))
 
-  let register store configuration =
+  let register node_ctxt store configuration =
     RPC_directory.empty
     |> register_sc_rollup_address configuration
     |> register_current_tezos_head store
-    |> register_current_inbox store
+    |> register_current_inbox node_ctxt store
     |> register_current_ticks store
     |> register_current_total_ticks store
     |> register_current_num_messages store
     |> register_current_state_hash store
     |> register_current_status store
 
-  let start store configuration =
-    Common.start configuration (register store configuration)
+  let start node_ctxt store configuration =
+    Common.start configuration (register node_ctxt store configuration)
 end
 
 module Arith = Make (Arith_pvm)
