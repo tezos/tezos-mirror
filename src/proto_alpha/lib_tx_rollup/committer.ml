@@ -46,12 +46,7 @@ let commitment_of_inbox ~predecessor level (inbox : Inbox.t) =
         Tx_rollup_message_result_hash.hash_uncarbonated message_result)
       inbox.contents
   in
-  let message_hashes =
-    List.map
-      (fun msg -> Tx_rollup_message_hash.hash_uncarbonated msg.Inbox.message)
-      inbox.contents
-  in
-  let inbox_merkle_root = Tx_rollup_inbox.Merkle.merklize_list message_hashes in
+  let inbox_merkle_root = Inbox.merkle_root inbox in
   let predecessor = predecessor.L2block.header.commitment in
   Tx_rollup_commitment.{level; messages; predecessor; inbox_merkle_root}
 
