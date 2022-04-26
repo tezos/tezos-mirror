@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,6 +24,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** This type represents a commitment to an amount of tokens which can be claimed
+    by a fund raiser after the blockchain is deployed. *)
 type t = {
   blinded_public_key_hash : Blinded_public_key_hash.t;
   amount : Tez_repr.t;
