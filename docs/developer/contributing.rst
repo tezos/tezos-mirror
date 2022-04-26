@@ -29,10 +29,14 @@ Going further
 ~~~~~~~~~~~~~
 
 You may also want to fix some typos and minor errors or incoherencies in the *documentation*, which is situated in the ``docs/`` subfolder of the code repository.
-This kind of small contributions can be done without creating a merge request, by directly pushing commits to the ``typo-doc`` branch, which is regularly merged into the master branch, e.g., every one or two weeks.
+Small tweaks like these can be contributed without creating a merge request and commits can rather be pushed directly to the ``typo-doc`` branch in the ``tezos/tezos`` repository. This branch is regularly merged into the master branch, e.g., every one or two weeks.
+(If the branch has been automatically deleted following a merge, just create it again.)
 This periodic merging is implemented by a series of MRs named "the typo train", created for you by a volunteer, and batching the currently pending fixes.
 Of course, all these commits will be reviewed before being integrated.
 The current edition of the typo train MR can be found in meta-issue :gl:`#2329`.
+
+If you don't have enough permissions to push to the branch above, you can  still make commits in your own fork of the Octez repository, and ask for them to be cherry-picked on the typo/train on the ``#documentation`` channel on the Tezos Dev Slack space.
+Alternatively, you may of course create your own MRs for submitting your changes, without using the typo train.
 
 To directly contribute to the *codebase*, expertise in a few areas is necessary.
 
