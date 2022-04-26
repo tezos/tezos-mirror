@@ -25,6 +25,8 @@ be documented here either.
 Node
 ----
 
+- Added a store metric to expose the amount of data written.
+
 Client
 ------
 
