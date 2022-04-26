@@ -511,7 +511,7 @@ let handle_l1_operation direction (block : Alpha_block_services.block_info)
       Receipt (Operation_metadata {contents = result_contents}) ) -> (
       match kind_equal_list operation_contents result_contents with
       | None ->
-          (* Should not happen *)
+          let*! () = Debug_events.(emit should_not_happen) __LOC__ in
           return acc
       | Some Eq ->
           let operation_and_result =
