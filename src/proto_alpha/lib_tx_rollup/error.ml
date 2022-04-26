@@ -25,6 +25,23 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type error += Tx_rollup_fatal
+
+let () =
+  register_error_kind
+    ~id:"tx_rollup.node.fatal"
+    ~title:"Fatal error in rollup node"
+    ~description:
+      "The node encountered a fatal error which prevents it from working \
+       properly"
+    ~pp:(fun ppf () -> Format.fprintf ppf "Fatal error in rollup node.")
+    `Permanent
+    Data_encoding.unit
+    (function Tx_rollup_fatal -> Some () | _ -> None)
+    (fun () -> Tx_rollup_fatal)
+
+let trace_fatal p = trace Tx_rollup_fatal p
+
 type error +=
   | Tx_rollup_not_originated_in_the_given_block of
       Protocol.Alpha_context.Tx_rollup.t

@@ -25,6 +25,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** The node encountered a fatal error which prevents it from working \
+    properly. *)
+type error += Tx_rollup_fatal
+
+(** Add the [Tx_rollup_fatal] error to any error occurring in the promise. *)
+val trace_fatal : 'a tzresult Lwt.t -> 'a tzresult Lwt.t
+
 (** Error issued when the rollup referenced by its hash has not been created
     on the block referenced by its hash. The node computes a state from the
     block that created the rollup. *)

@@ -367,9 +367,10 @@ let rec process_block state current_hash rollup_id :
         let predecessor_hash = block_info.header.shell.predecessor in
         let block_level = block_info.header.shell.level in
         let* () =
-          fail_when
-            (block_level < state.State.rollup_info.origination_level)
-            Tx_rollup_originated_in_fork
+          Error.trace_fatal
+          @@ fail_when
+               (block_level < state.State.rollup_info.origination_level)
+               Tx_rollup_originated_in_fork
         in
         (* Handle predecessor Tezos block first *)
         let*! () = Event.(emit processing_block_predecessor) predecessor_hash in
@@ -739,7 +740,7 @@ let run configuration cctxt =
                 let*! r = process_head state head rollup_id in
                 match r with
                 | Ok _ -> Lwt.return ()
-                | Error (Tx_rollup_originated_in_fork :: _ as e) ->
+                | Error (Tx_rollup_fatal :: _ as e) ->
                     Format.eprintf "%a@.Exiting.@." pp_print_trace e ;
                     Lwt_exit.exit_and_raise 1
                 | Error e ->
