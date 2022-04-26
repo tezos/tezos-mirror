@@ -23,7 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** This is for use *within* the data encoding library only. *)
+(** Like most other [.mli] files in this directory, this is not intended for
+    end-users. Instead, the interface from this file is used internally to
+    assemble the end-user-intended module {!Data_encoding}. Refer to that module
+    for doucmentation. *)
 
 type integer_extended = [Binary_size.integer | `Int32 | `Int64]
 

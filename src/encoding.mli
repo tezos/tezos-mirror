@@ -24,6 +24,15 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Like most other [.mli] files in this directory, this is not intended for
+    end-users. Instead, the interface from this file is used internally to
+    assemble the end-user-intended module {!Data_encoding}. Refer to that module
+    for doucmentation.
+
+    Note however that this module can be of interest to advanced users. You may
+    read on if you need access to the concrete definition of the
+    {!Data_encoding.encoding} type. *)
+
 type limit = No_limit | At_most of int | Exactly of int
 
 (** This is for use *within* the data encoding library only. Instead, you should

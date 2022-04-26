@@ -23,6 +23,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Like most other [.mli] files in this directory, this is not intended for
+    end-users. Instead, the interface from this file is used internally to
+    assemble the end-user-intended module {!Data_encoding}. Refer to that module
+    for doucmentation. *)
+
 val get_int32 : bytes -> int -> int32
 
 val get_int32_string : string -> int -> int32
