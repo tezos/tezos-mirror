@@ -303,6 +303,9 @@ let set_commitment_included state commitment_hash block operation =
     commitment_hash
     Stores.Commitment_store.{block; operation}
 
+let unset_commitment_included state commitment_hash =
+  Stores.Commitment_store.remove state.stores.commitments commitment_hash
+
 let get_block_metadata state (header : L2block.header) =
   let open Lwt_syntax in
   let+ commitment_included =

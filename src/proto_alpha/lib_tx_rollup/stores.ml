@@ -533,7 +533,7 @@ module Commitment_store = struct
   }
 
   include
-    Make_indexable (Commitment_key) (Commitment_info)
+    Make_indexable_removable (Commitment_key) (Commitment_info)
       (struct
         let path ~data_dir = Node_data.commitments_index data_dir
       end)

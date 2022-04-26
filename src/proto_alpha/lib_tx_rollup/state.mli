@@ -163,6 +163,9 @@ val set_commitment_included :
   Operation_hash.t ->
   unit Lwt.t
 
+(** Register a commitment as not included on L1. *)
+val unset_commitment_included : t -> Tx_rollup_commitment_hash.t -> unit Lwt.t
+
 (** {2 Misc}  *)
 
 (** [rollup_operation_index] returns the index in which the rollup operation are

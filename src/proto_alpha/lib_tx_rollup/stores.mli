@@ -144,7 +144,7 @@ module Commitment_store : sig
   }
 
   include
-    INDEXABLE_STORE
+    INDEXABLE_REMOVABLE_STORE
       with type key := Protocol.Alpha_context.Tx_rollup_commitment_hash.t
        and type value := value
 end

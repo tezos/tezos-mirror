@@ -447,12 +447,23 @@ let process_op (type kind) (state : State.t) l1_block l1_operation ~source:_
       return acc
   | (_, _) -> return acc
 
-let rollback_op (type kind) (state : State.t) l1_block l1_operation ~source:_
+let rollback_op (type kind) (state : State.t) _l1_block _l1_operation ~source:_
     (op : kind manager_operation) (result : kind manager_operation_result)
     (acc : 'acc) : 'acc tzresult Lwt.t =
-  ignore (state, l1_block, l1_operation, op, result) ;
-  (* TODO/TORU: implement rollback actions for some Tx rollup operations *)
-  return acc
+  let open Lwt_result_syntax in
+  let is_my_rollup tx_rollup =
+    Tx_rollup.equal state.rollup_info.rollup_id tx_rollup
+  in
+  match (op, result) with
+  | ( Tx_rollup_commit {commitment; tx_rollup},
+      Applied (Tx_rollup_commit_result _) )
+    when is_my_rollup tx_rollup ->
+      let commitment_hash =
+        Tx_rollup_commitment.(Compact.hash (Full.compact commitment))
+      in
+      let*! () = State.unset_commitment_included state commitment_hash in
+      return acc
+  | (_, _) -> return acc
 
 let handle_l1_operation direction (block : Alpha_block_services.block_info)
     state acc (operation : Alpha_block_services.operation) =
