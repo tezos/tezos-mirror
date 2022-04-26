@@ -65,7 +65,10 @@ type commitment_included_info = {
   operation : Operation_hash.t;
 }
 
-type metadata = {commitment_included : commitment_included_info option}
+type metadata = {
+  commitment_included : commitment_included_info option;
+  finalized : bool;
+}
 
 let level_encoding =
   let open Data_encoding in
@@ -141,9 +144,11 @@ let commitment_included_info_encoding =
 let metadata_encoding =
   let open Data_encoding in
   conv
-    (fun {commitment_included} -> commitment_included)
-    (fun commitment_included -> {commitment_included})
-    (obj1 (opt "commitment_included" commitment_included_info_encoding))
+    (fun {commitment_included; finalized} -> (commitment_included, finalized))
+    (fun (commitment_included, finalized) -> {commitment_included; finalized})
+    (obj2
+       (opt "commitment_included" commitment_included_info_encoding)
+       (req "finalized" bool))
 
 let genesis_hash rollup = Hash.hash_string [Tx_rollup.to_b58check rollup]
 

@@ -1968,6 +1968,12 @@ let test_withdrawals =
             unit
         | `Nothing_injected -> Test.fail "No %s injected" tag
       in
+      let check_l2_block_finalized block =
+        let finalized =
+          JSON.(block |-> "metadata" |-> "finalized" |> as_bool)
+        in
+        Check.((finalized = true) bool) ~error_msg:"L2 Block is not finalized"
+      in
       (* Generating some identities *)
       let* bls_key_1 = generate_bls_addr ~alias:"alice" client in
       let bls_pkh_1 = bls_key_1.aggregate_public_key_hash in
@@ -2085,6 +2091,8 @@ let test_withdrawals =
       in
       let* block = RPC.get_block client in
       check_l1_block_contains_finalize ~level:2 block ;
+      let* l2_head = Rollup_node.Client.get_block ~tx_node ~block:"head" in
+      check_l2_block_finalized l2_head ;
       Log.info "Baking 1 L1 block for dispatch to be included" ;
       let* () = Client.bake_for_and_wait client in
       let* block = RPC.get_block client in

@@ -306,14 +306,32 @@ let set_commitment_included state commitment_hash block operation =
 let unset_commitment_included state commitment_hash =
   Stores.Commitment_store.remove state.stores.commitments commitment_hash
 
+let get_finalized_level state =
+  Stores.Finalized_level_store.read state.stores.finalized_level
+
+let set_finalized_level state l =
+  Stores.Finalized_level_store.write state.stores.finalized_level l
+
+let delete_finalized_level state =
+  Stores.Finalized_level_store.delete state.stores.finalized_level
+
 let get_block_metadata state (header : L2block.header) =
   let open Lwt_syntax in
-  let+ commitment_included =
+  let* commitment_included =
     match header.commitment with
     | None -> return_none
     | Some c -> get_included_commitment state c
   in
-  L2block.{commitment_included}
+  let+ finalized_level = get_finalized_level state in
+  let finalized =
+    match finalized_level with
+    | None -> false
+    | Some l -> (
+        match header.level with
+        | Genesis -> false
+        | Rollup_level level -> Tx_rollup_level.(level >= l))
+  in
+  L2block.{commitment_included; finalized}
 
 let get_block_and_metadata state hash =
   let open Lwt_syntax in
@@ -323,15 +341,6 @@ let get_block_and_metadata state hash =
   | Some block ->
       let* metadata = get_block_metadata state block.header in
       return_some (block, metadata)
-
-let get_finalized_level state =
-  Stores.Finalized_level_store.read state.stores.finalized_level
-
-let set_finalized_level state l =
-  Stores.Finalized_level_store.write state.stores.finalized_level l
-
-let delete_finalized_level state =
-  Stores.Finalized_level_store.delete state.stores.finalized_level
 
 let check_origination_in_block_info rollup block_info =
   let extract_originated_tx_rollup :
