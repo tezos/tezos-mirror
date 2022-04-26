@@ -892,3 +892,8 @@ val generate : ?exclude:(string -> bool) -> unit -> unit
     [dune] is a free form s-expression that will be included as is at the end of the file.
  *)
 val generate_workspace : Env.t -> Dune.s_expr -> unit
+
+(** [write filename f] writes a file relatively to the root directory of the repository.
+
+    The callback [f] is reponsible for feeding the content of the file by using the formmater. *)
+val write : string -> (Format.formatter -> unit) -> unit

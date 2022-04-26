@@ -4288,9 +4288,6 @@ let exclude filename =
   | "tezt" :: "vesting_contract_test" :: _ -> true
   | _ -> false
 
-(* Generate dune and opam files. *)
-let () = generate ~exclude ()
-
 (* Generate a dunw-workspace file at the root of the repo *)
 let () =
   let p_static = Env.Profile "static" in
@@ -4313,12 +4310,14 @@ let () =
 
 (* Generate active_protocol_versions. *)
 let () =
-  let ch = open_out "../active_protocol_versions" in
-  Fun.protect ~finally:(fun () -> close_out ch) @@ fun () ->
-  let write_protocol protocol =
+  let write_protocol fmt protocol =
     match Protocol.number protocol with
-    | Alpha -> Printf.fprintf ch "%s\n" (Protocol.name protocol)
-    | V number -> Printf.fprintf ch "%03d-%s\n" number (Protocol.name protocol)
+    | Alpha -> Format.fprintf fmt "%s\n" (Protocol.name protocol)
+    | V number -> Format.fprintf fmt "%03d-%s\n" number (Protocol.name protocol)
     | Other -> ()
   in
-  List.iter write_protocol Protocol.active
+  write "active_protocol_versions" @@ fun fmt ->
+  List.iter (write_protocol fmt) Protocol.active
+
+(* Generate dune and opam files. *)
+let () = generate ~exclude ()
