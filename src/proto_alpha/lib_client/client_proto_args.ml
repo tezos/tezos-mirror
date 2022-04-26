@@ -158,22 +158,31 @@ let bytes_of_prefixed_string s =
 
 let bytes_parameter = parameter (fun _ s -> bytes_of_prefixed_string s)
 
+let parse_file parse cctxt ~path =
+  let open Lwt_result_syntax in
+  let* content = cctxt#read_file path in
+  parse content
+
+let file_or_text_parameter ~from_text ?(from_path = parse_file from_text) () =
+  parameter (fun (cctxt : #Client_context.full) ->
+      Client_aliases.parse_alternatives
+        [("file", fun path -> from_path cctxt ~path); ("text", from_text)])
+
+let json_parameter =
+  let from_text s =
+    match Data_encoding.Json.from_string s with
+    | Ok json -> return json
+    | Error err -> failwith "'%s' is not a valid JSON-encoded value: %s" s err
+  in
+  file_or_text_parameter ~from_text ()
+
 let data_parameter =
   let open Lwt_syntax in
-  let parse input =
+  let from_text input =
     return @@ Tezos_micheline.Micheline_parser.no_parsing_error
     @@ Michelson_v1_parser.parse_expression input
   in
-  parameter (fun (cctxt : #Client_context.full) ->
-      Client_aliases.parse_alternatives
-        [
-          ( "file",
-            fun filename ->
-              let open Lwt_result_syntax in
-              let* input = catch_es (fun () -> cctxt#read_file filename) in
-              parse input );
-          ("text", parse);
-        ])
+  file_or_text_parameter ~from_text ()
 
 let entrypoint_parameter =
   parameter (fun _ str ->
@@ -594,12 +603,6 @@ let display_names_flag =
     ~long:"display-names"
     ~doc:"Print names of scripts passed to this command"
     ()
-
-let json_parameter =
-  Clic.parameter (fun _ s ->
-      match Data_encoding.Json.from_string s with
-      | Ok json -> return json
-      | Error err -> failwith "'%s' is not a valid JSON-encoded valie: %s" s err)
 
 module Daemon = struct
   let baking_switch =

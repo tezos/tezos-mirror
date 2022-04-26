@@ -138,6 +138,14 @@ val bytes_of_prefixed_string : string -> Bytes.t tzresult Lwt.t
 
 val bytes_parameter : (Bytes.t, full) Clic.parameter
 
+val file_or_text_parameter :
+  from_text:(string -> 'a tzresult Lwt.t) ->
+  ?from_path:(full -> path:string -> 'a tzresult Lwt.t) ->
+  unit ->
+  ('a, full) Clic.parameter
+
+val json_parameter : (Data_encoding.Json.t, full) Clic.parameter
+
 val data_parameter : (Michelson_v1_parser.parsed, full) Clic.parameter
 
 val unparsing_mode_arg :

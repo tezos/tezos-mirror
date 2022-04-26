@@ -671,7 +671,7 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
                    \"storage-limit\". The complete schema can be inspected via \
                    `tezos-codec describe %s.fa1.2.token_transfer json schema`."
                   Protocol.name)
-             Client_proto_context_commands.json_file_or_text_parameter
+             json_parameter
         @@ stop)
         (fun ( fee,
                as_address,
