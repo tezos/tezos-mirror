@@ -1163,6 +1163,84 @@ let test_conflict_point_is_first_point_of_disagreement () =
   let* () = assert_commitment_hash_equal ~loc:__LOC__ ctxt left c2 in
   assert_commitment_hash_equal ~loc:__LOC__ ctxt right c3
 
+let test_conflict_point_computation_fits_in_gas_limit () =
+  (* Worst case of conflict point computation: two branches of maximum
+     length rooted just after the LFC. *)
+  let* (ctxt, rollup, staker1, staker2) =
+    originate_rollup_and_deposit_with_two_stakers ()
+  in
+  let root_level = Raw_level_repr.to_int32 Level_storage.(current ctxt).level in
+  let commitment_freq =
+    Constants_storage.sc_rollup_commitment_frequency_in_blocks ctxt
+  in
+  let max_commits =
+    Int32.div
+      (Constants_storage.sc_rollup_max_lookahead_in_blocks ctxt)
+      (Int32.of_int commitment_freq)
+  in
+  let level i =
+    Raw_level_repr.of_int32_exn
+      (Int32.add root_level (Int32.mul (Int32.of_int commitment_freq) i))
+  in
+  let root_commitment =
+    Sc_rollup_repr.Commitment.
+      {
+        predecessor = Sc_rollup_repr.Commitment_hash.zero;
+        inbox_level = level 1l;
+        number_of_messages = number_of_messages_exn 1l;
+        number_of_ticks = number_of_ticks_exn 1l;
+        compressed_state = Sc_rollup_repr.State_hash.zero;
+      }
+  in
+  let* (root_commitment_hash, ctxt) =
+    lift @@ Sc_rollup_storage.refine_stake ctxt rollup staker1 root_commitment
+  in
+  let* (_, ctxt) =
+    lift @@ Sc_rollup_storage.refine_stake ctxt rollup staker2 root_commitment
+  in
+  let rec branch ctxt staker_id staker predecessor i max acc =
+    let commitment =
+      Sc_rollup_repr.Commitment.
+        {
+          predecessor;
+          inbox_level = level i;
+          number_of_messages = number_of_messages_exn staker_id;
+          number_of_ticks = number_of_ticks_exn 1l;
+          compressed_state = Sc_rollup_repr.State_hash.zero;
+        }
+    in
+    let* (commitment_hash, ctxt) =
+      lift @@ Sc_rollup_storage.refine_stake ctxt rollup staker commitment
+    in
+    if i = max then
+      return (Array.of_list (List.rev (commitment_hash :: acc)), ctxt)
+    else
+      branch
+        ctxt
+        staker_id
+        staker
+        commitment_hash
+        (Int32.succ i)
+        max
+        (commitment_hash :: acc)
+  in
+  let* (branch_1, ctxt) =
+    branch ctxt 1l staker1 root_commitment_hash 2l max_commits []
+  in
+  let* (branch_2, ctxt) =
+    branch ctxt 2l staker2 root_commitment_hash 2l max_commits []
+  in
+  let ctxt =
+    Raw_context.set_gas_limit
+      ctxt
+      (Constants_storage.hard_gas_limit_per_operation ctxt)
+  in
+  let* ((left, right), ctxt) =
+    lift @@ Sc_rollup_storage.get_conflict_point ctxt rollup staker1 staker2
+  in
+  let* () = assert_commitment_hash_equal ~loc:__LOC__ ctxt left branch_1.(0) in
+  assert_commitment_hash_equal ~loc:__LOC__ ctxt right branch_2.(0)
+
 let test_no_conflict_point_one_staker_at_lcc_preboot () =
   let* (ctxt, rollup, staker1, staker2) =
     originate_rollup_and_deposit_with_two_stakers ()
@@ -1717,6 +1795,10 @@ let tests =
       "finds no conflict point when both stakers commit to LCC"
       `Quick
       test_no_conflict_point_both_stakers_at_lcc;
+    Tztest.tztest
+      "test_conflict_point_computation_fits_in_gas_limit"
+      `Quick
+      test_conflict_point_computation_fits_in_gas_limit;
     Tztest.tztest "staker cannot backtrack" `Quick test_staker_cannot_backtrack;
     Tztest.tztest
       "staker cannot change branch"
