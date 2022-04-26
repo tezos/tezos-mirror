@@ -102,7 +102,7 @@ let rollup_genesis_arg =
          @@ Block_hash.of_b58check_opt str))
 
 let rpc_addr_arg =
-  let default = P2p_point.Id.to_string Configuration.default_rpc_addr in
+  let default = P2p_point.Id.to_string Node_config.default_rpc_addr in
   let doc = rpc_addr_doc default in
   Clic.default_arg
     ~long:"rpc-addr"
@@ -115,7 +115,7 @@ let rpc_addr_arg =
          |> Lwt.return))
 
 let reconnection_delay_arg =
-  let default = Configuration.default_reconnection_delay in
+  let default = Node_config.default_reconnection_delay in
   let doc = reconnection_delay_doc default in
   Clic.default_arg
     ~long:"reconnection-delay"
@@ -168,10 +168,10 @@ let configuration_init_command =
       let data_dir =
         match data_dir with
         | Some d -> d
-        | None -> Configuration.default_data_dir rollup_id
+        | None -> Node_config.default_data_dir rollup_id
       in
       let config =
-        Configuration.
+        Node_config.
           {
             data_dir;
             operator;
@@ -189,7 +189,7 @@ let configuration_init_command =
             l2_blocks_cache_size = default_l2_blocks_cache_size;
           }
       in
-      let* file = Configuration.save config in
+      let* file = Node_config.save config in
       (* This is necessary because the node has not yet been launched, so event
          listening can't be used. *)
       let*! () = cctxt#message "Configuration written in %s" file in
@@ -213,9 +213,9 @@ let run_command =
             let* rollup_id =
               to_tzresult "Provide at least --rollup-id or --data-dir" rollup_id
             in
-            return (Configuration.default_data_dir rollup_id)
+            return (Node_config.default_data_dir rollup_id)
       in
-      let* config = Configuration.load ~data_dir in
+      let* config = Node_config.load ~data_dir in
       Daemon.run config cctxt)
 
 let tx_rollup_commands () =

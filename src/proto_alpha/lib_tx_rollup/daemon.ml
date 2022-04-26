@@ -444,7 +444,7 @@ let run configuration cctxt =
   let open Lwt_result_syntax in
   let*! () = Event.(emit starting_node) () in
   let {
-    Configuration.data_dir;
+    Node_config.data_dir;
     rollup_id;
     rollup_genesis;
     operator;
