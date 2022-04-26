@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
 (* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
@@ -1237,9 +1238,9 @@ let apply_external_manager_operation_content :
     ~gas_consumed_in_precheck
   >>=? fun (ctxt, before_operation, consume_deserialization_gas) ->
   match operation with
-  | Reveal _ ->
+  | Reveal pk ->
+      Contract.reveal_manager_key ctxt source pk >>=? fun ctxt ->
       return
-        (* No-op: action already performed by `precheck_manager_contents`. *)
         ( ctxt,
           (Reveal_result
              {consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt}
@@ -1905,7 +1906,12 @@ let precheck_manager_contents (type kind) ctxt (op : kind Kind.manager contents)
      risk getting different results if the operation has already been
      deserialized before (e.g. when retrieve in JSON format). *)
   (match operation with
-  | Reveal pk -> Contract.reveal_manager_key ctxt source pk
+  | Reveal _pk ->
+      (* TODO #2603
+         Should pre-check/validate have a specific precondition for
+         individual reveals?
+      *)
+      return ctxt
   | Transaction {parameters; _} ->
       Lwt.return
       @@ record_trace Gas_quota_exceeded_init_deserialize

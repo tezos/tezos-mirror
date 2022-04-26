@@ -38,6 +38,10 @@ RPC Changes
 Bug Fixes
 ---------
 
+- Restore *all-or-nothing* semantics of manager operation batches by
+  enforcing that failing reveal operations do not take effect (MR
+  :gl:`!5182`).
+
 Minor Changes
 -------------
 
