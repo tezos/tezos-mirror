@@ -247,13 +247,13 @@ module Block = struct
     register0 inbox @@ fun (state, block_id) () () ->
     let*! block = block_of_id state block_id in
     match block with
-    | None -> return None
+    | None -> return_none
     | Some block -> (
         match block_id with
         | `Tezos_block b when Block_hash.(block.header.tezos_block <> b) ->
             (* Tezos block has no l2 inbox *)
-            return None
-        | _ -> return (Some block.inbox))
+            return_none
+        | _ -> return_some block.inbox)
 
   let () =
     register1 proof @@ fun ((state, block_id), message_pos) () () ->
@@ -459,9 +459,9 @@ module Context_RPC = struct
     | Left i ->
         if check_index then
           let* number_indexes = count context in
-          if Indexable.to_int32 i >= number_indexes then return None
-          else return (Some i)
-        else return (Some i)
+          if Indexable.to_int32 i >= number_indexes then return_none
+          else return_some i
+        else return_some i
     | Right v -> get context v
 
   let get_address_index ?check_index context address =
@@ -507,13 +507,13 @@ module Context_RPC = struct
     register1 address_metadata @@ fun (c, address) () () ->
     let* address_index = get_address_index c address in
     match address_index with
-    | None -> return None
+    | None -> return_none
     | Some address_index -> (
         let* metadata = Context.Address_metadata.get c address_index in
         match metadata with
-        | None -> return None
+        | None -> return_none
         | Some {counter; public_key} ->
-            return (Some {index = address_index; counter; public_key}))
+            return_some {index = address_index; counter; public_key})
 
   let () =
     register1 address_counter @@ fun (c, address) () () ->
@@ -530,12 +530,12 @@ module Context_RPC = struct
     register1 address_public_key @@ fun (c, address) () () ->
     let* address_index = get_address_index c address in
     match address_index with
-    | None -> return None
+    | None -> return_none
     | Some address_index -> (
         let* metadata = Context.Address_metadata.get c address_index in
         match metadata with
-        | None -> return None
-        | Some {public_key; _} -> return (Some public_key))
+        | None -> return_none
+        | Some {public_key; _} -> return_some public_key)
 
   let build_directory state =
     !directory
