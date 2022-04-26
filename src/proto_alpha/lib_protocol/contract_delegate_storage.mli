@@ -36,8 +36,7 @@ val find :
 
 (** [init ctxt contract delegate] sets the [delegate] associated to [contract].
 
-    This function is undefined if [contract] is not allocated, or if [contract]
-    has already a delegate. *)
+    This function assumes that [contract] does not have a delegate already. *)
 val init :
   Raw_context.t ->
   Contract_repr.t ->
@@ -49,20 +48,19 @@ val init :
     This function does not affect the value of the expression
     [find ctxt contract].
 
-    This function is undefined if [contract] is not allocated. *)
+    This function assumes that [contract] is allocated. *)
 val unlink : Raw_context.t -> Contract_repr.t -> Raw_context.t tzresult Lwt.t
 
 (** [delete ctxt contract] behaves as [unlink ctxt contract], but in addition
     removes the association of the [contract] to its current delegate, leaving
     the former without delegate.
 
-    This function is undefined if [contract] is not allocated. *)
+    This function assumes that [contract] is allocated. *)
 val delete : Raw_context.t -> Contract_repr.t -> Raw_context.t tzresult Lwt.t
 
 (** [set ctxt contract delegate] updates the [delegate] associated to [contract].
 
-    This function is undefined if [contract] is not allocated, or if [contract]
-    does not have a delegate. *)
+    This function assumes that [contract] is allocated and has a delegate. *)
 val set :
   Raw_context.t ->
   Contract_repr.t ->

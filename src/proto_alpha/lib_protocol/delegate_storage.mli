@@ -26,17 +26,26 @@
 (*****************************************************************************)
 
 (** This module groups everything related to delegate registration.
+    For the invariants maintained, see the submodule {!Contract}.
 
     It also groups "trivial" getters/setters related to delegates.
 
     It is responsible for maintaining the following tables:
     - {!Storage.Contract.Frozen_deposits_limit}
     - {!Storage.Delegates}
- *)
+*)
 
 type error +=
   | (* `Permanent *) Unregistered_delegate of Signature.Public_key_hash.t
 
+(** This module ensures the following invariants:
+    - registered delegates (i.e. those that appear in {!Storage.Delegates}) are
+    self-delegated, that is a delegate's implicit account delegates to itself
+    (i.e. {!Contract_delegate_storage.find} [delegate] returns [delegate]),
+    - registered delegates have their public keys revealed,
+    - registered delegates cannot change their delegation,
+    - stake is properly moved when changing delegation.
+*)
 module Contract : sig
   type error +=
     | (* `Temporary *) Active_delegate
@@ -44,14 +53,33 @@ module Contract : sig
     | (* `Permanent *) No_deletion of Signature.Public_key_hash.t
     | (* `Temporary *) Current_delegate
 
-  (** Allow to register a delegate when creating an account. *)
+  (** [init ctxt contract delegate] registers a delegate when
+      creating a contract.
+
+      This functions assumes that [contract] is allocated.
+
+      This function returns the {!Unregistered_delegate} error
+      if [contract] already has a delegate or
+      if [delegate] is not a registered delegate. *)
   val init :
     Raw_context.t ->
     Contract_repr.t ->
     Signature.Public_key_hash.t ->
     Raw_context.t tzresult Lwt.t
 
-  (** Allow to set the delegate of an account. *)
+  (** [set ctxt contract delegate_opt] allows to set the
+      delegate of a contract to [delegate] when [delegate_opt = Some delegate]
+      or to unset the delegate when [delegate_opt = None].
+      When [delegate_opt = Some contract] (aka self-delegation),
+      the function also registers the contract as a delegate and
+      sets the delegate as {{!module:Delegate_activation_storage}active}.
+
+      It returns the {!Unregistered_delegate} error when self-delegating and when the public key is not yet revealed.
+      It returns the {!Empty_delegate_account} error when self-delegating and the implicit account is not {{!Contract_storage.allocated}allocated}.
+      It returns the {!Active_delegate} error when self-delegating and the delegate is already active.
+      It returns the {!Unregistered_delegate} error when trying to set the delegate to an unregistered delegate.
+      It returns the {!Current_delegate} error when contract is already delegated to the same delegate.
+      It returns the {!No_deletion} error when trying to unset or change the delegate of a registered delegate. *)
   val set :
     Raw_context.t ->
     Contract_repr.t ->

@@ -46,7 +46,7 @@ type error +=
       Signature.Public_key_hash.t
 
 (** [allocated ctxt contract] returns [true] if and only if the
-   contract is stored in [Storage.Contract.Balance]. *)
+   contract is stored in {!Storage.Contract.Spendable_balance}. *)
 val allocated : Raw_context.t -> Contract_repr.t -> bool Lwt.t
 
 (** [exists ctxt contract] returns [true] if and only if either the
