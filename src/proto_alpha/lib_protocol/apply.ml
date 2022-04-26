@@ -126,6 +126,7 @@ type error +=
   | Failing_noop_error
   | Zero_frozen_deposits of Signature.Public_key_hash.t
   | Forbidden_zero_ticket_quantity
+  | Incorrect_reveal_position
 
 let () =
   register_error_kind
@@ -774,7 +775,20 @@ let () =
       "It is not allowed to use a zero amount ticket in this operation."
     Data_encoding.empty
     (function Forbidden_zero_ticket_quantity -> Some () | _ -> None)
-    (fun () -> Forbidden_zero_ticket_quantity)
+    (fun () -> Forbidden_zero_ticket_quantity) ;
+  register_error_kind
+    `Permanent
+    ~id:"operations.incorrect_reveal_position"
+    ~title:"Incorrect reveal position"
+    ~description:"Incorrect reveal position in batch"
+    ~pp:(fun ppf () ->
+      Format.fprintf
+        ppf
+        "Incorrect reveal operation position in batch: only allowed in first \
+         position")
+    Data_encoding.empty
+    (function Incorrect_reveal_position -> Some () | _ -> None)
+    (fun () -> Incorrect_reveal_position)
 
 open Apply_results
 
@@ -2427,42 +2441,55 @@ let precheck_manager_contents_list ctxt contents_list ~mempool_mode =
   rec_precheck_manager_contents_list ctxt contents_list
 
 let find_manager_public_key ctxt (op : _ Kind.manager contents_list) =
-  (* Currently, the [op] only contains one signature, so
-     all operations are required to be from the same manager. This may
-     change in the future, allowing several managers to group-sign a
-     sequence of transactions. *)
-  let check_same_manager (source, source_key) manager =
-    match manager with
-    | None -> ok (source, source_key)
-    | Some (manager, manager_key) ->
-        if Signature.Public_key_hash.equal source manager then
-          (* Consistency will be checked by
-             [reveal_manager_key] in [precheck_manager_contents]. *)
-          ok (source, Option.either manager_key source_key)
-        else error Inconsistent_sources
+  (* Currently, the [op] batch contains only one signature, so all
+     operations in the batch are required to originate from the same
+     manager. This may change in the future, in order to allow several
+     managers to group-sign a sequence of operations. *)
+  (* Invariants checked:
+
+     - Reveal operations are only authorized in the first position element of a batch.
+
+     - All sources in a batch must be equal. *)
+  (* Performs a sanity check and return the operation's (single)
+     source and a potential public key if the batch contains a reveal
+     operation in the head position. *)
+  let rec check_batch_tail_sanity :
+      type kind.
+      public_key_hash -> kind Kind.manager contents_list -> unit tzresult =
+   fun expected_source -> function
+    | Single (Manager_operation {operation = Reveal _key; _}) ->
+        error Incorrect_reveal_position
+    | Cons (Manager_operation {operation = Reveal _key; _}, _res) ->
+        error Incorrect_reveal_position
+    | Single (Manager_operation {source; _}) ->
+        error_unless
+          (Signature.Public_key_hash.equal expected_source source)
+          Inconsistent_sources
+    | Cons (Manager_operation {source; _}, rest) ->
+        error_unless
+          (Signature.Public_key_hash.equal expected_source source)
+          Inconsistent_sources
+        >>? fun () -> check_batch_tail_sanity source rest
   in
-  let rec find_source :
+  let check_batch :
       type kind.
       kind Kind.manager contents_list ->
-      (Signature.public_key_hash * Signature.public_key option) option ->
-      (Signature.public_key_hash * Signature.public_key option) tzresult =
-   fun contents_list manager ->
-    let source (type kind) = function[@coq_match_with_default]
-      | (Manager_operation {source; operation = Reveal key; _} :
-          kind Kind.manager contents) ->
-          (source, Some key)
-      | Manager_operation {source; _} -> (source, None)
-    in
-    match contents_list with
-    | Single op -> check_same_manager (source op) manager
-    | Cons (op, rest) ->
-        check_same_manager (source op) manager >>? fun manager ->
-        find_source rest (Some manager)
+      (public_key_hash * public_key option) tzresult =
+   fun op ->
+    match op with
+    | Single (Manager_operation {source; operation = Reveal key; _}) ->
+        ok (source, Some key)
+    | Single (Manager_operation {source; _}) -> ok (source, None)
+    | Cons (Manager_operation {source; operation = Reveal key; _}, rest) ->
+        check_batch_tail_sanity source rest >>? fun () -> ok (source, Some key)
+    | Cons (Manager_operation {source; _}, rest) ->
+        check_batch_tail_sanity source rest >>? fun () -> ok (source, None)
   in
-  find_source op None >>?= fun (source, source_key) ->
-  match source_key with
-  | Some key -> return key
+  check_batch op >>?= fun (source, revealed_key) ->
+  Contract.must_be_allocated ctxt (Contract.Implicit source) >>=? fun () ->
+  match revealed_key with
   | None -> Contract.get_manager_key ctxt source
+  | Some pk -> return pk
 
 let check_manager_signature ctxt chain_id (op : _ Kind.manager contents_list)
     raw_operation =

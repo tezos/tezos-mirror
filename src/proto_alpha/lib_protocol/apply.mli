@@ -44,6 +44,7 @@ type error +=
   | Sc_rollup_feature_disabled
   | Inconsistent_counters
   | Forbidden_zero_ticket_quantity
+  | Incorrect_reveal_position
 
 val begin_partial_construction :
   context ->
