@@ -638,7 +638,7 @@ let sign_one_transaction key txs_string =
       Tx_rollup_l2_batch.V1.transaction_encoding
       (List.hd txs)
   in
-  Bls12_381.Signature.MinPk.Aug.sign (bls_sk_of_key key) buf
+  Tezos_crypto.Bls.sign (bls_sk_of_key key) buf
 
 let craft_tx ?counter tx_client ~qty ~signer ~dest ~ticket =
   let* json_str =

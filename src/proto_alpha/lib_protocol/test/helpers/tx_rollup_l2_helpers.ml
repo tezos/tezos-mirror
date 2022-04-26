@@ -99,11 +99,7 @@ let rng_state = Random.State.make_self_init ()
 let gen_l1_address ?seed () = Signature.generate_key ~algo:Ed25519 ?seed ()
 
 let gen_l2_address () =
-  let seed =
-    Bytes.init 32 (fun _ -> char_of_int @@ Random.State.int rng_state 255)
-  in
-  let secret_key = Bls12_381.Signature.generate_sk seed in
-  let public_key = Bls12_381.Signature.MinPk.derive_pk secret_key in
+  let (_pkh, public_key, secret_key) = Bls.generate_key () in
   (secret_key, public_key, Tx_rollup_l2_address.of_bls_pk public_key)
 
 (** [make_unit_ticket_key ctxt ticketer l2_address] computes the key hash of
@@ -157,7 +153,7 @@ let gen_n_ticket_hash n =
   | Error _ -> raise (Invalid_argument "Failed to forge tickets")
 
 let sign_transaction :
-    Bls12_381.Signature.sk list ->
+    Bls.Secret_key.t list ->
     ('signer, 'content) Tx_rollup_l2_batch.V1.transaction ->
     Tx_rollup_l2_batch.V1.signature list =
  fun sks transaction ->
@@ -169,8 +165,7 @@ let sign_transaction :
       Tx_rollup_l2_batch.V1.transaction_encoding
       transaction
   in
-
-  List.map (fun sk -> Bls12_381.Signature.MinPk.Aug.sign sk buf) sks
+  List.map (fun sk -> Bls.sign sk buf) sks
 
 type Environment.Error_monad.error += Test_error of string
 

@@ -104,7 +104,7 @@ let sign_transaction sks txs =
       Tx_rollup_l2_batch.V1.transaction_encoding
       txs
   in
-  List.map (fun sk -> Bls12_381.Signature.MinPk.Aug.sign sk buf) sks
+  List.map (fun sk -> Bls.sign sk buf) sks
 
 let craft_tx ~counter ~signer ~destination ~ticket_hash ~qty =
   let content =
@@ -120,7 +120,7 @@ let craft_tx ~counter ~signer ~destination ~ticket_hash ~qty =
   Tx_rollup_l2_batch.V1.{signer; counter; contents = [content]}
 
 let aggregate_signature_exn signatures =
-  match Bls12_381.Signature.MinPk.aggregate_signature_opt signatures with
+  match Bls.aggregate_signature_opt signatures with
   | Some res -> res
   | None -> invalid_arg "aggregate_signature_exn"
 
@@ -149,13 +149,7 @@ let craft_batch
 
 let conv_pk =
   Clic.parameter (fun _ pk_str ->
-      let bls_pk =
-        Tezos_crypto.Bls.Public_key.of_b58check_exn pk_str
-        |> Data_encoding.Binary.to_bytes_exn
-             Tezos_crypto.Bls.Public_key.encoding
-        |> Bls12_381.Signature.MinPk.pk_of_bytes_exn
-      in
-      return bls_pk)
+      return (Bls.Public_key.of_b58check_exn pk_str))
 
 let conv_qty =
   Clic.parameter (fun _ qty ->
@@ -218,18 +212,10 @@ let batch_of_json ~txs:tx_json ~sks:sks_json =
     Data_encoding.(
       Json.destruct (list Tx_rollup_l2_batch.V1.transaction_encoding) tx_json)
   in
-  let signatures =
-    Data_encoding.(
-      Json.destruct (list (list Tezos_crypto.Bls.Secret_key.encoding)) sks_json)
+  let sks =
+    Data_encoding.(Json.destruct (list (list Bls.Secret_key.encoding)) sks_json)
   in
-  let signatures =
-    List.map
-      (List.map (fun v ->
-           Data_encoding.Binary.to_bytes_exn Bls.Secret_key.encoding v
-           |> Bls12_381.Signature.sk_of_bytes_exn))
-      signatures
-  in
-  craft_batch transactions signatures
+  craft_batch transactions sks
 
 let craft_tx_batch () =
   command
