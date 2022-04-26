@@ -121,7 +121,8 @@ let preendorsement ?delegate ?slot ?level ?round ?block_payload_hash
 let sign ?watermark sk ctxt (Contents_list contents) =
   Operation.pack (sign ?watermark sk ctxt contents)
 
-let batch_operations ~source ctxt (operations : packed_operation list) =
+let batch_operations ?(recompute_counters = false) ~source ctxt
+    (operations : packed_operation list) =
   let operations =
     List.map
       (function
@@ -130,6 +131,22 @@ let batch_operations ~source ctxt (operations : packed_operation list) =
       operations
     |> List.flatten
   in
+  (if recompute_counters then
+   Context.Contract.counter ctxt source >>=? fun counter ->
+   (* Update counters and transform into a contents_list *)
+   let _, rev_operations =
+     List.fold_left
+       (fun (counter, acc) -> function
+         | Contents (Manager_operation m) ->
+             ( Z.succ counter,
+               Contents (Manager_operation {m with counter}) :: acc )
+         | x -> (counter, x :: acc))
+       (Z.succ counter, [])
+       operations
+   in
+   return (List.rev rev_operations)
+  else return operations)
+  >>=? fun operations ->
   Context.Contract.manager ctxt source >>=? fun account ->
   Environment.wrap_tzresult @@ Operation.of_list operations
   >>?= fun operations -> return @@ sign account.sk ctxt operations
