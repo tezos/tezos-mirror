@@ -113,6 +113,189 @@ let read_int8 str offset =
   let i = TzEndian.get_int8_string str offset in
   (i, offset + 1)
 
+(* Functors to build stores on indexes *)
+
+module type SINGLETON_STORE = sig
+  type t
+
+  type value
+
+  val read : t -> value option Lwt.t
+
+  val write : t -> value -> unit tzresult Lwt.t
+end
+
+module type INDEXABLE_STORE = sig
+  type t
+
+  type key
+
+  type value
+
+  val mem : t -> key -> bool Lwt.t
+
+  val find : t -> key -> value option Lwt.t
+
+  val add : ?flush:bool -> t -> key -> value -> unit Lwt.t
+end
+
+module type INDEXABLE_REMOVABLE_STORE = sig
+  include INDEXABLE_STORE
+
+  val remove : ?flush:bool -> t -> key -> unit Lwt.t
+end
+
+module Make_indexable
+    (K : Index.Key.S)
+    (V : Index.Value.S) (P : sig
+      val path : data_dir:string -> string
+    end) =
+struct
+  module I = Index_unix.Make (K) (V) (Index.Cache.Unbounded)
+
+  type t = {index : I.t; scheduler : Lwt_idle_waiter.t}
+
+  let log_size = 10_000
+
+  let mem store k =
+    Lwt_idle_waiter.task store.scheduler @@ fun () ->
+    Lwt.return (I.mem store.index k)
+
+  let find store k =
+    let open Lwt_syntax in
+    Lwt_idle_waiter.task store.scheduler @@ fun () ->
+    Option.catch_os @@ fun () ->
+    let v = I.find store.index k in
+    return_some v
+
+  let add ?(flush = true) store k v =
+    Lwt_idle_waiter.force_idle store.scheduler @@ fun () ->
+    I.replace store.index k v ;
+    if flush then I.flush store.index ;
+    Lwt.return_unit
+
+  let init ~data_dir ~readonly =
+    let index = I.v ~log_size ~readonly (P.path ~data_dir) in
+    let scheduler = Lwt_idle_waiter.create () in
+    Lwt.return {index; scheduler}
+
+  let close store =
+    Lwt_idle_waiter.force_idle store.scheduler @@ fun () ->
+    (try I.close store.index with Index.Closed -> ()) ;
+    Lwt.return_unit
+end
+
+module Make_indexable_removable
+    (K : Index.Key.S)
+    (V : Index.Value.S) (P : sig
+      val path : data_dir:string -> string
+    end) =
+struct
+  module V_opt = struct
+    (* The values stored in the index are optional values.  When we "remove" a
+       key from the store, we're not really removing it from the index, but
+       simply setting its association to [None] (encoded with zero bytes here).
+    *)
+
+    type t = V.t option
+
+    let t = Repr.option V.t
+
+    let encoded_size = 1 + V.encoded_size
+
+    let encode v =
+      let dst = Bytes.create encoded_size in
+      let (tag, value_bytes) =
+        match v with
+        | None -> (0, Bytes.make V.encoded_size '\000')
+        | Some v -> (1, V.encode v |> Bytes.unsafe_of_string)
+      in
+      let offset = bytes_set_int8 ~dst ~src:tag 0 in
+      let _ = blit ~src:value_bytes ~dst offset in
+      Bytes.unsafe_to_string dst
+
+    let decode str offset =
+      let (tag, offset) = read_int8 str offset in
+      match tag with
+      | 0 -> None
+      | 1 ->
+          let value = V.decode str offset in
+          Some value
+      | _ -> assert false
+  end
+
+  include Make_indexable (K) (V_opt) (P)
+
+  let find store k =
+    let open Lwt_syntax in
+    let+ v = find store k in
+    match v with None | Some None -> None | Some (Some v) -> Some v
+
+  let mem store hash =
+    let open Lwt_syntax in
+    let+ b = find store hash in
+    Option.is_some b
+
+  let add ?flush store k v = add ?flush store k (Some v)
+
+  let remove ?(flush = true) store k =
+    Lwt_idle_waiter.force_idle store.scheduler @@ fun () ->
+    let exists = I.mem store.index k in
+    if not exists then Lwt.return_unit
+    else (
+      I.replace store.index k None ;
+      if flush then I.flush store.index ;
+      Lwt.return_unit)
+end
+
+module Make_singleton (S : sig
+  type t
+
+  val name : string
+
+  val encoding : t Data_encoding.t
+end) =
+struct
+  type t = {file : string}
+
+  let read store =
+    let open Lwt_syntax in
+    let* exists = Lwt_unix.file_exists store.file in
+    match exists with
+    | false -> return_none
+    | true ->
+        Lwt_io.with_file
+          ~flags:[Unix.O_RDONLY; O_CLOEXEC]
+          ~mode:Input
+          store.file
+        @@ fun channel ->
+        let+ bytes = Lwt_io.read channel in
+        Data_encoding.Binary.of_bytes_opt
+          S.encoding
+          (Bytes.unsafe_of_string bytes)
+
+  let write store x =
+    let open Lwt_result_syntax in
+    let*! res =
+      Lwt_utils_unix.with_atomic_open_out ~overwrite:true store.file
+      @@ fun fd ->
+      let* block_bytes =
+        match Data_encoding.Binary.to_bytes_opt S.encoding x with
+        | None -> tzfail (Cannot_encode_data S.name)
+        | Some bytes -> return bytes
+      in
+      let*! () = Lwt_utils_unix.write_bytes fd block_bytes in
+      return_unit
+    in
+    match res with
+    | Ok res -> Lwt.return res
+    | Error _ -> tzfail (Cannot_write_file S.name)
+
+  let init ~data_dir =
+    let file = Filename.Infix.(Node_data.store_dir data_dir // S.name) in
+    Lwt.return {file}
+end
+
 module L2_block_key = struct
   include L2block.Hash
 
@@ -295,46 +478,6 @@ module Tezos_block_info = struct
     {l2_block; level; predecessor}
 end
 
-module L2_level_info = struct
-  (* The information associated to L2 levels in the index are optional L2 block
-     hashes.  When we "remove" a level from the store, we're not really removing
-     it from the index, but simply setting its association to [None] (encoded
-     with zero bytes here). This is needed in the case of L2 reorganizations
-     where the new chain is shorter than the old one (though this is unlikely to
-     happen in practice). When the new L2 chain progresses, the zero bytes will
-     be overwritten by actual L2 block hashes, so this index should only contain
-     levels mapped to [None] very temporarily. *)
-
-  type t = L2block.hash option
-
-  let t = Repr.option L2_block_key.t
-
-  let encoded_size = 1 + L2block.Hash.size
-
-  let encode bh =
-    let dst = Bytes.create encoded_size in
-    let (tag, l2_block_bytes) =
-      match bh with
-      | None -> (0, Bytes.make L2block.Hash.size '\000')
-      | Some l2_block -> (1, L2block.Hash.to_bytes l2_block)
-    in
-    let offset = bytes_set_int8 ~dst ~src:tag 0 in
-    let _ = blit ~src:l2_block_bytes ~dst offset in
-    Bytes.unsafe_to_string dst
-
-  let decode str offset =
-    let (tag, offset) = read_int8 str offset in
-    match tag with
-    | 0 -> None
-    | 1 ->
-        let (l2block_hash, _) =
-          read_str str ~offset ~len:L2block.Hash.size L2block.Hash.of_string_exn
-        in
-
-        Some l2block_hash
-    | _ -> assert false
-end
-
 module Commitment_info = struct
   type t = {block : Block_hash.t; operation : Operation_hash.t}
 
@@ -363,42 +506,37 @@ module Commitment_info = struct
     {block; operation}
 end
 
-module L2_block_index =
-  Index_unix.Make (L2_block_key) (L2_block_info) (Index.Cache.Unbounded)
-module Level_index =
-  Index_unix.Make (L2_level_key) (L2_level_info) (Index.Cache.Unbounded)
-module Tezos_block_index =
-  Index_unix.Make (Tezos_store.Block_key) (Tezos_block_info)
-    (Index.Cache.Unbounded)
-module Commitment_index =
-  Index_unix.Make (Commitment_key) (Commitment_info) (Index.Cache.Unbounded)
+module Tezos_block_store = struct
+  type value = Tezos_block_info.t = {
+    l2_block : L2block.hash;
+    level : int32;
+    predecessor : Block_hash.t;
+  }
 
-module L2_blocks_file = struct
-  let encoding = Data_encoding.dynamic_size ~kind:`Uint30 L2block.encoding
+  include
+    Make_indexable (Tezos_store.Block_key) (Tezos_block_info)
+      (struct
+        let path ~data_dir = Node_data.tezos_blocks_index data_dir
+      end)
+end
 
-  let pread_block_exn fd ~file_offset =
-    let open Lwt_syntax in
-    (* Read length *)
-    let length_bytes = Bytes.create 4 in
-    let* () =
-      Lwt_utils_unix.read_bytes ~file_offset ~pos:0 ~len:4 fd length_bytes
-    in
-    let block_length_int32 = Bytes.get_int32_be length_bytes 0 in
-    let block_length = Int32.to_int block_length_int32 in
-    let block_bytes = Bytes.extend length_bytes 0 block_length in
-    let* () =
-      Lwt_utils_unix.read_bytes
-        ~file_offset:(file_offset + 4)
-        ~pos:4
-        ~len:block_length
-        fd
-        block_bytes
-    in
-    Lwt.return
-      (Data_encoding.Binary.of_bytes_exn encoding block_bytes, 4 + block_length)
+module Level_store =
+  Make_indexable_removable (L2_level_key) (L2_block_key)
+    (struct
+      let path ~data_dir = Node_data.levels_index data_dir
+    end)
 
-  let pread_block fd ~file_offset =
-    Option.catch_s (fun () -> pread_block_exn fd ~file_offset)
+module Commitment_store = struct
+  type value = Commitment_info.t = {
+    block : Block_hash.t;
+    operation : Operation_hash.t;
+  }
+
+  include
+    Make_indexable (Commitment_key) (Commitment_info)
+      (struct
+        let path ~data_dir = Node_data.commitments_index data_dir
+      end)
 end
 
 module L2_block_store = struct
@@ -409,6 +547,38 @@ module L2_block_store = struct
       ((val Ringo.(
               map_maker ~replacement:LRU ~overflow:Strong ~accounting:Precise))
          (L2block.Hash))
+
+  module L2_block_index =
+    Index_unix.Make (L2_block_key) (L2_block_info) (Index.Cache.Unbounded)
+
+  module L2_blocks_file = struct
+    let encoding = Data_encoding.dynamic_size ~kind:`Uint30 L2block.encoding
+
+    let pread_block_exn fd ~file_offset =
+      let open Lwt_syntax in
+      (* Read length *)
+      let length_bytes = Bytes.create 4 in
+      let* () =
+        Lwt_utils_unix.read_bytes ~file_offset ~pos:0 ~len:4 fd length_bytes
+      in
+      let block_length_int32 = Bytes.get_int32_be length_bytes 0 in
+      let block_length = Int32.to_int block_length_int32 in
+      let block_bytes = Bytes.extend length_bytes 0 block_length in
+      let* () =
+        Lwt_utils_unix.read_bytes
+          ~file_offset:(file_offset + 4)
+          ~pos:4
+          ~len:block_length
+          fd
+          block_bytes
+      in
+      Lwt.return
+        ( Data_encoding.Binary.of_bytes_exn encoding block_bytes,
+          4 + block_length )
+
+    let pread_block fd ~file_offset =
+      Option.catch_s (fun () -> pread_block_exn fd ~file_offset)
+  end
 
   type t = {
     index : L2_block_index.t;
@@ -512,185 +682,6 @@ module L2_block_store = struct
     (try L2_block_index.close store.index with Index.Closed -> ()) ;
     let* _ignore = Lwt_utils_unix.safe_close store.fd in
     Lwt.return_unit
-end
-
-module Tezos_block_store = struct
-  type t = {index : Tezos_block_index.t; scheduler : Lwt_idle_waiter.t}
-
-  type info = Tezos_block_info.t = {
-    l2_block : L2block.hash;
-    level : int32;
-    predecessor : Block_hash.t;
-  }
-
-  let log_size = 10_000
-
-  let mem store hash =
-    Lwt_idle_waiter.task store.scheduler @@ fun () ->
-    Lwt.return (Tezos_block_index.mem store.index hash)
-
-  let find store hash =
-    let open Lwt_syntax in
-    Lwt_idle_waiter.task store.scheduler @@ fun () ->
-    Option.catch_os @@ fun () ->
-    let info = Tezos_block_index.find store.index hash in
-    return_some info
-
-  let add ?(flush = true) store tezos_block info =
-    Lwt_idle_waiter.force_idle store.scheduler @@ fun () ->
-    Tezos_block_index.replace store.index tezos_block info ;
-    if flush then Tezos_block_index.flush store.index ;
-    Lwt.return_unit
-
-  let init ~data_dir ~readonly =
-    let index =
-      Tezos_block_index.v
-        ~log_size
-        ~readonly
-        (Node_data.tezos_blocks_index data_dir)
-    in
-    let scheduler = Lwt_idle_waiter.create () in
-    Lwt.return {index; scheduler}
-
-  let close store =
-    Lwt_idle_waiter.force_idle store.scheduler @@ fun () ->
-    (try Tezos_block_index.close store.index with Index.Closed -> ()) ;
-    Lwt.return_unit
-end
-
-module Level_store = struct
-  type t = {index : Level_index.t; scheduler : Lwt_idle_waiter.t}
-
-  let log_size = 10_000
-
-  let find store hash =
-    Lwt_idle_waiter.task store.scheduler @@ fun () ->
-    Option.catch_os @@ fun () ->
-    let b = Level_index.find store.index hash in
-    Lwt.return b
-
-  let mem store hash =
-    let open Lwt_syntax in
-    let+ b = find store hash in
-    Option.is_some b
-
-  let add ?(flush = true) store level l2_block =
-    Lwt_idle_waiter.force_idle store.scheduler @@ fun () ->
-    Level_index.replace store.index level (Some l2_block) ;
-    if flush then Level_index.flush store.index ;
-    Lwt.return_unit
-
-  let remove ?(flush = true) store level =
-    Lwt_idle_waiter.force_idle store.scheduler @@ fun () ->
-    let exists = Level_index.mem store.index level in
-    if not exists then Lwt.return_unit
-    else (
-      Level_index.replace store.index level None ;
-      if flush then Level_index.flush store.index ;
-      Lwt.return_unit)
-
-  let init ~data_dir ~readonly =
-    let index =
-      Level_index.v ~log_size ~readonly (Node_data.levels_index data_dir)
-    in
-    let scheduler = Lwt_idle_waiter.create () in
-    Lwt.return {index; scheduler}
-
-  let close store =
-    Lwt_idle_waiter.force_idle store.scheduler @@ fun () ->
-    (try Level_index.close store.index with Index.Closed -> ()) ;
-    Lwt.return_unit
-end
-
-module Commitment_store = struct
-  type t = {index : Commitment_index.t; scheduler : Lwt_idle_waiter.t}
-
-  type info = Commitment_info.t = {
-    block : Block_hash.t;
-    operation : Operation_hash.t;
-  }
-
-  let log_size = 1_000
-
-  let mem store hash =
-    Lwt_idle_waiter.task store.scheduler @@ fun () ->
-    Lwt.return (Commitment_index.mem store.index hash)
-
-  let find store hash =
-    let open Lwt_syntax in
-    Lwt_idle_waiter.task store.scheduler @@ fun () ->
-    Option.catch_os @@ fun () ->
-    let info = Commitment_index.find store.index hash in
-    return_some info
-
-  let add ?(flush = true) store tezos_block info =
-    Lwt_idle_waiter.force_idle store.scheduler @@ fun () ->
-    Commitment_index.replace store.index tezos_block info ;
-    if flush then Commitment_index.flush store.index ;
-    Lwt.return_unit
-
-  let init ~data_dir ~readonly =
-    let index =
-      Commitment_index.v
-        ~log_size
-        ~readonly
-        (Node_data.commitments_index data_dir)
-    in
-    let scheduler = Lwt_idle_waiter.create () in
-    Lwt.return {index; scheduler}
-
-  let close store =
-    Lwt_idle_waiter.force_idle store.scheduler @@ fun () ->
-    (try Commitment_index.close store.index with Index.Closed -> ()) ;
-    Lwt.return_unit
-end
-
-module Make_singleton (S : sig
-  type t
-
-  val name : string
-
-  val encoding : t Data_encoding.t
-end) =
-struct
-  type t = {file : string}
-
-  let read store =
-    let open Lwt_syntax in
-    let* exists = Lwt_unix.file_exists store.file in
-    match exists with
-    | false -> return_none
-    | true ->
-        Lwt_io.with_file
-          ~flags:[Unix.O_RDONLY; O_CLOEXEC]
-          ~mode:Input
-          store.file
-        @@ fun channel ->
-        let+ bytes = Lwt_io.read channel in
-        Data_encoding.Binary.of_bytes_opt
-          S.encoding
-          (Bytes.unsafe_of_string bytes)
-
-  let write store x =
-    let open Lwt_result_syntax in
-    let*! res =
-      Lwt_utils_unix.with_atomic_open_out ~overwrite:true store.file
-      @@ fun fd ->
-      let* block_bytes =
-        match Data_encoding.Binary.to_bytes_opt S.encoding x with
-        | None -> tzfail (Cannot_encode_data S.name)
-        | Some bytes -> return bytes
-      in
-      let*! () = Lwt_utils_unix.write_bytes fd block_bytes in
-      return_unit
-    in
-    match res with
-    | Ok res -> Lwt.return res
-    | Error _ -> tzfail (Cannot_write_file S.name)
-
-  let init ~data_dir =
-    let file = Filename.Infix.(Node_data.store_dir data_dir // S.name) in
-    Lwt.return {file}
 end
 
 module Head_store = Make_singleton (struct
