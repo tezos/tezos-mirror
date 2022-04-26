@@ -67,7 +67,10 @@ module type S = sig
 
   val get_status : state -> status Lwt.t
 
-  type instruction = IPush : int -> instruction | IAdd : instruction
+  type instruction =
+    | IPush : int -> instruction
+    | IAdd : instruction
+    | IStore : string -> instruction
 
   val equal_instruction : instruction -> instruction -> bool
 
@@ -78,6 +81,8 @@ module type S = sig
   val get_code : state -> instruction list Lwt.t
 
   val get_stack : state -> int list Lwt.t
+
+  val get_var : state -> string -> int option Lwt.t
 
   val get_evaluation_result : state -> bool option Lwt.t
 
@@ -110,17 +115,22 @@ module Make (Context : P) :
 
   type status = Halted | WaitingForInputMessage | Parsing | Evaluating
 
-  type instruction = IPush : int -> instruction | IAdd : instruction
+  type instruction =
+    | IPush : int -> instruction
+    | IAdd : instruction
+    | IStore : string -> instruction
 
   let equal_instruction i1 i2 =
     match (i1, i2) with
     | (IPush x, IPush y) -> Compare.Int.(x = y)
     | (IAdd, IAdd) -> true
+    | (IStore x, IStore y) -> Compare.String.(x = y)
     | (_, _) -> false
 
   let pp_instruction fmt = function
     | IPush x -> Format.fprintf fmt "push(%d)" x
     | IAdd -> Format.fprintf fmt "add"
+    | IStore x -> Format.fprintf fmt "store(%s)" x
 
   (*
 
@@ -170,6 +180,8 @@ module Make (Context : P) :
 
       val find_value : Tree.key -> 'a Data_encoding.t -> 'a option t
 
+      val children : Tree.key -> 'a Data_encoding.t -> (string * 'a) list t
+
       val get_value : default:'a -> Tree.key -> 'a Data_encoding.t -> 'a t
 
       val set_value : Tree.key -> 'a Data_encoding.t -> 'a -> unit t
@@ -206,15 +218,41 @@ module Make (Context : P) :
         let* tree = Tree.remove tree key in
         return (tree, Some ())
 
+      let decode encoding bytes state =
+        let open Lwt_syntax in
+        match Data_encoding.Binary.of_bytes_opt encoding bytes with
+        | None -> internal_error "Error during decoding" state
+        | Some v -> return (state, Some v)
+
       let find_value key encoding state =
         let open Lwt_syntax in
         let* obytes = Tree.find state key in
         match obytes with
         | None -> return (state, Some None)
-        | Some bytes -> (
-            match Data_encoding.Binary.of_bytes_opt encoding bytes with
-            | None -> internal_error "Internal_Error during decoding" state
-            | Some v -> return (state, Some (Some v)))
+        | Some bytes ->
+            let* (state, value) = decode encoding bytes state in
+            return (state, Some value)
+
+      let children key encoding state =
+        let open Lwt_syntax in
+        let* children = Tree.list state key in
+        let rec aux = function
+          | [] -> return (state, Some [])
+          | (key, tree) :: children -> (
+              let* obytes = Tree.to_value tree in
+              match obytes with
+              | None -> internal_error "Invalid children" state
+              | Some bytes -> (
+                  let* (state, v) = decode encoding bytes state in
+                  match v with
+                  | None -> return (state, None)
+                  | Some v -> (
+                      let* (state, l) = aux children in
+                      match l with
+                      | None -> return (state, None)
+                      | Some l -> return (state, Some ((key, v) :: l)))))
+        in
+        aux children
 
       let get_value ~default key encoding =
         let open Syntax in
@@ -265,6 +303,31 @@ module Make (Context : P) :
         return @@ fun fmt () -> Format.fprintf fmt "@[%s : %a@]" P.name P.pp v
     end
 
+    module MakeDict (P : sig
+      type t
+
+      val name : string
+
+      val pp : Format.formatter -> t -> unit
+
+      val encoding : t Data_encoding.t
+    end) =
+    struct
+      let key k = [P.name; k]
+
+      let get k = find_value (key k) P.encoding
+
+      let set k v = set_value (key k) P.encoding v
+
+      let pp =
+        let open Monad.Syntax in
+        let* l = children [P.name] P.encoding in
+        let pp_elem fmt (key, value) =
+          Format.fprintf fmt "@[%s : %a@]" key P.pp value
+        in
+        return @@ fun fmt () -> Format.pp_print_list pp_elem fmt l
+    end
+
     module MakeDeque (P : sig
       type t
 
@@ -296,6 +359,17 @@ module Make (Context : P) :
       let set_end = set_value end_key Data_encoding.z
 
       let idx_key idx = [P.name; Z.to_string idx]
+
+      let top =
+        let open Monad.Syntax in
+        let* head_idx = get_head in
+        let* end_idx = get_end in
+        let* v = find_value (idx_key head_idx) P.encoding in
+        if Z.(leq end_idx head_idx) then return None
+        else
+          match v with
+          | None -> (* By invariants of the Deque. *) assert false
+          | Some x -> return (Some x)
 
       let push x =
         let open Monad.Syntax in
@@ -349,6 +423,16 @@ module Make (Context : P) :
       let name = "tick"
     end)
 
+    module Vars = MakeDict (struct
+      type t = int
+
+      let name = "vars"
+
+      let encoding = Data_encoding.int31
+
+      let pp fmt x = Format.fprintf fmt "%d" x
+    end)
+
     module Stack = MakeDeque (struct
       type t = int
 
@@ -378,6 +462,12 @@ module Make (Context : P) :
                 Data_encoding.unit
                 (function IAdd -> Some () | _ -> None)
                 (fun () -> IAdd);
+              case
+                ~title:"store"
+                (Tag 1)
+                Data_encoding.string
+                (function IStore x -> Some x | _ -> None)
+                (fun x -> IStore x);
             ])
     end)
 
@@ -626,6 +716,8 @@ module Make (Context : P) :
 
   let get_stack = result_of ~default:[] @@ Stack.to_list
 
+  let get_var state k = (result_of ~default:None @@ Vars.get k) @@ state
+
   let get_evaluation_result = result_of ~default:None @@ EvaluationResult.get
 
   let get_is_stuck = result_of ~default:None @@ is_stuck
@@ -771,6 +863,9 @@ module Make (Context : P) :
     match i with
     | None -> stop_evaluating true
     | Some (IPush x) -> Stack.push x
+    | Some (IStore x) -> (
+        let* v = Stack.top in
+        match v with None -> return () | Some v -> Vars.set x v)
     | Some IAdd -> (
         let* v = Stack.pop in
         match v with
