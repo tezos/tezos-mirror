@@ -57,12 +57,13 @@ variables:
       when: never
     - if: '$CI_MERGE_REQUEST_SOURCE_BRANCH_NAME == $TEZOS_DEFAULT_BRANCH && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
       when: never
-    # No jobs on test latest release
+    # No development jobs on test latest release
     - if: '$CI_COMMIT_REF_NAME == "test-latest-release" && $CI_PROJECT_NAMESPACE == "nomadic-labs"'
       when: never
     # No development jobs on release branches
     - if: '($CI_COMMIT_BRANCH =~ /-release$/ || $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /-release$/) && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
       when: never
+    # No development jobs on release tags
     - if: '$CI_COMMIT_TAG && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
       when: never
     - when: on_success
@@ -76,12 +77,13 @@ variables:
       when: never
     - if: '$CI_MERGE_REQUEST_SOURCE_BRANCH_NAME == $TEZOS_DEFAULT_BRANCH && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
       when: never
-    # No jobs on test latest release
+    # No development jobs on test latest release
     - if: '$CI_COMMIT_REF_NAME == "test-latest-release" && $CI_PROJECT_NAMESPACE == "nomadic-labs"'
       when: never
     # No development jobs on release branches
     - if: '($CI_COMMIT_BRANCH =~ /-release$/ || $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /-release$/) && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
       when: never
+    # No development jobs on release tags
     - if: '$CI_COMMIT_TAG && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
       when: never
     - when: manual
@@ -168,7 +170,7 @@ variables:
       when: always
     - if: '$CI_COMMIT_TAG && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
       when: never
-    # No jobs on latest release branches
+    # No development jobs on latest release branches
     - if: '$CI_COMMIT_REF_NAME == "test-latest-release" && $CI_PROJECT_NAMESPACE == "nomadic-labs"'
       when: never
     # No development jobs on release branches
@@ -182,7 +184,7 @@ variables:
       changes:
         - docs/introduction/*.sh
       when: on_success
-    # Run when there is label on the merge request.
+    # Run when there is label on the merge request
     - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|[,])ci--docs(?:$|[,])/'
       when: on_success
     - when: manual
@@ -211,23 +213,27 @@ variables:
   rules:
     - if: '$TZ_PIPELINE_KIND == "SCHEDULE" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"'
       when: always
+    # Run when arm64 is in the branch name
     - if: '$CI_COMMIT_BRANCH =~ /arm64/ || $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /arm64/'
       when: on_success
-    # Run when there is label on the merge request.
+    # Run when there is label on the merge request
     - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|[,])ci--arm64(?:$|[,])/'
       when: on_success
-    # No jobs on test latest release
+    # No development jobs on test latest release
     - if: '$CI_COMMIT_REF_NAME == "test-latest-release" && $CI_PROJECT_NAMESPACE == "nomadic-labs"'
       when: never
     # No development jobs on release branches
     - if: '($CI_COMMIT_BRANCH =~ /-release$/ || $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /-release$/) && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
+      when: never
+    # No development jobs on release tags
+    - if: '$CI_COMMIT_TAG && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
       when: never
     - when: manual
       allow_failure: true
 
 .rules_template__development_docker:
   rules:
-    # No jobs on test latest release
+    # No development jobs on test latest release
     - if: '$CI_COMMIT_REF_NAME == "test-latest-release" && $CI_PROJECT_NAMESPACE == "nomadic-labs"'
       when: never
     # No development jobs on release branches
@@ -236,7 +242,7 @@ variables:
     # Run when docker is in the branch name
     - if: '$CI_COMMIT_BRANCH =~ /docker/ || $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /docker/'
       when: on_success
-    # Run when there is label on the merge request.
+    # Run when there is label on the merge request
     - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|[,])ci--docker(?:$|[,])/'
       when: on_success
     - if: $CI_COMMIT_BRANCH || $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME
@@ -278,7 +284,7 @@ variables:
     # Run when the branch name contains the `opam` keyword.
     - if: '$CI_COMMIT_BRANCH =~ /opam/ || $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /opam/'
       when: on_success
-    # Run when there is label on the merge request.
+    # Run when there is label on the merge request
     - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|[,])ci--opam(?:$|[,])/'
       when: on_success
     # Run on merge requests when opam changes are detected.
