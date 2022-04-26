@@ -328,7 +328,7 @@ let lwt_log_sink = Lwt_log_sink_unix.create_cfg ~rules:"* -> debug" ()
 let testcase (module T : TEST) =
   Alcotest_lwt.test_case T.name `Quick (fun _switch () ->
       let open Lwt_syntax in
-      let* () = Internal_event_unix.init ~lwt_log_sink () in
+      let* () = Tezos_base_unix.Internal_event_unix.init ~lwt_log_sink () in
       Tztest.with_empty_mock_sink (fun () ->
           let* r = T.run () in
           match r with
