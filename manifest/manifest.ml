@@ -1373,6 +1373,8 @@ type release = {version : string; url : Opam.url}
 (*                                GENERATOR                                  *)
 (*****************************************************************************)
 
+let checks_done = ref false
+
 (* Gather the list of generated files so that we can find out whether
    there are other files that we should have generated. *)
 let generated_files = ref String_set.empty
@@ -1385,6 +1387,8 @@ let rec create_parent path =
 
 (* Write a file relatively to the root directory of the repository. *)
 let write filename f =
+  if !checks_done then
+    failwith ("trying to generate " ^ filename ^ " after [check] was run") ;
   let real_filename =
     if Filename.is_relative filename then Filename.parent_dir_name // filename
     else filename
@@ -2202,16 +2206,26 @@ let (packages_dir, release) =
   in
   (!packages_dir, release)
 
-let generate ?exclude () =
+let generate () =
   Printexc.record_backtrace true ;
   try
     generate_dune_files () ;
     generate_opam_files () ;
     generate_dune_project_files () ;
     generate_package_json_file () ;
-    check_for_non_generated_files ?exclude () ;
-    check_js_of_ocaml () ;
     Option.iter (generate_opam_files_for_release packages_dir) release
+  with exn ->
+    Printexc.print_backtrace stderr ;
+    prerr_endline ("Error: " ^ Printexc.to_string exn) ;
+    exit 1
+
+let check ?exclude () =
+  if !checks_done then failwith "Cannot run check twice" ;
+  checks_done := true ;
+  Printexc.record_backtrace true ;
+  try
+    check_for_non_generated_files ?exclude () ;
+    check_js_of_ocaml ()
   with exn ->
     Printexc.print_backtrace stderr ;
     prerr_endline ("Error: " ^ Printexc.to_string exn) ;

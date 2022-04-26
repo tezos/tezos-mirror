@@ -4288,6 +4288,9 @@ let exclude filename =
   | "tezt" :: "vesting_contract_test" :: _ -> true
   | _ -> false
 
+(* Generate dune and opam files. *)
+let () = generate ()
+
 (* Generate a dunw-workspace file at the root of the repo *)
 let () =
   let p_static = Env.Profile "static" in
@@ -4319,5 +4322,4 @@ let () =
   write "active_protocol_versions" @@ fun fmt ->
   List.iter (write_protocol fmt) Protocol.active
 
-(* Generate dune and opam files. *)
-let () = generate ~exclude ()
+let () = check ~exclude ()
