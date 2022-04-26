@@ -24,12 +24,7 @@
 (*****************************************************************************)
 
 open Clic
-
-let l2_addr_param =
-  Clic.parameter (fun _ s ->
-      match Tx_rollup_l2_address.of_b58check_opt s with
-      | Some addr -> return addr
-      | None -> failwith "The given L2 address is invalid")
+open Tezos_client_base
 
 let l1_addr_param =
   Clic.parameter (fun _ s ->
@@ -57,6 +52,64 @@ let json_file_or_text_parameter =
   let from_path = Lwt_utils_unix.Json.read_file in
   file_or_text_parameter ~from_text ~from_path ()
 
+let alias_or_literal ~from_alias ~from_key =
+  Client_aliases.parse_alternatives [("alias", from_alias); ("key", from_key)]
+
+let bls_pkh_parameter () =
+  Clic.parameter
+    ~autocomplete:Client_keys.Aggregate_alias.Public_key_hash.autocomplete
+    (fun cctxt s ->
+      let open Lwt_result_syntax in
+      let from_alias s =
+        let* (Bls12_381 pkh) =
+          Client_keys.Aggregate_alias.Public_key_hash.find cctxt s
+        in
+        return pkh
+      in
+      let from_key s = Bls.Public_key_hash.of_b58check s |> Lwt.return in
+      alias_or_literal ~from_alias ~from_key s)
+
+let conv_bls_pkh_to_l2_addr pkh =
+  Bls.Public_key_hash.to_b58check pkh |> Tx_rollup_l2_address.of_b58check_exn
+
+let bls_pkh_param ?(name = "public key hash")
+    ?(desc = "bls public key hash to use") =
+  let desc =
+    String.concat
+      "\n"
+      [
+        desc; "Can be an alias or a key.\nUse 'alias:name', 'key:name' to force.";
+      ]
+  in
+  Clic.param
+    ~name
+    ~desc
+    (Clic.map_parameter ~f:conv_bls_pkh_to_l2_addr (bls_pkh_parameter ()))
+
+let bls_pk_parameter () =
+  Clic.parameter
+    ~autocomplete:Client_keys.Aggregate_alias.Public_key.autocomplete
+    (fun cctxt s ->
+      let open Lwt_result_syntax in
+      let from_alias s =
+        let* pk_opt = Client_keys.Aggregate_alias.Public_key.find cctxt s in
+        match pk_opt with
+        | (_pk_uri, Some (Bls12_381 pk)) -> return pk
+        | (_pk_uri, None) -> failwith "it is not a valid bls public key"
+      in
+      let from_key s = Bls.Public_key.of_b58check s |> Lwt.return in
+      alias_or_literal ~from_alias ~from_key s)
+
+let bls_pk_param ?(name = "public key") ?(desc = "Bls public key to use.") =
+  let desc =
+    String.concat
+      "\n"
+      [
+        desc; "Can be an alias or a key.\nUse 'alias:name', 'key:name' to force.";
+      ]
+  in
+  Clic.param ~name ~desc (bls_pk_parameter ())
+
 let block_id_param =
   let open Lwt_result_syntax in
   Clic.parameter (fun _ s ->
@@ -79,10 +132,9 @@ let get_tx_address_balance_command () =
           ~default:"head"
           block_id_param))
     (prefixes ["get"; "balance"; "for"]
-    @@ param
+    @@ bls_pkh_param
          ~name:"tz4"
          ~desc:"tz4 address from which the balance is queried"
-         l2_addr_param
     @@ prefixes ["of"]
     @@ param
          ~name:"ticket-hash"
@@ -186,10 +238,6 @@ let craft_batch
   in
   batch signatures transactions
 
-let conv_pk =
-  Clic.parameter (fun _ pk_str ->
-      return (Bls.Public_key.of_b58check_exn pk_str))
-
 let conv_qty =
   Clic.parameter (fun _ qty ->
       match Tx_rollup_l2_qty.of_string qty with
@@ -229,7 +277,7 @@ let craft_tx_transfers () =
           ~doc:"counter value of the destination"
           conv_counter))
     (prefixes ["craft"; "tx"; "transfers"; "from"]
-    @@ param ~name:"signer_pk" ~desc:"public key of the signer" conv_pk
+    @@ bls_pk_param ~name:"signer_pk" ~desc:"public key of the signer"
     @@ prefix "using"
     @@ param
          ~name:"transfers.json"
@@ -288,9 +336,9 @@ let craft_tx_transaction () =
     (prefixes ["craft"; "tx"; "transferring"]
     @@ param ~name:"qty" ~desc:"qty to transfer" conv_qty
     @@ prefixes ["from"]
-    @@ param ~name:"signer_pk" ~desc:"public key of the signer" conv_pk
+    @@ bls_pk_param ~name:"signer_pk" ~desc:"public key of the signer"
     @@ prefixes ["to"]
-    @@ param ~name:"dest" ~desc:"tz4 destination address" l2_addr_param
+    @@ bls_pkh_param ~name:"dest" ~desc:"tz4 destination address"
     @@ prefixes ["for"]
     @@ param ~name:"ticket" ~desc:"ticket to transfer" parse_ticket
     @@ stop)
@@ -323,7 +371,7 @@ let craft_tx_withdrawal () =
     (prefixes ["craft"; "tx"; "withdrawing"]
     @@ param ~name:"qty" ~desc:"qty to withdraw" conv_qty
     @@ prefixes ["from"]
-    @@ param ~name:"signer_pk" ~desc:"public key of the signer" conv_pk
+    @@ bls_pk_param ~name:"signer_pk" ~desc:"public key of the signer"
     @@ prefixes ["to"]
     @@ param ~name:"dest" ~desc:"L1 destination address" l1_addr_param
     @@ prefixes ["for"]
@@ -373,7 +421,9 @@ let craft_tx_batch () =
     ~desc:"craft a transactional rollup batch"
     no_options
     (prefixes ["craft"; "batch"; "with"]
-    @@ string ~name:"json" ~desc:"JSON containing a list of operations"
+    @@ string
+         ~name:"json"
+         ~desc:"JSON containing a list of operations and signature"
     @@ prefixes ["for"]
     @@ string
          ~name:"secret-keys"
