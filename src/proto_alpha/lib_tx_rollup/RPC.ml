@@ -626,7 +626,7 @@ let launch ~host ~acl ~node ~dir () =
 
 let start configuration state =
   let open Lwt_result_syntax in
-  let Configuration.{rpc_addr; _} = configuration in
+  let Node_config.{rpc_addr; _} = configuration in
   let (host, rpc_port) = rpc_addr in
   let host = P2p_addr.to_string host in
   let dir = register state in

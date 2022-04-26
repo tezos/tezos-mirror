@@ -51,7 +51,7 @@ type t = private {
   tezos_blocks_cache : Alpha_block_services.block_info Tezos_blocks_cache.t;
   constants : Constants.t;
   operator : signer option;
-  signers : Configuration.signers;
+  signers : Node_config.signers;
 }
 
 (** [init cctxt ~data_dir ~rollup_genesis ~operator rollup] creates a new state
@@ -69,7 +69,7 @@ val init :
   ?rollup_genesis:Block_hash.t ->
   l2_blocks_cache_size:int ->
   operator:Signature.public_key_hash option ->
-  signers:Configuration.signers ->
+  signers:Node_config.signers ->
   Tx_rollup.t ->
   t tzresult Lwt.t
 

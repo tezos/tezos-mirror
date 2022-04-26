@@ -46,7 +46,7 @@ let configuration_was_written =
     ~msg:"configuration written in {file}"
     ~level:Notice
     ("file", Data_encoding.string)
-    ("config", Configuration.encoding)
+    ("config", Node_config.encoding)
 
 let starting_node =
   declare_0

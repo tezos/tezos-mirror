@@ -38,7 +38,7 @@ val destruct_block_id : string -> (block_id, string) result
 type context_id = [block_id | `Context of Tx_rollup_l2_context_hash.t]
 
 (** Starts the RPC server of the tx_rollup_node. *)
-val start : Configuration.t -> State.t -> RPC_server.server tzresult Lwt.t
+val start : Node_config.t -> State.t -> RPC_server.server tzresult Lwt.t
 
 (** Returns the balance for an l2-address and a ticket. *)
 val balance :
