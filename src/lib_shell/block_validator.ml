@@ -259,6 +259,12 @@ let on_validation_request w
                                       operations
                                 | Error _ as x -> Lwt.return x))
                       in
+                      Shell_metrics.Block_validator
+                      .set_operation_per_pass_collector
+                        (fun () ->
+                          List.map
+                            (fun v -> Int.to_float (List.length v))
+                            operations) ;
                       let* o =
                         Distributed_db.commit_block
                           chain_db
