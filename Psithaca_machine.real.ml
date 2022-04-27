@@ -136,16 +136,15 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
         let () = assert (Compare.Int.equal priority p) in
         return (delegate, timestamp)
 
-  let block_round header =
-    match
-      Data_encoding.Binary.of_bytes
-        Protocol.block_header_data_encoding
-        header.Block_header.protocol_data
-    with
-    | Error err -> Error [Tezos_base.Data_encoding_wrapper.Decoding_error err]
-    | Ok data ->
-        Protocol.Environment.wrap_tzresult
-          (Protocol.Alpha_context.Round.to_int data.contents.payload_round)
+  let block_round (header : Block_header.t) =
+    let wrap = Protocol.Environment.wrap_tzresult in
+    let open Result_syntax in
+    let* round =
+      wrap
+      @@ Protocol.Alpha_context.Fitness.round_from_raw
+           header.Block_header.shell.fitness
+    in
+    wrap @@ Protocol.Alpha_context.Round.to_int round
 
   let consensus_op_participants_of_block cctxt hash =
     let* ops =

@@ -61,7 +61,7 @@ module type PROTOCOL_SERVICES = sig
     int ->
     (Signature.public_key_hash * Time.Protocol.t option) tzresult Lwt.t
 
-  val block_round : Block_header.t -> (int, tztrace) result
+  val block_round : Block_header.t -> int tzresult
 
   val consensus_op_participants_of_block :
     wrap_full -> Block_hash.t -> Signature.public_key_hash list tzresult Lwt.t
