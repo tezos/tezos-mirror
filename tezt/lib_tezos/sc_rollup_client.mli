@@ -26,6 +26,14 @@
 (** Smart-Contract Rollup client state *)
 type t
 
+type commitment = {
+  compressed_state : string;
+  inbox_level : int;
+  predecessor : string;
+  number_of_messages : int;
+  number_of_ticks : int;
+}
+
 (** [create ?name ?path ?base_dir ?path node] returns a fresh client
    identified by a specified [name], logging in [color], executing the
    program at [path], storing local information in [base_dir], and
@@ -56,3 +64,11 @@ val state_hash : ?hooks:Process.hooks -> t -> string Lwt.t
 
 (** [status client] gets the corresponding PVM status for the current head block. *)
 val status : ?hooks:Process.hooks -> t -> string Lwt.t
+
+(** [last_stored_commitment client] gets the last commitment stored by the rollup node. *)
+val last_stored_commitment :
+  ?hooks:Process.hooks -> t -> commitment option Lwt.t
+
+(** [last_published_commitment client] gets the last commitment published by the rollup node. *)
+val last_published_commitment :
+  ?hooks:Process.hooks -> t -> commitment option Lwt.t

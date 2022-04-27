@@ -31,6 +31,33 @@ type t = {
   color : Log.Color.t;
 }
 
+type commitment = {
+  compressed_state : string;
+  inbox_level : int;
+  predecessor : string;
+  number_of_messages : int;
+  number_of_ticks : int;
+}
+
+let commitment_from_json json =
+  if JSON.is_null json then None
+  else
+    let compressed_state = JSON.as_string @@ JSON.get "compressed_state" json in
+    let inbox_level = JSON.as_int @@ JSON.get "inbox_level" json in
+    let predecessor = JSON.as_string @@ JSON.get "predecessor" json in
+    let number_of_messages =
+      JSON.as_int @@ JSON.get "number_of_messages" json
+    in
+    let number_of_ticks = JSON.as_int @@ JSON.get "number_of_ticks" json in
+    Some
+      {
+        compressed_state;
+        inbox_level;
+        predecessor;
+        number_of_messages;
+        number_of_ticks;
+      }
+
 let next_name = ref 1
 
 let fresh_name () =
@@ -96,3 +123,13 @@ let status ?hooks sc_client =
   let open Lwt.Syntax in
   let+ res = rpc_get ?hooks sc_client ["status"] in
   JSON.as_string res
+
+let last_stored_commitment ?hooks sc_client =
+  let open Lwt.Syntax in
+  let+ res = rpc_get ?hooks sc_client ["last_stored_commitment"] in
+  commitment_from_json res
+
+let last_published_commitment ?hooks sc_client =
+  let open Lwt.Syntax in
+  let+ res = rpc_get ?hooks sc_client ["last_published_commitment"] in
+  commitment_from_json res

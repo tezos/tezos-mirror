@@ -222,7 +222,7 @@ module Commitment_hash_index = struct
 end
 
 module Number_of_messages = Bounded.Int32.Make (struct
-  let min_int = 1l
+  let min_int = 0l
 
   let max_int = 4096l
   (* TODO: check this is reasonable.
@@ -231,7 +231,7 @@ module Number_of_messages = Bounded.Int32.Make (struct
 end)
 
 module Number_of_ticks = Bounded.Int32.Make (struct
-  let min_int = 1l
+  let min_int = 0l
 
   let max_int = Int32.max_int
 end)

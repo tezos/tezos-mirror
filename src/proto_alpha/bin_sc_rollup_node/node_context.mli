@@ -37,6 +37,8 @@ type t = {
       (** Address of the rollup node operator. *)
   initial_level : Raw_level.t;
       (** Origination level of the smart contract rollup. *)
+  block_finality_time : int;
+      (** Deterministic block finality time for the layer 1 protocol. *)
 }
 
 (** [get_operator_keys cctxt] returns a triple [(pkh, pk, sk)] corresponding

@@ -83,6 +83,20 @@ let current_state_hash () =
     ~output:Sc_rollup.State_hash.encoding
     RPC_path.(open_root / "state_hash")
 
+let last_stored_commitment () =
+  RPC_service.get_service
+    ~description:"Last commitment computed by the node"
+    ~query:RPC_query.empty
+    ~output:(Data_encoding.option Sc_rollup.Commitment.encoding)
+    RPC_path.(open_root / "last_stored_commitment")
+
+let last_published_commitment () =
+  RPC_service.get_service
+    ~description:"Last commitment published by the node"
+    ~query:RPC_query.empty
+    ~output:(Data_encoding.option Sc_rollup.Commitment.encoding)
+    RPC_path.(open_root / "last_published_commitment")
+
 let current_status () =
   RPC_service.get_service
     ~description:"Current PVM status"

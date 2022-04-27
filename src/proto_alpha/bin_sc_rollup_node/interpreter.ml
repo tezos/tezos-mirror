@@ -28,9 +28,12 @@ open Alpha_context
 module Inbox = Store.Inbox
 
 module type S = sig
-  (** [update store event] interprets the messages associated with a chain [event].
-      This requires the inbox to be updated beforehand. *)
-  val update : Store.t -> Layer1.chain_event -> unit tzresult Lwt.t
+  (** [process_head store head] interprets the messages associated with a [head] 
+      from a chain [event]. This requires the inbox to be updated beforehand. *)
+
+  val process_head : Store.t -> Layer1.head -> unit tzresult Lwt.t
+
+  (** [start store] sets up the initial state for the PVM interpreter to work. *)
 end
 
 module Make (PVM : Pvm.S) : S = struct
@@ -124,15 +127,6 @@ module Make (PVM : Pvm.S) : S = struct
     let open Lwt_result_syntax in
     let*! predecessor_hash = Layer1.predecessor store head in
     transition_pvm store predecessor_hash hash
-
-  (** [update store chain_event] reacts to an event on the chain. *)
-  let update store chain_event =
-    let open Lwt_result_syntax in
-    match chain_event with
-    | Layer1.SameBranch {intermediate_heads; new_head} ->
-        let* () = List.iter_es (process_head store) intermediate_heads in
-        process_head store new_head
-    | Layer1.Rollback _new_head -> return_unit
 end
 
 module Arith = Make (Arith_pvm)

@@ -136,6 +136,32 @@ module Make (PVM : Pvm.S) = struct
         let*! hash = PVM.state_hash state in
         return hash)
 
+  let register_last_stored_commitment store dir =
+    RPC_directory.register0
+      dir
+      (Sc_rollup_services.last_stored_commitment ())
+      (fun () () ->
+        let open Lwt_result_syntax in
+        let*! commitment =
+          Commitment.last_commitment
+            (module Store.Last_stored_commitment_level)
+            store
+        in
+        return commitment)
+
+  let register_last_published_commitment store dir =
+    RPC_directory.register0
+      dir
+      (Sc_rollup_services.last_published_commitment ())
+      (fun () () ->
+        let open Lwt_result_syntax in
+        let*! commitment =
+          Commitment.last_commitment
+            (module Store.Last_published_commitment_level)
+            store
+        in
+        return commitment)
+
   let register_current_status store dir =
     RPC_directory.register0
       dir
@@ -156,6 +182,8 @@ module Make (PVM : Pvm.S) = struct
     |> register_current_num_messages store
     |> register_current_state_hash store
     |> register_current_status store
+    |> register_last_stored_commitment store
+    |> register_last_published_commitment store
 
   let start node_ctxt store configuration =
     Common.start configuration (register node_ctxt store configuration)

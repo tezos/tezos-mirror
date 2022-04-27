@@ -123,24 +123,6 @@ let process_head Node_context.({cctxt; rollup_address; _} as node_ctxt) store
          let*! () = State.add_history store head_hash history in
          return_unit
 
-let update node_ctxt store chain_event =
-  let open Lwt_result_syntax in
-  let open Layer1 in
-  match chain_event with
-  | SameBranch {new_head; intermediate_heads} ->
-      let* () =
-        List.iter_es (process_head node_ctxt store) intermediate_heads
-      in
-      process_head node_ctxt store new_head
-  | Rollback {new_head = _} ->
-      (*
-
-          Since [process_head] is robust to chain reorganizations, we do
-          need a specific treatment of [Rollback] events.
-
-      *)
-      return_unit
-
 let inbox_of_hash = State.inbox_of_hash
 
 let start () = Inbox_event.starting ()
