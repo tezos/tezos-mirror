@@ -143,7 +143,10 @@ module Secret_key = struct
   include Compare.Make (struct
     type nonrec t = t
 
-    let compare a b = Stdlib.compare a b
+    let compare a b =
+      let a = Bls12_381.Signature.sk_to_bytes a
+      and b = Bls12_381.Signature.sk_to_bytes b in
+      Bytes.compare a b
   end)
 
   let size = Bls12_381.Signature.sk_size_in_bytes
