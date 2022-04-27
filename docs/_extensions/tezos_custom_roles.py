@@ -62,7 +62,8 @@ def package_role(
     src = find_dot_opam(lib)
     branch = os.environ.get('CI_COMMIT_REF_NAME', 'master')
     project_url = os.environ.get(
-        'CI_PROJECT_URL', 'https://gitlab.com/tezos/tezos'
+        'CI_MERGE_REQUEST_SOURCE_PROJECT_URL',
+        os.environ.get('CI_PROJECT_URL', 'https://gitlab.com/tezos/tezos'),
     )
     src_url = project_url + "/tree/" + branch + "/" + src
     if os.path.isdir('_build/api/odoc/_html/' + lib):
@@ -124,7 +125,8 @@ def src_role(_name, rawtext, text, lineno, inliner, options={}, _content=[]):
 
     branch = os.environ.get('CI_COMMIT_REF_NAME', 'master')
     project_url = os.environ.get(
-        'CI_PROJECT_URL', 'https://gitlab.com/tezos/tezos'
+        'CI_MERGE_REQUEST_SOURCE_PROJECT_URL',
+        os.environ.get('CI_PROJECT_URL', 'https://gitlab.com/tezos/tezos'),
     )
     if Path(TEZOS_HOME, file).is_file():
         url = project_url + "/-/blob/" + branch + "/" + src
