@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -29,6 +30,12 @@ type t = {
   sc_rollup_node_operator : Signature.Public_key_hash.t;
   rpc_addr : string;
   rpc_port : int;
+  minimal_fees : Protocol.Alpha_context.Tez.t;
+  minimal_nanotez_per_byte : Q.t;
+  minimal_nanotez_per_gas_unit : Q.t;
+  force_low_fee : bool;
+  fee_cap : Protocol.Alpha_context.Tez.t;
+  burn_cap : Protocol.Alpha_context.Tez.t;
 }
 
 (** [default_data_dir] is the default value for [data_dir]. *)
@@ -41,6 +48,9 @@ val default_rpc_addr : string
 val default_rpc_port : int
 
 val default_fee_parameter : Injection.fee_parameter
+
+(** [fee_parameter configuration] returns the configured {!Injection.fee_parameter}. *)
+val fee_parameter : t -> Injection.fee_parameter
 
 (** [filename configuration] returns the [configuration] filename. *)
 val filename : t -> string
