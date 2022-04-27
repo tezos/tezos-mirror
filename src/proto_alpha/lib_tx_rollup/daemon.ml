@@ -327,7 +327,7 @@ let process_messages_and_inboxes (state : State.t) ~(predecessor : L2block.t)
   match contents with
   | None ->
       (* No inbox at this block *)
-      return (predecessor, predecessor_context)
+      return (`Old, predecessor, predecessor_context)
   | Some contents ->
       let inbox = Inbox.{contents; cumulated_size} in
       let*! context_hash = Context.commit context in
@@ -354,8 +354,7 @@ let process_messages_and_inboxes (state : State.t) ~(predecessor : L2block.t)
       let*! () =
         Event.(emit rollup_block) (header.level, hash, header.tezos_block)
       in
-      let+ () = commit_block_on_l1 state block in
-      (block, context)
+      return (`New, block, context)
 
 let set_head state head =
   let open Lwt_result_syntax in
@@ -366,8 +365,7 @@ let set_head state head =
   | Ok () -> return_unit
   | Error _ as res -> Lwt.return res
 
-let rec process_block state current_hash rollup_id :
-    (L2block.t * Context.context option, tztrace) result Lwt.t =
+let rec process_block state current_hash rollup_id =
   let open Lwt_result_syntax in
   if Block_hash.equal state.State.rollup_info.origination_block current_hash
   then
@@ -375,7 +373,7 @@ let rec process_block state current_hash rollup_id :
     let*! (genesis_block, genesis_ctxt) =
       create_genesis_block state current_hash
     in
-    return (genesis_block, Some genesis_ctxt)
+    return (genesis_block, Some genesis_ctxt, [])
   else
     let*! l2_block = State.get_tezos_l2_block state current_hash in
     match l2_block with
@@ -383,7 +381,7 @@ let rec process_block state current_hash rollup_id :
         (* Already processed *)
         let*! () = Event.(emit block_already_processed) current_hash in
         let* () = set_head state l2_block in
-        return (l2_block, None)
+        return (l2_block, None, [])
     | None ->
         let* block_info = State.fetch_tezos_block state current_hash in
         let predecessor_hash = block_info.header.shell.predecessor in
@@ -396,13 +394,13 @@ let rec process_block state current_hash rollup_id :
         in
         (* Handle predecessor Tezos block first *)
         let*! () = Event.(emit processing_block_predecessor) predecessor_hash in
-        let* (l2_predecessor_header, predecessor_context) =
+        let* (l2_predecessor_header, predecessor_context, blocks_to_commit) =
           process_block state predecessor_hash rollup_id
         in
         let*! () =
           Event.(emit processing_block) (current_hash, predecessor_hash)
         in
-        let* (l2_block, context) =
+        let* (is_new_block, l2_block, context) =
           process_messages_and_inboxes
             state
             ~predecessor:l2_predecessor_header
@@ -418,10 +416,15 @@ let rec process_block state current_hash rollup_id :
             ~level:block_info.header.shell.level
             ~predecessor:block_info.header.shell.predecessor
         in
+        let blocks_to_commit =
+          match is_new_block with
+          | `Old -> blocks_to_commit
+          | `New -> l2_block :: blocks_to_commit
+        in
         let* () = set_head state l2_block in
         let*! () = Event.(emit new_tezos_head) current_hash in
         let*! () = Event.(emit block_processed) (current_hash, block_level) in
-        return (l2_block, Some context)
+        return (l2_block, Some context, blocks_to_commit)
 
 let batch () = if Batcher.active () then Batcher.batch () else return_unit
 
@@ -660,14 +663,15 @@ let handle_l1_reorg state acc reorg =
 let process_head state (current_hash, current_header) rollup_id =
   let open Lwt_result_syntax in
   let*! () = Event.(emit new_block) current_hash in
-  let* res = process_block state current_hash rollup_id in
+  let* (_, _, blocks_to_commit) = process_block state current_hash rollup_id in
   let* l1_reorg = State.set_tezos_head state current_hash in
   let* () = handle_l1_reorg state () l1_reorg in
+  let* () = List.iter_es (commit_block_on_l1 state) blocks_to_commit in
   let* () = batch () in
   let* () = queue_gc_operations state in
   let* () = notify_head state current_hash l1_reorg in
   let*! () = trigger_injection state current_header in
-  return res
+  return_unit
 
 let main_exit_callback state exit_status =
   let open Lwt_syntax in
