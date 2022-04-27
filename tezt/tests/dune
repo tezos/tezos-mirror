@@ -6,8 +6,7 @@
             tezos-base
             tezos-base.unix
             tezos-stdlib-unix
-            tezos-protocol-alpha
-            tezos-protocol-010-PtGRANAD)
+            tezos-protocol-alpha)
  (flags
   (:standard
    -open Tezt
