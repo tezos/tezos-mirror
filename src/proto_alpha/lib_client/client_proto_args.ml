@@ -158,15 +158,21 @@ let bytes_of_prefixed_string s =
 
 let bytes_parameter = parameter (fun _ s -> bytes_of_prefixed_string s)
 
-let parse_file parse cctxt ~path =
+let parse_file ~from_text ~read_file ~path =
   let open Lwt_result_syntax in
-  let* content = cctxt#read_file path in
-  parse content
+  let* content = read_file path in
+  from_text content
 
-let file_or_text_parameter ~from_text ?(from_path = parse_file from_text) () =
+let file_or_text ~from_text ~read_file =
+  Client_aliases.parse_alternatives
+    [
+      ("file", fun path -> parse_file ~from_text ~read_file ~path);
+      ("text", from_text);
+    ]
+
+let file_or_text_parameter ~from_text () =
   parameter (fun (cctxt : #Client_context.full) ->
-      Client_aliases.parse_alternatives
-        [("file", fun path -> from_path cctxt ~path); ("text", from_text)])
+      file_or_text ~from_text ~read_file:cctxt#read_file)
 
 let json_parameter =
   let from_text s =
