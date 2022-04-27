@@ -2096,8 +2096,8 @@ let check_for_non_generated_files ?(exclude = fun _ -> false) () =
       && String_set.is_empty error_generated_and_excluded)
   then (
     prerr_endline
-      "Please modify manifest/main.ml to generate the above file(s)\n\
-       or declare them in the 'exclude' function." ;
+      "Please modify manifest/main.ml to either generate the above file(s)\n\
+       or declare them in the 'exclude' function (but not both)." ;
     exit 1)
 
 let check_js_of_ocaml () =
