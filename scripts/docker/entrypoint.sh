@@ -25,7 +25,7 @@ export client_dir="$DATA_DIR/client"
 export node_dir="$DATA_DIR/node"
 export node_data_dir="$node_dir/data"
 
-# shellcheck source=./scripts/docker/entrypoint.inc.sh
+# shellcheck disable=SC1090
 . "$bin_dir/entrypoint.inc.sh"
 
 command=${1:-tezos-node}
