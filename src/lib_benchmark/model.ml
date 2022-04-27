@@ -459,6 +459,27 @@ let nlogm ~intercept ~coeff =
   end in
   (module M : Model_impl with type arg_type = int * (int * unit))
 
+let n_plus_logm ~intercept ~linear_coeff ~log_coeff =
+  let module M = struct
+    type arg_type = int * (int * unit)
+
+    module Def (X : Costlang.S) = struct
+      open X
+
+      type model_type = size -> size -> size
+
+      let arity = arity_2
+
+      let model =
+        lam ~name:"size1" @@ fun size1 ->
+        lam ~name:"size2" @@ fun size2 ->
+        free ~name:intercept
+        + (free ~name:linear_coeff * size1)
+        + (free ~name:log_coeff * log2 (int 1 + size2))
+    end
+  end in
+  (module M : Model_impl with type arg_type = int * (int * unit))
+
 let trilinear ~coeff1 ~coeff2 ~coeff3 =
   let module M = struct
     type arg_type = int * (int * (int * unit))
