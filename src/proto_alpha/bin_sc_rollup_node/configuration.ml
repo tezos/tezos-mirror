@@ -32,12 +32,7 @@ type t = {
   sc_rollup_node_operator : Signature.Public_key_hash.t;
   rpc_addr : string;
   rpc_port : int;
-  minimal_fees : Tez.t;
-  minimal_nanotez_per_byte : Q.t;
-  minimal_nanotez_per_gas_unit : Q.t;
-  force_low_fee : bool;
-  fee_cap : Tez.t;
-  burn_cap : Tez.t;
+  fee_parameter : Injection.fee_parameter;
 }
 
 let default_data_dir =
@@ -46,16 +41,6 @@ let default_data_dir =
 let relative_filename data_dir = Filename.concat data_dir "config.json"
 
 let filename config = relative_filename config.data_dir
-
-let fee_parameter config : Injection.fee_parameter =
-  {
-    minimal_fees = config.minimal_fees;
-    minimal_nanotez_per_byte = config.minimal_nanotez_per_byte;
-    minimal_nanotez_per_gas_unit = config.minimal_nanotez_per_gas_unit;
-    force_low_fee = config.force_low_fee;
-    fee_cap = config.fee_cap;
-    burn_cap = config.burn_cap;
-  }
 
 let default_rpc_addr = "127.0.0.1"
 
@@ -82,15 +67,75 @@ let default_fee_cap =
 let default_burn_cap =
   match Tez.of_string "0" with None -> assert false | Some t -> t
 
-let default_fee_parameter : Injection.fee_parameter =
+let default_fee_parameter =
   {
-    minimal_fees = default_minimal_fees;
-    minimal_nanotez_per_gas_unit = default_minimal_nanotez_per_gas_unit;
+    Injection.minimal_fees = default_minimal_fees;
     minimal_nanotez_per_byte = default_minimal_nanotez_per_byte;
+    minimal_nanotez_per_gas_unit = default_minimal_nanotez_per_gas_unit;
     force_low_fee = default_force_low_fee;
     fee_cap = default_fee_cap;
     burn_cap = default_burn_cap;
   }
+
+let fee_parameter_encoding =
+  let open Data_encoding in
+  conv
+    (fun {
+           Injection.minimal_fees;
+           minimal_nanotez_per_byte;
+           minimal_nanotez_per_gas_unit;
+           force_low_fee;
+           fee_cap;
+           burn_cap;
+         } ->
+      ( minimal_fees,
+        minimal_nanotez_per_byte,
+        minimal_nanotez_per_gas_unit,
+        force_low_fee,
+        fee_cap,
+        burn_cap ))
+    (fun ( minimal_fees,
+           minimal_nanotez_per_byte,
+           minimal_nanotez_per_gas_unit,
+           force_low_fee,
+           fee_cap,
+           burn_cap ) ->
+      {
+        minimal_fees;
+        minimal_nanotez_per_byte;
+        minimal_nanotez_per_gas_unit;
+        force_low_fee;
+        fee_cap;
+        burn_cap;
+      })
+    (obj6
+       (dft
+          "minimal-fees"
+          ~description:"Exclude operations with lower fees"
+          Tez.encoding
+          default_minimal_fees)
+       (dft
+          "minimal-nanotez-per-byte"
+          ~description:"Exclude operations with lower fees per byte"
+          Plugin.Mempool.nanotez_enc
+          default_minimal_nanotez_per_byte)
+       (dft
+          "minimal-nanotez-per-gas-unit"
+          ~description:"Exclude operations with lower gas fees"
+          Plugin.Mempool.nanotez_enc
+          default_minimal_nanotez_per_gas_unit)
+       (dft
+          "force-low-fee"
+          ~description:
+            "Don't check that the fee is lower than the estimated default"
+          bool
+          default_force_low_fee)
+       (dft "fee-cap" ~description:"The fee cap" Tez.encoding default_fee_cap)
+       (dft
+          "burn-cap"
+          ~description:"The burn cap"
+          Tez.encoding
+          default_burn_cap))
 
 let encoding : t Data_encoding.t =
   let open Data_encoding in
@@ -101,47 +146,27 @@ let encoding : t Data_encoding.t =
            sc_rollup_node_operator;
            rpc_addr;
            rpc_port;
-           minimal_fees;
-           minimal_nanotez_per_byte;
-           minimal_nanotez_per_gas_unit;
-           force_low_fee;
-           fee_cap;
-           burn_cap;
+           fee_parameter;
          } ->
       ( data_dir,
         sc_rollup_address,
         sc_rollup_node_operator,
         rpc_addr,
         rpc_port,
-        ( minimal_fees,
-          minimal_nanotez_per_byte,
-          minimal_nanotez_per_gas_unit,
-          force_low_fee,
-          fee_cap,
-          burn_cap ) ))
+        fee_parameter ))
     (fun ( data_dir,
            sc_rollup_address,
            sc_rollup_node_operator,
            rpc_addr,
            rpc_port,
-           ( minimal_fees,
-             minimal_nanotez_per_byte,
-             minimal_nanotez_per_gas_unit,
-             force_low_fee,
-             fee_cap,
-             burn_cap ) ) ->
+           fee_parameter ) ->
       {
         data_dir;
         sc_rollup_address;
         sc_rollup_node_operator;
         rpc_addr;
         rpc_port;
-        minimal_fees;
-        minimal_nanotez_per_byte;
-        minimal_nanotez_per_gas_unit;
-        force_low_fee;
-        fee_cap;
-        burn_cap;
+        fee_parameter;
       })
     (obj6
        (dft
@@ -160,41 +185,11 @@ let encoding : t Data_encoding.t =
           Signature.Public_key_hash.encoding)
        (dft "rpc-addr" ~description:"RPC address" string default_rpc_addr)
        (dft "rpc-port" ~description:"RPC port" int16 default_rpc_port)
-       (req
+       (dft
           "fee-parameter"
           ~description:"The fee parameter used when injecting operations in L1"
-          (obj6
-             (dft
-                "minimal-fees"
-                ~description:"Exclude operations with lower fees"
-                Tez.encoding
-                default_minimal_fees)
-             (dft
-                "minimal-nanotez-per-byte"
-                ~description:"Exclude operations with lower fees per byte"
-                Plugin.Mempool.nanotez_enc
-                default_minimal_nanotez_per_byte)
-             (dft
-                "minimal-nanotez-per-gas-unit"
-                ~description:"Exclude operations with lower gas fees"
-                Plugin.Mempool.nanotez_enc
-                default_minimal_nanotez_per_gas_unit)
-             (dft
-                "force-low-fee"
-                ~description:
-                  "Don't check that the fee is lower than the estimated default"
-                bool
-                default_force_low_fee)
-             (dft
-                "fee-cap"
-                ~description:"The fee cap"
-                Tez.encoding
-                default_fee_cap)
-             (dft
-                "burn-cap"
-                ~description:"The burn cap"
-                Tez.encoding
-                default_burn_cap))))
+          fee_parameter_encoding
+          default_fee_parameter))
 
 let save config =
   let open Lwt_syntax in

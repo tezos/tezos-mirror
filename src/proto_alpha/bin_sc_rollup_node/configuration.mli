@@ -30,12 +30,7 @@ type t = {
   sc_rollup_node_operator : Signature.Public_key_hash.t;
   rpc_addr : string;
   rpc_port : int;
-  minimal_fees : Protocol.Alpha_context.Tez.t;
-  minimal_nanotez_per_byte : Q.t;
-  minimal_nanotez_per_gas_unit : Q.t;
-  force_low_fee : bool;
-  fee_cap : Protocol.Alpha_context.Tez.t;
-  burn_cap : Protocol.Alpha_context.Tez.t;
+  fee_parameter : Injection.fee_parameter;
 }
 
 (** [default_data_dir] is the default value for [data_dir]. *)
@@ -47,10 +42,8 @@ val default_rpc_addr : string
 (** [default_rpc_port] is the default value for [rpc_port]. *)
 val default_rpc_port : int
 
+(** [default_fee_parameter] is the default value for [fee_parameter] *)
 val default_fee_parameter : Injection.fee_parameter
-
-(** [fee_parameter configuration] returns the configured {!Injection.fee_parameter}. *)
-val fee_parameter : t -> Injection.fee_parameter
 
 (** [filename configuration] returns the [configuration] filename. *)
 val filename : t -> string

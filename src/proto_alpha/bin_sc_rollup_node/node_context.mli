@@ -40,6 +40,8 @@ type t = {
   block_finality_time : int;
       (** Deterministic block finality time for the layer 1 protocol. *)
   kind : Sc_rollup.Kind.t;  (** Kind of the smart contract rollup. *)
+  fee_parameter : Injection.fee_parameter;
+      (** Fee parameter to use when injecting operations in layer 1. *)
 }
 
 (** [get_operator_keys cctxt] returns a triple [(pkh, pk, sk)] corresponding
@@ -59,4 +61,5 @@ val init :
   Protocol_client_context.full ->
   Sc_rollup.t ->
   Signature.Public_key_hash.t ->
+  Injection.fee_parameter ->
   t tzresult Lwt.t

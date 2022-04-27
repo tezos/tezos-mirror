@@ -29,7 +29,7 @@ type error += Bad_minimal_fees of string
 let () =
   register_error_kind
     `Permanent
-    ~id:"badMinimalFeesArg"
+    ~id:"bad_minimal_fees_arg"
     ~title:"Bad -minimal-fees arg"
     ~description:"invalid fee threshold in -fee-threshold"
     ~pp:(fun ppf literal ->
@@ -106,13 +106,13 @@ let minimal_fees_arg =
     ~long:"minimal-fees"
     ~placeholder:"amount"
     ~doc:
-      "exclude operations with fees lower than this threshold (in tez) when \
+      "Exclude operations with fees lower than this threshold (in tez) when \
        injecting."
     ~default
     (Clic.parameter (fun _ s ->
          match Tez.of_string s with
          | Some t -> return t
-         | None -> failwith "Bad minimal fees"))
+         | None -> fail (Bad_minimal_fees s)))
 
 let minimal_nanotez_per_gas_unit_arg =
   let default =
@@ -123,7 +123,7 @@ let minimal_nanotez_per_gas_unit_arg =
     ~long:"minimal-nanotez-per-gas-unit"
     ~placeholder:"amount"
     ~doc:
-      "exclude operations with fees per gas lower than this threshold (in \
+      "Exclude operations with fees per gas lower than this threshold (in \
        nanotez) when injecting."
     ~default
     (Clic.parameter (fun _ s ->
@@ -138,7 +138,7 @@ let minimal_nanotez_per_byte_arg =
     ~placeholder:"amount"
     ~default
     ~doc:
-      "exclude operations with fees per byte lower than this threshold (in \
+      "Exclude operations with fees per byte lower than this threshold (in \
        nanotez) when injecting."
     (Clic.parameter (fun _ s ->
          try return (Q.of_string s) with _ -> fail (Bad_minimal_fees s)))
@@ -222,12 +222,15 @@ let config_init_command =
           sc_rollup_node_operator;
           rpc_addr;
           rpc_port;
-          minimal_fees;
-          minimal_nanotez_per_byte;
-          minimal_nanotez_per_gas_unit;
-          force_low_fee;
-          fee_cap;
-          burn_cap;
+          fee_parameter =
+            {
+              minimal_fees;
+              minimal_nanotez_per_byte;
+              minimal_nanotez_per_gas_unit;
+              force_low_fee;
+              fee_cap;
+              burn_cap;
+            };
         }
       in
       save config >>=? fun () ->
