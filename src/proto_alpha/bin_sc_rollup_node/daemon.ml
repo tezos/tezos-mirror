@@ -82,14 +82,13 @@ module Make (PVM : Pvm.S) = struct
         Components.Interpreter.process_head node_ctxt store head
     in
     let* () =
-      if finalized then
-        Commitment.process_head (module Arith_pvm) node_ctxt store head
+      if finalized then Components.Commitment.process_head node_ctxt store head
       else return_unit
     in
     (* Publishing a commitment when one is available does not depend on the state of
        the current head, but we still need to ensure that the node only published
        one commitment per block. *)
-    Commitment.publish_commitment node_ctxt store
+    Components.Commitment.publish_commitment node_ctxt store
 
   (* [on_layer_1_chain_event node_ctxt store chain_event old_heads] processes a
      list of heads, coming from either a list of [old_heads] or from the current
@@ -192,7 +191,7 @@ module Make (PVM : Pvm.S) = struct
         Layer1.start configuration node_ctxt.Node_context.cctxt store
       in
       let*! () = Inbox.start () in
-      let*! () = Commitment.start () in
+      let*! () = Components.Commitment.start () in
 
       let _ = install_finalizer store rpc_server in
       let*! () =
