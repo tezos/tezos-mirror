@@ -518,6 +518,12 @@ let dispatch_withdrawals_on_l1 state level =
       | None -> return_unit
       | Some block -> Dispatcher.dispatch_withdrawals ~source state block)
 
+let reject_bad_commitment state commitment =
+  let open Lwt_result_syntax in
+  match state.State.signers.rejection with
+  | None -> return_unit
+  | Some source -> Accuser.reject_bad_commitment ~source state commitment
+
 let process_op (type kind) (state : State.t) l1_block l1_operation ~source:_
     (op : kind manager_operation) (result : kind manager_operation_result)
     (acc : 'acc) : 'acc tzresult Lwt.t =
@@ -539,6 +545,7 @@ let process_op (type kind) (state : State.t) l1_block l1_operation ~source:_
           l1_block
           l1_operation
       in
+      let* () = reject_bad_commitment state commitment in
       return acc
   | ( Tx_rollup_finalize_commitment {tx_rollup},
       Applied (Tx_rollup_finalize_commitment_result {level; _}) )
