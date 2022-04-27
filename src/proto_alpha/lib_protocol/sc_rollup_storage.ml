@@ -213,6 +213,12 @@ module Store = Storage.Sc_rollup
 module Commitment = Sc_rollup_repr.Commitment
 module Commitment_hash = Sc_rollup_repr.Commitment_hash
 
+module Internal = struct
+  let update_num_and_size_of_messages ~num_messages ~total_messages_size message
+      =
+    (num_messages + 1, total_messages_size + String.length message)
+end
+
 let originate ctxt ~kind ~boot_sector =
   Raw_context.increment_origination_nonce ctxt >>?= fun (ctxt, nonce) ->
   let level = Raw_context.current_level ctxt in
@@ -278,16 +284,45 @@ let assert_inbox_size_ok ctxt next_size =
 let add_messages ctxt rollup messages =
   let open Lwt_tzresult_syntax in
   let open Raw_context in
-  inbox ctxt rollup >>=? fun (inbox, ctxt) ->
+  let* (inbox, ctxt) = inbox ctxt rollup in
+  let* (num_messages, total_messages_size, ctxt) =
+    List.fold_left_es
+      (fun (num_messages, total_messages_size, ctxt) message ->
+        let*? ctxt =
+          Raw_context.consume_gas
+            ctxt
+            Sc_rollup_costs.Constants.cost_update_num_and_size_of_messages
+        in
+        let (num_messages, total_messages_size) =
+          Internal.update_num_and_size_of_messages
+            ~num_messages
+            ~total_messages_size
+            message
+        in
+        return (num_messages, total_messages_size, ctxt))
+      (0, 0, ctxt)
+      messages
+  in
   let next_size =
     Z.add
       (Sc_rollup_inbox_repr.number_of_available_messages inbox)
-      (Z.of_int (List.length messages))
+      (Z.of_int num_messages)
   in
-  assert_inbox_size_ok ctxt next_size >>=? fun () ->
+  let* () = assert_inbox_size_ok ctxt next_size in
+  let inbox_level = Sc_rollup_inbox_repr.inbox_level inbox in
+  let* origination_level = Storage.Sc_rollup.Initial_level.get ctxt rollup in
+  let levels =
+    Int32.sub
+      (Raw_level_repr.to_int32 inbox_level)
+      (Raw_level_repr.to_int32 origination_level)
+  in
   let*? (current_messages, ctxt) =
     Sc_rollup_in_memory_inbox.current_messages ctxt rollup
   in
+  let gas_cost_add_messages =
+    Sc_rollup_costs.cost_add_messages ~num_messages ~total_messages_size levels
+  in
+  let*? ctxt = Raw_context.consume_gas ctxt gas_cost_add_messages in
   let {Level_repr.level; _} = Raw_context.current_level ctxt in
   (*
       Notice that the protocol is forgetful: it throws away the inbox

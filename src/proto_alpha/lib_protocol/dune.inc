@@ -148,6 +148,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    tx_rollup_inbox_storage.mli tx_rollup_inbox_storage.ml
    tx_rollup_commitment_storage.mli tx_rollup_commitment_storage.ml
    tx_rollup_storage.mli tx_rollup_storage.ml
+   sc_rollup_costs.mli sc_rollup_costs.ml
    sc_rollup_storage.mli sc_rollup_storage.ml
    alpha_context.mli alpha_context.ml
    script_string.mli script_string.ml
@@ -336,6 +337,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    tx_rollup_inbox_storage.mli tx_rollup_inbox_storage.ml
    tx_rollup_commitment_storage.mli tx_rollup_commitment_storage.ml
    tx_rollup_storage.mli tx_rollup_storage.ml
+   sc_rollup_costs.mli sc_rollup_costs.ml
    sc_rollup_storage.mli sc_rollup_storage.ml
    alpha_context.mli alpha_context.ml
    script_string.mli script_string.ml
@@ -524,6 +526,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    tx_rollup_inbox_storage.mli tx_rollup_inbox_storage.ml
    tx_rollup_commitment_storage.mli tx_rollup_commitment_storage.ml
    tx_rollup_storage.mli tx_rollup_storage.ml
+   sc_rollup_costs.mli sc_rollup_costs.ml
    sc_rollup_storage.mli sc_rollup_storage.ml
    alpha_context.mli alpha_context.ml
    script_string.mli script_string.ml
@@ -734,6 +737,7 @@ include Tezos_raw_protocol_alpha.Main
    Tx_rollup_inbox_storage
    Tx_rollup_commitment_storage
    Tx_rollup_storage
+   Sc_rollup_costs
    Sc_rollup_storage
    Alpha_context
    Script_string
@@ -963,6 +967,7 @@ include Tezos_raw_protocol_alpha.Main
    tx_rollup_inbox_storage.mli tx_rollup_inbox_storage.ml
    tx_rollup_commitment_storage.mli tx_rollup_commitment_storage.ml
    tx_rollup_storage.mli tx_rollup_storage.ml
+   sc_rollup_costs.mli sc_rollup_costs.ml
    sc_rollup_storage.mli sc_rollup_storage.ml
    alpha_context.mli alpha_context.ml
    script_string.mli script_string.ml
