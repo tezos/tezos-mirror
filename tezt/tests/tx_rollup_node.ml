@@ -294,6 +294,183 @@ let generate_bls_addr ~alias client =
   Log.info "A new BLS key was generated: %s" bls_addr.aggregate_public_key_hash ;
   Lwt.return bls_addr
 
+type commitment_info = {
+  roots : string list;
+  context_hashes : string list;
+  inbox_merkle_root : string;
+  predecessor : string option;
+}
+
+(** Build a {!commitment_info} for the inbox at a given level but do not inject
+    the operation.
+
+    Note that the field [commitment_info.context_hashes] is not used
+    in the commitment but is necessary for subsequent rejections. *)
+let build_commitment_info ~tx_level ~tx_rollup_hash ~tx_node ~client =
+  let*! inbox_opt =
+    Rollup.get_inbox ~rollup:tx_rollup_hash ~level:tx_level client
+  in
+  let inbox =
+    match inbox_opt with
+    | Some x -> x
+    | None ->
+        failwith ("There is no inbox at the level " ^ string_of_int tx_level)
+  in
+  let inbox_merkle_root = inbox.merkle_root in
+  let* rollup_inbox =
+    Rollup_node.Client.get_inbox ~tx_node ~block:(string_of_int tx_level)
+  in
+  let context_hashes =
+    List.map
+      (fun x -> x.Rollup_node.Inbox.l2_context_hash.tree_hash)
+      rollup_inbox.contents
+  in
+  let* roots =
+    Lwt_list.map_p
+      (fun context_hash ->
+        let*! root =
+          Rollup.message_result_hash
+            ~context_hash
+            ~withdraw_list_hash:Constant.tx_rollup_empty_withdraw_list_hash
+            client
+        in
+        return root)
+      context_hashes
+  in
+  let* predecessor =
+    if tx_level > 0 then
+      let*! prev_commitment_opt =
+        Rollup.get_commitment
+          ~rollup:tx_rollup_hash
+          ~level:(tx_level - 1)
+          client
+      in
+      match prev_commitment_opt with
+      | None -> failwith "Failed to find the previous commitment"
+      | Some x -> return (Some x.commitment_hash)
+    else return None
+  in
+  return {roots; context_hashes; predecessor; inbox_merkle_root}
+
+type rejection_info = {
+  proof : string;
+  message : string;
+  path : string;
+  rejected_message_result_hash : string;
+  rejected_message_result_path : string;
+  context_hash : string;
+  withdraw_list_hash : string;
+  agreed_message_result_path : string;
+}
+
+(** Build a rejection for the inbox at a given level but do not inject the
+    operation.
+
+    Note that if [message_pos = 0] and [tx_level > 0], we need information from
+    the previous commitment: [agreed_context_hash] and
+    [agreed_message_result_path]. If they are absent in this case, the function
+    will fail.
+
+    TODO/TORU: the withdraw_list_hash is currently always the empty list hash.
+*)
+let build_rejection ~tx_level ~tx_node ~message_pos ~client ?agreed_context_hash
+    ?agreed_message_result_path commitment_info : rejection_info Lwt.t =
+  let* rollup_inbox =
+    Rollup_node.Client.get_inbox ~tx_node ~block:(string_of_int tx_level)
+  in
+  let* hashes =
+    Lwt_list.map_p
+      (fun content ->
+        let message = content.Rollup_node.Inbox.message in
+        let message =
+          (match JSON.(message |-> "batch" |> as_string_opt) with
+           | Some x -> `Batch (`Hex x)
+           | None ->
+               let deposit = JSON.(message |-> "deposit") in
+               let sender = JSON.(deposit |-> "sender" |> as_string) in
+               let destination =
+                 JSON.(deposit |-> "destination" |> as_string)
+               in
+               let ticket_hash =
+                 JSON.(deposit |-> "ticket_hash" |> as_string)
+               in
+               let amount = JSON.(deposit |-> "amount" |> as_int64) in
+               Rollup.make_deposit ~sender ~destination ~ticket_hash ~amount
+            :> Rollup.message)
+        in
+        let*! message_hash = Rollup.message_hash ~message client in
+        return message_hash)
+      rollup_inbox.contents
+  in
+  let message =
+    List.nth rollup_inbox.contents message_pos |> fun content ->
+    JSON.encode content.message
+  in
+  let* message_path =
+    let*! message_path =
+      Rollup.inbox_merkle_tree_path
+        ~message_hashes:hashes
+        ~position:message_pos
+        client
+    in
+    return (JSON.encode message_path)
+  in
+  let* (agreed_context_hash, agreed_message_result_path) =
+    if message_pos = 0 && tx_level = 0 then
+      return (Constant.tx_rollup_empty_l2_context, "[]")
+    else if message_pos = 0 then
+      (* If the message position is 0, we need information from the previous
+         commitment. *)
+      return
+        (Option.get agreed_context_hash, Option.get agreed_message_result_path)
+    else
+      (* Else, we take the information from the previous message in the inbox. *)
+      let agreed_context_hash =
+        List.nth commitment_info.context_hashes (message_pos - 1)
+      in
+      let*! agreed_result_path =
+        Rollup.commitment_merkle_tree_path
+          ~message_result_hashes:
+            (List.map (fun x -> `Hash x) commitment_info.roots)
+          ~position:(message_pos - 1)
+          client
+      in
+      return (agreed_context_hash, JSON.encode agreed_result_path)
+  in
+  let rejected_message_result_hash =
+    List.nth commitment_info.roots message_pos
+  in
+  let* rejected_message_result_path =
+    let*! rejected_message_result_path =
+      Rollup.commitment_merkle_tree_path
+        ~message_result_hashes:
+          (List.map (fun x -> `Hash x) commitment_info.roots)
+        ~position:message_pos
+        client
+    in
+    return (JSON.encode rejected_message_result_path)
+  in
+  let* proof =
+    let* proof =
+      Rollup_node.Client.get_merkle_proof
+        ~tx_node
+        ~block:(string_of_int tx_level)
+        ~message_pos:(string_of_int message_pos)
+    in
+    return (JSON.encode proof)
+  in
+  return
+    {
+      proof;
+      message;
+      path = message_path;
+      rejected_message_result_hash;
+      rejected_message_result_path;
+      context_hash = agreed_context_hash;
+      withdraw_list_hash = Constant.tx_rollup_empty_withdraw_list_hash;
+      agreed_message_result_path;
+    }
+
 let check_tz4_balance ~tx_client ~block ~ticket_id ~tz4_address
     ~expected_balance =
   let* tz4_balance =
@@ -1143,11 +1320,11 @@ let test_reorganization =
       in
       unit)
 
-let test_l2_proofs =
+let test_l2_proof_rpc_position =
   Protocol.register_test
     ~__FILE__
-    ~title:"TX_rollup: proofs l2 transactions"
-    ~tags:["tx_rollup"; "node"; "proofs"]
+    ~title:"TX_rollup: reject messages at position 0 and 1"
+    ~tags:["tx_rollup"; "node"; "proofs"; "rejection"]
     (fun protocol ->
       let* parameter_file = get_rollup_parameter_file ~protocol in
       let* (node, client) =
@@ -1179,30 +1356,23 @@ let test_l2_proofs =
       let* inbox = Rollup_node.Client.get_inbox ~tx_node ~block:"head" in
       let ticket_id = get_ticket_hash_from_deposit (List.hd inbox.contents) in
       Log.info "Ticket %s was successfully emitted" ticket_id ;
-      Log.info "Crafting a commitment for the deposit" ;
-      let*! inbox_opt =
-        Rollup.get_inbox ~rollup:tx_rollup_hash ~level:0 client
+
+      Log.info "Commitment for rollup level: 0" ;
+      let* {
+             roots;
+             context_hashes = context_hashes_level0;
+             inbox_merkle_root;
+             predecessor;
+           } =
+        build_commitment_info ~tx_level:0 ~tx_rollup_hash ~tx_node ~client
       in
-      let inbox = Option.get inbox_opt in
-      let inbox_merkle_root = inbox.merkle_root in
-      let* rollup_inbox = Rollup_node.Client.get_inbox ~tx_node ~block:"head" in
-      let deposit_context_hash =
-        match rollup_inbox.contents with
-        | [x] -> x.Rollup_node.Inbox.l2_context_hash.tree_hash
-        | _ -> assert false
-      in
-      let*! deposit_result_hash =
-        Rollup.message_result_hash
-          ~context_hash:deposit_context_hash
-          ~withdraw_list_hash:Constant.tx_rollup_empty_withdraw_list
-          client
-      in
-      Log.info "Submit a commitment for the deposit" ;
+
       let*! () =
         Client.Tx_rollup.submit_commitment
           ~level:0
-          ~roots:[deposit_result_hash]
+          ~roots
           ~inbox_merkle_root
+          ?predecessor
           ~rollup:tx_rollup_hash
           ~src:Constant.bootstrap3.public_key_hash
           client
@@ -1268,40 +1438,21 @@ let test_l2_proofs =
       let* () = Client.bake_for client in
       let* _ = Node.wait_for_level node 5 in
       let* _ = Rollup_node.wait_for_tezos_level tx_node 5 in
-      Log.info "Crafting the commitment" ;
-      let*! inbox_opt =
-        Rollup.get_inbox ~rollup:tx_rollup_hash ~level:1 client
+      Log.info "Commitment for rollup level: 1" ;
+      let* ({
+              roots;
+              context_hashes = _context_hashes_level1;
+              inbox_merkle_root;
+              predecessor;
+            } as commitment_info) =
+        build_commitment_info ~tx_level:1 ~tx_rollup_hash ~tx_node ~client
       in
-      let inbox = Option.get inbox_opt in
-      let inbox_merkle_root = inbox.merkle_root in
-      let* rollup_inbox = Rollup_node.Client.get_inbox ~tx_node ~block:"head" in
-      let context_hashes =
-        List.map
-          (fun x -> x.Rollup_node.Inbox.l2_context_hash.tree_hash)
-          rollup_inbox.contents
-      in
-      let* roots =
-        Lwt_list.map_p
-          (fun context_hash ->
-            let*! root =
-              Rollup.message_result_hash
-                ~context_hash
-                ~withdraw_list_hash:Constant.tx_rollup_empty_withdraw_list
-                client
-            in
-            return root)
-          context_hashes
-      in
-      let*! prev_commitment_opt =
-        Rollup.get_commitment ~rollup:tx_rollup_hash ~level:0 client
-      in
-      let prev_commitment = Option.get prev_commitment_opt in
       let*! () =
         Client.Tx_rollup.submit_commitment
           ~level:1
           ~roots
           ~inbox_merkle_root
-          ~predecessor:prev_commitment.commitment_hash
+          ?predecessor
           ~rollup:tx_rollup_hash
           ~src:operator
           client
@@ -1309,93 +1460,93 @@ let test_l2_proofs =
       let* () = Client.bake_for client in
       let* _ = Node.wait_for_level node 6 in
       let* _ = Rollup_node.wait_for_tezos_level tx_node 6 in
-      Log.info "Get the proof for message at position 0" ;
-      let* proof1 =
-        Rollup_node.Client.get_merkle_proof
+      Log.info "Try to reject a good commitment at level 1, message 0" ;
+      let last_prev_pos = List.length context_hashes_level0 - 1 in
+      let agreed_context_hash = List.nth context_hashes_level0 last_prev_pos in
+      let* agreed_message_result_path =
+        let*! agreed_message_result_path =
+          Rollup.commitment_merkle_tree_path
+            ~message_result_hashes:
+              (List.map (fun x -> `Hash x) commitment_info.roots)
+            ~position:last_prev_pos
+            client
+        in
+        return (JSON.encode agreed_message_result_path)
+      in
+      let* {
+             proof;
+             message;
+             path;
+             rejected_message_result_hash;
+             rejected_message_result_path;
+             context_hash;
+             withdraw_list_hash;
+             agreed_message_result_path;
+           } =
+        build_rejection
+          ~tx_level:1
           ~tx_node
-          ~block:"head"
-          ~message_pos:"0"
+          ~message_pos:0
+          ~client
+          ~agreed_context_hash
+          ~agreed_message_result_path
+          commitment_info
       in
-      let proof1_str = JSON.encode proof1 in
-      let (`Hex content) = content1 in
-      let message =
-        Ezjsonm.value_to_string @@ `O [("batch", `String content)]
-      in
-      let*! message1_hash =
-        Rollup.message_hash ~message:(`Batch content1) client
-      in
-      let*! message2_hash =
-        Rollup.message_hash ~message:(`Batch content2) client
-      in
-      let message_hashes = [message1_hash; message2_hash] in
-      Log.info "Trying to reject a valid commitment" ;
-      let*! message1_path =
-        Rollup.inbox_merkle_tree_path ~message_hashes ~position:0 client
-      in
-      let*! message2_path =
-        Rollup.inbox_merkle_tree_path ~message_hashes ~position:1 client
-      in
-      let message1_path = JSON.encode message1_path in
-      let message2_path = JSON.encode message2_path in
-      let message1_context_hash = Stdlib.List.nth context_hashes 0 in
-      let message2_context_hash = Stdlib.List.nth context_hashes 1 in
-      let message1_result_hash = Stdlib.List.nth roots 0 in
-      let message2_result_hash = Stdlib.List.nth roots 1 in
-      let*! rejected_message1_result_hash =
-        Rollup.message_result_hash
-          ~context_hash:message1_context_hash
-          ~withdraw_list_hash:Constant.tx_rollup_empty_withdraw_list
-          client
-      in
-      let*! rejected_message2_result_hash =
-        Rollup.message_result_hash
-          ~context_hash:message2_context_hash
-          ~withdraw_list_hash:Constant.tx_rollup_empty_withdraw_list
-          client
-      in
-      let*! rejected_message1_result_path =
-        Rollup.commitment_merkle_tree_path
-          ~message_result_hashes:
-            [`Hash message1_result_hash; `Hash message2_result_hash]
+      let*? process =
+        Client.Tx_rollup.submit_rejection
+          ~src:operator
+          ~proof
+          ~rollup:tx_rollup_hash
+          ~level:1
+          ~message
           ~position:0
+          ~path
+          ~message_result_hash:rejected_message_result_hash
+          ~rejected_message_result_path
+          ~context_hash
+          ~withdraw_list_hash
+          ~agreed_message_result_path
           client
       in
-      let*! rejected_message2_result_path =
-        Rollup.commitment_merkle_tree_path
-          ~message_result_hashes:
-            [`Hash message1_result_hash; `Hash message2_result_hash]
+      let* () =
+        Process.check_error
+          ~msg:(rex "proto.alpha.tx_rollup_proof_produced_rejected_state")
+          process
+      in
+      Log.info "Try to reject a good commitment at level 1, message 1" ;
+      let* {
+             proof;
+             message;
+             path;
+             rejected_message_result_hash;
+             rejected_message_result_path;
+             context_hash;
+             withdraw_list_hash;
+             agreed_message_result_path;
+           } =
+        build_rejection
+          ~tx_level:1
+          ~tx_node
+          ~message_pos:1
+          ~client
+          ~agreed_context_hash
+          ~agreed_message_result_path
+          commitment_info
+      in
+      let*? process =
+        Client.Tx_rollup.submit_rejection
+          ~src:operator
+          ~proof
+          ~rollup:tx_rollup_hash
+          ~level:1
+          ~message
           ~position:1
-          client
-      in
-      let agreed_message1_result_hash = deposit_result_hash in
-      let*! agreed_message1_result_path =
-        Rollup.commitment_merkle_tree_path
-          ~message_result_hashes:[`Hash agreed_message1_result_hash]
-          ~position:0
-          client
-      in
-      let*! agreed_message2_result_path =
-        Rollup.commitment_merkle_tree_path
-          ~message_result_hashes:
-            [`Hash message1_result_hash; `Hash message2_result_hash]
-          ~position:0
-          client
-      in
-      let*? process =
-        Client.Tx_rollup.submit_rejection
-          ~src:operator
-          ~proof:proof1_str
-          ~rollup:tx_rollup_hash
-          ~level:1
-          ~message
-          ~position:0
-          ~path:message1_path
-          ~message_result_hash:rejected_message1_result_hash
-          ~rejected_message_result_path:
-            (JSON.encode rejected_message1_result_path)
-          ~context_hash:deposit_context_hash
-          ~withdraw_list_hash:Constant.tx_rollup_empty_withdraw_list
-          ~agreed_message_result_path:(JSON.encode agreed_message1_result_path)
+          ~path
+          ~message_result_hash:rejected_message_result_hash
+          ~rejected_message_result_path
+          ~context_hash
+          ~withdraw_list_hash
+          ~agreed_message_result_path
           client
       in
       let* () =
@@ -1403,40 +1554,84 @@ let test_l2_proofs =
           ~msg:(rex "proto.alpha.tx_rollup_proof_produced_rejected_state")
           process
       in
-      Log.info "Get the proof for the second message at level 1" ;
-      let* proof2 =
-        Rollup_node.Client.get_merkle_proof
+      unit)
+
+let test_reject_bad_commitment =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"TX_rollup: reject bad commitment"
+    ~tags:["tx_rollup"; "node"; "proofs"; "rejection"]
+    (fun protocol ->
+      let* parameter_file = get_rollup_parameter_file ~protocol in
+      let* (node, client) =
+        Client.init_with_protocol ~parameter_file `Client ~protocol ()
+      in
+      let operator = Constant.bootstrap1.public_key_hash in
+      let* (tx_rollup_hash, tx_node) =
+        init_and_run_rollup_node ~operator node client
+      in
+      (* Generating some identities *)
+      let* bls_key1 = generate_bls_addr ~alias:"alice" client in
+      let pkh1_str = bls_key1.aggregate_public_key_hash in
+      let* (tx_node, _node, client, _level) =
+        make_deposit
+          ~tx_rollup_hash
           ~tx_node
-          ~block:"head"
-          ~message_pos:"1"
+          ~node
+          ~client
+          ~tickets_amount:10
+          pkh1_str
       in
-      let proof2_str = JSON.encode proof2 in
-      let (`Hex content) = content2 in
-      let message =
-        Ezjsonm.value_to_string @@ `O [("batch", `String content)]
+      let* ({roots = _; context_hashes = _; inbox_merkle_root; predecessor} as
+           commitment_info) =
+        build_commitment_info ~tx_level:0 ~tx_rollup_hash ~tx_node ~client
       in
-      Log.info "Trying to reject a valid commitment" ;
-      let*? process =
-        Client.Tx_rollup.submit_rejection
-          ~src:operator
-          ~proof:proof2_str
+      (* Change the roots to produce an invalid commitment. *)
+      let roots = [Constant.tx_rollup_initial_message_result] in
+      let*! () =
+        Client.Tx_rollup.submit_commitment
+          ~level:0
+          ~roots
+          ~inbox_merkle_root
+          ?predecessor
           ~rollup:tx_rollup_hash
-          ~level:1
-          ~message
-          ~position:1 (* OK *)
-          ~path:message2_path (* OK *)
-          ~message_result_hash:rejected_message2_result_hash (* OK *)
-          ~rejected_message_result_path:
-            (JSON.encode rejected_message2_result_path) (* OK *)
-          ~context_hash:message1_context_hash (* OK *)
-          ~withdraw_list_hash:Constant.tx_rollup_empty_withdraw_list
-          ~agreed_message_result_path:(JSON.encode agreed_message2_result_path)
+          ~src:Constant.bootstrap3.public_key_hash
           client
       in
-      let* () =
-        Process.check_error
-          ~msg:(rex "proto.alpha.tx_rollup_proof_produced_rejected_state")
-          process
+      let* () = Client.bake_for client in
+      let* _ = Rollup_node.wait_for_tezos_level tx_node 4 in
+      let* {
+             proof;
+             message;
+             path;
+             rejected_message_result_hash = _;
+             rejected_message_result_path;
+             context_hash;
+             withdraw_list_hash;
+             agreed_message_result_path;
+           } =
+        build_rejection
+          ~tx_level:0
+          ~tx_node
+          ~message_pos:0
+          ~client
+          commitment_info
+      in
+      let*! () =
+        Client.Tx_rollup.submit_rejection
+          ~src:operator
+          ~proof
+          ~rollup:tx_rollup_hash
+          ~level:0
+          ~message
+          ~position:0
+          ~path
+          ~message_result_hash:Constant.tx_rollup_initial_message_result
+          ~rejected_message_result_path
+          ~context_hash
+          ~withdraw_list_hash
+          ~agreed_message_result_path
+          client
       in
       unit)
 
@@ -1448,4 +1643,5 @@ let register ~protocols =
   test_l2_to_l2_transaction protocols ;
   test_batcher protocols ;
   test_reorganization protocols ;
-  test_l2_proofs protocols
+  test_l2_proof_rpc_position protocols ;
+  test_reject_bad_commitment protocols

@@ -1076,7 +1076,7 @@ let test_rollup_last_commitment_is_rejected =
       ~agreed_message_result_path
       ~proof:Constant.tx_rollup_proof_initial_state
       ~context_hash:Constant.tx_rollup_empty_l2_context
-      ~withdraw_list_hash:Constant.tx_rollup_empty_withdraw_list
+      ~withdraw_list_hash:Constant.tx_rollup_empty_withdraw_list_hash
       state
   in
   let* () = Client.bake_for client in
@@ -1167,7 +1167,7 @@ let test_rollup_reject_position_one =
       ~agreed_message_result_path:(agreed_message_result_path |> JSON.encode)
       ~proof:Constant.tx_rollup_proof_initial_state
       ~context_hash:Constant.tx_rollup_empty_l2_context
-      ~withdraw_list_hash:Constant.tx_rollup_empty_withdraw_list
+      ~withdraw_list_hash:Constant.tx_rollup_empty_withdraw_list_hash
       state
   in
   let* () = Client.bake_for client in
@@ -1239,7 +1239,7 @@ let test_rollup_wrong_rejection =
       ~previous_message_result_path:(`A [])
       ~previous_message_context_hash:Constant.tx_rollup_empty_l2_context
       ~previous_message_withdraw_list_hash:
-        Constant.tx_rollup_empty_withdraw_list
+        Constant.tx_rollup_empty_withdraw_list_hash
       state.client
   in
   let* () = Client.bake_for client in
@@ -1311,7 +1311,7 @@ let test_rollup_wrong_path_for_rejection =
       ~previous_message_result_path:(`A [])
       ~previous_message_context_hash:Constant.tx_rollup_empty_l2_context
       ~previous_message_withdraw_list_hash:
-        Constant.tx_rollup_empty_withdraw_list
+        Constant.tx_rollup_empty_withdraw_list_hash
       client
   in
   let* () = Client.bake_for client in
@@ -1393,7 +1393,7 @@ let test_rollup_wrong_rejection_long_path =
       ~rejected_message_result_path:(rejected_message_result_path |> JSON.encode)
       ~agreed_message_result_path
       ~context_hash:Constant.tx_rollup_empty_l2_context
-      ~withdraw_list_hash:Constant.tx_rollup_empty_withdraw_list
+      ~withdraw_list_hash:Constant.tx_rollup_empty_withdraw_list_hash
       state.client
   in
   let* () =
@@ -1416,7 +1416,7 @@ let test_rollup_wrong_rejection_long_path =
       ~rejected_message_result_path:(rejected_message_result_path |> JSON.encode)
       ~agreed_message_result_path
       ~context_hash:Constant.tx_rollup_empty_l2_context
-      ~withdraw_list_hash:Constant.tx_rollup_empty_withdraw_list
+      ~withdraw_list_hash:Constant.tx_rollup_empty_withdraw_list_hash
       state.client
   in
   Process.check_error

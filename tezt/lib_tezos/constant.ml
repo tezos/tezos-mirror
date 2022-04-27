@@ -85,7 +85,7 @@ let tx_rollup_l2_address = "tz4MSfZsn6kMDczShy8PMeB628TNukn9hi2K"
 let tx_rollup_empty_l2_context =
   "CoVu7Pqp1Gh3z33mink5T5Q2kAQKtnn3GHxVhyehdKZpQMBxFBGF"
 
-let tx_rollup_empty_withdraw_list =
+let tx_rollup_empty_withdraw_list_hash =
   "txw1sFoLju3ySMAdY6v1dcHUMqJ4Zxc1kcynC8xkYgCmH6bpNSDhV"
 
 let tx_rollup_initial_message_result =
