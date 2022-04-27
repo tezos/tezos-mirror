@@ -71,3 +71,6 @@ val merkle_root : t -> Tx_rollup_inbox.Merkle.root
     to the structure that is stored on L1, i.e. an inbox with Merklized
     contents. *)
 val to_proto : t -> Tx_rollup_inbox.t
+
+(** Return protocol message results for an inbox  *)
+val proto_message_results : t -> Tx_rollup_message_result.t list

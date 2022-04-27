@@ -27,24 +27,9 @@ open Protocol
 open Alpha_context
 
 let commitment_of_inbox ~predecessor level (inbox : Inbox.t) =
+  let message_results = Inbox.proto_message_results inbox in
   let messages =
-    List.map
-      (fun msg ->
-        let withdrawals =
-          match msg.Inbox.result with
-          | Inbox.Discarded _ -> []
-          | Interpreted (_result, withdrawals) -> withdrawals
-        in
-        let message_result =
-          Tx_rollup_message_result.
-            {
-              context_hash = msg.Inbox.l2_context_hash.tree_hash;
-              withdraw_list_hash =
-                Tx_rollup_withdraw_list_hash.hash_uncarbonated withdrawals;
-            }
-        in
-        Tx_rollup_message_result_hash.hash_uncarbonated message_result)
-      inbox.contents
+    List.map Tx_rollup_message_result_hash.hash_uncarbonated message_results
   in
   let inbox_merkle_root = Inbox.merkle_root inbox in
   let predecessor = predecessor.L2block.header.commitment in
