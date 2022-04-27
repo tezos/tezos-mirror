@@ -115,76 +115,87 @@ module Contract = struct
     >>=? fun balance_and_frozen_bonds ->
     Stake_storage.add_stake ctxt delegate balance_and_frozen_bonds
 
-  let set c contract delegate =
-    match delegate with
-    | None -> (
-        (* check if contract is a registered delegate *)
-        (match contract with
-        | Contract_repr.Implicit pkh ->
-            registered c pkh >>= fun is_registered ->
-            fail_when is_registered (No_deletion pkh)
-        | Originated _ -> return_unit)
-        >>=? fun () ->
-        Contract_delegate_storage.find c contract >>=? function
-        | None -> return c
-        | Some delegate ->
-            (* Removes the balance of the contract from the delegate *)
-            Contract_storage.get_balance_and_frozen_bonds c contract
-            >>=? fun balance_and_frozen_bonds ->
-            Stake_storage.remove_stake c delegate balance_and_frozen_bonds
-            >>=? fun c -> Contract_delegate_storage.delete c contract)
-    | Some delegate ->
-        Contract_manager_storage.is_manager_key_revealed c delegate
-        >>=? fun known_delegate ->
-        registered c delegate >>= fun registered_delegate ->
-        let self_delegation =
-          match contract with
-          | Implicit pkh -> Signature.Public_key_hash.equal pkh delegate
-          | Originated _ -> false
+  let set_self_delegate c delegate =
+    let open Lwt_tzresult_syntax in
+    let*! is_registered = registered c delegate in
+    if is_registered then
+      let* () =
+        let* is_inactive = Delegate_activation_storage.is_inactive c delegate in
+        fail_unless is_inactive Active_delegate
+      in
+      Stake_storage.set_active c delegate
+    else
+      let contract = Contract_repr.Implicit delegate in
+      let* () =
+        let* is_pk_revealed =
+          Contract_manager_storage.is_manager_key_revealed c delegate
         in
-        if (not known_delegate) || not (registered_delegate || self_delegation)
-        then fail (Unregistered_delegate delegate)
-        else
-          Contract_delegate_storage.find c contract >>=? fun current_delegate ->
-          (match current_delegate with
-          | Some current_delegate
-            when Signature.Public_key_hash.equal delegate current_delegate ->
-              if self_delegation then
-                Delegate_activation_storage.is_inactive c delegate >>=? function
-                | true -> return_unit
-                | false -> fail Active_delegate
-              else fail Current_delegate
-          | None | Some _ -> return_unit)
-          >>=? fun () ->
-          (* check if contract is a registered delegate *)
-          (match contract with
-          | Implicit pkh ->
-              registered c pkh >>= fun is_registered ->
-              (* allow self-delegation to re-activate *)
-              if (not self_delegation) && is_registered then
-                fail (No_deletion pkh)
-              else return_unit
-          | Originated _ -> return_unit)
-          >>=? fun () ->
-          Contract_storage.allocated c contract >>= fun exists ->
-          error_when
-            (self_delegation && not exists)
-            (Empty_delegate_account delegate)
-          >>?= fun () ->
-          Contract_storage.get_balance_and_frozen_bonds c contract
-          >>=? fun balance_and_frozen_bonds ->
-          Stake_storage.remove_contract_stake
-            c
-            contract
-            balance_and_frozen_bonds
-          >>=? fun c ->
-          Contract_delegate_storage.set c contract delegate >>=? fun c ->
-          Stake_storage.add_stake c delegate balance_and_frozen_bonds
-          >>=? fun c ->
-          if self_delegation then
-            Storage.Delegates.add c delegate >>= fun c ->
-            Stake_storage.set_active c delegate
-          else return c
+        fail_unless is_pk_revealed (Unregistered_delegate delegate)
+      in
+      let* () =
+        let*! is_allocated = Contract_storage.allocated c contract in
+        fail_unless is_allocated (Empty_delegate_account delegate)
+      in
+      let* balance_and_frozen_bonds =
+        Contract_storage.get_balance_and_frozen_bonds c contract
+      in
+      let* c =
+        Stake_storage.remove_contract_stake c contract balance_and_frozen_bonds
+      in
+      let* c = Contract_delegate_storage.set c contract delegate in
+      let* c = Stake_storage.add_stake c delegate balance_and_frozen_bonds in
+      let*! c = Storage.Delegates.add c delegate in
+      let* c = Stake_storage.set_active c delegate in
+      return c
+
+  let set_delegate c contract delegate =
+    let open Lwt_tzresult_syntax in
+    let* () =
+      match contract with
+      | Contract_repr.Originated _ -> return_unit
+      | Implicit pkh ->
+          let*! is_registered = registered c pkh in
+          fail_when is_registered (No_deletion pkh)
+    in
+    let* () =
+      let* current_delegate = Contract_delegate_storage.find c contract in
+      match (delegate, current_delegate) with
+      | None, None ->
+          (* we don't fail in this case in order not to risk breaking
+             existing smart contracts. *)
+          return_unit
+      | Some delegate, Some current_delegate
+        when Signature.Public_key_hash.equal delegate current_delegate ->
+          fail Current_delegate
+      | _ -> return_unit
+    in
+    let* balance_and_frozen_bonds =
+      Contract_storage.get_balance_and_frozen_bonds c contract
+    in
+    let* c =
+      Stake_storage.remove_contract_stake c contract balance_and_frozen_bonds
+    in
+    match delegate with
+    | None ->
+        let* c = Contract_delegate_storage.delete c contract in
+        return c
+    | Some delegate ->
+        let* () =
+          let*! is_delegate_registered = registered c delegate in
+          fail_when
+            (not is_delegate_registered)
+            (Unregistered_delegate delegate)
+        in
+        let* c = Contract_delegate_storage.set c contract delegate in
+        let* c = Stake_storage.add_stake c delegate balance_and_frozen_bonds in
+        return c
+
+  let set c contract delegate =
+    match (delegate, contract) with
+    | Some delegate, Contract_repr.Implicit source
+      when Signature.Public_key_hash.equal source delegate ->
+        set_self_delegate c delegate
+    | _ -> set_delegate c contract delegate
 end
 
 let fold = Storage.Delegates.fold
