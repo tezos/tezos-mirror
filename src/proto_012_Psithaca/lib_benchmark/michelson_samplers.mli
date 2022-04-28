@@ -77,7 +77,7 @@ module type S = sig
 
   (** Samplers for random Michelson values. Restrictions apply on the
       supported types as listed at the beginning of this file. *)
-  module rec Random_value : sig
+  module Random_value : sig
     (** Sample a value given its type. *)
     val value : 'a Script_typed_ir.ty -> 'a sampler
 
