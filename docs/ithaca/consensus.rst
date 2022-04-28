@@ -198,7 +198,7 @@ latest (because up to that cycle the frozen deposit also depends on the
 active stake at cycles before cycle ``c+1``).
 
 The active stake is computed ``PRESERVED_CYCLES`` in advance: at
-the end of cycle ``c`` for cycle ``c + PRESERVED_CYCLES`` (as in Emmy*). Intuitively,
+the end of cycle ``c`` for cycle ``c + 1 + PRESERVED_CYCLES`` (as in Emmy*). Intuitively,
 the active stake is set to 10 times the delegate's chosen frozen
 deposit limit, without going beyond its available staking balance,
 nor its maximum staking capacity (determined by its full balance).
