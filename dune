@@ -2,6 +2,7 @@
  (name main)
  (package teztale)
  (public_name teztale)
+ (promote (until-clean))
  (libraries
   tezos-client-base-unix
   (select
