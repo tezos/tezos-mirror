@@ -330,8 +330,8 @@ let pp_manager_operation_content (type kind) source internal pp_result ppf
   | Sc_rollup_timeout {rollup; stakers} ->
       Format.fprintf
         ppf
-        "@[<v 2>Punish one of the two stakers %a and %a by timeout in the smart \
-         contract rollup at address %a%a@]"
+        "@[<v 2>Punish one of the two stakers %a and %a by timeout in the \
+         smart contract rollup at address %a%a@]"
         Sc_rollup.Staker.pp
         (fst stakers)
         Sc_rollup.Staker.pp

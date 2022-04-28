@@ -27,7 +27,7 @@
 (** The smart contract rollup refutation game types are defined here, as
     well as the basic pure logic for:
 
-    - how to create a new game from a pair of commits in the commit tree
+    - how to create a new game from a pair of commits in the commit tree;
 
     - how to update a game or complete a game when a move is played.
 
@@ -38,8 +38,8 @@
     ====================
 
     At any given moment, the game stores a list [dissection] of state
-    hashes and tick counts. These are the claims made by the player who
-    has just moved about the PVM history.
+    hashes and tick counts. These are the claims about the PVM history
+    made by the player who has just moved.
 
     The next player to move will specify a tick count which appears in
     the [dissection]; this is the last of the state hashes which she
@@ -58,11 +58,13 @@
     Initializing a game
     ===================
 
-    The game begins when the refuter plays a first move.
+    In order to trigger the start of a game, one player must publish a
+    first move.
 
-    At this point the [initial] function will be called to convert the
-    defender's commitment into an initial [dissection]. The first move
-    is immediately applied to this to give the first state of the game.
+    The [initial] function is called at this point. It converts a
+    parent-child pair of commitments (belonging to the other player) into
+    an initial [dissection]. The first move is immediately applied to
+    this to give the first state of the game.
 
     Note: it is quite possible for the game to end immediately after
     this first move, either if the commitment has a tick count of one or
@@ -96,7 +98,8 @@
     P2' - If [dissection] is dishonest, the next player has a winning
     strategy.
 
-    This allows us to see that
+    This allows us to see the following. (We use [refuter] to mean the
+    first player to move, and [defender] to mean the other player.)
 
     Honest refuter wins:
       An honest refuter will be refuting a dishonest commitment, because
@@ -133,7 +136,7 @@ module Proof : sig
       will include a proof that the machine is in a blocked state and a
       proof that the next message to be read is correct. The inbox proof
       part of this will refer to the [inbox_snapshot] stored in the game
-      type.
+      type (see {!Sc_rollup_game_repr.t}).
 
       [Blocked_step]: similar to an input step, this is a step where the
       machine is in a blocked state. However, it includes a proof that
@@ -163,9 +166,9 @@ module Proof : sig
   val valid : t -> bool
 end
 
-(** The two stakers index the game in the storage, as an ordered pair
-    of public key hashes. We use [Alice] and [Bob] to represent the
-    first and second player respectively. *)
+(** The two stakers index the game in the storage as a pair of public
+    key hashes which is in lexical order. We use [Alice] and [Bob] to
+    represent the first and second player in the pair respectively. *)
 type player = Alice | Bob
 
 (**
@@ -205,6 +208,8 @@ val pp : Format.formatter -> t -> unit
 module Index : sig
   type t = Staker.t * Staker.t
 
+  (** [to_path i p] returns a new path with the path to the game indexed
+      by [i] added as a prefix to path [p]. See [Path_encoding] module. *)
   val to_path : t -> string list -> string list
 
   val of_path : string list -> t option
@@ -217,8 +222,8 @@ module Index : sig
 
   val compare : t -> t -> int
 
-  (** The 'normal form' for indices is when the two stakers are
-      ordered (we just use [Staker.compare]). *)
+  (** The 'normal form' for indices is when the two stakers appear in
+      the pair in lexical order (we just use [Staker.compare]). *)
   val normalize : t -> t
 
   (** Given an index in normal form, resolve a given [player] ([Alice]
@@ -228,7 +233,7 @@ end
 
 (** To begin a game, first the conflict point in the commit tree is
     found, and then this function is applied.
-    
+
     [initial inbox parent child refuter defender] will construct an
     initial game where [refuter] is next to play. The game has
     [dissection] with three states:
@@ -242,7 +247,7 @@ end
       - thirdly, a [None] state which is a single tick after the [child]
       commitment. This represents the claim, implicit in the commitment,
       that the state given is blocked.
-    
+
     This gives [refuter] a binary choice: she can refute the commit
     itself by providing a new dissection between the two committed
     states, or she can refute the claim that the [child] commit is a
@@ -294,9 +299,10 @@ val pp_status : Format.formatter -> status -> unit
 val status_encoding : status Data_encoding.t
 
 (** A game ends with a single [loser] and the [reason] for the game
-    ending. This type is 'internal' to the game logic, it uses
-    [Alice] or [Bob] to refer to the players without knowing which
-    stakers they are. *)
+    ending. This type uses [Alice] or [Bob] to refer to the players
+    without knowing which stakers they are---so it cannot identify an
+    actual staker who should be punished without the associated game
+    index. *)
 type outcome = {loser : player; reason : reason}
 
 val pp_outcome : Format.formatter -> outcome -> unit
@@ -305,8 +311,8 @@ val outcome_encoding : outcome Data_encoding.t
 
 (** Applies the move [refutation] to the game. Checks the move is
     valid and returns an [Invalid_move] outcome if not.
-    
+
     In the case of the game continuing, this swaps the current
     player and updates the [dissection]. In the case of a [Proof]
-    being provided this returns a [Conflict_resolved] outcome. *)
+    being provided this returns an [outcome]. *)
 val play : t -> refutation -> (outcome, t) Either.t

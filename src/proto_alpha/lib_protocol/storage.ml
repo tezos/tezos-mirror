@@ -1628,4 +1628,17 @@ module Sc_rollup = struct
 
            let encoding = Raw_level_repr.encoding
          end)
+
+  module Opponent =
+    Make_indexed_carbonated_data_storage
+      (Make_subcontext (Registered) (Indexed_context.Raw_context)
+         (struct
+           let name = ["opponent"]
+         end))
+         (Public_key_hash_index)
+      (struct
+        type t = Sc_rollup_repr.Staker.t
+
+        let encoding = Sc_rollup_repr.Staker.encoding
+      end)
 end

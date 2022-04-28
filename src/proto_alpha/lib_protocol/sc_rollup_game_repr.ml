@@ -27,7 +27,7 @@
 open Sc_rollup_repr
 
 module Proof = struct
-  (* TODO #2759: these proof cases are dummy ones for testing. Replace
+  (* TODO: #2759 these proof cases are dummy ones for testing. Replace
      them with the proper proofs. *)
   type t =
     | Computation_step of {
@@ -69,24 +69,24 @@ module Proof = struct
             (fun (valid, start) -> Blocked_step {valid; start});
         ])
 
-  (* TODO #2759 *)
+  (* TODO: #2759 *)
   let pp _ _ = ()
 
-  (* TODO #2759 *)
+  (* TODO: #2759 *)
   let start p =
     match p with
     | Computation_step x -> x.start
     | Input_step x -> x.start
     | Blocked_step x -> x.start
 
-  (* TODO #2759 *)
+  (* TODO: #2759 *)
   let stop p =
     match p with
     | Computation_step x -> Some x.stop
     | Input_step x -> Some x.stop
     | Blocked_step _ -> None
 
-  (* TODO #2759 *)
+  (* TODO: #2759 *)
   let valid p =
     match p with
     | Computation_step x -> x.valid
