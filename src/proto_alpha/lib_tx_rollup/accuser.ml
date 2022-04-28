@@ -58,7 +58,9 @@ let rejectable_commitment (state : State.t)
   | Some finalized_level
     when Tx_rollup_level.(commitment.level <= finalized_level) ->
       (* This commitment is already finalized, nothing we can do anyway. *)
-      (* TODO: log message *)
+      let* () =
+        Event.(emit Accuser.bad_finalized_commitment) commitment.level
+      in
       return `Don't_reject
   | _ -> (
       let* block =
@@ -66,8 +68,9 @@ let rejectable_commitment (state : State.t)
       in
       match block with
       | None ->
-          (* Should not happen. We have no block for that level, so we cannot know
-             if the commitment is bad. *)
+          (* Should not happen. We have no block for that level, so we cannot
+             know if the commitment is bad. *)
+          let* () = Debug_events.(emit should_not_happen) __LOC__ in
           return `Don't_reject
       | Some block -> (
           let our_commitment =
@@ -79,8 +82,9 @@ let rejectable_commitment (state : State.t)
                 commitment.inbox_merkle_root
                 our_commitment.inbox_merkle_root
             then Lwt.return_unit
-            else (* TODO warning message *)
-              Lwt.return_unit
+            else
+              Event.(emit Accuser.inbox_merkle_root_mismatch)
+                (commitment.inbox_merkle_root, our_commitment.inbox_merkle_root)
           in
           if
             not
@@ -92,6 +96,10 @@ let rejectable_commitment (state : State.t)
             (* Commitments have different predecessors, we cannot construct
                rejection. This means that the commitment is on top of a bad
                commitment so it will be slashed automatically. *)
+            let* () =
+              Event.(emit Accuser.commitment_predecessor_mismatch)
+                (commitment.predecessor, our_commitment.predecessor)
+            in
             return `Don't_reject
           else
             match
@@ -101,7 +109,6 @@ let rejectable_commitment (state : State.t)
                   if Tx_rollup_message_result_hash.(m1 = m2) then
                     Ok (position + 1)
                   else
-                    (* TODO: Log *)
                     let path =
                       let open Tx_rollup_commitment.Merkle in
                       let tree = List.fold_left snoc nil commitment.messages in
@@ -115,10 +122,14 @@ let rejectable_commitment (state : State.t)
             | Ok _ -> return `Don't_reject
             | Error None ->
                 (* Should not happen if the inboxes are the same *)
-                (* TODO: log and/or fail *)
+                let* () = Debug_events.(emit should_not_happen) __LOC__ in
                 return `Don't_reject
             | Error (Some (position, message_result, message_path)) ->
                 (* We found a bad commitment *)
+                let* () =
+                  Event.(emit Accuser.bad_commitment)
+                    (commitment.level, position)
+                in
                 return (`Reject (position, message_result, message_path, block))
           ))
 

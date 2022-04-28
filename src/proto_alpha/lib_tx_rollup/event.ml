@@ -466,3 +466,50 @@ module Injector = struct
       ("operations", Data_encoding.list L1_operation.Hash.encoding)
       ~pp2:pp_operations_hash_list
 end
+
+module Accuser = struct
+  let section = section @ ["accuser"]
+
+  let bad_finalized_commitment =
+    declare_1
+      ~name:"bad_finalized_commitment"
+      ~msg:"Commitment at level {level} is bad but already finalized!!!"
+      ~level:Error
+      ("level", Protocol.Alpha_context.Tx_rollup_level.encoding)
+
+  let inbox_merkle_root_mismatch =
+    declare_2
+      ~name:"inbox_merkle_root_mismatch"
+      ~msg:
+        "Inbox merkle root for commitment on L1 {l1_merkle_root} is different \
+         from the one computed by the rollup node {our_merkle_root}"
+      ~level:Warning
+      ( "l1_merkle_root",
+        Protocol.Alpha_context.Tx_rollup_inbox.Merkle.root_encoding )
+      ( "our_merkle_root",
+        Protocol.Alpha_context.Tx_rollup_inbox.Merkle.root_encoding )
+
+  let commitment_predecessor_mismatch =
+    declare_2
+      ~name:"commitment_predecessor_mismatch"
+      ~msg:
+        "Commitment predecessor L1 {l1_predecessor} is different from the one \
+         computed by the rollup node {our_predecessor}"
+      ~level:Warning
+      ( "l1_predecessor",
+        Data_encoding.option
+          Protocol.Alpha_context.Tx_rollup_commitment_hash.encoding )
+      ( "our_predecessor",
+        Data_encoding.option
+          Protocol.Alpha_context.Tx_rollup_commitment_hash.encoding )
+
+  let bad_commitment =
+    declare_2
+      ~name:"bad_commitment"
+      ~msg:
+        "Detected a bad (rejectable) commitment at level {level} for message \
+         at position {position}"
+      ~level:Warning
+      ("level", Protocol.Alpha_context.Tx_rollup_level.encoding)
+      ("position", Data_encoding.int31)
+end
