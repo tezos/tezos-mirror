@@ -28,4 +28,5 @@
    -open Tezos_stdlib_unix
    -open Tezos_client_base_unix
    -open Tezos_protocol_013_PtJakart_parameters
+   -open Tenderbrute_013_PtJakart
    -open Tezos_protocol_013_PtJakart.Protocol)))

@@ -3192,7 +3192,7 @@ end = struct
       some_if (active && N.(number >= 013)) @@ fun () ->
       public_lib
         (sf "tezos-baking-%s.tenderbrute" name_dash)
-        ~internal_name:"tenderbrute"
+        ~internal_name:(sf "tenderbrute_%s" name_underscore)
         ~path:
           (sf "src/proto_%s/lib_delegate/test/tenderbrute/lib" name_underscore)
         ~opam:
@@ -3232,7 +3232,7 @@ end = struct
             tezos_client_base |> open_;
             client |> if_some |> open_;
             main |> open_;
-            tenderbrute |> if_some;
+            tenderbrute |> if_some |> open_;
           ]
         ~linkall:true
     in
@@ -3267,7 +3267,7 @@ end = struct
               tezos_mockup;
               tezos_mockup_proxy;
               tezos_mockup_commands;
-              tenderbrute |> if_some |> if_ N.(number >= 013);
+              tenderbrute |> if_some |> if_ N.(number >= 013) |> open_;
             ]
           ~opens:[sf "Tezos_protocol_%s.Protocol" name_underscore]
           ~bisect_ppx:false
