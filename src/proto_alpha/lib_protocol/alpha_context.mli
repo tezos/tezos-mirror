@@ -2589,6 +2589,59 @@ module Sc_rollup : sig
       MerkelizedOperations with type tree = Tree.tree
   end
 
+  module Game : sig
+    module Proof : sig
+      type t =
+        | Computation_step of {
+            valid : bool;
+            start : State_hash.t;
+            stop : State_hash.t;
+          }
+        | Input_step of {
+            valid : bool;
+            start : State_hash.t;
+            stop : State_hash.t;
+          }
+        | Blocked_step of {valid : bool; start : State_hash.t}
+    end
+
+    type player = Alice | Bob
+
+    type t = {
+      turn : player;
+      inbox_snapshot : Inbox.t;
+      dissection : (State_hash.t option * Tick.t) list;
+    }
+
+    val opponent : player -> player
+
+    type step =
+      | Dissection of (State_hash.t option * Tick.t) list
+      | Proof of Proof.t
+
+    type refutation = {choice : Tick.t; step : step}
+
+    val pp_refutation : Format.formatter -> refutation -> unit
+
+    type reason = Conflict_resolved | Invalid_move | Timeout
+
+    val pp_reason : Format.formatter -> reason -> unit
+
+    val reason_encoding : reason Data_encoding.t
+
+    type status = Ongoing | Ended of (reason * Staker.t)
+
+    val pp_status : Format.formatter -> status -> unit
+
+    val status_encoding : status Data_encoding.t
+
+    type outcome = {loser : player; reason : reason}
+
+    val pp_outcome : Format.formatter -> outcome -> unit
+
+    val outcome_encoding : outcome Data_encoding.t
+  end
+
   val rpc_arg : t RPC_arg.t
 
   val add_messages :

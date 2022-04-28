@@ -40,6 +40,9 @@ let of_int x = if Compare.Int.(x < 0) then None else Some (Z.of_int x)
 
 let to_int x = if Z.fits_int x then Some (Z.to_int x) else None
 
+let of_number_of_ticks x =
+  Z.of_int (Int32.to_int (Sc_rollup_repr.Number_of_ticks.to_int32 x))
+
 let ( <= ) = leq
 
 let ( < ) = lt
