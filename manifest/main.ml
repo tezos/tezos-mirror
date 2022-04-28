@@ -466,7 +466,7 @@ let tezos_lwt_result_stdlib =
     ~synopsis:"Tezos: error-aware stdlib replacement"
     ~ocaml:V.(at_least "4.12")
     ~js_compatible:true
-    ~documentation:[]
+    ~documentation:[Dune.[S "package"; S "tezos-lwt-result-stdlib"]]
     ~deps:
       [
         lwt;
@@ -1056,7 +1056,7 @@ let tezos_workers =
     "tezos-workers"
     ~path:"src/lib_workers"
     ~synopsis:"Tezos: worker library"
-    ~documentation:[]
+    ~documentation:[Dune.[S "package"; S "tezos-workers"]]
     ~deps:
       [
         tezos_base |> open_ ~m:"TzPervasives" |> open_;
@@ -1800,6 +1800,7 @@ let tezos_protocol_compiler_native =
                   S "final_protocol_versions";
                 ];
             ]
+            ~package:"tezos-protocol-compiler"
             ~section:"libexec";
         ]
 
@@ -1901,7 +1902,7 @@ let tezos_shell =
     ~synopsis:
       "Tezos: core of `tezos-node` (gossip, validation scheduling, mempool, \
        ...)"
-    ~documentation:[]
+    ~documentation:[Dune.[S "package"; S "tezos-shell"]]
     ~deps:
       [
         lwt_watcher;
@@ -2947,6 +2948,7 @@ end = struct
                   S "test-parameters.json";
                   S "mainnet-parameters.json";
                 ]
+                ~package:(sf "tezos-protocol-%s-parameters" name_dash)
                 ~section:"lib";
             ])
         ~bisect_ppx:false
@@ -3951,7 +3953,14 @@ let _replace =
       ]
     ~modules:["Replace"]
     ~static:true
-    ~dune:Dune.[install [as_ "replace.exe" "replace"] ~section:"libexec"]
+    ~dune:
+      Dune.
+        [
+          install
+            [as_ "replace.exe" "replace"]
+            ~section:"libexec"
+            ~package:"tezos-protocol-compiler";
+        ]
 
 let _tezos_validator_bin =
   public_exe

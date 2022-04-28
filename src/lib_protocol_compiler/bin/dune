@@ -61,4 +61,7 @@
          -open Tezos_stdlib_unix))
  (modules Replace))
 
-(install (section libexec) (files (replace.exe as replace)))
+(install
+ (package tezos-protocol-compiler)
+ (section libexec)
+ (files (replace.exe as replace)))

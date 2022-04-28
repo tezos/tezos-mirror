@@ -44,5 +44,6 @@
  (action (run %{deps} --mainnet)))
 
 (install
+ (package tezos-protocol-011-PtHangz2-parameters)
  (section lib)
  (files sandbox-parameters.json test-parameters.json mainnet-parameters.json))

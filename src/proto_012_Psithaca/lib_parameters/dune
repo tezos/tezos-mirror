@@ -46,5 +46,6 @@
  (action (run %{deps} --mainnet)))
 
 (install
+ (package tezos-protocol-012-Psithaca-parameters)
  (section lib)
  (files sandbox-parameters.json test-parameters.json mainnet-parameters.json))

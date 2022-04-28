@@ -15,4 +15,4 @@
   tezos-lwt-result-stdlib.traced.structs)
  (js_of_ocaml))
 
-(documentation)
+(documentation (package tezos-lwt-result-stdlib))
