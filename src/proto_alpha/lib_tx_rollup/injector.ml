@@ -412,8 +412,10 @@ let rec inject_operations ~must_succeed state (operations : L1_operation.t list)
        returned an error. We try to inject without the failing operation. *)
     let operations = List.rev rev_non_failing_operations in
     inject_operations ~must_succeed state operations
-  else (* Inject on node for real *)
-    inject_on_node state packed_contents
+  else
+    (* Inject on node for real *)
+    let+ oph = inject_on_node state packed_contents in
+    (oph, operations)
 
 (** Returns the (upper bound on) the size of an L1 batch of operations composed
     of the manager operations [rev_ops]. *)
@@ -487,7 +489,7 @@ let get_operations_from_queue ~size_limit state =
    operations fail when there are either no commitment to finalize or to remove
    (which can happen when there are no inbox for instance). *)
 let ignore_failing_gc_operations operations = function
-  | Ok oph -> Ok (`Injected oph)
+  | Ok res -> Ok (`Injected res)
   | Error _ as res ->
       let only_gc_operations =
         List.for_all
@@ -525,15 +527,16 @@ let inject_pending_operations
       in
       let*? res = ignore_failing_gc_operations operations_to_inject res in
       match res with
-      | `Injected oph ->
+      | `Injected (oph, injected_operations) ->
           (* Injection succeeded, remove from pending and add to injected *)
           List.iter
             (fun op -> Op_queue.remove state.queue op.L1_operation.hash)
-            operations_to_inject ;
+            injected_operations ;
           add_injected_operations state oph operations_to_inject ;
           return_unit
       | `Ignored ->
-          (* Injection failed but we ignore the failure *)
+          (* Injection failed but we ignore the failure. We can leave the GC
+             operations in the queue as their can be only one unique. *)
           return_unit)
 
 (** [register_included_operation state block level oph] marks the manager
