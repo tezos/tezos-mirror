@@ -192,8 +192,21 @@ latest (because up to that cycle the frozen deposit also depends on the
 active stake at cycles before cycle ``c+1``).
 
 The active stake is computed ``PRESERVED_CYCLES`` in advance: at
-the end of cycle ``c`` for cycle ``c + 1 + PRESERVED_CYCLES`` (as in Emmy*). Intuitively,
-the active stake is set to 10 times the delegate's chosen frozen
+the end of cycle ``c`` for cycle ``c + 1 + PRESERVED_CYCLES`` (as in Emmy*),
+before updating the delegates' :ref:`activity status<active_delegate_alpha>`.
+
+..
+   This entails that a delegate which was participating until cycle ``c -
+   1`` and is no longer participating in cycle ``c`,
+   will lose its rights from cycle
+   ``c + 2 * PRESERVED_CYCLES + 2`` onwards -- at the end of cycle ``c +
+   PRESERVED_CYCLES``, the rights for cycle ``c + 2 *
+   PRESERVED_CYCLES + 1`` are computed, and only then is the delegate
+   declared passive. Here "participation" means *having baked a final
+   block* or *having a preendorsement or endorsement included in a final
+   block*.
+
+Intuitively, the active stake is set to 10 times the delegate's chosen frozen
 deposit limit, without going beyond its available staking balance,
 nor its maximum staking capacity (determined by its full balance).
 More precisely, the active stake is the minimum between:
