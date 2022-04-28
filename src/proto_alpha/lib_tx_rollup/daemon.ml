@@ -680,6 +680,71 @@ let process_head state (current_hash, current_header) rollup_id =
   let*! () = trigger_injection state current_header in
   return_unit
 
+let catch_up_on_commitments state =
+  let open Lwt_result_syntax in
+  let*! () = Event.(emit catch_up_commitments) () in
+  let head = State.get_head state in
+  let* proto_rollup_state =
+    Protocol.Tx_rollup_services.state
+      state.State.cctxt
+      (state.State.cctxt#chain, `Head 0)
+      state.State.rollup_info.rollup_id
+  and* tezos_head =
+    Shell_services.Blocks.Header.shell_header
+      state.State.cctxt
+      ~chain:state.State.cctxt#chain
+      ~block:(`Head 0)
+      ()
+  in
+  (* TODO/TORU: https://gitlab.com/tezos/tezos/-/issues/2957
+     We have to serialize the state to access the required information *)
+  let proto_rollup_state =
+    let open Data_encoding.Binary in
+    to_bytes_exn Tx_rollup_state.encoding proto_rollup_state
+    |> of_bytes_exn Tx_rollup_state_repr.encoding
+  in
+  let next_commitment_level =
+    match
+      Tx_rollup_state_repr.next_commitment_level
+        proto_rollup_state
+        (* Next commitment will be included in next block *)
+        Raw_level_repr.(succ @@ of_int32_exn tezos_head.level)
+    with
+    | Ok l -> Some l
+    | Error _ ->
+        (* TODO/TORU: https://gitlab.com/tezos/tezos/-/issues/2957
+           We assume the error is Tx_rollup_errors.No_uncommitted_inbox as we
+           cannot match on it. *)
+        None
+  in
+  match next_commitment_level with
+  | None -> return_unit
+  | Some next_commitment_level ->
+      let rec missing_commitments to_commit block_hash =
+        let open Lwt_syntax in
+        let* b = State.get_block state block_hash in
+        match b with
+        | None -> return to_commit
+        | Some {header = {level = Genesis; _}; _} ->
+            (* No commitments for genesis block *)
+            return to_commit
+        | Some ({header = {level = Rollup_level level; _}; _} as block) ->
+            if
+              Tx_rollup_level.to_int32 level
+              < Tx_rollup_level_repr.to_int32 next_commitment_level
+            then
+              (* We have iterated over all missing commitments *)
+              return to_commit
+            else
+              missing_commitments (block :: to_commit) block.header.predecessor
+      in
+      let*! to_commit = missing_commitments [] head.hash in
+      List.iter_es (commit_block_on_l1 state) to_commit
+
+let catch_up state = catch_up_on_commitments state
+(* TODO/TORU: https://gitlab.com/tezos/tezos/-/issues/2958
+   We may also need to catch up on finalization/removal of commitments here. *)
+
 let main_exit_callback state exit_status =
   let open Lwt_syntax in
   let* () = Stores.close state.State.stores in
@@ -760,6 +825,7 @@ let run configuration cctxt =
     Lwt_exit.register_clean_up_callback ~loc:__LOC__ (main_exit_callback state)
   in
   let*! () = Event.(emit node_is_ready) () in
+  let* () = catch_up state in
   let rec loop () =
     let* () =
       Lwt.catch
