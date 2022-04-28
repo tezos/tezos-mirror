@@ -293,12 +293,9 @@ let inbox_testable = Alcotest.testable Tx_rollup_inbox.pp Tx_rollup_inbox.( = )
 
 let rng_state = Random.State.make_self_init ()
 
-let gen_l2_account ?(rng_state = rng_state) () =
-  let seed =
-    Bytes.init 32 (fun _ -> char_of_int @@ Random.State.int rng_state 255)
-  in
-  let secret_key = Bls12_381.Signature.generate_sk seed in
-  let public_key = Bls12_381.Signature.MinPk.derive_pk secret_key in
+let gen_l2_account () =
+  (* TODO: when add bls into env6 we could use directly the pkh *)
+  let (_pkh, public_key, secret_key) = Bls.generate_key () in
   (secret_key, public_key, Tx_rollup_l2_address.of_bls_pk public_key)
 
 (** [make_ticket_key ty contents ticketer tx_rollup] computes the ticket hash
@@ -328,8 +325,6 @@ let make_unit_ticket_key ctxt ~ticketer tx_rollup =
   let ty = Prim (0, T_unit, [], []) in
   let contents = Prim (0, D_Unit, [], []) in
   make_ticket_key ctxt ~ty ~contents ~ticketer tx_rollup
-
-let rng_state = Random.State.make_self_init ()
 
 let print_deposit_arg tx_rollup account =
   let open Alpha_context.Script in
@@ -3417,7 +3412,6 @@ module Rejection = struct
       Tezos operation even in the worst cases.
   *)
   let test_rejection_size_limit () =
-    let rng_state = Random.State.make [|42|] in
     context_init1 () >>=? fun (b, account) ->
     originate b account >>=? fun (b, tx_rollup) ->
     Context.get_constants (B b) >>=? fun constant ->
@@ -3430,8 +3424,7 @@ module Rejection = struct
        we add in the context, bigger the proofs becomes. It needs to be adjusted
        so the following [message2] in this context produces a proof that
        is larger to 30Kb. *)
-    List.init ~when_negative_length:[] 200 (fun _ ->
-        gen_l2_account ~rng_state ())
+    List.init ~when_negative_length:[] 200 (fun _ -> gen_l2_account ())
     >>?= fun l2_accounts ->
     (* The context is filled with the generated l2 accounts. *)
     fill_store store l2_accounts >>= fun store ->
@@ -3447,7 +3440,7 @@ module Rejection = struct
     in
     (* Then, we build a real message which is close to the maximum message size
        limit and produces a proof also close to the maximum proof size limit. *)
-    let (_sk, _pk, addr) = gen_l2_account ~rng_state () in
+    let (_sk, _pk, addr) = gen_l2_account () in
     let (signers, transfers) =
       List.map
         (fun (sk, pk, _) ->

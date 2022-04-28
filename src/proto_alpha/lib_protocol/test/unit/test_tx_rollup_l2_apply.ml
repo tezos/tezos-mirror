@@ -84,7 +84,7 @@ let expect_error_status ~msg error status cont =
 
 let aggregate_signature_exn : signature list -> signature =
  fun signatures ->
-  match Bls12_381.Signature.MinPk.aggregate_signature_opt signatures with
+  match Bls.aggregate_signature_opt signatures with
   | Some res -> res
   | None -> raise (Invalid_argument "aggregate_signature_exn")
 
@@ -125,9 +125,10 @@ let pp_metadata fmt Tx_rollup_l2_context_sig.{counter; public_key} =
   let counter = Int64.to_int counter in
   Format.fprintf
     fmt
-    "{counter=%d; public_key=%s}"
+    "{counter=%d; public_key=%a}"
     counter
-    (Environment.Bls_signature.pk_to_bytes public_key |> Bytes.to_string)
+    Bls.Public_key.pp
+    public_key
 
 let eq_metadata = Alcotest.of_pp pp_metadata
 
@@ -282,12 +283,8 @@ let batch_from_transfers inputs =
       (fun all_sks input ->
         List.fold_left
           (fun acc (sk, _, _, _, _, _) ->
-            let equal x y =
-              Bytes.equal
-                (Bls12_381.Signature.sk_to_bytes x)
-                (Bls12_381.Signature.sk_to_bytes y)
-            in
-            if List.mem ~equal sk acc then acc else sk :: acc)
+            if List.mem ~equal:Bls.Secret_key.equal sk acc then acc
+            else sk :: acc)
           []
           input
         :: all_sks)
