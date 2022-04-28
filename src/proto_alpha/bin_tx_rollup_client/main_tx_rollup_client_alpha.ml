@@ -27,8 +27,13 @@ let executable_name = Filename.basename Sys.executable_name
 
 let argv () = Array.to_list Sys.argv |> List.tl |> Stdlib.Option.get
 
+let register_signers () =
+  Tezos_client_base.Client_keys.register_aggregate_signer
+    (module Tezos_signer_backends.Unencrypted.Aggregate)
+
 let main () =
   Configuration.parse (argv ()) >>=? fun (configuration, argv) ->
+  register_signers () ;
   let cctxt = Configuration.make_unix_client_context configuration in
   Clic.dispatch (Commands.all ()) cctxt argv
 
