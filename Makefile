@@ -77,16 +77,17 @@ build-parameters:
 	@dune build --profile=$(PROFILE) $(COVERAGE_OPTIONS) @copy-parameters
 
 .PHONY: $(TEZOS_BIN)
-$(TEZOS_BIN): generate_dune
+$(TEZOS_BIN):
 	dune build $(COVERAGE_OPTIONS) --profile=$(PROFILE) _build/install/default/bin/$@
 	cp -f _build/install/default/bin/$@ ./
 
 .PHONY: $(UNRELEASED_TEZOS_BIN)
-$(UNRELEASED_TEZOS_BIN): generate_dune
+$(UNRELEASED_TEZOS_BIN):
 	@dune build $(COVERAGE_OPTIONS) --profile=$(PROFILE) _build/install/default/bin/$@
 	@cp -f _build/install/default/bin/$@ ./
 
-build: generate_dune
+.PHONY: build
+build:
 ifneq (${current_ocaml_version},${ocaml_version})
 	$(error Unexpected ocaml version (found: ${current_ocaml_version}, expected: ${ocaml_version}))
 endif
@@ -99,12 +100,8 @@ endif
 TEZOS_PROTOCOL_FILES=$(wildcard src/proto_*/lib_protocol/TEZOS_PROTOCOL)
 PROTOCOLS=$(patsubst %/lib_protocol/TEZOS_PROTOCOL,%,${TEZOS_PROTOCOL_FILES})
 
-.PHONY: generate_dune
-generate_dune:
-	@make -C manifest
-
 .PHONY: all.pkg
-all.pkg: generate_dune
+all.pkg:
 	@dune build --profile=$(PROFILE) \
 	    $(patsubst %.opam,%.install, $(shell find src vendors -name \*.opam -print))
 
