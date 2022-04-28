@@ -1373,6 +1373,8 @@ type release = {version : string; url : Opam.url}
 (*                                GENERATOR                                  *)
 (*****************************************************************************)
 
+let checks_done = ref false
+
 (* Gather the list of generated files so that we can find out whether
    there are other files that we should have generated. *)
 let generated_files = ref String_set.empty
@@ -1385,7 +1387,9 @@ let rec create_parent path =
 
 (* Write a file relatively to the root directory of the repository. *)
 let write filename f =
-  let filename =
+  if !checks_done then
+    failwith ("trying to generate " ^ filename ^ " after [check] was run") ;
+  let real_filename =
     if Filename.is_relative filename then Filename.parent_dir_name // filename
     else filename
   in
@@ -1393,8 +1397,8 @@ let write filename f =
     failwith
       (filename ^ " is generated twice; did you declare the same library twice?") ;
   generated_files := String_set.add filename !generated_files ;
-  create_parent filename ;
-  let outch = open_out filename in
+  create_parent real_filename ;
+  let outch = open_out real_filename in
   let fmt = Format.formatter_of_out_channel outch in
   match f fmt with
   | exception exn ->
@@ -1933,7 +1937,7 @@ let dune_lang_version = "2.9"
 let generate_dune_project_files () =
   let t = Hashtbl.create 17 in
   (* Add a dune project at the root *)
-  Hashtbl.replace t "./" false ;
+  Hashtbl.replace t "" false ;
   (* And one next to every opam files.
      Dune only understand dune files at the root of a dune project. *)
   Target.iter_internal_by_opam (fun package _internals ->
@@ -2050,34 +2054,50 @@ let generate_workspace env dune =
   Format.fprintf fmt "; Edit file manifest/manifest.ml instead.@."
 
 let check_for_non_generated_files ?(exclude = fun _ -> false) () =
-  let rec find_opam_and_dune_files acc dir =
-    let dir_contents = Sys.readdir dir in
+  let rec find_opam_and_dune_files prefix acc dir =
+    let dir_contents = Sys.readdir (prefix // dir) in
     let add_item acc filename =
       let full_filename = dir // filename in
-      if try Sys.is_directory full_filename with Sys_error _ -> false then
-        find_opam_and_dune_files acc full_filename
-      else if
+      if
         filename = "dune"
         || Filename.extension filename = ".opam"
         || filename = "dune-project"
+        || filename = "dune-workspace"
       then String_set.add full_filename acc
+      else if filename.[0] = '.' || filename.[0] = '_' then acc
+      else if
+        try Sys.is_directory (prefix // dir // filename)
+        with Sys_error _ -> false
+      then find_opam_and_dune_files prefix acc full_filename
       else acc
     in
     Array.fold_left add_item acc dir_contents
   in
-  let all_files = find_opam_and_dune_files String_set.empty "../src" in
-  let diff = String_set.diff all_files !generated_files in
-  let error = ref false in
-  let ignore_or_fail filename =
-    if not (exclude filename) then (
-      Printf.eprintf "Error: %s: exists but was not generated\n%!" filename ;
-      error := true)
+  let all_files = find_opam_and_dune_files ".." String_set.empty "" in
+
+  let all_non_excluded_files =
+    String_set.filter (fun x -> not (exclude x)) all_files
   in
-  String_set.iter ignore_or_fail diff ;
-  if !error then (
+  let error_generated_and_excluded =
+    String_set.filter exclude !generated_files
+  in
+  String_set.iter
+    (Printf.eprintf "Error: %s: generated but is excluded\n%!")
+    error_generated_and_excluded ;
+  let error_not_generated =
+    String_set.diff all_non_excluded_files !generated_files
+  in
+  String_set.iter
+    (Printf.eprintf "Error: %s: exists but was not generated\n%!")
+    error_not_generated ;
+  if
+    not
+      (String_set.is_empty error_not_generated
+      && String_set.is_empty error_generated_and_excluded)
+  then (
     prerr_endline
-      "Please modify manifest/main.ml to generate the above file(s)\n\
-       or declare them in the 'exclude' function." ;
+      "Please modify manifest/main.ml to either generate the above file(s)\n\
+       or declare them in the 'exclude' function (but not both)." ;
     exit 1)
 
 let check_js_of_ocaml () =
@@ -2186,16 +2206,26 @@ let (packages_dir, release) =
   in
   (!packages_dir, release)
 
-let generate ?exclude () =
+let generate () =
   Printexc.record_backtrace true ;
   try
     generate_dune_files () ;
     generate_opam_files () ;
     generate_dune_project_files () ;
     generate_package_json_file () ;
-    check_for_non_generated_files ?exclude () ;
-    check_js_of_ocaml () ;
     Option.iter (generate_opam_files_for_release packages_dir) release
+  with exn ->
+    Printexc.print_backtrace stderr ;
+    prerr_endline ("Error: " ^ Printexc.to_string exn) ;
+    exit 1
+
+let check ?exclude () =
+  if !checks_done then failwith "Cannot run check twice" ;
+  checks_done := true ;
+  Printexc.record_backtrace true ;
+  try
+    check_for_non_generated_files ?exclude () ;
+    check_js_of_ocaml ()
   with exn ->
     Printexc.print_backtrace stderr ;
     prerr_endline ("Error: " ^ Printexc.to_string exn) ;

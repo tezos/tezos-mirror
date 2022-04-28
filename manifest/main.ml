@@ -4257,37 +4257,39 @@ let _tezos_tps_evaluation =
     ~static:false
     ~release:false
 
-(* For now we don't generate:
-   - lib_protocol files (that's a TODO);
-   - proto_/parameters/dune (it only has a (copy_files) stanza);
-   - lib_time_measurement (its dune structure is *very* specific);
-   - src/lib_protocol_compiler/test/dune (it does not define any library,
-     executable or test stanza, it only defines aliases).
-
-   Note that [filename] is relative to the manifest directory,
-   i.e. it starts with "../". *)
+(* For now we don't generate the following *)
 let exclude filename =
-  let is_in_lib_protocol =
-    match String.split_on_char '/' filename with
-    | ".." :: "src" :: maybe_proto :: "lib_protocol" :: _ ->
-        has_prefix ~prefix:"proto_" maybe_proto
-    | _ -> false
-  in
-  let is_protocol_parameters =
-    match String.split_on_char '/' filename with
-    | ".." :: "src" :: maybe_proto :: "parameters" :: _ ->
-        has_prefix ~prefix:"proto_" maybe_proto
-    | _ -> false
-  in
-  is_in_lib_protocol || is_protocol_parameters
-  || has_prefix ~prefix:"../src/lib_time_measurement/" filename
-  ||
-  match filename with
-  | "../src/lib_protocol_compiler/test/dune" -> true
+  let is_proto_ name = has_prefix ~prefix:"proto_" name in
+  match String.split_on_char '/' filename with
+  (* lib_protocol files (that's a TODO). *)
+  | "src" :: maybe_proto :: "lib_protocol" :: _ when is_proto_ maybe_proto ->
+      true
+  (* proto_/parameters/dune (it only has a (copy_files) stanza). *)
+  | "src" :: maybe_proto :: "parameters" :: _ when is_proto_ maybe_proto -> true
+  (* lib_time_measurement (its dune structure is *very* specific). *)
+  | "src" :: "lib_time_measurement" :: _ -> true
+  (* src/lib_protocol_compiler/test/dune (it does not define any library,
+     executable or test stanza, it only defines aliases). *)
+  | ["src"; "lib_protocol_compiler"; "test"; "dune"] -> true
+  (* We don't generate the toplevel dune file. *)
+  | ["dune"] -> true
+  (* ignore the following directories: *)
+  | "vendors" :: _ -> true
+  | "scripts" :: _ -> true
+  | "docs" :: _ -> true
+  | "devtools" :: _ -> true
+  (* tezt is partially managed by the manifest. *)
+  | "tezt" :: "long_tests" :: _ -> true
+  | "tezt" :: "manual_tests" :: _ -> true
+  | "tezt" :: "records" :: _ -> true
+  | "tezt" :: "remote_tests" :: _ -> true
+  | "tezt" :: "snoop" :: _ -> true
+  | "tezt" :: "tests" :: _ -> true
+  | "tezt" :: "vesting_contract_test" :: _ -> true
   | _ -> false
 
 (* Generate dune and opam files. *)
-let () = generate ~exclude ()
+let () = generate ()
 
 (* Generate a dunw-workspace file at the root of the repo *)
 let () =
@@ -4311,12 +4313,13 @@ let () =
 
 (* Generate active_protocol_versions. *)
 let () =
-  let ch = open_out "../active_protocol_versions" in
-  Fun.protect ~finally:(fun () -> close_out ch) @@ fun () ->
-  let write_protocol protocol =
+  let write_protocol fmt protocol =
     match Protocol.number protocol with
-    | Alpha -> Printf.fprintf ch "%s\n" (Protocol.name protocol)
-    | V number -> Printf.fprintf ch "%03d-%s\n" number (Protocol.name protocol)
+    | Alpha -> Format.fprintf fmt "%s\n" (Protocol.name protocol)
+    | V number -> Format.fprintf fmt "%03d-%s\n" number (Protocol.name protocol)
     | Other -> ()
   in
-  List.iter write_protocol Protocol.active
+  write "active_protocol_versions" @@ fun fmt ->
+  List.iter (write_protocol fmt) Protocol.active
+
+let () = check ~exclude ()
