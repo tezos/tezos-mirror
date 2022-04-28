@@ -422,8 +422,8 @@ let craft_tx_transaction () =
       let op = craft_tx ~counter ~signer ~destination ~ticket_hash ~qty in
       let json =
         Data_encoding.Json.construct
-          (Data_encoding.list Tx_rollup_l2_batch.V1.transaction_encoding)
-          [[op]]
+          Tx_rollup_l2_batch.V1.transaction_encoding
+          [op]
       in
       cctxt#message "@[%a@]" Data_encoding.Json.pp json >>= fun () ->
       return_unit)
