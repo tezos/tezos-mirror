@@ -105,9 +105,9 @@ val wait_for_full :
       look like. *)
 val wait_for : ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
 
-(** Connected to a tezos node.
+(** Write the configuration file for a rollup node.
     Returns the name of the configuration file. *)
-val config_init : t -> string -> string -> string Lwt.t
+val config_init : t -> string Lwt.t
 
 (** [run node] launches the given transaction rollup node. *)
 val run : t -> unit Lwt.t

@@ -203,9 +203,7 @@ let test_node_configuration =
           client
           node
       in
-      let* filename =
-        Rollup_node.config_init tx_rollup_node tx_rollup_hash block_hash
-      in
+      let* filename = Rollup_node.config_init tx_rollup_node in
       Log.info "Tx_rollup configuration file was successfully created" ;
       let () =
         let open Ezjsonm in
@@ -243,7 +241,7 @@ let init_and_run_rollup_node ~originator ?operator ?batch_signer
       client
       node
   in
-  let* _ = Rollup_node.config_init tx_node tx_rollup_hash block_hash in
+  let* _ = Rollup_node.config_init tx_node in
   let* () = Rollup_node.run tx_node in
   Log.info "Tx_rollup node is now running" ;
   let* () = Rollup_node.wait_for_ready tx_node in
@@ -321,7 +319,7 @@ let test_tx_node_store_inbox =
           client
           node
       in
-      let* _ = Rollup_node.config_init tx_node rollup block_hash in
+      let* _ = Rollup_node.config_init tx_node in
       let* () = Rollup_node.run tx_node in
       let tx_client =
         Tx_rollup_client.create ~wallet_dir:(Client.base_dir client) tx_node
