@@ -76,7 +76,7 @@ let process_head node_ctxt store head_state =
       let* () = Inbox.process_head node_ctxt store head in
       (* Avoid storing and publishing commitments if the head is not final *)
       (* Avoid triggering the pvm execution if this has been done before for this head *)
-      Interpreter.Arith.process_head store head
+      Interpreter.Arith.process_head node_ctxt store head
   in
   let* () =
     if finalized then
@@ -90,16 +90,16 @@ let process_head node_ctxt store head_state =
 
 (* [on_layer_1_chain_event node_ctxt store chain_event old_heads] processes a
    list of heads, coming from either a list of [old_heads] or from the current
-   [chain_event]. [old_heads] is the list of heads returned by the previous 
+   [chain_event]. [old_heads] is the list of heads returned by the previous
    iteration of [on_layer_1_chain_event] in the [daemonize function]. These are
-   heads included in the branch currently tracked by the rollup node, and that 
-   have only been partially processed, due to the rollup  node not being able 
-   to establish their finality. The function returns a list of heads from the 
-   current branch tracked by the rollup node, whose finality cannot be 
-   established at the time the function is invoked. Those heads will be 
-   processed again at the next iteration of [on_layer_1_chain_event] in the 
+   heads included in the branch currently tracked by the rollup node, and that
+   have only been partially processed, due to the rollup  node not being able
+   to establish their finality. The function returns a list of heads from the
+   current branch tracked by the rollup node, whose finality cannot be
+   established at the time the function is invoked. Those heads will be
+   processed again at the next iteration of [on_layer_1_chain_event] in the
    [daemonize] function. If [chain_event] is a rollback event, then no head
-   needs to be returned to be included as the rollup node started tracking a 
+   needs to be returned to be included as the rollup node started tracking a
    new branch.
  *)
 let on_layer_1_chain_event node_ctxt store chain_event old_heads =

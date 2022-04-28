@@ -2917,6 +2917,13 @@ module RPC = struct
           ~output:(obj1 (opt "kind" Sc_rollup.Kind.encoding))
           RPC_path.(path /: Sc_rollup.Address.rpc_arg / "kind")
 
+      let boot_sector =
+        RPC_service.get_service
+          ~description:"Boot sector of smart-contract rollup"
+          ~query:RPC_query.empty
+          ~output:Data_encoding.string
+          RPC_path.(path /: Sc_rollup.Address.rpc_arg / "boot_sector")
+
       let inbox =
         RPC_service.get_service
           ~description:"Inbox for a smart-contract rollup"
@@ -2960,6 +2967,11 @@ module RPC = struct
       @@ fun ctxt address () () ->
       Alpha_context.Sc_rollup.initial_level ctxt address
 
+    let register_boot_sector () =
+      Registration.register1 ~chunked:true S.boot_sector
+      @@ fun ctxt address () () ->
+      Alpha_context.Sc_rollup.get_boot_sector ctxt address
+
     let register_root () =
       Registration.register0 ~chunked:true S.root (fun context () () ->
           Sc_rollup.list context)
@@ -2968,12 +2980,16 @@ module RPC = struct
       register_kind () ;
       register_inbox () ;
       register_initial_level () ;
+      register_boot_sector () ;
       register_root ()
 
     let list ctxt block = RPC_context.make_call0 S.root ctxt block () ()
 
     let initial_level ctxt block sc_rollup_address =
       RPC_context.make_call1 S.initial_level ctxt block sc_rollup_address () ()
+
+    let boot_sector ctxt block sc_rollup_address =
+      RPC_context.make_call1 S.boot_sector ctxt block sc_rollup_address () ()
   end
 
   module Forge = struct

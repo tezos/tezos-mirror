@@ -101,19 +101,7 @@ let with_fresh_rollup f tezos_node tezos_client bootstrap1_key =
   let* () = Client.bake_for tezos_client in
   f rollup_address sc_rollup_node configuration_filename
 
-let with_fresh_rollups n f node client bootstrap1 =
-  let rec go n addrs k =
-    if n < 1 then k addrs
-    else
-      with_fresh_rollup
-        (fun addr _ _ -> go (n - 1) (String_set.add addr addrs) k)
-        node
-        client
-        bootstrap1
-  in
-  go n String_set.empty f
-
-(* TODO: create and insert issue number. Many tests 
+(* TODO: create and insert issue number. Many tests
 can be refactored using test_scenario.*)
 let test_scenario {output_file_prefix; variant; tags; description} scenario =
   let output_file _ = output_file_prefix ^ "_" ^ variant in
@@ -177,6 +165,37 @@ let test_origination =
    A rollup node has a configuration file that must be initialized.
 
 *)
+let with_fresh_rollup ?(boot_sector = "") f tezos_node tezos_client
+    bootstrap1_key =
+  let* rollup_address =
+    Client.Sc_rollup.originate
+      ~hooks
+      ~burn_cap:Tez.(of_int 9999999)
+      ~src:bootstrap1_key
+      ~kind:"arith"
+      ~boot_sector
+      tezos_client
+  in
+  let sc_rollup_node =
+    Sc_rollup_node.create tezos_node tezos_client ~operator_pkh:bootstrap1_key
+  in
+  let* configuration_filename =
+    Sc_rollup_node.config_init sc_rollup_node rollup_address
+  in
+  let* () = Client.bake_for tezos_client in
+  f rollup_address sc_rollup_node configuration_filename
+
+let with_fresh_rollups n f node client bootstrap1 =
+  let rec go n addrs k =
+    if n < 1 then k addrs
+    else
+      with_fresh_rollup
+        (fun addr _ _ -> go (n - 1) (String_set.add addr addrs) k)
+        node
+        client
+        bootstrap1
+  in
+  go n String_set.empty f
 
 let test_rollup_node_configuration =
   let output_file _ = "sc_rollup_node_configuration" in
@@ -833,11 +852,11 @@ let test_rollup_node_advances_pvm_state =
 (* Ensure that commitments are stored and published properly.
    ----------------------------------------------------------
 
-   Every 20 level, a commitment is computed and stored by the 
-   rollup node. The rollup node will also publish previously 
-   computed commitments on the layer1, in a first in first out 
-   fashion. To ensure that commitments are robust to chain 
-   reorganisations, only finalized block are processed when 
+   Every 20 level, a commitment is computed and stored by the
+   rollup node. The rollup node will also publish previously
+   computed commitments on the layer1, in a first in first out
+   fashion. To ensure that commitments are robust to chain
+   reorganisations, only finalized block are processed when
    trying to publish a commitment.
 *)
 
@@ -1186,6 +1205,93 @@ let commitments_reorgs protocol sc_rollup_node sc_rollup_address node client =
          Option.map (fun c2 -> (c1, c2)) stored_commitment) ;
   Lwt.return_unit
 
+(* Check that the SC rollup is correctly originated with a boot sector.
+   -------------------------------------------------------
+
+   Originate a rollup with a custom boot sector and check if the RPC returns it.
+
+*)
+let test_rollup_origination_boot_sector =
+  let boot_sector = "10 10 10 + +" in
+
+  let go client sc_rollup_address =
+    let* client_boot_sector =
+      RPC.Sc_rollup.get_boot_sector ~hooks ~sc_rollup_address client
+    in
+    let client_boot_sector = JSON.as_string client_boot_sector in
+    Check.(boot_sector = client_boot_sector)
+      Check.string
+      ~error_msg:"expected value %L, got %R" ;
+    Lwt.return_unit
+  in
+
+  let output_file _ = "sc_rollup_origination_bootsector" in
+  test
+    ~__FILE__
+    ~output_file
+    ~tags:["run"]
+    "originate with boot sector"
+    (fun protocol ->
+      setup ~protocol @@ fun node client ->
+      with_fresh_rollup
+        ~boot_sector
+        (fun sc_rollup_address _sc_rollup_node _filename ->
+          go client sc_rollup_address)
+        node
+        client)
+
+(* Check that a node makes use of the boot sector.
+   -------------------------------------------------------
+
+   Originate 2 rollups with different boot sectors to check if the are
+   actually different.
+
+*)
+let test_rollup_node_uses_boot_sector =
+  let go_boot client sc_rollup_address sc_rollup_node =
+    let* init_level =
+      RPC.Sc_rollup.get_initial_level ~hooks ~sc_rollup_address client
+    in
+    let init_level = init_level |> JSON.as_int in
+
+    let* () = Sc_rollup_node.run sc_rollup_node in
+
+    let sc_rollup_client = Sc_rollup_client.create sc_rollup_node in
+    let* level = Sc_rollup_node.wait_for_level sc_rollup_node init_level in
+
+    let* () = send_text_messages client sc_rollup_address ["10 +"] in
+    let* _ = Sc_rollup_node.wait_for_level sc_rollup_node (level + 1) in
+
+    Sc_rollup_client.state_hash ~hooks sc_rollup_client
+  in
+
+  let with_booted ~boot_sector node client =
+    with_fresh_rollup
+      ~boot_sector
+      (fun sc_rollup_address sc_rollup_node _filename ->
+        go_boot client sc_rollup_address sc_rollup_node)
+      node
+      client
+  in
+
+  let output_file _ = "sc_rollup_node_uses_boot_sector" in
+  test
+    ~__FILE__
+    ~output_file
+    ~tags:["run"; "node"]
+    "ensure boot sector is used"
+    (fun protocol ->
+      setup ~protocol @@ fun node client x ->
+      let* state_hash1 =
+        with_booted ~boot_sector:"10 10 10 + +" node client x
+      in
+      let* state_hash2 = with_booted ~boot_sector:"31" node client x in
+      Check.(state_hash1 <> state_hash2)
+        Check.string
+        ~error_msg:"State hashes should be different! (%L, %R)" ;
+
+      Lwt.return_unit)
+
 let register ~protocols =
   test_origination protocols ;
   test_rollup_node_configuration protocols ;
@@ -1212,4 +1318,6 @@ let register ~protocols =
     commitment_not_stored_if_non_final
     protocols ;
   test_commitment_scenario "messages_reset" commitments_messages_reset protocols ;
-  test_commitment_scenario "handles_chain_reorgs" commitments_reorgs protocols
+  test_commitment_scenario "handles_chain_reorgs" commitments_reorgs protocols ;
+  test_rollup_origination_boot_sector protocols ;
+  test_rollup_node_uses_boot_sector protocols

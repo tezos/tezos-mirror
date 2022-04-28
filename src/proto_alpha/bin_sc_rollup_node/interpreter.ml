@@ -28,12 +28,11 @@ open Alpha_context
 module Inbox = Store.Inbox
 
 module type S = sig
-  (** [process_head store head] interprets the messages associated with a [head] 
-      from a chain [event]. This requires the inbox to be updated beforehand. *)
-
-  val process_head : Store.t -> Layer1.head -> unit tzresult Lwt.t
-
-  (** [start store] sets up the initial state for the PVM interpreter to work. *)
+  (** [process_head node_ctxt store head] interprets the messages associated
+      with a [head] from a chain [event]. This requires the inbox to be updated
+      beforehand. *)
+  val process_head :
+    Node_context.t -> Store.t -> Layer1.head -> unit tzresult Lwt.t
 end
 
 module Make (PVM : Pvm.S) : S = struct
@@ -62,25 +61,31 @@ module Make (PVM : Pvm.S) : S = struct
     let* state = eval_until_input state in
     return state
 
-  (** [transition_pvm store predecessor_hash hash] runs a PVM at the previous state from block
+  (** [transition_pvm node_ctxt store predecessor_hash hash] runs a PVM at the previous state from block
       [predecessor_hash] by consuming as many messages as possible from block [hash]. *)
-  let transition_pvm store predecessor_hash hash =
+  let transition_pvm node_ctxt store predecessor_hash hash =
+    let open Node_context in
     let open Lwt_result_syntax in
     (* Retrieve the previous PVM state from store. *)
     let*! predecessor_state = Store.PVMState.find store predecessor_hash in
-    let*! predecessor_state =
+    let* predecessor_state =
       match predecessor_state with
       | None ->
-          (* The predecessor is before the origination. *)
-          PVM.initial_state
-            store
-            (* TODO: #2722
-               This initial state is a stub. We must figure out the bootsector (part of the
-               origination message for a SC rollup) first - only then can the initial state be
-               constructed.
-            *)
-            ""
-      | Some predecessor_state -> Lwt.return predecessor_state
+          (* The predecessor is before the origination.
+             Here we use an RPC to get the boot sector instead of doing this
+             before and packing it into the [node_ctxt] because the bootsector
+             might be very large and we don't want to keep that in memory for
+             ever.
+          *)
+          let* boot_sector =
+            Plugin.RPC.Sc_rollup.boot_sector
+              node_ctxt.cctxt
+              (node_ctxt.cctxt#chain, node_ctxt.cctxt#block)
+              node_ctxt.rollup_address
+          in
+          let*! initial_state = PVM.initial_state store boot_sector in
+          return initial_state
+      | Some predecessor_state -> return predecessor_state
     in
 
     (* Obtain inbox and its messages for this block. *)
@@ -122,11 +127,11 @@ module Make (PVM : Pvm.S) : S = struct
 
     return_unit
 
-  (** [process_head store head] runs the PVM for the given head. *)
-  let process_head store (Layer1.Head {hash; _} as head) =
+  (** [process_head node_ctxt store head] runs the PVM for the given head. *)
+  let process_head node_ctxt store (Layer1.Head {hash; _} as head) =
     let open Lwt_result_syntax in
     let*! predecessor_hash = Layer1.predecessor store head in
-    transition_pvm store predecessor_hash hash
+    transition_pvm node_ctxt store predecessor_hash hash
 end
 
 module Arith = Make (Arith_pvm)
