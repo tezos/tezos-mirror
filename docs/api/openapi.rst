@@ -62,6 +62,19 @@ and specific to the Ithaca protocol can be found at:
 
 - `ithaca-mempool-openapi.json (version 12.0~rc2) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/ithaca-mempool-openapi.json>`_
 
+Jakarta RPCs
+------------
+
+The OpenAPI specification for RPCs which are specific to the Jakarta (``PtJakart``)
+protocol can be found at:
+
+- `jakarta-openapi.json (version 13.0~rc1) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/jakarta-openapi.json>`_
+
+The OpenAPI specification for RPCs which are related to the mempool
+and specific to the Jakarta protocol can be found at:
+
+- `jakarta-mempool-openapi.json (version 13.0~rc1) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/jakarta-mempool-openapi.json>`_
+
 .. _openapi_generate:
 
 How to Generate
