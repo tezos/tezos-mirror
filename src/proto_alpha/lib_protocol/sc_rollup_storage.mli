@@ -141,6 +141,18 @@ type error +=
   | (* `Temporary *)
       Sc_rollup_bad_inbox_level
 
+(** Module [Internal] implements functions that are used only internally by
+    the [Sc_rollup_storage] module, but need to be exposed in tests or 
+    benchmarks. 
+  *)
+module Internal : sig
+  (** [update_num_and_size_of_messages ~num_messages ~total_messages_size 
+       message] returns the length and total messages size
+      [messages]. *)
+  val update_num_and_size_of_messages :
+    num_messages:int -> total_messages_size:int -> string -> int * int
+end
+
 (** [originate context ~kind ~boot_sector] produces an address [a] for
    a smart contract rollup using the origination nonce found in
    [context]. This function also initializes the storage with a new
