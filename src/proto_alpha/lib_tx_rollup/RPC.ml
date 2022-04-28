@@ -453,6 +453,15 @@ module Context_RPC = struct
       ~output:(Data_encoding.option bls_pk_encoding)
       RPC_path.(path / "addresses" /: Arg.address_indexable / "public_key")
 
+  let ticket =
+    RPC_service.get_service
+      ~description:
+        "Get a ticket from its hash (or index), or null if the ticket is not \
+         known by the rollup"
+      ~query:RPC_query.empty
+      ~output:Data_encoding.(option Ticket.encoding)
+      RPC_path.(path / "tickets" /: Arg.ticket_indexable)
+
   let get_index ?(check_index = false) (context : Context.t)
       (i : (_, _) Indexable.t) get count =
     match Indexable.destruct i with
@@ -536,6 +545,16 @@ module Context_RPC = struct
         match metadata with
         | None -> return_none
         | Some {public_key; _} -> return_some public_key)
+
+  let () =
+    register1 ticket @@ fun (c, ticket_id) () () ->
+    let open Lwt_result_syntax in
+    let* ticket_index = get_ticket_index c ticket_id in
+    match ticket_index with
+    | None -> return_none
+    | Some ticket_index ->
+        let*! ticket = Context.get_ticket c ticket_index in
+        return ticket
 
   let build_directory state =
     !directory

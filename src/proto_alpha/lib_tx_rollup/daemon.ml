@@ -31,6 +31,7 @@ open Protocol_client_context
 open Protocol
 open Alpha_context
 open Error
+module Ticket_hash_map = Map.Make (Ticket_hash)
 
 let parse_tx_rollup_l2_address :
     Script.node -> Protocol.Tx_rollup_l2_address.Indexable.value tzresult =
@@ -48,12 +49,28 @@ let parse_tx_rollup_l2_address :
   | Int (loc, _) | Prim (loc, _, _, _) | Seq (loc, _) ->
       error (Error.Tx_rollup_invalid_l2_address loc)
 
-let parse_tx_rollup_amount_l2_destination_parameters :
+let parse_ticketer : Script.node -> Contract.t tzresult =
+  let open Protocol in
+  let open Micheline in
+  function
+  | Bytes (_loc, bytes) (* As unparsed with [Optimized]. *) ->
+      Result.of_option
+        ~error:
+          [Environment.wrap_tzerror Tx_rollup_errors.Wrong_deposit_parameters]
+      @@ Data_encoding.Binary.of_bytes_opt Contract.encoding bytes
+  | String (_loc, str) (* As unparsed with [Readable]. *) ->
+      Environment.wrap_tzresult @@ Contract.of_b58check str
+  | Int _ | Prim _ | Seq _ ->
+      error (Environment.wrap_tzerror Tx_rollup_errors.Wrong_deposit_parameters)
+
+let parse_tx_rollup_deposit_parameters :
     Script.expr ->
-    (Protocol.Tx_rollup_l2_qty.t
+    (Ticket.t
+    * Protocol.Tx_rollup_l2_qty.t
     * Protocol.Script_typed_ir.tx_rollup_l2_address)
     tzresult =
  fun parameters ->
+  let open Result_syntax in
   let open Micheline in
   let open Protocol in
   (* /!\ This pattern matching needs to remain in sync with the deposit
@@ -70,22 +87,27 @@ let parse_tx_rollup_amount_l2_destination_parameters :
                 Prim
                   ( _,
                     D_Pair,
-                    [_ticketer; Prim (_, D_Pair, [_contents; amount], _)],
+                    [ticketer; Prim (_, D_Pair, [contents; amount], _)],
                     _ );
                 bls;
               ],
               _ );
-          _ty;
+          ty;
         ] ) ->
-      parse_tx_rollup_l2_address bls >>? fun destination ->
-      (match amount with
-      | Int (_, v) when Compare.Z.(Z.zero < v && v <= Z.of_int64 Int64.max_int)
-        ->
-          ok @@ Tx_rollup_l2_qty.of_int64_exn (Z.to_int64 v)
-      | Int (_, invalid_amount) ->
-          error (Error.Tx_rollup_invalid_ticket_amount invalid_amount)
-      | _expr -> error Error.Tx_rollup_invalid_deposit)
-      >|? fun amount -> (amount, destination)
+      let* destination = parse_tx_rollup_l2_address bls in
+      let* amount =
+        match amount with
+        | Int (_, v)
+          when Compare.Z.(Z.zero < v && v <= Z.of_int64 Int64.max_int) ->
+            ok @@ Tx_rollup_l2_qty.of_int64_exn (Z.to_int64 v)
+        | Int (_, invalid_amount) ->
+            error (Error.Tx_rollup_invalid_ticket_amount invalid_amount)
+        | _expr -> error Error.Tx_rollup_invalid_deposit
+      in
+      let* ticketer = parse_ticketer ticketer in
+      let ty = strip_locations ty in
+      let contents = strip_locations contents in
+      return (Ticket.{ticketer; ty; contents}, amount, destination)
   | _expr -> error Error.Tx_rollup_invalid_deposit
 
 let extract_messages_from_block block_info rollup_id =
@@ -100,16 +122,20 @@ let extract_messages_from_block block_info rollup_id =
       kind manager_operation ->
       kind manager_operation_result ->
       packed_internal_manager_operation_result list ->
-      Tx_rollup_message.t list * int ->
-      Tx_rollup_message.t list * int =
-   fun ~source op result internal_operation_results (messages, cumulated_size) ->
-    let message_and_size =
+      Tx_rollup_message.t list * int * Ticket.t Ticket_hash_map.t ->
+      Tx_rollup_message.t list * int * Ticket.t Ticket_hash_map.t =
+   fun ~source
+       op
+       result
+       internal_operation_results
+       (messages, cumulated_size, tickets) ->
+    let message_size_ticket =
       match (op, result) with
       | ( Tx_rollup_submit_batch {tx_rollup; content; burn_limit = _},
           Applied (Tx_rollup_submit_batch_result _) )
         when Tx_rollup.equal rollup_id tx_rollup ->
           (* Batch message *)
-          Some (Tx_rollup_message.make_batch content)
+          Some (Tx_rollup_message.make_batch content, None)
       | ( Transaction
             {amount = _; parameters; destination = Tx_rollup dst; entrypoint},
           Applied
@@ -120,20 +146,30 @@ let extract_messages_from_block block_info rollup_id =
           (* Deposit message *)
           Option.bind (Data_encoding.force_decode parameters)
           @@ fun parameters ->
-          parse_tx_rollup_amount_l2_destination_parameters parameters
+          parse_tx_rollup_deposit_parameters parameters
           |> Result.to_option
-          |> Option.map @@ fun (amount, destination) ->
-             Tx_rollup_message.make_deposit
-               source
-               destination
-               ticket_hash
-               amount
+          |> Option.map @@ fun (ticket, amount, destination) ->
+             let deposit =
+               Tx_rollup_message.make_deposit
+                 source
+                 destination
+                 ticket_hash
+                 amount
+             in
+             (deposit, Some (ticket_hash, ticket))
       | (_, _) -> None
     in
     let acc =
-      match message_and_size with
-      | None -> (messages, cumulated_size)
-      | Some (msg, size) -> (msg :: messages, cumulated_size + size)
+      match message_size_ticket with
+      | None -> (messages, cumulated_size, tickets)
+      | Some ((msg, size), new_ticket) ->
+          let tickets =
+            match new_ticket with
+            | None -> tickets
+            | Some (ticket_hash, ticket) ->
+                Ticket_hash_map.add ticket_hash ticket tickets
+          in
+          (msg :: messages, cumulated_size + size, tickets)
     in
     (* Add messages from internal operations *)
     List.fold_left
@@ -145,9 +181,9 @@ let extract_messages_from_block block_info rollup_id =
   in
   let rec get_related_messages :
       type kind.
-      Tx_rollup_message.t list * int ->
+      Tx_rollup_message.t list * int * Ticket.t Ticket_hash_map.t ->
       kind contents_and_result_list ->
-      Tx_rollup_message.t list * int =
+      Tx_rollup_message.t list * int * Ticket.t Ticket_hash_map.t =
    fun acc -> function
     | Single_and_result
         ( Manager_operation {operation; source; _},
@@ -192,13 +228,16 @@ let extract_messages_from_block block_info rollup_id =
         error (Tx_rollup_no_operation_metadata operation.hash)
   in
   match managed_operation with
-  | None -> ok ([], 0)
+  | None -> ok ([], 0, Ticket_hash_map.empty)
   | Some managed_operations ->
       let open Result_syntax in
-      let+ (rev_messages, cumulated_size) =
-        List.fold_left_e finalize_receipt ([], 0) managed_operations
+      let+ (rev_messages, cumulated_size, new_tickets) =
+        List.fold_left_e
+          finalize_receipt
+          ([], 0, Ticket_hash_map.empty)
+          managed_operations
       in
-      (List.rev rev_messages, cumulated_size)
+      (List.rev rev_messages, cumulated_size, new_tickets)
 
 let create_genesis_block state tezos_block =
   let open Lwt_syntax in
@@ -222,7 +261,7 @@ let process_messages_and_inboxes (state : State.t) ~(predecessor : L2block.t)
     ?predecessor_context block_info rollup_id =
   let open Lwt_result_syntax in
   let current_hash = block_info.Alpha_block_services.hash in
-  let*? (messages, cumulated_size) =
+  let*? (messages, cumulated_size, new_tickets) =
     extract_messages_from_block block_info rollup_id
   in
   let*! () = Event.(emit messages_application) (List.length messages) in
@@ -238,13 +277,31 @@ let process_messages_and_inboxes (state : State.t) ~(predecessor : L2block.t)
           state.constants.parametric.tx_rollup_max_withdrawals_per_batch;
       }
   in
+  let context = predecessor_context in
   let* (context, contents) =
     Interpreter.interpret_messages
-      predecessor_context
+      context
       parameters
       ~rejection_max_proof_size:
         state.constants.parametric.tx_rollup_rejection_max_proof_size
       messages
+  in
+  let* context =
+    Ticket_hash_map.fold_es
+      (fun ticket_hash ticket context ->
+        let* ticket_index = Context.Ticket_index.get context ticket_hash in
+        match ticket_index with
+        | None ->
+            (* Can only happen if the interpretation of the corresponding deposit
+               fails (with an overflow on amounts or indexes). *)
+            return context
+        | Some ticket_index ->
+            let*! context =
+              Context.register_ticket context ticket_index ticket
+            in
+            return context)
+      new_tickets
+      context
   in
   match contents with
   | None ->
