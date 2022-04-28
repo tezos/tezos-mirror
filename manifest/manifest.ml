@@ -1968,7 +1968,7 @@ let generate_opam_files () =
      but one can specify a custom .opam path too. *)
   Target.iter_internal_by_opam @@ fun package internals ->
   let opam = generate_opam package internals in
-  write (package ^ ".opam") @@ fun fmt ->
+  write ("opam/" ^ Filename.basename package ^ ".opam") @@ fun fmt ->
   Format.fprintf
     fmt
     "# This file was automatically generated, do not edit.@.# Edit file \
@@ -2003,17 +2003,14 @@ let generate_dune_project_files () =
         || List.exists (fun Target.{cram; _} -> cram) _internals
       in
       Hashtbl.replace t (Filename.dirname package) cram_enabled) ;
-  Hashtbl.iter
-    (fun path cram ->
-      write (Filename.concat path "dune-project") @@ fun fmt ->
-      Format.fprintf fmt "(lang dune %s)@." dune_lang_version ;
-      Format.fprintf fmt "(formatting (enabled_for ocaml))@." ;
-      if cram then Format.fprintf fmt "(cram enable)@." ;
-      Format.fprintf
-        fmt
-        "; This file was automatically generated, do not edit.@." ;
-      Format.fprintf fmt "; Edit file manifest/manifest.ml instead.@.")
-    t
+  write "dune-project" @@ fun fmt ->
+  Format.fprintf fmt "(lang dune %s)@." dune_lang_version ;
+  Format.fprintf fmt "(formatting (enabled_for ocaml))@." ;
+  Format.fprintf fmt "(cram enable)@." ;
+  ( Target.iter_internal_by_opam @@ fun package _internals ->
+    Format.fprintf fmt "(package (name %s))@." (Filename.basename package) ) ;
+  Format.fprintf fmt "; This file was automatically generated, do not edit.@." ;
+  Format.fprintf fmt "; Edit file manifest/manifest.ml instead.@."
 
 let generate_package_json_file () =
   let l = ref [] in
