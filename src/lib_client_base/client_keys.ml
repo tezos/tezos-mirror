@@ -952,6 +952,33 @@ let alias_aggregate_keys cctxt name =
   | Ok (_name, pk, sk_uri) -> return_some (pkh, pk, sk_uri)
   | Error _ -> return_none
 
+let aggregate_sign cctxt sk_uri buf =
+  let open Lwt_result_syntax in
+  with_scheme_aggregate_signer sk_uri (fun (module Signer : AGGREGATE_SIGNER) ->
+      let* signature = Signer.sign sk_uri buf in
+      let* pk_uri = Signer.neuterize sk_uri in
+      let* pubkey =
+        let* o = Aggregate_alias.Secret_key.rev_find cctxt sk_uri in
+        match o with
+        | None -> aggregate_public_key pk_uri
+        | Some name -> (
+            let* r = Aggregate_alias.Public_key.find cctxt name in
+            match r with
+            | (_, None) ->
+                let* pk = aggregate_public_key pk_uri in
+                let* () =
+                  Aggregate_alias.Public_key.update cctxt name (pk_uri, Some pk)
+                in
+                return pk
+            | (_, Some pubkey) -> return pubkey)
+      in
+      let* () =
+        fail_unless
+          (Aggregate_signature.check pubkey signature buf)
+          (Signature_mismatch sk_uri)
+      in
+      return signature)
+
 module Mnemonic = struct
   let new_random = Bip39.of_entropy (Hacl.Rand.gen 32)
 

@@ -118,6 +118,49 @@ let bls_pk_param ?(name = "public key") ?(desc = "Bls public key to use.") =
   in
   Clic.param ~name ~desc (bls_pk_parameter ())
 
+let bls_sk_uri_parameter () =
+  Clic.parameter
+    ~autocomplete:Client_keys.Aggregate_alias.Secret_key.autocomplete
+    Client_keys.Aggregate_alias.Secret_key.find
+
+let bls_sk_uri_param ?(name = "secret key") ?(desc = "Bls secret key to use.") =
+  let desc =
+    String.concat
+      "\n"
+      [
+        desc; "Can be an alias or a key.\nUse 'alias:name', 'key:name' to force.";
+      ]
+  in
+  Clic.param ~name ~desc (bls_sk_uri_parameter ())
+
+let signature_parameter () =
+  Clic.parameter (fun _cctxt s -> Bls.of_b58check s |> Lwt.return)
+
+let signature_arg =
+  Clic.arg
+    ~doc:"aggregated signature"
+    ~long:"aggregated-signature"
+    ~placeholder:"current aggregated signature"
+    (signature_parameter ())
+
+let transaction_parameter =
+  Clic.map_parameter
+    ~f:(fun json ->
+      try
+        Data_encoding.Json.destruct
+          Tx_rollup_l2_batch.V1.transaction_encoding
+          json
+      with Data_encoding.Json.Cannot_destruct (_path, exn) ->
+        Stdlib.failwith
+          (Format.asprintf
+             "Invalid JSON for a message result path: %a"
+             (fun ppf -> Data_encoding.Json.print_error ppf)
+             exn))
+    json_parameter
+
+let transaction_param next =
+  Clic.param ~name:"transaction" ~desc:"Transaction" transaction_parameter next
+
 let l2_transaction_parameter =
   Clic.map_parameter
     ~f:(fun json ->
@@ -223,6 +266,21 @@ let craft_transfers ~counter ~signer transfers =
 
 let craft_tx ~counter ~signer ~destination ~ticket_hash ~qty =
   craft_transfers ~counter ~signer [(qty, destination, ticket_hash)]
+
+let sign_transaction cctxt sks_uri txs =
+  let open Lwt_result_syntax in
+  let buf =
+    Data_encoding.Binary.to_bytes_exn
+      Tx_rollup_l2_batch.V1.transaction_encoding
+      txs
+  in
+  List.map_ep
+    (fun sk ->
+      let* signature = Client_keys.aggregate_sign cctxt sk buf in
+      match signature with
+      | Bls12_381 signature -> return signature
+      | Unknown _signature -> failwith "failed to sign")
+    sks_uri
 
 let craft_withdraw ~counter ~signer ~destination ~ticket_hash ~qty =
   let content =
@@ -447,6 +505,42 @@ let craft_tx_batch () =
         let*! () = cctxt#message "@[%a@]" Data_encoding.Json.pp json in
         return_unit)
 
+let sign_transaction () =
+  command
+    ~desc:"sign a transaction"
+    (args2
+       (Clic.switch ~doc:"aggregate signature" ~long:"aggregate" ())
+       signature_arg)
+    (prefixes ["sign"; "transaction"]
+    @@ transaction_param @@ prefix "with"
+    @@ seq_of_param bls_sk_uri_param)
+    (fun (aggregate, aggregated_signature)
+         transactions
+         sks_uri
+         (cctxt : #Configuration.tx_client_context) ->
+      let open Lwt_result_syntax in
+      let* signatures = sign_transaction cctxt sks_uri transactions in
+      if aggregate then
+        let signatures =
+          match aggregated_signature with
+          | Some aggregated_signature -> aggregated_signature :: signatures
+          | None -> signatures
+        in
+        let*? aggregated_signature = aggregate_signature signatures in
+
+        let*! () = cctxt#message "@[%a@]" Bls.pp aggregated_signature in
+        return_unit
+      else
+        let*! () =
+          cctxt#message
+            "@[%a@]"
+            (Format.pp_print_list
+               ~pp_sep:(fun ppf () -> Format.pp_print_string ppf ";")
+               Bls.pp)
+            signatures
+        in
+        return_unit)
+
 let get_batcher_queue () =
   command
     ~desc:"returns the batcher's queue of pending operations"
@@ -508,6 +602,7 @@ let all () =
     craft_tx_transfers ();
     craft_tx_withdrawal ();
     craft_tx_batch ();
+    sign_transaction ();
     get_batcher_queue ();
     get_batcher_transaction ();
     inject_batcher_transaction ();
