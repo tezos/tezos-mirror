@@ -278,6 +278,53 @@ let run node =
       node.persistent_state.data_dir;
     ]
 
+let change_signers ?operator ?batch_signer ?finalize_commitment_signer
+    ?remove_commitment_signer ?dispatch_withdrawals_signer ?rejection_signer
+    (tx_node : t) =
+  let operator =
+    Option.value operator ~default:tx_node.persistent_state.operator
+  in
+  let batch_signer =
+    Option.value batch_signer ~default:tx_node.persistent_state.batch_signer
+  in
+  let finalize_commitment_signer =
+    Option.value
+      finalize_commitment_signer
+      ~default:tx_node.persistent_state.finalize_commitment_signer
+  in
+  let remove_commitment_signer =
+    Option.value
+      remove_commitment_signer
+      ~default:tx_node.persistent_state.remove_commitment_signer
+  in
+  let dispatch_withdrawals_signer =
+    Option.value
+      dispatch_withdrawals_signer
+      ~default:tx_node.persistent_state.dispatch_withdrawals_signer
+  in
+  let rejection_signer =
+    Option.value
+      rejection_signer
+      ~default:tx_node.persistent_state.rejection_signer
+  in
+  let tmp_tx_node =
+    {
+      tx_node with
+      persistent_state =
+        {
+          tx_node.persistent_state with
+          operator;
+          batch_signer;
+          finalize_commitment_signer;
+          remove_commitment_signer;
+          dispatch_withdrawals_signer;
+          rejection_signer;
+        };
+    }
+  in
+  let* _ = config_init tmp_tx_node in
+  unit
+
 module Inbox = struct
   type l2_context_hash = {irmin_hash : string; tree_hash : string}
 

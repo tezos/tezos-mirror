@@ -65,6 +65,16 @@ val wait_for_ready : t -> unit Lwt.t
     If such an event already occurred, return immediately. *)
 val wait_for_tezos_level : t -> int -> int Lwt.t
 
+val change_signers :
+  ?operator:string option ->
+  ?batch_signer:string option ->
+  ?finalize_commitment_signer:string option ->
+  ?remove_commitment_signer:string option ->
+  ?dispatch_withdrawals_signer:string option ->
+  ?rejection_signer:string option ->
+  t ->
+  unit Lwt.t
+
 (** Wait for a custom event to occur.
 
       Usage: [wait_for_full daemon name filter]
