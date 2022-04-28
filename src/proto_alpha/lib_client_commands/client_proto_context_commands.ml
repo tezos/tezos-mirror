@@ -64,26 +64,6 @@ let report_michelson_errors ?(no_print_source = false) ~msg
       cctxt#error "%s" msg >>= fun () -> Lwt.return_none
   | Ok data -> Lwt.return_some data
 
-let parse_file parse path =
-  Lwt_utils_unix.read_file path >>= fun contents -> parse contents
-
-let file_or_text_parameter ~from_text
-    ?(from_path = parse_file (from_text ~heuristic:false)) () =
-  Clic.parameter @@ fun _ p ->
-  match String.split ~limit:1 ':' p with
-  | ["text"; text] -> from_text ~heuristic:false text
-  | ["file"; path] -> from_path path
-  | _ -> if Sys.file_exists p then from_path p else from_text ~heuristic:true p
-
-let json_file_or_text_parameter =
-  let from_text ~heuristic s =
-    try return (Ezjsonm.from_string s)
-    with Ezjsonm.Parse_error _ when heuristic ->
-      failwith "Neither an existing file nor valid JSON: '%s'" s
-  in
-  let from_path = Lwt_utils_unix.Json.read_file in
-  file_or_text_parameter ~from_text ~from_path ()
-
 let non_negative_param =
   Clic.parameter (fun _ s ->
       match int_of_string_opt s with
@@ -106,7 +86,7 @@ let rollup_kind_param =
       | Some k -> return k)
 
 let boot_sector_param =
-  let from_text ~heuristic:_ s =
+  let from_text s =
     return (fun (module R : Sc_rollups.PVM.S) ->
         R.parse_boot_sector s |> function
         | None -> failwith "Invalid boot sector"
@@ -852,7 +832,7 @@ let commands_network network () =
                ~desc:
                  "Activate an Alphanet/Zeronet faucet account from the JSON \
                   (file or directly inlined)."
-               json_file_or_text_parameter
+               json_parameter
           @@ stop)
           (fun (force, encrypted) name activation_json cctxt ->
             Secret_key.of_fresh cctxt force name >>=? fun name ->
@@ -1228,7 +1208,7 @@ let commands_rw () =
               \"amount\": qty (, <field>: <val> ...) } (, ...) ]', where an \
               optional <field> can either be \"fee\", \"gas-limit\", \
               \"storage-limit\", \"arg\", or \"entrypoint\"."
-           json_file_or_text_parameter
+           json_parameter
       @@ stop)
       (fun ( fee,
              dry_run,
