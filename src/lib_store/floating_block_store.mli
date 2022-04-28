@@ -98,9 +98,15 @@ val read_block_and_predecessors :
 (** [append_block floating_store ?flush preds block] stores the
     [block] in [floating_store] updating its index with the given
     predecessors [preds] and flushing if [flush] is set to [true]
-    (defaults to [true]). *)
+    (defaults to [true]). [log_metrics] enables logs of the amount of
+    written bytes using the node's metrics. *)
 val append_block :
-  ?flush:bool -> t -> Block_hash.t list -> Block_repr.t -> unit Lwt.t
+  ?flush:bool ->
+  ?log_metrics:bool ->
+  t ->
+  Block_hash.t trace ->
+  Block_repr.block ->
+  unit tzresult Lwt.t
 
 (** [append_all floating_store chunk] stores the [chunk] of
     (predecessors × blocks) in [floating_store] updating its index
@@ -168,7 +174,7 @@ val swap : src:t -> dst:t -> unit Lwt.t
 
 (** [append_floating_store ~from ~into] takes two opened floating block stores
     and appends all blocks contained in [from] to [into]. *)
-val append_floating_store : from:t -> into:t -> (unit, tztrace) result Lwt.t
+val append_floating_store : from:t -> into:t -> unit tzresult Lwt.t
 
 (** Integrity checks *)
 

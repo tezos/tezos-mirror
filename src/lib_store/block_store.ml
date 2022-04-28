@@ -325,13 +325,11 @@ let store_block block_store block =
             block_store.block_cache
             block.hash
             (Lwt.return_some block) ;
-          let*! () =
-            Floating_block_store.append_block
-              block_store.rw_floating_block_store
-              predecessors
-              block
-          in
-          return_unit))
+          Floating_block_store.append_block
+            ~log_metrics:true
+            block_store.rw_floating_block_store
+            predecessors
+            block))
 
 let check_blocks_consistency blocks =
   let rec loop = function
@@ -858,8 +856,8 @@ let update_floating_stores block_store ~history_mode ~ro_store ~rw_store
   in
   (* As blocks from [lafl_predecessors] contains older blocks first,
      the resulting [new_store] will contains newer blocks first. *)
-  let*! () =
-    List.iter_s
+  let* () =
+    List.iter_es
       (fun (block, predecessors) ->
         Floating_block_store.append_block new_store predecessors block)
       lafl_predecessors
@@ -902,10 +900,7 @@ let update_floating_stores block_store ~history_mode ~ro_store ~rw_store
               if Block_hash.Set.mem (Block_repr.predecessor block) !visited then (
                 let hash = Block_repr.hash block in
                 visited := Block_hash.Set.add hash !visited ;
-                let*! () =
-                  Floating_block_store.append_block new_store predecessors block
-                in
-                return_unit)
+                Floating_block_store.append_block new_store predecessors block)
               else return_unit))
           store)
       [ro_store; rw_store]

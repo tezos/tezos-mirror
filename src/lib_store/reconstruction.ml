@@ -751,7 +751,7 @@ let reconstruct_floating chain_store context_index ~user_activated_upgrades
                       last_allowed_fork_level
                       block
                   in
-                  let*! () =
+                  let* () =
                     Floating_block_store.append_block
                       new_ro_store
                       predecessors
