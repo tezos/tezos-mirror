@@ -188,6 +188,7 @@ module Points = struct
     let zero () =
       trusted := 0. ;
       greylisted := 0. ;
+      accepted := 0. ;
       running := 0. ;
       disconnected := 0.
   end
