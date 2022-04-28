@@ -734,6 +734,16 @@ let craft_tx_transfers ?counter ~signer tx_client contents =
   let transfer : Rollup.transfer = {signer; counter; contents} in
   Tx_rollup_client.craft_tx_transfers tx_client transfer
 
+let json_of_transactions_and_sig ~origin transaction signatures =
+  JSON.(
+    annotate
+      ~origin
+      (`O
+        [
+          ("transaction", transaction);
+          ("signatures", `A (List.map (fun s -> `String s) signatures));
+        ]))
+
 let craft_batch tx_client ~batch ~signers =
   let signatures = bls_signers_sks_json signers in
   let* json_str =
@@ -908,33 +918,28 @@ let test_l2_to_l2_transaction =
 
 let tx_client_inject_transaction ~tx_client ?failswith transaction_str signature
     =
-  let open Tezos_protocol_alpha.Protocol in
   let txs_json =
     match Data_encoding.Json.from_string transaction_str with
     | Ok v -> v
     | _ -> Test.fail "cannot decode transaction from json"
   in
   let transaction =
-    List.hd
-      (Data_encoding.Json.destruct
-         (Data_encoding.list
-            Tezos_raw_protocol_alpha.Tx_rollup_l2_batch.V1.transaction_encoding)
-         txs_json)
+    Data_encoding.Json.construct
+      Tezos_raw_protocol_alpha.Tx_rollup_l2_batch.V1.transaction_encoding
+      (List.hd
+         (Data_encoding.Json.destruct
+            (Data_encoding.list
+               Tezos_raw_protocol_alpha.Tx_rollup_l2_batch.V1
+               .transaction_encoding)
+            txs_json))
   in
   let signed_tx_json =
-    JSON.annotate ~origin:"signed_l2_transaction"
-    @@ `O
-         [
-           ( "transaction",
-             Data_encoding.Json.construct
-               Tx_rollup_l2_batch.V1.transaction_encoding
-               transaction );
-           ( "signature",
-             Data_encoding.Json.construct
-               Tx_rollup_l2_context_sig.signature_encoding
-               signature );
-         ]
+    json_of_transactions_and_sig
+      ~origin:"signed_l2_transaction"
+      transaction
+      [Tezos_crypto.Bls.to_b58check signature]
   in
+
   let expect_failure = Option.is_some failswith in
   let* (stdout, stderr) =
     Tx_rollup_client.inject_batcher_transaction

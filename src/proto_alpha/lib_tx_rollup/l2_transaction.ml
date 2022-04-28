@@ -28,23 +28,23 @@ open Protocol
 type t = {
   transaction :
     (Indexable.unknown, Indexable.unknown) Tx_rollup_l2_batch.V1.transaction;
-  signature : Tx_rollup_l2_batch.V1.signature;
+  signatures : Tx_rollup_l2_batch.V1.signature list;
 }
 
 let encoding =
   let open Data_encoding in
   conv
-    (fun {transaction; signature} -> (transaction, signature))
-    (fun (transaction, signature) -> {transaction; signature})
+    (fun {transaction; signatures} -> (transaction, signatures))
+    (fun (transaction, signatures) -> {transaction; signatures})
   @@ obj2
        (req "transaction" Tx_rollup_l2_batch.V1.transaction_encoding)
-       (req "signature" Tx_rollup_l2_context_sig.signature_encoding)
+       (req "signatures" (list Bls.encoding))
 
 let batch l =
   let contents = List.map (fun {transaction; _} -> transaction) l in
   let aggregated_signature =
-    Environment.Bls_signature.aggregate_signature_opt
-    @@ List.map (fun {signature; _} -> signature) l
+    List.concat_map (fun {signatures; _} -> signatures) l
+    |> Environment.Bls_signature.aggregate_signature_opt
   in
   match aggregated_signature with
   | None -> error_with "Cannot aggregate signatures"
