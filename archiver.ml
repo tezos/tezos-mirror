@@ -26,8 +26,9 @@ open Lwt_result_syntax
 
 let levels_per_folder = 4096l
 
-module Endorsement = struct
+module Delegate_operations = struct
   type operation = {
+    kind : Operation_kind.t;
     round : Int32.t option;
     reception_time : Time.System.t option;
     errors : error list option;
@@ -37,11 +38,12 @@ module Endorsement = struct
   let operation_encoding =
     let open Data_encoding in
     conv
-      (fun {round; reception_time; errors; block_inclusion} ->
-        (round, reception_time, errors, block_inclusion))
-      (fun (round, reception_time, errors, block_inclusion) ->
-        {round; reception_time; errors; block_inclusion})
-      (obj4
+      (fun {kind; round; reception_time; errors; block_inclusion} ->
+        (kind, round, reception_time, errors, block_inclusion))
+      (fun (kind, round, reception_time, errors, block_inclusion) ->
+        {kind; round; reception_time; errors; block_inclusion})
+      (obj5
+         (dft "kind" Operation_kind.encoding Operation_kind.Endorsement)
          (opt "round" int32)
          (req "reception_time" (option Time.System.encoding))
          (opt "errors" (list error_encoding))
@@ -65,7 +67,15 @@ module Endorsement = struct
               delegate;
               delegate_alias;
               operations =
-                [{reception_time; errors; round = None; block_inclusion}];
+                [
+                  {
+                    kind = Endorsement;
+                    reception_time;
+                    errors;
+                    round = None;
+                    block_inclusion;
+                  };
+                ];
             })
       (obj5
          (req "delegate" Signature.Public_key_hash.encoding)
@@ -154,6 +164,7 @@ module Block = struct
 end
 
 module Anomaly = struct
+  (* only anomalies related to endorsements are considered for now *)
   type problem = Missed | Forgotten | Sequestered | Incorrect
 
   type t = {
@@ -198,23 +209,24 @@ end
 
 type t = {
   blocks : Block.t list;
-  endorsements : Endorsement.t list;
+  delegate_operations : Delegate_operations.t list;
   unaccurate : bool;
 }
 
 let encoding =
   let open Data_encoding in
   conv
-    (fun {blocks; endorsements; unaccurate} ->
-      (blocks, endorsements, unaccurate))
-    (fun (blocks, endorsements, unaccurate) ->
-      {blocks; endorsements; unaccurate})
+    (fun {blocks; delegate_operations; unaccurate} ->
+      (blocks, delegate_operations, unaccurate))
+    (fun (blocks, delegate_operations, unaccurate) ->
+      {blocks; delegate_operations; unaccurate})
     (obj3
        (dft "blocks" (list Block.encoding) [])
-       (dft "endorsements" (list Endorsement.encoding) [])
+       (* TODO: change name? *)
+       (dft "endorsements" (list Delegate_operations.encoding) [])
        (dft "unaccurate" bool false))
 
-let empty = {blocks = []; endorsements = []; unaccurate = true}
+let empty = {blocks = []; delegate_operations = []; unaccurate = true}
 
 let dirname_of_level prefix level =
   let base = Int32.mul (Int32.div level levels_per_folder) levels_per_folder in
@@ -290,11 +302,11 @@ let extract_anomalies path level infos =
   else
     let anomalies =
       List.fold_left
-        (fun acc Endorsement.{delegate; delegate_alias; operations} ->
+        (fun acc Delegate_operations.{delegate; delegate_alias; operations} ->
           List.fold_left
             (fun acc
-                 Endorsement.
-                   {round = _; reception_time; errors; block_inclusion} ->
+                 Delegate_operations.
+                   {kind; round = _; reception_time; errors; block_inclusion} ->
               match errors with
               | Some (_ :: _) ->
                   Anomaly.
@@ -306,8 +318,8 @@ let extract_anomalies path level infos =
                     }
                   :: acc
               | None | Some [] -> (
-                  match (reception_time, block_inclusion) with
-                  | (None, []) ->
+                  match (kind, reception_time, block_inclusion) with
+                  | (Endorsement, None, []) ->
                       Anomaly.
                         {
                           level;
@@ -316,7 +328,7 @@ let extract_anomalies path level infos =
                           problem = Anomaly.Missed;
                         }
                       :: acc
-                  | (Some _, []) ->
+                  | (Endorsement, Some _, []) ->
                       Anomaly.
                         {
                           level;
@@ -325,7 +337,7 @@ let extract_anomalies path level infos =
                           problem = Anomaly.Forgotten;
                         }
                       :: acc
-                  | (None, _ :: _) ->
+                  | (Endorsement, None, _ :: _) ->
                       Anomaly.
                         {
                           level;
@@ -334,29 +346,37 @@ let extract_anomalies path level infos =
                           problem = Anomaly.Sequestered;
                         }
                       :: acc
-                  | (Some _, _ :: _) -> acc))
+                  | (Endorsement, Some _, _ :: _) -> acc
+                  | (Preendorsement, _, _) -> acc))
             acc
             operations)
         []
-        infos.endorsements
+        infos.delegate_operations
     in
     match anomalies with
     | [] -> return_unit
     | _ :: _ -> dump_anomalies path level anomalies
 
+(* For now, only endorsements are extracted from blocks; so we know we
+   add information for an endorsement, not for a preendorsement. When
+   adding information for preendorsements, this function needs to take
+   one more argument. *)
 let add_to_operations block_hash block_round operations =
   match
     List.partition
-      (fun Endorsement.{round; _} ->
+      (fun Delegate_operations.{kind; round; _} ->
         match round with
         | None -> true
-        | Some round -> Int32.equal block_round round)
+        | Some round -> kind = Endorsement && Int32.equal block_round round)
       operations
   with
-  | ( Endorsement.{round = _; errors; reception_time; block_inclusion} :: _,
+  | ( Delegate_operations.
+        {kind; round = _; errors; reception_time; block_inclusion}
+      :: _,
       operations' ) ->
-      Endorsement.
+      Delegate_operations.
         {
+          kind;
           round = Some block_round;
           errors;
           reception_time;
@@ -365,6 +385,7 @@ let add_to_operations block_hash block_round operations =
       :: operations'
   | ([], _) ->
       {
+        kind = Endorsement;
         round = Some block_round;
         errors = None;
         reception_time = None;
@@ -391,14 +412,15 @@ let dump_included_in_block cctxt path block_level block_hash block_round
        let (updated_known, unknown) =
          List.fold_left
            (fun (acc, missing)
-                Endorsement.({delegate; delegate_alias; operations} as en) ->
+                Delegate_operations.(
+                  {delegate; delegate_alias; operations} as en) ->
              match
                List.partition
                  (fun pkh -> Signature.Public_key_hash.equal pkh delegate)
                  missing
              with
              | (_ :: _, missing') ->
-                 ( Endorsement.
+                 ( Delegate_operations.
                      {
                        delegate;
                        delegate_alias;
@@ -409,21 +431,25 @@ let dump_included_in_block cctxt path block_level block_hash block_round
                    missing' )
              | ([], _) -> (en :: acc, missing))
            ([], endorsers_pkhs)
-           infos.endorsements
+           infos.delegate_operations
        in
-       let endorsements =
+       let delegate_operations =
          match unknown with
          | [] -> updated_known
          | _ :: _ ->
              List.fold_left
                (fun acc delegate ->
-                 Endorsement.
+                 Delegate_operations.
                    {
                      delegate;
                      delegate_alias = Wallet.alias_of_pkh aliases delegate;
                      operations =
                        [
                          {
+                           (* for now, we only consider included
+                              endorsements, not included
+                              preendorsements *)
+                           kind = Endorsement;
                            round = Some block_round;
                            errors = None;
                            reception_time = None;
@@ -436,7 +462,11 @@ let dump_included_in_block cctxt path block_level block_hash block_round
                unknown
        in
        let out_infos =
-         {blocks = infos.blocks; endorsements; unaccurate = infos.unaccurate}
+         {
+           blocks = infos.blocks;
+           delegate_operations;
+           unaccurate = infos.unaccurate;
+         }
        in
        let* () = write filename encoding out_infos in
        extract_anomalies path endorsements_level out_infos)
@@ -447,7 +477,8 @@ let dump_included_in_block cctxt path block_level block_hash block_round
    | Error err ->
        Lwt_io.printl
          (Format.asprintf
-            "@[Failed to dump endorsements in block %a at level %li :@ @[%a@]@]"
+            "@[Failed to dump delegate operations in block %a at level %li :@ \
+             @[%a@]@]"
             Block_hash.pp
             block_hash
             block_level
@@ -476,7 +507,7 @@ let dump_included_in_block cctxt path block_level block_hash block_round
         encoding
         {
           blocks;
-          endorsements = infos.endorsements;
+          delegate_operations = infos.delegate_operations;
           unaccurate = infos.unaccurate;
         })
   >>= fun out ->
@@ -494,15 +525,18 @@ let dump_included_in_block cctxt path block_level block_hash block_round
            err)
 
 let merge_operations =
-  List.fold_left (fun acc (round, errors, reception_time) ->
+  List.fold_left (fun acc (kind, round, errors, reception_time) ->
       match
         List.partition
-          (fun Endorsement.{round = r; _} -> Option.equal Int32.equal r round)
+          (fun Delegate_operations.{round = r; kind = k; _} ->
+            Option.equal Int32.equal r round && kind = k)
           acc
       with
-      | (Endorsement.{block_inclusion; reception_time = None; _} :: _, acc') ->
-          Endorsement.
+      | ( Delegate_operations.{block_inclusion; reception_time = None; _} :: _,
+          acc' ) ->
+          Delegate_operations.
             {
+              kind;
               round;
               errors;
               reception_time = Some reception_time;
@@ -512,6 +546,7 @@ let merge_operations =
       | (_ :: _, _) -> acc
       | ([], _) ->
           {
+            kind;
             round;
             errors;
             reception_time = Some reception_time;
@@ -528,14 +563,15 @@ let dump_received cctxt path ?unaccurate level items =
         let (updated_known, unknown) =
           List.fold_left
             (fun (acc, missing)
-                 Endorsement.({delegate; delegate_alias; operations} as en) ->
+                 Delegate_operations.(
+                   {delegate; delegate_alias; operations} as en) ->
               match
                 List.partition
                   (fun (pkh, _) -> Signature.Public_key_hash.equal pkh delegate)
                   missing
               with
               | ((_, new_operations) :: _, missing') ->
-                  ( Endorsement.
+                  ( Delegate_operations.
                       {
                         delegate;
                         delegate_alias;
@@ -545,9 +581,9 @@ let dump_received cctxt path ?unaccurate level items =
                     missing' )
               | ([], _) -> (en :: acc, missing))
             ([], items)
-            infos.endorsements
+            infos.delegate_operations
         in
-        let* endorsements =
+        let* delegate_operations =
           match unknown with
           | [] -> return updated_known
           | _ :: _ ->
@@ -558,14 +594,15 @@ let dump_received cctxt path ?unaccurate level items =
               return
                 (List.fold_left
                    (fun acc (delegate, ops) ->
-                     Endorsement.
+                     Delegate_operations.
                        {
                          delegate;
                          delegate_alias = Wallet.alias_of_pkh aliases delegate;
                          operations =
                            List.rev_map
-                             (fun (round, errors, reception_time) ->
+                             (fun (op_kind, round, errors, reception_time) ->
                                {
+                                 kind = op_kind;
                                  round;
                                  errors;
                                  reception_time = Some reception_time;
@@ -578,7 +615,9 @@ let dump_received cctxt path ?unaccurate level items =
                    unknown)
         in
         let unaccurate = Option.value ~default:infos.unaccurate unaccurate in
-        let out_infos = {blocks = infos.blocks; endorsements; unaccurate} in
+        let out_infos =
+          {blocks = infos.blocks; delegate_operations; unaccurate}
+        in
         let* () = write filename encoding out_infos in
         if infos.unaccurate then return_unit
         else extract_anomalies path level out_infos)
@@ -589,7 +628,7 @@ let dump_received cctxt path ?unaccurate level items =
   | Error err ->
       Lwt_io.printl
         (Format.asprintf
-           "@[Failed to dump endorsements at level %li :@ @[%a@]@]"
+           "@[Failed to dump delegate operations at level %li :@ @[%a@]@]"
            level
            Error_monad.pp_print_trace
            err)
@@ -605,9 +644,13 @@ type chunk =
       * Signature.Public_key_hash.t list
   | Mempool of
       bool option
-      * Int32.t
+      * Int32.t (* level *)
       * (Signature.Public_key_hash.t
-        * (Int32.t option * error list option * Time.System.t) list)
+        * (Operation_kind.t
+          * Int32.t option
+          * error list option
+          * Time.System.t)
+          list)
         list
 
 let (chunk_stream, chunk_feeder) = Lwt_stream.create ()
@@ -616,8 +659,13 @@ let launch cctxt prefix =
   Lwt_stream.iter_p
     (function
       | Block
-          (block_level, block, round, timestamp, reception_time, delegate, pkhs)
-        ->
+          ( block_level,
+            block,
+            round,
+            timestamp,
+            reception_time,
+            baker,
+            endorsers_pkhs ) ->
           dump_included_in_block
             cctxt
             prefix
@@ -626,8 +674,8 @@ let launch cctxt prefix =
             round
             timestamp
             reception_time
-            delegate
-            pkhs
+            baker
+            endorsers_pkhs
       | Mempool (unaccurate, level, items) ->
           dump_received cctxt prefix ?unaccurate level items)
     chunk_stream

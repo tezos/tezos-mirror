@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2021-2022 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -61,17 +61,20 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
   let same_slot slot right =
     Int.equal slot (slot_to_int right.Plugin.RPC.Endorsing_rights.first_slot)
 
+  (* NB: A delegate is in [missing] if we have seen neither
+     endorsements from him, nor preendorsements. It might be
+     interesting at some point to distinguish these two cases. *)
   let couple_ops_to_rights ops rights =
     let (items, missing) =
       List.fold_left
-        (fun (acc, remaining_rights) (errors, delay, round, slot) ->
+        (fun (acc, remaining_rights) (op_kind, errors, delay, round, slot) ->
           match
             List.partition (fun right -> same_slot slot right) remaining_rights
           with
           | (_ :: _ :: _, _) -> assert false
           | ([right], rights') ->
               ( ( right.Plugin.RPC.Endorsing_rights.delegate,
-                  [(round, errors, delay)] )
+                  [(op_kind, round, errors, delay)] )
                 :: acc,
                 rights' )
           | ([], _) -> (
@@ -79,7 +82,7 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
               | None -> assert false
               | Some right ->
                   ( ( right.Plugin.RPC.Endorsing_rights.delegate,
-                      [(round, errors, delay)] )
+                      [(op_kind, round, errors, delay)] )
                     :: acc,
                     remaining_rights )))
         ([], rights)
@@ -105,6 +108,23 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
         Some
           ( ( block_payload_hash,
               Protocol.Alpha_context.Raw_level.to_int32 level,
+              Operation_kind.Endorsement,
+              Some (Protocol.Alpha_context.Round.to_int32 round) ),
+            slot_to_int slot )
+    | {
+     Protocol.Main.protocol_data =
+       Protocol.Alpha_context.Operation_data
+         {
+           contents =
+             Single (Preendorsement {slot; level; round; block_payload_hash});
+           signature = _;
+         };
+     shell = _;
+    } ->
+        Some
+          ( ( block_payload_hash,
+              Protocol.Alpha_context.Raw_level.to_int32 level,
+              Operation_kind.Preendorsement,
               Some (Protocol.Alpha_context.Round.to_int32 round) ),
             slot_to_int slot )
     | _ -> None

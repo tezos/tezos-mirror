@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2021-2022 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -34,11 +34,19 @@ module type PROTOCOL_SERVICES = sig
 
   val endorsing_rights : wrap_full -> Int32.t -> endorsing_rights tzresult Lwt.t
 
+  (* [couple_ops_to_rights ops rights] returns [(participating,
+     missing)], where [participating] is a list associating delegates
+     with their operations in [ops], and [missing] is the list of
+     delegates which do not have associated operations in [ops].
+
+     TODO: it might be clearer to use a map instead of an association
+     list for [participating]. *)
   val couple_ops_to_rights :
-    (error trace option * Ptime.t * Int32.t option * int) list ->
+    (Operation_kind.t * error trace option * Ptime.t * Int32.t option * int)
+    list ->
     endorsing_rights ->
     (Signature.public_key_hash
-    * (Int32.t option * error trace option * Ptime.t) list)
+    * (Operation_kind.t * Int32.t option * error trace option * Ptime.t) list)
     list
     * Signature.public_key_hash list
 
@@ -48,7 +56,8 @@ module type PROTOCOL_SERVICES = sig
 
   val consensus_operation_stream :
     wrap_full ->
-    (((Operation_hash.t * ((block_id * Int32.t * Int32.t option) * int))
+    (((Operation_hash.t
+      * ((block_id * Int32.t * Operation_kind.t * Int32.t option) * int))
      * error trace option)
      Lwt_stream.t
     * RPC_context.stopper)

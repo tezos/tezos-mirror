@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2021-2022 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -37,10 +37,11 @@ module type PROTOCOL_SERVICES = sig
   val endorsing_rights : wrap_full -> Int32.t -> endorsing_rights tzresult Lwt.t
 
   val couple_ops_to_rights :
-    (error trace option * Ptime.t * Int32.t option * int) list ->
+    (Operation_kind.t * error trace option * Ptime.t * Int32.t option * int)
+    list ->
     endorsing_rights ->
     (Signature.public_key_hash
-    * (Int32.t option * error trace option * Ptime.t) list)
+    * (Operation_kind.t * Int32.t option * error trace option * Ptime.t) list)
     list
     * Signature.public_key_hash list
 
@@ -50,7 +51,8 @@ module type PROTOCOL_SERVICES = sig
 
   val consensus_operation_stream :
     wrap_full ->
-    (((Operation_hash.t * ((block_id * Int32.t * Int32.t option) * int))
+    (((Operation_hash.t
+      * ((block_id * Int32.t * Operation_kind.t * Int32.t option) * int))
      * error trace option)
      Lwt_stream.t
     * RPC_context.stopper)
@@ -100,13 +102,14 @@ module Make (Protocol_services : PROTOCOL_SERVICES) : S = struct
     in
     let*! out =
       Lwt_stream.fold
-        (fun ((_hash, ((block, level, round), news)), errors) acc ->
+        (fun ((_hash, ((block, level, op_kind, round), news)), errors) acc ->
           let delay = Time.System.now () in
           Protocol_services.BlockIdMap.update
             block
             (function
-              | Some (_, l) -> Some (level, (errors, delay, round, news) :: l)
-              | None -> Some (level, [(errors, delay, round, news)]))
+              | Some (_, l) ->
+                  Some (level, (op_kind, errors, delay, round, news) :: l)
+              | None -> Some (level, [(op_kind, errors, delay, round, news)]))
             acc)
         op_stream
         Protocol_services.BlockIdMap.empty
