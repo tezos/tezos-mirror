@@ -58,7 +58,7 @@ In particular the file :src:`src/bin_node/node_config_file.ml` should be
 amended.
 
 The protocol plugin registration module should be removed from
-:src:`src/bin_node/dune` and :src:`src/bin_node/tezos-node.opam`.
+:src:`src/bin_node/dune` and :src:`opam/tezos-node.opam`.
 
 Remove Protocol From Python Tests of Current Protocol
 -----------------------------------------------------

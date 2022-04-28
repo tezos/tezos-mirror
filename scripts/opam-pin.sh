@@ -10,7 +10,7 @@ export OPAMYES=yes
 echo
 echo "## Pinning tezos packages..."
 
-opams=$(find "$src_dir/vendors" "$src_dir/src" "$src_dir/tezt" -name \*.opam -print)
+opams=$(find "$src_dir/src" "$src_dir/tezt" "$src_dir/opam" -name \*.opam -print)
 
 bin_packages=
 lib_packages=
@@ -22,6 +22,9 @@ for opam in $opams; do
       bin_packages="$bin_packages $package"
     else
       lib_packages="$lib_packages $package"
+    fi
+    if [ "$dir" = "$src_dir/opam" ]; then
+      dir=$src_dir;
     fi
     opam pin add --no-action "$package" "$dir" > /dev/null 2>&1
 done
