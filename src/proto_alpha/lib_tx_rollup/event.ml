@@ -109,7 +109,7 @@ let processing_block =
     ~section
     ~name:"tx_rollup_node_processing_block"
     ~msg:"processing block: {block_hash} (pred: {predecessor_hash})"
-    ~level:Notice
+    ~level:Debug
     ("block_hash", Block_hash.encoding)
     ("predecessor_hash", Block_hash.encoding)
 
@@ -129,7 +129,7 @@ let block_already_processed =
     ~msg:
       "the block {block_hash} has already been processed, nothing more to be \
        done"
-    ~level:Notice
+    ~level:Debug
     ("block_hash", Block_hash.encoding)
 
 let processing_block_predecessor =
@@ -137,7 +137,7 @@ let processing_block_predecessor =
     ~section
     ~name:"tx_rollup_node_processing_block_predecessor"
     ~msg:"processing block predecessor: {predecessor_hash}"
-    ~level:Notice
+    ~level:Debug
     ("predecessor_hash", Block_hash.encoding)
 
 let messages_application =

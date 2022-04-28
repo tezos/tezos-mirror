@@ -120,7 +120,8 @@ let init_injector rollup_node_state ~signer strategy tags =
   let open Lwt_result_syntax in
   let+ signer = get_signer rollup_node_state.State.cctxt signer in
   let queue = Op_queue.create 50_000 in
-  (* Very coarse approximation Number of operation we expect for each block *)
+  (* Very coarse approximation for the number of operation we expect for each
+     block *)
   let n =
     Tags.fold
       (fun t acc ->
@@ -562,6 +563,35 @@ let register_included_operations state (block : Alpha_block_services.block_info)
             callback *)))
     block.Alpha_block_services.operations
 
+(** Returns [true] if an included operation should be re-queued for injection
+    when the block in which it is included is reverted (due to a
+    reorganization). *)
+let requeue_reverted_operation state op =
+  let open Lwt_syntax in
+  let (Manager operation) = op.L1_operation.manager_operation in
+  match operation with
+  | Tx_rollup_rejection _ ->
+      (* TODO: check if rejected commitment in still in main chain *)
+      return_true
+  | Tx_rollup_commit {commitment; _} -> (
+      let level = L2block.Rollup_level commitment.level in
+      let* l2_block = State.get_level_l2_block state.rollup_node_state level in
+      match l2_block with
+      | None ->
+          (* We don't know this L2 block, should not happen *)
+          let+ () = Debug_events.(emit should_not_happen) __LOC__ in
+          false
+      | Some l2_block -> (
+          match l2_block.L2block.header.commitment with
+          | None -> return_false
+          | Some c ->
+              let commit_hash =
+                Tx_rollup_commitment.(Compact.hash (Full.compact commitment))
+              in
+              (* Do not re-queue if commitment for this level has changed *)
+              return Tx_rollup_commitment_hash.(c = commit_hash)))
+  | _ -> return_true
+
 (** [revert_included_operations state block] marks the known (by this injector)
     manager operations contained in [block] as not being included any more,
     typically in the case of a reorganization where [block] is on an alternative
@@ -576,7 +606,11 @@ let revert_included_operations state block =
   in
   (* TODO/TORU: https://gitlab.com/tezos/tezos/-/issues/2814
      maybe put at the front of the queue for re-injection. *)
-  List.iter_s (fun {op; _} -> add_pending_operation state op) included_infos
+  List.iter_s
+    (fun {op; _} ->
+      let* requeue = requeue_reverted_operation state op in
+      if requeue then add_pending_operation state op else return_unit)
+    included_infos
 
 (** [register_confirmed_level state confirmed_level] is called when the level
     [confirmed_level] is known as confirmed. In this case, the operations of
@@ -613,7 +647,7 @@ let on_new_tezos_head state (head : Alpha_block_services.block_info)
     List.iter_s
       (fun removed_block ->
         revert_included_operations state removed_block.Alpha_block_services.hash)
-      reorg.old_chain
+      (List.rev reorg.old_chain)
   in
   let*! () =
     List.iter_s

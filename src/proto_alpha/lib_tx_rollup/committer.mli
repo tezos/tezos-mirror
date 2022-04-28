@@ -23,31 +23,17 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Filename.Infix
+open Protocol.Alpha_context
 
-type t = string
+(** Build the commitment for an inbox. *)
+val commitment_of_inbox :
+  predecessor:L2block.t ->
+  Tx_rollup_level.t ->
+  Inbox.t ->
+  Tx_rollup_commitment.Full.t
 
-let store_dir data_dir = data_dir // "store"
-
-let context_dir data_dir = data_dir // "context"
-
-let l2blocks_index data_dir = store_dir data_dir // "l2blocks_index"
-
-let l2blocks_data data_dir = store_dir data_dir // "l2blocks_data"
-
-let tezos_blocks_index data_dir = store_dir data_dir // "tezos_blocks_index"
-
-let commitments_index data_dir = store_dir data_dir // "commitments_index"
-
-let levels_index data_dir = store_dir data_dir // "levels_index"
-
-let head_file data_dir = store_dir data_dir // "head"
-
-let mkdir ?(perm = 0o777) dir =
-  let open Lwt_syntax in
-  let* b = Lwt_unix.file_exists dir in
-  match b with false -> Lwt_unix.mkdir dir perm | true -> Lwt.return_unit
-
-let mk_store_dir ?perm data_dir = mkdir ?perm (store_dir data_dir)
-
-let mk_context_dir ?perm data_dir = mkdir ?perm (context_dir data_dir)
+(** Commit a block on the L1 chain. This takes the commitment embedded in the
+    block an produces a commitment operation that is queued for injection in the
+    injector. *)
+val commit_block :
+  operator:public_key_hash -> Tx_rollup.t -> L2block.t -> unit tzresult Lwt.t

@@ -57,12 +57,15 @@ module Irmin_storage :
     include Lwt_result_syntax
 
     let catch m k h =
-      m >>= function
+      let open Lwt_syntax in
+      let* res = m in
+      match res with
       | Ok x -> k x
       | Error (Environment.Ecoproto_error e :: _) -> h e
       | Error err ->
           (* TODO/TORU: replace error either in STORAGE or here *)
           (* Should not happen *)
+          let* () = Debug_events.(emit should_not_happen) __LOC__ in
           fail err
 
     let fail e =

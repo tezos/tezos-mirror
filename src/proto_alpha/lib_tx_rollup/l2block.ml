@@ -50,9 +50,22 @@ type header = {
   tezos_block : Block_hash.t;
   predecessor : hash;
   context : Tx_rollup_l2_context_hash.t;
+  commitment : Tx_rollup_commitment_hash.t option;
 }
 
-type t = {hash : hash; header : header; inbox : Inbox.t}
+type t = {
+  hash : hash;
+  header : header;
+  inbox : Inbox.t;
+  commitment : Tx_rollup_commitment.Full.t option;
+}
+
+type commitment_included_info = {
+  block : Block_hash.t;
+  operation : Operation_hash.t;
+}
+
+type metadata = {commitment_included : commitment_included_info option}
 
 let level_encoding =
   let open Data_encoding in
@@ -94,25 +107,43 @@ let level_to_string = function
 let header_encoding =
   let open Data_encoding in
   conv
-    (fun {level; tezos_block; predecessor; context} ->
-      (level, tezos_block, predecessor, context))
-    (fun (level, tezos_block, predecessor, context) ->
-      {level; tezos_block; predecessor; context})
-    (obj4
+    (fun {level; tezos_block; predecessor; context; commitment} ->
+      (level, tezos_block, predecessor, context, commitment))
+    (fun (level, tezos_block, predecessor, context, commitment) ->
+      {level; tezos_block; predecessor; context; commitment})
+    (obj5
        (req "level" level_encoding)
        (req "tezos_block" Block_hash.encoding)
        (req "predecessor" Hash.encoding)
-       (req "context" Tx_rollup_l2_context_hash.encoding))
+       (req "context" Tx_rollup_l2_context_hash.encoding)
+       (opt "commitment" Tx_rollup_commitment_hash.encoding))
 
 let encoding =
   let open Data_encoding in
   conv
-    (fun {hash; header; inbox} -> (hash, header, inbox))
-    (fun (hash, header, inbox) -> {hash; header; inbox})
-    (obj3
+    (fun {hash; header; inbox; commitment} -> (hash, header, inbox, commitment))
+    (fun (hash, header, inbox, commitment) -> {hash; header; inbox; commitment})
+    (obj4
        (req "hash" Hash.encoding)
        (req "header" header_encoding)
-       (req "inbox" Inbox.encoding))
+       (req "inbox" Inbox.encoding)
+       (opt "commitment" Tx_rollup_commitment.Full.encoding))
+
+let commitment_included_info_encoding =
+  let open Data_encoding in
+  conv
+    (fun {block; operation} -> (block, operation))
+    (fun (block, operation) -> {block; operation})
+    (obj2
+       (req "block" Block_hash.encoding)
+       (req "operation" Operation_hash.encoding))
+
+let metadata_encoding =
+  let open Data_encoding in
+  conv
+    (fun {commitment_included} -> commitment_included)
+    (fun commitment_included -> {commitment_included})
+    (obj1 (opt "commitment_included" commitment_included_info_encoding))
 
 let genesis_hash rollup = Hash.hash_string [Tx_rollup.to_b58check rollup]
 
@@ -137,7 +168,8 @@ let genesis_block ctxt rollup tezos_block =
       predecessor = hash;
       (* Genesis block is its own predecessor *)
       context = context_hash;
+      commitment = None;
     }
   in
   let inbox : Inbox.t = {contents = []; cumulated_size = 0} in
-  return {hash; header; inbox}
+  return {hash; header; inbox; commitment = None}

@@ -23,31 +23,15 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Filename.Infix
+include Internal_event.Simple
 
-type t = string
+let section = ["tx_rollup_node"]
 
-let store_dir data_dir = data_dir // "store"
-
-let context_dir data_dir = data_dir // "context"
-
-let l2blocks_index data_dir = store_dir data_dir // "l2blocks_index"
-
-let l2blocks_data data_dir = store_dir data_dir // "l2blocks_data"
-
-let tezos_blocks_index data_dir = store_dir data_dir // "tezos_blocks_index"
-
-let commitments_index data_dir = store_dir data_dir // "commitments_index"
-
-let levels_index data_dir = store_dir data_dir // "levels_index"
-
-let head_file data_dir = store_dir data_dir // "head"
-
-let mkdir ?(perm = 0o777) dir =
-  let open Lwt_syntax in
-  let* b = Lwt_unix.file_exists dir in
-  match b with false -> Lwt_unix.mkdir dir perm | true -> Lwt.return_unit
-
-let mk_store_dir ?perm data_dir = mkdir ?perm (store_dir data_dir)
-
-let mk_context_dir ?perm data_dir = mkdir ?perm (context_dir data_dir)
+let should_not_happen =
+  declare_1
+    ~section
+    ~name:"tx_rollup_node_should_not_happen"
+    ~msg:"This should not happen at {loc}"
+    ~level:Warning
+    ("loc", Data_encoding.string)
+    ~pp1:Format.pp_print_string
