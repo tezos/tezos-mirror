@@ -2645,7 +2645,7 @@ let tezos_shell_benchmarks =
       ]
     ~linkall:true
 
-let tezt =
+let tezt_lib =
   public_lib
     "tezt"
     ~path:"tezt/lib"
@@ -2661,7 +2661,7 @@ let tezt_performance_regression =
     ~path:"tezt/lib_performance_regression"
     ~synopsis:"Performance regression test framework based on Tezt"
     ~bisect_ppx:false
-    ~deps:[tezt |> open_ |> open_ ~m:"Base"; uri; cohttp_lwt_unix]
+    ~deps:[tezt_lib |> open_ |> open_ ~m:"Base"; uri; cohttp_lwt_unix]
 
 let tezt_tezos =
   public_lib
@@ -2671,7 +2671,7 @@ let tezt_tezos =
     ~bisect_ppx:false
     ~deps:
       [
-        tezt |> open_ |> open_ ~m:"Base";
+        tezt_lib |> open_ |> open_ ~m:"Base";
         tezt_performance_regression |> open_;
         uri;
         hex;
@@ -2689,7 +2689,7 @@ let _tezt_self_tests =
     ~synopsis:"Tests for the Tezos test framework based on Tezt"
     ~bisect_ppx:false
     ~static:false
-    ~deps:[tezt |> open_ |> open_ ~m:"Base"; tezt_tezos |> open_]
+    ~deps:[tezt_lib |> open_ |> open_ ~m:"Base"; tezt_tezos |> open_]
     ~cram:true
     ~dune:
       Dune.
@@ -2708,7 +2708,7 @@ let tezos_openapi =
     ~synopsis:
       "Tezos: a library for querying RPCs and converting into the OpenAPI \
        format"
-    ~deps:[ezjsonm; json_data_encoding; tezt]
+    ~deps:[ezjsonm; json_data_encoding; tezt_lib]
 
 let _tezos_protocol_compiler_bin =
   public_exe
@@ -3203,7 +3203,7 @@ end = struct
                ~opam:(sf "tezos-protocol-%s-tests" name_dash)
                ~deps:
                  [
-                   tezt;
+                   tezt_lib;
                    tezos_base |> open_ ~m:"TzPervasives";
                    main |> open_;
                    client |> if_some |> open_;
@@ -4990,7 +4990,7 @@ let _tezos_tps_evaluation =
         Protocol.(client_commands_exn alpha);
         tezos_client_base_unix;
         Protocol.(main alpha);
-        tezt |> open_ |> open_ ~m:"Base";
+        tezt_lib |> open_ |> open_ ~m:"Base";
         tezt_tezos |> open_;
         tezt_performance_regression |> open_;
         uri;
