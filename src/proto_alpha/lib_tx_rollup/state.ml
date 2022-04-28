@@ -121,12 +121,19 @@ let tezos_reorg state ~old_head_hash ~new_head_hash =
 let set_tezos_head state new_head_hash =
   let open Lwt_result_syntax in
   let*! old_head_hash = Stores.Tezos_head_store.read state.stores.tezos_head in
+  let* reorg =
+    match old_head_hash with
+    | None ->
+        (* No known tezos head, consider the new head as being on top of a previous
+           tezos block. *)
+        let+ new_head = fetch_tezos_block state new_head_hash in
+        {ancestor = None; old_chain = []; new_chain = [new_head]}
+    | Some old_head_hash -> tezos_reorg state ~old_head_hash ~new_head_hash
+  in
   let* () =
     Stores.Tezos_head_store.write state.stores.tezos_head new_head_hash
   in
-  match old_head_hash with
-  | None -> return no_reorg
-  | Some old_head_hash -> tezos_reorg state ~old_head_hash ~new_head_hash
+  return reorg
 
 let save_tezos_block_info state block l2_block ~level ~predecessor =
   Stores.Tezos_block_store.add
