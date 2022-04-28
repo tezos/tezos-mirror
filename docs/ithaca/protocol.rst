@@ -64,10 +64,9 @@ Sapling, etc), and some details about its implementation.
 .. toctree::
    :maxdepth: 2
 
-   plugins
+   precheck
 
 .. toctree::
    :maxdepth: 2
 
-   precheck
-
+   plugins
