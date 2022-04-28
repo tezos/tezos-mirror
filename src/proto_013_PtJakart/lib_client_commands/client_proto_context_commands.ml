@@ -726,7 +726,7 @@ let transfer_command amount source destination (cctxt : #Client_context.printer)
           name
     | _ -> Lwt.return_unit
   in
-  (if force then
+  (if force && not simulation then
    check_force_dependency "--gas-limit" gas_limit >>= fun () ->
    check_force_dependency "--storage-limit" storage_limit >>= fun () ->
    check_force_dependency "--fee" fee
