@@ -34,6 +34,7 @@ val create :
   ?name:string ->
   ?path:string ->
   ?base_dir:string ->
+  ?wallet_dir:string ->
   ?color:Log.Color.t ->
   Tx_rollup_node.t ->
   t

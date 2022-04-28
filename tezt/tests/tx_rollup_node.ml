@@ -328,7 +328,9 @@ let test_tx_node_store_inbox =
       in
       let* _ = Rollup_node.config_init tx_node rollup block_hash in
       let* () = Rollup_node.run tx_node in
-      let tx_client = Tx_rollup_client.create tx_node in
+      let tx_client =
+        Tx_rollup_client.create ~wallet_dir:(Client.base_dir client) tx_node
+      in
       (* Submit a batch *)
       let (`Batch content) = Rollup.make_batch "tezos_l2_batch_1" in
       let*! () =
@@ -628,7 +630,9 @@ let test_ticket_deposit_from_l1_to_l2 =
       let* (tx_rollup_hash, tx_node) =
         init_and_run_rollup_node ~originator:operator node client
       in
-      let tx_client = Tx_rollup_client.create tx_node in
+      let tx_client =
+        Tx_rollup_client.create ~wallet_dir:(Client.base_dir client) tx_node
+      in
       let* contract_id =
         Client.originate_contract
           ~alias:"rollup_deposit"
@@ -782,7 +786,9 @@ let test_l2_to_l2_transaction =
       let* (tx_rollup_hash, tx_node) =
         init_and_run_rollup_node ~originator node client
       in
-      let tx_client = Tx_rollup_client.create tx_node in
+      let tx_client =
+        Tx_rollup_client.create ~wallet_dir:(Client.base_dir client) tx_node
+      in
       let* contract_id =
         Client.originate_contract
           ~alias:"rollup_deposit"
@@ -1073,7 +1079,9 @@ let test_batcher =
           node
           client
       in
-      let tx_client = Tx_rollup_client.create tx_node in
+      let tx_client =
+        Tx_rollup_client.create ~wallet_dir:(Client.base_dir client) tx_node
+      in
       (* Genarating some identities *)
       let* bls_key_1 = generate_bls_addr ~alias:"bob" client in
       let bls_pkh_1 = bls_key_1.aggregate_public_key_hash in
@@ -1320,7 +1328,9 @@ let test_reorganization =
       let* (tx_rollup_hash, tx_node) =
         init_and_run_rollup_node ~originator:operator node1 client1
       in
-      let tx_client = Tx_rollup_client.create tx_node in
+      let tx_client =
+        Tx_rollup_client.create ~wallet_dir:(Client.base_dir client1) tx_node
+      in
       (* Genarating some identities *)
       let* bls_key_1 = generate_bls_addr ~alias:"alice" client1 in
       let bls_pkh_1 = bls_key_1.aggregate_public_key_hash in
@@ -1436,7 +1446,9 @@ let test_l2_proof_rpc_position =
       let* (tx_rollup_hash, tx_node) =
         init_and_run_rollup_node ~originator node client
       in
-      let tx_client = Tx_rollup_client.create tx_node in
+      let tx_client =
+        Tx_rollup_client.create ~wallet_dir:(Client.base_dir client) tx_node
+      in
       (* Generating some identities *)
       let* bls_key_1 = generate_bls_addr ~alias:"alice" client in
       let bls_pkh_1 = bls_key_1.aggregate_public_key_hash in

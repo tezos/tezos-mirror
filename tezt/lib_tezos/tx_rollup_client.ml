@@ -28,6 +28,7 @@ type t = {
   path : string;
   tx_node : Tx_rollup_node.t;
   base_dir : string;
+  wallet_dir : string;
   color : Log.Color.t;
 }
 
@@ -36,11 +37,12 @@ let next_name = ref 1
 let fresh_name () =
   let index = !next_name in
   incr next_name ;
-  "client" ^ string_of_int index
+  "tx_rollup_client" ^ string_of_int index
 
 let () = Test.declare_reset_function @@ fun () -> next_name := 1
 
-let create ?name ?path ?base_dir ?(color = Log.Color.FG.green) tx_node =
+let create ?name ?path ?base_dir ?wallet_dir ?(color = Log.Color.FG.green)
+    tx_node =
   let name = match name with None -> fresh_name () | Some name -> name in
   let path =
     match path with None -> Constant.tx_rollup_client | Some p -> p
@@ -48,9 +50,14 @@ let create ?name ?path ?base_dir ?(color = Log.Color.FG.green) tx_node =
   let base_dir =
     match base_dir with None -> Temp.dir name | Some dir -> dir
   in
-  {name; path; tx_node; base_dir; color}
+  let wallet_dir =
+    match wallet_dir with None -> Temp.dir name | Some dir -> dir
+  in
+  {name; path; tx_node; base_dir; wallet_dir; color}
 
 let base_dir_arg tx_client = ["--base-dir"; tx_client.base_dir]
+
+let wallet_dir_arg tx_client = ["--wallet-dir"; tx_client.wallet_dir]
 
 let endpoint_arg tx_client =
   ["--endpoint"; Tx_rollup_node.endpoint tx_client.tx_node]
@@ -64,7 +71,8 @@ let spawn_command ?hooks tx_client command =
     ~color:tx_client.color
     ?hooks
     tx_client.path
-    (base_dir_arg tx_client @ endpoint_arg tx_client @ command)
+    (base_dir_arg tx_client @ wallet_dir_arg tx_client @ endpoint_arg tx_client
+   @ command)
 
 let get_balance ?block tx_client ~tz4_address ~ticket_id =
   let* out =
