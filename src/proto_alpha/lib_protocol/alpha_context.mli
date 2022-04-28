@@ -2693,6 +2693,34 @@ module Sc_rollup : sig
   val last_cemented_commitment_hash_with_level :
     context -> t -> (Commitment_hash.t * Raw_level.t * context) tzresult Lwt.t
 
+  val get_or_init_game :
+    context ->
+    t ->
+    refuter:Staker.t ->
+    defender:Staker.t ->
+    (Game.t * context) tzresult Lwt.t
+
+  val update_game :
+    context ->
+    t ->
+    refuter:Staker.t ->
+    defender:Staker.t ->
+    Game.refutation ->
+    (Game.outcome option * context) tzresult Lwt.t
+
+  val apply_outcome :
+    context ->
+    t ->
+    Staker.t * Staker.t ->
+    Game.outcome ->
+    (Game.status * context) tzresult Lwt.t
+
+  val timeout :
+    context ->
+    t ->
+    Staker.t * Staker.t ->
+    (Game.outcome * context) tzresult Lwt.t
+
   module Internal_for_tests : sig
     val originated_sc_rollup : Origination_nonce.Internal_for_tests.t -> t
   end
