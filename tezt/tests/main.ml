@@ -69,12 +69,6 @@ let () =
   Rpc_config_logging.register ~protocols:[Alpha] ;
   Protocol_table_update.register ~migrate_from ~migrate_to ;
   Cache_cache.register [Ithaca; Jakarta; Alpha] ;
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/1823
-     the "Baking" test does not have a documentation.
-     I don't know if it is about baking accounts (and thus it is not a protocol-agnostic
-     test since it requires Alpha) or about baking (which would make it possible to run
-     on previous protocols, if not for a problem that was introduced in
-     Client.bake_for which causes the default key to be a baking account key). *)
   Baking.register ~protocols:[Ithaca; Jakarta; Alpha] ;
   Prevalidator.register ~protocols:[Ithaca; Jakarta; Alpha] ;
   Monitor_operations.register ~protocols:[Alpha] ;
