@@ -232,15 +232,26 @@ module Distributed_db = struct
 end
 
 module Block_validator = struct
+  open Prometheus
+
+  type block_validator_collectors = {
+    mutable operations_per_pass : unit -> float list;
+  }
+
+  let block_validator_collectors = {operations_per_pass = (fun () -> [])}
+
+  let set_operation_per_pass_collector fn =
+    block_validator_collectors.operations_per_pass <- fn
+
   type t = {
-    already_commited_blocks_count : Prometheus.Counter.t;
-    outdated_blocks_count : Prometheus.Counter.t;
-    validated_blocks_count : Prometheus.Counter.t;
-    validation_errors_count : Prometheus.Counter.t;
-    preapplied_blocks_count : Prometheus.Counter.t;
-    preapplication_errors_count : Prometheus.Counter.t;
-    validation_errors_after_precheck_count : Prometheus.Counter.t;
-    precheck_failed_count : Prometheus.Counter.t;
+    already_commited_blocks_count : Counter.t;
+    outdated_blocks_count : Counter.t;
+    validated_blocks_count : Counter.t;
+    validation_errors_count : Counter.t;
+    preapplied_blocks_count : Counter.t;
+    preapplication_errors_count : Counter.t;
+    validation_errors_after_precheck_count : Counter.t;
+    precheck_failed_count : Counter.t;
     validation_worker_metrics : Worker.t;
   }
 
@@ -248,44 +259,36 @@ module Block_validator = struct
     let subsystem = Some (String.concat "_" name) in
     let already_commited_blocks_count =
       let help = "Number of requests to validate a block already handled" in
-      Prometheus.Counter.v
-        ~help
-        ~namespace
-        ?subsystem
-        "already_commited_blocks_count"
+      Counter.v ~help ~namespace ?subsystem "already_commited_blocks_count"
     in
     let outdated_blocks_count =
       let help =
         "Number of requests to validate a block older than the node's \
          checkpoint"
       in
-      Prometheus.Counter.v ~help ~namespace ?subsystem "outdated_blocks_count"
+      Counter.v ~help ~namespace ?subsystem "outdated_blocks_count"
     in
     let validated_blocks_count =
       let help = "Number of requests to validate a valid block" in
-      Prometheus.Counter.v ~help ~namespace ?subsystem "validated_blocks_count"
+      Counter.v ~help ~namespace ?subsystem "validated_blocks_count"
     in
     let validation_errors_count =
       let help = "Number of requests to validate an invalid block" in
-      Prometheus.Counter.v ~help ~namespace ?subsystem "validation_errors_count"
+      Counter.v ~help ~namespace ?subsystem "validation_errors_count"
     in
     let preapplied_blocks_count =
       let help = "Number of successful application simulations of blocks" in
-      Prometheus.Counter.v ~help ~namespace ?subsystem "preapplied_blocks_count"
+      Counter.v ~help ~namespace ?subsystem "preapplied_blocks_count"
     in
     let preapplication_errors_count =
       let help = "Number of refused application simulations of blocks" in
-      Prometheus.Counter.v
-        ~help
-        ~namespace
-        ?subsystem
-        "preapplication_errors_count"
+      Counter.v ~help ~namespace ?subsystem "preapplication_errors_count"
     in
     let validation_errors_after_precheck_count =
       let help =
         "Number of requests to validate an invalid but precheckable block"
       in
-      Prometheus.Counter.v
+      Counter.v
         ~help
         ~namespace
         ?subsystem
@@ -296,11 +299,38 @@ module Block_validator = struct
         "Number of block validation requests where the prechecking of a block \
          failed"
       in
-      Prometheus.Counter.v ~help ~namespace ?subsystem "precheck_failed_count"
+      Counter.v ~help ~namespace ?subsystem "precheck_failed_count"
     in
     let validation_worker_metrics =
       Worker.declare ~label_names:[] ~namespace ?subsystem () []
     in
+    let operations_per_pass_metrics () =
+      let info =
+        MetricInfo.
+          {
+            name =
+              MetricName.v
+                (String.concat
+                   "_"
+                   ([namespace] @ name @ ["operations_per_pass"]));
+            metric_type = Gauge;
+            help = "Number of operations per pass for the last validated block";
+            label_names = List.map LabelName.v ["pass_id"];
+          }
+      in
+      (* This collector aims to associate a label for each operation
+         validation pass. The label name is based on the index of the
+         list of operations. *)
+      let collector () =
+        List.fold_left_i
+          (fun i map v ->
+            LabelSetMap.add [string_of_int i] [Sample_set.sample v] map)
+          LabelSetMap.empty
+          (block_validator_collectors.operations_per_pass ())
+      in
+      CollectorRegistry.(register default info collector)
+    in
+    operations_per_pass_metrics () ;
     {
       already_commited_blocks_count;
       outdated_blocks_count;

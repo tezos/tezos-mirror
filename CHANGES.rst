@@ -27,6 +27,9 @@ Node
 
 - Added a store metric to expose the amount of data written.
 
+- Added a block validator metric to expose the number of operation per
+  pass for each new block validated
+
 Client
 ------
 

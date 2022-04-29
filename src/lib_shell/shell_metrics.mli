@@ -68,6 +68,8 @@ module Block_validator : sig
   }
 
   val init : string trace -> t
+
+  val set_operation_per_pass_collector : (unit -> float list) -> unit
 end
 
 module Chain_validator : sig
