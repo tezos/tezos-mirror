@@ -35,20 +35,15 @@ let get_signer cctxt pkh =
   let* alias, pk, sk = Client_keys.get_key cctxt pkh in
   return {alias; pkh; pk; sk}
 
-type 'block reorg = {
-  ancestor : 'block option;
-  old_chain : 'block list;
-  new_chain : 'block list;
-}
+type 'block reorg = {old_chain : 'block list; new_chain : 'block list}
 
-let no_reorg = {ancestor = None; old_chain = []; new_chain = []}
+let no_reorg = {old_chain = []; new_chain = []}
 
 let reorg_encoding block_encoding =
   let open Data_encoding in
   conv
-    (fun {ancestor; old_chain; new_chain} -> (ancestor, old_chain, new_chain))
-    (fun (ancestor, old_chain, new_chain) -> {ancestor; old_chain; new_chain})
-  @@ obj3
-       (opt "ancestor" block_encoding)
+    (fun {old_chain; new_chain} -> (old_chain, new_chain))
+    (fun (old_chain, new_chain) -> {old_chain; new_chain})
+  @@ obj2
        (req "old_chain" (list block_encoding))
        (req "new_chain" (list block_encoding))

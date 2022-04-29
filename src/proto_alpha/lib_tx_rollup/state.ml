@@ -87,12 +87,7 @@ let tezos_reorg state ~old_head_hash ~new_head_hash =
   let open Lwt_result_syntax in
   let rec loop old_chain new_chain old_head_hash new_head_hash =
     if Block_hash.(old_head_hash = new_head_hash) then
-      let+ ancestor = fetch_tezos_block state old_head_hash in
-      {
-        ancestor = Some ancestor;
-        old_chain = List.rev old_chain;
-        new_chain = List.rev new_chain;
-      }
+      return {old_chain = List.rev old_chain; new_chain = List.rev new_chain}
     else
       let* new_head = fetch_tezos_block state new_head_hash in
       let* old_head = fetch_tezos_block state old_head_hash in
@@ -131,7 +126,7 @@ let set_tezos_head state new_head_hash =
         (* No known tezos head, consider the new head as being on top of a previous
            tezos block. *)
         let+ new_head = fetch_tezos_block state new_head_hash in
-        {ancestor = None; old_chain = []; new_chain = [new_head]}
+        {old_chain = []; new_chain = [new_head]}
     | Some old_head_hash -> tezos_reorg state ~old_head_hash ~new_head_hash
   in
   let* () =
@@ -213,20 +208,11 @@ let rollup_reorg state ~old_head ~new_head =
   let rec loop old_chain new_chain old_head new_head =
     match (old_head, new_head) with
     | None, _ | _, None ->
-        return
-          {
-            ancestor = None;
-            old_chain = List.rev old_chain;
-            new_chain = List.rev new_chain;
-          }
+        return {old_chain = List.rev old_chain; new_chain = List.rev new_chain}
     | Some old_head, Some new_head ->
         if L2block.Hash.(old_head.L2block.hash = new_head.L2block.hash) then
           return
-            {
-              ancestor = Some old_head;
-              old_chain = List.rev old_chain;
-              new_chain = List.rev new_chain;
-            }
+            {old_chain = List.rev old_chain; new_chain = List.rev new_chain}
         else
           let diff =
             distance_l2_levels

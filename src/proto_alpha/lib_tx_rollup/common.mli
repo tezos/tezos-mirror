@@ -33,9 +33,6 @@ type signer = {
 
 (** Type of chain reorganizations. *)
 type 'block reorg = {
-  ancestor : 'block option;
-      (** The common ancestor of the two chains. Can be [None] if the chains have no
-          common ancestor, in which case all the blocks are changed *)
   old_chain : 'block list;
       (** The blocks that were in the old chain and which are not in the new one. *)
   new_chain : 'block list;
