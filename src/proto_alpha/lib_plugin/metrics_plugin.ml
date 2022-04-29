@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Development. <contact@tezcore.com>             *)
+(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,17 +23,28 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Plugin = struct
-  module Proto = Registerer.Registered
-  include Plugin
-end
+open Protocol
+open Alpha_context
 
-module MetricsPlugin = struct
-  include Metrics_plugin
+type t = {cycle : float; consumed_gas : float}
 
-  let hash = Registerer.Registered.hash
-end
+let zero = {cycle = -1.; consumed_gas = -1.}
 
-let () = Prevalidator_filters.register (module Plugin)
-
-let () = Shell_metrics.Proto_plugin.register_plugin (module MetricsPlugin)
+let decode_metadata metadata =
+  match
+    Data_encoding.Binary.of_bytes_opt
+      Protocol.block_header_metadata_encoding
+      metadata
+  with
+  | None ->
+      (* this is the case of the genesis block and the activation block
+         in a sandbox environment *)
+      zero
+  | Some protocol_data ->
+      {
+        cycle = Int32.to_float (Cycle.to_int32 protocol_data.level_info.cycle);
+        consumed_gas =
+          Z.to_float
+            (Gas.Arith.integral_to_z
+               (Gas.Arith.ceil protocol_data.consumed_gas));
+      }

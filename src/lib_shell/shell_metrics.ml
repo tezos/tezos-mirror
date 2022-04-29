@@ -344,6 +344,47 @@ module Block_validator = struct
     }
 end
 
+module Proto_plugin = struct
+  module type PROTOMETRICS = sig
+    type t = {cycle : float; consumed_gas : float}
+
+    val hash : Protocol_hash.t
+
+    val decode_metadata : bytes -> t
+  end
+
+  module UndefinedProtoMetrics (P : sig
+    val hash : Protocol_hash.t
+  end) =
+  struct
+    type t = {cycle : float; consumed_gas : float}
+
+    let hash = P.hash
+
+    let decode_metadata _ = {cycle = -1.; consumed_gas = -1.}
+  end
+
+  let proto_metrics_table : (module PROTOMETRICS) Protocol_hash.Table.t =
+    Protocol_hash.Table.create 5
+
+  let register_plugin (module ProtoMetrics : PROTOMETRICS) =
+    Protocol_hash.Table.replace
+      proto_metrics_table
+      ProtoMetrics.hash
+      (module ProtoMetrics)
+
+  let find_plugin = Protocol_hash.Table.find proto_metrics_table
+
+  let safe_get_prevalidator_proto_metrics hash =
+    match find_plugin hash with
+    | Some proto_metrics -> Lwt.return proto_metrics
+    | None ->
+        let module ProtoMetrics = UndefinedProtoMetrics (struct
+          let hash = hash
+        end) in
+        Lwt.return (module ProtoMetrics : PROTOMETRICS)
+end
+
 module Chain_validator = struct
   type t = {
     head_level : Prometheus.Gauge.t;
@@ -351,6 +392,8 @@ module Chain_validator = struct
     branch_switch_count : Prometheus.Counter.t;
     head_increment_count : Prometheus.Counter.t;
     validation_worker_metrics : Worker.t;
+    head_cycle : Prometheus.Gauge.t;
+    consumed_gas : Prometheus.Gauge.t;
   }
 
   let init name =
@@ -398,6 +441,24 @@ module Chain_validator = struct
         ?subsystem
         "head_increment_count"
     in
+    let head_cycle =
+      let help = "Current cycle" in
+      Prometheus.Gauge.v_label
+        ~label_name
+        ~help
+        ~namespace
+        ?subsystem
+        "head_cycle"
+    in
+    let consumed_gas =
+      let help = "Consumed Gas" in
+      Prometheus.Gauge.v_label
+        ~label_name
+        ~help
+        ~namespace
+        ?subsystem
+        "consumed_gas"
+    in
     let validation_worker_metrics =
       Worker.declare ~label_names:[label_name] ~namespace ?subsystem ()
     in
@@ -409,7 +470,18 @@ module Chain_validator = struct
         branch_switch_count = branch_switch_count label;
         head_increment_count = head_increment_count label;
         validation_worker_metrics = validation_worker_metrics [label];
+        head_cycle = head_cycle label;
+        consumed_gas = consumed_gas label;
       }
+
+  let update_ref = ref (fun () -> Lwt.return_unit)
+
+  let update_proto update = update_ref := update
+
+  let pre_collect () = Lwt_main.run (!update_ref ())
+
+  let () =
+    Prometheus.CollectorRegistry.(register_pre_collect default) pre_collect
 end
 
 module Version = struct
