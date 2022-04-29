@@ -203,7 +203,7 @@ let test_wrapper ~protocol =
       ~burn_cap:Tez.(of_int 9999999)
       client
   in
-  let* () = Client.bake_for client in
+  let* () = Client.bake_for_and_wait client in
   let* actual_all_values =
     rpc_big_map_get_all ?offset:None ?length:None client
   in

@@ -209,7 +209,7 @@ let propagate_precheckable_bad_block =
     List.init blocks_to_bake Fun.id
     |> List.map succ
     |> Lwt_list.iter_s (fun i ->
-           let* () = Client.bake_for ~keys:[bootstrap1] client in
+           let* () = Client.bake_for_and_wait ~keys:[bootstrap1] client in
            wait_for_cluster_at_level cluster i)
   in
   let* block_header = forge_block ~client n1 ~key:bootstrap1 ~with_op:false in
@@ -291,7 +291,7 @@ let propagate_precheckable_bad_block =
     "Bake a valid block and check the cluster receives it (ensuring the \
      cluster is still connected)." ;
   (* One final bake to ensure everyone is at the same level *)
-  let* () = Client.bake_for ~keys:[bootstrap1] client in
+  let* () = Client.bake_for_and_wait ~keys:[bootstrap1] client in
   (* activation block + four blocks + the final bake *)
   wait_for_cluster_at_level cluster (1 + blocks_to_bake + 1)
 
@@ -333,7 +333,7 @@ let propagate_precheckable_bad_block_signature =
     List.init blocks_to_bake Fun.id
     |> List.map succ
     |> Lwt_list.iter_s (fun i ->
-           let* () = Client.bake_for ~keys:[bootstrap1] client in
+           let* () = Client.bake_for_and_wait ~keys:[bootstrap1] client in
            wait_for_cluster_at_level cluster i)
   in
   let* op_block_header = forge_block ~client n1 ~key:bootstrap1 ~with_op:true in
@@ -416,7 +416,7 @@ let propagate_precheckable_bad_block_signature =
     "Bake a valid block and check the cluster receives it (ensuring the \
      cluster is still connected)." ;
   (* One final bake to ensure everyone is at the same level *)
-  let* () = Client.bake_for ~keys:[bootstrap1] client in
+  let* () = Client.bake_for_and_wait ~keys:[bootstrap1] client in
   (* activation block + four blocks + the final bake *)
   wait_for_cluster_at_level cluster (1 + blocks_to_bake + 1)
 

@@ -87,7 +87,7 @@ module Helpers = struct
         ~prg
         client
     in
-    let* () = Client.bake_for client in
+    let* () = Client.bake_for_and_wait client in
     Log.info "  - Originated %s." contract ;
     return (client, contract_address)
 
@@ -156,7 +156,7 @@ module Helpers = struct
     in
     if expect_failure then return (0., 0.)
     else
-      let* () = Client.bake_for client in
+      let* () = Client.bake_for_and_wait client in
       Log.info "shield" ;
       return @@ Re.balance_diff ~dst:contract client_output
 
@@ -197,7 +197,7 @@ module Helpers = struct
             ])
         |> Process.check
       in
-      let* () = Client.bake_for client in
+      let* () = Client.bake_for_and_wait client in
       Log.info "transfer" ;
       unit
 
@@ -223,7 +223,7 @@ module Helpers = struct
     in
     if expect_failure then return (0., 0.)
     else
-      let* () = Client.bake_for client in
+      let* () = Client.bake_for_and_wait client in
       Log.info "unshield" ;
       return @@ Re.balance_diff ~dst:contract client_output
 

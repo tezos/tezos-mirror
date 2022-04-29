@@ -191,23 +191,19 @@ end
 module Helpers = struct
   (** Bake a block and wait for the node to switch to this head *)
   let bake_and_wait_block {client; node} =
-    let* level_json = RPC.get_current_level client in
-    let level = JSON.(level_json |-> "level" |> as_int) in
-    let* () =
-      Client.bake_for ~context_path:(Node.data_dir node // "context") client
-      (* We need to have the client build the block without the
-         /helpers/preapply/block RPC to the node because this RPC serializes the
-         operations before sending them off to Block_validator.preapply.
+    (* We need to have the client build the block without the
+       /helpers/preapply/block RPC to the node because this RPC serializes the
+       operations before sending them off to Block_validator.preapply.
 
-         This is needed to expose the bug where a baker could build an invalid
-         block (wrt. the context hash), if it got the operation deserialized from
-         the mempool and then builds a block without accounting for the
-         deserialization cost of the parameters. (This is captured by the test
-         Deserialization.test_deserialization_gas_accounting.)
-      *)
-    in
-    let* _i = Node.wait_for_level node (level + 1) in
-    Lwt.return_unit
+       This is needed to expose the bug where a baker could build an invalid
+       block (wrt. the context hash), if it got the operation deserialized from
+       the mempool and then builds a block without accounting for the
+       deserialization cost of the parameters. (This is captured by the test
+       Deserialization.test_deserialization_gas_accounting.)
+    *)
+    Client.bake_for_and_wait
+      ~context_path:(Node.data_dir node // "context")
+      client
 
   let contract_file alias =
     `File (Format.sprintf "./tezt/tests/contracts/proto_alpha/%s" alias)

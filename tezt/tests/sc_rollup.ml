@@ -157,7 +157,7 @@ let test_origination =
           ~boot_sector:""
           client
       in
-      Client.bake_for client)
+      Client.bake_for_and_wait client)
 
 (* Configuration of a rollup node
    ------------------------------
@@ -309,13 +309,7 @@ let test_rollup_get_initial_level =
       ( with_fresh_rollup @@ fun sc_rollup_address _sc_rollup_node _filename ->
         (* Bake 10 blocks to be sure that the initial level of rollup is different
            from the current level. *)
-        let rec bake_blocks n =
-          match n with
-          | 0 -> return ()
-          | _ ->
-              Lwt.bind (Client.bake_for client) (fun _ -> bake_blocks (n - 1))
-        in
-        let* _ = bake_blocks 10 in
+        let* _ = repeat 10 (fun () -> Client.bake_for_and_wait client) in
         let* initial_level =
           RPC.Sc_rollup.get_initial_level ~sc_rollup_address client
         in
@@ -347,7 +341,7 @@ let send_message client sc_rollup_address msg =
       ~msg
       client
   in
-  Client.bake_for client
+  Client.bake_for_and_wait client
 
 let send_messages n sc_rollup_address client =
   let messages =
@@ -716,7 +710,7 @@ let test_rollup_list =
     with_fresh_rollups
       10
       (fun scoru_addresses ->
-        let* () = Client.bake_for client in
+        let* () = Client.bake_for_and_wait client in
         let+ rollups = RPC.Sc_rollup.list client in
         let rollups =
           JSON.as_list rollups |> List.map JSON.as_string |> String_set.of_list

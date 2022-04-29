@@ -99,7 +99,7 @@ let setup_node ~limit protocol =
       ~burn_cap:Tez.(of_int 1)
       client
   in
-  let* () = Client.bake_for client in
+  let* () = Client.bake_for_and_wait client in
   return (contract_id, client, node)
 
 let check_default_limit_metadata =
@@ -127,7 +127,7 @@ let check_default_limit_metadata =
       ~force:true
       client
   in
-  let* () = Client.bake_for client in
+  let* () = Client.bake_for_and_wait client in
   (* All protocols should store the metadata. *)
   let* () = metadata_is_available client small_exponent in
   (* We now call the contract with a bigger exponent to exceed the
@@ -147,7 +147,7 @@ let check_default_limit_metadata =
       ~force:true
       client
   in
-  let* () = Client.bake_for client in
+  let* () = Client.bake_for_and_wait client in
   (* All protocols should not store the metadata. *)
   let* () = metadata_is_not_available client in
   unit
@@ -179,7 +179,7 @@ let check_limit_metadata =
       ~force:true
       client
   in
-  let* () = Client.bake_for client in
+  let* () = Client.bake_for_and_wait client in
   (* The metadata should be present. *)
   let* () = metadata_is_available client small_exponent in
   (* We now call the contract with a bigger exponent to exceed the
@@ -198,7 +198,7 @@ let check_limit_metadata =
       ~force:true
       client
   in
-  let* () = Client.bake_for client in
+  let* () = Client.bake_for_and_wait client in
   (* The metadata shouldn't be present. *)
   let* () = metadata_is_not_available client in
   unit
@@ -228,7 +228,7 @@ let check_unlimited_metadata =
       ~force:true
       client
   in
-  let* () = Client.bake_for client in
+  let* () = Client.bake_for_and_wait client in
   (* The metadata should be present. *)
   let* () = metadata_is_available client big_exponent in
   unit
@@ -260,7 +260,7 @@ let check_metadata_force_recompute =
       ~force:true
       client
   in
-  let* () = Client.bake_for client in
+  let* () = Client.bake_for_and_wait client in
   (* The metadata should be present. *)
   let* () = metadata_is_available client small_exponent in
   (* We now call the contract with a bigger exponent to exceed the
@@ -279,7 +279,7 @@ let check_metadata_force_recompute =
       ~force:true
       client
   in
-  let* () = Client.bake_for client in
+  let* () = Client.bake_for_and_wait client in
   (* The metadata shouldn't be present. *)
   let* () = metadata_is_not_available client in
   (* The metadata should be available as we force the node to

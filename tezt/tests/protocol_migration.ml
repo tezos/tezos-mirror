@@ -55,7 +55,7 @@ let test_protocol_migration ~blocks_per_cycle ~migration_level ~migrate_from
   let* () = Client.activate_protocol ~protocol:migrate_from client in
   Log.info "Protocol activated" ;
   (* Bake until migration *)
-  let* () = repeat 2 (fun () -> Client.bake_for client) in
+  let* () = repeat 2 (fun () -> Client.bake_for_and_wait client) in
   (* Ensure that we did migrate *)
   let* migration_block = RPC.get_block_metadata ~block:"2" client in
   let protocol = JSON.(migration_block |-> "protocol" |> as_string) in
@@ -70,7 +70,7 @@ let test_protocol_migration ~blocks_per_cycle ~migration_level ~migrate_from
       string
       ~error_msg:"expected next_protocol = %R, got %L") ;
   (* Test that we can still bake after migration *)
-  let* () = repeat 5 (fun () -> Client.bake_for client) in
+  let* () = repeat 5 (fun () -> Client.bake_for_and_wait client) in
   unit
 
 (* Test all levels for one cycle, after the first cycle. *)

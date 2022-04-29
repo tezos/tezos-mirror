@@ -72,7 +72,9 @@ let register =
   (* We use [context_path] to ensure the baker will not use the
      preapply RPC. Indeed, this test was introduced because of a bug
      that happens when the baker does not use the preapply RPC. *)
-  let* () = Client.bake_for ~context_path:(data_dir // "context") client in
+  let* () =
+    Client.bake_for_and_wait ~context_path:(data_dir // "context") client
+  in
   let wait_injection = Node.wait_for_request ~request:`Inject node in
   let* (`OpHash _todo) =
     Operation.inject_contract_call
@@ -84,7 +86,9 @@ let register =
       client
   in
   let* () = wait_injection in
-  let* () = Client.bake_for ~context_path:(data_dir // "context") client in
+  let* () =
+    Client.bake_for_and_wait ~context_path:(data_dir // "context") client
+  in
   let wait_injection = Node.wait_for_request ~request:`Inject node in
   let* (`OpHash _op_hash) =
     Operation.inject_contract_call
@@ -96,6 +100,4 @@ let register =
       client
   in
   let* () = wait_injection in
-  let* () = Client.bake_for ~context_path:(data_dir // "context") client in
-  let* _ = Node.wait_for_level node 4 in
-  unit
+  Client.bake_for_and_wait ~context_path:(data_dir // "context") client

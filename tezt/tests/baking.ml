@@ -361,7 +361,7 @@ let bake_with_mempool ?protocol node client mempool =
   in
   (* Use --context's client argument to prevent the node from sorting
      the operations. *)
-  Client.bake_for
+  Client.bake_for_and_wait
     ?protocol
     ~mempool
     ~force:true
@@ -602,11 +602,15 @@ let baking_operation_exception_ithaca =
   (* We use [context_path] to ensure the baker will not use the
      preapply RPC. Indeed, this test was introduced because of a bug
      that happens when the baker does not use the preapply RPC. *)
-  let* () = Client.bake_for ~context_path:(data_dir // "context") client in
+  let* () =
+    Client.bake_for_and_wait ~context_path:(data_dir // "context") client
+  in
   let wait_injection = Node.wait_for_request ~request:`Inject node in
   let*! () = Client.reveal ~fee:Tez.one ~src:new_account.alias client in
   let* () = wait_injection in
-  let* () = Client.bake_for ~context_path:(data_dir // "context") client in
+  let* () =
+    Client.bake_for_and_wait ~context_path:(data_dir // "context") client
+  in
   let*! json_balance =
     RPC.Contracts.get_balance ~contract_id:new_account.public_key_hash client
   in
@@ -668,11 +672,15 @@ let baking_operation_exception =
   (* We use [context_path] to ensure the baker will not use the
      preapply RPC. Indeed, this test was introduced because of a bug
      that happens when the baker does not use the preapply RPC. *)
-  let* () = Client.bake_for ~context_path:(data_dir // "context") client in
+  let* () =
+    Client.bake_for_and_wait ~context_path:(data_dir // "context") client
+  in
   let wait_injection = Node.wait_for_request ~request:`Inject node in
   let*! () = Client.reveal ~fee:Tez.one ~src:new_account.alias client in
   let* () = wait_injection in
-  let* () = Client.bake_for ~context_path:(data_dir // "context") client in
+  let* () =
+    Client.bake_for_and_wait ~context_path:(data_dir // "context") client
+  in
   let wait_injection = Node.wait_for_request ~request:`Inject node in
   let* _ =
     Operation.inject_delegation
@@ -682,9 +690,7 @@ let baking_operation_exception =
       client
   in
   let* () = wait_injection in
-  let* () = Client.bake_for ~context_path:(data_dir // "context") client in
-  let* _ = Node.wait_for_level node 4 in
-  unit
+  Client.bake_for_and_wait ~context_path:(data_dir // "context") client
 
 let register ~protocols =
   test_ordering protocols ;

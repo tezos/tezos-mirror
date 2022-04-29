@@ -53,10 +53,10 @@ let init_light ~protocol =
   assert (is_light_mode mode_received) ;
   Client.set_mode (Client.Client (Some (Node node0), None)) client ;
   let* () =
-    Client.bake_for ~endpoint ~keys:[Constant.bootstrap1.alias] client
+    Client.bake_for_and_wait ~endpoint ~keys:[Constant.bootstrap1.alias] client
   in
   let* () =
-    Client.bake_for ~endpoint ~keys:[Constant.bootstrap2.alias] client
+    Client.bake_for_and_wait ~endpoint ~keys:[Constant.bootstrap2.alias] client
   in
   let* level_json = get_current_level ~endpoint client in
   let level = JSON.(level_json |-> "level" |> as_int) in
@@ -150,7 +150,7 @@ let test_bake =
   let* (_, client) = init_light ~protocol in
   let giver = Constant.bootstrap1.alias in
   let* () = do_transfer ~giver client in
-  Client.bake_for ~keys:[giver] client
+  Client.bake_for_and_wait ~keys:[giver] client
 
 module NoUselessRpc = struct
   (** [starts_with prefix s] returns [true] iff [prefix] is a prefix of [s]. *)

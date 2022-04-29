@@ -51,7 +51,7 @@ let check_client_force =
       ~burn_cap:Tez.(of_int 1)
       client
   in
-  let* () = Client.bake_for client in
+  let* () = Client.bake_for_and_wait client in
   let* () =
     Client.transfer
       ~gas_limit:100_000
@@ -65,7 +65,7 @@ let check_client_force =
       ~force:true
       client
   in
-  let* () = Client.bake_for client in
+  let* () = Client.bake_for_and_wait client in
   let* first_manager_operation =
     Client.rpc
       Client.GET
