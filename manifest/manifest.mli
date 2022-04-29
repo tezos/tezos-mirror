@@ -753,8 +753,12 @@ val tests :
     Default value for [js_compatible] is false.
 
     [npm_deps]: npm dependencies used when targeting JavaScript.
+
+    [released_on_opam]: whether the library is available on the upstream opam-repository (default true).
+    In case the lib is not available on opam, tezos packages depending on it won't be installable on opam. 
  *)
 val vendored_lib :
+  ?released_on_opam:bool ->
   ?main_module:string ->
   ?js_compatible:bool ->
   ?npm_deps:Npm.t list ->
