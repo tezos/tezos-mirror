@@ -46,9 +46,7 @@ let output_stanzas prefix =
  (targets %s)
  (deps (:pp pp.exe) (:input %s))
  (action
-   (progn
-      (run ./%%{pp} --impl %%{input} -o %%{targets})
-      (run ocamlformat %%{targets} -i))))
+   (run ./%%{pp} --impl %%{input} -o %%{targets})))
 
 ; Compares preprocessed output with expected output
 (rule

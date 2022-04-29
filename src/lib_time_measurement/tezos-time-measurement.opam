@@ -12,8 +12,6 @@ depends: [
   "data-encoding" {>= "0.4"}
   "lwt" {>= "5.4.2"}
   "tezos-event-logging" {dev}
-  "ppx_inline_test" {with-test}
-  "ocamlformat" {with-test}
   "odoc" {with-doc}
 ]
 build: [
