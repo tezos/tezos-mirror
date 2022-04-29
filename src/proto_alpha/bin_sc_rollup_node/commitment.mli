@@ -44,37 +44,39 @@ open Protocol.Alpha_context
 module type Mutable_level_store =
   Store.Mutable_value with type value = Raw_level.t
 
-(** [process_head (module PVM) node_ctxt store head] checks whether a new
-    commitment needs to be computed and stored, by looking at the level of
-    [head] and checking whether it is a multiple of 20 levels away from
-    [node_ctxt.initial_level]. It uses the functionalities of [PVM] to
-    compute the hash of to be included in the commitment.
-*)
-
-val process_head :
-  (module Pvm.S) ->
-  Node_context.t ->
-  Store.t ->
-  Layer1.head ->
-  unit tzresult Lwt.t
-
-(** [publish_commitment node_ctxt store] publishes the earliest
-    commitment stored in [store] that has not been published yet.
-    It uses [node_ctxt.cctxt] to make the RPC call to the Layer1 node.
-*)
-
-val publish_commitment : Node_context.t -> Store.t -> unit tzresult Lwt.t
-
-(** [start ()] only emits the event that the commitment manager
-    for the rollup node has started. *)
-val start : unit -> unit Lwt.t
-
 (** [last_commitment (module Last_level_module: Mutable_level_store) store]
-    returns the last commitment (if any) stored according to the value of
-    level indicated by [module Last_level_module]. Two possible implementations
-    for the latter are [Store.Last_published_commitment_level] and
-    [Store.Last_stored_commitment_level].
-*)
+      returns the last commitment (if any) stored according to the value of
+      level indicated by [module Last_level_module]. Two possible implementations
+      for the latter are [Store.Last_published_commitment_level] and
+      [Store.Last_stored_commitment_level].
+  *)
 
 val last_commitment :
   (module Mutable_level_store) -> Store.t -> Sc_rollup.Commitment.t option Lwt.t
+
+module type S = sig
+  module PVM : Pvm.S
+
+  (** [process_head node_ctxt store head] checks whether a new
+      commitment needs to be computed and stored, by looking at the level of
+      [head] and checking whether it is a multiple of 20 levels away from
+      [node_ctxt.initial_level]. It uses the functionalities of [PVM] to
+      compute the hash of to be included in the commitment.
+  *)
+
+  val process_head :
+    Node_context.t -> Store.t -> Layer1.head -> unit tzresult Lwt.t
+
+  (** [publish_commitment node_ctxt store] publishes the earliest
+      commitment stored in [store] that has not been published yet.
+      It uses [node_ctxt.cctxt] to make the RPC call to the Layer1 node.
+  *)
+
+  val publish_commitment : Node_context.t -> Store.t -> unit tzresult Lwt.t
+
+  (** [start ()] only emits the event that the commitment manager
+      for the rollup node has started. *)
+  val start : unit -> unit Lwt.t
+end
+
+module Make (PVM : Pvm.S) : S with module PVM = PVM

@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
+(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,50 +23,23 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol
-open Alpha_context
+module type S = sig
+  module PVM : Pvm.S
 
-type t = {
-  cctxt : Protocol_client_context.full;
-  rollup_address : Sc_rollup.t;
-  operator : Signature.Public_key_hash.t;
-  initial_level : Raw_level.t;
-  block_finality_time : int;
-  kind : Sc_rollup.Kind.t;
-}
+  module Interpreter : Interpreter.S
 
-let get_operator_keys node_ctxt =
-  let open Lwt_result_syntax in
-  let+ (_, pk, sk) = Client_keys.get_key node_ctxt.cctxt node_ctxt.operator in
-  (node_ctxt.operator, pk, sk)
+  module Commitment : Commitment.S with module PVM = PVM
 
-let init (cctxt : Protocol_client_context.full) rollup_address operator =
-  let open Lwt_result_syntax in
-  let* initial_level =
-    Plugin.RPC.Sc_rollup.initial_level
-      cctxt
-      (cctxt#chain, cctxt#block)
-      rollup_address
-  in
-  let* kind =
-    Plugin.RPC.Sc_rollup.kind cctxt (cctxt#chain, cctxt#block) rollup_address ()
-  in
-  let+ kind =
-    match kind with
-    | Some k -> return k
-    | None ->
-        (* Technically this error cannot happen, initial level will fail if the
-           rollup does not exist. *)
-        cctxt#error
-          "Rollup %a does not exists."
-          Sc_rollup.Address.pp
-          rollup_address
-  in
-  {
-    cctxt;
-    rollup_address;
-    operator;
-    initial_level;
-    kind;
-    block_finality_time = 2;
-  }
+  module RPC_server : RPC_server.S with module PVM = PVM
+end
+
+module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
+  module PVM = PVM
+  module Interpreter = Interpreter.Make (PVM)
+  module Commitment = Commitment.Make (PVM)
+  module RPC_server = RPC_server.Make (PVM)
+end
+
+let pvm_of_kind : Protocol.Alpha_context.Sc_rollup.Kind.t -> (module Pvm.S) =
+  function
+  | Example_arith -> (module Arith_pvm)

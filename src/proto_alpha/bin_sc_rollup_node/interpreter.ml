@@ -133,5 +133,3 @@ module Make (PVM : Pvm.S) : S = struct
     let*! predecessor_hash = Layer1.predecessor store head in
     transition_pvm node_ctxt store predecessor_hash hash
 end
-
-module Arith = Make (Arith_pvm)

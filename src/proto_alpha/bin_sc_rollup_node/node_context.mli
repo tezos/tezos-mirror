@@ -39,6 +39,7 @@ type t = {
       (** Origination level of the smart contract rollup. *)
   block_finality_time : int;
       (** Deterministic block finality time for the layer 1 protocol. *)
+  kind : Sc_rollup.Kind.t;  (** Kind of the smart contract rollup. *)
 }
 
 (** [get_operator_keys cctxt] returns a triple [(pkh, pk, sk)] corresponding
@@ -51,8 +52,8 @@ val get_operator_keys :
   Lwt.t
 
 (** [init cctxt sc_rollup operator_pkh] initialises the rollup representation.
-    The rollup origination level is fetched via an RPC call to the layer1 node
-    that [cctxt] uses for RPC requests.
+    The rollup origination level and kind are fetched via an RPC call to the
+    layer1 node that [cctxt] uses for RPC requests.
 *)
 val init :
   Protocol_client_context.full ->
