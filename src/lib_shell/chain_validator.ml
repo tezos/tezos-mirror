@@ -537,6 +537,7 @@ let on_request (type a) w start_testchain active_chains spawn_child
 let on_completion (type a) w (req : a Request.t) (update : a) request_status =
   match req with
   | Request.Validated {block; _} ->
+      let open Lwt_syntax in
       let fitness = Store.Block.fitness block in
       let request = Request.Hash (Store.Block.hash block) in
       let level = Store.Block.level block in
@@ -547,6 +548,36 @@ let on_completion (type a) w (req : a Request.t) (update : a) request_status =
           Shell_metrics.Worker.update
             nv.parameters.metrics.validation_worker_metrics
             request_status
+        in
+        let collect_proto (chain_store, block) =
+          let* metadata_opt =
+            Store.Block.get_block_metadata_opt chain_store block
+          in
+          match metadata_opt with
+          | None -> Lwt.return_unit
+          | Some metadata ->
+              let open Shell_metrics.Proto_plugin in
+              let protocol_metadata = Block_repr.block_metadata metadata in
+              Lwt.catch
+                (fun () ->
+                  (* Return Noop if the protocol does not exist, and
+                     UndefinedMetric if the plugin for the protocol
+                     does not exist *)
+                  let* (module ProtoMetrics) =
+                    let* protocol =
+                      Store.Block.protocol_hash_exn chain_store block
+                    in
+                    safe_get_prevalidator_proto_metrics protocol
+                  in
+                  let {ProtoMetrics.cycle; consumed_gas} =
+                    ProtoMetrics.decode_metadata protocol_metadata
+                  in
+                  Prometheus.Gauge.set nv.parameters.metrics.head_cycle cycle ;
+                  Prometheus.Gauge.set
+                    nv.parameters.metrics.consumed_gas
+                    consumed_gas ;
+                  Lwt.return_unit)
+                (fun _ -> Lwt.return_unit)
         in
         match update with
         | Event.Ignored_head ->
@@ -561,7 +592,9 @@ let on_completion (type a) w (req : a Request.t) (update : a) request_status =
               nv.parameters.metrics.head_increment_count ;
             Prometheus.Gauge.set
               nv.parameters.metrics.head_level
-              (Int32.to_float level)
+              (Int32.to_float level) ;
+            Shell_metrics.Chain_validator.update_proto (fun () ->
+                collect_proto (nv.parameters.chain_store, block))
       in
       Worker.record_event
         w
