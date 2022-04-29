@@ -472,10 +472,7 @@ let queue_gc_operations state =
   let open Lwt_result_syntax in
   let tx_rollup = state.State.rollup_info.rollup_id in
   let inject source op =
-    let manager_operation = Manager op in
-    let hash = L1_operation.hash_manager_operation manager_operation in
-    Injector.add_pending_operation
-      {L1_operation.hash; source; manager_operation}
+    Injector.add_pending_operation (L1_operation.make ~source op)
   in
   let queue_finalize_commitment state =
     match state.State.signers.finalize_commitment with

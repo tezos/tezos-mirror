@@ -114,8 +114,6 @@ let dispatch_withdrawals ~source state block =
   let* operations = dispatch_operations_of_block state block in
   List.iter_es
     (fun dispatch_op ->
-      let manager_operation = Manager dispatch_op in
-      let hash = L1_operation.hash_manager_operation manager_operation in
-      Injector.add_pending_operation
-        {L1_operation.hash; source; manager_operation})
+      let l1_operation = L1_operation.make ~source dispatch_op in
+      Injector.add_pending_operation l1_operation)
     operations

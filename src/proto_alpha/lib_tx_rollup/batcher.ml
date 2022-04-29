@@ -53,21 +53,15 @@ let inject_batches state batches =
       (fun batch ->
         let open Result_syntax in
         let+ batch_content = encode_batch batch in
-        let manager_operation =
-          Manager
-            (Tx_rollup_submit_batch
-               {
-                 tx_rollup = state.rollup;
-                 content = batch_content;
-                 burn_limit = state.batch_burn_limit;
-               })
+        let batch_operation =
+          Tx_rollup_submit_batch
+            {
+              tx_rollup = state.rollup;
+              content = batch_content;
+              burn_limit = state.batch_burn_limit;
+            }
         in
-        {
-          L1_operation.hash =
-            L1_operation.hash_manager_operation manager_operation;
-          source = state.signer;
-          manager_operation;
-        })
+        L1_operation.make ~source:state.signer batch_operation)
       batches
   in
   Injector.add_pending_operations operations

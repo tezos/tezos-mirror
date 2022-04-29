@@ -32,7 +32,7 @@ module Hash : S.HASH
 type hash = Hash.t
 
 (** The type of L1 operations that are injected on Tezos by the rollup node *)
-type t = {
+type t = private {
   hash : hash;  (** The hash of the L1 manager operation (without the source) *)
   source : public_key_hash;
       (** The source of the operation, i.e., the key that will sign the
@@ -41,12 +41,12 @@ type t = {
   manager_operation : packed_manager_operation;  (** The manager operation *)
 }
 
+(** [make ~source op] returns an L1 operation with the corresponding hash and
+    whose source is set to [source]. *)
+val make : source:public_key_hash -> 'a manager_operation -> t
+
 (** Hash a manager operation *)
 val hash_manager_operation : packed_manager_operation -> hash
-
-(** Hash an L1 operation. This is the same as hashing the corresponding manager
-    operation. *)
-val hash : t -> hash
 
 (** Encoding for L1 operations *)
 val encoding : t Data_encoding.t

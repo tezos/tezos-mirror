@@ -176,9 +176,10 @@ let hash_manager_operation op =
   Hash.hash_bytes
     [Data_encoding.Binary.to_bytes_exn Manager_operation.encoding op]
 
-let hash op =
-  (* Hashing only manager operation *)
-  hash_manager_operation op.manager_operation
+let make ~source manager_operation =
+  let manager_operation = Manager manager_operation in
+  let hash = hash_manager_operation manager_operation in
+  {hash; source; manager_operation}
 
 let encoding =
   let open Data_encoding in
