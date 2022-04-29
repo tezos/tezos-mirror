@@ -23,6 +23,10 @@ be documented here either.
 Node
 ----
 
+- Fixed the RPC ``/chains/<chain>/mempool/monitor_operations`` which
+  would not notify outdated operations when the query
+  ``outdated=true`` was provided.
+
 - Added optional parameter ``--media-type`` and its corresponding field
   in the configuration file. It defines which format of data serialisation
   must be used for RPC requests to the node. The value can be  ``json``,
@@ -68,6 +72,10 @@ Client
 
 Baker / Endorser / Accuser
 --------------------------
+
+- Fixed a memory leak in ``baker`` binary (Ithaca2, Jakarta and Alpha)
+
+- Fixed a memory leak in ``accuser`` binary (Ithaca2, Jakarta and Alpha)
 
 Proxy server
 ------------
