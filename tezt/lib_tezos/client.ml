@@ -1174,14 +1174,14 @@ let hash_data ?expect_failure ?hooks ~data ~typ client =
   let key_value_list = List.map parse_line lines |> List.filter_map Fun.id in
   Lwt.return key_value_list
 
+let normalize_mode_to_string = function
+  | Readable -> "Readable"
+  | Optimized -> "Optimized"
+  | Optimized_legacy -> "Optimized_legacy"
+
 let spawn_normalize_data ?mode ?(legacy = false) ~data ~typ client =
-  let mode_to_string = function
-    | Readable -> "Readable"
-    | Optimized -> "Optimized"
-    | Optimized_legacy -> "Optimized_legacy"
-  in
   let mode_cmd =
-    Option.map mode_to_string mode
+    Option.map normalize_mode_to_string mode
     |> Option.map (fun s -> ["--unparsing-mode"; s])
   in
   let cmd =
@@ -1196,13 +1196,8 @@ let normalize_data ?mode ?legacy ~data ~typ client =
   |> Process.check_and_read_stdout
 
 let spawn_normalize_script ?mode ~script client =
-  let mode_to_string = function
-    | Readable -> "Readable"
-    | Optimized -> "Optimized"
-    | Optimized_legacy -> "Optimized_legacy"
-  in
   let mode_cmd =
-    Option.map mode_to_string mode
+    Option.map normalize_mode_to_string mode
     |> Option.map (fun s -> ["--unparsing-mode"; s])
   in
   let cmd =
@@ -1237,6 +1232,40 @@ let typecheck_script ~script ?(details = false) ?(emacs = false)
     ~no_print_source
     ?gas
     ~legacy
+    client
+  |> Process.check_and_read_stdout
+
+let spawn_run_view ?hooks ?source ?payer ?gas ?unparsing_mode ~view ~contract
+    ?input ?(unlimited_gas = false) client =
+  let input_params =
+    match input with None -> [] | Some input -> ["with"; "input"; input]
+  in
+  spawn_command
+    ?hooks
+    client
+    (["run"; "view"; view; "on"; "contract"; contract]
+    @ input_params
+    @ optional_arg ~name:"payer" Fun.id payer
+    @ optional_arg ~name:"source" Fun.id source
+    @ optional_arg
+        ~name:"unparsing-mode"
+        normalize_mode_to_string
+        unparsing_mode
+    @ optional_arg ~name:"gas" Int.to_string gas
+    @ if unlimited_gas then ["--unlimited-gas"] else [])
+
+let run_view ?hooks ?source ?payer ?gas ?unparsing_mode ~view ~contract ?input
+    ?unlimited_gas client =
+  spawn_run_view
+    ?hooks
+    ?source
+    ?payer
+    ?gas
+    ?unparsing_mode
+    ~view
+    ~contract
+    ?input
+    ?unlimited_gas
     client
   |> Process.check_and_read_stdout
 
@@ -1762,17 +1791,12 @@ let spawn_register_key owner client =
 let register_key owner client = spawn_register_key owner client |> Process.check
 
 let contract_storage ?unparsing_mode address client =
-  let unparsing_mode_to_string = function
-    | `Optimized -> "Optimized"
-    | `Optimized_legacy -> "Optimized_legacy"
-    | `Readable -> "Readable"
-  in
   spawn_command
     client
     (["get"; "contract"; "storage"; "for"; address]
     @ optional_arg
         ~name:"unparsing-mode"
-        unparsing_mode_to_string
+        normalize_mode_to_string
         unparsing_mode)
   |> Process.check_and_read_stdout
 

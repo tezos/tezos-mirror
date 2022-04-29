@@ -979,4 +979,85 @@ let commands () =
             entrypoint;
           }
         >>= fun res -> print_view_result cctxt res);
+    command
+      ~group
+      ~desc:"Ask the node to run a Michelson view with Unit as input."
+      (args7
+         source_arg
+         payer_arg
+         run_gas_limit_arg
+         unlimited_gas_arg
+         (unparsing_mode_arg ~default:"Readable")
+         now_arg
+         level_arg)
+      (prefixes ["run"; "view"]
+      @@ param ~name:"view" ~desc:"the name of the view" string_parameter
+      @@ prefixes ["on"; "contract"]
+      @@ ContractAlias.destination_param
+           ~name:"contract"
+           ~desc:"the contract containing the view"
+      @@ stop)
+      (fun (source, payer, gas, unlimited_gas, unparsing_mode, now, level)
+           view
+           (_, contract)
+           cctxt ->
+        let source = Option.map snd source in
+        let payer = Option.map snd payer in
+        Micheline_parser.no_parsing_error
+        @@ Michelson_v1_parser.parse_expression "Unit"
+        >>?= fun input ->
+        Client_proto_programs.run_script_view
+          cctxt
+          ~chain:cctxt#chain
+          ~block:cctxt#block
+          {
+            shared_params =
+              {input; unparsing_mode; now; level; source; payer; gas};
+            contract;
+            view;
+            unlimited_gas;
+          }
+        >>= fun res -> print_view_result cctxt res);
+    command
+      ~group
+      ~desc:"Ask the node to run a Michelson view."
+      (args7
+         source_arg
+         payer_arg
+         run_gas_limit_arg
+         unlimited_gas_arg
+         (unparsing_mode_arg ~default:"Readable")
+         now_arg
+         level_arg)
+      (prefixes ["run"; "view"]
+      @@ param ~name:"view" ~desc:"the name of the view" string_parameter
+      @@ prefixes ["on"; "contract"]
+      @@ ContractAlias.destination_param
+           ~name:"contract"
+           ~desc:"the contract containing the view"
+      @@ prefixes ["with"; "input"]
+      @@ param
+           ~name:"input"
+           ~desc:"the argument provided to the view"
+           data_parameter
+      @@ stop)
+      (fun (source, payer, gas, unlimited_gas, unparsing_mode, now, level)
+           view
+           (_, contract)
+           input
+           cctxt ->
+        let source = Option.map snd source in
+        let payer = Option.map snd payer in
+        Client_proto_programs.run_script_view
+          cctxt
+          ~chain:cctxt#chain
+          ~block:cctxt#block
+          {
+            shared_params =
+              {input; unparsing_mode; now; level; source; payer; gas};
+            contract;
+            view;
+            unlimited_gas;
+          }
+        >>= fun res -> print_view_result cctxt res);
   ]

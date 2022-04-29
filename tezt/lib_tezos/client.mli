@@ -985,6 +985,39 @@ val spawn_typecheck_script :
   t ->
   Process.t
 
+(** Same as [run_view] but does not wait for the process to exit. *)
+val spawn_run_view :
+  ?hooks:Process.hooks ->
+  ?source:string ->
+  ?payer:string ->
+  ?gas:int ->
+  ?unparsing_mode:normalize_mode ->
+  view:string ->
+  contract:string ->
+  ?input:string ->
+  ?unlimited_gas:bool ->
+  t ->
+  Process.t
+
+(** Run [tezos-client run view .. on contract .. with input ..].
+
+    Returns the value returned by a view as a string.
+
+    Fails if the view or the contract does not exist. If [input] is [None], it
+    runs [tezos-client run view .. on contract ..]. *)
+val run_view :
+  ?hooks:Process.hooks ->
+  ?source:string ->
+  ?payer:string ->
+  ?gas:int ->
+  ?unparsing_mode:normalize_mode ->
+  view:string ->
+  contract:string ->
+  ?input:string ->
+  ?unlimited_gas:bool ->
+  t ->
+  string Lwt.t
+
 (** Run [tezos-client list mode protocols].
 
     Note: the [list protocols] command (without mode) is an admin command
@@ -1319,10 +1352,7 @@ val register_key : string -> t -> unit Lwt.t
 (** Get contract storage for a contract. Returns a Micheline expression
     representing the storage as a string. *)
 val contract_storage :
-  ?unparsing_mode:[`Optimized | `Optimized_legacy | `Readable] ->
-  string ->
-  t ->
-  string Lwt.t
+  ?unparsing_mode:normalize_mode -> string -> t -> string Lwt.t
 
 (** Sign a string of bytes with secret key of the given account. *)
 val sign_bytes : signer:string -> data:string -> t -> string Lwt.t

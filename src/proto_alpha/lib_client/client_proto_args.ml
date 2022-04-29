@@ -389,6 +389,12 @@ let run_gas_limit_arg =
     ~placeholder:"gas"
     gas_limit_kind
 
+let unlimited_gas_arg =
+  switch
+    ~long:"unlimited-gas"
+    ~doc:"Allows interpretation with virtually unlimited gas"
+    ()
+
 let storage_limit_kind =
   parameter (fun _ s ->
       try

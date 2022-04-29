@@ -46,6 +46,8 @@ val default_gas_limit_arg : (Gas.Arith.integral option, full) Clic.arg
 
 val run_gas_limit_arg : (Gas.Arith.integral option, full) Clic.arg
 
+val unlimited_gas_arg : (bool, full) Clic.arg
+
 val storage_limit_arg : (Z.t option, full) Clic.arg
 
 val default_storage_limit_arg : (Z.t option, full) Clic.arg
