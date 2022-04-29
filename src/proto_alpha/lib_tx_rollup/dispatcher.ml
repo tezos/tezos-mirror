@@ -112,8 +112,4 @@ let dispatch_operations_of_block (state : State.t) (block : L2block.t) =
 let dispatch_withdrawals ~source state block =
   let open Lwt_result_syntax in
   let* operations = dispatch_operations_of_block state block in
-  List.iter_es
-    (fun dispatch_op ->
-      let l1_operation = L1_operation.make ~source dispatch_op in
-      Injector.add_pending_operation l1_operation)
-    operations
+  List.iter_es (Injector.add_pending_operation ~source) operations

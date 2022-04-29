@@ -45,10 +45,8 @@ val init :
   unit tzresult Lwt.t
 
 (** Add an operation as pending injection in the injector. *)
-val add_pending_operation : L1_operation.t -> unit tzresult Lwt.t
-
-(** Add multiple operations as pending injection in the injector. *)
-val add_pending_operations : L1_operation.t trace -> unit tzresult Lwt.t
+val add_pending_operation :
+  source:public_key_hash -> 'a manager_operation -> unit tzresult Lwt.t
 
 (** Notify the injector of a new Tezos head. The injector marks the operations
     appropriately (for instance reverted operations that are part of a

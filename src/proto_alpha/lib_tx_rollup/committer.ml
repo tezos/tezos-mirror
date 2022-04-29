@@ -41,5 +41,4 @@ let commit_block ~operator tx_rollup block =
   let commit_operation =
     Tx_rollup_commit {tx_rollup; commitment = block.L2block.commitment}
   in
-  let l1_operation = L1_operation.make ~source:operator commit_operation in
-  Injector.add_pending_operation l1_operation
+  Injector.add_pending_operation ~source:operator commit_operation

@@ -841,13 +841,12 @@ let worker_of_signer signer_pkh =
       error (Error.No_worker_for_source signer_pkh)
   | Some worker -> ok worker
 
-let add_pending_operation op =
+let add_pending_operation ~source op =
   let open Lwt_result_syntax in
-  let*? w = worker_of_signer op.L1_operation.source in
-  let*! () = Worker.Queue.push_request w (Request.Add_pending op) in
+  let*? w = worker_of_signer source in
+  let l1_operation = L1_operation.make ~source op in
+  let*! () = Worker.Queue.push_request w (Request.Add_pending l1_operation) in
   return_unit
-
-let add_pending_operations ops = List.iter_es add_pending_operation ops
 
 let new_tezos_head h reorg =
   let workers = Worker.list table in

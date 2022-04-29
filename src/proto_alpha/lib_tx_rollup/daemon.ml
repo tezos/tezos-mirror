@@ -471,18 +471,21 @@ let notify_head state head reorg =
 let queue_gc_operations state =
   let open Lwt_result_syntax in
   let tx_rollup = state.State.rollup_info.rollup_id in
-  let inject source op =
-    Injector.add_pending_operation (L1_operation.make ~source op)
-  in
   let queue_finalize_commitment state =
     match state.State.signers.finalize_commitment with
     | None -> return_unit
-    | Some source -> inject source (Tx_rollup_finalize_commitment {tx_rollup})
+    | Some source ->
+        Injector.add_pending_operation
+          ~source
+          (Tx_rollup_finalize_commitment {tx_rollup})
   in
   let queue_remove_commitment state =
     match state.State.signers.remove_commitment with
     | None -> return_unit
-    | Some source -> inject source (Tx_rollup_remove_commitment {tx_rollup})
+    | Some source ->
+        Injector.add_pending_operation
+          ~source
+          (Tx_rollup_remove_commitment {tx_rollup})
   in
   let* () = queue_finalize_commitment state in
   queue_remove_commitment state
