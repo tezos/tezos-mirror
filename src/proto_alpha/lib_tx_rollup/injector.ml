@@ -158,7 +158,7 @@ let init_injector rollup_node_state ~signer strategy tags =
   }
 
 module Event = struct
-  include Event
+  include Injector_events
 
   let emit1 e state x = Event.emit e (state.signer.pkh, state.tags, x)
 
@@ -171,7 +171,7 @@ end
     operation.  *)
 let add_pending_operation state op =
   let open Lwt_syntax in
-  let+ () = Event.(emit1 Injector.add_pending) state op in
+  let+ () = Event.(emit1 add_pending) state op in
   Op_queue.replace state.queue op.L1_operation.hash op
 
 (** Mark operations as injected (in [oph]). *)
@@ -193,7 +193,7 @@ let add_injected_operations state oph operations =
 let add_included_operations state oph l1_block l1_level operations =
   let open Lwt_syntax in
   let+ () =
-    Event.(emit3 Injector.included)
+    Event.(emit3 included)
       state
       l1_block
       l1_level
@@ -343,9 +343,7 @@ let simulate_operations ~must_succeed state signer
            succeed *)
         match must_succeed with `All -> false | `At_least_one -> true)
   in
-  let*! () =
-    Event.(emit2 Injector.simulating_operations) state operations force
-  in
+  let*! () = Event.(emit2 simulating_operations) state operations force in
   let fee_parameter = fee_parameter_of_operations state operations in
   let operations =
     List.map
@@ -416,7 +414,7 @@ let inject_on_node state packed_contents =
     ~chain:state.cctxt#chain
     op_bytes
   >>=? fun oph ->
-  let*! () = Event.(emit1 Injector.injected) state oph in
+  let*! () = Event.(emit1 injected) state oph in
   return oph
 
 (** Inject the given [operations] in an L1 batch. If [must_succeed] is [`All]
@@ -448,9 +446,7 @@ let rec inject_operations ~must_succeed state (operations : L1_operation.t list)
         match result with
         | Apply_results.Manager_operation_result
             {operation_result = Failed (_, error); _} ->
-            let*! () =
-              Event.(emit2 Injector.dropping_operation) state op error
-            in
+            let*! () = Event.(emit2 dropping_operation) state op error in
             failure := true ;
             Lwt.return acc
         | Apply_results.Manager_operation_result
@@ -573,9 +569,7 @@ let inject_pending_operations
   | [] -> return_unit
   | _ -> (
       let*! () =
-        Event.(emit1 Injector.injecting_pending)
-          state
-          (List.length operations_to_inject)
+        Event.(emit1 injecting_pending) state (List.length operations_to_inject)
       in
       (* TODO: https://gitlab.com/tezos/tezos/-/issues/2813
          Decide if some operations must all succeed *)
@@ -660,7 +654,7 @@ let revert_included_operations state block =
   let open Lwt_syntax in
   let included_infos = remove_included_operation state block in
   let* () =
-    Event.(emit1 Injector.revert_operations)
+    Event.(emit1 revert_operations)
       state
       (List.map (fun o -> o.op.hash) included_infos)
   in
@@ -680,14 +674,13 @@ let revert_included_operations state block =
 let register_confirmed_level state confirmed_level =
   let open Lwt_syntax in
   let* () =
-    Event.(emit Injector.confirmed_level)
-      (state.signer.pkh, state.tags, confirmed_level)
+    Event.(emit confirmed_level) (state.signer.pkh, state.tags, confirmed_level)
   in
   Block_hash.Table.iter_s
     (fun block (level, _operations) ->
       if level <= confirmed_level then
         let confirmed_ops = remove_included_operation state block in
-        Event.(emit2 Injector.confirmed_operations)
+        Event.(emit2 confirmed_operations)
           state
           level
           (List.map (fun o -> o.op.hash) confirmed_ops)
@@ -702,7 +695,7 @@ let register_confirmed_level state confirmed_level =
 let on_new_tezos_head state (head : Alpha_block_services.block_info)
     (reorg : Alpha_block_services.block_info reorg) =
   let open Lwt_result_syntax in
-  let*! () = Event.(emit1 Injector.new_tezos_head) state head.hash in
+  let*! () = Event.(emit1 new_tezos_head) state head.hash in
   let*! () =
     List.iter_s
       (fun removed_block ->
@@ -773,19 +766,16 @@ module Handlers = struct
     let open Lwt_result_syntax in
     let state = Worker.state w in
     (* Errors do not stop the worker but emit an entry in the log. *)
-    let*! () = Event.(emit3 Injector.request_failed) state r st errs in
+    let*! () = Event.(emit3 request_failed) state r st errs in
     return_unit
 
   let on_completion w r _ st =
     let state = Worker.state w in
     match Request.view r with
     | Request.View (Add_pending _ | New_tezos_head _) ->
-        Event.(emit2 Injector.request_completed_debug) state (Request.view r) st
+        Event.(emit2 request_completed_debug) state (Request.view r) st
     | View Inject ->
-        Event.(emit2 Injector.request_completed_notice)
-          state
-          (Request.view r)
-          st
+        Event.(emit2 request_completed_notice) state (Request.view r) st
 
   let on_no_request _ = return_unit
 

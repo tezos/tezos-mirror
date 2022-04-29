@@ -531,7 +531,7 @@ let trigger_injection state header =
     let* () =
       if delay <= 0. then return_unit
       else
-        let* () = Event.(emit Injector.wait) delay in
+        let* () = Event.(emit inject_wait) delay in
         Lwt_unix.sleep delay
     in
     Injector.inject ~strategy:Injector.Delay_block ()
