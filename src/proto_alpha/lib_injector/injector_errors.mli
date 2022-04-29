@@ -23,27 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** The type of signers for operations injected by the Tx rollup node  *)
-type signer = {
-  alias : string;
-  pkh : Signature.public_key_hash;
-  pk : Signature.public_key;
-  sk : Client_keys.sk_uri;
-}
-
-(** Type of chain reorganizations. *)
-type 'block reorg = {
-  old_chain : 'block list;
-      (** The blocks that were in the old chain and which are not in the new one. *)
-  new_chain : 'block list;
-      (** The blocks that are now in the new chain. The length of [old_chain] and
-      [new_chain] may be different. *)
-}
-
-(** Retrieve a signer from the client wallet. *)
-val get_signer :
-  #Client_context.wallet -> Signature.public_key_hash -> signer tzresult Lwt.t
-
-val no_reorg : 'a reorg
-
-val reorg_encoding : 'a Data_encoding.t -> 'a reorg Data_encoding.t
+(** Error when the injector has no worker for the source which must inject an
+    operation. *)
+type error += No_worker_for_source of Signature.Public_key_hash.t

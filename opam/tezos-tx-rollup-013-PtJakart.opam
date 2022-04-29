@@ -30,6 +30,7 @@ depends: [
   "tezos-store"
   "tezos-workers"
   "tezos-protocol-plugin-013-PtJakart"
+  "tezos-injector-013-PtJakart"
 ]
 build: [
   ["rm" "-r" "vendors"]

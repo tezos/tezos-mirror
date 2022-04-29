@@ -26,7 +26,7 @@
 open Protocol.Alpha_context
 
 (** Type to represent {e appoximate upper-bounds} for the fee and limits, used
-   to compute an upper bound on the size (in bytes) of an operation. *)
+    to compute an upper bound on the size (in bytes) of an operation. *)
 type approximate_fee_bound = {
   fee : Tez.t;
   counter : Z.t;
@@ -42,6 +42,7 @@ type injection_strategy =
         kind of operations to include in a block. *)
   ]
 
+(** Signature for tags used in injector  *)
 module type TAG = sig
   include Stdlib.Set.OrderedType
 
@@ -61,8 +62,8 @@ module type PARAMETERS = sig
   (** Where to put the events for this injector  *)
   val events_section : string list
 
-  (** Returns an estimation of the size of operations of this tag injected at
-      each block *)
+  (** Coarse approximation for the number of operation of each tag we expect to
+      inject for each block. *)
   val table_estimated_size : Tag.t -> int
 
   (** [requeue_reverted_operation state op] should return [true] if an included
@@ -74,7 +75,7 @@ module type PARAMETERS = sig
   (** [ignore_failing_operation op] specifies if the injector should
       ignore this operation when its simulation fails when trying to inject.
       Returns:
-      - [`Ignore_keep] if the operation should be ignored but kept from the
+      - [`Ignore_keep] if the operation should be ignored but kept in the
         pending queue,
       - [`Ignore_drop] if the operation should be ignored and dropped from the
         pending queue,
@@ -84,8 +85,9 @@ module type PARAMETERS = sig
   val ignore_failing_operation :
     'a manager_operation -> [`Ignore_keep | `Ignore_drop | `Don't_ignore]
 
-  (** Returns the {e appoximate upper-bounds} for the fee and limits of an operation, used
-      to compute an upper bound on the size (in bytes) for this operation. *)
+  (** Returns the {e appoximate upper-bounds} for the fee and limits of an
+      operation, used to compute an upper bound on the size (in bytes) for this
+      operation. *)
   val approximate_fee_bound : 'a manager_operation -> approximate_fee_bound
 
   (** Returns the fee_parameter (to compute fee w.r.t. gas, size, etc.) and the
@@ -95,7 +97,7 @@ module type PARAMETERS = sig
 
   (** When injecting the given [operations] in an L1 batch, if
      [batch_must_succeed operations] returns [`All] then all the operations must
-     succeed in the simulation of injection. If it returns [`At_least_one] at
+     succeed in the simulation of injection. If it returns [`At_least_one], at
      least one operation in the list [operations] must be successful in the
      simulation. In any case, only operations which are known as successful will
      be included in the injected L1 batch. {b Note}: Returning [`At_least_one]
@@ -112,8 +114,8 @@ module type S = sig
   type tag
 
   (** Initializes the injector with the rollup node state, for a list of
-      signers. Each signer has its own worker with a queue of operations to
-      inject. *)
+      signers, and start the workers. Each signer has its own worker with a
+      queue of operations to inject. *)
   val init :
     #Protocol_client_context.full ->
     rollup_node_state ->

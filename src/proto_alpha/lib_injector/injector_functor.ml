@@ -29,6 +29,7 @@ open Alpha_context
 open Common
 open Injector_worker_types
 open Injector_sigs
+open Injector_errors
 
 (* This is the Tenderbake finality for blocks. *)
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/2815
@@ -154,12 +155,11 @@ module Make (Rollup : PARAMETERS) = struct
   module Event = struct
     include Injector_events.Make (Rollup)
 
-    let emit1 e state x = Event.emit e (state.signer.pkh, state.tags, x)
+    let emit1 e state x = emit e (state.signer.pkh, state.tags, x)
 
-    let emit2 e state x y = Event.emit e (state.signer.pkh, state.tags, x, y)
+    let emit2 e state x y = emit e (state.signer.pkh, state.tags, x, y)
 
-    let emit3 e state x y z =
-      Event.emit e (state.signer.pkh, state.tags, x, y, z)
+    let emit3 e state x y z = emit e (state.signer.pkh, state.tags, x, y, z)
   end
 
   (** Add an operation to the pending queue corresponding to the signer for this
@@ -790,7 +790,7 @@ module Make (Rollup : PARAMETERS) = struct
     | None ->
         (* TODO: https://gitlab.com/tezos/tezos/-/issues/2818
            maybe lazily start worker here *)
-        error (Error.No_worker_for_source signer_pkh)
+        error (No_worker_for_source signer_pkh)
     | Some worker -> ok worker
 
   let add_pending_operation ~source op =
