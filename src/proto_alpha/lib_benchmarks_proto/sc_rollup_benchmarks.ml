@@ -25,9 +25,9 @@
 
 open Protocol
 
-(** A benchmark for estimating the gas cost of 
-    {!Sc_rollup_costs.Constants.cost_update_num_and_size_of_messages}. This 
-    value is used to consume the gas cost internally in 
+(** A benchmark for estimating the gas cost of
+    {!Sc_rollup_costs.Constants.cost_update_num_and_size_of_messages}. This
+    value is used to consume the gas cost internally in
     [Sc_rollup_storage.add_messages], when computing the number of messages
     and their totla size in bytes to be added to an inbox.
 *)
@@ -122,12 +122,12 @@ module Sc_rollup_update_num_and_size_of_messages_benchmark = struct
 end
 
 (** A benchmark for estimating the gas cost of {!Sc_rollup.Inbox.add_messages}.
-    We assume that the cost (in gas) `cost(n, l)` of adding a message of size
+    We assume that the cost (in gas) [cost(n, l)] of adding a message of size
     [n] bytes, at level [l] since the origination of the rollup, satisfies the
-    equation `cost(n) = c_0 + c_1 * n + c_2 * log(l)`, where `c_0`, `c_1` and 
-    `c_2` are the values to be benchmarked. We also assume that the cost of 
-    adding messages `m_0, ..., m_k` to a rollup inbox is 
-    `\sum_{i=0}^{k} cost(|m_i|, l)`. Thus, it suffices to estimate the cost of 
+    equation [cost(n) = c_0 + c_1 * n + c_2 * log(l)], where [c_0], [c_1] and
+    [c_2] are the values to be benchmarked. We also assume that the cost of
+    adding messages [m_0, ..., m_k] to a rollup inbox is
+    [\sum_{i=0}^{k} cost(|m_i|, l)]. Thus, it suffices to estimate the cost of 
     adding a single message to the inbox.
 *)
 
