@@ -29,6 +29,10 @@ RPC Changes
 
   ``/chains/<chain_id>/blocks/<block>/context/delegates/<delegate_pkh>/voting_info``
 
+- Add a new RPC to execute contracts' views offchain. (MR :gl:`!4810`)
+
+  ``/chains/<chain_id>/blocks/<block>/helpers/scripts/run_script_view``
+
 Bug Fixes
 ---------
 
@@ -48,3 +52,7 @@ Internal
 - Add Raw_carbonated_map. (MR :gl:`!4815`)
 
 - Other internal refactorings or documentation. (MRs :gl:`!4890`, :gl:`!4721`)
+
+- Rename `run_view` into `run_tzip4_view` for consistency with
+  `run_script_view`. Does not affect the existing `run_view` RPC.
+  (MR :gl:`!4810`)
