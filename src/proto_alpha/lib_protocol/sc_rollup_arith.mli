@@ -34,6 +34,9 @@
 
    - a number [x] is interpreted as pushing [x] on the stack ;
 
+   - a variable [a] is interpreted as storing the topmost element of the
+     stack in the storage under the name "a" ;
+
    - a symbol [+] pops two integers [x] and [y] and pushes [x + y] on
    the stack.
 
@@ -78,8 +81,11 @@ module type S = sig
   (** [get_status state] returns the machine status in [state]. *)
   val get_status : state -> status Lwt.t
 
-  (** The machine has only two instructions. *)
-  type instruction = IPush : int -> instruction | IAdd : instruction
+  (** The machine has only three instructions. *)
+  type instruction =
+    | IPush : int -> instruction
+    | IAdd : instruction
+    | IStore : string -> instruction
 
   (** [equal_instruction i1 i2] is [true] iff [i1] equals [i2]. *)
   val equal_instruction : instruction -> instruction -> bool
@@ -99,6 +105,10 @@ module type S = sig
 
   (** [get_stack state] returns the current stack. *)
   val get_stack : state -> int list Lwt.t
+
+  (** [get_var state x] returns the current value of variable [x].
+      Returns [None] if [x] does not exist. *)
+  val get_var : state -> string -> int option Lwt.t
 
   (** [get_evaluation_result state] returns [Some true] if the current
       message evaluation succeeds, [Some false] if it failed, and

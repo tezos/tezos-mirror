@@ -464,7 +464,7 @@ module Make (Context : P) :
                 (fun () -> IAdd);
               case
                 ~title:"store"
-                (Tag 1)
+                (Tag 2)
                 Data_encoding.string
                 (function IStore x -> Some x | _ -> None)
                 (fun x -> IStore x);
@@ -546,7 +546,7 @@ module Make (Context : P) :
         | Some s -> Format.fprintf fmt "Some %s" s
     end)
 
-    type parser_state = ParseInt | SkipLayout
+    type parser_state = ParseInt | ParseVar | SkipLayout
 
     module LexerState = MakeVar (struct
       type t = int * int
@@ -570,10 +570,15 @@ module Make (Context : P) :
 
       let encoding =
         Data_encoding.string_enum
-          [("ParseInt", ParseInt); ("SkipLayout", SkipLayout)]
+          [
+            ("ParseInt", ParseInt);
+            ("ParseVar", ParseVar);
+            ("SkipLayout", SkipLayout);
+          ]
 
       let pp fmt = function
         | ParseInt -> Format.fprintf fmt "Parsing int"
+        | ParseVar -> Format.fprintf fmt "Parsing var"
         | SkipLayout -> Format.fprintf fmt "Skipping layout"
     end)
 
@@ -616,10 +621,11 @@ module Make (Context : P) :
       let* parser_state_pp = ParserState.pp in
       let* lexer_state_pp = LexerState.pp in
       let* evaluation_result_pp = EvaluationResult.pp in
+      let* vars_pp = Vars.pp in
       return @@ fun fmt () ->
       Format.fprintf
         fmt
-        "@[<v 0 >@;%a@;%a@;%a@;%a@;%a@;%a@;%a@]"
+        "@[<v 0 >@;%a@;%a@;%a@;%a@;%a@;%a@;%a@;%a@]"
         status_pp
         ()
         message_counter_pp
@@ -633,6 +639,8 @@ module Make (Context : P) :
         lexer_state_pp
         ()
         evaluation_result_pp
+        ()
+        vars_pp
         ()
   end
 
@@ -785,6 +793,11 @@ module Make (Context : P) :
     | Some x -> Code.inject (IPush x)
     | None -> (* By validity of int parsing. *) assert false
 
+  let push_var =
+    let open Monad.Syntax in
+    let* s = lexeme in
+    Code.inject (IStore s)
+
   let start_parsing : unit t =
     let open Monad.Syntax in
     let* () = Status.set Parsing in
@@ -825,7 +838,13 @@ module Make (Context : P) :
       let* () = ParserState.set SkipLayout in
       return ()
     in
+    let produce_var =
+      let* () = push_var in
+      let* () = ParserState.set SkipLayout in
+      return ()
+    in
     let is_digit d = Compare.Char.(d >= '0' && d <= '9') in
+    let is_letter d = Compare.Char.(d >= 'a' && d <= 'z') in
     let* parser_state = ParserState.get in
     match parser_state with
     | ParseInt -> (
@@ -844,6 +863,22 @@ module Make (Context : P) :
             let* () = push_int_literal in
             stop_parsing true
         | _ -> stop_parsing false)
+    | ParseVar -> (
+        let* char = current_char in
+        match char with
+        | Some d when is_letter d -> next_char
+        | Some '+' ->
+            let* () = produce_var in
+            let* () = produce_add in
+            return ()
+        | Some ' ' ->
+            let* () = produce_var in
+            let* () = next_char in
+            return ()
+        | None ->
+            let* () = push_var in
+            stop_parsing true
+        | _ -> stop_parsing false)
     | SkipLayout -> (
         let* char = current_char in
         match char with
@@ -853,6 +888,11 @@ module Make (Context : P) :
             let* _ = lexeme in
             let* () = next_char in
             let* () = ParserState.set ParseInt in
+            return ()
+        | Some d when is_letter d ->
+            let* _ = lexeme in
+            let* () = next_char in
+            let* () = ParserState.set ParseVar in
             return ()
         | None -> stop_parsing true
         | _ -> stop_parsing false)
@@ -865,7 +905,7 @@ module Make (Context : P) :
     | Some (IPush x) -> Stack.push x
     | Some (IStore x) -> (
         let* v = Stack.top in
-        match v with None -> return () | Some v -> Vars.set x v)
+        match v with None -> stop_evaluating false | Some v -> Vars.set x v)
     | Some IAdd -> (
         let* v = Stack.pop in
         match v with
