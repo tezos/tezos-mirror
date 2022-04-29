@@ -26,14 +26,13 @@
 
 type error +=
   | (* `Temporary *)
-      Balance_too_low of
-      Contract_repr.contract * Tez_repr.t * Tez_repr.t
+      Balance_too_low of Contract_repr.t * Tez_repr.t * Tez_repr.t
   | (* `Temporary *)
-      Counter_in_the_past of Contract_repr.contract * Z.t * Z.t
+      Counter_in_the_past of Contract_repr.t * Z.t * Z.t
   | (* `Branch *)
-      Counter_in_the_future of Contract_repr.contract * Z.t * Z.t
+      Counter_in_the_future of Contract_repr.t * Z.t * Z.t
   | (* `Temporary *)
-      Non_existing_contract of Contract_repr.contract
+      Non_existing_contract of Contract_repr.t
   | (* `Branch *)
       Empty_implicit_contract of Signature.Public_key_hash.t
   | (* `Branch *)
@@ -479,23 +478,20 @@ let delete c contract =
       Storage.Contract.Paid_storage_space.remove c contract >>= fun c ->
       Storage.Contract.Used_storage_space.remove c contract >|= ok
 
-let allocated c contract =
-  Storage.Contract.Spendable_balance.find c contract >>=? function
-  | None -> return_false
-  | Some _ -> return_true
+let allocated c contract = Storage.Contract.Spendable_balance.mem c contract
 
 let exists c contract =
   match Contract_repr.is_implicit contract with
-  | Some _ -> return_true
+  | Some _ -> Lwt.return_true
   | None -> allocated c contract
 
 let must_exist c contract =
-  exists c contract >>=? function
+  exists c contract >>= function
   | true -> return_unit
   | false -> fail (Non_existing_contract contract)
 
 let must_be_allocated c contract =
-  allocated c contract >>=? function
+  allocated c contract >>= function
   | true -> return_unit
   | false -> (
       match Contract_repr.is_implicit contract with
@@ -511,9 +507,10 @@ let fresh_contract_from_current_nonce c =
 let originated_from_current_nonce ~since:ctxt_since ~until:ctxt_until =
   Raw_context.get_origination_nonce ctxt_since >>?= fun since ->
   Raw_context.get_origination_nonce ctxt_until >>?= fun until ->
-  List.filter_es
+  List.filter_s
     (fun contract -> exists ctxt_until contract)
     (Contract_repr.originated_contracts ~since ~until)
+  >|= ok
 
 let check_counter_increment c manager counter =
   let contract = Contract_repr.implicit_contract manager in

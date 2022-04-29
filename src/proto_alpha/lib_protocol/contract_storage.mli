@@ -28,9 +28,9 @@
 
 type error +=
   | (* `Branch *)
-      Counter_in_the_future of Contract_repr.contract * Z.t * Z.t
+      Counter_in_the_future of Contract_repr.t * Z.t * Z.t
   | (* `Temporary *)
-      Non_existing_contract of Contract_repr.contract
+      Non_existing_contract of Contract_repr.t
   | (* `Permanent *)
       Inconsistent_public_key of
       Signature.Public_key.t * Signature.Public_key.t
@@ -38,11 +38,11 @@ type error +=
 
 (** [allocated ctxt contract] returns [true] if and only if the
    contract is stored in [Storage.Contract.Balance]. *)
-val allocated : Raw_context.t -> Contract_repr.t -> bool tzresult Lwt.t
+val allocated : Raw_context.t -> Contract_repr.t -> bool Lwt.t
 
 (** [exists ctxt contract] returns [true] if and only if either the
    contract is originated or it is (implicit and) "allocated". *)
-val exists : Raw_context.t -> Contract_repr.t -> bool tzresult Lwt.t
+val exists : Raw_context.t -> Contract_repr.t -> bool Lwt.t
 
 (** [must_exist ctxt contract] fails with the [Non_existing_contract] error if
     [exists ctxt contract] returns [false]. Even though this function is

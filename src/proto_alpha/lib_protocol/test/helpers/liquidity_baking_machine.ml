@@ -119,10 +119,6 @@ let far_future = Script_timestamp.of_zint (Z.of_int 42_000)
 (* --------------------------------------------------------------------------- *)
 
 (** {1 Miscellaneous Helpers} *)
-
-let is_implicit_exn account =
-  match Contract.is_implicit account with Some k -> k | _ -> assert false
-
 module List_helpers = struct
   let rec zip l r =
     match (l, r) with
@@ -764,7 +760,7 @@ module ConcreteBaseMachine :
 
   let bake ~invariant ~baker ops env blk =
     Incremental.begin_construction
-      ~policy:(Block.By_account (is_implicit_exn baker))
+      ~policy:(Block.By_account (Context.Contract.pkh baker))
       blk
     >>= fun incr ->
     fold_m Incremental.add_operation incr ops >>= fun incr ->

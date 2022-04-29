@@ -175,7 +175,7 @@ let first_bootstrap_account =
 
 let check_tzBTC ~typecheck current_level ctxt f =
   Contract_repr.of_b58check mainnet_tzBTC_address >>?= fun tzBTC ->
-  Contract_storage.exists ctxt tzBTC >>=? function
+  Contract_storage.exists ctxt tzBTC >>= function
   | true ->
       (* If tzBTC exists, we're on mainnet and we use it as the token address in the CPMM. *)
       f ctxt tzBTC []

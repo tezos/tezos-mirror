@@ -42,57 +42,54 @@ type t = private
   | Implicit of Signature.Public_key_hash.t
   | Originated of Contract_hash.t
 
-type contract = t
-
-include Compare.S with type t := contract
+include Compare.S with type t := t
 
 val in_memory_size : t -> Cache_memory_helpers.sint
 
 (** {2 Implicit contracts} *)
 
-val implicit_contract : Signature.Public_key_hash.t -> contract
+val implicit_contract : Signature.Public_key_hash.t -> t
 
-val is_implicit : contract -> Signature.Public_key_hash.t option
+val is_implicit : t -> Signature.Public_key_hash.t option
 
 (** {2 Originated contracts} *)
 
 (** [originated_contract nonce] is the contract address originated from [nonce].
 *)
-val originated_contract : Origination_nonce.t -> contract
+val originated_contract : Origination_nonce.t -> t
 
 (** [originated_contracts ~since ~until] is the contract addresses originated
     from [since] until [until]. The operation hash of nonce [since] and [until]
     must be the same or it will fail with an [assert]. [since] < [until] or the
     returned list is empty *)
 val originated_contracts :
-  since:Origination_nonce.t -> until:Origination_nonce.t -> contract list
+  since:Origination_nonce.t -> until:Origination_nonce.t -> t list
 
-val is_originated : contract -> Contract_hash.t option
+val is_originated : t -> Contract_hash.t option
 
 (** {2 Human readable notation} *)
 
 type error += Invalid_contract_notation of string (* `Permanent *)
 
-val to_b58check : contract -> string
+val to_b58check : t -> string
 
-val of_b58check : string -> contract tzresult
+val of_b58check : string -> t tzresult
 
-val pp : Format.formatter -> contract -> unit
+val pp : Format.formatter -> t -> unit
 
-val pp_short : Format.formatter -> contract -> unit
+val pp_short : Format.formatter -> t -> unit
 
 (** {2 Serializers} *)
 
-val encoding : contract Data_encoding.t
+val encoding : t Data_encoding.t
 
 (** [cases f g] exports the {!Data_encoding.cases} used to define {!encoding}.
 
     The only reason why we export that is to let {!Destination_repr.encoding}
     use it. This allows the latter to be compatible with {!encoding}, which
     is of key importance for backward compatibility reasons. *)
-val cases :
-  ('a -> contract option) -> (contract -> 'a) -> 'a Data_encoding.case list
+val cases : ('a -> t option) -> (t -> 'a) -> 'a Data_encoding.case list
 
-val rpc_arg : contract RPC_arg.arg
+val rpc_arg : t RPC_arg.arg
 
 module Index : Storage_description.INDEX with type t = t

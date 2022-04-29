@@ -290,19 +290,19 @@ let[@coq_axiom_with_reason "gadt"] register () =
   register0 ~chunked:true S.list (fun ctxt () () -> Contract.list ctxt >|= ok) ;
   let register_field ~chunked s f =
     opt_register1 ~chunked s (fun ctxt contract () () ->
-        Contract.exists ctxt contract >>=? function
+        Contract.exists ctxt contract >>= function
         | true -> f ctxt contract >|=? Option.some
         | false -> return_none)
   in
   let register_field_with_query ~chunked s f =
     opt_register1 ~chunked s (fun ctxt contract query () ->
-        Contract.exists ctxt contract >>=? function
+        Contract.exists ctxt contract >>= function
         | true -> f ctxt contract query >|=? Option.some
         | false -> return_none)
   in
   let register_opt_field ~chunked s f =
     opt_register1 ~chunked s (fun ctxt contract () () ->
-        Contract.exists ctxt contract >>=? function
+        Contract.exists ctxt contract >>= function
         | true -> f ctxt contract
         | false -> return_none)
   in

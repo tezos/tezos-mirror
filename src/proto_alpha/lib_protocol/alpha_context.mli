@@ -1475,31 +1475,29 @@ end
 module Contract : sig
   include BASIC_DATA
 
-  type contract = t
-
   val in_memory_size : t -> Cache_memory_helpers.sint
 
-  val rpc_arg : contract RPC_arg.arg
+  val rpc_arg : t RPC_arg.arg
 
-  val to_b58check : contract -> string
+  val to_b58check : t -> string
 
-  val of_b58check : string -> contract tzresult
+  val of_b58check : string -> t tzresult
 
-  val implicit_contract : public_key_hash -> contract
+  val implicit_contract : public_key_hash -> t
 
-  val is_implicit : contract -> public_key_hash option
+  val is_implicit : t -> public_key_hash option
 
-  val is_originated : contract -> Contract_hash.t option
+  val is_originated : t -> Contract_hash.t option
 
-  val exists : context -> contract -> bool tzresult Lwt.t
+  val exists : context -> t -> bool Lwt.t
 
-  val must_exist : context -> contract -> unit tzresult Lwt.t
+  val must_exist : context -> t -> unit tzresult Lwt.t
 
-  val allocated : context -> contract -> bool tzresult Lwt.t
+  val allocated : context -> t -> bool Lwt.t
 
-  val must_be_allocated : context -> contract -> unit tzresult Lwt.t
+  val must_be_allocated : context -> t -> unit tzresult Lwt.t
 
-  val list : context -> contract list Lwt.t
+  val list : context -> t list Lwt.t
 
   val get_manager_key :
     ?error:error -> context -> public_key_hash -> public_key tzresult Lwt.t
@@ -1511,29 +1509,27 @@ module Contract : sig
     context -> public_key_hash -> public_key -> context tzresult Lwt.t
 
   val get_script_code :
-    context -> contract -> (context * Script.lazy_expr option) tzresult Lwt.t
+    context -> t -> (context * Script.lazy_expr option) tzresult Lwt.t
 
-  val get_script :
-    context -> contract -> (context * Script.t option) tzresult Lwt.t
+  val get_script : context -> t -> (context * Script.t option) tzresult Lwt.t
 
   val get_storage :
-    context -> contract -> (context * Script.expr option) tzresult Lwt.t
+    context -> t -> (context * Script.expr option) tzresult Lwt.t
 
   val get_counter : context -> public_key_hash -> Z.t tzresult Lwt.t
 
-  val get_balance : context -> contract -> Tez.t tzresult Lwt.t
+  val get_balance : context -> t -> Tez.t tzresult Lwt.t
 
-  val get_balance_carbonated :
-    context -> contract -> (context * Tez.t) tzresult Lwt.t
+  val get_balance_carbonated : context -> t -> (context * Tez.t) tzresult Lwt.t
 
   val fresh_contract_from_current_nonce : context -> (context * t) tzresult
 
   val originated_from_current_nonce :
-    since:context -> until:context -> contract list tzresult Lwt.t
+    since:context -> until:context -> t list tzresult Lwt.t
 
-  val get_frozen_bonds : context -> contract -> Tez.t tzresult Lwt.t
+  val get_frozen_bonds : context -> t -> Tez.t tzresult Lwt.t
 
-  val get_balance_and_frozen_bonds : context -> contract -> Tez.t tzresult Lwt.t
+  val get_balance_and_frozen_bonds : context -> t -> Tez.t tzresult Lwt.t
 
   module Legacy_big_map_diff : sig
     type item = private
@@ -1558,7 +1554,7 @@ module Contract : sig
 
   val update_script_storage :
     context ->
-    contract ->
+    t ->
     Script.expr ->
     Lazy_storage.diffs option ->
     context tzresult Lwt.t
@@ -1579,7 +1575,7 @@ module Contract : sig
 
   module Internal_for_tests : sig
     (** see [Contract_repr.originated_contract] for documentation *)
-    val originated_contract : Origination_nonce.Internal_for_tests.t -> contract
+    val originated_contract : Origination_nonce.Internal_for_tests.t -> t
 
     val paid_storage_space : context -> t -> Z.t tzresult Lwt.t
   end

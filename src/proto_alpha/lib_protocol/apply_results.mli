@@ -52,7 +52,7 @@ val manager_operation_of_internal_operation :
   'kind internal_manager_operation -> 'kind Alpha_context.manager_operation
 
 type 'kind internal_contents = {
-  source : Contract.contract;
+  source : Contract.t;
   operation : 'kind internal_manager_operation;
   nonce : int;
 }

@@ -956,7 +956,7 @@ let apply_transaction ~ctxt ~parameter ~source ~contract ~amount ~entrypoint
       error_when Tez.(amount = zero) (Empty_transaction contract) >>?= fun () ->
       (* If the implicit contract is not yet allocated at this point then
          the next transfer of tokens will allocate it. *)
-      Contract.allocated ctxt contract >|=? not)
+      Contract.allocated ctxt contract >|= ok >|=? not)
   >>=? fun allocated_destination_contract ->
   Token.transfer ctxt (`Contract source) (`Contract contract) amount
   >>=? fun (ctxt, balance_updates) ->

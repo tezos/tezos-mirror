@@ -39,8 +39,6 @@ include Compare.Make (struct
     | (Originated _, Implicit _) -> 1
 end)
 
-type contract = t
-
 let blake2b_hash_size =
   let open Cache_memory_helpers in
   h1w +! string_size_gen 20
@@ -173,7 +171,7 @@ let rpc_arg =
     ()
 
 module Index = struct
-  type t = contract
+  type nonrec t = t
 
   let path_length = 1
 
