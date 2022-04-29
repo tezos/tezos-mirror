@@ -2876,13 +2876,6 @@ val consensus_content_encoding : consensus_content Data_encoding.t
 
 val pp_consensus_content : Format.formatter -> consensus_content -> unit
 
-type transaction = {
-  amount : Tez.tez;
-  parameters : Script.lazy_expr;
-  entrypoint : Entrypoint.t;
-  destination : Destination.t;
-}
-
 type origination = {
   delegate : Signature.Public_key_hash.t option;
   script : Script.t;
@@ -2959,7 +2952,13 @@ and _ contents =
 
 and _ manager_operation =
   | Reveal : Signature.Public_key.t -> Kind.reveal manager_operation
-  | Transaction : transaction -> Kind.transaction manager_operation
+  | Transaction : {
+      amount : Tez.tez;
+      parameters : Script.lazy_expr;
+      entrypoint : Entrypoint.t;
+      destination : Destination.t;
+    }
+      -> Kind.transaction manager_operation
   | Origination : origination -> Kind.origination manager_operation
   | Delegation :
       Signature.Public_key_hash.t option

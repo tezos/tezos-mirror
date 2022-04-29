@@ -70,7 +70,7 @@ let parse_ticket_and_operation ~consume_deserialization_gas ~ticketer ~contents
   >>=? fun (parameters_expr, ctxt) ->
   Gas.consume ctxt (Script.strip_locations_cost parameters_expr)
   >>?= fun ctxt ->
-  let parameters =
+  let unparsed_parameters =
     Script.lazy_expr (Micheline.strip_locations parameters_expr)
   in
   fresh_internal_nonce ctxt >>?= fun (ctxt, nonce) ->
@@ -82,8 +82,10 @@ let parse_ticket_and_operation ~consume_deserialization_gas ~ticketer ~contents
         operation =
           Transaction
             {
-              transaction =
-                {amount = Tez.zero; parameters; destination; entrypoint};
+              amount = Tez.zero;
+              unparsed_parameters;
+              destination;
+              entrypoint;
               location = Micheline.location parameters_expr;
               parameters_ty = ticket_ty;
               parameters = ticket;

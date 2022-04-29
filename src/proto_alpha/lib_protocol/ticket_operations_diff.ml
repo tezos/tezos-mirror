@@ -240,13 +240,10 @@ let tickets_of_operation ctxt
   match operation with
   | Transaction
       {
-        transaction =
-          {
-            amount = _;
-            parameters = _;
-            entrypoint;
-            destination = Destination.Contract destination;
-          };
+        amount = _;
+        unparsed_parameters = _;
+        entrypoint;
+        destination = Destination.Contract destination;
         location;
         parameters_ty;
         parameters;
@@ -260,13 +257,10 @@ let tickets_of_operation ctxt
         ~parameters
   | Transaction
       {
-        transaction =
-          {
-            destination = Destination.Tx_rollup tx_rollup_dest;
-            parameters = _;
-            entrypoint;
-            amount = _;
-          };
+        destination = Destination.Tx_rollup tx_rollup_dest;
+        unparsed_parameters = _;
+        entrypoint;
+        amount = _;
         location = _;
         parameters_ty;
         parameters;

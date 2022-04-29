@@ -203,13 +203,6 @@ type raw = Operation.t = {shell : Operation.shell_header; proto : bytes}
 
 let raw_encoding = Operation.encoding
 
-type transaction = {
-  amount : Tez_repr.tez;
-  parameters : Script_repr.lazy_expr;
-  entrypoint : Entrypoint_repr.t;
-  destination : Destination_repr.t;
-}
-
 type origination = {
   delegate : Signature.Public_key_hash.t option;
   script : Script_repr.t;
@@ -286,7 +279,13 @@ and _ contents =
 
 and _ manager_operation =
   | Reveal : Signature.Public_key.t -> Kind.reveal manager_operation
-  | Transaction : transaction -> Kind.transaction manager_operation
+  | Transaction : {
+      amount : Tez_repr.tez;
+      parameters : Script_repr.lazy_expr;
+      entrypoint : Entrypoint_repr.t;
+      destination : Destination_repr.t;
+    }
+      -> Kind.transaction manager_operation
   | Origination : origination -> Kind.origination manager_operation
   | Delegation :
       Signature.Public_key_hash.t option
