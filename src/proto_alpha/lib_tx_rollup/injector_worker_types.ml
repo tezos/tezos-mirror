@@ -28,55 +28,6 @@ open Protocol
 open Alpha_context
 open Common
 
-type tag =
-  [ `Commitment
-  | `Submit_batch
-  | `Finalize_commitment
-  | `Remove_commitment
-  | `Rejection
-  | `Dispatch_withdrawals ]
-
-module Tags = Set.Make (struct
-  type t = tag
-
-  let compare = Stdlib.compare
-end)
-
-type tags = Tags.t
-
-let string_of_tag : tag -> string = function
-  | `Submit_batch -> "submit_batch"
-  | `Commitment -> "commitment"
-  | `Finalize_commitment -> "finalize_commitment"
-  | `Remove_commitment -> "remove_commitment"
-  | `Rejection -> "rejection"
-  | `Dispatch_withdrawals -> "dispatch_withdrawals"
-
-let pp_tags ppf tags =
-  Format.pp_print_list
-    ~pp_sep:(fun ppf () -> Format.fprintf ppf ",@ ")
-    (fun ppf t -> Format.pp_print_string ppf (string_of_tag t))
-    ppf
-    (Tags.elements tags)
-
-let tag_encoding : tag Data_encoding.t =
-  let open Data_encoding in
-  string_enum
-    (List.map
-       (fun t -> (string_of_tag t, t))
-       [
-         `Submit_batch;
-         `Commitment;
-         `Finalize_commitment;
-         `Remove_commitment;
-         `Rejection;
-         `Dispatch_withdrawals;
-       ])
-
-let tags_encoding : tags Data_encoding.t =
-  let open Data_encoding in
-  conv Tags.elements Tags.of_list (list tag_encoding)
-
 module Request = struct
   type 'a t =
     | Add_pending : L1_operation.t -> unit t
