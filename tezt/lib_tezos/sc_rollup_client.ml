@@ -133,3 +133,62 @@ let last_published_commitment ?hooks sc_client =
   let open Lwt.Syntax in
   let+ res = rpc_get ?hooks sc_client ["last_published_commitment"] in
   commitment_from_json res
+
+let spawn_generate_keys ?hooks ?(force = false) ~alias sc_client =
+  spawn_command
+    ?hooks
+    sc_client
+    (["gen"; "unencrypted"; "keys"; alias] @ if force then ["--force"] else [])
+
+let generate_keys ?hooks ?force ~alias sc_client =
+  spawn_generate_keys ?hooks ?force ~alias sc_client |> Process.check
+
+let spawn_list_keys ?hooks sc_client =
+  spawn_command ?hooks sc_client ["list"; "keys"]
+
+let parse_list_keys output =
+  output |> String.trim |> String.split_on_char '\n'
+  |> List.fold_left (fun acc s -> (s =~** rex "^(\\w+): (\\w{36})") :: acc) []
+  |> List.fold_left
+       (fun acc k ->
+         match (k, acc) with
+         | (None, _) | (_, None) -> None
+         | (Some k, Some acc) -> Some (k :: acc))
+       (Some [])
+  |> function
+  | None ->
+      Test.fail
+        ~__LOC__
+        "Cannot extract `list keys` format from client_output: %s"
+        output
+  | Some l -> l
+
+let list_keys ?hooks sc_client =
+  let* out =
+    spawn_list_keys ?hooks sc_client |> Process.check_and_read_stdout
+  in
+  return (parse_list_keys out)
+
+let spawn_show_address ?hooks ~alias sc_client =
+  spawn_command ?hooks sc_client ["show"; "address"; alias]
+
+let show_address ?hooks ~alias sc_client =
+  let* out =
+    spawn_show_address ?hooks ~alias sc_client |> Process.check_and_read_stdout
+  in
+  return (Account.parse_client_output_aggregate ~alias ~client_output:out)
+
+let spawn_import_secret_key ?hooks ?(force = false)
+    (key : Account.aggregate_key) sc_client =
+  let sk_uri =
+    let (Unencrypted sk) = key.aggregate_secret_key in
+    "aggregate_unencrypted:" ^ sk
+  in
+  spawn_command
+    ?hooks
+    sc_client
+    (["import"; "secret"; "key"; key.aggregate_alias; sk_uri]
+    @ if force then ["--force"] else [])
+
+let import_secret_key ?hooks ?force key sc_client =
+  spawn_import_secret_key ?hooks ?force key sc_client |> Process.check

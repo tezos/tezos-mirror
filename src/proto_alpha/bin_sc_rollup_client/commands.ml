@@ -89,4 +89,56 @@ let rpc_get_command =
     (prefixes ["rpc"; "get"] @@ string ~name:"url" ~desc:"the RPC URL" @@ stop)
     (fun () url cctxt -> call_get cctxt url)
 
-let all () = [get_sc_rollup_addresses_command (); rpc_get_command]
+module Keys = struct
+  open Tezos_client_base.Client_keys
+
+  let generate_keys () =
+    command
+      ~desc:"Generate a pair of keys."
+      (args1 (Secret_key.force_switch ()))
+      (prefixes ["gen"; "unencrypted"; "keys"]
+      @@ Aggregate_alias.Secret_key.fresh_alias_param @@ stop)
+      (fun force name (cctxt : #Configuration.sc_client_context) ->
+        Client_keys_commands.Bls_commands.generate_keys ~force name cctxt)
+
+  let list_keys () =
+    command
+      ~desc:"List keys."
+      no_options
+      (prefixes ["list"; "keys"] @@ stop)
+      (fun () (cctxt : #Configuration.sc_client_context) ->
+        Client_keys_commands.Bls_commands.list_keys cctxt)
+
+  let show_address () =
+    command
+      ~desc:"Show the keys associated with an account."
+      no_options
+      (prefixes ["show"; "address"]
+      @@ Aggregate_alias.Public_key_hash.alias_param @@ stop)
+      (fun () (name, _pkh) (cctxt : #Configuration.sc_client_context) ->
+        Client_keys_commands.Bls_commands.show_address name cctxt)
+
+  let import_secret_key () =
+    command
+      ~desc:"Add a secret key to the wallet."
+      (args1 (Aggregate_alias.Secret_key.force_switch ()))
+      (prefixes ["import"; "secret"; "key"]
+      @@ Aggregate_alias.Secret_key.fresh_alias_param @@ aggregate_sk_uri_param
+      @@ stop)
+      (fun force name sk_uri (cctxt : #Configuration.sc_client_context) ->
+        Client_keys_commands.Bls_commands.import_secret_key
+          ~force
+          name
+          sk_uri
+          cctxt)
+end
+
+let all () =
+  [
+    get_sc_rollup_addresses_command ();
+    rpc_get_command;
+    Keys.generate_keys ();
+    Keys.list_keys ();
+    Keys.show_address ();
+    Keys.import_secret_key ();
+  ]
