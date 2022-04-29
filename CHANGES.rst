@@ -30,6 +30,8 @@ Node
 - Added a block validator metric to expose the number of operation per
   pass for each new block validated
 
+- Added a protocol specific metrics, head_cycle and head_consumed_gas.
+
 Client
 ------
 
