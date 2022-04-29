@@ -1,1 +1,4 @@
 (vendored_dirs vendors)
+(env
+ (_
+  (binaries (%{workspace_root}/src/tooling/node_wrapper.exe as node))))

@@ -1718,30 +1718,6 @@ let generate_dune_files () =
       static_profile cclibs env
     else env
   in
-  (* Ideally, we would want a wrap/shadow the node binary in a single place at the root of the repo.
-     It is achievable by setting the env in dune-workspace.
-     Sadly, we can't do that just yet because of a bug in dune (see https://github.com/ocaml/dune/issues/5555)
-     As a workaround, we can set env in dune files next to dune-project.
-     Note that dune will complain if the same binary is defined multiple times in the same scope
-     (e.g. src/lib_base/dune and src/lib_base/test/dune)
-  *)
-  let env =
-    if
-      String_map.exists
-        (fun opam internals ->
-          Filename.dirname opam = path
-          && List.exists
-               (fun (internal : Target.internal) -> internal.js_compatible)
-               internals)
-        !Target.by_opam
-    then
-      Env.add
-        Any
-        ~key:"binaries"
-        [S "%{workspace_root}/src/tooling/node_wrapper.exe"; S "as"; S "node"]
-        env
-    else env
-  in
   let env =
     match node_preload with
     | [] -> env
