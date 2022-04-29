@@ -240,6 +240,7 @@ class TestExternalOperations:
     ):
         # Restart
         sandbox.node(0).terminate()
+        time.sleep(3)
         sandbox.node(0).run()
         client.check_node_listening()
 

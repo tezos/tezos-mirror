@@ -192,6 +192,14 @@ module Event = struct
       (* may be negative in case of signals *)
       ("exit_code", Data_encoding.int31)
 
+  let metrics_ended =
+    declare_1
+      ~section
+      ~name:"metrics_ended"
+      ~level:Error
+      ~msg:"metrics server ended with error {stacktrace}"
+      ("stacktrace", Data_encoding.string)
+
   let incorrect_history_mode =
     declare_2
       ~section
@@ -454,6 +462,23 @@ let metrics_serve metrics_addrs =
   in
   return servers
 
+(* This call is not strictly necessary as the parameters are initialized
+   lazily the first time a Sapling operation (validation or forging) is
+   done. This is what the client does.
+   For a long running binary however it is important to make sure that the
+   parameters files are there at the start and avoid failing much later while
+   validating an operation. Plus paying this cost upfront means that the first
+   validation will not be more expensive. *)
+let init_zcash () =
+  try
+    Tezos_sapling.Core.Validator.init_params () ;
+    Lwt.return_unit
+  with exn ->
+    Lwt.fail_with
+      (Printf.sprintf
+         "Failed to initialize Zcash parameters: %s"
+         (Printexc.to_string exn))
+
 let run ?verbosity ?sandbox ?target ~singleprocess ~force_history_mode_switch
     (config : Node_config_file.t) =
   let open Lwt_result_syntax in
@@ -479,6 +504,7 @@ let run ?verbosity ?sandbox ?target ~singleprocess ~force_history_mode_switch
         Tezos_version.Current_git_info.version,
         Tezos_version.Current_git_info.abbreviated_commit_hash )
   in
+  let*! () = init_zcash () in
   let*! node =
     init_node
       ?sandbox
@@ -521,7 +547,16 @@ let run ?verbosity ?sandbox ?target ~singleprocess ~force_history_mode_switch
         let*! () = Event.(emit bye) exit_status in
         Tezos_base_unix.Internal_event_unix.close ())
   in
-  let _ = metrics_serve config.metrics_addr in
+  Lwt.dont_wait
+    (fun () ->
+      let*! r = metrics_serve config.metrics_addr in
+      match r with
+      | Ok _ -> Lwt.return_unit
+      | Error err ->
+          Event.(emit metrics_ended (Format.asprintf "%a" pp_print_trace err)))
+    (fun exn ->
+      Event.(
+        emit__dont_wait__use_with_care metrics_ended (Printexc.to_string exn))) ;
   Lwt_utils.never_ending ()
 
 let process sandbox verbosity target singleprocess force_history_mode_switch
