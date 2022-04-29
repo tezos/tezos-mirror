@@ -3,6 +3,7 @@ SPHINXOPTS    = -j auto -aE -n -W --keep-going
 SPHINXBUILD   = poetry run sphinx-build
 SPHINXPROJ    = Tezos
 SOURCEDIR     = .
+TMPDOCDIR        = /tmp/tezosdoc
 BUILDDIR      = _build
 TOPBUILDDIR   = ../_build/default
 
@@ -25,8 +26,12 @@ ACTIVE_SHORT   = $(ITHACA_SHORT)
 SCRIPTSDIR     = scripts
 CHECKXREFS     = $(SCRIPTSDIR)/check_proto_xrefs.py
 
-all: manuals odoc
+# Build all documentation (with CLI manuals and odoc) but without old protocols
+all: manuals odoc-lite
 	${MAKE} html
+
+# Build the full documentation including archived protocols; for publishing only
+full: manuals odoc html
 
 main:
 	${MAKE} -C .. all
@@ -57,11 +62,16 @@ odoc: main docexes
 	@rm -rf $$(pwd)/_build/api/odoc
 	@mkdir -p $$(pwd)/_build/api
 	@cp -r $$(pwd)/../_build/default/_doc $$(pwd)/_build/api/odoc
-	@sed -e 's/@media only screen and (max-width: 95ex) {/@media only screen and (max-width: 744px) {/' $$(pwd)/_build/api/odoc/_html/odoc.css > $$(pwd)/_build/api/odoc/_html/odoc.css2
-	@echo '.toc {position: static}' >> $$(pwd)/_build/api/odoc/_html/odoc.css2
-	@echo '.content { margin-left: 4ex }' >> $$(pwd)/_build/api/odoc/_html/odoc.css2
-	@echo '@media (min-width: 745px) {.content {margin-left: 4ex}}' >> $$(pwd)/_build/api/odoc/_html/odoc.css2
-	@mv -f $$(pwd)/_build/api/odoc/_html/odoc.css2  $$(pwd)/_build/api/odoc/_html/odoc.css
+
+odoc-lite: main docexes
+	rm -rf $(TMPDOCDIR)/
+	mkdir -p $(TMPDOCDIR)/
+	rsync --recursive --links --perms --exclude="src/proto_0*" \
+		../src ../tezt ../vendors ../dune ../dune-project $(TMPDOCDIR)/
+	cd $(TMPDOCDIR); ODOC_WARN_ERROR=true dune build @doc
+	@rm -rf _build/api/odoc
+	@mkdir -p _build/api
+	@cp -r $(TMPDOCDIR)/_build/default/_doc _build/api/odoc
 
 linkcheck:
 	$(SPHINXBUILD) -b linkcheck "$(SOURCEDIR)" "$(BUILDDIR)"
