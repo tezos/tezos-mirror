@@ -37,7 +37,13 @@ let output_stanzas prefix =
   let input = prefix ^ input_suffix in
   let output = prefix ^ output_suffix in
   let actual = prefix ^ actual_suffix in
-
+  if not (Sys.file_exists output) then
+    failwith
+    @@ Format.sprintf
+         "File %s detected but %s not found. Each input file should gets its \
+          own output file."
+         input
+         output ;
   Format.printf
     {|
 ; Prepreocesses %s
@@ -62,9 +68,6 @@ let output_stanzas prefix =
     actual
 
 let () =
-  let files = Sys.readdir "." |> Array.to_list in
-  let prefixes = Utils.input_prefixes files input_suffix in
-  List.iter
-    (Utils.check_output_existence files input_suffix output_suffix)
-    prefixes ;
-  List.iter output_stanzas prefixes
+  Utils.test_files "."
+  |> List.filter_map (fun f -> Filename.chop_suffix_opt f ~suffix:input_suffix)
+  |> List.iter output_stanzas

@@ -36,6 +36,13 @@ let actual_suffix = "actual.ml"
 let output_stanzas prefix =
   let input = prefix ^ input_suffix in
   let output = prefix ^ output_suffix in
+  if not (Sys.file_exists output) then
+    failwith
+    @@ Format.sprintf
+         "File %s detected but %s not found. Each input file should gets its \
+          own output file."
+         input
+         output ;
   let actual = prefix ^ actual_suffix in
   let input_module = String.sub input 0 @@ (String.length input - 3) in
   let output_module = String.sub output 0 @@ (String.length output - 3) in
@@ -47,13 +54,22 @@ let output_stanzas prefix =
  (deps (:pp pp.exe) (:input %s))
  (action
    (run ./%%{pp} --impl %%{input} -o %%{targets})))
-
+|}
+    input
+    actual
+    input ;
+  Format.printf
+    {|
 ; Compares preprocessed output with expected output
 (rule
  (alias runtest)
  (package tezos-time-measurement)
  (action (diff %s %s)))
-
+|}
+    output
+    actual ;
+  Format.printf
+    {|
 ; Ensures that %s compiles
 (library
  (name %s)
@@ -61,7 +77,12 @@ let output_stanzas prefix =
  (preprocess (pps tezos-time-measurement.ppx))
  (libraries lwt)
  (flags (:standard -open Lwt)))
-
+|}
+    input
+    input_module
+    input_module ;
+  Format.printf
+    {|
 ; Ensures that %s compiles
 (library
  (name %s)
@@ -69,22 +90,11 @@ let output_stanzas prefix =
  (libraries lwt tezos-time-measurement)
  (flags (:standard -open Lwt)))
 |}
-    input
-    actual
-    input
-    output
-    actual
-    input
-    input_module
-    input_module
     output
     output_module
     output_module
 
 let () =
-  let files = Sys.readdir "." |> Array.to_list in
-  let prefixes = Utils.input_prefixes files input_suffix in
-  List.iter
-    (Utils.check_output_existence files input_suffix output_suffix)
-    prefixes ;
-  List.iter output_stanzas prefixes
+  Utils.test_files "."
+  |> List.filter_map (fun f -> Filename.chop_suffix_opt f ~suffix:input_suffix)
+  |> List.iter output_stanzas
