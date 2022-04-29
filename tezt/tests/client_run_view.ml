@@ -43,18 +43,61 @@ let viewable_script =
     {CAR; DUP; EQ;
      IF{DROP; UNIT}
        {SELF_ADDRESS; SWAP; PUSH int -1; ADD; VIEW "loop" unit; ASSERT_SOME}};
+  view "my_external_view"
+       int
+       int
+       { LAMBDA int int { DUP ; MUL } ;
+         SWAP ;
+         UNPAIR ;
+         DUP 3 ;
+         SWAP ;
+         EXEC ;
+         SWAP ;
+         DIG 2 ;
+         SWAP ;
+         INT ;
+         EXEC ;
+         ADD ;
+         PUSH int 1000000 ;
+         NEG ;
+         ADD } ;
+  view "v_external"
+       address
+       int
+       { UNPAIR ;
+         PUSH int 33 ;
+         VIEW "my_external_view" int ;
+         IF_NONE
+           { DROP ; PUSH string "Call to 'my_external_view' returned None" ; FAILWITH }
+           { ADD } } ;
+  view "v_entrypoint"
+       int
+       int
+       { LAMBDA int int { DUP ; MUL } ;
+         SWAP ;
+         UNPAIR ;
+         DUP 3 ;
+         SWAP ;
+         EXEC ;
+         SWAP ;
+         DIG 2 ;
+         SWAP ;
+         INT ;
+         EXEC ;
+         ADD } ;
 }
 |}
 
 (* Initializes the client and a viewable contract with a storage of 10 *)
-let init_with_contract ~protocol =
+let init_with_contract ?(alias = "viewable_script") ?(prg = viewable_script)
+    ~protocol () =
   let* client = Client.init_mockup ~protocol () in
   let* contract =
     Client.originate_contract
-      ~alias:"viewable_script"
+      ~alias
       ~amount:Tez.zero
       ~src:Constant.bootstrap1.alias
-      ~prg:viewable_script
+      ~prg
       ~init:"10"
       ~burn_cap:(Tez.of_int 1)
       client
@@ -62,7 +105,7 @@ let init_with_contract ~protocol =
   Lwt.return (client, contract)
 
 let test_run_view_generic ?unlimited_gas ~protocol ~view ~input ~expected () =
-  let* (client, contract) = init_with_contract ~protocol in
+  let* (client, contract) = init_with_contract ~protocol () in
   let* view = Client.run_view ?unlimited_gas ~view ~contract ?input client in
   if String.equal (String.trim view) expected then unit
   else Test.fail ~__LOC__ "Unexpected view result: %s" view
@@ -88,6 +131,65 @@ let test_run_view_mul_v_10 ~protocol () =
 (* Runs view `value` without input, should yield `10` *)
 let test_run_view_value ~protocol () =
   test_run_view_generic ~protocol ~view:"value" ~input:None ~expected:"10" ()
+
+let test_run_view_v_entrypoint ~protocol () =
+  test_run_view_generic
+    ~protocol
+    ~view:"v_entrypoint"
+    ~input:(Some "10")
+    ~expected:"200"
+    ()
+
+let test_run_view_my_external_view ~protocol () =
+  test_run_view_generic
+    ~protocol
+    ~view:"my_external_view"
+    ~input:(Some "10")
+    ~expected:"-999800"
+    ()
+
+let check_storage_is contract client expected =
+  let* s = Client.contract_storage contract client in
+  let s = String.trim s in
+  Log.info "Contract %s storage: got %s, expected %s@." contract s expected ;
+  if String.equal s expected then unit
+  else Test.fail ~__LOC__ "Unexpected storage result for %s" contract unit
+
+(** Test running views of a smart contract that can call other external views.
+
+     The external call is done by providing the address of an external smart
+     contract that implements the desired interface. It could be 'SELF' or
+     another deployed contract, as tested below. *)
+let test_run_external_nested_view ~protocol () =
+  let* (client, contract) =
+    init_with_contract ~prg:viewable_script ~alias:"contract1" ~protocol ()
+  in
+  let* contract' =
+    Client.originate_contract
+      ~alias:"contract2"
+      ~amount:Tez.zero
+      ~src:Constant.bootstrap1.alias
+      ~prg:viewable_script
+      ~init:"10"
+      ~burn_cap:(Tez.of_int 1)
+      client
+  in
+  let view = "v_external" in
+  let expected = "-998801" in
+  let* () =
+    Lwt_list.iter_s
+      (fun external_contract ->
+        let input = Format.sprintf "%S" external_contract in
+        let* view_res =
+          Client.run_view ?unlimited_gas:None ~view ~contract ~input client
+        in
+        Log.info "Call view %s: got %s, expected %s@." view view_res expected ;
+        if String.equal (String.trim view_res) expected then unit
+        else Test.fail ~__LOC__ "Unexpected view result: %s" view unit)
+      [contract; contract']
+  in
+  let* () = check_storage_is contract client "10" in
+  check_storage_is contract' client "10"
 
 let test_run_view_fail_generic ~protocol ~view ~contract ~input ~msg () =
   let* client = Client.init_mockup ~protocol () in
@@ -118,7 +220,7 @@ let test_run_view_unknown_contract ~protocol () =
 
 (* Runs view `unknown` on the viewable_contract and fails *)
 let test_run_view_unknown_view ~protocol () =
-  let* (client, contract) = init_with_contract ~protocol in
+  let* (client, contract) = init_with_contract ~protocol () in
   let failed_command =
     Client.spawn_run_view ~view:"unknown" ~contract ~input:"10" client
   in
@@ -128,7 +230,7 @@ let test_run_view_unknown_view ~protocol () =
 (* Runs high consumption view `loop` with 961 as input and default gas limit,
    and fails because of gas exhaustion. *)
 let test_run_view_loop_default_limit ~protocol () =
-  let* (client, contract) = init_with_contract ~protocol in
+  let* (client, contract) = init_with_contract ~protocol () in
   let failed_command =
     Client.spawn_run_view ~view:"loop" ~contract ~input:"961" client
   in
@@ -153,6 +255,11 @@ let make_for ~protocol () =
       ("Run view `add_v` with 10", test_run_view_add_v_10 ~protocol);
       ("Run view `mul_v` with 10", test_run_view_mul_v_10 ~protocol);
       ("Run view `value` without input", test_run_view_value ~protocol);
+      ("Run view `v_entrypoint` with 10", test_run_view_v_entrypoint ~protocol);
+      ( "Run view `my_external_view` with 10",
+        test_run_view_my_external_view ~protocol );
+      ( "Run view calling another contract",
+        test_run_external_nested_view ~protocol );
       ("Run view on implicit account", test_run_view_implicit_account ~protocol);
       ( "Run view on non existing contract",
         test_run_view_unknown_contract ~protocol );
