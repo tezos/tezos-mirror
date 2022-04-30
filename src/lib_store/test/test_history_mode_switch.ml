@@ -57,7 +57,7 @@ let expected_savepoint chain_store current_head blocks_per_cycle ~previous_mode
       | Archive ->
           (* We can comply to every mode *)
           (* The preserved_level is the level to be kept to be able to
-             export snasphots.*)
+             export snapshots.*)
           let preserved_level = Int32.(sub head_lafl (of_int max_op_ttl)) in
           let target_offset_window =
             Int32.(mul blocks_per_cycle (of_int target_offset))
