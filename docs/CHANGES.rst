@@ -967,7 +967,7 @@ Node
       ``tezos-node export snapshot [output_file]`` becomes optional and
       defaults to a file whose name follows this pattern
       ``<NETWORK>-<BLOCK_HASH>-<BLOCK_LEVEL>.<SNAPSHOT_HISTORY_MODE>``
-   -  Improved the metadata of snasphots which can be displayed using
+   -  Improved the metadata of snapshots which can be displayed using
       ``tezos-node snapshot info``
    -  The ``tezos-node snapshot import`` command is retro-compatible
       with the previous snapshot format (v1) but legacy snapshots cannot
