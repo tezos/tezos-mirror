@@ -70,12 +70,6 @@ val minimal_nanotez_per_gas_unit_arg : (Q.t, full) Clic.arg
 
 val minimal_nanotez_per_byte_arg : (Q.t, full) Clic.arg
 
-val force_low_fee_arg : (bool, full) Clic.arg
-
-val fee_cap_arg : (Tez.t, full) Clic.arg
-
-val burn_cap_arg : (Tez.t, full) Clic.arg
-
 val replace_by_fees_arg : (bool, full) Clic.arg
 
 val successor_level_arg : (bool, full) Clic.arg
@@ -242,3 +236,6 @@ module Tx_rollup : sig
     ('a, full) Clic.params ->
     (Tx_rollup_inbox.Merkle.root -> 'a, full) Clic.params
 end
+
+val fee_parameter_args :
+  (Injection.fee_parameter, Protocol_client_context.full) Clic.arg
