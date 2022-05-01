@@ -108,6 +108,10 @@ val default_arg :
 val switch :
   doc:string -> ?short:char -> long:string -> unit -> (bool, 'ctx) arg
 
+(** Map a function over the result of a parsed argument. *)
+val map_arg :
+  f:('ctx -> 'a -> 'b tzresult Lwt.t) -> ('a, 'ctx) arg -> ('b, 'ctx) arg
+
 (** {2 Groups of Optional Arguments} *)
 
 (** Defines a group of options, either the global options or the
@@ -442,6 +446,9 @@ val args19 :
     * 's,
     'ctx )
   options
+
+(** Aggregate a set of options into a single value. *)
+val aggregate : ('a, 'ctx) options -> ('a, 'ctx) arg
 
 (** {2 Parameter based command lines} *)
 
