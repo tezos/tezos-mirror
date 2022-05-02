@@ -334,6 +334,56 @@ let test_backtracked_reveal_in_batch () =
   when_ revelead (fun () ->
       failwith "Unexpected contract revelation: reveal was expected to fail")
 
+(* Asserts that re-revealing an already revealed manager will make the
+   whole batch fail. *)
+let test_already_revealed_manager_in_batch () =
+  Context.init1 ~consensus_threshold:0 () >>=? fun (blk, c) ->
+  let new_c = Account.new_account () in
+  let new_contract = Contract.Implicit new_c.pkh in
+  (* Create the contract *)
+  Op.transaction (B blk) c new_contract Tez.one >>=? fun operation ->
+  Block.bake blk ~operation >>=? fun blk ->
+  (Context.Contract.is_manager_key_revealed (B blk) new_contract >|=? function
+   | true -> Stdlib.failwith "Unexpected revelation: expecting fresh pkh"
+   | false -> ())
+  >>=? fun () ->
+  (* Reveal the contract *)
+  Op.revelation (B blk) new_c.pk >>=? fun operation ->
+  Block.bake blk ~operation >>=? fun blk ->
+  (* We pack a correct batch of operations attempting to re-reveal the contract *)
+  Incremental.begin_construction blk >>=? fun inc ->
+  Op.revelation ~fee:Tez.zero (I inc) new_c.pk >>=? fun op_reveal ->
+  Op.transaction
+    ~force_reveal:false
+    ~fee:Tez.zero
+    (I inc)
+    new_contract
+    new_contract
+    (Tez.of_mutez_exn 1_000_001L)
+  >>=? fun op_transfer ->
+  Op.batch_operations
+    ~recompute_counters:true
+    ~source:new_contract
+    (B blk)
+    [op_reveal; op_transfer]
+  >>=? fun batched_operation ->
+  let expect_apply_failure = function
+    | [
+        Environment.Ecoproto_error
+          (Contract_manager_storage.Previously_revealed_key _);
+      ] ->
+        return_unit
+    | _ -> assert false
+  in
+  Incremental.add_operation ~expect_apply_failure inc batched_operation
+  >>=? fun inc ->
+  (* We assert the manager key is still revealed. *)
+  Context.Contract.is_manager_key_revealed (I inc) new_contract
+  >>=? fun revelead ->
+  unless revelead (fun () ->
+      Stdlib.failwith
+        "Unexpected unrevelation: failing batch shouldn't unreveal the manager")
+
 let tests =
   [
     Tztest.tztest "simple reveal" `Quick test_simple_reveal;
@@ -358,4 +408,8 @@ let tests =
       "a backtracked reveal in a batch doesn't take effect"
       `Quick
       test_backtracked_reveal_in_batch;
+    Tztest.tztest
+      "cannot re-reveal a manager in a batch"
+      `Quick
+      test_already_revealed_manager_in_batch;
   ]
