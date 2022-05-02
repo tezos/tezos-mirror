@@ -556,3 +556,22 @@ let () =
     Data_encoding.unit
     (function Tx_rollup_deposit_not_allowed -> Some () | _ -> None)
     (fun () -> Tx_rollup_deposit_not_allowed)
+
+type error += Tx_rollup_deposit_slashed of Operation_hash.t
+
+let () =
+  register_error_kind
+    ~id:"tx_rollup.node.deposit_slashed"
+    ~title:"Deposit slashed"
+    ~description:"Deposit slashed."
+    ~pp:(fun ppf op ->
+      Format.fprintf
+        ppf
+        "The deposit for our operator was slashed in operation %a. Aborting to \
+         investigate."
+        Operation_hash.pp
+        op)
+    `Permanent
+    Data_encoding.(obj1 (req "operation" Operation_hash.encoding))
+    (function Tx_rollup_deposit_slashed o -> Some o | _ -> None)
+    (fun o -> Tx_rollup_deposit_slashed o)

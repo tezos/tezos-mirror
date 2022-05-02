@@ -521,6 +521,42 @@ let reject_bad_commitment state commitment =
   | None -> return_unit
   | Some source -> Accuser.reject_bad_commitment ~source state commitment
 
+let fail_when_slashed (type kind) state l1_operation
+    (result : kind manager_operation_result) =
+  let open Lwt_result_syntax in
+  let open Apply_results in
+  match state.State.signers.operator with
+  | None -> return_unit
+  | Some operator -> (
+      match result with
+      | Applied result ->
+          let balance_updates =
+            match result with
+            | Tx_rollup_commit_result {balance_updates; _}
+            | Tx_rollup_rejection_result {balance_updates; _} ->
+                (* These are the only two operations which can slash a bond. *)
+                balance_updates
+            | _ -> []
+          in
+          let (frozen_debit, punish) =
+            List.fold_left
+              (fun (frozen_debit, punish) -> function
+                | Receipt.(Tx_rollup_rejection_punishments, Credited _, _) ->
+                    (* Someone was punished *)
+                    (frozen_debit, true)
+                | (Frozen_bonds (committer, _), Debited _, _)
+                  when Contract.(committer = Implicit operator) ->
+                    (* Our frozen bonds are gone *)
+                    (true, punish)
+                | _ -> (frozen_debit, punish))
+              (false, false)
+              balance_updates
+          in
+          fail_when
+            (frozen_debit && punish)
+            (Error.Tx_rollup_deposit_slashed l1_operation)
+      | _ -> return_unit)
+
 let process_op (type kind) (state : State.t) l1_block l1_operation ~source:_
     (op : kind manager_operation) (result : kind manager_operation_result)
     (acc : 'acc) : 'acc tzresult Lwt.t =
@@ -528,6 +564,7 @@ let process_op (type kind) (state : State.t) l1_block l1_operation ~source:_
   let is_my_rollup tx_rollup =
     Tx_rollup.equal state.rollup_info.rollup_id tx_rollup
   in
+  let* () = Error.trace_fatal @@ fail_when_slashed state l1_operation result in
   match (op, result) with
   | ( Tx_rollup_commit {commitment; tx_rollup},
       Applied (Tx_rollup_commit_result _) )
