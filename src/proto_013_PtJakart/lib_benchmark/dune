@@ -16,7 +16,6 @@
   tezos-crypto
   tezos-protocol-013-PtJakart-parameters
   hashcons
-  benchmark-utils
   tezos-013-PtJakart-test-helpers
   prbnmcn-stats)
  (library_flags (:standard -linkall))

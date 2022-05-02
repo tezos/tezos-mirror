@@ -17,7 +17,6 @@
   tezos-crypto
   tezos-protocol-012-Psithaca-parameters
   hashcons
-  benchmark-utils
   tezos-012-Psithaca-test-helpers
   prbnmcn-stats)
  (library_flags (:standard -linkall))

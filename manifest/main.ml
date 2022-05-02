@@ -298,8 +298,6 @@ let zarith_stubs_js = external_lib ~js_compatible:true "zarith_stubs_js" V.True
 
 (* VENDORED LIBS *)
 
-let benchmark_utils = vendored_lib "benchmark-utils"
-
 let flextesa = vendored_lib "flextesa"
 
 let ledgerwallet_tezos = vendored_lib "ledgerwallet-tezos"
@@ -3546,7 +3544,6 @@ end = struct
             tezos_crypto |> open_;
             parameters |> if_some;
             hashcons;
-            benchmark_utils;
             test_helpers |> open_;
             prbnmcn_stats;
           ]

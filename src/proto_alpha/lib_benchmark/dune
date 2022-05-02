@@ -16,7 +16,6 @@
   tezos-crypto
   tezos-protocol-alpha-parameters
   hashcons
-  benchmark-utils
   tezos-alpha-test-helpers
   prbnmcn-stats)
  (library_flags (:standard -linkall))
