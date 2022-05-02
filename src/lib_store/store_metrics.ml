@@ -30,6 +30,7 @@ type metrics = {
   alternate_heads_count : Prometheus.Gauge.t;
   last_written_block_size : Prometheus.Gauge.t;
   last_store_merge_time : Prometheus.Gauge.t;
+  invalid_blocks : Prometheus.Gauge.t;
 }
 
 let namespace = Tezos_version.Node_version.namespace
@@ -60,6 +61,10 @@ let metrics =
     let help = "Time, in seconds, for the completion of the last store merge" in
     Prometheus.Gauge.v ~help ~namespace ?subsystem "last_merge_time"
   in
+  let invalid_blocks =
+    let help = "Number of blocks known to be invalid stored on disk" in
+    Prometheus.Gauge.v ~help ~namespace ?subsystem "invalid_blocks"
+  in
   {
     checkpoint_level;
     savepoint_level;
@@ -67,4 +72,5 @@ let metrics =
     alternate_heads_count;
     last_written_block_size;
     last_store_merge_time;
+    invalid_blocks;
   }

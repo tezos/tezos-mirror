@@ -669,6 +669,7 @@ module Block = struct
             Stored_data.update_with
               chain_state.invalid_blocks_data
               (fun invalid_blocks ->
+                Prometheus.Gauge.inc_one Store_metrics.metrics.invalid_blocks ;
                 Lwt.return
                   (Block_hash.Map.add hash {level; errors} invalid_blocks)))
       in
@@ -679,6 +680,7 @@ module Block = struct
         Stored_data.update_with
           chain_state.invalid_blocks_data
           (fun invalid_blocks ->
+            Prometheus.Gauge.dec_one Store_metrics.metrics.invalid_blocks ;
             Lwt.return (Block_hash.Map.remove hash invalid_blocks)))
 
   (** Accessors *)
@@ -1525,12 +1527,18 @@ module Chain = struct
               (* Remove potentially outdated invalid blocks if the
                  checkpoint changed *)
               let* () =
+                Prometheus.Gauge.set Store_metrics.metrics.invalid_blocks 0. ;
                 Stored_data.update_with
                   chain_state.invalid_blocks_data
                   (fun invalid_blocks ->
                     Lwt.return
                       (Block_hash.Map.filter
-                         (fun _k {level; _} -> level > snd new_checkpoint)
+                         (fun _k {level; _} ->
+                           if level > snd new_checkpoint then (
+                             Prometheus.Gauge.inc_one
+                               Store_metrics.metrics.invalid_blocks ;
+                             true)
+                           else false)
                          invalid_blocks))
               in
               write_checkpoint chain_state new_checkpoint
