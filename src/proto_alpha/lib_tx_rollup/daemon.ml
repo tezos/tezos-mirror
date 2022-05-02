@@ -742,6 +742,31 @@ let catch_up state = catch_up_on_commitments state
 (* TODO/TORU: https://gitlab.com/tezos/tezos/-/issues/2958
    We may also need to catch up on finalization/removal of commitments here. *)
 
+let check_operator_deposit state config =
+  let open Lwt_result_syntax in
+  match state.State.signers.operator with
+  | None ->
+      (* No operator for this node, no commitments will be made. *)
+      return_unit
+  | Some operator ->
+      let* has_deposit =
+        Plugin.RPC.Tx_rollup.has_bond
+          state.State.cctxt
+          (state.State.cctxt#chain, `Head 0)
+          state.State.rollup_info.rollup_id
+          operator
+      in
+      if has_deposit then
+        (* The operator already has a deposit for this rollup, no other check
+           necessary. *)
+        return_unit
+      else
+        (* Operator never made a deposit for this rollup, ensure they are ready to
+           make one. *)
+        fail_unless
+          config.Node_config.allow_deposit
+          Error.Tx_rollup_deposit_not_allowed
+
 let main_exit_callback state exit_status =
   let open Lwt_syntax in
   let* () = Stores.close state.State.stores in
@@ -784,6 +809,7 @@ let run configuration cctxt =
       ?rollup_genesis
       rollup_id
   in
+  let* () = check_operator_deposit state configuration in
   let* () =
     Injector.init
       state

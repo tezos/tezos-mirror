@@ -131,3 +131,6 @@ type error +=
       missing_signers : string list;
       extra_signers : string list;
     }
+
+(** Error returned when the rollup node is not authorized to make deposits *)
+type error += Tx_rollup_deposit_not_allowed

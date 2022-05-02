@@ -25,7 +25,8 @@
   tezos-client-base-unix
   tezos-shell
   tezos-store
-  tezos-workers)
+  tezos-workers
+  tezos-protocol-plugin-alpha)
  (inline_tests (flags -verbose) (modes native))
  (preprocess (pps ppx_inline_test))
  (library_flags (:standard -linkall))
@@ -48,4 +49,5 @@
    -open Tezos_micheline
    -open Tezos_client_base
    -open Tezos_client_base_unix
-   -open Tezos_workers)))
+   -open Tezos_workers
+   -open Tezos_protocol_plugin_alpha)))

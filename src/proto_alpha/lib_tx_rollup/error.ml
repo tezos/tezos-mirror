@@ -538,3 +538,21 @@ let () =
       | _ -> None)
     (fun (mode, missing_signers, extra_signers) ->
       Tx_rollup_mismatch_mode_signers {mode; missing_signers; extra_signers})
+
+type error += Tx_rollup_deposit_not_allowed
+
+let () =
+  register_error_kind
+    ~id:"tx_rollup.node.deposit_not_allowed"
+    ~title:"Deposit not allowed for operator"
+    ~description:"This node is not authorized to make a deposit"
+    ~pp:(fun ppf () ->
+      Format.fprintf
+        ppf
+        "This rollup node is not authorized to make a deposit for the operator \
+         and the operator has never made a deposit for the rollup. Please \
+         restart/configure the node with --allow-deposit.")
+    `Permanent
+    Data_encoding.unit
+    (function Tx_rollup_deposit_not_allowed -> Some () | _ -> None)
+    (fun () -> Tx_rollup_deposit_not_allowed)
