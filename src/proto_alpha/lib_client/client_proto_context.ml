@@ -562,7 +562,6 @@ let inject_activate_operation cctxt ~chain ~block ?confirmations ?dry_run alias
     ?dry_run
     ~chain
     ~block
-    ~fee_parameter:Injection.dummy_fee_parameter
     contents
   >>=? fun (oph, op, result) ->
   (match confirmations with
@@ -695,7 +694,6 @@ let submit_proposals ?dry_run ?verbose_signing (cctxt : #full) ~chain ~block
     ~chain
     ~block
     ?confirmations
-    ~fee_parameter:Injection.dummy_fee_parameter
     ?dry_run
     ~src_sk
     contents
@@ -713,7 +711,6 @@ let submit_ballot ?dry_run ?verbose_signing (cctxt : #full) ~chain ~block
     ~chain
     ~block
     ?confirmations
-    ~fee_parameter:Injection.dummy_fee_parameter
     ?dry_run
     ~src_sk
     contents
