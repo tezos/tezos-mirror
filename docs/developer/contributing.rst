@@ -123,14 +123,11 @@ While the code is still not ready to be peer reviewed, but it is
 merely a work in progress, the developer prefixes the MR with
 ``Draft:`` and assigns it to themselves.  This will tell everybody
 they can look at the code, comment, but there is still work to be done
-and the branch can change and history be rewritten. Alternatively, the
-MR title can be prefixed with ``WIP:``.  ``Draft:`` prefix is
-sometimes set automatically by GitLab, so ``WIP:`` is in a sense less
-ambiguous.
+and the branch can change and history be rewritten.
 
 Finally, when the code is ready for the :ref:`code review
-<code_review>`, the developer removes the Draft status (or ``WIP:``
-prefix) of the MR and freezes the branch. From this moment on, the
+<code_review>`, the developer removes the Draft status
+of the MR and freezes the branch. From this moment on, the
 developer will refrain from rewriting history, but he/she can add new
 commits and rebase the branch for syncing it with master (this can be
 done regularly to make sure the branch does not get stale). At this
