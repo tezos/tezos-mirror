@@ -32,9 +32,6 @@ open Alpha_context
    on top of [Alpha_context], while [Tx_rollup_gas] is defined on top
    of [Raw_context]. *)
 
-(** TODO: https://gitlab.com/tezos/tezos/-/issues/2773
-    Merge the benchmark used to compute this model into master and
-    reference it here. *)
 let verify_proof_model message_size proof_size =
   let open Saturation_repr in
   (* The cost of verifiying the proof depends bilinearly on the size
@@ -115,6 +112,12 @@ let hash_message_result ctxt after withdraw =
 let after_hash_when_proof_failed ctxt before =
   hash_message_result ctxt before Tx_rollup_withdraw_list_hash.empty
 
+let verify_l2_proof proof parameters message =
+  Context.verify_stream_proof proof (fun tree ->
+      Verifier_apply.apply_message tree parameters message >>= function
+      | Ok (tree, (_, withdrawals)) -> Lwt.return (tree, withdrawals)
+      | Error _ -> Lwt.return (tree, []))
+
 (** [compute_proof_after_hash ~max_proof_size agreed proof message] computes the
     after hash expected while verifying [proof] on [message] starting from
     [agreed].
@@ -150,11 +153,7 @@ let compute_proof_after_hash ~max_proof_size ctxt parameters agreed proof
     ~message_size:message_length
     ~proof_size:proof_length
   >>?= fun ctxt ->
-  Context.verify_stream_proof proof (fun tree ->
-      Verifier_apply.apply_message tree parameters message >>= function
-      | Ok (tree, (_, withdrawals)) -> Lwt.return (tree, withdrawals)
-      | Error _ -> Lwt.return (tree, []))
-  >>= fun res ->
+  verify_l2_proof proof parameters message >>= fun res ->
   match res with
   | (Ok _ | Error (`Stream_too_short _)) when proof_is_too_long ->
       (* If the proof is larger than [max_proof_size] we care about 2 cases:
@@ -194,3 +193,7 @@ let verify_proof ctxt parameters message proof
   if Alpha_context.Tx_rollup_message_result_hash.(computed_result <> rejected)
   then return ctxt
   else fail Proof_produced_rejected_state
+
+module Internal_for_tests = struct
+  let verify_l2_proof = verify_l2_proof
+end
