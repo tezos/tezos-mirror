@@ -67,6 +67,8 @@ build_x86_64:
   variables:
     ARCH: ""
   before_script:
+    # FIXME: https://gitlab.com/tezos/tezos/-/issues/2865
+    - sudo chown -R $(id -u):$(id -g) $CI_PROJECT_DIR
     - sudo apk --no-cache --virtual add unzip wget eudev-dev autoconf automake libtool linux-headers binutils zlib-static
     # dune build @install make ocamlopt stack overflow when compiling
     # protocol functor with static linking (because of
