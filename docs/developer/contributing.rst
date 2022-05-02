@@ -145,7 +145,7 @@ When all discussions are resolved, and the MR has got at least two
 approvals from Octez Merge Team members, the developer should squash
 any fix-up commits that were applied (remembering to edit the commit
 message appropriately). Then anyone can assign the MR to the `Nomadic
-Margebot <https://gitlab.com/nomadic-margebot>`__, which will
+Marge-bot <https://gitlab.com/nomadic-margebot>`__, which will
 automatically rebase the branch on top of master and finally merge it.
 
 .. _preparing_MR:
@@ -480,7 +480,7 @@ this additional dedicated guide:
 
    contributing-adding-a-new-opam-dependency
 
-In the special case where your MR adds a new Python, Rust, Javascript, or other
+In the special case where your MR adds a new Python, Rust, JavaScript, or other
 dependency, additional steps must also be followed.
 
 * for Python, you can refer to the related section in the :ref:`python testing documentation <python_adding_new_dependencies>`.
@@ -648,7 +648,7 @@ pitfalls a code reviewer should avoid.
   have a different reaction to it and impact on the quality of this work. This
   general remark is valid for any comment.
 
-When reviewing MRs involving documentation, you may check the built documentation directly within the Gitlab interface, see :ref:`build_doc_ci`.
+When reviewing MRs involving documentation, you may check the built documentation directly within the GitLab interface, see :ref:`build_doc_ci`.
 
 .. _merge_bot:
 
