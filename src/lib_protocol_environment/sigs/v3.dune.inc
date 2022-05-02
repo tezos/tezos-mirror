@@ -70,7 +70,6 @@
    v3/block_header.mli
    v3/fitness.mli
    v3/operation.mli
-   v3/protocol.mli
    v3/context.mli
    v3/updater.mli
    v3/RPC_context.mli
