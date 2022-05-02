@@ -32,9 +32,6 @@ open Alpha_context
    on top of [Alpha_context], while [Tx_rollup_gas] is defined on top
    of [Raw_context]. *)
 
-(** TODO: https://gitlab.com/tezos/tezos/-/issues/2773
-    Merge the benchmark used to compute this model into master and
-    reference it here. *)
 let verify_proof_model message_size proof_size =
   let open Saturation_repr in
   (* The cost of verifiying the proof depends bilinearly on the size
