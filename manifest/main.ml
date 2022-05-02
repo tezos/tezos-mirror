@@ -2382,6 +2382,8 @@ let tezos_benchmark =
     ~synopsis:
       "Tezos: library for writing benchmarks and performing simple parameter \
        inference"
+    ~foreign_stubs:
+      {language = C; flags = [":standard"]; names = ["snoop_stubs"]}
     ~deps:
       [
         tezos_base |> open_ ~m:"TzPervasives";
@@ -2394,7 +2396,6 @@ let tezos_benchmark =
         prbnmcn_dagger_stats;
         prbnmcn_stats;
         pringo;
-        benchmark_utils;
         pyml_plot;
         ocaml_migrate_parsetree;
         opam_only "hashcons" V.True;

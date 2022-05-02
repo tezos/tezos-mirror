@@ -194,12 +194,6 @@ let maths s =
   Inline_math_blob s
 
 let benchmark_options_table (bench_opts : Measure.options) =
-  let flush_cache =
-    match bench_opts.flush_cache with
-    | `Cache_megabytes i -> normal_text (Printf.sprintf "%d megabytes" i)
-    | `Dont -> normal_text "no"
-  in
-  let stabilize_gc = normal_text (string_of_bool bench_opts.stabilize_gc) in
   let seed =
     match bench_opts.seed with
     | None -> normal_text "self-init"
@@ -214,21 +208,13 @@ let benchmark_options_table (bench_opts : Measure.options) =
     | Percentile i -> normal_text (Printf.sprintf "percentile@%d" i)
     | Mean -> normal_text "mean"
   in
-  let cpu_affinity =
-    match bench_opts.cpu_affinity with
-    | None -> normal_text "none"
-    | Some i -> normal_text (Printf.sprintf "cpu %d" i)
-  in
   let open Latex_syntax in
   let rows =
     [
       Hline;
-      Row [[normal_text "flush cache"]; [flush_cache]];
-      Row [[normal_text "stabilize gc"]; [stabilize_gc]];
       Row [[normal_text "seed"]; [seed]];
       Row [[normal_text "nsamples"]; [nsamples]];
       Row [[normal_text "determinizer"]; [determinizer]];
-      Row [[normal_text "cpu affinity"]; [cpu_affinity]];
       Hline;
     ]
   in

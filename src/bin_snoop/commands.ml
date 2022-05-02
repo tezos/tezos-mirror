@@ -41,17 +41,11 @@ module Benchmark_cmd = struct
   (* Handling the options of the benchmarker *)
   open Measure
 
-  let set_flush_cache flush_opt options = {options with flush_cache = flush_opt}
-
-  let set_stabilize_gc stabilize_gc options = {options with stabilize_gc}
-
   let set_seed seed (options : options) = {options with seed = Some seed}
 
   let set_nsamples nsamples options = {options with nsamples}
 
   let set_determinizer determinizer options = {options with determinizer}
-
-  let set_cpu_affinity cpu_affinity options = {options with cpu_affinity}
 
   let set_save_file save_file options = {options with save_file}
 
@@ -70,12 +64,9 @@ module Benchmark_cmd = struct
   let default_benchmark_options =
     let options =
       {
-        flush_cache = `Dont;
-        stabilize_gc = false;
         seed = None;
         nsamples = 3000;
         determinizer = Percentile 50;
-        cpu_affinity = None;
         bench_number = 300;
         minor_heap_size = `words (256 * 1024);
         config_dir = None;
@@ -115,24 +106,18 @@ module Benchmark_cmd = struct
   (* "benchmark" command handler *)
 
   let benchmark_handler
-      ( cache,
-        gc,
-        det,
+      ( det,
         nsamples,
         seed,
-        cpu_affinity,
         bench_number,
         minor_heap_size,
         config_dir,
         csv_export ) bench_name save_file () =
     let options =
       default_benchmark_options.options
-      |> lift_opt set_flush_cache cache
-      |> set_stabilize_gc gc
       |> lift_opt set_determinizer det
       |> lift_opt set_nsamples nsamples
       |> lift_opt set_seed seed
-      |> set_cpu_affinity cpu_affinity
       |> lift_opt set_bench_number bench_number
       |> lift_opt set_minor_heap_size minor_heap_size
       |> set_config_dir config_dir
@@ -146,28 +131,6 @@ module Benchmark_cmd = struct
     Lwt.return_ok ()
 
   module Options = struct
-    (* Argument --flush-cache mb
-       Parmeter: size in megabytes of the cache. *)
-    let flush_cache_arg =
-      let flush_cache_arg_param =
-        parse_parameter
-          (fun p ->
-            Option.map (fun p -> `Cache_megabytes p) (int_of_string_opt p))
-          "Error while parsing --flush-cache argument."
-      in
-      Clic.arg
-        ~doc:"Force flushing the cache before each measurement"
-        ~long:"flush-cache"
-        ~placeholder:"cache size in megabytes"
-        flush_cache_arg_param
-
-    (* Boolean argument --stabilize-gc *)
-    let stabilize_gc_arg =
-      Clic.switch
-        ~doc:"Major GC until fixpoint before each measurement"
-        ~long:"stabilize-gc"
-        ()
-
     (* Sum type [mean| percentile [1-100]] argument --determinizer *)
     let determinizer_arg =
       let determinizer_arg_param =
@@ -195,20 +158,6 @@ module Benchmark_cmd = struct
         ~long:"determinizer"
         ~placeholder:"{mean | percentile@[1-100]}"
         determinizer_arg_param
-
-    (* Int argument --cpu-affinity
-       Parameter: Id of the CPU where to preferentially pin the benchmark *)
-    let cpu_affinity_arg =
-      let cpu_affinity_arg_param =
-        parse_parameter
-          int_of_string_opt
-          "Error while parsing --cpu-affinity argument."
-      in
-      Clic.arg
-        ~doc:"Sets CPU affinity"
-        ~long:"cpu-affinity"
-        ~placeholder:"CPU id"
-        cpu_affinity_arg_param
 
     (* Integer argument --nsamples *)
     let nsamples_arg =
@@ -285,13 +234,10 @@ module Benchmark_cmd = struct
 
   let options =
     let open Options in
-    Clic.args10
-      flush_cache_arg
-      stabilize_gc_arg
+    Clic.args7
       determinizer_arg
       nsamples_arg
       seed_arg
-      cpu_affinity_arg
       bench_number_arg
       minor_heap_size_arg
       config_dir_arg

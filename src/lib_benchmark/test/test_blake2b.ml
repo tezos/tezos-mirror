@@ -41,13 +41,10 @@ open Tezos_benchmark_examples
 let bench_opts =
   let open Measure in
   {
-    flush_cache = `Dont;
-    stabilize_gc = false;
     seed = Some 1337;
     nsamples = 3000;
     (* Percentile 50 = Median *)
     determinizer = Percentile 50;
-    cpu_affinity = None;
     bench_number = 100;
     minor_heap_size = `words (256 * 1024);
     config_dir = None;
