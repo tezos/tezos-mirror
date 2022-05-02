@@ -1721,6 +1721,7 @@ let test_reject_bad_commitment =
         Client.init_with_protocol ~parameter_file `Client ~protocol ()
       in
       let originator = Constant.bootstrap1.public_key_hash in
+      let operator = Constant.bootstrap3.public_key_hash in
       let* (tx_rollup_hash, tx_node) =
         init_and_run_rollup_node ~originator node client
       in
@@ -1749,11 +1750,10 @@ let test_reject_bad_commitment =
           ~inbox_merkle_root
           ?predecessor
           ~rollup:tx_rollup_hash
-          ~src:Constant.bootstrap3.public_key_hash
+          ~src:operator
           client
       in
-      let* () = Client.bake_for client in
-      let* _ = Rollup_node.wait_for_tezos_level tx_node 4 in
+      let* () = Client.bake_for_and_wait client in
       let* {
              proof;
              message;
@@ -1771,6 +1771,13 @@ let test_reject_bad_commitment =
           ~client
           commitment_info
       in
+      Log.info "Stopping rollup node" ;
+      let* () = Rollup_node.terminate tx_node in
+      Log.info "Restarting rollup node with committer/operator" ;
+      let* () = Rollup_node.change_signers ~operator:(Some operator) tx_node in
+      let* () = Rollup_node.run tx_node in
+      let* () = Rollup_node.wait_for_ready tx_node in
+      Log.info "Injecting rejection" ;
       let*! () =
         Client.Tx_rollup.submit_rejection
           ~src:Constant.bootstrap4.public_key_hash
@@ -1787,7 +1794,14 @@ let test_reject_bad_commitment =
           ~agreed_message_result_path
           client
       in
-      unit)
+      let node_process = Option.get @@ Rollup_node.process tx_node in
+      (* Baking one block for rejection *)
+      let* () = Client.bake_for_and_wait client in
+      Log.info "Rollup node must exist with error message because of slashing" ;
+      Process.check_error
+        ~exit_code:1
+        ~msg:(rex "The deposit for our operator was slashed")
+        node_process)
 
 let test_committer =
   Protocol.register_test
