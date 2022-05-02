@@ -58,6 +58,7 @@ type t = {
   reconnection_delay : float;
   mode : mode;
   signers : signers;
+  allow_deposit : bool;
   l2_blocks_cache_size : int;
 }
 

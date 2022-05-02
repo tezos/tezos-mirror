@@ -44,6 +44,7 @@ type t = {
   reconnection_delay : float;
   mode : mode;
   signers : signers;
+  allow_deposit : bool;
   l2_blocks_cache_size : int;
 }
 
@@ -162,6 +163,7 @@ let encoding =
            reconnection_delay;
            mode;
            signers;
+           allow_deposit;
            l2_blocks_cache_size;
          } ->
       ( Some data_dir,
@@ -171,6 +173,7 @@ let encoding =
         reconnection_delay,
         mode,
         signers,
+        allow_deposit,
         l2_blocks_cache_size ))
     (fun ( data_dir_opt,
            rollup_id,
@@ -179,6 +182,7 @@ let encoding =
            reconnection_delay,
            mode,
            signers,
+           allow_deposit,
            l2_blocks_cache_size ) ->
       let data_dir =
         match data_dir_opt with
@@ -193,9 +197,10 @@ let encoding =
         reconnection_delay;
         mode;
         signers;
+        allow_deposit;
         l2_blocks_cache_size;
       })
-  @@ obj8
+  @@ obj9
        (opt
           ~description:
             "Location where the rollup node data (store, context, etc.) is \
@@ -225,6 +230,12 @@ let encoding =
           ~description:"The signers for the various tx rollup operations"
           "signers"
           signers_encoding)
+       (dft
+          ~description:
+            "Allow the operator to make a first deposit for commitments"
+          "allow_deposit"
+          bool
+          false)
        (dft
           ~description:"The size of the L2 block cache in number of blocks"
           "l2_blocks_cache_size"
