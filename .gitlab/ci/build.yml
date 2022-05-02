@@ -70,15 +70,8 @@ build_x86_64:
     # FIXME: https://gitlab.com/tezos/tezos/-/issues/2865
     - sudo chown -R $(id -u):$(id -g) $CI_PROJECT_DIR
     - sudo apk --no-cache --virtual add unzip wget eudev-dev autoconf automake libtool linux-headers binutils zlib-static
-    # dune build @install make ocamlopt stack overflow when compiling
-    # protocol functor with static linking (because of
-    # liquidity_baking_cpmm.ml).
-    # Let's skip protocol functors, they are not needed for the release
-    - dune build
-      @src/lib_protocol_compiler/install
-      $(for i in src/{,proto_*/}bin_* ; do echo @$i/install ; done)
-      --profile static
-    - mkdir -p "tezos-binaries/$ARCH" && install -t "tezos-binaries/$ARCH" _build/install/default/bin/*
+    - mkdir -p tezos-binaries
+    - bash ./scripts/build_and_install_static_binaries.sh "tezos-binaries/$ARCH"
     # Strip debug symbols in binaries
     - find "tezos-binaries/$ARCH" -maxdepth 1 -type f ! -name "*.*" -exec strip --strip-debug {} \;
   artifacts:

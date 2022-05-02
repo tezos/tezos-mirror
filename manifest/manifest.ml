@@ -2041,6 +2041,18 @@ let generate_package_json_file () =
        pp_dep)
     (List.sort compare !l)
 
+let generate_static_packages () =
+  write "static-packages" @@ fun fmt ->
+  Target.iter_internal_by_opam (fun package internals ->
+      if
+        List.exists
+          (fun (internal : Target.internal) ->
+            match internal.kind with
+            | Public_executable _ | Private_executable _ -> internal.static
+            | Public_library _ | Private_library _ | Test_executable _ -> false)
+          internals
+      then Format.fprintf fmt "%s\n" package)
+
 let generate_workspace env dune =
   let pp_dune fmt dune =
     if not (Dune.is_empty dune) then Format.fprintf fmt "@.%a@." Dune.pp dune
@@ -2213,6 +2225,7 @@ let generate () =
     generate_opam_files () ;
     generate_dune_project_files () ;
     generate_package_json_file () ;
+    generate_static_packages () ;
     Option.iter (generate_opam_files_for_release packages_dir) release
   with exn ->
     Printexc.print_backtrace stderr ;

@@ -2521,6 +2521,7 @@ let _tezt_self_tests =
     ~path:"tezt/self_tests"
     ~synopsis:"Tests for the Tezos test framework based on Tezt"
     ~bisect_ppx:false
+    ~static:false
     ~deps:[tezt |> open_ |> open_ ~m:"Base"; tezt_tezos |> open_]
     ~cram:true
     ~dune:
