@@ -420,7 +420,7 @@ let () =
     ~pp:(fun ppf s ->
       Format.fprintf
         ppf
-        "Failed to import snasphot as the given directory %s already exists."
+        "Failed to import snapshot as the given directory %s already exists."
         s)
     (obj1 (req "path" string))
     (function Directory_already_exists s -> Some s | _ -> None)
@@ -2271,7 +2271,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
         retrieve_export_block chain_store block
       in
       (* The number of additional cycles to export is fixed as the
-         snasphot content must not rely on the local configuration. *)
+         snapshot content must not rely on the local configuration. *)
       let export_mode = History_mode.Rolling None in
       let*! () =
         Event.(
@@ -2351,7 +2351,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
         retrieve_export_block chain_store block
       in
       (* The number of additional cycles to export is fixed as the
-         snasphot content must not rely on the local configuration. *)
+         snapshot content must not rely on the local configuration. *)
       let export_mode = History_mode.Full None in
       let*! () =
         Event.(

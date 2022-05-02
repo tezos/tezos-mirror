@@ -15,7 +15,7 @@ storage.
     history
   - `Block_store`: persistent and cached generic block store based on
     both cemented and floating blocks stores.
-  - `Snasphots`: canonical storage representation for storage
+  - `Snapshots`: canonical storage representation for storage
     import/export
 - A comprehensive view of the storage implementation is available at
   https://tezos.gitlab.io/shell/storage.html

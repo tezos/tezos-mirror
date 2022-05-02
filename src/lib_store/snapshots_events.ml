@@ -81,7 +81,7 @@ module Event = struct
       ~level:Notice
       ~name:"import_on_disk_mode"
       ~msg:
-        "importing snasphot in on-disk mode. Mind using the --in-memory flag \
+        "importing snapshot in on-disk mode. Mind using the --in-memory flag \
          to allow a faster import which uses a higher quantity of ram"
       ()
 
