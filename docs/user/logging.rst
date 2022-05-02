@@ -274,7 +274,7 @@ events) this call adds a sink to suddenly start pretty-printing all
 
 ::
 
-   tezos-client rpc post /config/logging with \
+   tezos-client rpc put /config/logging with \
      '{ "active_sinks": [ "file-descriptor-path:///tmp/rpclogs?section-prefix=rpc:debug&format=pp&fresh=true" ] }'
 
 Client and Baking Daemons
