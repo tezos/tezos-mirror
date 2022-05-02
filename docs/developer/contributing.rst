@@ -128,17 +128,17 @@ and the branch can change and history be rewritten.
 Finally, when the code is ready for the :ref:`code review
 <code_review>`, the developer removes the Draft status
 of the MR and freezes the branch. From this moment on, the
-developer will refrain from rewriting history, but he/she can add new
+developer will refrain from rewriting history, but they can add new
 commits and rebase the branch for syncing it with master (this can be
 done regularly to make sure the branch does not get stale). At this
 point the developer interacts with the reviewers to address their
 comments and suggestions.
 
 GitLab allows both to comment on the code and to add general comments
-on the MR.  Each comment should be addressed by the developer. He/she
+on the MR.  Each comment should be addressed by the developer. They
 can add additional commits to address each comment. This incremental
 approach will make it easier for the reviewer to keep interacting till
-each discussion is resolved. When the reviewer is satisfied, he/she
+each discussion is resolved. When the reviewer is satisfied, they
 will mark the discussion resolved.
 
 When all discussions are resolved, and the MR has got at least two
@@ -398,7 +398,7 @@ action is required to get the merge request moving. Example actions include:
 - merge;
 - find someone else who can get the merge request moving.
 
-The assignee will thus often be one of the reviewers (if he needs to review
+The assignee will thus often be one of the reviewers (if they needs to review
 or respond to a comment) or one of the merge request authors (if they need
 to update the code or respond to a comment).
 
