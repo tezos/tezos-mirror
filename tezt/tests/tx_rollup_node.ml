@@ -236,6 +236,7 @@ let test_node_configuration =
           Observer
           ~rollup_id:tx_rollup_hash
           ~rollup_genesis:block_hash
+          ~allow_deposit:true
           client
           node
       in
@@ -259,7 +260,8 @@ let test_node_configuration =
 
 let init_and_run_rollup_node ~originator ?operator ?batch_signer
     ?finalize_commitment_signer ?remove_commitment_signer
-    ?dispatch_withdrawals_signer ?rejection_signer node client =
+    ?dispatch_withdrawals_signer ?rejection_signer
+    ?(allow_deposit = operator <> None) node client =
   let*! tx_rollup_hash = Client.Tx_rollup.originate ~src:originator client in
   let* () = Client.bake_for_and_wait client in
   Log.info "Tx_rollup %s was successfully originated" tx_rollup_hash ;
@@ -275,6 +277,7 @@ let init_and_run_rollup_node ~originator ?operator ?batch_signer
       ?remove_commitment_signer
       ?dispatch_withdrawals_signer
       ?rejection_signer
+      ~allow_deposit
       client
       node
   in
@@ -298,6 +301,75 @@ let test_tx_node_origination =
       in
       let originator = Constant.bootstrap1.public_key_hash in
       let* _tx_node = init_and_run_rollup_node ~originator node client in
+      unit)
+
+let test_not_allow_deposit =
+  Protocol.register_test
+    ~__FILE__
+    ~title:
+      "TX_rollup: test that the node refuses to start if not allowed to deposit"
+    ~tags:["tx_rollup"; "node"; "allow"; "deposit"]
+    (fun protocol ->
+      let* parameter_file = Parameters.parameter_file protocol in
+      let* (node, client) =
+        Client.init_with_protocol ~parameter_file `Client ~protocol ()
+      in
+      let originator = Constant.bootstrap1.public_key_hash in
+      let operator = Constant.bootstrap2.public_key_hash in
+      let*! tx_rollup_hash =
+        Client.Tx_rollup.originate ~src:originator client
+      in
+      let* () = Client.bake_for_and_wait client in
+      Log.info "Tx_rollup %s was successfully originated" tx_rollup_hash ;
+      let* block_hash = RPC.get_block_hash client in
+      let tx_node =
+        Rollup_node.create
+          Custom
+          ~rollup_id:tx_rollup_hash
+          ~rollup_genesis:block_hash
+          ~operator
+          ~allow_deposit:false
+          client
+          node
+      in
+      let* _ = Rollup_node.init_config tx_node in
+      let* () = Rollup_node.run tx_node in
+      Log.info "Tx_rollup node is now running" ;
+      let ready =
+        let* () = Rollup_node.wait_for_ready tx_node in
+        Test.fail
+          "Rollup node shouldn't start when not allowed to make deposits"
+      in
+      let dies =
+        let node_process = Option.get @@ Rollup_node.process tx_node in
+        Process.check_error
+          ~exit_code:1
+          ~msg:(rex "This rollup node is not authorized to make a deposit")
+          node_process
+      in
+      let* () = Lwt.choose [ready; dies] in
+      unit)
+
+let test_allow_deposit =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"TX_rollup: test that the node starts if allowed to deposit"
+    ~tags:["tx_rollup"; "node"; "allow"; "deposit"]
+    (fun protocol ->
+      let* parameter_file = Parameters.parameter_file protocol in
+      let* (node, client) =
+        Client.init_with_protocol ~parameter_file `Client ~protocol ()
+      in
+      let originator = Constant.bootstrap1.public_key_hash in
+      let operator = Constant.bootstrap2.public_key_hash in
+      let* _tx_node =
+        init_and_run_rollup_node
+          ~originator
+          ~operator
+          ~allow_deposit:true
+          node
+          client
+      in
       unit)
 
 (*FIXME/TORU: add additional checks such as contents, context_hash, …*)
@@ -353,6 +425,7 @@ let test_tx_node_store_inbox =
           Observer
           ~rollup_id:rollup
           ~rollup_genesis:block_hash
+          ~allow_deposit:true
           client
           node
       in
@@ -2446,7 +2519,12 @@ let test_catch_up =
   Log.info "Stopping rollup node" ;
   let* () = Rollup_node.terminate tx_node in
   Log.info "Restarting rollup node with committer/operator" ;
-  let* () = Rollup_node.change_signers ~operator:(Some operator) tx_node in
+  let* () =
+    Rollup_node.change_signers
+      ~operator:(Some operator)
+      ~allow_deposit:true
+      tx_node
+  in
   let* () = Rollup_node.run tx_node in
   let* () = Rollup_node.wait_for_ready tx_node in
   (* Baking one block to make sure catch up phase is over *)
@@ -2460,6 +2538,8 @@ let test_catch_up =
 
 let register ~protocols =
   test_node_configuration protocols ;
+  test_not_allow_deposit protocols ;
+  test_allow_deposit protocols ;
   test_tx_node_origination protocols ;
   test_tx_node_store_inbox protocols ;
   test_ticket_deposit_from_l1_to_l2 protocols ;
