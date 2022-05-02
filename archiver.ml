@@ -357,17 +357,23 @@ let extract_anomalies path level infos =
     | [] -> return_unit
     | _ :: _ -> dump_anomalies path level anomalies
 
-(* For now, only endorsements are extracted from blocks; so we know we
-   add information for an endorsement, not for a preendorsement. When
-   adding information for preendorsements, this function needs to take
-   one more argument. *)
-let add_to_operations block_hash block_round operations =
+(* For now, only endorsements are extracted from blocks; so we know
+   that we add information for endorsements, not for
+   preendorsements.
+
+   Therefore, [add_to_operations block_hash block_round ops] adds the
+   endorsements in ops, which were included in block [block_hash], to
+   the list of operations already known for operation's producer.  *)
+let add_to_operations block_hash block_round ?endorsements_round operations =
   match
     List.partition
       (fun Delegate_operations.{kind; round; _} ->
-        match round with
-        | None -> true
-        | Some round -> kind = Endorsement && Int32.equal block_round round)
+        kind = Endorsement
+        &&
+        match (round, endorsements_round) with
+        | (None, None) -> true
+        | (Some round, Some round') -> Int32.equal round round'
+        | _ -> assert false)
       operations
   with
   | ( Delegate_operations.
@@ -386,7 +392,7 @@ let add_to_operations block_hash block_round operations =
   | ([], _) ->
       {
         kind = Endorsement;
-        round = Some block_round;
+        round = endorsements_round;
         errors = None;
         reception_time = None;
         block_inclusion = [block_hash];
@@ -394,7 +400,7 @@ let add_to_operations block_hash block_round operations =
       :: operations
 
 let dump_included_in_block cctxt path block_level block_hash block_round
-    timestamp reception_time baker endorsers_pkhs =
+    timestamp reception_time baker ?endorsements_round endorsers_pkhs =
   let open Lwt.Infix in
   Wallet.of_context cctxt >>= fun aliases_opt ->
   let aliases =
@@ -425,7 +431,11 @@ let dump_included_in_block cctxt path block_level block_hash block_round
                        delegate;
                        delegate_alias;
                        operations =
-                         add_to_operations block_hash block_round operations;
+                         add_to_operations
+                           block_hash
+                           block_round
+                           ?endorsements_round
+                           operations;
                      }
                    :: acc,
                    missing' )
@@ -641,6 +651,7 @@ type chunk =
       * Time.Protocol.t
       * Time.System.t
       * Signature.Public_key_hash.t
+      * Int32.t option
       * Signature.Public_key_hash.t list
   | Mempool of
       bool option
@@ -659,22 +670,24 @@ let launch cctxt prefix =
   Lwt_stream.iter_p
     (function
       | Block
-          ( block_level,
-            block,
+          ( level,
+            block_hash,
             round,
             timestamp,
             reception_time,
             baker,
+            endorsements_round,
             endorsers_pkhs ) ->
           dump_included_in_block
             cctxt
             prefix
-            block_level
-            block
+            level
+            block_hash
             round
             timestamp
             reception_time
             baker
+            ?endorsements_round
             endorsers_pkhs
       | Mempool (unaccurate, level, items) ->
           dump_received cctxt prefix ?unaccurate level items)
@@ -685,8 +698,16 @@ let stop () = chunk_feeder None
 let add_received ?unaccurate level items =
   chunk_feeder (Some (Mempool (unaccurate, level, items)))
 
-let add_block ~level block_hash ~round timestamp reception_time delegate pkhs =
+let add_block ~level block_hash ~round timestamp reception_time baker
+    ?endorsements_round pkhs =
   chunk_feeder
     (Some
        (Block
-          (level, block_hash, round, timestamp, reception_time, delegate, pkhs)))
+          ( level,
+            block_hash,
+            round,
+            timestamp,
+            reception_time,
+            baker,
+            endorsements_round,
+            pkhs )))

@@ -154,7 +154,7 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
     | Ok data -> Ok data.contents.priority
     | Error err -> Error [Tezos_base.Data_encoding_wrapper.Decoding_error err]
 
-  let consensus_op_participants_of_block cctxt hash =
+  let endorsements_info_of_block cctxt hash =
     let* ops =
       Block_services.Operations.operations_in_pass
         cctxt
@@ -179,7 +179,7 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
           | _ -> None)
         ops
     in
-    return pks
+    return Protocol_machinery.{endorsers = pks; round = None}
 end
 
 include Protocol_machinery.Make (Services)

@@ -53,5 +53,6 @@ val add_block :
   Time.Protocol.t ->
   Time.System.t ->
   Signature.Public_key_hash.t ->
+  ?endorsements_round:Int32.t ->
   Signature.Public_key_hash.t list ->
   unit

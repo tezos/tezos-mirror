@@ -172,7 +172,14 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
     in
     wrap @@ Protocol.Alpha_context.Round.to_int round
 
-  let consensus_op_participants_of_block cctxt hash =
+  let get_endorsement_round protocol_data =
+    match protocol_data with
+    | Protocol.Alpha_context.Operation_data {contents; _} -> (
+        match contents with
+        | Single (Endorsement {round; _}) -> round
+        | _ -> assert false)
+
+  let endorsements_info_of_block cctxt hash =
     let* ops =
       Block_services.Operations.operations_in_pass
         cctxt
@@ -180,9 +187,10 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
         ~block:(`Hash (hash, 0))
         0
     in
+    let round = ref None in
     let pks =
       List.filter_map
-        (fun Block_services.{receipt; _} ->
+        (fun Block_services.{receipt; protocol_data; _} ->
           match receipt with
           | Receipt
               (Protocol.Apply_results.Operation_metadata
@@ -191,11 +199,17 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
                     Single_result
                       (Protocol.Apply_results.Endorsement_result {delegate; _});
                 }) ->
+              round := Some (get_endorsement_round protocol_data) ;
               Some delegate
           | _ -> None)
         ops
     in
-    return pks
+    return
+      Protocol_machinery.
+        {
+          endorsers = pks;
+          round = Option.map Protocol.Alpha_context.Round.to_int32 !round;
+        }
 end
 
 include Protocol_machinery.Make (Services)

@@ -23,6 +23,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type block_endorsements_info = {
+  endorsers : Signature.public_key_hash list;
+  round : Int32.t option;
+}
+
 module type PROTOCOL_SERVICES = sig
   val hash : Protocol_hash.t
 
@@ -72,8 +77,8 @@ module type PROTOCOL_SERVICES = sig
 
   val block_round : Block_header.t -> int tzresult
 
-  val consensus_op_participants_of_block :
-    wrap_full -> Block_hash.t -> Signature.public_key_hash list tzresult Lwt.t
+  val endorsements_info_of_block :
+    wrap_full -> Block_hash.t -> block_endorsements_info tzresult Lwt.t
 end
 
 module type S = sig

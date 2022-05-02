@@ -25,6 +25,11 @@
 
 open Lwt_result_syntax
 
+type block_endorsements_info = {
+  endorsers : Signature.public_key_hash list;
+  round : Int32.t option;
+}
+
 module type PROTOCOL_SERVICES = sig
   val hash : Protocol_hash.t
 
@@ -67,8 +72,8 @@ module type PROTOCOL_SERVICES = sig
 
   val block_round : Block_header.t -> int tzresult
 
-  val consensus_op_participants_of_block :
-    wrap_full -> Block_hash.t -> Signature.public_key_hash list tzresult Lwt.t
+  val endorsements_info_of_block :
+    wrap_full -> Block_hash.t -> block_endorsements_info tzresult Lwt.t
 end
 
 module type S = sig
@@ -134,40 +139,39 @@ module Make (Protocol_services : PROTOCOL_SERVICES) : S = struct
           (fun ((_chain_id, hash), header) ->
             let reception_time = Time.System.now () in
             let block_level = header.Block_header.shell.Block_header.level in
-            let priority = Protocol_services.block_round header in
-            match priority with
+            let round = Protocol_services.block_round header in
+            match round with
             | Error e ->
                 Lwt.return (Error_monad.pp_print_trace Format.err_formatter e)
-            | Ok priority -> (
-                let*! pks =
-                  Protocol_services.consensus_op_participants_of_block
-                    cctxt'
-                    hash
+            | Ok round -> (
+                let*! endorsements_info =
+                  Protocol_services.endorsements_info_of_block cctxt' hash
                 in
-                match pks with
+                match endorsements_info with
                 | Error e ->
                     Lwt.return
                       (Error_monad.pp_print_trace Format.err_formatter e)
-                | Ok pks -> (
+                | Ok endorsements_info -> (
                     let*! baking_rights =
-                      Protocol_services.baking_right cctxt' hash priority
+                      Protocol_services.baking_right cctxt' hash round
                     in
                     match baking_rights with
                     | Error e ->
                         Error_monad.pp_print_trace Format.err_formatter e ;
                         Lwt.return_unit
-                    | Ok (delegate, _) ->
+                    | Ok (baker, _) ->
                         let timestamp =
                           header.Block_header.shell.Block_header.timestamp
                         in
                         Archiver.add_block
                           ~level:block_level
                           hash
-                          ~round:(Int32.of_int priority)
+                          ~round:(Int32.of_int round)
                           timestamp
                           reception_time
-                          delegate
-                          pks ;
+                          baker
+                          ?endorsements_round:endorsements_info.round
+                          endorsements_info.endorsers ;
                         Lwt.return_unit)))
           block_stream
 
