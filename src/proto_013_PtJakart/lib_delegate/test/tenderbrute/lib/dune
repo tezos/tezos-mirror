@@ -2,7 +2,7 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tenderbrute)
+ (name tenderbrute_013_PtJakart)
  (public_name tezos-baking-013-PtJakart.tenderbrute)
  (libraries
   data-encoding

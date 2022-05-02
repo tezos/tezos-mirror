@@ -17,4 +17,5 @@
    -open Tezos_base
    -open Tezos_client_base
    -open Tezos_client_013_PtJakart
-   -open Tezos_protocol_013_PtJakart)))
+   -open Tezos_protocol_013_PtJakart
+   -open Tenderbrute_013_PtJakart)))

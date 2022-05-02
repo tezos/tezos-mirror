@@ -2,7 +2,7 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tenderbrute)
+ (name tenderbrute_alpha)
  (public_name tezos-baking-alpha.tenderbrute)
  (libraries
   data-encoding

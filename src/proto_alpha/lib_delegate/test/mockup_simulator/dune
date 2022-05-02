@@ -28,4 +28,5 @@
    -open Tezos_stdlib_unix
    -open Tezos_client_base_unix
    -open Tezos_protocol_alpha_parameters
+   -open Tenderbrute_alpha
    -open Tezos_protocol_alpha.Protocol)))
