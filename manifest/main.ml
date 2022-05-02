@@ -250,8 +250,6 @@ let qcheck_core = external_lib "qcheck-core" V.True
 
 let re = external_lib ~js_compatible:true "re" V.(at_least "1.7.2")
 
-let re_str = external_sublib ~js_compatible:true re "re.str"
-
 let resto_version = V.(at_least "0.6" && less_than "0.7")
 
 let resto = external_lib ~js_compatible:true "resto" resto_version
@@ -1793,16 +1791,7 @@ let tezos_protocol_compiler_native =
       Dune.
         [
           install
-            [
-              V
-                [
-                  S "dune_protocol.v0";
-                  S "dune_protocol.v1";
-                  S "dune_protocol.template.v0";
-                  S "dune_protocol.template.v1";
-                  S "final_protocol_versions";
-                ];
-            ]
+            [V [S "final_protocol_versions"]]
             ~package:"tezos-protocol-compiler"
             ~section:"libexec";
         ]
@@ -4451,29 +4440,6 @@ let _s_packer =
             [as_ "s_packer.exe" "s_packer"]
             ~package:"tezos-protocol-environment"
             ~section:"libexec";
-        ]
-
-let _replace =
-  private_exe
-    "replace"
-    ~path:"src/lib_protocol_compiler/bin"
-    ~opam:"tezos-protocol-compiler"
-    ~deps:
-      [
-        tezos_base |> open_ ~m:"TzPervasives";
-        tezos_base_unix;
-        tezos_stdlib_unix |> open_;
-        re_str;
-      ]
-    ~modules:["Replace"]
-    ~static:true
-    ~dune:
-      Dune.
-        [
-          install
-            [as_ "replace.exe" "replace"]
-            ~section:"libexec"
-            ~package:"tezos-protocol-compiler";
         ]
 
 let _tezos_validator_bin =
