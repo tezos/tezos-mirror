@@ -60,9 +60,9 @@ delegate cannot participate in the consensus algorithm.
 
 A delegate is marked as active at its registration.
 
-A delegate becomes passive for cycle ``n`` when they
-fail to participate in the consensus algorithm in
-the past ``PRESERVED_CYCLES`` cycles, that is, in cycles ``n-1``,
+A delegate becomes passive at the end of cycle ``n`` when it has
+failed to participate in the consensus algorithm in
+the past ``PRESERVED_CYCLES + 1`` cycles. That is, in cycles ``n``, ``n-1``,
 ``n-2``, ..., ``n - PRESERVED_CYCLES``.
 
 Delegates' rights selection
