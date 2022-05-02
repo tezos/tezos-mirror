@@ -478,7 +478,13 @@ module Chain_validator = struct
 
   let update_proto update = update_ref := update
 
-  let pre_collect () = Lwt_main.run (!update_ref ())
+  let pre_collect_lock = Lwt_mutex.create ()
+
+  let pre_collect () =
+    Lwt.dont_wait
+      (fun () ->
+        Lwt_mutex.with_lock pre_collect_lock (fun () -> !update_ref ()))
+      (fun _ -> ())
 
   let () =
     Prometheus.CollectorRegistry.(register_pre_collect default) pre_collect
