@@ -15,7 +15,7 @@ else
 fi
 
 
-export OPAMYES=${OPAMYES:=true}
+export OPAMYES="${OPAMYES:=true}"
 
 ## In another ideal world, this list should be extracted from the pinned
 ## packages and filter only conf-* packages
