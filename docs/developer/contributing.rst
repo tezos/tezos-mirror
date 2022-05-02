@@ -166,7 +166,7 @@ While working on your branch to prepare a Merge Request, make sure you respect t
      the branch name.
 
      + Use ``opam`` in the branch name if you want to explicitly trigger
-       the OPAM packaging pipeline. Note that any OPAM related changes
+       the opam packaging pipeline. Note that any opam related changes
        will automatically trigger it.
      + Use ``doc`` in the branch name if you change the documentation.
      + Use ``arm64`` in the branch name if you need to build ARM64 artifacts.
@@ -195,8 +195,8 @@ While working on your branch to prepare a Merge Request, make sure you respect t
    non-obvious design choice), you should document them in this file header,
    but in a separate "History" section.
 -  If you add new functions to an interface, don’t forget to
-   document the function in the interface (in the corresponding .mli file; or,
-   if there is no .mli file, directly in the .ml file)
+   document the function in the interface (in the corresponding ``.mli`` file; or,
+   if there is no ``.mli`` file, directly in the ``.ml`` file)
 -  If you add a new RPC endpoint or modify an existing one, be sure to take
    into account the impact on :ref:`RPC security <rpc_security>`.
 -  If you modify the user API (e.g. add or change a configuration parameter or
@@ -290,7 +290,7 @@ Therefore, when creating your MR, observe the following rules:
 
     + ``ci--opam`` is for triggering the opam packaging tests pipeline.
     + ``ci--docs`` is for testing some scripts in the documentation (e.g. Octez installation scenarios).
-    + ``ci--docker`` is for publishing the docker image of the MR.
+    + ``ci--docker`` is for publishing the Docker image of the MR.
     + ``ci--arm64`` is for building on the ARM64 architecture.
 
 - *MR Options*: When opening an MR you should probably tick the following
@@ -426,7 +426,7 @@ To find reviewers, either:
   - Look at authors of the code you are modifying using
     `git blame <https://git-scm.com/docs/git-blame>`_.
   - Ask help to the :ref:`merge coordinator <merge_coordinator>`, either
-    by asking him/her on Slack or mentioning them in a comment (see next paragraph).
+    by asking them on Slack or mentioning them in a comment (see next paragraph).
 
 Depending on your `GitLab role <https://docs.gitlab.com/ee/user/permissions.html>`_
 you may or may not be able to use the *Reviewers* field for specifying
@@ -487,7 +487,7 @@ dependency, additional steps must also be followed.
 * the Rust dependencies are located in the GitLab repository `tezos-rust-libs <https://gitlab.com/tezos/tezos-rust-libs>`_ and the instructions are listed there.
 
 For others, there is currently no dedicated guide. Do not hesitate to ask for
-help on the ``#devteam`` channel on the `tezos-dev` Slack.
+help on the ``#devteam`` channel on the `tezos-dev <https://tezos-dev.slack.com/>`_ Slack.
 
 .. _protocol_mr:
 
@@ -535,7 +535,7 @@ Merge Request Approvals
 ~~~~~~~~~~~~~~~~~~~~~~~
 
 Two approvals from different Octez :doc:`Octez merge team <merge_team>` members are required for merge
-requests to be merged. Both approvals must result from independent thorough
+requests to be merged. Both approvals must result from independent, thorough
 reviews. After both reviews, the second approver will also typically merge.
 
 However, for less critical parts of the code, an Octez merge team member may
@@ -568,7 +568,7 @@ painful for everybody. The reviewer is your ally, not your enemy.
   Did I leave a :ref:`TODO/FIXME comment <todo_fixme>` without an issue number?
 
 - Docstrings: Did I export a new function? Each exported
-  function should be documented in the corresponding ``mli`` (or directly in the ``ml`` file if there is no ``mli``).
+  function should be documented in the corresponding ``.mli`` (or directly in the ``.ml`` file if there is no ``.mli``).
 
 - README: Did I check whether my changes impact the corresponding README
   file(s)?

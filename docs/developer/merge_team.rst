@@ -22,7 +22,7 @@ the next protocol (``src/proto_alpha/lib_protocol/``). Companies that contribute
 `tezos/tezos <https://gitlab.com/tezos/tezos>`_
 reach a consensus to decide what gets in the Alpha protocol,
 i.e. in the proposal of the next upgrade. In particular, other companies
-can fork this repo and do their own protocol proposals.
+can fork this repository and do their own protocol proposals.
 
 .. _merge_coordinator:
 
@@ -79,8 +79,8 @@ The Octez merge team is always looking for software engineers with at least the 
 - You are relatively skilled in one of the technologies used in the ``tezos/tezos``
   repository, i.e. ``OCaml``, ``python``, ``CI``, building, packaging, etc.
 
-To apply for being included in the Octez merge team, contact an existing member
-on the `tezos-dev <https://tezos-dev.slack.com/>`_ Slack. Your application
+To apply for being included in the Octez merge team, contact the :ref:`merge coordinator <merge_coordinator>` or
+an existing member on the `tezos-dev <https://tezos-dev.slack.com/>`_ Slack. Your application
 will be discussed during the next weekly meeting of the Octez merge team.
 
 Helping the Octez Merge Team
