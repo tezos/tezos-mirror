@@ -1116,6 +1116,23 @@ let tezos_workers =
         ringo;
       ]
 
+let _tezos_workers_tests =
+  tests
+    ["test_workers_unit"]
+    ~path:"src/lib_workers/test"
+    ~opam:"tezos-workers"
+    ~deps:
+      [
+        tezos_stdlib |> open_;
+        tezos_stdlib_unix |> open_;
+        tezos_base |> open_ |> open_ ~m:"TzPervasives"
+        |> open_ ~m:"Worker_types";
+        tezos_workers |> open_;
+        tezos_test_helpers |> open_;
+        tezos_base_test_helpers |> open_;
+        alcotest_lwt;
+      ]
+
 let tezos_shell_services =
   public_lib
     "tezos-shell-services"
