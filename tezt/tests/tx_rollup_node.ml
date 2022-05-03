@@ -119,45 +119,70 @@ let check_inbox_success (inbox : Rollup_node.Inbox.t) =
                 (JSON.encode result)))
     inbox.contents
 
-let check_l1_block_contains_commitment ~level block =
+(** Helper function to check if the tx_node does an injection with while (or
+    after) executing [f]. *)
+let check_injection tx_node tag f =
+  let injection = wait_for_injecting_or_completed_event ~tags:[tag] tx_node in
+  let* () = f in
+  let* injected = injection in
+  match injected with
+  | `Injected count ->
+      Log.info "Injected %d %ss" count tag ;
+      unit
+  | `Nothing_injected -> Test.fail "No %s injected" tag
+
+let check_l1_block_contains ~kind ~what ?(extra = fun _ -> true) block =
   let ops = JSON.(block |-> "operations" |=> 3 |> as_list) in
-  if
-    not
-    @@ List.exists
-         (fun op ->
-           JSON.(op |-> "contents" |=> 0 |-> "kind" |> as_string)
-           = "tx_rollup_commit"
-           && JSON.(
-                op |-> "contents" |=> 0 |-> "commitment" |-> "level" |> as_int)
-              = level)
-         ops
-  then Test.fail "Block does not contain commitment of level %d" level
+  match
+    List.find_opt
+      (fun op ->
+        JSON.(op |-> "contents" |=> 0 |-> "kind" |> as_string) = kind
+        && extra op)
+      ops
+  with
+  | None -> Test.fail "Block does not contain %s" what
+  | Some op ->
+      let status =
+        JSON.(
+          op |-> "contents" |=> 0 |-> "metadata" |-> "operation_result"
+          |-> "status" |> as_string)
+      in
+      Check.((status = "applied") string)
+        ~error_msg:(sf "%s status in block is %%L instead of %%R" what)
+
+let check_l1_block_contains_commitment ~level block =
+  check_l1_block_contains
+    ~kind:"tx_rollup_commit"
+    ~what:(sf "commitment of level %d" level)
+    ~extra:(fun op ->
+      JSON.(op |-> "contents" |=> 0 |-> "commitment" |-> "level" |> as_int)
+      = level)
+    block
 
 let check_l1_block_contains_finalize ~level block =
-  let ops = JSON.(block |-> "operations" |=> 3 |> as_list) in
-  if
-    not
-    @@ List.exists
-         (fun op ->
-           JSON.(op |-> "contents" |=> 0 |-> "kind" |> as_string)
-           = "tx_rollup_finalize_commitment"
-           && JSON.(
-                op |-> "contents" |=> 0 |-> "metadata" |-> "operation_result"
-                |-> "level" |> as_int)
-              = level)
-         ops
-  then Test.fail "Block does not contain finalization of level %d" level
+  check_l1_block_contains
+    ~kind:"tx_rollup_finalize_commitment"
+    ~what:(sf "finalization of level %d" level)
+    ~extra:(fun op ->
+      JSON.(
+        op |-> "contents" |=> 0 |-> "metadata" |-> "operation_result"
+        |-> "level" |> as_int)
+      = level)
+    block
 
 let check_l1_block_contains_dispatch block =
-  let ops = JSON.(block |-> "operations" |=> 3 |> as_list) in
-  if
-    not
-    @@ List.exists
-         (fun op ->
-           JSON.(op |-> "contents" |=> 0 |-> "kind" |> as_string)
-           = "tx_rollup_dispatch_tickets")
-         ops
-  then Test.fail "Block does not contain dispatch tickets"
+  check_l1_block_contains
+    ~kind:"tx_rollup_dispatch_tickets"
+    ~what:"dispatch tickets"
+    block
+
+let check_l1_block_contains_rejection ~level block =
+  check_l1_block_contains
+    ~kind:"tx_rollup_rejection"
+    ~what:(sf "rejection of level %d" level)
+    ~extra:(fun op ->
+      JSON.(op |-> "contents" |=> 0 |-> "level" |> as_int) = level)
+    block
 
 (* Checks that the configuration is stored and that the  required
    fields are present. *)
@@ -1759,18 +1784,6 @@ let test_committer =
             unit)
           list
       in
-      let check_commitment_injection f =
-        let inject_commitment =
-          wait_for_injecting_or_completed_event ~tags:["commitment"] tx_node
-        in
-        let* () = f in
-        let* injected = inject_commitment in
-        match injected with
-        | `Injected count ->
-            Log.info "Injected %d commitments" count ;
-            unit
-        | `Nothing_injected -> Test.fail "No commitment injected"
-      in
       let* () = check_commitments_inclusion [("0", false)] in
       Log.info "Sending some L2 transactions" ;
       let* _ = inject_tx ~from:bls_key_1 ~dest:bls_pkh_2 ~amount:1000L () in
@@ -1778,7 +1791,9 @@ let test_committer =
       let* () = Client.bake_for client in
       let* tzlevel = Rollup_node.wait_for_tezos_level tx_node (tzlevel + 1) in
       let* () = check_commitments_inclusion [("0", true)] in
-      let* () = check_commitment_injection @@ Client.bake_for client in
+      let* () =
+        check_injection tx_node "commitment" @@ Client.bake_for client
+      in
       let* tzlevel = Rollup_node.wait_for_tezos_level tx_node (tzlevel + 1) in
       let* block = Rollup_node.Client.get_block ~tx_node ~block:"head" in
       check_l2_level block 1 ;
@@ -1794,14 +1809,18 @@ let test_committer =
       Log.info "Sending some more L2 transactions" ;
       let* _ = inject_tx ~from:bls_key_1 ~dest:bls_pkh_2 ~amount:5L () in
       let* _ = inject_tx ~from:bls_key_2 ~dest:bls_pkh_1 ~amount:6L () in
-      let* () = check_commitment_injection @@ Client.bake_for client in
+      let* () =
+        check_injection tx_node "commitment" @@ Client.bake_for client
+      in
       let* tzlevel = Rollup_node.wait_for_tezos_level tx_node (tzlevel + 1) in
       let* block = Rollup_node.Client.get_block ~tx_node ~block:"head" in
       check_l2_level block 2 ;
       let* () =
         check_commitments_inclusion [("0", true); ("1", true); ("2", false)]
       in
-      let* () = check_commitment_injection @@ Client.bake_for client in
+      let* () =
+        check_injection tx_node "commitment" @@ Client.bake_for client
+      in
       let* _tzlevel = Rollup_node.wait_for_tezos_level tx_node (tzlevel + 1) in
       let* block = Rollup_node.Client.get_block ~tx_node ~block:"head" in
       check_l2_level block 3 ;
@@ -1963,19 +1982,6 @@ let test_withdrawals =
           client
       in
       let tx_client = Tx_rollup_client.create tx_node in
-      (* Helper function to check for injection *)
-      let check_injection tag f =
-        let injection =
-          wait_for_injecting_or_completed_event ~tags:[tag] tx_node
-        in
-        let* () = f in
-        let* injected = injection in
-        match injected with
-        | `Injected count ->
-            Log.info "Injected %d %ss" count tag ;
-            unit
-        | `Nothing_injected -> Test.fail "No %s injected" tag
-      in
       let check_l2_block_finalized block =
         let finalized =
           JSON.(block |-> "metadata" |-> "finalized" |> as_bool)
@@ -2091,10 +2097,11 @@ let test_withdrawals =
       check_l1_block_contains_commitment ~level:2 block ;
       Log.info "Baking 2 L1 blocks for finalization of commitment" ;
       let* () =
-        check_injection "finalize_commitment" @@ Client.bake_for_and_wait client
+        check_injection tx_node "finalize_commitment"
+        @@ Client.bake_for_and_wait client
       in
       let* () =
-        check_injection "dispatch_withdrawals"
+        check_injection tx_node "dispatch_withdrawals"
         @@ Client.bake_for_and_wait client
       in
       let* block = RPC.get_block client in
@@ -2133,6 +2140,73 @@ let test_withdrawals =
       let* () = Client.bake_for_and_wait client in
       unit)
 
+let test_accuser =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"TX_rollup: accuser"
+    ~tags:["tx_rollup"; "node"; "accuser"; "rejection"]
+  @@ fun protocol ->
+  let* parameter_file =
+    Parameters.parameter_file
+      ~parameters:Parameters.{finality_period = 5; withdraw_period = 5}
+      protocol
+  in
+  let* (node, client) =
+    Client.init_with_protocol ~parameter_file `Client ~protocol ()
+  in
+  let originator = Constant.bootstrap2.public_key_hash in
+  let operator = Constant.bootstrap1.public_key_hash in
+  let* (tx_rollup_hash, tx_node) =
+    (* Starting without committer/operator *)
+    init_and_run_rollup_node
+      ~originator
+      ~batch_signer:Constant.bootstrap5.public_key_hash
+      ~rejection_signer:operator
+      node
+      client
+  in
+  (* Generating one identity *)
+  let* bls_key_1 = generate_bls_addr ~alias:"alice" client in
+  let bls_pkh_1 = bls_key_1.aggregate_public_key_hash in
+  let* (_level, _deposit_contract) =
+    make_deposit
+      ~source:Constant.bootstrap2.public_key_hash
+      ~tx_rollup_hash
+      ~tx_node
+      ~client
+      ~tickets_amount:100_000
+      bls_pkh_1
+  in
+  let* ({roots = _; context_hashes = _; inbox_merkle_root; predecessor} as
+       _commitment_info) =
+    build_commitment_info ~tx_level:0 ~tx_rollup_hash ~tx_node ~client
+  in
+  (* Change the roots to produce an invalid commitment. *)
+  let roots = [Constant.tx_rollup_initial_message_result] in
+  Log.info "Injecting bad commitment 'by hand'" ;
+  let*! () =
+    Client.Tx_rollup.submit_commitment
+      ~level:0
+      ~roots
+      ~inbox_merkle_root
+      ?predecessor
+      ~rollup:tx_rollup_hash
+      ~src:Constant.bootstrap3.public_key_hash
+      client
+  in
+  (* Bake for rollup node to see bad commitment and inject rejection *)
+  let* () =
+    check_injection tx_node "rejection" @@ Client.bake_for_and_wait client
+  in
+  let* block = RPC.get_block client in
+  check_l1_block_contains_commitment ~level:0 block ;
+  Log.info "Baking 1 L1 block for rejection to be included" ;
+  let* () = Client.bake_for_and_wait client in
+  let* block = RPC.get_block client in
+  let* _ = RPC.get_mempool_pending_operations client in
+  check_l1_block_contains_rejection ~level:0 block ;
+  unit
+
 let register ~protocols =
   test_node_configuration protocols ;
   test_tx_node_origination protocols ;
@@ -2145,4 +2219,5 @@ let register ~protocols =
   test_reject_bad_commitment protocols ;
   test_committer protocols ;
   test_tickets_context protocols ;
-  test_withdrawals protocols
+  test_withdrawals protocols ;
+  test_accuser protocols

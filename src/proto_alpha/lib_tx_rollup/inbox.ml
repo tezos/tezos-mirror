@@ -107,3 +107,19 @@ let to_proto inbox =
   let cumulated_size = inbox.cumulated_size in
   let merkle_root = merkle_root inbox in
   Tx_rollup_inbox.{inbox_length; cumulated_size; merkle_root}
+
+let proto_message_results inbox =
+  List.map
+    (fun msg ->
+      let withdrawals =
+        match msg.result with
+        | Discarded _ -> []
+        | Interpreted (_result, withdrawals) -> withdrawals
+      in
+      Tx_rollup_message_result.
+        {
+          context_hash = msg.l2_context_hash.tree_hash;
+          withdraw_list_hash =
+            Tx_rollup_withdraw_list_hash.hash_uncarbonated withdrawals;
+        })
+    inbox.contents
