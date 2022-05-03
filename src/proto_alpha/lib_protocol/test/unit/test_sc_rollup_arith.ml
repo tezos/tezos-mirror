@@ -139,10 +139,13 @@ let syntactically_valid_messages =
       ("1 2+", [IPush 1; IPush 2; IAdd]);
       ("1 2 3++3+", [IPush 1; IPush 2; IPush 3; IAdd; IAdd; IPush 3; IAdd]);
       ("", []);
+      ("1 a", [IPush 1; IStore "a"]);
     ]
 
 let syntactically_invalid_messages =
-  List.map (fun s -> (s, [])) ["@"; "  @"; "  @  "; "---"; "12 +++ --"]
+  List.map
+    (fun s -> (s, []))
+    ["@"; "  @"; "  @  "; "---"; "12 +++ --"; "1a"; "a1"]
 
 let test_parsing_messages () =
   List.iter_es (test_parsing_message ~valid:true) syntactically_valid_messages
@@ -205,10 +208,17 @@ let valid_messages =
     ("", "1 a", [1], [("a", 1)]);
     ("", "1 a 2 + b 3 +", [6], [("a", 1); ("b", 3)]);
     ("", "1 a 2 + b 3 + result", [6], [("a", 1); ("b", 3); ("result", 6)]);
+    ("1 a ", "2 b", [2; 1], [("a", 1); ("b", 2)]);
+    ("1 a ", "2 a", [2; 1], [("a", 2)]);
+    ("", "1 a 2 a + a", [3], [("a", 3)]);
+    ("", "1 a b", [1], [("a", 1); ("b", 1)]);
+    ("1 a", "", [1], [("a", 1)]);
   ]
 
 let invalid_messages =
-  List.map (fun s -> ("", s, [], [])) ["+"; "1 +"; "1 1 + +"; "1 1 + 1 1 + + +"]
+  List.map
+    (fun s -> ("", s, [], []))
+    ["+"; "1 +"; "1 1 + +"; "1 1 + 1 1 + + +"; "a"]
 
 let test_evaluation_messages () =
   List.iter_es (test_evaluation_message ~valid:true) valid_messages
