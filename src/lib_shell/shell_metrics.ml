@@ -350,8 +350,9 @@ module Proto_plugin = struct
 
     val update_metrics :
       protocol_metadata:bytes ->
-      (cycle:float -> consumed_gas:float -> unit) ->
-      unit
+      Fitness.t ->
+      (cycle:float -> consumed_gas:float -> round:float -> unit) ->
+      unit Lwt.t
   end
 
   module UndefinedProtoMetrics (P : sig
@@ -360,7 +361,7 @@ module Proto_plugin = struct
   struct
     let hash = P.hash
 
-    let update_metrics ~protocol_metadata:_ _ = ()
+    let update_metrics ~protocol_metadata:_ _ _ = Lwt.return_unit
   end
 
   let proto_metrics_table : (module PROTOMETRICS) Protocol_hash.Table.t =
@@ -390,6 +391,7 @@ module Chain_validator = struct
     ignored_head_count : Prometheus.Counter.t;
     branch_switch_count : Prometheus.Counter.t;
     head_increment_count : Prometheus.Counter.t;
+    head_round : Prometheus.Gauge.t;
     validation_worker_metrics : Worker.t;
     head_cycle : Prometheus.Gauge.t;
     consumed_gas : Prometheus.Gauge.t;
@@ -458,6 +460,16 @@ module Chain_validator = struct
         ?subsystem
         "consumed_gas"
     in
+    let head_round =
+      let help = "Current Round" in
+      Prometheus.Gauge.v_label
+        ~label_name
+        ~help
+        ~namespace
+        ?subsystem
+        "head_round"
+    in
+
     let validation_worker_metrics =
       Worker.declare ~label_names:[label_name] ~namespace ?subsystem ()
     in
@@ -468,10 +480,16 @@ module Chain_validator = struct
         ignored_head_count = ignored_head_count label;
         branch_switch_count = branch_switch_count label;
         head_increment_count = head_increment_count label;
+        head_round = head_round label;
         validation_worker_metrics = validation_worker_metrics [label];
         head_cycle = head_cycle label;
         consumed_gas = consumed_gas label;
       }
+
+  let update_proto_metrics_callback ~metrics ~cycle ~consumed_gas ~round =
+    Prometheus.Gauge.set metrics.head_cycle cycle ;
+    Prometheus.Gauge.set metrics.consumed_gas consumed_gas ;
+    Prometheus.Gauge.set metrics.head_round round
 
   let update_ref = ref (fun () -> Lwt.return_unit)
 

@@ -83,8 +83,9 @@ module Proto_plugin : sig
 
     val update_metrics :
       protocol_metadata:bytes ->
-      (cycle:float -> consumed_gas:float -> unit) ->
-      unit
+      Fitness.t ->
+      (cycle:float -> consumed_gas:float -> round:float -> unit) ->
+      unit Lwt.t
   end
 
   (** Emtpy metrics module. All metrics are -1. *)
@@ -108,12 +109,16 @@ module Chain_validator : sig
     ignored_head_count : Prometheus.Counter.t;
     branch_switch_count : Prometheus.Counter.t;
     head_increment_count : Prometheus.Counter.t;
+    head_round : Prometheus.Gauge.t;
     validation_worker_metrics : Worker.t;
     head_cycle : Prometheus.Gauge.t;
     consumed_gas : Prometheus.Gauge.t;
   }
 
   val init : string trace -> Chain_id.t -> t
+
+  val update_proto_metrics_callback :
+    metrics:t -> cycle:float -> consumed_gas:float -> round:float -> unit
 
   val update_proto : (unit -> unit Lwt.t) -> unit
 end

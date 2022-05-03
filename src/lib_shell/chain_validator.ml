@@ -534,7 +534,7 @@ let on_request (type a) w start_testchain active_chains spawn_child
       on_notify_head w peer_id (hash, header) mempool
   | Request.Disconnection peer_id -> on_disconnection w peer_id
 
-let collect_proto ~head_cycle_gauge ~consumed_gas_gauge (chain_store, block) =
+let collect_proto ~metrics (chain_store, block) =
   let open Lwt_syntax in
   let* metadata_opt = Store.Block.get_block_metadata_opt chain_store block in
   match metadata_opt with
@@ -551,12 +551,13 @@ let collect_proto ~head_cycle_gauge ~consumed_gas_gauge (chain_store, block) =
             let* protocol = Store.Block.protocol_hash_exn chain_store block in
             safe_get_prevalidator_proto_metrics protocol
           in
-          let () =
+          let fitness = Store.Block.fitness block in
+          let* () =
             ProtoMetrics.update_metrics
               ~protocol_metadata
-              (fun ~cycle ~consumed_gas ->
-                Prometheus.Gauge.set head_cycle_gauge cycle ;
-                Prometheus.Gauge.set consumed_gas_gauge consumed_gas)
+              fitness
+              (Shell_metrics.Chain_validator.update_proto_metrics_callback
+                 ~metrics)
           in
           Lwt.return_unit)
         (fun _ -> Lwt.return_unit)
@@ -591,8 +592,7 @@ let on_completion (type a) w (req : a Request.t) (update : a) request_status =
               (Int32.to_float level) ;
             Shell_metrics.Chain_validator.update_proto (fun () ->
                 collect_proto
-                  ~head_cycle_gauge:nv.parameters.metrics.head_cycle
-                  ~consumed_gas_gauge:nv.parameters.metrics.consumed_gas
+                  ~metrics:nv.parameters.metrics
                   (nv.parameters.chain_store, block))
       in
       Worker.record_event
