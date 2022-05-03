@@ -193,16 +193,15 @@ module Make (PVM : Pvm.S) = struct
     in
     go []
 
-  let daemonize node_ctxt store layer_1_chain_events =
-    Lwt.no_cancel
-    @@ iter_stream layer_1_chain_events
+  let daemonize node_ctxt store (l1_ctxt : Layer1.t) =
+    Lwt.no_cancel @@ iter_stream l1_ctxt.events
     @@ on_layer_1_chain_event node_ctxt store
 
-  let install_finalizer store rpc_server heads stopper =
+  let install_finalizer store rpc_server (l1_ctxt : Layer1.t) =
     let open Lwt_syntax in
     Lwt_exit.register_clean_up_callback ~loc:__LOC__ @@ fun exit_status ->
-    stopper () ;
-    let* () = Lwt_stream.closed heads in
+    l1_ctxt.stopper () ;
+    let* () = Lwt_stream.closed l1_ctxt.events in
     let* () = Layer1.shutdown store in
     let* () = Components.RPC_server.shutdown rpc_server in
     let* () = Store.close store in
@@ -215,19 +214,17 @@ module Make (PVM : Pvm.S) = struct
       let* rpc_server =
         Components.RPC_server.start node_ctxt store configuration
       in
-      let* tezos_heads, stopper =
-        Layer1.start configuration node_ctxt.Node_context.cctxt store
-      in
+      let* l1_ctxt = Layer1.start configuration node_ctxt.cctxt store in
       let*! () = Inbox.start () in
       let*! () = Components.Commitment.start () in
 
-      let _ = install_finalizer store rpc_server tezos_heads stopper in
+      let _ = install_finalizer store rpc_server l1_ctxt in
       let*! () =
         Event.node_is_ready
           ~rpc_addr:configuration.rpc_addr
           ~rpc_port:configuration.rpc_port
       in
-      daemonize node_ctxt store tezos_heads
+      daemonize node_ctxt store l1_ctxt
     in
     start ()
 end
