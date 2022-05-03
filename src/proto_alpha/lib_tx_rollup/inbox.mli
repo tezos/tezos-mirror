@@ -63,3 +63,11 @@ val message_encoding : message Data_encoding.t
 
 (** Encoding for inboxes *)
 val encoding : t Data_encoding.t
+
+(** Returns the Merkle root of the (contents of the) inbox. *)
+val merkle_root : t -> Tx_rollup_inbox.Merkle.root
+
+(** Returns the protocol inbox from an L2 inbox. The protocol inbox corresponds
+    to the structure that is stored on L1, i.e. an inbox with Merklized
+    contents. *)
+val to_proto : t -> Tx_rollup_inbox.t

@@ -93,3 +93,17 @@ let encoding =
     (obj2
        (req "contents" @@ list message_encoding)
        (req "cumulated_size" int31))
+
+let merkle_root inbox =
+  let message_hashes =
+    List.map
+      (fun msg -> Tx_rollup_message_hash.hash_uncarbonated msg.message)
+      inbox.contents
+  in
+  Tx_rollup_inbox.Merkle.merklize_list message_hashes
+
+let to_proto inbox =
+  let inbox_length = List.length inbox.contents in
+  let cumulated_size = inbox.cumulated_size in
+  let merkle_root = merkle_root inbox in
+  Tx_rollup_inbox.{inbox_length; cumulated_size; merkle_root}

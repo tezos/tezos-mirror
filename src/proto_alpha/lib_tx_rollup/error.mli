@@ -25,6 +25,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** The node encountered a fatal error which prevents it from working \
+    properly. *)
+type error += Tx_rollup_fatal
+
+(** Add the [Tx_rollup_fatal] error to any error occurring in the promise. *)
+val trace_fatal : 'a tzresult Lwt.t -> 'a tzresult Lwt.t
+
 (** Error issued when the rollup referenced by its hash has not been created
     on the block referenced by its hash. The node computes a state from the
     block that created the rollup. *)
@@ -96,3 +103,16 @@ type error += No_batcher
 type error +=
   | Tx_rollup_unknown_ticket of
       Protocol.Tx_rollup_l2_context_sig.Ticket_indexable.either
+
+(** Error when the tezos node does not know the inbox *)
+type error +=
+  | Tx_rollup_no_proto_inbox of
+      Protocol.Alpha_context.Tx_rollup_level.t * Block_hash.t
+
+(** Error when the node reconstructed a different inbox than the one stored on L1 *)
+type error +=
+  | Tx_rollup_inbox_mismatch of {
+      level : Protocol.Alpha_context.Tx_rollup_level.t;
+      reconstructed_inbox : Protocol.Alpha_context.Tx_rollup_inbox.t;
+      protocol_inbox : Protocol.Alpha_context.Tx_rollup_inbox.t;
+    }

@@ -335,6 +335,14 @@ let test_tx_node_store_inbox =
           ~src:Constant.bootstrap2.public_key_hash
           client
       in
+      let (`Batch content) = Rollup.make_batch "tezos_l2_batch_3" in
+      let*! () =
+        Client.Tx_rollup.submit_batch
+          ~content
+          ~rollup
+          ~src:Constant.bootstrap3.public_key_hash
+          client
+      in
       let* () = Client.bake_for_and_wait client in
       let* _ = Node.wait_for_level node 4 in
       let* _ = Rollup_node.wait_for_tezos_level tx_node 4 in

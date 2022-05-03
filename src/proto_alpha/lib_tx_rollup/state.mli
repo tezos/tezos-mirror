@@ -44,7 +44,7 @@ type rollup_info = Stores.rollup_info = {
 
 type t = private {
   stores : Stores.t;
-  cctxt : Client_context.full;
+  cctxt : Protocol_client_context.full;
   context_index : Context.index;
   mutable head : L2block.t;
   rollup_info : rollup_info;
