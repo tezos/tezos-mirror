@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Protocol_client_context
+
 type signer = {
   alias : string;
   pkh : Signature.public_key_hash;
@@ -47,3 +49,51 @@ let reorg_encoding block_encoding =
   @@ obj2
        (req "old_chain" (list block_encoding))
        (req "new_chain" (list block_encoding))
+
+let fetch_tezos_block ~find_in_cache (cctxt : #full) hash :
+    (Alpha_block_services.block_info, error trace) result Lwt.t =
+  let fetch hash =
+    Alpha_block_services.info
+      cctxt
+      ~chain:cctxt#chain
+      ~block:(`Hash (hash, 0))
+      ()
+  in
+  find_in_cache hash fetch
+
+(* Compute the reorganization of L1 blocks from the chain whose head is
+   [old_head_hash] and the chain whose head [new_head_hash]. *)
+let tezos_reorg fetch_tezos_block ~old_head_hash ~new_head_hash =
+  let open Alpha_block_services in
+  let open Lwt_result_syntax in
+  let rec loop old_chain new_chain old_head_hash new_head_hash =
+    if Block_hash.(old_head_hash = new_head_hash) then
+      return {old_chain = List.rev old_chain; new_chain = List.rev new_chain}
+    else
+      let* new_head = fetch_tezos_block new_head_hash in
+      let* old_head = fetch_tezos_block old_head_hash in
+      let old_level = old_head.header.shell.level in
+      let new_level = new_head.header.shell.level in
+      let diff = Int32.sub new_level old_level in
+      let old_chain, new_chain, old, new_ =
+        if diff = 0l then
+          (* Heads at same level *)
+          let new_chain = new_head :: new_chain in
+          let old_chain = old_head :: old_chain in
+          let new_head_hash = new_head.header.shell.predecessor in
+          let old_head_hash = old_head.header.shell.predecessor in
+          (old_chain, new_chain, old_head_hash, new_head_hash)
+        else if diff > 0l then
+          (* New chain is longer *)
+          let new_chain = new_head :: new_chain in
+          let new_head_hash = new_head.header.shell.predecessor in
+          (old_chain, new_chain, old_head_hash, new_head_hash)
+        else
+          (* Old chain was longer *)
+          let old_chain = old_head :: old_chain in
+          let old_head_hash = old_head.header.shell.predecessor in
+          (old_chain, new_chain, old_head_hash, new_head_hash)
+      in
+      loop old_chain new_chain old new_
+  in
+  loop [] [] old_head_hash new_head_hash
