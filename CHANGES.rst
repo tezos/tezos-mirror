@@ -32,6 +32,10 @@ Node
 
 - Added a protocol specific metrics, head_cycle and head_consumed_gas.
 
+- Added the ``jakartanet`` built-in network alias.
+  You can now configure your node with ``--network jakartanet`` to run the
+  Jakartanet test network.
+
 Client
 ------
 

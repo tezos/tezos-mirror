@@ -197,6 +197,41 @@ let blockchain_network_ithacanet =
         "ithacanet.boot.ecadinfra.com";
       ]
 
+let blockchain_network_jakartanet =
+  make_blockchain_network
+    ~alias:"jakartanet"
+    {
+      time = Time.Protocol.of_notation_exn "2022-04-27T15:00:00Z";
+      block =
+        Block_hash.of_b58check_exn
+          "BLockGenesisGenesisGenesisGenesisGenesisbd16dciJxo9";
+      protocol =
+        Protocol_hash.of_b58check_exn
+          "Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P";
+    }
+    ~genesis_parameters:
+      {
+        context_key = "sandbox_parameter";
+        values =
+          `O
+            [
+              ( "genesis_pubkey",
+                `String "edpkuYLienS3Xdt5c1vfRX1ibMxQuvfM67ByhJ9nmRYYKGAAoTq1UC"
+              );
+            ];
+      }
+    ~chain_name:"TEZOS_JAKARTANET_2022-04-27T15:00:00Z"
+    ~sandboxed_chain_name:"SANDBOXED_TEZOS"
+    ~user_activated_upgrades:
+      [(8192l, "PtJakart2xVj7pYXJBXrqHgd82rdkLey5ZeeGwDgPp9rhQUbSqY")]
+    ~default_bootstrap_peers:
+      [
+        "jakartanet.teztnets.xyz";
+        "jakartanet.boot.ecadinfra.com";
+        "jakartanet.kaml.fr";
+        "jakartanet.visualtez.com";
+      ]
+
 let blockchain_network_sandbox =
   make_blockchain_network
     ~alias:"sandbox"
@@ -297,6 +332,7 @@ let builtin_blockchain_networks_with_tags =
     (4, blockchain_network_mainnet);
     (16, blockchain_network_hangzhounet);
     (17, blockchain_network_ithacanet);
+    (18, blockchain_network_jakartanet);
   ]
   |> List.map (fun (tag, network) ->
          match network.alias with

@@ -32,6 +32,20 @@ Faucets can be accessed from https://teztnets.xyz/. Each of the test
 network listed there, including the active test networks described
 below, have independent faucets.
 
+Jakartanet
+==========
+
+- Built-in network alias: ``jakartanet`` (see :ref:`builtin_networks`)
+
+  * Available from version 13.0.
+
+Jakartanet is a test network which runs the Jakarta 2 protocol.
+Jakartanet will run until Jakarta is refused through the amendment process
+or replaced by another protocol on Mainnet.
+
+On Jakartanet, some constants differ from Mainnet.
+This results in a faster chain than Mainnet.
+See :ref:`protocol constants <protocol_constants>` to learn how to find out their values.
 
 Ithacanet
 =========
