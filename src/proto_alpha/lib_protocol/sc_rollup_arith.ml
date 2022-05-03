@@ -724,7 +724,7 @@ module Make (Context : P) :
 
   let get_stack = result_of ~default:[] @@ Stack.to_list
 
-  let get_var state k = (result_of ~default:None @@ Vars.get k) @@ state
+  let get_var state k = (result_of ~default:None @@ Vars.get k) state
 
   let get_evaluation_result = result_of ~default:None @@ EvaluationResult.get
 
