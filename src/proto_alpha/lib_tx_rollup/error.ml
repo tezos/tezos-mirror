@@ -42,6 +42,20 @@ let () =
 
 let trace_fatal p = trace Tx_rollup_fatal p
 
+type error += Tx_rollup_internal of string
+
+let () =
+  register_error_kind
+    ~id:"tx_rollup.node.internal"
+    ~title:"Internal error in rollup node"
+    ~description:"Internal error encountered"
+    ~pp:(fun ppf loc ->
+      Format.fprintf ppf "Internal error in rollup node at %s" loc)
+    `Permanent
+    Data_encoding.(obj1 (req "loc" string))
+    (function Tx_rollup_internal loc -> Some loc | _ -> None)
+    (fun loc -> Tx_rollup_internal loc)
+
 type error +=
   | Tx_rollup_not_originated_in_the_given_block of
       Protocol.Alpha_context.Tx_rollup.t

@@ -52,26 +52,26 @@ let eq_merkle_roots r1 r2 =
    Strengthen accuser *)
 let rejectable_commitment (state : State.t)
     (commitment : Tx_rollup_commitment.Full.t) =
-  let open Lwt_syntax in
-  let* finalized_level = State.get_finalized_level state in
+  let open Lwt_result_syntax in
+  let*! finalized_level = State.get_finalized_level state in
   match finalized_level with
   | Some finalized_level
     when Tx_rollup_level.(commitment.level <= finalized_level) ->
       (* This commitment is already finalized, nothing we can do anyway. *)
-      let* () =
+      let*! () =
         Event.(emit Accuser.bad_finalized_commitment) commitment.level
       in
       return `Don't_reject
   | _ -> (
-      let* block =
+      let*! block =
         State.get_level_l2_block state (L2block.Rollup_level commitment.level)
       in
       match block with
       | None ->
           (* Should not happen. We have no block for that level, so we cannot
              know if the commitment is bad. *)
-          let* () = Debug_events.(emit should_not_happen) __LOC__ in
-          return `Don't_reject
+          let*! () = Debug_events.(emit should_not_happen) __LOC__ in
+          tzfail (Error.Tx_rollup_internal __LOC__)
       | Some block -> (
           let our_commitment =
             WithExceptions.Option.get ~loc:__LOC__ block.commitment
@@ -81,10 +81,14 @@ let rejectable_commitment (state : State.t)
               eq_merkle_roots
                 commitment.inbox_merkle_root
                 our_commitment.inbox_merkle_root
-            then Lwt.return_unit
+            then return_unit
             else
-              Event.(emit Accuser.inbox_merkle_root_mismatch)
-                (commitment.inbox_merkle_root, our_commitment.inbox_merkle_root)
+              let*! () =
+                Event.(emit Accuser.inbox_merkle_root_mismatch)
+                  ( commitment.inbox_merkle_root,
+                    our_commitment.inbox_merkle_root )
+              in
+              tzfail (Error.Tx_rollup_internal __LOC__)
           in
           if
             not
@@ -96,7 +100,7 @@ let rejectable_commitment (state : State.t)
             (* Commitments have different predecessors, we cannot construct
                rejection. This means that the commitment is on top of a bad
                commitment so it will be slashed automatically. *)
-            let* () =
+            let*! () =
               Event.(emit Accuser.commitment_predecessor_mismatch)
                 (commitment.predecessor, our_commitment.predecessor)
             in
@@ -122,11 +126,11 @@ let rejectable_commitment (state : State.t)
             | Ok _ -> return `Don't_reject
             | Error None ->
                 (* Should not happen if the inboxes are the same *)
-                let* () = Debug_events.(emit should_not_happen) __LOC__ in
-                return `Don't_reject
+                let*! () = Debug_events.(emit should_not_happen) __LOC__ in
+                tzfail (Error.Tx_rollup_internal __LOC__)
             | Error (Some (position, message_result, message_path)) ->
                 (* We found a bad commitment *)
-                let* () =
+                let*! () =
                   Event.(emit Accuser.bad_commitment)
                     (commitment.level, position)
                 in
@@ -136,7 +140,7 @@ let rejectable_commitment (state : State.t)
 let reject_bad_commitment ~source (state : State.t)
     (commitment : Tx_rollup_commitment.Full.t) =
   let open Lwt_result_syntax in
-  let*! rejectable = rejectable_commitment state commitment in
+  let* rejectable = rejectable_commitment state commitment in
   match rejectable with
   | `Don't_reject -> return_unit
   | `Reject (position, message_result_hash, message_result_path, block) ->
