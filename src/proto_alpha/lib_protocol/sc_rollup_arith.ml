@@ -269,7 +269,6 @@ module Make (Context : P) :
     end
 
     open Monad
-    open Monad.Syntax
 
     module MakeVar (P : sig
       type t
@@ -288,6 +287,7 @@ module Make (Context : P) :
       let create = set_value key P.encoding P.initial
 
       let get =
+        let open Monad.Syntax in
         let* v = find_value key P.encoding in
         match v with
         | None ->
