@@ -7,7 +7,7 @@ economic protocol represents the amendable part of Tezos.
 
 This page groups the documentation helping developers and users in
 understanding the basic concepts of the economic protocol
-(proof-of-stake, consensus, voting, etc), its features (Michelson,
+(Proof Of Stake, consensus, voting, etc), its features (Michelson,
 Sapling, etc), and some details about its implementation.
 
 
