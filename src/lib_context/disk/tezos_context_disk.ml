@@ -50,23 +50,9 @@
     shallow siblings, [Context_binary] is thus optimised for producing smaller
     Merkle proofs. *)
 
-module Context_binary = struct
-  type error +=
-    | Cannot_create_file = Context.Cannot_create_file
-    | Cannot_open_file = Context.Cannot_open_file
-    | Cannot_find_protocol = Context.Cannot_find_protocol
-    | Suspicious_file = Context.Suspicious_file
+module type TEZOS_CONTEXT_UNIX = Context.TEZOS_CONTEXT_UNIX
 
-  include Context.Make (Tezos_context_encoding.Context_binary)
-end
+module Context_binary = Context.Make (Tezos_context_encoding.Context_binary)
 
 (** The context of a tezos node. Persisted to disk. *)
-module Context = struct
-  type error +=
-    | Cannot_create_file = Context.Cannot_create_file
-    | Cannot_open_file = Context.Cannot_open_file
-    | Cannot_find_protocol = Context.Cannot_find_protocol
-    | Suspicious_file = Context.Suspicious_file
-
-  include Context.Make (Tezos_context_encoding.Context)
-end
+module Context = Context.Make (Tezos_context_encoding.Context)

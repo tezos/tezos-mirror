@@ -1430,7 +1430,13 @@ let tezos_context_sigs =
   public_lib
     "tezos-context.sigs"
     ~path:"src/lib_context/sigs"
-    ~deps:[tezos_base |> open_ ~m:"TzPervasives"; tezos_stdlib |> open_]
+    ~opam:"tezos-context"
+    ~deps:
+      [
+        tezos_base |> open_ ~m:"TzPervasives";
+        tezos_stdlib |> open_;
+        tezos_shell_services |> open_;
+      ]
 
 let tezos_scoru_wasm =
   public_lib

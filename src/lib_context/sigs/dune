@@ -7,7 +7,10 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base
-  tezos-stdlib)
- (flags (:standard)
-        -open Tezos_base.TzPervasives
-        -open Tezos_stdlib))
+  tezos-stdlib
+  tezos-shell-services)
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_stdlib
+  -open Tezos_shell_services))

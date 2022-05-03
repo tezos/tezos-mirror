@@ -85,6 +85,52 @@ let () =
     (function Suspicious_file e -> Some e | _ -> None)
     (fun e -> Suspicious_file e)
 
+module type TEZOS_CONTEXT_UNIX = sig
+  type error +=
+    | Cannot_create_file of string
+    | Cannot_open_file of string
+    | Cannot_find_protocol
+    | Suspicious_file of int
+
+  include
+    Tezos_context_sigs.Context.TEZOS_CONTEXT
+      with type memory_context_tree := Tezos_context_memory.Context.tree
+
+  (** Sync the context with disk. Only useful for read-only instances.
+    Does not fail when the context is not in read-only mode. *)
+  val sync : index -> unit Lwt.t
+
+  val flush : t -> t Lwt.t
+
+  (** {2 Context dumping} *)
+
+  val dump_context :
+    index ->
+    Context_hash.t ->
+    fd:Lwt_unix.file_descr ->
+    on_disk:bool ->
+    progress_display_mode:Animation.progress_display_mode ->
+    int tzresult Lwt.t
+
+  (** Rebuild a context from a given snapshot. *)
+  val restore_context :
+    index ->
+    expected_context_hash:Context_hash.t ->
+    nb_context_elements:int ->
+    fd:Lwt_unix.file_descr ->
+    legacy:bool ->
+    in_memory:bool ->
+    progress_display_mode:Animation.progress_display_mode ->
+    unit tzresult Lwt.t
+
+  (** Offline integrity checking and statistics for contexts. *)
+  module Checks : sig
+    module Pack : Irmin_pack_unix.Checks.S
+
+    module Index : Index.Checks.S
+  end
+end
+
 let reporter () =
   let report src level ~over k msgf =
     let k _ =
@@ -202,6 +248,12 @@ let () =
         args
 
 module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
+  type error +=
+    | Cannot_create_file = Cannot_create_file
+    | Cannot_open_file = Cannot_open_file
+    | Cannot_find_protocol = Cannot_find_protocol
+    | Suspicious_file = Suspicious_file
+
   open Encoding
 
   (** Tezos - Versioned (key x value) store (over Irmin) *)
@@ -353,7 +405,11 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
 
   type tree = Store.tree
 
-  type kinded_key = [`Node of Store.node_key | `Value of Store.contents_key]
+  type node_key = Store.node_key
+
+  type value_key = Store.contents_key
+
+  type kinded_key = [`Node of node_key | `Value of value_key]
 
   module Tree = Tezos_context_helpers.Context.Make_tree (Conf) (Store)
   include Tezos_context_helpers.Context.Make_config (Conf)

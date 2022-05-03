@@ -33,7 +33,11 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
     module Schema = Tezos_context_encoding.Context.Schema
   end
 
-  type kinded_key = [`Value of Context_hash.t | `Node of Context_hash.t]
+  type node_key = Context_hash.t
+
+  type value_key = Context_hash.t
+
+  type kinded_key = [`Value of value_key | `Node of node_key]
 
   module Kinded_key = struct
     let to_irmin_key (t : kinded_key) =
