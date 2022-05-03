@@ -126,11 +126,9 @@ module Request = struct
     | Add_pending op ->
         Format.fprintf
           ppf
-          "request add %a by %a to pending queue"
+          "request add %a to pending queue"
           L1_operation.Hash.pp
           op.hash
-          Signature.Public_key_hash.pp
-          op.source
     | New_tezos_head (b, r) ->
         Format.fprintf
           ppf

@@ -484,7 +484,7 @@ let size_l1_batch signer rev_ops =
         let contents =
           Manager_operation
             {
-              source = op.source;
+              source = signer.pkh;
               operation;
               (* Below are dummy values that are only used to approximate the
                  size. It is thus important that they remain above the real
@@ -844,7 +844,7 @@ let worker_of_signer signer_pkh =
 let add_pending_operation ~source op =
   let open Lwt_result_syntax in
   let*? w = worker_of_signer source in
-  let l1_operation = L1_operation.make ~source op in
+  let l1_operation = L1_operation.make op in
   let*! () = Worker.Queue.push_request w (Request.Add_pending l1_operation) in
   return_unit
 
