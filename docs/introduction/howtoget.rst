@@ -476,6 +476,8 @@ and ``sapling-output.params``. Here is where you should expect to find those fil
    Some operating systems may not be covered by the list of directories above.
    If Zcash is located elsewhere on your system (typically, on MacOS X), you may try creating a symbolic link such as: ``ln -s ~/Library/Application\ Support/ZcashParams ~/.zcash-params``.
 
+Note that the script ``fetch-params.sh`` downloads a third file containing parameters for Sprout (currently called ``sprout-groth16.params``), which is not loaded by Sapling and can be deleted to save a significant amount of space (this file is *much* bigger than the two other files).
+
 Get the sources
 ~~~~~~~~~~~~~~~
 
