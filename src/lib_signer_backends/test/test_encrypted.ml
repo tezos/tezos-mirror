@@ -112,6 +112,11 @@ let make_sk_uris =
   List.map_e (fun path ->
       Client_keys.make_sk_uri (Uri.make ~scheme:"encrypted" ~path ()))
 
+let make_aggregate_sk_uris =
+  List.map_e (fun path ->
+      Client_keys.make_aggregate_sk_uri
+        (Uri.make ~scheme:"aggregate_encrypted" ~path ()))
+
 let ed25519_sks =
   [
     "edsk3kMNLNdzLPbbABASDLARft8JRZ3Wpwibn8SMAb4KmuWSMJmAFd";
@@ -157,8 +162,28 @@ let p256_sks_encrypted =
       "p2esk2Ge1jrVak7NhxksimzaQjRCTLx5vxUZ4Akgq3spGQLx6N41h6aKXeEYDgxN5eztnPwD6QiCHCfVAKXLPNm8";
     ]
 
+let bls12_381_sks =
+  [
+    "BLsk1o1S8oAG76r3o3aJr1gbVhNdDnAMsdy1yMfwHLWwUHfAeyEXHV";
+    "BLsk1ootrVQmMBgcnXDKdyBR2M5tXwZh2TRVcinBJwMhCYVDRm3K1N";
+    "BLsk1rgztT2EBdQ2vtyXkTzgwmEjabvZri3c7tLHQtDmgH695mcWUt";
+  ]
+
+let bls12_381_sks_encrypted =
+  make_aggregate_sk_uris
+    [
+      "BLesk1ExnCaFxVcGFvKFQrPs2AADo2KpukB6bhA8SLASRzZ58uqvSNUNyzdNdya5NPgE1BAFwcN3wtyFv76r1GJ9";
+      "BLesk1c92TTyYAbkt5Aa2g2puGZHy1M9hQVX7um7PYpxfsjbaaiYsqR2ahArH53WGSvbvzUBizgPipMyfmh8bCs5";
+      "BLesk1yLinYLYYxq947JSbwt4s94xZb6azZz8AD8myiU67mQpKA2bLxYwq8QhYTrsCdXTtLSLyYnVL5EQAuubYjJ";
+    ]
+
 let sk_testable =
   Alcotest.testable Signature.Secret_key.pp Signature.Secret_key.equal
+
+let aggregate_sk_testable =
+  Alcotest.testable
+    Aggregate_signature.Secret_key.pp
+    Aggregate_signature.Secret_key.equal
 
 let test_vectors () =
   let open Encrypted in
@@ -177,6 +202,19 @@ let test_vectors () =
       (p256_sks, p256_sks_encrypted);
     ]
 
+let test_vectors_aggregate () =
+  let open Encrypted in
+  List.iter_es
+    (fun (sks, encrypted_sks) ->
+      let open Lwt_result_syntax in
+      let ctx = fake_ctx () in
+      let sks = List.map Aggregate_signature.Secret_key.of_b58check_exn sks in
+      let*? l = encrypted_sks in
+      let* decs = List.map_es (decrypt_aggregate ctx) l in
+      assert (List.equal Aggregate_signature.Secret_key.equal decs sks) ;
+      return_unit)
+    [(bls12_381_sks, bls12_381_sks_encrypted)]
+
 let test_random algo =
   let open Encrypted in
   let ctx = fake_ctx () in
@@ -191,6 +229,30 @@ let test_random algo =
       in
       let* decrypted_sk = decrypt decrypt_ctx sk_uri in
       Alcotest.check sk_testable "test_encrypt: decrypt" sk decrypted_sk ;
+      inner (succ i)
+  in
+  inner 0
+
+let test_random_aggregate () =
+  let open Encrypted in
+  let ctx = fake_ctx () in
+  let decrypt_ctx = (ctx :> Client_context.io_wallet) in
+  let rec inner i =
+    let open Lwt_result_syntax in
+    if i >= loops then return_unit
+    else
+      let (_, _, sk) = Aggregate_signature.generate_key () in
+      let* sk_uri =
+        Tezos_signer_backends.Encrypted.prompt_twice_and_encrypt_aggregate
+          ctx
+          sk
+      in
+      let* decrypted_sk = decrypt_aggregate decrypt_ctx sk_uri in
+      Alcotest.check
+        aggregate_sk_testable
+        "test_encrypt_aggregate: decrypt"
+        sk
+        decrypted_sk ;
       inner (succ i)
   in
   inner 0
@@ -220,10 +282,41 @@ let test_vectors _switch () =
   | Ok _ -> Lwt.return_unit
   | Error _ -> Lwt.fail_with "test_vectors"
 
+(** For BLS12_381, creates a dummy context. It randomly generates a
+    Base58-encoded secret key, then encrypts it into a URI and decrypts it. It
+    it asserted that the secret key is preserved after Base58-decoding
+    comparison. This process is repeated 10 times.
+*)
+let test_random_aggregate _ () =
+  let open Lwt_syntax in
+  let* r = test_random_aggregate () in
+  match r with
+  | Ok _ -> Lwt.return_unit
+  | Error _ -> Lwt.fail_with "test_random"
+
+(** For BLS12_381, creates a dummy context, uses it to decrypt a list of secret
+    key URIs [...__sks_encrypted]. It is asserted that the decrypted keys shall
+    match the list [..._sks].
+*)
+let test_vectors_aggregate _switch () =
+  let open Lwt_syntax in
+  let* r = test_vectors_aggregate () in
+  match r with
+  | Ok _ -> Lwt.return_unit
+  | Error _ -> Lwt.fail_with "test_vectors_aggregate"
+
 let tests =
   [
     Alcotest_lwt.test_case "random_roundtrip" `Quick test_random;
     Alcotest_lwt.test_case "vectors_decrypt" `Quick test_vectors;
+    Alcotest_lwt.test_case
+      "aggregate_random_roundtrip"
+      `Quick
+      test_random_aggregate;
+    Alcotest_lwt.test_case
+      "aggregate_vectors_decrypt"
+      `Quick
+      test_vectors_aggregate;
   ]
 
 let () =
