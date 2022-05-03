@@ -79,6 +79,8 @@ type t = {
       (** maximum operation metadata size allowed to be stored on disk *)
 }
 
+val process_command : unit tzresult Lwt.t -> unit Cmdliner.Term.ret
+
 module Term : sig
   val args : t Cmdliner.Term.t
 

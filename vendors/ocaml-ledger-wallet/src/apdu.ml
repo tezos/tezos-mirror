@@ -32,12 +32,12 @@ let create_string ?(p1=0) ?(p2=0) ?(lc=0) ?(le=0) ?(data="") cmd =
   let data = Cstruct.of_string data in
   { cmd ; p1 ; p2 ; lc ; le ; data }
 
-let length { data ; _ } = 5 + Cstruct.len data
+let length { data ; _ } = 5 + Cstruct.length data
 
 let write cs { cmd = Apdu_command { cmd ; cla_of_cmd ; ins_of_cmd } ;
                p1 ; p2 ; lc ; le ; data } =
   let len = match lc, le with | 0, _ -> le | _ -> lc in
-  let datalen = Cstruct.len data in
+  let datalen = Cstruct.length data in
   Cstruct.set_uint8 cs 0 (cla_of_cmd cmd) ;
   Cstruct.set_uint8 cs 1 (ins_of_cmd cmd) ;
   Cstruct.set_uint8 cs 2 p1 ;

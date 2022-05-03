@@ -224,82 +224,85 @@ let cmd () =
       ~command_name:"node-synchronization"
       ()
   in
-  Test_command_line.Run_command.make
-    ~pp_error
-    (pure
-       (fun
-         node_exec
-         client_exec
-         primary_history_mode
-         secondary_history_mode
-         should_synch
-         state
-       ->
-         ( state,
-           Interactive_test.Pauser.run_test
-             ~pp_error
-             state
-             (run
-                state
-                ~node_exec
-                ~client_exec
-                ~primary_history_mode
-                ~secondary_history_mode
-                ~should_synch) ))
-    $ Tezos_executable.cli_term base_state `Node "tezos"
-    $ Tezos_executable.cli_term base_state `Client "tezos"
-    $ Arg.(
-        value
-        & opt hm_arg (`Full 5)
-        & info
-            ["primary-history-mode"]
-            ~docv:"STRING"
-            ~doc:
-              (sprintf
-                 "History mode of the primary node. This one lonely bakes %d \
-                  blocks."
-                 number_of_lonely_bakes))
-    $ Arg.(
-        value
-        & opt hm_arg (`Full 5)
-        & info
-            ["secondary-history-mode"]
-            ~docv:"STRING"
-            ~doc:
-              (sprintf
-                 "History mode of the secondary node. This one tries to \
-                  bootstrap after the primary node lonely bakes %d blocks."
-                 number_of_lonely_bakes))
-    $ Arg.(
-        value & opt bool true
-        & info
-            ["should-synch"]
-            ~docv:"BOOL"
-            ~doc:
-              "Specify if the nodes should be synchronized after the lonely \
-               baking run.")
-    $ Test_command_line.cli_state ~name:"history_mode_synchronization" ())
-    (let doc =
-       sprintf
-         "Synchronization of two sandboxed nodes after a lonely baking run of \
-          %d blocks."
-         number_of_lonely_bakes
-     in
-     let man : Manpage.block list =
-       [
-         `S "NODE SYNCHRONIZATION";
-         `P
-           (sprintf
-              "This command builds a network of two interconnected nodes N1 \
-               and N2. The test first waits for synchronization of both nodes \
-               after N1 bakes %d blocks, it then kills N2, makes N1 lonely \
-               bake %d blocks and restarts N2. Finally, the test verifies if \
-               N2 is bootstrapped, and that N1 is not considered as a banned \
-               peer by N2. Depending on the specified history modes, N1 may or \
-               not bootstrap N2, the expected result is provided by the \
-               'should-synch' command argument."
-              starting_level
-              number_of_lonely_bakes);
-       ]
-     in
-     info ~man ~doc "node-synchronization")
+  let (term, info) =
+    Test_command_line.Run_command.make
+      ~pp_error
+      (const
+         (fun
+           node_exec
+           client_exec
+           primary_history_mode
+           secondary_history_mode
+           should_synch
+           state
+         ->
+           ( state,
+             Interactive_test.Pauser.run_test
+               ~pp_error
+               state
+               (run
+                  state
+                  ~node_exec
+                  ~client_exec
+                  ~primary_history_mode
+                  ~secondary_history_mode
+                  ~should_synch) ))
+      $ Tezos_executable.cli_term base_state `Node "tezos"
+      $ Tezos_executable.cli_term base_state `Client "tezos"
+      $ Arg.(
+          value
+          & opt hm_arg (`Full 5)
+          & info
+              ["primary-history-mode"]
+              ~docv:"STRING"
+              ~doc:
+                (sprintf
+                   "History mode of the primary node. This one lonely bakes %d \
+                    blocks."
+                   number_of_lonely_bakes))
+      $ Arg.(
+          value
+          & opt hm_arg (`Full 5)
+          & info
+              ["secondary-history-mode"]
+              ~docv:"STRING"
+              ~doc:
+                (sprintf
+                   "History mode of the secondary node. This one tries to \
+                    bootstrap after the primary node lonely bakes %d blocks."
+                   number_of_lonely_bakes))
+      $ Arg.(
+          value & opt bool true
+          & info
+              ["should-synch"]
+              ~docv:"BOOL"
+              ~doc:
+                "Specify if the nodes should be synchronized after the lonely \
+                 baking run.")
+      $ Test_command_line.cli_state ~name:"history_mode_synchronization" ())
+      (let doc =
+         sprintf
+           "Synchronization of two sandboxed nodes after a lonely baking run \
+            of %d blocks."
+           number_of_lonely_bakes
+       in
+       let man : Manpage.block list =
+         [
+           `S "NODE SYNCHRONIZATION";
+           `P
+             (sprintf
+                "This command builds a network of two interconnected nodes N1 \
+                 and N2. The test first waits for synchronization of both \
+                 nodes after N1 bakes %d blocks, it then kills N2, makes N1 \
+                 lonely bake %d blocks and restarts N2. Finally, the test \
+                 verifies if N2 is bootstrapped, and that N1 is not considered \
+                 as a banned peer by N2. Depending on the specified history \
+                 modes, N1 may or not bootstrap N2, the expected result is \
+                 provided by the 'should-synch' command argument."
+                starting_level
+                number_of_lonely_bakes);
+         ]
+       in
+       Cmd.info ~man ~doc "node-synchronization")
+  in
+  Cmd.v info term

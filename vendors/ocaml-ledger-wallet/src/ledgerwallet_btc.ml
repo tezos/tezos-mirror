@@ -380,7 +380,7 @@ let hash_tx_input_start
      (init_cs >>= fun (_ : Cstruct.t) ->
       List.fold_left2 begin fun acc { TxIn.script ; seq ; _ } input ->
         acc >>= fun i ->
-        let input_len = Cstruct.len input in
+        let input_len = Cstruct.length input in
         Cstruct.set_uint8 cs 0 0x01 ;
         Cstruct.set_uint8 cs 1 input_len ;
         Cstruct.blit input 0 cs 2 input_len ;
@@ -487,7 +487,7 @@ let sign ?pp ?buf ~path ~prev_outputs h (tx : Bitcoin.Protocol.Transaction.t) =
     ~f:(fun (tx, i) acc ->
       acc >>= fun tail ->
       get_trusted_input ?buf h tx i >>| fun input ->
-      let () = assert (Cstruct.len input = 56) in input :: tail) >>= fun trusted_inputs ->
+      let () = assert (Cstruct.length input = 56) in input :: tail) >>= fun trusted_inputs ->
   ArrayLabels.fold_left ~init:(R.ok (0, [])) tx.inputs ~f:begin fun res _ ->
     res >>= fun  (i, acc) ->
     hash_tx_input_start ?pp ?buf
