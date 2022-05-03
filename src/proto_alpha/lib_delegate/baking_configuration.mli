@@ -59,7 +59,7 @@ type t = {
   user_activated_upgrades : (int32 * Protocol_hash.t) list;
   liquidity_baking_toggle_vote :
     Protocol.Alpha_context.Liquidity_baking.liquidity_baking_toggle_vote;
-  per_block_vote_file : string option;
+  per_block_vote_file : string;
   force : bool;
   state_recorder : state_recorder_config;
   extra_operations : Operations_source.t option;
@@ -84,7 +84,7 @@ val default_state_recorder_config : state_recorder_config
 
 val default_extra_operations : Operations_source.t option
 
-val default_per_block_vote_file : string option
+val default_per_block_vote_file : string
 
 val default_config : t
 
