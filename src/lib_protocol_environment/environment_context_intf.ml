@@ -309,13 +309,16 @@ module V5 = struct
   module type CACHE = CACHE
 end
 
-module type S = V5.S
+module V6 = V5
+
+module type S = V6.S
 
 module type Sigs = sig
   module V2 = V2
   module V3 = V3
   module V4 = V4
   module V5 = V5
+  module V6 = V6
 
   module type VIEW = VIEW
 

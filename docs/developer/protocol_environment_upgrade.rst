@@ -13,7 +13,7 @@ This page details the process of creating a new environment by copying the lates
 Bootstrap
 ---------
 
-The following steps are roughly the steps taken in the `V5 bootstrap MR <https://gitlab.com/tezos/tezos/-/merge_requests/4071>`__
+The following steps are roughly the steps taken in the `V6 bootstrap MR <https://gitlab.com/tezos/tezos/-/merge_requests/4961>`__
 
 1. Copy the existing environment files:
 
@@ -21,11 +21,13 @@ The following steps are roughly the steps taken in the `V5 bootstrap MR <https:/
 
    * Copy the file ``src/lib_protocol_environment/sigs/v<N-1>.dune.inc`` into ``src/lib_protocol_environment/sigs/v<N>.dune.inc`` and adapt the version number in it
 
-2. Make the new environment buildable by updating ``src/lib_protocol_environment/sigs/dune``:
+2. Make the new environment buildable by updating ``manifest/main.ml``:
 
-   * Add ``(include v<N>.dune.inc)``
+   * Add ``include_ "v<N>.dune.inc";`` (twice in the file)
 
-   * Add the new version to ``library.modules``
+   * Add the new version to ``~modules: ["V0"; "V1" ...`` (twice in the file)
+
+   * Run ``make -C manifest``
 
 3. Copy the existing compatibility layer if any (see details in `Struct compatibility layer <#struct-compatibility-layer>`__).
 
@@ -36,6 +38,8 @@ The following steps are roughly the steps taken in the `V5 bootstrap MR <https:/
    * Copy ``src/lib_protocol_environment/environment_V<N-1>.ml[i]`` to ``src/lib_protocol_environment/environment_V<N>.ml[i]``
 
    * Change any reference from ``V<N-1>`` to ``V<N>`` in all those copied files the
+
+   * Update ``src/lib_protocol_environment/environment_context_intf.ml``
 
 5. If the protocol signature is expected to change then copy and adapt it otherwise leave it as is:
 
@@ -51,10 +55,6 @@ The following steps are roughly the steps taken in the `V5 bootstrap MR <https:/
    * Add references to ``src/lib_base/protocol.ml[i]``
 
    * Add references to ``src/lib_protocol_environment/sigs/v*/protocol.mli`` (in all versions, not just the newly created one)
-
-   * ``src/lib_shell/prevalidation.ml``
-
-   * ``src/lib_store/legacy_store/legacy_state.ml``
 
    * ``src/lib_validation/block_validation.ml``
 
@@ -97,16 +97,19 @@ How to activate
 To activate the environment you will need to change the following files, adding references to ``V<N>`` to match the references to ``V<N-1>``:
 
 * ``src/lib_protocol_environment/tezos_protocol_environment.ml[i]``
-* ``src/lib_protocol_environment/dune``
 * ``src/lib_protocol_updater/registered_protocol.ml[i]``
 * ``src/lib_protocol_compiler/registerer.ml[i]``
 * ``src/lib_protocol_compiler/embedded_cmis.mli``
 * ``src/lib_protocol_compiler/compiler.ml``
 * ``src/lib_protocol_compiler/dune``
 
+Update ``manifest/main.ml`` to embed the new environment version in ``embedded_cmis.ml``, and then run ``make -C manifest``.
+
+Bump environment version in ``src/bin_client/test/proto_test_injection/TEZOS_PROTOCOL`` and in the embedded ``TEZOS_PROTOCOL`` found in ``tezt/tests/voting.ml``. Update the corresponding test in the multiple ``tests_python/tests_*/test_injection.py`` accordingly.
+
 And finally, bump environment version in ``src/proto_alpha/lib_protocol/dune.inc`` and ``src/proto_alpha/lib_protocol/TEZOS_PROTOCOL``.
 
-For an example, check `the MR in which the environment V3 was activated <https://gitlab.com/tezos/tezos/-/merge_requests/3040>`__.
+For an example, check `the MR in which the environment V6 was activated <https://gitlab.com/tezos/tezos/-/merge_requests/4961>`__.
 
 
 Making changes in the environment

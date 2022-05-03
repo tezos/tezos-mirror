@@ -420,7 +420,7 @@ module Make (Proto : Registered_protocol.T) = struct
     let should_include_metadata_hashes =
       match proto_env_version with
       | Protocol.V0 -> false
-      | Protocol.(V1 | V2 | V3 | V4 | V5) -> true
+      | Protocol.(V1 | V2 | V3 | V4 | V5 | V6) -> true
     in
     let block_metadata =
       let metadata =
@@ -840,7 +840,7 @@ module Make (Proto : Registered_protocol.T) = struct
       Protocol.(
         match Proto.environment_version with
         | V0 -> false
-        | V1 | V2 | V3 | V4 | V5 -> true)
+        | V1 | V2 | V3 | V4 | V5 | V6 -> true)
       && not is_from_genesis
     in
     let* context =

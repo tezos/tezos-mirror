@@ -31,7 +31,8 @@
    %{lib:tezos-protocol-environment.sigs:tezos_protocol_environment_sigs__V2.cmi}
    %{lib:tezos-protocol-environment.sigs:tezos_protocol_environment_sigs__V3.cmi}
    %{lib:tezos-protocol-environment.sigs:tezos_protocol_environment_sigs__V4.cmi}
-   %{lib:tezos-protocol-environment.sigs:tezos_protocol_environment_sigs__V5.cmi})))
+   %{lib:tezos-protocol-environment.sigs:tezos_protocol_environment_sigs__V5.cmi}
+   %{lib:tezos-protocol-environment.sigs:tezos_protocol_environment_sigs__V6.cmi})))
 
 (library
  (name tezos_protocol_compiler)
