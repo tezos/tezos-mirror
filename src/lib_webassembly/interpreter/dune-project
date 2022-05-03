@@ -1,0 +1,9 @@
+(lang dune 2.9)
+
+(generate_opam_files true)
+
+(package
+ (name wasm-interpreter-lib)
+ (synopsis "Copy of the WebAssembly reference interpreter for SCORU WASM")
+ (description "Copy of the WebAssembly reference interpreter for SCORU WASM")
+ (maintainers "Tezos Developers"))
