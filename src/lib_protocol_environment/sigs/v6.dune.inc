@@ -73,7 +73,6 @@
    v6/bounded.mli
    v6/fitness.mli
    v6/operation.mli
-   v6/protocol.mli
    v6/context.mli
    v6/updater.mli
    v6/RPC_context.mli

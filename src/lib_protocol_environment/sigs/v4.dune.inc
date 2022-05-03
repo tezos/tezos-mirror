@@ -71,7 +71,6 @@
    v4/block_header.mli
    v4/fitness.mli
    v4/operation.mli
-   v4/protocol.mli
    v4/context.mli
    v4/updater.mli
    v4/RPC_context.mli

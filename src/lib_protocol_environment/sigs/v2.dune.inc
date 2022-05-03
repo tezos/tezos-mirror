@@ -61,7 +61,6 @@
    v2/block_header.mli
    v2/fitness.mli
    v2/operation.mli
-   v2/protocol.mli
    v2/context.mli
    v2/updater.mli
    v2/RPC_context.mli

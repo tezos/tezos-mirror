@@ -54,8 +54,6 @@ The following steps are roughly the steps taken in the `V6 bootstrap MR <https:/
 
    * Add references to ``src/lib_base/protocol.ml[i]``
 
-   * Add references to ``src/lib_protocol_environment/sigs/v*/protocol.mli`` (in all versions, not just the newly created one)
-
    * ``src/lib_validation/block_validation.ml``
 
 7. Adapt demo protocols to the new environment:

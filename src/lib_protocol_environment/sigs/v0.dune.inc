@@ -54,7 +54,6 @@
    v0/block_header.mli
    v0/fitness.mli
    v0/operation.mli
-   v0/protocol.mli
    v0/context.mli
    v0/updater.mli
    v0/RPC_context.mli
