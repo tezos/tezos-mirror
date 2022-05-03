@@ -359,3 +359,27 @@ let () =
     Data_encoding.unit
     (function No_batcher -> Some () | _ -> None)
     (fun () -> No_batcher)
+
+type error +=
+  | Tx_rollup_unknown_ticket of
+      Protocol.Tx_rollup_l2_context_sig.Ticket_indexable.either
+
+let () =
+  register_error_kind
+    ~id:"tx_rollup.node.unknown_ticket"
+    ~title:"No ticket registered for indexable ticket hash"
+    ~description:"A ticket indexable has not ticket associated in the context."
+    ~pp:(fun ppf s ->
+      Format.fprintf
+        ppf
+        "Unknown ticket for ticket indexable %a"
+        Protocol.Tx_rollup_l2_context_sig.Ticket_indexable.pp
+        s)
+    `Permanent
+    Data_encoding.(
+      obj1
+        (req
+           "ticket_index"
+           Protocol.Tx_rollup_l2_context_sig.Ticket_indexable.encoding))
+    (function Tx_rollup_unknown_ticket t -> Some t | _ -> None)
+    (fun t -> Tx_rollup_unknown_ticket t)

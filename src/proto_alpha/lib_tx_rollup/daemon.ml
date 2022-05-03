@@ -480,6 +480,18 @@ let trigger_injection state header =
   (* Queue request for injection of operation that must be injected each block *)
   Injector.inject ~strategy:Injector.Each_block ()
 
+let dispatch_withdrawals_on_l1 state level =
+  let open Lwt_result_syntax in
+  match state.State.signers.dispatch_withdrawals with
+  | None -> return_unit
+  | Some source -> (
+      let*! block =
+        State.get_level_l2_block state (L2block.Rollup_level level)
+      in
+      match block with
+      | None -> return_unit
+      | Some block -> Dispatcher.dispatch_withdrawals ~source state block)
+
 let process_op (type kind) (state : State.t) l1_block l1_operation ~source:_
     (op : kind manager_operation) (result : kind manager_operation_result)
     (acc : 'acc) : 'acc tzresult Lwt.t =
@@ -502,6 +514,11 @@ let process_op (type kind) (state : State.t) l1_block l1_operation ~source:_
           l1_operation
       in
       return acc
+  | ( Tx_rollup_finalize_commitment {tx_rollup},
+      Applied (Tx_rollup_finalize_commitment_result {level; _}) )
+    when is_my_rollup tx_rollup ->
+      let* () = dispatch_withdrawals_on_l1 state level in
+      State.set_finalized_level state level
   | (_, _) -> return acc
 
 let rollback_op (type kind) (state : State.t) _l1_block _l1_operation ~source:_
@@ -520,6 +537,14 @@ let rollback_op (type kind) (state : State.t) _l1_block _l1_operation ~source:_
       in
       let*! () = State.unset_commitment_included state commitment_hash in
       return acc
+  | ( Tx_rollup_finalize_commitment {tx_rollup},
+      Applied (Tx_rollup_finalize_commitment_result {level; _}) )
+    when is_my_rollup tx_rollup -> (
+      match Tx_rollup_level.pred level with
+      | None ->
+          let*! () = State.delete_finalized_level state in
+          return_unit
+      | Some level -> State.set_finalized_level state level)
   | (_, _) -> return acc
 
 let handle_l1_operation direction (block : Alpha_block_services.block_info)
@@ -682,6 +707,7 @@ let run configuration cctxt =
              (signers.finalize_commitment, Each_block, [`Finalize_commitment]);
              (signers.remove_commitment, Each_block, [`Remove_commitment]);
              (signers.rejection, Each_block, [`Rejection]);
+             (signers.dispatch_withdrawals, Each_block, [`Dispatch_withdrawals]);
            ])
   in
   let* () =

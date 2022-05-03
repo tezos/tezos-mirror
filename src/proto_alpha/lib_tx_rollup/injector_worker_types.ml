@@ -33,7 +33,8 @@ type tag =
   | `Submit_batch
   | `Finalize_commitment
   | `Remove_commitment
-  | `Rejection ]
+  | `Rejection
+  | `Dispatch_withdrawals ]
 
 module Tags = Set.Make (struct
   type t = tag
@@ -49,6 +50,7 @@ let string_of_tag : tag -> string = function
   | `Finalize_commitment -> "finalize_commitment"
   | `Remove_commitment -> "remove_commitment"
   | `Rejection -> "rejection"
+  | `Dispatch_withdrawals -> "dispatch_withdrawals"
 
 let pp_tags ppf tags =
   Format.pp_print_list
@@ -68,6 +70,7 @@ let tag_encoding : tag Data_encoding.t =
          `Finalize_commitment;
          `Remove_commitment;
          `Rejection;
+         `Dispatch_withdrawals;
        ])
 
 let tags_encoding : tags Data_encoding.t =

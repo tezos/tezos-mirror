@@ -36,6 +36,7 @@ module Parameters = struct
     batch_signer : string option;
     finalize_commitment_signer : string option;
     remove_commitment_signer : string option;
+    dispatch_withdrawals_signer : string option;
     rejection_signer : string option;
     rollup_genesis : string;
     rpc_addr : string;
@@ -94,6 +95,9 @@ let spawn_config_init node rollup_id rollup_genesis =
     |> add_option
          "--remove-commitment-signer"
          node.persistent_state.remove_commitment_signer
+    |> add_option
+         "--dispatch-withdrawals-signer"
+         node.persistent_state.dispatch_withdrawals_signer
     |> add_option "--rejection-signer" node.persistent_state.rejection_signer)
 
 let config_init node rollup_id rollup_genesis =
@@ -204,8 +208,8 @@ let wait_for ?where node name filter =
 let create ?(path = Constant.tx_rollup_node) ?runner ?data_dir
     ?(addr = "127.0.0.1") ?(dormant_mode = false) ?color ?event_pipe ?name
     ~rollup_id ~rollup_genesis ?operator ?batch_signer
-    ?finalize_commitment_signer ?remove_commitment_signer ?rejection_signer
-    client tezos_node =
+    ?finalize_commitment_signer ?remove_commitment_signer
+    ?dispatch_withdrawals_signer ?rejection_signer client tezos_node =
   let name = match name with None -> fresh_name () | Some name -> name in
   let rpc_addr =
     match String.rindex_opt addr ':' with
@@ -233,6 +237,7 @@ let create ?(path = Constant.tx_rollup_node) ?runner ?data_dir
         batch_signer;
         finalize_commitment_signer;
         remove_commitment_signer;
+        dispatch_withdrawals_signer;
         rejection_signer;
         client;
         pending_ready = [];

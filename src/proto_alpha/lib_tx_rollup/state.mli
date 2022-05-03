@@ -118,6 +118,9 @@ val get_included_commitment :
   Tx_rollup_commitment_hash.t ->
   L2block.commitment_included_info option Lwt.t
 
+(** Returns the last finalized (on L1) rollup level. *)
+val get_finalized_level : t -> Tx_rollup_level.t option Lwt.t
+
 (** Retrieve an L2 block metadata from its header *)
 val get_block_metadata : t -> L2block.header -> L2block.metadata Lwt.t
 
@@ -165,6 +168,12 @@ val set_commitment_included :
 
 (** Register a commitment as not included on L1. *)
 val unset_commitment_included : t -> Tx_rollup_commitment_hash.t -> unit Lwt.t
+
+(** Register the last finalized (on L1) rollup level. *)
+val set_finalized_level : t -> Tx_rollup_level.t -> unit tzresult Lwt.t
+
+(** Delete the last finalized (on L1) rollup level. *)
+val delete_finalized_level : t -> unit Lwt.t
 
 (** {2 Misc}  *)
 

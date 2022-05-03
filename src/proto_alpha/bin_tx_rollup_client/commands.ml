@@ -29,7 +29,13 @@ let l2_addr_param =
   Clic.parameter (fun _ s ->
       match Tx_rollup_l2_address.of_b58check_opt s with
       | Some addr -> return addr
-      | None -> failwith "The given rollup address is invalid")
+      | None -> failwith "The given L2 address is invalid")
+
+let l1_addr_param =
+  Clic.parameter (fun _ s ->
+      match Signature.Public_key_hash.of_b58check_opt s with
+      | Some addr -> return addr
+      | None -> failwith "The given L1 address is invalid")
 
 let block_id_param =
   let open Lwt_result_syntax in
@@ -119,6 +125,13 @@ let craft_tx ~counter ~signer ~destination ~ticket_hash ~qty =
   let signer = Indexable.from_value signer in
   Tx_rollup_l2_batch.V1.{signer; counter; contents = [content]}
 
+let craft_withdraw ~counter ~signer ~destination ~ticket_hash ~qty =
+  let content =
+    Tx_rollup_l2_batch.V1.(Withdraw {destination; ticket_hash; qty})
+  in
+  let signer = Indexable.from_value signer in
+  Tx_rollup_l2_batch.V1.{signer; counter; contents = [content]}
+
 let aggregate_signature_exn signatures =
   match Bls.aggregate_signature_opt signatures with
   | Some res -> res
@@ -199,6 +212,53 @@ let craft_tx_transaction () =
       >>=? fun counter ->
       let signer = Tx_rollup_l2_batch.Bls_pk signer_pk in
       let op = craft_tx ~counter ~signer ~destination ~ticket_hash ~qty in
+      let json =
+        Data_encoding.Json.construct
+          (Data_encoding.list Tx_rollup_l2_batch.V1.transaction_encoding)
+          [[op]]
+      in
+      cctxt#message "@[%a@]" Data_encoding.Json.pp json >>= fun () ->
+      return_unit)
+
+let craft_tx_withdrawal () =
+  command
+    ~desc:"WIP: craft a withdrawal from L2 to L1"
+    (args1
+       (arg
+          ~long:"counter"
+          ~placeholder:"counter"
+          ~doc:"counter value of the destination"
+          conv_counter))
+    (prefixes ["craft"; "tx"; "withdrawing"]
+    @@ param ~name:"qty" ~desc:"qty to withdraw" conv_qty
+    @@ prefixes ["from"]
+    @@ param ~name:"signer_pk" ~desc:"public key of the signer" conv_pk
+    @@ prefixes ["to"]
+    @@ param ~name:"dest" ~desc:"L1 destination address" l1_addr_param
+    @@ prefixes ["for"]
+    @@ param ~name:"ticket" ~desc:"ticket to withdraw" parse_ticket
+    @@ stop)
+    (fun counter
+         qty
+         signer_pk
+         destination
+         ticket_hash
+         (cctxt : #Configuration.tx_client_context) ->
+      (match counter with
+      | Some c -> return c
+      | None ->
+          (* Retrieve the counter of the current head and increments it
+             by one. *)
+          (match RPC.destruct_block_id "head" with
+          | Ok v -> return v
+          | Error e -> failwith "Cannot get counter of current head (%s)" e)
+          >>=? fun head ->
+          let pkh = Tx_rollup_l2_address.of_bls_pk signer_pk in
+          RPC.counter cctxt head pkh >>=? fun counter ->
+          return (Int64.succ counter))
+      >>=? fun counter ->
+      let signer = Tx_rollup_l2_batch.Bls_pk signer_pk in
+      let op = craft_withdraw ~counter ~signer ~destination ~ticket_hash ~qty in
       let json =
         Data_encoding.Json.construct
           (Data_encoding.list Tx_rollup_l2_batch.V1.transaction_encoding)
@@ -318,6 +378,7 @@ let all () =
     get_tx_inbox ();
     get_tx_block ();
     craft_tx_transaction ();
+    craft_tx_withdrawal ();
     craft_tx_batch ();
     get_batcher_queue ();
     get_batcher_transaction ();

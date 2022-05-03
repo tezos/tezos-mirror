@@ -30,6 +30,7 @@ type signers = {
   finalize_commitment : Signature.public_key_hash option;
   remove_commitment : Signature.public_key_hash option;
   rejection : Signature.public_key_hash option;
+  dispatch_withdrawals : Signature.public_key_hash option;
 }
 
 type t = {
@@ -60,11 +61,31 @@ let default_l2_blocks_cache_size = 64
 let signers_encoding =
   let open Data_encoding in
   conv
-    (fun {submit_batch; finalize_commitment; remove_commitment; rejection} ->
-      (submit_batch, finalize_commitment, remove_commitment, rejection))
-    (fun (submit_batch, finalize_commitment, remove_commitment, rejection) ->
-      {submit_batch; finalize_commitment; remove_commitment; rejection})
-  @@ obj4
+    (fun {
+           submit_batch;
+           finalize_commitment;
+           remove_commitment;
+           rejection;
+           dispatch_withdrawals;
+         } ->
+      ( submit_batch,
+        finalize_commitment,
+        remove_commitment,
+        rejection,
+        dispatch_withdrawals ))
+    (fun ( submit_batch,
+           finalize_commitment,
+           remove_commitment,
+           rejection,
+           dispatch_withdrawals ) ->
+      {
+        submit_batch;
+        finalize_commitment;
+        remove_commitment;
+        rejection;
+        dispatch_withdrawals;
+      })
+  @@ obj5
        (opt
           "submit_batch"
           Signature.Public_key_hash.encoding
@@ -83,6 +104,11 @@ let signers_encoding =
           "rejection"
           Signature.Public_key_hash.encoding
           ~description:"The public key hash of the signer for rejections")
+       (opt
+          "dispatch_withdrawals"
+          Signature.Public_key_hash.encoding
+          ~description:
+            "The public key hash of the signer for the dispatch of withdrawals")
 
 let encoding =
   let open Data_encoding in

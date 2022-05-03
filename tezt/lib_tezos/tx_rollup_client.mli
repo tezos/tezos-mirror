@@ -54,6 +54,15 @@ val craft_tx_transaction :
   ticket:string ->
   string Lwt.t
 
+val craft_tx_withdraw :
+  ?counter:Int64.t ->
+  t ->
+  qty:Int64.t ->
+  signer:string ->
+  dest:string ->
+  ticket:string ->
+  string Lwt.t
+
 val craft_tx_batch : t -> batch:string -> signatures:string -> string Lwt.t
 
 val get_batcher_queue : t -> string Lwt.t

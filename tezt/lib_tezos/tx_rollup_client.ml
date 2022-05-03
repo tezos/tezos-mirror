@@ -115,6 +115,28 @@ let craft_tx_transaction ?counter tx_client ~qty ~signer ~dest ~ticket =
   in
   Lwt.return out
 
+let craft_tx_withdraw ?counter tx_client ~qty ~signer ~dest ~ticket =
+  let qty = Int64.to_string qty in
+  let* out =
+    spawn_command
+      tx_client
+      ([
+         "craft";
+         "tx";
+         "withdrawing";
+         qty;
+         "from";
+         signer;
+         "to";
+         dest;
+         "for";
+         ticket;
+       ]
+      @ optional_arg ~name:"counter" Int64.to_string counter)
+    |> Process.check_and_read_stdout
+  in
+  Lwt.return out
+
 let craft_tx_batch tx_client ~batch ~signatures =
   let* out =
     spawn_command tx_client ["craft"; "batch"; "with"; batch; "for"; signatures]

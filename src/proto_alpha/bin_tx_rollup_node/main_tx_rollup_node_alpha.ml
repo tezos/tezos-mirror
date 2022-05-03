@@ -80,6 +80,13 @@ let rejection_signer_arg =
     ~doc:"The signer for rejections"
     ()
 
+let dispatch_withdrawals_signer_arg =
+  Client_keys.Public_key_hash.source_arg
+    ~long:"dispatch-withdrawals-signer"
+    ~placeholder:"dispatch-withdrawals-signer"
+    ~doc:"The signer for dispatch withdrawals"
+    ()
+
 let rollup_id_arg =
   Clic.arg
     ~long:"rollup-id"
@@ -139,13 +146,14 @@ let configuration_init_command =
   command
     ~group
     ~desc:"Configure the transaction rollup daemon."
-    (args10
+    (args11
        data_dir_arg
        operator_arg
        batch_signer_arg
        finalize_commitment_signer_arg
        remove_commitment_signer_arg
        rejection_signer_arg
+       dispatch_withdrawals_signer_arg
        rollup_id_arg
        rollup_genesis_arg
        rpc_addr_arg
@@ -157,6 +165,7 @@ let configuration_init_command =
            finalize_commitment_signer,
            remove_commitment_signer,
            rejection_signer,
+           dispatch_withdrawals_signer,
            rollup_id,
            rollup_genesis,
            rpc_addr,
@@ -181,6 +190,7 @@ let configuration_init_command =
                 finalize_commitment = finalize_commitment_signer;
                 remove_commitment = remove_commitment_signer;
                 rejection = rejection_signer;
+                dispatch_withdrawals = dispatch_withdrawals_signer;
               };
             rollup_id;
             rollup_genesis;

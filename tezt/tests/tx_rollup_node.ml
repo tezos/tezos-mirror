@@ -32,6 +32,7 @@
 
 module Rollup = Rollup.Tx_rollup
 module Rollup_node = Rollup_node.Tx_node
+module Parameters = Rollup.Parameters
 
 let check_json =
   Check.equalable
@@ -39,11 +40,6 @@ let check_json =
     (fun a b -> JSON.unannotate a = JSON.unannotate b)
 
 let get_block_hash block_json = JSON.(block_json |-> "hash" |> as_string)
-
-let get_rollup_parameter_file ~protocol =
-  let enable_tx_rollup = [(["tx_rollup_enable"], Some "true")] in
-  let base = Either.right (protocol, None) in
-  Protocol.write_parameter_file ~base enable_tx_rollup
 
 (* Wait for the [batch_success] event from the rollup node batcher. *)
 let wait_for_batch_success_event node =
@@ -123,6 +119,46 @@ let check_inbox_success (inbox : Rollup_node.Inbox.t) =
                 (JSON.encode result)))
     inbox.contents
 
+let check_l1_block_contains_commitment ~level block =
+  let ops = JSON.(block |-> "operations" |=> 3 |> as_list) in
+  if
+    not
+    @@ List.exists
+         (fun op ->
+           JSON.(op |-> "contents" |=> 0 |-> "kind" |> as_string)
+           = "tx_rollup_commit"
+           && JSON.(
+                op |-> "contents" |=> 0 |-> "commitment" |-> "level" |> as_int)
+              = level)
+         ops
+  then Test.fail "Block does not contain commitment of level %d" level
+
+let check_l1_block_contains_finalize ~level block =
+  let ops = JSON.(block |-> "operations" |=> 3 |> as_list) in
+  if
+    not
+    @@ List.exists
+         (fun op ->
+           JSON.(op |-> "contents" |=> 0 |-> "kind" |> as_string)
+           = "tx_rollup_finalize_commitment"
+           && JSON.(
+                op |-> "contents" |=> 0 |-> "metadata" |-> "operation_result"
+                |-> "level" |> as_int)
+              = level)
+         ops
+  then Test.fail "Block does not contain finalization of level %d" level
+
+let check_l1_block_contains_dispatch block =
+  let ops = JSON.(block |-> "operations" |=> 3 |> as_list) in
+  if
+    not
+    @@ List.exists
+         (fun op ->
+           JSON.(op |-> "contents" |=> 0 |-> "kind" |> as_string)
+           = "tx_rollup_dispatch_tickets")
+         ops
+  then Test.fail "Block does not contain dispatch tickets"
+
 (* Checks that the configuration is stored and that the  required
    fields are present. *)
 let test_node_configuration =
@@ -131,7 +167,7 @@ let test_node_configuration =
     ~title:"TX_rollup: configuration"
     ~tags:["tx_rollup"; "configuration"]
     (fun protocol ->
-      let* parameter_file = get_rollup_parameter_file ~protocol in
+      let* parameter_file = Parameters.parameter_file protocol in
       let* (node, client) =
         Client.init_with_protocol ~parameter_file `Client ~protocol ()
       in
@@ -168,8 +204,8 @@ let test_node_configuration =
       unit)
 
 let init_and_run_rollup_node ~originator ?operator ?batch_signer
-    ?finalize_commitment_signer ?remove_commitment_signer ?rejection_signer node
-    client =
+    ?finalize_commitment_signer ?remove_commitment_signer
+    ?dispatch_withdrawals_signer ?rejection_signer node client =
   let*! tx_rollup_hash = Client.Tx_rollup.originate ~src:originator client in
   let* () = Client.bake_for_and_wait client in
   Log.info "Tx_rollup %s was successfully originated" tx_rollup_hash ;
@@ -182,6 +218,7 @@ let init_and_run_rollup_node ~originator ?operator ?batch_signer
       ?batch_signer
       ?finalize_commitment_signer
       ?remove_commitment_signer
+      ?dispatch_withdrawals_signer
       ?rejection_signer
       client
       node
@@ -200,7 +237,7 @@ let test_tx_node_origination =
     ~title:"TX_rollup: test if the node is ready"
     ~tags:["tx_rollup"; "ready"; "originate"]
     (fun protocol ->
-      let* parameter_file = get_rollup_parameter_file ~protocol in
+      let* parameter_file = Parameters.parameter_file protocol in
       let* (node, client) =
         Client.init_with_protocol ~parameter_file `Client ~protocol ()
       in
@@ -247,7 +284,7 @@ let test_tx_node_store_inbox =
     ~title:"TX_rollup: store inbox"
     ~tags:["tx_rollup"; "store"; "inbox"]
     (fun protocol ->
-      let* parameter_file = get_rollup_parameter_file ~protocol in
+      let* parameter_file = Parameters.parameter_file protocol in
       let* (node, client) =
         Client.init_with_protocol ~parameter_file `Client ~protocol ()
       in
@@ -550,7 +587,7 @@ let test_ticket_deposit_from_l1_to_l2 =
     ~title:"TX_rollup: deposit ticket from l1 to l2"
     ~tags:["tx_rollup"; "deposit"; "ticket"]
     (fun protocol ->
-      let* parameter_file = get_rollup_parameter_file ~protocol in
+      let* parameter_file = Parameters.parameter_file protocol in
       let* (node, client) =
         Client.init_with_protocol ~parameter_file `Client ~protocol ()
       in
@@ -640,16 +677,13 @@ let sign_one_transaction key txs_string =
   Tezos_crypto.Bls.sign (bls_sk_of_key key) buf
 
 let craft_tx ?counter tx_client ~qty ~signer ~dest ~ticket =
-  let* json_str =
-    Tx_rollup_client.craft_tx_transaction
-      tx_client
-      ?counter
-      ~qty
-      ~signer
-      ~dest
-      ~ticket
-  in
-  Lwt.return json_str
+  Tx_rollup_client.craft_tx_transaction
+    tx_client
+    ?counter
+    ~qty
+    ~signer
+    ~dest
+    ~ticket
 
 let bls_signers_sks_json keys =
   let sks =
@@ -695,7 +729,7 @@ let test_l2_to_l2_transaction =
     ~title:"TX_rollup: l2 to l2 transaction"
     ~tags:["tx_rollup"; "rollup"; "internal"; "transaction"]
     (fun protocol ->
-      let* parameter_file = get_rollup_parameter_file ~protocol in
+      let* parameter_file = Parameters.parameter_file protocol in
       let* (node, client) =
         Client.init_with_protocol ~parameter_file `Client ~protocol ()
       in
@@ -983,7 +1017,7 @@ let test_batcher =
     ~title:"TX_rollup: L2 batcher"
     ~tags:["tx_rollup"; "node"; "batcher"; "transaction"]
     (fun protocol ->
-      let* parameter_file = get_rollup_parameter_file ~protocol in
+      let* parameter_file = Parameters.parameter_file protocol in
       let* (node, client) =
         Client.init_with_protocol ~parameter_file `Client ~protocol ()
       in
@@ -1232,7 +1266,7 @@ let test_reorganization =
     ~title:"TX_rollup: L2 rollup node reorganization"
     ~tags:["tx_rollup"; "node"; "reorganization"]
     (fun protocol ->
-      let* parameter_file = get_rollup_parameter_file ~protocol in
+      let* parameter_file = Parameters.parameter_file protocol in
       let nodes_args = Node.[Connections 2; Synchronisation_threshold 0] in
       let* (node1, client1) =
         Client.init_with_protocol
@@ -1353,7 +1387,7 @@ let test_l2_proof_rpc_position =
     ~title:"TX_rollup: reject messages at position 0 and 1"
     ~tags:["tx_rollup"; "node"; "proofs"; "rejection"]
     (fun protocol ->
-      let* parameter_file = get_rollup_parameter_file ~protocol in
+      let* parameter_file = Parameters.parameter_file protocol in
       let* (node, client) =
         Client.init_with_protocol ~parameter_file `Client ~protocol ()
       in
@@ -1568,7 +1602,7 @@ let test_reject_bad_commitment =
     ~title:"TX_rollup: reject bad commitment"
     ~tags:["tx_rollup"; "node"; "proofs"; "rejection"]
     (fun protocol ->
-      let* parameter_file = get_rollup_parameter_file ~protocol in
+      let* parameter_file = Parameters.parameter_file protocol in
       let* (node, client) =
         Client.init_with_protocol ~parameter_file `Client ~protocol ()
       in
@@ -1647,7 +1681,7 @@ let test_committer =
     ~title:"TX_rollup: injecting commitments automatically"
     ~tags:["tx_rollup"; "node"; "commitments"]
     (fun protocol ->
-      let* parameter_file = get_rollup_parameter_file ~protocol in
+      let* parameter_file = Parameters.parameter_file protocol in
       let* (node, client) =
         Client.init_with_protocol ~parameter_file `Client ~protocol ()
       in
@@ -1775,7 +1809,7 @@ let test_tickets_context =
     ~title:"TX_rollup: tickets hashes to tickets context"
     ~tags:["tx_rollup"; "tickets"; "context"]
     (fun protocol ->
-      let* parameter_file = get_rollup_parameter_file ~protocol in
+      let* parameter_file = Parameters.parameter_file protocol in
       let* (node, client) =
         Client.init_with_protocol ~parameter_file `Client ~protocol ()
       in
@@ -1894,6 +1928,203 @@ let test_tickets_context =
         ~error_msg:"Ticket is %L but expected %R" ;
       unit)
 
+let test_withdrawals =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"TX_rollup: dispatch withdrawals"
+    ~tags:["tx_rollup"; "dispatch"; "withdrawals"]
+    (fun protocol ->
+      let* parameter_file =
+        Parameters.parameter_file
+          ~parameters:Parameters.{finality_period = 2; withdraw_period = 2}
+          protocol
+      in
+      let* (node, client) =
+        Client.init_with_protocol ~parameter_file `Client ~protocol ()
+      in
+      let originator = Constant.bootstrap2.public_key_hash in
+      let operator = Constant.bootstrap1.public_key_hash in
+      let* (tx_rollup_hash, tx_node) =
+        init_and_run_rollup_node
+          ~originator
+          ~operator
+          ~batch_signer:Constant.bootstrap5.public_key_hash
+          ~finalize_commitment_signer:Constant.bootstrap4.public_key_hash
+          ~dispatch_withdrawals_signer:Constant.bootstrap3.public_key_hash
+          node
+          client
+      in
+      let tx_client = Tx_rollup_client.create tx_node in
+      (* Helper function to check for injection *)
+      let check_injection tag f =
+        let injection =
+          wait_for_injecting_or_completed_event ~tags:[tag] tx_node
+        in
+        let* () = f in
+        let* injected = injection in
+        match injected with
+        | `Injected count ->
+            Log.info "Injected %d %ss" count tag ;
+            unit
+        | `Nothing_injected -> Test.fail "No %s injected" tag
+      in
+      let check_l2_block_finalized block =
+        let finalized =
+          JSON.(block |-> "metadata" |-> "finalized" |> as_bool)
+        in
+        Check.((finalized = true) bool) ~error_msg:"L2 Block is not finalized"
+      in
+      (* Generating some identities *)
+      let* bls_key_1 = generate_bls_addr ~alias:"alice" client in
+      let bls_pkh_1 = bls_key_1.aggregate_public_key_hash in
+      let bls_pk_1 = bls_key_1.aggregate_public_key in
+      let* bls_key_2 = generate_bls_addr ~alias:"bob" client in
+      let bls_pkh_2 = bls_key_2.aggregate_public_key_hash in
+      let bls_pk_2 = bls_key_2.aggregate_public_key in
+      let* (_level, deposit_contract) =
+        make_deposit
+          ~source:Constant.bootstrap2.public_key_hash
+          ~tx_rollup_hash
+          ~tx_node
+          ~client
+          ~tickets_amount:100_000
+          bls_pkh_1
+      in
+      let* inbox = tx_client_get_inbox_as_json ~tx_client ~block:"head" in
+      let ticket_id = get_ticket_hash_from_deposit_json inbox in
+      Log.info "Ticket %s was successfully emitted" ticket_id ;
+      Log.info "Submitting transactions to queue" ;
+      let* tx =
+        Tx_rollup_client.craft_tx_transaction
+          tx_client
+          ~signer:bls_pk_1
+          ~dest:bls_pkh_2
+          ~ticket:ticket_id
+          ~qty:10L
+      in
+      let signature = sign_one_transaction bls_key_1 tx in
+      let* _txh1 = tx_client_inject_transaction ~tx_client tx signature in
+      let* tx =
+        Tx_rollup_client.craft_tx_transaction
+          tx_client
+          ~signer:bls_pk_2
+          ~dest:bls_pkh_1
+          ~ticket:ticket_id
+          ~qty:5L
+      in
+      let signature = sign_one_transaction bls_key_2 tx in
+      let* _txh2 = tx_client_inject_transaction ~tx_client tx signature in
+      Log.info "Waiting for new L2 block" ;
+      let* () = Client.bake_for_and_wait client in
+      let* () = Client.bake_for_and_wait client in
+      let* _ = Rollup_node.wait_for_tezos_level tx_node 6 in
+      let* inbox = Rollup_node.Client.get_inbox ~tx_node ~block:"head" in
+      check_inbox_success inbox ;
+      let* () =
+        check_tz4_balance
+          ~tx_client
+          ~block:"head"
+          ~ticket_id
+          ~tz4_address:bls_pkh_1
+          ~expected_balance:(100_000 - 5)
+      and* () =
+        check_tz4_balance
+          ~tx_client
+          ~block:"head"
+          ~ticket_id
+          ~tz4_address:bls_pkh_2
+          ~expected_balance:5
+      in
+      Log.info "Submitting withdrawals to queue" ;
+      let* tx =
+        Tx_rollup_client.craft_tx_withdraw
+          tx_client
+          ~signer:bls_pk_2
+          ~dest:Constant.bootstrap2.public_key_hash
+          ~ticket:ticket_id
+          ~qty:5L
+      in
+      let signature = sign_one_transaction bls_key_2 tx in
+      let* _ = tx_client_inject_transaction ~tx_client tx signature in
+      let* tx =
+        Tx_rollup_client.craft_tx_withdraw
+          tx_client
+          ~signer:bls_pk_1
+          ~dest:Constant.bootstrap2.public_key_hash
+          ~ticket:ticket_id
+          ~qty:10L
+      in
+      let signature = sign_one_transaction bls_key_1 tx in
+      let* _ = tx_client_inject_transaction ~tx_client tx signature in
+      Log.info "Waiting for new L2 block" ;
+      let* () = Client.bake_for_and_wait client in
+      let* () = Client.bake_for_and_wait client in
+      let* _ = Rollup_node.wait_for_tezos_level tx_node 8 in
+      let* inbox = Rollup_node.Client.get_inbox ~tx_node ~block:"head" in
+      check_inbox_success inbox ;
+      let* () =
+        check_tz4_balance
+          ~tx_client
+          ~block:"head"
+          ~ticket_id
+          ~tz4_address:bls_pkh_1
+          ~expected_balance:(100_000 - 5 - 10)
+      and* () =
+        check_tz4_balance
+          ~tx_client
+          ~block:"head"
+          ~ticket_id
+          ~tz4_address:bls_pkh_2
+          ~expected_balance:0
+      in
+      Log.info "Baking 1 L1 block for inclusion of commitment" ;
+      let* () = Client.bake_for_and_wait client in
+      let* block = RPC.get_block client in
+      check_l1_block_contains_commitment ~level:2 block ;
+      Log.info "Baking 2 L1 blocks for finalization of commitment" ;
+      let* () =
+        check_injection "finalize_commitment" @@ Client.bake_for_and_wait client
+      in
+      let* () =
+        check_injection "dispatch_withdrawals"
+        @@ Client.bake_for_and_wait client
+      in
+      let* block = RPC.get_block client in
+      check_l1_block_contains_finalize ~level:2 block ;
+      let* l2_head = Rollup_node.Client.get_block ~tx_node ~block:"head" in
+      check_l2_block_finalized l2_head ;
+      Log.info "Baking 1 L1 block for dispatch to be included" ;
+      let* () = Client.bake_for_and_wait client in
+      let* block = RPC.get_block client in
+      check_l1_block_contains_dispatch block ;
+      Log.info "Originate contract to withdraw tickets" ;
+      let* withdraw_contract =
+        Client.originate_contract
+          ~alias:"withdraw_contract"
+          ~amount:Tez.zero
+          ~src:Constant.bootstrap3.public_key_hash
+          ~prg:"file:./tezt/tests/contracts/proto_alpha/tx_rollup_withdraw.tz"
+          ~init:"None"
+          ~burn_cap:Tez.one
+          client
+      in
+      let* () = Client.bake_for_and_wait client in
+      Log.info "Transfer the tickets to withdraw contract" ;
+      let*! () =
+        Client.Tx_rollup.transfer_tickets
+          ~qty:15L
+          ~src:Constant.bootstrap2.public_key_hash
+          ~destination:withdraw_contract
+          ~entrypoint:"default"
+          ~contents:{|"toru"|}
+          ~ty:"string"
+          ~ticketer:deposit_contract
+          ~burn_cap:Tez.one
+          client
+      in
+      let* () = Client.bake_for_and_wait client in
+      unit)
+
 let register ~protocols =
   test_node_configuration protocols ;
   test_tx_node_origination protocols ;
@@ -1905,4 +2136,5 @@ let register ~protocols =
   test_l2_proof_rpc_position protocols ;
   test_reject_bad_commitment protocols ;
   test_committer protocols ;
-  test_tickets_context protocols
+  test_tickets_context protocols ;
+  test_withdrawals protocols

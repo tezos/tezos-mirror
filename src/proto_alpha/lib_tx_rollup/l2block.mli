@@ -69,7 +69,13 @@ type commitment_included_info = {
   operation : Operation_hash.t;
 }
 
-type metadata = {commitment_included : commitment_included_info option}
+(** Metadata for the block  *)
+type metadata = {
+  commitment_included : commitment_included_info option;
+      (** Contains information if the commitment for this block has been included on L1 *)
+  finalized : bool;
+      (** Flag to signal if the commitment for this block is finalized on L1 *)
+}
 
 (** Build the genesis block  *)
 val genesis_block : Context.t -> Tx_rollup.t -> Block_hash.t -> t Lwt.t

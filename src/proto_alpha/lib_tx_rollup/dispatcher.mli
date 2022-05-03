@@ -2,8 +2,6 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
-(* Copyright (c) 2022 Marigold, <contact@marigold.dev>                       *)
-(* Copyright (c) 2022 Oxhead Alpha <info@oxhead-alpha.com>                   *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -25,50 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/2458
-   Provide a default configuration
-*)
-
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/2817
-   Better documentation/semantic for signers + modes
-*)
-type signers = {
-  submit_batch : Signature.public_key_hash option;
-  finalize_commitment : Signature.public_key_hash option;
-  remove_commitment : Signature.public_key_hash option;
-  rejection : Signature.public_key_hash option;
-  dispatch_withdrawals : Signature.public_key_hash option;
-}
-
-type t = {
-  data_dir : string;
-  rollup_id : Protocol.Alpha_context.Tx_rollup.t;
-  rollup_genesis : Block_hash.t option;
-  rpc_addr : P2p_point.Id.t;
-  reconnection_delay : float;
-  operator : Signature.public_key_hash option;
-  signers : signers;
-  l2_blocks_cache_size : int;
-}
-
-(** [default_data_dir] is the default value for [data_dir]. *)
-val default_data_dir : Protocol.Alpha_context.Tx_rollup.t -> string
-
-(** [default_rpc_addr] is the default value for [rpc_addr]. *)
-val default_rpc_addr : P2p_point.Id.t
-
-(** [default_reconnection_delay] is the default value for [reconnection-delay] *)
-val default_reconnection_delay : float
-
-(** [default_l2_blocks_cache_size] is the default number of L2 blocks that are
-    cached by the rollup node *)
-val default_l2_blocks_cache_size : int
-
-(** [save configuration] overwrites [configuration] file and returns the filename. *)
-val save : t -> string tzresult Lwt.t
-
-(** [load ~data_dir] loads a configuration stored in [data_dir]. *)
-val load : data_dir:string -> t tzresult Lwt.t
-
-(** [encoding] encodes a configuration. *)
-val encoding : t Data_encoding.t
+(** Produce dispatch of withdrawals operations and sends them to the
+    injector. *)
+val dispatch_withdrawals :
+  source:Signature.Public_key_hash.t ->
+  State.t ->
+  L2block.t ->
+  unit tzresult Lwt.t
