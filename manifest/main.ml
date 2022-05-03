@@ -1472,6 +1472,14 @@ let tezos_context_helpers =
         irmin_pack;
       ]
 
+let tezos_context_dump =
+  public_lib
+    "tezos-context.dump"
+    ~path:"src/lib_context/dump"
+    ~opam:"tezos-context"
+    ~deps:
+      [tezos_base |> open_ ~m:"TzPervasives"; tezos_stdlib_unix |> open_; fmt]
+
 let tezos_context_memory =
   public_lib
     "tezos-context.memory"
@@ -1509,6 +1517,7 @@ let tezos_context_disk =
         tezos_context_helpers;
         tezos_context_encoding;
         tezos_context_memory;
+        tezos_context_dump;
       ]
 
 let tezos_context =

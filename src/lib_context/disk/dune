@@ -20,7 +20,8 @@
   tezos-context.sigs
   tezos-context.helpers
   tezos-context.encoding
-  tezos-context.memory)
+  tezos-context.memory
+  tezos-context.dump)
  (flags
   (:standard)
   -open Tezos_shell_services

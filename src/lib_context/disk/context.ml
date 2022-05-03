@@ -1072,6 +1072,7 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
 
   (* Context dumper *)
 
+  open Tezos_context_dump
   module Context_dumper = Context_dump.Make (Dumpable_context)
   module Context_dumper_legacy = Context_dump.Make_legacy (Dumpable_context)
 

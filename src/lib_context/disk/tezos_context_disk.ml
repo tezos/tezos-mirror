@@ -70,5 +70,3 @@ module Context = struct
 
   include Context.Make (Tezos_context_encoding.Context)
 end
-
-module Context_dump = Context_dump
