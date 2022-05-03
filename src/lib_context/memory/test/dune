@@ -6,7 +6,7 @@
  (libraries
   tezos-base
   tezos-base.unix
-  tezos-context
+  tezos-context.disk
   tezos-context.memory
   tezos-stdlib-unix
   alcotest-lwt)
