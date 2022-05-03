@@ -187,6 +187,12 @@ Miscellaneous
 - Removed delegates for protocol Hangzhou, since it was replaced by Ithaca
   as the active protocol on Mainnet.
 
+Version 12.4
+============
+
+- Fixed a memory leak in the baker and the accuser.
+  This is a backport of the fix introduced in version 13.0~rc1.
+
 Version 12.3
 ============
 
