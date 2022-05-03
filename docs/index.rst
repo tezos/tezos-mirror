@@ -51,11 +51,11 @@ The Community
     - https://tzstats.com
     - https://tezblock.io
     - https://teztracker.com/
-    - https://tzkt.io (Baking focused Explorer)
-    - https://arronax.io
+    - https://tzkt.io (Baking focused explorer)
+    - https://arronax.io (Analytics-oriented explorer)
     - https://mininax.io
-    - https://baking-bad.org (Reward Tracker)
-    - https://better-call.dev (Smart-contract Explorer)
+    - https://baking-bad.org (Baking rewards tracker)
+    - https://better-call.dev (Smart contracts explorer)
 
 - A few community-run websites collect useful Tezos links:
 

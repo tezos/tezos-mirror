@@ -7,7 +7,7 @@ economic protocol represents the amendable part of Tezos.
 
 This page groups the documentation helping developers and users in
 understanding the basic concepts of the economic protocol
-(proof-of-stake, consensus, voting, etc), its features (Michelson,
+(Proof Of Stake, consensus, voting, etc), its features (Michelson,
 Sapling, etc), and some details about its implementation.
 
 
@@ -64,14 +64,14 @@ Sapling, etc), and some details about its implementation.
 .. toctree::
    :maxdepth: 2
 
-   plugins
-
-.. toctree::
-   :maxdepth: 2
-
    precheck
 
 .. toctree::
    :maxdepth: 2
 
    transaction_rollups
+
+.. toctree::
+   :maxdepth: 2
+
+   plugins
