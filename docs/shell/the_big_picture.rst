@@ -263,12 +263,6 @@ compatible, and library vs command-line interface.
   - :package:`tezos-client-alpha` provides some functions to perform
     the operations of protocol Alpha using the wallet and signers from
     the client context.
-  - :package:`tezos-client-commands` plugs the basic context access
-    functions from :package:`tezos-client-base` as handlers for the
-    commands of the ``tezos-client`` command-line wallet.
-  - :package:`tezos-client-alpha-commands` plugs the functions from
-    :package:`tezos-client-alpha` as handlers for the Alpha specific
-    commands of the ``tezos-client`` command-line wallet.
   - :package:`tezos-client-genesis` contains the basic activator
     commands available on the genesis protocol.
   - :package:`tezos-client-base-unix` implements configuration file
