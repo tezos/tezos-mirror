@@ -82,14 +82,13 @@ everything for you: measure time, send data points, compare them with
 previous runs, and send an alert if the difference is too large.
 
 The ``Long_test`` module also provides function
-``update_grafana_dashboard`` which is called in
-:src:`tezt/long_tests/main.ml` with a specification of graphs to
-display in Grafana at https://graf.nomadic-labs.com/?orgId=1 (in the
-"Long Tezts" dashboard by default but you can create your own
-dashboards). To add graphs for your tests, define them next to your
-test in the same file as your test, and declare them in
-:src:`tezt/long_tests/main.ml` in the call to
-``update_grafana_dashboard``.
+``update_grafana_dashboard`` called in
+:src:`tezt/long_tests/main.ml` with a specification to create/overwrite a dashboard
+in `Nomadic Labs' Grafana <https://grafana.nomadic-labs.com/d/longtezts>`_.
+Default is named `Long Tezts` but you can add additional dashboards using the
+`Long_test.update_grafana_dashboard` function. To add a dashboard for your tests, define
+it next to your test (in the same file), and declare it in the call to
+``update_grafana_dashboard`` in :src:`tezt/long_tests/main.ml`.
 
 As always in Tezt, the above functions try to provide flexibility.
 The ``time`` function in particular is parameterized by settings like
@@ -99,6 +98,11 @@ measurements, how much of a difference to tolerate before alerting,
 etc. ``time`` itself being a combination of other lower-level
 functions that are also provided and which you can combine to fit your
 needs. And of course you can contribute to improve them.
+
+Automated long tezts logs are available in `Nomadic Labs' public S3 bucket browser
+<https://logs.nomadic-labs.com/#PRT/master/>`_. In case of InfluxDB issues, you can
+also inspect the time series stored with `Nomadic Labs' private Chronograf
+<https://chronograf.nomadic-labs.com/>`_, but access is restricted to administrators.
 
 Example
 -------
@@ -117,7 +121,7 @@ One-Shot Tests
 You may be interested in running some long tests using this framework
 on your own branch instead of ``master``.
 
-See documentation in the README `here <https://gitlab.com/nomadic-labs/iac/terraform/tf-aws-performance-regression-oneshot-instance>`_
+Check the documentation of the `PRT one-shot repository <https://gitlab.com/nomadic-labs/iac/terraform/tf-aws-performance-regression-oneshot-instance>`_
 
 Providing Large Data
 --------------------
