@@ -65,13 +65,22 @@ val state_hash : ?hooks:Process.hooks -> t -> string Lwt.t
 (** [status client] gets the corresponding PVM status for the current head block. *)
 val status : ?hooks:Process.hooks -> t -> string Lwt.t
 
-(** [last_stored_commitment client] gets the last commitment stored by the rollup node. *)
-val last_stored_commitment :
-  ?hooks:Process.hooks -> t -> commitment option Lwt.t
+(** [commitment_from_json] parses a commitment from its JSON representation. *)
+val commitment_from_json : JSON.t -> commitment option
 
-(** [last_published_commitment client] gets the last commitment published by the rollup node. *)
+(** [commitment_with_hash_from_json] parses a commitment and its hash from the
+    JSON representation. *)
+val commitment_with_hash_from_json : JSON.t -> (string * commitment) option
+
+(** [last_stored_commitment client] gets the last commitment with its hash
+    stored by the rollup node. *)
+val last_stored_commitment :
+  ?hooks:Process.hooks -> t -> (string * commitment) option Lwt.t
+
+(** [last_published_commitment client] gets the last commitment published with
+    its hash by the rollup node. *)
 val last_published_commitment :
-  ?hooks:Process.hooks -> t -> commitment option Lwt.t
+  ?hooks:Process.hooks -> t -> (string * commitment) option Lwt.t
 
 (** [generate_keys ~alias client] generates new unencrypted keys for [alias]. *)
 val generate_keys :

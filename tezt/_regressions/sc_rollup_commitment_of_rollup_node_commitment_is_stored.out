@@ -828,15 +828,19 @@ This sequence of operations was run:
 
 
 ./tezos-sc-rollup-client-alpha rpc get /last_stored_commitment
-{ "compressed_state":
-    "[SC_ROLLUP_STATE_HASH]",
-  "inbox_level": 22,
-  "predecessor": "[SC_ROLLUP_COMMITMENT_HASH]",
-  "number_of_messages": 210, "number_of_ticks": 631 }
+{ "hash": "[SC_ROLLUP_COMMITMENT_HASH]",
+  "commitment":
+    { "compressed_state":
+        "[SC_ROLLUP_STATE_HASH]",
+      "inbox_level": 22,
+      "predecessor": "[SC_ROLLUP_COMMITMENT_HASH]",
+      "number_of_messages": 210, "number_of_ticks": 631 } }
 
 ./tezos-sc-rollup-client-alpha rpc get /last_published_commitment
-{ "compressed_state":
-    "[SC_ROLLUP_STATE_HASH]",
-  "inbox_level": 22,
-  "predecessor": "[SC_ROLLUP_COMMITMENT_HASH]",
-  "number_of_messages": 210, "number_of_ticks": 631 }
+{ "hash": "[SC_ROLLUP_COMMITMENT_HASH]",
+  "commitment":
+    { "compressed_state":
+        "[SC_ROLLUP_STATE_HASH]",
+      "inbox_level": 22,
+      "predecessor": "[SC_ROLLUP_COMMITMENT_HASH]",
+      "number_of_messages": 210, "number_of_ticks": 631 } }
