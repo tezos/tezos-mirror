@@ -26,6 +26,7 @@
 (*****************************************************************************)
 
 type signers = {
+  operator : Signature.public_key_hash option;
   submit_batch : Signature.public_key_hash option;
   finalize_commitment : Signature.public_key_hash option;
   remove_commitment : Signature.public_key_hash option;
@@ -39,7 +40,6 @@ type t = {
   rollup_genesis : Block_hash.t option;
   rpc_addr : P2p_point.Id.t;
   reconnection_delay : float;
-  operator : Signature.public_key_hash option;
   signers : signers;
   l2_blocks_cache_size : int;
 }
@@ -62,30 +62,38 @@ let signers_encoding =
   let open Data_encoding in
   conv
     (fun {
+           operator;
            submit_batch;
            finalize_commitment;
            remove_commitment;
            rejection;
            dispatch_withdrawals;
          } ->
-      ( submit_batch,
+      ( operator,
+        submit_batch,
         finalize_commitment,
         remove_commitment,
         rejection,
         dispatch_withdrawals ))
-    (fun ( submit_batch,
+    (fun ( operator,
+           submit_batch,
            finalize_commitment,
            remove_commitment,
            rejection,
            dispatch_withdrawals ) ->
       {
+        operator;
         submit_batch;
         finalize_commitment;
         remove_commitment;
         rejection;
         dispatch_withdrawals;
       })
-  @@ obj5
+  @@ obj6
+       (opt
+          ~description:"The operator of the rollup (public key hash) if any"
+          "operator"
+          Signature.Public_key_hash.encoding)
        (opt
           "submit_batch"
           Signature.Public_key_hash.encoding
@@ -119,7 +127,6 @@ let encoding =
            rollup_genesis;
            rpc_addr;
            reconnection_delay;
-           operator;
            signers;
            l2_blocks_cache_size;
          } ->
@@ -128,7 +135,6 @@ let encoding =
         rollup_genesis,
         rpc_addr,
         reconnection_delay,
-        operator,
         signers,
         l2_blocks_cache_size ))
     (fun ( data_dir_opt,
@@ -136,7 +142,6 @@ let encoding =
            rollup_genesis,
            rpc_addr,
            reconnection_delay,
-           operator,
            signers,
            l2_blocks_cache_size ) ->
       let data_dir =
@@ -150,11 +155,10 @@ let encoding =
         rollup_genesis;
         rpc_addr;
         reconnection_delay;
-        operator;
         signers;
         l2_blocks_cache_size;
       })
-  @@ obj8
+  @@ obj7
        (opt
           ~description:
             "Location where the rollup node data (store, context, etc.) is \
@@ -179,10 +183,6 @@ let encoding =
           "reconnection_delay"
           float
           default_reconnection_delay)
-       (opt
-          ~description:"The operator of the rollup (public key hash) if any"
-          "operator"
-          Signature.Public_key_hash.encoding)
        (req
           ~description:
             "The additional signers for the various tx rollup operations"

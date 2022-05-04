@@ -50,11 +50,10 @@ type t = private {
   rollup_info : rollup_info;
   tezos_blocks_cache : Alpha_block_services.block_info Tezos_blocks_cache.t;
   constants : Constants.t;
-  operator : signer option;
   signers : Node_config.signers;
 }
 
-(** [init cctxt ~data_dir ~rollup_genesis ~operator rollup] creates a new state
+(** [init cctxt ~data_dir ~rollup_genesis rollup] creates a new state
    for the rollup node with a new store and context.  If the [rollup_genesis]
    block hash is provided, checks that the rollup [rollup_id] is created inside
    the block identified by the hash. Otherwise, the genesis information is read
@@ -68,7 +67,6 @@ val init :
   ?readonly:bool ->
   ?rollup_genesis:Block_hash.t ->
   l2_blocks_cache_size:int ->
-  operator:Signature.public_key_hash option ->
   signers:Node_config.signers ->
   Tx_rollup.t ->
   t tzresult Lwt.t

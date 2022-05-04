@@ -50,7 +50,6 @@ type t = {
   rollup_info : rollup_info;
   tezos_blocks_cache : Alpha_block_services.block_info Tezos_blocks_cache.t;
   constants : Constants.t;
-  operator : signer option;
   signers : Node_config.signers;
 }
 
@@ -450,7 +449,7 @@ let retrieve_constants cctxt =
   Protocol.Constants_services.all cctxt (cctxt#chain, cctxt#block)
 
 let init cctxt ~data_dir ?(readonly = false) ?rollup_genesis
-    ~l2_blocks_cache_size ~operator ~(signers : Node_config.signers) rollup =
+    ~l2_blocks_cache_size ~(signers : Node_config.signers) rollup =
   let open Lwt_result_syntax in
   let*! stores =
     Stores.init ~data_dir ~readonly ~blocks_cache_size:l2_blocks_cache_size
@@ -463,7 +462,6 @@ let init cctxt ~data_dir ?(readonly = false) ?rollup_genesis
   in
   let*! head = init_head stores context_index rollup rollup_info in
   let* constants = retrieve_constants cctxt in
-  let* operator = Option.map_es (get_signer cctxt) operator in
   (* L1 blocks are cached to handle reorganizations efficiently *)
   let tezos_blocks_cache = Tezos_blocks_cache.create 32 in
   return
@@ -475,6 +473,5 @@ let init cctxt ~data_dir ?(readonly = false) ?rollup_genesis
       rollup_info;
       tezos_blocks_cache;
       constants;
-      operator;
       signers;
     }

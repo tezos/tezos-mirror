@@ -33,6 +33,7 @@
    Better documentation/semantic for signers + modes
 *)
 type signers = {
+  operator : Signature.public_key_hash option;
   submit_batch : Signature.public_key_hash option;
   finalize_commitment : Signature.public_key_hash option;
   remove_commitment : Signature.public_key_hash option;
@@ -46,7 +47,6 @@ type t = {
   rollup_genesis : Block_hash.t option;
   rpc_addr : P2p_point.Id.t;
   reconnection_delay : float;
-  operator : Signature.public_key_hash option;
   signers : signers;
   l2_blocks_cache_size : int;
 }

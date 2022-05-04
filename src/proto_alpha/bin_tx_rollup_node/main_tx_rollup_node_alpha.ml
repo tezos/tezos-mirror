@@ -183,9 +183,9 @@ let configuration_init_command =
         Node_config.
           {
             data_dir;
-            operator;
             signers =
               {
+                operator;
                 submit_batch = batch_signer;
                 finalize_commitment = finalize_commitment_signer;
                 remove_commitment = remove_commitment_signer;

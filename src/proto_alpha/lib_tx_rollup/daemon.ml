@@ -270,13 +270,10 @@ let check_inbox state tezos_block level inbox =
           {level; reconstructed_inbox; protocol_inbox})
 
 let commit_block_on_l1 state block =
-  match state.State.operator with
+  match state.State.signers.operator with
   | None -> return_unit
   | Some operator ->
-      Committer.commit_block
-        ~operator:operator.pkh
-        state.State.rollup_info.rollup_id
-        block
+      Committer.commit_block ~operator state.State.rollup_info.rollup_id block
 
 let process_messages_and_inboxes (state : State.t) ~(predecessor : L2block.t)
     ?predecessor_context block_info rollup_id =
@@ -771,7 +768,6 @@ let run configuration cctxt =
     Node_config.data_dir;
     rollup_id;
     rollup_genesis;
-    operator;
     signers;
     reconnection_delay;
     l2_blocks_cache_size;
@@ -784,7 +780,6 @@ let run configuration cctxt =
       cctxt
       ~data_dir
       ~l2_blocks_cache_size
-      ~operator
       ~signers
       ?rollup_genesis
       rollup_id
@@ -798,7 +793,7 @@ let run configuration cctxt =
              | (None, _, _) -> None
              | (Some x, strategy, tags) -> Some (x, strategy, tags))
            [
-             (operator, Injector.Each_block, [`Commitment]);
+             (signers.operator, Injector.Each_block, [`Commitment]);
              (* Batches of L2 operations are submitted with a delay after each
                 block, to allow for more operations to arrive and be included in
                 the following block. *)
