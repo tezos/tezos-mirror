@@ -74,9 +74,9 @@ module MakeSizedSet (S : TzLwtreslib.Set.S) = struct
 
   let compare t1 t2 = S.compare t1.set t2.set
 
-  let equal t1 t2 = S.equal t1.set t2.set
+  let equal t1 t2 = t1.cardinal = t2.cardinal && S.equal t1.set t2.set
 
-  let subset t1 t2 = S.subset t1.set t2.set
+  let subset t1 t2 = t1.cardinal <= t2.cardinal && S.subset t1.set t2.set
 
   let iter f t = S.iter f t.set
 
@@ -224,7 +224,7 @@ module MakeSizedMap (M : TzLwtreslib.Map.S) = struct
 
   let compare f t1 t2 = M.compare f t1.map t2.map
 
-  let equal f t1 t2 = M.equal f t1.map t2.map
+  let equal f t1 t2 = t1.cardinal = t2.cardinal && M.equal f t1.map t2.map
 
   let iter f t = M.iter f t.map
 
