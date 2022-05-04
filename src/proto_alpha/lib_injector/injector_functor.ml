@@ -262,7 +262,7 @@ module Make (Rollup : PARAMETERS) = struct
   let fee_parameter_of_operations state ops =
     List.fold_left
       (fun acc {L1_operation.manager_operation = Manager op; _} ->
-        let param = Rollup.fee_parameter state.rollup_node_state op in
+        let param = Rollup.fee_parameter state op in
         Injection.
           {
             minimal_fees = Tez.max acc.minimal_fees param.minimal_fees;
@@ -295,8 +295,8 @@ module Make (Rollup : PARAMETERS) = struct
 
   (** Simulate the injection of [operations]. See {!inject_operations} for the
     specification of [must_succeed]. *)
-  let simulate_operations ~must_succeed state signer
-      (operations : L1_operation.t list) =
+  let simulate_operations ~must_succeed state (operations : L1_operation.t list)
+      =
     let open Lwt_result_syntax in
     let open Annotated_manager_operation in
     let force =
@@ -311,7 +311,9 @@ module Make (Rollup : PARAMETERS) = struct
           match must_succeed with `All -> false | `At_least_one -> true)
     in
     let*! () = Event.(emit2 simulating_operations) state operations force in
-    let fee_parameter = fee_parameter_of_operations state operations in
+    let fee_parameter =
+      fee_parameter_of_operations state.rollup_node_state operations
+    in
     let operations =
       List.map
         (fun {L1_operation.manager_operation = Manager operation; _} ->
@@ -333,9 +335,9 @@ module Make (Rollup : PARAMETERS) = struct
         ~force
         ~chain:state.cctxt#chain
         ~block:(`Head 0)
-        ~source:signer.pkh
-        ~src_pk:signer.pk
-        ~src_sk:signer.sk
+        ~source:state.signer.pkh
+        ~src_pk:state.signer.pk
+        ~src_sk:state.signer.sk
         ~successor_level:true
           (* Needed to simulate tx_rollup operations in the next block *)
         ~fee:Limit.unknown
@@ -396,7 +398,7 @@ module Make (Rollup : PARAMETERS) = struct
       (operations : L1_operation.t list) =
     let open Lwt_result_syntax in
     let* _oph, packed_contents, result =
-      simulate_operations ~must_succeed state state.signer operations
+      simulate_operations ~must_succeed state operations
     in
     let results = Apply_results.to_list result in
     let failure = ref false in
@@ -439,18 +441,18 @@ module Make (Rollup : PARAMETERS) = struct
 
   (** Returns the (upper bound on) the size of an L1 batch of operations composed
     of the manager operations [rev_ops]. *)
-  let size_l1_batch signer rev_ops =
+  let size_l1_batch state rev_ops =
     let contents_list =
       List.map
         (fun (op : L1_operation.t) ->
           let (Manager operation) = op.manager_operation in
           let {fee; counter; gas_limit; storage_limit} =
-            Rollup.approximate_fee_bound operation
+            Rollup.approximate_fee_bound state.rollup_node_state operation
           in
           let contents =
             Manager_operation
               {
-                source = signer.pkh;
+                source = state.signer.pkh;
                 operation;
                 fee;
                 counter;
@@ -470,7 +472,7 @@ module Make (Rollup : PARAMETERS) = struct
       | Ok packed_contents_list -> packed_contents_list
     in
     let signature =
-      match signer.pkh with
+      match state.signer.pkh with
       | Signature.Ed25519 _ -> Signature.of_ed25519 Ed25519.zero
       | Secp256k1 _ -> Signature.of_secp256k1 Secp256k1.zero
       | P256 _ -> Signature.of_p256 P256.zero
@@ -493,7 +495,7 @@ module Make (Rollup : PARAMETERS) = struct
         Op_queue.fold
           (fun _oph op ops ->
             let new_ops = op :: ops in
-            let new_size = size_l1_batch state.signer new_ops in
+            let new_size = size_l1_batch state new_ops in
             if new_size > size_limit then raise (Reached_limit ops) ;
             new_ops)
           state.queue
