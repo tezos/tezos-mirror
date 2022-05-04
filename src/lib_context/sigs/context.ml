@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018-2021 Tarides <contact@tarides.com>                     *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -401,6 +402,14 @@ module type PROOF_ENCODING = sig
   val stream_proof_encoding : stream t Data_encoding.t
 end
 
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/2967
+
+   What is the purpose of module type [S]?
+
+   [S] is morally the interface to the low-level storage visible to the
+   protocol. "Morally" because the exact module type expected by the protocol
+   is now defined to be {!Tezos_protocol_environment.Environment_context_intf.S}.
+*)
 module type S = sig
   val equal_config : Config.t -> Config.t -> bool
 
@@ -547,6 +556,15 @@ module type S = sig
   val verify_stream_proof : (stream_proof, 'a) verifier
 end
 
+(** [TEZOS_CONTEXT] is the module type implemented by all storage
+    implementations. This is the module type that the {e shell} expects for its
+    operation. As such, it should be a strict superset of the interface exposed
+    to the protocol (see module type {!S} above and
+    {!Tezos_protocol_environment.Environment_context_intf.S}).
+
+    The main purpose of this module type is to keep the on-disk and in-memory
+    implementations in sync.
+*)
 module type TEZOS_CONTEXT = sig
   (** {2 Generic interface} *)
 
@@ -562,6 +580,9 @@ module type TEZOS_CONTEXT = sig
 
   type context = t
 
+  (** [memory_context_tree] is a forward declaration of the type of
+      an in-memory Irmin tree. This type variable is to be substituted
+      by a concrete type wherever the {!TEZOS_CONTEXT} signature is used. *)
   type memory_context_tree
 
   val index : context -> index

@@ -1494,6 +1494,7 @@ let tezos_context_memory =
       [
         tezos_base |> open_ ~m:"TzPervasives";
         tezos_stdlib |> open_;
+        tezos_shell_services |> open_;
         irmin_pack;
         irmin_pack_mem;
         tezos_context_sigs;
