@@ -1873,8 +1873,17 @@ let generate_opam ?release this_package (internals : Target.internal list) :
       internal.conflicts
   in
   let synopsis =
-    String.concat " " @@ List.flatten @@ map internals
-    @@ fun internal -> Option.to_list internal.synopsis
+    let all =
+      List.filter_map (fun (i : Target.internal) -> i.synopsis) internals
+    in
+    let () =
+      match all with
+      | [_] -> ()
+      | [] -> error "No synopsis declared for package %s\n" for_package
+      | _ :: _ :: _ ->
+          error "Too many synopsis declared for package %s\n" for_package
+    in
+    String.concat " " all
   in
   let description =
     let descriptions =
