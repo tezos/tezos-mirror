@@ -92,6 +92,10 @@ Node
   that display progress animation. This option allows to redirect progress
   animation to non-TTY file descriptors.
 
+- Added the ``jakartanet`` built-in network alias.
+  You can now configure your node with ``--network jakartanet`` to run the
+  Jakartanet test network.
+
 Client
 ------
 
