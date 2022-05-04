@@ -36,7 +36,14 @@ module CompareListQ = Compare.List (Q)
 
 let pending_of_list =
   List.fold_left
-    (fun pendings (op, priority) -> Pending_ops.add op priority pendings)
+    (fun pendings (op, priority) ->
+      if
+        Operation_hash.Set.mem
+          (Prevalidation.Internal_for_tests.hash_of op)
+          (Pending_ops.hashes pendings)
+      then (* no duplicate hashes *)
+        pendings
+      else Pending_ops.add op priority pendings)
     Pending_ops.empty
 
 (* 1. Test iterators ordering *)
