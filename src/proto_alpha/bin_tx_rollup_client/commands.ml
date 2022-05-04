@@ -576,6 +576,41 @@ let inject_batcher_transaction () =
       let*! () = cctxt#message "@[%s@]" (Data_encoding.Json.to_string json) in
       return_unit)
 
+let prepare_operation_parameters cctxt signer counter =
+  let open Tx_rollup_l2_batch in
+  let open Lwt_result_syntax in
+  let*? signer_pk =
+    match signer.public_key with
+    | Some pk -> ok pk
+    | None -> error_with "missing signer public key in the wallet"
+  in
+  let signer_addr = Tx_rollup_l2_address.of_bls_pk signer_pk in
+  let* counter =
+    match counter with
+    | Some counter -> return counter
+    | None ->
+        let+ counter = RPC.counter cctxt `Head signer_addr in
+        Int64.succ counter
+  in
+  let*? sk_uri =
+    match signer.secret_key_uri with
+    | None -> error_with "missing secret key in wallet"
+    | Some sk_uri -> ok sk_uri
+  in
+  (* For the very first operation sent by a given account, we need
+     to provide the full public key; otherwise, sending the public
+     key hash is fine. *)
+  let signer =
+    if Compare.Int64.(counter = 1L) then Bls_pk signer_pk
+    else L2_addr signer_addr
+  in
+  (* TODO/TORU: https://gitlab.com/tezos/tezos/-/issues/2903
+     Use an RPC to know whether or not it can be safely replaced by
+     an index. *)
+  let signer = Indexable.from_value signer in
+
+  return (signer, sk_uri, counter)
+
 let transfer () =
   command
     ~desc:"submit a layer-2 transfer to a rollup node’s batcher"
@@ -599,37 +634,10 @@ let transfer () =
     @@ stop)
     (fun counter qty ticket_hash signer destination cctxt ->
       let open Lwt_result_syntax in
-      let open Tx_rollup_l2_batch in
       let open Tx_rollup_l2_batch.V1 in
-      let*? signer_pk =
-        match signer.public_key with
-        | Some pk -> ok pk
-        | None -> error_with "missing signer public key in the wallet"
+      let* (signer, sk_uri, counter) =
+        prepare_operation_parameters cctxt signer counter
       in
-      let signer_addr = Tx_rollup_l2_address.of_bls_pk signer_pk in
-      let* counter =
-        match counter with
-        | Some counter -> return counter
-        | None ->
-            let+ counter = RPC.counter cctxt `Head signer_addr in
-            Int64.succ counter
-      in
-      let*? sk_uri =
-        match signer.secret_key_uri with
-        | None -> error_with "missing secret key in wallet"
-        | Some sk_uri -> ok sk_uri
-      in
-      (* For the very first operation sent by a given account, we need
-         to provide the full public key; otherwise, sending the public
-         key hash is fine. *)
-      let signer =
-        if Compare.Int64.(counter = 1L) then Bls_pk signer_pk
-        else L2_addr signer_addr
-      in
-      (* TODO/TORU: https://gitlab.com/tezos/tezos/-/issues/2903
-         Use an RPC to know whether or not it can be safely replaced by
-         an index. *)
-      let signer = Indexable.from_value signer in
       (* TODO/TORU: https://gitlab.com/tezos/tezos/-/issues/2903
          Use an RPC to know whether or not it can be safely replaced by
          an index. *)
@@ -639,6 +647,44 @@ let transfer () =
          an index. *)
       let ticket_hash = Indexable.from_value ticket_hash in
       let contents = [Transfer {destination; ticket_hash; qty}] in
+      let operation = Tx_rollup_l2_batch.V1.{counter; signer; contents} in
+      let transaction = [operation] in
+      let* signatures = sign_transaction cctxt [sk_uri] transaction in
+      let* hash = RPC.inject_transaction cctxt {transaction; signatures} in
+      let*! () =
+        cctxt#message "Transaction hash: %a" L2_transaction.Hash.pp hash
+      in
+      return_unit)
+
+let withdraw () =
+  command
+    ~desc:"submit a layer-2 withdraw to a rollup node’s batcher"
+    (args1
+       (arg
+          ~long:"counter"
+          ~short:'c'
+          ~placeholder:"counter"
+          ~doc:"The counter associated to the signer address"
+          conv_counter))
+    (prefix "withdraw"
+    @@ param ~name:"qty" ~desc:"quantity to withdraw" conv_qty
+    @@ prefix "of"
+    @@ param ~name:"ticket" ~desc:"A ticket hash" ticket_hash_parameter
+    @@ prefix "from"
+    @@ wallet_param ~name:"source" ~desc:"An alias for a tz4 address"
+    @@ prefix "to"
+    @@ param
+         ~name:"destination"
+         ~desc:"A L1 public key hash"
+         l1_destination_parameter
+    @@ stop)
+    (fun counter qty ticket_hash signer destination cctxt ->
+      let open Lwt_result_syntax in
+      let open Tx_rollup_l2_batch.V1 in
+      let* (signer, sk_uri, counter) =
+        prepare_operation_parameters cctxt signer counter
+      in
+      let contents = [Withdraw {destination; ticket_hash; qty}] in
       let operation = Tx_rollup_l2_batch.V1.{counter; signer; contents} in
       let transaction = [operation] in
       let* signatures = sign_transaction cctxt [sk_uri] transaction in
@@ -698,4 +744,5 @@ let all () =
     get_batcher_transaction ();
     inject_batcher_transaction ();
     transfer ();
+    withdraw ();
   ]
