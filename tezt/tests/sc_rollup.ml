@@ -788,6 +788,9 @@ let sc_rollup_node_handles_chain_reorg protocol sc_rollup_node sc_rollup_address
   let* _ = Sc_rollup_node.wait_for_level sc_rollup_node 5 in
   return ()
 
+(* One can retrieve the list of originated SCORUs.
+   -----------------------------------------------
+*)
 let test_rollup_list =
   let open Lwt.Syntax in
   let go node client bootstrap1 =
@@ -1686,6 +1689,9 @@ let client_with_initial_keys ~protocol =
   let* () = Sc_rollup_client.import_secret_key account sc_client in
   return (sc_client, account)
 
+(* Check that the client can show the address of a registered account.
+   -------------------------------------------------------------------
+*)
 let test_rollup_client_show_address =
   test
     ~__FILE__
@@ -1725,6 +1731,9 @@ let test_rollup_client_show_address =
              sk)
       else return ())
 
+(* Check that the client can generate keys.
+   ----------------------------------------
+*)
 let test_rollup_client_generate_keys =
   test
     ~__FILE__
@@ -1739,6 +1748,9 @@ let test_rollup_client_generate_keys =
       let* _account = Sc_rollup_client.show_address ~alias sc_client in
       return ())
 
+(* Check that the client can list keys.
+   ------------------------------------
+*)
 let test_rollup_client_list_keys =
   test
     ~__FILE__
