@@ -32,6 +32,17 @@ let has_prefix ~prefix string =
   let prefix_len = String.length prefix in
   String.length string >= prefix_len && String.sub string 0 prefix_len = prefix
 
+let has_error = ref false
+
+let info fmt = Format.eprintf fmt
+
+let error fmt =
+  Format.ksprintf
+    (fun s ->
+      has_error := true ;
+      Format.eprintf "Error: %s" s)
+    fmt
+
 (*****************************************************************************)
 (*                                  DUNE                                     *)
 (*****************************************************************************)
@@ -2094,23 +2105,22 @@ let check_for_non_generated_files ?(exclude = fun _ -> false) () =
     String_set.filter exclude !generated_files
   in
   String_set.iter
-    (Printf.eprintf "Error: %s: generated but is excluded\n%!")
+    (error "%s: generated but is excluded\n%!")
     error_generated_and_excluded ;
   let error_not_generated =
     String_set.diff all_non_excluded_files !generated_files
   in
   String_set.iter
-    (Printf.eprintf "Error: %s: exists but was not generated\n%!")
+    (error "%s: exists but was not generated\n%!")
     error_not_generated ;
   if
     not
       (String_set.is_empty error_not_generated
       && String_set.is_empty error_generated_and_excluded)
-  then (
-    prerr_endline
+  then
+    error
       "Please modify manifest/main.ml to either generate the above file(s)\n\
-       or declare them in the 'exclude' function (but not both)." ;
-    exit 1)
+       or declare them in the 'exclude' function (but not both)."
 
 let check_js_of_ocaml () =
   let internal_name ({kind; path; _} : Target.internal) =
@@ -2164,21 +2174,18 @@ let check_js_of_ocaml () =
   let jsoo_ok = ref true in
   if String_set.cardinal !missing_with_js_mode > 0 then (
     jsoo_ok := false ;
-    Printf.eprintf
+    error
       "The following targets use `(modes js)` and are missing \
        `~js_compatible:true`\n" ;
-    String_set.iter
-      (fun name -> Printf.eprintf "- %s\n" name)
-      !missing_with_js_mode) ;
+    String_set.iter (fun name -> info "- %s\n" name) !missing_with_js_mode) ;
   if String_map.cardinal !missing_from_target > 0 then (
     jsoo_ok := false ;
-    Printf.eprintf
+    error
       "The following targets are not `~js_compatible` but their dependant \
        expect them to be\n" ;
     String_map.iter
-      (fun k v -> List.iter (fun v -> Printf.eprintf "- %s used by %s\n" v k) v)
-      !missing_from_target) ;
-  if not !jsoo_ok then exit 1
+      (fun k v -> List.iter (fun v -> info "- %s used by %s\n" v k) v)
+      !missing_from_target)
 
 let usage_msg = "Usage: " ^ Sys.executable_name ^ " [OPTIONS]"
 
@@ -2238,7 +2245,8 @@ let check ?exclude () =
   Printexc.record_backtrace true ;
   try
     check_for_non_generated_files ?exclude () ;
-    check_js_of_ocaml ()
+    check_js_of_ocaml () ;
+    if !has_error then exit 1
   with exn ->
     Printexc.print_backtrace stderr ;
     prerr_endline ("Error: " ^ Printexc.to_string exn) ;
