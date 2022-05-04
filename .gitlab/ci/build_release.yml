@@ -7,7 +7,6 @@
   variables:
     IMAGE_ARCH_PREFIX: ""
   script:
-    - apk --no-cache --virtual add git
     # Environment variables from before_script
     - . ./scripts/ci/docker.env
     # Build minimal, bare and debug images
