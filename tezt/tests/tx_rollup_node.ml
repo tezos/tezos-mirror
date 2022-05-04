@@ -66,18 +66,6 @@ let wait_for_request_completed ?(tags = []) node request =
     let event_tags = JSON.(json |-> "tags" |> as_list |> List.map as_string) in
     if List.for_all (fun t -> List.mem t event_tags) tags then Some () else None
 
-(* Wait for injecting or request completed events from the injector. *)
-let wait_for_injecting_or_completed_event ?(tags = []) ?count node =
-  let wait_injected =
-    let* count = wait_for_injecting_event ~tags ?count node in
-    return (`Injected count)
-  in
-  let wait_completed =
-    let* () = wait_for_request_completed ~tags node "inject" in
-    return `Nothing_injected
-  in
-  Lwt.choose [wait_injected; wait_completed]
-
 (* Check that all messages in the inbox have been successfully applied. *)
 let check_inbox_success (inbox : Rollup_node.Inbox.t) =
   let ( |->? ) json field =
@@ -119,17 +107,24 @@ let check_inbox_success (inbox : Rollup_node.Inbox.t) =
                 (JSON.encode result)))
     inbox.contents
 
-(** Helper function to check if the tx_node does an injection with while (or
-    after) executing [f]. *)
-let check_injection tx_node tag f =
-  let injection = wait_for_injecting_or_completed_event ~tags:[tag] tx_node in
+(** Helper function to check if the tx_node does an injection with
+    after executing [f].  *)
+let check_injection ?(timeout = 5.0) tx_node tag f =
+  let wait_injected =
+    let* count = wait_for_injecting_event ~tags:[tag] tx_node in
+    return (`Injected count)
+  in
+  let wait_timeout =
+    let* () = Lwt_unix.sleep timeout in
+    return `Timeout
+  in
   let* () = f in
-  let* injected = injection in
+  let* injected = Lwt.choose [wait_injected; wait_timeout] in
   match injected with
   | `Injected count ->
       Log.info "Injected %d %ss" count tag ;
       unit
-  | `Nothing_injected -> Test.fail "No %s injected" tag
+  | `Timeout -> Test.fail "No %s injected after %f" tag timeout
 
 let check_l1_block_contains ~kind ~what ?(extra = fun _ -> true) block =
   let ops = JSON.(block |-> "operations" |=> 3 |> as_list) in
