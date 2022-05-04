@@ -90,7 +90,11 @@ module MakeSizedSet (S : TzLwtreslib.Set.S) = struct
 
   let iter_ep f t = S.iter_ep f t.set
 
-  let map f t = {cardinal = t.cardinal; set = S.map f t.set}
+  let map f t =
+    (* If [f] returns the same value for different inputs, then the cardinal
+       needs recomputing. We cannot detect this cheaply so we need to recompute
+       the cardinal on each application. *)
+    S.map f t.set |> of_set
 
   let fold f t a = S.fold f t.set a
 
@@ -150,7 +154,7 @@ module MakeSizedSet (S : TzLwtreslib.Set.S) = struct
 
   let find_last_opt e t = S.find_last_opt e t.set
 
-  let of_list el = {cardinal = List.length el; set = S.of_list el}
+  let of_list el = S.of_list el |> of_set
 
   let to_seq_from e t = S.to_seq_from e t.set
 
