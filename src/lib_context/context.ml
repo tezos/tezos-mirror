@@ -451,9 +451,10 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
 
   let to_memory_tree (ctxt : t) (key : string list) :
       Tezos_context_memory.Context.tree option Lwt.t =
-    let open Lwt_syntax in
+    let open Lwt_option_syntax in
     let* ctxt_tree = find_tree ctxt key in
-    Option.map_s tree_to_memory_tree ctxt_tree
+    let*! c = tree_to_memory_tree ctxt_tree in
+    return c
 
   let merkle_hash tree =
     let merkle_hash_kind =
