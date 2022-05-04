@@ -23,172 +23,281 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* Testing
+   -------
+   Component:    Base
+   Invocation:   dune exec src/lib_base/test/test_sized.exe
+   Subject:      Check that the sized map and set functions behave correctly
+*)
+
 module IntSet = TzLwtreslib.Set.Make (Int)
 module SizedSet = Sized.MakeSizedSet (IntSet)
 module IntMap = TzLwtreslib.Map.Make (Int)
 module SizedMap = Sized.MakeSizedMap (IntMap)
 
 module SizedSet_test = struct
+  open QCheck2
+
   let assert_consistent t =
     SizedSet.cardinal t = IntSet.cardinal (SizedSet.to_set t)
 
-  let test_empty () = SizedSet.is_empty SizedSet.empty
+  let generator = Gen.(small_list small_nat >|= SizedSet.of_list)
 
-  let test_add_element () = SizedSet.add 1 SizedSet.empty |> assert_consistent
+  let seq_generator = Gen.(small_list small_nat >|= List.to_seq)
 
-  let test_duplicate_element () =
-    SizedSet.add 1 SizedSet.empty |> SizedSet.add 1 |> assert_consistent
+  let empty =
+    Alcotest.test_case "empty" `Quick (fun () ->
+        assert (SizedSet.is_empty SizedSet.empty))
 
-  let test_remove () =
-    SizedSet.add 1 SizedSet.empty |> SizedSet.remove 1 |> assert_consistent
+  let singleton =
+    Alcotest.test_case "singleton" `Quick (fun () ->
+        assert (SizedSet.singleton 1 |> assert_consistent))
 
-  let test_remove_non_existent () =
-    let s = SizedSet.remove 1 SizedSet.empty in
-    SizedSet.cardinal s = 0
+  let equal = Test.make ~name:"equal" generator (fun s -> SizedSet.equal s s)
 
-  let test_filter () =
-    let s = SizedSet.of_seq (List.to_seq [1; 2; 4; 4; 5; 6; 7]) in
-    let filtered_s_1 = SizedSet.filter (fun e -> e mod 2 = 0) s in
-    let filtered_s_2 = SizedSet.filter (fun e -> e mod 2 = 1) s in
-    assert_consistent filtered_s_1 && assert_consistent filtered_s_2
+  let inequal =
+    Test.make
+      ~name:"inequal"
+      Gen.(pair generator small_nat)
+      (fun (s, v) -> not (SizedSet.equal s (SizedSet.add (-v - 1) s)))
 
-  let test_filter_map () =
-    let s = SizedSet.of_seq (List.to_seq [1; 2; 4; 4; 5; 6; 7]) in
-    let filtered_s =
-      SizedSet.filter_map
-        (fun n -> if n mod 2 = 0 then Some (n / 2) else None)
-        s
-    in
-    assert_consistent filtered_s
+  let add =
+    Test.make
+      ~name:"add"
+      Gen.(pair generator small_nat)
+      (fun (s, v) -> SizedSet.add v s |> assert_consistent)
 
-  let test_partition () =
-    let s = SizedSet.of_seq (List.to_seq [1; 2; 4; 4; 5; 6; 7]) in
-    let (partition_1, partition_2) =
-      SizedSet.partition (fun e -> e mod 2 = 0) s
-    in
-    assert_consistent partition_1 && assert_consistent partition_2
+  let remove =
+    Test.make
+      ~name:"remove"
+      Gen.(pair generator small_nat)
+      (fun (s, v) -> SizedSet.remove v s |> assert_consistent)
 
-  let test_split_with_element_contained () =
-    let s = SizedSet.of_seq (List.to_seq [1; 2; 4; 4; 5; 6; 7]) in
-    let (split_1, b, split_2) = SizedSet.split 2 s in
-    assert_consistent split_1 && assert_consistent split_2 && b
+  let union =
+    Test.make
+      ~name:"union"
+      Gen.(pair generator generator)
+      (fun (s1, s2) -> SizedSet.union s1 s2 |> assert_consistent)
 
-  let test_split_without_element_contained () =
-    let s = SizedSet.of_seq (List.to_seq [1; 2; 4; 4; 5; 6; 7]) in
-    let (split_1, b, split_2) = SizedSet.split 3 s in
-    assert_consistent split_1 && assert_consistent split_2 && not b
+  let inter =
+    Test.make
+      ~name:"inter"
+      Gen.(pair generator generator)
+      (fun (s1, s2) -> SizedSet.inter s1 s2 |> assert_consistent)
+
+  let diff =
+    Test.make
+      ~name:"diff"
+      Gen.(pair generator generator)
+      (fun (s1, s2) -> SizedSet.diff s1 s2 |> assert_consistent)
+
+  let map =
+    Test.make
+      ~name:"map"
+      Gen.(pair generator (fun1 Observable.int int))
+      (fun (s, f) -> SizedSet.map (Fn.apply f) s |> assert_consistent)
+
+  let filter =
+    Test.make
+      ~name:"filter"
+      Gen.(pair generator (fun1 Observable.int bool))
+      (fun (s, f) -> SizedSet.filter (Fn.apply f) s |> assert_consistent)
+
+  let filter_map =
+    Test.make
+      ~name:"filter_map"
+      Gen.(pair generator (fun1 Observable.int (opt int)))
+      (fun (s, f) -> SizedSet.filter_map (Fn.apply f) s |> assert_consistent)
+
+  let partition =
+    Test.make
+      ~name:"partition"
+      Gen.(pair generator (fun1 Observable.int bool))
+      (fun (s, f) ->
+        let (s1, s2) = SizedSet.partition (Fn.apply f) s in
+        assert_consistent s1 && assert_consistent s2)
+
+  let split =
+    Test.make
+      ~name:"split"
+      Gen.(pair generator small_nat)
+      (fun (s, v) ->
+        let (s1, _, s2) = SizedSet.split v s in
+        assert_consistent s1 && assert_consistent s2)
+
+  let add_seq =
+    Test.make
+      ~name:"add_seq"
+      Gen.(pair generator seq_generator)
+      (fun (s, seq) -> SizedSet.add_seq seq s |> assert_consistent)
+
+  let of_seq =
+    Test.make ~name:"of_seq" seq_generator (fun seq ->
+        SizedSet.of_seq seq |> assert_consistent)
 
   let test =
-    let open Alcotest in
-    [
-      test_case "empty" `Quick (fun () -> assert (test_empty ()));
-      test_case "add element" `Quick (fun () -> assert (test_add_element ()));
-      test_case "duplicate element" `Quick (fun () ->
-          assert (test_duplicate_element ()));
-      test_case "remove element" `Quick (fun () -> assert (test_remove ()));
-      test_case "remove non existent element" `Quick (fun () ->
-          assert (test_remove_non_existent ()));
-      test_case "filter" `Quick (fun () -> assert (test_filter ()));
-      test_case "filter_map" `Quick (fun () -> assert (test_filter_map ()));
-      test_case "partition" `Quick (fun () -> assert (test_partition ()));
-      test_case "split with the element contained" `Quick (fun () ->
-          assert (test_split_with_element_contained ()));
-      test_case "split with the element not contained" `Quick (fun () ->
-          assert (test_split_without_element_contained ()));
-    ]
+    [empty; singleton]
+    @ Lib_test.Qcheck_helpers.qcheck_wrap
+        [
+          equal;
+          inequal;
+          add;
+          remove;
+          union;
+          inter;
+          diff;
+          map;
+          filter;
+          filter_map;
+          partition;
+          split;
+          add_seq;
+          of_seq;
+        ]
 end
 
 module SizedMap_test = struct
+  open QCheck2
+
   let assert_consistent t =
     SizedMap.cardinal t = IntMap.cardinal (SizedMap.to_map t)
 
-  let test_empty () = SizedMap.is_empty SizedMap.empty
+  let seq_generator =
+    Gen.(small_list (pair small_nat small_nat) >|= List.to_seq)
 
-  let test_add_element () =
-    SizedMap.add 1 "_" SizedMap.empty |> assert_consistent
+  let generator = Gen.(seq_generator >|= SizedMap.of_seq)
 
-  let test_duplicate_element () =
-    SizedMap.add 1 "_" SizedMap.empty |> SizedMap.add 1 "_" |> assert_consistent
+  let empty =
+    Alcotest.test_case "empty" `Quick (fun () ->
+        assert (SizedMap.is_empty SizedMap.empty))
 
-  let test_remove () =
-    SizedMap.add 1 "_" SizedMap.empty |> SizedMap.remove 1 |> assert_consistent
+  let singleton =
+    Alcotest.test_case "singleton" `Quick (fun () ->
+        assert (SizedMap.singleton 1 1 |> assert_consistent))
 
-  let test_remove_non_existent () =
-    SizedMap.remove 1 SizedMap.empty |> assert_consistent
+  let equal =
+    Test.make ~name:"equal" generator (fun m -> SizedMap.equal Int.equal m m)
 
-  let test_replace_binding () =
-    SizedMap.add 1 "old_binding" SizedMap.empty
-    |> SizedMap.add 1 "new_binding"
-    |> assert_consistent
+  let inequal =
+    Test.make
+      ~name:"inequal"
+      Gen.(triple generator small_nat small_nat)
+      (fun (m, v1, v2) ->
+        not (SizedMap.equal Int.equal m (SizedMap.add (-v1 - 1) (-v2 - 1) m)))
 
-  let test_filter () =
-    let m =
-      SizedMap.of_seq
-        (List.to_seq [(1, 1); (2, 2); (4, 4); (4, 4); (6, 6); (7, 7); (5, 5)])
-    in
-    let filtered_s_1 = SizedMap.filter (fun _ b -> b mod 2 = 0) m in
-    let filtered_s_2 = SizedMap.filter (fun _ b -> b mod 2 = 1) m in
-    assert_consistent filtered_s_1 && assert_consistent filtered_s_2
+  let add =
+    Test.make
+      ~name:"add"
+      Gen.(triple generator small_nat small_nat)
+      (fun (m, k, v) -> SizedMap.add k v m |> assert_consistent)
 
-  let test_filter_map () =
-    let m =
-      SizedMap.of_seq
-        (List.to_seq [(1, 1); (2, 2); (4, 4); (4, 4); (6, 6); (7, 7); (5, 5)])
-    in
-    let filtered_s =
-      SizedMap.filter_map
-        (fun _ b -> if b mod 2 = 0 then Some (b / 2) else None)
-        m
-    in
-    assert_consistent filtered_s
+  let update =
+    Test.make
+      ~name:"update"
+      Gen.(
+        triple
+          generator
+          small_nat
+          (fun1 Observable.(option int) (opt small_nat)))
+      (fun (m, k, f) -> SizedMap.update k (Fn.apply f) m |> assert_consistent)
 
-  let test_partition () =
-    let m =
-      SizedMap.of_seq
-        (List.to_seq [(1, 1); (2, 2); (4, 4); (4, 4); (6, 6); (7, 7); (5, 5)])
-    in
-    let (partition_1, partition_2) =
-      SizedMap.partition (fun _ b -> b mod 2 = 0) m
-    in
-    assert_consistent partition_1 && assert_consistent partition_2
+  let remove =
+    Test.make
+      ~name:"remove"
+      Gen.(pair generator small_nat)
+      (fun (m, v) -> SizedMap.remove v m |> assert_consistent)
 
-  let test_split_with_element_contained () =
-    let m =
-      SizedMap.of_seq
-        (List.to_seq [(1, 1); (2, 2); (4, 4); (4, 4); (6, 6); (7, 7); (5, 5)])
-    in
-    let (split_1, _, split_2) = SizedMap.split 2 m in
-    assert_consistent split_1 && assert_consistent split_2
+  let merge =
+    Test.make
+      ~name:"merge"
+      Gen.(
+        triple
+          generator
+          generator
+          (fun3
+             Observable.int
+             Observable.(option int)
+             Observable.(option int)
+             (opt int)))
+      (fun (m1, m2, f) ->
+        SizedMap.merge (Fn.apply f) m1 m2 |> assert_consistent)
 
-  let test_split_without_element_contained () =
-    let m =
-      SizedMap.of_seq
-        (List.to_seq [(1, 1); (2, 2); (4, 4); (4, 4); (6, 6); (7, 7); (5, 5)])
-    in
-    let (split_1, _, split_2) = SizedMap.split 3 m in
-    assert_consistent split_1 && assert_consistent split_2
+  let union =
+    Test.make
+      ~name:"union"
+      Gen.(
+        triple
+          generator
+          generator
+          (fun3 Observable.int Observable.int Observable.int (opt int)))
+      (fun (m1, m2, f) ->
+        SizedMap.union (Fn.apply f) m1 m2 |> assert_consistent)
+
+  let map =
+    Test.make
+      ~name:"map"
+      Gen.(pair generator (fun1 Observable.int (opt int)))
+      (fun (m, f) -> SizedMap.map (Fn.apply f) m |> assert_consistent)
+
+  let mapi =
+    Test.make
+      ~name:"mapi"
+      Gen.(pair generator (fun2 Observable.int Observable.int (opt int)))
+      (fun (m, f) -> SizedMap.mapi (Fn.apply f) m |> assert_consistent)
+
+  let filter =
+    Test.make
+      ~name:"filter"
+      Gen.(pair generator (fun2 Observable.int Observable.int bool))
+      (fun (m, f) -> SizedMap.filter (Fn.apply f) m |> assert_consistent)
+
+  let filter_map =
+    Test.make
+      ~name:"filter_map"
+      Gen.(pair generator (fun2 Observable.int Observable.int (opt int)))
+      (fun (m, f) -> SizedMap.filter_map (Fn.apply f) m |> assert_consistent)
+
+  let partition =
+    Test.make
+      ~name:"partition"
+      Gen.(pair generator (fun2 Observable.int Observable.int bool))
+      (fun (m, f) ->
+        let (s1, s2) = SizedMap.partition (Fn.apply f) m in
+        assert_consistent s1 && assert_consistent s2)
+
+  let split =
+    Test.make
+      ~name:"split"
+      Gen.(pair generator small_nat)
+      (fun (m, v) ->
+        let (s1, _, s2) = SizedMap.split v m in
+        assert_consistent s1 && assert_consistent s2)
+
+  let add_seq =
+    Test.make
+      ~name:"add_seq"
+      Gen.(pair generator seq_generator)
+      (fun (s, seq) -> SizedMap.add_seq seq s |> assert_consistent)
 
   let test =
-    let open Alcotest in
-    [
-      test_case "empty" `Quick (fun () -> assert (test_empty ()));
-      test_case "add element" `Quick (fun () -> assert (test_add_element ()));
-      test_case "duplicate element" `Quick (fun () ->
-          assert (test_duplicate_element ()));
-      test_case "remove element" `Quick (fun () -> assert (test_remove ()));
-      test_case "remove non existent element" `Quick (fun () ->
-          assert (test_remove_non_existent ()));
-      test_case "replace binding" `Quick (fun () ->
-          assert (test_replace_binding ()));
-      test_case "update" `Quick (fun () -> assert (test_filter ()));
-      test_case "filter" `Quick (fun () -> assert (test_filter ()));
-      test_case "filter_map" `Quick (fun () -> assert (test_filter_map ()));
-      test_case "partition" `Quick (fun () -> assert (test_partition ()));
-      test_case "split with the element contained" `Quick (fun () ->
-          assert (test_split_with_element_contained ()));
-      test_case "split with the element not contained" `Quick (fun () ->
-          assert (test_split_without_element_contained ()));
-    ]
+    [empty; singleton]
+    @ Lib_test.Qcheck_helpers.qcheck_wrap
+        [
+          equal;
+          inequal;
+          add;
+          update;
+          remove;
+          merge;
+          union;
+          map;
+          mapi;
+          filter;
+          filter_map;
+          partition;
+          split;
+          add_seq;
+        ]
 end
 
 let () =
