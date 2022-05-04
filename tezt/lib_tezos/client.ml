@@ -605,17 +605,17 @@ let propose_for ?endpoint ?(minimal_timestamp = true) ?protocol ?key ?force
   spawn_propose_for ?endpoint ?protocol ?key ?force ~minimal_timestamp client
   |> Process.check
 
-let spawn_gen_keys =
-  let id = ref 0 in
-  fun ?alias client ->
-    let alias =
-      match alias with
-      | None ->
-          incr id ;
-          sf "tezt_%d" !id
-      | Some alias -> alias
-    in
-    (spawn_command client ["gen"; "keys"; alias], alias)
+let id = ref 0
+
+let spawn_gen_keys ?alias client =
+  let alias =
+    match alias with
+    | None ->
+        incr id ;
+        sf "tezt_%d" !id
+    | Some alias -> alias
+  in
+  (spawn_command client ["gen"; "keys"; alias], alias)
 
 let gen_keys ?alias client =
   let (p, alias) = spawn_gen_keys ?alias client in
@@ -635,14 +635,24 @@ let gen_and_show_keys ?alias client =
   let* alias = gen_keys ?alias client in
   show_address ~alias client
 
-let spawn_bls_gen_keys ?hooks ?(force = false) ~alias client =
-  spawn_command
-    ?hooks
-    client
-    (["bls"; "gen"; "keys"; alias] @ optional_switch ~name:"force" force)
+let spawn_bls_gen_keys ?hooks ?(force = false) ?alias client =
+  let alias =
+    match alias with
+    | None ->
+        incr id ;
+        sf "tezt_%d" !id
+    | Some alias -> alias
+  in
+  ( spawn_command
+      ?hooks
+      client
+      (["bls"; "gen"; "keys"; alias] @ optional_switch ~name:"force" force),
+    alias )
 
-let bls_gen_keys ?hooks ?force ~alias client =
-  spawn_bls_gen_keys ?hooks ?force ~alias client |> Process.check
+let bls_gen_keys ?hooks ?force ?alias client =
+  let (p, alias) = spawn_bls_gen_keys ?hooks ?force ?alias client in
+  let* () = Process.check p in
+  return alias
 
 let spawn_bls_list_keys ?hooks client =
   spawn_command ?hooks client ["bls"; "list"; "keys"]
@@ -672,6 +682,10 @@ let bls_show_address ?hooks ~alias client =
     spawn_bls_show_address ?hooks ~alias client |> Process.check_and_read_stdout
   in
   return (Account.parse_client_output_aggregate ~alias ~client_output:out)
+
+let bls_gen_and_show_keys ?alias client =
+  let* alias = bls_gen_keys ?alias client in
+  bls_show_address ~alias client
 
 let spawn_bls_import_secret_key ?hooks ?(force = false)
     (key : Account.aggregate_key) client =

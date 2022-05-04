@@ -406,12 +406,6 @@ let make_tx_rollup_deposit_argument tickets_content tickets_amount tz4 txr1 =
     tz4
     txr1
 
-let generate_bls_addr ~alias client =
-  let* () = Client.bls_gen_keys ~alias client in
-  let* bls_addr = Client.bls_show_address ~alias client in
-  Log.info "A new BLS key was generated: %s" bls_addr.aggregate_public_key_hash ;
-  Lwt.return bls_addr
-
 type commitment_info = {
   roots : string list;
   context_hashes : string list;
@@ -648,15 +642,14 @@ let test_ticket_deposit_from_l1_to_l2 =
       Log.info
         "The tx_rollup_deposit %s contract was successfully originated"
         contract_id ;
-      let* bls_keys = generate_bls_addr ~alias:"bob" client in
-      let bls_pkh_str = bls_keys.aggregate_public_key_hash in
+      let* bls_key = Client.bls_gen_and_show_keys client in
       let tickets_content = "toru" in
       let tickets_amount = 10 in
       let arg =
         make_tx_rollup_deposit_argument
           tickets_content
           tickets_amount
-          bls_pkh_str
+          bls_key.aggregate_public_key_hash
           tx_rollup_hash
       in
       (* This smart contract call will transfer 10 tickets to the given
@@ -684,59 +677,8 @@ let test_ticket_deposit_from_l1_to_l2 =
         ~tx_client
         ~block:"head"
         ~ticket_id
-        ~tz4_address:bls_pkh_str
+        ~tz4_address:bls_key.aggregate_public_key_hash
         ~expected_balance:10)
-
-let bls_sk_of_key bls_key =
-  let (Account.Unencrypted sk) = bls_key.Account.aggregate_secret_key in
-  let sk = Tezos_crypto.Bls.Secret_key.of_b58check_exn sk in
-  Data_encoding.Binary.to_bytes_exn Tezos_crypto.Bls.Secret_key.encoding sk
-  |> Bls12_381.Signature.sk_of_bytes_exn
-
-let sign_one_transaction key txs_string =
-  let open Tezos_protocol_alpha.Protocol in
-  let txs_json =
-    match Data_encoding.Json.from_string txs_string with
-    | Ok v -> v
-    | _ -> Test.fail "cannot decode transactions from json"
-  in
-  let txs =
-    Data_encoding.Json.destruct
-      (Data_encoding.list
-         Tezos_raw_protocol_alpha.Tx_rollup_l2_batch.V1.transaction_encoding)
-      txs_json
-  in
-  let buf =
-    Data_encoding.Binary.to_bytes_exn
-      Tx_rollup_l2_batch.V1.transaction_encoding
-      (List.hd txs)
-  in
-  Tezos_crypto.Bls.sign (bls_sk_of_key key) buf
-
-let bls_signers_sks_json keys =
-  let sks =
-    List.map
-      (List.map (fun key ->
-           let (Account.Unencrypted b58_sk_signer) =
-             key.Account.aggregate_secret_key
-           in
-           Tezos_crypto.Bls.Secret_key.of_b58check_exn b58_sk_signer))
-      keys
-  in
-  Data_encoding.(
-    Json.construct (list (list Tezos_crypto.Bls.Secret_key.encoding)) sks
-    |> Json.to_string)
-
-let craft_tx ?counter tx_client ~qty ~signer ~dest ~ticket =
-  Tx_rollup_client.craft_tx_transaction
-    ?counter
-    ~signer
-    tx_client
-    {destination = dest; qty; ticket}
-
-let craft_tx_transfers ?counter ~signer tx_client contents =
-  let transfer : Rollup.transfer = {signer; counter; contents} in
-  Tx_rollup_client.craft_tx_transfers tx_client transfer
 
 let json_of_transactions_and_sig ~origin transaction signatures =
   JSON.(
@@ -748,25 +690,74 @@ let json_of_transactions_and_sig ~origin transaction signatures =
           ("signatures", `A (List.map (fun s -> `String s) signatures));
         ]))
 
-let craft_batch tx_client ~batch ~signers =
-  let signatures = bls_signers_sks_json signers in
-  let* json_str =
-    Tx_rollup_client.craft_tx_batch tx_client ~batch ~signatures
+let craft_tx_transfers_and_sign ?counter tx_client ~signer transfers =
+  let* transaction =
+    Tx_rollup_client.craft_tx_transfers
+      tx_client
+      {
+        signer = signer.Account.aggregate_public_key;
+        counter;
+        contents = transfers;
+      }
   in
-  match Data_encoding.Json.from_string json_str with
-  | Ok json ->
-      let batch =
-        Data_encoding.Json.destruct
-          Tezos_protocol_alpha.Protocol.Tx_rollup_l2_batch.encoding
-          json
-      in
-      let batch_bytes =
-        Data_encoding.Binary.to_bytes_exn
-          Tezos_protocol_alpha.Protocol.Tx_rollup_l2_batch.encoding
-          batch
-      in
-      Lwt.return (Bytes.to_string batch_bytes)
-  | _ -> failwith "cannot decode batch"
+  let* signature =
+    Tx_rollup_client.sign_transaction
+      ~transaction
+      ~signers:[signer.Account.aggregate_alias]
+      tx_client
+  in
+  return (transaction, signature)
+
+let craft_tx_and_sign ?counter tx_client ~qty ~signer ~dest ~ticket =
+  let* transaction =
+    Tx_rollup_client.craft_tx_transaction
+      tx_client
+      ?counter
+      {qty; destination = dest; ticket}
+      ~signer
+  in
+  let* signature =
+    Tx_rollup_client.sign_transaction ~transaction ~signers:[signer] tx_client
+  in
+  return (transaction, signature)
+
+let craft_withdraw_and_sign ?counter tx_client ~qty ~signer ~dest ~ticket =
+  let* transaction =
+    Tx_rollup_client.craft_tx_withdraw
+      tx_client
+      ?counter
+      ~qty
+      ~signer:signer.Account.aggregate_public_key
+      ~dest
+      ~ticket
+  in
+  let* signature =
+    Tx_rollup_client.sign_transaction
+      ~transaction
+      ~signers:[signer.Account.aggregate_alias]
+      tx_client
+  in
+  return (transaction, signature)
+
+let craft_batch_for_one_tx ?counter tx_client ~qty ~signer ~dest ~ticket =
+  let* (transaction, signature) =
+    craft_tx_and_sign ?counter tx_client ~qty ~signer ~dest ~ticket
+  in
+  let transactions_and_sig =
+    json_of_transactions_and_sig
+      ~origin:"signed_l2_transaction"
+      (JSON.unannotate transaction)
+      [signature]
+  in
+  let* batch =
+    Tx_rollup_client.craft_tx_batch
+      ~show_hex:true
+      tx_client
+      ~transactions_and_sig
+  in
+  match batch with
+  | `Json _j -> assert false
+  | `Hex _hex as batch -> return batch
 
 let tx_client_get_block ~tx_client ~block =
   Tx_rollup_client.get_block ~block tx_client
@@ -805,17 +796,15 @@ let test_l2_to_l2_transaction =
         "The tx_rollup_deposit %s contract was successfully originated"
         contract_id ;
       (* Genarating some identities *)
-      let* bls_keys_1 = generate_bls_addr ~alias:"bob" client in
-      let bls_pkh_1_str = bls_keys_1.aggregate_public_key_hash in
-      let* bls_keys_2 = generate_bls_addr ~alias:"alice" client in
-      let bls_pkh_2_str = bls_keys_2.aggregate_public_key_hash in
+      let* bls_keys_1 = Client.bls_gen_and_show_keys client in
+      let* bls_keys_2 = Client.bls_gen_and_show_keys client in
       let tickets_content = "toru" in
       let tickets_amount = 10 in
       let arg_1 =
         make_tx_rollup_deposit_argument
           tickets_content
           tickets_amount
-          bls_pkh_1_str
+          bls_keys_1.aggregate_public_key_hash
           tx_rollup_hash
       in
       let* () =
@@ -841,7 +830,7 @@ let test_l2_to_l2_transaction =
           ~tx_client
           ~block:"head"
           ~ticket_id
-          ~tz4_address:bls_pkh_1_str
+          ~tz4_address:bls_keys_1.aggregate_public_key_hash
           ~expected_balance:10
       in
       let tickets_content = "toru" in
@@ -850,7 +839,7 @@ let test_l2_to_l2_transaction =
         make_tx_rollup_deposit_argument
           tickets_content
           tickets_amount
-          bls_pkh_2_str
+          bls_keys_2.aggregate_public_key_hash
           tx_rollup_hash
       in
       let* () =
@@ -873,24 +862,22 @@ let test_l2_to_l2_transaction =
           ~tx_client
           ~block:"head"
           ~ticket_id
-          ~tz4_address:bls_pkh_2_str
+          ~tz4_address:bls_keys_2.aggregate_public_key_hash
           ~expected_balance:10
       in
       Log.info "Crafting a l2 transaction" ;
-      let* tx =
-        craft_tx
+      let* batch =
+        craft_batch_for_one_tx
           tx_client
           ~qty:1L
-          ~signer:bls_keys_1.aggregate_public_key
-          ~dest:bls_pkh_2_str
+          ~signer:bls_keys_1.aggregate_alias
+          ~dest:bls_keys_2.aggregate_public_key_hash
           ~ticket:ticket_id
       in
-      Log.info "Crafting a batch" ;
-      let* batch = craft_batch tx_client ~batch:tx ~signers:[[bls_keys_1]] in
       Log.info "Submiting a batch" ;
       let*! () =
         Client.Tx_rollup.submit_batch
-          ~content:(Hex.of_string batch)
+          ~content:batch
           ~rollup:tx_rollup_hash
           ~src:Constant.bootstrap2.public_key_hash
           client
@@ -910,48 +897,31 @@ let test_l2_to_l2_transaction =
           ~tx_client
           ~block:"head"
           ~ticket_id
-          ~tz4_address:bls_pkh_1_str
+          ~tz4_address:bls_keys_1.aggregate_public_key_hash
           ~expected_balance:9
       and* () =
         check_tz4_balance
           ~tx_client
           ~block:"head"
           ~ticket_id
-          ~tz4_address:bls_pkh_2_str
+          ~tz4_address:bls_keys_2.aggregate_public_key_hash
           ~expected_balance:11
       in
       unit)
 
-let tx_client_inject_transaction ~tx_client ?failswith transaction_str signature
-    =
-  let txs_json =
-    match Data_encoding.Json.from_string transaction_str with
-    | Ok v -> v
-    | _ -> Test.fail "cannot decode transaction from json"
-  in
-  let transaction =
-    Data_encoding.Json.construct
-      Tezos_raw_protocol_alpha.Tx_rollup_l2_batch.V1.transaction_encoding
-      (List.hd
-         (Data_encoding.Json.destruct
-            (Data_encoding.list
-               Tezos_raw_protocol_alpha.Tx_rollup_l2_batch.V1
-               .transaction_encoding)
-            txs_json))
-  in
-  let signed_tx_json =
+let tx_client_inject_transaction ~tx_client ?failswith transaction signature =
+  let transactions_and_sig =
     json_of_transactions_and_sig
       ~origin:"signed_l2_transaction"
-      transaction
-      [Tezos_crypto.Bls.to_b58check signature]
+      (JSON.unannotate transaction)
+      signature
   in
-
   let expect_failure = Option.is_some failswith in
   let* (stdout, stderr) =
     Tx_rollup_client.inject_batcher_transaction
       ~expect_failure
       tx_client
-      JSON.(encode signed_tx_json)
+      ~transactions_and_sig
   in
   match failswith with
   | None -> (
@@ -965,6 +935,13 @@ let tx_client_inject_transaction ~tx_client ?failswith transaction_str signature
         ~error_msg:"Injection should have failed with %R but failed with %L" ;
       (* Dummy value for operation hash *)
       return ""
+
+let craft_tx_and_inject ?failswith ?counter tx_client ~qty ~signer ~dest ~ticket
+    =
+  let* (transaction, signature) =
+    craft_tx_and_sign ?counter tx_client ~qty ~signer ~dest ~ticket
+  in
+  tx_client_inject_transaction ~tx_client ?failswith transaction [signature]
 
 let tx_client_get_queue ~tx_client =
   let* out = Tx_rollup_client.get_batcher_queue tx_client in
@@ -1083,12 +1060,10 @@ let test_batcher =
         Tx_rollup_client.create ~wallet_dir:(Client.base_dir client) tx_node
       in
       (* Genarating some identities *)
-      let* bls_key_1 = generate_bls_addr ~alias:"bob" client in
+      let* bls_key_1 = Client.bls_gen_and_show_keys client in
       let bls_pkh_1 = bls_key_1.aggregate_public_key_hash in
-      let bls_pk_1 = bls_key_1.aggregate_public_key in
-      let* bls_key_2 = generate_bls_addr ~alias:"alice" client in
+      let* bls_key_2 = Client.bls_gen_and_show_keys client in
       let bls_pkh_2 = bls_key_2.aggregate_public_key_hash in
-      let bls_pk_2 = bls_key_2.aggregate_public_key in
       let* (_level, _contract_id) =
         make_deposit
           ~source:Constant.bootstrap2.public_key_hash
@@ -1119,99 +1094,83 @@ let test_batcher =
           ~expected_balance:100_000
       in
       Log.info
-        "Crafting a l2 transaction: %s transfers 1 to %s"
+        "Crafting and injecting a l2 transaction: %s transfers 1 to %s"
         bls_pkh_1
         bls_pkh_2 ;
-      let* tx =
-        craft_tx
+      let* txh1 =
+        craft_tx_and_inject
           tx_client
           ~qty:1L
-          ~signer:bls_pk_1
+          ~signer:bls_key_1.aggregate_alias
           ~dest:bls_pkh_2
           ~ticket:ticket_id
       in
-      let signature = sign_one_transaction bls_key_1 tx in
-      Log.info "Submitting the L2 transaction" ;
-      let* txh1 = tx_client_inject_transaction ~tx_client tx signature in
-      Log.info "Successfully submitted L2 transaction %s" txh1 ;
+
       Log.info
-        "Crafting a l2 transaction: %s transfers 5 to %s"
+        "Crafting and injecting a l2 transaction: %s transfers 5 to %s"
         bls_pkh_2
         bls_pkh_1 ;
-      let* tx =
-        craft_tx
+      let* txh2 =
+        craft_tx_and_inject
           tx_client
           ~qty:5L
-          ~signer:bls_pk_2
+          ~signer:bls_key_2.aggregate_alias
           ~dest:bls_pkh_1
           ~ticket:ticket_id
       in
-      let signature = sign_one_transaction bls_key_2 tx in
-      Log.info "Submitting the L2 transaction" ;
-      let* txh2 = tx_client_inject_transaction ~tx_client tx signature in
-      Log.info "Successfully submitted L2 transaction %s" txh2 ;
 
       Log.info "Crafting a l2 transaction with wrong counter" ;
-      let* tx =
-        craft_tx
+      let* _txh =
+        craft_tx_and_inject
           tx_client
+          ~failswith:"proto.alpha.tx_rollup_operation_counter_mismatch"
           ~qty:5L
           ~counter:5L
-          ~signer:bls_pk_2
-          ~dest:bls_pkh_1
+          ~signer:bls_key_2.aggregate_alias
+          ~dest:bls_key_1.aggregate_public_key_hash
           ~ticket:ticket_id
-      in
-
-      let signature = sign_one_transaction bls_key_2 tx in
-      Log.info "Submitting the bad counter L2 transaction" ;
-      let* _ =
-        tx_client_inject_transaction
-          ~tx_client
-          tx
-          ~failswith:"proto.alpha.tx_rollup_operation_counter_mismatch"
-          signature
       in
 
       Log.info "Crafting a l2 transaction with wrong signature" ;
-      let* tx =
-        craft_tx
-          tx_client
-          ~qty:1L
-          ~signer:bls_pk_1
-          ~dest:bls_pkh_2
-          ~ticket:ticket_id
-      in
-
-      let signature = sign_one_transaction bls_key_2 tx in
-      Log.info "Submitting the bad signature L2 transaction" ;
-      let* _ =
+      let* _txh =
+        (* craft a transaction, but ignore the signature *)
+        let* (transaction, _signature) =
+          craft_tx_and_sign
+            tx_client
+            ~qty:1L
+            ~signer:bls_key_1.aggregate_alias
+            ~dest:bls_key_2.aggregate_public_key_hash
+            ~ticket:ticket_id
+        in
+        (* craft a signature, for an ignored transaction *)
+        let* (_transaction, signature) =
+          craft_tx_and_sign
+            tx_client
+            ~qty:2L
+            ~signer:bls_key_1.aggregate_alias
+            ~dest:bls_key_2.aggregate_public_key_hash
+            ~ticket:ticket_id
+        in
+        (* mix both *)
         tx_client_inject_transaction
           ~tx_client
-          tx
           ~failswith:"proto.alpha.tx_rollup_incorrect_aggregated_signature"
-          signature
+          transaction
+          [signature]
       in
 
       Log.info "Crafting a l2 transaction with too big amount" ;
-      let* tx =
-        craft_tx
+      let* _txh =
+        craft_tx_and_inject
           tx_client
           ~qty:1_000_000L
-          ~signer:bls_pk_1
-          ~dest:bls_pkh_2
+          ~signer:bls_key_1.aggregate_alias
+          ~dest:bls_key_2.aggregate_public_key_hash
           ~ticket:ticket_id
           ~counter:2L
+          ~failswith:"proto.alpha.tx_rollup_balance_too_low"
       in
 
-      let signature = sign_one_transaction bls_key_1 tx in
-      Log.info "Submitting the wrong amount L2 transaction" ;
-      let* _ =
-        tx_client_inject_transaction
-          ~tx_client
-          tx
-          ~failswith:"proto.alpha.tx_rollup_balance_too_low"
-          signature
-      in
       Log.info "Checking rollup node queue" ;
       let* q = tx_client_get_queue ~tx_client in
       let len_q = JSON.(q |> as_list |> List.length) in
@@ -1239,20 +1198,16 @@ let test_batcher =
           ~expected_balance:99_996
       in
 
-      let inject_tx ~counter ~from ~dest ?(amount = 1L) () =
-        let* tx =
-          craft_tx
-            tx_client
-            ~qty:amount
-            ~counter
-            ~signer:from.Account.aggregate_public_key
-            ~dest
-            ~ticket:ticket_id
-        in
-
-        let signature = sign_one_transaction from tx in
-        tx_client_inject_transaction ~tx_client tx signature
+      let inject_tx ?(amount = 1L) ~counter ~from ~dest () =
+        craft_tx_and_inject
+          tx_client
+          ~qty:amount
+          ~counter
+          ~signer:from.Account.aggregate_alias
+          ~dest
+          ~ticket:ticket_id
       in
+
       let nbtxs1 = 70 in
       let batch_success_promise = wait_for_batch_success_event tx_node in
       Log.info "Injecting %d transactions to queue" nbtxs1 ;
@@ -1332,10 +1287,9 @@ let test_reorganization =
         Tx_rollup_client.create ~wallet_dir:(Client.base_dir client1) tx_node
       in
       (* Genarating some identities *)
-      let* bls_key_1 = generate_bls_addr ~alias:"alice" client1 in
+      let* bls_key_1 = Client.bls_gen_and_show_keys client1 in
       let bls_pkh_1 = bls_key_1.aggregate_public_key_hash in
-      let bls_pk_1 = bls_key_1.aggregate_public_key in
-      let* bls_key_2 = generate_bls_addr ~alias:"bob" client1 in
+      let* bls_key_2 = Client.bls_gen_and_show_keys client1 in
       let bls_pkh_2 = bls_key_2.aggregate_public_key_hash in
       let* (_level, _contract_id) =
         make_deposit
@@ -1366,18 +1320,17 @@ let test_reorganization =
           ~expected_balance:10
       in
       Log.info "crafting a branch of size 1 on node 1 with a L2 transfer" ;
-      let* tx =
-        craft_tx
+      let* batch =
+        craft_batch_for_one_tx
           tx_client
           ~qty:10L
-          ~signer:bls_pk_1
+          ~signer:bls_key_1.aggregate_alias
           ~dest:bls_pkh_2
           ~ticket:ticket_id
       in
-      let* batch = craft_batch tx_client ~batch:tx ~signers:[[bls_key_1]] in
       let*! () =
         Client.Tx_rollup.submit_batch
-          ~content:(Hex.of_string batch)
+          ~content:batch
           ~rollup:tx_rollup_hash
           ~src:Constant.bootstrap2.public_key_hash
           client1
@@ -1450,12 +1403,10 @@ let test_l2_proof_rpc_position =
         Tx_rollup_client.create ~wallet_dir:(Client.base_dir client) tx_node
       in
       (* Generating some identities *)
-      let* bls_key_1 = generate_bls_addr ~alias:"alice" client in
+      let* bls_key_1 = Client.bls_gen_and_show_keys client in
       let bls_pkh_1 = bls_key_1.aggregate_public_key_hash in
-      let bls_pk_1 = bls_key_1.aggregate_public_key in
-      let* bls_key_2 = generate_bls_addr ~alias:"bob" client in
+      let* bls_key_2 = Client.bls_gen_and_show_keys client in
       let bls_pkh_2 = bls_key_2.aggregate_public_key_hash in
-      let bls_pk_2 = bls_key_2.aggregate_public_key in
       let* (_level, _contract_id) =
         make_deposit
           ~source:Constant.bootstrap2.public_key_hash
@@ -1489,39 +1440,35 @@ let test_l2_proof_rpc_position =
           ~src:Constant.bootstrap3.public_key_hash
           client
       in
-      let* tx1 =
-        craft_tx
+      let* batch1 =
+        craft_batch_for_one_tx
           tx_client
           ~counter:1L
-          ~signer:bls_pk_1
+          ~signer:bls_key_1.aggregate_alias
           ~dest:bls_pkh_2
           ~ticket:ticket_id
           ~qty:5L
       in
-      let* batch1 = craft_batch tx_client ~batch:tx1 ~signers:[[bls_key_1]] in
-      let content1 = Hex.of_string batch1 in
-      let* tx2 =
-        craft_tx
+      let* batch2 =
+        craft_batch_for_one_tx
           tx_client
           ~counter:1L
-          ~signer:bls_pk_2
+          ~signer:bls_key_2.aggregate_alias
           ~dest:bls_pkh_1
           ~ticket:ticket_id
           ~qty:10L
       in
-      let* batch2 = craft_batch tx_client ~batch:tx2 ~signers:[[bls_key_2]] in
-      let content2 = Hex.of_string batch2 in
       Log.info "Submiting two batches" ;
       let*! () =
         Client.Tx_rollup.submit_batch
-          ~content:content1
+          ~content:batch1
           ~rollup:tx_rollup_hash
           ~src:operator
           client
       in
       let*! () =
         Client.Tx_rollup.submit_batch
-          ~content:content2
+          ~content:batch2
           ~rollup:tx_rollup_hash
           ~src:Constant.bootstrap2.public_key_hash
           client
@@ -1663,7 +1610,7 @@ let test_reject_bad_commitment =
         init_and_run_rollup_node ~originator node client
       in
       (* Generating some identities *)
-      let* bls_key1 = generate_bls_addr ~alias:"alice" client in
+      let* bls_key1 = Client.bls_gen_and_show_keys client in
       let pkh1_str = bls_key1.aggregate_public_key_hash in
       let* (_level, _contract_id) =
         make_deposit
@@ -1747,11 +1694,13 @@ let test_committer =
           node
           client
       in
-      let tx_client = Tx_rollup_client.create tx_node in
+      let tx_client =
+        Tx_rollup_client.create ~wallet_dir:(Client.base_dir client) tx_node
+      in
       (* Generating some identities *)
-      let* bls_key_1 = generate_bls_addr ~alias:"alice" client in
+      let* bls_key_1 = Client.bls_gen_and_show_keys client in
       let bls_pkh_1 = bls_key_1.aggregate_public_key_hash in
-      let* bls_key_2 = generate_bls_addr ~alias:"bob" client in
+      let* bls_key_2 = Client.bls_gen_and_show_keys client in
       let bls_pkh_2 = bls_key_2.aggregate_public_key_hash in
       let* (tzlevel, _) =
         make_deposit
@@ -1765,17 +1714,13 @@ let test_committer =
       let* inbox = Rollup_node.Client.get_inbox ~tx_node ~block:"head" in
       let ticket_id = get_ticket_hash_from_deposit (List.hd inbox.contents) in
       let inject_tx ?counter ~from ~dest ?(amount = 1L) () =
-        let* tx =
-          craft_tx
-            tx_client
-            ~qty:amount
-            ?counter
-            ~signer:from.Account.aggregate_public_key
-            ~dest
-            ~ticket:ticket_id
-        in
-        let signature = sign_one_transaction from tx in
-        tx_client_inject_transaction ~tx_client tx signature
+        craft_tx_and_inject
+          tx_client
+          ~qty:amount
+          ?counter
+          ~signer:from.Account.aggregate_alias
+          ~dest
+          ~ticket:ticket_id
       in
       let check_l2_level block expected_level =
         let level = JSON.(block |-> "header" |-> "level" |> as_int) in
@@ -1867,14 +1812,14 @@ let test_tickets_context =
           node
           client
       in
-      let tx_client = Tx_rollup_client.create tx_node in
+      let tx_client =
+        Tx_rollup_client.create ~wallet_dir:(Client.base_dir client) tx_node
+      in
       (* Generating some identities *)
-      let* bls_key_1 = generate_bls_addr ~alias:"alice" client in
+      let* bls_key_1 = Client.bls_gen_and_show_keys client in
       let bls_pkh_1 = bls_key_1.aggregate_public_key_hash in
-      let bls_pk_1 = bls_key_1.aggregate_public_key in
-      let* bls_key_2 = generate_bls_addr ~alias:"bob" client in
+      let* bls_key_2 = Client.bls_gen_and_show_keys client in
       let bls_pkh_2 = bls_key_2.aggregate_public_key_hash in
-      let bls_pk_2 = bls_key_2.aggregate_public_key in
       let* (_level, contract_id) =
         make_deposit
           ~source:Constant.bootstrap2.public_key_hash
@@ -1917,26 +1862,22 @@ let test_tickets_context =
         check_json
         ~error_msg:"Ticket is %L but expected %R" ;
       Log.info "Submitting transactions to queue" ;
-      let* tx =
-        craft_tx
+      let* _txh1 =
+        craft_tx_and_inject
           tx_client
-          ~signer:bls_pk_1
+          ~signer:bls_key_1.aggregate_alias
           ~dest:bls_pkh_2
           ~ticket:ticket_id
           ~qty:10L
       in
-      let signature = sign_one_transaction bls_key_1 tx in
-      let* _txh1 = tx_client_inject_transaction ~tx_client tx signature in
-      let* tx =
-        craft_tx
+      let* _txh2 =
+        craft_tx_and_inject
           tx_client
-          ~signer:bls_pk_2
+          ~signer:bls_key_2.aggregate_alias
           ~dest:bls_pkh_1
           ~ticket:ticket_id
           ~qty:5L
       in
-      let signature = sign_one_transaction bls_key_2 tx in
-      let* _txh2 = tx_client_inject_transaction ~tx_client tx signature in
       Log.info "Waiting for new L2 block" ;
       let* () = Client.bake_for client in
       let* () = Client.bake_for client in
@@ -2000,7 +1941,9 @@ let test_withdrawals =
           node
           client
       in
-      let tx_client = Tx_rollup_client.create tx_node in
+      let tx_client =
+        Tx_rollup_client.create ~wallet_dir:(Client.base_dir client) tx_node
+      in
       let check_l2_block_finalized block =
         let finalized =
           JSON.(block |-> "metadata" |-> "finalized" |> as_bool)
@@ -2008,12 +1951,10 @@ let test_withdrawals =
         Check.((finalized = true) bool) ~error_msg:"L2 Block is not finalized"
       in
       (* Generating some identities *)
-      let* bls_key_1 = generate_bls_addr ~alias:"alice" client in
+      let* bls_key_1 = Client.bls_gen_and_show_keys client in
       let bls_pkh_1 = bls_key_1.aggregate_public_key_hash in
-      let bls_pk_1 = bls_key_1.aggregate_public_key in
-      let* bls_key_2 = generate_bls_addr ~alias:"bob" client in
+      let* bls_key_2 = Client.bls_gen_and_show_keys client in
       let bls_pkh_2 = bls_key_2.aggregate_public_key_hash in
-      let bls_pk_2 = bls_key_2.aggregate_public_key in
       let* (_level, deposit_contract) =
         make_deposit
           ~source:Constant.bootstrap2.public_key_hash
@@ -2027,26 +1968,22 @@ let test_withdrawals =
       let ticket_id = get_ticket_hash_from_deposit_json inbox in
       Log.info "Ticket %s was successfully emitted" ticket_id ;
       Log.info "Submitting transactions to queue" ;
-      let* tx =
-        craft_tx
+      let* _txh1 =
+        craft_tx_and_inject
           tx_client
-          ~signer:bls_pk_1
+          ~signer:bls_key_1.aggregate_alias
           ~dest:bls_pkh_2
           ~ticket:ticket_id
           ~qty:10L
       in
-      let signature = sign_one_transaction bls_key_1 tx in
-      let* _txh1 = tx_client_inject_transaction ~tx_client tx signature in
-      let* tx =
-        craft_tx
+      let* _txh2 =
+        craft_tx_and_inject
           tx_client
-          ~signer:bls_pk_2
+          ~signer:bls_key_2.aggregate_alias
           ~dest:bls_pkh_1
           ~ticket:ticket_id
           ~qty:5L
       in
-      let signature = sign_one_transaction bls_key_2 tx in
-      let* _txh2 = tx_client_inject_transaction ~tx_client tx signature in
       Log.info "Waiting for new L2 block" ;
       let* () = Client.bake_for_and_wait client in
       let* () = Client.bake_for_and_wait client in
@@ -2069,26 +2006,24 @@ let test_withdrawals =
           ~expected_balance:5
       in
       Log.info "Submitting withdrawals to queue" ;
-      let* tx =
-        Tx_rollup_client.craft_tx_withdraw
+      let* (tx, signature) =
+        craft_withdraw_and_sign
           tx_client
-          ~signer:bls_pk_2
+          ~signer:bls_key_2
           ~dest:Constant.bootstrap2.public_key_hash
           ~ticket:ticket_id
           ~qty:5L
       in
-      let signature = sign_one_transaction bls_key_2 tx in
-      let* _ = tx_client_inject_transaction ~tx_client tx signature in
-      let* tx =
-        Tx_rollup_client.craft_tx_withdraw
+      let* _ = tx_client_inject_transaction ~tx_client tx [signature] in
+      let* (tx, signature) =
+        craft_withdraw_and_sign
           tx_client
-          ~signer:bls_pk_1
+          ~signer:bls_key_1
           ~dest:Constant.bootstrap2.public_key_hash
           ~ticket:ticket_id
           ~qty:10L
       in
-      let signature = sign_one_transaction bls_key_1 tx in
-      let* _ = tx_client_inject_transaction ~tx_client tx signature in
+      let* _ = tx_client_inject_transaction ~tx_client tx [signature] in
       Log.info "Waiting for new L2 block" ;
       let* () = Client.bake_for_and_wait client in
       let* () = Client.bake_for_and_wait client in
@@ -2185,7 +2120,7 @@ let test_accuser =
       client
   in
   (* Generating one identity *)
-  let* bls_key_1 = generate_bls_addr ~alias:"alice" client in
+  let* bls_key_1 = Client.bls_gen_and_show_keys client in
   let bls_pkh_1 = bls_key_1.aggregate_public_key_hash in
   let* (_level, _deposit_contract) =
     make_deposit
@@ -2248,8 +2183,10 @@ let test_batcher_large_message =
           node
           client
       in
-      let tx_client = Tx_rollup_client.create tx_node in
-      let* bls_key = generate_bls_addr ~alias:"bob" client in
+      let tx_client =
+        Tx_rollup_client.create ~wallet_dir:(Client.base_dir client) tx_node
+      in
+      let* bls_key = Client.bls_gen_and_show_keys client in
       let pkh1_str = bls_key.aggregate_public_key_hash in
       let contents : Rollup.transfer_content list =
         let transfer_content : Rollup.transfer_content =
@@ -2263,19 +2200,18 @@ let test_batcher_large_message =
         in
         List.init 200 (fun _ -> transfer_content)
       in
-      let* tx =
-        craft_tx_transfers
+      let* (tx, signature) =
+        craft_tx_transfers_and_sign
           ~counter:1L
-          ~signer:bls_key.aggregate_public_key
+          ~signer:bls_key
           tx_client
           contents
       in
-      let signature = sign_one_transaction bls_key tx in
       let* _ =
         tx_client_inject_transaction
           ~tx_client
           tx
-          signature
+          [signature]
           ~failswith:"tx_rollup.node.transaction_too_large"
       in
       unit)
