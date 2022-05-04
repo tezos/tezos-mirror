@@ -1101,6 +1101,27 @@ module Target = struct
                  must specify ~opam (set it to \"\" for no opam file)"
                 name)
     in
+    let () =
+      match kind with
+      | Public_library {public_name; _} -> (
+          match
+            List.filter_map
+              (function
+                | Internal {kind = Private_library name; opam = private_pkg; _}
+                  when opam <> private_pkg ->
+                    Some name
+                | _ -> None)
+              deps
+          with
+          | [] -> ()
+          | privates ->
+              error
+                "The public library %s depend on private libraries not part of \
+                 the same package: %s"
+                public_name
+                (String.concat ", " privates))
+      | _ -> ()
+    in
     let release =
       match release with
       | Some release -> release
