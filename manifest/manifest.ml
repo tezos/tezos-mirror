@@ -871,6 +871,15 @@ module Target = struct
     | Select of select
     | Open of t * string
 
+  let rec get_internal = function
+    | Internal i -> Some i
+    | Optional t -> get_internal t
+    | Open (t, _) -> get_internal t
+    | Select {package; _} -> get_internal package
+    | Vendored _ -> None
+    | External _ -> None
+    | Opam_only _ -> None
+
   let pps ?(args = []) = function
     | None -> invalid_arg "Manifest.Target.pps cannot be given no_target"
     | Some target -> PPS (target, args)
@@ -2222,6 +2231,59 @@ let check_js_of_ocaml () =
       (fun k v -> List.iter (fun v -> info "- %s used by %s\n" v k) v)
       !missing_from_target)
 
+(* This check returns all circular opam deps, always reporting the
+   shortest path.
+
+   For every two targets [A0] and [Ax] in package [A], we search for
+   chains of dependencies of the form [A0 -> B0 -> -> Bn -> Ax] where
+   [B0 .. Bn] do not belong to Package A. If such paths exist, we
+   report one path with the minimum length. *)
+let check_circular_opam_deps () =
+  let list_iter l f = List.iter f l in
+  let name i = Target.name_for_errors (Internal i) in
+  let deps_of (t : Target.internal) =
+    let pp =
+      List.map (function Target.PPS (target, _) -> target) t.preprocess
+    in
+    List.concat_map
+      (List.filter_map Target.get_internal)
+      [t.deps; t.opam_only_deps; pp]
+  in
+  Target.iter_internal_by_opam @@ fun this_package internals ->
+  let error_header = ref true in
+  let report_circular_dep pkg (paths : Target.internal list) =
+    if !error_header then (
+      error "Circular opam dependency for %s:\n" this_package ;
+      error_header := false) ;
+    info "- %s\n" (String.concat " -> " (List.map name (pkg :: paths)))
+  in
+  list_iter internals @@ fun internal_from_this_package ->
+  let to_visit : Target.internal Queue.t = Queue.create () in
+  let shortest_path : (Target.kind, Target.internal list) Hashtbl.t =
+    Hashtbl.create 17
+  in
+  (* Push to the queue all direct dependencies to other
+     packages. Dependencies within the same package are ignored
+     because they will never result in a minimum paths. *)
+  let () =
+    list_iter (deps_of internal_from_this_package)
+    @@ fun (dep : Target.internal) ->
+    if dep.opam <> Some this_package then (
+      Hashtbl.add shortest_path dep.kind [dep] ;
+      Queue.push dep to_visit)
+  in
+  while not (Queue.is_empty to_visit) do
+    let elt = Queue.take to_visit in
+    let elt_path = Hashtbl.find shortest_path elt.kind in
+    list_iter (deps_of elt) (fun (dep : Target.internal) ->
+        if not (Hashtbl.mem shortest_path dep.kind) then (
+          let path = dep :: elt_path in
+          Hashtbl.add shortest_path dep.kind path ;
+          if dep.opam = Some this_package then
+            report_circular_dep internal_from_this_package (List.rev path)
+          else Queue.push dep to_visit))
+  done
+
 let usage_msg = "Usage: " ^ Sys.executable_name ^ " [OPTIONS]"
 
 let (packages_dir, release, remove_extra_files) =
@@ -2283,6 +2345,7 @@ let check ?exclude () =
   checks_done := true ;
   Printexc.record_backtrace true ;
   try
+    check_circular_opam_deps () ;
     check_for_non_generated_files ~remove_extra_files ?exclude () ;
     check_js_of_ocaml () ;
     if !has_error then exit 1

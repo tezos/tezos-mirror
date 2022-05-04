@@ -887,6 +887,8 @@ val generate : unit -> unit
 
    2. Check that the transitive closure of dependencies of a [js_compatible] target is [js_compatible].
 
+   3. Check that there are no circular dependencies of opam packages.
+
    In case of errors, errors are printed and the process exits with exit code 1.
  *)
 val check : ?exclude:(string -> bool) -> unit -> unit
