@@ -104,11 +104,7 @@ let () =
     ~title:"Unable to find configuration file"
     ~description:"The configuration file does not seem to exist"
     ~pp:(fun ppf filepath ->
-      Format.fprintf
-        ppf
-        "The configuration file '%s' does not seem to exist. Try giving \
-         another '--data-dir' or running the 'config init on' subcommand"
-        filepath)
+      Format.fprintf ppf "The configuration file '%s' does not exist." filepath)
     `Permanent
     Data_encoding.(obj1 (req "filepath" string))
     (function
@@ -495,3 +491,50 @@ let () =
       | Transaction_too_large {actual; limit} -> Some (actual, limit)
       | _ -> None)
     (fun (actual, limit) -> Transaction_too_large {actual; limit})
+
+type error +=
+  | Tx_rollup_mismatch_mode_signers of {
+      mode : string;
+      missing_signers : string list;
+      extra_signers : string list;
+    }
+
+let () =
+  register_error_kind
+    ~id:"tx_rollup.node.mismatch_mode_signers"
+    ~title:"Mismatch between mode and signers"
+    ~description:"Mismatch between the chosen mode and the provided signers."
+    ~pp:(fun ppf (mode, missing_signers, extra_signers) ->
+      Format.fprintf ppf "@[<hov>" ;
+      if missing_signers <> [] then
+        Format.fprintf
+          ppf
+          "Missing signers %a"
+          (Format.pp_print_list
+             ~pp_sep:(fun ppf () -> Format.fprintf ppf ",@ ")
+             Format.pp_print_string)
+          missing_signers ;
+      if missing_signers <> [] && extra_signers <> [] then
+        Format.fprintf ppf " and " ;
+      if extra_signers <> [] then
+        Format.fprintf
+          ppf
+          "superfluous signers %a"
+          (Format.pp_print_list
+             ~pp_sep:(fun ppf () -> Format.fprintf ppf ",@ ")
+             Format.pp_print_string)
+          extra_signers ;
+      Format.fprintf ppf " for mode %s.@]" mode)
+    `Permanent
+    Data_encoding.(
+      obj3
+        (req "mode" string)
+        (req "missing_signers" (list string))
+        (req "extra_signers" (list string)))
+    (function
+      | Tx_rollup_mismatch_mode_signers {mode; missing_signers; extra_signers}
+        ->
+          Some (mode, missing_signers, extra_signers)
+      | _ -> None)
+    (fun (mode, missing_signers, extra_signers) ->
+      Tx_rollup_mismatch_mode_signers {mode; missing_signers; extra_signers})

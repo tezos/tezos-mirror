@@ -87,15 +87,18 @@ let dispatch_withdrawals_signer_arg =
     ~doc:"The signer for dispatch withdrawals"
     ()
 
+let rollup_id_param =
+  Clic.parameter (fun _ s ->
+      match Protocol.Alpha_context.Tx_rollup.of_b58check s with
+      | Ok x -> return x
+      | Error _ -> failwith "Invalid Rollup Id")
+
 let rollup_id_arg =
   Clic.arg
     ~long:"rollup-id"
     ~placeholder:"rollup-id"
     ~doc:"The rollup id of the rollup to target"
-    (Clic.parameter (fun _ s ->
-         match Protocol.Alpha_context.Tx_rollup.of_b58check s with
-         | Ok x -> return x
-         | Error _ -> failwith "Invalid Rollup Id"))
+    rollup_id_param
 
 let rollup_genesis_arg =
   Clic.arg
@@ -132,6 +135,22 @@ let reconnection_delay_arg =
     (Clic.parameter (fun _ p ->
          try return (float_of_string p) with _ -> failwith "Cannot read float"))
 
+let possible_modes = List.map Node_config.string_of_mode Node_config.modes
+
+let mode_parameter =
+  Clic.parameter
+    ~autocomplete:(fun _ -> return possible_modes)
+    (fun _ m -> Lwt.return (Node_config.mode_of_string m))
+
+let mode_param =
+  Clic.param
+    ~name:"mode"
+    ~desc:
+      (Printf.sprintf
+         "The mode for the rollup node (%s)"
+         (String.concat ", " possible_modes))
+    mode_parameter
+
 let group =
   Clic.
     {
@@ -146,7 +165,7 @@ let configuration_init_command =
   command
     ~group
     ~desc:"Configure the transaction rollup daemon."
-    (args11
+    (args10
        data_dir_arg
        operator_arg
        batch_signer_arg
@@ -154,11 +173,16 @@ let configuration_init_command =
        remove_commitment_signer_arg
        rejection_signer_arg
        dispatch_withdrawals_signer_arg
-       rollup_id_arg
        rollup_genesis_arg
        rpc_addr_arg
        reconnection_delay_arg)
-    (prefixes ["config"; "init"; "on"] @@ stop)
+    (prefix "init" @@ mode_param
+    @@ prefixes ["config"; "for"]
+    @@ Clic.param
+         ~name:"rollup-id"
+         ~desc:"address of the rollup"
+         rollup_id_param
+    @@ stop)
     (fun ( data_dir,
            operator,
            batch_signer,
@@ -166,14 +190,14 @@ let configuration_init_command =
            remove_commitment_signer,
            rejection_signer,
            dispatch_withdrawals_signer,
-           rollup_id,
            rollup_genesis,
            rpc_addr,
            reconnection_delay )
+         mode
+         rollup_id
          cctxt ->
       let open Lwt_result_syntax in
       let*! () = Event.(emit preamble_warning) () in
-      let* rollup_id = to_tzresult "Missing arg --rollup-id" rollup_id in
       let data_dir =
         match data_dir with
         | Some d -> d
@@ -183,6 +207,7 @@ let configuration_init_command =
         Node_config.
           {
             data_dir;
+            mode;
             signers =
               {
                 operator;

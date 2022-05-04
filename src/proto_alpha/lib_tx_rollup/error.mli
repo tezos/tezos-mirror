@@ -123,3 +123,11 @@ type error +=
 (** Error when the transaction submitted to the batcher produces a too large
     message regarding the layer1 limit. *)
 type error += Transaction_too_large of {actual : int; limit : int}
+
+(** Mismatch between the chosen mode and the provided signers. *)
+type error +=
+  | Tx_rollup_mismatch_mode_signers of {
+      mode : string;
+      missing_signers : string list;
+      extra_signers : string list;
+    }

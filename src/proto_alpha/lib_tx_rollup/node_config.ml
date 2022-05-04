@@ -25,6 +25,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type mode = Observer | Accuser | Batcher | Maintenance | Operator | Custom
+
 type signers = {
   operator : Signature.public_key_hash option;
   submit_batch : Signature.public_key_hash option;
@@ -40,6 +42,7 @@ type t = {
   rollup_genesis : Block_hash.t option;
   rpc_addr : P2p_point.Id.t;
   reconnection_delay : float;
+  mode : mode;
   signers : signers;
   l2_blocks_cache_size : int;
 }
@@ -57,6 +60,36 @@ let default_rpc_addr = (Ipaddr.V6.localhost, 9999)
 let default_reconnection_delay = 2.0
 
 let default_l2_blocks_cache_size = 64
+
+let modes = [Observer; Accuser; Batcher; Maintenance; Operator; Custom]
+
+let string_of_mode = function
+  | Observer -> "observer"
+  | Accuser -> "accuser"
+  | Batcher -> "batcher"
+  | Maintenance -> "maintenance"
+  | Operator -> "operator"
+  | Custom -> "custom"
+
+let mode_of_string = function
+  | "observer" -> Ok Observer
+  | "accuser" -> Ok Accuser
+  | "batcher" -> Ok Batcher
+  | "maintenance" -> Ok Maintenance
+  | "operator" -> Ok Operator
+  | "custom" -> Ok Custom
+  | _ -> Error [Exn (Failure "Invalid mode")]
+
+let mode_encoding =
+  Data_encoding.string_enum
+    [
+      ("observer", Observer);
+      ("accuser", Accuser);
+      ("batcher", Batcher);
+      ("maintenance", Maintenance);
+      ("operator", Operator);
+      ("custom", Custom);
+    ]
 
 let signers_encoding =
   let open Data_encoding in
@@ -127,6 +160,7 @@ let encoding =
            rollup_genesis;
            rpc_addr;
            reconnection_delay;
+           mode;
            signers;
            l2_blocks_cache_size;
          } ->
@@ -135,6 +169,7 @@ let encoding =
         rollup_genesis,
         rpc_addr,
         reconnection_delay,
+        mode,
         signers,
         l2_blocks_cache_size ))
     (fun ( data_dir_opt,
@@ -142,6 +177,7 @@ let encoding =
            rollup_genesis,
            rpc_addr,
            reconnection_delay,
+           mode,
            signers,
            l2_blocks_cache_size ) ->
       let data_dir =
@@ -155,10 +191,11 @@ let encoding =
         rollup_genesis;
         rpc_addr;
         reconnection_delay;
+        mode;
         signers;
         l2_blocks_cache_size;
       })
-  @@ obj7
+  @@ obj8
        (opt
           ~description:
             "Location where the rollup node data (store, context, etc.) is \
@@ -183,9 +220,9 @@ let encoding =
           "reconnection_delay"
           float
           default_reconnection_delay)
+       (req ~description:"The mode for this rollup node" "mode" mode_encoding)
        (req
-          ~description:
-            "The additional signers for the various tx rollup operations"
+          ~description:"The signers for the various tx rollup operations"
           "signers"
           signers_encoding)
        (dft
@@ -198,8 +235,64 @@ let get_configuration_filename data_dir =
   let filename = "config.json" in
   Filename.concat data_dir filename
 
+let check_mode config =
+  let config_signers =
+    let add signer name acc =
+      Option.fold ~none:acc ~some:(fun _ -> String.Set.add name acc) signer
+    in
+    String.Set.empty
+    |> add config.signers.operator "operator"
+    |> add config.signers.submit_batch "submit_batch"
+    |> add config.signers.finalize_commitment "finalize_commitment"
+    |> add config.signers.remove_commitment "remove_commitment"
+    |> add config.signers.rejection "rejection"
+    |> add config.signers.dispatch_withdrawals "dispatch_withdrawals"
+  in
+  let should_have signers =
+    let signers = String.Set.of_list signers in
+    if String.Set.equal config_signers signers then Ok ()
+    else
+      let missing_signers =
+        String.Set.(diff signers config_signers |> elements)
+      in
+      let extra_signers =
+        String.Set.(diff config_signers signers |> elements)
+      in
+      let mode = string_of_mode config.mode in
+      Error
+        [
+          Error.Tx_rollup_mismatch_mode_signers
+            {mode; missing_signers; extra_signers};
+        ]
+  in
+  match config.mode with
+  | Observer -> should_have []
+  | Accuser -> should_have ["rejection"]
+  | Batcher -> should_have ["submit_batch"]
+  | Maintenance ->
+      should_have
+        [
+          "operator";
+          "finalize_commitment";
+          "remove_commitment";
+          "rejection";
+          "dispatch_withdrawals";
+        ]
+  | Operator ->
+      should_have
+        [
+          "operator";
+          "submit_batch";
+          "finalize_commitment";
+          "remove_commitment";
+          "rejection";
+          "dispatch_withdrawals";
+        ]
+  | Custom -> Ok ()
+
 let save configuration =
   let open Lwt_result_syntax in
+  let*? () = check_mode configuration in
   let json = Data_encoding.Json.construct encoding configuration in
   let*! () = Lwt_utils_unix.create_dir configuration.data_dir in
   let file = get_configuration_filename configuration.data_dir in
@@ -223,5 +316,7 @@ let load ~data_dir =
   let* () =
     fail_unless exists (Error.Tx_rollup_configuration_file_does_not_exists file)
   in
-  let+ json = Lwt_utils_unix.Json.read_file file in
-  Data_encoding.Json.destruct encoding json
+  let* json = Lwt_utils_unix.Json.read_file file in
+  let config = Data_encoding.Json.destruct encoding json in
+  let*? () = check_mode config in
+  return config
