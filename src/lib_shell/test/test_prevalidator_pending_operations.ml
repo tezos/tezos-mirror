@@ -104,22 +104,36 @@ let test_partial_fold_es =
   let card0 = Pending_ops.cardinal pending in
   Lwt_main.run
   @@ Pending_ops.fold_es
-       (fun _priority hash _op (to_process, acc) ->
-         if to_process <= 0 then Lwt.return_error (to_process, acc)
-         else Lwt.return_ok (to_process - 1, Pending_ops.remove hash acc))
+       (fun _priority hash _op (remaining_to_process, acc) ->
+         assert (remaining_to_process >= 0) ;
+         if remaining_to_process = 0 then Lwt.return_error acc
+         else
+           Lwt.return_ok (remaining_to_process - 1, Pending_ops.remove hash acc))
        pending
        (to_process, pending)
   |> function
-  | Ok (rem, pending) ->
+  | Ok (remaining_to_process, pending) ->
+      (* [Ok] means we have reached the end of the collection before exhausting
+         the limit of iterations: the remaining collection is empty && we spent
+         as many iterations as there were elements in the original collection. *)
       let card1 = Pending_ops.cardinal pending in
-      qcheck_eq true (card1 = 0) && qcheck_eq (to_process - rem) (card0 - card1)
-  | Error (rem, pending) ->
+      qcheck_eq' ~pp:Format.pp_print_int ~expected:0 ~actual:card1 ()
+      && qcheck_eq'
+           ~pp:Format.pp_print_int
+           ~expected:card0
+           ~actual:(to_process - remaining_to_process)
+           ()
+  | Error pending ->
+      (* [Error] means we have reached the limit of the number of iterations:
+         the number of removed elements is exactly the number of iterations &&
+         there are still elements in the resulting collection. *)
       let card1 = Pending_ops.cardinal pending in
-      if to_process < 0 then qcheck_eq card0 card1
-      else
-        qcheck_eq rem 0
-        && qcheck_eq (to_process - rem) (card0 - card1)
-        && qcheck_eq (card1 = 0) false
+      qcheck_eq'
+        ~pp:Format.pp_print_int
+        ~expected:to_process
+        ~actual:(card0 - card1)
+        ()
+      && qcheck_neq ~pp:Format.pp_print_int card1 0
 
 let () =
   let mk_tests label tests = (label, qcheck_wrap tests) in
