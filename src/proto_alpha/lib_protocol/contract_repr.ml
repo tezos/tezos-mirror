@@ -121,24 +121,34 @@ let cases is_contract to_contract =
       ~inj:(fun k -> to_contract (Originated k));
   ]
 
-let encoding =
+let encoding_gen ~id_extra ~title_extra ~can_be ~cases ~to_b58check ~of_b58data
+    =
   let open Data_encoding in
   def
-    "contract_id"
-    ~title:"A contract handle"
+    ("contract_id" ^ id_extra)
+    ~title:("A contract handle" ^ title_extra)
     ~description:
-      "A contract notation as given to an RPC or inside scripts. Can be a \
-       base58 implicit contract hash or a base58 originated contract hash."
+      ("A contract notation as given to an RPC or inside scripts. Can be a \
+        base58 " ^ can_be)
   @@ splitted
        ~binary:(union ~tag_size:`Uint8 @@ cases (fun x -> Some x) (fun x -> x))
        ~json:
          (conv
             to_b58check
             (fun s ->
-              match of_b58check s with
+              match of_b58check_gen ~of_b58data s with
               | Ok s -> s
               | Error _ -> Json.cannot_destruct "Invalid contract notation.")
             string)
+
+let encoding =
+  encoding_gen
+    ~id_extra:""
+    ~title_extra:""
+    ~can_be:"implicit contract hash or a base58 originated contract hash."
+    ~cases
+    ~to_b58check
+    ~of_b58data:contract_of_b58data
 
 let () =
   let open Data_encoding in
