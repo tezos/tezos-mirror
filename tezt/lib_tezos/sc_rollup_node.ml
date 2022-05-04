@@ -137,8 +137,18 @@ let set_ready sc_node =
   | Running status -> status.session_state.ready <- true) ;
   trigger_ready sc_node (Some ())
 
-let check_event ?where sc_node name promise =
-  let* result = promise in
+let check_event ?timeout ?where sc_node name promise =
+  let* result =
+    match timeout with
+    | None -> promise
+    | Some timeout ->
+        Lwt.pick
+          [
+            promise;
+            (let* () = Lwt_unix.sleep timeout in
+             Lwt.return None);
+          ]
+  in
   match result with
   | None ->
       raise
@@ -173,7 +183,7 @@ let update_level sc_node current_level =
           pending :: sc_node.persistent_state.pending_level)
     pending
 
-let wait_for_level sc_node level =
+let wait_for_level ?timeout sc_node level =
   match sc_node.status with
   | Running {session_state = {level = Known current_level; _}; _}
     when current_level >= level ->
@@ -183,6 +193,7 @@ let wait_for_level sc_node level =
       sc_node.persistent_state.pending_level <-
         (level, resolver) :: sc_node.persistent_state.pending_level ;
       check_event
+        ?timeout
         sc_node
         "sc_rollup_node_layer_1_new_head.v0"
         ~where:("level >= " ^ string_of_int level)
