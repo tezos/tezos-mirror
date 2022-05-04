@@ -3511,7 +3511,9 @@ end = struct
             |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
             main |> open_;
             client |> if_some |> open_;
+            client_commands |> if_some |> open_;
             tezos_client_base_unix |> open_;
+            tezos_stdlib_unix |> open_;
             tx_rollup |> if_some |> open_;
             raw_protocol |> open_;
           ]

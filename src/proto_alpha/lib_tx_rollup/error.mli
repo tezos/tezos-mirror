@@ -119,3 +119,7 @@ type error +=
       reconstructed_inbox : Protocol.Alpha_context.Tx_rollup_inbox.t;
       protocol_inbox : Protocol.Alpha_context.Tx_rollup_inbox.t;
     }
+
+(** Error when the transaction submitted to the batcher produces a too large
+    message regarding the layer1 limit. *)
+type error += Transaction_too_large of {actual : int; limit : int}

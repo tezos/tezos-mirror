@@ -709,15 +709,6 @@ let sign_one_transaction key txs_string =
   in
   Tezos_crypto.Bls.sign (bls_sk_of_key key) buf
 
-let craft_tx ?counter tx_client ~qty ~signer ~dest ~ticket =
-  Tx_rollup_client.craft_tx_transaction
-    tx_client
-    ?counter
-    ~qty
-    ~signer
-    ~dest
-    ~ticket
-
 let bls_signers_sks_json keys =
   let sks =
     List.map
@@ -731,6 +722,17 @@ let bls_signers_sks_json keys =
   Data_encoding.(
     Json.construct (list (list Tezos_crypto.Bls.Secret_key.encoding)) sks
     |> Json.to_string)
+
+let craft_tx ?counter tx_client ~qty ~signer ~dest ~ticket =
+  Tx_rollup_client.craft_tx_transaction
+    ?counter
+    ~signer
+    tx_client
+    {destination = dest; qty; ticket}
+
+let craft_tx_transfers ?counter ~signer tx_client contents =
+  let transfer : Rollup.transfer = {signer; counter; contents} in
+  Tx_rollup_client.craft_tx_transfers tx_client transfer
 
 let craft_batch tx_client ~batch ~signers =
   let signatures = bls_signers_sks_json signers in
@@ -2009,7 +2011,7 @@ let test_withdrawals =
       Log.info "Ticket %s was successfully emitted" ticket_id ;
       Log.info "Submitting transactions to queue" ;
       let* tx =
-        Tx_rollup_client.craft_tx_transaction
+        craft_tx
           tx_client
           ~signer:bls_pk_1
           ~dest:bls_pkh_2
@@ -2019,7 +2021,7 @@ let test_withdrawals =
       let signature = sign_one_transaction bls_key_1 tx in
       let* _txh1 = tx_client_inject_transaction ~tx_client tx signature in
       let* tx =
-        Tx_rollup_client.craft_tx_transaction
+        craft_tx
           tx_client
           ~signer:bls_pk_2
           ~dest:bls_pkh_1
@@ -2207,6 +2209,60 @@ let test_accuser =
   check_l1_block_contains_rejection ~level:0 block ;
   unit
 
+let test_batcher_large_message =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"TX_rollup: submit a large message to the batcher"
+    ~tags:["tx_rollup"; "node"; "batcher"]
+    (fun protocol ->
+      let* parameter_file =
+        Parameters.parameter_file
+          ~parameters:Parameters.{finality_period = 5; withdraw_period = 5}
+          protocol
+      in
+      let* (node, client) =
+        Client.init_with_protocol ~parameter_file `Client ~protocol ()
+      in
+      let originator = Constant.bootstrap1.public_key_hash in
+      let* (_tx_rollup_hash, tx_node) =
+        init_and_run_rollup_node
+          ~originator
+          ~batch_signer:Constant.bootstrap5.public_key_hash
+          node
+          client
+      in
+      let tx_client = Tx_rollup_client.create tx_node in
+      let* bls_key = generate_bls_addr ~alias:"bob" client in
+      let pkh1_str = bls_key.aggregate_public_key_hash in
+      let contents : Rollup.transfer_content list =
+        let transfer_content : Rollup.transfer_content =
+          let destination = pkh1_str in
+          let ticket =
+            Tezos_protocol_alpha.Protocol.Alpha_context.Ticket_hash.(
+              to_b58check zero)
+          in
+          let qty = 1L in
+          {destination; ticket; qty}
+        in
+        List.init 200 (fun _ -> transfer_content)
+      in
+      let* tx =
+        craft_tx_transfers
+          ~counter:1L
+          ~signer:bls_key.aggregate_public_key
+          tx_client
+          contents
+      in
+      let signature = sign_one_transaction bls_key tx in
+      let* _ =
+        tx_client_inject_transaction
+          ~tx_client
+          tx
+          signature
+          ~failswith:"tx_rollup.node.transaction_too_large"
+      in
+      unit)
+
 let register ~protocols =
   test_node_configuration protocols ;
   test_tx_node_origination protocols ;
@@ -2220,4 +2276,5 @@ let register ~protocols =
   test_committer protocols ;
   test_tickets_context protocols ;
   test_withdrawals protocols ;
-  test_accuser protocols
+  test_accuser protocols ;
+  test_batcher_large_message protocols

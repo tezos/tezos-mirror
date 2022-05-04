@@ -12,7 +12,9 @@ depends: [
   "tezos-base"
   "tezos-protocol-alpha"
   "tezos-client-alpha"
+  "tezos-client-alpha-commands"
   "tezos-client-base-unix"
+  "tezos-stdlib-unix"
   "tezos-tx-rollup-alpha"
 ]
 build: [

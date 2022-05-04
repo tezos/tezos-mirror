@@ -46,13 +46,13 @@ val get_inbox : ?block:string -> t -> string Lwt.t
 val get_block : t -> block:string -> string Lwt.t
 
 val craft_tx_transaction :
-  ?counter:Int64.t ->
   t ->
-  qty:Int64.t ->
   signer:string ->
-  dest:string ->
-  ticket:string ->
+  ?counter:int64 ->
+  Rollup.Tx_rollup.transfer_content ->
   string Lwt.t
+
+val craft_tx_transfers : t -> Rollup.Tx_rollup.transfer -> string Lwt.t
 
 val craft_tx_withdraw :
   ?counter:Int64.t ->
