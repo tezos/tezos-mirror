@@ -295,6 +295,8 @@ module Make (Proto : Tezos_protocol_environment.PROTOCOL) :
 module Internal_for_tests = struct
   let to_raw {raw; _} = raw
 
+  let hash_of {hash; _} = hash
+
   let make_operation op oph data =
     (* When we build an operation, we assume that it has never been
        successfully prechecked. *)
