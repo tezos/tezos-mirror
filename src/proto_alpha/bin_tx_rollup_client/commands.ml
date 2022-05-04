@@ -27,7 +27,7 @@ open Clic
 open Tezos_client_base
 
 let l1_destination_parameter =
-  Clic.parameter (fun _ s ->
+  parameter (fun _ s ->
       match Signature.Public_key_hash.of_b58check_opt s with
       | Some addr -> return addr
       | None -> failwith "cannot parse %s to get a valid destination" s)
@@ -37,7 +37,7 @@ let parse_file parse path =
 
 let file_or_text_parameter ~from_text
     ?(from_path = parse_file (from_text ~heuristic:false)) () =
-  Clic.parameter @@ fun _ p ->
+  parameter @@ fun _ p ->
   match String.split ~limit:1 ':' p with
   | ["text"; text] -> from_text ~heuristic:false text
   | ["file"; path] -> from_path path
@@ -71,7 +71,7 @@ type wallet_entry = {
 }
 
 let wallet_parameter () =
-  Clic.parameter (fun cctxt alias ->
+  parameter (fun cctxt alias ->
       let open Lwt_result_syntax in
       let open Aggregate_signature in
       let* (Bls12_381 public_key_hash) =
@@ -90,10 +90,10 @@ let wallet_parameter () =
 
 let wallet_param ?(name = "an alias for a tz4 address")
     ?(desc = "an alias for a tz4 address") =
-  Clic.param ~name ~desc @@ wallet_parameter ()
+  param ~name ~desc @@ wallet_parameter ()
 
 let bls_pkh_parameter () =
-  Clic.parameter
+  parameter
     ~autocomplete:Client_keys.Aggregate_alias.Public_key_hash.autocomplete
     (fun cctxt s ->
       let open Lwt_result_syntax in
@@ -118,13 +118,13 @@ let bls_pkh_param ?(name = "public key hash")
         desc; "Can be an alias or a key.\nUse 'alias:name', 'key:name' to force.";
       ]
   in
-  Clic.param
+  param
     ~name
     ~desc
-    (Clic.map_parameter ~f:conv_bls_pkh_to_l2_addr (bls_pkh_parameter ()))
+    (map_parameter ~f:conv_bls_pkh_to_l2_addr (bls_pkh_parameter ()))
 
 let bls_pk_parameter () =
-  Clic.parameter
+  parameter
     ~autocomplete:Client_keys.Aggregate_alias.Public_key.autocomplete
     (fun cctxt s ->
       let open Lwt_result_syntax in
@@ -145,10 +145,10 @@ let bls_pk_param ?(name = "public key") ?(desc = "Bls public key to use.") =
         desc; "Can be an alias or a key.\nUse 'alias:name', 'key:name' to force.";
       ]
   in
-  Clic.param ~name ~desc (bls_pk_parameter ())
+  param ~name ~desc (bls_pk_parameter ())
 
 let bls_sk_uri_parameter () =
-  Clic.parameter
+  parameter
     ~autocomplete:Client_keys.Aggregate_alias.Secret_key.autocomplete
     Client_keys.Aggregate_alias.Secret_key.find
 
@@ -160,20 +160,20 @@ let bls_sk_uri_param ?(name = "secret key") ?(desc = "Bls secret key to use.") =
         desc; "Can be an alias or a key.\nUse 'alias:name', 'key:name' to force.";
       ]
   in
-  Clic.param ~name ~desc (bls_sk_uri_parameter ())
+  param ~name ~desc (bls_sk_uri_parameter ())
 
 let signature_parameter () =
-  Clic.parameter (fun _cctxt s -> Bls.of_b58check s |> Lwt.return)
+  parameter (fun _cctxt s -> Bls.of_b58check s |> Lwt.return)
 
 let signature_arg =
-  Clic.arg
+  arg
     ~doc:"aggregated signature"
     ~long:"aggregated-signature"
     ~placeholder:"current aggregated signature"
     (signature_parameter ())
 
 let transaction_parameter =
-  Clic.map_parameter
+  map_parameter
     ~f:(fun json ->
       try
         Data_encoding.Json.destruct
@@ -188,10 +188,10 @@ let transaction_parameter =
     json_parameter
 
 let transaction_param next =
-  Clic.param ~name:"transaction" ~desc:"Transaction" transaction_parameter next
+  param ~name:"transaction" ~desc:"Transaction" transaction_parameter next
 
 let l2_transaction_parameter =
-  Clic.map_parameter
+  map_parameter
     ~f:(fun json ->
       try Data_encoding.Json.destruct L2_transaction.encoding json
       with Data_encoding.Json.Cannot_destruct (_path, exn) ->
@@ -203,7 +203,7 @@ let l2_transaction_parameter =
     json_parameter
 
 let l2_transaction_param next =
-  Clic.param
+  param
     ~name:"signed l2 transaction"
     ~desc:
       "Signed l2 transaction. Must be a valid json with the following format: \
@@ -213,14 +213,14 @@ let l2_transaction_param next =
 
 let block_id_param =
   let open Lwt_result_syntax in
-  Clic.parameter (fun _ s ->
+  parameter (fun _ s ->
       match RPC.destruct_block_id s with
       | Ok v -> return v
       | Error e -> failwith "%s" e)
 
 let ticket_hash_parameter =
   let open Lwt_result_syntax in
-  Clic.parameter (fun _ s ->
+  parameter (fun _ s ->
       match Alpha_context.Ticket_hash.of_b58check_opt s with
       | Some tkh -> return tkh
       | None -> failwith "cannot parse %s to get a valid ticket_hash" s)
@@ -340,13 +340,12 @@ let craft_batch ~transactions =
   return Tx_rollup_l2_batch.V1.{aggregated_signature; contents = transactions}
 
 let conv_qty =
-  Clic.parameter (fun _ qty ->
+  parameter (fun _ qty ->
       match Tx_rollup_l2_qty.of_string qty with
       | Some qty -> return qty
       | None -> failwith "The given qty is invalid")
 
-let conv_counter =
-  Clic.parameter (fun _ counter -> return (Int64.of_string counter))
+let conv_counter = parameter (fun _ counter -> return (Int64.of_string counter))
 
 let signer_next_counter cctxt signer_pk counter =
   match counter with
@@ -513,12 +512,11 @@ let craft_tx_withdrawal () =
 let craft_tx_batch () =
   command
     ~desc:"craft a batch from a list of signed layer-2 transactions"
-    Clic.(
-      args1
-        (switch
-           ~doc:"Bytes representation of the batch encoded in hexadecimal"
-           ~long:"bytes"
-           ()))
+    (args1
+       (switch
+          ~doc:"Bytes representation of the batch encoded in hexadecimal"
+          ~long:"bytes"
+          ()))
     (prefixes ["craft"; "batch"; "with"] @@ seq_of_param l2_transaction_param)
     (fun show_bytes transactions (cctxt : #Configuration.tx_client_context) ->
       let open Lwt_result_syntax in
@@ -554,7 +552,7 @@ let get_batcher_queue () =
       return_unit)
 
 let valid_transaction_hash =
-  Clic.parameter (fun _ s ->
+  parameter (fun _ s ->
       match L2_transaction.Hash.of_b58check_opt s with
       | Some addr -> return addr
       | None -> failwith "The L2 transaction hash is invalid")
@@ -668,7 +666,7 @@ let sign_transaction () =
   command
     ~desc:"sign a transaction"
     (args2
-       (Clic.switch ~doc:"aggregate signature" ~long:"aggregate" ())
+       (switch ~doc:"aggregate signature" ~long:"aggregate" ())
        signature_arg)
     (prefixes ["sign"; "transaction"]
     @@ transaction_param @@ prefix "with"
