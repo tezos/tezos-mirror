@@ -191,7 +191,6 @@ let rec wait_next_event ~timeout loop_state =
         (Operation_worker.Prequorum_reached
           (candidate, voting_power, preendorsement_qc))) ->
       loop_state.last_get_qc_event <- None ;
-      (* TODO: pass the candidate to add a consistency check *)
       return_some
         (Prequorum_reached (candidate, voting_power, preendorsement_qc))
   | `QC_reached
@@ -199,7 +198,6 @@ let rec wait_next_event ~timeout loop_state =
         (Operation_worker.Quorum_reached
           (candidate, voting_power, endorsement_qc))) ->
       loop_state.last_get_qc_event <- None ;
-      (* TODO: pass the candidate to add a consistency check *)
       return_some (Quorum_reached (candidate, voting_power, endorsement_qc))
   | `Timeout e -> return_some (Timeout e)
 

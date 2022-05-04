@@ -139,24 +139,37 @@ let filter_outdated_nonces state nonces =
   >>=? fun () -> return (remove_all nonces outdated_nonces)
 
 let blocks_from_current_cycle {cctxt; chain; _} block ?(offset = 0l) () =
-  Shell_services.Blocks.hash cctxt ~chain ~block () >>=? fun hash ->
-  Shell_services.Blocks.Header.shell_header cctxt ~chain ~block ()
-  >>=? fun {level; _} ->
   Plugin.RPC.levels_in_current_cycle cctxt ~offset (chain, block) >>= function
   | Error (RPC_context.Not_found _ :: _) -> return_nil
   | Error _ as err -> Lwt.return err
-  | Ok (first, last) ->
+  | Ok (first, last) -> (
+      Shell_services.Blocks.hash cctxt ~chain ~block () >>=? fun hash ->
+      Shell_services.Blocks.Header.shell_header cctxt ~chain ~block ()
+      >>=? fun {level; _} ->
       (* FIXME: crappy algorithm, change this *)
+      (* Compute how many blocks below current level we should ask for *)
       let length = Int32.to_int (Int32.sub level (Raw_level.to_int32 first)) in
       Shell_services.Blocks.list cctxt ~chain ~heads:[hash] ~length ()
-      >>=? fun blocks ->
-      let head = Stdlib.List.hd blocks in
-      let blocks =
-        List.drop_n (length - Int32.to_int (Raw_level.diff last first)) head
-      in
-      if Int32.equal level (Raw_level.to_int32 last) then
-        return (hash :: blocks)
-      else return blocks
+      (* Looks like this function call retrieves a list of blocks ordered from
+         latest to earliest - decreasing order of insertion in the chain *)
+      >>=?
+      function
+      | [blocks] ->
+          if Int32.equal level (Raw_level.to_int32 last) then
+            (* We have just retrieved a block list of the right size starting at
+               first until last *)
+            return blocks
+          else
+            (* Remove all the latest blocks from last up to length*)
+            List.drop_n
+              (length - Int32.to_int (Raw_level.diff last first))
+              blocks
+            |> return
+      | l ->
+          failwith
+            "Baking_nonces.blocks_from_current_cycle: unexpected block list of \
+             size %d (expected 1)"
+            (List.length l))
 
 let get_unrevealed_nonces ({cctxt; chain; _} as state) nonces =
   blocks_from_current_cycle state (`Head 0) ~offset:(-1l) () >>=? fun blocks ->

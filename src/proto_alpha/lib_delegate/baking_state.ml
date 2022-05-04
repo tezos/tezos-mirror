@@ -459,6 +459,23 @@ let record_state (state : state) =
   >>= fun () ->
   Lwt_unix.rename filename_tmp filename >>= fun () -> return_unit
 
+type error += Broken_locked_values_invariant
+
+let () =
+  Error_monad.register_error_kind
+    `Permanent
+    ~id:"Baking_state.broken_locked_values_invariant"
+    ~title:"Broken locked values invariant"
+    ~description:
+      "The expected consistency invariant on locked values does not hold"
+    ~pp:(fun ppf () ->
+      Format.fprintf
+        ppf
+        "The expected consistency invariant on locked values does not hold")
+    Data_encoding.unit
+    (function Broken_locked_values_invariant -> Some () | _ -> None)
+    (fun () -> Broken_locked_values_invariant)
+
 let may_record_new_state ~previous_state ~new_state =
   let {
     current_level = previous_current_level;
@@ -502,10 +519,7 @@ let may_record_new_state ~previous_state ~new_state =
          is_new_locked_round_consistent && is_new_endorsable_payload_consistent
        else true
   in
-  (* TODO: proper error *)
-  fail_unless
-    is_new_state_consistent
-    (Exn (Failure "locked values invariant does not hold"))
+  fail_unless is_new_state_consistent Broken_locked_values_invariant
   >>=? fun () ->
   let has_not_changed =
     previous_state.level_state.current_level
@@ -582,12 +596,11 @@ end
 
 let cache_size_limit = 100
 
-let compute_delegate_slots (cctxt : Protocol_client_context.full) delegates
-    ~level ~chain =
+let compute_delegate_slots (cctxt : Protocol_client_context.full)
+    ?(block = `Head 0) ~level ~chain delegates =
   let own_delegates = DelegateSet.of_list delegates in
   Environment.wrap_tzresult (Raw_level.of_int32 level) >>?= fun level ->
-  (* FIXME? should we not take `Head 0 ? *)
-  Plugin.RPC.Validators.get cctxt (chain, `Head 0) ~levels:[level]
+  Plugin.RPC.Validators.get cctxt (chain, block) ~levels:[level]
   >>=? fun endorsing_rights ->
   let (own_delegate_slots, all_delegate_slots) =
     List.fold_left

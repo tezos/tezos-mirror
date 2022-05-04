@@ -183,11 +183,13 @@ val load_endorsable_data :
 
 val may_load_endorsable_data : t -> t tzresult Lwt.t
 
+(** @param block default to [`Head 0]*)
 val compute_delegate_slots :
   Protocol_client_context.full ->
-  delegate trace ->
+  ?block:Block_services.block ->
   level:int32 ->
   chain:Shell_services.chain ->
+  delegate list ->
   delegate_slots tzresult Lwt.t
 
 val create_cache : unit -> cache
