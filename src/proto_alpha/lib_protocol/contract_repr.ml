@@ -59,17 +59,34 @@ let to_b58check = function
   | Implicit pbk -> Signature.Public_key_hash.to_b58check pbk
   | Originated h -> Contract_hash.to_b58check h
 
-let of_b58check s =
+let implicit_of_b58data : Base58.data -> Signature.public_key_hash option =
+  function
+  | Ed25519.Public_key_hash.Data h -> Some (Signature.Ed25519 h)
+  | Secp256k1.Public_key_hash.Data h -> Some (Signature.Secp256k1 h)
+  | P256.Public_key_hash.Data h -> Some (Signature.P256 h)
+  | _ -> None
+
+let originated_of_b58data = function
+  | Contract_hash.Data h -> Some h
+  | _ -> None
+
+let contract_of_b58data data =
+  match implicit_of_b58data data with
+  | Some pkh -> Some (Implicit pkh)
+  | None -> (
+      match originated_of_b58data data with
+      | Some contract_hash -> Some (Originated contract_hash)
+      | None -> None)
+
+let of_b58check_gen ~of_b58data s =
   match Base58.decode s with
   | Some data -> (
-      match data with
-      | Ed25519.Public_key_hash.Data h -> ok (Implicit (Signature.Ed25519 h))
-      | Secp256k1.Public_key_hash.Data h ->
-          ok (Implicit (Signature.Secp256k1 h))
-      | P256.Public_key_hash.Data h -> ok (Implicit (Signature.P256 h))
-      | Contract_hash.Data h -> ok (Originated h)
-      | _ -> error (Invalid_contract_notation s))
+      match of_b58data data with
+      | Some c -> ok c
+      | None -> error (Invalid_contract_notation s))
   | None -> error (Invalid_contract_notation s)
+
+let of_b58check = of_b58check_gen ~of_b58data:contract_of_b58data
 
 let pp ppf = function
   | Implicit pbk -> Signature.Public_key_hash.pp ppf pbk
