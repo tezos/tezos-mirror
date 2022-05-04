@@ -5,6 +5,8 @@ gitlab:release:
   # https://gitlab.com/tezos/docker-images/ci-release
   image: "${CI_REGISTRY}/tezos/docker-images/ci-release:v1.0.0"
   stage: publish_release
+  # Publish jobs are uninterruptible to avoid publishing partial results.
+  interruptible: false
   dependencies:
     - build:static-x86_64-linux-binaries
     - build:static-arm64-linux-binaries

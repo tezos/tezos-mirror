@@ -83,4 +83,5 @@ publish:documentation:
         git commit -m "Import doc of ${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}:${CI_COMMIT_SHA}" ;
         git push origin master ;
       fi
+  # Publish jobs are uninterruptible to avoid publishing partial results.
   interruptible: false

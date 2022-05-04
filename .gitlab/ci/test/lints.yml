@@ -35,6 +35,7 @@ misc_opam_checks:
 
 semgrep:
   extends:
+    - .default_settings_template
     - .rules_template__development
   # We specify the image by hash to avoid flakiness. Indeed, if we took the
   # latest release, then an update in the parser or analyser could result in new

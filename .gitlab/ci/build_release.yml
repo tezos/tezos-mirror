@@ -31,7 +31,6 @@ docker:manual_build_amd64:
   variables:
     IMAGE_ARCH_PREFIX: "amd64_"
   stage: manual
-  interruptible: false
   needs: []
 
 docker:manual_build_arm64:
@@ -41,7 +40,6 @@ docker:manual_build_arm64:
   variables:
     IMAGE_ARCH_PREFIX: "arm64_"
   stage: manual
-  interruptible: false
   needs: []
   tags:
     - arm64
