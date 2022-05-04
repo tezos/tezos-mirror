@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -25,15 +26,13 @@
 
 open Protocol.Alpha_context
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/2793
-   add fee parameters values in the configuration. 
-*)
 type t = {
   data_dir : string;
   sc_rollup_address : Sc_rollup.t;
   sc_rollup_node_operator : Signature.Public_key_hash.t;
   rpc_addr : string;
   rpc_port : int;
+  fee_parameter : Injection.fee_parameter;
 }
 
 let default_data_dir =
@@ -68,15 +67,75 @@ let default_fee_cap =
 let default_burn_cap =
   match Tez.of_string "0" with None -> assert false | Some t -> t
 
-let default_fee_parameter : Injection.fee_parameter =
+let default_fee_parameter =
   {
-    minimal_fees = default_minimal_fees;
-    minimal_nanotez_per_gas_unit = default_minimal_nanotez_per_gas_unit;
+    Injection.minimal_fees = default_minimal_fees;
     minimal_nanotez_per_byte = default_minimal_nanotez_per_byte;
+    minimal_nanotez_per_gas_unit = default_minimal_nanotez_per_gas_unit;
     force_low_fee = default_force_low_fee;
     fee_cap = default_fee_cap;
     burn_cap = default_burn_cap;
   }
+
+let fee_parameter_encoding =
+  let open Data_encoding in
+  conv
+    (fun {
+           Injection.minimal_fees;
+           minimal_nanotez_per_byte;
+           minimal_nanotez_per_gas_unit;
+           force_low_fee;
+           fee_cap;
+           burn_cap;
+         } ->
+      ( minimal_fees,
+        minimal_nanotez_per_byte,
+        minimal_nanotez_per_gas_unit,
+        force_low_fee,
+        fee_cap,
+        burn_cap ))
+    (fun ( minimal_fees,
+           minimal_nanotez_per_byte,
+           minimal_nanotez_per_gas_unit,
+           force_low_fee,
+           fee_cap,
+           burn_cap ) ->
+      {
+        minimal_fees;
+        minimal_nanotez_per_byte;
+        minimal_nanotez_per_gas_unit;
+        force_low_fee;
+        fee_cap;
+        burn_cap;
+      })
+    (obj6
+       (dft
+          "minimal-fees"
+          ~description:"Exclude operations with lower fees"
+          Tez.encoding
+          default_minimal_fees)
+       (dft
+          "minimal-nanotez-per-byte"
+          ~description:"Exclude operations with lower fees per byte"
+          Plugin.Mempool.nanotez_enc
+          default_minimal_nanotez_per_byte)
+       (dft
+          "minimal-nanotez-per-gas-unit"
+          ~description:"Exclude operations with lower gas fees"
+          Plugin.Mempool.nanotez_enc
+          default_minimal_nanotez_per_gas_unit)
+       (dft
+          "force-low-fee"
+          ~description:
+            "Don't check that the fee is lower than the estimated default"
+          bool
+          default_force_low_fee)
+       (dft "fee-cap" ~description:"The fee cap" Tez.encoding default_fee_cap)
+       (dft
+          "burn-cap"
+          ~description:"The burn cap"
+          Tez.encoding
+          default_burn_cap))
 
 let encoding : t Data_encoding.t =
   let open Data_encoding in
@@ -87,15 +146,29 @@ let encoding : t Data_encoding.t =
            sc_rollup_node_operator;
            rpc_addr;
            rpc_port;
+           fee_parameter;
          } ->
-      (data_dir, sc_rollup_address, sc_rollup_node_operator, rpc_addr, rpc_port))
+      ( data_dir,
+        sc_rollup_address,
+        sc_rollup_node_operator,
+        rpc_addr,
+        rpc_port,
+        fee_parameter ))
     (fun ( data_dir,
            sc_rollup_address,
            sc_rollup_node_operator,
            rpc_addr,
-           rpc_port ) ->
-      {data_dir; sc_rollup_address; sc_rollup_node_operator; rpc_addr; rpc_port})
-    (obj5
+           rpc_port,
+           fee_parameter ) ->
+      {
+        data_dir;
+        sc_rollup_address;
+        sc_rollup_node_operator;
+        rpc_addr;
+        rpc_port;
+        fee_parameter;
+      })
+    (obj6
        (dft
           "data-dir"
           ~description:"Location of the data dir"
@@ -111,7 +184,12 @@ let encoding : t Data_encoding.t =
             "Public key hash of the Smart contract rollup node operator"
           Signature.Public_key_hash.encoding)
        (dft "rpc-addr" ~description:"RPC address" string default_rpc_addr)
-       (dft "rpc-port" ~description:"RPC port" int16 default_rpc_port))
+       (dft "rpc-port" ~description:"RPC port" int16 default_rpc_port)
+       (dft
+          "fee-parameter"
+          ~description:"The fee parameter used when injecting operations in L1"
+          fee_parameter_encoding
+          default_fee_parameter))
 
 let save config =
   let open Lwt_syntax in

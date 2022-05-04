@@ -259,6 +259,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
       let*! commitment = Store.Commitments.get store next_level_to_publish in
       let cctxt = node_ctxt.cctxt in
       let sc_rollup_address = node_ctxt.rollup_address in
+      let fee_parameter = node_ctxt.fee_parameter in
       let* (source, src_pk, src_sk) =
         Node_context.get_operator_keys node_ctxt
       in
@@ -272,7 +273,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
           ~rollup:sc_rollup_address
           ~src_pk
           ~src_sk
-          ~fee_parameter:Configuration.default_fee_parameter
+          ~fee_parameter
           ()
       in
       let open Apply_results in
