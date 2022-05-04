@@ -117,6 +117,10 @@ let setup_remote_signer (module C : M) client_config
     (module Tezos_signer_backends.Encrypted.Make (struct
       let cctxt = (client_config :> Client_context.io_wallet)
     end)) ;
+  Client_keys.register_aggregate_signer
+    (module Tezos_signer_backends.Encrypted.Make_aggregate (struct
+      let cctxt = (client_config :> Client_context.io_wallet)
+    end)) ;
   Client_keys.register_signer (module Tezos_signer_backends.Unencrypted) ;
   Client_keys.register_aggregate_signer
     (module Tezos_signer_backends.Unencrypted.Aggregate) ;

@@ -324,7 +324,7 @@ let aggregate_fail_if_already_registered cctxt force pk_uri name =
 module Bls_commands = struct
   open Lwt_result_syntax
 
-  let generate_keys ~force name (cctxt : #Client_context.io_wallet) =
+  let generate_keys ~force ~encrypted name (cctxt : #Client_context.io_wallet) =
     let* name = Aggregate_alias.Secret_key.of_fresh cctxt force name in
     let mnemonic = Mnemonic.new_random in
     let*! () =
@@ -340,7 +340,13 @@ module Bls_commands = struct
     let seed = Mnemonic.to_32_bytes mnemonic in
     let (pkh, pk, sk) = Aggregate_signature.generate_key ~seed () in
     let*? pk_uri = Tezos_signer_backends.Unencrypted.Aggregate.make_pk pk in
-    let*? sk_uri = Tezos_signer_backends.Unencrypted.Aggregate.make_sk sk in
+    let* sk_uri =
+      if encrypted then
+        Tezos_signer_backends.Encrypted.prompt_twice_and_encrypt_aggregate
+          cctxt
+          sk
+      else Tezos_signer_backends.Unencrypted.Aggregate.make_sk sk |> Lwt.return
+    in
     register_aggregate_key
       cctxt
       ~force
@@ -367,7 +373,7 @@ module Bls_commands = struct
         return_unit)
       aggregate_keys_list
 
-  let show_address name (cctxt : #Client_context.io_wallet) =
+  let show_address ~show_private name (cctxt : #Client_context.io_wallet) =
     let* keys_opt = alias_aggregate_keys cctxt name in
     match keys_opt with
     | None ->
@@ -386,12 +392,14 @@ module Bls_commands = struct
                 Aggregate_signature.Public_key.pp
                 pk
             in
-            Option.iter_es
-              (fun skloc ->
-                let* skloc = Aggregate_alias.Secret_key.to_source skloc in
-                let*! () = cctxt#message "Secret Key: %s" skloc in
-                return_unit)
-              skloc)
+            if show_private then
+              Option.iter_es
+                (fun skloc ->
+                  let* skloc = Aggregate_alias.Secret_key.to_source skloc in
+                  let*! () = cctxt#message "Secret Key: %s" skloc in
+                  return_unit)
+                skloc
+            else return_unit)
 
   let import_secret_key ~force name sk_uri (cctxt : #Client_context.io_wallet) =
     let* name = Aggregate_alias.Secret_key.of_fresh cctxt false name in
@@ -930,13 +938,29 @@ let commands network : Client_context.full Clic.command list =
           in
           let* () = PVSS_public_key.set cctxt [] in
           PVSS_secret_key.set cctxt []);
-      command
-        ~group
-        ~desc:"Generate a pair of BLS keys."
-        (args1 (Aggregate_alias.Secret_key.force_switch ()))
-        (prefixes ["bls"; "gen"; "keys"]
-        @@ Aggregate_alias.Secret_key.fresh_alias_param @@ stop)
-        (fun force name cctxt -> Bls_commands.generate_keys ~force name cctxt);
+      (let desc = "Generate a pair of BLS keys." in
+       let force_switch = Aggregate_alias.Secret_key.force_switch in
+       let cmd =
+         prefixes ["bls"; "gen"; "keys"]
+         @@ Aggregate_alias.Secret_key.fresh_alias_param @@ stop
+       in
+       match network with
+       | Some `Mainnet ->
+           command
+             ~group
+             ~desc
+             (args1 (force_switch ()))
+             cmd
+             (fun force name (cctxt : #Client_context.full) ->
+               Bls_commands.generate_keys ~force ~encrypted:true name cctxt)
+       | Some `Testnet | None ->
+           command
+             ~group
+             ~desc
+             (args2 (force_switch ()) (encrypted_switch ()))
+             cmd
+             (fun (force, encrypted) name (cctxt : #Client_context.full) ->
+               Bls_commands.generate_keys ~force ~encrypted name cctxt));
       command
         ~group
         ~desc:"List BlS keys."
@@ -946,11 +970,11 @@ let commands network : Client_context.full Clic.command list =
       command
         ~group
         ~desc:"Show the keys associated with an rollup account."
-        no_options
+        (args1 show_private_switch)
         (prefixes ["bls"; "show"; "address"]
         @@ Aggregate_alias.Public_key_hash.alias_param @@ stop)
-        (fun () (name, _pkh) (cctxt : #Client_context.full) ->
-          Bls_commands.show_address name cctxt);
+        (fun show_private (name, _pkh) (cctxt : #Client_context.full) ->
+          Bls_commands.show_address ~show_private name cctxt);
       command
         ~group
         ~desc:"Add a secret key to the wallet."

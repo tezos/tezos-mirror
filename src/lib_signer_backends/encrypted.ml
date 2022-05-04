@@ -32,9 +32,19 @@ type Base58.data += Encrypted_p256 of Bytes.t
 
 type Base58.data += Encrypted_secp256k1_element of Bytes.t
 
+type Base58.data += Encrypted_bls12_381 of Bytes.t
+
+type encrypted_sk = Encrypted_aggregate_sk | Encrypted_sk of Signature.algo
+
+type decrypted_sk =
+  | Decrypted_aggregate_sk of Aggregate_signature.Secret_key.t
+  | Decrypted_sk of Signature.Secret_key.t
+
 open Client_keys
 
 let scheme = "encrypted"
+
+let aggregate_scheme = "aggregate_encrypted"
 
 module Raw = struct
   (* https://tools.ietf.org/html/rfc2898#section-4.1 *)
@@ -53,12 +63,15 @@ module Raw = struct
     let salt = Hacl.Rand.gen salt_len in
     let key = Crypto_box.Secretbox.unsafe_of_bytes (pbkdf ~salt ~password) in
     let msg =
-      match (sk : Signature.secret_key) with
-      | Ed25519 sk ->
+      match (sk : decrypted_sk) with
+      | Decrypted_sk (Ed25519 sk) ->
           Data_encoding.Binary.to_bytes_exn Ed25519.Secret_key.encoding sk
-      | Secp256k1 sk ->
+      | Decrypted_sk (Secp256k1 sk) ->
           Data_encoding.Binary.to_bytes_exn Secp256k1.Secret_key.encoding sk
-      | P256 sk -> Data_encoding.Binary.to_bytes_exn P256.Secret_key.encoding sk
+      | Decrypted_sk (P256 sk) ->
+          Data_encoding.Binary.to_bytes_exn P256.Secret_key.encoding sk
+      | Decrypted_aggregate_sk (Bls12_381 sk) ->
+          Data_encoding.Binary.to_bytes_exn Bls.Secret_key.encoding sk
     in
     Bytes.cat salt (Crypto_box.Secretbox.secretbox key msg nonce)
 
@@ -79,32 +92,47 @@ module Raw = struct
       (Crypto_box.Secretbox.secretbox_open key encrypted_sk nonce, algo)
     with
     | (None, _) -> return_none
-    | (Some bytes, Signature.Ed25519) -> (
+    | (Some bytes, Encrypted_sk Signature.Ed25519) -> (
         match
           Data_encoding.Binary.of_bytes_opt Ed25519.Secret_key.encoding bytes
         with
-        | Some sk -> return_some (Ed25519 sk : Signature.Secret_key.t)
+        | Some sk ->
+            return_some (Decrypted_sk (Ed25519 sk : Signature.Secret_key.t))
         | None ->
             failwith
               "Corrupted wallet, deciphered key is not a valid Ed25519 secret \
                key")
-    | (Some bytes, Signature.Secp256k1) -> (
+    | (Some bytes, Encrypted_sk Signature.Secp256k1) -> (
         match
           Data_encoding.Binary.of_bytes_opt Secp256k1.Secret_key.encoding bytes
         with
-        | Some sk -> return_some (Secp256k1 sk : Signature.Secret_key.t)
+        | Some sk ->
+            return_some (Decrypted_sk (Secp256k1 sk : Signature.Secret_key.t))
         | None ->
             failwith
               "Corrupted wallet, deciphered key is not a valid Secp256k1 \
                secret key")
-    | (Some bytes, Signature.P256) -> (
+    | (Some bytes, Encrypted_sk Signature.P256) -> (
         match
           Data_encoding.Binary.of_bytes_opt P256.Secret_key.encoding bytes
         with
-        | Some sk -> return_some (P256 sk : Signature.Secret_key.t)
+        | Some sk ->
+            return_some (Decrypted_sk (P256 sk : Signature.Secret_key.t))
         | None ->
             failwith
               "Corrupted wallet, deciphered key is not a valid P256 secret key")
+    | (Some bytes, Encrypted_aggregate_sk) -> (
+        match
+          Data_encoding.Binary.of_bytes_opt Bls.Secret_key.encoding bytes
+        with
+        | Some sk ->
+            return_some
+              (Decrypted_aggregate_sk
+                 (Bls12_381 sk : Aggregate_signature.Secret_key.t))
+        | None ->
+            failwith
+              "Corrupted wallet, deciphered key is not a valid BLS12_381 \
+               secret key")
 end
 
 module Encodings = struct
@@ -139,6 +167,19 @@ module Encodings = struct
         if String.length buf <> length then None else Some (Bytes.of_string buf))
       ~wrap:(fun sk -> Encrypted_p256 sk)
 
+  let bls12_381 =
+    let length =
+      Bls12_381.Signature.sk_size_in_bytes + Crypto_box.tag_length
+      + Raw.salt_len
+    in
+    Base58.register_encoding
+      ~prefix:Base58.Prefix.bls12_381_encrypted_secret_key
+      ~length
+      ~to_raw:(fun sk -> Bytes.to_string sk)
+      ~of_raw:(fun buf ->
+        if String.length buf <> length then None else Some (Bytes.of_string buf))
+      ~wrap:(fun sk -> Encrypted_bls12_381 sk)
+
   let secp256k1_scalar =
     let length = 36 + Crypto_box.tag_length + Raw.salt_len in
     Base58.register_encoding
@@ -153,6 +194,7 @@ module Encodings = struct
     Base58.check_encoded_prefix ed25519 "edesk" 88 ;
     Base58.check_encoded_prefix secp256k1 "spesk" 88 ;
     Base58.check_encoded_prefix p256 "p2esk" 88 ;
+    Base58.check_encoded_prefix bls12_381 "BLesk" 88 ;
     Base58.check_encoded_prefix secp256k1_scalar "seesk" 93
 end
 
@@ -231,10 +273,13 @@ let decrypt_payload cctxt ?name encrypted_sk =
   let* (algo, encrypted_sk) =
     match Base58.decode encrypted_sk with
     | Some (Encrypted_ed25519 encrypted_sk) ->
-        return (Signature.Ed25519, encrypted_sk)
+        return (Encrypted_sk Signature.Ed25519, encrypted_sk)
     | Some (Encrypted_secp256k1 encrypted_sk) ->
-        return (Signature.Secp256k1, encrypted_sk)
-    | Some (Encrypted_p256 encrypted_sk) -> return (Signature.P256, encrypted_sk)
+        return (Encrypted_sk Signature.Secp256k1, encrypted_sk)
+    | Some (Encrypted_p256 encrypted_sk) ->
+        return (Encrypted_sk Signature.P256, encrypted_sk)
+    | Some (Encrypted_bls12_381 encrypted_sk) ->
+        return (Encrypted_aggregate_sk, encrypted_sk)
     | _ -> failwith "Not a Base58Check-encoded encrypted key"
   in
   let* o = noninteractive_decrypt_loop algo ~encrypted_sk !passwords in
@@ -244,14 +289,40 @@ let decrypt_payload cctxt ?name encrypted_sk =
       let retries_left = if cctxt#multiple_password_retries then 3 else 1 in
       interactive_decrypt_loop cctxt ?name ~retries_left ~encrypted_sk algo
 
-let internal_decrypt (cctxt : #Client_context.prompter) ?name sk_uri =
+let internal_decrypt_simple (cctxt : #Client_context.prompter) ?name sk_uri =
+  let open Lwt_result_syntax in
   let payload = Uri.path (sk_uri : sk_uri :> Uri.t) in
-  decrypt_payload cctxt ?name payload
+  let* decrypted_sk = decrypt_payload cctxt ?name payload in
+  match decrypted_sk with
+  | Decrypted_sk sk -> return sk
+  | Decrypted_aggregate_sk _sk ->
+      failwith
+        "Found an aggregate secret key where a non-aggregate one was expected."
+
+let internal_decrypt_aggregate (cctxt : #Client_context.prompter) ?name
+    aggregate_sk_uri =
+  let open Lwt_result_syntax in
+  let payload = Uri.path (aggregate_sk_uri : aggregate_sk_uri :> Uri.t) in
+  let* decrypted_sk = decrypt_payload cctxt ?name payload in
+  match decrypted_sk with
+  | Decrypted_aggregate_sk sk -> return sk
+  | Decrypted_sk _sk ->
+      failwith
+        "Found a non-aggregate secret key where an aggregate one was expected."
 
 let decrypt (cctxt : #Client_context.prompter) ?name sk_uri =
   let open Lwt_result_syntax in
   let* () = password_file_load cctxt in
-  internal_decrypt (cctxt : #Client_context.prompter) ?name sk_uri
+  internal_decrypt_simple (cctxt : #Client_context.prompter) ?name sk_uri
+
+let decrypt_aggregate (cctxt : #Client_context.prompter) ?name aggregate_sk_uri
+    =
+  let open Lwt_result_syntax in
+  let* () = password_file_load cctxt in
+  internal_decrypt_aggregate
+    (cctxt : #Client_context.prompter)
+    ?name
+    aggregate_sk_uri
 
 let decrypt_all (cctxt : #Client_context.io_wallet) =
   let open Lwt_result_syntax in
@@ -261,7 +332,7 @@ let decrypt_all (cctxt : #Client_context.io_wallet) =
     (fun (name, sk_uri) ->
       if Uri.scheme (sk_uri : sk_uri :> Uri.t) <> Some scheme then return_unit
       else
-        let* _ = internal_decrypt cctxt ~name sk_uri in
+        let* _ = internal_decrypt_simple cctxt ~name sk_uri in
         return_unit)
     sks
 
@@ -275,7 +346,7 @@ let decrypt_list (cctxt : #Client_context.io_wallet) keys =
         Uri.scheme (sk_uri : sk_uri :> Uri.t) = Some scheme
         && (keys = [] || List.mem ~equal:String.equal name keys)
       then
-        let* _ = internal_decrypt cctxt ~name sk_uri in
+        let* _ = internal_decrypt_simple cctxt ~name sk_uri in
         return_unit
       else return_unit)
     sks
@@ -291,23 +362,46 @@ let rec read_password (cctxt : #Client_context.io) =
     read_password cctxt
   else return password
 
-let encrypt sk password =
-  let open Lwt_result_syntax in
+let common_encrypt sk password =
   let payload = Raw.encrypt ~password sk in
   let encoding =
     match sk with
-    | Ed25519 _ -> Encodings.ed25519
-    | Secp256k1 _ -> Encodings.secp256k1
-    | P256 _ -> Encodings.p256
+    | Decrypted_sk (Ed25519 _) -> Encodings.ed25519
+    | Decrypted_sk (Secp256k1 _) -> Encodings.secp256k1
+    | Decrypted_sk (P256 _) -> Encodings.p256
+    | Decrypted_aggregate_sk (Bls12_381 _) -> Encodings.bls12_381
   in
-  let path = Base58.simple_encode encoding payload in
+  Base58.simple_encode encoding payload
+
+let internal_encrypt_simple sk password =
+  let open Lwt_result_syntax in
+  let path = common_encrypt sk password in
   let*? v = Client_keys.make_sk_uri (Uri.make ~scheme ~path ()) in
   return v
+
+let internal_encrypt_aggregate sk password =
+  let open Lwt_result_syntax in
+  let path = common_encrypt sk password in
+  let*? v =
+    Client_keys.make_aggregate_sk_uri
+      (Uri.make ~scheme:aggregate_scheme ~path ())
+  in
+  return v
+
+let encrypt sk password = internal_encrypt_simple (Decrypted_sk sk) password
+
+let encrypt_aggregate sk password =
+  internal_encrypt_aggregate (Decrypted_aggregate_sk sk) password
 
 let prompt_twice_and_encrypt cctxt sk =
   let open Lwt_result_syntax in
   let* password = read_password cctxt in
   encrypt sk password
+
+let prompt_twice_and_encrypt_aggregate cctxt sk =
+  let open Lwt_result_syntax in
+  let* password = read_password cctxt in
+  encrypt_aggregate sk password
 
 module Sapling_raw = struct
   let salt_len = 8
@@ -429,6 +523,46 @@ struct
     return (Signature.deterministic_nonce_hash sk buf)
 
   let supports_deterministic_nonces _ = Lwt_result_syntax.return_true
+end
+
+module Make_aggregate (C : sig
+  val cctxt : Client_context.io_wallet
+end) =
+struct
+  let scheme = "aggregate_encrypted"
+
+  let title = "Built-in signer using encrypted aggregate keys."
+
+  let description =
+    "Valid aggregate secret key URIs are of the form\n\
+    \ - aggregate_encrypted:<encrypted_aggregate_key>\n\
+     where <encrypted_key> is the encrypted (password protected using Nacl's \
+     cryptobox and pbkdf) secret key, formatted in unprefixed Base58.\n\
+     Valid aggregate public key URIs are of the form\n\
+    \ - aggregate_encrypted:<public_aggregate_key>\n\
+     where <public_aggregate_key> is the public key in Base58."
+
+  include Client_keys.Aggregate_type
+
+  let public_key = Unencrypted.Aggregate.public_key
+
+  let public_key_hash = Unencrypted.Aggregate.public_key_hash
+
+  let import_secret_key = Unencrypted.Aggregate.import_secret_key
+
+  let neuterize sk_uri =
+    let open Lwt_result_syntax in
+    let* sk = decrypt_aggregate C.cctxt sk_uri in
+    let*? v =
+      Unencrypted.Aggregate.make_pk
+        (Aggregate_signature.Secret_key.to_public_key sk)
+    in
+    return v
+
+  let sign sk_uri buf =
+    let open Lwt_result_syntax in
+    let* sk = decrypt_aggregate C.cctxt sk_uri in
+    return (Aggregate_signature.sign sk buf)
 end
 
 let encrypt_pvss_key cctxt sk =
