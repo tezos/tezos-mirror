@@ -44,6 +44,9 @@ let get_state_info_exn store =
   let*! state = Store.StateInfo.get store head in
   return state
 
+let commitment_with_hash commitment =
+  (Protocol.Alpha_context.Sc_rollup.Commitment.hash commitment, commitment)
+
 module Common = struct
   let register_current_num_messages store dir =
     RPC_directory.register0
@@ -163,7 +166,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
             (module Store.Last_stored_commitment_level)
             store
         in
-        return commitment)
+        return @@ Option.map commitment_with_hash commitment)
 
   let register_last_published_commitment store dir =
     RPC_directory.register0
@@ -176,7 +179,7 @@ module Make (PVM : Pvm.S) : S with module PVM = PVM = struct
             (module Store.Last_published_commitment_level)
             store
         in
-        return commitment)
+        return @@ Option.map commitment_with_hash commitment)
 
   let register_current_status store dir =
     RPC_directory.register0
