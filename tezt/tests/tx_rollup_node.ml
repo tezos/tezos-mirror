@@ -757,6 +757,13 @@ let craft_batch_for_one_tx ?counter tx_client ~qty ~signer ~dest ~ticket =
   | `Json _j -> assert false
   | `Hex _hex as batch -> return batch
 
+let inject_transfer ?counter tx_client ~source ~qty ~dest ~ticket =
+  Tx_rollup_client.transfer
+    ?counter
+    tx_client
+    ~source
+    {qty; destination = dest; ticket}
+
 let tx_client_get_block ~tx_client ~block =
   Tx_rollup_client.get_block ~block tx_client
 
@@ -2214,6 +2221,70 @@ let test_batcher_large_message =
       in
       unit)
 
+let test_transfer_command =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"TX_rollup: inject transaction with transfer command"
+    ~tags:["tx_rollup"; "client"; "transfer"]
+    (fun protocol ->
+      let* parameter_file = Parameters.parameter_file protocol in
+      let* (node, client) =
+        Client.init_with_protocol ~parameter_file `Client ~protocol ()
+      in
+      let originator = Constant.bootstrap1.public_key_hash in
+      let* (tx_rollup_hash, tx_node) =
+        init_and_run_rollup_node
+          ~originator
+          ~batch_signer:Constant.bootstrap5.public_key_hash
+          node
+          client
+      in
+      let tx_client =
+        Tx_rollup_client.create ~wallet_dir:(Client.base_dir client) tx_node
+      in
+      (* Generating some identities *)
+      let* bls_key_1 = Client.bls_gen_and_show_keys client in
+      let* bls_key_2 = Client.bls_gen_and_show_keys client in
+      let* (_level, _contract_id) =
+        make_deposit
+          ~source:Constant.bootstrap2.public_key_hash
+          ~tx_rollup_hash
+          ~tx_node
+          ~client
+          ~tickets_amount:10
+          bls_key_1.aggregate_public_key_hash
+      in
+      let* inbox = tx_client_get_inbox_as_json ~tx_client ~block:"head" in
+      let ticket_id = get_ticket_hash_from_deposit_json inbox in
+      let* _ =
+        inject_transfer
+          tx_client
+          ~source:bls_key_1.aggregate_alias
+          ~qty:1L
+          ~dest:bls_key_2.aggregate_alias
+          ~ticket:ticket_id
+      in
+      let* () = Client.bake_for_and_wait client in
+      let* () = Client.bake_for_and_wait client in
+      let* level = Client.level client in
+      let* _ = Rollup_node.wait_for_tezos_level tx_node level in
+      let* () =
+        check_tz4_balance
+          ~tx_client
+          ~block:"head"
+          ~ticket_id
+          ~tz4_address:bls_key_1.aggregate_public_key_hash
+          ~expected_balance:9
+      and* () =
+        check_tz4_balance
+          ~tx_client
+          ~block:"head"
+          ~ticket_id
+          ~tz4_address:bls_key_2.aggregate_public_key_hash
+          ~expected_balance:1
+      in
+      unit)
+
 let register ~protocols =
   test_node_configuration protocols ;
   test_tx_node_origination protocols ;
@@ -2228,4 +2299,5 @@ let register ~protocols =
   test_tickets_context protocols ;
   test_withdrawals protocols ;
   test_accuser protocols ;
-  test_batcher_large_message protocols
+  test_batcher_large_message protocols ;
+  test_transfer_command protocols

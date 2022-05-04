@@ -78,6 +78,13 @@ val sign_transaction :
   signers:string list ->
   string Lwt.t
 
+val transfer :
+  ?counter:int64 ->
+  t ->
+  source:string ->
+  Rollup.Tx_rollup.transfer_content ->
+  string Lwt.t
+
 val get_batcher_queue : t -> string Lwt.t
 
 val get_batcher_transaction : t -> transaction_hash:string -> string Lwt.t

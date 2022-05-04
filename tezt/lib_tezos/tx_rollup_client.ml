@@ -189,6 +189,18 @@ let craft_tx_batch ?(show_hex = false) tx_client ~transactions_and_sig =
   if show_hex then `Hex (String.trim out)
   else `Json (JSON.parse ~origin:"tx_rollup_client.craft_tx_batch" out)
 
+let transfer ?counter tx_client ~source
+    Rollup.Tx_rollup.{qty; destination; ticket} =
+  let qty = Int64.to_string qty in
+  let* out =
+    spawn_command
+      tx_client
+      (["transfer"; qty; "of"; ticket; "from"; source; "to"; destination]
+      @ optional_arg ~name:"counter" Int64.to_string counter)
+    |> Process.check_and_read_stdout
+  in
+  Lwt.return out
+
 let get_batcher_queue tx_client =
   let* out =
     spawn_command tx_client ["get"; "batcher"; "queue"]
