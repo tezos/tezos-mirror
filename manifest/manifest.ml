@@ -2076,7 +2076,8 @@ let generate_workspace env dune =
   Format.fprintf fmt "; This file was automatically generated, do not edit.@." ;
   Format.fprintf fmt "; Edit file manifest/manifest.ml instead.@."
 
-let check_for_non_generated_files ?(exclude = fun _ -> false) () =
+let check_for_non_generated_files ~remove_extra_files
+    ?(exclude = fun _ -> false) () =
   let rec find_opam_and_dune_files prefix acc dir =
     let dir_contents = Sys.readdir (prefix // dir) in
     let add_item acc filename =
@@ -2111,11 +2112,15 @@ let check_for_non_generated_files ?(exclude = fun _ -> false) () =
     String_set.diff all_non_excluded_files !generated_files
   in
   String_set.iter
-    (error "%s: exists but was not generated\n%!")
+    (fun file ->
+      if remove_extra_files then (
+        info "%s: exists but was not generated, removing it.\n%!" file ;
+        Sys.remove (Filename.concat ".." file))
+      else error "%s: exists but was not generated\n%!" file)
     error_not_generated ;
   if
     not
-      (String_set.is_empty error_not_generated
+      ((remove_extra_files || String_set.is_empty error_not_generated)
       && String_set.is_empty error_generated_and_excluded)
   then
     error
@@ -2189,11 +2194,12 @@ let check_js_of_ocaml () =
 
 let usage_msg = "Usage: " ^ Sys.executable_name ^ " [OPTIONS]"
 
-let (packages_dir, release) =
+let (packages_dir, release, remove_extra_files) =
   let packages_dir = ref "packages" in
   let url = ref "" in
   let sha256 = ref "" in
   let sha512 = ref "" in
+  let remove_extra_files = ref false in
   let version = ref "" in
   let anon_fun _args = () in
   let spec =
@@ -2209,6 +2215,9 @@ let (packages_dir, release) =
         ( "--release",
           Arg.Set_string version,
           "<VERSION> Generate opam files for release instead, for VERSION" );
+        ( "--remove-extra-files",
+          Arg.Set remove_extra_files,
+          " Remove files that are neither generated nor excluded" );
       ]
   in
   Arg.parse spec anon_fun usage_msg ;
@@ -2223,7 +2232,7 @@ let (packages_dir, release) =
     | (url, sha256, sha512, version) ->
         Some {version; url = {url; sha256; sha512}}
   in
-  (!packages_dir, release)
+  (!packages_dir, release, !remove_extra_files)
 
 let generate () =
   Printexc.record_backtrace true ;
@@ -2244,7 +2253,7 @@ let check ?exclude () =
   checks_done := true ;
   Printexc.record_backtrace true ;
   try
-    check_for_non_generated_files ?exclude () ;
+    check_for_non_generated_files ~remove_extra_files ?exclude () ;
     check_js_of_ocaml () ;
     if !has_error then exit 1
   with exn ->
