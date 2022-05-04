@@ -96,24 +96,30 @@ let pp_short ppf = function
   | Implicit pbk -> Signature.Public_key_hash.pp_short ppf pbk
   | Originated h -> Contract_hash.pp_short ppf h
 
+let implicit_case ~proj ~inj =
+  let open Data_encoding in
+  case (Tag 0) ~title:"Implicit" Signature.Public_key_hash.encoding proj inj
+
+let originated_case ~proj ~inj =
+  let open Data_encoding in
+  case
+    (Tag 1)
+    (Fixed.add_padding Contract_hash.encoding 1)
+    ~title:"Originated"
+    proj
+    inj
+
 let cases is_contract to_contract =
-  Data_encoding.
-    [
-      case
-        (Tag 0)
-        ~title:"Implicit"
-        Signature.Public_key_hash.encoding
-        (fun k ->
-          match is_contract k with Some (Implicit k) -> Some k | _ -> None)
-        (fun k -> to_contract (Implicit k));
-      case
-        (Tag 1)
-        (Fixed.add_padding Contract_hash.encoding 1)
-        ~title:"Originated"
-        (fun k ->
-          match is_contract k with Some (Originated k) -> Some k | _ -> None)
-        (fun k -> to_contract (Originated k));
-    ]
+  [
+    implicit_case
+      ~proj:(fun k ->
+        match is_contract k with Some (Implicit k) -> Some k | _ -> None)
+      ~inj:(fun k -> to_contract (Implicit k));
+    originated_case
+      ~proj:(fun k ->
+        match is_contract k with Some (Originated k) -> Some k | _ -> None)
+      ~inj:(fun k -> to_contract (Originated k));
+  ]
 
 let encoding =
   let open Data_encoding in
