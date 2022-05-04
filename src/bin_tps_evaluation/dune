@@ -14,7 +14,7 @@
   data-encoding
   lwt
   tezos-baking-alpha
-  tezos-client-alpha-commands
+  tezos-client-alpha.commands
   tezos-client-base-unix
   tezos-protocol-alpha
   tezt

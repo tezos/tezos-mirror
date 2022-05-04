@@ -12,7 +12,7 @@
   tezos-base
   tezos-protocol-013-PtJakart
   tezos-client-013-PtJakart
-  tezos-client-013-PtJakart-commands
+  tezos-client-013-PtJakart.commands
   tezos-client-base-unix
   tezos-stdlib-unix
   tezos-tx-rollup-013-PtJakart

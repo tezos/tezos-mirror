@@ -3,7 +3,7 @@
 
 (library
  (name tezos_client_sapling_013_PtJakart)
- (public_name tezos-client-sapling-013-PtJakart)
+ (public_name tezos-client-013-PtJakart.sapling)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base
@@ -12,7 +12,7 @@
   tezos-client-base
   tezos-signer-backends
   tezos-client-013-PtJakart
-  tezos-client-013-PtJakart-commands
+  tezos-client-013-PtJakart.commands
   tezos-protocol-013-PtJakart
   tezos-protocol-013-PtJakart.environment
   tezos-protocol-plugin-013-PtJakart)

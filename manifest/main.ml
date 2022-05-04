@@ -3716,10 +3716,8 @@ include Tezos_raw_protocol_%s.Main
     let client_commands =
       some_if (N.(number >= 001) && not_overridden) @@ fun () ->
       public_lib
-        (sf "tezos-client-%s-commands" name_dash)
+        (sf "tezos-client-%s.commands" name_dash)
         ~path:(path // "lib_client_commands")
-        ~synopsis:
-          "Tezos/Protocol: protocol-specific commands for `tezos-client`"
         ~deps:
           [
             tezos_base |> open_ ~m:"TzPervasives"
@@ -3746,9 +3744,9 @@ include Tezos_raw_protocol_%s.Main
     let client_sapling =
       some_if (N.(number >= 011) && not_overridden) @@ fun () ->
       public_lib
-        (sf "tezos-client-sapling-%s" name_dash)
+        (sf "tezos-client-%s.sapling" name_dash)
+        ~internal_name:(sf "tezos_client_sapling_%s" name_underscore)
         ~path:(path // "lib_client_sapling")
-        ~synopsis:"Tezos: sapling support for `tezos-client`"
         ~deps:
           [
             tezos_base |> open_ ~m:"TzPervasives"
@@ -3767,18 +3765,10 @@ include Tezos_raw_protocol_%s.Main
     in
     let client_commands_registration =
       some_if (N.(number >= 001) && not_overridden) @@ fun () ->
-      let is_sublib = N.(number <= 006) in
       public_lib
-        (if is_sublib then sf "tezos-client-%s-commands.registration" name_dash
-        else sf "tezos-client-%s-commands-registration" name_dash)
+        (sf "tezos-client-%s.commands-registration" name_dash)
         ~path:(path // "lib_client_commands")
-        ?opam:
-          ( some_if is_sublib @@ fun () ->
-            sf "tezos-client-%s-commands" name_dash )
-        ?synopsis:
-          (if is_sublib then None
-          else
-            Some "Tezos/Protocol: protocol-specific commands for `tezos-client`")
+        ~opam:(sf "tezos-client-%s" name_dash)
         ~deps:
           [
             tezos_base |> open_ ~m:"TzPervasives"

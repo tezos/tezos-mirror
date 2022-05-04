@@ -3,7 +3,7 @@
 
 (library
  (name tezos_client_011_PtHangz2_commands)
- (public_name tezos-client-011-PtHangz2-commands)
+ (public_name tezos-client-011-PtHangz2.commands)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base
@@ -38,7 +38,7 @@
 
 (library
  (name tezos_client_011_PtHangz2_commands_registration)
- (public_name tezos-client-011-PtHangz2-commands-registration)
+ (public_name tezos-client-011-PtHangz2.commands-registration)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base
@@ -48,8 +48,8 @@
   tezos-client-base
   tezos-client-011-PtHangz2
   tezos-client-commands
-  tezos-client-011-PtHangz2-commands
-  tezos-client-sapling-011-PtHangz2
+  tezos-client-011-PtHangz2.commands
+  tezos-client-011-PtHangz2.sapling
   tezos-rpc
   tezos-protocol-plugin-011-PtHangz2)
  (library_flags (:standard -linkall))

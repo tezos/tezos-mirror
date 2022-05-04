@@ -30,61 +30,61 @@
    (tezos-client-000-Ps9mPmXa -> void_for_linking-tezos-client-000-Ps9mPmXa.empty)
    (-> void_for_linking-tezos-client-000-Ps9mPmXa.empty))
   (select void_for_linking-tezos-client-001-PtCJ7pwo-commands-registration from
-   (tezos-client-001-PtCJ7pwo-commands.registration -> void_for_linking-tezos-client-001-PtCJ7pwo-commands-registration.empty)
+   (tezos-client-001-PtCJ7pwo.commands-registration -> void_for_linking-tezos-client-001-PtCJ7pwo-commands-registration.empty)
    (-> void_for_linking-tezos-client-001-PtCJ7pwo-commands-registration.empty))
   (select void_for_linking-tezos-client-002-PsYLVpVv-commands-registration from
-   (tezos-client-002-PsYLVpVv-commands.registration -> void_for_linking-tezos-client-002-PsYLVpVv-commands-registration.empty)
+   (tezos-client-002-PsYLVpVv.commands-registration -> void_for_linking-tezos-client-002-PsYLVpVv-commands-registration.empty)
    (-> void_for_linking-tezos-client-002-PsYLVpVv-commands-registration.empty))
   (select void_for_linking-tezos-client-003-PsddFKi3-commands-registration from
-   (tezos-client-003-PsddFKi3-commands.registration -> void_for_linking-tezos-client-003-PsddFKi3-commands-registration.empty)
+   (tezos-client-003-PsddFKi3.commands-registration -> void_for_linking-tezos-client-003-PsddFKi3-commands-registration.empty)
    (-> void_for_linking-tezos-client-003-PsddFKi3-commands-registration.empty))
   (select void_for_linking-tezos-client-004-Pt24m4xi-commands-registration from
-   (tezos-client-004-Pt24m4xi-commands.registration -> void_for_linking-tezos-client-004-Pt24m4xi-commands-registration.empty)
+   (tezos-client-004-Pt24m4xi.commands-registration -> void_for_linking-tezos-client-004-Pt24m4xi-commands-registration.empty)
    (-> void_for_linking-tezos-client-004-Pt24m4xi-commands-registration.empty))
   (select void_for_linking-tezos-client-005-PsBabyM1-commands-registration from
-   (tezos-client-005-PsBabyM1-commands.registration -> void_for_linking-tezos-client-005-PsBabyM1-commands-registration.empty)
+   (tezos-client-005-PsBabyM1.commands-registration -> void_for_linking-tezos-client-005-PsBabyM1-commands-registration.empty)
    (-> void_for_linking-tezos-client-005-PsBabyM1-commands-registration.empty))
   (select void_for_linking-tezos-client-006-PsCARTHA-commands-registration from
-   (tezos-client-006-PsCARTHA-commands.registration -> void_for_linking-tezos-client-006-PsCARTHA-commands-registration.empty)
+   (tezos-client-006-PsCARTHA.commands-registration -> void_for_linking-tezos-client-006-PsCARTHA-commands-registration.empty)
    (-> void_for_linking-tezos-client-006-PsCARTHA-commands-registration.empty))
   (select void_for_linking-tezos-client-007-PsDELPH1-commands-registration from
-   (tezos-client-007-PsDELPH1-commands-registration -> void_for_linking-tezos-client-007-PsDELPH1-commands-registration.empty)
+   (tezos-client-007-PsDELPH1.commands-registration -> void_for_linking-tezos-client-007-PsDELPH1-commands-registration.empty)
    (-> void_for_linking-tezos-client-007-PsDELPH1-commands-registration.empty))
   (select void_for_linking-tezos-protocol-plugin-007-PsDELPH1 from
    (tezos-protocol-plugin-007-PsDELPH1 -> void_for_linking-tezos-protocol-plugin-007-PsDELPH1.empty)
    (-> void_for_linking-tezos-protocol-plugin-007-PsDELPH1.empty))
   (select void_for_linking-tezos-client-008-PtEdo2Zk-commands-registration from
-   (tezos-client-008-PtEdo2Zk-commands-registration -> void_for_linking-tezos-client-008-PtEdo2Zk-commands-registration.empty)
+   (tezos-client-008-PtEdo2Zk.commands-registration -> void_for_linking-tezos-client-008-PtEdo2Zk-commands-registration.empty)
    (-> void_for_linking-tezos-client-008-PtEdo2Zk-commands-registration.empty))
   (select void_for_linking-tezos-protocol-plugin-008-PtEdo2Zk from
    (tezos-protocol-plugin-008-PtEdo2Zk -> void_for_linking-tezos-protocol-plugin-008-PtEdo2Zk.empty)
    (-> void_for_linking-tezos-protocol-plugin-008-PtEdo2Zk.empty))
   (select void_for_linking-tezos-client-009-PsFLoren-commands-registration from
-   (tezos-client-009-PsFLoren-commands-registration -> void_for_linking-tezos-client-009-PsFLoren-commands-registration.empty)
+   (tezos-client-009-PsFLoren.commands-registration -> void_for_linking-tezos-client-009-PsFLoren-commands-registration.empty)
    (-> void_for_linking-tezos-client-009-PsFLoren-commands-registration.empty))
   (select void_for_linking-tezos-protocol-plugin-009-PsFLoren from
    (tezos-protocol-plugin-009-PsFLoren -> void_for_linking-tezos-protocol-plugin-009-PsFLoren.empty)
    (-> void_for_linking-tezos-protocol-plugin-009-PsFLoren.empty))
   (select void_for_linking-tezos-client-010-PtGRANAD-commands-registration from
-   (tezos-client-010-PtGRANAD-commands-registration -> void_for_linking-tezos-client-010-PtGRANAD-commands-registration.empty)
+   (tezos-client-010-PtGRANAD.commands-registration -> void_for_linking-tezos-client-010-PtGRANAD-commands-registration.empty)
    (-> void_for_linking-tezos-client-010-PtGRANAD-commands-registration.empty))
   (select void_for_linking-tezos-protocol-plugin-010-PtGRANAD from
    (tezos-protocol-plugin-010-PtGRANAD -> void_for_linking-tezos-protocol-plugin-010-PtGRANAD.empty)
    (-> void_for_linking-tezos-protocol-plugin-010-PtGRANAD.empty))
   (select void_for_linking-tezos-client-011-PtHangz2-commands-registration from
-   (tezos-client-011-PtHangz2-commands-registration -> void_for_linking-tezos-client-011-PtHangz2-commands-registration.empty)
+   (tezos-client-011-PtHangz2.commands-registration -> void_for_linking-tezos-client-011-PtHangz2-commands-registration.empty)
    (-> void_for_linking-tezos-client-011-PtHangz2-commands-registration.empty))
   (select void_for_linking-tezos-protocol-plugin-011-PtHangz2 from
    (tezos-protocol-plugin-011-PtHangz2 -> void_for_linking-tezos-protocol-plugin-011-PtHangz2.empty)
    (-> void_for_linking-tezos-protocol-plugin-011-PtHangz2.empty))
-  tezos-client-012-Psithaca-commands-registration
+  tezos-client-012-Psithaca.commands-registration
   tezos-baking-012-Psithaca-commands.registration
   tezos-protocol-plugin-012-Psithaca
-  tezos-client-013-PtJakart-commands-registration
+  tezos-client-013-PtJakart.commands-registration
   tezos-baking-013-PtJakart-commands.registration
   tezos-protocol-plugin-013-PtJakart
   (select void_for_linking-tezos-client-alpha-commands-registration from
-   (tezos-client-alpha-commands-registration -> void_for_linking-tezos-client-alpha-commands-registration.empty)
+   (tezos-client-alpha.commands-registration -> void_for_linking-tezos-client-alpha-commands-registration.empty)
    (-> void_for_linking-tezos-client-alpha-commands-registration.empty))
   (select void_for_linking-tezos-baking-alpha-commands-registration from
    (tezos-baking-alpha-commands.registration -> void_for_linking-tezos-baking-alpha-commands-registration.empty)

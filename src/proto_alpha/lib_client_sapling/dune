@@ -3,7 +3,7 @@
 
 (library
  (name tezos_client_sapling_alpha)
- (public_name tezos-client-sapling-alpha)
+ (public_name tezos-client-alpha.sapling)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base
@@ -12,7 +12,7 @@
   tezos-client-base
   tezos-signer-backends
   tezos-client-alpha
-  tezos-client-alpha-commands
+  tezos-client-alpha.commands
   tezos-protocol-alpha
   tezos-protocol-alpha.environment
   tezos-protocol-plugin-alpha)
