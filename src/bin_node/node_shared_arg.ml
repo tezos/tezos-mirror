@@ -202,6 +202,11 @@ let wrap data_dir config_file network connections max_download_speed
     operation_metadata_size_limit;
   }
 
+let process_command run =
+  match Lwt_main.run @@ Lwt_exit.wrap_and_exit run with
+  | Ok () -> `Ok ()
+  | Error err -> `Error (false, Format.asprintf "%a" pp_print_trace err)
+
 module Manpage = struct
   let misc_section = "MISC OPTIONS"
 
@@ -346,7 +351,7 @@ module Term = struct
       "The directory where the Tezos node will store all its data. Parent \
        directories are created if necessary."
     in
-    let env = Arg.env_var Node_config_file.data_dir_env_name in
+    let env = Cmd.Env.info ~doc Node_config_file.data_dir_env_name in
     Arg.(
       value
       & opt (some string) None

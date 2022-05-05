@@ -47,7 +47,7 @@ let test_getpk ~display_addr () =
  * let test_getpk h curve =
  *   let pk = get_public_key h curve path in
  *   Alcotest.(check int "pklen"
- *               (if curve = Ed25519 then 33 else 65) (Cstruct.len pk))
+ *               (if curve = Ed25519 then 33 else 65) (Cstruct.length pk))
  * 
  * let test_getpk () =
  *   let h = Hidapi.open_id_exn ~vendor_id ~product_id in

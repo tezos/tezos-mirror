@@ -84,9 +84,9 @@ let test_sign_segwit () =
     Printf.printf "Got %d BCH signatures.\n%!" (List.length bch_signatures) ;
     let bchSig = List.hd bch_signatures in
     let scriptSig =
-      Bitcoin.Script.[Element.O (Op_pushdata (Cstruct.len bchSig));
+      Bitcoin.Script.[Element.O (Op_pushdata (Cstruct.length bchSig));
                       D bchSig ;
-                      O (Op_pushdata (Cstruct.len pk_compressed)) ;
+                      O (Op_pushdata (Cstruct.length pk_compressed)) ;
                       D pk_compressed ;
       ] in
     let nextTx_input = nextTx.inputs.(0) in

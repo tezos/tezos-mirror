@@ -99,7 +99,7 @@ let man = description @ Node_run_command.Manpage.examples
 
 let info =
   let version = Tezos_version.Bin_version.version_string in
-  Cmdliner.Term.info ~doc:"The Tezos node" ~man ~version "tezos-node"
+  Cmdliner.Cmd.info ~doc:"The Tezos node" ~man ~version "tezos-node"
 
 module Node_metrics_command = struct
   let dump_metrics () =
@@ -153,27 +153,30 @@ module Node_metrics_command = struct
     let man = description
 
     let info =
-      Cmdliner.Term.info
+      Cmdliner.Cmd.info
         ~doc:"Show all the openmetrics collected by the Tezos node"
         ~man
         "dump-metrics"
   end
 
-  let cmd = (Term.term, Manpage.info)
+  let cmd = Cmdliner.Cmd.v Manpage.info Term.term
 end
 
 let commands =
-  [
-    Node_run_command.cmd;
-    Node_replay_command.cmd;
-    Node_config_command.cmd;
-    Node_identity_command.cmd;
-    Node_upgrade_command.cmd;
-    Node_snapshot_command.cmd;
-    Node_reconstruct_command.cmd;
-    Node_storage_command.cmd;
-    Node_metrics_command.cmd;
-  ]
+  Cmdliner.Cmd.group
+    ~default:term
+    info
+    [
+      Node_run_command.cmd;
+      Node_replay_command.cmd;
+      Node_config_command.cmd;
+      Node_identity_command.cmd;
+      Node_upgrade_command.cmd;
+      Node_snapshot_command.cmd;
+      Node_reconstruct_command.cmd;
+      Node_storage_command.cmd;
+      Node_metrics_command.cmd;
+    ]
 
 (* This call is not strictly necessary as the parameters are initialized
    lazily the first time a Sapling operation (validation or forging) is
@@ -192,8 +195,4 @@ let () =
 
 let () =
   Random.self_init () ;
-  match Cmdliner.Term.eval_choice (term, info) commands with
-  | `Error _ -> exit 1
-  | `Help -> exit 0
-  | `Version -> exit 0
-  | `Ok () -> exit 0
+  exit (Cmdliner.Cmd.eval commands)

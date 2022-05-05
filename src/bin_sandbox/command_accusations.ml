@@ -981,6 +981,6 @@ let cmd () =
                `Blocks [pf "* $(b,`%s`): $(i,%s)." n tit; `Noblank; m]));
       ]
     in
-    info ~man ~doc "accusations"
+    Cmd.info ~man ~doc "accusations"
   in
-  (term, info)
+  Cmd.v info term
