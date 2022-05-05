@@ -113,7 +113,7 @@ check_scripts () {
     shellcheck_skips=""
     while read -r shellcheck_skip; do
       shellcheck_skips+=" $shellcheck_skip"
-    done < "src/tooling/shellcheck_skips"
+    done < "scripts/shellcheck_skips"
 
     for script in ${scripts}; do
         if [[ "${shellcheck_skips}" == *"${script}"* ]]; then

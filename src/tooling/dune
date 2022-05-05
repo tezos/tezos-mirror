@@ -8,11 +8,6 @@
  (libraries)
  (modules))
 
-(install
- (package tezos-tooling)
- (section libexec)
- (files (lint.sh as lint.sh)))
-
 (executable
  (name run_js_inline_tests)
  (libraries
