@@ -584,9 +584,9 @@ let make_transaction_to_tx_rollup (type t tc) ctxt ~destination ~amount
       assert false
 
 (* [transfer (ctxt, sc) gas tez parameters_ty parameters destination entrypoint]
-   creates an operation that transfers an amount of [tez] to
-   a contract determined by [(destination, entrypoint)]
-   instantiated with argument [parameters] of type [parameters_ty]. *)
+   creates an operation that transfers an amount of [tez] to a destination and
+   an entrypoint instantiated with argument [parameters] of type
+   [parameters_ty]. *)
 let transfer (ctxt, sc) gas amount location parameters_ty parameters
     (destination : Destination.t) entrypoint =
   let ctxt = update_context gas ctxt in
