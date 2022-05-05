@@ -3,6 +3,28 @@
 Changelog
 '''''''''
 
+Version 13.0
+============
+
+Node
+----
+
+- Fixed a bug that caused metrics to return wrong values for the
+  number of accepted points.
+
+- Added the ``jakartanet`` built-in network alias.
+  You can now configure your node with ``--network jakartanet`` to run the
+  Jakartanet test network.
+
+- Fixed a bug in the environment that could prevent checking BLS signatures.
+  This bug could affect transactional optimistic rollups (TORUs, introduced in Jakarta).
+
+Miscellaneous
+-------------
+
+- Fixed a bug that caused static executables to report the wrong
+  version number with ``--version``.
+
 Version 13.0~rc1
 ================
 
@@ -186,6 +208,12 @@ Miscellaneous
 
 - Removed delegates for protocol Hangzhou, since it was replaced by Ithaca
   as the active protocol on Mainnet.
+
+Version 12.4
+============
+
+- Fixed a memory leak in the baker and the accuser.
+  This is a backport of the fix introduced in version 13.0~rc1.
 
 Version 12.3
 ============
