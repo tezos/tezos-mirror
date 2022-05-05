@@ -1157,14 +1157,6 @@ let tezos_tooling =
            Disabled until compatible with ocaml 4.14 *)
         (* ometrics; *)
       ]
-    ~dune:
-      Dune.
-        [
-          install
-            [as_ "lint.sh" "lint.sh"]
-            ~package:"tezos-tooling"
-            ~section:"libexec";
-        ]
 
 let _tezos_tooling_js_inline_tests =
   test

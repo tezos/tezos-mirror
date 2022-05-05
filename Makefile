@@ -285,8 +285,8 @@ test: lint-opam-dune test-code
 .PHONY: check-linting check-python-linting
 
 check-linting:
-	@src/tooling/lint.sh --check-scripts
-	@src/tooling/lint.sh --check-ocamlformat
+	@scripts/lint.sh --check-scripts
+	@scripts/lint.sh --check-ocamlformat
 	@dune build --profile=$(PROFILE) @fmt
 
 check-python-linting:

@@ -78,7 +78,7 @@ linkcheck:
 
 .PHONY: redirectcheck
 redirectcheck:
-	@cd $$(pwd)/.. ; ./src/tooling/lint.sh --check-redirects
+	@cd $$(pwd)/.. ; ./scripts/lint.sh --check-redirects
 
 # xrefs should be checked:
 # - on the active protocol using its numeric name (not the "active" symlink)
