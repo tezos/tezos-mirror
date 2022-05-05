@@ -58,6 +58,7 @@ type t = {
   allow_deposit : bool;
   l2_blocks_cache_size : int;
   caps : caps;
+  transaction_burn_limit : Protocol.Alpha_context.Tez.t option;
 }
 
 let default_data_dir rollup_id =
@@ -275,27 +276,30 @@ let encoding =
            allow_deposit;
            l2_blocks_cache_size;
            caps;
+           transaction_burn_limit;
          } ->
-      ( Some data_dir,
-        rollup_id,
-        rollup_genesis,
-        rpc_addr,
-        reconnection_delay,
-        mode,
-        signers,
-        allow_deposit,
-        l2_blocks_cache_size,
-        caps ))
-    (fun ( data_dir_opt,
-           rollup_id,
-           rollup_genesis,
-           rpc_addr,
-           reconnection_delay,
-           mode,
-           signers,
-           allow_deposit,
-           l2_blocks_cache_size,
-           caps ) ->
+      ( ( Some data_dir,
+          rollup_id,
+          rollup_genesis,
+          rpc_addr,
+          reconnection_delay,
+          mode,
+          signers,
+          allow_deposit,
+          l2_blocks_cache_size,
+          caps ),
+        transaction_burn_limit ))
+    (fun ( ( data_dir_opt,
+             rollup_id,
+             rollup_genesis,
+             rpc_addr,
+             reconnection_delay,
+             mode,
+             signers,
+             allow_deposit,
+             l2_blocks_cache_size,
+             caps ),
+           transaction_burn_limit ) ->
       let data_dir =
         match data_dir_opt with
         | Some dir -> dir
@@ -312,53 +316,66 @@ let encoding =
         allow_deposit;
         l2_blocks_cache_size;
         caps;
+        transaction_burn_limit;
       })
-  @@ obj9
-       (opt
-          ~description:
-            "Location where the rollup node data (store, context, etc.) is \
-             stored"
-          "data_dir"
-          string)
-       (req
-          ~description:"Rollup id of the rollup to target"
-          "rollup_id"
-          Protocol.Alpha_context.Tx_rollup.encoding)
-       (opt
-          ~description:"Hash of the block where the rollup was created"
-          "origination_block"
-          Block_hash.encoding)
-       (dft
-          ~description:"RPC address on which the rollup node listens"
-          "rpc_addr"
-          P2p_point.Id.encoding
-          default_rpc_addr)
-       (dft
-          ~description:"The reconnection (to the tezos node) delay in seconds"
-          "reconnection_delay"
-          float
-          default_reconnection_delay)
-       (req ~description:"The mode for this rollup node" "mode" mode_encoding)
-       (req
-          ~description:"The signers for the various tx rollup operations"
-          "signers"
-          signers_encoding)
-       (dft
-          ~description:
-            "Allow the operator to make a first deposit for commitments"
-          "allow_deposit"
-          bool
-          false)
-       (dft
-          ~description:"The size of the L2 block cache in number of blocks"
-          "l2_blocks_cache_size"
-          int31
-          default_l2_blocks_cache_size)
-       (dft
-          ~description:"The cost caps for the injection of operations"
-          "caps"
-          caps_encoding
-          default_caps)
+  @@ merge_objs
+       (obj10
+          (opt
+             ~description:
+               "Location where the rollup node data (store, context, etc.) is \
+                stored"
+             "data_dir"
+             string)
+          (req
+             ~description:"Rollup id of the rollup to target"
+             "rollup_id"
+             Protocol.Alpha_context.Tx_rollup.encoding)
+          (opt
+             ~description:"Hash of the block where the rollup was created"
+             "origination_block"
+             Block_hash.encoding)
+          (dft
+             ~description:"RPC address on which the rollup node listens"
+             "rpc_addr"
+             P2p_point.Id.encoding
+             default_rpc_addr)
+          (dft
+             ~description:
+               "The reconnection (to the tezos node) delay in seconds"
+             "reconnection_delay"
+             float
+             default_reconnection_delay)
+          (req
+             ~description:"The mode for this rollup node"
+             "mode"
+             mode_encoding)
+          (req
+             ~description:"The signers for the various tx rollup operations"
+             "signers"
+             signers_encoding)
+          (dft
+             ~description:
+               "Allow the operator to make a first deposit for commitments"
+             "allow_deposit"
+             bool
+             false)
+          (dft
+             ~description:"The size of the L2 block cache in number of blocks"
+             "l2_blocks_cache_size"
+             int31
+             default_l2_blocks_cache_size)
+          (dft
+             ~description:"The cost caps for the injection of operations"
+             "caps"
+             caps_encoding
+             default_caps))
+       (obj1
+          (opt
+             ~description:
+               "The burn limit in for a single transaction (to be paid for the \
+                submission of messages in the protocol inbox)"
+             "transaction_burn_limit"
+             Tez.encoding))
 
 let get_configuration_filename data_dir =
   let filename = "config.json" in

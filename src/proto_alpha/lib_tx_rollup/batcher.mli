@@ -29,6 +29,7 @@ open Alpha_context
 val init :
   rollup:Tx_rollup.t ->
   signer:Signature.public_key_hash ->
+  transaction_burn_limit:Tez.t option ->
   Context.index ->
   Constants.t ->
   unit tzresult Lwt.t

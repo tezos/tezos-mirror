@@ -821,7 +821,15 @@ let rec connect ~delay cctxt =
 let run configuration cctxt =
   let open Lwt_result_syntax in
   let*! () = Event.(emit starting_node) () in
-  let {Node_config.signers; reconnection_delay; rollup_id; _} = configuration in
+  let {
+    Node_config.signers;
+    reconnection_delay;
+    rollup_id;
+    transaction_burn_limit;
+    _;
+  } =
+    configuration
+  in
   let* state = State.init cctxt configuration in
   let* () = check_operator_deposit state configuration in
   let* () =
@@ -850,6 +858,7 @@ let run configuration cctxt =
         Batcher.init
           ~rollup:rollup_id
           ~signer
+          ~transaction_burn_limit
           state.State.context_index
           state.State.constants)
       signers.submit_batch

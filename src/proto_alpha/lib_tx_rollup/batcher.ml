@@ -31,6 +31,7 @@ module Tx_queue = Hash_queue.Make (L2_transaction.Hash) (L2_transaction)
 type state = {
   rollup : Tx_rollup.t;
   constants : Constants.t;
+  transaction_burn_limit : Tez.t option;
   index : Context.index;
   signer : Signature.public_key_hash;
   transactions : Tx_queue.t;
@@ -51,15 +52,23 @@ let inject_batches state batches =
     List.map_e
       (fun batch ->
         let open Result_syntax in
+        let nb_transactions =
+          let (Tx_rollup_l2_batch.V1 {contents; _}) = batch in
+          List.length contents
+        in
+        let* burn_limit =
+          match state.transaction_burn_limit with
+          | None -> ok None
+          | Some limit ->
+              (Environment.wrap_tzresult
+              @@ Tez.(limit *? Int64.of_int nb_transactions))
+              |> Result.map Option.some
+        in
         let+ batch_content = encode_batch batch in
         let manager_operation =
           Manager
             (Tx_rollup_submit_batch
-               {
-                 tx_rollup = state.rollup;
-                 content = batch_content;
-                 burn_limit = None;
-               })
+               {tx_rollup = state.rollup; content = batch_content; burn_limit})
         in
         {
           L1_operation.hash =
@@ -253,7 +262,7 @@ let on_new_head state head =
      Flush and reapply queue *)
   state.incr_context <- context
 
-let init_batcher_state ~rollup ~signer index constants =
+let init_batcher_state ~rollup ~signer ~transaction_burn_limit index constants =
   let open Lwt_syntax in
   let+ incr_context = Context.init_context index in
   {
@@ -261,6 +270,7 @@ let init_batcher_state ~rollup ~signer index constants =
     index;
     signer;
     constants;
+    transaction_burn_limit;
     transactions = Tx_queue.create 500_000;
     incr_context;
     lock = Lwt_mutex.create ();
@@ -273,6 +283,7 @@ module Types = struct
     signer : Signature.public_key_hash;
     index : Context.index;
     constants : Constants.t;
+    transaction_burn_limit : Tez.t option;
   }
 end
 
@@ -296,9 +307,12 @@ module Handlers = struct
 
   let on_request w r = protect @@ fun () -> on_request w r
 
-  let on_launch _w rollup Types.{signer; index; constants} =
+  let on_launch _w rollup
+      Types.{signer; index; constants; transaction_burn_limit} =
     let open Lwt_result_syntax in
-    let*! state = init_batcher_state ~rollup ~signer index constants in
+    let*! state =
+      init_batcher_state ~rollup ~signer ~transaction_burn_limit index constants
+    in
     return state
 
   let on_error _w r st errs =
@@ -322,10 +336,14 @@ let table = Worker.create_table Queue
 
 let (worker_promise, worker_waker) = Lwt.task ()
 
-let init ~rollup ~signer index constants =
+let init ~rollup ~signer ~transaction_burn_limit index constants =
   let open Lwt_result_syntax in
   let+ worker =
-    Worker.launch table rollup {signer; index; constants} (module Handlers)
+    Worker.launch
+      table
+      rollup
+      {signer; index; constants; transaction_burn_limit}
+      (module Handlers)
   in
   Lwt.wakeup worker_waker worker
 

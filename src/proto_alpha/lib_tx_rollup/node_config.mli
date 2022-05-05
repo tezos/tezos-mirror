@@ -70,6 +70,7 @@ type t = {
   allow_deposit : bool;
   l2_blocks_cache_size : int;
   caps : caps;
+  transaction_burn_limit : Protocol.Alpha_context.Tez.t option;
 }
 
 (** [default_data_dir] is the default value for [data_dir]. *)
