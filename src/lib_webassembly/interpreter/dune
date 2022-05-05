@@ -1,26 +1,9 @@
 (include_subdirs unqualified)
 
 (library
- (name wasm)
- ; The 'main' module shall not be part of the library, as it would start the
- ; WASM REPL every time in all the dependencies.
- ; We also need to exclude the 'wasm' module as it overlaps with the library
- ; name.
- (modules :standard \ main wasm))
-
-(executable
- (name main)
- (modules main)
- (libraries wasm)
- (flags
-  (-open Wasm)))
-
-(executable
- (name main)
- (modules main)
- (libraries wasm-interpreter-lib)
- (flags
-  (-open Wasm_interpreter_lib)))
+ (name tezos_webassembly_interpreter)
+ (public_name tezos-webassembly-interpreter)
+ (modules :standard \ main))
 
 (subdir
  text
