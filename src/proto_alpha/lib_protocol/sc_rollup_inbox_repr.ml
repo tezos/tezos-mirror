@@ -142,7 +142,7 @@ let pp_history_proof fmt cell =
    level, this archival process is applied until we reach the current
    level using an empty [current_messages]. See {!MakeHashingScheme.archive}
    for details.
-   
+
    The [current_messages_hash] is either:
    - the hash of 'empty bytes' when there are no current messages ;
    - the root hash of the tree, where the contents of each message sit at the
@@ -350,12 +350,14 @@ module MakeHashingScheme (Tree : TREE) :
   type message = tree
 
   let add_message inbox payload messages =
+    let open Lwt_syntax in
     let message_index = inbox.message_counter in
     let message_counter = Z.succ inbox.message_counter in
     let key = key_of_message message_index in
     let nb_available_messages = Int64.succ inbox.nb_available_messages in
-    Tree.(add messages [key; "payload"] (Bytes.of_string payload))
-    >>= fun messages ->
+    let* messages =
+      Tree.(add messages [key; "payload"] (Bytes.of_string payload))
+    in
     let inbox = {inbox with message_counter; nb_available_messages} in
     Lwt.return (messages, inbox)
 
@@ -488,25 +490,30 @@ module MakeHashingScheme (Tree : TREE) :
     aux (history, inbox)
 
   let add_messages history inbox level payloads messages =
+    let open Lwt_tzresult_syntax in
     if Raw_level_repr.(level < inbox.level) then
       fail (Invalid_level_add_messages level)
     else
       let history, inbox = archive_if_needed history inbox level in
-      List.fold_left_es
-        (fun (messages, inbox) payload ->
-          add_message inbox payload messages >>= return)
-        (messages, inbox)
-        payloads
-      >>=? fun (messages, inbox) ->
+      let* messages, inbox =
+        List.fold_left_es
+          (fun (messages, inbox) payload ->
+            add_message inbox payload messages >>= return)
+          (messages, inbox)
+          payloads
+      in
       let current_messages_hash () =
         if Tree.is_empty messages then no_messages_hash else Tree.hash messages
       in
       return (messages, history, {inbox with current_messages_hash})
 
   let add_messages_no_history inbox level payloads messages =
+    let open Lwt_tzresult_syntax in
     let history = history_at_genesis ~bound:0L in
-    add_messages history inbox level payloads messages
-    >>=? fun (messages, _, inbox) -> return (messages, inbox)
+    let* messages, _, inbox =
+      add_messages history inbox level payloads messages
+    in
+    return (messages, inbox)
 
   (* An [inclusion_proof] is a path in the Merkelized skip list
      showing that a given inbox history is a prefix of another one.
