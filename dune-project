@@ -55,6 +55,7 @@
 (package (name tezos-client-genesis))
 (package (name tezos-codec))
 (package (name tezos-context))
+(package (name tezos-context-ops))
 (package (name tezos-crypto))
 (package (name tezos-embedded-protocol-000-Ps9mPmXa))
 (package (name tezos-embedded-protocol-001-PtCJ7pwo))

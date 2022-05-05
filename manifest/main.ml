@@ -1796,6 +1796,21 @@ let _tezos_protocol_environment_tests =
         lwt_unix;
       ]
 
+let tezos_context_ops =
+  public_lib
+    "tezos-context-ops"
+    ~path:"src/lib_protocol_environment"
+    ~synopsis:"Tezos: backend-agnostic operations on constexts"
+    ~deps:
+      [
+        tezos_base |> open_ ~m:"TzPervasives";
+        tezos_error_monad |> open_;
+        tezos_protocol_environment;
+        tezos_context |> open_;
+        tezos_shell_context |> open_;
+      ]
+    ~modules:["Context_ops"]
+
 let _tezos_protocol_shell_context_tests =
   tests
     ["test_proxy_context"]
@@ -3846,6 +3861,7 @@ include Tezos_raw_protocol_%s.Main
             tezos_context |> open_;
             tezos_context_memory |> if_ N.(number >= 012);
             tezos_rpc_http_client_unix |> if_ N.(number >= 011);
+            tezos_context_ops |> if_ N.(number >= 011) |> open_;
             tezos_rpc |> open_;
             tezos_rpc_http |> open_;
             lwt_canceler;

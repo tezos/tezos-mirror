@@ -571,6 +571,13 @@ opam:tezos-context:
   variables:
     package: tezos-context
 
+opam:tezos-context-ops:
+  extends:
+    - .opam_template
+    - .rules_template__trigger_opam_batch_4
+  variables:
+    package: tezos-context-ops
+
 opam:tezos-crypto:
   extends:
     - .opam_template
@@ -903,7 +910,7 @@ opam:tezos-protocol-006-PsCARTHA:
 opam:tezos-protocol-007-PsDELPH1:
   extends:
     - .opam_template
-    - .rules_template__trigger_opam_batch_4
+    - .rules_template__trigger_opam_batch_5
   variables:
     package: tezos-protocol-007-PsDELPH1
 
