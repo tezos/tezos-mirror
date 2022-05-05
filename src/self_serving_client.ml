@@ -144,7 +144,7 @@ module Make (Encoding : Resto.ENCODING) (Log : Server.LOGGING) = struct
     end : Client.CALL)
 
   let launch ?(cors = Cors.default) ?(agent = Server.Agent.default_agent)
-      ?(acl = Acl.Allow_all {except = []}) ~media_types root =
+      ?(acl = Acl.Allow_all {except = []}) ?middleware:_ ~media_types root =
     let default_media_type = Server.Media.default_media_type media_types in
     let medias : Server.Media.medias = {media_types; default_media_type} in
     create {root; cors; medias; agent; acl}

@@ -42,10 +42,12 @@
 module Make
     (Encoding : Resto.ENCODING)
     (Log : Resto_cohttp_server.Server.LOGGING) : sig
+  (** The [middleware] parameter is ignored. *)
   val launch :
     ?cors:Cors.t ->
     ?agent:string ->
     ?acl:Acl.t ->
+    ?middleware:Resto_cohttp_server.Server.middleware ->
     media_types:Media_type.Make(Encoding).t list ->
     unit Resto_directory.Make(Encoding).directory ->
     (module Client.CALL)

@@ -27,6 +27,26 @@
 open Lwt.Infix
 module ConnectionMap = Map.Make (Cohttp.Connection)
 
+(** A callback passed to [Cohttp_lwt_unix.Server.make_response_action],
+     which can be transformed by a [middleware].
+  *)
+type callback =
+  Cohttp_lwt_unix.Server.conn ->
+  Cohttp.Request.t ->
+  Cohttp_lwt.Body.t ->
+  Cohttp_lwt_unix.Server.response_action Lwt.t
+
+(** A middleware that wraps the operation of a [Cohttp] server.
+
+    We implement this idea as a transformer for the request -> response callback,
+    which lets the middleware modify the arguments passed to the callback, run it,
+    and then postprocess the response.
+
+    Middleware can be passed to [Make.launch] as an optional argument. For most
+    use-cases, this functionality will not be required.
+    *)
+type middleware = {transform_callback : callback -> callback}
+
 let ( >>? ) v f = match v with Ok x -> f x | Error err -> Lwt.return_error err
 
 let lwt_return_ok_response r = Lwt.return_ok (`Response r)
@@ -465,7 +485,7 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
 
   let launch ?(host = "::") ?(cors = Cors.default)
       ?(agent = Agent.default_agent) ?(acl = Acl.Allow_all {except = []})
-      ~media_types mode root =
+      ?middleware ~media_types mode root =
     let default_media_type = Media.default_media_type media_types in
     let stop, stopper = Lwt.wait () in
     let medias : Media.medias = {media_types; default_media_type} in
@@ -519,12 +539,20 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
                  in
                  lwt_return_response (Response.make ~status ~headers (), body))
        in
+       let modified_callback =
+         match middleware with
+         | None -> callback
+         | Some {transform_callback} -> transform_callback callback
+       in
        Cohttp_lwt_unix.Server.create
          ~stop
          ~ctx
          ~mode
          ~on_exn
-         (Cohttp_lwt_unix.Server.make_response_action ~callback ~conn_closed ())) ;
+         (Cohttp_lwt_unix.Server.make_response_action
+            ~callback:modified_callback
+            ~conn_closed
+            ())) ;
     Log.lwt_log_info "Server started (agent: %s)" server.agent >>= fun () ->
     Lwt.return server
 

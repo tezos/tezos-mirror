@@ -26,6 +26,27 @@
 
 (** Serving a directory of registered services. *)
 
+(** A callback passed to [Cohttp_lwt_unix.Server.make_response_action].
+    This type is used to define the {!middleware} type.
+  *)
+type callback =
+  Cohttp_lwt_unix.Server.conn ->
+  Cohttp.Request.t ->
+  Cohttp_lwt.Body.t ->
+  Cohttp_lwt_unix.Server.response_action Lwt.t
+
+(** A middleware function that wraps the operation of the [Cohttp] server that
+    Resto builds, adding pieces of extra functionality on top of it at a low
+    level when they cannot be implemented within the public Resto API.
+
+    We define a middleware as a transformer for the request -> response {!callback},
+    which lets the middleware modify the arguments passed to the callback, run it,
+    and then postprocess the response.
+
+    To use a middleware function, pass it to [Make.launch].
+  *)
+type middleware = {transform_callback : callback -> callback}
+
 module type LOGGING = sig
   val debug : ('a, Format.formatter, unit, unit) format4 -> 'a
 
@@ -66,6 +87,7 @@ module Make (Encoding : Resto.ENCODING) (Log : LOGGING) : sig
     ?cors:Cors.t ->
     ?agent:string ->
     ?acl:Acl.t ->
+    ?middleware:middleware ->
     media_types:Media_type.t list ->
     Conduit_lwt_unix.server ->
     unit Directory.t ->
