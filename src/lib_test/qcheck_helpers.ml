@@ -47,6 +47,28 @@ let qcheck_eq ?pp ?cmp ?eq expected actual =
           pp
           actual
 
+let qcheck_neq ?pp ?cmp ?eq left right =
+  let pass =
+    match (eq, cmp) with
+    | (Some eq, _) -> eq left right
+    | (None, Some cmp) -> cmp left right = 0
+    | (None, None) -> Stdlib.compare left right = 0
+  in
+  if not pass then true
+  else
+    match pp with
+    | None ->
+        QCheck.Test.fail_reportf
+          "@[<h 0>Values are unexpectedly equal, but no pretty printer was \
+           provided.@]"
+    | Some pp ->
+        QCheck.Test.fail_reportf
+          "@[<v 2>Inequality check failed!@,left:@,%a@,right:@,%a@]"
+          pp
+          left
+          pp
+          right
+
 let qcheck_eq_tests ~eq ~arb ~eq_name =
   let reflexivity_test =
     QCheck.Test.make

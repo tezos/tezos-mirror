@@ -140,6 +140,9 @@ module Internal_for_tests : sig
   (** Returns the {!Operation.t} underlying an {!operation} *)
   val to_raw : _ operation -> Operation.t
 
+  (** The hash of an {!operation} *)
+  val hash_of : _ operation -> Operation_hash.t
+
   (** A constructor for the [operation] datatype. It by-passes the
       checks done by the [parse] function. *)
   val make_operation : Operation.t -> Operation_hash.t -> 'a -> 'a operation
