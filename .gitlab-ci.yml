@@ -1,6 +1,8 @@
 ---
 
 # General setup
+default:
+  interruptible: true
 
 # Basic configuration to guard against double-pipelines
 workflow:

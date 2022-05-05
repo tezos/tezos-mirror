@@ -14,9 +14,9 @@ variables:
 
 # Basic, specialised, minimal, orthogonal templates
 
-# Some settings we want by default on all jobs
+# Some settings we want by default on all jobs that cannot be set
+# through the key `default` in `.gitlab-ci.yml`.
 .default_settings_template:
-  interruptible: true
   # `dependencies` are empty be default. Each individual job or
   # template requiring artifacts from preceeding jobs should declare
   # their dependencies locally.

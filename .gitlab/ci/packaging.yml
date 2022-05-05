@@ -13,6 +13,11 @@ opam:create_pipeline:
 
 opam:trigger:
   extends:
+    # Jobs with the field `trigger` cannot set the field
+    # dependencies. Therefore, we do not extend
+    # `default_settings_template` here (as it sets this field). Care
+    # must be taken to ensure that this job otherwise follows the
+    # defaults when applicable.
     - .rules_template__trigger_opam_pipeline
   stage: packaging
   needs:
